@@ -2,5 +2,8 @@
 
 namespace hipsi
 {
+	namespace tools
+	{
 
+	}
 }
