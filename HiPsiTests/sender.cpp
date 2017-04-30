@@ -5,7 +5,7 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 namespace HiPsiTests
 {		
-	TEST_CLASS(UnitTest1)
+	TEST_CLASS(SenderTests)
 	{
 	public:
 		
