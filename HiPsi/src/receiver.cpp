@@ -4,5 +4,8 @@ using namespace std;
 
 namespace hipsi
 {
+	namespace receiver
+	{
 
+	}
 }
