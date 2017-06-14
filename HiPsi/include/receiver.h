@@ -1,6 +1,6 @@
 #pragma once
 
-namespace hipsi
+namespace apsi
 {
 	namespace receiver
 	{

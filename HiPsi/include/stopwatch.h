@@ -6,7 +6,7 @@
 #include <chrono>
 #include <ostream>
 
-namespace hipsi
+namespace apsi
 {
 	namespace tools
 	{

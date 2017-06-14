@@ -3,7 +3,7 @@
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
-namespace HiPsiTests
+namespace APSITests
 {
 	TEST_CLASS(ReceiverTests)
 	{

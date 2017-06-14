@@ -4,7 +4,7 @@
 #include <ostream>
 #include <mutex>
 
-namespace hipsi
+namespace apsi
 {
 	namespace tools
 	{
