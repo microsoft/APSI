@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\hipsi.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="include\sender.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -31,6 +28,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\clp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\apsi.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
