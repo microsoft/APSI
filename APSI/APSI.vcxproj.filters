@@ -13,42 +13,129 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\Network">
+      <UniqueIdentifier>{a5768c81-a58e-40f8-9044-42d1daaf06e0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Network">
+      <UniqueIdentifier>{ebe78ba2-c8a6-4a56-b675-4dff56e07513}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Receiver">
+      <UniqueIdentifier>{697b477a-1b7c-4938-b7ae-210a0d923639}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Sender">
+      <UniqueIdentifier>{60858af7-f52f-4e2a-9c74-1ff8bfe40139}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Tools">
+      <UniqueIdentifier>{4e09fc83-bf22-4d8e-a677-9dd606cfdcc6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Sender">
+      <UniqueIdentifier>{06290153-ce5f-47b0-b510-00bc5ed85904}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Receiver">
+      <UniqueIdentifier>{e42be588-5cca-4442-b14a-226e5429bcac}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Tools">
+      <UniqueIdentifier>{80709ccd-a2db-4ce3-bde5-b623d092770d}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\sender.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\receiver.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\log.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\stopwatch.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\clp.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="include\apsi.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\Network\array_view.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Network\boost_acceptor.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Network\boost_channel.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Network\boost_endpoint.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Network\boost_ioservice.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Network\boost_socket.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Network\byte_stream.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Network\channel.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Network\concurrent_queue.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Network\endpoint.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Network\local_channel.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Network\local_endpoint.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Receiver\receiver.h">
+      <Filter>Header Files\Receiver</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Sender\sender.h">
+      <Filter>Header Files\Sender</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Tools\clp.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Tools\log.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Tools\stopwatch.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="include\defines.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\receiver.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="src\Network\boost_acceptor.cpp">
+      <Filter>Source Files\Network</Filter>
     </ClCompile>
-    <ClCompile Include="src\sender.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="src\Network\boost_channel.cpp">
+      <Filter>Source Files\Network</Filter>
     </ClCompile>
-    <ClCompile Include="src\stopwatch.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="src\Network\boost_endpoint.cpp">
+      <Filter>Source Files\Network</Filter>
     </ClCompile>
-    <ClCompile Include="src\log.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="src\Network\boost_ioservice.cpp">
+      <Filter>Source Files\Network</Filter>
     </ClCompile>
-    <ClCompile Include="src\clp.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="src\Network\byte_stream.cpp">
+      <Filter>Source Files\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Network\channel.cpp">
+      <Filter>Source Files\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Network\local_channel.cpp">
+      <Filter>Source Files\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Network\local_endpoint.cpp">
+      <Filter>Source Files\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Receiver\receiver.cpp">
+      <Filter>Source Files\Receiver</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Sender\sender.cpp">
+      <Filter>Source Files\Sender</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Tools\clp.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Tools\log.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Tools\stopwatch.cpp">
+      <Filter>Source Files\Tools</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
