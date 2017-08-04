@@ -13,12 +13,6 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Header Files\Network">
-      <UniqueIdentifier>{a5768c81-a58e-40f8-9044-42d1daaf06e0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Network">
-      <UniqueIdentifier>{ebe78ba2-c8a6-4a56-b675-4dff56e07513}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\Receiver">
       <UniqueIdentifier>{697b477a-1b7c-4938-b7ae-210a0d923639}</UniqueIdentifier>
     </Filter>
@@ -42,42 +36,6 @@
     <ClInclude Include="include\apsi.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Network\array_view.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\boost_acceptor.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\boost_channel.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\boost_endpoint.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\boost_ioservice.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\boost_socket.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\byte_stream.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\channel.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\concurrent_queue.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\endpoint.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\local_channel.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\local_endpoint.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
     <ClInclude Include="include\Receiver\receiver.h">
       <Filter>Header Files\Receiver</Filter>
     </ClInclude>
@@ -93,35 +51,23 @@
     <ClInclude Include="include\Tools\stopwatch.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
-    <ClInclude Include="include\defines.h">
+    <ClInclude Include="include\item.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\psiparams.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Sender\senderdb.h">
+      <Filter>Header Files\Sender</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Sender\senderthreadcontext.h">
+      <Filter>Header Files\Sender</Filter>
+    </ClInclude>
+    <ClInclude Include="include\apsidefines.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\Network\boost_acceptor.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Network\boost_channel.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Network\boost_endpoint.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Network\boost_ioservice.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Network\byte_stream.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Network\channel.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Network\local_channel.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Network\local_endpoint.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
     <ClCompile Include="src\Receiver\receiver.cpp">
       <Filter>Source Files\Receiver</Filter>
     </ClCompile>
@@ -136,6 +82,18 @@
     </ClCompile>
     <ClCompile Include="src\Tools\stopwatch.cpp">
       <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="item.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="psiparams.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Sender\senderdb.cpp">
+      <Filter>Source Files\Sender</Filter>
+    </ClCompile>
+    <ClCompile Include="src\apsidefines.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

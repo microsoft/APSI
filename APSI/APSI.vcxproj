@@ -87,13 +87,13 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>include;C:\libs\boost;C:\Users\kilai\Documents\Visual Studio 2017\Projects\Cuckoo\Cuckoo\include;C:\Users\kilai\Documents\Visual Studio 2017\Projects\SEAL\SEAL;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;$(BOOST_ROOT);..\..\Cuckoo\Cuckoo\include;..\..\SEAL\SEAL;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Lib>
       <AdditionalDependencies>SEAL.lib; Cuckoo.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>C:\Users\kilai\Documents\Visual Studio 2017\Projects\Cuckoo\bin\$(Configuration);C:\Users\kilai\Documents\Visual Studio 2017\Projects\SEAL\bin\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\Cuckoo\bin\$(Configuration);..\..\SEAL\bin\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -116,7 +116,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>include;C:\libs\boost;C:\Users\kilai\Documents\Visual Studio 2017\Projects\Cuckoo\Cuckoo\include;C:\Users\kilai\Documents\Visual Studio 2017\Projects\SEAL\SEAL;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;$(BOOST_ROOT);..\..\Cuckoo\Cuckoo\include;..\..\SEAL\SEAL;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -126,41 +126,29 @@
       <AdditionalDependencies>SEAL.lib; Cuckoo.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>C:\Users\kilai\Documents\Visual Studio 2017\Projects\Cuckoo\bin\$(Configuration);C:\Users\kilai\Documents\Visual Studio 2017\Projects\SEAL\bin\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\Cuckoo\bin\$(Configuration);..\..\SEAL\bin\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="include\apsi.h" />
-    <ClInclude Include="include\defines.h" />
-    <ClInclude Include="include\Network\array_view.h" />
-    <ClInclude Include="include\Network\boost_acceptor.h" />
-    <ClInclude Include="include\Network\boost_channel.h" />
-    <ClInclude Include="include\Network\boost_endpoint.h" />
-    <ClInclude Include="include\Network\boost_ioservice.h" />
-    <ClInclude Include="include\Network\boost_socket.h" />
-    <ClInclude Include="include\Network\byte_stream.h" />
-    <ClInclude Include="include\Network\channel.h" />
-    <ClInclude Include="include\Network\concurrent_queue.h" />
-    <ClInclude Include="include\Network\endpoint.h" />
-    <ClInclude Include="include\Network\local_channel.h" />
-    <ClInclude Include="include\Network\local_endpoint.h" />
+    <ClInclude Include="include\apsidefines.h" />
+    <ClInclude Include="include\item.h" />
+    <ClInclude Include="include\psiparams.h" />
     <ClInclude Include="include\Receiver\receiver.h" />
     <ClInclude Include="include\Sender\sender.h" />
+    <ClInclude Include="include\Sender\senderdb.h" />
+    <ClInclude Include="include\Sender\senderthreadcontext.h" />
     <ClInclude Include="include\Tools\clp.h" />
     <ClInclude Include="include\Tools\log.h" />
     <ClInclude Include="include\Tools\stopwatch.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\Network\boost_acceptor.cpp" />
-    <ClCompile Include="src\Network\boost_channel.cpp" />
-    <ClCompile Include="src\Network\boost_endpoint.cpp" />
-    <ClCompile Include="src\Network\boost_ioservice.cpp" />
-    <ClCompile Include="src\Network\byte_stream.cpp" />
-    <ClCompile Include="src\Network\channel.cpp" />
-    <ClCompile Include="src\Network\local_channel.cpp" />
-    <ClCompile Include="src\Network\local_endpoint.cpp" />
+    <ClCompile Include="item.cpp" />
+    <ClCompile Include="psiparams.cpp" />
+    <ClCompile Include="src\apsidefines.cpp" />
     <ClCompile Include="src\Receiver\receiver.cpp" />
     <ClCompile Include="src\Sender\sender.cpp" />
+    <ClCompile Include="src\Sender\senderdb.cpp" />
     <ClCompile Include="src\Tools\clp.cpp" />
     <ClCompile Include="src\Tools\log.cpp" />
     <ClCompile Include="src\Tools\stopwatch.cpp" />

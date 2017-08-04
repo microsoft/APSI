@@ -1,5 +1,6 @@
 #include "Tools/log.h"
 #include <iostream>
+#include <Windows.h>
 
 using namespace std;
 
