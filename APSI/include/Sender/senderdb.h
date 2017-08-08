@@ -53,6 +53,16 @@ namespace apsi
 			void add_data(const Item &item);
 
 			/**
+			Deletes the data items in the sender's database. Items are ignored if they don't exist in the database.
+			*/
+			void delete_data(const std::vector<Item> &data);
+
+			/**
+			Deletes one item in sender's database. The item is ignored if it doesn't exist in the database.
+			*/
+			void delete_data(const Item &item);
+
+			/**
 			Computes the symmetric polynomials for the specified split in sender's database.
 			One symmetric polynomial is computed for one sub-bin (because a bin is separated into splits).
 			Input sub-bin: (a_1, a_2, ..., a_n)
@@ -114,6 +124,9 @@ namespace apsi
 			(Note: Null value for receiver is: 00..0010..00, with 1 on the itemL-th position.)
 			*/
 			Item sender_null_item_;
+
+			/* The ExRing encoding of the sender null value. */
+			seal::util::ExRingElement null_element_;
 
 			cuckoo::PermutationBasedCuckoo cuckoo_;
 

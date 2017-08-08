@@ -63,10 +63,13 @@ namespace apsi
 			map<uint64_t, vector<ExRingElement>> powers = generate_powers(exring_items);
 
 			map<uint64_t, vector<Ciphertext>> ciphers = encrypt(powers);
+			stop_watch.set_time_point("Receiver encryption");
 
 			/* Send to sender. */
 			vector<vector<Ciphertext>> result_ciphers = sender.respond(ciphers);
+			stop_watch.set_time_point("Sender online");
 			vector<vector<ExRingElement>> result = decrypt(result_ciphers);
+			stop_watch.set_time_point("Receiver decryption");
 
 			vector<bool> tmp(params_.table_size(), false);
 			ExRingElement zero(ex_ring_);

@@ -111,7 +111,7 @@ namespace apsi
 		right_shift_uint(value_.data(), value_.data(), cuckoo.log_capacity(), value_.size());
 	}
 
-	Item Item::itemL(cuckoo::PermutationBasedCuckoo &cuckoo, int hash_func_index)
+	Item Item::itemL(cuckoo::PermutationBasedCuckoo &cuckoo, int hash_func_index) const
 	{
 		Item item(*this);
 		item.to_itemL(cuckoo, hash_func_index);
@@ -127,14 +127,14 @@ namespace apsi
 
 	void Item::to_exring_element(ExRingElement &ring_item)
 	{
-		shared_ptr<ExRing> exring = ring_item.exring();
+		shared_ptr<ExRing> exring = ring_item.ex_ring();
 		int split_length = exring->coeff_modulus().significant_bit_count() - 1; // Should minus 1 to avoid wrapping around p^r
-		int split_index_bound = reduced_bit_length_ / split_length; 
+		int split_index_bound = (reduced_bit_length_ + split_length - 1) / split_length; 
 		int j = 0;
 		for (; j < (exring->coeff_count() - 1) && j < split_index_bound; j++)
-			ring_item[j].pointer()[0] = item_part(j, split_length);
+			ring_item.pointer(j)[0] = item_part(j, split_length);
 		for (; j < (exring->coeff_count() - 1); j++)
-			ring_item[j].pointer()[0] = 0;
+			ring_item.pointer(j)[0] = 0;
 	}
 
 	uint64_t Item::item_part(uint32_t i, uint32_t split_length)
@@ -144,7 +144,7 @@ namespace apsi
 			j1 = (i * split_length) & 0x3F,  // mod 64
 			j2 = ((i + 1) * split_length) & 0x3F;  // mod 64
 #ifdef _DEBUG
-		if (split_length > 64 || i2 > value_.size() || (i2 == value_.size() && j2 > 0))
+		if (split_length > 64 || i2 > value_.size())
 			throw invalid_argument("invalid split_length, or index out of range.");
 #endif
 		int mask = (1 << split_length) - 1;

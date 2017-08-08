@@ -23,16 +23,16 @@ void example_slow_vs_fast();
 int main(int argc, char *argv[])
 {
 	// Example: Basics
-	example_basics();
+	//example_basics();
 
-	// Example: Update
-	example_update();
+	//// Example: Update
+	//example_update();
 
-	// Example: Fast batching
+	//// Example: Fast batching
 	example_fast_batching();
 
 	// Example: Slow batching vs. Fast batching
-	example_slow_vs_fast();
+	//example_slow_vs_fast();
 
 	// Wait for ENTER before closing screen.
 	cout << endl << "Press ENTER to exit" << endl;
@@ -147,6 +147,20 @@ void example_update()
 		cout << intersection[i] << ", ";
 	cout << ']' << endl;
 
+	/* We can also delete items in the database. */
+	sender.delete_data(string("1")); // Item will be ignored if it doesn't exist in the database.
+	sender.delete_data(string("f"));
+	sender.offline_compute();
+	stop_watch.set_time_point("Delete done");
+
+	intersection = receiver.query(vector<Item>{string("1"), string("f"), string("i"), string("c")}, sender);
+	stop_watch.set_time_point("Query done");
+	cout << "Intersection result: ";
+	cout << '[';
+	for (int i = 0; i < intersection.size(); i++)
+		cout << intersection[i] << ", ";
+	cout << ']' << endl;
+
 	cout << stop_watch << endl;
 }
 
@@ -164,11 +178,21 @@ void example_fast_batching()
 	*/
 
 	auto time_start = chrono::high_resolution_clock::now();
-	PSIParams params(8, 12, 128, 2, 8);
+	//PSIParams params(4, 13, 112, 3, 8);
+	//params.set_item_bit_length(32); // The effective item bit length will be limited by ExRing's p.
+	//params.set_exring_polymod(string("1x^1")); // f(x) = x
+	//params.set_exring_characteristic(string("820001")); // p = 8519681. NOTE: p=1 (mod 2n)
+	//params.set_log_poly_degree(13); /* n = 2^13 = 8192, in SEAL's poly modulus "x^n + 1". */
+	//params.set_coeff_mod_bit_count(189);  // SEAL param: when n = 8192, q has 189 or 226 bits.
+	//params.set_decomposition_bit_count(48);
+
+	PSIParams params(4, 14, 3584, 1, 256);
 	params.set_item_bit_length(32); // The effective item bit length will be limited by ExRing's p.
 	params.set_exring_polymod(string("1x^1")); // f(x) = x
-	params.set_exring_characteristic(string("A001")); // p = 40961. NOTE: p=1 (mod 2n)
-	params.set_coeff_mod_bit_count(116);  // SEAL param: when n = 4096, q has 116 bits.
+	params.set_exring_characteristic(string("820001")); // p = 8519681. NOTE: p=1 (mod 2n)
+	params.set_log_poly_degree(14); /* n = 2^14 = 16384, in SEAL's poly modulus "x^n + 1". */
+	params.set_coeff_mod_bit_count(226);  // SEAL param: when n = 8192, q has 189 or 226 bits.
+	params.set_decomposition_bit_count(46);
 	params.validate();
 
 	cout << "Reduced item bit length: " << params.reduced_item_bit_length() << endl;
@@ -186,7 +210,10 @@ void example_fast_batching()
 	Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
 	Sender sender(params, MemoryPoolHandle::acquire_new(true));
 	sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
+
+	stop_watch.set_time_point("Application preparation");
 	sender.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
+	stop_watch.set_time_point("Sender pre-processing");
 
 	vector<bool> intersection = receiver.query(vector<Item>{string("1"), string("f"), string("i"), string("c")}, sender);
 
@@ -195,6 +222,8 @@ void example_fast_batching()
 	for (int i = 0; i < intersection.size(); i++)
 		cout << intersection[i] << ", ";
 	cout << ']' << endl;
+
+	cout << stop_watch << endl;
 }
 
 void example_slow_vs_fast()
@@ -209,6 +238,7 @@ void example_slow_vs_fast()
 	params.set_item_bit_length(90); // We can handle very long items in the following ExRing.
 	params.set_exring_polymod(string("1x^8 + 7"));  // f(x) = x^8 + 7
 	params.set_exring_characteristic(string("3401")); // p = 13313
+	params.set_log_poly_degree(12);
 	params.set_coeff_mod_bit_count(116);  // SEAL param: when n = 4096, q has 116 bits.
 	params.validate();
 
@@ -245,6 +275,7 @@ void example_slow_vs_fast()
 	params2.set_item_bit_length(90); // The effective item bit length will be limited by ExRing's p.
 	params2.set_exring_polymod(string("1x^1")); // f(x) = x
 	params2.set_exring_characteristic(string("A001")); // p = 40961. NOTE: p=1 (mod 2n)
+	params2.set_log_poly_degree(12);
 	params2.set_coeff_mod_bit_count(116);  // SEAL param: when n = 4096, q has 116 bits.
 	params2.validate();
 

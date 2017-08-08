@@ -67,6 +67,22 @@ namespace apsi
 			}
 
 			/**
+			Deletes the data items in sender's database. Items are ignored if they don't exist in the database.
+			*/
+			void delete_data(const std::vector<Item> &data)
+			{
+				sender_db_.delete_data(data);
+			}
+
+			/**
+			Deletes one item in sender's database. The item is ignored if it doesn't exist in the database.
+			*/
+			void delete_data(const Item &item)
+			{
+				sender_db_.delete_data(item);
+			}
+
+			/**
 			Precomputes all necessary components for the PSI protocol, including symmetric polynomials, batching, etc.
 			This function is expensive and can be called after sender finishes adding items to the database.
 			*/
@@ -89,9 +105,21 @@ namespace apsi
 
 			@params[in] input Map from exponent (k) to a vector of Ciphertext, each of which encrypts a batch of items of the same power (y^k). 
 							  The size of the vector is the number of batches.
-			@params[out] all_powers All powers computed from the input.
+			@params[out] all_powers All powers computed from the input, with outer index indicating the batch, and inner index indicating the power.
 			*/
 			void compute_all_powers(const std::map<uint64_t, std::vector<seal::Ciphertext>> &input, std::vector<std::vector<seal::Ciphertext>> &all_powers);
+
+			/**
+			Constructs all powers of receiver's items for the specified batch, based on the powers sent from the receiver. For example, if the 
+			desired highest exponent (determined by PSIParams) is 15, the input exponents are {1, 2, 4, 8}, then this function will compute powers 
+			from 0 to 15, by multiplying appropriate powers in {1, 2, 4, 8}.
+
+			@params[in] input Map from exponent (k) to a vector of Ciphertext, each of which encrypts a batch of items of the same power (y^k).
+							  The size of the vector is the number of batches.
+			@params[out] all_powers All powers computed from the input for the specified batch.
+			*/
+			void compute_batch_powers(int batch, const std::map<uint64_t, std::vector<seal::Ciphertext>> &input,
+				std::vector<seal::Ciphertext> &batch_powers, SenderThreadContext &context);
 
 			/**
 			Computes dot product between sender's symmetric polynomial terms and receiver's powers, for the specified split and the specified batch

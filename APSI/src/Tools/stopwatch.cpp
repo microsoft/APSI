@@ -21,12 +21,12 @@ namespace apsi
 			for (auto tp : stopwatch.time_points)
 			{
 				out << tp.second
-					<< " | Total: "
-					<< chrono::duration_cast<chrono::microseconds>(tp.first - stopwatch.start_time).count()
-					<< " microseconds"
 					<< " | Since last: "
-					<< chrono::duration_cast<chrono::microseconds>(tp.first - prev_time).count()
-					<< " microseconds"
+					<< chrono::duration_cast<chrono::milliseconds>(tp.first - prev_time).count()
+					<< " milliseconds"
+					<< " | Total: "
+					<< chrono::duration_cast<chrono::milliseconds>(tp.first - stopwatch.start_time).count()
+					<< " milliseconds"
 					<< endl;
 				prev_time = tp.first;
 			}

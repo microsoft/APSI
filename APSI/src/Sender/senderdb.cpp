@@ -32,6 +32,8 @@ namespace apsi
 			right_shift_uint(sender_null_item_.data(), sender_null_item_.data(),
 				(sender_null_item_.bit_count() - cuckoo_.itemL_bit_length()), sender_null_item_.uint64_count());
 
+			null_element_ = sender_null_item_.to_exring_element(global_ex_ring_);
+
 			/* Set nature index */
 			for (int i = 0; i < params_.table_size(); i++)
 				for (int j = 0; j < params_.sender_bin_size(); j++)
@@ -41,12 +43,11 @@ namespace apsi
 
 		void SenderDB::clear_db()
 		{
-			ExRingElement null_element = sender_null_item_.to_exring_element(global_ex_ring_);
 			for (int i = 0; i < params_.sender_bin_size(); i++)
 				for (int j = 0; j < params_.table_size(); j++)
 				{
 					simple_hashing_db_[i][j] = sender_null_item_;
-					exring_db_[i][j] = null_element;
+					exring_db_[i][j] = null_element_;
 				}
 
 			shuffle();
@@ -88,6 +89,36 @@ namespace apsi
 		void SenderDB::add_data(const Item &item)
 		{
 			add_data(vector<Item>(1, item));
+		}
+
+		void SenderDB::delete_data(const std::vector<Item> &data)
+		{
+			vector<uint64_t> hash_locations;
+			for (int i = 0; i < data.size(); i++)
+			{
+				cuckoo_.get_locations(data[i].data(), hash_locations);
+				for (int j = 0; j < hash_locations.size(); j++)
+				{
+					Item target_itemL = data[i].itemL(cuckoo_, j);
+					for (int k = 0; k < next_shuffle_locs_[hash_locations[j]]; k++)
+					{
+						int index = shuffle_index_[hash_locations[j]][k];
+						if (simple_hashing_db_[index][hash_locations[j]] == target_itemL) /* Item is found. Delete it. */
+						{
+							simple_hashing_db_[index][hash_locations[j]] = sender_null_item_;
+							exring_db_[index][hash_locations[j]] = null_element_;
+
+							/* Set the block that contains this item to be stale. */
+							symm_polys_stale_[index / params_.split_size()][hash_locations[j] / params_.batch_size()] = true;
+						}
+					}
+				}
+			}
+		}
+
+		void SenderDB::delete_data(const Item &item)
+		{
+			delete_data(vector<Item>(1, item));
 		}
 
 		void SenderDB::shuffle()

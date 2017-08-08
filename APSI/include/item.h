@@ -57,7 +57,7 @@ namespace apsi
 		/**
 		Reduce this item into an item that is stored in the permutation based hashing table, and return the new item. This item is not changed.
 		*/
-		Item itemL(cuckoo::PermutationBasedCuckoo &cuckoo, int hash_func_index);
+		Item itemL(cuckoo::PermutationBasedCuckoo &cuckoo, int hash_func_index) const;
 
 		/**
 		Convert this item into an exring element. Assuming that this item has been reduced in a hash table,
@@ -73,7 +73,9 @@ namespace apsi
 
 		/**
 		Return value of the i-th part of this item. We split the item into small parts,
-		each of which has bit length specified by split_length (not bigger than 64).
+		each of which has bit length specified by split_length (not bigger than 64). If
+		split_length is not a factor of 64, the highest split of the item will be prepended
+		with zero bits to most significant positions to match split_length.
 
 		@param[in] i The i-th part.
 		@param[in] split_length Bit length of each part.
@@ -85,6 +87,11 @@ namespace apsi
 		Item& operator =(uint64_t assign);
 
 		Item& operator =(const Item &assign);
+
+		bool operator ==(const Item &other) const
+		{
+			return value_ == other.value_;
+		}
 
 		uint64_t& operator[](size_t i)
 		{

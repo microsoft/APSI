@@ -32,12 +32,14 @@ namespace apsi
 			seal_context_.reset(new SEALContext(enc_params_));
 
 			ex_ring_->init_frobe_table();
+			const BigPoly poly_mod(ex_ring_->coeff_count(), ex_ring_->coeff_uint64_count() * bits_per_uint64, 
+				const_cast<uint64_t*>(ex_ring_->poly_modulus().get()));
 
 			/* Set local exrings for multithreaded efficient use of memory pools. */
 			for (int i = 0; i < params_.sender_thread_count(); i++)
 			{
 				thread_contexts_[i].set_exring(ExRing::acquire_ring(ex_ring_->characteristic(),
-					ex_ring_->exponent(), ex_ring_->poly_modulus_bigpoly(), MemoryPoolHandle::acquire_new(false)));
+					ex_ring_->exponent(), poly_mod, MemoryPoolHandle::acquire_new(false)));
 				thread_contexts_[i].exring()->set_frobe_table(ex_ring_->frobe_table());
 
 				thread_contexts_[i].set_batcher(make_shared<ExPolyCRTBuilder>(thread_contexts_[i].exring(), params_.log_poly_degree()));
@@ -79,7 +81,7 @@ namespace apsi
 		{
 			/* Offline pre-processing. */
 			atomic<int> block_index = 0;
-			auto split_computation = [&](SenderThreadContext& context)
+			auto block_computation = [&](SenderThreadContext& context)
 			{
 				int next_block = 0;
 				while (true)
@@ -97,7 +99,7 @@ namespace apsi
 			{
 				// Must use 'std::ref' to pass by reference when we construct thread with a lambda function that takes reference arguments.
 				// But if we just call the lambda function, then we don't need 'std::ref'.
-				thread_pool.push_back(thread(split_computation, std::ref(thread_contexts_[i])));
+				thread_pool.push_back(thread(block_computation, std::ref(thread_contexts_[i])));
 			}
 
 			for (int i = 0; i < thread_pool.size(); i++)
@@ -112,7 +114,7 @@ namespace apsi
 			compute_all_powers(query, powers);
 
 			atomic<int> block_index = 0;
-			auto split_computation = [&](SenderThreadContext &context)
+			auto block_computation = [&](SenderThreadContext &context)
 			{
 				int next_block = 0;
 				while (true)
@@ -130,7 +132,7 @@ namespace apsi
 			{
 				// Must use 'std::ref' to pass by reference when we construct thread with a lambda function that takes reference arguments.
 				// But if we just call the lambda function, then we don't need 'std::ref'.
-				thread_pool.push_back(thread(split_computation, std::ref(thread_contexts_[i]))); 
+				thread_pool.push_back(thread(block_computation, std::ref(thread_contexts_[i]))); 
 			}
 
 			for (int i = 0; i < thread_pool.size(); i++)
@@ -141,28 +143,55 @@ namespace apsi
 
 		void Sender::compute_all_powers(const map<uint64_t, vector<Ciphertext>> &input, vector<vector<Ciphertext>> &all_powers)
 		{
-			all_powers.resize(params_.split_size() + 1, vector<Ciphertext>(params_.number_of_batches()));
-			for (int k = 0; k < params_.number_of_batches(); k++)
+			all_powers.resize(params_.number_of_batches());
+			atomic<int> batch_index = 0;
+			auto batch_computation = [&](SenderThreadContext &context)
 			{
-				all_powers[0][k] = encryptor_->encrypt(BigPoly("1"));
-				for (int i = 1; i <= params_.split_size(); i++)
+				int next_batch = 0;
+				while (true)
 				{
-					int i1 = optimal_split(i, 1 << params_.window_size());
-					int i2 = i - i1;
-					if (i1 == 0 || i2 == 0)
-					{
-						all_powers[i][k] = input.at(i)[k];
-					}
-					else
-					{
-						evaluator_->multiply(all_powers[i1][k], all_powers[i2][k], all_powers[i][k]);
-						evaluator_->relinearize(all_powers[i][k], all_powers[i][k]);
-					}
-					
+					next_batch = batch_index++;
+					if (next_batch >= params_.number_of_batches())
+						break;
+					compute_batch_powers(next_batch, input, all_powers[next_batch], context);
 				}
-				for(int i = 0; i <= params_.split_size(); i++)
-					evaluator_->transform_to_ntt(all_powers[i][k]);
+			};
+
+			vector<thread> thread_pool;
+			for (int i = 0; i < params_.sender_thread_count() && i < params_.number_of_batches(); i++)
+			{
+				// Must use 'std::ref' to pass by reference when we construct thread with a lambda function that takes reference arguments.
+				// But if we just call the lambda function, then we don't need 'std::ref'.
+				thread_pool.push_back(thread(batch_computation, std::ref(thread_contexts_[i])));
 			}
+
+			for (int i = 0; i < thread_pool.size(); i++)
+				thread_pool[i].join();
+		}
+
+		void Sender::compute_batch_powers(int batch, const std::map<uint64_t, std::vector<seal::Ciphertext>> &input,
+			std::vector<seal::Ciphertext> &batch_powers, SenderThreadContext &context)
+		{
+			batch_powers.resize(params_.split_size() + 1);
+			shared_ptr<Evaluator> local_evaluator = context.evaluator();
+			batch_powers[0] = encryptor_->encrypt(BigPoly("1"));
+			for (int i = 1; i <= params_.split_size(); i++)
+			{
+				int i1 = optimal_split(i, 1 << params_.window_size());
+				int i2 = i - i1;
+				if (i1 == 0 || i2 == 0)
+				{
+					batch_powers[i] = input.at(i)[batch];
+				}
+				else
+				{
+					local_evaluator->multiply(batch_powers[i1], batch_powers[i2], batch_powers[i]);
+					local_evaluator->relinearize(batch_powers[i], batch_powers[i]);
+				}
+
+			}
+			for (int i = 0; i <= params_.split_size(); i++)
+				local_evaluator->transform_to_ntt(batch_powers[i]);
 		}
 
 		void Sender::compute_dot_product(int split, int batch, const vector<vector<Ciphertext>> &all_powers, 
@@ -174,11 +203,11 @@ namespace apsi
 
 			shared_ptr<Evaluator> local_evaluator = context.evaluator();
 
-			local_evaluator->multiply_plain_ntt(all_powers[0][batch], sender_coeffs[0], result);
+			local_evaluator->multiply_plain_ntt(all_powers[batch][0], sender_coeffs[0], result);
 			for (int s = 1; s <= params_.split_size(); s++)
 			{
 				local_evaluator->multiply_plain_ntt(
-					all_powers[s][batch],
+					all_powers[batch][s],
 					sender_coeffs[s],
 					tmp);
 				local_evaluator->add(tmp, result, result);
