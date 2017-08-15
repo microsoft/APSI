@@ -14,7 +14,7 @@ namespace apsi
         //extern std::vector<std::string> split(const std::string &s, char delim);
 
 
-        void BoostEndpoint::start(BoostIOService& ioService, std::string remoteIP, u32 port, bool host, std::string name)
+        void BoostEndpoint::start(BoostIOService& ioService, std::string remoteIP, uint32_t port, bool host, std::string name)
         {
             if (mStopped == false)
                 throw std::runtime_error("");

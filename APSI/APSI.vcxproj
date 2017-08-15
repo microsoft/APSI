@@ -93,7 +93,7 @@
       <AdditionalDependencies>SEAL.lib; Cuckoo.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>..\..\Cuckoo\bin\$(Configuration);..\..\SEAL\bin\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(BOOST_ROOT)/stage/lib/$(Platform);..\..\Cuckoo\bin\$(Configuration);..\..\SEAL\bin\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -126,19 +126,33 @@
       <AdditionalDependencies>SEAL.lib; Cuckoo.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>..\..\Cuckoo\bin\$(Configuration);..\..\SEAL\bin\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(BOOST_ROOT)/stage/lib/$(Platform);..\..\Cuckoo\bin\$(Configuration);..\..\SEAL\bin\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="include\apsi.h" />
     <ClInclude Include="include\apsidefines.h" />
     <ClInclude Include="include\item.h" />
+    <ClInclude Include="include\Network\array_view.h" />
+    <ClInclude Include="include\Network\boost_acceptor.h" />
+    <ClInclude Include="include\Network\boost_channel.h" />
+    <ClInclude Include="include\Network\boost_endpoint.h" />
+    <ClInclude Include="include\Network\boost_ioservice.h" />
+    <ClInclude Include="include\Network\boost_socket.h" />
+    <ClInclude Include="include\Network\byte_stream.h" />
+    <ClInclude Include="include\Network\channel.h" />
+    <ClInclude Include="include\Network\concurrent_queue.h" />
+    <ClInclude Include="include\Network\endpoint.h" />
+    <ClInclude Include="include\Network\local_channel.h" />
+    <ClInclude Include="include\Network\local_endpoint.h" />
+    <ClInclude Include="include\Network\network_utils.h" />
     <ClInclude Include="include\psiparams.h" />
     <ClInclude Include="include\Receiver\receiver.h" />
     <ClInclude Include="include\Sender\sender.h" />
     <ClInclude Include="include\Sender\senderdb.h" />
     <ClInclude Include="include\Sender\senderthreadcontext.h" />
     <ClInclude Include="include\Tools\clp.h" />
+    <ClInclude Include="include\Tools\hash.h" />
     <ClInclude Include="include\Tools\log.h" />
     <ClInclude Include="include\Tools\stopwatch.h" />
   </ItemGroup>
@@ -146,10 +160,20 @@
     <ClCompile Include="item.cpp" />
     <ClCompile Include="psiparams.cpp" />
     <ClCompile Include="src\apsidefines.cpp" />
+    <ClCompile Include="src\Network\boost_acceptor.cpp" />
+    <ClCompile Include="src\Network\boost_channel.cpp" />
+    <ClCompile Include="src\Network\boost_endpoint.cpp" />
+    <ClCompile Include="src\Network\boost_ioservice.cpp" />
+    <ClCompile Include="src\Network\byte_stream.cpp" />
+    <ClCompile Include="src\Network\channel.cpp" />
+    <ClCompile Include="src\Network\local_channel.cpp" />
+    <ClCompile Include="src\Network\local_endpoint.cpp" />
+    <ClCompile Include="src\Network\network_utils.cpp" />
     <ClCompile Include="src\Receiver\receiver.cpp" />
     <ClCompile Include="src\Sender\sender.cpp" />
     <ClCompile Include="src\Sender\senderdb.cpp" />
     <ClCompile Include="src\Tools\clp.cpp" />
+    <ClCompile Include="src\Tools\hash.cpp" />
     <ClCompile Include="src\Tools\log.cpp" />
     <ClCompile Include="src\Tools\stopwatch.cpp" />
   </ItemGroup>

@@ -3,7 +3,7 @@
 #include <array>
 #include <string>
 #include "util/exring.h"
-#include "util/hash.h"
+#include "Tools/hash.h"
 #include <stdexcept>
 #include "cuckoo.h"
 

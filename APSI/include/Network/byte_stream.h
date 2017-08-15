@@ -2,7 +2,7 @@
  
 #include "channel.h" 
 #include "array_view.h"
-#include "defines.h"
+#include "apsidefines.h"
 
 namespace apsi 
 { 

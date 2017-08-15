@@ -17,8 +17,6 @@ namespace apsi
         class BoostEndpoint;
         class BoostSocket;
 
-        std::vector<std::string> split(const std::string &s, char delim);
-
         class BoostIOService
         {
             friend class BoostSocket;

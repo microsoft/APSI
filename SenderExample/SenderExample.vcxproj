@@ -81,10 +81,10 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\..\SEAL\SEAL;../../Cuckoo/Cuckoo/include;$(SolutionDir)/APSI/include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(BOOST_ROOT);..\..\SEAL\SEAL;../../Cuckoo/Cuckoo/include;$(SolutionDir)/APSI/include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(SolutionDir)/$(Platform)/$(Configuration)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(BOOST_ROOT)/stage/lib/$(Platform);$(SolutionDir)/$(Platform)/$(Configuration)</AdditionalLibraryDirectories>
       <AdditionalDependencies>APSI.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -108,12 +108,12 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\..\SEAL\SEAL;../../Cuckoo/Cuckoo/include;$(SolutionDir)/APSI/include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(BOOST_ROOT);..\..\SEAL\SEAL;../../Cuckoo/Cuckoo/include;$(SolutionDir)/APSI/include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>$(SolutionDir)/$(Platform)/$(Configuration)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(BOOST_ROOT)/stage/lib/$(Platform);$(SolutionDir)/$(Platform)/$(Configuration)</AdditionalLibraryDirectories>
       <AdditionalDependencies>APSI.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>

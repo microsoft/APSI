@@ -38,7 +38,7 @@ namespace apsi
 		{
 		public:
 
-		private:
+		
 			LogStream(std::ostream& stream) : stream_(&stream)
 			{
 			}
@@ -60,6 +60,8 @@ namespace apsi
 
 			LogStream &operator <<(const Log::Modifier in);
 
+
+        private:
 			std::ostream *stream_;
 			std::mutex mutex_;
 

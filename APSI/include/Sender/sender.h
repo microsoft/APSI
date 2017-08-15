@@ -10,172 +10,175 @@
 #include "Sender/senderthreadcontext.h"
 #include "publickey.h"
 #include "secretkey.h"
+#include "Network/boost_ioservice.h"
+#include "Network/channel.h"
 
 
 namespace apsi
 {
-	namespace sender
-	{
-		class Sender
-		{
-		public:
-			Sender(const PSIParams &params, const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::acquire_global());
+    namespace sender
+    {
+        class Sender
+        {
+        public:
+            Sender(const PSIParams &params, const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::acquire_global());
 
-			void set_public_key(const seal::PublicKey &public_key);
+            ~Sender();
 
-			void set_evaluation_keys(const seal::EvaluationKeys &evaluation_keys);
+            void set_public_key(const seal::PublicKey &public_key);
 
-			/**
-			This function is only for testing purpose. Sender should not have the secret key.
-			*/
-			void set_secret_key(const seal::SecretKey &secret_key);
+            void set_evaluation_keys(const seal::EvaluationKeys &evaluation_keys);
 
-			void set_keys(const seal::PublicKey &public_key, const seal::EvaluationKeys &evaluation_keys)
-			{
-				set_public_key(public_key);
-				set_evaluation_keys(evaluation_keys);
-			}
+            /**
+            This function is only for testing purpose. Sender should not have the secret key.
+            */
+            void set_secret_key(const seal::SecretKey &secret_key);
 
-			/**
-			Clears data in sender's database.
-			*/
-			void clear_sender_db()
-			{
-				sender_db_.clear_db();
-			}
+            void set_keys(const seal::PublicKey &public_key, const seal::EvaluationKeys &evaluation_keys)
+            {
+                set_public_key(public_key);
+                set_evaluation_keys(evaluation_keys);
+            }
 
-			/**
-			Loads the input data into sender's database, and precomputes all necessary components for the PSI protocol,
-			including symmetric polynomials, batching, etc.
-			*/
-			void load_db(const std::vector<Item> &data);
+            /**
+            Clears data in sender's database.
+            */
+            void clear_sender_db()
+            {
+                sender_db_.clear_db();
+            }
 
-			/**
-			Adds the data items to sender's database.
-			*/
-			void add_data(const std::vector<Item> &data)
-			{
-				sender_db_.add_data(data);
-			}
+            /**
+            Loads the input data into sender's database, and precomputes all necessary components for the PSI protocol,
+            including symmetric polynomials, batching, etc.
+            */
+            void load_db(const std::vector<Item> &data);
 
-			/**
-			Adds one item to sender's database.
-			*/
-			void add_data(const Item &item)
-			{
-				sender_db_.add_data(item);
-			}
+            /**
+            Adds the data items to sender's database.
+            */
+            void add_data(const std::vector<Item> &data)
+            {
+                sender_db_.add_data(data);
+            }
 
-			/**
-			Deletes the data items in sender's database. Items are ignored if they don't exist in the database.
-			*/
-			void delete_data(const std::vector<Item> &data)
-			{
-				sender_db_.delete_data(data);
-			}
+            /**
+            Adds one item to sender's database.
+            */
+            void add_data(const Item &item)
+            {
+                sender_db_.add_data(item);
+            }
 
-			/**
-			Deletes one item in sender's database. The item is ignored if it doesn't exist in the database.
-			*/
-			void delete_data(const Item &item)
-			{
-				sender_db_.delete_data(item);
-			}
+            /**
+            Deletes the data items in sender's database. Items are ignored if they don't exist in the database.
+            */
+            void delete_data(const std::vector<Item> &data)
+            {
+                sender_db_.delete_data(data);
+            }
 
-			/**
-			Precomputes all necessary components for the PSI protocol, including symmetric polynomials, batching, etc.
-			This function is expensive and can be called after sender finishes adding items to the database.
-			*/
-			void offline_compute();
+            /**
+            Deletes one item in sender's database. The item is ignored if it doesn't exist in the database.
+            */
+            void delete_data(const Item &item)
+            {
+                sender_db_.delete_data(item);
+            }
 
-			/**
-			Responds to a query from the receiver. Input is a map of powers of receiver's items, from k to y^k, where k is an 
-			exponent, y is an item in receiver's cuckoo hashing table.
+            /**
+            Precomputes all necessary components for the PSI protocol, including symmetric polynomials, batching, etc.
+            This function is expensive and can be called after sender finishes adding items to the database.
+            */
+            void offline_compute();
 
-			Returns (#splits x #batches) ciphertexts, each of which is a result of the compoute_dot_product function.
+            apsi::network::Channel& connect();
 
-			@see compute_dot_product for an explanation of the result.
-			*/
-			std::vector<std::vector<seal::Ciphertext>> respond(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query);
+            void query_engine(apsi::network::Channel& server_channel);
 
-			/**
-			Constructs all powers of receiver's items, based on the powers sent from the receiver. For example, if the desired highest 
-			exponent (determined by PSIParams) is 15, the input exponents are {1, 2, 4, 8}, then this function will compute powers from 0
-			to 15, by multiplying appropriate powers in {1, 2, 4, 8}.
+            /**
+            Responds to a query from the receiver. Input is a map of powers of receiver's items, from k to y^k, where k is an 
+            exponent, y is an item in receiver's cuckoo hashing table.
 
-			@params[in] input Map from exponent (k) to a vector of Ciphertext, each of which encrypts a batch of items of the same power (y^k). 
-							  The size of the vector is the number of batches.
-			@params[out] all_powers All powers computed from the input, with outer index indicating the batch, and inner index indicating the power.
-			*/
-			void compute_all_powers(const std::map<uint64_t, std::vector<seal::Ciphertext>> &input, std::vector<std::vector<seal::Ciphertext>> &all_powers);
+            Returns (#splits x #batches) ciphertexts, each of which is a result of the compoute_dot_product function.
 
-			/**
-			Constructs all powers of receiver's items for the specified batch, based on the powers sent from the receiver. For example, if the 
-			desired highest exponent (determined by PSIParams) is 15, the input exponents are {1, 2, 4, 8}, then this function will compute powers 
-			from 0 to 15, by multiplying appropriate powers in {1, 2, 4, 8}.
+            @see compute_dot_product for an explanation of the result.
+            */
+            std::vector<std::vector<seal::Ciphertext>> respond(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query,
+                apsi::network::Channel *channel = nullptr);
 
-			@params[in] input Map from exponent (k) to a vector of Ciphertext, each of which encrypts a batch of items of the same power (y^k).
-							  The size of the vector is the number of batches.
-			@params[out] all_powers All powers computed from the input for the specified batch.
-			*/
-			void compute_batch_powers(int batch, const std::map<uint64_t, std::vector<seal::Ciphertext>> &input,
-				std::vector<seal::Ciphertext> &batch_powers, SenderThreadContext &context);
+            /**
+            Constructs all powers of receiver's items, based on the powers sent from the receiver. For example, if the desired highest 
+            exponent (determined by PSIParams) is 15, the input exponents are {1, 2, 4, 8}, then this function will compute powers from 0
+            to 15, by multiplying appropriate powers in {1, 2, 4, 8}.
 
-			/**
-			Computes dot product between sender's symmetric polynomial terms and receiver's powers, for the specified split and the specified batch
-			of sender's database. The result essentially tells: for each sub-bin, is there a sender item that is the same as the receiver 
-			item in this sub-bin? If yes, then the result for this bin is an encryption of 0, otherwise, it is an encryption of a random number.
+            @params[in] input Map from exponent (k) to a vector of Ciphertext, each of which encrypts a batch of items of the same power (y^k). 
+                              The size of the vector is the number of batches.
+            @params[out] all_powers All powers computed from the input, with outer index indicating the batch, and inner index indicating the power.
+            */
+            void compute_all_powers(const std::map<uint64_t, std::vector<seal::Ciphertext>> &input, std::vector<std::vector<seal::Ciphertext>> &all_powers);
 
-			@param[out] result A ciphertext encrypting a batch of results for a consecutive range of sub-bins. 
-			*/
-			void compute_dot_product(int split, int batch, const std::vector<std::vector<seal::Ciphertext>> &all_powers,
-				seal::Ciphertext &result, SenderThreadContext &context);
+            /**
+            Constructs all powers of receiver's items for the specified batch, based on the powers sent from the receiver. For example, if the 
+            desired highest exponent (determined by PSIParams) is 15, the input exponents are {1, 2, 4, 8}, then this function will compute powers 
+            from 0 to 15, by multiplying appropriate powers in {1, 2, 4, 8}.
 
-			seal::Evaluator& evaluator() const
-			{
-				return *evaluator_;
-			}
+            @params[in] input Map from exponent (k) to a vector of Ciphertext, each of which encrypts a batch of items of the same power (y^k).
+                              The size of the vector is the number of batches.
+            @params[out] all_powers All powers computed from the input for the specified batch.
+            */
+            void compute_batch_powers(int batch, const std::map<uint64_t, std::vector<seal::Ciphertext>> &input,
+                std::vector<seal::Ciphertext> &batch_powers, SenderThreadContext &context);
 
-		private:
-			void initialize();
+            /**
+            Computes dot product between sender's symmetric polynomial terms and receiver's powers, for the specified split and the specified batch
+            of sender's database. The result essentially tells: for each sub-bin, is there a sender item that is the same as the receiver 
+            item in this sub-bin? If yes, then the result for this bin is an encryption of 0, otherwise, it is an encryption of a random number.
 
-			PSIParams params_;
+            @param[out] result A ciphertext encrypting a batch of results for a consecutive range of sub-bins. 
+            */
+            void compute_dot_product(int split, int batch, const std::vector<std::vector<seal::Ciphertext>> &all_powers,
+                seal::Ciphertext &result, SenderThreadContext &context);
 
-			seal::MemoryPoolHandle pool_;
+            seal::Evaluator& evaluator() const
+            {
+                return *evaluator_;
+            }
 
-			std::shared_ptr <seal::util::ExRing > ex_ring_;
+        private:
+            void initialize();
 
-			seal::PublicKey public_key_;
+            PSIParams params_;
 
-			std::unique_ptr<seal::Encryptor> encryptor_;
+            seal::MemoryPoolHandle pool_;
 
-			seal::SecretKey secret_key_;
+            std::shared_ptr <seal::util::ExRing > ex_ring_;
 
-			std::unique_ptr<seal::Decryptor> decryptor_;
+            seal::PublicKey public_key_;
 
-			seal::EvaluationKeys evaluation_keys_;
+            std::unique_ptr<seal::Encryptor> encryptor_;
 
-			std::unique_ptr<seal::Evaluator> evaluator_;
+            seal::SecretKey secret_key_;
 
-			seal::EncryptionParameters enc_params_;
+            std::unique_ptr<seal::Decryptor> decryptor_;
 
-			std::unique_ptr<seal::SEALContext> seal_context_;
+            seal::EvaluationKeys evaluation_keys_;
 
-			/* Sender's database, including raw data, hashed data, ExRing data, and symmetric polynomials. */
-			SenderDB sender_db_;
+            std::unique_ptr<seal::Evaluator> evaluator_;
 
-			/* One context for one thread, to improve preformance by using single-thread memory pool. */
-			std::vector<SenderThreadContext> thread_contexts_;
+            seal::EncryptionParameters enc_params_;
 
+            std::unique_ptr<seal::SEALContext> seal_context_;
 
-			///* One evaluator for one thread, to improve performance by using single-thread memory pool. */
-			//std::vector<seal::Evaluator> thread_evaluators_;
+            /* Sender's database, including raw data, hashed data, ExRing data, and symmetric polynomials. */
+            SenderDB sender_db_;
 
-			///* One generalized batcher for one thread, to improve performance by using single-thread memory pool. */
-			//std::vector<seal::util::ExPolyCRTBuilder> thread_batchers_;
+            /* One context for one thread, to improve preformance by using single-thread memory pool. */
+            std::vector<SenderThreadContext> thread_contexts_;
 
-			///* One exring for one thread, to improve performance by using single-thread memory pool. */
-			//std::vector<std::shared_ptr<seal::util::ExRing>> thread_ex_rings_;
-		};
-	}
+            std::unique_ptr<apsi::network::BoostIOService> ios_;
+
+            std::unique_ptr<apsi::network::BoostEndpoint> server_;
+        };
+    }
 }

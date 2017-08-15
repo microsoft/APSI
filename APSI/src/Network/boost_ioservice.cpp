@@ -3,7 +3,7 @@
 #include "Network/boost_endpoint.h"
 #include "Network/boost_socket.h"
 #include "Network/boost_acceptor.h"
-#include "defines.h"
+#include "apsidefines.h"
 #include "Tools/log.h"
 #include <stdio.h>
 #include <algorithm>
@@ -15,9 +15,6 @@ namespace apsi
 {
     namespace network
     {
-        extern void split(const std::string &s, char delim, std::vector<std::string> &elems);
-        extern std::vector<std::string> split(const std::string &s, char delim);
-
         BoostIOService::BoostIOService(uint64_t numThreads) :
             mIoService(),
             mWorker(new boost::asio::io_service::work(mIoService)),
@@ -52,7 +49,7 @@ namespace apsi
         BoostIOService::~BoostIOService()
         {
             // block until everything has shutdown.
-            //stop();
+            stop();
         }
 
         void BoostIOService::stop()
