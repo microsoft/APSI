@@ -12,6 +12,9 @@
 #include "secretkey.h"
 #include "Network/boost_ioservice.h"
 #include "Network/channel.h"
+#include "Sender/sendersessioncontext.h"
+#include <deque>
+#include <mutex>
 
 
 namespace apsi
@@ -92,9 +95,9 @@ namespace apsi
             */
             void offline_compute();
 
-            apsi::network::Channel& connect();
+            void query_engine();
 
-            void query_engine(apsi::network::Channel& server_channel);
+            void query_session(apsi::network::Channel &channel);
 
             /**
             Responds to a query from the receiver. Input is a map of powers of receiver's items, from k to y^k, where k is an 
@@ -104,8 +107,13 @@ namespace apsi
 
             @see compute_dot_product for an explanation of the result.
             */
+            std::vector<std::vector<seal::Ciphertext>> respond(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query)
+            {
+                return respond(query, *local_session_, nullptr);
+            }
+
             std::vector<std::vector<seal::Ciphertext>> respond(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query,
-                apsi::network::Channel *channel = nullptr);
+                apsi::sender::SenderSessionContext &session_context, apsi::network::Channel *channel);
 
             /**
             Constructs all powers of receiver's items, based on the powers sent from the receiver. For example, if the desired highest 
@@ -116,7 +124,15 @@ namespace apsi
                               The size of the vector is the number of batches.
             @params[out] all_powers All powers computed from the input, with outer index indicating the batch, and inner index indicating the power.
             */
-            void compute_all_powers(const std::map<uint64_t, std::vector<seal::Ciphertext>> &input, std::vector<std::vector<seal::Ciphertext>> &all_powers);
+            void compute_all_powers(const std::map<uint64_t, std::vector<seal::Ciphertext>> &input,
+                std::vector<std::vector<seal::Ciphertext>> &all_powers)
+            {
+                compute_all_powers(input, all_powers, *local_session_);
+            }
+
+            void compute_all_powers(const std::map<uint64_t, std::vector<seal::Ciphertext>> &input, 
+                std::vector<std::vector<seal::Ciphertext>> &all_powers,
+                apsi::sender::SenderSessionContext &session_context);
 
             /**
             Constructs all powers of receiver's items for the specified batch, based on the powers sent from the receiver. For example, if the 
@@ -140,13 +156,18 @@ namespace apsi
             void compute_dot_product(int split, int batch, const std::vector<std::vector<seal::Ciphertext>> &all_powers,
                 seal::Ciphertext &result, SenderThreadContext &context);
 
-            seal::Evaluator& evaluator() const
+            SenderSessionContext& local_session()
             {
-                return *evaluator_;
+                return *local_session_;
             }
+
 
         private:
             void initialize();
+
+            int acquire_thread_context();
+
+            void release_thread_context(int idx);
 
             PSIParams params_;
 
@@ -154,21 +175,11 @@ namespace apsi
 
             std::shared_ptr <seal::util::ExRing > ex_ring_;
 
-            seal::PublicKey public_key_;
-
-            std::unique_ptr<seal::Encryptor> encryptor_;
-
-            seal::SecretKey secret_key_;
-
-            std::unique_ptr<seal::Decryptor> decryptor_;
-
-            seal::EvaluationKeys evaluation_keys_;
-
-            std::unique_ptr<seal::Evaluator> evaluator_;
+            std::unique_ptr<SenderSessionContext> local_session_;
 
             seal::EncryptionParameters enc_params_;
 
-            std::unique_ptr<seal::SEALContext> seal_context_;
+            std::shared_ptr<seal::SEALContext> seal_context_;
 
             /* Sender's database, including raw data, hashed data, ExRing data, and symmetric polynomials. */
             SenderDB sender_db_;
@@ -176,9 +187,15 @@ namespace apsi
             /* One context for one thread, to improve preformance by using single-thread memory pool. */
             std::vector<SenderThreadContext> thread_contexts_;
 
+            std::deque<int> available_thread_contexts_;
+
+            std::mutex thread_context_mtx_;
+
             std::unique_ptr<apsi::network::BoostIOService> ios_;
 
             std::unique_ptr<apsi::network::BoostEndpoint> server_;
+
+            
         };
     }
 }

@@ -21,13 +21,26 @@ namespace apsi
 
             }
 
-            SenderThreadContext(std::shared_ptr<seal::util::ExRing> exring,
+            SenderThreadContext(int id,
+                std::shared_ptr<seal::util::ExRing> exring,
+                std::shared_ptr<seal::Encryptor> encryptor,
                 std::shared_ptr<seal::Evaluator> evaluator,
                 std::shared_ptr<seal::PolyCRTBuilder> builder,
                 std::shared_ptr<seal::util::ExPolyCRTBuilder> exbuilder)
-                :exring_(std::move(exring)), evaluator_(std::move(evaluator)), builder_(std::move(builder)), exbuilder_(std::move(exbuilder))
+                :id_(id), exring_(std::move(exring)), encryptor_(std::move(encryptor)), evaluator_(std::move(evaluator)), 
+                builder_(std::move(builder)), exbuilder_(std::move(exbuilder))
             {
 
+            }
+
+            int id()
+            {
+                return id_;
+            }
+
+            void set_id(int id)
+            {
+                id_ = id;
             }
 
             std::shared_ptr<seal::util::ExRing> exring()
@@ -38,6 +51,16 @@ namespace apsi
             void set_exring(std::shared_ptr<seal::util::ExRing> exring)
             {
                 exring_ = move(exring);
+            }
+
+            std::shared_ptr<seal::Encryptor> encryptor()
+            {
+                return encryptor_;
+            }
+
+            void set_encryptor(std::shared_ptr<seal::Encryptor> encryptor)
+            {
+                encryptor_ = std::move(encryptor);
             }
 
             std::shared_ptr<seal::Evaluator> evaluator()
@@ -71,8 +94,10 @@ namespace apsi
             }
 
         private:
+            int id_;
             std::shared_ptr<seal::util::ExRing> exring_;
             std::shared_ptr<seal::Evaluator> evaluator_;
+            std::shared_ptr<seal::Encryptor> encryptor_;
             std::shared_ptr<seal::PolyCRTBuilder> builder_;
             std::shared_ptr<seal::util::ExPolyCRTBuilder> exbuilder_;
         };

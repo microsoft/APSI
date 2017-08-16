@@ -26,7 +26,7 @@ namespace APSITests
 	public:
 		TEST_METHOD(TestCuckooHashing)
 		{
-			PSIParams params(8, 11, 32, 2, 4);
+			PSIParams params(8, 8, 11, 32, 2, 4);
 			Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
 			vector<Item> data{ string("1"), string("f"), string("i"), string("c") };
 			
@@ -51,7 +51,7 @@ namespace APSITests
 
 		TEST_METHOD(TESTCuckooIndices)
 		{
-			PSIParams params(8, 11, 32, 2, 4);
+			PSIParams params(8, 8, 11, 32, 2, 4);
 			Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
 			vector<Item> data{ string("1"), string("f"), string("i"), string("c") };
 
@@ -81,7 +81,7 @@ namespace APSITests
 
 		TEST_METHOD(TestExRingEncoding)
 		{
-			PSIParams params(8, 11, 32, 2, 4);
+			PSIParams params(8, 8, 11, 32, 2, 4);
 			Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
 			vector<Item> data{ string("1"), string("f"), string("i"), string("c") };
 
@@ -102,7 +102,7 @@ namespace APSITests
 
 		TEST_METHOD(TestGeneratePowers)
 		{
-			PSIParams params(8, 8, 32, 4, 8);
+			PSIParams params(8, 8, 8, 32, 4, 8);
 			Receiver receiver(params);
 			std::shared_ptr<ExRing> ring = receiver.exring();
 
@@ -123,7 +123,7 @@ namespace APSITests
 
 		TEST_METHOD(TestEncryptDecrypt)
 		{
-			PSIParams params(8, 8, 32, 4, 8);
+			PSIParams params(8, 8, 8, 32, 4, 8);
 			Receiver receiver(params);
 			shared_ptr<ExRing> ring = receiver.exring();
 
@@ -139,7 +139,7 @@ namespace APSITests
 
 		TEST_METHOD(TestQuery)
 		{
-			PSIParams params(8, 8, 32, 2, 4);
+			PSIParams params(8, 8, 8, 32, 2, 4);
 			params.set_item_bit_length(32);
 			params.set_decomposition_bit_count(2);
 			params.set_log_poly_degree(11);

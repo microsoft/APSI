@@ -118,11 +118,10 @@ namespace apsi
             map<uint64_t, vector<ExRingElement>> powers = generate_powers(exring_items);
 
             map<uint64_t, vector<Ciphertext>> ciphers = encrypt(powers);
-            stop_watch.set_time_point("Receiver encryption");
 
             /* Create communication channel. */
             BoostEndpoint client(*ios_, ip, port, false, "APSI");
-            Channel& client_channel = client.addChannel("receiver", "sender");
+            Channel& client_channel = client.addChannel("-", "-");
 
             /* Send keys. */
             send_pubkey(public_key_, client_channel);
@@ -131,11 +130,8 @@ namespace apsi
             /* Send query data. */
             send_query(ciphers, client_channel);
 
-            stop_watch.set_time_point("Sender online");
-
             /* Receive results in a streaming fashion. */
             vector<vector<ExRingElement>> result = stream_decrypt(client_channel);
-            stop_watch.set_time_point("Receiver decryption");
 
             vector<bool> tmp(params_.table_size(), false);
             ExRingElement zero(ex_ring_);

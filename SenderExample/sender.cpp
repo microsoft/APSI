@@ -37,8 +37,8 @@ void example_remote()
     print_example_banner("Example: Remote");
     stop_watch.time_points.clear();
 
-    /* sender threads (8), table size (2^8=256), sender bin size (32), window size (2), splits (4). */
-    PSIParams params(8, 8, 32, 2, 4);
+    /* sender threads (8), sender session threads (4), table size (2^8=256), sender bin size (32), window size (2), splits (4). */
+    PSIParams params(8, 4, 8, 32, 2, 4);
 
     /*
     Item's bit length. In this example, we will only consider 32 bits of input items.
@@ -64,15 +64,12 @@ void example_remote()
     params.validate();
 
     Sender sender(params, MemoryPoolHandle::acquire_new(true));
-    Channel& server_channel = sender.connect();
 
     sender.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
     stop_watch.set_time_point("Precomputation done");
 
-    sender.query_engine(server_channel);
+    sender.query_engine();
     stop_watch.set_time_point("Query done");
-
-    server_channel.close();
 
     cout << stop_watch << endl;
 }

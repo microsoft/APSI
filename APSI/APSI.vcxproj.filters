@@ -114,6 +114,9 @@
     <ClInclude Include="include\Tools\hash.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
+    <ClInclude Include="include\Sender\sendersessioncontext.h">
+      <Filter>Header Files\Sender</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Receiver\receiver.cpp">

@@ -20,7 +20,7 @@ namespace apsi
             pool_(pool),
             ex_ring_(ExRing::acquire_ring(params.exring_characteristic(), params.exring_exponent(), params.exring_polymod(), pool)),
             sender_db_(params, ex_ring_),
-            thread_contexts_(params.sender_thread_count()),
+            thread_contexts_(params.sender_total_thread_count()),
             ios_(new BoostIOService(0))
         {
             initialize();
@@ -34,14 +34,19 @@ namespace apsi
             enc_params_.set_decomposition_bit_count(params_.decomposition_bit_count());
 
             seal_context_.reset(new SEALContext(enc_params_));
+            local_session_.reset(new SenderSessionContext(seal_context_, params_.sender_total_thread_count()));
 
             ex_ring_->init_frobe_table();
             const BigPoly poly_mod(ex_ring_->coeff_count(), ex_ring_->coeff_uint64_count() * bits_per_uint64, 
                 const_cast<uint64_t*>(ex_ring_->poly_modulus().get()));
 
             /* Set local exrings for multithreaded efficient use of memory pools. */
-            for (int i = 0; i < params_.sender_thread_count(); i++)
+            for (int i = 0; i < params_.sender_total_thread_count(); i++)
             {
+                available_thread_contexts_.push_back(i);
+
+                thread_contexts_[i].set_id(i);
+
                 thread_contexts_[i].set_exring(ExRing::acquire_ring(ex_ring_->characteristic(),
                     ex_ring_->exponent(), poly_mod, MemoryPoolHandle::acquire_new(false)));
                 thread_contexts_[i].exring()->set_frobe_table(ex_ring_->frobe_table());
@@ -50,6 +55,7 @@ namespace apsi
                     thread_contexts_[i].set_builder(make_shared<PolyCRTBuilder>(*seal_context_, MemoryPoolHandle::acquire_new(false)));
 
                 thread_contexts_[i].set_exbuilder(make_shared<ExPolyCRTBuilder>(thread_contexts_[i].exring(), params_.log_poly_degree()));
+
             }
 
             server_.reset(new BoostEndpoint(*ios_, "127.0.0.1", 4000, true, "APSI"));
@@ -62,25 +68,23 @@ namespace apsi
 
         void Sender::set_public_key(const PublicKey &public_key)
         {
-            public_key_ = public_key;
-            encryptor_.reset(new Encryptor(*seal_context_, public_key_));
+            local_session_->set_public_key(public_key);
         }
 
         void Sender::set_evaluation_keys(const seal::EvaluationKeys &evaluation_keys)
         {
-            evaluation_keys_ = evaluation_keys;
-            evaluator_.reset(new Evaluator(*seal_context_, evaluation_keys_));
+            /* This is a special local session with maximum threads. */
+            local_session_->set_evaluation_keys(evaluation_keys, params_.sender_total_thread_count());
 
-            for (int i = 0; i < params_.sender_thread_count(); i++)
+            /*for (int i = 0; i < params_.sender_thread_count(); i++)
             {
-                thread_contexts_[i].set_evaluator(make_shared<Evaluator>(*seal_context_, evaluation_keys_, MemoryPoolHandle::acquire_new(false)));
-            }
+                thread_contexts_[i].set_evaluator(make_shared<Evaluator>(*seal_context_, local_session_->evaluation_keys_, MemoryPoolHandle::acquire_new(false)));
+            }*/
         }
 
         void Sender::set_secret_key(const SecretKey &secret_key)
         {
-            secret_key_ = secret_key;
-            decryptor_.reset(new Decryptor(*seal_context_, secret_key_));
+            local_session_->set_secret_key(secret_key);
         }
 
         void Sender::load_db(const std::vector<Item> &data)
@@ -106,33 +110,55 @@ namespace apsi
                     int split = next_block / params_.number_of_batches(), batch = next_block % params_.number_of_batches();
                     sender_db_.batched_randomized_symmetric_polys(split, batch, context);
                 }
+                /* After this point, this thread will no longer use the context resource, so it is free to return it. */
+                release_thread_context(context.id());
             };
 
             vector<thread> thread_pool;
-            for (int i = 0; i < params_.sender_thread_count(); i++)
+            for (int i = 0; i < params_.sender_total_thread_count(); i++)
             {
+                /* Multiple client sessions can enter this function to compete for thread context resources. */
+                int thread_context_idx = acquire_thread_context();
+
+                /* Update the context with the session's specific keys. */
+                thread_contexts_[thread_context_idx].set_encryptor(local_session_->encryptor_);
+                thread_contexts_[thread_context_idx].set_evaluator(local_session_->local_evaluators_[i]);
+
                 // Must use 'std::ref' to pass by reference when we construct thread with a lambda function that takes reference arguments.
                 // But if we just call the lambda function, then we don't need 'std::ref'.
-                thread_pool.push_back(thread(block_computation, std::ref(thread_contexts_[i])));
+                thread_pool.push_back(thread(block_computation, std::ref(thread_contexts_[thread_context_idx])));
             }
 
             for (int i = 0; i < thread_pool.size(); i++)
                 thread_pool[i].join();
         }
 
-        Channel& Sender::connect()
-        {
-            Channel& server_channel = server_->addChannel("sender", "receiver");
-            /* Set up keys. */
-            receive_pubkey(public_key_, server_channel);
-            receive_evalkeys(evaluation_keys_, server_channel);
-            set_keys(public_key_, evaluation_keys_);
 
-            return server_channel;
+        void Sender::query_engine()
+        {
+            while (true)
+            {
+                Channel* server_channel = server_->getNextQueuedChannel();
+                if (server_channel == nullptr)
+                {
+                    this_thread::sleep_for(chrono::milliseconds(50));
+                    continue;
+                }
+                
+                thread session(&Sender::query_session, this, std::ref(*server_channel));
+                session.detach();
+            }
         }
 
-        void Sender::query_engine(Channel &server_channel)
+        void Sender::query_session(Channel &server_channel)
         {
+            /* Set up keys. */
+            PublicKey pub;
+            EvaluationKeys eval;
+            receive_pubkey(pub, server_channel);
+            receive_evalkeys(eval, server_channel);
+            SenderSessionContext session_context(seal_context_, pub, eval, params_.sender_session_thread_count());
+
             /* Receive client's query data. */
             int num_of_powers = 0;
             receive_int(num_of_powers, server_channel);
@@ -146,15 +172,18 @@ namespace apsi
             }
 
             /* Answer to the query. */
-            respond(query, &server_channel);
+            respond(query, session_context, &server_channel);
+
+            server_channel.close();
         }
 
-        vector<vector<Ciphertext>> Sender::respond(const map<uint64_t, vector<Ciphertext>> &query, Channel *channel)
+        vector<vector<Ciphertext>> Sender::respond(
+            const map<uint64_t, vector<Ciphertext>> &query, SenderSessionContext &session_context, Channel *channel)
         {
             vector<vector<Ciphertext>> result(params_.number_of_splits(), vector<Ciphertext>(params_.number_of_batches()));
 
             vector<vector<Ciphertext>> powers;
-            compute_all_powers(query, powers);
+            compute_all_powers(query, powers, session_context);
 
             atomic<int> block_index = 0;
             mutex mtx;
@@ -177,14 +206,23 @@ namespace apsi
                         send_ciphertext(result[split][batch], *channel);
                     }
                 }
+                /* After this point, this thread will no longer use the context resource, so it is free to return it. */
+                release_thread_context(context.id());
             };
             
             vector<thread> thread_pool;
-            for (int i = 0; i < params_.sender_thread_count(); i++)
+            for (int i = 0; i < params_.sender_session_thread_count(); i++)
             {
+                /* Multiple client sessions can enter this function to compete for thread context resources. */
+                int thread_context_idx = acquire_thread_context();
+
+                /* Update the context with the session's specific keys. */
+                thread_contexts_[thread_context_idx].set_encryptor(session_context.encryptor_);
+                thread_contexts_[thread_context_idx].set_evaluator(session_context.local_evaluators_[i]);
+
                 // Must use 'std::ref' to pass by reference when we construct thread with a lambda function that takes reference arguments.
                 // But if we just call the lambda function, then we don't need 'std::ref'.
-                thread_pool.push_back(thread(block_computation, std::ref(thread_contexts_[i]))); 
+                thread_pool.push_back(thread(block_computation, std::ref(thread_contexts_[thread_context_idx]))); 
             }
 
             for (int i = 0; i < thread_pool.size(); i++)
@@ -193,7 +231,9 @@ namespace apsi
             return result;
         }
 
-        void Sender::compute_all_powers(const map<uint64_t, vector<Ciphertext>> &input, vector<vector<Ciphertext>> &all_powers)
+        void Sender::compute_all_powers(const map<uint64_t, vector<Ciphertext>> &input, 
+            vector<vector<Ciphertext>> &all_powers,
+            SenderSessionContext &session_context)
         {
             all_powers.resize(params_.number_of_batches());
             atomic<int> batch_index = 0;
@@ -207,14 +247,23 @@ namespace apsi
                         break;
                     compute_batch_powers(next_batch, input, all_powers[next_batch], context);
                 }
+                /* After this point, this thread will no longer use the context resource, so it is free to return it. */
+                release_thread_context(context.id());
             };
 
             vector<thread> thread_pool;
-            for (int i = 0; i < params_.sender_thread_count() && i < params_.number_of_batches(); i++)
+            for (int i = 0; i < params_.sender_session_thread_count() && i < params_.number_of_batches(); i++)
             {
+                /* Multiple client sessions can enter this function to compete for thread context resources. */
+                int thread_context_idx = acquire_thread_context();
+
+                /* Update the context with the session's specific keys. */
+                thread_contexts_[thread_context_idx].set_encryptor(session_context.encryptor_);
+                thread_contexts_[thread_context_idx].set_evaluator(session_context.local_evaluators_[i]);
+
                 // Must use 'std::ref' to pass by reference when we construct thread with a lambda function that takes reference arguments.
                 // But if we just call the lambda function, then we don't need 'std::ref'.
-                thread_pool.push_back(thread(batch_computation, std::ref(thread_contexts_[i])));
+                thread_pool.push_back(thread(batch_computation, std::ref(thread_contexts_[thread_context_idx])));
             }
 
             for (int i = 0; i < thread_pool.size(); i++)
@@ -226,7 +275,7 @@ namespace apsi
         {
             batch_powers.resize(params_.split_size() + 1);
             shared_ptr<Evaluator> local_evaluator = context.evaluator();
-            batch_powers[0] = encryptor_->encrypt(BigPoly("1"));
+            batch_powers[0] = context.encryptor()->encrypt(BigPoly("1"));
             for (int i = 1; i <= params_.split_size(); i++)
             {
                 int i1 = optimal_split(i, 1 << params_.window_size());
@@ -269,6 +318,34 @@ namespace apsi
 
             /* TODO: Noise truncation? */
 
+        }
+
+        int Sender::acquire_thread_context()
+        {
+            /* Multiple threads can enter this function to compete for thread context resources. */
+            int thread_context_idx = -1;
+            while (thread_context_idx == -1)
+            {
+                if (!available_thread_contexts_.empty())
+                {
+                    unique_lock<mutex> lock(thread_context_mtx_);
+                    if (!available_thread_contexts_.empty())
+                    {
+                        thread_context_idx = available_thread_contexts_.front();
+                        available_thread_contexts_.pop_front();
+                    }
+                }
+                else
+                    this_thread::sleep_for(chrono::milliseconds(50));
+            }
+
+            return thread_context_idx;
+        }
+
+        void Sender::release_thread_context(int idx)
+        {
+            unique_lock<mutex> lock(thread_context_mtx_);
+            available_thread_contexts_.push_back(idx);
         }
 
     }

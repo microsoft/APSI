@@ -6,6 +6,7 @@
 #include "Network/boost_socket.h"
 #include "Tools/log.h"
 #include <sstream>
+#include <stdexcept>
 
 namespace apsi
 {
@@ -127,6 +128,28 @@ namespace apsi
             }
 
             return chl;
+        }
+
+        Channel* BoostEndpoint::getNextQueuedChannel()
+        {
+            if (!mHost)
+                throw std::logic_error("Cannot get queued channel for non-host endpoints.");
+            if (mStopped == true)
+            {
+                throw std::runtime_error("");
+            }
+            std::pair<std::string, BoostSocket*> socket = mAcceptor->getNextQueuedSocket();
+            if (socket.second == nullptr)
+                return nullptr;
+            auto names = split(socket.first, char(':'));
+            if (names[0] != mName)
+                throw std::logic_error("Unexpected endpoint name."); // This should never happen.
+
+            std::lock_guard<std::mutex> lock(mAddChannelMtx);
+            mChannels.emplace_back(*this, names[1], names[2]);
+            mChannels.back().mSocket.reset(socket.second);
+
+            return &mChannels.back();
         }
 
 

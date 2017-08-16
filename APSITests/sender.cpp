@@ -24,7 +24,7 @@ namespace APSITests
 		
 		TEST_METHOD(TestAllPowers)
 		{
-			PSIParams params(8, 8, 32, 4, 8);
+			PSIParams params(8, 8, 8, 32, 4, 8);
 			Sender sender(params);
 			Receiver receiver(params);
 			std::shared_ptr<ExRing> ring = receiver.exring();
@@ -42,7 +42,7 @@ namespace APSITests
 			for (int i = 0; i < enc_powers.size(); i++)
 			{
 				for (int j = 0; j < enc_powers[i].size(); j++)
-					sender.evaluator().transform_from_ntt(enc_powers[i][j]);
+					sender.local_session().evaluator_->transform_from_ntt(enc_powers[i][j]);
 
 				vector<ExRingElement> recovered_power = receiver.decrypt(enc_powers[i]);
 				for (int j = 0; j < 10; j++)
@@ -53,7 +53,7 @@ namespace APSITests
 
 		TEST_METHOD(TestUpdateDB)
 		{
-			PSIParams params(8, 10, 32, 2, 4);
+			PSIParams params(8, 8, 10, 32, 2, 4);
 			params.set_item_bit_length(32);
 			params.set_decomposition_bit_count(2);
 			params.set_log_poly_degree(11);

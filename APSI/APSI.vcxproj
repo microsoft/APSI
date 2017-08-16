@@ -150,6 +150,7 @@
     <ClInclude Include="include\Receiver\receiver.h" />
     <ClInclude Include="include\Sender\sender.h" />
     <ClInclude Include="include\Sender\senderdb.h" />
+    <ClInclude Include="include\Sender\sendersessioncontext.h" />
     <ClInclude Include="include\Sender\senderthreadcontext.h" />
     <ClInclude Include="include\Tools\clp.h" />
     <ClInclude Include="include\Tools\hash.h" />

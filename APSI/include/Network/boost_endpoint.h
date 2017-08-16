@@ -65,6 +65,8 @@ namespace apsi
             /// <summary>Adds a new channel (data pipe) between this endpoint and the remote. The channel is named at each end.</summary>
             Channel& addChannel(std::string localName, std::string remoteName) override;
 
+            Channel* getNextQueuedChannel();
+
 
             /// <summary>Stops this Endpoint. Will block until all channels have closed.</summary>
             void stop() override;

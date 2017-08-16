@@ -53,6 +53,7 @@ namespace apsi
             std::atomic<bool> mStopped;
             std::mutex mMtx;
             std::unordered_map<std::string, std::promise<BoostSocket*>> mSocketPromises;
+            std::deque<std::string> mQueuedConnections;
 
             std::promise<BoostSocket*>& getSocketPromise(
                 std::string endpointName,
@@ -60,6 +61,11 @@ namespace apsi
                 std::string remoteChannelName);
 
             BoostSocket* getSocket(BoostChannel& chl);
+
+            std::promise<BoostSocket*>& createRandomSocketPromise(
+                std::string endpointName);
+
+            std::pair<std::string, BoostSocket*> getNextQueuedSocket();
 
             std::uint64_t mPort;
             boost::asio::ip::tcp::endpoint mAddress;

@@ -5,6 +5,8 @@
 #include "Network/byte_stream.h"
 #include "Tools/log.h"
 #include "boost/lexical_cast.hpp"
+#include <random>
+#include <stdexcept>
 
 using namespace apsi::tools;
 
@@ -110,7 +112,11 @@ namespace apsi
 
                                         // Now lets create or get the std::promise<WinNetSocket> that will hold this socket
                                         // for the WinNetEndpoint that will eventually receive it.
-                                        auto& prom = getSocketPromise(names[0], names[2], names[1]);
+                                        auto& prom = (names[1] == "-") ?
+                                            (createRandomSocketPromise(names[0]))
+                                            :
+                                            (getSocketPromise(names[0], names[2], names[1]));
+                                        
                                         //Log::out << "accept WinNetSocket @ " << (std::uint64_t)socket << Log::endl;
 
                                         try
@@ -212,6 +218,43 @@ namespace apsi
             }
 
             return mSocketPromises[tag];
+        }
+
+        std::promise<BoostSocket*>& BoostAcceptor::createRandomSocketPromise(
+            std::string endpointName)
+        {
+            std::random_device rd;
+            std::string tag;
+            std::unique_lock<std::mutex> lock(mMtx);
+            while (true)
+            {
+                uint64_t random_channel = 0;
+                random_channel |= rd();
+                random_channel |= ((uint64_t)rd()) << 32;
+                tag = endpointName + ":" + std::to_string(random_channel) + ":" + std::to_string(random_channel);
+                auto iter = mSocketPromises.find(tag);
+                if (iter == mSocketPromises.end())
+                    break;
+            }
+            mSocketPromises.emplace(tag, std::promise<BoostSocket*>());
+            mQueuedConnections.push_back(tag);
+
+            return mSocketPromises[tag];
+        }
+
+        std::pair<std::string, BoostSocket*> BoostAcceptor::getNextQueuedSocket()
+        {
+            std::unique_lock<std::mutex> lock(mMtx);
+            if (mQueuedConnections.empty())
+                return std::make_pair("", nullptr);
+            std::string tag = mQueuedConnections.front();
+            mQueuedConnections.pop_front();
+            auto iter = mSocketPromises.find(tag);
+            if (iter == mSocketPromises.end())
+                throw std::logic_error(std::string("Socket with name") + tag + " does not exist."); // This should never happen.
+
+            std::promise<BoostSocket*>* prom = &(iter->second);
+            return std::make_pair(tag, std::move(prom->get_future().get()));
         }
     }
 }

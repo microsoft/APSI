@@ -20,23 +20,27 @@ void example_update();
 void example_fast_batching();
 void example_slow_vs_fast();
 void example_remote();
+void example_remote_multiple();
 
 int main(int argc, char *argv[])
 {
     // Example: Basics
-    //example_basics();
+    example_basics();
 
     //// Example: Update
-    //example_update();
+    example_update();
 
     //// Example: Fast batching
-    //example_fast_batching();
+    example_fast_batching();
 
     // Example: Slow batching vs. Fast batching
-    //example_slow_vs_fast();
+    example_slow_vs_fast();
 
     // Example: Remote connection
-    example_remote();
+    //example_remote();
+
+    // Example: Remote connection from multiple receivers
+    //example_remote_multiple();
 
     // Wait for ENTER before closing screen.
     cout << endl << "Press ENTER to exit" << endl;
@@ -50,8 +54,8 @@ void example_basics()
     print_example_banner("Example: Basics");
     stop_watch.time_points.clear();
 
-    /* sender threads (8), table size (2^8=256), sender bin size (32), window size (2), splits (4). */
-    PSIParams params(8, 8, 32, 2, 4);
+    /* sender total threads (8), sender session threads (8), table size (2^8=256), sender bin size (32), window size (2), splits (4). */
+    PSIParams params(8, 8, 8, 32, 2, 4);
 
     /* 
     Item's bit length. In this example, we will only consider 32 bits of input items. 
@@ -113,7 +117,7 @@ void example_update()
     print_example_banner("Example: Update");
     stop_watch.time_points.clear();
 
-    PSIParams params(8, 8, 32, 2, 4);
+    PSIParams params(8, 8, 8, 32, 2, 4);
     params.set_item_bit_length(32);
     params.set_decomposition_bit_count(2);
     params.set_log_poly_degree(11);
@@ -181,7 +185,7 @@ void example_fast_batching()
     plain modulus in SEAL). "Reduced item" refers to the permutation-based cuckoo hashing items.
     */
 
-    PSIParams params(4, 13, 112, 3, 8);
+    PSIParams params(4, 4, 13, 112, 3, 8);
     params.set_item_bit_length(32); // The effective item bit length will be limited by ExRing's p.
     params.set_exring_polymod(string("1x^1")); // f(x) = x
     params.set_exring_characteristic(string("820001")); // p = 8519681. NOTE: p=1 (mod 2n)
@@ -237,7 +241,7 @@ void example_slow_vs_fast()
     /* The slow batching case. We are using an ExRing with f(x) of degree higher than 1, which results in fewer batching slots and thus 
     potentially more batches to be processed. The following table size is 4096, number of batching slots is 512, hence we have 8 batches. 
     In exchange, we could handle very long items. */
-    PSIParams params(8, 12, 128, 2, 8);
+    PSIParams params(8, 8, 12, 128, 2, 8);
     params.set_item_bit_length(90); // We can handle very long items in the following ExRing.
     params.set_exring_polymod(string("1x^8 + 7"));  // f(x) = x^8 + 7
     params.set_exring_characteristic(string("3401")); // p = 13313
@@ -274,7 +278,7 @@ void example_slow_vs_fast()
     stop_watch.set_time_point("PSI with slow batching done.");
     
     /* The fast batching case. The table size is 4096, and the batching slots are also 4096, hence we only have one batch. */
-    PSIParams params2(8, 12, 128, 2, 8);
+    PSIParams params2(8, 8, 12, 128, 2, 8);
     params2.set_item_bit_length(90); // The effective item bit length will be limited by ExRing's p.
     params2.set_exring_polymod(string("1x^1")); // f(x) = x
     params2.set_exring_characteristic(string("A001")); // p = 40961. NOTE: p=1 (mod 2n)
@@ -316,8 +320,8 @@ void example_remote()
     print_example_banner("Example: Remote");
     stop_watch.time_points.clear();
 
-    /* sender threads (8), table size (2^8=256), sender bin size (32), window size (2), splits (4). */
-    PSIParams params(8, 8, 32, 2, 4);
+    /* sender total threads (8), sender session threads (4), table size (2^8=256), sender bin size (32), window size (2), splits (4). */
+    PSIParams params(8, 4, 8, 32, 2, 4);
 
     /*
     Item's bit length. In this example, we will only consider 32 bits of input items.
@@ -351,6 +355,68 @@ void example_remote()
     for (int i = 0; i < intersection.size(); i++)
         cout << intersection[i] << ", ";
     cout << ']' << endl;
+
+    cout << stop_watch << endl;
+}
+
+void example_remote_multiple()
+{
+    print_example_banner("Example: Remote multiple");
+    stop_watch.time_points.clear();
+
+    /* sender total threads (8), sender session threads (4), table size (2^8=256), sender bin size (32), window size (2), splits (4). */
+    PSIParams params(8, 4, 8, 32, 2, 4);
+
+    /*
+    Item's bit length. In this example, we will only consider 32 bits of input items.
+    If we use Item's string or pointer constructor, it means we only consider the first 32 bits of its hash;
+    If we use Item's integer constructor, it means we only consider the first 32 bits of the integer.
+    */
+    params.set_item_bit_length(32);
+
+    params.set_decomposition_bit_count(2);
+
+    /* n = 2^11 = 2048, in SEAL's poly modulus "x^n + 1". */
+    params.set_log_poly_degree(11);
+
+    /* The prime p in ExRing. It is also the plain modulus in SEAL. */
+    params.set_exring_characteristic(string("101"));
+
+    /* f(x) in ExRing. It determines the generalized batching slots. */
+    params.set_exring_polymod(string("1x^16 + 3"));
+
+    /* SEAL's coefficient modulus q: when n = 2048, q has 60 bits. */
+    params.set_coeff_mod_bit_count(60);
+
+    params.validate();
+
+    mutex mtx;
+
+    auto receiver_connection = [&](int id)
+    {
+        Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
+        stop_watch.set_time_point("[Receiver " + to_string(id) + "] Initialization done");
+
+        vector<bool> intersection = receiver.query(vector<Item>{string("1"), string("f"), string("i"), string("c")}, "127.0.0.1", 4000);
+        stop_watch.set_time_point("[Receiver " + to_string(id) + "] Query done");
+        mtx.lock();
+        cout << "[Receiver " << id << "] Intersection result: ";
+        cout << '[';
+        for (int i = 0; i < intersection.size(); i++)
+            cout << intersection[i] << ", ";
+        cout << ']' << endl;
+        mtx.unlock();
+    };
+
+    int receiver_count = 3;
+    vector<thread> receiver_pool;
+    for (int i = 0; i < receiver_count; i++)
+    {
+        receiver_pool.emplace_back(receiver_connection, i);
+    }
+
+    for (int i = 0; i < receiver_count; i++)
+        receiver_pool[i].join();
 
     cout << stop_watch << endl;
 }
