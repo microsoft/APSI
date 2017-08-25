@@ -1,7 +1,7 @@
 #include "Receiver/receiver.h"
 #include "util/uintcore.h"
-#include "encryptionparams.h"
-#include "keygenerator.h"
+#include "rnsencryptionparams.h"
+#include "rnskeygenerator.h"
 #include "Sender/sender.h"
 #include "apsidefines.h"
 #include <sstream>
@@ -23,7 +23,7 @@ namespace apsi
         Receiver::Receiver(const PSIParams &params, const MemoryPoolHandle &pool)
             :params_(params), 
             pool_(pool),
-            ex_ring_(ExRing::acquire_ring(params.exring_characteristic(), params.exring_exponent(), params.exring_polymod(), pool)),
+            ex_field_(ExField::acquire_field(params.exfield_characteristic(), params.exfield_polymod(), pool)),
             ios_(new BoostIOService(0))
         {
             initialize();
@@ -31,32 +31,32 @@ namespace apsi
 
         void Receiver::initialize()
         {
-            EncryptionParameters enc_params;
+            RNSEncryptionParameters enc_params;
             
             enc_params.set_poly_modulus("1x^" + to_string(params_.poly_degree()) + " + 1");
             enc_params.set_coeff_modulus(params_.coeff_modulus());
-            enc_params.set_plain_modulus(*params_.exring_characteristic().pointer());
+            enc_params.set_plain_modulus(ex_field_->coeff_modulus());
             enc_params.set_decomposition_bit_count(params_.decomposition_bit_count());
             
-            SEALContext seal_context(enc_params);
-            KeyGenerator generator(seal_context);
-            generator.generate();
+            RNSContext seal_context(enc_params);
+            RNSKeyGenerator generator(seal_context);
+            generator.generate(1);
 
             public_key_ = generator.public_key();
             secret_key_ = generator.secret_key();
 
-            encryptor_.reset(new Encryptor(seal_context, public_key_));
-            decryptor_.reset(new Decryptor(seal_context, secret_key_));
+            encryptor_.reset(new RNSEncryptor(seal_context, public_key_));
+            decryptor_.reset(new RNSDecryptor(seal_context, secret_key_));
 
-            generator.generate_evaluation_keys(1);
+            //generator.generate_rns_evaluation_keys(1);
             evaluation_keys_ = generator.evaluation_keys();
 
-            expolycrtbuilder_.reset(new ExPolyCRTBuilder(ex_ring_, params_.log_poly_degree()));
+            exfieldpolycrtbuilder_.reset(new ExFieldPolyCRTBuilder(ex_field_, params_.log_poly_degree()));
 
             if(seal_context.get_qualifiers().enable_batching)
-                polycrtbuilder_.reset(new PolyCRTBuilder(seal_context));
+                polycrtbuilder_.reset(new RNSPolyCRTBuilder(seal_context));
             
-            ex_ring_->init_frobe_table();
+            ex_field_->init_frobe_table();
         }
 
         vector<bool> Receiver::query(const vector<Item> &items, apsi::sender::Sender &sender)
@@ -67,9 +67,9 @@ namespace apsi
 
             vector<int> indices = cuckoo_indices(items, *cuckoo);
 
-            vector<ExRingElement> exring_items = exring_encoding(*cuckoo);
+            vector<ExFieldElement> exfield_items = exfield_encoding(*cuckoo);
 
-            map<uint64_t, vector<ExRingElement>> powers = generate_powers(exring_items);
+            map<uint64_t, vector<ExFieldElement>> powers = generate_powers(exfield_items);
 
             map<uint64_t, vector<Ciphertext>> ciphers = encrypt(powers);
             stop_watch.set_time_point("Receiver encryption");
@@ -77,11 +77,11 @@ namespace apsi
             /* Send to sender. */
             vector<vector<Ciphertext>> result_ciphers = sender.respond(ciphers);
             stop_watch.set_time_point("Sender online");
-            vector<vector<ExRingElement>> result = bulk_decrypt(result_ciphers);
+            vector<vector<ExFieldElement>> result = bulk_decrypt(result_ciphers);
             stop_watch.set_time_point("Receiver decryption");
 
             vector<bool> tmp(params_.table_size(), false);
-            ExRingElement zero(ex_ring_);
+            ExFieldElement zero(ex_field_);
             for (int i = 0; i < params_.table_size(); i++)
             {
                 bool match_found = false;
@@ -109,32 +109,19 @@ namespace apsi
         {
             clear_memory_backing();
 
-            unique_ptr<PermutationBasedCuckoo> cuckoo = cuckoo_hashing(items);
-
-            vector<int> indices = cuckoo_indices(items, *cuckoo);
-
-            vector<ExRingElement> exring_items = exring_encoding(*cuckoo);
-
-            map<uint64_t, vector<ExRingElement>> powers = generate_powers(exring_items);
-
-            map<uint64_t, vector<Ciphertext>> ciphers = encrypt(powers);
+            auto query_data = preprocess(items);
 
             /* Create communication channel. */
             BoostEndpoint client(*ios_, ip, port, false, "APSI");
             Channel& client_channel = client.addChannel("-", "-");
 
-            /* Send keys. */
-            send_pubkey(public_key_, client_channel);
-            send_evalkeys(evaluation_keys_, client_channel);
-
-            /* Send query data. */
-            send_query(ciphers, client_channel);
+            send(query_data.first, client_channel);
 
             /* Receive results in a streaming fashion. */
-            vector<vector<ExRingElement>> result = stream_decrypt(client_channel);
+            vector<vector<ExFieldElement>> result = stream_decrypt(client_channel);            
 
             vector<bool> tmp(params_.table_size(), false);
-            ExRingElement zero(ex_ring_);
+            ExFieldElement zero(ex_field_);
             for (int i = 0; i < params_.table_size(); i++)
             {
                 bool match_found = false;
@@ -152,13 +139,64 @@ namespace apsi
 
             /* Now we need to shorten and convert this tmp vector to match the length and indice of the query "items". */
             vector<bool> intersection(items.size(), false);
-            for (int i = 0; i < indices.size(); i++)
-                intersection[i] = tmp[indices[i]];
+            for (int i = 0; i < query_data.second.size(); i++)
+                intersection[i] = tmp[query_data.second[i]];
 
             client_channel.close();
             client.stop();
 
             return intersection;
+        }
+
+        void Receiver::query(const std::vector<Item> &items, std::string ip, uint64_t port,
+            std::vector<std::vector<seal::Plaintext>> intermediate_result)
+        {
+            clear_memory_backing();
+
+            auto query_data = preprocess(items);
+
+            /* Create communication channel. */
+            BoostEndpoint client(*ios_, ip, port, false, "APSI");
+            Channel& client_channel = client.addChannel("-", "-");
+
+            send(query_data.first, client_channel);
+
+            /* Receive results in a streaming fashion. */
+            vector<vector<Plaintext>> result;
+            stream_decrypt(client_channel, result);
+        }
+
+        std::pair<
+            std::map<uint64_t, std::vector<seal::Ciphertext>>,
+            std::vector<int>
+        > Receiver::preprocess(const vector<Item> &items)
+        {
+            unique_ptr<PermutationBasedCuckoo> cuckoo = cuckoo_hashing(items);
+
+            vector<int> indices = cuckoo_indices(items, *cuckoo);
+
+            vector<ExFieldElement> exfield_items = exfield_encoding(*cuckoo);
+
+            map<uint64_t, vector<ExFieldElement>> powers = generate_powers(exfield_items);
+
+            map<uint64_t, vector<Ciphertext>> ciphers = encrypt(powers);
+
+            return make_pair(ciphers, indices);
+        }
+
+        void Receiver::send(map<uint64_t, vector<Ciphertext>> &query, Channel &channel)
+        {
+            /* Send keys. */
+            send_pubkey(public_key_, channel);
+            send_evalkeys(evaluation_keys_, channel);
+
+            /* Send query data. */
+            send_int(query.size(), channel);
+            for (map<uint64_t, vector<Ciphertext>>::iterator it = query.begin(); it != query.end(); it++)
+            {
+                send_uint64(it->first, channel);
+                send_ciphertext(it->second, channel);
+            }
         }
 
         unique_ptr<PermutationBasedCuckoo> Receiver::cuckoo_hashing(const vector<Item> &items)
@@ -207,10 +245,10 @@ namespace apsi
             return indice;
         }
 
-        vector<ExRingElement> Receiver::exring_encoding(const PermutationBasedCuckoo &cuckoo)
+        vector<ExFieldElement> Receiver::exfield_encoding(const PermutationBasedCuckoo &cuckoo)
         {
             memory_backing_.emplace_back(Pointer());
-            vector<ExRingElement> exring_items = ex_ring_->allocate_elements(cuckoo.capacity(), memory_backing_.back());
+            vector<ExFieldElement> exfield_items = ex_field_->allocate_elements(cuckoo.capacity(), memory_backing_.back());
             int bin_u64_len = cuckoo.bin_u64_length();
             Item item;
             for (int i = 0; i < cuckoo.capacity(); i++)
@@ -222,20 +260,20 @@ namespace apsi
                 else
                     item[1] = 0;
 
-                item.to_exring_element(exring_items[i]);
+                item.to_exfield_element(exfield_items[i]);
             }
-            return exring_items;
+            return exfield_items;
         }
 
-        map<uint64_t, vector<ExRingElement> > Receiver::generate_powers(const vector<ExRingElement> &exring_items)
+        map<uint64_t, vector<ExFieldElement> > Receiver::generate_powers(const vector<ExFieldElement> &exfield_items)
         {
-            map<uint64_t, vector<ExRingElement> > result;
+            map<uint64_t, vector<ExFieldElement> > result;
             int split_size = (params_.sender_bin_size() + params_.number_of_splits() - 1) / params_.number_of_splits();
             int window_size = params_.window_size();
             int radix = 1 << window_size;
             int bound = floor(log2(split_size) / window_size) + 1;
 
-            vector<ExRingElement> current_power = exring_items;
+            vector<ExFieldElement> current_power = exfield_items;
             for (int j = 0; j < bound; j++)
             {
                 result[1 << (window_size * j)] = current_power;
@@ -246,23 +284,23 @@ namespace apsi
                         return result;
                     }
                     memory_backing_.emplace_back(Pointer());
-                    result[i * (1 << (window_size * j))] = ex_ring_->allocate_elements(current_power.size(), memory_backing_.back());
-                    ex_ring_->dyadic_multiply(result[(i - 1)*(1 << (window_size*j))], current_power, result[i * (1 << (window_size * j))]);
+                    result[i * (1 << (window_size * j))] = ex_field_->allocate_elements(current_power.size(), memory_backing_.back());
+                    ex_field_->dyadic_multiply(result[(i - 1)*(1 << (window_size*j))], current_power, result[i * (1 << (window_size * j))]);
                 }
                 for (int k = 0; k < window_size; k++)
                 {
-                    ex_ring_->dyadic_square_inplace(current_power);
+                    ex_field_->dyadic_square_inplace(current_power);
                 }
             }
 
             return result;
         }
 
-        std::map<uint64_t, vector<Ciphertext>> Receiver::encrypt(std::map<uint64_t, std::vector<ExRingElement>> &input)
+        std::map<uint64_t, vector<Ciphertext>> Receiver::encrypt(std::map<uint64_t, std::vector<ExFieldElement>> &input)
         {
             map<uint64_t, vector<Ciphertext>> result;
 
-            for (map<uint64_t, vector<ExRingElement>>::iterator it = input.begin(); it != input.end(); it++)
+            for (map<uint64_t, vector<ExFieldElement>>::iterator it = input.begin(); it != input.end(); it++)
             {
                 result[it->first] = encrypt(it->second);
             }
@@ -270,46 +308,46 @@ namespace apsi
             return result;
         }
 
-        vector<Ciphertext> Receiver::encrypt(const vector<ExRingElement> &input)
+        vector<Ciphertext> Receiver::encrypt(const vector<ExFieldElement> &input)
         {
-            int batch_size = expolycrtbuilder_->slot_count(), num_of_batches = (input.size() + batch_size - 1) / batch_size;
+            int batch_size = exfieldpolycrtbuilder_->slot_count(), num_of_batches = (input.size() + batch_size - 1) / batch_size;
             Pointer tmp_backing;
-            vector<ExRingElement> batch = ex_ring_->allocate_elements(batch_size, tmp_backing);
+            vector<ExFieldElement> batch = ex_field_->allocate_elements(batch_size, tmp_backing);
             vector<uint64_t> integer_batch(batch_size, 0);
             vector<Ciphertext> result;
             for (int i = 0; i < num_of_batches; i++)
             {
                 
                 Plaintext plain;
-                if (ex_ring_->is_integer_field() && polycrtbuilder_)
+                if (polycrtbuilder_)
                 {
                     for (int j = 0; (j < batch_size) && ((i * batch_size + j) < input.size()); j++)
                         integer_batch[j] = *input[i * batch_size + j].pointer(0);
                     polycrtbuilder_->compose(integer_batch, plain);
                 }
-                else // This branch works even if ex_ring_ is an integer field, but it is slower than normal batching.
+                else // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
                 {
                     for (int j = 0; (j < batch_size) && ((i * batch_size + j) < input.size()); j++)
                         batch[j] = input[i * batch_size + j];
-                     expolycrtbuilder_->compose(batch, plain);
+                     exfieldpolycrtbuilder_->compose(batch, plain);
                 }
                 result.emplace_back(
-                    encryptor_->encrypt(plain));
+                    encryptor_->rns_encrypt(plain));
             }
             return result;
         }
 
-        vector<vector<ExRingElement>> Receiver::bulk_decrypt(const vector<vector<Ciphertext>> &result_ciphers)
+        vector<vector<ExFieldElement>> Receiver::bulk_decrypt(const vector<vector<Ciphertext>> &result_ciphers)
         {
             if (result_ciphers.size() != params_.number_of_splits() || result_ciphers[0].size() != params_.number_of_batches())
                 throw invalid_argument("Result ciphers have unexpexted sizes.");
 
-            int slot_count = expolycrtbuilder_->slot_count();
+            int slot_count = exfieldpolycrtbuilder_->slot_count();
             memory_backing_.emplace_back(Pointer());
-            vector<vector<ExRingElement>> result = ex_ring_->allocate_elements(
+            vector<vector<ExFieldElement>> result = ex_field_->allocate_elements(
                 result_ciphers.size(), result_ciphers[0].size() * slot_count, memory_backing_.back());
             Pointer tmp_backing;
-            vector<ExRingElement> temp = ex_ring_->allocate_elements(slot_count, tmp_backing);
+            vector<ExFieldElement> temp = ex_field_->allocate_elements(slot_count, tmp_backing);
             for (int i = 0; i < result_ciphers.size(); i++)
                 for(int j = 0; j < result_ciphers[0].size(); j++)
                 {
@@ -318,19 +356,29 @@ namespace apsi
                         result[i][j * slot_count + k] = temp[k];
                 }
             cout << "Remaining Nosie Budget: " << decryptor_->invariant_noise_budget(result_ciphers[0][0]) << endl;
+
             return result;
         }
 
-        vector<vector<ExRingElement>> Receiver::stream_decrypt(Channel &channel)
+        vector<vector<ExFieldElement>> Receiver::stream_decrypt(Channel &channel)
         {
-            int num_of_splits = params_.number_of_splits(), num_of_batches = params_.number_of_batches(),
-                slot_count = expolycrtbuilder_->slot_count();
-            memory_backing_.emplace_back(Pointer());
-            vector<vector<ExRingElement>> result = ex_ring_->allocate_elements(
-                num_of_splits, num_of_batches * slot_count, memory_backing_.back());
-            Pointer batch_backing;
-            vector<ExRingElement> batch = ex_ring_->allocate_elements(slot_count, batch_backing);
+            vector<vector<ExFieldElement>> result;
+            stream_decrypt(channel, result);
+            return result;
+        }
 
+        void Receiver::stream_decrypt(Channel &channel, vector<vector<ExFieldElement>> &result)
+        {
+            vector<vector<Plaintext>> plaintext_matrix;
+            stream_decrypt(channel, plaintext_matrix);
+            decompose(plaintext_matrix, result);
+        }
+
+        void Receiver::stream_decrypt(apsi::network::Channel &channel, std::vector<std::vector<seal::Plaintext>> &result)
+        {
+            int num_of_splits = params_.number_of_splits(), num_of_batches = params_.number_of_batches();
+            result.resize(num_of_splits, vector<Plaintext>(num_of_batches));
+            
             int block_count = num_of_splits * num_of_batches, split_idx = 0, batch_idx = 0;
             Ciphertext tmp;
             while (block_count-- > 0)
@@ -338,31 +386,28 @@ namespace apsi
                 receive_int(split_idx, channel);
                 receive_int(batch_idx, channel);
                 receive_ciphertext(tmp, channel);
-                decrypt(tmp, batch);
-                for (int k = 0; k < batch.size(); k++)
-                    result[split_idx][batch_idx * slot_count + k] = batch[k];
+                decrypt(tmp, result[split_idx][batch_idx]);
             }
-            return result;
         }
 
-        vector<ExRingElement> Receiver::decrypt(const vector<Ciphertext> &ciphers)
+        vector<ExFieldElement> Receiver::decrypt(const vector<Ciphertext> &ciphers)
         {
-            int slot_count = expolycrtbuilder_->slot_count();
+            int slot_count = exfieldpolycrtbuilder_->slot_count();
             memory_backing_.emplace_back(Pointer());
-            vector<ExRingElement> result = ex_ring_->allocate_elements(ciphers.size() * slot_count, memory_backing_.back());
+            vector<ExFieldElement> result = ex_field_->allocate_elements(ciphers.size() * slot_count, memory_backing_.back());
             Pointer tmp_backing;
-            vector<ExRingElement> temp = ex_ring_->allocate_elements(slot_count, tmp_backing);
+            vector<ExFieldElement> temp = ex_field_->allocate_elements(slot_count, tmp_backing);
             for (int i = 0; i < ciphers.size(); i++)
             {
-                if (ex_ring_->is_integer_field() && polycrtbuilder_)
+                if (polycrtbuilder_)
                 {
-                    vector<BigUInt> integer_batch = polycrtbuilder_->decompose(decryptor_->decrypt(ciphers[i]));
+                    vector<BigUInt> integer_batch = polycrtbuilder_->decompose(decryptor_->rns_decrypt(ciphers[i]));
                     for (int j = 0; j < integer_batch.size(); j++)
                         *temp[j].pointer(0) = *integer_batch[j].pointer();
                 }
                 else
                 {
-                    expolycrtbuilder_->decompose(decryptor_->decrypt(ciphers[i]), temp);
+                    exfieldpolycrtbuilder_->decompose(decryptor_->rns_decrypt(ciphers[i]), temp);
                 }
                 for(int j = 0; j < temp.size(); j++)
                     result[i * slot_count + j] = temp[j];
@@ -370,28 +415,55 @@ namespace apsi
             return result;
         }
 
-        void Receiver::decrypt(const seal::Ciphertext &cipher, vector<ExRingElement> &batch)
+        void Receiver::decrypt(const seal::Ciphertext &cipher, vector<ExFieldElement> &batch)
         {
-            if (ex_ring_->is_integer_field() && polycrtbuilder_)
+            Plaintext plain;
+            decrypt(cipher, plain);
+            decompose(plain, batch);
+        }
+
+        void Receiver::decrypt(const seal::Ciphertext &cipher, Plaintext &plain)
+        {
+            decryptor_->rns_decrypt(cipher, plain);
+        }
+
+        void Receiver::decompose(const Plaintext &plain, std::vector<seal::util::ExFieldElement> &batch)
+        {
+            if (polycrtbuilder_)
             {
-                vector<BigUInt> integer_batch = polycrtbuilder_->decompose(decryptor_->decrypt(cipher));
+                vector<BigUInt> integer_batch = polycrtbuilder_->decompose(plain);
                 for (int j = 0; j < integer_batch.size(); j++)
                     *batch[j].pointer(0) = *integer_batch[j].pointer();
             }
             else
             {
-                expolycrtbuilder_->decompose(decryptor_->decrypt(cipher), batch);
+                exfieldpolycrtbuilder_->decompose(plain, batch);
             }
         }
 
-        void Receiver::send_query(map<uint64_t, vector<Ciphertext>> &query, Channel &channel)
+        void Receiver::decompose(const std::vector<std::vector<seal::Plaintext>> &plain_matrix,
+            std::vector<std::vector<seal::util::ExFieldElement>> &result)
         {
-            send_int(query.size(), channel);
-            for (map<uint64_t, vector<Ciphertext>>::iterator it = query.begin(); it != query.end(); it++)
+            int num_of_splits = params_.number_of_splits(), num_of_batches = params_.number_of_batches(),
+                slot_count = exfieldpolycrtbuilder_->slot_count();
+            memory_backing_.emplace_back(Pointer());
+            result = ex_field_->allocate_elements(
+                num_of_splits, num_of_batches * slot_count, memory_backing_.back());
+            Pointer batch_backing;
+            vector<ExFieldElement> batch = ex_field_->allocate_elements(slot_count, batch_backing);
+
+            for (int i = 0; i < num_of_splits; i++)
             {
-                send_uint64(it->first, channel);
-                send_ciphertext(it->second, channel);
+                for (int j = 0; j < num_of_batches; j++)
+                {
+                    decompose(plain_matrix[i][j], batch);
+                    for (int k = 0; k < batch.size(); k++)
+                    {
+                        result[i][j * slot_count + k] = batch[k];
+                    }
+                }
             }
         }
+
     }
 }

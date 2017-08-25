@@ -2,13 +2,19 @@
 
 #include "ciphertext.h"
 #include "boost_channel.h"
-#include "evaluationkeys.h"
+#include "rnsevaluationkeys.h"
 #include "publickey.h"
+#include "item.h"
+#include "plaintext.h"
 
 namespace apsi
 {
     namespace network
     {
+        void send_plaintext(const seal::Plaintext &plaintext, Channel &channel);
+
+        void receive_plaintext(seal::Plaintext &plaintext, Channel &channel);
+
         void send_ciphertext(const seal::Ciphertext &ciphertext, Channel &channel);
 
         void receive_ciphertext(seal::Ciphertext &ciphertext, Channel &channel);
@@ -29,12 +35,18 @@ namespace apsi
 
         void receive_string(std::string &data, Channel &channel);
 
-        void send_evalkeys(const seal::EvaluationKeys &keys, Channel &channel);
+        void send_evalkeys(const seal::RNSEvaluationKeys &keys, Channel &channel);
 
-        void receive_evalkeys(seal::EvaluationKeys &keys, Channel &channel);
+        void receive_evalkeys(seal::RNSEvaluationKeys &keys, Channel &channel);
 
         void send_pubkey(const seal::PublicKey &pubkey, Channel &channel);
 
         void receive_pubkey(seal::PublicKey &pubkey, Channel &channel);
+
+        void send_item(const apsi::Item &item, Channel &channel);
+
+        void receive_item(apsi::Item &item, Channel &channel);
+
+        
     }
 }

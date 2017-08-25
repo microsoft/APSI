@@ -3,7 +3,7 @@
 #include "psiparams.h"
 #include "Receiver/receiver.h"
 #include "Sender/sender.h"
-#include "util/exring.h"
+#include "util/exfield.h"
 #include "ciphertext.h"
 #include <vector>
 #include <map>
@@ -27,13 +27,13 @@ namespace APSITests
 			PSIParams params(8, 8, 8, 32, 4, 8);
 			Sender sender(params);
 			Receiver receiver(params);
-			std::shared_ptr<ExRing> ring = receiver.exring();
+			std::shared_ptr<ExField> ring = receiver.exfield();
 			sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
 			
-			vector<ExRingElement> v1(10);
+			vector<ExFieldElement> v1(10);
 			for (int i = 0; i < 10; i++)
 				v1[i] = ring->random_element();
-			map<uint64_t, vector<ExRingElement>> r1 = receiver.generate_powers(v1);
+			map<uint64_t, vector<ExFieldElement>> r1 = receiver.generate_powers(v1);
 			map<uint64_t, vector<Ciphertext>> enc_r1 = receiver.encrypt(r1);
 
 			vector<vector<Ciphertext>> enc_powers;
@@ -44,7 +44,7 @@ namespace APSITests
 				for (int j = 0; j < enc_powers[i].size(); j++)
 					sender.local_session().evaluator_->transform_from_ntt(enc_powers[i][j]);
 
-				vector<ExRingElement> recovered_power = receiver.decrypt(enc_powers[i]);
+				vector<ExFieldElement> recovered_power = receiver.decrypt(enc_powers[i]);
 				for (int j = 0; j < 10; j++)
 					Assert::IsTrue(recovered_power[j] == (v1[j] ^ i));
 			}
@@ -57,8 +57,8 @@ namespace APSITests
 			params.set_item_bit_length(32);
 			params.set_decomposition_bit_count(2);
 			params.set_log_poly_degree(11);
-			params.set_exring_characteristic(string("101"));
-			params.set_exring_polymod(string("1x^16 + 3"));
+			params.set_exfield_characteristic(0x101);
+			params.set_exfield_polymod(string("1x^16 + 3"));
 			params.set_coeff_mod_bit_count(60);
 			params.validate();
 			Receiver receiver(params, MemoryPoolHandle::acquire_new(true));

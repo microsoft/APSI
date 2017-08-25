@@ -11,21 +11,21 @@ namespace apsi
 {
     namespace sender
     {
-        SenderDB::SenderDB(const PSIParams& params, shared_ptr<ExRing> ex_ring)
+        SenderDB::SenderDB(const PSIParams& params, shared_ptr<ExField> ex_field)
             :params_(params),
-            global_ex_ring_(ex_ring),
+            global_ex_field_(ex_field),
             cuckoo_(params.hash_func_count(), params.hash_func_seed(), params.log_table_size(), params.item_bit_length(), params.max_probe()),
             simple_hashing_db_(params.sender_bin_size(), vector<Item>(params.table_size())),
             shuffle_index_(params.table_size(), vector<int>(params.sender_bin_size())),
             symm_polys_stale_(params.number_of_splits(), vector<bool>(params.number_of_batches(), true)),
             batch_random_symm_polys_(params.number_of_splits(), vector<vector<Plaintext>>(params.number_of_batches(), vector<Plaintext>(params.split_size() + 1)))
         {
-            exring_db_ = global_ex_ring_->allocate_elements(params_.sender_bin_size(), params_.table_size(), exring_db_backing_);
+            exfield_db_ = global_ex_field_->allocate_elements(params_.sender_bin_size(), params_.table_size(), exfield_db_backing_);
 
-            symm_polys_ = global_ex_ring_->allocate_elements(
+            symm_polys_ = global_ex_field_->allocate_elements(
                 params_.number_of_splits(), params_.table_size(), params_.split_size() + 1, symm_polys_backing_);
 
-            random_symm_polys_ = global_ex_ring_->allocate_elements(
+            random_symm_polys_ = global_ex_field_->allocate_elements(
                 params_.number_of_splits(), params_.table_size(), params_.split_size() + 1, random_symm_polys_backing_);
 
             /* Set null value for sender: 00..0011..11, with itemL's 1 */
@@ -33,7 +33,7 @@ namespace apsi
             right_shift_uint(sender_null_item_.data(), sender_null_item_.data(),
                 (sender_null_item_.bit_count() - cuckoo_.itemL_bit_length()), sender_null_item_.uint64_count());
 
-            null_element_ = sender_null_item_.to_exring_element(global_ex_ring_);
+            null_element_ = sender_null_item_.to_exfield_element(global_ex_field_);
 
             /* Set nature index */
             for (int i = 0; i < params_.table_size(); i++)
@@ -48,7 +48,7 @@ namespace apsi
                 for (int j = 0; j < params_.table_size(); j++)
                 {
                     simple_hashing_db_[i][j] = sender_null_item_;
-                    exring_db_[i][j] = null_element_;
+                    exfield_db_[i][j] = null_element_;
                 }
 
             shuffle();
@@ -78,8 +78,8 @@ namespace apsi
                     simple_hashing_db_[index][hash_locations[j]] = data[i];
                     simple_hashing_db_[index][hash_locations[j]].to_itemL(cuckoo_, j);
 
-                    /* Encode the item to an ExRing element. */
-                    simple_hashing_db_[index][hash_locations[j]].to_exring_element(exring_db_[index][hash_locations[j]]);
+                    /* Encode the item to an ExField element. */
+                    simple_hashing_db_[index][hash_locations[j]].to_exfield_element(exfield_db_[index][hash_locations[j]]);
 
                     /* Set the block that contains this item to be stale. */
                     symm_polys_stale_[index / params_.split_size()][hash_locations[j] / params_.batch_size()] = true;
@@ -107,7 +107,7 @@ namespace apsi
                         if (simple_hashing_db_[index][hash_locations[j]] == target_itemL) /* Item is found. Delete it. */
                         {
                             simple_hashing_db_[index][hash_locations[j]] = sender_null_item_;
-                            exring_db_[index][hash_locations[j]] = null_element_;
+                            exfield_db_[index][hash_locations[j]] = null_element_;
 
                             /* Set the block that contains this item to be stale. */
                             symm_polys_stale_[index / params_.split_size()][hash_locations[j] / params_.batch_size()] = true;
@@ -129,7 +129,7 @@ namespace apsi
             next_shuffle_locs_.assign(params_.table_size(), 0);
         }
 
-        vector<vector<ExRingElement>>& SenderDB::symmetric_polys(int split, SenderThreadContext &context)
+        vector<vector<ExFieldElement>>& SenderDB::symmetric_polys(int split, SenderThreadContext &context)
         {
             for (int i = 0; i < params_.number_of_batches(); i++)
                 symmetric_polys(split, i, context);
@@ -142,24 +142,24 @@ namespace apsi
             int table_size = params_.table_size(), split_size = params_.split_size(), batch_size = params_.batch_size(), split_start = split * split_size,
                 batch_start = batch * batch_size, batch_end = (batch_start + batch_size < table_size? (batch_start + batch_size) : table_size);
 
-            shared_ptr<ExRing> exring = context.exring();
+            shared_ptr<ExField> exfield = context.exfield();
 
-            ExRingElement one(exring, "1");
-            ExRingElement temp1(exring), temp2(exring);
+            ExFieldElement one(exfield, "1");
+            ExFieldElement temp1(exfield), temp2(exfield);
             for (int i = batch_start; i < batch_end; i++)
             {
                 symm_polys_[split][i][split_size] = one;
                 for (int j = split_size - 1; j >= 0; j--)
                 {
-                    exring->negate(exring_db_[split_start + j][i], temp1);
-                    exring->multiply(
+                    exfield->negate(exfield_db_[split_start + j][i], temp1);
+                    exfield->multiply(
                         symm_polys_[split][i][j + 1],
                         temp1,
                         symm_polys_[split][i][j]);
 
                     for (int k = j + 1; k < split_size; k++)
                     {
-                        exring->multiply(
+                        exfield->multiply(
                             symm_polys_[split][i][k + 1],
                             temp1,
                             temp2);
@@ -169,7 +169,7 @@ namespace apsi
             }
         }
 
-        vector<vector<ExRingElement>>& SenderDB::randomized_symmetric_polys(int split, SenderThreadContext &context)
+        vector<vector<ExFieldElement>>& SenderDB::randomized_symmetric_polys(int split, SenderThreadContext &context)
         {
             for (int i = 0; i < params_.number_of_batches(); i++)
                 randomized_symmetric_polys(split, i, context);
@@ -186,9 +186,10 @@ namespace apsi
 
             for (int i = batch_start; i < batch_end; i++)
             {
-                ExRingElement r = context.exring()->random_element();
+                //ExFieldElement r = context.exfield()->random_element();
+                ExFieldElement r = ExFieldElement(context.exfield(), string("1"));
                 for (int j = 0; j < split_size + 1; j++)
-                    context.exring()->multiply(symm_polys_[split][i][j], r, random_symm_polys_[split][i][j]);
+                    context.exfield()->multiply(symm_polys_[split][i][j], r, random_symm_polys_[split][i][j]);
             }
         }
 
@@ -211,19 +212,20 @@ namespace apsi
             int table_size = params_.table_size(), split_size = params_.split_size(), split_start = split * split_size, batch_size = params_.batch_size(),
                 batch_start = batch * batch_size, batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);;
             Pointer batch_backing;
-            vector<ExRingElement> batch_vector = context.exring()->allocate_elements(batch_size, batch_backing);
+            vector<ExFieldElement> batch_vector = context.exfield()->allocate_elements(batch_size, batch_backing);
             vector<uint64_t> integer_batch_vector(batch_size, 0);
 
-            Plaintext temp_plain;
+            
             for (int i = 0; i < split_size + 1; i++)
             {
-                if (context.exring()->is_integer_field() && context.builder())
+                Plaintext temp_plain;
+                if (context.builder())
                 {
                     for (int k = 0; batch_start + k < batch_end; k++)
                         integer_batch_vector[k] = *random_symm_polys_[split][batch_start + k][i].pointer(0);
                     temp_plain = context.builder()->compose(integer_batch_vector);
                 }
-                else // This branch works even if ex_ring_ is an integer field, but it is slower than normal batching.
+                else // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
                 {
                     for (int k = 0; batch_start + k < batch_end; k++)
                         batch_vector[k] = random_symm_polys_[split][batch_start + k][i];

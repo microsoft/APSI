@@ -3,7 +3,7 @@
 #include <iostream>
 #include <string>
 #include "Sender/sender.h"
-#include "util/exring.h"
+#include "util/exfield.h"
 #include "apsidefines.h"
 
 using namespace std;
@@ -25,16 +25,16 @@ void example_remote_multiple();
 int main(int argc, char *argv[])
 {
     // Example: Basics
-    example_basics();
+    //example_basics();
 
     //// Example: Update
-    example_update();
+    //example_update();
 
     //// Example: Fast batching
     example_fast_batching();
 
     // Example: Slow batching vs. Fast batching
-    example_slow_vs_fast();
+    //example_slow_vs_fast();
 
     // Example: Remote connection
     //example_remote();
@@ -69,11 +69,11 @@ void example_basics()
     /* n = 2^11 = 2048, in SEAL's poly modulus "x^n + 1". */
     params.set_log_poly_degree(11);
 
-    /* The prime p in ExRing. It is also the plain modulus in SEAL. */
-    params.set_exring_characteristic(string("101"));
+    /* The prime p in ExField. It is also the plain modulus in SEAL. */
+    params.set_exfield_characteristic(0x101);
 
-    /* f(x) in ExRing. It determines the generalized batching slots. */
-    params.set_exring_polymod(string("1x^16 + 3"));
+    /* f(x) in ExField. It determines the generalized batching slots. */
+    params.set_exfield_polymod(string("1x^16 + 3"));
 
     /* SEAL's coefficient modulus q: when n = 2048, q has 60 bits. */
     params.set_coeff_mod_bit_count(60);
@@ -121,8 +121,8 @@ void example_update()
     params.set_item_bit_length(32);
     params.set_decomposition_bit_count(2);
     params.set_log_poly_degree(11);
-    params.set_exring_characteristic(string("101"));
-    params.set_exring_polymod(string("1x^16 + 3"));
+    params.set_exfield_characteristic(0x101);
+    params.set_exfield_polymod(string("1x^16 + 3"));
     params.set_coeff_mod_bit_count(60);  // SEAL param: when n = 2048, q has 60 bits.
     params.validate();
     Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
@@ -144,7 +144,7 @@ void example_update()
     sender.add_data(string("i"));
     sender.add_data(string("h")); // duplicated item
     sender.add_data(string("x"));
-    sender.offline_compute();
+    //sender.offline_compute();
     stop_watch.set_time_point("Update done");
 
     intersection = receiver.query(vector<Item>{string("1"), string("f"), string("i"), string("c")}, sender);
@@ -158,7 +158,7 @@ void example_update()
     /* We can also delete items in the database. */
     sender.delete_data(string("1")); // Item will be ignored if it doesn't exist in the database.
     sender.delete_data(string("f"));
-    sender.offline_compute();
+    //sender.offline_compute();
     stop_watch.set_time_point("Delete done");
 
     intersection = receiver.query(vector<Item>{string("1"), string("f"), string("i"), string("c")}, sender);
@@ -177,37 +177,41 @@ void example_fast_batching()
     print_example_banner("Example: Fast batching");
     stop_watch.time_points.clear();
 
-    /* Use generalized batching in integer mode. This requires using an ExRing with f(x) = x and r = 1, which makes ExRing becomes an integer field.
+    /* Use generalized batching in integer mode. This requires using an ExField with f(x) = x and r = 1, which makes ExField becomes an integer field.
     Then the generalized batching is essentially equivalent to SEAL's PolyCRTBuilder, which is slightly faster due to David Harvey's optimization of
     NTT butterfly operation on integers.
     
-    However, in this case, we can only use short PSI items such that the reduced item length is smaller than bit length of 'p' in ExRing (also the 
+    However, in this case, we can only use short PSI items such that the reduced item length is smaller than bit length of 'p' in ExField (also the 
     plain modulus in SEAL). "Reduced item" refers to the permutation-based cuckoo hashing items.
     */
 
-    PSIParams params(4, 4, 13, 112, 3, 8);
-    params.set_item_bit_length(32); // The effective item bit length will be limited by ExRing's p.
-    params.set_exring_polymod(string("1x^1")); // f(x) = x
-    params.set_exring_characteristic(string("820001")); // p = 8519681. NOTE: p=1 (mod 2n)
-    params.set_log_poly_degree(13); /* n = 2^13 = 8192, in SEAL's poly modulus "x^n + 1". */
-    params.set_coeff_mod_bit_count(189);  // SEAL param: when n = 8192, q has 189 or 226 bits.
-    params.set_decomposition_bit_count(48);
+    //PSIParams params(4, 4, 13, 112, 3, 8);
+    //params.set_item_bit_length(32); // The effective item bit length will be limited by ExField's p.
+    //params.set_exfield_polymod(string("1x^1")); // f(x) = x
+    //params.set_exfield_characteristic(0x820001); // p = 8519681. NOTE: p=1 (mod 2n)
+    //params.set_log_poly_degree(13); /* n = 2^13 = 8192, in SEAL's poly modulus "x^n + 1". */
+    //params.set_coeff_mod_bit_count(189);  // SEAL param: when n = 8192, q has 189 or 226 bits.
+    //params.set_decomposition_bit_count(48);
 
-    //PSIParams params(4, 14, 3584, 1, 256);
-    //params.set_item_bit_length(32); // The effective item bit length will be limited by ExRing's p.
-    //params.set_exring_polymod(string("1x^1")); // f(x) = x
-    //params.set_exring_characteristic(string("820001")); // p = 8519681. NOTE: p=1 (mod 2n)
-    //params.set_log_poly_degree(14); /* n = 2^14 = 16384, in SEAL's poly modulus "x^n + 1". */
-    //params.set_coeff_mod_bit_count(226);  // SEAL param: when n = 8192, q has 189 or 226 bits.
-    //params.set_decomposition_bit_count(46);
+    PSIParams params(1, 1, 14, 3584, 1, 256);
+    //PSIParams params(1, 1, 8, 32, 4, 4);
+
+    params.set_item_bit_length(32); // The effective item bit length will be limited by ExField's p.
+    params.set_exfield_polymod(string("1x^1")); // f(x) = x
+    params.set_exfield_characteristic(0x820001); // p = 8519681. NOTE: p=1 (mod 2n)
+    /*params.set_exfield_polymod(string("1x^16 + 3"));
+    params.set_exfield_characteristic(0x101);*/
+    params.set_log_poly_degree(14); /* n = 2^14 = 16384, in SEAL's poly modulus "x^n + 1". */
+    params.set_coeff_mod_bit_count(226);  // SEAL param: when n = 16384, q has 189 or 226 bits.
+    params.set_decomposition_bit_count(46);
     params.validate();
 
     cout << "Reduced item bit length: " << params.reduced_item_bit_length() << endl;
-    cout << "Bit length of p: " << params.exring_characteristic().significant_bit_count() << endl;
+    cout << "Bit length of p: " << get_significant_bit_count(params.exfield_characteristic()) << endl;
 
-    if (params.reduced_item_bit_length() >= params.exring_characteristic().significant_bit_count())
+    if (params.reduced_item_bit_length() >= get_significant_bit_count(params.exfield_characteristic()))
     {
-        cout << "Reduced items too long. We will only use the first " << params.exring_characteristic().significant_bit_count() - 1 << " bits." << endl;
+        cout << "Reduced items too long. We will only use the first " << get_significant_bit_count(params.exfield_characteristic()) - 1 << " bits." << endl;
     }
     else
     {
@@ -217,6 +221,7 @@ void example_fast_batching()
     Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
     Sender sender(params, MemoryPoolHandle::acquire_new(true));
     sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
+    sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 
     stop_watch.set_time_point("Application preparation");
     sender.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
@@ -238,25 +243,25 @@ void example_slow_vs_fast()
     print_example_banner("Example: Slow batching vs. Fast batching");
     stop_watch.time_points.clear();
 
-    /* The slow batching case. We are using an ExRing with f(x) of degree higher than 1, which results in fewer batching slots and thus 
+    /* The slow batching case. We are using an ExField with f(x) of degree higher than 1, which results in fewer batching slots and thus 
     potentially more batches to be processed. The following table size is 4096, number of batching slots is 512, hence we have 8 batches. 
     In exchange, we could handle very long items. */
     PSIParams params(8, 8, 12, 128, 2, 8);
-    params.set_item_bit_length(90); // We can handle very long items in the following ExRing.
-    params.set_exring_polymod(string("1x^8 + 7"));  // f(x) = x^8 + 7
-    params.set_exring_characteristic(string("3401")); // p = 13313
+    params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+    params.set_exfield_polymod(string("1x^8 + 7"));  // f(x) = x^8 + 7
+    params.set_exfield_characteristic(0x3401); // p = 13313
     params.set_log_poly_degree(12);
     params.set_coeff_mod_bit_count(116);  // SEAL param: when n = 4096, q has 116 bits.
     params.validate();
 
     cout << "Reduced item bit length: " << params.reduced_item_bit_length() << endl;
-    cout << "Bit length of p: " << params.exring_characteristic().significant_bit_count() << endl;
+    cout << "Bit length of p: " << get_significant_bit_count(params.exfield_characteristic()) << endl;
 
     if (params.reduced_item_bit_length() > 
-        (params.exring_characteristic().significant_bit_count() - 1) * (params.exring_polymod().coeff_count() - 1))
+        (get_significant_bit_count(params.exfield_characteristic()) - 1) * (params.exfield_polymod().coeff_count() - 1))
     {
         cout << "Reduced items too long. We will only use the first " 
-            << (params.exring_characteristic().significant_bit_count() - 1) * (params.exring_polymod().coeff_count() - 1) << " bits." << endl;
+            << (get_significant_bit_count(params.exfield_characteristic()) - 1) * (params.exfield_polymod().coeff_count() - 1) << " bits." << endl;
     }
     else
     {
@@ -279,19 +284,19 @@ void example_slow_vs_fast()
     
     /* The fast batching case. The table size is 4096, and the batching slots are also 4096, hence we only have one batch. */
     PSIParams params2(8, 8, 12, 128, 2, 8);
-    params2.set_item_bit_length(90); // The effective item bit length will be limited by ExRing's p.
-    params2.set_exring_polymod(string("1x^1")); // f(x) = x
-    params2.set_exring_characteristic(string("A001")); // p = 40961. NOTE: p=1 (mod 2n)
+    params2.set_item_bit_length(90); // The effective item bit length will be limited by ExField's p.
+    params2.set_exfield_polymod(string("1x^1")); // f(x) = x
+    params2.set_exfield_characteristic(0xA001); // p = 40961. NOTE: p=1 (mod 2n)
     params2.set_log_poly_degree(12);
     params2.set_coeff_mod_bit_count(116);  // SEAL param: when n = 4096, q has 116 bits.
     params2.validate();
 
     cout << "Reduced item bit length: " << params2.reduced_item_bit_length() << endl;
-    cout << "Bit length of p: " << params2.exring_characteristic().significant_bit_count() << endl;
+    cout << "Bit length of p: " << get_significant_bit_count(params2.exfield_characteristic()) << endl;
 
-    if (params2.reduced_item_bit_length() >= params2.exring_characteristic().significant_bit_count())
+    if (params2.reduced_item_bit_length() >= get_significant_bit_count(params2.exfield_characteristic()))
     {
-        cout << "Reduced items too long. We will only use the first " << params2.exring_characteristic().significant_bit_count() - 1 << " bits." << endl;
+        cout << "Reduced items too long. We will only use the first " << get_significant_bit_count(params2.exfield_characteristic()) - 1 << " bits." << endl;
     }
     else
     {
@@ -335,11 +340,11 @@ void example_remote()
     /* n = 2^11 = 2048, in SEAL's poly modulus "x^n + 1". */
     params.set_log_poly_degree(11);
 
-    /* The prime p in ExRing. It is also the plain modulus in SEAL. */
-    params.set_exring_characteristic(string("101"));
+    /* The prime p in ExField. It is also the plain modulus in SEAL. */
+    params.set_exfield_characteristic(0x101);
 
-    /* f(x) in ExRing. It determines the generalized batching slots. */
-    params.set_exring_polymod(string("1x^16 + 3"));
+    /* f(x) in ExField. It determines the generalized batching slots. */
+    params.set_exfield_polymod(string("1x^16 + 3"));
 
     /* SEAL's coefficient modulus q: when n = 2048, q has 60 bits. */
     params.set_coeff_mod_bit_count(60);
@@ -348,7 +353,7 @@ void example_remote()
 
     Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
 
-    vector<bool> intersection = receiver.query(vector<Item>{string("1"), string("f"), string("i"), string("c")}, "127.0.0.1", 4000);
+    vector<bool> intersection = receiver.query(vector<Item>{string("1"), string("f"), string("i"), string("c")}, "127.0.0.1", params.apsi_port());
     stop_watch.set_time_point("Query done");
     cout << "Intersection result: ";
     cout << '[';
@@ -379,11 +384,11 @@ void example_remote_multiple()
     /* n = 2^11 = 2048, in SEAL's poly modulus "x^n + 1". */
     params.set_log_poly_degree(11);
 
-    /* The prime p in ExRing. It is also the plain modulus in SEAL. */
-    params.set_exring_characteristic(string("101"));
+    /* The prime p in ExField. It is also the plain modulus in SEAL. */
+    params.set_exfield_characteristic(0x101);
 
-    /* f(x) in ExRing. It determines the generalized batching slots. */
-    params.set_exring_polymod(string("1x^16 + 3"));
+    /* f(x) in ExField. It determines the generalized batching slots. */
+    params.set_exfield_polymod(string("1x^16 + 3"));
 
     /* SEAL's coefficient modulus q: when n = 2048, q has 60 bits. */
     params.set_coeff_mod_bit_count(60);
@@ -397,7 +402,7 @@ void example_remote_multiple()
         Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
         stop_watch.set_time_point("[Receiver " + to_string(id) + "] Initialization done");
 
-        vector<bool> intersection = receiver.query(vector<Item>{string("1"), string("f"), string("i"), string("c")}, "127.0.0.1", 4000);
+        vector<bool> intersection = receiver.query(vector<Item>{string("1"), string("f"), string("i"), string("c")}, "127.0.0.1", params.apsi_port());
         stop_watch.set_time_point("[Receiver " + to_string(id) + "] Query done");
         mtx.lock();
         cout << "[Receiver " << id << "] Intersection result: ";

@@ -6,66 +6,66 @@
 
 namespace apsi
 {
-	namespace tools
-	{
-		class LogStream;
+    namespace tools
+    {
+        class LogStream;
 
-		class Log
-		{
-		public:
-			enum Modifier
-			{
-				endl,
-				flush,
-				lock,
-				unlock
-			};
+        class Log
+        {
+        public:
+            enum Modifier
+            {
+                endl,
+                flush,
+                lock,
+                unlock
+            };
 
             static void setThreadName(const std::string name);
 
             static void setThreadName(const char* name);
 
-			static void set_sink(std::ostream &stream);
+            static void set_sink(std::ostream &stream);
 
-			static LogStream out;
+            static LogStream out;
 
-		private:
+        private:
 
-			friend class LogStream;
-		};
+            friend class LogStream;
+        };
 
-		class LogStream
-		{
-		public:
+        class LogStream
+        {
+        public:
 
-		
-			LogStream(std::ostream& stream) : stream_(&stream)
-			{
-			}
+        
+            LogStream(std::ostream& stream) : stream_(&stream)
+            {
+            }
 
-			~LogStream()
-			{
-				if (stream_)
-				{
-					stream_->flush();
-				}
-			}
+            ~LogStream()
+            {
+                if (stream_)
+                {
+                    stream_->flush();
+                }
+            }
 
-			template<typename T>
-			inline LogStream &operator <<(const T &in)
-			{
-				*stream_ << in;
-				return *this;
-			}
+            template<typename T>
+            inline LogStream &operator <<(const T &in)
+            {
+                *stream_ << in;
+                return *this;
+            }
 
-			LogStream &operator <<(const Log::Modifier in);
+            LogStream &operator <<(const Log::Modifier in);
 
 
         private:
-			std::ostream *stream_;
-			std::mutex mutex_;
+            std::ostream *stream_;
+            std::mutex mutex_;
 
-			friend class Log;
-		};
-	}
+            friend class Log;
+        };
+    }
 }

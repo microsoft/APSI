@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "CppUnitTest.h"
 #include "psiparams.h"
-#include "util/exring.h"
+#include "util/exfield.h"
 #include "ciphertext.h"
 #include <vector>
 #include <map>
@@ -48,11 +48,11 @@ namespace APSITests
 			item[0] = 0x3850683f4a;
 			item[1] = 0x238bc3df32;
 
-			shared_ptr<ExRing> ring = ExRing::acquire_ring(string("1e01"), 1, string("1x^16 + 3e"));
+			shared_ptr<ExField> field = ExField::acquire_field(0x1e01, string("1x^16 + 3e"));
 
-			ExRingElement e = item.to_exring_element(ring);
+			ExFieldElement e = item.to_exfield_element(field);
 
-			ExRingElement e_manual(ring, "23x^8 + 8bcx^7 + 3dfx^6 + 320x^5 + 3x^3 + 850x^2 + 683x^1 + f4a");
+			ExFieldElement e_manual(field, "23x^8 + 8bcx^7 + 3dfx^6 + 320x^5 + 3x^3 + 850x^2 + 683x^1 + f4a");
 
 			Assert::IsTrue(e == e_manual);
 		}

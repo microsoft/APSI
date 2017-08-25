@@ -9,6 +9,22 @@ namespace apsi
 {
     namespace network
     {
+        void send_plaintext(const Plaintext &plaintext, Channel &channel)
+        {
+            stringstream ss;
+            plaintext.save(ss);
+            unique_ptr<ByteStream> buff(new ByteStream(reinterpret_cast<const uint8_t*>(ss.str().data()), ss.str().size()));
+            channel.asyncSend(std::move(buff));
+        }
+
+        void receive_plaintext(Plaintext &plaintext, Channel &channel)
+        {
+            ByteStream buff;
+            channel.recv(buff);
+            stringstream ss(string(reinterpret_cast<char*>(buff.data()), buff.size()));
+            plaintext.load(ss);
+        }
+
         void send_ciphertext(const Ciphertext &ciphertext, Channel &channel)
         {
             stringstream ss;
@@ -84,7 +100,7 @@ namespace apsi
             data = string((char*)buff.data(), buff.size());
         }
 
-        void send_evalkeys(const seal::EvaluationKeys &keys, Channel &channel)
+        void send_evalkeys(const seal::RNSEvaluationKeys &keys, Channel &channel)
         {
             stringstream ss;
             keys.save(ss);
@@ -92,7 +108,7 @@ namespace apsi
             channel.asyncSend(std::move(buff));
         }
 
-        void receive_evalkeys(seal::EvaluationKeys &keys, Channel &channel)
+        void receive_evalkeys(seal::RNSEvaluationKeys &keys, Channel &channel)
         {
             ByteStream buff;
             channel.recv(buff);
@@ -114,6 +130,22 @@ namespace apsi
             channel.recv(buff);
             stringstream ss(string(reinterpret_cast<char*>(buff.data()), buff.size()));
             pubkey.load(ss);
+        }
+
+        void send_item(const apsi::Item &item, Channel &channel)
+        {
+            stringstream ss;
+            item.save(ss);
+            unique_ptr<ByteStream> buff(new ByteStream(reinterpret_cast<const uint8_t*>(ss.str().data()), ss.str().size()));
+            channel.asyncSend(std::move(buff));
+        }
+
+        void receive_item(apsi::Item &item, Channel &channel)
+        {
+            ByteStream buff;
+            channel.recv(buff);
+            stringstream ss(string(reinterpret_cast<char*>(buff.data()), buff.size()));
+            item.load(ss);
         }
     }
 }

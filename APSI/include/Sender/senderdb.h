@@ -3,7 +3,7 @@
 #include "item.h"
 #include "psiparams.h"
 #include "cuckoo.h"
-#include "util/exring.h"
+#include "util/exfield.h"
 #include "evaluator.h"
 #include "util/expolycrt.h"
 #include "senderthreadcontext.h"
@@ -15,7 +15,7 @@ namespace apsi
 		class SenderDB
 		{
 		public:
-			SenderDB(const PSIParams &params, std::shared_ptr<seal::util::ExRing> ex_ring);
+			SenderDB(const PSIParams &params, std::shared_ptr<seal::util::ExField> ex_field);
 
 			/**
 			Clears sender's database and set all entries to sender's null item.
@@ -68,7 +68,7 @@ namespace apsi
 			Input sub-bin: (a_1, a_2, ..., a_n)
 			Output polynomial terms: (1, \sum_i a_i, \sum_{i,j} a_i*a_j, ...).
 			*/
-			std::vector<std::vector<seal::util::ExRingElement>>& symmetric_polys(int splitIndex, SenderThreadContext &context);
+			std::vector<std::vector<seal::util::ExFieldElement>>& symmetric_polys(int splitIndex, SenderThreadContext &context);
 
 			/**
 			Computes the symmetric polynomials for the specified split and the specified batch in sender's database.
@@ -84,7 +84,7 @@ namespace apsi
 
 			@see symmetric_polys for computing symmetric polynomials.
 			*/
-			std::vector<std::vector<seal::util::ExRingElement>>& randomized_symmetric_polys(int splitIndex, SenderThreadContext &context);
+			std::vector<std::vector<seal::util::ExFieldElement>>& randomized_symmetric_polys(int splitIndex, SenderThreadContext &context);
 
 			/**
 			Computes the randomized symmetric polynomials for the specified split and the specified batch in sender's database. Basically, it
@@ -125,12 +125,12 @@ namespace apsi
 			*/
 			Item sender_null_item_;
 
-			/* The ExRing encoding of the sender null value. */
-			seal::util::ExRingElement null_element_;
+			/* The ExField encoding of the sender null value. */
+			seal::util::ExFieldElement null_element_;
 
 			cuckoo::PermutationBasedCuckoo cuckoo_;
 
-			std::shared_ptr<seal::util::ExRing> global_ex_ring_;
+			std::shared_ptr<seal::util::ExField> global_ex_field_;
 
 			/* B x m, where B is sender's bin size, m is table size.
 			This is actually a rotated view of the DB. We store it in this
@@ -147,15 +147,15 @@ namespace apsi
 			in the corresponding bin. */
 			std::vector<int> next_shuffle_locs_;
 
-			/* B x m, the corresponding ExRing version of the DB. Refer to simple_hashing_db_. */
-			std::vector<std::vector<seal::util::ExRingElement>> exring_db_;
-			seal::util::Pointer exring_db_backing_;
+			/* B x m, the corresponding ExField version of the DB. Refer to simple_hashing_db_. */
+			std::vector<std::vector<seal::util::ExFieldElement>> exfield_db_;
+			seal::util::Pointer exfield_db_backing_;
 
 			/* Symmetric polynomial terms. 
 			#splits x m x (split_size + 1). In fact, B = #splits x split_size. The table is 
 			essentially split into '#splits' parts, and we add an extra row for each part to
 			store the coefficient '1' of the highest degree terms in the symmetric polynomials. */
-			std::vector<std::vector<std::vector<seal::util::ExRingElement>>> symm_polys_;
+			std::vector<std::vector<std::vector<seal::util::ExFieldElement>>> symm_polys_;
 			seal::util::Pointer symm_polys_backing_;
 
 			/* Randomized symmetric polynomial terms.
@@ -163,7 +163,7 @@ namespace apsi
 			essentially split into '#splits' parts, and we add an extra row for each part to
 			store the coefficient '1' of the highest degree terms in the symmetric polynomials.
 			*/
-			std::vector<std::vector<std::vector<seal::util::ExRingElement>>> random_symm_polys_;
+			std::vector<std::vector<std::vector<seal::util::ExFieldElement>>> random_symm_polys_;
 			seal::util::Pointer random_symm_polys_backing_;
 			
 			/* Batched randomized symmetric polynomial terms.

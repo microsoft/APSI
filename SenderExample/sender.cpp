@@ -3,7 +3,7 @@
 #include <iostream>
 #include <string>
 #include "Sender/sender.h"
-#include "util/exring.h"
+#include "util/exfield.h"
 #include "apsidefines.h"
 #include "Network/channel.h"
 #include "Network/network_utils.h"
@@ -52,11 +52,11 @@ void example_remote()
     /* n = 2^11 = 2048, in SEAL's poly modulus "x^n + 1". */
     params.set_log_poly_degree(11);
 
-    /* The prime p in ExRing. It is also the plain modulus in SEAL. */
-    params.set_exring_characteristic(string("101"));
+    /* The prime p in ExField. It is also the plain modulus in SEAL. */
+    params.set_exfield_characteristic(0x101);
 
-    /* f(x) in ExRing. It determines the generalized batching slots. */
-    params.set_exring_polymod(string("1x^16 + 3"));
+    /* f(x) in ExField. It determines the generalized batching slots. */
+    params.set_exfield_polymod(string("1x^16 + 3"));
 
     /* SEAL's coefficient modulus q: when n = 2048, q has 60 bits. */
     params.set_coeff_mod_bit_count(60);

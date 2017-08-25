@@ -4,6 +4,7 @@
 #include <map>
 #include "biguint.h"
 #include "bigpoly.h"
+#include "smallmodulus.h"
 
 
 namespace apsi
@@ -26,11 +27,13 @@ namespace apsi
             int max_probe = 1000,
             int item_bit_length = 120,  
             /* The following parameters should be consistent with each other. */
-            seal::BigUInt exring_characteristic = seal::BigUInt("1E01"),
-            int exring_exponent = 1,
-            seal::BigPoly exring_polymod = seal::BigPoly("1x^16 + 3E"),
+            uint64_t exfield_characteristic = 0x1E01,
+            seal::BigPoly exfield_polymod = seal::BigPoly("1x^16 + 3E"),
             int log_poly_degree = 12,
-            int coeff_mod_bit_count = 116)
+            int coeff_mod_bit_count = 116,
+            
+            uint32_t port = 4000,
+            std::string endpoint = "APSI")
             :
             sender_total_thread_count_(sender_total_thread_count),
             sender_session_thread_count_(sender_session_thread_count),
@@ -39,9 +42,10 @@ namespace apsi
             decomposition_bit_count_(decomposition_bit_count),
             hash_func_count_(hash_func_count), hash_func_seed_(hash_func_seed), max_probe_(max_probe),
             item_bit_length_(item_bit_length), reduced_item_bit_length_(item_bit_length - log_table_size + floor(log2(hash_func_count)) + 1 + 1),
-            exring_characteristic_(exring_characteristic), exring_exponent_(exring_exponent), exring_polymod_(exring_polymod),
+            exfield_characteristic_(exfield_characteristic), exfield_polymod_(exfield_polymod),
             log_poly_degree_(log_poly_degree), poly_degree_(1 << log_poly_degree),
-            coeff_mod_bit_count_(coeff_mod_bit_count)
+            coeff_mod_bit_count_(coeff_mod_bit_count),
+            apsi_port_(port), apsi_endpoint_(endpoint)
         {
             
         }
@@ -112,34 +116,24 @@ namespace apsi
             return reduced_item_bit_length_;
         }
 
-        inline const seal::BigUInt& exring_characteristic() const
+        inline uint64_t exfield_characteristic() const
         {
-            return exring_characteristic_;
+            return exfield_characteristic_;
         }
 
-        inline void set_exring_characteristic(const seal::BigUInt &characteristic)
+        inline void set_exfield_characteristic(uint64_t characteristic)
         {
-            exring_characteristic_ = characteristic;
+            exfield_characteristic_ = characteristic;
         }
 
-        inline int exring_exponent() const
+        inline const seal::BigPoly& exfield_polymod() const
         {
-            return exring_exponent_;
+            return exfield_polymod_;
         }
 
-        void set_exring_exponent(int exponent)
+        inline void set_exfield_polymod(const seal::BigPoly& poly)
         {
-            exring_exponent_ = exponent;
-        }
-
-        inline const seal::BigPoly& exring_polymod() const
-        {
-            return exring_polymod_;
-        }
-
-        inline void set_exring_polymod(const seal::BigPoly& poly)
-        {
-            exring_polymod_ = poly;
+            exfield_polymod_ = poly;
         }
 
         inline int number_of_splits() const
@@ -159,7 +153,7 @@ namespace apsi
 
         inline int batch_size() const
         {
-            return poly_degree_ / (exring_polymod_.significant_coeff_count() - 1);
+            return poly_degree_ / (exfield_polymod_.significant_coeff_count() - 1);
         }
 
         inline int number_of_batches() const
@@ -239,7 +233,29 @@ namespace apsi
             coeff_mod_bit_count_ = coeff_mod_bit_count;
         }
 
-        seal::BigUInt coeff_modulus();
+        std::vector<seal::SmallModulus> coeff_modulus();
+
+        inline uint32_t apsi_port() const
+        {
+            return apsi_port_;
+        }
+
+        void set_apsi_port(uint32_t port)
+        {
+            apsi_port_ = port;
+        }
+
+        inline std::string apsi_endpoint() const
+        {
+            return apsi_endpoint_;
+        }
+
+        void set_apsi_endpoint(std::string endpoint)
+        {
+            apsi_endpoint_ = endpoint;
+        }
+
+
 
     private:
 
@@ -278,13 +294,15 @@ namespace apsi
 
         int sender_session_thread_count_;
 
-        seal::BigUInt exring_characteristic_;
+        std::uint64_t exfield_characteristic_;
 
-        int exring_exponent_;
-
-        seal::BigPoly exring_polymod_;
+        seal::BigPoly exfield_polymod_;
 
         static std::map<std::string, int> upperbound_on_B;
+
+        uint32_t apsi_port_;
+
+        std::string apsi_endpoint_;
     };
 
 

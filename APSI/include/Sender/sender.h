@@ -2,9 +2,9 @@
 
 #include "psiparams.h"
 #include "memorypoolhandle.h"
-#include "encryptor.h"
-#include "decryptor.h"
-#include "util/exring.h"
+#include "rnsencryptor.h"
+#include "rnsdecryptor.h"
+#include "util/exfield.h"
 #include "util/expolycrt.h"
 #include "Sender/senderdb.h"
 #include "Sender/senderthreadcontext.h"
@@ -28,16 +28,25 @@ namespace apsi
 
             ~Sender();
 
+            /**
+            Set public key for offline testing.
+            */
             void set_public_key(const seal::PublicKey &public_key);
 
-            void set_evaluation_keys(const seal::EvaluationKeys &evaluation_keys);
+            /**
+            Set evaluation keys for offline testing.
+            */
+            void set_evaluation_keys(const seal::RNSEvaluationKeys &evaluation_keys);
 
             /**
             This function is only for testing purpose. Sender should not have the secret key.
             */
             void set_secret_key(const seal::SecretKey &secret_key);
 
-            void set_keys(const seal::PublicKey &public_key, const seal::EvaluationKeys &evaluation_keys)
+            /**
+            Set public key and evaluation keys for offline testing.
+            */
+            void set_keys(const seal::PublicKey &public_key, const seal::RNSEvaluationKeys &evaluation_keys)
             {
                 set_public_key(public_key);
                 set_evaluation_keys(evaluation_keys);
@@ -95,9 +104,16 @@ namespace apsi
             */
             void offline_compute();
 
-            void query_engine();
+            void query_engine()
+            {
+                query_engine(false, nullptr);
+            }
 
-            void query_session(apsi::network::Channel &channel);
+            void query_engine(apsi::network::BoostEndpoint* sharing_endpoint, bool sharing);
+
+            void query_session(apsi::network::Channel* channel, apsi::network::Channel* sharing_channel, bool sharing);
+
+            void stop();
 
             /**
             Responds to a query from the receiver. Input is a map of powers of receiver's items, from k to y^k, where k is an 
@@ -109,11 +125,12 @@ namespace apsi
             */
             std::vector<std::vector<seal::Ciphertext>> respond(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query)
             {
-                return respond(query, *local_session_, nullptr);
+                return respond(query, *local_session_, nullptr, nullptr, false);
             }
 
             std::vector<std::vector<seal::Ciphertext>> respond(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query,
-                apsi::sender::SenderSessionContext &session_context, apsi::network::Channel *channel);
+                apsi::sender::SenderSessionContext &session_context, apsi::network::Channel *channel, 
+                apsi::network::Channel *sharing_channel, bool sharing);
 
             /**
             Constructs all powers of receiver's items, based on the powers sent from the receiver. For example, if the desired highest 
@@ -161,6 +178,20 @@ namespace apsi
                 return *local_session_;
             }
 
+            /**********************Secret sharing****************************/
+            /* This function creates random shares of cipher. It changes cipher by substracting it with the returned random shares.
+            The returned vecotor size is one less than num_of_shares, because the last share is cipher itself. */
+            std::vector<seal::Plaintext> share(seal::Ciphertext& cipher, SenderSessionContext &session_contex, int num_of_shares = 2);
+
+            /* Insert share into a map of shares. Not thread-safe. Users of this function must provide syncrhonization. */
+            void insert_share(int split, int batch, seal::Plaintext&& share);
+
+            /* Insert share into a map of shares. Not thread-safe. Users of this function must provide syncrhonization. */
+            void send_share(int split, int batch, const seal::Plaintext& share, apsi::network::Channel *channel);
+
+            seal::Plaintext& get_share(int split, int batch);
+            /**********************Secret sharing****************************/
+
 
         private:
             void initialize();
@@ -169,19 +200,22 @@ namespace apsi
 
             void release_thread_context(int idx);
 
+            seal::Plaintext random_plaintext();
+
             PSIParams params_;
 
             seal::MemoryPoolHandle pool_;
 
-            std::shared_ptr <seal::util::ExRing > ex_ring_;
+            std::shared_ptr <seal::util::ExField > ex_field_;
 
+            /* This is a special local session for offline testing. */
             std::unique_ptr<SenderSessionContext> local_session_;
 
-            seal::EncryptionParameters enc_params_;
+            seal::RNSEncryptionParameters enc_params_;
 
-            std::shared_ptr<seal::SEALContext> seal_context_;
+            std::shared_ptr<seal::RNSContext> seal_context_;
 
-            /* Sender's database, including raw data, hashed data, ExRing data, and symmetric polynomials. */
+            /* Sender's database, including raw data, hashed data, ExField data, and symmetric polynomials. */
             SenderDB sender_db_;
 
             /* One context for one thread, to improve preformance by using single-thread memory pool. */
@@ -193,9 +227,13 @@ namespace apsi
 
             std::unique_ptr<apsi::network::BoostIOService> ios_;
 
-            std::unique_ptr<apsi::network::BoostEndpoint> server_;
+            std::unique_ptr<apsi::network::BoostEndpoint> apsi_endpoint_;
 
-            
+            bool stopped_;
+
+
+            /* Map used only for secret sharing. Normal users should not have any chance to use this. */
+            std::map<std::string, seal::Plaintext> shares_;
         };
     }
 }
