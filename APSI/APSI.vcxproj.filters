@@ -134,12 +134,6 @@
     <ClCompile Include="src\Tools\stopwatch.cpp">
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
-    <ClCompile Include="item.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="psiparams.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\Sender\senderdb.cpp">
       <Filter>Source Files\Sender</Filter>
     </ClCompile>
@@ -175,6 +169,12 @@
     </ClCompile>
     <ClCompile Include="src\Tools\hash.cpp">
       <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="src\item.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\psiparams.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

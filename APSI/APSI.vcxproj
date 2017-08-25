@@ -158,9 +158,8 @@
     <ClInclude Include="include\Tools\stopwatch.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="item.cpp" />
-    <ClCompile Include="psiparams.cpp" />
     <ClCompile Include="src\apsidefines.cpp" />
+    <ClCompile Include="src\item.cpp" />
     <ClCompile Include="src\Network\boost_acceptor.cpp" />
     <ClCompile Include="src\Network\boost_channel.cpp" />
     <ClCompile Include="src\Network\boost_endpoint.cpp" />
@@ -170,6 +169,7 @@
     <ClCompile Include="src\Network\local_channel.cpp" />
     <ClCompile Include="src\Network\local_endpoint.cpp" />
     <ClCompile Include="src\Network\network_utils.cpp" />
+    <ClCompile Include="src\psiparams.cpp" />
     <ClCompile Include="src\Receiver\receiver.cpp" />
     <ClCompile Include="src\Sender\sender.cpp" />
     <ClCompile Include="src\Sender\senderdb.cpp" />
