@@ -5,6 +5,7 @@
 #include "Sender/sender.h"
 #include "util/exfield.h"
 #include "apsidefines.h"
+#include <fstream>
 
 using namespace std;
 using namespace apsi;
@@ -17,10 +18,14 @@ using namespace seal;
 void print_example_banner(string title);
 void example_basics();
 void example_update();
+void example_save_db();
+void example_load_db();
 void example_fast_batching();
+void example_slow_batching();
 void example_slow_vs_fast();
 void example_remote();
 void example_remote_multiple();
+
 
 int main(int argc, char *argv[])
 {
@@ -30,8 +35,15 @@ int main(int argc, char *argv[])
     //// Example: Update
     //example_update();
 
+    //// Example: Save and Load
+    //example_save_db();
+    //example_load_db();
+
     //// Example: Fast batching
-    example_fast_batching();
+    //example_fast_batching();
+
+    //// Example: Slow batching
+    example_slow_batching();
 
     // Example: Slow batching vs. Fast batching
     //example_slow_vs_fast();
@@ -54,8 +66,9 @@ void example_basics()
     print_example_banner("Example: Basics");
     stop_watch.time_points.clear();
 
-    /* sender total threads (8), sender session threads (8), table size (2^8=256), sender bin size (32), window size (2), splits (4). */
-    PSIParams params(8, 8, 8, 32, 2, 4);
+    /* sender total threads (8), sender session threads (8), receiver threads (1),
+    table size (2^8=256), sender bin size (32), window size (2), splits (4). */
+    PSIParams params(8, 8, 1, 8, 32, 2, 4);
 
     /* 
     Item's bit length. In this example, we will only consider 32 bits of input items. 
@@ -101,7 +114,7 @@ void example_basics()
     sender.load_db(vector<Item>{10, 12, 89, 33, 123, 352, 4, 236});
     stop_watch.set_time_point("Precomputation done");
 
-    intersection = receiver.query(vector<Item>{78, 12, 84, 784, 3, 352}, sender);
+    intersection = receiver.query({78, 12, 84, 784, 3, 352}, sender);
     stop_watch.set_time_point("Query done");
     cout << "Intersection result: ";
     cout << '[';
@@ -117,7 +130,7 @@ void example_update()
     print_example_banner("Example: Update");
     stop_watch.time_points.clear();
 
-    PSIParams params(8, 8, 8, 32, 2, 4);
+    PSIParams params(8, 8, 1, 8, 32, 2, 4);
     params.set_item_bit_length(32);
     params.set_decomposition_bit_count(2);
     params.set_log_poly_degree(11);
@@ -172,6 +185,111 @@ void example_update()
     cout << stop_watch << endl;
 }
 
+void example_save_db()
+{
+    print_example_banner("Example: Save DB");
+    stop_watch.time_points.clear();
+
+    PSIParams params(4, 4, 1, 14, 3584, 1, 256);
+    params.set_item_bit_length(32); // The effective item bit length will be limited by ExField's p.
+    params.set_exfield_polymod(string("1x^1")); // f(x) = x
+    params.set_exfield_characteristic(0x820001); // p = 8519681. NOTE: p=1 (mod 2n)
+    params.set_log_poly_degree(14); /* n = 2^14 = 16384, in SEAL's poly modulus "x^n + 1". */
+    params.set_coeff_mod_bit_count(226);  // SEAL param: when n = 16384, q has 189 or 226 bits.
+    params.set_decomposition_bit_count(46);
+    params.validate();
+
+    cout << "Reduced item bit length: " << params.reduced_item_bit_length() << endl;
+    cout << "Bit length of p: " << get_significant_bit_count(params.exfield_characteristic()) << endl;
+
+    if (params.reduced_item_bit_length() >= get_significant_bit_count(params.exfield_characteristic()))
+    {
+        cout << "Reduced items too long. We will only use the first " << get_significant_bit_count(params.exfield_characteristic()) - 1 << " bits." << endl;
+    }
+    else
+    {
+        cout << "All bits of reduced items are used." << endl;
+    }
+
+    Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
+    Sender sender(params, MemoryPoolHandle::acquire_new(true));
+    sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
+    sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
+
+    stop_watch.set_time_point("Application preparation");
+    sender.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
+    stop_watch.set_time_point("Sender pre-processing");
+
+    ofstream ofs("apsi.sender.db", ofstream::out | ofstream::binary); // Must use binary mode
+    sender.save_db(ofs);
+    ofs.close();
+    stop_watch.set_time_point("Sender DB saved");
+
+    cout << stop_watch << endl;
+}
+
+void example_load_db()
+{
+    print_example_banner("Example: Load DB");
+    stop_watch.time_points.clear();
+
+    PSIParams params(4, 4, 1, 14, 3584, 1, 256);
+    params.set_item_bit_length(32); // The effective item bit length will be limited by ExField's p.
+    params.set_exfield_polymod(string("1x^1")); // f(x) = x
+    params.set_exfield_characteristic(0x820001); // p = 8519681. NOTE: p=1 (mod 2n)
+    params.set_log_poly_degree(14); /* n = 2^14 = 16384, in SEAL's poly modulus "x^n + 1". */
+    params.set_coeff_mod_bit_count(226);  // SEAL param: when n = 16384, q has 189 or 226 bits.
+    params.set_decomposition_bit_count(46);
+    params.validate();
+
+    cout << "Reduced item bit length: " << params.reduced_item_bit_length() << endl;
+    cout << "Bit length of p: " << get_significant_bit_count(params.exfield_characteristic()) << endl;
+
+    if (params.reduced_item_bit_length() >= get_significant_bit_count(params.exfield_characteristic()))
+    {
+        cout << "Reduced items too long. We will only use the first " << get_significant_bit_count(params.exfield_characteristic()) - 1 << " bits." << endl;
+    }
+    else
+    {
+        cout << "All bits of reduced items are used." << endl;
+    }
+
+    Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
+    Sender sender(params, MemoryPoolHandle::acquire_new(true));
+    sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
+    sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
+
+    stop_watch.set_time_point("Application preparation");
+
+    ifstream ifs("apsi.sender.db", ifstream::in | ifstream::binary); // Must use binary mode
+    sender.load_db(ifs);
+    ifs.close();
+    stop_watch.set_time_point("Sender DB loaded");
+
+    vector<bool> intersection = receiver.query(vector<Item>{string("1"), string("f"), string("i"), string("c")}, sender);
+
+    cout << "Intersection result: ";
+    cout << '[';
+    for (int i = 0; i < intersection.size(); i++)
+        cout << intersection[i] << ", ";
+    cout << ']' << endl;
+
+    /* Try update database. */
+    sender.delete_data(string("1")); // Item will be ignored if it doesn't exist in the database.
+    sender.delete_data(string("f"));
+    stop_watch.set_time_point("Delete done");
+
+    intersection = receiver.query(vector<Item>{string("1"), string("f"), string("i"), string("c")}, sender);
+    stop_watch.set_time_point("Query done");
+    cout << "Intersection result: ";
+    cout << '[';
+    for (int i = 0; i < intersection.size(); i++)
+        cout << intersection[i] << ", ";
+    cout << ']' << endl;
+
+    cout << stop_watch << endl;
+}
+
 void example_fast_batching()
 {
     print_example_banner("Example: Fast batching");
@@ -185,7 +303,7 @@ void example_fast_batching()
     plain modulus in SEAL). "Reduced item" refers to the permutation-based cuckoo hashing items.
     */
 
-    //PSIParams params(4, 4, 13, 112, 3, 8);
+    //PSIParams params(4, 4, 1, 13, 112, 3, 8);
     //params.set_item_bit_length(32); // The effective item bit length will be limited by ExField's p.
     //params.set_exfield_polymod(string("1x^1")); // f(x) = x
     //params.set_exfield_characteristic(0x820001); // p = 8519681. NOTE: p=1 (mod 2n)
@@ -193,18 +311,23 @@ void example_fast_batching()
     //params.set_coeff_mod_bit_count(189);  // SEAL param: when n = 8192, q has 189 or 226 bits.
     //params.set_decomposition_bit_count(48);
 
-    PSIParams params(1, 1, 14, 3584, 1, 256);
-    //PSIParams params(1, 1, 8, 32, 4, 4);
-
+    PSIParams params(4, 4, 1, 14, 3584, 1, 256);
     params.set_item_bit_length(32); // The effective item bit length will be limited by ExField's p.
     params.set_exfield_polymod(string("1x^1")); // f(x) = x
     params.set_exfield_characteristic(0x820001); // p = 8519681. NOTE: p=1 (mod 2n)
-    /*params.set_exfield_polymod(string("1x^16 + 3"));
-    params.set_exfield_characteristic(0x101);*/
     params.set_log_poly_degree(14); /* n = 2^14 = 16384, in SEAL's poly modulus "x^n + 1". */
     params.set_coeff_mod_bit_count(226);  // SEAL param: when n = 16384, q has 189 or 226 bits.
     params.set_decomposition_bit_count(46);
     params.validate();
+    
+    //PSIParams params(1, 1, 1, 13, 80, 1, 16);
+    //params.set_item_bit_length(32); // The effective item bit length will be limited by ExField's p.
+    //params.set_exfield_polymod(string("1x^1")); // f(x) = x
+    //params.set_exfield_characteristic(0x820001); // p = 8519681. NOTE: p=1 (mod 2n)
+    //params.set_log_poly_degree(13); /* n = 2^14 = 16384, in SEAL's poly modulus "x^n + 1". */
+    //params.set_coeff_mod_bit_count(189);  // SEAL param: when n = 16384, q has 189 or 226 bits.
+    //params.set_decomposition_bit_count(61);
+    //params.validate();
 
     cout << "Reduced item bit length: " << params.reduced_item_bit_length() << endl;
     cout << "Bit length of p: " << get_significant_bit_count(params.exfield_characteristic()) << endl;
@@ -212,6 +335,124 @@ void example_fast_batching()
     if (params.reduced_item_bit_length() >= get_significant_bit_count(params.exfield_characteristic()))
     {
         cout << "Reduced items too long. We will only use the first " << get_significant_bit_count(params.exfield_characteristic()) - 1 << " bits." << endl;
+    }
+    else
+    {
+        cout << "All bits of reduced items are used." << endl;
+    }
+
+    Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
+    Sender sender(params, MemoryPoolHandle::acquire_new(true));
+    sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
+    sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
+
+    stop_watch.set_time_point("Application preparation");
+    sender.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
+    stop_watch.set_time_point("Sender pre-processing");
+
+    vector<bool> intersection = receiver.query(vector<Item>{string("1"), string("f"), string("i"), string("c")}, sender);
+
+    cout << "Intersection result: ";
+    cout << '[';
+    for (int i = 0; i < intersection.size(); i++)
+        cout << intersection[i] << ", ";
+    cout << ']' << endl;
+
+
+    /* Test different update performance. */
+    /*vector<int> updates{1, 10, 30, 50, 70, 100};
+    random_device rd;
+    for (int i = 0; i < updates.size(); i++)
+    {
+        vector<Item> items;
+        for (int j = 0; j < updates[i]; j++)
+            items.emplace_back(to_string(rd()));
+        sender.add_data(items);
+        sender.offline_compute();
+
+        stop_watch.set_time_point(string("Add ") + to_string(updates[i]) + " records done");
+    }*/
+
+    cout << stop_watch << endl;
+}
+
+void example_slow_batching()
+{
+    print_example_banner("Example: Slow batching");
+    stop_watch.time_points.clear();
+
+    /* Use generalized batching. */
+
+    //PSIParams params(1, 1, 1, 10, 448, 1, 32);
+    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+    //params.set_exfield_polymod(string("1x^8 + 3"));
+    //params.set_exfield_characteristic(0xE801);
+    //params.set_log_poly_degree(13);
+    //params.set_coeff_mod_bit_count(189); 
+    //params.set_decomposition_bit_count(61);
+    //params.validate();
+
+    //PSIParams params(1, 1, 1, 9, 896, 1, 64);
+    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+    //params.set_exfield_polymod(string("1x^8 + 7"));
+    //params.set_exfield_characteristic(0x3401);
+    //params.set_log_poly_degree(12);
+    //params.set_coeff_mod_bit_count(189); 
+    //params.set_decomposition_bit_count(61);
+    //params.validate();
+
+    //PSIParams params(1, 1, 1, 8, 1792, 1, 128);
+    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+    //params.set_exfield_polymod(string("1x^8 + 7"));
+    //params.set_exfield_characteristic(0x3401);
+    //params.set_log_poly_degree(12);
+    //params.set_coeff_mod_bit_count(189); 
+    //params.set_decomposition_bit_count(61);
+    //params.validate();
+
+    PSIParams params(8, 8, 1, 10, 3968, 1, 128);
+    params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+    params.set_exfield_polymod(string("1x^8 + 3"));
+    params.set_exfield_characteristic(0xE801);
+    params.set_log_poly_degree(13);
+    params.set_coeff_mod_bit_count(189);
+    params.set_decomposition_bit_count(61);
+    params.validate();
+
+    //PSIParams params(1, 1, 1, 9, 7936, 1, 256);
+    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+    //params.set_exfield_polymod(string("1x^8 + 7"));
+    //params.set_exfield_characteristic(0x3401);
+    //params.set_log_poly_degree(12);
+    //params.set_coeff_mod_bit_count(189);
+    //params.set_decomposition_bit_count(61);
+    //params.validate();
+
+    //PSIParams params(8, 8, 1, 10, 52736, 2, 256);
+    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+    //params.set_exfield_polymod(string("1x^8 + 3"));
+    //params.set_exfield_characteristic(0xE801);
+    //params.set_log_poly_degree(13);
+    //params.set_coeff_mod_bit_count(189);
+    //params.set_decomposition_bit_count(61);
+    //params.validate();
+
+    //PSIParams params(2, 2, 1, 10, 13056, 2, 256);
+    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+    //params.set_exfield_polymod(string("1x^8 + 3"));
+    //params.set_exfield_characteristic(0xE801);
+    //params.set_log_poly_degree(13);
+    //params.set_coeff_mod_bit_count(189);
+    //params.set_decomposition_bit_count(61);
+    //params.validate();
+
+    cout << "Reduced item bit length: " << params.reduced_item_bit_length() << endl;
+    cout << "Bit length of p: " << get_significant_bit_count(params.exfield_characteristic()) << endl;
+
+    if (params.reduced_item_bit_length() >
+        (get_significant_bit_count(params.exfield_characteristic()) - 1) * (params.exfield_polymod().coeff_count() - 1))
+    {
+        cout << "Reduced items too long. We will only use the first " << (get_significant_bit_count(params.exfield_characteristic()) - 1) * (params.exfield_polymod().coeff_count() - 1) << " bits." << endl;
     }
     else
     {
@@ -246,7 +487,7 @@ void example_slow_vs_fast()
     /* The slow batching case. We are using an ExField with f(x) of degree higher than 1, which results in fewer batching slots and thus 
     potentially more batches to be processed. The following table size is 4096, number of batching slots is 512, hence we have 8 batches. 
     In exchange, we could handle very long items. */
-    PSIParams params(8, 8, 12, 128, 2, 8);
+    PSIParams params(8, 8, 1, 12, 128, 2, 8);
     params.set_item_bit_length(90); // We can handle very long items in the following ExField.
     params.set_exfield_polymod(string("1x^8 + 7"));  // f(x) = x^8 + 7
     params.set_exfield_characteristic(0x3401); // p = 13313
@@ -283,7 +524,7 @@ void example_slow_vs_fast()
     stop_watch.set_time_point("PSI with slow batching done.");
     
     /* The fast batching case. The table size is 4096, and the batching slots are also 4096, hence we only have one batch. */
-    PSIParams params2(8, 8, 12, 128, 2, 8);
+    PSIParams params2(8, 8, 1, 12, 128, 2, 8);
     params2.set_item_bit_length(90); // The effective item bit length will be limited by ExField's p.
     params2.set_exfield_polymod(string("1x^1")); // f(x) = x
     params2.set_exfield_characteristic(0xA001); // p = 40961. NOTE: p=1 (mod 2n)
@@ -325,8 +566,9 @@ void example_remote()
     print_example_banner("Example: Remote");
     stop_watch.time_points.clear();
 
-    /* sender total threads (8), sender session threads (4), table size (2^8=256), sender bin size (32), window size (2), splits (4). */
-    PSIParams params(8, 4, 8, 32, 2, 4);
+    /* sender total threads (8), sender session threads (4), receiver threads (1)
+    table size (2^8=256), sender bin size (32), window size (2), splits (4). */
+    PSIParams params(8, 4, 1, 8, 32, 2, 4);
 
     /*
     Item's bit length. In this example, we will only consider 32 bits of input items.
@@ -369,8 +611,9 @@ void example_remote_multiple()
     print_example_banner("Example: Remote multiple");
     stop_watch.time_points.clear();
 
-    /* sender total threads (8), sender session threads (4), table size (2^8=256), sender bin size (32), window size (2), splits (4). */
-    PSIParams params(8, 4, 8, 32, 2, 4);
+    /* sender total threads (8), sender session threads (4), receiver threads (1)
+    table size (2^8=256), sender bin size (32), window size (2), splits (4). */
+    PSIParams params(8, 4, 1, 8, 32, 2, 4);
 
     /*
     Item's bit length. In this example, we will only consider 32 bits of input items.

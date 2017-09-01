@@ -6,6 +6,8 @@
 #include <vector>
 #include "Tools/stopwatch.h"
 #include <memory>
+#include "plaintext.h"
+#include "rnscontext.h"
 
 namespace apsi
 {
@@ -29,6 +31,8 @@ namespace apsi
     void split(const std::string &s, char delim, std::vector<std::string> &elems);
 
     std::vector<std::string> split(const std::string &s, char delim);
+
+    seal::Plaintext random_plaintext(const seal::RNSContext &context);
 
     extern apsi::tools::Stopwatch stop_watch;
 

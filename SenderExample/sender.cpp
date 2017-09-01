@@ -38,7 +38,7 @@ void example_remote()
     stop_watch.time_points.clear();
 
     /* sender threads (8), sender session threads (4), table size (2^8=256), sender bin size (32), window size (2), splits (4). */
-    PSIParams params(8, 4, 8, 32, 2, 4);
+    PSIParams params(8, 4, 1, 8, 32, 2, 4);
 
     /*
     Item's bit length. In this example, we will only consider 32 bits of input items.

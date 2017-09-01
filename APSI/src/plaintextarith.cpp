@@ -7,7 +7,7 @@
 using namespace seal;
 using namespace seal::util;
 
-namespace idash
+namespace apsi
 {
     ConstPointer duplicate_poly_if_needed(const BigPoly &poly, int new_coeff_count, int new_coeff_uint64_count, bool force, MemoryPool &pool)
     {

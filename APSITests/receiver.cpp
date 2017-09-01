@@ -26,7 +26,7 @@ namespace APSITests
 	public:
 		TEST_METHOD(TestCuckooHashing)
 		{
-			PSIParams params(8, 8, 11, 32, 2, 4);
+			PSIParams params(8, 8, 1, 11, 32, 2, 4);
 			Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
 			vector<Item> data{ string("1"), string("f"), string("i"), string("c") };
 			
@@ -51,7 +51,7 @@ namespace APSITests
 
 		TEST_METHOD(TESTCuckooIndices)
 		{
-			PSIParams params(8, 8, 11, 32, 2, 4);
+			PSIParams params(8, 8, 1, 11, 32, 2, 4);
 			Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
 			vector<Item> data{ string("1"), string("f"), string("i"), string("c") };
 
@@ -81,7 +81,7 @@ namespace APSITests
 
 		TEST_METHOD(TestExFieldEncoding)
 		{
-			PSIParams params(8, 8, 11, 32, 2, 4);
+			PSIParams params(8, 8, 1, 11, 32, 2, 4);
 			Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
 			vector<Item> data{ string("1"), string("f"), string("i"), string("c") };
 
@@ -96,15 +96,15 @@ namespace APSITests
 				Item tmp;
 				tmp[0] = item[0];
 				tmp[1] = item[1];
-				Assert::IsTrue(encoded_data[i] == tmp.to_exfield_element(receiver.exfield()));
+				Assert::IsTrue(encoded_data[i] == tmp.to_exfield_element(receiver.ex_field()));
 			}
 		}
 
 		TEST_METHOD(TestGeneratePowers)
 		{
-			PSIParams params(8, 8, 8, 32, 4, 8);
+			PSIParams params(8, 8, 1, 8, 32, 4, 8);
 			Receiver receiver(params);
-			std::shared_ptr<ExField> ring = receiver.exfield();
+			std::shared_ptr<ExField> ring = receiver.ex_field();
 
 			vector<ExFieldElement> v1(10);
 			for (int i = 0; i < 10; i++)
@@ -123,9 +123,9 @@ namespace APSITests
 
 		TEST_METHOD(TestEncryptDecrypt)
 		{
-			PSIParams params(8, 8, 8, 32, 4, 8);
+			PSIParams params(8, 8, 1, 8, 32, 4, 8);
 			Receiver receiver(params);
-			shared_ptr<ExField> ring = receiver.exfield();
+			shared_ptr<ExField> ring = receiver.ex_field();
 
 			vector<ExFieldElement> v1(10);
 			for (int i = 0; i < 10; i++)
@@ -139,7 +139,7 @@ namespace APSITests
 
 		TEST_METHOD(TestQuery)
 		{
-			PSIParams params(8, 8, 8, 32, 2, 4);
+			PSIParams params(8, 8, 1, 8, 32, 2, 4);
 			params.set_item_bit_length(32);
 			params.set_decomposition_bit_count(2);
 			params.set_log_poly_degree(11);

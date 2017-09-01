@@ -17,6 +17,7 @@ namespace apsi
         PSIParams(
             int sender_total_thread_count = 1,
             int sender_session_thread_count = 1,
+            int receiver_thread_count = 1,
             int log_table_size = 12,
             int sender_bin_size = 128,
             int window_size = 4,
@@ -37,6 +38,7 @@ namespace apsi
             :
             sender_total_thread_count_(sender_total_thread_count),
             sender_session_thread_count_(sender_session_thread_count),
+            receiver_thread_count_(receiver_thread_count),
             log_table_size_(log_table_size), table_size_(1 << log_table_size),
             sender_bin_size_(sender_bin_size), window_size_(window_size), number_of_splits_(number_of_splits), 
             decomposition_bit_count_(decomposition_bit_count),
@@ -228,6 +230,16 @@ namespace apsi
             sender_session_thread_count_ = sender_session_thread_count;
         }
 
+        inline int receiver_thread_count() const
+        {
+            return receiver_thread_count_;
+        }
+
+        void set_receiver_thread_count(int receiver_thread_count)
+        {
+            receiver_thread_count_ = receiver_thread_count;
+        }
+
         inline void set_coeff_mod_bit_count(int coeff_mod_bit_count)
         {
             coeff_mod_bit_count_ = coeff_mod_bit_count;
@@ -293,6 +305,8 @@ namespace apsi
         int sender_total_thread_count_;
 
         int sender_session_thread_count_;
+
+        int receiver_thread_count_;
 
         std::uint64_t exfield_characteristic_;
 

@@ -96,7 +96,7 @@ namespace apsi
         vector<SmallModulus> coeff_mod_array(num_coeff_mod);
         for (int i = 0; i < num_coeff_mod; i++)
         {
-            coeff_mod_array[i] = small_mods[i];
+            coeff_mod_array[i] = small_mods61[i];
         }
         return coeff_mod_array;
     }
@@ -111,6 +111,9 @@ namespace apsi
 
         if ((item_bit_length_ + 63) / 64 != (item_bit_length_ + (int)floor(log2(hash_func_count_)) + 1 + 1 + 63) / 64)
             throw invalid_argument("invalid for cuckoo: null bit and location index overflow to new uint64_t.");
+
+        if (sender_session_thread_count_ > sender_total_thread_count_)
+            throw invalid_argument("invalid thread count for sender.");
     }
 
 }

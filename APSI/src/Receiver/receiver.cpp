@@ -149,11 +149,12 @@ namespace apsi
         }
 
         void Receiver::query(const std::vector<Item> &items, std::string ip, uint64_t port,
-            std::vector<std::vector<seal::Plaintext>> intermediate_result)
+            std::vector<std::vector<seal::Plaintext>> &intermediate_result, vector<int> &indices)
         {
             clear_memory_backing();
 
             auto query_data = preprocess(items);
+            indices = move(query_data.second);
 
             /* Create communication channel. */
             BoostEndpoint client(*ios_, ip, port, false, "APSI");
@@ -162,8 +163,66 @@ namespace apsi
             send(query_data.first, client_channel);
 
             /* Receive results in a streaming fashion. */
-            vector<vector<Plaintext>> result;
-            stream_decrypt(client_channel, result);
+            stream_decrypt(client_channel, intermediate_result);
+
+            client_channel.close();
+            client.stop();
+        }
+
+        void Receiver::query(const std::vector<Item> &items, apsi::network::Channel &channel,
+            std::vector<std::vector<seal::Plaintext>> &intermediate_result, vector<int> &indices)
+        {
+            clear_memory_backing();
+
+            auto query_data = preprocess(items);
+            indices = move(query_data.second);
+
+            send(query_data.first, channel);
+
+            /* Receive results in a streaming fashion. */
+            stream_decrypt(channel, intermediate_result);
+        }
+
+        void Receiver::query(const std::map<uint64_t, std::vector<seal::Ciphertext>> &ciphers, apsi::network::Channel &channel,
+            std::vector<std::vector<seal::Plaintext>> &intermediate_result)
+        {
+            clear_memory_backing();
+
+            send(ciphers, channel);
+
+            /* Receive results in a streaming fashion. */
+            stream_decrypt(channel, intermediate_result);
+        }
+
+        std::vector<bool> Receiver::reveal_result(const std::vector<std::vector<seal::Plaintext>> &intermediate_result, const std::vector<int> &indices)
+        {
+            /* Receive results in a streaming fashion. */
+            vector<vector<ExFieldElement>> result;
+            decompose(intermediate_result, result);
+
+            vector<bool> tmp(params_.table_size(), false);
+            ExFieldElement zero(ex_field_);
+            for (int i = 0; i < params_.table_size(); i++)
+            {
+                bool match_found = false;
+                for (int j = 0; j < params_.number_of_splits(); j++)
+                {
+                    if (result[j][i] == zero)
+                    {
+                        match_found = true;
+                        break;
+                    }
+                }
+                if (match_found)
+                    tmp[i] = true;
+            }
+
+            /* Now we need to shorten and convert this tmp vector to match the length and indice of the query "items". */
+            vector<bool> intersection(indices.size(), false);
+            for (int i = 0; i < indices.size(); i++)
+                intersection[i] = tmp[indices[i]];
+
+            return intersection;
         }
 
         std::pair<
@@ -184,7 +243,7 @@ namespace apsi
             return make_pair(ciphers, indices);
         }
 
-        void Receiver::send(map<uint64_t, vector<Ciphertext>> &query, Channel &channel)
+        void Receiver::send(const map<uint64_t, vector<Ciphertext>> &query, Channel &channel)
         {
             /* Send keys. */
             send_pubkey(public_key_, channel);
@@ -192,7 +251,7 @@ namespace apsi
 
             /* Send query data. */
             send_int(query.size(), channel);
-            for (map<uint64_t, vector<Ciphertext>>::iterator it = query.begin(); it != query.end(); it++)
+            for (map<uint64_t, vector<Ciphertext>>::const_iterator it = query.begin(); it != query.end(); it++)
             {
                 send_uint64(it->first, channel);
                 send_ciphertext(it->second, channel);
@@ -381,13 +440,32 @@ namespace apsi
             
             int block_count = num_of_splits * num_of_batches, split_idx = 0, batch_idx = 0;
             Ciphertext tmp;
+
+            /*atomic<int> running_threads = 0;
+            auto decrypt_computation = [&](unique_ptr<Ciphertext> cipher, Plaintext &plain)
+            {
+                decrypt(*cipher, plain);
+                running_threads--;
+            };*/
+
             while (block_count-- > 0)
             {
+                //unique_ptr<Ciphertext> tmp(new Ciphertext());
+
                 receive_int(split_idx, channel);
                 receive_int(batch_idx, channel);
                 receive_ciphertext(tmp, channel);
                 decrypt(tmp, result[split_idx][batch_idx]);
+                //receive_ciphertext(*tmp, channel);
+
+                /*while (running_threads >= params_.receiver_thread_count())
+                    this_thread::sleep_for(chrono::milliseconds(10));
+                running_threads++;
+                thread decrypt_thread(decrypt_computation, move(tmp), ref(result[split_idx][batch_idx]));
+                decrypt_thread.detach();*/
             }
+            /*while (running_threads > 0)
+                this_thread::sleep_for(chrono::milliseconds(10));*/
         }
 
         vector<ExFieldElement> Receiver::decrypt(const vector<Ciphertext> &ciphers)

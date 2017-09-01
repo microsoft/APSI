@@ -24,10 +24,10 @@ namespace APSITests
 		
 		TEST_METHOD(TestAllPowers)
 		{
-			PSIParams params(8, 8, 8, 32, 4, 8);
+			PSIParams params(8, 8, 1, 8, 32, 4, 8);
 			Sender sender(params);
 			Receiver receiver(params);
-			std::shared_ptr<ExField> ring = receiver.exfield();
+			std::shared_ptr<ExField> ring = receiver.ex_field();
 			sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
 			
 			vector<ExFieldElement> v1(10);
@@ -53,7 +53,7 @@ namespace APSITests
 
 		TEST_METHOD(TestUpdateDB)
 		{
-			PSIParams params(8, 8, 10, 32, 2, 4);
+			PSIParams params(8, 8, 1, 10, 32, 2, 4);
 			params.set_item_bit_length(32);
 			params.set_decomposition_bit_count(2);
 			params.set_log_poly_degree(11);

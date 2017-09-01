@@ -76,7 +76,7 @@ namespace apsi
 			Input sub-bin: (a_1, a_2, ..., a_n)
 			Output polynomial terms: (1, \sum_i a_i, \sum_{i,j} a_i*a_j, ...).
 			*/
-			void symmetric_polys(int split, int batch, SenderThreadContext &context);
+			void symmetric_polys(int split, int batch, SenderThreadContext &context, std::vector<std::vector<seal::util::ExFieldElement>> &symm_block);
 
 			/**
 			Computes the randomized symmetric polynomials for the specified split in sender's database. Basically, it multiplies each term in a
@@ -93,7 +93,7 @@ namespace apsi
 
 			@see symmetric_polys for computing symmetric polynomials.
 			*/
-			void randomized_symmetric_polys(int split, int batch, SenderThreadContext &context);
+			void randomized_symmetric_polys(int split, int batch, SenderThreadContext &context, std::vector<std::vector<seal::util::ExFieldElement>> &symm_block);
 
 			/**
 			Batches the randomized symmetric polynonmials for the specified split in sender's database.
@@ -115,6 +115,10 @@ namespace apsi
 			{
 				return simple_hashing_db_;
 			}
+
+            void save(std::ostream &stream) const;
+
+            void load(std::istream &stream);
 
 		private:
 
@@ -148,23 +152,23 @@ namespace apsi
 			std::vector<int> next_shuffle_locs_;
 
 			/* B x m, the corresponding ExField version of the DB. Refer to simple_hashing_db_. */
-			std::vector<std::vector<seal::util::ExFieldElement>> exfield_db_;
-			seal::util::Pointer exfield_db_backing_;
+			/*std::vector<std::vector<seal::util::ExFieldElement>> exfield_db_;
+			seal::util::Pointer exfield_db_backing_;*/
 
 			/* Symmetric polynomial terms. 
 			#splits x m x (split_size + 1). In fact, B = #splits x split_size. The table is 
 			essentially split into '#splits' parts, and we add an extra row for each part to
 			store the coefficient '1' of the highest degree terms in the symmetric polynomials. */
-			std::vector<std::vector<std::vector<seal::util::ExFieldElement>>> symm_polys_;
-			seal::util::Pointer symm_polys_backing_;
+			/*std::vector<std::vector<std::vector<seal::util::ExFieldElement>>> symm_polys_;
+			seal::util::Pointer symm_polys_backing_;*/
 
 			/* Randomized symmetric polynomial terms.
 			#splits x m x (split_size + 1). In fact, B = #splits x split_size. The table is
 			essentially split into '#splits' parts, and we add an extra row for each part to
 			store the coefficient '1' of the highest degree terms in the symmetric polynomials.
 			*/
-			std::vector<std::vector<std::vector<seal::util::ExFieldElement>>> random_symm_polys_;
-			seal::util::Pointer random_symm_polys_backing_;
+			/*std::vector<std::vector<std::vector<seal::util::ExFieldElement>>> random_symm_polys_;
+			seal::util::Pointer random_symm_polys_backing_;*/
 			
 			/* Batched randomized symmetric polynomial terms.
 			#splits x #batches x (split_size + 1). In fact, B = #splits x split_size. The table is

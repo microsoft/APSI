@@ -47,7 +47,16 @@ namespace apsi
             @param[out] intermediate_result Matrix of size (#splits X #batches)
             */
             void query(const std::vector<Item> &items, std::string ip, uint64_t port,
-                std::vector<std::vector<seal::Plaintext>> intermediate_result);
+                std::vector<std::vector<seal::Plaintext>> &intermediate_result, std::vector<int> &indices);
+
+            void query(const std::vector<Item> &items, apsi::network::Channel &channel,
+                std::vector<std::vector<seal::Plaintext>> &intermediate_result, std::vector<int> &indices);
+
+            /* Directly query with the preprocessed ciphers. */
+            void query(const std::map<uint64_t, std::vector<seal::Ciphertext>> &ciphers, apsi::network::Channel &channel,
+                std::vector<std::vector<seal::Plaintext>> &intermediate_result);
+
+            std::vector<bool> reveal_result(const std::vector<std::vector<seal::Plaintext>> &intermediate_result, const std::vector<int> &indices);
 
             /**
             Preprocesses the PSI items. Returns the powr map of the items, and the indices of them in the hash table.
@@ -57,7 +66,7 @@ namespace apsi
                 std::vector<int>
             > preprocess(const std::vector<Item> &items);
 
-            void send(std::map<uint64_t, std::vector<seal::Ciphertext>> &query_data, apsi::network::Channel &channel);
+            void send(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query_data, apsi::network::Channel &channel);
 
             /**
             Hash all items in the input vector into a cuckoo hashing table.
@@ -175,9 +184,14 @@ namespace apsi
             void decompose(const std::vector<std::vector<seal::Plaintext>> &plain_matrix, 
                 std::vector<std::vector<seal::util::ExFieldElement>> &result);
 
-            std::shared_ptr<seal::util::ExField> exfield() const
+            std::shared_ptr<seal::util::ExField> ex_field() const
             {
                 return ex_field_;
+            }
+
+            std::shared_ptr<seal::util::ExFieldPolyCRTBuilder> ex_builder() const
+            {
+                return exfieldpolycrtbuilder_;
             }
 
             const seal::PublicKey& public_key() const
@@ -219,7 +233,7 @@ namespace apsi
 
             seal::RNSEvaluationKeys evaluation_keys_;
 
-            std::unique_ptr<seal::util::ExFieldPolyCRTBuilder> exfieldpolycrtbuilder_;
+            std::shared_ptr<seal::util::ExFieldPolyCRTBuilder> exfieldpolycrtbuilder_;
 
             std::unique_ptr<seal::RNSPolyCRTBuilder> polycrtbuilder_;
 

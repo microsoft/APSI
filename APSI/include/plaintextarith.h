@@ -5,13 +5,13 @@
 #include "smallmodulus.h"
 #include "memorypoolhandle.h"
 
-namespace idash
+namespace apsi
 {
     void multiply(const seal::Plaintext &plaintext1, const seal::Plaintext &plaintext2,
         const seal::util::PolyModulus &poly_mod, const seal::SmallModulus &coeff_mod,
         seal::Plaintext &result, seal::MemoryPoolHandle pool = seal::MemoryPoolHandle::acquire_global());
 
-    seal::Plaintext multiply(const seal::Plaintext &plaintext1, const seal::Plaintext &plaintext2,
+    inline seal::Plaintext multiply(const seal::Plaintext &plaintext1, const seal::Plaintext &plaintext2,
         const seal::util::PolyModulus &poly_mod, const seal::SmallModulus &coeff_mod, seal::MemoryPoolHandle pool = seal::MemoryPoolHandle::acquire_global())
     {
         seal::Plaintext result;
@@ -23,7 +23,7 @@ namespace idash
         const seal::util::PolyModulus &poly_mod, const seal::SmallModulus &coeff_mod,
         seal::Plaintext &result, seal::MemoryPoolHandle pool = seal::MemoryPoolHandle::acquire_global());
 
-    seal::Plaintext add(const seal::Plaintext &plaintext1, const seal::Plaintext &plaintext2,
+    inline seal::Plaintext add(const seal::Plaintext &plaintext1, const seal::Plaintext &plaintext2,
         const seal::util::PolyModulus &poly_mod, const seal::SmallModulus &coeff_mod,
         seal::MemoryPoolHandle pool = seal::MemoryPoolHandle::acquire_global())
     {
@@ -36,7 +36,7 @@ namespace idash
         const seal::util::PolyModulus &poly_mod, const seal::SmallModulus &coeff_mod,
         seal::Plaintext &result, seal::MemoryPoolHandle pool = seal::MemoryPoolHandle::acquire_global());
 
-    seal::Plaintext sub(const seal::Plaintext &plaintext1, const seal::Plaintext &plaintext2,
+    inline seal::Plaintext sub(const seal::Plaintext &plaintext1, const seal::Plaintext &plaintext2,
         const seal::util::PolyModulus &poly_mod, const seal::SmallModulus &coeff_mod,
         seal::MemoryPoolHandle pool = seal::MemoryPoolHandle::acquire_global())
     {

@@ -7,6 +7,7 @@
 #include "Tools/log.h"
 #include <sstream>
 #include <stdexcept>
+#include "Network/network_utils.h"
 
 namespace apsi
 {
@@ -125,6 +126,13 @@ namespace apsi
 
 
                 chl.asyncSend(std::move(buff));
+
+                /* If client lets server sets the channel name, then client should receive that channel name before moving on. */
+                if (localName == "-")
+                {
+                    receive_string(chl.mLocalName, chl);
+                    chl.mRemoteName = chl.mLocalName;
+                }
             }
 
             return chl;
@@ -148,6 +156,8 @@ namespace apsi
             std::lock_guard<std::mutex> lock(mAddChannelMtx);
             mChannels.emplace_back(*this, names[1], names[2]);
             mChannels.back().mSocket.reset(socket.second);
+
+            send_string(names[1], mChannels.back()); // Send back the channel name
 
             return &mChannels.back();
         }
