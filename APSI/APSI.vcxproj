@@ -146,6 +146,7 @@
     <ClInclude Include="include\Network\local_channel.h" />
     <ClInclude Include="include\Network\local_endpoint.h" />
     <ClInclude Include="include\Network\network_utils.h" />
+    <ClInclude Include="include\plaintextarith.h" />
     <ClInclude Include="include\psiparams.h" />
     <ClInclude Include="include\Receiver\receiver.h" />
     <ClInclude Include="include\Sender\sender.h" />
@@ -169,6 +170,7 @@
     <ClCompile Include="src\Network\local_channel.cpp" />
     <ClCompile Include="src\Network\local_endpoint.cpp" />
     <ClCompile Include="src\Network\network_utils.cpp" />
+    <ClCompile Include="src\plaintextarith.cpp" />
     <ClCompile Include="src\psiparams.cpp" />
     <ClCompile Include="src\Receiver\receiver.cpp" />
     <ClCompile Include="src\Sender\sender.cpp" />

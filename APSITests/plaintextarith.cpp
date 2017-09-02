@@ -29,7 +29,7 @@ namespace APSITests
             SmallModulus coeff_mod(5);
             PolyModulus poly_mod(modulus.get_poly().pointer(), 9, 1);
 
-            Plaintext result = apsi::goodmultiply(plain1, plain2, poly_mod, coeff_mod);
+            Plaintext result = apsi::multiply(plain1, plain2, poly_mod, coeff_mod);
 
             Assert::IsTrue(result == Plaintext(string("3x^2 + 4x^1")));
 

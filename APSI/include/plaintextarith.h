@@ -11,7 +11,7 @@ namespace apsi
         const seal::util::PolyModulus &poly_mod, const seal::SmallModulus &coeff_mod,
         seal::Plaintext &result, seal::MemoryPoolHandle pool = seal::MemoryPoolHandle::acquire_global());
 
-    inline seal::Plaintext goodmultiply(const seal::Plaintext &plaintext1, const seal::Plaintext &plaintext2,
+    inline seal::Plaintext multiply(const seal::Plaintext &plaintext1, const seal::Plaintext &plaintext2,
         const seal::util::PolyModulus &poly_mod, const seal::SmallModulus &coeff_mod, seal::MemoryPoolHandle pool = seal::MemoryPoolHandle::acquire_global())
     {
         seal::Plaintext result;

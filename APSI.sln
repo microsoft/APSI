@@ -20,11 +20,6 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "APSITests", "APSITests\APSI
 		{6E84A852-E68E-4C1D-8266-08CEEAB6ADE6} = {6E84A852-E68E-4C1D-8266-08CEEAB6ADE6}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "iDASH2017", "iDASH2017\iDASH2017.vcxproj", "{14E3E8AF-0990-4EDE-9C75-BA88F9098002}"
-	ProjectSection(ProjectDependencies) = postProject
-		{6E84A852-E68E-4C1D-8266-08CEEAB6ADE6} = {6E84A852-E68E-4C1D-8266-08CEEAB6ADE6}
-	EndProjectSection
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -65,14 +60,6 @@ Global
 		{49E062C3-F57A-4BCA-B400-40947E973054}.Release|x64.Build.0 = Release|x64
 		{49E062C3-F57A-4BCA-B400-40947E973054}.Release|x86.ActiveCfg = Release|Win32
 		{49E062C3-F57A-4BCA-B400-40947E973054}.Release|x86.Build.0 = Release|Win32
-		{14E3E8AF-0990-4EDE-9C75-BA88F9098002}.Debug|x64.ActiveCfg = Debug|x64
-		{14E3E8AF-0990-4EDE-9C75-BA88F9098002}.Debug|x64.Build.0 = Debug|x64
-		{14E3E8AF-0990-4EDE-9C75-BA88F9098002}.Debug|x86.ActiveCfg = Debug|Win32
-		{14E3E8AF-0990-4EDE-9C75-BA88F9098002}.Debug|x86.Build.0 = Debug|Win32
-		{14E3E8AF-0990-4EDE-9C75-BA88F9098002}.Release|x64.ActiveCfg = Release|x64
-		{14E3E8AF-0990-4EDE-9C75-BA88F9098002}.Release|x64.Build.0 = Release|x64
-		{14E3E8AF-0990-4EDE-9C75-BA88F9098002}.Release|x86.ActiveCfg = Release|Win32
-		{14E3E8AF-0990-4EDE-9C75-BA88F9098002}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
