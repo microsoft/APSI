@@ -22,13 +22,6 @@ namespace apsi
             symm_polys_stale_(params.number_of_splits(), vector<bool>(params.number_of_batches(), true)),
             batch_random_symm_polys_(params.number_of_splits(), vector<vector<Plaintext>>(params.number_of_batches(), vector<Plaintext>(params.split_size() + 1)))
         {
-            /*exfield_db_ = global_ex_field_->allocate_elements(params_.sender_bin_size(), params_.table_size(), exfield_db_backing_);*/
-
-            //symm_polys_ = global_ex_field_->allocate_elements(
-            //    params_.number_of_splits(), params_.table_size(), params_.split_size() + 1, symm_polys_backing_);
-
-            //random_symm_polys_ = global_ex_field_->allocate_elements(
-            //    params_.number_of_splits(), params_.table_size(), params_.split_size() + 1, random_symm_polys_backing_);
 
             /* Set null value for sender: 00..0011..11, with itemL's 1 */
             sender_null_item_.fill(~static_cast<uint64_t>(0));
@@ -80,9 +73,6 @@ namespace apsi
                     simple_hashing_db_[index][hash_locations[j]] = data[i];
                     simple_hashing_db_[index][hash_locations[j]].to_itemL(cuckoo_, j);
 
-                    /* Encode the item to an ExField element. */
-                    //simple_hashing_db_[index][hash_locations[j]].to_exfield_element(exfield_db_[index][hash_locations[j]]);
-
                     /* Set the block that contains this item to be stale. */
                     symm_polys_stale_[index / params_.split_size()][hash_locations[j] / params_.batch_size()] = true;
                 }
@@ -109,7 +99,6 @@ namespace apsi
                         if (simple_hashing_db_[index][hash_locations[j]] == target_itemL) /* Item is found. Delete it. */
                         {
                             simple_hashing_db_[index][hash_locations[j]] = sender_null_item_;
-                            //exfield_db_[index][hash_locations[j]] = null_element_;
 
                             /* Set the block that contains this item to be stale. */
                             symm_polys_stale_[index / params_.split_size()][hash_locations[j] / params_.batch_size()] = true;
@@ -133,37 +122,6 @@ namespace apsi
 
         void SenderDB::symmetric_polys(int split, int batch, SenderThreadContext &context, std::vector<std::vector<seal::util::ExFieldElement>> &symm_block)
         {
-            /***********************************With precomputed table*****************************************/
-            /*int table_size = params_.table_size(), split_size = params_.split_size(), batch_size = params_.batch_size(), split_start = split * split_size,
-                batch_start = batch * batch_size, batch_end = (batch_start + batch_size < table_size? (batch_start + batch_size) : table_size);
-
-            shared_ptr<ExField> exfield = context.exfield();
-
-            ExFieldElement one(exfield, "1");
-            ExFieldElement temp1(exfield), temp2(exfield);
-            for (int i = batch_start; i < batch_end; i++)
-            {
-                symm_polys_[split][i][split_size] = one;
-                for (int j = split_size - 1; j >= 0; j--)
-                {
-                    exfield->negate(exfield_db_[split_start + j][i], temp1);
-                    exfield->multiply(
-                        symm_polys_[split][i][j + 1],
-                        temp1,
-                        symm_polys_[split][i][j]);
-
-                    for (int k = j + 1; k < split_size; k++)
-                    {
-                        exfield->multiply(
-                            symm_polys_[split][i][k + 1],
-                            temp1,
-                            temp2);
-                        symm_polys_[split][i][k] += temp2;
-                    }
-                }
-            }*/
-
-            /***********************************Without precomputed table*****************************************/
             int table_size = params_.table_size(), split_size = params_.split_size(), batch_size = params_.batch_size(), split_start = split * split_size,
                 batch_start = batch * batch_size;
             shared_ptr<ExField> exfield = context.exfield();
@@ -196,23 +154,6 @@ namespace apsi
 
         void SenderDB::randomized_symmetric_polys(int split, int batch, SenderThreadContext &context, std::vector<std::vector<seal::util::ExFieldElement>> &symm_block)
         {
-            /***********************************With precomputed table*****************************************/
-            //int table_size = params_.table_size(), split_size = params_.split_size(), batch_size = params_.batch_size(),
-            //    batch_start = batch * batch_size, batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
-            //symmetric_polys(split, batch, context);
-
-            //int table_size = params_.table_size(), split_size = params_.split_size(), batch_size = params_.batch_size(),
-            //    batch_start = batch * batch_size, batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
-
-            //for (int i = batch_start; i < batch_end; i++)
-            //{
-            //    ExFieldElement r = context.exfield()->random_element();
-            //    //ExFieldElement r = ExFieldElement(context.exfield(), string("1"));
-            //    for (int j = 0; j < split_size + 1; j++)
-            //        context.exfield()->multiply(symm_polys_[split][i][j], r, random_symm_polys_[split][i][j]);
-            //}
-
-            /***********************************Without precomputed table*****************************************/
             int split_size = params_.split_size();
             symmetric_polys(split, batch, context, symm_block);
 
@@ -230,38 +171,6 @@ namespace apsi
             if (!symm_polys_stale_[split][batch])
                 return batch_random_symm_polys_[split][batch];
 
-            /***********************************With precomputed table*****************************************/
-            //int table_size = params_.table_size(), split_size = params_.split_size(), split_start = split * split_size, batch_size = params_.batch_size(),
-            //    batch_start = batch * batch_size, batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
-
-            //randomized_symmetric_polys(split, batch, context);
-            //
-            //Pointer batch_backing;
-            //vector<ExFieldElement> batch_vector = context.exfield()->allocate_elements(batch_size, batch_backing);
-            //vector<uint64_t> integer_batch_vector(batch_size, 0);
-
-            //
-            //for (int i = 0; i < split_size + 1; i++)
-            //{
-            //    Plaintext temp_plain;
-            //    if (context.builder())
-            //    {
-            //        for (int k = 0; batch_start + k < batch_end; k++)
-            //            integer_batch_vector[k] = *random_symm_polys_[split][batch_start + k][i].pointer(0);
-            //        temp_plain = context.builder()->compose(integer_batch_vector);
-            //    }
-            //    else // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
-            //    {
-            //        for (int k = 0; batch_start + k < batch_end; k++)
-            //            batch_vector[k] = random_symm_polys_[split][batch_start + k][i];
-            //        temp_plain = context.exbuilder()->compose(batch_vector);
-            //    }
-
-            //    context.evaluator()->transform_to_ntt(temp_plain);
-            //    batch_random_symm_polys_[split][batch][i] = temp_plain;
-            //}
-
-            /***********************************Without precomputed table*****************************************/
             int table_size = params_.table_size(), split_size = params_.split_size(), split_start = split * split_size, batch_size = params_.batch_size(),
                 batch_start = batch * batch_size, batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
 
