@@ -96,7 +96,7 @@ namespace apsi
         vector<SmallModulus> coeff_mod_array(num_coeff_mod);
         for (int i = 0; i < num_coeff_mod; i++)
         {
-            coeff_mod_array[i] = small_mods61[i];
+            coeff_mod_array[i] = small_mods60[i];
         }
         return coeff_mod_array;
     }

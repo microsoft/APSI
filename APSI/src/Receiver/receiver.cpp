@@ -48,7 +48,6 @@ namespace apsi
             encryptor_.reset(new RNSEncryptor(seal_context, public_key_));
             decryptor_.reset(new RNSDecryptor(seal_context, secret_key_));
 
-            //generator.generate_rns_evaluation_keys(1);
             evaluation_keys_ = generator.evaluation_keys();
 
             exfieldpolycrtbuilder_.reset(new ExFieldPolyCRTBuilder(ex_field_, params_.log_poly_degree()));

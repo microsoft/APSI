@@ -104,14 +104,9 @@ namespace apsi
             */
             void offline_compute();
 
-            void query_engine()
-            {
-                query_engine(nullptr);
-            }
+            void query_engine();
 
-            void query_engine(apsi::network::BoostEndpoint* sharing_endpoint);
-
-            void query_session(apsi::network::Channel* channel, apsi::network::Channel* sharing_channel);
+            void query_session(apsi::network::Channel* channel);
 
             void stop();
 
@@ -125,12 +120,11 @@ namespace apsi
             */
             std::vector<std::vector<seal::Ciphertext>> respond(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query)
             {
-                return respond(query, *local_session_, nullptr, nullptr);
+                return respond(query, *local_session_, nullptr);
             }
 
             std::vector<std::vector<seal::Ciphertext>> respond(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query,
-                apsi::sender::SenderSessionContext &session_context, apsi::network::Channel *channel, 
-                apsi::network::Channel *sharing_channel);
+                apsi::sender::SenderSessionContext &session_context, apsi::network::Channel *channel);
 
             /**
             Constructs all powers of receiver's items, based on the powers sent from the receiver. For example, if the desired highest 
@@ -198,35 +192,6 @@ namespace apsi
                 sender_db_.load(stream);
             }
 
-            /**********************Secret sharing****************************/
-            /* This function creates random shares of cipher. It changes cipher by substracting it with the returned random shares.
-            The returned vecotor size is one less than num_of_shares, because the last share is cipher itself. */
-            std::vector<seal::Plaintext> share(seal::Ciphertext& cipher, SenderSessionContext &session_contex, int num_of_shares = 2);
-
-            /* Insert share into a map of shares. Not thread-safe. Users of this function must provide syncrhonization. */
-            void insert_share(int split, int batch, seal::Plaintext&& share);
-
-            /* Insert share into a map of shares. Not thread-safe. Users of this function must provide syncrhonization. */
-            void send_share(int split, int batch, const seal::Plaintext& share, apsi::network::Channel *channel);
-
-            seal::Plaintext& get_share(int split, int batch);
-
-            void set_sender_id(int id)
-            {
-                sender_id_ = id;
-            }
-
-            std::map<std::pair<int, int>, seal::Plaintext>&& sender_moved_shares()
-            {
-                return move(shares_);
-            }
-
-            int current_num_shares() const
-            {
-                return shares_.size();
-            }
-            /**********************Secret sharing****************************/
-
 
         private:
             void initialize();
@@ -263,16 +228,6 @@ namespace apsi
             std::unique_ptr<apsi::network::BoostEndpoint> apsi_endpoint_;
 
             bool stopped_;
-
-
-            /* Map used only for secret sharing. Normal users should not have any chance to use this. */
-            std::map<std::pair<int, int>, seal::Plaintext> shares_;
-
-            bool sharing = true; // Turn the flag on
-
-            int current_receiver_id_ = -100000;
-
-            int sender_id_ = -100000; // Make sure the user has set this id before using secret sharing.
         };
     }
 }

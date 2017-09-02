@@ -128,7 +128,7 @@ namespace apsi
         }
 
 
-        void Sender::query_engine(BoostEndpoint* sharing_endpoint)
+        void Sender::query_engine()
         {
             while (true && !stopped_)
             {
@@ -138,20 +138,13 @@ namespace apsi
                     this_thread::sleep_for(chrono::milliseconds(50));
                     continue;
                 }
-                Channel* sharing_channel = nullptr;
-                if (sharing_endpoint)
-                {
-                    receive_int(current_receiver_id_, *server_channel);
-                    if(current_receiver_id_ != ((sender_id_ + 1) % 3)) // Only pass the other share if the target is not the receiver.
-                        sharing_channel = &(sharing_endpoint->addChannel("-", "-"));
-                }
                 
-                thread session(&Sender::query_session, this, server_channel, sharing_channel);
+                thread session(&Sender::query_session, this, server_channel);
                 session.detach();
             }
         }
 
-        void Sender::query_session(Channel *server_channel, Channel *sharing_channel)
+        void Sender::query_session(Channel *server_channel)
         {
             /* Set up keys. */
             PublicKey pub;
@@ -173,11 +166,9 @@ namespace apsi
             }
 
             /* Answer to the query. */
-            respond(query, session_context, server_channel, sharing_channel);
+            respond(query, session_context, server_channel);
 
             server_channel->close();
-            if(sharing_channel)
-                sharing_channel->close();
         }
 
         void Sender::stop()
@@ -187,7 +178,7 @@ namespace apsi
 
         vector<vector<Ciphertext>> Sender::respond(
             const map<uint64_t, vector<Ciphertext>> &query, SenderSessionContext &session_context, 
-            Channel *channel, Channel *sharing_channel)
+            Channel *channel)
         {
             vector<vector<Ciphertext>> result(params_.number_of_splits(), vector<Ciphertext>(params_.number_of_batches()));
 
@@ -195,7 +186,7 @@ namespace apsi
             compute_all_powers(query, powers, session_context);
 
             atomic<int> block_index = 0;
-            mutex mtx1, mtx2;
+            mutex mtx;
             auto block_computation = [&](SenderThreadContext &context)
             {
                 int next_block = 0;
@@ -209,17 +200,7 @@ namespace apsi
 
                     if (channel)
                     {
-                        if (sharing)
-                        {
-                            vector<Plaintext> shares = share(result[split][batch], session_context);
-                            unique_lock<mutex> net_lock1(mtx1);
-                            if(sharing_channel)
-                                send_share(split, batch, shares[0], sharing_channel);
-                            else
-                                insert_share(split, batch, move(shares[0]));
-                        }
-
-                        unique_lock<mutex> net_lock2(mtx2);
+                        unique_lock<mutex> net_lock2(mtx);
                         send_int(split, *channel);
                         send_int(batch, *channel);
                         send_ciphertext(result[split][batch], *channel);
@@ -368,41 +349,5 @@ namespace apsi
             unique_lock<mutex> lock(thread_context_mtx_);
             available_thread_contexts_.push_back(idx);
         }
-
-
-
-        /********************Below for secret sharing*****************************/
-
-        vector<Plaintext> Sender::share(Ciphertext& cipher, SenderSessionContext &session_contex, int num_of_shares)
-        {
-            if (num_of_shares != 2)
-                throw invalid_argument("Invalid number of shares.");
-
-            vector<Plaintext> shares;
-            Plaintext random_share = random_plaintext(enc_params_);
-            /*Ciphertext enc_share = session_contex.encryptor_->rns_encrypt(random_share);
-            session_contex.evaluator_->sub(cipher, enc_share, cipher);*/
-            session_contex.evaluator_->sub_plain(cipher, random_share, cipher);
-            shares.emplace_back(move(random_share));
-            return shares;
-        }
-
-        void Sender::insert_share(int split, int batch, Plaintext&& plain_share)
-        {
-            shares_[make_pair(split, batch)] = move(plain_share);
-        }
-
-        void Sender::send_share(int split, int batch, const seal::Plaintext& share, apsi::network::Channel *channel)
-        {
-            send_int(split, *channel);
-            send_int(batch, *channel);
-            send_plaintext(share, *channel);
-        }
-
-        Plaintext& Sender::get_share(int split, int batch)
-        {
-            return shares_.at(make_pair(split, batch));
-        }
-
     }
 }

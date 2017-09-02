@@ -326,7 +326,7 @@ void example_fast_batching()
     //params.set_exfield_characteristic(0x820001); // p = 8519681. NOTE: p=1 (mod 2n)
     //params.set_log_poly_degree(13); /* n = 2^14 = 16384, in SEAL's poly modulus "x^n + 1". */
     //params.set_coeff_mod_bit_count(189);  // SEAL param: when n = 16384, q has 189 or 226 bits.
-    //params.set_decomposition_bit_count(61);
+    //params.set_decomposition_bit_count(60);
     //params.validate();
 
     cout << "Reduced item bit length: " << params.reduced_item_bit_length() << endl;
@@ -389,7 +389,7 @@ void example_slow_batching()
     //params.set_exfield_characteristic(0xE801);
     //params.set_log_poly_degree(13);
     //params.set_coeff_mod_bit_count(189); 
-    //params.set_decomposition_bit_count(61);
+    //params.set_decomposition_bit_count(60);
     //params.validate();
 
     //PSIParams params(1, 1, 1, 9, 896, 1, 64);
@@ -398,7 +398,7 @@ void example_slow_batching()
     //params.set_exfield_characteristic(0x3401);
     //params.set_log_poly_degree(12);
     //params.set_coeff_mod_bit_count(189); 
-    //params.set_decomposition_bit_count(61);
+    //params.set_decomposition_bit_count(60);
     //params.validate();
 
     //PSIParams params(1, 1, 1, 8, 1792, 1, 128);
@@ -407,7 +407,7 @@ void example_slow_batching()
     //params.set_exfield_characteristic(0x3401);
     //params.set_log_poly_degree(12);
     //params.set_coeff_mod_bit_count(189); 
-    //params.set_decomposition_bit_count(61);
+    //params.set_decomposition_bit_count(60);
     //params.validate();
 
     PSIParams params(8, 8, 1, 10, 3968, 1, 128);
@@ -416,7 +416,7 @@ void example_slow_batching()
     params.set_exfield_characteristic(0xE801);
     params.set_log_poly_degree(13);
     params.set_coeff_mod_bit_count(189);
-    params.set_decomposition_bit_count(61);
+    params.set_decomposition_bit_count(60);
     params.validate();
 
     //PSIParams params(1, 1, 1, 9, 7936, 1, 256);
@@ -425,7 +425,7 @@ void example_slow_batching()
     //params.set_exfield_characteristic(0x3401);
     //params.set_log_poly_degree(12);
     //params.set_coeff_mod_bit_count(189);
-    //params.set_decomposition_bit_count(61);
+    //params.set_decomposition_bit_count(60);
     //params.validate();
 
     //PSIParams params(8, 8, 1, 10, 52736, 2, 256);
@@ -434,7 +434,7 @@ void example_slow_batching()
     //params.set_exfield_characteristic(0xE801);
     //params.set_log_poly_degree(13);
     //params.set_coeff_mod_bit_count(189);
-    //params.set_decomposition_bit_count(61);
+    //params.set_decomposition_bit_count(60);
     //params.validate();
 
     //PSIParams params(2, 2, 1, 10, 13056, 2, 256);
@@ -443,7 +443,7 @@ void example_slow_batching()
     //params.set_exfield_characteristic(0xE801);
     //params.set_log_poly_degree(13);
     //params.set_coeff_mod_bit_count(189);
-    //params.set_decomposition_bit_count(61);
+    //params.set_decomposition_bit_count(60);
     //params.validate();
 
     cout << "Reduced item bit length: " << params.reduced_item_bit_length() << endl;
