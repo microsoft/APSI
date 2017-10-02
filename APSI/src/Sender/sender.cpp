@@ -92,7 +92,7 @@ namespace apsi
         void Sender::offline_compute()
         {
             /* Offline pre-processing. */
-            atomic<int> block_index = 0;
+	  atomic<int> block_index(0);
             auto block_computation = [&](SenderThreadContext& context)
             {
                 int next_block = 0;
@@ -184,7 +184,7 @@ namespace apsi
             vector<vector<Ciphertext>> powers;
             compute_all_powers(query, powers, session_context);
 
-            atomic<int> block_index = 0;
+            atomic<int> block_index(0);
             mutex mtx;
             auto block_computation = [&](SenderThreadContext &context)
             {
@@ -235,7 +235,7 @@ namespace apsi
             SenderSessionContext &session_context)
         {
             all_powers.resize(params_.number_of_batches());
-            atomic<int> batch_index = 0;
+            atomic<int> batch_index(0);
             auto batch_computation = [&](SenderThreadContext &context)
             {
                 int next_batch = 0;

@@ -182,7 +182,7 @@ namespace apsi
             /*
             #splits x #batches. Flags indicating whether the blocks need to be re-computed or not.
             */
-            std::vector<std::vector<bool>> symm_polys_stale_;
+            std::vector<std::vector<char>> symm_polys_stale_;
         };
     }
 }

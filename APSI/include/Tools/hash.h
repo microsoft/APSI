@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdint>
 
+#include <wmmintrin.h>
 namespace apsi
 {
     namespace tools

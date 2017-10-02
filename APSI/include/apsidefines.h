@@ -8,6 +8,7 @@
 #include <memory>
 #include "plaintext.h"
 #include "context.h"
+#include <cstring>
 
 namespace apsi
 {

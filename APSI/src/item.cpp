@@ -10,7 +10,7 @@ using namespace apsi::tools;
 
 namespace apsi
 {
-    const apsi::tools::HashFunction Item::hf_({ 0, 0 });
+  const apsi::tools::HashFunction Item::hf_(apsi::tools::HashFunction::zero_block);
 
     size_t Item::item_bit_length_(128);
 
@@ -20,9 +20,10 @@ namespace apsi
     {
         apsi::tools::HashFunction::aes_block_type hash_block(apsi::tools::HashFunction::zero_block);
         hf_(pointer, uint64_count, hash_block);
-
-        value_[0] = hash_block.m128i_u64[0];
-        value_[1] = hash_block.m128i_u64[1];
+        
+        value_ = *(std::array<uint64_t, 2>*)&hash_block;
+        //value_[0] = hash_block.m128i_u64[0];
+        //value_[1] = hash_block.m128i_u64[1];
 
         if (item_bit_length_ < 64)
         {
@@ -71,8 +72,9 @@ namespace apsi
             last |= ((data[i] & 0xFFFF) << (i * 8));
         hf_(last, hash_block);
 
-        value_[0] = hash_block.m128i_u64[0];
-        value_[1] = hash_block.m128i_u64[1];
+	value_ = *(std::array<uint64_t, 2>*)&hash_block;
+        //value_[0] = hash_block.m128i_u64[0];
+        //value_[1] = hash_block.m128i_u64[1];
 
         if (item_bit_length_ < 64)
         {

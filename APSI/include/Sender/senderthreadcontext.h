@@ -4,6 +4,7 @@
 #include "util/exfieldpolycrt.h"
 #include "evaluator.h"
 #include "polycrt.h"
+#include "encryptor.h"
 
 namespace apsi
 {

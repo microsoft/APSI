@@ -3,6 +3,7 @@
 #include "apsidefines.h"
 #include "util/uintcore.h"
 #include <fstream>
+#include  <algorithm>
 
 using namespace std;
 using namespace seal;
@@ -19,7 +20,7 @@ namespace apsi
             simple_hashing_db_(params.sender_bin_size(), vector<Item>(params.table_size())),
             shuffle_index_(params.table_size(), vector<int>(params.sender_bin_size())),
             next_shuffle_locs_(params.table_size(), 0),
-            symm_polys_stale_(params.number_of_splits(), vector<bool>(params.number_of_batches(), true)),
+            symm_polys_stale_(params.number_of_splits(), vector<char>(params.number_of_batches(), true)),
             batch_random_symm_polys_(params.number_of_splits(), vector<vector<Plaintext>>(params.number_of_batches(), vector<Plaintext>(params.split_size() + 1)))
         {
 

@@ -9,7 +9,7 @@ DEPS=$(OBJS:.o=.d)
 INSTALL_DIR=APSI
 APSILIB=libapsi.a
 CXX=g++
-CXXFLAGS=-O3 -DHAVE_CONFIG -march=native -std=c++11
+CXXFLAGS=-O3 -DHAVE_CONFIG -march=native -std=c++11  -maes -msse2 -msse4.1 -mpclmul
 PREFIX=/usr/local
 LDFLAGS=-lseal -lboost_system -lcuckoo -lpthread
 LIBRARY_PATHS=../../SEAL-dev-new/bin ../../Cuckoo/bin ../thirdparty/boost/stage/lib

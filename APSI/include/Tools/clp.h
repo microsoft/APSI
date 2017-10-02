@@ -20,7 +20,7 @@ namespace apsi
 				std::cerr << message;
 			}
 
-			virtual const char* what() const override
+			virtual const char* what() const noexcept override
 			{
 				return message_.c_str();
 			}
