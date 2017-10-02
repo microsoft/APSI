@@ -2,7 +2,7 @@
 
 #include "ciphertext.h"
 #include "boost_channel.h"
-#include "rnsevaluationkeys.h"
+#include "evaluationkeys.h"
 #include "publickey.h"
 #include "item.h"
 #include "plaintext.h"
@@ -35,9 +35,9 @@ namespace apsi
 
         void receive_string(std::string &data, Channel &channel);
 
-        void send_evalkeys(const seal::RNSEvaluationKeys &keys, Channel &channel);
+        void send_evalkeys(const seal::EvaluationKeys &keys, Channel &channel);
 
-        void receive_evalkeys(seal::RNSEvaluationKeys &keys, Channel &channel);
+        void receive_evalkeys(seal::EvaluationKeys &keys, Channel &channel);
 
         void send_pubkey(const seal::PublicKey &pubkey, Channel &channel);
 

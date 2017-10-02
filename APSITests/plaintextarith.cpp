@@ -5,7 +5,7 @@
 #include "psiparams.h"
 #include "util/exfield.h"
 #include "util/exfieldpolycrt.h"
-#include "rnscontext.h"
+#include "context.h"
 #include "plaintextarith.h"
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;

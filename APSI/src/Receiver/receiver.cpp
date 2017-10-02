@@ -1,7 +1,7 @@
 #include "Receiver/receiver.h"
 #include "util/uintcore.h"
-#include "rnsencryptionparams.h"
-#include "rnskeygenerator.h"
+#include "encryptionparams.h"
+#include "keygenerator.h"
 #include "Sender/sender.h"
 #include "apsidefines.h"
 #include <sstream>
@@ -31,31 +31,30 @@ namespace apsi
 
         void Receiver::initialize()
         {
-            RNSEncryptionParameters enc_params;
+            EncryptionParameters enc_params;
             
             enc_params.set_poly_modulus("1x^" + to_string(params_.poly_degree()) + " + 1");
-            enc_params.set_coeff_modulus(params_.coeff_modulus());
+            enc_params.set_coeff_moduli(params_.coeff_modulus());
             enc_params.set_plain_modulus(ex_field_->coeff_modulus());
-            enc_params.set_decomposition_bit_count(params_.decomposition_bit_count());
             
-            RNSContext seal_context(enc_params);
-            RNSKeyGenerator generator(seal_context);
-            generator.generate(1);
+            SEALContext seal_context(enc_params);
+            KeyGenerator generator(seal_context);
+            generator.generate();
 
             public_key_ = generator.public_key();
             secret_key_ = generator.secret_key();
 
-            encryptor_.reset(new RNSEncryptor(seal_context, public_key_));
-            decryptor_.reset(new RNSDecryptor(seal_context, secret_key_));
+            encryptor_.reset(new Encryptor(seal_context, public_key_));
+            decryptor_.reset(new Decryptor(seal_context, secret_key_));
 
-            evaluation_keys_ = generator.evaluation_keys();
+            evaluation_keys_ = generator.generate_evaluation_keys(params_.decomposition_bit_count());
 
             exfieldpolycrtbuilder_.reset(new ExFieldPolyCRTBuilder(ex_field_, params_.log_poly_degree()));
 
             if(seal_context.get_qualifiers().enable_batching)
-                polycrtbuilder_.reset(new RNSPolyCRTBuilder(seal_context));
+                polycrtbuilder_.reset(new PolyCRTBuilder(seal_context));
             
-            ex_field_->init_frobe_table();
+            ex_field_->init_frob_table();
         }
 
         vector<bool> Receiver::query(const vector<Item> &items, apsi::sender::Sender &sender)
@@ -390,7 +389,7 @@ namespace apsi
                      exfieldpolycrtbuilder_->compose(batch, plain);
                 }
                 result.emplace_back(
-                    encryptor_->rns_encrypt(plain));
+                    encryptor_->encrypt(plain));
             }
             return result;
         }
@@ -478,13 +477,13 @@ namespace apsi
             {
                 if (polycrtbuilder_)
                 {
-                    vector<BigUInt> integer_batch = polycrtbuilder_->decompose(decryptor_->rns_decrypt(ciphers[i]));
+                    vector<uint64_t> integer_batch = polycrtbuilder_->decompose(decryptor_->decrypt(ciphers[i]));
                     for (int j = 0; j < integer_batch.size(); j++)
-                        *temp[j].pointer(0) = *integer_batch[j].pointer();
+                        *temp[j].pointer(0) = integer_batch[j];
                 }
                 else
                 {
-                    exfieldpolycrtbuilder_->decompose(decryptor_->rns_decrypt(ciphers[i]), temp);
+                    exfieldpolycrtbuilder_->decompose(decryptor_->decrypt(ciphers[i]), temp);
                 }
                 for(int j = 0; j < temp.size(); j++)
                     result[i * slot_count + j] = temp[j];
@@ -501,16 +500,16 @@ namespace apsi
 
         void Receiver::decrypt(const seal::Ciphertext &cipher, Plaintext &plain)
         {
-            decryptor_->rns_decrypt(cipher, plain);
+            decryptor_->decrypt(cipher, plain);
         }
 
         void Receiver::decompose(const Plaintext &plain, std::vector<seal::util::ExFieldElement> &batch)
         {
             if (polycrtbuilder_)
             {
-                vector<BigUInt> integer_batch = polycrtbuilder_->decompose(plain);
+                vector<uint64_t> integer_batch = polycrtbuilder_->decompose(plain);
                 for (int j = 0; j < integer_batch.size(); j++)
-                    *batch[j].pointer(0) = *integer_batch[j].pointer();
+                    *batch[j].pointer(0) = integer_batch[j];
             }
             else
             {

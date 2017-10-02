@@ -87,13 +87,13 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>include;$(BOOST_ROOT);..\..\Cuckoo\Cuckoo\include;..\..\SEAL\SEAL;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;C:\libs\boost;..\..\Cuckoo\Cuckoo\include;..\..\SEAL-dev-new\SEAL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Lib>
       <AdditionalDependencies>SEAL.lib; Cuckoo.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>$(BOOST_ROOT)/stage/lib/$(Platform);..\..\Cuckoo\bin\$(Configuration);..\..\SEAL\bin\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib/$(Platform);..\..\Cuckoo\bin\$(Configuration);..\..\SEAL-dev-new\bin\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -116,7 +116,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>include;$(BOOST_ROOT);..\..\Cuckoo\Cuckoo\include;..\..\SEAL\SEAL;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;C:\libs\boost;..\..\Cuckoo\Cuckoo\include;..\..\SEAL-dev-new\SEAL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -126,7 +126,7 @@
       <AdditionalDependencies>SEAL.lib; Cuckoo.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>$(BOOST_ROOT)/stage/lib/$(Platform);..\..\Cuckoo\bin\$(Configuration);..\..\SEAL\bin\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib/$(Platform);..\..\Cuckoo\bin\$(Configuration);..\..\SEAL-dev-new\bin\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>

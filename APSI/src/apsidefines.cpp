@@ -121,7 +121,7 @@ namespace apsi
         return elems;
     }
 
-    seal::Plaintext random_plaintext(const seal::RNSContext &context)
+    seal::Plaintext random_plaintext(const seal::SEALContext &context)
     {
         const seal::BigPoly& poly_mod = context.poly_modulus();
         const seal::SmallModulus& coeff_mod = context.plain_modulus();

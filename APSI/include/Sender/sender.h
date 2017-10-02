@@ -2,10 +2,12 @@
 
 #include "psiparams.h"
 #include "memorypoolhandle.h"
-#include "rnsencryptor.h"
-#include "rnsdecryptor.h"
+#include "encryptor.h"
+#include "decryptor.h"
 #include "util/exfield.h"
-#include "util/expolycrt.h"
+#include "util/exfieldpolycrt.h"
+#include "util/exring.h"
+#include "util/exringpolycrt.h"
 #include "Sender/senderdb.h"
 #include "Sender/senderthreadcontext.h"
 #include "publickey.h"
@@ -24,7 +26,7 @@ namespace apsi
         class Sender
         {
         public:
-            Sender(const PSIParams &params, const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::acquire_global());
+            Sender(const PSIParams &params, const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::Global());
 
             ~Sender();
 
@@ -36,7 +38,7 @@ namespace apsi
             /**
             Set evaluation keys for offline testing.
             */
-            void set_evaluation_keys(const seal::RNSEvaluationKeys &evaluation_keys);
+            void set_evaluation_keys(const seal::EvaluationKeys &evaluation_keys);
 
             /**
             This function is only for testing purpose. Sender should not have the secret key.
@@ -46,7 +48,7 @@ namespace apsi
             /**
             Set public key and evaluation keys for offline testing.
             */
-            void set_keys(const seal::PublicKey &public_key, const seal::RNSEvaluationKeys &evaluation_keys)
+            void set_keys(const seal::PublicKey &public_key, const seal::EvaluationKeys &evaluation_keys)
             {
                 set_public_key(public_key);
                 set_evaluation_keys(evaluation_keys);
@@ -177,7 +179,7 @@ namespace apsi
                 return ex_field_;
             }
 
-            std::shared_ptr<seal::RNSContext> seal_context() const
+            std::shared_ptr<seal::SEALContext> seal_context() const
             {
                 return seal_context_;
             }
@@ -209,9 +211,9 @@ namespace apsi
             /* This is a special local session for offline testing. */
             std::unique_ptr<SenderSessionContext> local_session_;
 
-            seal::RNSEncryptionParameters enc_params_;
+            seal::EncryptionParameters enc_params_;
 
-            std::shared_ptr<seal::RNSContext> seal_context_;
+            std::shared_ptr<seal::SEALContext> seal_context_;
 
             /* Sender's database, including raw data, hashed data, ExField data, and symmetric polynomials. */
             SenderDB sender_db_;

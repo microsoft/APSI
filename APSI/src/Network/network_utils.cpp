@@ -100,7 +100,7 @@ namespace apsi
             data = string((char*)buff.data(), buff.size());
         }
 
-        void send_evalkeys(const seal::RNSEvaluationKeys &keys, Channel &channel)
+        void send_evalkeys(const seal::EvaluationKeys &keys, Channel &channel)
         {
             stringstream ss;
             keys.save(ss);
@@ -108,7 +108,7 @@ namespace apsi
             channel.asyncSend(std::move(buff));
         }
 
-        void receive_evalkeys(seal::RNSEvaluationKeys &keys, Channel &channel)
+        void receive_evalkeys(seal::EvaluationKeys &keys, Channel &channel)
         {
             ByteStream buff;
             channel.recv(buff);

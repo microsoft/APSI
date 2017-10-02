@@ -61,9 +61,9 @@ namespace APSITests
 			params.set_exfield_polymod(string("1x^16 + 3"));
 			params.set_coeff_mod_bit_count(60);
 			params.validate();
-			Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
+			Receiver receiver(params, MemoryPoolHandle::New(true));
 
-			Sender sender(params, MemoryPoolHandle::acquire_new(true));
+			Sender sender(params, MemoryPoolHandle::New(true));
 			sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
 			sender.set_secret_key(receiver.secret_key());
 			sender.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});

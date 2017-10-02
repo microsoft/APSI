@@ -2,7 +2,7 @@
 #include "chooser.h"
 #include <stdexcept>
 #include <item.h>
-#include "primes.h"
+#include "defaultparams.h"
 
 using namespace seal;
 using namespace std;

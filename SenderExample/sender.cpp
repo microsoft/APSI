@@ -63,7 +63,7 @@ void example_remote()
 
     params.validate();
 
-    Sender sender(params, MemoryPoolHandle::acquire_new(true));
+    Sender sender(params, MemoryPoolHandle::New(true));
 
     sender.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
     stop_watch.set_time_point("Precomputation done");

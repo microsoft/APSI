@@ -29,14 +29,13 @@ namespace apsi
         void Sender::initialize()
         {
             enc_params_.set_poly_modulus("1x^" + to_string(params_.poly_degree()) + " + 1");
-            enc_params_.set_coeff_modulus(params_.coeff_modulus());
+            enc_params_.set_coeff_moduli(params_.coeff_modulus());
             enc_params_.set_plain_modulus(ex_field_->coeff_modulus()); // Assume the prime 'p' is always smaller than 64 bits.
-            enc_params_.set_decomposition_bit_count(params_.decomposition_bit_count());
 
-            seal_context_.reset(new RNSContext(enc_params_));
+            seal_context_.reset(new SEALContext(enc_params_));
             local_session_.reset(new SenderSessionContext(seal_context_, params_.sender_total_thread_count()));
 
-            ex_field_->init_frobe_table();
+            ex_field_->init_frob_table();
             const BigPoly poly_mod(ex_field_->coeff_count(), ex_field_->coeff_uint64_count() * bits_per_uint64, 
                 const_cast<uint64_t*>(ex_field_->poly_modulus().get()));
 
@@ -48,17 +47,17 @@ namespace apsi
                 thread_contexts_[i].set_id(i);
 
                 thread_contexts_[i].set_exfield(ExField::acquire_field(ex_field_->characteristic(),
-                    poly_mod, MemoryPoolHandle::acquire_new(false)));
-                thread_contexts_[i].exfield()->set_frobe_table(ex_field_->frobe_table());
+                    poly_mod, MemoryPoolHandle::New(false)));
+                thread_contexts_[i].exfield()->set_frob_table(ex_field_->frobe_table());
 
                 if(seal_context_->get_qualifiers().enable_batching)
-                    thread_contexts_[i].set_builder(make_shared<RNSPolyCRTBuilder>(*seal_context_, MemoryPoolHandle::acquire_new(false)));
+                    thread_contexts_[i].set_builder(make_shared<PolyCRTBuilder>(*seal_context_, MemoryPoolHandle::New(false)));
 
                 thread_contexts_[i].set_exbuilder(make_shared<ExFieldPolyCRTBuilder>(thread_contexts_[i].exfield(), params_.log_poly_degree()));
 
             }
 
-            apsi_endpoint_.reset(new BoostEndpoint(*ios_, "127.0.0.1", params_.apsi_port(), true, params_.apsi_endpoint()));
+            apsi_endpoint_.reset(new BoostEndpoint(*ios_, "0.0.0.0", params_.apsi_port(), true, params_.apsi_endpoint()));
         }
 
         Sender::~Sender()
@@ -71,10 +70,10 @@ namespace apsi
             local_session_->set_public_key(public_key);
         }
 
-        void Sender::set_evaluation_keys(const seal::RNSEvaluationKeys &evaluation_keys)
+        void Sender::set_evaluation_keys(const seal::EvaluationKeys &evaluation_keys)
         {
             /* This is a special local session with maximum threads. */
-            local_session_->set_evaluation_keys(evaluation_keys, params_.sender_total_thread_count());
+            local_session_->set_evaluation_keys(evaluation_keys);
         }
 
         void Sender::set_secret_key(const SecretKey &secret_key)
@@ -148,7 +147,7 @@ namespace apsi
         {
             /* Set up keys. */
             PublicKey pub;
-            RNSEvaluationKeys eval;
+            EvaluationKeys eval;
             receive_pubkey(pub, *server_channel);
             receive_evalkeys(eval, *server_channel);
             SenderSessionContext session_context(seal_context_, pub, eval, params_.sender_session_thread_count());
@@ -274,8 +273,8 @@ namespace apsi
             std::vector<seal::Ciphertext> &batch_powers, SenderThreadContext &context)
         {
             batch_powers.resize(params_.split_size() + 1);
-            shared_ptr<RNSEvaluator> local_evaluator = context.evaluator();
-            batch_powers[0] = context.encryptor()->rns_encrypt(BigPoly("1"));
+            shared_ptr<Evaluator> local_evaluator = context.evaluator();
+            batch_powers[0] = context.encryptor()->encrypt(BigPoly("1"));
             for (int i = 1; i <= params_.split_size(); i++)
             {
                 int i1 = optimal_split(i, 1 << params_.window_size());
@@ -287,7 +286,7 @@ namespace apsi
                 else
                 {
                     local_evaluator->multiply(batch_powers[i1], batch_powers[i2], batch_powers[i]);
-                    local_evaluator->relinearize(batch_powers[i], batch_powers[i]);
+                    local_evaluator->relinearize(batch_powers[i], local_session_->evaluation_keys_, batch_powers[i]);
 
                 }
 
@@ -303,7 +302,7 @@ namespace apsi
             
             Ciphertext tmp;
 
-            shared_ptr<RNSEvaluator> local_evaluator = context.evaluator();
+            shared_ptr<Evaluator> local_evaluator = context.evaluator();
 
             local_evaluator->multiply_plain_ntt(all_powers[batch][0], sender_coeffs[0], result);
            

@@ -6,8 +6,8 @@
 #include "item.h"
 #include "psiparams.h"
 #include "bigpolyarray.h"
-#include "rnsencryptor.h"
-#include "rnsdecryptor.h"
+#include "encryptor.h"
+#include "decryptor.h"
 #include "util/exfieldpolycrt.h"
 #include "Sender/sender.h"
 #include "publickey.h"
@@ -15,8 +15,8 @@
 #include "Network/boost_ioservice.h"
 #include "Network/boost_endpoint.h"
 #include "Network/boost_channel.h"
-#include "rnsevaluationkeys.h"
-#include "rnspolycrt.h"
+#include "evaluationkeys.h"
+#include "polycrt.h"
 
 namespace apsi
 {
@@ -25,7 +25,7 @@ namespace apsi
         class Receiver
         {
         public:
-            Receiver(const PSIParams &params, const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::acquire_global());
+            Receiver(const PSIParams &params, const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::Global());
 
             /**
             Sends a query to the specified sender, and get the intersection result. The query is a vector of items, and the result
@@ -199,7 +199,7 @@ namespace apsi
                 return public_key_;
             }
 
-            const seal::RNSEvaluationKeys& evaluation_keys() const
+            const seal::EvaluationKeys& evaluation_keys() const
             {
                 return evaluation_keys_;
             }
@@ -225,17 +225,17 @@ namespace apsi
 
             seal::PublicKey public_key_;
 
-            std::unique_ptr<seal::RNSEncryptor> encryptor_;
+            std::unique_ptr<seal::Encryptor> encryptor_;
 
             seal::SecretKey secret_key_;
 
-            std::unique_ptr<seal::RNSDecryptor> decryptor_;
+            std::unique_ptr<seal::Decryptor> decryptor_;
 
-            seal::RNSEvaluationKeys evaluation_keys_;
+            seal::EvaluationKeys evaluation_keys_;
 
             std::shared_ptr<seal::util::ExFieldPolyCRTBuilder> exfieldpolycrtbuilder_;
 
-            std::unique_ptr<seal::RNSPolyCRTBuilder> polycrtbuilder_;
+            std::unique_ptr<seal::PolyCRTBuilder> polycrtbuilder_;
 
             /* Pointers to temporary memory allocated during execution of queries. */
             std::vector<seal::util::Pointer> memory_backing_;

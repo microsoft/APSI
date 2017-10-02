@@ -2,8 +2,8 @@
 
 #include "util/exfield.h"
 #include "util/exfieldpolycrt.h"
-#include "rnsevaluator.h"
-#include "rnspolycrt.h"
+#include "evaluator.h"
+#include "polycrt.h"
 
 namespace apsi
 {
@@ -23,9 +23,9 @@ namespace apsi
 
             SenderThreadContext(int id,
                 std::shared_ptr<seal::util::ExField> exfield,
-                std::shared_ptr<seal::RNSEncryptor> encryptor,
-                std::shared_ptr<seal::RNSEvaluator> evaluator,
-                std::shared_ptr<seal::RNSPolyCRTBuilder> builder,
+                std::shared_ptr<seal::Encryptor> encryptor,
+                std::shared_ptr<seal::Evaluator> evaluator,
+                std::shared_ptr<seal::PolyCRTBuilder> builder,
                 std::shared_ptr<seal::util::ExFieldPolyCRTBuilder> exbuilder)
                 :id_(id), exfield_(std::move(exfield)), encryptor_(std::move(encryptor)), evaluator_(std::move(evaluator)), 
                 builder_(std::move(builder)), exbuilder_(std::move(exbuilder))
@@ -53,22 +53,22 @@ namespace apsi
                 exfield_ = move(exfield);
             }
 
-            std::shared_ptr<seal::RNSEncryptor> encryptor()
+            std::shared_ptr<seal::Encryptor> encryptor()
             {
                 return encryptor_;
             }
 
-            void set_encryptor(std::shared_ptr<seal::RNSEncryptor> encryptor)
+            void set_encryptor(std::shared_ptr<seal::Encryptor> encryptor)
             {
                 encryptor_ = std::move(encryptor);
             }
 
-            std::shared_ptr<seal::RNSEvaluator> evaluator()
+            std::shared_ptr<seal::Evaluator> evaluator()
             {
                 return evaluator_;
             }
 
-            void set_evaluator(std::shared_ptr<seal::RNSEvaluator> evaluator)
+            void set_evaluator(std::shared_ptr<seal::Evaluator> evaluator)
             {
                 evaluator_ = std::move(evaluator);
             }
@@ -83,12 +83,12 @@ namespace apsi
                 exbuilder_ = std::move(batcher);
             }
 
-            std::shared_ptr<seal::RNSPolyCRTBuilder> builder()
+            std::shared_ptr<seal::PolyCRTBuilder> builder()
             {
                 return builder_;
             }
 
-            void set_builder(std::shared_ptr<seal::RNSPolyCRTBuilder> builder)
+            void set_builder(std::shared_ptr<seal::PolyCRTBuilder> builder)
             {
                 builder_ = std::move(builder);
             }
@@ -96,9 +96,9 @@ namespace apsi
         private:
             int id_;
             std::shared_ptr<seal::util::ExField> exfield_;
-            std::shared_ptr<seal::RNSEvaluator> evaluator_;
-            std::shared_ptr<seal::RNSEncryptor> encryptor_;
-            std::shared_ptr<seal::RNSPolyCRTBuilder> builder_;
+            std::shared_ptr<seal::Evaluator> evaluator_;
+            std::shared_ptr<seal::Encryptor> encryptor_;
+            std::shared_ptr<seal::PolyCRTBuilder> builder_;
             std::shared_ptr<seal::util::ExFieldPolyCRTBuilder> exbuilder_;
         };
     }

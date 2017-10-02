@@ -4,6 +4,7 @@
 #include <string>
 #include "Sender/sender.h"
 #include "util/exfield.h"
+#include "util/uintcore.h"
 #include "apsidefines.h"
 #include <fstream>
 
@@ -30,7 +31,7 @@ void example_remote_multiple();
 int main(int argc, char *argv[])
 {
     // Example: Basics
-    //example_basics();
+    example_basics();
 
     //// Example: Update
     //example_update();
@@ -40,7 +41,7 @@ int main(int argc, char *argv[])
     //example_load_db();
 
     //// Example: Fast batching
-    //example_fast_batching();
+    example_fast_batching();
 
     //// Example: Slow batching
     example_slow_batching();
@@ -93,9 +94,9 @@ void example_basics()
 
     params.validate();
 
-    Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
+    Receiver receiver(params, MemoryPoolHandle::New(true));
 
-    Sender sender(params, MemoryPoolHandle::acquire_new(true));
+    Sender sender(params, MemoryPoolHandle::New(true));
     sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
     sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
     sender.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
@@ -138,9 +139,9 @@ void example_update()
     params.set_exfield_polymod(string("1x^16 + 3"));
     params.set_coeff_mod_bit_count(60);  // SEAL param: when n = 2048, q has 60 bits.
     params.validate();
-    Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
+    Receiver receiver(params, MemoryPoolHandle::New(true));
 
-    Sender sender(params, MemoryPoolHandle::acquire_new(true));
+    Sender sender(params, MemoryPoolHandle::New(true));
     sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
     sender.set_secret_key(receiver.secret_key());
     sender.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
@@ -211,8 +212,8 @@ void example_save_db()
         cout << "All bits of reduced items are used." << endl;
     }
 
-    Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
-    Sender sender(params, MemoryPoolHandle::acquire_new(true));
+    Receiver receiver(params, MemoryPoolHandle::New(true));
+    Sender sender(params, MemoryPoolHandle::New(true));
     sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
     sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 
@@ -254,8 +255,8 @@ void example_load_db()
         cout << "All bits of reduced items are used." << endl;
     }
 
-    Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
-    Sender sender(params, MemoryPoolHandle::acquire_new(true));
+    Receiver receiver(params, MemoryPoolHandle::New(true));
+    Sender sender(params, MemoryPoolHandle::New(true));
     sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
     sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 
@@ -311,13 +312,13 @@ void example_fast_batching()
     //params.set_coeff_mod_bit_count(189);  // SEAL param: when n = 8192, q has 189 or 226 bits.
     //params.set_decomposition_bit_count(48);
 
-    PSIParams params(4, 4, 1, 14, 3584, 1, 256);
+    PSIParams params(8, 8, 1, 14, 3584, 1, 256);
     params.set_item_bit_length(32); // The effective item bit length will be limited by ExField's p.
     params.set_exfield_polymod(string("1x^1")); // f(x) = x
     params.set_exfield_characteristic(0x820001); // p = 8519681. NOTE: p=1 (mod 2n)
     params.set_log_poly_degree(14); /* n = 2^14 = 16384, in SEAL's poly modulus "x^n + 1". */
     params.set_coeff_mod_bit_count(226);  // SEAL param: when n = 16384, q has 189 or 226 bits.
-    params.set_decomposition_bit_count(46);
+    params.set_decomposition_bit_count(60);
     params.validate();
     
     //PSIParams params(1, 1, 1, 13, 80, 1, 16);
@@ -341,8 +342,8 @@ void example_fast_batching()
         cout << "All bits of reduced items are used." << endl;
     }
 
-    Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
-    Sender sender(params, MemoryPoolHandle::acquire_new(true));
+    Receiver receiver(params, MemoryPoolHandle::New(true));
+    Sender sender(params, MemoryPoolHandle::New(true));
     sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
     sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 
@@ -459,8 +460,8 @@ void example_slow_batching()
         cout << "All bits of reduced items are used." << endl;
     }
 
-    Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
-    Sender sender(params, MemoryPoolHandle::acquire_new(true));
+    Receiver receiver(params, MemoryPoolHandle::New(true));
+    Sender sender(params, MemoryPoolHandle::New(true));
     sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
     sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 
@@ -509,8 +510,8 @@ void example_slow_vs_fast()
         cout << "All bits of reduced items are used." << endl;
     }
 
-    Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
-    Sender sender(params, MemoryPoolHandle::acquire_new(true));
+    Receiver receiver(params, MemoryPoolHandle::New(true));
+    Sender sender(params, MemoryPoolHandle::New(true));
     sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
     sender.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
 
@@ -544,8 +545,8 @@ void example_slow_vs_fast()
         cout << "All bits of reduced items are used." << endl;
     }
 
-    Receiver receiver2(params2, MemoryPoolHandle::acquire_new(true));
-    Sender sender2(params2, MemoryPoolHandle::acquire_new(true));
+    Receiver receiver2(params2, MemoryPoolHandle::New(true));
+    Sender sender2(params2, MemoryPoolHandle::New(true));
     sender2.set_keys(receiver2.public_key(), receiver2.evaluation_keys());
     sender2.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
 
@@ -593,7 +594,7 @@ void example_remote()
 
     params.validate();
 
-    Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
+    Receiver receiver(params, MemoryPoolHandle::New(true));
 
     vector<bool> intersection = receiver.query(vector<Item>{string("1"), string("f"), string("i"), string("c")}, "127.0.0.1", params.apsi_port());
     stop_watch.set_time_point("Query done");
@@ -642,7 +643,7 @@ void example_remote_multiple()
 
     auto receiver_connection = [&](int id)
     {
-        Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
+        Receiver receiver(params, MemoryPoolHandle::New(true));
         stop_watch.set_time_point("[Receiver " + to_string(id) + "] Initialization done");
 
         vector<bool> intersection = receiver.query(vector<Item>{string("1"), string("f"), string("i"), string("c")}, "127.0.0.1", params.apsi_port());

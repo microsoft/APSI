@@ -2,7 +2,7 @@
 #include "util/mempool.h"
 #include "util/polycore.h"
 #include "util/polyfftmultsmallmod.h"
-#include "util/smallpolyarith.h"
+#include "util/polyarithsmallmod.h"
 
 using namespace seal;
 using namespace seal::util;
@@ -50,7 +50,7 @@ namespace apsi
         resize_destination_if_needed(result_poly, coeff_count, coeff_bit_count);
 
         // Multiply polynomials.
-        nussbaumer_multiply_poly_poly_coeff_smallmod(poly1ptr.get(), poly2ptr.get(), poly_mod.coeff_count_power_of_two(), coeff_mod, result_poly.pointer(), pool);
+        nussbaumer_multiply_poly_poly_coeffmod(poly1ptr.get(), poly2ptr.get(), poly_mod.coeff_count_power_of_two(), coeff_mod, result_poly.pointer(), pool);
      
     }
 
@@ -73,7 +73,7 @@ namespace apsi
         resize_destination_if_needed(result_poly, coeff_count, coeff_bit_count);
 
         // Add polynomials.
-        add_poly_poly_coeff_smallmod(poly1ptr.get(), poly2ptr.get(), coeff_count, coeff_mod, result_poly.pointer());
+        add_poly_poly_coeffmod(poly1ptr.get(), poly2ptr.get(), coeff_count, coeff_mod, result_poly.pointer());
     }
 
     void sub(const seal::Plaintext &plaintext1, const seal::Plaintext &plaintext2,
@@ -95,6 +95,6 @@ namespace apsi
         resize_destination_if_needed(result_poly, coeff_count, coeff_bit_count);
 
         // Add polynomials.
-        sub_poly_poly_coeff_smallmod(poly1ptr.get(), poly2ptr.get(), coeff_count, coeff_mod, result_poly.pointer());
+        sub_poly_poly_coeffmod(poly1ptr.get(), poly2ptr.get(), coeff_count, coeff_mod, result_poly.pointer());
     }
 }

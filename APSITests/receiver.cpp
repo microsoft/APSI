@@ -27,7 +27,7 @@ namespace APSITests
 		TEST_METHOD(TestCuckooHashing)
 		{
 			PSIParams params(8, 8, 1, 11, 32, 2, 4);
-			Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
+			Receiver receiver(params, MemoryPoolHandle::New(true));
 			vector<Item> data{ string("1"), string("f"), string("i"), string("c") };
 			
 			unique_ptr<PermutationBasedCuckoo> cuckoo = receiver.cuckoo_hashing(data);
@@ -52,7 +52,7 @@ namespace APSITests
 		TEST_METHOD(TESTCuckooIndices)
 		{
 			PSIParams params(8, 8, 1, 11, 32, 2, 4);
-			Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
+			Receiver receiver(params, MemoryPoolHandle::New(true));
 			vector<Item> data{ string("1"), string("f"), string("i"), string("c") };
 
 			unique_ptr<PermutationBasedCuckoo> cuckoo = receiver.cuckoo_hashing(data);
@@ -82,7 +82,7 @@ namespace APSITests
 		TEST_METHOD(TestExFieldEncoding)
 		{
 			PSIParams params(8, 8, 1, 11, 32, 2, 4);
-			Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
+			Receiver receiver(params, MemoryPoolHandle::New(true));
 			vector<Item> data{ string("1"), string("f"), string("i"), string("c") };
 
 			unique_ptr<PermutationBasedCuckoo> cuckoo = receiver.cuckoo_hashing(data);
@@ -147,9 +147,9 @@ namespace APSITests
 			params.set_exfield_polymod(string("1x^16 + 3"));
 			params.set_coeff_mod_bit_count(60);
 			params.validate();
-			Receiver receiver(params, MemoryPoolHandle::acquire_new(true));
+			Receiver receiver(params, MemoryPoolHandle::New(true));
 
-			Sender sender(params, MemoryPoolHandle::acquire_new(true));
+			Sender sender(params, MemoryPoolHandle::New(true));
 			sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
 			sender.set_secret_key(receiver.secret_key());
 			sender.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
