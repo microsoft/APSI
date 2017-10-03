@@ -110,8 +110,7 @@ namespace apsi
 
             @see randomized_symmetric_polys for computing randomized symmetric polynomials.
             */
-            std::vector<seal::Plaintext>& batched_randomized_symmetric_polys(
-                int split, int batch, SenderThreadContext &context);
+            void batched_randomized_symmetric_polys(SenderThreadContext &context);
 
             const std::vector<std::vector<Item>>& simple_hashing_db() const
             {
@@ -121,6 +120,11 @@ namespace apsi
             void save(std::ostream &stream) const;
 
             void load(std::istream &stream);
+
+            std::vector<std::vector<std::vector<seal::Plaintext>>> &batch_random_symm_polys()
+            {
+                return batch_random_symm_polys_;
+            }
 
         private:
 

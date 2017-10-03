@@ -93,18 +93,19 @@ namespace apsi
         void Sender::offline_compute()
         {
             /* Offline pre-processing. */
-      //atomic<int> block_index(0);
             auto block_computation = [&](SenderThreadContext& context)
             {
-                int total_blocks = params_.number_of_splits() * params_.number_of_batches();
-                int start_block = context.id() * total_blocks / params_.sender_total_thread_count();
-                int end_block = (context.id() + 1) * total_blocks / params_.sender_total_thread_count();
-                int next_block = 0;
-                for (int next_block = start_block; next_block < end_block; next_block++)
-                {
-                    int split = next_block / params_.number_of_batches(), batch = next_block % params_.number_of_batches();
-                    sender_db_.batched_randomized_symmetric_polys(split, batch, context);
-                }
+                sender_db_.batched_randomized_symmetric_polys(context);
+
+                //int total_blocks = params_.number_of_splits() * params_.number_of_batches();
+                //int start_block = context.id() * total_blocks / params_.sender_total_thread_count();
+                //int end_block = (context.id() + 1) * total_blocks / params_.sender_total_thread_count();
+                //int next_block = 0;
+                //for (int next_block = start_block; next_block < end_block; next_block++)
+                //{
+                //    int split = next_block / params_.number_of_batches(), batch = next_block % params_.number_of_batches();
+                //    sender_db_.batched_randomized_symmetric_polys(split, batch, context);
+                //}
                 /* After this point, this thread will no longer use the context resource, so it is free to return it. */
                 release_thread_context(context.id());
             };
@@ -190,6 +191,7 @@ namespace apsi
             auto block_computation = [&](SenderThreadContext &context)
             {
                 int next_block = 0;
+                sender_db_.batched_randomized_symmetric_polys(context);
                 while (true)
                 {
                     next_block = block_index++;
@@ -298,9 +300,8 @@ namespace apsi
 
         void Sender::compute_dot_product(int split, int batch, const vector<vector<Ciphertext>> &all_powers, 
             Ciphertext &result, SenderThreadContext &context)
-        {
-            vector<Plaintext>& sender_coeffs = sender_db_.batched_randomized_symmetric_polys(split, batch, context);
-            
+        {            
+            vector<Plaintext>& sender_coeffs = sender_db_.batch_random_symm_polys()[split][batch];
             Ciphertext tmp;
 
             shared_ptr<Evaluator> local_evaluator = context.evaluator();

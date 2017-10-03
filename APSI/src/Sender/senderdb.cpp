@@ -166,47 +166,88 @@ namespace apsi
             }
         }
 
-        vector<Plaintext>& SenderDB::batched_randomized_symmetric_polys(
-            int split, int batch, SenderThreadContext &context)
+        void SenderDB::batched_randomized_symmetric_polys(SenderThreadContext &context)
         {
-            if (!symm_polys_stale_[split][batch])
-                return batch_random_symm_polys_[split][batch];
-
-            int table_size = params_.table_size(), split_size = params_.split_size(), split_start = split * split_size, batch_size = params_.batch_size(),
-                batch_start = batch * batch_size, batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
-
             shared_ptr<ExField> exfield = context.exfield();
             Pointer symm_block_backing;
-            vector<vector<ExFieldElement>> symm_block = exfield->allocate_elements(batch_end - batch_start, split_size + 1, symm_block_backing);
-
-            randomized_symmetric_polys(split, batch, context, symm_block);
+            vector<vector<ExFieldElement>> symm_block = exfield->allocate_elements(params_.batch_size(), params_.split_size() + 1, symm_block_backing);
 
             Pointer batch_backing;
-            vector<ExFieldElement> batch_vector = context.exfield()->allocate_elements(batch_size, batch_backing);
-            vector<uint64_t> integer_batch_vector(batch_size, 0);
+            vector<ExFieldElement> batch_vector = context.exfield()->allocate_elements(params_.batch_size(), batch_backing);
+            vector<uint64_t> integer_batch_vector(params_.batch_size(), 0);
 
-            for (int i = 0; i < split_size + 1; i++)
+            int total_blocks = params_.number_of_splits() * params_.number_of_batches();
+            int start_block = context.id() * total_blocks / params_.sender_total_thread_count();
+            int end_block = (context.id() + 1) * total_blocks / params_.sender_total_thread_count();
+            int next_block = 0;
+            for (int next_block = start_block; next_block < end_block; next_block++)
             {
-                Plaintext temp_plain;
-                if (context.builder())
+                int split = next_block / params_.number_of_batches(), batch = next_block % params_.number_of_batches();
+
+                if (!symm_polys_stale_[split][batch])
+                    continue;
+
+                int table_size = params_.table_size(), split_size = params_.split_size(), split_start = split * split_size, batch_size = params_.batch_size(),
+                    batch_start = batch * batch_size, batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
+
+                randomized_symmetric_polys(split, batch, context, symm_block);
+
+                for (int i = 0; i < split_size + 1; i++)
                 {
-                    for (int k = 0; batch_start + k < batch_end; k++)
-                        integer_batch_vector[k] = *symm_block[k][i].pointer(0);
-                    temp_plain = context.builder()->compose(integer_batch_vector);
-                }
-                else // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
-                {
-                    for (int k = 0; batch_start + k < batch_end; k++)
-                        batch_vector[k] = symm_block[k][i];
-                    temp_plain = context.exbuilder()->compose(batch_vector);
+                    Plaintext temp_plain;
+                    if (context.builder())
+                    {
+                        for (int k = 0; batch_start + k < batch_end; k++)
+                            integer_batch_vector[k] = *symm_block[k][i].pointer(0);
+                        temp_plain = context.builder()->compose(integer_batch_vector);
+                    }
+                    else // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
+                    {
+                        for (int k = 0; batch_start + k < batch_end; k++)
+                            batch_vector[k] = symm_block[k][i];
+                        temp_plain = context.exbuilder()->compose(batch_vector);
+                    }
+
+                    context.evaluator()->transform_to_ntt(temp_plain);
+                    batch_random_symm_polys_[split][batch][i] = temp_plain;
                 }
 
-                context.evaluator()->transform_to_ntt(temp_plain);
-                batch_random_symm_polys_[split][batch][i] = temp_plain;
+                symm_polys_stale_[split][batch] = false;
             }
 
-            symm_polys_stale_[split][batch] = false;
-            return batch_random_symm_polys_[split][batch];
+            //if (!symm_polys_stale_[split][batch])
+            //    return batch_random_symm_polys_[split][batch];
+
+            //int table_size = params_.table_size(), split_size = params_.split_size(), split_start = split * split_size, batch_size = params_.batch_size(),
+            //    batch_start = batch * batch_size, batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
+
+            //randomized_symmetric_polys(split, batch, context, symm_block);
+
+            //Pointer batch_backing;
+            //vector<ExFieldElement> batch_vector = context.exfield()->allocate_elements(batch_size, batch_backing);
+            //vector<uint64_t> integer_batch_vector(batch_size, 0);
+
+            //for (int i = 0; i < split_size + 1; i++)
+            //{
+            //    Plaintext temp_plain;
+            //    if (context.builder())
+            //    {
+            //        for (int k = 0; batch_start + k < batch_end; k++)
+            //            integer_batch_vector[k] = *symm_block[k][i].pointer(0);
+            //        temp_plain = context.builder()->compose(integer_batch_vector);
+            //    }
+            //    else // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
+            //    {
+            //        for (int k = 0; batch_start + k < batch_end; k++)
+            //            batch_vector[k] = symm_block[k][i];
+            //        temp_plain = context.exbuilder()->compose(batch_vector);
+            //    }
+
+            //    context.evaluator()->transform_to_ntt(temp_plain);
+            //    batch_random_symm_polys_[split][batch][i] = temp_plain;
+            //}
+
+            //symm_polys_stale_[split][batch] = false;
         }
 
         void SenderDB::save(std::ostream &stream) const
