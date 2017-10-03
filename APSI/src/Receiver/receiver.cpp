@@ -23,7 +23,7 @@ namespace apsi
         Receiver::Receiver(const PSIParams &params, const MemoryPoolHandle &pool)
             :params_(params), 
             pool_(pool),
-            ex_field_(ExField::acquire_field(params.exfield_characteristic(), params.exfield_polymod(), pool)),
+            ex_field_(ExField::Acquire(params.exfield_characteristic(), params.exfield_polymod(), pool)),
             ios_(new BoostIOService(0))
         {
             initialize();

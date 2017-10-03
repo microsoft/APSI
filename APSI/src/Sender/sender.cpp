@@ -17,7 +17,7 @@ namespace apsi
         Sender::Sender(const PSIParams &params, const MemoryPoolHandle &pool)
             :params_(params),
             pool_(pool),
-            ex_field_(ExField::acquire_field(params.exfield_characteristic(), params.exfield_polymod(), pool)),
+            ex_field_(ExField::Acquire(params.exfield_characteristic(), params.exfield_polymod(), pool)),
             sender_db_(params, ex_field_),
             thread_contexts_(params.sender_total_thread_count()),
             ios_(new BoostIOService(0)),
@@ -46,7 +46,7 @@ namespace apsi
 
                 thread_contexts_[i].set_id(i);
 
-                thread_contexts_[i].set_exfield(ExField::acquire_field(ex_field_->characteristic(),
+                thread_contexts_[i].set_exfield(ExField::Acquire(ex_field_->characteristic(),
                     poly_mod, MemoryPoolHandle::New(false)));
                 thread_contexts_[i].exfield()->set_frob_table(ex_field_->frobe_table());
 
@@ -92,7 +92,7 @@ namespace apsi
         void Sender::offline_compute()
         {
             /* Offline pre-processing. */
-	  atomic<int> block_index(0);
+      atomic<int> block_index(0);
             auto block_computation = [&](SenderThreadContext& context)
             {
                 int next_block = 0;

@@ -48,7 +48,7 @@ namespace APSITests
 			item[0] = 0x3850683f4a;
 			item[1] = 0x238bc3df32;
 
-			shared_ptr<ExField> field = ExField::acquire_field(0x1e01, string("1x^16 + 3e"));
+			shared_ptr<ExField> field = ExField::Acquire(0x1e01, string("1x^16 + 3e"));
 
 			ExFieldElement e = item.to_exfield_element(field);
 
