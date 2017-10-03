@@ -42,16 +42,17 @@ namespace apsi
             /* Set local exfields for multithreaded efficient use of memory pools. */
             for (int i = 0; i < params_.sender_total_thread_count(); i++)
             {
+                auto local_mph = MemoryPoolHandle::New(false);
                 available_thread_contexts_.push_back(i);
-
+                
                 thread_contexts_[i].set_id(i);
 
                 thread_contexts_[i].set_exfield(ExField::Acquire(ex_field_->characteristic(),
-                    poly_mod, MemoryPoolHandle::New(false)));
+                    poly_mod, local_mph));
                 thread_contexts_[i].exfield()->set_frob_table(ex_field_->frobe_table());
 
                 if(seal_context_->get_qualifiers().enable_batching)
-                    thread_contexts_[i].set_builder(make_shared<PolyCRTBuilder>(*seal_context_, MemoryPoolHandle::New(false)));
+                    thread_contexts_[i].set_builder(make_shared<PolyCRTBuilder>(*seal_context_, local_mph));
 
                 thread_contexts_[i].set_exbuilder(make_shared<ExFieldPolyCRTBuilder>(thread_contexts_[i].exfield(), params_.log_poly_degree()));
 
@@ -92,15 +93,15 @@ namespace apsi
         void Sender::offline_compute()
         {
             /* Offline pre-processing. */
-      atomic<int> block_index(0);
+      //atomic<int> block_index(0);
             auto block_computation = [&](SenderThreadContext& context)
             {
+                int total_blocks = params_.number_of_splits() * params_.number_of_batches();
+                int start_block = context.id() * total_blocks / params_.sender_total_thread_count();
+                int end_block = (context.id() + 1) * total_blocks / params_.sender_total_thread_count();
                 int next_block = 0;
-                while (true)
+                for (int next_block = start_block; next_block < end_block; next_block++)
                 {
-                    next_block = block_index++;
-                    if (next_block >= params_.number_of_splits() * params_.number_of_batches())
-                        break;
                     int split = next_block / params_.number_of_batches(), batch = next_block % params_.number_of_batches();
                     sender_db_.batched_randomized_symmetric_polys(split, batch, context);
                 }
