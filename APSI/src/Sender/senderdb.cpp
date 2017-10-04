@@ -21,7 +21,13 @@ namespace apsi
             shuffle_index_(params.table_size(), vector<int>(params.sender_bin_size())),
             next_shuffle_locs_(params.table_size(), 0),
             symm_polys_stale_(params.number_of_splits(), vector<char>(params.number_of_batches(), true)),
-            batch_random_symm_polys_(params.number_of_splits(), vector<vector<Plaintext>>(params.number_of_batches(), vector<Plaintext>(params.split_size() + 1)))
+            batch_random_symm_polys_(
+                params.number_of_splits(), 
+                vector<vector<Plaintext>>(
+                    params.number_of_batches(), 
+                    vector<Plaintext>(
+                        params.split_size() + 1,
+                        BigPoly(params_.poly_degree(), util::get_significant_bit_count(params_.exfield_characteristic())))))
         {
 
             /* Set null value for sender: 00..0011..11, with itemL's 1 */
