@@ -31,7 +31,7 @@ void example_remote_multiple();
 int main(int argc, char *argv[])
 {
     // Example: Basics
-    example_basics();
+    //example_basics();
 
     //// Example: Update
     //example_update();
@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
     example_fast_batching();
 
     //// Example: Slow batching
-    example_slow_batching();
+    //example_slow_batching();
 
     // Example: Slow batching vs. Fast batching
     //example_slow_vs_fast();

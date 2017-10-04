@@ -194,22 +194,21 @@ namespace apsi
 
                 for (int i = 0; i < split_size + 1; i++)
                 {
-                    Plaintext temp_plain;
+                    Plaintext &temp_plain = batch_random_symm_polys_[split][batch][i];
                     if (context.builder())
                     {
                         for (int k = 0; batch_start + k < batch_end; k++)
                             integer_batch_vector[k] = *symm_block[k][i].pointer(0);
-                        temp_plain = context.builder()->compose(integer_batch_vector);
+                        context.builder()->compose(integer_batch_vector, temp_plain);
                     }
                     else // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
                     {
                         for (int k = 0; batch_start + k < batch_end; k++)
                             batch_vector[k] = symm_block[k][i];
-                        temp_plain = context.exbuilder()->compose(batch_vector);
+                        context.exbuilder()->compose(batch_vector, temp_plain);
                     }
 
                     context.evaluator()->transform_to_ntt(temp_plain);
-                    batch_random_symm_polys_[split][batch][i] = temp_plain;
                 }
 
                 symm_polys_stale_[split][batch] = false;
