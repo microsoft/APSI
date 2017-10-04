@@ -27,7 +27,7 @@ namespace apsi
                     params.number_of_batches(), 
                     vector<Plaintext>(
                         params.split_size() + 1,
-                        BigPoly(params_.poly_degree(), util::get_significant_bit_count(params_.exfield_characteristic())))))
+                        BigPoly(params_.poly_degree() + 1, util::get_significant_bit_count(params_.exfield_characteristic())))))
         {
 
             /* Set null value for sender: 00..0011..11, with itemL's 1 */
