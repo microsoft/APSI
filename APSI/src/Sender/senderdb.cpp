@@ -21,14 +21,14 @@ namespace apsi
             shuffle_index_(params.table_size(), vector<int>(params.sender_bin_size())),
             next_shuffle_locs_(params.table_size(), 0),
             symm_polys_stale_(params.number_of_splits(), vector<char>(params.number_of_batches(), true)),
-            batch_random_symm_polys_(
-                params.number_of_splits(), 
-                vector<vector<Plaintext>>(
-                    params.number_of_batches(), 
-                    vector<Plaintext>(
-                        params.split_size() + 1,
-                        BigPoly(params_.poly_degree() + 1, util::get_significant_bit_count(params_.exfield_characteristic())))))
+            batch_random_symm_polys_(params.number_of_splits() * params.number_of_batches() * (params.split_size() + 1))
+
         {
+            int characteristic_bit_count = util::get_significant_bit_count(params_.exfield_characteristic());
+            for (auto &plain : batch_random_symm_polys_)
+            {
+                plain.resize(params_.poly_degree() + 1, characteristic_bit_count);
+            }
 
             /* Set null value for sender: 00..0011..11, with itemL's 1 */
             sender_null_item_.fill(~static_cast<uint64_t>(0));
@@ -182,10 +182,22 @@ namespace apsi
             vector<ExFieldElement> batch_vector = context.exfield()->allocate_elements(params_.batch_size(), batch_backing);
             vector<uint64_t> integer_batch_vector(params_.batch_size(), 0);
 
+            int table_size = params_.table_size(),
+                split_size = params_.split_size(),
+                batch_size = params_.batch_size(),
+                split_size_plus_one = params_.split_size() + 1;
+
+            auto indexer = [
+                 splitStep = params_.number_of_batches() * split_size_plus_one,
+                 batchStep = split_size_plus_one](int splitIdx, int batchIdx, int i)
+            {
+                return splitIdx * splitStep + batchIdx * batchStep + i;
+            };
+
             int total_blocks = params_.number_of_splits() * params_.number_of_batches();
             int start_block = context.id() * total_blocks / params_.sender_total_thread_count();
             int end_block = (context.id() + 1) * total_blocks / params_.sender_total_thread_count();
-            int next_block = 0;
+
             for (int next_block = start_block; next_block < end_block; next_block++)
             {
                 int split = next_block / params_.number_of_batches(), batch = next_block % params_.number_of_batches();
@@ -193,14 +205,16 @@ namespace apsi
                 if (!symm_polys_stale_[split][batch])
                     continue;
 
-                int table_size = params_.table_size(), split_size = params_.split_size(), split_start = split * split_size, batch_size = params_.batch_size(),
-                    batch_start = batch * batch_size, batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
+                int split_start = split * split_size, 
+                    batch_start = batch * batch_size, 
+                    batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
 
                 randomized_symmetric_polys(split, batch, context, symm_block);
 
-                for (int i = 0; i < split_size + 1; i++)
+                auto idx = indexer(split, batch, 0);
+                for (int i = 0; i < split_size + 1; i++, idx++)
                 {
-                    Plaintext &temp_plain = batch_random_symm_polys_[split][batch][i];
+                    Plaintext &temp_plain = batch_random_symm_polys_[idx];
                     if (context.builder())
                     {
                         for (int k = 0; batch_start + k < batch_end; k++)
@@ -295,10 +309,12 @@ namespace apsi
             for (int i = 0; i < table_size; i++)
                 stream.write(reinterpret_cast<const char*>(&(next_shuffle_locs_[i])), sizeof(int));
 
-            for (int i = 0; i < num_splits; i++)
-                for (int j = 0; j < num_batches; j++)
-                    for (int k = 0; k < split_size_plus_one; k++)
-                        batch_random_symm_polys_[i][j][k].save(stream);
+            //for (int i = 0; i < num_splits; i++)
+            //    for (int j = 0; j < num_batches; j++)
+            //        for (int k = 0; k < split_size_plus_one; k++)
+            //            batch_random_symm_polys_[i][j][k].save(stream);
+            for (auto& p : batch_random_symm_polys_)
+                p.save(stream);
 
             for (int i = 0; i < num_splits; i++)
                 for (int j = 0; j < num_batches; j++)
@@ -336,10 +352,12 @@ namespace apsi
             for (int i = 0; i < table_size; i++)
                 stream.read(reinterpret_cast<char*>(&(next_shuffle_locs_[i])), sizeof(int));
 
-            for (int i = 0; i < num_splits; i++)
-                for (int j = 0; j < num_batches; j++)
-                    for (int k = 0; k < split_size_plus_one; k++)
-                        batch_random_symm_polys_[i][j][k].load(stream);
+            //for (int i = 0; i < num_splits; i++)
+            //    for (int j = 0; j < num_batches; j++)
+            //        for (int k = 0; k < split_size_plus_one; k++)
+            //            batch_random_symm_polys_[i][j][k].load(stream);
+            for (auto& p : batch_random_symm_polys_)
+                p.load(stream);
 
             for (int i = 0; i < num_splits; i++)
                 for (int j = 0; j < num_batches; j++)

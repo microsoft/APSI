@@ -121,7 +121,8 @@ namespace apsi
 
             void load(std::istream &stream);
 
-            std::vector<std::vector<std::vector<seal::Plaintext>>> &batch_random_symm_polys()
+            //std::vector<std::vector<std::vector<seal::Plaintext>>> &batch_random_symm_polys()
+            std::vector<seal::Plaintext> &batch_random_symm_polys()
             {
                 return batch_random_symm_polys_;
             }
@@ -181,7 +182,7 @@ namespace apsi
             essentially split into '#splits x #batches' blocks. Each block is related with a split
             and a batch.
             */
-            std::vector<std::vector<std::vector<seal::Plaintext>>> batch_random_symm_polys_;
+            std::vector<seal::Plaintext> batch_random_symm_polys_;
 
             /*
             #splits x #batches. Flags indicating whether the blocks need to be re-computed or not.

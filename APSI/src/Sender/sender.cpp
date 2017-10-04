@@ -4,7 +4,7 @@
 #include <mutex>
 #include "Network/boost_endpoint.h"
 #include "Network/network_utils.h"
-
+#include "Network\array_view.h"
 using namespace std;
 using namespace seal;
 using namespace seal::util;
@@ -301,7 +301,14 @@ namespace apsi
         void Sender::compute_dot_product(int split, int batch, const vector<vector<Ciphertext>> &all_powers, 
             Ciphertext &result, SenderThreadContext &context)
         {            
-            vector<Plaintext>& sender_coeffs = sender_db_.batch_random_symm_polys()[split][batch];
+            int split_size_plus_one = params_.split_size() + 1,
+                splitStep = params_.number_of_batches() * split_size_plus_one;
+
+
+            network::ArrayView<Plaintext> sender_coeffs (
+                &sender_db_.batch_random_symm_polys()[split * splitStep + batch * split_size_plus_one],
+                split_size_plus_one);
+
             Ciphertext tmp;
 
             shared_ptr<Evaluator> local_evaluator = context.evaluator();
