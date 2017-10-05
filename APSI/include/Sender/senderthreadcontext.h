@@ -44,7 +44,7 @@ namespace apsi
                 id_ = id;
             }
 
-            std::shared_ptr<seal::util::ExField> exfield()
+            std::shared_ptr<seal::util::ExField> &exfield()
             {
                 return exfield_;
             }
@@ -54,7 +54,7 @@ namespace apsi
                 exfield_ = move(exfield);
             }
 
-            std::shared_ptr<seal::Encryptor> encryptor()
+            std::shared_ptr<seal::Encryptor> &encryptor()
             {
                 return encryptor_;
             }
@@ -64,7 +64,7 @@ namespace apsi
                 encryptor_ = std::move(encryptor);
             }
 
-            std::shared_ptr<seal::Evaluator> evaluator()
+            std::shared_ptr<seal::Evaluator> &evaluator()
             {
                 return evaluator_;
             }
@@ -74,7 +74,7 @@ namespace apsi
                 evaluator_ = std::move(evaluator);
             }
 
-            std::shared_ptr<seal::util::ExFieldPolyCRTBuilder> exbuilder()
+            std::shared_ptr<seal::util::ExFieldPolyCRTBuilder> &exbuilder()
             {
                 return exbuilder_;
             }
@@ -84,7 +84,7 @@ namespace apsi
                 exbuilder_ = std::move(batcher);
             }
 
-            std::shared_ptr<seal::PolyCRTBuilder> builder()
+            std::shared_ptr<seal::PolyCRTBuilder> &builder()
             {
                 return builder_;
             }
