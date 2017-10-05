@@ -3,7 +3,7 @@
 #include "apsidefines.h"
 #include "util/uintcore.h"
 #include <fstream>
-#include  <algorithm>
+#include <algorithm>
 
 using namespace std;
 using namespace seal;

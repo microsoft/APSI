@@ -72,7 +72,7 @@ namespace apsi
             last |= ((data[i] & 0xFFFF) << (i * 8));
         hf_(last, hash_block);
 
-	value_ = *(std::array<uint64_t, 2>*)&hash_block;
+    value_ = *(std::array<uint64_t, 2>*)&hash_block;
         //value_[0] = hash_block.m128i_u64[0];
         //value_[1] = hash_block.m128i_u64[1];
 
@@ -130,7 +130,7 @@ namespace apsi
 
     void Item::to_exfield_element(ExFieldElement &ring_item)
     {
-        shared_ptr<ExField> exfield = ring_item.ex_field();
+        shared_ptr<ExField> &exfield = ring_item.ex_field();
         int split_length = exfield->coeff_modulus().bit_count() - 1; // Should minus 1 to avoid wrapping around p
         int split_index_bound = (reduced_bit_length_ + split_length - 1) / split_length; 
         int j = 0;

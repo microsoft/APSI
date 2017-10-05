@@ -166,8 +166,8 @@ namespace apsi
 
             @param[out] result A ciphertext encrypting a batch of results for a consecutive range of sub-bins. 
             */
-            void compute_dot_product(int split, int batch, const std::vector<std::vector<seal::Ciphertext>> &all_powers,
-                seal::Ciphertext &result, SenderThreadContext &context);
+            //void compute_dot_product(int split, int batch, const std::vector<std::vector<seal::Ciphertext>> &all_powers,
+            //    seal::Ciphertext &result, SenderThreadContext &context);
 
             SenderSessionContext& local_session()
             {
