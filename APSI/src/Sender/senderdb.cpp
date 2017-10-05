@@ -27,7 +27,7 @@ namespace apsi
             int characteristic_bit_count = util::get_significant_bit_count(params_.exfield_characteristic());
             for (auto &plain : batch_random_symm_polys_)
             {
-                plain.resize(params_.poly_degree() + 1, characteristic_bit_count);
+                plain.resize(params_.poly_degree() + 1);
             }
 
             /* Set null value for sender: 00..0011..11, with itemL's 1 */

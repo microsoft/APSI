@@ -96,18 +96,18 @@ namespace apsi
             for (int i = 0; i < params_.sender_total_thread_count(); i++)
             {
                thread_pool[i] = std::thread([&,i]()
-				{
-					int thread_context_idx = acquire_thread_context();
-					auto& context = thread_contexts_[thread_context_idx];
+                {
+                    int thread_context_idx = acquire_thread_context();
+                    auto& context = thread_contexts_[thread_context_idx];
 
-					/* Update the context with the session's specific keys. */
-					context.set_encryptor(local_session_->encryptor_);
-					context.set_evaluator(local_session_->local_evaluators_[i]);
+                    /* Update the context with the session's specific keys. */
+                    context.set_encryptor(local_session_->encryptor_);
+                    context.set_evaluator(local_session_->local_evaluators_[i]);
 
-					sender_db_.batched_randomized_symmetric_polys(context);
-					
-					release_thread_context(context.id());
-				});
+                    sender_db_.batched_randomized_symmetric_polys(context);
+                    
+                    release_thread_context(context.id());
+                });
             }
 
             for (int i = 0; i < thread_pool.size(); i++)
@@ -167,93 +167,93 @@ namespace apsi
             const map<uint64_t, vector<Ciphertext>> &query, SenderSessionContext &session_context, 
             Channel *channel)
         {
-			vector<vector<Ciphertext>> resultVec(params_.number_of_splits());
-			for(auto& v : resultVec) v.resize(params_.number_of_batches());
+            vector<vector<Ciphertext>> resultVec(params_.number_of_splits());
+            for(auto& v : resultVec) v.resize(params_.number_of_batches());
             vector<vector<Ciphertext>> powers(params_.number_of_batches());
 
-			std::vector<std::pair<std::promise<void>,std::shared_future<void>>> 
-				batch_powers_computed(params_.number_of_batches());
-			for (auto& pf : batch_powers_computed) pf.second = pf.first.get_future();
+            std::vector<std::pair<std::promise<void>,std::shared_future<void>>> 
+                batch_powers_computed(params_.number_of_batches());
+            for (auto& pf : batch_powers_computed) pf.second = pf.first.get_future();
 
-			auto number_of_batches = params_.number_of_batches();
-			int split_size_plus_one = params_.split_size() + 1;
-			int	splitStep = params_.number_of_batches() * split_size_plus_one;
-			int total_blocks = params_.number_of_splits() * params_.number_of_batches();
+            auto number_of_batches = params_.number_of_batches();
+            int split_size_plus_one = params_.split_size() + 1;
+            int	splitStep = params_.number_of_batches() * split_size_plus_one;
+            int total_blocks = params_.number_of_splits() * params_.number_of_batches();
 
             mutex mtx;
             vector<thread> thread_pool(params_.sender_session_thread_count());
             for (int i = 0; i < thread_pool.size(); i++)
             {
-				thread_pool[i] = thread([&,i]()
-				{
-					/* Multiple client sessions can enter this function to compete for thread context resources. */
-					int thread_context_idx = acquire_thread_context();
-					auto& context = thread_contexts_[thread_context_idx];
-					/* Update the context with the session's specific keys. */
-					context.set_encryptor(session_context.encryptor_);
-					context.set_evaluator(session_context.local_evaluators_[i]);
+                thread_pool[i] = thread([&,i]()
+                {
+                    /* Multiple client sessions can enter this function to compete for thread context resources. */
+                    int thread_context_idx = acquire_thread_context();
+                    auto& context = thread_contexts_[thread_context_idx];
+                    /* Update the context with the session's specific keys. */
+                    context.set_encryptor(session_context.encryptor_);
+                    context.set_evaluator(session_context.local_evaluators_[i]);
 
-					Ciphertext tmp;
-					shared_ptr<Evaluator>& local_evaluator = context.evaluator();
+                    Ciphertext tmp;
+                    shared_ptr<Evaluator>& local_evaluator = context.evaluator();
 
-					auto batch_start = i * number_of_batches / thread_pool.size();
-					auto batch_end = (i+1) * number_of_batches / thread_pool.size();
+                    auto batch_start = i * number_of_batches / thread_pool.size();
+                    auto batch_end = (i+1) * number_of_batches / thread_pool.size();
 
-					for (auto batch = batch_start; batch < batch_end; ++batch)
-					{
-						compute_batch_powers(batch, query, powers[batch], context);
-						batch_powers_computed[batch].first.set_value();
-					}
+                    for (auto batch = batch_start; batch < batch_end; ++batch)
+                    {
+                        compute_batch_powers(batch, query, powers[batch], context);
+                        batch_powers_computed[batch].first.set_value();
+                    }
 
-					// Check if we need to re-batch things. This happens if we do an update.
-					sender_db_.batched_randomized_symmetric_polys(context);
+                    // Check if we need to re-batch things. This happens if we do an update.
+                    sender_db_.batched_randomized_symmetric_polys(context);
 
-					int start_block = i * total_blocks / params_.sender_total_thread_count();
-					int end_block = (i + 1) * total_blocks / params_.sender_total_thread_count();
-					
-					for (int block = start_block; block < end_block; block++)
-					{
-						int batch = block / params_.number_of_splits(),
-							split = block % params_.number_of_splits();
+                    int start_block = i * total_blocks / params_.sender_total_thread_count();
+                    int end_block = (i + 1) * total_blocks / params_.sender_total_thread_count();
+                    
+                    for (int block = start_block; block < end_block; block++)
+                    {
+                        int batch = block / params_.number_of_splits(),
+                            split = block % params_.number_of_splits();
 
-						// if we are starting a new batch, then make sure that the batch is ready
-						if(block== start_block || split == 0)
-							batch_powers_computed[batch].second.get();
+                        // if we are starting a new batch, then make sure that the batch is ready
+                        if(block== start_block || split == 0)
+                            batch_powers_computed[batch].second.get();
 
-						// get the pointer to the first poly of this batch.
-						Plaintext* sender_coeffs(
-							&sender_db_.batch_random_symm_polys()[split * splitStep + batch * split_size_plus_one]);
+                        // get the pointer to the first poly of this batch.
+                        Plaintext* sender_coeffs(
+                            &sender_db_.batch_random_symm_polys()[split * splitStep + batch * split_size_plus_one]);
 
 
-						//  Iterate over the coeffs multiplying them with the query powers  and summing the results
-						auto& result = resultVec[split][batch];
+                        //  Iterate over the coeffs multiplying them with the query powers  and summing the results
+                        auto& result = resultVec[split][batch];
 
-						local_evaluator->multiply_plain_ntt(powers[batch][0], sender_coeffs[0], result);
-						for (int s = 1; s <= params_.split_size(); s++)
-						{
-							local_evaluator->multiply_plain_ntt(
-								powers[batch][s],
-								sender_coeffs[s],
-								tmp);
-							local_evaluator->add(tmp, result, result);
-						}
+                        local_evaluator->multiply_plain_ntt(powers[batch][0], sender_coeffs[0], result);
+                        for (int s = 1; s <= params_.split_size(); s++)
+                        {
+                            local_evaluator->multiply_plain_ntt(
+                                powers[batch][s],
+                                sender_coeffs[s],
+                                tmp);
+                            local_evaluator->add(tmp, result, result);
+                        }
 
-						// transform back from ntt form.
-						local_evaluator->transform_from_ntt(result);
+                        // transform back from ntt form.
+                        local_evaluator->transform_from_ntt(result);
 
-						// send the result over the network if needed.
-						if (channel)
-						{
-							unique_lock<mutex> net_lock2(mtx);
-							send_int(split, *channel);
-							send_int(batch, *channel);
-							send_ciphertext(result, *channel);
-						}
-					}
+                        // send the result over the network if needed.
+                        if (channel)
+                        {
+                            unique_lock<mutex> net_lock2(mtx);
+                            send_int(split, *channel);
+                            send_int(batch, *channel);
+                            send_ciphertext(result, *channel);
+                        }
+                    }
 
-					/* After this point, this thread will no longer use the context resource, so it is free to return it. */
-					release_thread_context(context.id());
-				});
+                    /* After this point, this thread will no longer use the context resource, so it is free to return it. */
+                    release_thread_context(context.id());
+                });
             }
 
             for (int i = 0; i < thread_pool.size(); i++)

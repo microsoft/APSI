@@ -126,9 +126,8 @@ namespace apsi
         const seal::BigPoly& poly_mod = context.poly_modulus();
         const seal::SmallModulus& coeff_mod = context.plain_modulus();
         int coeff_count = poly_mod.significant_coeff_count();
-        seal::Plaintext random;
-        random.get_poly().resize(coeff_count, coeff_mod.bit_count());
-        uint64_t* random_ptr = random.get_poly().pointer();
+        seal::Plaintext random(coeff_count);
+        uint64_t* random_ptr = random.pointer();
 
         random_device rd;
         for (int i = 0; i < coeff_count - 1; i++)
