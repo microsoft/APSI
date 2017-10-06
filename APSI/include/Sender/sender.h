@@ -120,7 +120,7 @@ namespace apsi
 
             @see compute_dot_product for an explanation of the result.
             */
-            std::vector<std::vector<seal::Ciphertext>> respond(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query)
+            void respond(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query)
             {
                 return respond(query, *local_session_, nullptr);
             }

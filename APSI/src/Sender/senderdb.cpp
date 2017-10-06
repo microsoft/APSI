@@ -174,13 +174,12 @@ namespace apsi
 
         void SenderDB::batched_randomized_symmetric_polys(SenderThreadContext &context)
         {
-            shared_ptr<ExField> exfield = context.exfield();
-            Pointer symm_block_backing;
-            vector<vector<ExFieldElement>> symm_block = exfield->allocate_elements(params_.batch_size(), params_.split_size() + 1, symm_block_backing);
+            shared_ptr<ExField>& exfield = context.exfield();
+			vector<vector<ExFieldElement>>& symm_block = context.symm_block();
 
             Pointer batch_backing;
-            vector<ExFieldElement> batch_vector = context.exfield()->allocate_elements(params_.batch_size(), batch_backing);
-            vector<uint64_t> integer_batch_vector(params_.batch_size(), 0);
+			vector<ExFieldElement>& batch_vector = context.batch_vector();
+            vector<uint64_t>& integer_batch_vector = context.integer_batch_vector();
 
             int table_size = params_.table_size(),
                 split_size = params_.split_size(),

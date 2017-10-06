@@ -99,6 +99,7 @@ namespace apsi
                 {
                     int thread_context_idx = acquire_thread_context();
                     auto& context = thread_contexts_[thread_context_idx];
+					context.construct_variables(params_);
 
                     /* Update the context with the session's specific keys. */
                     context.set_encryptor(local_session_->encryptor_);
@@ -189,6 +190,8 @@ namespace apsi
                     /* Multiple client sessions can enter this function to compete for thread context resources. */
                     int thread_context_idx = acquire_thread_context();
                     auto& context = thread_contexts_[thread_context_idx];
+					context.construct_variables(params_);
+
                     /* Update the context with the session's specific keys. */
                     context.set_encryptor(session_context.encryptor_);
                     context.set_evaluator(session_context.local_evaluators_[i]);
@@ -205,8 +208,11 @@ namespace apsi
                         batch_powers_computed[batch].first.set_value();
                     }
 
+					for (auto& b : batch_powers_computed)
+						b.second.get();
+
                     // Check if we need to re-batch things. This happens if we do an update.
-                    sender_db_.batched_randomized_symmetric_polys(context);
+                    //sender_db_.batched_randomized_symmetric_polys(context);
 
                     int start_block = i * total_blocks / params_.sender_total_thread_count();
                     int end_block = (i + 1) * total_blocks / params_.sender_total_thread_count();
@@ -217,8 +223,8 @@ namespace apsi
                             split = block % params_.number_of_splits();
 
                         // if we are starting a new batch, then make sure that the batch is ready
-                        if(block== start_block || split == 0)
-                            batch_powers_computed[batch].second.get();
+                        //if(block== start_block || split == 0)
+                        //    batch_powers_computed[batch].second.get();
 
                         // get the pointer to the first poly of this batch.
                         Plaintext* sender_coeffs(
