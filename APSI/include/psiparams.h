@@ -6,6 +6,7 @@
 #include "bigpoly.h"
 #include "smallmodulus.h"
 
+#include <cmath>
 
 namespace apsi
 {

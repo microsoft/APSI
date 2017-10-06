@@ -116,7 +116,7 @@ namespace apsi
 			{
 				return batch_vector_;
 			}
-			std::vector<uint64_t> integer_batch_vector()
+			std::vector<uint64_t>& integer_batch_vector()
 			{
 				return integer_batch_vector_;
 			}
