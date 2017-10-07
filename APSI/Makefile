@@ -2,17 +2,17 @@
 UTIL_DIR=src src/Network src/Receiver src/Sender src/Tools
 BIN_DIR=../bin
 OBJ_DIR=obj
-INCLUDE_DIRS=include ../thirdparty/boost ../../Cuckoo/Cuckoo/include ../../SEAL-dev-new/SEAL/include 
+INCLUDE_DIRS=include ../thirdparty/boost ../../Cuckoo/Cuckoo/include ../../SEAL-dev-new/SEAL/include ../../../libOTe/cryptoTools ../../../libOTe/thirdparty/linux/miracl
 SRCS=$(wildcard *.cpp) $(foreach d,$(UTIL_DIR),$(wildcard $d/*.cpp))
 OBJS=$(SRCS:%.cpp=$(OBJ_DIR)/%.o)
 DEPS=$(OBJS:.o=.d)
 INSTALL_DIR=APSI
 APSILIB=libapsi.a
 CXX=g++
-CXXFLAGS=-O3 -DHAVE_CONFIG -march=native -std=c++11  -maes -msse2 -msse4.1 -mpclmul
+CXXFLAGS=-O3 -DHAVE_CONFIG -march=native -std=c++14  -maes -msse2 -msse4.1 -mpclmul
 PREFIX=/usr/local
-LDFLAGS=-lseal -lboost_system -lcuckoo -lpthread
-LIBRARY_PATHS=../../SEAL-dev-new/bin ../../Cuckoo/bin ../thirdparty/boost/stage/lib
+LDFLAGS=-lseal -lboost_system -lcuckoo -lpthread -lcryptoTools -lmiracl
+LIBRARY_PATHS=../../SEAL-dev-new/bin ../../Cuckoo/bin ../thirdparty/boost/stage/lib ../../libOTe/lib
 
 .PHONY : all clean install uninstall
 
