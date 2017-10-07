@@ -14,11 +14,11 @@ namespace apsi
 {
     namespace sender
     {
-        Sender::Sender(const PSIParams &params, const MemoryPoolHandle &pool)
+        Sender::Sender(const PSIParams &params, const MemoryPoolHandle &pool, bool dummy_init)
             :params_(params),
             pool_(pool),
             ex_field_(ExField::Acquire(params.exfield_characteristic(), params.exfield_polymod(), pool)),
-            sender_db_(params, ex_field_),
+            sender_db_(params, ex_field_, dummy_init),
             thread_contexts_(params.sender_total_thread_count()),
             ios_(new BoostIOService(0)),
             stopped_(false)

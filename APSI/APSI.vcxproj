@@ -87,13 +87,13 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>include;C:\libs\boost;..\..\Cuckoo\Cuckoo\include;..\..\SEAL-dev-new\SEAL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;C:\libs\boost;..\..\Cuckoo\Cuckoo\include;..\..\SEAL-dev-new\SEAL\include;$(ProjectDir)../../libOTe/cryptoTools/;C:\libs\miracl\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Lib>
-      <AdditionalDependencies>SEAL.lib; Cuckoo.lib</AdditionalDependencies>
+      <AdditionalDependencies>SEAL.lib; Cuckoo.lib;miracl.lib;cryptoTools.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib/$(Platform);..\..\Cuckoo\bin\$(Configuration);..\..\SEAL-dev-new\bin\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib/$(Platform);..\..\Cuckoo\bin\$(Configuration);..\..\SEAL-dev-new\bin\$(Platform)\$(Configuration);C:\libs\miracl\x64\$(Configuration)_dllrt/;$(ProjectDir)../../libOTe/x64/$(Configuration)_dllrt/;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -116,17 +116,17 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>include;C:\libs\boost;..\..\Cuckoo\Cuckoo\include;..\..\SEAL-dev-new\SEAL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;C:\libs\boost;..\..\Cuckoo\Cuckoo\include;..\..\SEAL-dev-new\SEAL\include;$(ProjectDir)../../libOTe/cryptoTools/;C:\libs\miracl\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <Lib>
-      <AdditionalDependencies>SEAL.lib; Cuckoo.lib</AdditionalDependencies>
+      <AdditionalDependencies>SEAL.lib; Cuckoo.lib;miracl.lib;cryptoTools.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib/$(Platform);..\..\Cuckoo\bin\$(Configuration);..\..\SEAL-dev-new\bin\$(Platform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib/$(Platform);..\..\Cuckoo\bin\$(Configuration);..\..\SEAL-dev-new\bin\$(Platform)\$(Configuration);C:\libs\miracl\x64\$(Configuration)_dllrt/;$(ProjectDir)../../libOTe/x64/$(Configuration)_dllrt/;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>

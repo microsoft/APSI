@@ -17,7 +17,7 @@ namespace apsi
         class SenderDB
         {
         public:
-            SenderDB(const PSIParams &params, std::shared_ptr<seal::util::ExField> ex_field);
+            SenderDB(const PSIParams &params, std::shared_ptr<seal::util::ExField> ex_field, bool dummy_init);
 
             /**
             Clears sender's database and set all entries to sender's null item.
@@ -126,6 +126,8 @@ namespace apsi
             {
                 return batch_random_symm_polys_;
             }
+
+			bool dummy_init_ = false;
 
         private:
 

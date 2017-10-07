@@ -343,7 +343,9 @@ void example_fast_batching()
     }
 
     Receiver receiver(params, MemoryPoolHandle::New(true));
-    Sender sender(params, MemoryPoolHandle::New(true));
+    Sender sender(params, MemoryPoolHandle::New(true), true);
+
+
     sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
     sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 

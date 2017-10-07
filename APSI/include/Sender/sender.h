@@ -26,7 +26,7 @@ namespace apsi
         class Sender
         {
         public:
-            Sender(const PSIParams &params, const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::Global());
+            Sender(const PSIParams &params, const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::Global(), bool dummy_init = false);
 
             ~Sender();
 
