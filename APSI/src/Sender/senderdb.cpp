@@ -4,7 +4,7 @@
 #include "util/uintcore.h"
 #include <fstream>
 #include <algorithm>
-#include "cryptoTools/crypto/PRNG.h"
+#include "cryptoTools/Crypto/PRNG.h"
 
 using namespace std;
 using namespace seal;
