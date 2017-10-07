@@ -196,10 +196,10 @@ namespace apsi
 
 		void SenderDB::batched_randomized_symmetric_polys(SenderThreadContext &context)
 		{
-			//if (dummy_init_)
-			//{
-			//	return;
-			//}
+			if (dummy_init_)
+			{
+				return;
+			}
 
 
 			shared_ptr<ExField>& exfield = context.exfield();
