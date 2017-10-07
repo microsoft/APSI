@@ -343,7 +343,9 @@ void example_fast_batching()
     }
 
     Receiver receiver(params, MemoryPoolHandle::New(true));
-    Sender sender(params, MemoryPoolHandle::New(true), true);
+	stop_watch.set_time_point("recv-cntr");
+	Sender sender(params, MemoryPoolHandle::New(true), true);
+	stop_watch.set_time_point("send-cntr");
 
 
     sender.set_keys(receiver.public_key(), receiver.evaluation_keys());

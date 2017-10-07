@@ -85,6 +85,7 @@ namespace apsi
         void Sender::load_db(const std::vector<Item> &data)
         {
             sender_db_.set_data(data);
+			stop_watch.set_time_point("Sender set-data");
 
             offline_compute();
         }
