@@ -78,7 +78,7 @@ namespace apsi
             Input sub-bin: (a_1, a_2, ..., a_n)
             Output polynomial terms: (1, \sum_i a_i, \sum_{i,j} a_i*a_j, ...).
             */
-            void symmetric_polys(int split, int batch, SenderThreadContext &context, std::vector<std::vector<seal::util::ExFieldElement>> &symm_block);
+            void symmetric_polys(int split, int batch, SenderThreadContext &context, oc::MatrixView<seal::util::ExFieldElement> symm_block);
 
             /**
             Computes the randomized symmetric polynomials for the specified split in sender's database. Basically, it multiplies each term in a
@@ -95,7 +95,7 @@ namespace apsi
 
             @see symmetric_polys for computing symmetric polynomials.
             */
-            void randomized_symmetric_polys(int split, int batch, SenderThreadContext &context, std::vector<std::vector<seal::util::ExFieldElement>> &symm_block);
+            void randomized_symmetric_polys(int split, int batch, SenderThreadContext &context, oc::MatrixView<seal::util::ExFieldElement>symm_block);
 
             /**
             Batches the randomized symmetric polynonmials for the specified split in sender's database.

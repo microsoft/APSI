@@ -5,7 +5,7 @@
 #include <fstream>
 #include <algorithm>
 #include "cryptoTools/crypto/PRNG.h"
-
+#include "cryptoTools/Common/MatrixView.h"
 using namespace std;
 using namespace seal;
 using namespace seal::util;
@@ -144,62 +144,68 @@ namespace apsi
 			next_shuffle_locs_.assign(params_.table_size(), 0);
 		}
 
-		void SenderDB::symmetric_polys(int split, int batch, SenderThreadContext &context, std::vector<std::vector<seal::util::ExFieldElement>> &symm_block)
+		void SenderDB::symmetric_polys(int split, int batch, SenderThreadContext &context, oc::MatrixView<seal::util::ExFieldElement>symm_block)
 		{
 			int table_size = params_.table_size(), split_size = params_.split_size(), batch_size = params_.batch_size(), split_start = split * split_size,
 				batch_start = batch * batch_size;
 			shared_ptr<ExField> exfield = context.exfield();
 
+			auto num_rows = symm_block.bounds()[0];
+			auto num_cols = symm_block.bounds()[1];
+
 			ExFieldElement one(exfield, "1");
 			ExFieldElement temp1(exfield), temp2(exfield);
-			for (int i = 0; i < symm_block.size(); i++)
+			for (int i = 0; i < num_rows; i++)
 			{
-				symm_block[i][split_size] = one;
+				symm_block(i,split_size) = one;
 				for (int j = split_size - 1; j >= 0; j--)
 				{
 					simple_hashing_db_[split_start + j][batch_start + i].to_exfield_element(temp1);
 					exfield->negate(temp1, temp1);
 					exfield->multiply(
-						symm_block[i][j + 1],
+						symm_block(i,j + 1),
 						temp1,
-						symm_block[i][j]);
+						symm_block(i,j));
 
 					for (int k = j + 1; k < split_size; k++)
 					{
 						exfield->multiply(
-							symm_block[i][k + 1],
+							symm_block(i,k + 1),
 							temp1,
 							temp2);
-						symm_block[i][k] += temp2;
+						symm_block(i,k) += temp2;
 					}
 				}
 			}
 		}
 
-		void SenderDB::randomized_symmetric_polys(int split, int batch, SenderThreadContext &context, std::vector<std::vector<seal::util::ExFieldElement>> &symm_block)
+		void SenderDB::randomized_symmetric_polys(int split, int batch, SenderThreadContext &context, oc::MatrixView<seal::util::ExFieldElement> symm_block)
 		{
 			int split_size = params_.split_size();
 			symmetric_polys(split, batch, context, symm_block);
+			auto num_rows = symm_block.bounds()[0];
 
-			for (int i = 0; i < symm_block.size(); i++)
+			for (int i = 0; i <num_rows; i++)
 			{
 				ExFieldElement r = context.exfield()->random_element();
 				for (int j = 0; j < split_size + 1; j++)
-					context.exfield()->multiply(symm_block[i][j], r, symm_block[i][j]);
+					context.exfield()->multiply(symm_block(i,j), r, symm_block(i,j));
 			}
 		}
 
 		void SenderDB::batched_randomized_symmetric_polys(SenderThreadContext &context)
 		{
-			if (dummy_init_)
-			{
-				return;
-			}
+			//if (dummy_init_)
+			//{
+			//	return;
+			//}
 
 
 			shared_ptr<ExField>& exfield = context.exfield();
-			vector<vector<ExFieldElement>>& symm_block = context.symm_block();
-
+			auto symm_block = context.symm_block();
+			
+			//oc::MatrixView<ExFieldElement> ()
+			
 			Pointer batch_backing;
 			vector<ExFieldElement>& batch_vector = context.batch_vector();
 			vector<uint64_t>& integer_batch_vector = context.integer_batch_vector();
@@ -240,13 +246,13 @@ namespace apsi
 						if (context.builder())
 						{
 							for (int k = 0; batch_start + k < batch_end; k++)
-								integer_batch_vector[k] = *symm_block[k][i].pointer(0);
+								integer_batch_vector[k] = *symm_block(k,i).pointer(0);
 							context.builder()->compose(integer_batch_vector, temp_plain);
 						}
 						else // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
 						{
 							for (int k = 0; batch_start + k < batch_end; k++)
-								batch_vector[k] = symm_block[k][i];
+								batch_vector[k] = symm_block(k, i);
 							context.exbuilder()->compose(batch_vector, temp_plain);
 						}
 

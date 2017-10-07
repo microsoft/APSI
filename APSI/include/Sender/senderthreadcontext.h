@@ -7,6 +7,7 @@
 #include "evaluator.h"
 #include "polycrt.h"
 #include "encryptor.h"
+#include "cryptoTools/Common/MatrixView.h"
 
 namespace apsi
 {
@@ -99,14 +100,15 @@ namespace apsi
 			{
 				if (symm_block_.size() == 0)
 				{
-					symm_block_ = std::move(exfield_->allocate_elements(params.batch_size(), params.split_size() + 1, symm_block_backing_));
+					symm_block_vec_ = std::move(exfield_->allocate_elements(params.batch_size() * (params.split_size() + 1), symm_block_backing_));
+					symm_block_ = oc::MatrixView<seal::util::ExFieldElement>(symm_block_vec_.begin(), symm_block_vec_.end(), params.split_size() + 1);
 
 					batch_vector_ = std::move(exfield_->allocate_elements(params.batch_size(), batch_backing_));
 					integer_batch_vector_.resize(params.batch_size(), 0);
 				}
 			}
 
-			std::vector<std::vector<seal::util::ExFieldElement>>& symm_block() 
+			oc::MatrixView<seal::util::ExFieldElement> symm_block()
 			{
 				return symm_block_;
 			}
@@ -131,7 +133,8 @@ namespace apsi
 
 
 			seal::util::Pointer symm_block_backing_;
-			std::vector<std::vector<seal::util::ExFieldElement>> symm_block_;// = exfield->allocate_elements(params_.batch_size(), params_.split_size() + 1, symm_block_backing);
+			std::vector<seal::util::ExFieldElement> symm_block_vec_;// = exfield->allocate_elements(params_.batch_size(), params_.split_size() + 1, symm_block_backing);
+			oc::MatrixView<seal::util::ExFieldElement> symm_block_;
 
 			seal::util::Pointer batch_backing_;
 			std::vector<seal::util::ExFieldElement > batch_vector_;// = context.exfield()->allocate_elements(params_.batch_size(), batch_backing);
