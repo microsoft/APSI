@@ -9,6 +9,7 @@
 #include "util/exring.h"
 #include "util/exringpolycrt.h"
 #include "senderthreadcontext.h"
+#include "cryptoTools/Common/Matrix.h"
 
 namespace apsi
 {
@@ -112,9 +113,9 @@ namespace apsi
             */
             void batched_randomized_symmetric_polys(SenderThreadContext &context);
 
-            const std::vector<std::vector<Item>>& simple_hashing_db() const
+            const oc::Matrix<Item>& simple_hashing_db2() const
             {
-                return simple_hashing_db_;
+                return simple_hashing_db2_;
             }
 
             void save(std::ostream &stream) const;
@@ -149,7 +150,7 @@ namespace apsi
             This is actually a rotated view of the DB. We store it in this
             view so that multi-threading is more efficient for accessing data, 
             i.e., one thread will take care of several continuous complete rows. */
-            std::vector<std::vector<Item>> simple_hashing_db_;
+			oc::Matrix<Item> simple_hashing_db2_;
 
             /* m x B, where m is table size, B is sender's bin size. Keep in this view
             so that we can conveniently shuffle each row (bin) using STL. */

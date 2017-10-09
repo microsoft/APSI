@@ -7,6 +7,8 @@
 #include "util/uintcore.h"
 #include "apsidefines.h"
 #include <fstream>
+#include "cryptoTools/Common/CLP.h"
+#include "cryptoTools/Crypto/PRNG.h"
 
 using namespace std;
 using namespace apsi;
@@ -21,15 +23,40 @@ void example_basics();
 void example_update();
 void example_save_db();
 void example_load_db();
-void example_fast_batching();
+void example_fast_batching(oc::CLP&);
 void example_slow_batching();
 void example_slow_vs_fast();
 void example_remote();
 void example_remote_multiple();
 
 
+void perf()
+{
+	oc::PRNG prng(oc::ZeroBlock, 256);
+	std::random_device rd;
+
+	int count = 1 << 26;
+	oc::Timer t;
+	for (int i = 0; i < count; ++i)
+	{
+		prng.get<int>();
+	}
+	t.setTimePoint("prng");
+	for (int i = 0; i < count; ++i)
+	{
+		rd();
+	}
+	t.setTimePoint("prng");
+	std::cout <<t << std::endl;
+}
+
 int main(int argc, char *argv[])
 {
+	//perf();
+
+	oc::CLP cmd(argc, argv);
+
+	
     // Example: Basics
     //example_basics();
 
@@ -41,7 +68,7 @@ int main(int argc, char *argv[])
     //example_load_db();
 
     //// Example: Fast batching
-    example_fast_batching();
+    example_fast_batching(cmd);
 
     //// Example: Slow batching
     //example_slow_batching();
@@ -291,7 +318,7 @@ void example_load_db()
     cout << stop_watch << endl;
 }
 
-void example_fast_batching()
+void example_fast_batching(oc::CLP& cmd)
 {
     print_example_banner("Example: Fast batching");
     stop_watch.time_points.clear();
@@ -311,6 +338,9 @@ void example_fast_batching()
     //params.set_log_poly_degree(13); /* n = 2^13 = 8192, in SEAL's poly modulus "x^n + 1". */
     //params.set_coeff_mod_bit_count(189);  // SEAL param: when n = 8192, q has 189 or 226 bits.
     //params.set_decomposition_bit_count(48);
+
+	cmd.setDefault("t", 8);
+	int numThreads = cmd.get<int>("t");
 
     PSIParams params(8, 8, 1, 14, 3584, 1, 256);
     params.set_item_bit_length(32); // The effective item bit length will be limited by ExField's p.
@@ -344,7 +374,7 @@ void example_fast_batching()
 
     Receiver receiver(params, MemoryPoolHandle::New(true));
 	stop_watch.set_time_point("recv-cntr");
-	Sender sender(params, MemoryPoolHandle::New(true), true);
+	Sender sender(params, MemoryPoolHandle::New(true), cmd.isSet("dummy"));
 	stop_watch.set_time_point("send-cntr");
 
 

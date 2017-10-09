@@ -243,17 +243,26 @@ namespace apsi
 
 
 						//  Iterate over the coeffs multiplying them with the query powers  and summing the results
-						auto& result = resultVec[split][batch];
-
-						local_evaluator->multiply_plain_ntt(powers[batch][0], sender_coeffs[0], result);
+						
+						// constuct two ciphertext to store the result.  One keeps track of the current result, 
+						// one is used as a temp. Their roles switch each iteration. Saved needing to make a 
+						// copy in eval->add(...)
+						std::array<seal::Ciphertext, 2> runningResults;
+						char currResult = 0;
+						
+						local_evaluator->multiply_plain_ntt(powers[batch][0], sender_coeffs[0], runningResults[currResult]);
 						for (int s = 1; s <= params_.split_size(); s++)
 						{
 							local_evaluator->multiply_plain_ntt(
 								powers[batch][s],
 								sender_coeffs[s],
 								tmp);
-							local_evaluator->add(tmp, result, result);
+							local_evaluator->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
+
+							currResult ^= 1;
 						}
+						auto& result = resultVec[split][batch];
+						result = runningResults[currResult];
 
 						// transform back from ntt form.
 						local_evaluator->transform_from_ntt(result);

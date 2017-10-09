@@ -21,7 +21,7 @@ namespace apsi
 			params_(params),
 			global_ex_field_(ex_field),
 			cuckoo_(params.hash_func_count(), params.hash_func_seed(), params.log_table_size(), params.item_bit_length(), params.max_probe()),
-			simple_hashing_db_(params.sender_bin_size(), vector<Item>(params.table_size())),
+			simple_hashing_db2_(params.sender_bin_size(), params.table_size()),
 			shuffle_index_(params.table_size(), vector<int>(params.sender_bin_size())),
 			next_shuffle_locs_(params.table_size(), 0),
 			symm_polys_stale_(params.number_of_splits(), vector<char>(params.number_of_batches(), true)),
@@ -32,6 +32,7 @@ namespace apsi
 
 			if (dummy_init_)
 			{
+				std::cout << "WARNING: dummy init(...)" << std::endl;
 				for (auto& v : batch_random_symm_polys_)
 				{
 					v.resize(params_.coeff_modulus().size() * (params_.poly_degree() + 1));
@@ -63,12 +64,20 @@ namespace apsi
 
 		void SenderDB::clear_db()
 		{
-			for (int i = 0; i < params_.sender_bin_size(); i++)
-				for (int j = 0; j < params_.table_size(); j++)
-				{
-					simple_hashing_db_[i][j] = sender_null_item_;
-					//exfield_db_[i][j] = null_element_;
-				}
+			//static_assert(sizeof(Item) == 16,"");
+			//memset(simple_hashing_db2_.data(), 0, simple_hashing_db2_.size() *sizeof(Item));
+			//static_assert(std::is_trivially_copyable<Item>::value, "memset requires POD type");
+			static_assert(sizeof(Item) == sizeof(block), "requried");
+			auto src = (block*)simple_hashing_db2_.data();
+			auto val = *(block*)sender_null_item_.data();
+			std::fill_n(src, simple_hashing_db2_.size(), val);
+
+			//for (int i = 0; i < params_.sender_bin_size(); i++)
+			//	for (int j = 0; j < params_.table_size(); j++)
+			//	{
+			//		simple_hashing_db_[i][j] = sender_null_item_;
+			//		//exfield_db_[i][j] = null_element_;
+			//	}
 
 			shuffle();
 
@@ -94,8 +103,8 @@ namespace apsi
 						throw logic_error("Simple hashing failed. Bin size too small.");
 					int index = shuffle_index_[hash_locations[j]][next_shuffle_locs_[hash_locations[j]]++];
 
-					simple_hashing_db_[index][hash_locations[j]] = data[i];
-					simple_hashing_db_[index][hash_locations[j]].to_itemL(cuckoo_, j);
+					simple_hashing_db2_(index,hash_locations[j]) = data[i];
+					simple_hashing_db2_(index,hash_locations[j]).to_itemL(cuckoo_, j);
 
 					/* Set the block that contains this item to be stale. */
 					symm_polys_stale_[index / params_.split_size()][hash_locations[j] / params_.batch_size()] = true;
@@ -120,9 +129,9 @@ namespace apsi
 					for (int k = 0; k < next_shuffle_locs_[hash_locations[j]]; k++)
 					{
 						int index = shuffle_index_[hash_locations[j]][k];
-						if (simple_hashing_db_[index][hash_locations[j]] == target_itemL) /* Item is found. Delete it. */
+						if (simple_hashing_db2_(index,hash_locations[j]) == target_itemL) /* Item is found. Delete it. */
 						{
-							simple_hashing_db_[index][hash_locations[j]] = sender_null_item_;
+							simple_hashing_db2_(index,hash_locations[j]) = sender_null_item_;
 
 							/* Set the block that contains this item to be stale. */
 							symm_polys_stale_[index / params_.split_size()][hash_locations[j] / params_.batch_size()] = true;
@@ -139,9 +148,32 @@ namespace apsi
 
 		void SenderDB::shuffle()
 		{
-			oc::PRNG prng(oc::ZeroBlock);
-			for (int i = 0; i < params_.table_size(); i++)
-				std::shuffle(shuffle_index_[i].begin(), shuffle_index_[i].end(), prng);
+			std::random_device dev;
+			std::array<int, 4> ss{ dev(), dev(), dev(), dev() };
+			oc::PRNG prng(*(oc::block*)ss.data());
+			
+			std::vector<std::thread> thrds(params_.sender_total_thread_count());
+			for (int t = 0; t < thrds.size(); ++t)
+			{
+				auto seed = prng.get<oc::block>();
+				thrds[t] = std::thread([&, t, seed]()
+				{
+					auto start = t * params_.table_size() / thrds.size();
+					auto end = (t+1) * params_.table_size() / thrds.size();
+#ifdef APSI_SECURE_SHUFFLE
+					oc::PRNG prng(seed, 256);
+					for (int i = 0; i < params_.table_size(); i++)
+						std::shuffle(shuffle_index_[i].begin(), shuffle_index_[i].end(), prng);
+#else
+					for (int i = 0; i < params_.table_size(); i++)
+						std::random_shuffle(shuffle_index_[i].begin(), shuffle_index_[i].end());
+#endif
+				});
+			}
+
+			for (auto& thrd : thrds)
+				thrd.join();
+
 			next_shuffle_locs_.assign(params_.table_size(), 0);
 		}
 
@@ -161,7 +193,7 @@ namespace apsi
 				symm_block(i,split_size) = one;
 				for (int j = split_size - 1; j >= 0; j--)
 				{
-					simple_hashing_db_[split_start + j][batch_start + i].to_exfield_element(temp1);
+					simple_hashing_db2_(split_start + j,batch_start + i).to_exfield_element(temp1);
 					exfield->negate(temp1, temp1);
 					exfield->multiply(
 						symm_block(i,j + 1),
@@ -331,7 +363,7 @@ namespace apsi
 
 			for (int i = 0; i < bin_size; i++)
 				for (int j = 0; j < table_size; j++)
-					simple_hashing_db_[i][j].save(stream);
+					simple_hashing_db2_(i,j).save(stream);
 
 			for (int i = 0; i < table_size; i++)
 				for (int j = 0; j < bin_size; j++)
@@ -374,7 +406,7 @@ namespace apsi
 
 			for (int i = 0; i < bin_size; i++)
 				for (int j = 0; j < table_size; j++)
-					simple_hashing_db_[i][j].load(stream);
+					simple_hashing_db2_(i,j).load(stream);
 
 			for (int i = 0; i < table_size; i++)
 				for (int j = 0; j < bin_size; j++)

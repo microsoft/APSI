@@ -20,6 +20,8 @@ namespace apsi
 
         }
 
+		Item(const Item&) = default;
+
         /**
         Constructs an item by hahsing the uint64_t array and using 'item_bit_length_' bits of the hash.
         */
