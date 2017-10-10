@@ -254,16 +254,16 @@ namespace apsi
 					auto index = split_start + j;
 					auto loc = batch_start + i;
 
-					//if (simple_hashing_db_empty_[loc * numSlots + index])
-					//{
-					//	temp1 = &neg_null_element_;
-					//}
-					//else
-					//{
+					if (simple_hashing_db_empty_[loc * numSlots + index])
+					{
+						temp1 = &neg_null_element_;
+					}
+					else
+					{
 						simple_hashing_db2_(index , loc).to_exfield_element(temp11);
 						temp1 = &temp11;
 						exfield->negate(*temp1, *temp1);
-					//}
+					}
 					
 						exfield->multiply(
 							symm_block(i, j + 1),

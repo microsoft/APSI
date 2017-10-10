@@ -390,7 +390,7 @@ void example_fast_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 	int log_table_size = 14;
 	int sender_set_size = 1 << 24;
 	int num_hash_func = 3;
-	int binning_sec_level = 20;
+	int binning_sec_level = 40;
 	int num_splits = 256;
 	int bin_size = round_up_to(get_bin_size(1 << log_table_size, sender_set_size * num_hash_func, binning_sec_level), num_splits);
 	int window_size = 1;
