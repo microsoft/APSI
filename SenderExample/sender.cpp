@@ -34,44 +34,46 @@ int main(int argc, char *argv[])
 
 void example_remote()
 {
-    print_example_banner("Example: Remote");
-    stop_watch.time_points.clear();
+	throw std::runtime_error("NOT IMPL");
 
-    /* sender threads (8), sender session threads (4), table size (2^8=256), sender bin size (32), window size (2), splits (4). */
-    PSIParams params(8, 4, 1, 8, 32, 2, 4);
+    //print_example_banner("Example: Remote");
+    //stop_watch.time_points.clear();
 
-    /*
-    Item's bit length. In this example, we will only consider 32 bits of input items.
-    If we use Item's string or pointer constructor, it means we only consider the first 32 bits of its hash;
-    If we use Item's integer constructor, it means we only consider the first 32 bits of the integer.
-    */
-    params.set_item_bit_length(32);
+    ///* sender threads (8), sender session threads (4), table size (2^8=256), sender bin size (32), window size (2), splits (4). */
+    //PSIParams params(8, 4, 1, 8, 32, 2, 4);
 
-    params.set_decomposition_bit_count(2);
+    ///*
+    //Item's bit length. In this example, we will only consider 32 bits of input items.
+    //If we use Item's string or pointer constructor, it means we only consider the first 32 bits of its hash;
+    //If we use Item's integer constructor, it means we only consider the first 32 bits of the integer.
+    //*/
+    //params.set_item_bit_length(32);
 
-    /* n = 2^11 = 2048, in SEAL's poly modulus "x^n + 1". */
-    params.set_log_poly_degree(11);
+    //params.set_decomposition_bit_count(2);
 
-    /* The prime p in ExField. It is also the plain modulus in SEAL. */
-    params.set_exfield_characteristic(0x101);
+    ///* n = 2^11 = 2048, in SEAL's poly modulus "x^n + 1". */
+    //params.set_log_poly_degree(11);
 
-    /* f(x) in ExField. It determines the generalized batching slots. */
-    params.set_exfield_polymod(string("1x^16 + 3"));
+    ///* The prime p in ExField. It is also the plain modulus in SEAL. */
+    //params.set_exfield_characteristic(0x101);
 
-    /* SEAL's coefficient modulus q: when n = 2048, q has 60 bits. */
-    params.set_coeff_mod_bit_count(60);
+    ///* f(x) in ExField. It determines the generalized batching slots. */
+    //params.set_exfield_polymod(string("1x^16 + 3"));
 
-    params.validate();
+    ///* SEAL's coefficient modulus q: when n = 2048, q has 60 bits. */
+    //params.set_coeff_mod_bit_count(60);
 
-    Sender sender(params, MemoryPoolHandle::New(true));
+    //params.validate();
 
-    sender.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
-    stop_watch.set_time_point("Precomputation done");
+    //Sender sender(params, MemoryPoolHandle::New(true));
 
-    sender.query_engine();
-    stop_watch.set_time_point("Query done");
+    //sender.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
+    //stop_watch.set_time_point("Precomputation done");
 
-    cout << stop_watch << endl;
+    //sender.query_engine();
+    //stop_watch.set_time_point("Query done");
+
+    //cout << stop_watch << endl;
 }
 
 void print_example_banner(string title)

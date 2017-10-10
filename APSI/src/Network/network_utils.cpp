@@ -38,6 +38,7 @@ namespace apsi
             ByteStream buff;
             channel.recv(buff);
             stringstream ss(string(reinterpret_cast<char*>(buff.data()), buff.size()));
+			
             ciphertext.load(ss);
         }
 

@@ -10,7 +10,7 @@
 #include "util/exringpolycrt.h"
 #include "senderthreadcontext.h"
 #include "cryptoTools/Common/Matrix.h"
-
+#include "cryptoTools/Crypto/PRNG.h"
 namespace apsi
 {
     namespace sender
@@ -28,17 +28,17 @@ namespace apsi
             /**
             Resets the flags for precomputed results to make them stale.
             */
-            void reset_precomputation()
-            {
-                for (int i = 0; i < params_.number_of_splits(); i++)
-                    for (int j = 0; j < params_.number_of_batches(); j++)
-                        symm_polys_stale_[i][j] = true;
-            }
+            //void reset_precomputation()
+            //{
+            //    for (int i = 0; i < params_.number_of_splits(); i++)
+            //        for (int j = 0; j < params_.number_of_batches(); j++)
+            //            symm_polys_stale_[i][j] = true;
+            //}
 
             /**
             Generates random indices for randomly permute sender items in each bin. 
             */
-            void shuffle();
+            //void shuffle();
 
             /**
             Sets the sender's database by hashing the data items with all hash functions.
@@ -140,7 +140,7 @@ namespace apsi
             Item sender_null_item_;
 
             /* The ExField encoding of the sender null value. */
-            seal::util::ExFieldElement null_element_;
+            seal::util::ExFieldElement null_element_, neg_null_element_;
 
             cuckoo::PermutationBasedCuckoo cuckoo_;
 
@@ -151,16 +151,16 @@ namespace apsi
             view so that multi-threading is more efficient for accessing data, 
             i.e., one thread will take care of several continuous complete rows. */
 			oc::Matrix<Item> simple_hashing_db2_;
-
+			std::vector<bool> simple_hashing_db_empty_;
             /* m x B, where m is table size, B is sender's bin size. Keep in this view
             so that we can conveniently shuffle each row (bin) using STL. */
-            std::vector<std::vector<int>> shuffle_index_;
+            //oc::Matrix<int> shuffle_index2_;
 
             /* size m vector, where m is the table size. Each value is an incremental counter for the 
             corresponding bin in shuffle_index_. It points to the next value to be taken from shuffle_index_
             in the corresponding bin. */
-            std::vector<int> next_shuffle_locs_;
-
+            std::vector<int> next_locs_;
+			std::unique_ptr<std::atomic_bool[]> cuckoo_location_lock_;
             /* B x m, the corresponding ExField version of the DB. Refer to simple_hashing_db_. */
             /*std::vector<std::vector<seal::util::ExFieldElement>> exfield_db_;
             seal::util::Pointer exfield_db_backing_;*/
@@ -190,7 +190,9 @@ namespace apsi
             /*
             #splits x #batches. Flags indicating whether the blocks need to be re-computed or not.
             */
-            std::vector<std::vector<char>> symm_polys_stale_;
+            //std::vector<std::vector<char>> symm_polys_stale_;
+
+			oc::PRNG prng_;
         };
     }
 }

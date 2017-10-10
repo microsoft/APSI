@@ -106,9 +106,9 @@ namespace apsi
             */
             void offline_compute();
 
-            void query_engine();
+            void query_engine(network::BoostEndpoint& ep);
 
-            void query_session(apsi::network::Channel* channel);
+            void query_session(apsi::network::Channel& channel);
 
             void stop();
 
@@ -120,13 +120,13 @@ namespace apsi
 
             @see compute_dot_product for an explanation of the result.
             */
-            std::vector<std::vector<seal::Ciphertext>> respond(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query)
-            {
-                return respond(query, *local_session_, nullptr);
-            }
+            //std::vector<std::vector<seal::Ciphertext>> respond(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query)
+            //{
+            //    return respond(query, *local_session_, nullptr);
+            //}
 
-            std::vector<std::vector<seal::Ciphertext>> respond(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query,
-                apsi::sender::SenderSessionContext &session_context, apsi::network::Channel *channel);
+            void respond(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query,
+                apsi::sender::SenderSessionContext &session_context, apsi::network::Channel &channel);
 
             /**
             Constructs all powers of receiver's items, based on the powers sent from the receiver. For example, if the desired highest 
@@ -225,9 +225,9 @@ namespace apsi
 
             std::mutex thread_context_mtx_;
 
-            std::unique_ptr<apsi::network::BoostIOService> ios_;
+            //std::unique_ptr<apsi::network::BoostIOService> ios_;
 
-            std::unique_ptr<apsi::network::BoostEndpoint> apsi_endpoint_;
+            //std::unique_ptr<apsi::network::BoostEndpoint> apsi_endpoint_;
 
             bool stopped_;
         };

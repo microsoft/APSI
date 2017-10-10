@@ -120,6 +120,9 @@
     <ClInclude Include="include\plaintextarith.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\Tools\ThreadPool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Receiver\receiver.cpp">

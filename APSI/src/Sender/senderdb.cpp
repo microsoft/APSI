@@ -6,6 +6,7 @@
 #include <algorithm>
 #include "cryptoTools/Crypto/PRNG.h"
 #include "cryptoTools/Common/MatrixView.h"
+#include <thread>
 
 using namespace std;
 using namespace seal;
@@ -22,12 +23,18 @@ namespace apsi
 			global_ex_field_(ex_field),
 			cuckoo_(params.hash_func_count(), params.hash_func_seed(), params.log_table_size(), params.item_bit_length(), params.max_probe()),
 			simple_hashing_db2_(params.sender_bin_size(), params.table_size()),
-			shuffle_index_(params.table_size(), vector<int>(params.sender_bin_size())),
-			next_shuffle_locs_(params.table_size(), 0),
-			symm_polys_stale_(params.number_of_splits(), vector<char>(params.number_of_batches(), true)),
+			simple_hashing_db_empty_(params.sender_bin_size() * params.table_size(), true),
+			//shuffle_index2_(params.table_size(), params_.sender_bin_size()),
+			next_locs_(params.table_size(), 0),
+			cuckoo_location_lock_(new std::atomic_bool[params_.table_size()]),
+			//symm_polys_stale_(params.number_of_splits(), vector<char>(params.number_of_batches(), true)),
 			batch_random_symm_polys_(params.number_of_splits() * params.number_of_batches() * (params.split_size() + 1))
 
 		{
+
+			for (int i = 0; i < params_.table_size(); ++i)
+				cuckoo_location_lock_[i] = false;
+
 			int characteristic_bit_count = util::get_significant_bit_count(params_.exfield_characteristic());
 
 			if (dummy_init_)
@@ -42,10 +49,13 @@ namespace apsi
 			else
 			{
 				for (auto &plain : batch_random_symm_polys_)
-					plain.resize(params_.poly_degree() + 1);
+					plain.resize(params_.coeff_modulus().size() * (params_.poly_degree() + 1));
 			}
 
-
+			oc::block seed;
+			std::random_device rd;
+			*(std::array<unsigned int, 4>*)&seed = { rd(), rd(), rd(), rd() };
+			prng_.SetSeed(seed, 256);
 
 
 			/* Set null value for sender: 00..0011..11, with itemL's 1 */
@@ -55,61 +65,104 @@ namespace apsi
 
 			null_element_ = sender_null_item_.to_exfield_element(global_ex_field_);
 
+			// hack to get an allocation
+			neg_null_element_ = global_ex_field_->random_element();
+			global_ex_field_->negate(null_element_, neg_null_element_);
+
+			sender_null_item_.fill(~static_cast<uint64_t>(0));
 			/* Set nature index */
-			for (int i = 0; i < params_.table_size(); i++)
-				for (int j = 0; j < params_.sender_bin_size(); j++)
-					shuffle_index_[i][j] = j;
+			//for (int j = 0; j < params_.sender_bin_size(); j++)
+			//	shuffle_index2_(0, j) = j;
+
+			//for (int i = 1; i < params_.table_size(); i++)
+			//	memcpy(&shuffle_index2_(i, 0), &shuffle_index2_(0, 0), shuffle_index2_.stride());
+
 
 		}
 
 		void SenderDB::clear_db()
 		{
-			//static_assert(sizeof(Item) == 16,"");
-			//memset(simple_hashing_db2_.data(), 0, simple_hashing_db2_.size() *sizeof(Item));
-			//static_assert(std::is_trivially_copyable<Item>::value, "memset requires POD type");
-			static_assert(sizeof(Item) == sizeof(block), "requried");
-			auto src = (block*)simple_hashing_db2_.data();
-			auto val = *(block*)sender_null_item_.data();
-			std::fill_n(src, simple_hashing_db2_.size(), val);
 
-			//for (int i = 0; i < params_.sender_bin_size(); i++)
-			//	for (int j = 0; j < params_.table_size(); j++)
-			//	{
-			//		simple_hashing_db_[i][j] = sender_null_item_;
-			//		//exfield_db_[i][j] = null_element_;
-			//	}
+			auto src = simple_hashing_db2_.data();
+			//memset(src, -1, simple_hashing_db2_.size() * sizeof(Item));
 
-			shuffle();
-
-			reset_precomputation();
+			std::fill(simple_hashing_db_empty_.begin(), simple_hashing_db_empty_.end(), true);
 		}
 
 		void SenderDB::set_data(const vector<Item> &data)
 		{
 			clear_db();
-
 			add_data(data);
+			stop_watch.set_time_point("Sender add-data");
 		}
 
 		void SenderDB::add_data(const vector<Item> &data)
 		{
-			vector<uint64_t> hash_locations;
-			for (int i = 0; i < data.size(); i++)
+//#define ADD_DATA_MULTI_THREAD
+			auto numSlots = params_.sender_bin_size();
+
+			typedef unsigned short rand_type;
+			if (numSlots > 1 << (sizeof(rand_type) * 8))
+				throw std::runtime_error("need to use more than 16 bit randoms");
+
+#ifdef ADD_DATA_MULTI_THREAD
+			std::vector<std::thread> thrds(params_.sender_total_thread_count());
+			for (int t = 0; t < thrds.size(); ++t)
 			{
-				cuckoo_.get_locations(data[i].data(), hash_locations);
-				for (int j = 0; j < hash_locations.size(); j++)
-				{
-					if (next_shuffle_locs_[hash_locations[j]] >= params_.sender_bin_size())
-						throw logic_error("Simple hashing failed. Bin size too small.");
-					int index = shuffle_index_[hash_locations[j]][next_shuffle_locs_[hash_locations[j]]++];
+				auto seed = prng_.get<oc::block>();
+				thrds[t] = std::thread(
+					[&, t, seed](){
+					oc::PRNG prng(seed, 256);
+					auto start = t * data.size() / thrds.size();
+					auto end = (t+1) * data.size() / thrds.size();
+#else
+					auto start = 0;
+					auto end = data.size();
+					auto& prng = prng_;
+#endif
 
-					simple_hashing_db2_(index,hash_locations[j]) = data[i];
-					simple_hashing_db2_(index,hash_locations[j]).to_itemL(cuckoo_, j);
+					vector<uint64_t> hash_locations;
 
-					/* Set the block that contains this item to be stale. */
-					symm_polys_stale_[index / params_.split_size()][hash_locations[j] / params_.batch_size()] = true;
-				}
+					for (int i = start; i < end; i++)
+					{
+						cuckoo_.get_locations(data[i].data(), hash_locations);
+						for (int j = 0; j < hash_locations.size(); j++)
+						{
+							auto cuckoo_loc = hash_locations[j];
+
+							// splin lock
+							bool exp = false;
+							while (cuckoo_location_lock_[cuckoo_loc].compare_exchange_strong(exp, true, std::memory_order_acquire) == false);
+
+							if (next_locs_[cuckoo_loc]++ > params_.sender_bin_size())
+								throw logic_error("Simple hashing failed. Bin size too small.");
+
+
+
+
+							// find a location with trial and error
+							auto index = prng.get<rand_type>() % numSlots;
+							while (!simple_hashing_db_empty_[cuckoo_loc * numSlots + index])
+							{
+								index = (index + 1) % numSlots;
+							}
+
+							simple_hashing_db_empty_[cuckoo_loc * numSlots + index] = false;
+
+							simple_hashing_db2_(index, cuckoo_loc) = data[i];
+							simple_hashing_db2_(index, cuckoo_loc).to_itemL(cuckoo_, j);
+
+
+							// release the spin lock
+							cuckoo_location_lock_[cuckoo_loc].store(false, std::memory_order_release);
+						}
+					}
+#ifdef ADD_DATA_MULTI_THREAD
+				});
 			}
+
+			for (auto& t : thrds) t.join();
+#endif
 		}
 
 		void SenderDB::add_data(const Item &item)
@@ -119,26 +172,28 @@ namespace apsi
 
 		void SenderDB::delete_data(const std::vector<Item> &data)
 		{
-			vector<uint64_t> hash_locations;
-			for (int i = 0; i < data.size(); i++)
-			{
-				cuckoo_.get_locations(data[i].data(), hash_locations);
-				for (int j = 0; j < hash_locations.size(); j++)
-				{
-					Item target_itemL = data[i].itemL(cuckoo_, j);
-					for (int k = 0; k < next_shuffle_locs_[hash_locations[j]]; k++)
-					{
-						int index = shuffle_index_[hash_locations[j]][k];
-						if (simple_hashing_db2_(index,hash_locations[j]) == target_itemL) /* Item is found. Delete it. */
-						{
-							simple_hashing_db2_(index,hash_locations[j]) = sender_null_item_;
+			throw std::runtime_error("Update function");
 
-							/* Set the block that contains this item to be stale. */
-							symm_polys_stale_[index / params_.split_size()][hash_locations[j] / params_.batch_size()] = true;
-						}
-					}
-				}
-			}
+			//vector<uint64_t> hash_locations;
+			//for (int i = 0; i < data.size(); i++)
+			//{
+			//	cuckoo_.get_locations(data[i].data(), hash_locations);
+			//	for (int j = 0; j < hash_locations.size(); j++)
+			//	{
+			//		Item target_itemL = data[i].itemL(cuckoo_, j);
+			//		for (int k = 0; k < next_shuffle_locs_[hash_locations[j]]; k++)
+			//		{
+			//			int index = shuffle_index_[hash_locations[j]][k];
+			//			if (simple_hashing_db2_(index, hash_locations[j]) == target_itemL) /* Item is found. Delete it. */
+			//			{
+			//				simple_hashing_db2_(index, hash_locations[j]) = sender_null_item_;
+
+			//				/* Set the block that contains this item to be stale. */
+			//				//symm_polys_stale_[index / params_.split_size()][hash_locations[j] / params_.batch_size()] = true;
+			//			}
+			//		}
+			//	}
+			//}
 		}
 
 		void SenderDB::delete_data(const Item &item)
@@ -146,36 +201,36 @@ namespace apsi
 			delete_data(vector<Item>(1, item));
 		}
 
-		void SenderDB::shuffle()
-		{
-			std::random_device dev;
-			std::array<int, 4> ss{ dev(), dev(), dev(), dev() };
-			oc::PRNG prng(*(oc::block*)ss.data());
-			
-			std::vector<std::thread> thrds(params_.sender_total_thread_count());
-			for (int t = 0; t < thrds.size(); ++t)
-			{
-				auto seed = prng.get<oc::block>();
-				thrds[t] = std::thread([&, t, seed]()
-				{
-					auto start = t * params_.table_size() / thrds.size();
-					auto end = (t+1) * params_.table_size() / thrds.size();
-#ifdef APSI_SECURE_SHUFFLE
-					oc::PRNG prng(seed, 256);
-					for (int i = 0; i < params_.table_size(); i++)
-						std::shuffle(shuffle_index_[i].begin(), shuffle_index_[i].end(), prng);
-#else
-					for (int i = 0; i < params_.table_size(); i++)
-						std::random_shuffle(shuffle_index_[i].begin(), shuffle_index_[i].end());
-#endif
-				});
-			}
-
-			for (auto& thrd : thrds)
-				thrd.join();
-
-			next_shuffle_locs_.assign(params_.table_size(), 0);
-		}
+//		void SenderDB::shuffle()
+//		{
+//			std::random_device dev;
+//			std::array<int, 4> ss{ dev(), dev(), dev(), dev() };
+//			oc::PRNG prng(*(oc::block*)ss.data());
+//
+//			std::vector<std::thread> thrds(params_.sender_total_thread_count());
+//			for (int t = 0; t < thrds.size(); ++t)
+//			{
+//				auto seed = prng.get<oc::block>();
+//				thrds[t] = std::thread([&, t, seed]()
+//				{
+//					auto start = t * params_.table_size() / thrds.size();
+//					auto end = (t + 1) * params_.table_size() / thrds.size();
+//#ifdef APSI_SECURE_SHUFFLE
+//					oc::PRNG prng(seed, 256);
+//					for (int i = start; i < end; i++)
+//						std::shuffle(shuffle_index_[i].begin(), shuffle_index_[i].end(), prng);
+//#else
+//					for (int i = start; i < end; i++)
+//						std::random_shuffle(shuffle_index_[i].begin(), shuffle_index_[i].end());
+//#endif
+//				});
+//			}
+//
+//			for (auto& thrd : thrds)
+//				thrd.join();
+//
+//			next_shuffle_locs_.assign(params_.table_size(), 0);
+//		}
 
 		void SenderDB::symmetric_polys(int split, int batch, SenderThreadContext &context, oc::MatrixView<seal::util::ExFieldElement>symm_block)
 		{
@@ -187,27 +242,42 @@ namespace apsi
 			auto num_cols = symm_block.bounds()[1];
 
 			ExFieldElement one(exfield, "1");
-			ExFieldElement temp1(exfield), temp2(exfield);
+			ExFieldElement temp11(exfield), temp2(exfield), *temp1;
+
+			auto numSlots = params_.sender_bin_size();
+
 			for (int i = 0; i < num_rows; i++)
 			{
-				symm_block(i,split_size) = one;
+				symm_block(i, split_size) = one;
 				for (int j = split_size - 1; j >= 0; j--)
 				{
-					simple_hashing_db2_(split_start + j,batch_start + i).to_exfield_element(temp1);
-					exfield->negate(temp1, temp1);
-					exfield->multiply(
-						symm_block(i,j + 1),
-						temp1,
-						symm_block(i,j));
+					auto index = split_start + j;
+					auto loc = batch_start + i;
 
-					for (int k = j + 1; k < split_size; k++)
-					{
+					//if (simple_hashing_db_empty_[loc * numSlots + index])
+					//{
+					//	temp1 = &neg_null_element_;
+					//}
+					//else
+					//{
+						simple_hashing_db2_(index , loc).to_exfield_element(temp11);
+						temp1 = &temp11;
+						exfield->negate(*temp1, *temp1);
+					//}
+					
 						exfield->multiply(
-							symm_block(i,k + 1),
-							temp1,
-							temp2);
-						symm_block(i,k) += temp2;
-					}
+							symm_block(i, j + 1),
+							*temp1,
+							symm_block(i, j));
+
+						for (int k = j + 1; k < split_size; k++)
+						{
+							exfield->multiply(
+								symm_block(i, k + 1),
+								*temp1,
+								temp2);
+							symm_block(i, k) += temp2;
+						}
 				}
 			}
 		}
@@ -218,11 +288,11 @@ namespace apsi
 			symmetric_polys(split, batch, context, symm_block);
 			auto num_rows = symm_block.bounds()[0];
 
-			for (int i = 0; i <num_rows; i++)
+			for (int i = 0; i < num_rows; i++)
 			{
 				ExFieldElement r = context.exfield()->random_element();
 				for (int j = 0; j < split_size + 1; j++)
-					context.exfield()->multiply(symm_block(i,j), r, symm_block(i,j));
+					context.exfield()->multiply(symm_block(i, j), r, symm_block(i, j));
 			}
 		}
 
@@ -236,9 +306,9 @@ namespace apsi
 
 			shared_ptr<ExField>& exfield = context.exfield();
 			auto symm_block = context.symm_block();
-			
+
 			//oc::MatrixView<ExFieldElement> ()
-			
+
 			Pointer batch_backing;
 			vector<ExFieldElement>& batch_vector = context.batch_vector();
 			vector<uint64_t>& integer_batch_vector = context.integer_batch_vector();
@@ -263,8 +333,8 @@ namespace apsi
 				{
 					int split = next_block / params_.number_of_batches(), batch = next_block % params_.number_of_batches();
 
-					if (!symm_polys_stale_[split][batch])
-						continue;
+					//if (!symm_polys_stale_[split][batch])
+					//	continue;
 
 					int split_start = split * split_size,
 						batch_start = batch * batch_size,
@@ -272,14 +342,14 @@ namespace apsi
 
 					randomized_symmetric_polys(split, batch, context, symm_block);
 
+					Plaintext temp_plain;
 					auto idx = indexer(split, batch, 0);
 					for (int i = 0; i < split_size + 1; i++, idx++)
 					{
-						Plaintext &temp_plain = batch_random_symm_polys_[idx];
 						if (context.builder())
 						{
 							for (int k = 0; batch_start + k < batch_end; k++)
-								integer_batch_vector[k] = *symm_block(k,i).pointer(0);
+								integer_batch_vector[k] = *symm_block(k, i).pointer(0);
 							context.builder()->compose(integer_batch_vector, temp_plain);
 						}
 						else // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
@@ -290,11 +360,11 @@ namespace apsi
 						}
 
 
-						context.evaluator()->transform_to_ntt(temp_plain);
+						context.evaluator()->transform_to_ntt(temp_plain, batch_random_symm_polys_[idx]);
 						//temp_plain.resize()
 					}
 
-					symm_polys_stale_[split][batch] = false;
+					//symm_polys_stale_[split][batch] = false;
 				}
 
 				//if (!symm_polys_stale_[split][batch])
@@ -363,14 +433,14 @@ namespace apsi
 
 			for (int i = 0; i < bin_size; i++)
 				for (int j = 0; j < table_size; j++)
-					simple_hashing_db2_(i,j).save(stream);
+					simple_hashing_db2_(i, j).save(stream);
 
-			for (int i = 0; i < table_size; i++)
-				for (int j = 0; j < bin_size; j++)
-					stream.write(reinterpret_cast<const char*>(&(shuffle_index_[i][j])), sizeof(int));
+			//for (int i = 0; i < table_size; i++)
+			//	for (int j = 0; j < bin_size; j++)
+			//		stream.write(reinterpret_cast<const char*>(&(shuffle_index_[i][j])), sizeof(int));
 
-			for (int i = 0; i < table_size; i++)
-				stream.write(reinterpret_cast<const char*>(&(next_shuffle_locs_[i])), sizeof(int));
+			//for (int i = 0; i < table_size; i++)
+			//	stream.write(reinterpret_cast<const char*>(&(next_shuffle_locs_[i])), sizeof(int));
 
 			//for (int i = 0; i < num_splits; i++)
 			//    for (int j = 0; j < num_batches; j++)
@@ -379,12 +449,12 @@ namespace apsi
 			for (auto& p : batch_random_symm_polys_)
 				p.save(stream);
 
-			for (int i = 0; i < num_splits; i++)
-				for (int j = 0; j < num_batches; j++)
-				{
-					uint8_t c = (uint8_t)symm_polys_stale_[i][j];
-					stream.write(reinterpret_cast<const char*>(&c), 1);
-				}
+			//for (int i = 0; i < num_splits; i++)
+			//	for (int j = 0; j < num_batches; j++)
+			//	{
+			//		uint8_t c = (uint8_t)symm_polys_stale_[i][j];
+			//		stream.write(reinterpret_cast<const char*>(&c), 1);
+			//	}
 		}
 
 		void SenderDB::load(std::istream &stream)
@@ -406,14 +476,14 @@ namespace apsi
 
 			for (int i = 0; i < bin_size; i++)
 				for (int j = 0; j < table_size; j++)
-					simple_hashing_db2_(i,j).load(stream);
+					simple_hashing_db2_(i, j).load(stream);
 
-			for (int i = 0; i < table_size; i++)
-				for (int j = 0; j < bin_size; j++)
-					stream.read(reinterpret_cast<char*>(&(shuffle_index_[i][j])), sizeof(int));
+			//for (int i = 0; i < table_size; i++)
+			//	for (int j = 0; j < bin_size; j++)
+			//		stream.read(reinterpret_cast<char*>(&(shuffle_index_[i][j])), sizeof(int));
 
-			for (int i = 0; i < table_size; i++)
-				stream.read(reinterpret_cast<char*>(&(next_shuffle_locs_[i])), sizeof(int));
+			//for (int i = 0; i < table_size; i++)
+			//	stream.read(reinterpret_cast<char*>(&(next_shuffle_locs_[i])), sizeof(int));
 
 			//for (int i = 0; i < num_splits; i++)
 			//    for (int j = 0; j < num_batches; j++)
@@ -422,9 +492,9 @@ namespace apsi
 			for (auto& p : batch_random_symm_polys_)
 				p.load(stream);
 
-			for (int i = 0; i < num_splits; i++)
-				for (int j = 0; j < num_batches; j++)
-					stream.read(reinterpret_cast<char*>(&symm_polys_stale_[i][j]), sizeof(bool));
+			//for (int i = 0; i < num_splits; i++)
+			//	for (int j = 0; j < num_batches; j++)
+			//		stream.read(reinterpret_cast<char*>(&symm_polys_stale_[i][j]), sizeof(bool));
 		}
 	}
 }

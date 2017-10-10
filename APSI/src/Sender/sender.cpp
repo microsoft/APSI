@@ -20,7 +20,6 @@ namespace apsi
 			ex_field_(ExField::Acquire(params.exfield_characteristic(), params.exfield_polymod(), pool)),
 			sender_db_(params, ex_field_, dummy_init),
 			thread_contexts_(params.sender_total_thread_count()),
-			ios_(new BoostIOService(0)),
 			stopped_(false)
 		{
 			initialize();
@@ -68,12 +67,12 @@ namespace apsi
 			for (auto& thrd : thrds)
 				thrd.join();
 
-			apsi_endpoint_.reset(new BoostEndpoint(*ios_, "0.0.0.0", params_.apsi_port(), true, params_.apsi_endpoint()));
+			//apsi_endpoint_.reset(new BoostEndpoint(*ios_, "0.0.0.0", params_.apsi_port(), true, params_.apsi_endpoint()));
 		}
 
 		Sender::~Sender()
 		{
-			apsi_endpoint_->stop();
+			//apsi_endpoint_->stop();
 		}
 
 		void Sender::set_public_key(const PublicKey &public_key)
@@ -127,47 +126,46 @@ namespace apsi
 		}
 
 
-		void Sender::query_engine()
+		void Sender::query_engine(network::BoostEndpoint& ep)
 		{
 			while (true && !stopped_)
 			{
-				Channel* server_channel = apsi_endpoint_->getNextQueuedChannel();
+				Channel* server_channel = ep.getNextQueuedChannel();
 				if (server_channel == nullptr)
 				{
 					this_thread::sleep_for(chrono::milliseconds(50));
 					continue;
 				}
 
-				thread session(&Sender::query_session, this, server_channel);
-				session.detach();
+				thread([&]() {
+					query_session(*server_channel);
+				}).detach();
 			}
 		}
 
-		void Sender::query_session(Channel *server_channel)
+		void Sender::query_session(Channel &server_channel)
 		{
 			/* Set up keys. */
 			PublicKey pub;
 			EvaluationKeys eval;
-			receive_pubkey(pub, *server_channel);
-			receive_evalkeys(eval, *server_channel);
+			receive_pubkey(pub, server_channel);
+			receive_evalkeys(eval, server_channel);
 			SenderSessionContext session_context(seal_context_, pub, eval, params_.sender_session_thread_count());
 
 			/* Receive client's query data. */
 			int num_of_powers = 0;
-			receive_int(num_of_powers, *server_channel);
+			receive_int(num_of_powers, server_channel);
 			map<uint64_t, vector<Ciphertext>> query;
 			while (num_of_powers-- > 0)
 			{
 				uint64_t power = 0;
-				receive_uint64(power, *server_channel);
+				receive_uint64(power, server_channel);
 				query[power] = vector<Ciphertext>();
-				receive_ciphertext(query[power], *server_channel);
+				receive_ciphertext(query[power], server_channel);
 			}
 
 			/* Answer to the query. */
 			respond(query, session_context, server_channel);
-
-			server_channel->close();
 		}
 
 		void Sender::stop()
@@ -175,12 +173,12 @@ namespace apsi
 			stopped_ = true;
 		}
 
-		vector<vector<Ciphertext>> Sender::respond(
+		void Sender::respond(
 			const map<uint64_t, vector<Ciphertext>> &query, SenderSessionContext &session_context,
-			Channel *channel)
+			Channel &channel)
 		{
-			vector<vector<Ciphertext>> resultVec(params_.number_of_splits());
-			for (auto& v : resultVec) v.resize(params_.number_of_batches());
+			//vector<vector<Ciphertext>> resultVec(params_.number_of_splits());
+			//for (auto& v : resultVec) v.resize(params_.number_of_batches());
 			vector<vector<Ciphertext>> powers(params_.number_of_batches());
 
 			std::vector<std::pair<std::promise<void>, std::shared_future<void>>>
@@ -228,6 +226,11 @@ namespace apsi
 					int start_block = i * total_blocks / params_.sender_total_thread_count();
 					int end_block = (i + 1) * total_blocks / params_.sender_total_thread_count();
 
+					// constuct two ciphertext to store the result.  One keeps track of the current result, 
+					// one is used as a temp. Their roles switch each iteration. Saved needing to make a 
+					// copy in eval->add(...)
+					std::array<seal::Ciphertext, 2> runningResults;
+
 					for (int block = start_block; block < end_block; block++)
 					{
 						int batch = block / params_.number_of_splits(),
@@ -243,11 +246,6 @@ namespace apsi
 
 
 						//  Iterate over the coeffs multiplying them with the query powers  and summing the results
-						
-						// constuct two ciphertext to store the result.  One keeps track of the current result, 
-						// one is used as a temp. Their roles switch each iteration. Saved needing to make a 
-						// copy in eval->add(...)
-						std::array<seal::Ciphertext, 2> runningResults;
 						char currResult = 0;
 						
 						local_evaluator->multiply_plain_ntt(powers[batch][0], sender_coeffs[0], runningResults[currResult]);
@@ -261,20 +259,17 @@ namespace apsi
 
 							currResult ^= 1;
 						}
-						auto& result = resultVec[split][batch];
-						result = runningResults[currResult];
+						//auto& result = resultVec[split][batch];
+						//result = runningResults[currResult];
 
 						// transform back from ntt form.
-						local_evaluator->transform_from_ntt(result);
+						local_evaluator->transform_from_ntt(runningResults[currResult]);
 
 						// send the result over the network if needed.
-						if (channel)
-						{
 							unique_lock<mutex> net_lock2(mtx);
-							send_int(split, *channel);
-							send_int(batch, *channel);
-							send_ciphertext(result, *channel);
-						}
+							send_int(split, channel);
+							send_int(batch, channel);
+							send_ciphertext(runningResults[currResult], channel);
 					}
 
 					/* After this point, this thread will no longer use the context resource, so it is free to return it. */
@@ -285,7 +280,7 @@ namespace apsi
 			for (int i = 0; i < thread_pool.size(); i++)
 				thread_pool[i].join();
 
-			return std::move(resultVec);
+			//return std::move(resultVec);
 		}
 
 		void Sender::compute_batch_powers(int batch, const std::map<uint64_t, std::vector<seal::Ciphertext>> &input,

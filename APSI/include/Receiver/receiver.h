@@ -9,7 +9,7 @@
 #include "encryptor.h"
 #include "decryptor.h"
 #include "util/exfieldpolycrt.h"
-#include "Sender/sender.h"
+//#include "Sender/sender.h"
 #include "publickey.h"
 #include "secretkey.h"
 #include "Network/boost_ioservice.h"
@@ -32,22 +32,22 @@ namespace apsi
             is a same-size vector of bool values. If an item is in the intersection, the corresponding bool value is true on the 
             same position in the result vector .
             */
-            std::vector<bool> query(const std::vector<Item> &items, apsi::sender::Sender &sender);
+            //std::vector<bool> query(const std::vector<Item> &items, apsi::sender::Sender &sender);
 
             /**
             Sends a query to the remote sender, and get the intersection result. The query is a vector of items, and the result
             is a same-size vector of bool values. If an item is in the intersection, the corresponding bool value is true on the
             same position in the result vector .
             */
-            std::vector<bool> query(const std::vector<Item> &items, std::string ip, uint64_t port);
+			std::vector<bool> query(std::vector<Item> &items, network::Channel& chl);
 
             /**
             Sends a query to the remote sender, and get the intermediate plaintext result without decomposing.
 
             @param[out] intermediate_result Matrix of size (#splits X #batches)
             */
-            void query(const std::vector<Item> &items, std::string ip, uint64_t port,
-                std::vector<std::vector<seal::Plaintext>> &intermediate_result, std::vector<int> &indices);
+            //void query(const std::vector<Item> &items, std::string ip, uint64_t port,
+            //    std::vector<std::vector<seal::Plaintext>> &intermediate_result, std::vector<int> &indices);
 
             void query(const std::vector<Item> &items, apsi::network::Channel &channel,
                 std::vector<std::vector<seal::Plaintext>> &intermediate_result, std::vector<int> &indices);
@@ -81,7 +81,10 @@ namespace apsi
             /**
             Encodes items in the cuckoo hashing table into ExField elements.
             */
-            std::vector<seal::util::ExFieldElement> exfield_encoding(const cuckoo::PermutationBasedCuckoo &cuckoo_);
+            void exfield_encoding(
+				const cuckoo::PermutationBasedCuckoo &cuckoo_,
+				std::vector<seal::util::ExFieldElement>& ret,
+				seal::util::Pointer& data);
 
             /**
             Generates powers y^k, where y is an element in the input vector, k = i*2^{jw}, (i = 1, 2, ..., 2^w - 1), 
@@ -89,7 +92,9 @@ namespace apsi
             we break the bits of sender's split_size into segment of window size).
             The return result is a map from k to y^k.
             */
-            std::map<uint64_t, std::vector<seal::util::ExFieldElement> > generate_powers(const std::vector<seal::util::ExFieldElement> &exfield_items);
+            void generate_powers(const std::vector<seal::util::ExFieldElement> &exfield_items,
+				std::map<uint64_t, std::vector<seal::util::ExFieldElement> >& ret,
+				std::list<seal::util::Pointer>& data);
 
             /**
             Encrypts every vector of elements in the input map to a corresponding vector of SEAL Ciphertext, using generalized batching. The number of 
@@ -116,7 +121,7 @@ namespace apsi
             @return Matrix of size (#splits x table_size_ceiling). Here table_size_ceiling is defined as (#batches x batch_size), which might be
             larger than table_size.
             */
-            std::vector<std::vector<seal::util::ExFieldElement>> bulk_decrypt(const std::vector<std::vector<seal::Ciphertext>> &result_ciphers);
+            //std::vector<std::vector<seal::util::ExFieldElement>> bulk_decrypt(const std::vector<std::vector<seal::Ciphertext>> &result_ciphers);
 
             /**
             Stream decryption of ciphers from the sender. Ciphertext will be acquired from the sender in a streaming fashion one by one in
@@ -128,9 +133,12 @@ namespace apsi
             @return Matrix of size (#splits x table_size_ceiling). Here table_size_ceiling is defined as (#batches x batch_size), which might be
                     larger than table_size.
             */
-            std::vector<std::vector<seal::util::ExFieldElement>> stream_decrypt(apsi::network::Channel &channel);
+            //std::vector<std::vector<seal::util::ExFieldElement>> stream_decrypt(apsi::network::Channel &channel);
 
-            void stream_decrypt(apsi::network::Channel &channel, std::vector<std::vector<seal::util::ExFieldElement>> &result);
+            void stream_decrypt(
+				apsi::network::Channel &channel, 
+				std::vector<std::vector<seal::util::ExFieldElement>> &result,
+				seal::util::Pointer& backing);
 
             /**
             Stream decryption of ciphers from the sender. Ciphertext will be acquired from the sender in a streaming fashion one by one in
@@ -145,7 +153,9 @@ namespace apsi
             decrypted into multiple elements. For example, if the slot count in generalized batching is 256, then a ciphertext is decrypted
             into 256 elements. The return result is a concatenation of decrypted elements from all ciphertext in the input vector.
             */
-            std::vector<seal::util::ExFieldElement> decrypt(const std::vector<seal::Ciphertext> &ciphers);
+      //     void decrypt(const std::vector<seal::Ciphertext> &ciphers,
+			   //std::vector<seal::util::ExFieldElement>& result,
+			   //seal::util::Pointer& backing);
 
             /**
             Decrypts a SEAL Ciphertext to a batch of ExField elements, using generalized un-batching. One ciphertext will be
@@ -154,7 +164,7 @@ namespace apsi
 
             @param[out] batch The vector to hold the decrypted elements. It is assumed to be pre-allocated with appropriate size.
             */
-            void decrypt(const seal::Ciphertext &cipher, std::vector<seal::util::ExFieldElement> &batch);
+            //void decrypt(const seal::Ciphertext &cipher, std::vector<seal::util::ExFieldElement> &batch);
 
             /**
             Decrypts a SEAL Ciphertext to a Plaintext.
@@ -181,8 +191,8 @@ namespace apsi
             @param[in] result Matrix of size (#splits x table_size_ceiling). Here table_size_ceiling is defined as (#batches x batch_size), which might be
             larger than table_size.
             */
-            void decompose(const std::vector<std::vector<seal::Plaintext>> &plain_matrix, 
-                std::vector<std::vector<seal::util::ExFieldElement>> &result);
+            //void decompose(const std::vector<std::vector<seal::Plaintext>> &plain_matrix, 
+            //    std::vector<std::vector<seal::util::ExFieldElement>> &result);
 
             std::shared_ptr<seal::util::ExField> ex_field() const
             {
@@ -209,10 +219,10 @@ namespace apsi
                 return secret_key_;
             }
 
-            void clear_memory_backing()
-            {
-                memory_backing_.clear();
-            }
+            //void clear_memory_backing()
+            //{
+            //    memory_backing_.clear();
+            //}
 
         private:
             void initialize();
@@ -238,7 +248,7 @@ namespace apsi
             std::unique_ptr<seal::PolyCRTBuilder> polycrtbuilder_;
 
             /* Pointers to temporary memory allocated during execution of queries. */
-            std::vector<seal::util::Pointer> memory_backing_;
+            //std::vector<seal::util::Pointer> memory_backing_;
 
             std::unique_ptr<apsi::network::BoostIOService> ios_;
 

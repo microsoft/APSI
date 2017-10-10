@@ -101,7 +101,7 @@ namespace apsi
         /* Step 1: Append location index to end of item */
         // First move to highest u64
         uint64_t *item_ptr = value_.data();
-        item_ptr += cuckoo.bin_u64_length() - 1;
+        *item_ptr += cuckoo.bin_u64_length() - 1;
 
         // Clear null bit and location bits
         uint64_t top_u64_mask = (static_cast<uint64_t>(1) << (cuckoo.item_bit_length() % 64)) - 1;
