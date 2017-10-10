@@ -29,7 +29,7 @@ namespace apsi
         void Sender::initialize()
         {
             enc_params_.set_poly_modulus("1x^" + to_string(params_.poly_degree()) + " + 1");
-            enc_params_.set_coeff_moduli(params_.coeff_modulus());
+            enc_params_.set_coeff_modulus(params_.coeff_modulus());
             enc_params_.set_plain_modulus(ex_field_->coeff_modulus()); // Assume the prime 'p' is always smaller than 64 bits.
 
             seal_context_.reset(new SEALContext(enc_params_));
@@ -235,7 +235,7 @@ namespace apsi
                                 powers[batch][s],
                                 sender_coeffs[s],
                                 tmp);
-                            local_evaluator->add(tmp, result, result);
+                            local_evaluator->add(result, tmp);
                         }
 
                         // transform back from ntt form.
@@ -279,7 +279,7 @@ namespace apsi
                 else
                 {
                     local_evaluator->multiply(batch_powers[i1], batch_powers[i2], batch_powers[i]);
-                    local_evaluator->relinearize(batch_powers[i], local_session_->evaluation_keys_, batch_powers[i]);
+                    local_evaluator->relinearize(batch_powers[i], local_session_->evaluation_keys_);
 
                 }
 
