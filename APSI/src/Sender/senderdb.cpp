@@ -98,7 +98,7 @@ namespace apsi
 
 		void SenderDB::add_data(const vector<Item> &data)
 		{
-//#define ADD_DATA_MULTI_THREAD
+#define ADD_DATA_MULTI_THREAD
 			auto numSlots = params_.sender_bin_size();
 
 			typedef unsigned short rand_type;

@@ -438,7 +438,7 @@ void example_fast_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 
 
 
-	auto s1 = vector<Item>(1000);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
+	auto s1 = vector<Item>(sender_set_size);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
 	for (int i = 0; i < s1.size(); ++i)
 		s1[i][0] = i;
 
