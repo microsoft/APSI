@@ -25,11 +25,11 @@ namespace apsi
 			initialize();
 		}
 
-		void Sender::initialize()
-		{
-			enc_params_.set_poly_modulus("1x^" + to_string(params_.poly_degree()) + " + 1");
-			enc_params_.set_coeff_moduli(params_.coeff_modulus());
-			enc_params_.set_plain_modulus(ex_field_->coeff_modulus()); // Assume the prime 'p' is always smaller than 64 bits.
+        void Sender::initialize()
+        {
+            enc_params_.set_poly_modulus("1x^" + to_string(params_.poly_degree()) + " + 1");
+            enc_params_.set_coeff_modulus(params_.coeff_modulus());
+            enc_params_.set_plain_modulus(ex_field_->coeff_modulus()); // Assume the prime 'p' is always smaller than 64 bits.
 
 			seal_context_.reset(new SEALContext(enc_params_));
 			local_session_.reset(new SenderSessionContext(seal_context_, params_.sender_total_thread_count()));

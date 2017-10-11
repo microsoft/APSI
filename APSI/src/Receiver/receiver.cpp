@@ -34,7 +34,7 @@ namespace apsi
             EncryptionParameters enc_params;
             
             enc_params.set_poly_modulus("1x^" + to_string(params_.poly_degree()) + " + 1");
-            enc_params.set_coeff_moduli(params_.coeff_modulus());
+            enc_params.set_coeff_modulus(params_.coeff_modulus());
             enc_params.set_plain_modulus(ex_field_->coeff_modulus());
             
             SEALContext seal_context(enc_params);

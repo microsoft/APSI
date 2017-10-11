@@ -2,6 +2,7 @@
 
 #include <string>
 #include <map>
+#include <cmath>
 #include "biguint.h"
 #include "bigpoly.h"
 #include "smallmodulus.h"
