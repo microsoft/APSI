@@ -2,13 +2,13 @@
 #include "apsidefines.h"
 #include <thread>
 #include <mutex>
-#include "Network/boost_endpoint.h"
+
 #include "Network/network_utils.h"
-#include "Network/array_view.h"
+
 using namespace std;
 using namespace seal;
 using namespace seal::util;
-using namespace apsi::network;
+using namespace oc;
 
 namespace apsi
 {
@@ -126,20 +126,36 @@ namespace apsi
 		}
 
 
-		void Sender::query_engine(network::BoostEndpoint& ep)
+		void Sender::query_engine(std::string ipPort, IOService& ios)
 		{
-			while (true && !stopped_)
+			std::list<std::thread> thrds;
+			while (true)
 			{
-				Channel* server_channel = ep.getNextQueuedChannel();
-				if (server_channel == nullptr)
+				// create a new session with a client
+				Session newSession(ios, ipPort, SessionMode::Server);
+				Channel server_channel = newSession.addChannel();
+
+				// wait for the socket to connect
+				while (server_channel.waitForConnection(chrono::milliseconds(500)) == false)
 				{
-					this_thread::sleep_for(chrono::milliseconds(50));
-					continue;
+					// abort if we stop the Sender
+					if (stopped_)
+					{
+						// cancel the pending connection
+						server_channel.cancel();
+
+						// join the pending threads
+						for (auto& t : thrds) t.join();
+
+						return;
+					}
 				}
 
-				thread([&]() {
-					query_session(*server_channel);
-				}).detach();
+				// splin off a thread to process the client's request.
+				thrds.emplace_back(thread([this, server_channel]() mutable
+				{
+					query_session(server_channel);
+				}));
 			}
 		}
 
@@ -154,12 +170,12 @@ namespace apsi
 
 			/* Receive client's query data. */
 			int num_of_powers = 0;
-			receive_int(num_of_powers, server_channel);
+			server_channel.recv(num_of_powers);
 			map<uint64_t, vector<Ciphertext>> query;
 			while (num_of_powers-- > 0)
 			{
 				uint64_t power = 0;
-				receive_uint64(power, server_channel);
+				server_channel.recv(power);
 				query[power] = vector<Ciphertext>();
 				receive_ciphertext(query[power], server_channel);
 			}
@@ -267,8 +283,8 @@ namespace apsi
 
 						// send the result over the network if needed.
 							unique_lock<mutex> net_lock2(mtx);
-							send_int(split, channel);
-							send_int(batch, channel);
+							channel.asyncSendCopy(split);
+							channel.asyncSendCopy(batch);
 							send_ciphertext(runningResults[currResult], channel);
 					}
 

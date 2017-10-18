@@ -5,7 +5,6 @@
 #include "Sender/sender.h"
 #include "apsidefines.h"
 #include <sstream>
-#include "Network/byte_stream.h"
 #include "Network/network_utils.h"
 
 
@@ -14,7 +13,7 @@ using namespace seal;
 using namespace seal::util;
 using namespace cuckoo;
 using namespace apsi::tools;
-using namespace apsi::network;
+using namespace oc;
 
 namespace apsi
 {
@@ -23,8 +22,7 @@ namespace apsi
         Receiver::Receiver(const PSIParams &params, const MemoryPoolHandle &pool)
             :params_(params), 
             pool_(pool),
-            ex_field_(ExField::Acquire(params.exfield_characteristic(), params.exfield_polymod(), pool)),
-            ios_(new BoostIOService(0))
+            ex_field_(ExField::Acquire(params.exfield_characteristic(), params.exfield_polymod(), pool))
         {
             initialize();
         }
@@ -103,7 +101,7 @@ namespace apsi
         //    return intersection;
         //}
 
-        vector<bool> Receiver::query(vector<Item> &items, network::Channel& client_channel)
+        vector<bool> Receiver::query(vector<Item> &items, oc::Channel& client_channel)
         {
             //clear_memory_backing();
 
@@ -169,7 +167,7 @@ namespace apsi
         //    //client.stop();
         //}
 
-        //void Receiver::query(const std::vector<Item> &items, apsi::network::Channel &channel,
+        //void Receiver::query(const std::vector<Item> &items, oc::Channel &channel,
         //    std::vector<std::vector<seal::Plaintext>> &intermediate_result, vector<int> &indices)
         //{
         //    clear_memory_backing();
@@ -183,7 +181,7 @@ namespace apsi
         //    stream_decrypt(channel, intermediate_result);
         //}
 
-        //void Receiver::query(const std::map<uint64_t, std::vector<seal::Ciphertext>> &ciphers, apsi::network::Channel &channel,
+        //void Receiver::query(const std::map<uint64_t, std::vector<seal::Ciphertext>> &ciphers, oc::Channel &channel,
         //    std::vector<std::vector<seal::Plaintext>> &intermediate_result)
         //{
         //    clear_memory_backing();
@@ -257,10 +255,10 @@ namespace apsi
             send_evalkeys(evaluation_keys_, channel);
 
             /* Send query data. */
-            send_int(query.size(), channel);
+			channel.asyncSendCopy(int(query.size()));
             for (map<uint64_t, vector<Ciphertext>>::const_iterator it = query.begin(); it != query.end(); it++)
             {
-                send_uint64(it->first, channel);
+				channel.asyncSendCopy(it->first);
                 send_ciphertext(it->second, channel);
             }
         }
@@ -434,7 +432,7 @@ namespace apsi
 
 
         void Receiver::stream_decrypt(
-			apsi::network::Channel &channel, 
+			oc::Channel &channel, 
 			std::vector<std::vector<ExFieldElement>> &result,
 			seal::util::Pointer& backing)
         {
@@ -466,8 +464,8 @@ namespace apsi
             {
                 //unique_ptr<Ciphertext> tmp(new Ciphertext());
 
-                receive_int(split_idx, channel);
-                receive_int(batch_idx, channel);
+                channel.recv(split_idx);
+                channel.recv(batch_idx);
                 receive_ciphertext(tmp, channel);
                 decrypt(tmp, p);
 				auto& rr = result[split_idx];

@@ -12,9 +12,7 @@
 //#include "Sender/sender.h"
 #include "publickey.h"
 #include "secretkey.h"
-#include "Network/boost_ioservice.h"
-#include "Network/boost_endpoint.h"
-#include "Network/boost_channel.h"
+#include "cryptoTools/Network/Channel.h"
 #include "evaluationkeys.h"
 #include "polycrt.h"
 
@@ -39,7 +37,7 @@ namespace apsi
             is a same-size vector of bool values. If an item is in the intersection, the corresponding bool value is true on the
             same position in the result vector .
             */
-			std::vector<bool> query(std::vector<Item> &items, network::Channel& chl);
+			std::vector<bool> query(std::vector<Item> &items, oc::Channel& chl);
 
             /**
             Sends a query to the remote sender, and get the intermediate plaintext result without decomposing.
@@ -49,11 +47,11 @@ namespace apsi
             //void query(const std::vector<Item> &items, std::string ip, uint64_t port,
             //    std::vector<std::vector<seal::Plaintext>> &intermediate_result, std::vector<int> &indices);
 
-            void query(const std::vector<Item> &items, apsi::network::Channel &channel,
+            void query(const std::vector<Item> &items, oc::Channel &channel,
                 std::vector<std::vector<seal::Plaintext>> &intermediate_result, std::vector<int> &indices);
 
             /* Directly query with the preprocessed ciphers. */
-            void query(const std::map<uint64_t, std::vector<seal::Ciphertext>> &ciphers, apsi::network::Channel &channel,
+            void query(const std::map<uint64_t, std::vector<seal::Ciphertext>> &ciphers, oc::Channel &channel,
                 std::vector<std::vector<seal::Plaintext>> &intermediate_result);
 
             std::vector<bool> reveal_result(const std::vector<std::vector<seal::Plaintext>> &intermediate_result, const std::vector<int> &indices);
@@ -66,7 +64,7 @@ namespace apsi
                 std::vector<int>
             > preprocess(const std::vector<Item> &items);
 
-            void send(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query_data, apsi::network::Channel &channel);
+            void send(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query_data, oc::Channel &channel);
 
             /**
             Hash all items in the input vector into a cuckoo hashing table.
@@ -133,10 +131,10 @@ namespace apsi
             @return Matrix of size (#splits x table_size_ceiling). Here table_size_ceiling is defined as (#batches x batch_size), which might be
                     larger than table_size.
             */
-            //std::vector<std::vector<seal::util::ExFieldElement>> stream_decrypt(apsi::network::Channel &channel);
+            //std::vector<std::vector<seal::util::ExFieldElement>> stream_decrypt(oc::Channel &channel);
 
             void stream_decrypt(
-				apsi::network::Channel &channel, 
+				oc::Channel &channel, 
 				std::vector<std::vector<seal::util::ExFieldElement>> &result,
 				seal::util::Pointer& backing);
 
@@ -146,7 +144,7 @@ namespace apsi
 
             @param[out] result Plaintext matrix of size (#splits x #batches).
             */
-            void stream_decrypt(apsi::network::Channel &channel, std::vector<std::vector<seal::Plaintext>> &result);
+            void stream_decrypt(oc::Channel &channel, std::vector<std::vector<seal::Plaintext>> &result);
 
             /**
             Decrypts a vector of SEAL Ciphertext to a vector of ExField elements, using generalized un-batching. One ciphertext will be 
@@ -250,7 +248,6 @@ namespace apsi
             /* Pointers to temporary memory allocated during execution of queries. */
             //std::vector<seal::util::Pointer> memory_backing_;
 
-            std::unique_ptr<apsi::network::BoostIOService> ios_;
 
         };
 

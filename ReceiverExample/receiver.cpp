@@ -8,6 +8,8 @@
 #include "apsidefines.h"
 #include <fstream>
 #include "cryptoTools/Common/CLP.h"
+#include "cryptoTools/Common/Timer.h"
+#include "cryptoTools/Network/IOService.h"
 #include "cryptoTools/Crypto/PRNG.h"
 
 int round_up_to(int v, int s)
@@ -18,11 +20,11 @@ int round_up_to(int v, int s)
 using namespace std;
 using namespace apsi;
 using namespace apsi::tools;
-using namespace apsi::network;
 using namespace apsi::receiver;
 using namespace apsi::sender;
 using namespace seal::util;
 using namespace seal;
+using namespace oc;
 
 void print_example_banner(string title);
 void example_basics();
@@ -77,20 +79,15 @@ int main(int argc, char *argv[])
 {
 	//perf();
 
-	oc::CLP cmd(argc, argv);
+	CLP cmd(argc, argv);
 
 	
-	BoostIOService ios(0);
-	BoostEndpoint sendEp(ios, "127.0.0.1", 1212,true, "APSI");
-	Channel * sendChl = nullptr;
-	auto thrd = std::thread([&]() {
-		while (sendChl == nullptr)
-			sendChl = sendEp.getNextQueuedChannel();
-	});
+	IOService ios;
 
-	BoostEndpoint recvEp(ios, "127.0.0.1", 1212, false, "APSI");
-	Channel& recvChl = recvEp.addChannel("-", "-");
-	thrd.join();
+	Session clientSession(ios, "127.0.0.1:1212", oc::SessionMode::Client);
+	Session serverSession(ios, "127.0.0.1:1212", oc::SessionMode::Server);
+	Channel clientChl = clientSession.addChannel();
+	Channel serverChl = serverSession.addChannel();
 
     // Example: Basics
     //example_basics();
@@ -103,7 +100,7 @@ int main(int argc, char *argv[])
     //example_load_db();
 
     //// Example: Fast batching
-    example_fast_batching(cmd, recvChl, *sendChl);
+    example_fast_batching(cmd, clientChl, serverChl);
 
     //// Example: Slow batching
     //example_slow_batching();
@@ -117,16 +114,14 @@ int main(int argc, char *argv[])
     // Example: Remote connection from multiple receivers
     //example_remote_multiple();
 
-	recvChl.close();
-	sendChl->close();
-	recvEp.stop();
-	sendEp.stop();
-	ios.stop();
 
+#ifdef _MSC_VER
     // Wait for ENTER before closing screen.
     cout << endl << "Press ENTER to exit" << endl;
     char ignore;
     cin.get(ignore);
+#endif
+
     return 0;
 }
 

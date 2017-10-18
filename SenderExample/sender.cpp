@@ -5,7 +5,7 @@
 #include "Sender/sender.h"
 #include "util/exfield.h"
 #include "apsidefines.h"
-#include "Network/channel.h"
+#include "cryptoTools/Network/channel.h"
 #include "Network/network_utils.h"
 
 using namespace std;
@@ -15,7 +15,7 @@ using namespace apsi::receiver;
 using namespace apsi::sender;
 using namespace seal::util;
 using namespace seal;
-using namespace apsi::network;
+using namespace oc;
 
 void print_example_banner(string title);
 void example_remote();

@@ -48,9 +48,6 @@
     <ClInclude Include="include\Sender\sender.h">
       <Filter>Header Files\Sender</Filter>
     </ClInclude>
-    <ClInclude Include="include\Tools\clp.h">
-      <Filter>Header Files\Tools</Filter>
-    </ClInclude>
     <ClInclude Include="include\Tools\log.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
@@ -71,42 +68,6 @@
     </ClInclude>
     <ClInclude Include="include\apsidefines.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\array_view.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\boost_acceptor.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\boost_channel.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\boost_endpoint.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\boost_ioservice.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\boost_socket.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\byte_stream.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\channel.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\concurrent_queue.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\endpoint.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\local_channel.h">
-      <Filter>Header Files\Network</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\local_endpoint.h">
-      <Filter>Header Files\Network</Filter>
     </ClInclude>
     <ClInclude Include="include\Network\network_utils.h">
       <Filter>Header Files\Network</Filter>
@@ -131,9 +92,6 @@
     <ClCompile Include="src\Sender\sender.cpp">
       <Filter>Source Files\Sender</Filter>
     </ClCompile>
-    <ClCompile Include="src\Tools\clp.cpp">
-      <Filter>Source Files\Tools</Filter>
-    </ClCompile>
     <ClCompile Include="src\Tools\log.cpp">
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
@@ -146,33 +104,6 @@
     <ClCompile Include="src\apsidefines.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Network\boost_acceptor.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Network\boost_channel.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Network\boost_endpoint.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Network\boost_ioservice.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Network\byte_stream.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Network\channel.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Network\local_channel.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Network\local_endpoint.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Network\network_utils.cpp">
-      <Filter>Source Files\Network</Filter>
-    </ClCompile>
     <ClCompile Include="src\Tools\hash.cpp">
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
@@ -183,6 +114,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\plaintextarith.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Network\network_utils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
