@@ -90,10 +90,10 @@
       <AdditionalIncludeDirectories>include;C:\libs\boost;..\..\Cuckoo\Cuckoo\include;..\..\SEAL-dev-new\SEAL\include;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Lib>
-      <AdditionalDependencies>SEAL.lib; Cuckoo.lib;miracl.lib;cryptoTools.lib</AdditionalDependencies>
+      <AdditionalDependencies>SEAL.lib;miracl.lib;cryptoTools.lib;cuckoo.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib/$(Platform);..\..\Cuckoo\bin\$(Configuration);..\..\SEAL-dev-new\bin\$(Platform)\$(Configuration);C:\libs\miracl\x64\$(Configuration)_dllrt/;$(ProjectDir)../../../libOTe/x64/$(Configuration)_dllrt/;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib/$(Platform);..\..\cuckoo\bin\$(Configuration);..\..\SEAL-dev-new\bin\$(Platform)\$(Configuration);C:\libs\miracl\x64\$(Configuration)_dllrt/;$(ProjectDir)../../../libOTe/x64/$(Configuration)_dllrt/;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -123,10 +123,10 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <Lib>
-      <AdditionalDependencies>SEAL.lib; Cuckoo.lib;miracl.lib;cryptoTools.lib</AdditionalDependencies>
+      <AdditionalDependencies>SEAL.lib;miracl.lib;cryptoTools.lib;cuckoo.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib/$(Platform);..\..\Cuckoo\bin\$(Configuration);..\..\SEAL-dev-new\bin\$(Platform)\$(Configuration);C:\libs\miracl\x64\$(Configuration)_dllrt/;$(ProjectDir)../../../libOTe/x64/$(Configuration)_dllrt/;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib/$(Platform);..\..\cuckoo\bin\$(Configuration);..\..\SEAL-dev-new\bin\$(Platform)\$(Configuration);C:\libs\miracl\x64\$(Configuration)_dllrt/;$(ProjectDir)../../../libOTe/x64/$(Configuration)_dllrt/;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>

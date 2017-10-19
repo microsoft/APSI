@@ -151,7 +151,18 @@ namespace apsi
             view so that multi-threading is more efficient for accessing data, 
             i.e., one thread will take care of several continuous complete rows. */
 			oc::Matrix<Item> simple_hashing_db2_;
-			std::vector<bool> simple_hashing_db_empty_;
+
+#define ADD_DATA_MULTI_THREAD
+#ifdef ADD_DATA_MULTI_THREAD
+			std::unique_ptr<std::atomic_bool[]>  simple_hashing_db_has_item_;
+			std::vector<bool> simple_hashing_db_has_item_2;
+			std::vector<int> bin_size_;
+#else
+			std::vector<bool> simple_hashing_db_has_item_;
+#endif
+			int aquire_bin_location(int cockooIndex, oc::PRNG& prng, bool par);
+			bool has_item(int cockooIndex, int position);
+
             /* m x B, where m is table size, B is sender's bin size. Keep in this view
             so that we can conveniently shuffle each row (bin) using STL. */
             //oc::Matrix<int> shuffle_index2_;
@@ -160,7 +171,7 @@ namespace apsi
             corresponding bin in shuffle_index_. It points to the next value to be taken from shuffle_index_
             in the corresponding bin. */
             std::vector<int> next_locs_;
-			std::unique_ptr<std::atomic_bool[]> cuckoo_location_lock_;
+			//std::unique_ptr<std::atomic_bool[]> cuckoo_location_lock_;
             /* B x m, the corresponding ExField version of the DB. Refer to simple_hashing_db_. */
             /*std::vector<std::vector<seal::util::ExFieldElement>> exfield_db_;
             seal::util::Pointer exfield_db_backing_;*/

@@ -4,10 +4,11 @@
 #include "util/uintcore.h"
 #include <fstream>
 #include <algorithm>
+#include "cryptoTools/Crypto/Curve.h"
 #include "cryptoTools/Crypto/PRNG.h"
 #include "cryptoTools/Common/MatrixView.h"
 #include <thread>
-
+#include <cryptoTools/Crypto/sha1.h>
 using namespace std;
 using namespace seal;
 using namespace seal::util;
@@ -23,17 +24,17 @@ namespace apsi
 			global_ex_field_(ex_field),
 			cuckoo_(params.hash_func_count(), params.hash_func_seed(), params.log_table_size(), params.item_bit_length(), params.max_probe()),
 			simple_hashing_db2_(params.sender_bin_size(), params.table_size()),
-			simple_hashing_db_empty_(params.sender_bin_size() * params.table_size(), true),
+			//simple_hashing_db_empty_(params.sender_bin_size() * params.table_size(), true),
 			//shuffle_index2_(params.table_size(), params_.sender_bin_size()),
 			next_locs_(params.table_size(), 0),
-			cuckoo_location_lock_(new std::atomic_bool[params_.table_size()]),
+			//cuckoo_location_lock_(new std::atomic_bool[params_.table_size()]),
 			//symm_polys_stale_(params.number_of_splits(), vector<char>(params.number_of_batches(), true)),
 			batch_random_symm_polys_(params.number_of_splits() * params.number_of_batches() * (params.split_size() + 1))
 
 		{
 
-			for (int i = 0; i < params_.table_size(); ++i)
-				cuckoo_location_lock_[i] = false;
+			//for (int i = 0; i < params_.table_size(); ++i)
+			//	cuckoo_location_lock_[i] = false;
 
 			int characteristic_bit_count = util::get_significant_bit_count(params_.exfield_characteristic());
 
@@ -86,7 +87,21 @@ namespace apsi
 			auto src = simple_hashing_db2_.data();
 			//memset(src, -1, simple_hashing_db2_.size() * sizeof(Item));
 
-			std::fill(simple_hashing_db_empty_.begin(), simple_hashing_db_empty_.end(), true);
+			auto ss = params_.sender_bin_size() * params_.table_size();
+#ifdef ADD_DATA_MULTI_THREAD
+			simple_hashing_db_has_item_.reset(new std::atomic_bool[ss]());
+			simple_hashing_db_has_item_2.resize(ss, false);
+			bin_size_.resize(params_.table_size(),0);
+#else
+			simple_hashing_db_has_item_.resize(ss, false);
+#endif
+
+			// make sure the its zero init.
+			for (int i = 0; i < ss; ++i)
+				if (simple_hashing_db_has_item_[i])
+					throw std::runtime_error(LOCATION);
+
+			//std::fill(simple_hashing_db_empty_.begin(), simple_hashing_db_empty_.end(), true);
 		}
 
 		void SenderDB::set_data(const vector<Item> &data)
@@ -98,14 +113,11 @@ namespace apsi
 
 		void SenderDB::add_data(const vector<Item> &data)
 		{
-#define ADD_DATA_MULTI_THREAD
-			auto numSlots = params_.sender_bin_size();
+//#define ADD_DATA_MULTI_THREAD
+			auto bin_size = params_.sender_bin_size();
 
-			typedef unsigned short rand_type;
-			if (numSlots > 1 << (sizeof(rand_type) * 8))
-				throw std::runtime_error("need to use more than 16 bit randoms");
 
-#ifdef ADD_DATA_MULTI_THREAD
+#ifdef  NNNNNN 
 			std::vector<std::thread> thrds(params_.sender_total_thread_count());
 			for (int t = 0; t < thrds.size(); ++t)
 			{
@@ -120,50 +132,138 @@ namespace apsi
 					auto end = data.size();
 					auto& prng = prng_;
 #endif
+					using namespace oc;
+					EllipticCurve curve(Curve25519, prng.get<oc::block>());
+					std::vector<u8> buff(curve.getGenerator().sizeBytes());
+					PRNG pp(oc::CCBlock);
+					oc::EccNumber key_(curve, pp);
 
-					vector<uint64_t> hash_locations;
+
+					std::vector<uint64_t> hash_locations;
 
 					for (int i = start; i < end; i++)
 					{
+						if (params_.use_pk_oprf())
+						{
+							static_assert(sizeof(oc::block) == sizeof(Item), "");
+							oc::PRNG p((oc::block&)data[i], 8);
+							oc::EccPoint a(curve, p);
+
+							a *= key_;
+							a.toBytes(buff.data());
+
+							oc::SHA1 sha;
+							sha.Update(buff.data(), buff.size());
+							sha.Final((oc::block&)data[i]);
+						}
+
 						cuckoo_.get_locations(data[i].data(), hash_locations);
 						for (int j = 0; j < hash_locations.size(); j++)
 						{
 							auto cuckoo_loc = hash_locations[j];
+							// claim a location in this bin that is empty
 
-							// splin lock
-							bool exp = false;
-							while (cuckoo_location_lock_[cuckoo_loc].compare_exchange_strong(exp, true, std::memory_order_acquire) == false);
+							oc::block b = prng.get<oc::block>();
+							PRNG p0(b);
+							PRNG p1(b);
 
-							if (next_locs_[cuckoo_loc]++ > params_.sender_bin_size())
-								throw logic_error("Simple hashing failed. Bin size too small.");
+							auto position = aquire_bin_location(cuckoo_loc, p0, false);
+							auto position2 = aquire_bin_location(cuckoo_loc, p1, true);
 
-
-
-
-							// find a location with trial and error
-							auto index = prng.get<rand_type>() % numSlots;
-							while (!simple_hashing_db_empty_[cuckoo_loc * numSlots + index])
+							if (position != position2)
 							{
-								index = (index + 1) % numSlots;
+								std::cout << i << " " << j << std::endl;
+								std::cout << position << " " << position2 << std::endl;
+
+								throw std::runtime_error(LOCATION);
 							}
-
-							simple_hashing_db_empty_[cuckoo_loc * numSlots + index] = false;
-
-							simple_hashing_db2_(index, cuckoo_loc) = data[i];
-							simple_hashing_db2_(index, cuckoo_loc).to_itemL(cuckoo_, j);
-
-
-							// release the spin lock
-							cuckoo_location_lock_[cuckoo_loc].store(false, std::memory_order_release);
+							simple_hashing_db2_(position, cuckoo_loc) = data[i];
+							simple_hashing_db2_(position, cuckoo_loc).to_itemL(cuckoo_, j);
 						}
 					}
-#ifdef ADD_DATA_MULTI_THREAD
+#ifdef NNNNNN
 				});
 			}
 
 			for (auto& t : thrds) t.join();
 #endif
 		}
+
+		int SenderDB::aquire_bin_location(int cuckoo_loc, oc::PRNG & prng, bool par)
+		{
+			auto s = params_.sender_bin_size();
+			auto start = cuckoo_loc   * s;
+			auto end = (cuckoo_loc+1) * s;
+			if (cuckoo_loc >= params_.table_size())
+				throw std::runtime_error(LOCATION);
+
+
+			for (int i = 0; i < 100; ++i)
+			{
+				auto idx = prng.get<oc::u32>() % s;
+
+				//std::cout << idx;
+				if (par)
+				{
+					bool exp = false;
+					if (simple_hashing_db_has_item_[start + idx].compare_exchange_strong(exp, true))
+					{
+						//std::cout << " *" << std::endl << std::endl;
+						return idx;
+					}
+				}
+				else
+				{
+					if (simple_hashing_db_has_item_2[start + idx] == false)
+					{
+						simple_hashing_db_has_item_2[start + idx] = true;
+						++bin_size_[cuckoo_loc];
+						//std::cout << " *" << std::endl << std::endl;
+						return idx;
+					}
+				}
+				//std::cout << std::endl;
+
+			}
+			std::cout << "------------------------- "<< cuckoo_loc << std::endl;
+
+
+			// do linear scan
+			for (int idx = 0; idx< s; ++idx)
+			{
+				if (par)
+				{
+					bool exp = false;
+					if (simple_hashing_db_has_item_[start + idx].compare_exchange_strong(exp, true))
+						return idx;
+				}
+				else
+				{
+					if (simple_hashing_db_has_item_2[start + idx] == false)
+					{
+						simple_hashing_db_has_item_2[start + idx] = true;
+						++bin_size_[cuckoo_loc];
+						return idx;
+					}
+				}
+			}
+
+
+			std::cout << bin_size_[cuckoo_loc] << " vs " << params_.sender_bin_size() << std::endl;;
+			throw std::runtime_error("sender's bin is full. " LOCATION);
+		}
+
+		bool SenderDB::has_item(int cuckoo_loc, int position)
+		{
+			auto s = params_.sender_bin_size();
+			auto start = cuckoo_loc   * s;
+#ifdef ADD_DATA_MULTI_THREAD
+			return simple_hashing_db_has_item_[start + position].load(std::memory_order_relaxed);
+#else
+			return simple_hashing_db_has_item_[start + position];
+#endif
+		}
+
 
 		void SenderDB::add_data(const Item &item)
 		{
@@ -251,16 +351,16 @@ namespace apsi
 				symm_block(i, split_size) = one;
 				for (int j = split_size - 1; j >= 0; j--)
 				{
-					auto index = split_start + j;
-					auto loc = batch_start + i;
+					auto position = split_start + j;
+					auto cuckoo_loc = batch_start + i;
 
-					if (simple_hashing_db_empty_[loc * numSlots + index])
+					if (has_item(cuckoo_loc, position) == false)
 					{
 						temp1 = &neg_null_element_;
 					}
 					else
 					{
-						simple_hashing_db2_(index , loc).to_exfield_element(temp11);
+						simple_hashing_db2_(position , cuckoo_loc).to_exfield_element(temp11);
 						temp1 = &temp11;
 						exfield->negate(*temp1, *temp1);
 					}
@@ -496,5 +596,6 @@ namespace apsi
 			//	for (int j = 0; j < num_batches; j++)
 			//		stream.read(reinterpret_cast<char*>(&symm_polys_stale_[i][j]), sizeof(bool));
 		}
+
 	}
 }

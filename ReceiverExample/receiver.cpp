@@ -389,8 +389,9 @@ void example_fast_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 	int num_splits = 256;
 	int bin_size = round_up_to(get_bin_size(1 << log_table_size, sender_set_size * num_hash_func, binning_sec_level), num_splits);
 	int window_size = 1;
+	auto oprf_type = OprfType::PK;
 
-    PSIParams params(numThreads, numThreads, 1, log_table_size, bin_size, window_size, num_splits);
+    PSIParams params(numThreads, numThreads, 1, log_table_size, bin_size, window_size, num_splits, oprf_type);
     params.set_item_bit_length(32); // The effective item bit length will be limited by ExField's p.
     params.set_exfield_polymod(string("1x^1")); // f(x) = x
     params.set_exfield_characteristic(0x820001); // p = 8519681. NOTE: p=1 (mod 2n)
@@ -528,8 +529,9 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 	int num_splits = 256;
 	int bin_size = round_up_to(get_bin_size(1 << log_table_size, sender_set_size * num_hash_func, binning_sec_level), num_splits);
 	int window_size = 1;
+	auto oprf_type = OprfType::PK;
 
-	PSIParams params(numThreads, numThreads, 1, log_table_size, bin_size, window_size, num_splits);
+	PSIParams params(numThreads, numThreads, 1, log_table_size, bin_size, window_size, num_splits, oprf_type);
     params.set_item_bit_length(90); // We can handle very long items in the following ExField.
     params.set_exfield_polymod(string("1x^8 + 3"));
     params.set_exfield_characteristic(0xE801);

@@ -47,7 +47,7 @@ namespace apsi
             //void query(const std::vector<Item> &items, std::string ip, uint64_t port,
             //    std::vector<std::vector<seal::Plaintext>> &intermediate_result, std::vector<int> &indices);
 
-            void query(const std::vector<Item> &items, oc::Channel &channel,
+            void query(std::vector<Item> &items, oc::Channel &channel,
                 std::vector<std::vector<seal::Plaintext>> &intermediate_result, std::vector<int> &indices);
 
             /* Directly query with the preprocessed ciphers. */
@@ -62,7 +62,7 @@ namespace apsi
             std::pair<
                 std::map<uint64_t, std::vector<seal::Ciphertext>>, 
                 std::vector<int>
-            > preprocess(const std::vector<Item> &items);
+            > preprocess(std::vector<Item> &items, oc::Channel& channel);
 
             void send(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query_data, oc::Channel &channel);
 

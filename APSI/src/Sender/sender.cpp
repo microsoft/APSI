@@ -67,7 +67,11 @@ namespace apsi
 			for (auto& thrd : thrds)
 				thrd.join();
 
-			//apsi_endpoint_.reset(new BoostEndpoint(*ios_, "0.0.0.0", params_.apsi_port(), true, params_.apsi_endpoint()));
+
+			prng_.SetSeed(oc::ZeroBlock);
+			//curve_.setParameters(oc::Curve25519);
+
+
 		}
 
 		Sender::~Sender()
@@ -133,16 +137,16 @@ namespace apsi
 			{
 				// create a new session with a client
 				Session newSession(ios, ipPort, SessionMode::Server);
-				Channel server_channel = newSession.addChannel();
+				Channel chl = newSession.addChannel();
 
 				// wait for the socket to connect
-				while (server_channel.waitForConnection(chrono::milliseconds(500)) == false)
+				while (chl.waitForConnection(chrono::milliseconds(500)) == false)
 				{
 					// abort if we stop the Sender
 					if (stopped_)
 					{
 						// cancel the pending connection
-						server_channel.cancel();
+						chl.cancel();
 
 						// join the pending threads
 						for (auto& t : thrds) t.join();
@@ -152,36 +156,65 @@ namespace apsi
 				}
 
 				// splin off a thread to process the client's request.
-				thrds.emplace_back(thread([this, server_channel]() mutable
+				thrds.emplace_back(thread([this, chl]() mutable
 				{
-					query_session(server_channel);
+					query_session(chl);
 				}));
 			}
 		}
 
-		void Sender::query_session(Channel &server_channel)
+		void Sender::query_session(Channel &chl)
 		{
+			if (params_.use_pk_oprf())
+			{
+				EllipticCurve curve(Curve25519, prng_.get<oc::block>());
+				PRNG pp(oc::CCBlock);
+				oc::EccNumber key_(curve, pp);
+
+				auto step = curve.getGenerator().sizeBytes();
+				std::vector<u8> buff;
+				chl.recv(buff);
+
+				auto iter = buff.data();
+				oc::EccNumber x(curve);
+				u64 num = buff.size() / step;
+				for (u64 i = 0; i < num; ++i)
+				{
+					x.fromBytes(iter);
+
+					x *= key_;
+
+					x.toBytes(iter);
+
+					iter += step;
+				}
+
+				chl.asyncSend(buff);
+			}
+
+
+
 			/* Set up keys. */
 			PublicKey pub;
 			EvaluationKeys eval;
-			receive_pubkey(pub, server_channel);
-			receive_evalkeys(eval, server_channel);
+			receive_pubkey(pub, chl);
+			receive_evalkeys(eval, chl);
 			SenderSessionContext session_context(seal_context_, pub, eval, params_.sender_session_thread_count());
 
 			/* Receive client's query data. */
 			int num_of_powers = 0;
-			server_channel.recv(num_of_powers);
+			chl.recv(num_of_powers);
 			map<uint64_t, vector<Ciphertext>> query;
 			while (num_of_powers-- > 0)
 			{
 				uint64_t power = 0;
-				server_channel.recv(power);
+				chl.recv(power);
 				query[power] = vector<Ciphertext>();
-				receive_ciphertext(query[power], server_channel);
+				receive_ciphertext(query[power], chl);
 			}
 
 			/* Answer to the query. */
-			respond(query, session_context, server_channel);
+			respond(query, session_context, chl);
 		}
 
 		void Sender::stop()

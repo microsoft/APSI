@@ -6,7 +6,7 @@
 #include "apsidefines.h"
 #include <sstream>
 #include "Network/network_utils.h"
-
+#include "cryptoTools/Crypto/sha1.h"
 
 using namespace std;
 using namespace seal;
@@ -101,23 +101,23 @@ namespace apsi
         //    return intersection;
         //}
 
-        vector<bool> Receiver::query(vector<Item> &items, oc::Channel& client_channel)
+        vector<bool> Receiver::query(vector<Item> &items, oc::Channel& chl)
         {
             //clear_memory_backing();
 
-            auto query_data = preprocess(items);
+            auto query_data = preprocess(items, chl);
 
             /* Create communication channel. */
             //BoostEndpoint client(*ios_, ip, port, false, "APSI");
             //Channel& client_channel = client.addChannel("-", "-");
 
-			send(query_data.first, client_channel);
+			send(query_data.first, chl);
 			stop_watch.set_time_point("receiver pre-process/sent");
 
             /* Receive results in a streaming fashion. */
 			vector<vector<ExFieldElement>> result;
 			Pointer backing;
-			stream_decrypt(client_channel, result, backing);
+			stream_decrypt(chl, result, backing);
 			stop_watch.set_time_point("receiver decrypt");
 
             vector<bool> tmp(params_.table_size(), false);
@@ -226,8 +226,57 @@ namespace apsi
         std::pair<
             std::map<uint64_t, std::vector<seal::Ciphertext>>,
             std::vector<int>
-        > Receiver::preprocess(const vector<Item> &items)
+        > Receiver::preprocess(vector<Item> &items, Channel& channel)
         {
+			using namespace oc;
+			if (params_.use_pk_oprf())
+			{
+				PRNG prng(ZeroBlock);
+				EllipticCurve curve(Curve25519, prng.get<oc::block>());
+				std::vector<EccNumber> b;
+				b.reserve(items.size());
+				EccPoint x(curve);
+
+				auto step = curve.getGenerator().sizeBytes();
+				std::vector<u8> buff(items.size() * step);
+				auto iter = buff.data();
+				for (u64 i = 0; i < items.size(); ++i)
+				{
+					b.emplace_back(curve, prng);
+					PRNG pp((oc::block&)items[i], 8);
+					x.randomize(pp);
+
+					x *= b[i];
+
+					x.toBytes(iter);
+					iter += step;
+				}
+
+				channel.asyncSend(std::move(buff));
+				auto f = channel.asyncRecv(buff);
+
+				for (u64 i = 0; i < items.size(); ++i)
+				{
+					b[i] = std::move(b[i].inverse());
+				}
+				f.get();
+
+				iter = buff.data();
+				for (u64 i = 0; i < items.size(); ++i)
+				{
+					x.fromBytes(iter);
+
+					x *= b[i];
+
+					x.toBytes(iter);
+					SHA1 sha;
+					sha.Update(iter, step);
+					sha.Final((oc::block&)items[i]);
+
+					iter += step;
+				}
+			}
+
             unique_ptr<PermutationBasedCuckoo> cuckoo = cuckoo_hashing(items);
 
             vector<int> indices = cuckoo_indices(items, *cuckoo);
@@ -245,7 +294,7 @@ namespace apsi
 
             map<uint64_t, vector<Ciphertext>> ciphers = encrypt(powers);
 
-            return make_pair(ciphers, indices);
+            return make_pair(std::move(ciphers),std::move(indices));
         }
 
         void Receiver::send(const map<uint64_t, vector<Ciphertext>> &query, Channel &channel)

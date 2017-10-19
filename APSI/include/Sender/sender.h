@@ -13,6 +13,7 @@
 #include "publickey.h"
 #include "secretkey.h"
 #include "cryptoTools/Network/IOService.h"
+#include "cryptoTools/Crypto/Curve.h"
 #include "Sender/sendersessioncontext.h"
 #include <deque>
 #include <mutex>
@@ -224,9 +225,9 @@ namespace apsi
 
             std::mutex thread_context_mtx_;
 
-            //std::unique_ptr<oc::BoostIOService> ios_;
+			oc::PRNG prng_;
 
-            //std::unique_ptr<oc::BoostEndpoint> apsi_endpoint_;
+			//oc::EllipticCurve curve_;
 
             bool stopped_;
         };
