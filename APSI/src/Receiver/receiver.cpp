@@ -280,7 +280,7 @@ namespace apsi
 					x *= b[i];
 
 					x.toBytes(iter);
-					SHA1 sha;
+					SHA1 sha(sizeof(block));
 					sha.Update(iter, step);
 					sha.Final((oc::block&)items[i]);
 

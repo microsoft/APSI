@@ -176,7 +176,7 @@ namespace apsi
 
 							//std::cout << "a2 " <<a << " "<<p.mAes.getKey()  <<" _ "<< *(u64*)buff.data() << std::endl;
 
-							oc::SHA1 sha;
+							oc::SHA1 sha(sizeof(block));
 							sha.Update(buff.data(), buff.size());
 							sha.Final((oc::block&)data[i]);
 

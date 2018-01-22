@@ -389,7 +389,7 @@ void example_fast_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 	int num_splits = 256;
 	int bin_size = round_up_to(get_bin_size(1 << log_table_size, sender_set_size * num_hash_func, binning_sec_level), num_splits);
 	int window_size = 1;
-	auto oprf_type = OprfType::PK;
+	auto oprf_type = OprfType::None;
 
     PSIParams params(numThreads, numThreads, 1, log_table_size, bin_size, window_size, num_splits, oprf_type);
     params.set_item_bit_length(32); // The effective item bit length will be limited by ExField's p.
