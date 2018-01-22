@@ -9,6 +9,8 @@
 #include "cryptoTools/Common/MatrixView.h"
 #include <thread>
 #include <cryptoTools/Crypto/sha1.h>
+#include <unordered_map>
+
 using namespace std;
 using namespace seal;
 using namespace seal::util;
@@ -90,8 +92,8 @@ namespace apsi
 			auto ss = params_.sender_bin_size() * params_.table_size();
 #ifdef ADD_DATA_MULTI_THREAD
 			simple_hashing_db_has_item_.reset(new std::atomic_bool[ss]());
-			simple_hashing_db_has_item_2.resize(ss, false);
-			bin_size_.resize(params_.table_size(),0);
+			//simple_hashing_db_has_item_2.resize(ss, false);
+			//bin_size_.resize(params_.table_size(),0);
 #else
 			simple_hashing_db_has_item_.resize(ss, false);
 #endif
@@ -116,8 +118,9 @@ namespace apsi
 //#define ADD_DATA_MULTI_THREAD
 			auto bin_size = params_.sender_bin_size();
 
+			using namespace oc;
 
-#ifdef  NNNNNN 
+#ifdef  ADD_DATA_MULTI_THREAD 
 			std::vector<std::thread> thrds(params_.sender_total_thread_count());
 			for (int t = 0; t < thrds.size(); ++t)
 			{
@@ -131,9 +134,11 @@ namespace apsi
 					auto start = 0;
 					auto end = data.size();
 					auto& prng = prng_;
+					std::unordered_map<u64, u64> map, map2;
+					map.reserve(data.size());
+					map2.reserve(data.size());
 #endif
-					using namespace oc;
-					EllipticCurve curve(Curve25519, prng.get<oc::block>());
+					EllipticCurve curve(p256k1, prng.get<oc::block>());
 					std::vector<u8> buff(curve.getGenerator().sizeBytes());
 					PRNG pp(oc::CCBlock);
 					oc::EccNumber key_(curve, pp);
@@ -143,18 +148,46 @@ namespace apsi
 
 					for (int i = start; i < end; i++)
 					{
+
+						//SHA1 ss;
+						//ss.Update((oc::block&)data[i]);
+						//oc::block bb;
+						//ss.Final(bb);
+						//auto dd = *(u64*)&bb;
+
+						//auto iter = map.find(dd);
+						//if (iter != map.end())
+						//{
+						//	std::cout<< " *** " << i << std::endl;
+						//	//throw std::runtime_error(LOCATION);
+						//}
+						//map.insert({ dd, i });
+
 						if (params_.use_pk_oprf())
 						{
 							static_assert(sizeof(oc::block) == sizeof(Item), "");
 							oc::PRNG p((oc::block&)data[i], 8);
+							//std::cout << p.get<oc::block>() << std::endl;
 							oc::EccPoint a(curve, p);
+							//std::cout<< "a1 " << a << std::endl;
 
 							a *= key_;
 							a.toBytes(buff.data());
 
+							//std::cout << "a2 " <<a << " "<<p.mAes.getKey()  <<" _ "<< *(u64*)buff.data() << std::endl;
+
 							oc::SHA1 sha;
 							sha.Update(buff.data(), buff.size());
 							sha.Final((oc::block&)data[i]);
+
+
+							//auto iter2 = map2.find(data[i][0]);
+							//if (iter2 != map2.end())
+							//{
+							//	std::cout << " ++++ " << i << std::endl;
+
+							//}
+							//map2.insert({ data[i][0], i });
 						}
 
 						cuckoo_.get_locations(data[i].data(), hash_locations);
@@ -163,25 +196,25 @@ namespace apsi
 							auto cuckoo_loc = hash_locations[j];
 							// claim a location in this bin that is empty
 
-							oc::block b = prng.get<oc::block>();
-							PRNG p0(b);
-							PRNG p1(b);
+							//oc::block b = prng.get<oc::block>();
+							//PRNG p0(b);
+							//PRNG p0(b, 8);
 
-							auto position = aquire_bin_location(cuckoo_loc, p0, false);
-							auto position2 = aquire_bin_location(cuckoo_loc, p1, true);
+							auto position = aquire_bin_location(cuckoo_loc, prng, false, data[i]);
+							//auto position2 = aquire_bin_location(cuckoo_loc, p1, true, data[i]);
 
-							if (position != position2)
-							{
-								std::cout << i << " " << j << std::endl;
-								std::cout << position << " " << position2 << std::endl;
+							//if (position != position2)
+							//{ 
+							//	std::cout << i << " " << j << std::endl;
+							//	std::cout << position << " " << position2 << std::endl;
 
-								throw std::runtime_error(LOCATION);
-							}
+							//	throw std::runtime_error(LOCATION);
+							//}
 							simple_hashing_db2_(position, cuckoo_loc) = data[i];
 							simple_hashing_db2_(position, cuckoo_loc).to_itemL(cuckoo_, j);
 						}
 					}
-#ifdef NNNNNN
+#ifdef ADD_DATA_MULTI_THREAD
 				});
 			}
 
@@ -189,7 +222,7 @@ namespace apsi
 #endif
 		}
 
-		int SenderDB::aquire_bin_location(int cuckoo_loc, oc::PRNG & prng, bool par)
+		int SenderDB::aquire_bin_location(int cuckoo_loc, oc::PRNG & prng, bool par, const Item& i)
 		{
 			auto s = params_.sender_bin_size();
 			auto start = cuckoo_loc   * s;
@@ -203,53 +236,53 @@ namespace apsi
 				auto idx = prng.get<oc::u32>() % s;
 
 				//std::cout << idx;
-				if (par)
-				{
+				//if (par)
+				//{
 					bool exp = false;
 					if (simple_hashing_db_has_item_[start + idx].compare_exchange_strong(exp, true))
 					{
 						//std::cout << " *" << std::endl << std::endl;
 						return idx;
 					}
-				}
-				else
-				{
-					if (simple_hashing_db_has_item_2[start + idx] == false)
-					{
-						simple_hashing_db_has_item_2[start + idx] = true;
-						++bin_size_[cuckoo_loc];
-						//std::cout << " *" << std::endl << std::endl;
-						return idx;
-					}
-				}
+				//}
+				//else
+				//{
+				//	if (simple_hashing_db_has_item_2[start + idx] == false)
+				//	{
+				//		simple_hashing_db_has_item_2[start + idx] = true;
+				//		++bin_size_[cuckoo_loc];
+				//		//std::cout << " *" << std::endl << std::endl;
+				//		return idx;
+				//	}
+				//}
 				//std::cout << std::endl;
 
 			}
-			std::cout << "------------------------- "<< cuckoo_loc << std::endl;
+			//std::cout << "------------------------- "<< cuckoo_loc  << " " << (oc::block&)i << std::endl;
 
 
 			// do linear scan
 			for (int idx = 0; idx< s; ++idx)
 			{
-				if (par)
-				{
+				//if (par)
+				//{
 					bool exp = false;
 					if (simple_hashing_db_has_item_[start + idx].compare_exchange_strong(exp, true))
 						return idx;
-				}
-				else
-				{
-					if (simple_hashing_db_has_item_2[start + idx] == false)
-					{
-						simple_hashing_db_has_item_2[start + idx] = true;
-						++bin_size_[cuckoo_loc];
-						return idx;
-					}
-				}
+				//}
+				//else
+				//{
+				//	if (simple_hashing_db_has_item_2[start + idx] == false)
+				//	{
+				//		simple_hashing_db_has_item_2[start + idx] = true;
+				//		++bin_size_[cuckoo_loc];
+				//		return idx;
+				//	}
+				//}
 			}
 
 
-			std::cout << bin_size_[cuckoo_loc] << " vs " << params_.sender_bin_size() << std::endl;;
+			//std::cout << bin_size_[cuckoo_loc] << " vs " << params_.sender_bin_size() << std::endl;;
 			throw std::runtime_error("sender's bin is full. " LOCATION);
 		}
 

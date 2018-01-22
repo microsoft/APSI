@@ -155,12 +155,11 @@ namespace apsi
 #define ADD_DATA_MULTI_THREAD
 #ifdef ADD_DATA_MULTI_THREAD
 			std::unique_ptr<std::atomic_bool[]>  simple_hashing_db_has_item_;
-			std::vector<bool> simple_hashing_db_has_item_2;
-			std::vector<int> bin_size_;
+			//std::vector<int> bin_size_;
 #else
 			std::vector<bool> simple_hashing_db_has_item_;
 #endif
-			int aquire_bin_location(int cockooIndex, oc::PRNG& prng, bool par);
+			int aquire_bin_location(int cockooIndex, oc::PRNG& prng, bool par, const Item& i);
 			bool has_item(int cockooIndex, int position);
 
             /* m x B, where m is table size, B is sender's bin size. Keep in this view

@@ -93,7 +93,7 @@
       <AdditionalDependencies>SEAL.lib;miracl.lib;cryptoTools.lib;cuckoo.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib/$(Platform);..\..\cuckoo\bin\$(Configuration);..\..\SEAL-dev-new\bin\$(Platform)\$(Configuration);C:\libs\miracl\x64\$(Configuration)_dllrt/;$(ProjectDir)../../../libOTe/x64/$(Configuration)_dllrt/;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib/$(Platform);C:\libs\miracl\x64\$(Configuration)_dllrt/;$(ProjectDir)../../../libOTe/x64/$(Configuration)_dllrt/;$(SolutionDir)$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -126,7 +126,7 @@
       <AdditionalDependencies>SEAL.lib;miracl.lib;cryptoTools.lib;cuckoo.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib/$(Platform);..\..\cuckoo\bin\$(Configuration);..\..\SEAL-dev-new\bin\$(Platform)\$(Configuration);C:\libs\miracl\x64\$(Configuration)_dllrt/;$(ProjectDir)../../../libOTe/x64/$(Configuration)_dllrt/;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib/$(Platform);C:\libs\miracl\x64\$(Configuration)_dllrt/;$(ProjectDir)../../../libOTe/x64/$(Configuration)_dllrt/;$(SolutionDir)$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>

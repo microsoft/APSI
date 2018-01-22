@@ -4,6 +4,7 @@
 #include <mutex>
 
 #include "Network/network_utils.h"
+#include "cryptoTools/Common/Log.h"
 
 using namespace std;
 using namespace seal;
@@ -55,7 +56,7 @@ namespace apsi
 						poly_mod, local_mph));
 					thread_contexts_[i].exfield()->set_frob_table(ex_field_->frobe_table());
 
-					if (seal_context_->get_qualifiers().enable_batching)
+					if (seal_context_->qualifiers().enable_batching)
 						thread_contexts_[i].set_builder(make_shared<PolyCRTBuilder>(*seal_context_, local_mph));
 
 					thread_contexts_[i].set_exbuilder(make_shared<ExFieldPolyCRTBuilder>(thread_contexts_[i].exfield(), params_.log_poly_degree()));
@@ -167,7 +168,7 @@ namespace apsi
 		{
 			if (params_.use_pk_oprf())
 			{
-				EllipticCurve curve(Curve25519, prng_.get<oc::block>());
+				EllipticCurve curve(p256k1, prng_.get<oc::block>());
 				PRNG pp(oc::CCBlock);
 				oc::EccNumber key_(curve, pp);
 
@@ -175,14 +176,17 @@ namespace apsi
 				std::vector<u8> buff;
 				chl.recv(buff);
 
+				ostreamLock out(std::cout);
 				auto iter = buff.data();
-				oc::EccNumber x(curve);
+				oc::EccPoint x(curve);
 				u64 num = buff.size() / step;
 				for (u64 i = 0; i < num; ++i)
 				{
 					x.fromBytes(iter);
 
 					x *= key_;
+
+					out << "x " << i << " " << x << std::endl;
 
 					x.toBytes(iter);
 
@@ -337,7 +341,7 @@ namespace apsi
 		{
 			batch_powers.resize(params_.split_size() + 1);
 			shared_ptr<Evaluator> local_evaluator = context.evaluator();
-			batch_powers[0] = context.encryptor()->encrypt(BigPoly("1"));
+			context.encryptor()->encrypt(BigPoly("1"), batch_powers[0], pool_);
 			for (int i = 1; i <= params_.split_size(); i++)
 			{
 				int i1 = optimal_split(i, 1 << params_.window_size());

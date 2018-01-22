@@ -245,6 +245,7 @@ namespace apsi
 
             std::unique_ptr<seal::PolyCRTBuilder> polycrtbuilder_;
 
+
             /* Pointers to temporary memory allocated during execution of queries. */
             //std::vector<seal::util::Pointer> memory_backing_;
 

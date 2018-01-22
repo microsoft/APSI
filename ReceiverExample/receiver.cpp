@@ -428,13 +428,13 @@ void example_fast_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 	Sender sender(params, MemoryPoolHandle::New(true), cmd.isSet("dummy"));
 	stop_watch.set_time_point("send-cntr");
 
-
+	 
     sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
     sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 
+	auto actual_size = 1000;// sender_set_size;
 
-
-	auto s1 = vector<Item>(sender_set_size);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
+	auto s1 = vector<Item>(actual_size);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
 	for (int i = 0; i < s1.size(); ++i)
 		s1[i][0] = i;
 
