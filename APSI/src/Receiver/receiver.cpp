@@ -233,51 +233,65 @@ namespace apsi
 			if (params_.use_pk_oprf())
 			{
 
-				std::cout << "start " << std::endl;
+				//std::cout << "start " << std::endl;
 				PRNG prng(ZeroBlock);
 				EllipticCurve curve(p256k1, prng.get<oc::block>());
 				std::vector<EccNumber> b;
 				b.reserve(items.size());
 				EccPoint x(curve);
+				//std::vector<EccPoint> xx; xx.reserve(items.size());
 
 				auto step = curve.getGenerator().sizeBytes();
 				std::vector<u8> buff(items.size() * step);
 				auto iter = buff.data();
 				{
 					ostreamLock out(std::cout);
-				for (u64 i = 0; i < items.size(); ++i)
-				{
-					b.emplace_back(curve, prng);
-					PRNG pp((oc::block&)items[i], 8);
-					x.randomize(pp);
+					for (u64 i = 0; i < items.size(); ++i)
+					{
+						b.emplace_back(curve, prng);
+						PRNG pp((oc::block&)items[i], 8);
+						x.randomize(pp);
 
-					out << "i  " << i << " " << x << std::endl;
+						//xx.emplace_back(x);
+						//out << "x[" << i << "]    " << x << std::endl;
 
 
-					x *= b[i];
-					out << "    " << x << std::endl;
+						x *= b[i];
+						//out << "x[" << i << "]^b  " << x << std::endl;
 
-					x.toBytes(iter);
-					iter += step;
+						x.toBytes(iter);
+						iter += step;
+					}
 				}
-				}
 
+
+				// send the data over the network and prep for the response.
 				channel.asyncSend(std::move(buff));
 				auto f = channel.asyncRecv(buff);
+
+				// compute 1/b so that we can compute (x^ba)^(1/b) = x^a
 				for (u64 i = 0; i < items.size(); ++i)
 				{
 					b[i] = std::move(b[i].inverse());
 				}
 				f.get();
 
+				//PRNG pp(oc::CCBlock);
+				//oc::EccNumber key_(curve, pp);
+
 				ostreamLock out(std::cout);
 				iter = buff.data();
 				for (u64 i = 0; i < items.size(); ++i)
 				{
 					x.fromBytes(iter);
-
-					out << "im " << i << ":   " << x << " * " << b[i] << std::endl;
+					//out << "x^b[" << i << "]   " << x << " * " << b[i] << std::endl;
 					x *= b[i];
+
+					//auto exp = xx[i] * key_;
+					//if (x != exp)
+					//{
+					//	out << "neq exp: " << exp << "  x " << x << std::endl;
+					//}
 
 					x.toBytes(iter);
 					SHA1 sha(sizeof(block));
