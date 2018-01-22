@@ -2,9 +2,9 @@
 
 #include <array>
 #include <string>
-#include "util/exfield.h"
-#include "Tools/hash.h"
 #include <stdexcept>
+#include "seal/util/exfield.h"
+#include "Tools/hash.h"
 #include "cuckoo.h"
 
 namespace apsi

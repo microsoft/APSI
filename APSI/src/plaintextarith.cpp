@@ -1,8 +1,8 @@
 #include "plaintextarith.h"
-#include "util/mempool.h"
-#include "util/polycore.h"
-#include "util/polyfftmultsmallmod.h"
-#include "util/polyarithsmallmod.h"
+#include "seal/util/mempool.h"
+#include "seal/util/polycore.h"
+#include "seal/util/polyfftmultsmallmod.h"
+#include "seal/util/polyarithsmallmod.h"
 
 using namespace seal;
 using namespace seal::util;

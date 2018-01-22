@@ -1,12 +1,12 @@
 #pragma once
 
-#include "util/exfield.h"
-#include "util/exfieldpolycrt.h"
-#include "util/mempool.h"
+#include "seal/util/exfield.h"
+#include "seal/util/exfieldpolycrt.h"
+#include "seal/util/mempool.h"
 
-#include "evaluator.h"
-#include "polycrt.h"
-#include "encryptor.h"
+#include "seal/evaluator.h"
+#include "seal/polycrt.h"
+#include "seal/encryptor.h"
 #include "cryptoTools/Common/MatrixView.h"
 
 namespace apsi

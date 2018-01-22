@@ -81,10 +81,10 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\libs\boost;..\..\SEAL-dev-new\SEAL\include;../../Cuckoo/Cuckoo/include;$(SolutionDir)/APSI/include;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\libs\boost;..\..\SEAL-dev\SEAL\;../../Cuckoo/Cuckoo/include;$(SolutionDir)/APSI/include;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib;..\..\Cuckoo\bin\$(Configuration);..\..\SEAL-dev-new\bin\$(Platform)\$(Configuration);$(SolutionDir)$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib;..\..\Cuckoo\bin\$(Configuration);$(ProjectDir)../bin\x64\$(Configuration)\;$(SolutionDir)$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>SEAL.lib;Cuckoo.lib;APSI.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -108,12 +108,12 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\libs\boost;..\..\SEAL-dev-new\SEAL\include;../../Cuckoo/Cuckoo/include;$(SolutionDir)/APSI/include;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\libs\boost;..\..\SEAL-dev\SEAL\;../../Cuckoo/Cuckoo/include;$(SolutionDir)/APSI/include;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib;..\..\Cuckoo\bin\$(Configuration);..\..\SEAL-dev-new\bin\$(Platform)\$(Configuration);$(SolutionDir)$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib;..\..\Cuckoo\bin\$(Configuration);$(ProjectDir)../bin\x64\$(Configuration)\;$(SolutionDir)$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>SEAL.lib;Cuckoo.lib;APSI.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>

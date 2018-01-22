@@ -1,7 +1,7 @@
 
 #include "Sender/senderdb.h"
 #include "apsidefines.h"
-#include "util/uintcore.h"
+#include "seal/util/uintcore.h"
 #include <fstream>
 #include <algorithm>
 #include "cryptoTools/Crypto/Curve.h"

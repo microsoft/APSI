@@ -1,9 +1,9 @@
 #pragma once
 
-#include "plaintext.h"
-#include "util/polymodulus.h"
-#include "smallmodulus.h"
-#include "memorypoolhandle.h"
+#include "seal/plaintext.h"
+#include "seal/util/polymodulus.h"
+#include "seal/smallmodulus.h"
+#include "seal/memorypoolhandle.h"
 
 namespace apsi
 {

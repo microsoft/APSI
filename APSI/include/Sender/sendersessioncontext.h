@@ -1,13 +1,13 @@
 #pragma once
 
-#include "publickey.h"
-#include "evaluationkeys.h"
-#include "secretkey.h"
-#include "context.h"
-#include "encryptor.h"
-#include "decryptor.h"
-#include "evaluator.h"
-#include "memorypoolhandle.h"
+#include "seal/publickey.h"
+#include "seal/evaluationkeys.h"
+#include "seal/secretkey.h"
+#include "seal/context.h"
+#include "seal/encryptor.h"
+#include "seal/decryptor.h"
+#include "seal/evaluator.h"
+#include "seal/memorypoolhandle.h"
 
 namespace apsi
 {

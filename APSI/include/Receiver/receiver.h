@@ -1,20 +1,20 @@
 #pragma once
 
 #include <map>
-#include "cuckoo.h"
-#include "biguint.h"
+#include "seal/biguint.h"
+#include "seal/bigpolyarray.h"
+#include "seal/encryptor.h"
+#include "seal/decryptor.h"
+#include "seal/util/exfieldpolycrt.h"
+#include "seal/publickey.h"
+#include "seal/secretkey.h"
+#include "seal/evaluationkeys.h"
+#include "seal/polycrt.h"
 #include "item.h"
 #include "psiparams.h"
-#include "bigpolyarray.h"
-#include "encryptor.h"
-#include "decryptor.h"
-#include "util/exfieldpolycrt.h"
+#include "cuckoo.h"
 //#include "Sender/sender.h"
-#include "publickey.h"
-#include "secretkey.h"
 #include "cryptoTools/Network/Channel.h"
-#include "evaluationkeys.h"
-#include "polycrt.h"
 
 namespace apsi
 {

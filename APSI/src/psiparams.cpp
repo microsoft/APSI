@@ -1,8 +1,8 @@
-#include "psiparams.h"
-#include "chooser.h"
 #include <stdexcept>
+#include "seal/chooser.h"
+#include "seal/defaultparams.h"
+#include "psiparams.h"
 #include <item.h>
-#include "defaultparams.h"
 
 using namespace seal;
 using namespace std;

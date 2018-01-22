@@ -1,7 +1,7 @@
 #include "Receiver/receiver.h"
-#include "util/uintcore.h"
-#include "encryptionparams.h"
-#include "keygenerator.h"
+#include "seal/util/uintcore.h"
+#include "seal/encryptionparams.h"
+#include "seal/keygenerator.h"
 #include "Sender/sender.h"
 #include "apsidefines.h"
 #include <sstream>
@@ -38,7 +38,7 @@ namespace apsi
 
 			SEALContext seal_context(enc_params);
 			KeyGenerator generator(seal_context);
-			generator.generate();
+			//generator.generate();
 
 			public_key_ = generator.public_key();
 			secret_key_ = generator.secret_key();

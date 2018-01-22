@@ -3,14 +3,13 @@
 #include <string>
 #include <map>
 #include <cmath>
-#include "biguint.h"
-#include "bigpoly.h"
-#include "smallmodulus.h"
-#include "apsidefines.h"
 #include <numeric>
+#include "seal/biguint.h"
+#include "seal/bigpoly.h"
+#include "seal/smallmodulus.h"
+#include "apsidefines.h"
 #include <boost/math/special_functions/binomial.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
-#include <cmath>
 
 namespace apsi
 {

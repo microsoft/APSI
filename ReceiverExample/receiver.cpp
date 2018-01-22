@@ -3,8 +3,8 @@
 #include <iostream>
 #include <string>
 #include "Sender/sender.h"
-#include "util/exfield.h"
-#include "util/uintcore.h"
+#include "seal/util/exfield.h"
+#include "seal/util/uintcore.h"
 #include "apsidefines.h"
 #include <fstream>
 #include "cryptoTools/Common/CLP.h"

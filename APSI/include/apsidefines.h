@@ -6,8 +6,8 @@
 #include <vector>
 #include "Tools/stopwatch.h"
 #include <memory>
-#include "plaintext.h"
-#include "context.h"
+#include "seal/plaintext.h"
+#include "seal/context.h"
 #include <cstring>
 
 namespace apsi

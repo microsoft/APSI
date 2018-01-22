@@ -1,11 +1,11 @@
 #pragma once
 
-#include "ciphertext.h"
+#include "seal/ciphertext.h"
+#include "seal/evaluationkeys.h"
+#include "seal/publickey.h"
+#include "seal/plaintext.h"
 #include "cryptoTools/Network/Channel.h"
-#include "evaluationkeys.h"
-#include "publickey.h"
 #include "item.h"
-#include "plaintext.h"
 
 namespace apsi
 {

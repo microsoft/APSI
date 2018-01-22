@@ -1,10 +1,10 @@
 #pragma once
  
-#include "util/defines.h"
+#include "seal/util/defines.h"
 #include <array>
 #include <cstdint>
-
 #include <wmmintrin.h>
+
 namespace apsi
 {
     namespace tools
