@@ -100,10 +100,10 @@ int main(int argc, char *argv[])
     //example_load_db();
 
     //// Example: Fast batching
-    example_fast_batching(cmd, clientChl, serverChl);
+    //example_fast_batching(cmd, clientChl, serverChl);
 
     //// Example: Slow batching
-    //example_slow_batching();
+    example_slow_batching(cmd, clientChl, serverChl);
 
     // Example: Slow batching vs. Fast batching
     //example_slow_vs_fast();
@@ -525,13 +525,14 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 	cmd.setDefault("t", 8);
 	int numThreads = cmd.get<int>("t");
 	int log_table_size = 14;
-	int sender_set_size = 1 << 24;
+	int sender_set_size = 1 << 20;
 	int num_hash_func = 3;
 	int binning_sec_level = 20;
-	int num_splits = 256;
-	int bin_size = round_up_to(get_bin_size(1 << log_table_size, sender_set_size * num_hash_func, binning_sec_level), num_splits);
+	int num_splits = 128;
+	auto xx = get_bin_size(1 << log_table_size, sender_set_size * num_hash_func, binning_sec_level);
+	int bin_size = round_up_to(xx, num_splits);
 	int window_size = 1;
-	auto oprf_type = OprfType::PK;
+	auto oprf_type = OprfType::None;
 
 	PSIParams params(numThreads, numThreads, 1, log_table_size, bin_size, window_size, num_splits, oprf_type);
     params.set_item_bit_length(90); // We can handle very long items in the following ExField.
@@ -587,7 +588,9 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
     sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 
-	auto s1 = vector<Item>(sender_set_size);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
+	//auto s1 = vector<Item>(sender_set_size);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
+	auto s1 = vector<Item>{ string("a"), string("b"), string("c"), string("d"), string("e"), 
+		string("f"), string("g"), string("h") };
 	for (int i = 0; i < s1.size(); ++i)
 		s1[i][0] = i;
 
