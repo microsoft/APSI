@@ -12,7 +12,7 @@
 
 namespace apsi
 {
-    typedef __m128 block;
+    typedef __m128i block;
 
     typedef std::uint64_t u64;
 
@@ -37,18 +37,4 @@ namespace apsi
 
     extern apsi::tools::Stopwatch stop_watch;
 
-    class BadReceiveBufferSize : public std::exception
-    {
-    public:
-        const char* mWhat;
-        u64 mLength;
-        std::unique_ptr<char[]> mData;
-
-        BadReceiveBufferSize(const char* what, u64 length, std::unique_ptr<char[]>&& data)
-            :
-            mWhat(what),
-            mLength(length),
-            mData(std::move(data))
-        { }
-    };
 }

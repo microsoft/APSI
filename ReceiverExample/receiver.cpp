@@ -60,19 +60,19 @@ void perf()
     oc::PRNG prng(oc::ZeroBlock, 256);
     std::random_device rd;
 
-    int count = 1 << 26;
-    oc::Timer t;
-    for (int i = 0; i < count; ++i)
-    {
-        prng.get<int>();
-    }
-    t.setTimePoint("prng");
-    for (int i = 0; i < count; ++i)
-    {
-        rd();
-    }
-    t.setTimePoint("prng");
-    std::cout <<t << std::endl;
+	int count = 1 << 26;
+	oc::Timer t;
+	for (int i = 0; i < count; ++i)
+	{
+		prng.get<int>();
+	}
+	t.setTimePoint("prng");
+	for (int i = 0; i < count; ++i)
+	{
+		rd();
+	}
+	t.setTimePoint("prng");
+	std::cout << t << std::endl;
 }
 
 int main(int argc, char *argv[])
@@ -81,48 +81,56 @@ int main(int argc, char *argv[])
 
     CLP cmd(argc, argv);
 
-    
-    IOService ios;
+
+	IOService ios;
 
     Session clientSession(ios, "127.0.0.1:1212", oc::SessionMode::Client);
     Session serverSession(ios, "127.0.0.1:1212", oc::SessionMode::Server);
     Channel clientChl = clientSession.addChannel();
     Channel serverChl = serverSession.addChannel();
 
-    // Example: Basics
-    //example_basics();
 
-    //// Example: Update
-    //example_update();
+	auto none = true;
+	auto fastBatching = cmd.isSet("fast"); none &= !fastBatching;
+	auto slowBatching = cmd.isSet("slow"); none &= !slowBatching;
 
-    //// Example: Save and Load
-    //example_save_db();
-    //example_load_db();
+	// Example: Basics
+	//example_basics();
 
-    //// Example: Fast batching
-    //example_fast_batching(cmd, clientChl, serverChl);
+	//// Example: Update
+	//example_update();
 
-    //// Example: Slow batching
-    example_slow_batching(cmd, clientChl, serverChl);
+	//// Example: Save and Load
+	//example_save_db();
+	//example_load_db();
 
-    // Example: Slow batching vs. Fast batching
-    //example_slow_vs_fast();
 
-    // Example: Remote connection
-    //example_remote();
+	//// Example: Fast batching
+	if (none || fastBatching)
+		example_fast_batching(cmd, clientChl, serverChl);
 
-    // Example: Remote connection from multiple receivers
-    //example_remote_multiple();
+	// Example: Slow batching
+	if (slowBatching)
+		example_slow_batching(cmd, clientChl, serverChl);
+
+	// Example: Slow batching vs. Fast batching
+	//example_slow_vs_fast();
+
+	// Example: Remote connection
+	//example_remote();
+
+	// Example: Remote connection from multiple receivers
+	//example_remote_multiple();
 
 
 #ifdef _MSC_VER
-    // Wait for ENTER before closing screen.
-    cout << endl << "Press ENTER to exit" << endl;
-    char ignore;
-    cin.get(ignore);
+	// Wait for ENTER before closing screen.
+	cout << endl << "Press ENTER to exit" << endl;
+	char ignore;
+	cin.get(ignore);
 #endif
 
-    return 0;
+	return 0;
 }
 
 //void example_basics()
@@ -361,164 +369,161 @@ int main(int argc, char *argv[])
 
 void example_fast_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 {
-    print_example_banner("Example: Fast batching");
-    stop_watch.time_points.clear();
+	print_example_banner("Example: Fast batching");
+	stop_watch.time_points.clear();
 
-    /* Use generalized batching in integer mode. This requires using an ExField with f(x) = x and r = 1, which makes ExField becomes an integer field.
-    Then the generalized batching is essentially equivalent to SEAL's PolyCRTBuilder, which is slightly faster due to David Harvey's optimization of
-    NTT butterfly operation on integers.
-    
-    However, in this case, we can only use short PSI items such that the reduced item length is smaller than bit length of 'p' in ExField (also the 
-    plain modulus in SEAL). "Reduced item" refers to the permutation-based cuckoo hashing items.
-    */
+	/* Use generalized batching in integer mode. This requires using an ExField with f(x) = x and r = 1, which makes ExField becomes an integer field.
+	Then the generalized batching is essentially equivalent to SEAL's PolyCRTBuilder, which is slightly faster due to David Harvey's optimization of
+	NTT butterfly operation on integers.
 
-    //PSIParams params(4, 4, 1, 13, 112, 3, 8);
-    //params.set_item_bit_length(32); // The effective item bit length will be limited by ExField's p.
-    //params.set_exfield_polymod(string("1x^1")); // f(x) = x
-    //params.set_exfield_characteristic(0x820001); // p = 8519681. NOTE: p=1 (mod 2n)
-    //params.set_log_poly_degree(13); /* n = 2^13 = 8192, in SEAL's poly modulus "x^n + 1". */
-    //params.set_coeff_mod_bit_count(189);  // SEAL param: when n = 8192, q has 189 or 226 bits.
-    //params.set_decomposition_bit_count(48);
+	However, in this case, we can only use short PSI items such that the reduced item length is smaller than bit length of 'p' in ExField (also the
+	plain modulus in SEAL). "Reduced item" refers to the permutation-based cuckoo hashing items.
+	*/
 
-    cmd.setDefault("t", 8);
-    int numThreads = cmd.get<int>("t");
-    int log_table_size = 14;
-    int sender_set_size = 1 << 24;
-    int num_hash_func = 3;
-    int binning_sec_level = 40;
-    int num_splits = 256;
-    int bin_size = round_up_to(get_bin_size(1 << log_table_size, sender_set_size * num_hash_func, binning_sec_level), num_splits);
-    int window_size = 1;
-    auto oprf_type = OprfType::None;
+	//PSIParams params(4, 4, 1, 13, 112, 3, 8);
+	//params.set_item_bit_length(32); // The effective item bit length will be limited by ExField's p.
+	//params.set_exfield_polymod(string("1x^1")); // f(x) = x
+	//params.set_exfield_characteristic(0x820001); // p = 8519681. NOTE: p=1 (mod 2n)
+	//params.set_log_poly_degree(13); /* n = 2^13 = 8192, in SEAL's poly modulus "x^n + 1". */
+	//params.set_coeff_mod_bit_count(189);  // SEAL param: when n = 8192, q has 189 or 226 bits.
+	//params.set_decomposition_bit_count(48);
 
-    PSIParams params(numThreads, numThreads, 1, log_table_size, bin_size, window_size, num_splits, oprf_type);
-    params.set_item_bit_length(32); // The effective item bit length will be limited by ExField's p.
-    params.set_exfield_polymod(string("1x^1")); // f(x) = x
-    params.set_exfield_characteristic(0x820001); // p = 8519681. NOTE: p=1 (mod 2n)
-    params.set_log_poly_degree(14); /* n = 2^14 = 16384, in SEAL's poly modulus "x^n + 1". */
-    params.set_coeff_mod_bit_count(226);  // SEAL param: when n = 16384, q has 189 or 226 bits.
-    params.set_decomposition_bit_count(60);
+	cmd.setDefault("t", 8);
+	int numThreads = cmd.get<int>("t");
+	int bit_count = 20;
+	int log_table_size = 14;
+	int sender_set_size = 1 << 24;
+	int num_hash_func = 3;
+	int binning_sec_level = 40;
+	int num_splits = 256;
+	int bin_size = round_up_to(get_bin_size(1 << log_table_size, sender_set_size * num_hash_func, binning_sec_level), num_splits);
+	int window_size = 1;
+	auto oprf_type = OprfType::None;
+	auto cuckoo_mode = cuckoo::CuckooMode::Normal;
 
+	PSIParams params(numThreads, numThreads, 1, log_table_size, bin_size, window_size, num_splits, oprf_type);
+	params.set_item_bit_length(bit_count); // The effective item bit length will be limited by ExField's p.
+	params.set_exfield_polymod(string("1x^1")); // f(x) = x
+	params.set_exfield_characteristic(0x820001); // p = 8519681. NOTE: p=1 (mod 2n)
+	params.set_log_poly_degree(14); /* n = 2^14 = 16384, in SEAL's poly modulus "x^n + 1". */
+	params.set_coeff_mod_bit_count(226);  // SEAL param: when n = 16384, q has 189 or 226 bits.
+	params.set_decomposition_bit_count(60);
+	params.set_cuckoo_mode(cuckoo_mode);
 
-    params.validate();
-    
-    //PSIParams params(1, 1, 1, 13, 80, 1, 16);
-    //params.set_item_bit_length(32); // The effective item bit length will be limited by ExField's p.
-    //params.set_exfield_polymod(string("1x^1")); // f(x) = x
-    //params.set_exfield_characteristic(0x820001); // p = 8519681. NOTE: p=1 (mod 2n)
-    //params.set_log_poly_degree(13); /* n = 2^14 = 16384, in SEAL's poly modulus "x^n + 1". */
-    //params.set_coeff_mod_bit_count(189);  // SEAL param: when n = 16384, q has 189 or 226 bits.
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
+	params.validate();
 
-    cout << "Reduced item bit length: " << params.reduced_item_bit_length() << endl;
-    cout << "Bit length of p: " << get_significant_bit_count(params.exfield_characteristic()) << endl;
+	//PSIParams params(1, 1, 1, 13, 80, 1, 16);
+	//params.set_item_bit_length(32); // The effective item bit length will be limited by ExField's p.
+	//params.set_exfield_polymod(string("1x^1")); // f(x) = x
+	//params.set_exfield_characteristic(0x820001); // p = 8519681. NOTE: p=1 (mod 2n)
+	//params.set_log_poly_degree(13); /* n = 2^14 = 16384, in SEAL's poly modulus "x^n + 1". */
+	//params.set_coeff_mod_bit_count(189);  // SEAL param: when n = 16384, q has 189 or 226 bits.
+	//params.set_decomposition_bit_count(60);
+	//params.validate();
 
-    if (params.reduced_item_bit_length() >= get_significant_bit_count(params.exfield_characteristic()))
-    {
-        cout << "Reduced items too long. We will only use the first " << get_significant_bit_count(params.exfield_characteristic()) - 1 << " bits." << endl;
-    }
-    else
-    {
-        cout << "All bits of reduced items are used." << endl;
-    }
-
-    Receiver receiver(params, MemoryPoolHandle::New(true));
-    stop_watch.set_time_point("recv-cntr");
-    Sender sender(params, MemoryPoolHandle::New(true), cmd.isSet("dummy"));
-    stop_watch.set_time_point("send-cntr");
-
-     
-    sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
-    sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
-
-    auto actual_size = 1000;// sender_set_size;
-
-    auto s1 = vector<Item>(actual_size);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
-    for (int i = 0; i < s1.size(); ++i)
-        s1[i][0] = i;
-
-    auto intersectSize = 100;
-    auto c1 = randSubset(s1, intersectSize);
-    c1.reserve(c1.size() + 100);
-    for (u64 i = 0; i < 100; ++i)
-        c1.emplace_back(i + s1.size());
-
-    stop_watch.set_time_point("Application preparation");
-    sender.load_db(s1);
-    stop_watch.set_time_point("Sender pre-processing");
-
-    auto thrd = std::thread([&]() {sender.query_session(sendChl); });
-    vector<bool> intersection = receiver.query(c1, recvChl);
-    thrd.join();
+	//cout << "Reduced item bit length: " << params.reduced_item_bit_length() << endl;
+	//cout << "Bit length of p: " << get_significant_bit_count(params.exfield_characteristic()) << endl;
 
 
-    cout << "Intersection result: ";
-    bool correct = true;
-    for (int i = 0; i < intersection.size(); ++i)
-    {
-        if (intersection[i] != (i < intersectSize))
-        {
-            std::cout << i <<" ";
-            correct = false;
-        }
-    }
-    std::cout << (correct ? "correct" : "incorrect") << std::endl;
-    //cout << '[';
-    //for (int i = 0; i < intersection.size(); i++)
-    //    cout << intersection[i] << ", ";
-    //cout << ']' << endl;
+
+	Receiver receiver(params, MemoryPoolHandle::New(true));
+	stop_watch.set_time_point("recv-cntr");
+	Sender sender(params, MemoryPoolHandle::New(true), cmd.isSet("dummy"));
+	stop_watch.set_time_point("send-cntr");
 
 
-    /* Test different update performance. */
-    /*vector<int> updates{1, 10, 30, 50, 70, 100};
-    random_device rd;
-    for (int i = 0; i < updates.size(); i++)
-    {
-        vector<Item> items;
-        for (int j = 0; j < updates[i]; j++)
-            items.emplace_back(to_string(rd()));
-        sender.add_data(items);
-        sender.offline_compute();
+	sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
+	sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 
-        stop_watch.set_time_point(string("Add ") + to_string(updates[i]) + " records done");
-    }*/
+	auto actual_size = 4;// sender_set_size;
 
-    cout << stop_watch << endl;
+	auto s1 = vector<Item>(actual_size);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
+	for (int i = 0; i < s1.size(); ++i)
+		s1[i] = oc::mAesFixedKey.ecbEncBlock(oc::toBlock(i));
+
+	auto totalSize = 4;
+	auto intersectSize = 2;
+	auto rem = totalSize - intersectSize;
+	auto c1 = randSubset(s1, intersectSize);
+	c1.reserve(c1.size() + rem);
+	for (u64 i = 0; i < rem; ++i)
+		c1.emplace_back(oc::mAesFixedKey.ecbEncBlock(oc::toBlock(i + s1.size()) & toBlock(0, -1)));
+
+	stop_watch.set_time_point("Application preparation");
+	sender.load_db(s1);
+	stop_watch.set_time_point("Sender pre-processing");
+
+	auto thrd = std::thread([&]() {sender.query_session(sendChl); });
+	vector<bool> intersection = receiver.query(c1, recvChl);
+	thrd.join();
+
+
+	cout << "Intersection result: ";
+	bool correct = true;
+	for (int i = 0; i < intersection.size(); ++i)
+	{
+		if (intersection[i] != (i < intersectSize))
+		{
+			std::cout << i << " ";
+			correct = false;
+		}
+	}
+	std::cout << (correct ? "correct" : "incorrect") << std::endl;
+	//cout << '[';
+	//for (int i = 0; i < intersection.size(); i++)
+	//    cout << intersection[i] << ", ";
+	//cout << ']' << endl;
+
+
+	/* Test different update performance. */
+	/*vector<int> updates{1, 10, 30, 50, 70, 100};
+	random_device rd;
+	for (int i = 0; i < updates.size(); i++)
+	{
+		vector<Item> items;
+		for (int j = 0; j < updates[i]; j++)
+			items.emplace_back(to_string(rd()));
+		sender.add_data(items);
+		sender.offline_compute();
+
+		stop_watch.set_time_point(string("Add ") + to_string(updates[i]) + " records done");
+	}*/
+
+	cout << stop_watch << endl;
 }
 
 void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 {
-    print_example_banner("Example: Slow batching");
-    stop_watch.time_points.clear();
+	print_example_banner("Example: Slow batching");
+	stop_watch.time_points.clear();
 
-    /* Use generalized batching. */
+	/* Use generalized batching. */
 
-    //PSIParams params(1, 1, 1, 10, 448, 1, 32);
-    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    //params.set_exfield_polymod(string("1x^8 + 3"));
-    //params.set_exfield_characteristic(0xE801);
-    //params.set_log_poly_degree(13);
-    //params.set_coeff_mod_bit_count(189); 
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
-    //PSIParams params(1, 1, 1, 9, 896, 1, 64);
-    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    //params.set_exfield_polymod(string("1x^8 + 7"));
-    //params.set_exfield_characteristic(0x3401);
-    //params.set_log_poly_degree(12);
-    //params.set_coeff_mod_bit_count(189); 
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
+	//PSIParams params(1, 1, 1, 10, 448, 1, 32);
+	//params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+	//params.set_exfield_polymod(string("1x^8 + 3"));
+	//params.set_exfield_characteristic(0xE801);
+	//params.set_log_poly_degree(13);
+	//params.set_coeff_mod_bit_count(189); 
+	//params.set_decomposition_bit_count(60);
+	//params.validate();
+	//PSIParams params(1, 1, 1, 9, 896, 1, 64);
+	//params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+	//params.set_exfield_polymod(string("1x^8 + 7"));
+	//params.set_exfield_characteristic(0x3401);
+	//params.set_log_poly_degree(12);
+	//params.set_coeff_mod_bit_count(189); 
+	//params.set_decomposition_bit_count(60);
+	//params.validate();
 
-    //PSIParams params(1, 1, 1, 8, 1792, 1, 128);
-    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    //params.set_exfield_polymod(string("1x^8 + 7"));
-    //params.set_exfield_characteristic(0x3401);
-    //params.set_log_poly_degree(12);
-    //params.set_coeff_mod_bit_count(189); 
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
+	//PSIParams params(1, 1, 1, 8, 1792, 1, 128);
+	//params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+	//params.set_exfield_polymod(string("1x^8 + 7"));
+	//params.set_exfield_characteristic(0x3401);
+	//params.set_log_poly_degree(12);
+	//params.set_coeff_mod_bit_count(189); 
+	//params.set_decomposition_bit_count(60);
+	//params.validate();
 
     cmd.setDefault("t", 8);
     int numThreads = cmd.get<int>("t");
@@ -548,50 +553,38 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     params.set_decomposition_bit_count(60);
     params.validate();
 
-    //PSIParams params(1, 1, 1, 9, 7936, 1, 256);
-    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    //params.set_exfield_polymod(string("1x^8 + 7"));
-    //params.set_exfield_characteristic(0x3401);
-    //params.set_log_poly_degree(12);
-    //params.set_coeff_mod_bit_count(189);
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
+	//PSIParams params(1, 1, 1, 9, 7936, 1, 256);
+	//params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+	//params.set_exfield_polymod(string("1x^8 + 7"));
+	//params.set_exfield_characteristic(0x3401);
+	//params.set_log_poly_degree(12);
+	//params.set_coeff_mod_bit_count(189);
+	//params.set_decomposition_bit_count(60);
+	//params.validate();
 
-    //PSIParams params(8, 8, 1, 10, 52736, 2, 256);
-    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    //params.set_exfield_polymod(string("1x^8 + 3"));
-    //params.set_exfield_characteristic(0xE801);
-    //params.set_log_poly_degree(13);
-    //params.set_coeff_mod_bit_count(189);
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
+	//PSIParams params(8, 8, 1, 10, 52736, 2, 256);
+	//params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+	//params.set_exfield_polymod(string("1x^8 + 3"));
+	//params.set_exfield_characteristic(0xE801);
+	//params.set_log_poly_degree(13);
+	//params.set_coeff_mod_bit_count(189);
+	//params.set_decomposition_bit_count(60);
+	//params.validate();
 
-    //PSIParams params(2, 2, 1, 10, 13056, 2, 256);
-    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    //params.set_exfield_polymod(string("1x^8 + 3"));
-    //params.set_exfield_characteristic(0xE801);
-    //params.set_log_poly_degree(13);
-    //params.set_coeff_mod_bit_count(189);
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
+	//PSIParams params(2, 2, 1, 10, 13056, 2, 256);
+	//params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+	//params.set_exfield_polymod(string("1x^8 + 3"));
+	//params.set_exfield_characteristic(0xE801);
+	//params.set_log_poly_degree(13);
+	//params.set_coeff_mod_bit_count(189);
+	//params.set_decomposition_bit_count(60);
+	//params.validate();
 
-    cout << "Reduced item bit length: " << params.reduced_item_bit_length() << endl;
-    cout << "Bit length of p: " << get_significant_bit_count(params.exfield_characteristic()) << endl;
 
-    if (params.reduced_item_bit_length() >
-        (get_significant_bit_count(params.exfield_characteristic()) - 1) * (params.exfield_polymod().coeff_count() - 1))
-    {
-        cout << "Reduced items too long. We will only use the first " << (get_significant_bit_count(params.exfield_characteristic()) - 1) * (params.exfield_polymod().coeff_count() - 1) << " bits." << endl;
-    }
-    else
-    {
-        cout << "All bits of reduced items are used." << endl;
-    }
-
-    Receiver receiver(params, MemoryPoolHandle::New(true));
-    Sender sender(params, MemoryPoolHandle::New(true));
-    sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
-    sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
+	Receiver receiver(params, MemoryPoolHandle::New(true));
+	Sender sender(params, MemoryPoolHandle::New(true));
+	sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
+	sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 
     auto actual_size = 1000;// sender_set_size;
 
@@ -605,9 +598,9 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     for (u64 i = 0; i < 100; ++i)
         c1.emplace_back(i + s1.size());
 
-    stop_watch.set_time_point("Application preparation");
-    sender.load_db(s1);
-    stop_watch.set_time_point("Sender pre-processing");
+	stop_watch.set_time_point("Application preparation");
+	sender.load_db(s1);
+	stop_watch.set_time_point("Sender pre-processing");
 
     auto thrd = std::thread([&]() {sender.query_session(sendChl); });
     vector<bool> intersection = receiver.query(c1, recvChl);
@@ -631,7 +624,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     //    cout << intersection[i] << ", ";
     //cout << ']' << endl;
 
-    //cout << stop_watch << endl;
+	cout << stop_watch << endl;
 }
 //
 //void example_slow_vs_fast()
@@ -826,17 +819,17 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 
 void print_example_banner(string title)
 {
-    if (!title.empty())
-    {
-        size_t title_length = title.length();
-        size_t banner_length = title_length + 2 + 2 * 10;
-        string banner_top(banner_length, '*');
-        string banner_middle = string(10, '*') + " " + title + " " + string(10, '*');
+	if (!title.empty())
+	{
+		size_t title_length = title.length();
+		size_t banner_length = title_length + 2 + 2 * 10;
+		string banner_top(banner_length, '*');
+		string banner_middle = string(10, '*') + " " + title + " " + string(10, '*');
 
-        cout << endl
-            << banner_top << endl
-            << banner_middle << endl
-            << banner_top << endl
-            << endl;
-    }
+		cout << endl
+			<< banner_top << endl
+			<< banner_middle << endl
+			<< banner_top << endl
+			<< endl;
+	}
 }

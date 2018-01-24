@@ -106,8 +106,6 @@ namespace apsi
         if (sender_bin_size_ % number_of_splits_ != 0)
             throw invalid_argument("sender bin size must be a multiple of number of splits.");
 
-        Item::set_item_bit_length(item_bit_length_);
-        Item::set_reduced_bit_length(reduced_item_bit_length_);
 
         if ((item_bit_length_ + 63) / 64 != (item_bit_length_ + (int)floor(log2(hash_func_count_)) + 1 + 1 + 63) / 64)
             throw invalid_argument("invalid for cuckoo: null bit and location index overflow to new uint64_t.");

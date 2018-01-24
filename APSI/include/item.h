@@ -25,7 +25,7 @@ namespace apsi
         /**
         Constructs an item by hahsing the uint64_t array and using 'item_bit_length_' bits of the hash.
         */
-        Item(uint64_t *pointer, int uint64_count);
+        Item(uint64_t *pointer);
 
         /**
         Constructs an item by hashing the string and using 'item_bit_length_' bits of the hash.
@@ -36,42 +36,23 @@ namespace apsi
         Constructs a short item (without hashing) by using 'item_bit_length_' bits of the specified uint64_t value.
         */
         Item(uint64_t item);
+
+
+		Item(const cuckoo::block& item);
         
-        static void set_item_bit_length(size_t len)
-        {
-            if (len > 128)
-                throw std::invalid_argument("invalid bit length for items.");
-            item_bit_length_ = len;
-        }
 
-        static void set_reduced_bit_length(size_t len)
-        {
-            if (len > 128)
-                throw std::invalid_argument("invalid bit length for items.");
-            reduced_bit_length_ = len;
-        }
-
-        /**
-        Reduce (inplace) this item into an item that is stored in the permutation based hashing table.
-        */
-        void to_itemL(cuckoo::PermutationBasedCuckoo &cuckoo, int hash_func_index);
-
-        /**
-        Reduce this item into an item that is stored in the permutation based hashing table, and return the new item. This item is not changed.
-        */
-        Item itemL(cuckoo::PermutationBasedCuckoo &cuckoo, int hash_func_index) const;
 
         /**
         Convert this item into an exfield element. Assuming that this item has been reduced in a hash table,
         we will only use 'reduced_bit_length_' bits of this item.
         */
-        seal::util::ExFieldElement to_exfield_element(std::shared_ptr<seal::util::ExField> exfield);
+        seal::util::ExFieldElement to_exfield_element(std::shared_ptr<seal::util::ExField> exfield, int bit_length);
 
         /**
         Convert this item into the specified exfield element. Assuming that this item has been reduced in a hash table,
         we will only use 'reduced_bit_length_' bits of this item.
         */
-        void to_exfield_element(seal::util::ExFieldElement &ring_item);
+        void to_exfield_element(seal::util::ExFieldElement &ring_item, int bit_length);
 
         /**
         Return value of the i-th part of this item. We split the item into small parts,
@@ -88,12 +69,20 @@ namespace apsi
 
         Item& operator =(uint64_t assign);
 
-        Item& operator =(const Item &assign);
+		Item& operator =(const Item &assign);
+
+		Item& operator =(const cuckoo::block&assign);
 
         bool operator ==(const Item &other) const
         {
             return value_ == other.value_;
         }
+
+
+		operator cuckoo::block&() const
+		{
+			return *(cuckoo::block*)value_.data();
+		}
 
         uint64_t& operator[](size_t i)
         {
@@ -115,35 +104,11 @@ namespace apsi
             return value_.data();
         }
 
-        size_t uint64_count() const
-        {
-            return value_.size();
-        }
-
-        inline void fill(uint64_t value)
-        {
-            value_.fill(value);
-        }
-
-        size_t bit_count() const
-        {
-            return value_.size() * 64;
-        }
-
         void save(std::ostream &stream) const;
 
         void load(std::istream &stream);
 
     private:
         std::array<uint64_t, 2> value_;
-
-        static const apsi::tools::HashFunction hf_;
-
-        /* The bit length of an item, before being stored in a hash table. */
-        static size_t item_bit_length_;
-
-        /* This indicates the stored bit length in the hashing table (cuckoo or simple). 
-        For example, the itemL_bit_length_ in the PermutationBasedCuckoo. */
-        static size_t reduced_bit_length_;  
     };
 }

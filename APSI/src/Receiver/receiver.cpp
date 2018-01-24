@@ -38,7 +38,6 @@ namespace apsi
 
             SEALContext seal_context(enc_params);
             KeyGenerator generator(seal_context);
-            //generator.generate();
 
             public_key_ = generator.public_key();
             secret_key_ = generator.secret_key();
@@ -56,63 +55,17 @@ namespace apsi
             ex_field_->init_frob_table();
         }
 
-        //vector<bool> Receiver::query(const vector<Item> &items, apsi::sender::Sender &sender)
-        //{
-        //    clear_memory_backing();
-
-        //    unique_ptr<PermutationBasedCuckoo> cuckoo = cuckoo_hashing(items);
-
-        //    vector<int> indices = cuckoo_indices(items, *cuckoo);
-
-        //    vector<ExFieldElement> exfield_items = exfield_encoding(*cuckoo);
-
-        //    map<uint64_t, vector<ExFieldElement>> powers = generate_powers(exfield_items);
-
-        //    map<uint64_t, vector<Ciphertext>> ciphers = encrypt(powers);
-        //    stop_watch.set_time_point("Receiver encryption");
-
-        //    /* Send to sender. */
-        //    vector<vector<Ciphertext>> result_ciphers = sender.respond(ciphers);
-        //    stop_watch.set_time_point("Sender online");
-        //    vector<vector<ExFieldElement>> result = bulk_decrypt(result_ciphers);
-        //    stop_watch.set_time_point("Receiver decryption");
-
-        //    vector<bool> tmp(params_.table_size(), false);
-        //    ExFieldElement zero(ex_field_);
-        //    for (int i = 0; i < params_.table_size(); i++)
-        //    {
-        //        bool match_found = false;
-        //        for(int j = 0; j < params_.number_of_splits(); j++)
-        //        {
-        //            if (result[j][i] == zero)
-        //            {
-        //                match_found = true;
-        //                break;
-        //            }
-        //        }
-        //        if (match_found)
-        //            tmp[i] = true;
-        //    }
-
-        //    /* Now we need to shorten and convert this tmp vector to match the length and indice of the query "items". */
-        //    vector<bool> intersection(items.size(), false);
-        //    for (int i = 0; i < indices.size(); i++)
-        //        intersection[i] = tmp[indices[i]];
-
-        //    return intersection;
-        //}
-
         vector<bool> Receiver::query(vector<Item> &items, oc::Channel& chl)
         {
-            //clear_memory_backing();
 
-            auto query_data = preprocess(items, chl);
+            auto qq = preprocess(items, chl);
+            auto& ciphertexts = qq.first;
+            auto& cuckoo = *qq.second;
 
-            /* Create communication channel. */
-            //BoostEndpoint client(*ios_, ip, port, false, "APSI");
-            //Channel& client_channel = client.addChannel("-", "-");
 
-            send(query_data.first, chl);
+            send(ciphertexts, chl);
+            
+            auto table_to_input_map = cuckoo_indices(items, cuckoo);
             stop_watch.set_time_point("receiver pre-process/sent");
 
             /* Receive results in a streaming fashion. */
@@ -121,162 +74,79 @@ namespace apsi
             stream_decrypt(chl, result, backing);
             stop_watch.set_time_point("receiver decrypt");
 
-            vector<bool> tmp(params_.table_size(), false);
             ExFieldElement zero(ex_field_);
+            vector<bool> intersection(items.size(), false);
+
+
             for (int i = 0; i < params_.table_size(); i++)
             {
-                bool match_found = false;
                 for (int j = 0; j < params_.number_of_splits(); j++)
                 {
                     if (result[j][i] == zero)
                     {
-                        match_found = true;
+                        intersection[table_to_input_map[i]] = true;
                         break;
                     }
                 }
-                if (match_found)
-                    tmp[i] = true;
             }
 
             /* Now we need to shorten and convert this tmp vector to match the length and indice of the query "items". */
-            vector<bool> intersection(items.size(), false);
-            for (int i = 0; i < query_data.second.size(); i++)
-                intersection[i] = tmp[query_data.second[i]];
 
             stop_watch.set_time_point("receiver intersect");
             return intersection;
         }
 
-        //void Receiver::query(const std::vector<Item> &items, Channel& client_channel,
-        //    std::vector<std::vector<seal::Plaintext>> &intermediate_result, vector<int> &indices)
-        //{
-        //    clear_memory_backing();
-
-        //    auto query_data = preprocess(items);
-        //    indices = move(query_data.second);
-
-        //    /* Create communication channel. */
-        //    //BoostEndpoint client(*ios_, ip, port, false, "APSI");
-        //    //Channel& client_channel = client.addChannel("-", "-");
-
-        //    send(query_data.first, client_channel);
-
-        //    /* Receive results in a streaming fashion. */
-        //    stream_decrypt(client_channel, intermediate_result);
-
-        //    //client_channel.close();
-        //    //client.stop();
-        //}
-
-        //void Receiver::query(const std::vector<Item> &items, oc::Channel &channel,
-        //    std::vector<std::vector<seal::Plaintext>> &intermediate_result, vector<int> &indices)
-        //{
-        //    clear_memory_backing();
-
-        //    auto query_data = preprocess(items);
-        //    indices = move(query_data.second);
-
-        //    send(query_data.first, channel);
-
-        //    /* Receive results in a streaming fashion. */
-        //    stream_decrypt(channel, intermediate_result);
-        //}
-
-        //void Receiver::query(const std::map<uint64_t, std::vector<seal::Ciphertext>> &ciphers, oc::Channel &channel,
-        //    std::vector<std::vector<seal::Plaintext>> &intermediate_result)
-        //{
-        //    clear_memory_backing();
-
-        //    send(ciphers, channel);
-
-        //    /* Receive results in a streaming fashion. */
-        //    stream_decrypt(channel, intermediate_result);
-        //}
-
-        //std::vector<bool> Receiver::reveal_result(const std::vector<std::vector<seal::Plaintext>> &intermediate_result, const std::vector<int> &indices)
-        //{
-        //    /* Receive results in a streaming fashion. */
-        //    vector<vector<ExFieldElement>> result;
-        //    decompose(intermediate_result, result);
-
-        //    vector<bool> tmp(params_.table_size(), false);
-        //    ExFieldElement zero(ex_field_);
-        //    for (int i = 0; i < params_.table_size(); i++)
-        //    {
-        //        bool match_found = false;
-        //        for (int j = 0; j < params_.number_of_splits(); j++)
-        //        {
-        //            if (result[j][i] == zero)
-        //            {
-        //                match_found = true;
-        //                break;
-        //            }
-        //        }
-        //        if (match_found)
-        //            tmp[i] = true;
-        //    }
-
-        //    /* Now we need to shorten and convert this tmp vector to match the length and indice of the query "items". */
-        //    vector<bool> intersection(indices.size(), false);
-        //    for (int i = 0; i < indices.size(); i++)
-        //        intersection[i] = tmp[indices[i]];
-
-        //    return intersection;
-        //}
-
         std::pair<
             std::map<uint64_t, std::vector<seal::Ciphertext>>,
-            std::vector<int>
+            unique_ptr<CuckooInterface>
         > Receiver::preprocess(vector<Item> &items, Channel& channel)
         {
             using namespace oc;
             if (params_.use_pk_oprf())
             {
 
-                std::cout << "start " << std::endl;
+                //std::cout << "start " << std::endl;
                 PRNG prng(ZeroBlock);
                 EllipticCurve curve(p256k1, prng.get<oc::block>());
                 std::vector<EccNumber> b;
                 b.reserve(items.size());
                 EccPoint x(curve);
+                //std::vector<EccPoint> xx; xx.reserve(items.size());
 
                 auto step = curve.getGenerator().sizeBytes();
                 std::vector<u8> buff(items.size() * step);
                 auto iter = buff.data();
                 {
                     ostreamLock out(std::cout);
-                for (u64 i = 0; i < items.size(); ++i)
-                {
-                    b.emplace_back(curve, prng);
-                    PRNG pp((oc::block&)items[i], 8);
-                    x.randomize(pp);
+                    for (u64 i = 0; i < items.size(); ++i)
+                    {
+                        b.emplace_back(curve, prng);
+                        PRNG pp((oc::block&)items[i], 8);
 
-                    out << "i  " << i << " " << x << std::endl;
+                        x.randomize(pp);
+                        x *= b[i];
 
-
-                    x *= b[i];
-                    out << "    " << x << std::endl;
-
-                    x.toBytes(iter);
-                    iter += step;
-                }
+                        x.toBytes(iter);
+                        iter += step;
+                    }
                 }
 
+
+                // send the data over the network and prep for the response.
                 channel.asyncSend(std::move(buff));
                 auto f = channel.asyncRecv(buff);
+
+                // compute 1/b so that we can compute (x^ba)^(1/b) = x^a
                 for (u64 i = 0; i < items.size(); ++i)
                 {
                     b[i] = std::move(b[i].inverse());
                 }
                 f.get();
 
-                ostreamLock out(std::cout);
                 iter = buff.data();
                 for (u64 i = 0; i < items.size(); ++i)
                 {
                     x.fromBytes(iter);
-
-                    out << "im " << i << ":   " << x << " * " << b[i] << std::endl;
                     x *= b[i];
 
                     x.toBytes(iter);
@@ -288,9 +158,9 @@ namespace apsi
                 }
             }
 
-            unique_ptr<PermutationBasedCuckoo> cuckoo = cuckoo_hashing(items);
+            unique_ptr<CuckooInterface> cuckoo = cuckoo_hashing(items);
 
-            vector<int> indices = cuckoo_indices(items, *cuckoo);
+            //vector<int> indices = cuckoo_indices(items, *cuckoo);
 
             vector<ExFieldElement> exfield_items;
             Pointer data;
@@ -305,7 +175,7 @@ namespace apsi
 
             map<uint64_t, vector<Ciphertext>> ciphers = encrypt(powers);
 
-            return make_pair(std::move(ciphers), std::move(indices));
+            return { std::move(ciphers), std::move(cuckoo) };
         }
 
         void Receiver::send(const map<uint64_t, vector<Ciphertext>> &query, Channel &channel)
@@ -323,22 +193,48 @@ namespace apsi
             }
         }
 
-        unique_ptr<PermutationBasedCuckoo> Receiver::cuckoo_hashing(const vector<Item> &items)
+        unique_ptr<CuckooInterface> Receiver::cuckoo_hashing(const vector<Item> &items)
         {
-            unique_ptr<PermutationBasedCuckoo> cuckoo(
-                new PermutationBasedCuckoo(params_.hash_func_count(), params_.hash_func_seed(), params_.log_table_size(), params_.item_bit_length(), params_.max_probe()));
+            unique_ptr<CuckooInterface> cuckoo(
+                params_.get_cuckoo_mode() == CuckooMode::Permutation ?
+                static_cast<CuckooInterface*>(new PermutationBasedCuckoo(
+                    params_.hash_func_count(), 
+                    params_.hash_func_seed(), 
+                    params_.log_table_size(), 
+                    params_.item_bit_length(), 
+                    params_.max_probe()))
+                :
+                static_cast<CuckooInterface*>(new Cuckoo(
+                    params_.hash_func_count(),
+                    params_.hash_func_seed(),
+                    params_.log_table_size(),
+                    params_.item_bit_length(),
+                    params_.max_probe()))
+            );
+
+            if (cuckoo->encoding_bit_length() >= seal::util::get_significant_bit_count(params_.exfield_characteristic()))
+            {
+                cout << "Reduced items too long. Only have " << 
+                    seal::util::get_significant_bit_count(params_.exfield_characteristic()) - 1 << " bits." << endl;
+                throw std::runtime_error(LOCATION);
+            }
+            else
+            {
+                cout << "Using " << cuckoo->encoding_bit_length()
+                    << " out of " << seal::util::get_significant_bit_count(params_.exfield_characteristic()) - 1
+                    << " bits of exfield element." << std::endl;
+            }
             bool insertionSuccess;
             for (int i = 0; i < items.size(); i++)
             {
-                insertionSuccess = cuckoo->insert(items[i].data());
+                insertionSuccess = cuckoo->insert(items[i]);
                 if (!insertionSuccess)
                     throw logic_error("cuck hashing failed.");
             }
-            /* Lock to truncate the table items. */
-            cuckoo->lock_table_final();
 
             return cuckoo;
         }
+
 
         std::vector<int> Receiver::cuckoo_indices(const std::vector<Item> &items, cuckoo::PermutationBasedCuckoo &cuckoo)
         {

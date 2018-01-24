@@ -134,15 +134,17 @@ namespace apsi
 
 			PSIParams params_;
 
+			cuckoo::PermutationBasedCuckoo::Encoder encoder_;
+			int encoding_bit_length_;
+
 			/* Null value for sender: 00..0011..11. The number of 1 is itemL.
-			(Note: Null value for receiver is: 00..0010..00, with 1 on the itemL-th position.)
-			*/
-			Item sender_null_item_;
+            (Note: Null value for receiver is: 00..0010..00, with 1 on the itemL-th position.)
+            */
+            Item sender_null_item_;
 
 			/* The ExField encoding of the sender null value. */
 			seal::util::ExFieldElement null_element_, neg_null_element_;
 
-			cuckoo::PermutationBasedCuckoo cuckoo_;
 
 			std::shared_ptr<seal::util::ExField> global_ex_field_;
 
@@ -152,14 +154,14 @@ namespace apsi
 			i.e., one thread will take care of several continuous complete rows. */
 			oc::Matrix<Item> simple_hashing_db2_;
 
-#define ADD_DATA_MULTI_THREAD
-#ifdef ADD_DATA_MULTI_THREAD
 			std::unique_ptr<std::atomic_bool[]>  simple_hashing_db_has_item_;
-			//std::vector<int> bin_size_;
-#else
-			std::vector<bool> simple_hashing_db_has_item_;
-#endif
-			int aquire_bin_location(int cockooIndex, oc::PRNG& prng, bool par, const Item& i);
+
+			/* Thread safe function to insert an item into the bin 
+			 index by cockooIndex. The PRNG and be any PRNG.  */
+			int aquire_bin_location(int cockooIndex, oc::PRNG& prng);
+			
+			/* Returns true if the position'th slot within the bin at cockooIndex 
+			 currently has an item. */
 			bool has_item(int cockooIndex, int position);
 
 			/* m x B, where m is table size, B is sender's bin size. Keep in this view

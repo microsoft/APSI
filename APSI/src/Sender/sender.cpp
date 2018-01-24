@@ -186,7 +186,7 @@ namespace apsi
 
                     x *= key_;
 
-                    out << "x " << i << " " << x << std::endl;
+					//out << "x " << i << " " << x << std::endl;
 
                     x.toBytes(iter);
 
