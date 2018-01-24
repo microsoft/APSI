@@ -236,58 +236,43 @@ namespace apsi
         }
 
 
-        std::vector<int> Receiver::cuckoo_indices(const std::vector<Item> &items, cuckoo::PermutationBasedCuckoo &cuckoo)
+        std::vector<int> Receiver::cuckoo_indices(const std::vector<Item> &items, cuckoo::CuckooInterface &cuckoo)
         {
-            vector<int> indice(items.size(), -1);
+            vector<int> indice(cuckoo.capacity(), -1);
+            auto& encodings = cuckoo.get_encodings();
+            //cuckoo::PermutationBasedCuckoo::Encoder encoder(cuckoo.log_capacity(), cuckoo.loc_func_count(), params_.item_bit_length());
 
-            vector<uint64_t> locs;
-            int bin_bit_length = cuckoo.bin_bit_length(), bin_uint64_count = cuckoo.bin_u64_length(),
-                item_bit_length = cuckoo.item_bit_length(), log_capacity = cuckoo.log_capacity(),
-                shifted_bin_uint64_count = (bin_bit_length - log_capacity + 63) / 64;
-            unique_ptr<uint64_t> temp_item(new uint64_t[bin_uint64_count]);
-            uint64_t top_u64_mask = (static_cast<uint64_t>(1) << ((item_bit_length - log_capacity) % 64)) - 1;
+
             for (int i = 0; i < items.size(); i++)
             {
-                right_shift_uint(items[i].data(), temp_item.get(), log_capacity, bin_uint64_count); // Assuming item and bin have the same uint64_t count.
-                zero_uint(temp_item.get() + shifted_bin_uint64_count, bin_uint64_count - shifted_bin_uint64_count);
-                uint64_t *shifted_item_top_ptr = temp_item.get() + shifted_bin_uint64_count - 1;
-
-                cuckoo.get_locations(items[i].data(), locs);
-                for (int j = 0; j < locs.size(); j++)
-                {
-                    *shifted_item_top_ptr &= top_u64_mask;
-                    *shifted_item_top_ptr ^= (static_cast<uint64_t>(j) << ((item_bit_length - log_capacity) % 64));
-
-                    if (are_equal_uint(cuckoo.hash_table_item(locs[j]), temp_item.get(), bin_uint64_count))
-                        indice[i] = locs[j];
-                }
+                auto q = cuckoo.query_item(items[i]);
+                indice[q.table_index()] = i;
+                //auto rr = encoder.encode(items[i], q.hash_func_index(), true);
+                //if (neq(oc::block(rr), oc::block(encodings[indice[i]])))
+                //	throw std::runtime_error(LOCATION);
+                //ostreamLock(std::cout) << "Ritem[" << i << "] = " << items[i] << " -> " << q.hash_func_index() << " " << encodings[indice[i]]  << " @ " << indice[i] << std::endl;
             }
             return indice;
         }
 
         void Receiver::exfield_encoding(
-            const PermutationBasedCuckoo &cuckoo,
+            CuckooInterface &cuckoo,
             std::vector<seal::util::ExFieldElement>& ret,
             seal::util::Pointer& data)
         {
-            //memory_backing_.emplace_back(Pointer());
 
             ret = ex_field_->allocate_elements(cuckoo.capacity(), data);
-            int bin_u64_len = cuckoo.bin_u64_length();
-            Item item;
+            int encoding_bit_length = cuckoo.encoding_bit_length();
+            auto encoding_u64_len = roundUpTo(encoding_bit_length, 64) / 64;
+
+            auto& encodings = cuckoo.get_encodings();
+
             for (int i = 0; i < cuckoo.capacity(); i++)
             {
-                const uint64_t *cuckoo_item = cuckoo.hash_table_item(i);
-                item[0] = *cuckoo_item;
-                if (bin_u64_len > 1)
-                    item[1] = *(cuckoo_item + 1);
-                else
-                    item[1] = 0;
-
-                item.to_exfield_element(ret[i]);
+                Item(encodings[i]).to_exfield_element(ret[i], encoding_bit_length);
             }
-            //return exfield_items;
         }
+
 
         void Receiver::generate_powers(const vector<ExFieldElement> &exfield_items,
             std::map<uint64_t, std::vector<seal::util::ExFieldElement> >& result,
