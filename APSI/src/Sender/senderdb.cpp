@@ -7,6 +7,7 @@
 #include "cryptoTools/Crypto/Curve.h"
 #include "cryptoTools/Crypto/PRNG.h"
 #include "cryptoTools/Common/MatrixView.h"
+#include "cryptoTools/Common/Log.h"
 #include <thread>
 #include <cryptoTools/Crypto/sha1.h>
 #include <unordered_map>
@@ -23,26 +24,19 @@ namespace apsi
 			:
 			dummy_init_(dummy_init),
 			params_(params),
+			encoder_(params.log_table_size(), params.hash_func_count(), params.item_bit_length()),
 			global_ex_field_(ex_field),
-			cuckoo_(params.hash_func_count(), params.hash_func_seed(), params.log_table_size(), params.item_bit_length(), params.max_probe()),
 			simple_hashing_db2_(params.sender_bin_size(), params.table_size()),
-			//simple_hashing_db_empty_(params.sender_bin_size() * params.table_size(), true),
-			//shuffle_index2_(params.table_size(), params_.sender_bin_size()),
 			next_locs_(params.table_size(), 0),
-			//cuckoo_location_lock_(new std::atomic_bool[params_.table_size()]),
-			//symm_polys_stale_(params.number_of_splits(), vector<char>(params.number_of_batches(), true)),
 			batch_random_symm_polys_(params.number_of_splits() * params.number_of_batches() * (params.split_size() + 1))
 
 		{
-
-			//for (int i = 0; i < params_.table_size(); ++i)
-			//	cuckoo_location_lock_[i] = false;
 
 			int characteristic_bit_count = util::get_significant_bit_count(params_.exfield_characteristic());
 
 			if (dummy_init_)
 			{
-				std::cout << "WARNING: dummy init(...)" << std::endl;
+				std::cout << "--------------------- WARNING: dummy init(...) --------------------- " << std::endl;
 				for (auto& v : batch_random_symm_polys_)
 				{
 					v.resize(params_.coeff_modulus().size() * (params_.poly_degree() + 1));
@@ -61,49 +55,33 @@ namespace apsi
 			prng_.SetSeed(seed, 256);
 
 
-			/* Set null value for sender: 00..0011..11, with itemL's 1 */
-			sender_null_item_.fill(~static_cast<uint64_t>(0));
-			right_shift_uint(sender_null_item_.data(), sender_null_item_.data(),
-				(sender_null_item_.bit_count() - cuckoo_.itemL_bit_length()), sender_null_item_.uint64_count());
+			/* Set null value for sender: 00..001 */
+			sender_null_item_[0] = ~1;
+			sender_null_item_[1] = ~0;
 
-			null_element_ = sender_null_item_.to_exfield_element(global_ex_field_);
+			encoding_bit_length_ = params.get_cuckoo_mode() == cuckoo::CuckooMode::Normal
+				? params.item_bit_length()
+				: encoder_.encoding_bit_length_;
+
+			null_element_ = sender_null_item_.to_exfield_element(global_ex_field_, encoding_bit_length_);
 
 			// hack to get an allocation
 			neg_null_element_ = global_ex_field_->random_element();
 			global_ex_field_->negate(null_element_, neg_null_element_);
 
-			sender_null_item_.fill(~static_cast<uint64_t>(0));
-			/* Set nature index */
-			//for (int j = 0; j < params_.sender_bin_size(); j++)
-			//	shuffle_index2_(0, j) = j;
-
-			//for (int i = 1; i < params_.table_size(); i++)
-			//	memcpy(&shuffle_index2_(i, 0), &shuffle_index2_(0, 0), shuffle_index2_.stride());
-
-
 		}
 
 		void SenderDB::clear_db()
 		{
-
 			auto src = simple_hashing_db2_.data();
-			//memset(src, -1, simple_hashing_db2_.size() * sizeof(Item));
 
 			auto ss = params_.sender_bin_size() * params_.table_size();
-#ifdef ADD_DATA_MULTI_THREAD
 			simple_hashing_db_has_item_.reset(new std::atomic_bool[ss]());
-			//simple_hashing_db_has_item_2.resize(ss, false);
-			//bin_size_.resize(params_.table_size(),0);
-#else
-			simple_hashing_db_has_item_.resize(ss, false);
-#endif
 
 			// make sure the its zero init.
 			for (int i = 0; i < ss; ++i)
 				if (simple_hashing_db_has_item_[i])
 					throw std::runtime_error(LOCATION);
-
-			//std::fill(simple_hashing_db_empty_.begin(), simple_hashing_db_empty_.end(), true);
 		}
 
 		void SenderDB::set_data(const vector<Item> &data)
@@ -115,186 +93,131 @@ namespace apsi
 
 		void SenderDB::add_data(const vector<Item> &data)
 		{
-//#define ADD_DATA_MULTI_THREAD
+			//#define ADD_DATA_MULTI_THREAD
 			auto bin_size = params_.sender_bin_size();
 
 			using namespace oc;
 
-#ifdef  ADD_DATA_MULTI_THREAD 
+			//#ifdef  ADD_DATA_MULTI_THREAD 
 			std::vector<std::thread> thrds(params_.sender_total_thread_count());
 			for (int t = 0; t < thrds.size(); ++t)
 			{
 				auto seed = prng_.get<oc::block>();
-				thrds[t] = std::thread(
-					[&, t, seed](){
+				thrds[t] = std::thread([&, t, seed]() 
+				{
 					oc::PRNG prng(seed, 256);
 					auto start = t * data.size() / thrds.size();
-					auto end = (t+1) * data.size() / thrds.size();
-#else
-					auto start = 0;
-					auto end = data.size();
-					auto& prng = prng_;
-					std::unordered_map<u64, u64> map, map2;
-					map.reserve(data.size());
-					map2.reserve(data.size());
-#endif
+					auto end = (t + 1) * data.size() / thrds.size();
+					//#else
+					//					auto start = 0;
+					//					auto end = data.size();
+					//					auto& prng = prng_;
+					//#endif
+
 					EllipticCurve curve(p256k1, prng.get<oc::block>());
 					std::vector<u8> buff(curve.getGenerator().sizeBytes());
 					PRNG pp(oc::CCBlock);
 					oc::EccNumber key_(curve, pp);
 
-
-					std::vector<uint64_t> hash_locations;
+					//std::vector<uint64_t> hash_locations(params_.hash_func_count());
+					std::vector<cuckoo::LocFunc> normal_loc_func(params_.hash_func_count());
+					std::vector<cuckoo::PermutationBasedLocFunc> perm_loc_func(params_.hash_func_count());
+					
+					for (int i = 0; i < normal_loc_func.size(); ++i)
+					{
+						normal_loc_func[i] = cuckoo::LocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
+						perm_loc_func[i] = cuckoo::PermutationBasedLocFunc(params_.log_table_size(), params_.hash_func_seed() +i);
+					}
 
 					for (int i = start; i < end; i++)
 					{
-
-						//SHA1 ss;
-						//ss.Update((oc::block&)data[i]);
-						//oc::block bb;
-						//ss.Final(bb);
-						//auto dd = *(u64*)&bb;
-
-						//auto iter = map.find(dd);
-						//if (iter != map.end())
-						//{
-						//	std::cout<< " *** " << i << std::endl;
-						//	//throw std::runtime_error(LOCATION);
-						//}
-						//map.insert({ dd, i });
-
 						if (params_.use_pk_oprf())
 						{
 							static_assert(sizeof(oc::block) == sizeof(Item), "");
 							oc::PRNG p((oc::block&)data[i], 8);
-							//std::cout << p.get<oc::block>() << std::endl;
 							oc::EccPoint a(curve, p);
-							//std::cout<< "a1 " << a << std::endl;
 
 							a *= key_;
 							a.toBytes(buff.data());
 
-							//std::cout << "a2 " <<a << " "<<p.mAes.getKey()  <<" _ "<< *(u64*)buff.data() << std::endl;
-
 							oc::SHA1 sha(sizeof(block));
 							sha.Update(buff.data(), buff.size());
 							sha.Final((oc::block&)data[i]);
-
-
-							//auto iter2 = map2.find(data[i][0]);
-							//if (iter2 != map2.end())
-							//{
-							//	std::cout << " ++++ " << i << std::endl;
-
-							//}
-							//map2.insert({ data[i][0], i });
 						}
 
-						cuckoo_.get_locations(data[i].data(), hash_locations);
-						for (int j = 0; j < hash_locations.size(); j++)
+
+						// claim a location in this bin that is empty
+						for (int j = 0; j < params_.hash_func_count(); j++)
 						{
-							auto cuckoo_loc = hash_locations[j];
-							// claim a location in this bin that is empty
 
-							//oc::block b = prng.get<oc::block>();
-							//PRNG p0(b);
-							//PRNG p0(b, 8);
+							if (params_.get_cuckoo_mode() == cuckoo::CuckooMode::Normal)
+							{
+								auto cuckoo_loc = normal_loc_func[j].location(data[i]);
+								auto position = aquire_bin_location(cuckoo_loc, prng);
+								simple_hashing_db2_(position, cuckoo_loc) = data[i];
+							}
+							else
+							{
+								auto cuckoo_loc = perm_loc_func[j].location(data[i]);
+								auto position = aquire_bin_location(cuckoo_loc, prng);
+								simple_hashing_db2_(position, cuckoo_loc) = encoder_.encode(data[i], j, true);
 
-							auto position = aquire_bin_location(cuckoo_loc, prng, false, data[i]);
-							//auto position2 = aquire_bin_location(cuckoo_loc, p1, true, data[i]);
+								ostreamLock(std::cout) << "Sitem[" << i << "] = " << data[i] << " -> "<<j<<" " << simple_hashing_db2_(position, cuckoo_loc) << " @ " << cuckoo_loc << std::endl;
 
-							//if (position != position2)
-							//{ 
-							//	std::cout << i << " " << j << std::endl;
-							//	std::cout << position << " " << position2 << std::endl;
 
-							//	throw std::runtime_error(LOCATION);
-							//}
-							simple_hashing_db2_(position, cuckoo_loc) = data[i];
-							simple_hashing_db2_(position, cuckoo_loc).to_itemL(cuckoo_, j);
+							}
 						}
-					}
-#ifdef ADD_DATA_MULTI_THREAD
+
+					};
+					//#ifdef ADD_DATA_MULTI_THREAD
 				});
 			}
 
 			for (auto& t : thrds) t.join();
-#endif
+			//#endif
 		}
 
-		int SenderDB::aquire_bin_location(int cuckoo_loc, oc::PRNG & prng, bool par, const Item& i)
+
+		int SenderDB::aquire_bin_location(int cuckoo_loc, oc::PRNG & prng)
 		{
 			auto s = params_.sender_bin_size();
-			auto start = cuckoo_loc   * s;
-			auto end = (cuckoo_loc+1) * s;
+			auto start = cuckoo_loc * s;
+			auto end = (cuckoo_loc + 1) * s;
 			if (cuckoo_loc >= params_.table_size())
 				throw std::runtime_error(LOCATION);
 
 
+			// for 100 tries, guess a bin location can try to insert it there
+			// if nothing is currently there...
 			for (int i = 0; i < 100; ++i)
 			{
 				auto idx = prng.get<oc::u32>() % s;
 
-				//std::cout << idx;
-				//if (par)
-				//{
-					bool exp = false;
-					if (simple_hashing_db_has_item_[start + idx].compare_exchange_strong(exp, true))
-					{
-						//std::cout << " *" << std::endl << std::endl;
-						return idx;
-					}
-				//}
-				//else
-				//{
-				//	if (simple_hashing_db_has_item_2[start + idx] == false)
-				//	{
-				//		simple_hashing_db_has_item_2[start + idx] = true;
-				//		++bin_size_[cuckoo_loc];
-				//		//std::cout << " *" << std::endl << std::endl;
-				//		return idx;
-				//	}
-				//}
-				//std::cout << std::endl;
-
+				bool exp = false;
+				if (simple_hashing_db_has_item_[start + idx].compare_exchange_strong(exp, true))
+				{
+					// great, found an empty location and have marked it as mine.
+					return idx;
+				}
 			}
-			//std::cout << "------------------------- "<< cuckoo_loc  << " " << (oc::block&)i << std::endl;
-
 
 			// do linear scan
-			for (int idx = 0; idx< s; ++idx)
+			for (int idx = 0; idx < s; ++idx)
 			{
-				//if (par)
-				//{
-					bool exp = false;
-					if (simple_hashing_db_has_item_[start + idx].compare_exchange_strong(exp, true))
-						return idx;
-				//}
-				//else
-				//{
-				//	if (simple_hashing_db_has_item_2[start + idx] == false)
-				//	{
-				//		simple_hashing_db_has_item_2[start + idx] = true;
-				//		++bin_size_[cuckoo_loc];
-				//		return idx;
-				//	}
-				//}
+				bool exp = false;
+				if (simple_hashing_db_has_item_[start + idx].compare_exchange_strong(exp, true))
+					return idx;
 			}
 
-
-			//std::cout << bin_size_[cuckoo_loc] << " vs " << params_.sender_bin_size() << std::endl;;
+			// we failed, throw an error because this bin overflowed..
 			throw std::runtime_error("sender's bin is full. " LOCATION);
 		}
 
 		bool SenderDB::has_item(int cuckoo_loc, int position)
 		{
 			auto s = params_.sender_bin_size();
-			auto start = cuckoo_loc   * s;
-#ifdef ADD_DATA_MULTI_THREAD
-			return simple_hashing_db_has_item_[start + position].load(std::memory_order_relaxed);
-#else
+			auto start = cuckoo_loc * s;
 			return simple_hashing_db_has_item_[start + position];
-#endif
 		}
 
 
@@ -306,27 +229,6 @@ namespace apsi
 		void SenderDB::delete_data(const std::vector<Item> &data)
 		{
 			throw std::runtime_error("Update function");
-
-			//vector<uint64_t> hash_locations;
-			//for (int i = 0; i < data.size(); i++)
-			//{
-			//	cuckoo_.get_locations(data[i].data(), hash_locations);
-			//	for (int j = 0; j < hash_locations.size(); j++)
-			//	{
-			//		Item target_itemL = data[i].itemL(cuckoo_, j);
-			//		for (int k = 0; k < next_shuffle_locs_[hash_locations[j]]; k++)
-			//		{
-			//			int index = shuffle_index_[hash_locations[j]][k];
-			//			if (simple_hashing_db2_(index, hash_locations[j]) == target_itemL) /* Item is found. Delete it. */
-			//			{
-			//				simple_hashing_db2_(index, hash_locations[j]) = sender_null_item_;
-
-			//				/* Set the block that contains this item to be stale. */
-			//				//symm_polys_stale_[index / params_.split_size()][hash_locations[j] / params_.batch_size()] = true;
-			//			}
-			//		}
-			//	}
-			//}
 		}
 
 		void SenderDB::delete_data(const Item &item)
@@ -334,36 +236,7 @@ namespace apsi
 			delete_data(vector<Item>(1, item));
 		}
 
-//		void SenderDB::shuffle()
-//		{
-//			std::random_device dev;
-//			std::array<int, 4> ss{ dev(), dev(), dev(), dev() };
-//			oc::PRNG prng(*(oc::block*)ss.data());
-//
-//			std::vector<std::thread> thrds(params_.sender_total_thread_count());
-//			for (int t = 0; t < thrds.size(); ++t)
-//			{
-//				auto seed = prng.get<oc::block>();
-//				thrds[t] = std::thread([&, t, seed]()
-//				{
-//					auto start = t * params_.table_size() / thrds.size();
-//					auto end = (t + 1) * params_.table_size() / thrds.size();
-//#ifdef APSI_SECURE_SHUFFLE
-//					oc::PRNG prng(seed, 256);
-//					for (int i = start; i < end; i++)
-//						std::shuffle(shuffle_index_[i].begin(), shuffle_index_[i].end(), prng);
-//#else
-//					for (int i = start; i < end; i++)
-//						std::random_shuffle(shuffle_index_[i].begin(), shuffle_index_[i].end());
-//#endif
-//				});
-//			}
-//
-//			for (auto& thrd : thrds)
-//				thrd.join();
-//
-//			next_shuffle_locs_.assign(params_.table_size(), 0);
-//		}
+
 
 		void SenderDB::symmetric_polys(int split, int batch, SenderThreadContext &context, oc::MatrixView<seal::util::ExFieldElement>symm_block)
 		{
@@ -393,24 +266,24 @@ namespace apsi
 					}
 					else
 					{
-						simple_hashing_db2_(position , cuckoo_loc).to_exfield_element(temp11);
+						simple_hashing_db2_(position, cuckoo_loc).to_exfield_element(temp11, encoding_bit_length_);
 						temp1 = &temp11;
 						exfield->negate(*temp1, *temp1);
 					}
-					
-						exfield->multiply(
-							symm_block(i, j + 1),
-							*temp1,
-							symm_block(i, j));
 
-						for (int k = j + 1; k < split_size; k++)
-						{
-							exfield->multiply(
-								symm_block(i, k + 1),
-								*temp1,
-								temp2);
-							symm_block(i, k) += temp2;
-						}
+					exfield->multiply(
+						symm_block(i, j + 1),
+						*temp1,
+						symm_block(i, j));
+
+					for (int k = j + 1; k < split_size; k++)
+					{
+						exfield->multiply(
+							symm_block(i, k + 1),
+							*temp1,
+							temp2);
+						symm_block(i, k) += temp2;
+					}
 				}
 			}
 		}
@@ -451,88 +324,51 @@ namespace apsi
 				batch_size = params_.batch_size(),
 				split_size_plus_one = params_.split_size() + 1;
 
-			auto indexer = [
-				splitStep = params_.number_of_batches() * split_size_plus_one,
-					batchStep = split_size_plus_one](int splitIdx, int batchIdx, int i)
-				{
-					return splitIdx * splitStep + batchIdx * batchStep + i;
-				};
+			auto indexer = [splitStep = params_.number_of_batches() * split_size_plus_one,
+				batchStep = split_size_plus_one](int splitIdx, int batchIdx, int i)
+			{
+				return splitIdx * splitStep + batchIdx * batchStep + i;
+			};
 
-				int total_blocks = params_.number_of_splits() * params_.number_of_batches();
-				int start_block = context.id() * total_blocks / params_.sender_total_thread_count();
-				int end_block = (context.id() + 1) * total_blocks / params_.sender_total_thread_count();
+			int total_blocks = params_.number_of_splits() * params_.number_of_batches();
+			int start_block = context.id() * total_blocks / params_.sender_total_thread_count();
+			int end_block = (context.id() + 1) * total_blocks / params_.sender_total_thread_count();
 
-				for (int next_block = start_block; next_block < end_block; next_block++)
-				{
-					int split = next_block / params_.number_of_batches(), batch = next_block % params_.number_of_batches();
-
-					//if (!symm_polys_stale_[split][batch])
-					//	continue;
-
-					int split_start = split * split_size,
-						batch_start = batch * batch_size,
-						batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
-
-					randomized_symmetric_polys(split, batch, context, symm_block);
-
-					Plaintext temp_plain;
-					auto idx = indexer(split, batch, 0);
-					for (int i = 0; i < split_size + 1; i++, idx++)
-					{
-						if (context.builder())
-						{
-							for (int k = 0; batch_start + k < batch_end; k++)
-								integer_batch_vector[k] = *symm_block(k, i).pointer(0);
-							context.builder()->compose(integer_batch_vector, temp_plain);
-						}
-						else // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
-						{
-							for (int k = 0; batch_start + k < batch_end; k++)
-								batch_vector[k] = symm_block(k, i);
-							context.exbuilder()->compose(batch_vector, temp_plain);
-						}
-
-
-						context.evaluator()->transform_to_ntt(temp_plain, batch_random_symm_polys_[idx]);
-						//temp_plain.resize()
-					}
-
-					//symm_polys_stale_[split][batch] = false;
-				}
+			for (int next_block = start_block; next_block < end_block; next_block++)
+			{
+				int split = next_block / params_.number_of_batches(), batch = next_block % params_.number_of_batches();
 
 				//if (!symm_polys_stale_[split][batch])
-				//    return batch_random_symm_polys_[split][batch];
+				//	continue;
 
-				//int table_size = params_.table_size(), split_size = params_.split_size(), split_start = split * split_size, batch_size = params_.batch_size(),
-				//    batch_start = batch * batch_size, batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
+				int split_start = split * split_size,
+					batch_start = batch * batch_size,
+					batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
 
-				//randomized_symmetric_polys(split, batch, context, symm_block);
+				randomized_symmetric_polys(split, batch, context, symm_block);
 
-				//Pointer batch_backing;
-				//vector<ExFieldElement> batch_vector = context.exfield()->allocate_elements(batch_size, batch_backing);
-				//vector<uint64_t> integer_batch_vector(batch_size, 0);
+				Plaintext temp_plain;
+				auto idx = indexer(split, batch, 0);
+				for (int i = 0; i < split_size + 1; i++, idx++)
+				{
+					if (context.builder())
+					{
+						for (int k = 0; batch_start + k < batch_end; k++)
+							integer_batch_vector[k] = *symm_block(k, i).pointer(0);
+						context.builder()->compose(integer_batch_vector, temp_plain);
+					}
+					else // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
+					{
+						for (int k = 0; batch_start + k < batch_end; k++)
+							batch_vector[k] = symm_block(k, i);
+						context.exbuilder()->compose(batch_vector, temp_plain);
+					}
 
-				//for (int i = 0; i < split_size + 1; i++)
-				//{
-				//    Plaintext temp_plain;
-				//    if (context.builder())
-				//    {
-				//        for (int k = 0; batch_start + k < batch_end; k++)
-				//            integer_batch_vector[k] = *symm_block[k][i].pointer(0);
-				//        temp_plain = context.builder()->compose(integer_batch_vector);
-				//    }
-				//    else // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
-				//    {
-				//        for (int k = 0; batch_start + k < batch_end; k++)
-				//            batch_vector[k] = symm_block[k][i];
-				//        temp_plain = context.exbuilder()->compose(batch_vector);
-				//    }
 
-				//    context.evaluator()->transform_to_ntt(temp_plain);
-				//    batch_random_symm_polys_[split][batch][i] = temp_plain;
-				//}
+					context.evaluator()->transform_to_ntt(temp_plain, batch_random_symm_polys_[idx]);
+				}
 
-				//symm_polys_stale_[split][batch] = false;
+			}
 		}
 
 		void SenderDB::save(std::ostream &stream) const

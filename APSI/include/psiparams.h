@@ -10,6 +10,7 @@
 #include "apsidefines.h"
 #include <boost/math/special_functions/binomial.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
+#include "cuckoo.h"
 
 namespace apsi
 {
@@ -142,7 +143,7 @@ namespace apsi
 			oprf_type_(oprfType),
 			decomposition_bit_count_(decomposition_bit_count),
 			hash_func_count_(hash_func_count), hash_func_seed_(hash_func_seed), max_probe_(max_probe),
-			item_bit_length_(item_bit_length), reduced_item_bit_length_(item_bit_length - log_table_size + floor(log2(hash_func_count)) + 1 + 1),
+			item_bit_length_(item_bit_length), 
 			exfield_characteristic_(exfield_characteristic), exfield_polymod_(exfield_polymod),
 			log_poly_degree_(log_poly_degree), poly_degree_(1 << log_poly_degree),
 			coeff_mod_bit_count_(coeff_mod_bit_count),
@@ -168,7 +169,7 @@ namespace apsi
 		{
 			log_table_size_ = log_table_size;
 			table_size_ = 1 << log_table_size_;
-			reduced_item_bit_length_ = item_bit_length_ - log_table_size_ + floor(log2(hash_func_count_)) + 1 + 1;
+			//reduced_item_bit_length_ = item_bit_length_ - log_table_size_ + floor(log2(hash_func_count_)) + 1 + 1;
 		}
 
 		inline int table_size() const
@@ -184,7 +185,7 @@ namespace apsi
 		void set_hash_func_count(int hash_func_count)
 		{
 			hash_func_count_ = hash_func_count;
-			reduced_item_bit_length_ = item_bit_length_ - log_table_size_ + floor(log2(hash_func_count_)) + 1 + 1;
+			//reduced_item_bit_length_ = item_bit_length_ - log_table_size_ + floor(log2(hash_func_count_)) + 1 + 1;
 		}
 
 		inline int hash_func_seed() const
@@ -215,13 +216,13 @@ namespace apsi
 		inline void set_item_bit_length(int item_bit_length)
 		{
 			item_bit_length_ = item_bit_length;
-			reduced_item_bit_length_ = item_bit_length_ - log_table_size_ + floor(log2(hash_func_count_)) + 1 + 1;
+			//reduced_item_bit_length_ = item_bit_length_ - log_table_size_ + floor(log2(hash_func_count_)) + 1 + 1;
 		}
 
-		inline int reduced_item_bit_length()
-		{
-			return reduced_item_bit_length_;
-		}
+		//inline int reduced_item_bit_length()
+		//{
+		//	return reduced_item_bit_length_;
+		//}
 
 		inline uint64_t exfield_characteristic() const
 		{
@@ -375,7 +376,9 @@ namespace apsi
 			apsi_endpoint_ = endpoint;
 		}
 
+		cuckoo::CuckooMode get_cuckoo_mode() const { return cuckoo_mode_; }
 
+		void set_cuckoo_mode(cuckoo::CuckooMode mode) { cuckoo_mode_ = mode; }
 
 	private:
 
@@ -397,6 +400,7 @@ namespace apsi
 
 		OprfType oprf_type_;
 
+		cuckoo::CuckooMode cuckoo_mode_;
 
 		int decomposition_bit_count_;
 
@@ -411,7 +415,7 @@ namespace apsi
 		/* Should not exceed 128. Moreover, should reserve several bits because of the requirement of current Cuckoo hashing impl. */
 		int item_bit_length_;
 
-		int reduced_item_bit_length_;
+		//int reduced_item_bit_length_;
 
 		int sender_total_thread_count_;
 
