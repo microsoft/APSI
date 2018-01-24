@@ -48,9 +48,7 @@ namespace apsi
 
     Item& Item::operator =(uint64_t assign)
     {
-        if (item_bit_length_ > 64)
-            throw logic_error("Cannot use this constructor for item_bit_length_ bigger than 64.");
-        value_[0] = assign & (static_cast<uint64_t>(1) << item_bit_length_) - 1;
+        value_[0] = assign;
         value_[1] = 0;
 
         return *this;

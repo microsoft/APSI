@@ -71,9 +71,11 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetExt>.lib</TargetExt>
+    <OutDir>$(SolutionDir)/bin/$(Platform)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TargetExt>.lib</TargetExt>
+    <OutDir>$(SolutionDir)/bin/$(Platform)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -87,13 +89,13 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>include;C:\libs\boost;..\..\Cuckoo\Cuckoo\include;..\..\SEAL-dev\SEAL\;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;C:\libs\boost;..\..\Cuckoo\Cuckoo\include;..\..\SEAL-dev\SEAL\;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;$(ProjectDir)../../cryptoTools/thirdparty/win/miracl;$(ProjectDir)../../cryptoTools/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Lib>
       <AdditionalDependencies>SEAL.lib;miracl.lib;cryptoTools.lib;cuckoo.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>$(ProjectDir)../bin\x64\$(Configuration)\;C:\libs\boost/stage/lib/$(Platform);C:\libs\miracl\x64\$(Configuration)_dllrt/;$(ProjectDir)../../../libOTe/x64/$(Configuration)_dllrt/;$(SolutionDir)$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)../bin\x64\$(Configuration)\;C:\libs\boost/stage/lib/$(Platform);C:\libs\miracl\x64\$(Configuration)_dllrt/;$(ProjectDir)../../../libOTe/x64/$(Configuration)_dllrt/;$(ProjectDir)../../cryptoTools/x64/$(Configuration)_dllrt/;$(ProjectDir)../../cryptoTools/thirdparty/win\miracl\x64\$(Configuration)_dllrt/;$(SolutionDir)$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -116,7 +118,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>include;C:\libs\boost;..\..\Cuckoo\Cuckoo\include;..\..\SEAL-dev\SEAL\;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;C:\libs\boost;..\..\Cuckoo\Cuckoo\include;..\..\SEAL-dev\SEAL\;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;$(ProjectDir)../../cryptoTools/thirdparty/win/miracl;$(ProjectDir)../../cryptoTools/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -126,7 +128,7 @@
       <AdditionalDependencies>SEAL.lib;miracl.lib;cryptoTools.lib;cuckoo.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>$(ProjectDir)../bin\x64\$(Configuration)\;C:\libs\boost/stage/lib/$(Platform);C:\libs\miracl\x64\$(Configuration)_dllrt/;$(ProjectDir)../../../libOTe/x64/$(Configuration)_dllrt/;$(SolutionDir)$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)../bin\x64\$(Configuration)\;C:\libs\boost/stage/lib/$(Platform);C:\libs\miracl\x64\$(Configuration)_dllrt/;$(ProjectDir)../../../libOTe/x64/$(Configuration)_dllrt/;$(ProjectDir)../../cryptoTools/x64/$(Configuration)_dllrt/;$(ProjectDir)../../cryptoTools/thirdparty/win\miracl\x64\$(Configuration)_dllrt/;$(SolutionDir)$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>

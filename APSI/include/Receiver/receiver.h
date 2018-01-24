@@ -37,7 +37,7 @@ namespace apsi
             is a same-size vector of bool values. If an item is in the intersection, the corresponding bool value is true on the
             same position in the result vector .
             */
-			std::vector<bool> query(std::vector<Item> &items, oc::Channel& chl);
+            std::vector<bool> query(std::vector<Item> &items, oc::Channel& chl);
 
             /**
             Sends a query to the remote sender, and get the intermediate plaintext result without decomposing.
@@ -80,9 +80,9 @@ namespace apsi
             Encodes items in the cuckoo hashing table into ExField elements.
             */
             void exfield_encoding(
-				const cuckoo::PermutationBasedCuckoo &cuckoo_,
-				std::vector<seal::util::ExFieldElement>& ret,
-				seal::util::Pointer& data);
+                const cuckoo::PermutationBasedCuckoo &cuckoo_,
+                std::vector<seal::util::ExFieldElement>& ret,
+                seal::util::Pointer& data);
 
             /**
             Generates powers y^k, where y is an element in the input vector, k = i*2^{jw}, (i = 1, 2, ..., 2^w - 1), 
@@ -91,8 +91,8 @@ namespace apsi
             The return result is a map from k to y^k.
             */
             void generate_powers(const std::vector<seal::util::ExFieldElement> &exfield_items,
-				std::map<uint64_t, std::vector<seal::util::ExFieldElement> >& ret,
-				std::list<seal::util::Pointer>& data);
+                std::map<uint64_t, std::vector<seal::util::ExFieldElement> >& ret,
+                std::list<seal::util::Pointer>& data);
 
             /**
             Encrypts every vector of elements in the input map to a corresponding vector of SEAL Ciphertext, using generalized batching. The number of 
@@ -134,9 +134,9 @@ namespace apsi
             //std::vector<std::vector<seal::util::ExFieldElement>> stream_decrypt(oc::Channel &channel);
 
             void stream_decrypt(
-				oc::Channel &channel, 
-				std::vector<std::vector<seal::util::ExFieldElement>> &result,
-				seal::util::Pointer& backing);
+                oc::Channel &channel, 
+                std::vector<std::vector<seal::util::ExFieldElement>> &result,
+                seal::util::Pointer& backing);
 
             /**
             Stream decryption of ciphers from the sender. Ciphertext will be acquired from the sender in a streaming fashion one by one in
@@ -152,8 +152,8 @@ namespace apsi
             into 256 elements. The return result is a concatenation of decrypted elements from all ciphertext in the input vector.
             */
       //     void decrypt(const std::vector<seal::Ciphertext> &ciphers,
-			   //std::vector<seal::util::ExFieldElement>& result,
-			   //seal::util::Pointer& backing);
+               //std::vector<seal::util::ExFieldElement>& result,
+               //seal::util::Pointer& backing);
 
             /**
             Decrypts a SEAL Ciphertext to a batch of ExField elements, using generalized un-batching. One ciphertext will be

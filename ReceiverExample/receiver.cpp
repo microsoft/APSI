@@ -14,7 +14,7 @@
 
 int round_up_to(int v, int s)
 {
-	return (v + s - 1) / s * s;
+    return (v + s - 1) / s * s;
 }
 
 using namespace std;
@@ -40,54 +40,54 @@ void example_remote_multiple();
 
 std::vector<Item> randSubset(const std::vector<Item>& items, int size)
 {
-	oc::PRNG prn(oc::ZeroBlock);
+    oc::PRNG prn(oc::ZeroBlock);
 
-	std::set<int> ss;
-	while (ss.size() != size)
-	{
-		ss.emplace(prn.get<unsigned int>() % items.size());
-	}
-	auto ssIter = ss.begin();
+    std::set<int> ss;
+    while (ss.size() != size)
+    {
+        ss.emplace(prn.get<unsigned int>() % items.size());
+    }
+    auto ssIter = ss.begin();
 
-	std::vector<Item> ret(size);
-	for (int i = 0; i < size; ++i)
-		ret[i] = items[*ssIter++];
+    std::vector<Item> ret(size);
+    for (int i = 0; i < size; ++i)
+        ret[i] = items[*ssIter++];
 
-	return ret;
+    return ret;
 }
 void perf()
 {
-	oc::PRNG prng(oc::ZeroBlock, 256);
-	std::random_device rd;
+    oc::PRNG prng(oc::ZeroBlock, 256);
+    std::random_device rd;
 
-	int count = 1 << 26;
-	oc::Timer t;
-	for (int i = 0; i < count; ++i)
-	{
-		prng.get<int>();
-	}
-	t.setTimePoint("prng");
-	for (int i = 0; i < count; ++i)
-	{
-		rd();
-	}
-	t.setTimePoint("prng");
-	std::cout <<t << std::endl;
+    int count = 1 << 26;
+    oc::Timer t;
+    for (int i = 0; i < count; ++i)
+    {
+        prng.get<int>();
+    }
+    t.setTimePoint("prng");
+    for (int i = 0; i < count; ++i)
+    {
+        rd();
+    }
+    t.setTimePoint("prng");
+    std::cout <<t << std::endl;
 }
 
 int main(int argc, char *argv[])
 {
-	//perf();
+    //perf();
 
-	CLP cmd(argc, argv);
+    CLP cmd(argc, argv);
 
-	
-	IOService ios;
+    
+    IOService ios;
 
-	Session clientSession(ios, "127.0.0.1:1212", oc::SessionMode::Client);
-	Session serverSession(ios, "127.0.0.1:1212", oc::SessionMode::Server);
-	Channel clientChl = clientSession.addChannel();
-	Channel serverChl = serverSession.addChannel();
+    Session clientSession(ios, "127.0.0.1:1212", oc::SessionMode::Client);
+    Session serverSession(ios, "127.0.0.1:1212", oc::SessionMode::Server);
+    Channel clientChl = clientSession.addChannel();
+    Channel serverChl = serverSession.addChannel();
 
     // Example: Basics
     //example_basics();
@@ -100,10 +100,10 @@ int main(int argc, char *argv[])
     //example_load_db();
 
     //// Example: Fast batching
-    example_fast_batching(cmd, clientChl, serverChl);
+    //example_fast_batching(cmd, clientChl, serverChl);
 
     //// Example: Slow batching
-    //example_slow_batching();
+    example_slow_batching(cmd, clientChl, serverChl);
 
     // Example: Slow batching vs. Fast batching
     //example_slow_vs_fast();
@@ -380,16 +380,16 @@ void example_fast_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     //params.set_coeff_mod_bit_count(189);  // SEAL param: when n = 8192, q has 189 or 226 bits.
     //params.set_decomposition_bit_count(48);
 
-	cmd.setDefault("t", 8);
-	int numThreads = cmd.get<int>("t");
-	int log_table_size = 14;
-	int sender_set_size = 1 << 24;
-	int num_hash_func = 3;
-	int binning_sec_level = 40;
-	int num_splits = 256;
-	int bin_size = round_up_to(get_bin_size(1 << log_table_size, sender_set_size * num_hash_func, binning_sec_level), num_splits);
-	int window_size = 1;
-	auto oprf_type = OprfType::None;
+    cmd.setDefault("t", 8);
+    int numThreads = cmd.get<int>("t");
+    int log_table_size = 14;
+    int sender_set_size = 1 << 24;
+    int num_hash_func = 3;
+    int binning_sec_level = 40;
+    int num_splits = 256;
+    int bin_size = round_up_to(get_bin_size(1 << log_table_size, sender_set_size * num_hash_func, binning_sec_level), num_splits);
+    int window_size = 1;
+    auto oprf_type = OprfType::None;
 
     PSIParams params(numThreads, numThreads, 1, log_table_size, bin_size, window_size, num_splits, oprf_type);
     params.set_item_bit_length(32); // The effective item bit length will be limited by ExField's p.
@@ -424,46 +424,46 @@ void example_fast_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     }
 
     Receiver receiver(params, MemoryPoolHandle::New(true));
-	stop_watch.set_time_point("recv-cntr");
-	Sender sender(params, MemoryPoolHandle::New(true), cmd.isSet("dummy"));
-	stop_watch.set_time_point("send-cntr");
+    stop_watch.set_time_point("recv-cntr");
+    Sender sender(params, MemoryPoolHandle::New(true), cmd.isSet("dummy"));
+    stop_watch.set_time_point("send-cntr");
 
-	 
+     
     sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
     sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 
-	auto actual_size = 1000;// sender_set_size;
+    auto actual_size = 1000;// sender_set_size;
 
-	auto s1 = vector<Item>(actual_size);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
-	for (int i = 0; i < s1.size(); ++i)
-		s1[i][0] = i;
+    auto s1 = vector<Item>(actual_size);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
+    for (int i = 0; i < s1.size(); ++i)
+        s1[i][0] = i;
 
-	auto intersectSize = 100;
-	auto c1 = randSubset(s1, intersectSize);
-	c1.reserve(c1.size() + 100);
-	for (u64 i = 0; i < 100; ++i)
-		c1.emplace_back(i + s1.size());
+    auto intersectSize = 100;
+    auto c1 = randSubset(s1, intersectSize);
+    c1.reserve(c1.size() + 100);
+    for (u64 i = 0; i < 100; ++i)
+        c1.emplace_back(i + s1.size());
 
     stop_watch.set_time_point("Application preparation");
     sender.load_db(s1);
     stop_watch.set_time_point("Sender pre-processing");
 
-	auto thrd = std::thread([&]() {sender.query_session(sendChl); });
+    auto thrd = std::thread([&]() {sender.query_session(sendChl); });
     vector<bool> intersection = receiver.query(c1, recvChl);
-	thrd.join();
+    thrd.join();
 
 
-	cout << "Intersection result: ";
-	bool correct = true;
-	for (int i = 0; i < intersection.size(); ++i)
-	{
-		if (intersection[i] != (i < intersectSize))
-		{
-			std::cout << i <<" ";
-			correct = false;
-		}
-	}
-	std::cout << (correct ? "correct" : "incorrect") << std::endl;
+    cout << "Intersection result: ";
+    bool correct = true;
+    for (int i = 0; i < intersection.size(); ++i)
+    {
+        if (intersection[i] != (i < intersectSize))
+        {
+            std::cout << i <<" ";
+            correct = false;
+        }
+    }
+    std::cout << (correct ? "correct" : "incorrect") << std::endl;
     //cout << '[';
     //for (int i = 0; i < intersection.size(); i++)
     //    cout << intersection[i] << ", ";
@@ -520,18 +520,26 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     //params.set_decomposition_bit_count(60);
     //params.validate();
 
-	cmd.setDefault("t", 8);
-	int numThreads = cmd.get<int>("t");
-	int log_table_size = 14;
-	int sender_set_size = 1 << 24;
-	int num_hash_func = 3;
-	int binning_sec_level = 20;
-	int num_splits = 256;
-	int bin_size = round_up_to(get_bin_size(1 << log_table_size, sender_set_size * num_hash_func, binning_sec_level), num_splits);
-	int window_size = 1;
-	auto oprf_type = OprfType::PK;
+    cmd.setDefault("t", 8);
+    int numThreads = cmd.get<int>("t");
+    int log_table_size = 14;
+    int sender_set_size = 1 << 16;
+    int num_hash_func = 3;
+    int binning_sec_level = 30;
+    int num_splits = 8;
+    int bin_size = round_up_to(get_bin_size(1 << log_table_size, sender_set_size * num_hash_func, binning_sec_level), num_splits);
+    int window_size = 2;
+    auto oprf_type = OprfType::None;
 
-	PSIParams params(numThreads, numThreads, 1, log_table_size, bin_size, window_size, num_splits, oprf_type);
+    cout << "Thread count: " << numThreads << endl;
+    cout << "Log table size: " << log_table_size << endl;
+    cout << "Sender set size: " << sender_set_size << endl;
+    cout << "Splits: " << num_splits << endl;
+    cout << "Bin size: " << bin_size << endl;
+    cout << "Binning security level: " << binning_sec_level << endl;
+    cout << "Window size: " << window_size << endl;
+
+    PSIParams params(numThreads, numThreads, 1, log_table_size, bin_size, window_size, num_splits, oprf_type);
     params.set_item_bit_length(90); // We can handle very long items in the following ExField.
     params.set_exfield_polymod(string("1x^8 + 3"));
     params.set_exfield_characteristic(0xE801);
@@ -585,32 +593,45 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
     sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 
-	auto s1 = vector<Item>(sender_set_size);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
-	for (int i = 0; i < s1.size(); ++i)
-		s1[i][0] = i;
+    auto actual_size = 1000;// sender_set_size;
 
+    auto s1 = vector<Item>(actual_size);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
+    for (int i = 0; i < s1.size(); ++i)
+        s1[i][0] = i;
 
-	auto c1 = vector<Item>(4);// { string("1"), string("f"), string("i"), string("c") };
-	c1[0][0] = s1.size();
-	c1[1] = s1[100];
-	c1[2][0] = s1.size() + 1;
-	c1[3] = s1[200];
+    auto intersectSize = 100;
+    auto c1 = randSubset(s1, intersectSize);
+    c1.reserve(c1.size() + 100);
+    for (u64 i = 0; i < 100; ++i)
+        c1.emplace_back(i + s1.size());
 
     stop_watch.set_time_point("Application preparation");
     sender.load_db(s1);
     stop_watch.set_time_point("Sender pre-processing");
 
-	auto thrd = std::thread([&]() {sender.query_session(sendChl); });
-	vector<bool> intersection = receiver.query(c1, recvChl);
-	thrd.join();
+    auto thrd = std::thread([&]() {sender.query_session(sendChl); });
+    vector<bool> intersection = receiver.query(c1, recvChl);
+    thrd.join();
 
     cout << "Intersection result: ";
-    cout << '[';
-    for (int i = 0; i < intersection.size(); i++)
-        cout << intersection[i] << ", ";
-    cout << ']' << endl;
+    bool correct = true;
+    for (int i = 0; i < intersection.size(); ++i)
+    {
+        if (intersection[i] != (i < intersectSize))
+        {
+            std::cout << i << " ";
+            correct = false;
+        }
+    }
+    std::cout << (correct ? "correct" : "incorrect") << std::endl;
 
-    cout << stop_watch << endl;
+    //cout << "Intersection result: ";
+    //cout << '[';
+    //for (int i = 0; i < intersection.size(); i++)
+    //    cout << intersection[i] << ", ";
+    //cout << ']' << endl;
+
+    //cout << stop_watch << endl;
 }
 //
 //void example_slow_vs_fast()

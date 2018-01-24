@@ -13,143 +13,143 @@
 #include "cryptoTools/Crypto/PRNG.h"
 namespace apsi
 {
-    namespace sender
-    {
-        class SenderDB
-        {
-        public:
-            SenderDB(const PSIParams &params, std::shared_ptr<seal::util::ExField> ex_field, bool dummy_init);
+	namespace sender
+	{
+		class SenderDB
+		{
+		public:
+			SenderDB(const PSIParams &params, std::shared_ptr<seal::util::ExField> ex_field, bool dummy_init);
 
-            /**
-            Clears sender's database and set all entries to sender's null item.
-            */
-            void clear_db();
+			/**
+			Clears sender's database and set all entries to sender's null item.
+			*/
+			void clear_db();
 
-            /**
-            Resets the flags for precomputed results to make them stale.
-            */
-            //void reset_precomputation()
-            //{
-            //    for (int i = 0; i < params_.number_of_splits(); i++)
-            //        for (int j = 0; j < params_.number_of_batches(); j++)
-            //            symm_polys_stale_[i][j] = true;
-            //}
+			/**
+			Resets the flags for precomputed results to make them stale.
+			*/
+			//void reset_precomputation()
+			//{
+			//    for (int i = 0; i < params_.number_of_splits(); i++)
+			//        for (int j = 0; j < params_.number_of_batches(); j++)
+			//            symm_polys_stale_[i][j] = true;
+			//}
 
-            /**
-            Generates random indices for randomly permute sender items in each bin. 
-            */
-            //void shuffle();
+			/**
+			Generates random indices for randomly permute sender items in each bin. 
+			*/
+			//void shuffle();
 
-            /**
-            Sets the sender's database by hashing the data items with all hash functions.
-            */
-            void set_data(const std::vector<Item> &data);
+			/**
+			Sets the sender's database by hashing the data items with all hash functions.
+			*/
+			void set_data(const std::vector<Item> &data);
 
-            /**
-            Adds the data items to sender's database.
-            */
-            void add_data(const std::vector<Item> &data);
+			/**
+			Adds the data items to sender's database.
+			*/
+			void add_data(const std::vector<Item> &data);
 
-            /**
-            Adds one item to sender's database.
-            */
-            void add_data(const Item &item);
+			/**
+			Adds one item to sender's database.
+			*/
+			void add_data(const Item &item);
 
-            /**
-            Deletes the data items in the sender's database. Items are ignored if they don't exist in the database.
-            */
-            void delete_data(const std::vector<Item> &data);
+			/**
+			Deletes the data items in the sender's database. Items are ignored if they don't exist in the database.
+			*/
+			void delete_data(const std::vector<Item> &data);
 
-            /**
-            Deletes one item in sender's database. The item is ignored if it doesn't exist in the database.
-            */
-            void delete_data(const Item &item);
+			/**
+			Deletes one item in sender's database. The item is ignored if it doesn't exist in the database.
+			*/
+			void delete_data(const Item &item);
 
-            /**
-            Computes the symmetric polynomials for the specified split in sender's database.
-            One symmetric polynomial is computed for one sub-bin (because a bin is separated into splits).
-            Input sub-bin: (a_1, a_2, ..., a_n)
-            Output polynomial terms: (1, \sum_i a_i, \sum_{i,j} a_i*a_j, ...).
-            */
-            std::vector<std::vector<seal::util::ExFieldElement>>& symmetric_polys(int splitIndex, SenderThreadContext &context);
+			/**
+			Computes the symmetric polynomials for the specified split in sender's database.
+			One symmetric polynomial is computed for one sub-bin (because a bin is separated into splits).
+			Input sub-bin: (a_1, a_2, ..., a_n)
+			Output polynomial terms: (1, \sum_i a_i, \sum_{i,j} a_i*a_j, ...).
+			*/
+			std::vector<std::vector<seal::util::ExFieldElement>>& symmetric_polys(int splitIndex, SenderThreadContext &context);
 
-            /**
-            Computes the symmetric polynomials for the specified split and the specified batch in sender's database.
-            One symmetric polynomial is computed for one sub-bin (because a bin is separated into splits).
-            Input sub-bin: (a_1, a_2, ..., a_n)
-            Output polynomial terms: (1, \sum_i a_i, \sum_{i,j} a_i*a_j, ...).
-            */
-            void symmetric_polys(int split, int batch, SenderThreadContext &context, oc::MatrixView<seal::util::ExFieldElement> symm_block);
+			/**
+			Computes the symmetric polynomials for the specified split and the specified batch in sender's database.
+			One symmetric polynomial is computed for one sub-bin (because a bin is separated into splits).
+			Input sub-bin: (a_1, a_2, ..., a_n)
+			Output polynomial terms: (1, \sum_i a_i, \sum_{i,j} a_i*a_j, ...).
+			*/
+			void symmetric_polys(int split, int batch, SenderThreadContext &context, oc::MatrixView<seal::util::ExFieldElement> symm_block);
 
-            /**
-            Computes the randomized symmetric polynomials for the specified split in sender's database. Basically, it multiplies each term in a
-            symmetric polynomial with the same random number. Different symmetric polynomials are multiplied with different random numbers.
+			/**
+			Computes the randomized symmetric polynomials for the specified split in sender's database. Basically, it multiplies each term in a
+			symmetric polynomial with the same random number. Different symmetric polynomials are multiplied with different random numbers.
 
-            @see symmetric_polys for computing symmetric polynomials.
-            */
-            std::vector<std::vector<seal::util::ExFieldElement>>& randomized_symmetric_polys(int splitIndex, SenderThreadContext &context);
+			@see symmetric_polys for computing symmetric polynomials.
+			*/
+			std::vector<std::vector<seal::util::ExFieldElement>>& randomized_symmetric_polys(int splitIndex, SenderThreadContext &context);
 
-            /**
-            Computes the randomized symmetric polynomials for the specified split and the specified batch in sender's database. Basically, it
-            multiplies each term in a symmetric polynomial with the same random number. Different symmetric polynomials are multiplied with 
-            different random numbers.
+			/**
+			Computes the randomized symmetric polynomials for the specified split and the specified batch in sender's database. Basically, it
+			multiplies each term in a symmetric polynomial with the same random number. Different symmetric polynomials are multiplied with 
+			different random numbers.
 
-            @see symmetric_polys for computing symmetric polynomials.
-            */
-            void randomized_symmetric_polys(int split, int batch, SenderThreadContext &context, oc::MatrixView<seal::util::ExFieldElement>symm_block);
+			@see symmetric_polys for computing symmetric polynomials.
+			*/
+			void randomized_symmetric_polys(int split, int batch, SenderThreadContext &context, oc::MatrixView<seal::util::ExFieldElement>symm_block);
 
-            /**
-            Batches the randomized symmetric polynonmials for the specified split in sender's database.
+			/**
+			Batches the randomized symmetric polynonmials for the specified split in sender's database.
 
-            @see randomized_symmetric_polys for computing randomized symmetric polynomials.
-            */
-            std::vector<std::vector<seal::Plaintext>>& batched_randomized_symmetric_polys(
-                int split, SenderThreadContext &context);
+			@see randomized_symmetric_polys for computing randomized symmetric polynomials.
+			*/
+			std::vector<std::vector<seal::Plaintext>>& batched_randomized_symmetric_polys(
+				int split, SenderThreadContext &context);
 
-            /**
-            Batches the randomized symmetric polynonmials for the specified split and the specified batch in sender's database.
+			/**
+			Batches the randomized symmetric polynonmials for the specified split and the specified batch in sender's database.
 
-            @see randomized_symmetric_polys for computing randomized symmetric polynomials.
-            */
-            void batched_randomized_symmetric_polys(SenderThreadContext &context);
+			@see randomized_symmetric_polys for computing randomized symmetric polynomials.
+			*/
+			void batched_randomized_symmetric_polys(SenderThreadContext &context);
 
-            const oc::Matrix<Item>& simple_hashing_db2() const
-            {
-                return simple_hashing_db2_;
-            }
+			const oc::Matrix<Item>& simple_hashing_db2() const
+			{
+				return simple_hashing_db2_;
+			}
 
-            void save(std::ostream &stream) const;
+			void save(std::ostream &stream) const;
 
-            void load(std::istream &stream);
+			void load(std::istream &stream);
 
-            //std::vector<std::vector<std::vector<seal::Plaintext>>> &batch_random_symm_polys()
-            std::vector<seal::Plaintext> &batch_random_symm_polys()
-            {
-                return batch_random_symm_polys_;
-            }
+			//std::vector<std::vector<std::vector<seal::Plaintext>>> &batch_random_symm_polys()
+			std::vector<seal::Plaintext> &batch_random_symm_polys()
+			{
+				return batch_random_symm_polys_;
+			}
 
 			bool dummy_init_ = false;
 
-        private:
+		private:
 
-            PSIParams params_;
+			PSIParams params_;
 
-            /* Null value for sender: 00..0011..11. The number of 1 is itemL.
-            (Note: Null value for receiver is: 00..0010..00, with 1 on the itemL-th position.)
-            */
-            Item sender_null_item_;
+			/* Null value for sender: 00..0011..11. The number of 1 is itemL.
+			(Note: Null value for receiver is: 00..0010..00, with 1 on the itemL-th position.)
+			*/
+			Item sender_null_item_;
 
-            /* The ExField encoding of the sender null value. */
-            seal::util::ExFieldElement null_element_, neg_null_element_;
+			/* The ExField encoding of the sender null value. */
+			seal::util::ExFieldElement null_element_, neg_null_element_;
 
-            cuckoo::PermutationBasedCuckoo cuckoo_;
+			cuckoo::PermutationBasedCuckoo cuckoo_;
 
-            std::shared_ptr<seal::util::ExField> global_ex_field_;
+			std::shared_ptr<seal::util::ExField> global_ex_field_;
 
-            /* B x m, where B is sender's bin size, m is table size.
-            This is actually a rotated view of the DB. We store it in this
-            view so that multi-threading is more efficient for accessing data, 
-            i.e., one thread will take care of several continuous complete rows. */
+			/* B x m, where B is sender's bin size, m is table size.
+			This is actually a rotated view of the DB. We store it in this
+			view so that multi-threading is more efficient for accessing data, 
+			i.e., one thread will take care of several continuous complete rows. */
 			oc::Matrix<Item> simple_hashing_db2_;
 
 #define ADD_DATA_MULTI_THREAD
@@ -162,47 +162,47 @@ namespace apsi
 			int aquire_bin_location(int cockooIndex, oc::PRNG& prng, bool par, const Item& i);
 			bool has_item(int cockooIndex, int position);
 
-            /* m x B, where m is table size, B is sender's bin size. Keep in this view
-            so that we can conveniently shuffle each row (bin) using STL. */
-            //oc::Matrix<int> shuffle_index2_;
+			/* m x B, where m is table size, B is sender's bin size. Keep in this view
+			so that we can conveniently shuffle each row (bin) using STL. */
+			//oc::Matrix<int> shuffle_index2_;
 
-            /* size m vector, where m is the table size. Each value is an incremental counter for the 
-            corresponding bin in shuffle_index_. It points to the next value to be taken from shuffle_index_
-            in the corresponding bin. */
-            std::vector<int> next_locs_;
+			/* size m vector, where m is the table size. Each value is an incremental counter for the 
+			corresponding bin in shuffle_index_. It points to the next value to be taken from shuffle_index_
+			in the corresponding bin. */
+			std::vector<int> next_locs_;
 			//std::unique_ptr<std::atomic_bool[]> cuckoo_location_lock_;
-            /* B x m, the corresponding ExField version of the DB. Refer to simple_hashing_db_. */
-            /*std::vector<std::vector<seal::util::ExFieldElement>> exfield_db_;
-            seal::util::Pointer exfield_db_backing_;*/
+			/* B x m, the corresponding ExField version of the DB. Refer to simple_hashing_db_. */
+			/*std::vector<std::vector<seal::util::ExFieldElement>> exfield_db_;
+			seal::util::Pointer exfield_db_backing_;*/
 
-            /* Symmetric polynomial terms. 
-            #splits x m x (split_size + 1). In fact, B = #splits x split_size. The table is 
-            essentially split into '#splits' parts, and we add an extra row for each part to
-            store the coefficient '1' of the highest degree terms in the symmetric polynomials. */
-            /*std::vector<std::vector<std::vector<seal::util::ExFieldElement>>> symm_polys_;
-            seal::util::Pointer symm_polys_backing_;*/
+			/* Symmetric polynomial terms. 
+			#splits x m x (split_size + 1). In fact, B = #splits x split_size. The table is 
+			essentially split into '#splits' parts, and we add an extra row for each part to
+			store the coefficient '1' of the highest degree terms in the symmetric polynomials. */
+			/*std::vector<std::vector<std::vector<seal::util::ExFieldElement>>> symm_polys_;
+			seal::util::Pointer symm_polys_backing_;*/
 
-            /* Randomized symmetric polynomial terms.
-            #splits x m x (split_size + 1). In fact, B = #splits x split_size. The table is
-            essentially split into '#splits' parts, and we add an extra row for each part to
-            store the coefficient '1' of the highest degree terms in the symmetric polynomials.
-            */
-            /*std::vector<std::vector<std::vector<seal::util::ExFieldElement>>> random_symm_polys_;
-            seal::util::Pointer random_symm_polys_backing_;*/
-            
-            /* Batched randomized symmetric polynomial terms.
-            #splits x #batches x (split_size + 1). In fact, B = #splits x split_size. The table is
-            essentially split into '#splits x #batches' blocks. Each block is related with a split
-            and a batch.
-            */
-            std::vector<seal::Plaintext> batch_random_symm_polys_;
+			/* Randomized symmetric polynomial terms.
+			#splits x m x (split_size + 1). In fact, B = #splits x split_size. The table is
+			essentially split into '#splits' parts, and we add an extra row for each part to
+			store the coefficient '1' of the highest degree terms in the symmetric polynomials.
+			*/
+			/*std::vector<std::vector<std::vector<seal::util::ExFieldElement>>> random_symm_polys_;
+			seal::util::Pointer random_symm_polys_backing_;*/
+			
+			/* Batched randomized symmetric polynomial terms.
+			#splits x #batches x (split_size + 1). In fact, B = #splits x split_size. The table is
+			essentially split into '#splits x #batches' blocks. Each block is related with a split
+			and a batch.
+			*/
+			std::vector<seal::Plaintext> batch_random_symm_polys_;
 
-            /*
-            #splits x #batches. Flags indicating whether the blocks need to be re-computed or not.
-            */
-            //std::vector<std::vector<char>> symm_polys_stale_;
+			/*
+			#splits x #batches. Flags indicating whether the blocks need to be re-computed or not.
+			*/
+			//std::vector<std::vector<char>> symm_polys_stale_;
 
 			oc::PRNG prng_;
-        };
-    }
+		};
+	}
 }

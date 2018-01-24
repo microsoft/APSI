@@ -3,8 +3,8 @@
 #include "psiparams.h"
 #include "Receiver/receiver.h"
 #include "Sender/sender.h"
-#include "util/exfield.h"
-#include "ciphertext.h"
+#include "seal/util/exfield.h"
+#include "seal/ciphertext.h"
 #include <vector>
 #include <map>
 
