@@ -38,7 +38,7 @@ namespace apsi
             */
             std::pair<
                 std::map<uint64_t, std::vector<seal::Ciphertext>>, 
-				std::unique_ptr<cuckoo::CuckooInterface>
+                std::unique_ptr<cuckoo::CuckooInterface>
             > preprocess(std::vector<Item> &items, oc::Channel& channel);
 
             void send(const std::map<uint64_t, std::vector<seal::Ciphertext>> &query_data, oc::Channel &channel);
@@ -57,9 +57,9 @@ namespace apsi
             Encodes items in the cuckoo hashing table into ExField elements.
             */
             void exfield_encoding(
-				cuckoo::CuckooInterface &cuckoo_,
-				std::vector<seal::util::ExFieldElement>& ret,
-				seal::util::Pointer& data);
+                cuckoo::CuckooInterface &cuckoo_,
+                std::vector<seal::util::ExFieldElement>& ret,
+                seal::util::Pointer& data);
 
             /**
             Generates powers y^k, where y is an element in the input vector, k = i*2^{jw}, (i = 1, 2, ..., 2^w - 1), 

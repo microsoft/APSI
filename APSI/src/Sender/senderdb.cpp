@@ -155,6 +155,9 @@ namespace apsi
 								auto cuckoo_loc = normal_loc_func[j].location(data[i]);
 								auto position = aquire_bin_location(cuckoo_loc, prng);
 								simple_hashing_db2_(position, cuckoo_loc) = data[i];
+
+                                ostreamLock(std::cout) << "Sitem[" << i << "] = " << data[i] << " -> " << j << " " << simple_hashing_db2_(position, cuckoo_loc) << " @ " << cuckoo_loc << std::endl;
+
 							}
 							else
 							{

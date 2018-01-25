@@ -250,7 +250,7 @@ namespace apsi
                 //auto rr = encoder.encode(items[i], q.hash_func_index(), true);
                 //if (neq(oc::block(rr), oc::block(encodings[indice[i]])))
                 //	throw std::runtime_error(LOCATION);
-                //ostreamLock(std::cout) << "Ritem[" << i << "] = " << items[i] << " -> " << q.hash_func_index() << " " << encodings[indice[i]]  << " @ " << indice[i] << std::endl;
+                ostreamLock(std::cout) << "Ritem[" << i << "] = " << items[i] << " -> " << q.hash_func_index() << " " << encodings[indice[i]]  << " @ " << indice[i] << std::endl;
             }
             return indice;
         }
