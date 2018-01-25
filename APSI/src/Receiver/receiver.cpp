@@ -240,17 +240,28 @@ namespace apsi
         {
             vector<int> indice(cuckoo.capacity(), -1);
             auto& encodings = cuckoo.get_encodings();
-            //cuckoo::PermutationBasedCuckoo::Encoder encoder(cuckoo.log_capacity(), cuckoo.loc_func_count(), params_.item_bit_length());
+            
+			cuckoo::PermutationBasedCuckoo::Encoder encoder(cuckoo.log_capacity(), cuckoo.loc_func_count(), params_.item_bit_length());
 
 
-            for (int i = 0; i < items.size(); i++)
-            {
-                auto q = cuckoo.query_item(items[i]);
-                indice[q.table_index()] = i;
-                //auto rr = encoder.encode(items[i], q.hash_func_index(), true);
-                //if (neq(oc::block(rr), oc::block(encodings[indice[i]])))
-                //	throw std::runtime_error(LOCATION);
-                ostreamLock(std::cout) << "Ritem[" << i << "] = " << items[i] << " -> " << q.hash_func_index() << " " << encodings[indice[i]]  << " @ " << indice[i] << std::endl;
+			for (int i = 0; i < items.size(); i++)
+			{
+				auto q = cuckoo.query_item(items[i]);
+				indice[q.table_index()] = i;
+
+				if (params_.get_cuckoo_mode() == CuckooMode::Permutation)
+				{
+					auto rr = encoder.encode(items[i], q.hash_func_index(), true);
+					if (neq(oc::block(rr), oc::block(encodings[q.table_index()])))
+						throw std::runtime_error(LOCATION);
+				}
+				else
+				{
+					if (neq(items[i], encodings[q.table_index()]))
+						throw std::runtime_error(LOCATION);
+				}
+			
+                ostreamLock(std::cout) << "Ritem[" << i << "] = " << items[i] << " -> " << q.hash_func_index() << " " << encodings[q.table_index()]  << " @ " << q.table_index() << std::endl;
             }
             return indice;
         }
