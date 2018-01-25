@@ -4,6 +4,7 @@
 #include "seal/util/uintcore.h"
 #include <fstream>
 #include <algorithm>
+#include <memory>
 #include "cryptoTools/Crypto/Curve.h"
 #include "cryptoTools/Crypto/PRNG.h"
 #include "cryptoTools/Common/MatrixView.h"
@@ -21,8 +22,7 @@ namespace apsi
 {
     namespace sender
     {
-        SenderDB::SenderDB(const PSIParams& params, shared_ptr<ExField> ex_field, bool dummy_init)
-            :
+        SenderDB::SenderDB(const PSIParams &params, shared_ptr<ExField> &ex_field, bool dummy_init) :
             dummy_init_(dummy_init),
             params_(params),
             encoder_(params.log_table_size(), params.hash_func_count(), params.item_bit_length()),
@@ -30,61 +30,59 @@ namespace apsi
             simple_hashing_db2_(params.sender_bin_size(), params.table_size()),
             next_locs_(params.table_size(), 0),
             batch_random_symm_polys_(params.number_of_splits() * params.number_of_batches() * (params.split_size() + 1))
-
         {
-
-            int characteristic_bit_count = util::get_significant_bit_count(params_.exfield_characteristic());
-
             if (dummy_init_)
             {
-                std::cout << "--------------------- WARNING: dummy init(...) --------------------- " << std::endl;
-                for (auto& v : batch_random_symm_polys_)
+                cout << "--------------------- WARNING: dummy init(...) --------------------- " << endl;
+                for (auto& plain : batch_random_symm_polys_)
                 {
-                    v.resize(params_.coeff_modulus().size() * (params_.poly_degree() + 1));
-                    v[0] = 1;
+                    plain.resize(params_.coeff_modulus().size() * (params_.poly_degree() + 1));
+                    plain[0] = 1;
                 }
             }
             else
             {
-                for (auto &plain : batch_random_symm_polys_)
+                for (auto& plain : batch_random_symm_polys_)
                 {
-                    plain.resize(params_.coeff_modulus().size() * (params_.poly_degree() + 1));
+                    // Reserve memory for ciphertext size plaintexts (NTT transformed mod q)
+                    plain.reserve(params_.coeff_modulus().size() * (params_.poly_degree() + 1));
                 }
             }
 
             oc::block seed;
-            std::random_device rd;
-            *(std::array<unsigned int, 4>*)&seed = { rd(), rd(), rd(), rd() };
+            random_device rd;
+            *reinterpret_cast<array<unsigned int, 4>*>(&seed) = { rd(), rd(), rd(), rd() };
             prng_.SetSeed(seed, 256);
 
-
-            /* Set null value for sender: 00..001 */
+            // Set null value for sender: 1111...1110 (128 bits)
+            // Receiver's null value comes from the Cuckoo class: 1111...1111
             sender_null_item_[0] = ~1;
             sender_null_item_[1] = ~0;
 
+            // What is the actual length of strings stored in the hash table
             encoding_bit_length_ = params.get_cuckoo_mode() == cuckoo::CuckooMode::Normal
                 ? params.item_bit_length()
                 : encoder_.encoding_bit_length_;
 
+            // Create the null ExFieldElement (note: encoding truncation affects high bits)
             null_element_ = sender_null_item_.to_exfield_element(global_ex_field_, encoding_bit_length_);
-
-            // hack to get an allocation
-            neg_null_element_ = global_ex_field_->random_element();
+            neg_null_element_ = ExFieldElement(global_ex_field_);
             global_ex_field_->negate(null_element_, neg_null_element_);
-
         }
 
         void SenderDB::clear_db()
         {
-            auto src = simple_hashing_db2_.data();
-
             auto ss = params_.sender_bin_size() * params_.table_size();
-            simple_hashing_db_has_item_.reset(new std::atomic_bool[ss]());
+            simple_hashing_db_has_item_.reset(new atomic_bool[ss]);
 
-            // make sure the its zero init.
-            for (int i = 0; i < ss; ++i)
+            // Make sure all entries are false
+            for (int i = 0; i < ss; i++)
+            {
                 if (simple_hashing_db_has_item_[i])
-                    throw std::runtime_error(LOCATION);
+                {
+                    throw runtime_error(LOCATION);
+                }
+            }
         }
 
         void SenderDB::set_data(const vector<Item> &data)
@@ -96,68 +94,64 @@ namespace apsi
 
         void SenderDB::add_data(const vector<Item> &data)
         {
-            //#define ADD_DATA_MULTI_THREAD
-            auto bin_size = params_.sender_bin_size();
-
-            //#ifdef  ADD_DATA_MULTI_THREAD 
-            std::vector<std::thread> thrds(params_.sender_total_thread_count());
-            for (int t = 0; t < thrds.size(); ++t)
+            vector<thread> thrds(params_.sender_total_thread_count());
+            for (int t = 0; t < thrds.size(); t++)
             {
                 auto seed = prng_.get<oc::block>();
-                thrds[t] = std::thread([&, t, seed]() 
+                thrds[t] = thread([&, t, seed]()
                 {
                     oc::PRNG prng(seed, 256);
                     auto start = t * data.size() / thrds.size();
                     auto end = (t + 1) * data.size() / thrds.size();
-                    //#else
-                    //					auto start = 0;
-                    //					auto end = data.size();
-                    //					auto& prng = prng_;
-                    //#endif
 
                     EllipticCurve curve(p256k1, prng.get<oc::block>());
-                    std::vector<u8> buff(curve.getGenerator().sizeBytes());
+                    vector<u8> buff(curve.getGenerator().sizeBytes());
                     PRNG pp(oc::CCBlock);
                     oc::EccNumber key_(curve, pp);
 
-                    //std::vector<uint64_t> hash_locations(params_.hash_func_count());
-                    std::vector<cuckoo::LocFunc> normal_loc_func(params_.hash_func_count());
-                    std::vector<cuckoo::PermutationBasedLocFunc> perm_loc_func(params_.hash_func_count());
+                    vector<cuckoo::LocFunc> normal_loc_func(params_.hash_func_count());
+                    vector<cuckoo::PermutationBasedLocFunc> perm_loc_func(params_.hash_func_count());
                     
-                    for (int i = 0; i < normal_loc_func.size(); ++i)
+                    for (int i = 0; i < normal_loc_func.size(); i++)
                     {
                         normal_loc_func[i] = cuckoo::LocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
-                        perm_loc_func[i] = cuckoo::PermutationBasedLocFunc(params_.log_table_size(), params_.hash_func_seed() +i);
+                        perm_loc_func[i] = cuckoo::PermutationBasedLocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
                     }
 
                     for (int i = start; i < end; i++)
                     {
+                        // Do we do OPRF for Sender's security?
                         if (params_.use_pk_oprf())
                         {
-                            static_assert(sizeof(oc::block) == sizeof(Item), "");
-                            oc::PRNG p((oc::block&)data[i], 8);
+                            static_assert(sizeof(oc::block) == sizeof(Item), LOCATION);
+
+                            // Compute EC PRF first for data
+                            oc::PRNG p(static_cast<oc::block&>(data[i]), 8);
                             oc::EccPoint a(curve, p);
 
                             a *= key_;
                             a.toBytes(buff.data());
 
+                            // Then compress with SHA1
                             oc::SHA1 sha(sizeof(block));
                             sha.Update(buff.data(), buff.size());
-                            sha.Final((oc::block&)data[i]);
+                            sha.Final(static_cast<oc::block&>(data[i]));
                         }
 
-
-                        // claim a location in this bin that is empty
+                        // Claim a location in this bin that is empty
                         for (int j = 0; j < params_.hash_func_count(); j++)
                         {
-
                             if (params_.get_cuckoo_mode() == cuckoo::CuckooMode::Normal)
                             {
+                                // Compute bin locations
                                 auto cuckoo_loc = normal_loc_func[j].location(data[i]);
+
+                                // Lock-free thread-safe bin position search
                                 auto position = aquire_bin_location(cuckoo_loc, prng);
+
                                 simple_hashing_db2_(position, cuckoo_loc) = data[i];
 
-                                ostreamLock(std::cout) << "Sitem[" << i << "] = " << data[i] << " -> " << j << " " << simple_hashing_db2_(position, cuckoo_loc) << " @ " << cuckoo_loc << std::endl;
+                                ostreamLock(cout) << "Sitem[" << i << "] = " << data[i] << " -> " << j << " " << simple_hashing_db2_(position, cuckoo_loc) << " @ " << cuckoo_loc << endl;
 
                             }
                             else
@@ -166,7 +160,7 @@ namespace apsi
                                 auto position = aquire_bin_location(cuckoo_loc, prng);
                                 simple_hashing_db2_(position, cuckoo_loc) = encoder_.encode(data[i], j, true);
 
-                                ostreamLock(std::cout) << "Sitem[" << i << "] = " << data[i] << " -> "<<j<<" " << simple_hashing_db2_(position, cuckoo_loc) << " @ " << cuckoo_loc << std::endl;
+                                ostreamLock(cout) << "Sitem[" << i << "] = " << data[i] << " -> "<<j<<" " << simple_hashing_db2_(position, cuckoo_loc) << " @ " << cuckoo_loc << endl;
 
 
                             }
@@ -188,7 +182,7 @@ namespace apsi
             auto start = cuckoo_loc * s;
             auto end = (cuckoo_loc + 1) * s;
             if (cuckoo_loc >= params_.table_size())
-                throw std::runtime_error(LOCATION);
+                throw runtime_error(LOCATION);
 
 
             // for 100 tries, guess a bin location can try to insert it there
@@ -214,7 +208,7 @@ namespace apsi
             }
 
             // we failed, throw an error because this bin overflowed..
-            throw std::runtime_error("sender's bin is full. " LOCATION);
+            throw runtime_error("sender's bin is full. " LOCATION);
         }
 
         bool SenderDB::has_item(int cuckoo_loc, int position)
@@ -230,9 +224,9 @@ namespace apsi
             add_data(vector<Item>(1, item));
         }
 
-        void SenderDB::delete_data(const std::vector<Item> &data)
+        void SenderDB::delete_data(const vector<Item> &data)
         {
-            throw std::runtime_error("Update function");
+            throw runtime_error("Update function");
         }
 
         void SenderDB::delete_data(const Item &item)
@@ -375,23 +369,23 @@ namespace apsi
             }
         }
 
-        void SenderDB::save(std::ostream &stream) const
+        void SenderDB::save(ostream &stream) const
         {
             /** Save the following data.
             B x m
-            std::vector<std::vector<Item>> simple_hashing_db_;
+            vector<vector<Item>> simple_hashing_db_;
 
             m x B
-            std::vector<std::vector<int>> shuffle_index_;
+            vector<vector<int>> shuffle_index_;
 
             size m vector
-            std::vector<int> next_shuffle_locs_;
+            vector<int> next_shuffle_locs_;
 
             #splits x #batches x (split_size + 1).
-            std::vector<std::vector<std::vector<seal::Plaintext>>> batch_random_symm_polys_;
+            vector<vector<vector<seal::Plaintext>>> batch_random_symm_polys_;
 
             #splits x #batches.
-            std::vector<std::vector<bool>> symm_polys_stale_;
+            vector<vector<bool>> symm_polys_stale_;
             **/
 
             int32_t bin_size = params_.sender_bin_size(), table_size = params_.table_size(),
@@ -430,7 +424,7 @@ namespace apsi
             //	}
         }
 
-        void SenderDB::load(std::istream &stream)
+        void SenderDB::load(istream &stream)
         {
             int32_t bin_size = 0, table_size = 0,
                 num_splits = 0, num_batches = 0,
