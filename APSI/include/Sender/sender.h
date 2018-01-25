@@ -27,7 +27,9 @@ namespace apsi
         class Sender
         {
         public:
-            Sender(const PSIParams &params, const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::Global(), bool dummy_init = false);
+            Sender(const PSIParams &params,
+                const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::Global(), 
+                bool dummy_init = false);
 
             ~Sender();
 
@@ -226,9 +228,9 @@ namespace apsi
 
             std::mutex thread_context_mtx_;
 
-			oc::PRNG prng_;
+            oc::PRNG prng_;
 
-			//oc::EllipticCurve curve_;
+            //oc::EllipticCurve curve_;
 
             bool stopped_;
         };

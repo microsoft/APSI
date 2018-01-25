@@ -55,7 +55,7 @@ namespace apsi
             ex_field_->init_frob_table();
         }
 
-        vector<bool> Receiver::query(vector<Item> &items, oc::Channel& chl)
+        vector<bool> Receiver::query(vector<Item>& items, oc::Channel& chl)
         {
 
             auto qq = preprocess(items, chl);
@@ -101,7 +101,6 @@ namespace apsi
             unique_ptr<CuckooInterface>
         > Receiver::preprocess(vector<Item> &items, Channel& channel)
         {
-            using namespace oc;
             if (params_.use_pk_oprf())
             {
 
@@ -173,7 +172,8 @@ namespace apsi
             exfield_items.clear();
             data.release();
 
-            map<uint64_t, vector<Ciphertext>> ciphers = encrypt(powers);
+            map<uint64_t, vector<Ciphertext>> ciphers;
+            encrypt(powers, ciphers);
 
             return { std::move(ciphers), std::move(cuckoo) };
         }
@@ -211,8 +211,8 @@ namespace apsi
                     params_.item_bit_length(),
                     params_.max_probe()))
             );
-
-            if (cuckoo->encoding_bit_length() >= seal::util::get_significant_bit_count(params_.exfield_characteristic()))
+            
+            if (cuckoo->encoding_bit_length() >= ex_field_->characteristic().bit_count() * (ex_field_->poly_modulus().coeff_count() - 1))
             {
                 cout << "Reduced items too long. Only have " << 
                     seal::util::get_significant_bit_count(params_.exfield_characteristic()) - 1 << " bits." << endl;
@@ -241,26 +241,26 @@ namespace apsi
             vector<int> indice(cuckoo.capacity(), -1);
             auto& encodings = cuckoo.get_encodings();
             
-			cuckoo::PermutationBasedCuckoo::Encoder encoder(cuckoo.log_capacity(), cuckoo.loc_func_count(), params_.item_bit_length());
+            cuckoo::PermutationBasedCuckoo::Encoder encoder(cuckoo.log_capacity(), cuckoo.loc_func_count(), params_.item_bit_length());
 
 
-			for (int i = 0; i < items.size(); i++)
-			{
-				auto q = cuckoo.query_item(items[i]);
-				indice[q.table_index()] = i;
+            for (int i = 0; i < items.size(); i++)
+            {
+                auto q = cuckoo.query_item(items[i]);
+                indice[q.table_index()] = i;
 
-				if (params_.get_cuckoo_mode() == CuckooMode::Permutation)
-				{
-					auto rr = encoder.encode(items[i], q.hash_func_index(), true);
-					if (neq(oc::block(rr), oc::block(encodings[q.table_index()])))
-						throw std::runtime_error(LOCATION);
-				}
-				else
-				{
-					if (neq(items[i], encodings[q.table_index()]))
-						throw std::runtime_error(LOCATION);
-				}
-			
+                if (params_.get_cuckoo_mode() == CuckooMode::Permutation)
+                {
+                    auto rr = encoder.encode(items[i], q.hash_func_index(), true);
+                    if (neq(oc::block(rr), oc::block(encodings[q.table_index()])))
+                        throw std::runtime_error(LOCATION);
+                }
+                else
+                {
+                    if (neq(items[i], encodings[q.table_index()]))
+                        throw std::runtime_error(LOCATION);
+                }
+            
                 ostreamLock(std::cout) << "Ritem[" << i << "] = " << items[i] << " -> " << q.hash_func_index() << " " << encodings[q.table_index()]  << " @ " << q.table_index() << std::endl;
             }
             return indice;
@@ -284,12 +284,10 @@ namespace apsi
             }
         }
 
-
         void Receiver::generate_powers(const vector<ExFieldElement> &exfield_items,
             std::map<uint64_t, std::vector<seal::util::ExFieldElement> >& result,
             std::list<Pointer>& data)
         {
-            //map<uint64_t, vector<ExFieldElement> > result;
             int split_size = (params_.sender_bin_size() + params_.number_of_splits() - 1) / params_.number_of_splits();
             int window_size = params_.window_size();
             int radix = 1 << window_size;
@@ -317,25 +315,22 @@ namespace apsi
 
         }
 
-        std::map<uint64_t, vector<Ciphertext>> Receiver::encrypt(std::map<uint64_t, std::vector<ExFieldElement>> &input)
+        void Receiver::encrypt(std::map<uint64_t, std::vector<ExFieldElement>> &input, map<uint64_t, vector<Ciphertext>> &destination)
         {
-            map<uint64_t, vector<Ciphertext>> result;
-
+            destination.clear();
             for (auto it = input.begin(); it != input.end(); it++)
             {
-                result[it->first] = encrypt(it->second);
+                encrypt(it->second, destination[it->first]);
             }
-
-            return result;
         }
 
-        vector<Ciphertext> Receiver::encrypt(const vector<ExFieldElement> &input)
+        void Receiver::encrypt(const vector<ExFieldElement> &input, vector<Ciphertext> &destination)
         {
             int batch_size = exfieldpolycrtbuilder_->slot_count(), num_of_batches = (input.size() + batch_size - 1) / batch_size;
             Pointer tmp_backing;
             vector<ExFieldElement> batch = ex_field_->allocate_elements(batch_size, tmp_backing);
             vector<uint64_t> integer_batch(batch_size, 0);
-            vector<Ciphertext> result;
+            destination.clear();
             for (int i = 0; i < num_of_batches; i++)
             {
 
@@ -352,10 +347,9 @@ namespace apsi
                         batch[j] = input[i * batch_size + j];
                     exfieldpolycrtbuilder_->compose(batch, plain);
                 }
-                result.emplace_back();
-                encryptor_->encrypt(plain, result.back(), pool_);
+                destination.emplace_back();
+                encryptor_->encrypt(plain, destination.back(), pool_);
             }
-            return result;
         }
 
         //vector<vector<ExFieldElement>> Receiver::bulk_decrypt(const vector<vector<Ciphertext>> &result_ciphers)
@@ -514,7 +508,7 @@ namespace apsi
         void Receiver::decrypt(const seal::Ciphertext &cipher, Plaintext &plain)
         {
             decryptor_->decrypt(cipher, plain);
-            cout << "Noise budget: " << decryptor_->invariant_noise_budget(cipher) << endl;
+            //cout << "Noise budget: " << decryptor_->invariant_noise_budget(cipher) << endl;
         }
 
         //void Receiver::decompose(const Plaintext &plain, std::vector<seal::util::ExFieldElement> &batch)

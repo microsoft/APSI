@@ -114,7 +114,7 @@ namespace apsi
 			}
 
 
-			std::vector<seal::util::ExFieldElement >& batch_vector()
+			std::vector<seal::util::ExFieldElement>& batch_vector()
 			{
 				return batch_vector_;
 			}

@@ -14,8 +14,8 @@ namespace apsi
 
     Item::Item(uint64_t *pointer)
     {
-		value_[0] = pointer[0];
-		value_[1] = pointer[1];
+        value_[0] = pointer[0];
+        value_[1] = pointer[1];
     }
 
     Item::Item(const string &str)
@@ -28,41 +28,41 @@ namespace apsi
         operator=(item);
     }
 
-	Item::Item(const cuckoo::block & item)
-	{
-		value_ = *(std::array<u64, 2>*)&item;
-	}
+    Item::Item(const cuckoo::block & item)
+    {
+        value_ = *(std::array<u64, 2>*)&item;
+    }
 
-	Item& Item::operator =(uint64_t assign)
-	{
-		value_[0] = assign;
-		value_[1] = 0;
+    Item& Item::operator =(uint64_t assign)
+    {
+        value_[0] = assign;
+        value_[1] = 0;
 
-		return *this;
-	}
+        return *this;
+    }
 
-	Item& Item::operator =(const cuckoo::block& assign)
-	{
-		value_ = *(std::array<u64,2>*)&assign;
+    Item& Item::operator =(const cuckoo::block& assign)
+    {
+        value_ = *(std::array<u64,2>*)&assign;
 
-		return *this;
-	}
+        return *this;
+    }
 
     Item& Item::operator =(const string &str)
     {
-		if (str.size() > sizeof(value_))
-		{
+        if (str.size() > sizeof(value_))
+        {
 
-			oc::RandomOracle oracl(sizeof(block));
-			oracl.Update(str.data(), str.size());
-			oracl.Final(value_);
-		}
-		else
-		{
-			value_[0] = 0;
-			value_[1] = 0;
-			memcpy((void*)str.data(), value_.data(), str.size());
-		}
+            oc::RandomOracle oracl(sizeof(block));
+            oracl.Update(str.data(), str.size());
+            oracl.Final(value_);
+        }
+        else
+        {
+            value_[0] = 0;
+            value_[1] = 0;
+            memcpy((void*)str.data(), value_.data(), str.size());
+        }
 
         return *this;
     }

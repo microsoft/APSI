@@ -68,7 +68,7 @@ namespace apsi
             The return result is a map from k to y^k.
             */
             void generate_powers(const std::vector<seal::util::ExFieldElement> &exfield_items,
-                std::map<uint64_t, std::vector<seal::util::ExFieldElement> >& ret,
+                std::map<uint64_t, std::vector<seal::util::ExFieldElement> > &ret,
                 std::list<seal::util::Pointer>& data);
 
             /**
@@ -76,14 +76,14 @@ namespace apsi
             ciphertexts in a vector depends on the slot count in generalized batching. For example, if an input vector has size 1024, the slot count 
             is 256, then there are 1024/256 = 4 ciphertext in the Ciphertext vector.
             */
-            std::map<uint64_t, std::vector<seal::Ciphertext>> encrypt(std::map<uint64_t, std::vector<seal::util::ExFieldElement>> &input);
+            void encrypt(std::map<uint64_t, std::vector<seal::util::ExFieldElement>> &input, std::map<std::uint64_t, std::vector<seal::Ciphertext>> &destination);
 
             /**
             Encrypts a vector of elements to a corresponding vector of SEAL Ciphertext, using generalized batching. The number of
             ciphertexts in the vector depends on the slot count in generalized batching. For example, if an input vector has size 1024, 
             the slot count is 256, then there are 1024/256 = 4 ciphertext in the Ciphertext vector.
             */
-            std::vector<seal::Ciphertext> encrypt(const std::vector<seal::util::ExFieldElement> &input);
+            void encrypt(const std::vector<seal::util::ExFieldElement> &input, std::vector<seal::Ciphertext> &destination);
 
             /**
             Stream decryption of ciphers from the sender. Ciphertext will be acquired from the sender in a streaming fashion one by one in

@@ -36,36 +36,6 @@ namespace apsi
 
     vector<SmallModulus> PSIParams::coeff_modulus()
     {
-        
-        //if (coeff_mod_bit_count_ == 120)
-        //{
-        //	// 120 bits (2^120 - 2^26 + 3 * 2^15 + 1)
-        //	return "fffffffffffffffffffffffc018001";
-        //}
-        //else if (coeff_mod_bit_count_ == 125) {
-        //	// 125 bits (2^125 - 2^25 + 3 * 2^14 + 1)
-        //	return "1ffffffffffffffffffffffffe00c001";
-        //}
-        //else if (coeff_mod_bit_count_ == 189) {
-        //	// 189 bits (2^189 - 2^21 + 9 * 2^15 + 1)
-        //	return "1fffffffffffffffffffffffffffffffffffffffffe48001";
-        //}
-        //else if (coeff_mod_bit_count_ == 435) {
-        //	// 435 bits (2^435 - 2^33 + 1), default 16384
-        //	return ChooserEvaluator::default_parameter_options().at(16384);
-        //}
-        //else if (coeff_mod_bit_count_ == 226) {
-        //	// 226 bits (2^226 - 2^26 + 1), default 8192
-        //	return ChooserEvaluator::default_parameter_options().at(8192);
-        //}
-        //else if (coeff_mod_bit_count_ == 116) {
-        //	// 116 bits (2^116 - 2^18 + 1), default 4096
-        //	return ChooserEvaluator::default_parameter_options().at(4096);
-        //}
-        //else if (coeff_mod_bit_count_ == 60)
-        //{
-        //	return ChooserEvaluator::default_parameter_options().at(2048);
-        //}
         int num_coeff_mod;
         if (coeff_mod_bit_count_ == 120)
         {
