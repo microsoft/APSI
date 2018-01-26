@@ -87,7 +87,7 @@ namespace apsi
 
             @see symmetric_polys for computing symmetric polynomials.
             */
-            std::vector<std::vector<seal::util::ExFieldElement>>& randomized_symmetric_polys(int splitIndex, SenderThreadContext &context);
+            //std::vector<std::vector<seal::util::ExFieldElement>> &randomized_symmetric_polys(int splitIndex, SenderThreadContext &context);
 
             /**
             Computes the randomized symmetric polynomials for the specified split and the specified batch in sender's database. Basically, it
