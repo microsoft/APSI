@@ -64,7 +64,7 @@ namespace apsi
 
 
             send(ciphertexts, chl);
-            
+
             auto table_to_input_map = cuckoo_indices(items, cuckoo);
             stop_watch.set_time_point("receiver pre-process/sent");
 
@@ -80,18 +80,34 @@ namespace apsi
 
             for (int i = 0; i < params_.table_size(); i++)
             {
-                for (int j = 0; j < params_.number_of_splits(); j++)
+                //if (table_to_input_map[i] == -1)
                 {
-                    if (result[j][i] == zero)
+                    for (int j = 0; j < params_.number_of_splits(); j++)
                     {
-                        intersection[table_to_input_map[i]] = true;
-                        break;
+                        if (result[j][i] == zero)
+                        {
+                            if (table_to_input_map[i] == -1)
+                            {
+                                ostreamLock o(std::cout);
+                                o << "fake match at " << i << " pos " << j << std::endl;
+                                o << "   " << cuckoo.get_encodings()[i] << std::endl;
+
+                                chl.asyncSendCopy(std::array<int, 2>{i, j});
+                            }
+                            else
+                            {
+                                intersection[table_to_input_map[i]] = true;
+                            }
+                            break;
+                        }
                     }
                 }
             }
 
-            /* Now we need to shorten and convert this tmp vector to match the length and indice of the query "items". */
+            chl.asyncSendCopy(std::array<int, 2>{-1,-1});
 
+
+            /* Now we need to shorten and convert this tmp vector to match the length and indice of the query "items". */
             stop_watch.set_time_point("receiver intersect");
             return intersection;
         }
@@ -115,19 +131,16 @@ namespace apsi
                 auto step = curve.getGenerator().sizeBytes();
                 std::vector<u8> buff(items.size() * step);
                 auto iter = buff.data();
+                for (u64 i = 0; i < items.size(); ++i)
                 {
-                    ostreamLock out(std::cout);
-                    for (u64 i = 0; i < items.size(); ++i)
-                    {
-                        b.emplace_back(curve, prng);
-                        PRNG pp((oc::block&)items[i], 8);
+                    b.emplace_back(curve, prng);
+                    PRNG pp((oc::block&)items[i], 8);
 
-                        x.randomize(pp);
-                        x *= b[i];
+                    x.randomize(pp);
+                    x *= b[i];
 
-                        x.toBytes(iter);
-                        iter += step;
-                    }
+                    x.toBytes(iter);
+                    iter += step;
                 }
 
 
@@ -195,26 +208,30 @@ namespace apsi
 
         unique_ptr<CuckooInterface> Receiver::cuckoo_hashing(const vector<Item> &items)
         {
+            auto receiver_null_item = oc::AllOneBlock;
+
             unique_ptr<CuckooInterface> cuckoo(
                 params_.get_cuckoo_mode() == CuckooMode::Permutation ?
                 static_cast<CuckooInterface*>(new PermutationBasedCuckoo(
-                    params_.hash_func_count(), 
-                    params_.hash_func_seed(), 
-                    params_.log_table_size(), 
-                    params_.item_bit_length(), 
-                    params_.max_probe()))
+                    params_.hash_func_count(),
+                    params_.hash_func_seed(),
+                    params_.log_table_size(),
+                    params_.item_bit_length(),
+                    params_.max_probe(),
+                    receiver_null_item))
                 :
                 static_cast<CuckooInterface*>(new Cuckoo(
                     params_.hash_func_count(),
                     params_.hash_func_seed(),
                     params_.log_table_size(),
                     params_.item_bit_length(),
-                    params_.max_probe()))
+                    params_.max_probe(),
+                    receiver_null_item))
             );
-            
+
             if (cuckoo->encoding_bit_length() >= ex_field_->characteristic().bit_count() * (ex_field_->poly_modulus().coeff_count() - 1))
             {
-                cout << "Reduced items too long. Only have " << 
+                cout << "Reduced items too long. Only have " <<
                     seal::util::get_significant_bit_count(params_.exfield_characteristic()) - 1 << " bits." << endl;
                 throw std::runtime_error(LOCATION);
             }
@@ -240,7 +257,7 @@ namespace apsi
         {
             vector<int> indice(cuckoo.capacity(), -1);
             auto& encodings = cuckoo.get_encodings();
-            
+
             cuckoo::PermutationBasedCuckoo::Encoder encoder(cuckoo.log_capacity(), cuckoo.loc_func_count(), params_.item_bit_length());
 
 
@@ -260,8 +277,8 @@ namespace apsi
                     if (neq(items[i], encodings[q.table_index()]))
                         throw std::runtime_error(LOCATION);
                 }
-            
-                ostreamLock(std::cout) << "Ritem[" << i << "] = " << items[i] << " -> " << q.hash_func_index() << " " << encodings[q.table_index()]  << " @ " << q.table_index() << std::endl;
+
+                //ostreamLock(std::cout) << "Ritem[" << i << "] = " << items[i] << " -> " << q.hash_func_index() << " " << encodings[q.table_index()] << " @ " << q.table_index() << std::endl;
             }
             return indice;
         }
@@ -280,6 +297,7 @@ namespace apsi
 
             for (int i = 0; i < cuckoo.capacity(); i++)
             {
+                //if(cuckoo.has_item_at(i))
                 Item(encodings[i]).to_exfield_element(ret[i], encoding_bit_length);
             }
         }

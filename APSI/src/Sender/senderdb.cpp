@@ -59,6 +59,7 @@ namespace apsi
             sender_null_item_[0] = ~1;
             sender_null_item_[1] = ~0;
 
+
             // What is the actual length of strings stored in the hash table
             encoding_bit_length_ = params.get_cuckoo_mode() == cuckoo::CuckooMode::Normal
                 ? params.item_bit_length()
@@ -68,6 +69,9 @@ namespace apsi
             null_element_ = sender_null_item_.to_exfield_element(global_ex_field_, encoding_bit_length_);
             neg_null_element_ = ExFieldElement(global_ex_field_);
             global_ex_field_->negate(null_element_, neg_null_element_);
+
+
+            //std::cout << "neg_null_element_: " << neg_null_element_ << std::endl;
         }
 
         void SenderDB::clear_db()
@@ -151,7 +155,7 @@ namespace apsi
 
                                 simple_hashing_db2_(position, cuckoo_loc) = data[i];
 
-                                ostreamLock(cout) << "Sitem[" << i << "] = " << data[i] << " -> " << j << " " << simple_hashing_db2_(position, cuckoo_loc) << " @ " << cuckoo_loc << endl;
+                                //ostreamLock(cout) << "Sitem[" << i << "] = " << data[i] << " -> " << j << " " << simple_hashing_db2_(position, cuckoo_loc) << " @ " << cuckoo_loc << endl;
 
                             }
                             else
@@ -160,7 +164,7 @@ namespace apsi
                                 auto position = aquire_bin_location(cuckoo_loc, prng);
                                 simple_hashing_db2_(position, cuckoo_loc) = encoder_.encode(data[i], j, true);
 
-                                ostreamLock(cout) << "Sitem[" << i << "] = " << data[i] << " -> "<<j<<" " << simple_hashing_db2_(position, cuckoo_loc) << " @ " << cuckoo_loc << endl;
+                                //ostreamLock(cout) << "Sitem[" << i << "] = " << data[i] << " -> "<<j<<" " << simple_hashing_db2_(position, cuckoo_loc) << " @ " << cuckoo_loc << endl;
 
 
                             }
@@ -265,6 +269,7 @@ namespace apsi
                     else
                     {
                         simple_hashing_db2_(position, cuckoo_loc).to_exfield_element(temp11, encoding_bit_length_);
+                        ostreamLock(std::cout) << "sender(" << cuckoo_loc << ", " << position << ") " << simple_hashing_db2_(position, cuckoo_loc) << std::endl;
                         temp1 = &temp11;
                         exfield->negate(*temp1, *temp1);
                     }

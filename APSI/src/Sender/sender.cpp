@@ -160,6 +160,7 @@ namespace apsi
                 thrds.emplace_back(thread([this, chl]() mutable
                 {
                     query_session(chl);
+
                 }));
             }
         }
@@ -176,7 +177,7 @@ namespace apsi
                 std::vector<u8> buff;
                 chl.recv(buff);
 
-                ostreamLock out(std::cout);
+                //ostreamLock out(std::cout);
                 auto iter = buff.data();
                 oc::EccPoint x(curve);
                 u64 num = buff.size() / step;
@@ -219,6 +220,44 @@ namespace apsi
 
             /* Answer to the query. */
             respond(query, session_context, chl);
+
+
+
+            try
+            {
+                std::array<int, 2> printIdx;
+
+                while (true)
+                {
+                    chl.recv(printIdx);
+                    if (printIdx[0] == -1) return;
+
+                    auto start = printIdx[1] * params_.split_size();
+                    auto end = start + params_.split_size();
+
+                    ostreamLock o(std::cout);
+
+                    for (int i = start; i < end; ++i)
+                    {
+                        o << "s[" << printIdx[0] << "][" << i << "] = " << sender_db_.simple_hashing_db2_(i, printIdx[0]) << std::endl;
+                    }
+
+                    o << "---------------------------------------" << std::endl;
+                    //if (sender_db_.has_item(printIdx[0], printIdx[1]))
+                    //{
+                    //    std::cout << "sender has an item at " << printIdx[0] << " " << printIdx[1] << std::endl;
+                    //}
+                    //else
+                    //{
+                    //    std::cout << "sender does NOT have an item at " << printIdx[0] << " " << printIdx[1] << std::endl;
+
+                    //}
+                }
+            }
+            catch (std::exception& e) {
+                std::cout << "channel: " << e.what() << std::endl;
+            }
+
         }
 
         void Sender::stop()
@@ -300,7 +339,7 @@ namespace apsi
 
                         //  Iterate over the coeffs multiplying them with the query powers  and summing the results
                         char currResult = 0;
-                        
+
                         local_evaluator->multiply_plain_ntt(powers[batch][0], sender_coeffs[0], runningResults[currResult]);
                         for (int s = 1; s <= params_.split_size(); s++)
                         {
@@ -319,10 +358,10 @@ namespace apsi
                         local_evaluator->transform_from_ntt(runningResults[currResult]);
 
                         // send the result over the network if needed.
-                            unique_lock<mutex> net_lock2(mtx);
-                            channel.asyncSendCopy(split);
-                            channel.asyncSendCopy(batch);
-                            send_ciphertext(runningResults[currResult], channel);
+                        unique_lock<mutex> net_lock2(mtx);
+                        channel.asyncSendCopy(split);
+                        channel.asyncSendCopy(batch);
+                        send_ciphertext(runningResults[currResult], channel);
                     }
 
                     /* After this point, this thread will no longer use the context resource, so it is free to return it. */

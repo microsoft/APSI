@@ -130,7 +130,6 @@ namespace apsi
 
             bool dummy_init_ = false;
 
-        private:
 
             PSIParams params_;
 

@@ -395,13 +395,13 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
     int log_table_size = 14;
 
     // Larger set size
-    int sender_set_size = 1 << 24;
+    int sender_set_size = 1 << 20;
 
     // Cuckoo hash function count
     int num_hash_func = 3;
 
     // Negative log failure probability for simple hashing
-    int binning_sec_level = 40;
+    int binning_sec_level = 10;
 
     // Number of splits to use
     // Larger means lower depth but bigger S-->R communication
@@ -450,7 +450,7 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
     sender.set_secret_key(receiver.secret_key());
 
     // For testing only insert a couple of elements in the sender's dataset
-    int sendersActualSize = 4;
+    int sendersActualSize = 40;
 
     // Sender's dataset
     vector<Item> s1(sendersActualSize);
@@ -462,8 +462,8 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
     }
 
     // Receiver's dataset
-    int receiversActualSize = 4;
-    int intersectionSize = 2;
+    int receiversActualSize = 40;
+    int intersectionSize = 20;
     int rem = receiversActualSize - intersectionSize;
 
     /*
