@@ -89,10 +89,7 @@ namespace apsi
                             if (table_to_input_map[i] == -1)
                             {
                                 ostreamLock o(std::cout);
-                                o << "fake match at " << i << " pos " << j << std::endl;
-                                o << "   " << cuckoo.get_encodings()[i] << std::endl;
-
-                                chl.asyncSendCopy(std::array<int, 2>{i, j});
+                                o << " **** False positive match at empty cuckoo[" << i << "] and response ciphtertext #" << j << std::endl;
                             }
                             else
                             {
@@ -104,7 +101,7 @@ namespace apsi
                 }
             }
 
-            chl.asyncSendCopy(std::array<int, 2>{-1,-1});
+            //chl.asyncSendCopy(std::array<int, 2>{-1,-1});
 
 
             /* Now we need to shorten and convert this tmp vector to match the length and indice of the query "items". */

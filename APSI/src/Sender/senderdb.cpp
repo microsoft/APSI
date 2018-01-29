@@ -269,7 +269,7 @@ namespace apsi
                     else
                     {
                         simple_hashing_db2_(position, cuckoo_loc).to_exfield_element(temp11, encoding_bit_length_);
-                        ostreamLock(std::cout) << "sender(" << cuckoo_loc << ", " << position << ") " << simple_hashing_db2_(position, cuckoo_loc) << std::endl;
+                        //ostreamLock(std::cout) << "sender(" << cuckoo_loc << ", " << position << ") " << simple_hashing_db2_(position, cuckoo_loc) << std::endl;
                         temp1 = &temp11;
                         exfield->negate(*temp1, *temp1);
                     }

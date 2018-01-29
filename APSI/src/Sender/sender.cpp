@@ -223,40 +223,40 @@ namespace apsi
 
 
 
-            try
-            {
-                std::array<int, 2> printIdx;
+            //try
+            //{
+            //    std::array<int, 2> printIdx;
 
-                while (true)
-                {
-                    chl.recv(printIdx);
-                    if (printIdx[0] == -1) return;
+            //    while (true)
+            //    {
+            //        chl.recv(printIdx);
+            //        if (printIdx[0] == -1) return;
 
-                    auto start = printIdx[1] * params_.split_size();
-                    auto end = start + params_.split_size();
+            //        auto start = printIdx[1] * params_.split_size();
+            //        auto end = start + params_.split_size();
 
-                    ostreamLock o(std::cout);
+            //        ostreamLock o(std::cout);
 
-                    for (int i = start; i < end; ++i)
-                    {
-                        o << "s[" << printIdx[0] << "][" << i << "] = " << sender_db_.simple_hashing_db2_(i, printIdx[0]) << std::endl;
-                    }
+            //        for (int i = start; i < end; ++i)
+            //        {
+            //            o << "s[" << printIdx[0] << "][" << i << "] = " << sender_db_.simple_hashing_db2_(i, printIdx[0]) << std::endl;
+            //        }
 
-                    o << "---------------------------------------" << std::endl;
-                    //if (sender_db_.has_item(printIdx[0], printIdx[1]))
-                    //{
-                    //    std::cout << "sender has an item at " << printIdx[0] << " " << printIdx[1] << std::endl;
-                    //}
-                    //else
-                    //{
-                    //    std::cout << "sender does NOT have an item at " << printIdx[0] << " " << printIdx[1] << std::endl;
+            //        o << "---------------------------------------" << std::endl;
+            //        //if (sender_db_.has_item(printIdx[0], printIdx[1]))
+            //        //{
+            //        //    std::cout << "sender has an item at " << printIdx[0] << " " << printIdx[1] << std::endl;
+            //        //}
+            //        //else
+            //        //{
+            //        //    std::cout << "sender does NOT have an item at " << printIdx[0] << " " << printIdx[1] << std::endl;
 
-                    //}
-                }
-            }
-            catch (std::exception& e) {
-                std::cout << "channel: " << e.what() << std::endl;
-            }
+            //        //}
+            //    }
+            //}
+            //catch (std::exception& e) {
+            //    std::cout << "channel: " << e.what() << std::endl;
+            //}
 
         }
 
