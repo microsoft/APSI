@@ -146,7 +146,6 @@ namespace apsi
             /* The ExField encoding of the sender null value. */
             seal::util::ExFieldElement null_element_, neg_null_element_;
 
-
             std::shared_ptr<seal::util::ExField> global_ex_field_;
 
             /* B x m, where B is sender's bin size, m is table size.

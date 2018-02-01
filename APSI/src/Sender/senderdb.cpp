@@ -299,7 +299,9 @@ namespace apsi
             {
                 ExFieldElement r = context.exfield()->random_element();
                 for (int j = 0; j < split_size + 1; j++)
+                {
                     context.exfield()->multiply(symm_block(i, j), r, symm_block(i, j));
+                }
             }
         }
 
@@ -322,6 +324,7 @@ namespace apsi
                 batch_size = params_.batch_size(),
                 split_size_plus_one = params_.split_size() + 1;
 
+            // Data in batch-split table is stored in "batch-major order"
             auto indexer = [splitStep = params_.number_of_batches() * split_size_plus_one,
                 batchStep = split_size_plus_one](int splitIdx, int batchIdx, int i)
             {
@@ -363,7 +366,6 @@ namespace apsi
                         }
                         context.exbuilder()->compose(batch_vector, temp_plain);
                     }
-
 
                     context.evaluator()->transform_to_ntt(temp_plain, batch_random_symm_polys_[idx]);
                 }
