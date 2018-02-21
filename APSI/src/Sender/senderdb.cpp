@@ -115,7 +115,7 @@ namespace apsi
 
                     vector<cuckoo::LocFunc> normal_loc_func(params_.hash_func_count());
                     vector<cuckoo::PermutationBasedLocFunc> perm_loc_func(params_.hash_func_count());
-                    
+
                     for (int i = 0; i < normal_loc_func.size(); i++)
                     {
                         normal_loc_func[i] = cuckoo::LocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
@@ -153,15 +153,18 @@ namespace apsi
                                 // Lock-free thread-safe bin position search
                                 auto position = aquire_bin_location(cuckoo_loc, prng);
 
+                                // Now actually insert the item into the database
                                 simple_hashing_db2_(position, cuckoo_loc) = data[i];
 
                                 //ostreamLock(cout) << "Sitem[" << i << "] = " << data[i] << " -> " << j << " " << simple_hashing_db2_(position, cuckoo_loc) << " @ " << cuckoo_loc << endl;
-
                             }
                             else
                             {
+                                // Get the permutation-based Cuckoo location and find position
                                 auto cuckoo_loc = perm_loc_func[j].location(data[i]);
                                 auto position = aquire_bin_location(cuckoo_loc, prng);
+
+                                // Insert as usual
                                 simple_hashing_db2_(position, cuckoo_loc) = encoder_.encode(data[i], j, true);
 
                                 //ostreamLock(cout) << "Sitem[" << i << "] = " << data[i] << " -> "<<j<<" " << simple_hashing_db2_(position, cuckoo_loc) << " @ " << cuckoo_loc << endl;
@@ -169,50 +172,52 @@ namespace apsi
 
                             }
                         }
-
                     };
-                    //#ifdef ADD_DATA_MULTI_THREAD
                 });
             }
 
-            for (auto& t : thrds) t.join();
-            //#endif
+            for (auto &t : thrds)
+            {
+                t.join();
+            }
         }
 
-
-        int SenderDB::aquire_bin_location(int cuckoo_loc, oc::PRNG & prng)
+        int SenderDB::aquire_bin_location(int cuckoo_loc, oc::PRNG &prng)
         {
             auto s = params_.sender_bin_size();
             auto start = cuckoo_loc * s;
             auto end = (cuckoo_loc + 1) * s;
             if (cuckoo_loc >= params_.table_size())
+            {
                 throw runtime_error(LOCATION);
+            }
 
-
-            // for 100 tries, guess a bin location can try to insert it there
-            // if nothing is currently there...
-            for (int i = 0; i < 100; ++i)
+            // For 100 tries, guess a bin location can try to insert item there
+            for (int i = 0; i < 100; i++)
             {
                 auto idx = prng.get<oc::u32>() % s;
 
                 bool exp = false;
                 if (simple_hashing_db_has_item_[start + idx].compare_exchange_strong(exp, true))
                 {
-                    // great, found an empty location and have marked it as mine.
+                    // Great, found an empty location and have marked it as mine
                     return idx;
                 }
             }
 
-            // do linear scan
-            for (int idx = 0; idx < s; ++idx)
+            // If still failed, try to do linear scan
+            for (int idx = 0; idx < s; idx++)
             {
                 bool exp = false;
                 if (simple_hashing_db_has_item_[start + idx].compare_exchange_strong(exp, true))
+                {
+                    // Great, found an empty location and have marked it as mine
                     return idx;
+                }
             }
 
-            // we failed, throw an error because this bin overflowed..
-            throw runtime_error("sender's bin is full. " LOCATION);
+            // Throw an error because bin overflowed
+            throw runtime_error("simple hashing failed due to bin overflow");
         }
 
         bool SenderDB::has_item(int cuckoo_loc, int position)
@@ -222,7 +227,6 @@ namespace apsi
             return simple_hashing_db_has_item_[start + position];
         }
 
-
         void SenderDB::add_data(const Item &item)
         {
             add_data(vector<Item>(1, item));
@@ -230,7 +234,7 @@ namespace apsi
 
         void SenderDB::delete_data(const vector<Item> &data)
         {
-            throw runtime_error("Update function");
+            throw runtime_error("not implemented");
         }
 
         void SenderDB::delete_data(const Item &item)
@@ -238,9 +242,8 @@ namespace apsi
             delete_data(vector<Item>(1, item));
         }
 
-
-
-        void SenderDB::symmetric_polys(int split, int batch, SenderThreadContext &context, oc::MatrixView<seal::util::ExFieldElement>symm_block)
+        void SenderDB::symmetric_polys(int split, int batch, SenderThreadContext &context,
+            MatrixView<ExFieldElement> symm_block)
         {
             int table_size = params_.table_size(), split_size = params_.split_size(), batch_size = params_.batch_size(), split_start = split * split_size,
                 batch_start = batch * batch_size;
@@ -291,7 +294,7 @@ namespace apsi
             }
         }
 
-        void SenderDB::randomized_symmetric_polys(int split, int batch, SenderThreadContext &context, oc::MatrixView<seal::util::ExFieldElement> symm_block)
+        void SenderDB::randomized_symmetric_polys(int split, int batch, SenderThreadContext &context, MatrixView<ExFieldElement> symm_block)
         {
             int split_size = params_.split_size();
             symmetric_polys(split, batch, context, symm_block);
@@ -301,7 +304,9 @@ namespace apsi
             {
                 ExFieldElement r = context.exfield()->random_element();
                 for (int j = 0; j < split_size + 1; j++)
+                {
                     context.exfield()->multiply(symm_block(i, j), r, symm_block(i, j));
+                }
             }
         }
 
@@ -312,21 +317,19 @@ namespace apsi
                 return;
             }
 
-
-            shared_ptr<ExField>& exfield = context.exfield();
+            // Get the symmetric block
             auto symm_block = context.symm_block();
 
-            //oc::MatrixView<ExFieldElement> ()
-
-            Pointer batch_backing;
-            vector<ExFieldElement>& batch_vector = context.batch_vector();
-            vector<uint64_t>& integer_batch_vector = context.integer_batch_vector();
+            // The data is allocated in SenderThreadContext
+            vector<ExFieldElement> &batch_vector = context.batch_vector();
+            vector<uint64_t> &integer_batch_vector = context.integer_batch_vector();
 
             int table_size = params_.table_size(),
                 split_size = params_.split_size(),
                 batch_size = params_.batch_size(),
                 split_size_plus_one = params_.split_size() + 1;
 
+            // Data in batch-split table is stored in "batch-major order"
             auto indexer = [splitStep = params_.number_of_batches() * split_size_plus_one,
                 batchStep = split_size_plus_one](int splitIdx, int batchIdx, int i)
             {
@@ -363,14 +366,14 @@ namespace apsi
                     else // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
                     {
                         for (int k = 0; batch_start + k < batch_end; k++)
+                        {
                             batch_vector[k] = symm_block(k, i);
+                        }
                         context.exbuilder()->compose(batch_vector, temp_plain);
                     }
 
-
                     context.evaluator()->transform_to_ntt(temp_plain, batch_random_symm_polys_[idx]);
                 }
-
             }
         }
 

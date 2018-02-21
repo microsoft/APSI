@@ -6,11 +6,11 @@ bin/*
 */~*
 *~
 *.out
-
 *.psess
 *.vsp
 *.vspx
 */x64/*
 x64/*
 *.user
-.vs
+*.vs
+*.json
