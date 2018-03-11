@@ -153,7 +153,7 @@ namespace apsi
             i.e., one thread will take care of several continuous complete rows. */
             oc::Matrix<Item> simple_hashing_db2_;
 
-            std::unique_ptr<std::atomic_bool[]>  simple_hashing_db_has_item_;
+            std::unique_ptr<std::atomic_bool[]> simple_hashing_db_has_item_;
 
             /* Thread safe function to insert an item into the bin 
              index by cockooIndex. The PRNG and be any PRNG.  */

@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
     CLP cmd(argc, argv);
 
     // Thread count
-    cmd.setDefault("t", 8);
+    cmd.setDefault("t", 4);
 
     IOService ios;
 

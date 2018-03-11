@@ -118,7 +118,7 @@ namespace apsi
 
                     for (int i = 0; i < normal_loc_func.size(); i++)
                     {
-                        normal_loc_func[i] = cuckoo::LocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
+                        normal_loc_func[i] = cuckoo ::LocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
                         perm_loc_func[i] = cuckoo::PermutationBasedLocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
                     }
 
@@ -142,7 +142,7 @@ namespace apsi
                             sha.Final(static_cast<oc::block&>(data[i]));
                         }
 
-                        // Claim a location in this bin that is empty
+                        // Claim an emply location in each matching bin
                         for (int j = 0; j < params_.hash_func_count(); j++)
                         {
                             if (params_.get_cuckoo_mode() == cuckoo::CuckooMode::Normal)
@@ -168,8 +168,6 @@ namespace apsi
                                 simple_hashing_db2_(position, cuckoo_loc) = encoder_.encode(data[i], j, true);
 
                                 //ostreamLock(cout) << "Sitem[" << i << "] = " << data[i] << " -> "<<j<<" " << simple_hashing_db2_(position, cuckoo_loc) << " @ " << cuckoo_loc << endl;
-
-
                             }
                         }
                     };
@@ -302,7 +300,16 @@ namespace apsi
 
             for (int i = 0; i < num_rows; i++)
             {
-                ExFieldElement r = context.exfield()->random_element();
+                ExFieldElement r;
+                do
+                {
+                    r = context.exfield()->random_element();
+                } while (r.is_zero());
+
+                if (*r.pointer(0) == 0)
+                {
+                    cout << "Zero randomness observed." << endl;
+                }
                 for (int j = 0; j < split_size + 1; j++)
                 {
                     context.exfield()->multiply(symm_block(i, j), r, symm_block(i, j));
@@ -342,7 +349,8 @@ namespace apsi
 
             for (int next_block = start_block; next_block < end_block; next_block++)
             {
-                int split = next_block / params_.number_of_batches(), batch = next_block % params_.number_of_batches();
+                int split = next_block / params_.number_of_batches();
+                int batch = next_block % params_.number_of_batches();
 
                 //if (!symm_polys_stale_[split][batch])
                 //	continue;
@@ -353,26 +361,28 @@ namespace apsi
 
                 randomized_symmetric_polys(split, batch, context, symm_block);
 
-                Plaintext temp_plain;
                 auto idx = indexer(split, batch, 0);
                 for (int i = 0; i < split_size + 1; i++, idx++)
                 {
+                    Plaintext &temp_plain = batch_random_symm_polys_[idx];
                     if (context.builder())
                     {
                         for (int k = 0; batch_start + k < batch_end; k++)
+                        {
                             integer_batch_vector[k] = *symm_block(k, i).pointer(0);
+                        }
                         context.builder()->compose(integer_batch_vector, temp_plain);
                     }
-                    else // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
+                    else if(context.exbuilder())
                     {
+                        // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
                         for (int k = 0; batch_start + k < batch_end; k++)
                         {
                             batch_vector[k] = symm_block(k, i);
                         }
                         context.exbuilder()->compose(batch_vector, temp_plain);
                     }
-
-                    context.evaluator()->transform_to_ntt(temp_plain, batch_random_symm_polys_[idx]);
+                    context.evaluator()->transform_to_ntt(temp_plain);
                 }
             }
         }

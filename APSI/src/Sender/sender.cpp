@@ -15,8 +15,8 @@ namespace apsi
 {
     namespace sender
     {
-        Sender::Sender(const PSIParams &params, const MemoryPoolHandle &pool, bool dummy_init)
-            :params_(params),
+        Sender::Sender(const PSIParams &params, const MemoryPoolHandle &pool, bool dummy_init) : 
+            params_(params),
             pool_(pool),
             ex_field_(ExField::Acquire(params.exfield_characteristic(), params.exfield_polymod(), pool)),
             sender_db_(params, ex_field_, dummy_init),
@@ -30,7 +30,7 @@ namespace apsi
         {
             enc_params_.set_poly_modulus("1x^" + to_string(params_.poly_degree()) + " + 1");
             enc_params_.set_coeff_modulus(params_.coeff_modulus());
-            enc_params_.set_plain_modulus(ex_field_->coeff_modulus()); // Assume the prime 'p' is always smaller than 64 bits.
+            enc_params_.set_plain_modulus(ex_field_->coeff_modulus());
 
             seal_context_.reset(new SEALContext(enc_params_));
             local_session_.reset(new SenderSessionContext(seal_context_, params_.sender_total_thread_count()));
@@ -39,40 +39,35 @@ namespace apsi
             const BigPoly poly_mod(ex_field_->coeff_count(), ex_field_->coeff_uint64_count() * bits_per_uint64,
                 const_cast<uint64_t*>(ex_field_->poly_modulus().get()));
 
-
             std::vector<std::thread> thrds(params_.sender_total_thread_count());
-            /* Set local exfields for multithreaded efficient use of memory pools. */
+
+            // Set local exfields for multi-threaded efficient use of memory pools.
             for (int i = 0; i < params_.sender_total_thread_count(); i++)
             {
                 available_thread_contexts_.push_back(i);
                 thrds[i] = std::thread([&, i]()
                 {
-
                     auto local_mph = MemoryPoolHandle::New(false);
-
                     thread_contexts_[i].set_id(i);
-
-                    thread_contexts_[i].set_exfield(ExField::Acquire(ex_field_->characteristic(),
-                        poly_mod, local_mph));
+                    thread_contexts_[i].set_exfield(ExField::Acquire(ex_field_->characteristic(), poly_mod, local_mph));
                     thread_contexts_[i].exfield()->set_frob_table(ex_field_->frobe_table());
 
                     if (seal_context_->qualifiers().enable_batching)
+                    {
                         thread_contexts_[i].set_builder(make_shared<PolyCRTBuilder>(*seal_context_, local_mph));
-
+                    }
                     thread_contexts_[i].set_exbuilder(make_shared<ExFieldPolyCRTBuilder>(thread_contexts_[i].exfield(), params_.log_poly_degree()));
-
                     thread_contexts_[i].construct_variables(params_);
                 });
             }
 
             for (auto& thrd : thrds)
+            {
                 thrd.join();
-
+            }
 
             prng_.SetSeed(oc::ZeroBlock);
             //curve_.setParameters(oc::Curve25519);
-
-
         }
 
         Sender::~Sender()
@@ -114,9 +109,11 @@ namespace apsi
                 {
                     int thread_context_idx = acquire_thread_context();
                     auto& context = thread_contexts_[thread_context_idx];
+
+                    // Should already be constructed; if so, this does nothing.
                     context.construct_variables(params_);
 
-                    /* Update the context with the session's specific keys. */
+                    // Update the context with the session's specific keys.
                     context.set_encryptor(local_session_->encryptor_);
                     context.set_evaluator(local_session_->local_evaluators_[i]);
 
@@ -424,7 +421,9 @@ namespace apsi
                     }
                 }
                 else
+                {
                     this_thread::sleep_for(chrono::milliseconds(50));
+                }
             }
 
             return thread_context_idx;

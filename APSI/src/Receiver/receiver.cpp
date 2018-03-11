@@ -486,32 +486,32 @@ namespace apsi
         //}
 
 
-   //     void Receiver::decrypt(const vector<Ciphertext> &ciphers,
-            //std::vector<seal::util::ExFieldElement>& result,
-            //seal::util::Pointer& backing)
-   //     {
-   //         int slot_count = exfieldpolycrtbuilder_->slot_count();
-   //         
-   //         vector<ExFieldElement> result = ex_field_->allocate_elements(ciphers.size() * slot_count, backing);
-   //         Pointer tmp_backing;
-   //         vector<ExFieldElement> temp = ex_field_->allocate_elements(slot_count, tmp_backing);
-   //         for (int i = 0; i < ciphers.size(); i++)
-   //         {
-   //             if (polycrtbuilder_)
-   //             {
-   //                 vector<uint64_t> integer_batch = polycrtbuilder_->decompose(decryptor_->decrypt(ciphers[i]));
-   //                 for (int j = 0; j < integer_batch.size(); j++)
-   //                     *temp[j].pointer(0) = integer_batch[j];
-   //             }
-   //             else
-   //             {
-   //                 exfieldpolycrtbuilder_->decompose(decryptor_->decrypt(ciphers[i]), temp);
-   //             }
-   //             for(int j = 0; j < temp.size(); j++)
-   //                 result[i * slot_count + j] = temp[j];
-   //         }
-   //         //return result;
-   //     }
+        //     void Receiver::decrypt(const vector<Ciphertext> &ciphers,
+        //std::vector<seal::util::ExFieldElement>& result,
+        //seal::util::Pointer& backing)
+        //     {
+        //         int slot_count = exfieldpolycrtbuilder_->slot_count();
+        //         
+        //         vector<ExFieldElement> result = ex_field_->allocate_elements(ciphers.size() * slot_count, backing);
+        //         Pointer tmp_backing;
+        //         vector<ExFieldElement> temp = ex_field_->allocate_elements(slot_count, tmp_backing);
+        //         for (int i = 0; i < ciphers.size(); i++)
+        //         {
+        //             if (polycrtbuilder_)
+        //             {
+        //                 vector<uint64_t> integer_batch = polycrtbuilder_->decompose(decryptor_->decrypt(ciphers[i]));
+        //                 for (int j = 0; j < integer_batch.size(); j++)
+        //                     *temp[j].pointer(0) = integer_batch[j];
+        //             }
+        //             else
+        //             {
+        //                 exfieldpolycrtbuilder_->decompose(decryptor_->decrypt(ciphers[i]), temp);
+        //             }
+        //             for(int j = 0; j < temp.size(); j++)
+        //                 result[i * slot_count + j] = temp[j];
+        //         }
+        //         //return result;
+        //     }
 
         //void Receiver::decrypt(const seal::Ciphertext &cipher, vector<ExFieldElement> &batch)
         //{
