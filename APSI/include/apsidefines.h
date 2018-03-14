@@ -8,7 +8,7 @@
 #include <memory>
 #include "seal/plaintext.h"
 #include "seal/context.h"
-#include <cstring>
+#include <string>
 
 namespace apsi
 {
@@ -21,13 +21,9 @@ namespace apsi
         std::memset(reinterpret_cast<unsigned char*>(destination), 0, 8 * u64_count);
     }
 
-    void right_shift_uint(const u64 *source, u64 *destination, u64 shift_amount, u64 u64_count);
+    std::uint64_t optimal_split(std::uint64_t x, int base);
 
-    void left_shift_uint(const u64 *source, u64 *destination, u64 shift_amount, u64 u64_count);
-
-    uint64_t optimal_split(uint64_t x, int base);
-
-    std::vector<uint64_t> conversion_to_digits(uint64_t input, int base);
+    std::vector<std::uint64_t> conversion_to_digits(std::uint64_t input, int base);
 
     void split(const std::string &s, char delim, std::vector<std::string> &elems);
 

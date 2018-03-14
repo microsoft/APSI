@@ -19,23 +19,23 @@
     <Filter Include="Header Files\Sender">
       <UniqueIdentifier>{60858af7-f52f-4e2a-9c74-1ff8bfe40139}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\Tools">
-      <UniqueIdentifier>{4e09fc83-bf22-4d8e-a677-9dd606cfdcc6}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\Sender">
       <UniqueIdentifier>{06290153-ce5f-47b0-b510-00bc5ed85904}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\Receiver">
       <UniqueIdentifier>{e42be588-5cca-4442-b14a-226e5429bcac}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Tools">
-      <UniqueIdentifier>{80709ccd-a2db-4ce3-bde5-b623d092770d}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\Network">
       <UniqueIdentifier>{1d7550ee-b676-45fd-92a7-e3960c3f4180}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\Network">
       <UniqueIdentifier>{bc1b2fb6-fe51-4c78-aaa8-d0ce85877950}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Tools">
+      <UniqueIdentifier>{3724c067-3d6b-42ac-b9ab-cbf3c5c3fc09}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Tools">
+      <UniqueIdentifier>{3071dd66-85f2-4ab2-a9d1-1b986e2921e9}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -47,12 +47,6 @@
     </ClInclude>
     <ClInclude Include="include\Sender\sender.h">
       <Filter>Header Files\Sender</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Tools\log.h">
-      <Filter>Header Files\Tools</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Tools\stopwatch.h">
-      <Filter>Header Files\Tools</Filter>
     </ClInclude>
     <ClInclude Include="include\item.h">
       <Filter>Header Files</Filter>
@@ -72,9 +66,6 @@
     <ClInclude Include="include\Network\network_utils.h">
       <Filter>Header Files\Network</Filter>
     </ClInclude>
-    <ClInclude Include="include\Tools\hash.h">
-      <Filter>Header Files\Tools</Filter>
-    </ClInclude>
     <ClInclude Include="include\Sender\sendersessioncontext.h">
       <Filter>Header Files\Sender</Filter>
     </ClInclude>
@@ -82,7 +73,10 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="include\Tools\ThreadPool.h">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Tools\stopwatch.h">
+      <Filter>Header Files\Tools</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -92,20 +86,11 @@
     <ClCompile Include="src\Sender\sender.cpp">
       <Filter>Source Files\Sender</Filter>
     </ClCompile>
-    <ClCompile Include="src\Tools\log.cpp">
-      <Filter>Source Files\Tools</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Tools\stopwatch.cpp">
-      <Filter>Source Files\Tools</Filter>
-    </ClCompile>
     <ClCompile Include="src\Sender\senderdb.cpp">
       <Filter>Source Files\Sender</Filter>
     </ClCompile>
     <ClCompile Include="src\apsidefines.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Tools\hash.cpp">
-      <Filter>Source Files\Tools</Filter>
     </ClCompile>
     <ClCompile Include="src\item.cpp">
       <Filter>Source Files</Filter>
@@ -116,8 +101,11 @@
     <ClCompile Include="src\plaintextarith.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\Tools\stopwatch.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
     <ClCompile Include="src\Network\network_utils.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\Network</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

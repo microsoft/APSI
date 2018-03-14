@@ -114,11 +114,11 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
-      <Optimization>Disabled</Optimization>
+      <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>include;C:\libs\boost;..\..\Cuckoo\Cuckoo\include;..\..\SEAL-dev\SEAL\;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;$(ProjectDir)../../cryptoTools/thirdparty/win/miracl;$(ProjectDir)../../cryptoTools/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>include;C:\libs\boost;..\..\Cuckoo\Cuckoo\include;..\..\SEAL-dev\SEAL\;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;$(ProjectDir)../../cryptoTools/thirdparty/win/miracl;$(ProjectDir)../../cryptoTools;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -143,8 +143,6 @@
     <ClInclude Include="include\Sender\senderdb.h" />
     <ClInclude Include="include\Sender\sendersessioncontext.h" />
     <ClInclude Include="include\Sender\senderthreadcontext.h" />
-    <ClInclude Include="include\Tools\hash.h" />
-    <ClInclude Include="include\Tools\log.h" />
     <ClInclude Include="include\Tools\stopwatch.h" />
     <ClInclude Include="include\Tools\ThreadPool.h" />
   </ItemGroup>
@@ -157,8 +155,6 @@
     <ClCompile Include="src\Receiver\receiver.cpp" />
     <ClCompile Include="src\Sender\sender.cpp" />
     <ClCompile Include="src\Sender\senderdb.cpp" />
-    <ClCompile Include="src\Tools\hash.cpp" />
-    <ClCompile Include="src\Tools\log.cpp" />
     <ClCompile Include="src\Tools\stopwatch.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

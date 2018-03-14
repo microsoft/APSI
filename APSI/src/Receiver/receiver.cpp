@@ -1,8 +1,10 @@
+#include "Sender/sender.h"
 #include "Receiver/receiver.h"
+
+// SEAL includes
 #include "seal/util/uintcore.h"
 #include "seal/encryptionparams.h"
 #include "seal/keygenerator.h"
-#include "Sender/sender.h"
 #include "apsidefines.h"
 #include <sstream>
 #include "Network/network_utils.h"

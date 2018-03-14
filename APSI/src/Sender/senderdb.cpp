@@ -24,8 +24,7 @@ namespace apsi
 {
     namespace sender
     {
-        SenderDB::SenderDB(const PSIParams &params, shared_ptr<ExField> &ex_field, bool dummy_init) :
-            dummy_init_(dummy_init),
+        SenderDB::SenderDB(const PSIParams &params, shared_ptr<ExField> &ex_field) :
             params_(params),
             encoder_(params.log_table_size(), params.hash_func_count(), params.item_bit_length()),
             global_ex_field_(ex_field),
@@ -33,22 +32,10 @@ namespace apsi
             next_locs_(params.table_size(), 0),
             batch_random_symm_polys_(params.number_of_splits() * params.number_of_batches() * (params.split_size() + 1))
         {
-            if (dummy_init_)
+            for (auto& plain : batch_random_symm_polys_)
             {
-                cout << "--------------------- WARNING: dummy init(...) --------------------- " << endl;
-                for (auto& plain : batch_random_symm_polys_)
-                {
-                    plain.resize(params_.coeff_modulus().size() * (params_.poly_degree() + 1));
-                    plain[0] = 1;
-                }
-            }
-            else
-            {
-                for (auto& plain : batch_random_symm_polys_)
-                {
-                    // Reserve memory for ciphertext size plaintexts (NTT transformed mod q)
-                    plain.reserve(params_.coeff_modulus().size() * (params_.poly_degree() + 1));
-                }
+                // Reserve memory for ciphertext size plaintexts (NTT transformed mod q)
+                plain.reserve(params_.coeff_modulus().size() * (params_.poly_degree() + 1));
             }
 
             oc::block seed;
@@ -317,11 +304,6 @@ namespace apsi
         void SenderDB::batched_randomized_symmetric_polys(SenderThreadContext &context, 
             shared_ptr<Evaluator> evaluator, shared_ptr<PolyCRTBuilder> builder)
         {
-            if (dummy_init_)
-            {
-                return;
-            }
-
             // Get the symmetric block
             auto symm_block = context.symm_block();
 

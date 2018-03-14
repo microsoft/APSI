@@ -2,21 +2,10 @@
 #include <string>
 #include <fstream>
 #include <vector>
-#include "receiver.h"
 #include "apsi.h"
-#include "apsidefines.h"
-#include "Sender/sender.h"
-#include "seal/util/exfield.h"
-#include "seal/util/uintcore.h"
-#include "cryptoTools/Common/CLP.h"
-#include "cryptoTools/Common/Timer.h"
-#include "cryptoTools/Network/IOService.h"
-#include "cryptoTools/Crypto/PRNG.h"
 
-int round_up_to(int v, int s)
-{
-    return (v + s - 1) / s * s;
-}
+#include "cryptoTools/Common/CLP.h"
+#include "cryptoTools/Network/IOService.h"
 
 using namespace std;
 using namespace apsi;
@@ -38,6 +27,27 @@ void example_slow_vs_fast();
 void example_remote();
 void example_remote_multiple();
 
+int round_up_to(int v, int s)
+{
+    return (v + s - 1) / s * s;
+}
+
+void print_example_banner(string title)
+{
+    if (!title.empty())
+    {
+        size_t title_length = title.length();
+        size_t banner_length = title_length + 2 + 2 * 10;
+        string banner_top(banner_length, '*');
+        string banner_middle = string(10, '*') + " " + title + " " + string(10, '*');
+
+        cout << endl
+            << banner_top << endl
+            << banner_middle << endl
+            << banner_top << endl
+            << endl;
+    }
+}
 
 vector<Item> randSubset(const vector<Item>& items, int size)
 {
@@ -51,30 +61,12 @@ vector<Item> randSubset(const vector<Item>& items, int size)
     auto ssIter = ss.begin();
 
     vector<Item> ret(size);
-    for (int i = 0; i < size; ++i)
+    for (int i = 0; i < size; i++)
+    {
         ret[i] = items[*ssIter++];
+    }
 
     return ret;
-}
-
-void perf()
-{
-    oc::PRNG prng(oc::ZeroBlock, 256);
-    random_device rd;
-
-    int count = 1 << 26;
-    oc::Timer t;
-    for (int i = 0; i < count; ++i)
-    {
-        prng.get<int>();
-    }
-    t.setTimePoint("prng");
-    for (int i = 0; i < count; ++i)
-    {
-        rd();
-    }
-    t.setTimePoint("prng");
-    cout << t << endl;
 }
 
 int main(int argc, char *argv[])
@@ -124,14 +116,12 @@ int main(int argc, char *argv[])
     // Example: Remote connection from multiple receivers
     //example_remote_multiple();
 
-
 #ifdef _MSC_VER
     // Wait for ENTER before closing screen.
     cout << endl << "Press ENTER to exit" << endl;
     char ignore;
     cin.get(ignore);
 #endif
-
     return 0;
 }
 
@@ -440,7 +430,7 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
     stop_watch.set_time_point("Receiver constructor");
 
     // Set up sender
-    Sender sender(params, MemoryPoolHandle::New(true), cmd.isSet("dummy"));
+    Sender sender(params, MemoryPoolHandle::New(true));
     stop_watch.set_time_point("Sender constructor");
 
     // For testing only insert a couple of elements in the sender's dataset
@@ -847,20 +837,3 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 //
 //    cout << stop_watch << endl;
 //}
-
-void print_example_banner(string title)
-{
-    if (!title.empty())
-    {
-        size_t title_length = title.length();
-        size_t banner_length = title_length + 2 + 2 * 10;
-        string banner_top(banner_length, '*');
-        string banner_middle = string(10, '*') + " " + title + " " + string(10, '*');
-
-        cout << endl
-            << banner_top << endl
-            << banner_middle << endl
-            << banner_top << endl
-            << endl;
-    }
-}

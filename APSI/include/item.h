@@ -4,7 +4,6 @@
 #include <string>
 #include <stdexcept>
 #include "seal/util/exfield.h"
-#include "Tools/hash.h"
 #include "cuckoo.h"
 
 namespace apsi
@@ -17,7 +16,6 @@ namespace apsi
         */
         Item()
         {
-
         }
 
         Item(const Item&) = default;
