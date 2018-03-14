@@ -1,13 +1,11 @@
-#include "Sender/sender.h"
-#include "Receiver/receiver.h"
-
-// SEAL includes
+#include <sstream>
+#include "apsi/sender/sender.h"
+#include "apsi/receiver/receiver.h"
+#include "apsi/apsidefines.h"
+#include "apsi/network/network_utils.h"
 #include "seal/util/uintcore.h"
 #include "seal/encryptionparams.h"
 #include "seal/keygenerator.h"
-#include "apsidefines.h"
-#include <sstream>
-#include "Network/network_utils.h"
 #include "cryptoTools/Crypto/sha1.h"
 #include "cryptoTools/Common/Log.h"
 
@@ -90,8 +88,8 @@ namespace apsi
                         {
                             //if (table_to_input_map[i] == -1)
                             //{
-                            //    ostreamLock o(std::cout);
-                            //    o << " **** False positive match at empty cuckoo[" << i << "] and response ciphtertext #" << j << std::endl;
+                            //    ostreamLock o(cout);
+                            //    o << " **** False positive match at empty cuckoo[" << i << "] and response ciphtertext #" << j << endl;
                             //}
                             //else
                             //{
@@ -104,7 +102,7 @@ namespace apsi
                 }
             }
 
-            //chl.asyncSendCopy(std::array<int, 2>{-1,-1});
+            //chl.asyncSendCopy(array<int, 2>{-1,-1});
 
 
             /* Now we need to shorten and convert this tmp vector to match the length and indice of the query "items". */
@@ -112,24 +110,24 @@ namespace apsi
             return intersection;
         }
 
-        std::pair<
-            std::map<uint64_t, std::vector<seal::Ciphertext>>,
+        pair<
+            map<uint64_t, vector<Ciphertext>>,
             unique_ptr<CuckooInterface>
         > Receiver::preprocess(vector<Item> &items, Channel& channel)
         {
             if (params_.use_pk_oprf())
             {
 
-                //std::cout << "start " << std::endl;
+                //cout << "start " << endl;
                 PRNG prng(ZeroBlock);
                 EllipticCurve curve(p256k1, prng.get<oc::block>());
-                std::vector<EccNumber> b;
+                vector<EccNumber> b;
                 b.reserve(items.size());
                 EccPoint x(curve);
-                //std::vector<EccPoint> xx; xx.reserve(items.size());
+                //vector<EccPoint> xx; xx.reserve(items.size());
 
                 auto step = curve.getGenerator().sizeBytes();
-                std::vector<u8> buff(items.size() * step);
+                vector<u8> buff(items.size() * step);
                 auto iter = buff.data();
                 for (u64 i = 0; i < items.size(); ++i)
                 {
@@ -145,13 +143,13 @@ namespace apsi
 
 
                 // send the data over the network and prep for the response.
-                channel.asyncSend(std::move(buff));
+                channel.asyncSend(move(buff));
                 auto f = channel.asyncRecv(buff);
 
                 // compute 1/b so that we can compute (x^ba)^(1/b) = x^a
                 for (u64 i = 0; i < items.size(); ++i)
                 {
-                    b[i] = std::move(b[i].inverse());
+                    b[i] = move(b[i].inverse());
                 }
                 f.get();
 
@@ -179,8 +177,8 @@ namespace apsi
             exfield_encoding(*cuckoo, exfield_items, data);
 
 
-            std::map<uint64_t, std::vector<seal::util::ExFieldElement> > powers;
-            std::list<Pointer> data2;
+            map<uint64_t, vector<::ExFieldElement> > powers;
+            list<Pointer> data2;
             generate_powers(exfield_items, powers, data2);
             exfield_items.clear();
             data.release();
@@ -188,7 +186,7 @@ namespace apsi
             map<uint64_t, vector<Ciphertext>> ciphers;
             encrypt(powers, ciphers);
 
-            return { std::move(ciphers), std::move(cuckoo) };
+            return { move(ciphers), move(cuckoo) };
         }
 
         void Receiver::send(const map<uint64_t, vector<Ciphertext>> &query, Channel &channel)
@@ -233,13 +231,13 @@ namespace apsi
             {
                 cout << "Reduced items too long. Only have " <<
                     seal::util::get_significant_bit_count(params_.exfield_characteristic()) - 1 << " bits." << endl;
-                throw std::runtime_error(LOCATION);
+                throw runtime_error(LOCATION);
             }
             else
             {
                 cout << "Using " << cuckoo->encoding_bit_length()
                     << " out of " << seal::util::get_significant_bit_count(params_.exfield_characteristic()) - 1
-                    << " bits of exfield element." << std::endl;
+                    << " bits of exfield element." << endl;
             }
             bool insertionSuccess;
             for (int i = 0; i < items.size(); i++)
@@ -253,7 +251,7 @@ namespace apsi
         }
 
 
-        std::vector<int> Receiver::cuckoo_indices(const std::vector<Item> &items, cuckoo::CuckooInterface &cuckoo)
+        vector<int> Receiver::cuckoo_indices(const vector<Item> &items, cuckoo::CuckooInterface &cuckoo)
         {
             vector<int> indice(cuckoo.capacity(), -1);
             auto& encodings = cuckoo.get_encodings();
@@ -270,23 +268,23 @@ namespace apsi
                 {
                     auto rr = encoder.encode(items[i], q.hash_func_index(), true);
                     if (neq(oc::block(rr), oc::block(encodings[q.table_index()])))
-                        throw std::runtime_error(LOCATION);
+                        throw runtime_error(LOCATION);
                 }
                 else
                 {
                     if (neq(items[i], encodings[q.table_index()]))
-                        throw std::runtime_error(LOCATION);
+                        throw runtime_error(LOCATION);
                 }
 
-                //ostreamLock(std::cout) << "Ritem[" << i << "] = " << items[i] << " -> " << q.hash_func_index() << " " << encodings[q.table_index()] << " @ " << q.table_index() << std::endl;
+                //ostreamLock(cout) << "Ritem[" << i << "] = " << items[i] << " -> " << q.hash_func_index() << " " << encodings[q.table_index()] << " @ " << q.table_index() << endl;
             }
             return indice;
         }
 
         void Receiver::exfield_encoding(
             CuckooInterface &cuckoo,
-            std::vector<seal::util::ExFieldElement>& ret,
-            seal::util::Pointer& data)
+            vector<::ExFieldElement>& ret,
+            ::Pointer& data)
         {
 
             ret = ex_field_->allocate_elements(cuckoo.capacity(), data);
@@ -303,8 +301,8 @@ namespace apsi
         }
 
         void Receiver::generate_powers(const vector<ExFieldElement> &exfield_items,
-            std::map<uint64_t, std::vector<seal::util::ExFieldElement> >& result,
-            std::list<Pointer>& data)
+            map<uint64_t, vector<::ExFieldElement> >& result,
+            list<Pointer>& data)
         {
             int split_size = (params_.sender_bin_size() + params_.number_of_splits() - 1) / params_.number_of_splits();
             int window_size = params_.window_size();
@@ -333,7 +331,7 @@ namespace apsi
 
         }
 
-        void Receiver::encrypt(std::map<uint64_t, std::vector<ExFieldElement>> &input, map<uint64_t, vector<Ciphertext>> &destination)
+        void Receiver::encrypt(map<uint64_t, vector<ExFieldElement>> &input, map<uint64_t, vector<Ciphertext>> &destination)
         {
             destination.clear();
             for (auto it = input.begin(); it != input.end(); it++)
@@ -397,8 +395,8 @@ namespace apsi
 
         void Receiver::stream_decrypt(
             oc::Channel &channel,
-            std::vector<std::vector<ExFieldElement>> &result,
-            seal::util::Pointer& backing)
+            vector<vector<ExFieldElement>> &result,
+            ::Pointer& backing)
         {
             vector<vector<Plaintext>> plaintext_matrix;
 
@@ -462,8 +460,8 @@ namespace apsi
 
 
 
-        //void Receiver::decompose(const std::vector<std::vector<seal::Plaintext>> &plain_matrix,
-        //	std::vector<std::vector<seal::util::ExFieldElement>> &result)
+        //void Receiver::decompose(const vector<vector<Plaintext>> &plain_matrix,
+        //	vector<vector<::ExFieldElement>> &result)
         //{
         //	int num_of_splits = params_.number_of_splits(),
         //		num_of_batches = params_.number_of_batches(),
@@ -490,8 +488,8 @@ namespace apsi
 
 
         //     void Receiver::decrypt(const vector<Ciphertext> &ciphers,
-        //std::vector<seal::util::ExFieldElement>& result,
-        //seal::util::Pointer& backing)
+        //vector<::ExFieldElement>& result,
+        //::Pointer& backing)
         //     {
         //         int slot_count = exfieldpolycrtbuilder_->slot_count();
         //         
@@ -516,20 +514,20 @@ namespace apsi
         //         //return result;
         //     }
 
-        //void Receiver::decrypt(const seal::Ciphertext &cipher, vector<ExFieldElement> &batch)
+        //void Receiver::decrypt(const Ciphertext &cipher, vector<ExFieldElement> &batch)
         //{
         //    Plaintext plain;
         //    decrypt(cipher, plain);
         //    decompose(plain, batch);
         //}
 
-        void Receiver::decrypt(const seal::Ciphertext &cipher, Plaintext &plain)
+        void Receiver::decrypt(const Ciphertext &cipher, Plaintext &plain)
         {
             decryptor_->decrypt(cipher, plain);
             //cout << "Noise budget: " << decryptor_->invariant_noise_budget(cipher) << endl;
         }
 
-        //void Receiver::decompose(const Plaintext &plain, std::vector<seal::util::ExFieldElement> &batch)
+        //void Receiver::decompose(const Plaintext &plain, vector<::ExFieldElement> &batch)
         //{
 
         //}

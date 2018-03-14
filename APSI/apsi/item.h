@@ -3,8 +3,9 @@
 #include <array>
 #include <string>
 #include <stdexcept>
+
 #include "seal/util/exfield.h"
-#include "cuckoo.h"
+#include "cuckoo/cuckoo.h"
 
 namespace apsi
 {

@@ -1,6 +1,6 @@
 
-#include "Sender/senderdb.h"
-#include "apsidefines.h"
+#include "apsi/sender/senderdb.h"
+#include "apsi/apsidefines.h"
 #include "seal/util/uintcore.h"
 #include <fstream>
 #include <algorithm>

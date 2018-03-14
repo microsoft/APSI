@@ -11,9 +11,9 @@
 #include "seal/secretkey.h"
 #include "seal/evaluationkeys.h"
 #include "seal/polycrt.h"
-#include "item.h"
-#include "psiparams.h"
-#include "cuckoo.h"
+#include "apsi/item.h"
+#include "apsi/psiparams.h"
+#include "cuckoo/cuckoo.h"
 //#include "Sender/sender.h"
 #include "cryptoTools/Network/Channel.h"
 

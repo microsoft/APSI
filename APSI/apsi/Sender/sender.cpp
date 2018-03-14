@@ -3,9 +3,9 @@
 #include <chrono>
 #include <array>
 
-#include "Sender/sender.h"
-#include "apsidefines.h"
-#include "Network/network_utils.h"
+#include "apsi/sender/sender.h"
+#include "apsi/apsidefines.h"
+#include "apsi/network/network_utils.h"
 
 #include "cryptoTools/Common/Log.h"
 

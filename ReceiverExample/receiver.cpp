@@ -2,7 +2,8 @@
 #include <string>
 #include <fstream>
 #include <vector>
-#include "apsi.h"
+
+#include "apsi/apsi.h"
 
 #include "cryptoTools/Common/CLP.h"
 #include "cryptoTools/Network/IOService.h"

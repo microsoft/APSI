@@ -6,7 +6,7 @@
 #include <vector>
 
 // APSI
-#include "psiparams.h"
+#include "apsi/psiparams.h"
 
 // SEAL
 #include "seal/memorypoolhandle.h"

@@ -39,73 +39,73 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\apsi.h">
+    <ClInclude Include="apsi\apsi.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Receiver\receiver.h">
-      <Filter>Header Files\Receiver</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Sender\sender.h">
-      <Filter>Header Files\Sender</Filter>
-    </ClInclude>
-    <ClInclude Include="include\item.h">
+    <ClInclude Include="apsi\apsidefines.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\psiparams.h">
+    <ClInclude Include="apsi\item.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Sender\senderdb.h">
-      <Filter>Header Files\Sender</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Sender\senderthreadcontext.h">
-      <Filter>Header Files\Sender</Filter>
-    </ClInclude>
-    <ClInclude Include="include\apsidefines.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="include\Network\network_utils.h">
+    <ClInclude Include="apsi\Network\network_utils.h">
       <Filter>Header Files\Network</Filter>
     </ClInclude>
-    <ClInclude Include="include\Sender\sendersessioncontext.h">
-      <Filter>Header Files\Sender</Filter>
-    </ClInclude>
-    <ClInclude Include="include\plaintextarith.h">
+    <ClInclude Include="apsi\plaintextarith.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\Tools\ThreadPool.h">
+    <ClInclude Include="apsi\psiparams.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\Receiver\receiver.h">
+      <Filter>Header Files\Receiver</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\Sender\sender.h">
+      <Filter>Header Files\Sender</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\Sender\senderdb.h">
+      <Filter>Header Files\Sender</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\Sender\sendersessioncontext.h">
+      <Filter>Header Files\Sender</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\Sender\senderthreadcontext.h">
+      <Filter>Header Files\Sender</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\Tools\stopwatch.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
-    <ClInclude Include="include\Tools\stopwatch.h">
+    <ClInclude Include="apsi\Tools\ThreadPool.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\Receiver\receiver.cpp">
+    <ClCompile Include="apsi\apsidefines.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\item.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\Network\network_utils.cpp">
+      <Filter>Source Files\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\plaintextarith.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\psiparams.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\Receiver\receiver.cpp">
       <Filter>Source Files\Receiver</Filter>
     </ClCompile>
-    <ClCompile Include="src\Sender\sender.cpp">
+    <ClCompile Include="apsi\Sender\sender.cpp">
       <Filter>Source Files\Sender</Filter>
     </ClCompile>
-    <ClCompile Include="src\Sender\senderdb.cpp">
+    <ClCompile Include="apsi\Sender\senderdb.cpp">
       <Filter>Source Files\Sender</Filter>
     </ClCompile>
-    <ClCompile Include="src\apsidefines.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\item.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\psiparams.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\plaintextarith.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Tools\stopwatch.cpp">
+    <ClCompile Include="apsi\Tools\stopwatch.cpp">
       <Filter>Source Files\Tools</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Network\network_utils.cpp">
-      <Filter>Source Files\Network</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

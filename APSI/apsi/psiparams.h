@@ -4,13 +4,13 @@
 #include <map>
 #include <cmath>
 #include <numeric>
+#include "apsi/apsidefines.h"
 #include "seal/biguint.h"
 #include "seal/bigpoly.h"
 #include "seal/smallmodulus.h"
-#include "apsidefines.h"
 #include <boost/math/special_functions/binomial.hpp>
 #include <boost/multiprecision/cpp_bin_float.hpp>
-#include "cuckoo.h"
+#include "cuckoo/cuckoo.h"
 
 namespace apsi
 {

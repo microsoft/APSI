@@ -9,11 +9,11 @@
 #include <map>
 
 // APSI
-#include "item.h"
-#include "psiparams.h"
-#include "Sender/senderdb.h"
-#include "Sender/sendersessioncontext.h"
-#include "Sender/senderthreadcontext.h"
+#include "apsi/item.h"
+#include "apsi/psiparams.h"
+#include "apsi/sender/senderdb.h"
+#include "apsi/sender/sendersessioncontext.h"
+#include "apsi/sender/senderthreadcontext.h"
 
 // SEAL
 #include "seal/memorypoolhandle.h"

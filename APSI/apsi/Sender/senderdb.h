@@ -7,12 +7,12 @@
 #include <atomic>
 
 // APSI
-#include "item.h"
-#include "psiparams.h"
-#include "Sender/senderthreadcontext.h"
+#include "apsi/item.h"
+#include "apsi/psiparams.h"
+#include "apsi/sender/senderthreadcontext.h"
 
 // Cuckoo
-#include "cuckoo.h"
+#include "cuckoo/cuckoo.h"
 
 // SEAL
 #include "seal/plaintext.h"

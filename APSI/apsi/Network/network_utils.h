@@ -5,7 +5,7 @@
 #include "seal/publickey.h"
 #include "seal/plaintext.h"
 #include "cryptoTools/Network/Channel.h"
-#include "item.h"
+#include "apsi/item.h"
 
 namespace apsi
 {

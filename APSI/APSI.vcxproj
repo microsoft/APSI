@@ -89,7 +89,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>include;C:\libs\boost;..\..\Cuckoo\Cuckoo\include;..\..\SEAL-dev\SEAL\;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;$(ProjectDir)../../cryptoTools/thirdparty/win/miracl;$(ProjectDir)../../cryptoTools/;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);C:\libs\boost;$(SolutionDir)..\Cuckoo\Cuckoo;..\..\SEAL-dev\SEAL\;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;$(ProjectDir)../../cryptoTools/thirdparty/win/miracl;$(ProjectDir)../../cryptoTools;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Lib>
       <AdditionalDependencies>SEAL.lib;miracl.lib;cryptoTools.lib;cuckoo.lib</AdditionalDependencies>
@@ -118,7 +118,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>include;C:\libs\boost;..\..\Cuckoo\Cuckoo\include;..\..\SEAL-dev\SEAL\;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;$(ProjectDir)../../cryptoTools/thirdparty/win/miracl;$(ProjectDir)../../cryptoTools;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);C:\libs\boost;$(SolutionDir)..\Cuckoo\Cuckoo;..\..\SEAL-dev\SEAL\;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;$(ProjectDir)../../cryptoTools/thirdparty/win/miracl;$(ProjectDir)../../cryptoTools;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -132,30 +132,30 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="include\apsi.h" />
-    <ClInclude Include="include\apsidefines.h" />
-    <ClInclude Include="include\item.h" />
-    <ClInclude Include="include\Network\network_utils.h" />
-    <ClInclude Include="include\plaintextarith.h" />
-    <ClInclude Include="include\psiparams.h" />
-    <ClInclude Include="include\Receiver\receiver.h" />
-    <ClInclude Include="include\Sender\sender.h" />
-    <ClInclude Include="include\Sender\senderdb.h" />
-    <ClInclude Include="include\Sender\sendersessioncontext.h" />
-    <ClInclude Include="include\Sender\senderthreadcontext.h" />
-    <ClInclude Include="include\Tools\stopwatch.h" />
-    <ClInclude Include="include\Tools\ThreadPool.h" />
+    <ClInclude Include="apsi\apsi.h" />
+    <ClInclude Include="apsi\apsidefines.h" />
+    <ClInclude Include="apsi\item.h" />
+    <ClInclude Include="apsi\Network\network_utils.h" />
+    <ClInclude Include="apsi\plaintextarith.h" />
+    <ClInclude Include="apsi\psiparams.h" />
+    <ClInclude Include="apsi\Receiver\receiver.h" />
+    <ClInclude Include="apsi\Sender\sender.h" />
+    <ClInclude Include="apsi\Sender\senderdb.h" />
+    <ClInclude Include="apsi\Sender\sendersessioncontext.h" />
+    <ClInclude Include="apsi\Sender\senderthreadcontext.h" />
+    <ClInclude Include="apsi\Tools\stopwatch.h" />
+    <ClInclude Include="apsi\Tools\ThreadPool.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\apsidefines.cpp" />
-    <ClCompile Include="src\item.cpp" />
-    <ClCompile Include="src\Network\network_utils.cpp" />
-    <ClCompile Include="src\plaintextarith.cpp" />
-    <ClCompile Include="src\psiparams.cpp" />
-    <ClCompile Include="src\Receiver\receiver.cpp" />
-    <ClCompile Include="src\Sender\sender.cpp" />
-    <ClCompile Include="src\Sender\senderdb.cpp" />
-    <ClCompile Include="src\Tools\stopwatch.cpp" />
+    <ClCompile Include="apsi\apsidefines.cpp" />
+    <ClCompile Include="apsi\item.cpp" />
+    <ClCompile Include="apsi\Network\network_utils.cpp" />
+    <ClCompile Include="apsi\plaintextarith.cpp" />
+    <ClCompile Include="apsi\psiparams.cpp" />
+    <ClCompile Include="apsi\Receiver\receiver.cpp" />
+    <ClCompile Include="apsi\Sender\sender.cpp" />
+    <ClCompile Include="apsi\Sender\senderdb.cpp" />
+    <ClCompile Include="apsi\Tools\stopwatch.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
