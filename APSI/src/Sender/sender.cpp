@@ -1,4 +1,5 @@
 #include "Sender/sender.h"
+#include "Sender/sendersessioncontext.h"
 #include "apsidefines.h"
 #include <thread>
 #include <mutex>
@@ -115,7 +116,7 @@ namespace apsi
 
                     // Update the context with the session's specific keys.
                     context.set_encryptor(local_session_->encryptor_);
-                    context.set_evaluator(local_session_->local_evaluators_[i]);
+                    context.set_evaluator(local_session_->evaluator_);
 
                     sender_db_.batched_randomized_symmetric_polys(context);
 
@@ -128,42 +129,43 @@ namespace apsi
         }
 
 
-        void Sender::query_engine(std::string ipPort, IOService& ios)
-        {
-            std::list<std::thread> thrds;
-            while (true)
-            {
-                // create a new session with a client
-                Session newSession(ios, ipPort, SessionMode::Server);
-                Channel chl = newSession.addChannel();
+        //void Sender::query_engine(std::string ipPort, IOService& ios)
+        //{
+        //    std::list<std::thread> thrds;
+        //    while (true)
+        //    {
+        //        // create a new session with a client
+        //        Session newSession(ios, ipPort, SessionMode::Server);
+        //        Channel chl = newSession.addChannel();
 
-                // wait for the socket to connect
-                while (chl.waitForConnection(chrono::milliseconds(500)) == false)
-                {
-                    // abort if we stop the Sender
-                    if (stopped_)
-                    {
-                        // cancel the pending connection
-                        chl.cancel();
+        //        // wait for the socket to connect
+        //        while (chl.waitForConnection(chrono::milliseconds(500)) == false)
+        //        {
+        //            // abort if we stop the Sender
+        //            if (stopped_)
+        //            {
+        //                // cancel the pending connection
+        //                chl.cancel();
 
-                        // join the pending threads
-                        for (auto& t : thrds) t.join();
+        //                // join the pending threads
+        //                for (auto& t : thrds) t.join();
 
-                        return;
-                    }
-                }
+        //                return;
+        //            }
+        //        }
 
-                // splin off a thread to process the client's request.
-                thrds.emplace_back(thread([this, chl]() mutable
-                {
-                    query_session(chl);
+        //        // splin off a thread to process the client's request.
+        //        thrds.emplace_back(thread([this, chl]() mutable
+        //        {
+        //            query_session(chl);
 
-                }));
-            }
-        }
+        //        }));
+        //    }
+        //}
 
         void Sender::query_session(Channel &chl)
         {
+            // Send the EC point when using OPRF
             if (params_.use_pk_oprf())
             {
                 EllipticCurve curve(p256k1, prng_.get<oc::block>());
@@ -178,25 +180,18 @@ namespace apsi
                 auto iter = buff.data();
                 oc::EccPoint x(curve);
                 u64 num = buff.size() / step;
-                for (u64 i = 0; i < num; ++i)
+                for (u64 i = 0; i < num; i++)
                 {
                     x.fromBytes(iter);
-
                     x *= key_;
-
-                    //out << "x " << i << " " << x << std::endl;
-
                     x.toBytes(iter);
-
                     iter += step;
                 }
 
                 chl.asyncSend(buff);
             }
 
-
-
-            /* Set up keys. */
+            /* Set up and receive keys. */
             PublicKey pub;
             EvaluationKeys eval;
             receive_pubkey(pub, chl);
@@ -206,7 +201,7 @@ namespace apsi
             /* Receive client's query data. */
             int num_of_powers = 0;
             chl.recv(num_of_powers);
-            map<uint64_t, vector<Ciphertext>> query;
+            map<uint64_t, vector<Ciphertext> > query;
             while (num_of_powers-- > 0)
             {
                 uint64_t power = 0;
@@ -217,8 +212,6 @@ namespace apsi
 
             /* Answer to the query. */
             respond(query, session_context, chl);
-
-
 
             //try
             //{
@@ -254,7 +247,6 @@ namespace apsi
             //catch (std::exception& e) {
             //    std::cout << "channel: " << e.what() << std::endl;
             //}
-
         }
 
         void Sender::stop()
@@ -263,7 +255,7 @@ namespace apsi
         }
 
         void Sender::respond(
-            const map<uint64_t, vector<Ciphertext>> &query, SenderSessionContext &session_context,
+            const map<uint64_t, vector<Ciphertext> > &query, SenderSessionContext &session_context,
             Channel &channel)
         {
             //vector<vector<Ciphertext>> resultVec(params_.number_of_splits());
@@ -292,7 +284,7 @@ namespace apsi
 
                     /* Update the context with the session's specific keys. */
                     context.set_encryptor(session_context.encryptor_);
-                    context.set_evaluator(session_context.local_evaluators_[i]);
+                    context.set_evaluator(session_context.evaluator_);
 
                     Ciphertext tmp;
                     shared_ptr<Evaluator>& local_evaluator = context.evaluator();
@@ -390,7 +382,6 @@ namespace apsi
                 {
                     local_evaluator->multiply(batch_powers[i1], batch_powers[i2], batch_powers[i]);
                     local_evaluator->relinearize(batch_powers[i], local_session_->evaluation_keys_, batch_powers[i]);
-
                 }
 
             }

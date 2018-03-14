@@ -20,9 +20,8 @@ namespace apsi
         class SenderThreadContext
         {
         public:
-            SenderThreadContext()
+            SenderThreadContext() : pool_(seal::MemoryPoolHandle::New())
             {
-
             }
 
             SenderThreadContext(int id,
@@ -31,8 +30,13 @@ namespace apsi
                 std::shared_ptr<seal::Evaluator> evaluator,
                 std::shared_ptr<seal::PolyCRTBuilder> builder,
                 std::shared_ptr<seal::util::ExFieldPolyCRTBuilder> exbuilder) :
-                id_(id), exfield_(std::move(exfield)), encryptor_(std::move(encryptor)), evaluator_(std::move(evaluator)),
-                builder_(std::move(builder)), exbuilder_(std::move(exbuilder))
+                id_(id), 
+                pool_(seal::MemoryPoolHandle::New()),
+                exfield_(std::move(exfield)), 
+                encryptor_(std::move(encryptor)), 
+                evaluator_(std::move(evaluator)),
+                builder_(std::move(builder)), 
+                exbuilder_(std::move(exbuilder))
             {
             }
 
@@ -125,12 +129,14 @@ namespace apsi
 
         private:
             int id_;
+            seal::MemoryPoolHandle pool_;
+
             std::shared_ptr<seal::util::ExField> exfield_;
             std::shared_ptr<seal::Evaluator> evaluator_;
             std::shared_ptr<seal::Encryptor> encryptor_;
             std::shared_ptr<seal::PolyCRTBuilder> builder_;
             std::shared_ptr<seal::util::ExFieldPolyCRTBuilder> exbuilder_;
-
+            
             seal::util::Pointer symm_block_backing_;
             std::vector<seal::util::ExFieldElement> symm_block_vec_;// = exfield->allocate_elements(params_.batch_size(), params_.split_size() + 1, symm_block_backing);
             oc::MatrixView<seal::util::ExFieldElement> symm_block_;

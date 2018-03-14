@@ -109,8 +109,6 @@ namespace apsi
             */
             void offline_compute();
 
-            void query_engine(std::string ipPort, oc::IOService& ios);
-
             void query_session(oc::Channel& channel);
 
             void stop();

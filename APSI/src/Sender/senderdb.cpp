@@ -62,8 +62,7 @@ namespace apsi
 
             // What is the actual length of strings stored in the hash table
             encoding_bit_length_ = params.get_cuckoo_mode() == cuckoo::CuckooMode::Normal
-                ? params.item_bit_length()
-                : encoder_.encoding_bit_length_;
+                ? params.item_bit_length() : encoder_.encoding_bit_length_;
 
             // Create the null ExFieldElement (note: encoding truncation affects high bits)
             null_element_ = sender_null_item_.to_exfield_element(global_ex_field_, encoding_bit_length_);
@@ -243,17 +242,16 @@ namespace apsi
         void SenderDB::symmetric_polys(int split, int batch, SenderThreadContext &context,
             MatrixView<ExFieldElement> symm_block)
         {
-            int table_size = params_.table_size(), split_size = params_.split_size(), batch_size = params_.batch_size(), split_start = split * split_size,
-                batch_start = batch * batch_size;
-            shared_ptr<ExField> exfield = context.exfield();
+            int split_size = params_.split_size();
+            int batch_size = params_.batch_size();
+            int split_start = split * split_size;
+            int batch_start = batch * batch_size;
+            shared_ptr<ExField> &exfield = context.exfield();
 
             auto num_rows = symm_block.bounds()[0];
-            auto num_cols = symm_block.bounds()[1];
 
             ExFieldElement one(exfield, "1");
             ExFieldElement temp11(exfield), temp2(exfield), *temp1;
-
-            auto numSlots = params_.sender_bin_size();
 
             for (int i = 0; i < num_rows; i++)
             {
@@ -263,7 +261,7 @@ namespace apsi
                     auto position = split_start + j;
                     auto cuckoo_loc = batch_start + i;
 
-                    if (has_item(cuckoo_loc, position) == false)
+                    if (!has_item(cuckoo_loc, position))
                     {
                         temp1 = &neg_null_element_;
                     }
@@ -300,16 +298,13 @@ namespace apsi
 
             for (int i = 0; i < num_rows; i++)
             {
+                // Sample non-zero randomness
                 ExFieldElement r;
                 do
                 {
                     r = context.exfield()->random_element();
                 } while (r.is_zero());
 
-                if (*r.pointer(0) == 0)
-                {
-                    cout << "Zero randomness observed." << endl;
-                }
                 for (int j = 0; j < split_size + 1; j++)
                 {
                     context.exfield()->multiply(symm_block(i, j), r, symm_block(i, j));

@@ -19,21 +19,31 @@ namespace apsi
 
         public:
             SenderSessionContext(std::shared_ptr<seal::SEALContext> context, const seal::PublicKey &pub_key, 
-                const seal::EvaluationKeys &eval_keys, int local_evaluator_num = 0)
-                : seal_context_(std::move(context)), public_key_(pub_key), evaluation_keys_(eval_keys), local_evaluators_(local_evaluator_num)
+                const seal::EvaluationKeys &eval_keys, int local_evaluator_num = 0) : 
+                seal_context_(std::move(context)), 
+                public_key_(pub_key), 
+                evaluation_keys_(eval_keys)
+                //local_evaluators_(local_evaluator_num)
             {
                 encryptor_.reset(new seal::Encryptor(*seal_context_, public_key_));
                 evaluator_.reset(new seal::Evaluator(*seal_context_));
-
-                for (int i = 0; i < local_evaluator_num; i++)
-                    local_evaluators_[i].reset(new seal::Evaluator(*seal_context_, seal::MemoryPoolHandle::New(false)));
+                //for (int i = 0; i < local_evaluator_num; i++)
+                //{
+                //    //local_evaluators_[i].reset(new seal::Evaluator(*seal_context_, seal::MemoryPoolHandle::New(false)));
+                //    local_evaluators_[i] = evaluator_;
+                //}
             }
 
-            SenderSessionContext(std::shared_ptr<seal::SEALContext> context, int local_evaluator_num = 0)
-                : seal_context_(std::move(context)), local_evaluators_(local_evaluator_num)
+            SenderSessionContext(std::shared_ptr<seal::SEALContext> context, int local_evaluator_num = 0) : 
+                seal_context_(std::move(context))
+                //local_evaluators_(local_evaluator_num)
             {
-                for (int i = 0; i < local_evaluator_num; i++)
-                    local_evaluators_[i].reset(new seal::Evaluator(*seal_context_, seal::MemoryPoolHandle::New(false)));
+                evaluator_.reset(new seal::Evaluator(*seal_context_));
+                //for (int i = 0; i < local_evaluator_num; i++)
+                //{
+                //    //local_evaluators_[i].reset(new seal::Evaluator(*seal_context_, seal::MemoryPoolHandle::New(false)));
+                //    local_evaluators_[i] = evaluator_;
+                //}
             }
 
             void set_public_key(const seal::PublicKey &public_key)
@@ -70,7 +80,7 @@ namespace apsi
 
             std::shared_ptr<seal::Evaluator> evaluator_; /* Multi-thread evaluator. */
 
-            std::vector<std::shared_ptr<seal::Evaluator>> local_evaluators_; /* Single-thread evaluators. */
+            //std::vector<std::shared_ptr<seal::Evaluator>> local_evaluators_; /* Single-thread evaluators. */
         };
     }
 }
