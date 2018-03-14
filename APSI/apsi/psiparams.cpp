@@ -4,13 +4,13 @@
 #include "apsi/psiparams.h"
 #include "apsi/item.h"
 
-using namespace seal;
 using namespace std;
+using namespace seal;
 using namespace seal::util;
 
 namespace apsi
 {
-    static std::map<std::string, int> upperbound_on_B
+    map<string, int> PSIParams::upperbound_on_B
     {
         { "(4096, 8)", 10 },
         { "(4096, 12)", 26 },
@@ -61,7 +61,7 @@ namespace apsi
             num_coeff_mod = 1;
         }
         else {
-            throw std::runtime_error("bad coeff modulus.");
+            throw runtime_error("bad coeff modulus.");
         }
         vector<SmallModulus> coeff_mod_array(num_coeff_mod);
         for (int i = 0; i < num_coeff_mod; i++)
@@ -83,5 +83,4 @@ namespace apsi
         if (sender_session_thread_count_ > sender_total_thread_count_)
             throw invalid_argument("invalid thread count for sender.");
     }
-
 }

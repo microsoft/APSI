@@ -1,107 +1,25 @@
 #pragma once
 
+// STD
 #include <string>
 #include <map>
 #include <cmath>
 #include <numeric>
-#include "apsi/apsidefines.h"
+#include <stdexcept>
+
+// APSI
+#include "apsi/tools/binsizemath.h"
+
+// SEAL
 #include "seal/biguint.h"
 #include "seal/bigpoly.h"
 #include "seal/smallmodulus.h"
-#include <boost/math/special_functions/binomial.hpp>
-#include <boost/multiprecision/cpp_bin_float.hpp>
+
+// Cuckoo
 #include "cuckoo/cuckoo.h"
 
 namespace apsi
 {
-
-    //template<unsigned int N = 16>
-    inline double getBinOverflowProb(u64 numBins, u64 numBalls, u64 binSize, double epsilon = 0.0001)
-    {
-        if (numBalls <= binSize)
-            return std::numeric_limits<double>::max();
-
-        if (numBalls > std::numeric_limits<int>::max())
-        {
-            auto msg = ("boost::math::binomial_coefficient(...) only supports " + std::to_string(sizeof(unsigned) * 8) + " bit inputs which was exceeded.");
-            std::cout << msg << std::endl;
-            throw std::runtime_error(msg);
-        }
-
-        //std::cout << numBalls << " " << numBins << " " << binSize << std::endl;
-        typedef boost::multiprecision::number<boost::multiprecision::backends::cpp_bin_float<16>> T;
-        T sum = 0.0;
-        T sec = 0.0;// minSec + 1;
-        T diff = 1;
-        u64 i = binSize + 1;
-
-
-        while (diff > T(epsilon) && numBalls >= i /*&& sec > minSec*/)
-        {
-            sum += numBins * boost::math::binomial_coefficient<T>(int(numBalls), int(i))
-                * boost::multiprecision::pow(T(1.0) / numBins, i) * boost::multiprecision::pow(1 - T(1.0) / numBins, numBalls - i);
-
-            //std::cout << "sum[" << i << "] " << sum << std::endl;
-
-            T sec2 = boost::multiprecision::log2(sum);
-            diff = boost::multiprecision::abs(sec - sec2);
-            //std::cout << diff << std::endl;
-            sec = sec2;
-
-            i++;
-        }
-
-        return std::max<double>(0, (double)-sec);
-    }
-
-    inline u64 get_bin_size(u64 numBins, u64 numBalls, u64 statSecParam)
-    {
-
-        auto B = std::max<u64>(1, numBalls / numBins);
-
-        double currentProb = getBinOverflowProb(numBins, numBalls, B);
-        u64 step = 1;
-
-        bool doubling = true;
-
-        while (currentProb < statSecParam || step > 1)
-        {
-            if (!step)
-                throw std::runtime_error("Ssssss");
-
-
-            if (statSecParam > currentProb)
-            {
-                if (doubling) step = std::max<u64>(1, step * 2);
-                else          step = std::max<u64>(1, step / 2);
-
-                B += step;
-            }
-            else
-            {
-                doubling = false;
-                step = std::max<u64>(1, step / 2);
-                B -= step;
-            }
-            currentProb = getBinOverflowProb(numBins, numBalls, B);
-        }
-
-        return B;
-    }
-
-    struct IntWrapper
-    {
-        IntWrapper(int v)
-            : val_(v)
-        {}
-
-        operator int()
-        {
-            return val_;
-        }
-        int val_;
-    };
-
     enum class OprfType
     {
         None,
@@ -111,7 +29,6 @@ namespace apsi
     class PSIParams
     {
     public:
-
         PSIParams(
             int sender_total_thread_count,
             int sender_session_thread_count,
@@ -149,11 +66,9 @@ namespace apsi
             coeff_mod_bit_count_(coeff_mod_bit_count),
             apsi_port_(port), apsi_endpoint_(endpoint)
         {
-
         }
 
         void validate();
-
 
         inline bool use_pk_oprf() const
         {
@@ -216,13 +131,7 @@ namespace apsi
         inline void set_item_bit_length(int item_bit_length)
         {
             item_bit_length_ = item_bit_length;
-            //reduced_item_bit_length_ = item_bit_length_ - log_table_size_ + floor(log2(hash_func_count_)) + 1 + 1;
         }
-
-        //inline int reduced_item_bit_length()
-        //{
-        //	return reduced_item_bit_length_;
-        //}
 
         inline uint64_t exfield_characteristic() const
         {
@@ -381,7 +290,6 @@ namespace apsi
         void set_cuckoo_mode(cuckoo::CuckooMode mode) { cuckoo_mode_ = mode; }
 
     private:
-
         int log_table_size_;
 
         int table_size_;
