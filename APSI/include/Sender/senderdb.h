@@ -111,7 +111,8 @@ namespace apsi
 
             @see randomized_symmetric_polys for computing randomized symmetric polynomials.
             */
-            void batched_randomized_symmetric_polys(SenderThreadContext &context);
+            void batched_randomized_symmetric_polys(SenderThreadContext &context, 
+                std::shared_ptr<seal::Evaluator> evaluator, std::shared_ptr<seal::PolyCRTBuilder> builder);
 
             const oc::Matrix<Item>& simple_hashing_db2() const
             {

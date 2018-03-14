@@ -33,29 +33,29 @@ namespace apsi
 
             ~Sender();
 
-            /**
-            Set public key for offline testing.
-            */
-            void set_public_key(const seal::PublicKey &public_key);
+            ///**
+            //Set public key for offline testing.
+            //*/
+            //void set_public_key(const seal::PublicKey &public_key);
 
-            /**
-            Set evaluation keys for offline testing.
-            */
-            void set_evaluation_keys(const seal::EvaluationKeys &evaluation_keys);
+            ///**
+            //Set evaluation keys for offline testing.
+            //*/
+            //void set_evaluation_keys(const seal::EvaluationKeys &evaluation_keys);
 
-            /**
-            This function is only for testing purpose. Sender should not have the secret key.
-            */
-            void set_secret_key(const seal::SecretKey &secret_key);
+            ///**
+            //This function is only for testing purpose. Sender should not have the secret key.
+            //*/
+            //void set_secret_key(const seal::SecretKey &secret_key);
 
-            /**
-            Set public key and evaluation keys for offline testing.
-            */
-            void set_keys(const seal::PublicKey &public_key, const seal::EvaluationKeys &evaluation_keys)
-            {
-                set_public_key(public_key);
-                set_evaluation_keys(evaluation_keys);
-            }
+            ///**
+            //Set public key and evaluation keys for offline testing.
+            //*/
+            //void set_keys(const seal::PublicKey &public_key, const seal::EvaluationKeys &evaluation_keys)
+            //{
+            //    set_public_key(public_key);
+            //    set_evaluation_keys(evaluation_keys);
+            //}
 
             /**
             Clears data in sender's database.
@@ -138,15 +138,15 @@ namespace apsi
                               The size of the vector is the number of batches.
             @params[out] all_powers All powers computed from the input, with outer index indicating the batch, and inner index indicating the power.
             */
-            void compute_all_powers(const std::map<uint64_t, std::vector<seal::Ciphertext>> &input,
-                std::vector<std::vector<seal::Ciphertext>> &all_powers)
-            {
-                compute_all_powers(input, all_powers, *local_session_);
-            }
+            //void compute_all_powers(const std::map<uint64_t, std::vector<seal::Ciphertext>> &input,
+            //    std::vector<std::vector<seal::Ciphertext>> &all_powers)
+            //{
+            //    compute_all_powers(input, all_powers, *local_session_);
+            //}
 
-            void compute_all_powers(const std::map<uint64_t, std::vector<seal::Ciphertext>> &input, 
-                std::vector<std::vector<seal::Ciphertext>> &all_powers,
-                apsi::sender::SenderSessionContext &session_context);
+            //void compute_all_powers(const std::map<uint64_t, std::vector<seal::Ciphertext>> &input, 
+            //    std::vector<std::vector<seal::Ciphertext>> &all_powers,
+            //    apsi::sender::SenderSessionContext &session_context);
 
             /**
             Constructs all powers of receiver's items for the specified batch, based on the powers sent from the receiver. For example, if the 
@@ -157,8 +157,9 @@ namespace apsi
                               The size of the vector is the number of batches.
             @params[out] all_powers All powers computed from the input for the specified batch.
             */
-            void compute_batch_powers(int batch, const std::map<uint64_t, std::vector<seal::Ciphertext>> &input,
-                std::vector<seal::Ciphertext> &batch_powers, SenderThreadContext &context);
+            void compute_batch_powers(int batch, const std::map<uint64_t, 
+                std::vector<seal::Ciphertext>> &input, std::vector<seal::Ciphertext> &batch_powers, 
+                SenderSessionContext &session_context, SenderThreadContext &thread_context);
 
             /**
             Computes dot product between sender's symmetric polynomial terms and receiver's powers, for the specified split and the specified batch
@@ -170,15 +171,15 @@ namespace apsi
             //void compute_dot_product(int split, int batch, const std::vector<std::vector<seal::Ciphertext>> &all_powers,
             //    seal::Ciphertext &result, SenderThreadContext &context);
 
-            SenderSessionContext& local_session()
-            {
-                return *local_session_;
-            }
+            //SenderSessionContext& local_session()
+            //{
+            //    return *local_session_;
+            //}
 
-            std::shared_ptr<seal::util::ExField> ex_field() const
-            {
-                return ex_field_;
-            }
+            //std::shared_ptr<seal::util::ExField> ex_field() const
+            //{
+            //    return ex_field_;
+            //}
 
             std::shared_ptr<seal::SEALContext> seal_context() const
             {
@@ -209,12 +210,16 @@ namespace apsi
 
             std::shared_ptr <seal::util::ExField > ex_field_;
 
-            /* This is a special local session for offline testing. */
-            std::unique_ptr<SenderSessionContext> local_session_;
+            ///* This is a special local session for offline testing. */
+            //std::unique_ptr<SenderSessionContext> local_session_;
 
             seal::EncryptionParameters enc_params_;
 
             std::shared_ptr<seal::SEALContext> seal_context_;
+
+            std::shared_ptr<seal::Evaluator> evaluator_;
+
+            std::shared_ptr<seal::PolyCRTBuilder> builder_;
 
             /* Sender's database, including raw data, hashed data, ExField data, and symmetric polynomials. */
             SenderDB sender_db_;

@@ -12,6 +12,8 @@
 #include <thread>
 #include <cryptoTools/Crypto/sha1.h>
 #include <unordered_map>
+#include "seal/evaluator.h"
+#include "seal/polycrt.h"
 
 using namespace std;
 using namespace seal;
@@ -312,7 +314,8 @@ namespace apsi
             }
         }
 
-        void SenderDB::batched_randomized_symmetric_polys(SenderThreadContext &context)
+        void SenderDB::batched_randomized_symmetric_polys(SenderThreadContext &context, 
+            shared_ptr<Evaluator> evaluator, shared_ptr<PolyCRTBuilder> builder)
         {
             if (dummy_init_)
             {
@@ -338,6 +341,8 @@ namespace apsi
                 return splitIdx * splitStep + batchIdx * batchStep + i;
             };
 
+            MemoryPoolHandle local_pool = context.pool();
+
             int total_blocks = params_.number_of_splits() * params_.number_of_batches();
             int start_block = context.id() * total_blocks / params_.sender_total_thread_count();
             int end_block = (context.id() + 1) * total_blocks / params_.sender_total_thread_count();
@@ -357,27 +362,33 @@ namespace apsi
                 randomized_symmetric_polys(split, batch, context, symm_block);
 
                 auto idx = indexer(split, batch, 0);
-                for (int i = 0; i < split_size + 1; i++, idx++)
+                if (builder)
                 {
-                    Plaintext &temp_plain = batch_random_symm_polys_[idx];
-                    if (context.builder())
+                    for (int i = 0; i < split_size + 1; i++, idx++)
                     {
+                        Plaintext &temp_plain = batch_random_symm_polys_[idx];
                         for (int k = 0; batch_start + k < batch_end; k++)
                         {
                             integer_batch_vector[k] = *symm_block(k, i).pointer(0);
                         }
-                        context.builder()->compose(integer_batch_vector, temp_plain);
+                        builder->compose(integer_batch_vector, temp_plain);
+                        evaluator->transform_to_ntt(temp_plain, local_pool);
                     }
-                    else if(context.exbuilder())
+                }
+                else if (context.exbuilder())
+                {
+                    for (int i = 0; i < split_size + 1; i++, idx++)
                     {
+                        Plaintext &temp_plain = batch_random_symm_polys_[idx];
+
                         // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
                         for (int k = 0; batch_start + k < batch_end; k++)
                         {
                             batch_vector[k] = symm_block(k, i);
                         }
                         context.exbuilder()->compose(batch_vector, temp_plain);
+                        evaluator->transform_to_ntt(temp_plain, local_pool);
                     }
-                    context.evaluator()->transform_to_ntt(temp_plain);
                 }
             }
         }

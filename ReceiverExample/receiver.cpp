@@ -443,12 +443,6 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
     Sender sender(params, MemoryPoolHandle::New(true), cmd.isSet("dummy"));
     stop_watch.set_time_point("Sender constructor");
 
-    // This shouldn't be needed since the keys are sent anyway...?
-    sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
-
-    // For debugging purposes we also give the sender the secret key here
-    sender.set_secret_key(receiver.secret_key());
-
     // For testing only insert a couple of elements in the sender's dataset
     int sendersActualSize = 40;
 
@@ -620,8 +614,8 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 
     Receiver receiver(params, MemoryPoolHandle::New(true));
     Sender sender(params, MemoryPoolHandle::New(true));
-    sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
-    sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
+    //sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
+    //sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 
     auto actual_size = 1000;// sender_set_size;
 

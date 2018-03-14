@@ -26,7 +26,7 @@ namespace apsi
                 //local_evaluators_(local_evaluator_num)
             {
                 encryptor_.reset(new seal::Encryptor(*seal_context_, public_key_));
-                evaluator_.reset(new seal::Evaluator(*seal_context_));
+                //evaluator_.reset(new seal::Evaluator(*seal_context_));
                 //for (int i = 0; i < local_evaluator_num; i++)
                 //{
                 //    //local_evaluators_[i].reset(new seal::Evaluator(*seal_context_, seal::MemoryPoolHandle::New(false)));
@@ -38,7 +38,7 @@ namespace apsi
                 seal_context_(std::move(context))
                 //local_evaluators_(local_evaluator_num)
             {
-                evaluator_.reset(new seal::Evaluator(*seal_context_));
+                //evaluator_.reset(new seal::Evaluator(*seal_context_));
                 //for (int i = 0; i < local_evaluator_num; i++)
                 //{
                 //    //local_evaluators_[i].reset(new seal::Evaluator(*seal_context_, seal::MemoryPoolHandle::New(false)));
@@ -66,6 +66,13 @@ namespace apsi
                 decryptor_.reset(new seal::Decryptor(*seal_context_, secret_key_));
             }
 
+            const std::shared_ptr<seal::Encryptor> &encryptor()
+            {
+                return encryptor_;
+            }
+
+        private:
+
             std::shared_ptr<seal::SEALContext> seal_context_;
 
             seal::PublicKey public_key_;
@@ -78,7 +85,7 @@ namespace apsi
 
             seal::EvaluationKeys evaluation_keys_;
 
-            std::shared_ptr<seal::Evaluator> evaluator_; /* Multi-thread evaluator. */
+            //std::shared_ptr<seal::Evaluator> evaluator_; /* Multi-thread evaluator. */
 
             //std::vector<std::shared_ptr<seal::Evaluator>> local_evaluators_; /* Single-thread evaluators. */
         };

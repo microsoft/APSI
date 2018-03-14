@@ -2,11 +2,12 @@
 
 #include "seal/util/exfield.h"
 #include "seal/util/exfieldpolycrt.h"
-#include "seal/util/mempool.h"
+#include "seal/memorypoolhandle.h"
 
-#include "seal/evaluator.h"
-#include "seal/polycrt.h"
-#include "seal/encryptor.h"
+//#include "seal/evaluator.h"
+//#include "seal/polycrt.h"
+//#include "seal/encryptor.h"
+#include "psiparams.h"
 #include "cryptoTools/Common/MatrixView.h"
 
 namespace apsi
@@ -20,65 +21,89 @@ namespace apsi
         class SenderThreadContext
         {
         public:
-            SenderThreadContext() : pool_(seal::MemoryPoolHandle::New())
-            {
-            }
+            //SenderThreadContext() : pool_(seal::MemoryPoolHandle::New())
+            //{
+            //}
 
-            SenderThreadContext(int id,
-                std::shared_ptr<seal::util::ExField> exfield,
-                std::shared_ptr<seal::Encryptor> encryptor,
-                std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<seal::PolyCRTBuilder> builder,
-                std::shared_ptr<seal::util::ExFieldPolyCRTBuilder> exbuilder) :
-                id_(id), 
-                pool_(seal::MemoryPoolHandle::New()),
-                exfield_(std::move(exfield)), 
-                encryptor_(std::move(encryptor)), 
-                evaluator_(std::move(evaluator)),
-                builder_(std::move(builder)), 
-                exbuilder_(std::move(exbuilder))
-            {
-            }
+            //SenderThreadContext(std::shared_ptr<seal::util::ExField> exfield, 
+            //    const seal::MemoryPoolHandle &pool) :
+            //    pool_(pool),
+            //    exfield_(std::move(exfield))
+            //{
+            //}
 
-            int id()
+            //SenderThreadContext(std::shared_ptr<seal::util::ExField> exfield) :
+            //    pool_(exfield->pool()),
+            //    exfield_(std::move(exfield))
+            //{
+            //}
+
+            //SenderThreadContext(int id,
+            //    seal::MemoryPoolHandle pool
+            //    std::shared_ptr<seal::util::ExField> exfield,
+            //    //std::shared_ptr<seal::Encryptor> encryptor,
+            //    //std::shared_ptr<seal::Evaluator> evaluator,
+            //    //std::shared_ptr<seal::PolyCRTBuilder> builder,
+            //    //std::shared_ptr<seal::util::ExFieldPolyCRTBuilder> exbuilder) :
+            //    id_(id), 
+            //    pool_(seal::MemoryPoolHandle::New()),
+            //    exfield_(std::move(exfield))
+            //    //encryptor_(std::move(encryptor)), 
+            //    //evaluator_(std::move(evaluator)),
+            //    //builder_(std::move(builder)), 
+            //    //exbuilder_(std::move(exbuilder))
+            //{
+            //}
+
+            inline int id()
             {
                 return id_;
             }
 
-            void set_id(int id)
+            inline void set_id(int id)
             {
                 id_ = id;
             }
 
-            std::shared_ptr<seal::util::ExField> &exfield()
+            inline seal::MemoryPoolHandle pool()
+            {
+                return pool_;
+            }
+
+            inline void set_pool(const seal::MemoryPoolHandle &pool)
+            {
+                pool_ = pool;
+            }
+
+            inline std::shared_ptr<seal::util::ExField> &exfield()
             {
                 return exfield_;
             }
 
-            void set_exfield(std::shared_ptr<seal::util::ExField> exfield)
+            inline void set_exfield(std::shared_ptr<seal::util::ExField> exfield)
             {
-                exfield_ = move(exfield);
+                exfield_ = std::move(exfield);
             }
 
-            std::shared_ptr<seal::Encryptor> &encryptor()
-            {
-                return encryptor_;
-            }
+            //std::shared_ptr<seal::Encryptor> &encryptor()
+            //{
+            //    return encryptor_;
+            //}
 
-            void set_encryptor(std::shared_ptr<seal::Encryptor> encryptor)
-            {
-                encryptor_ = std::move(encryptor);
-            }
+            //void set_encryptor(std::shared_ptr<seal::Encryptor> encryptor)
+            //{
+            //    encryptor_ = std::move(encryptor);
+            //}
 
-            std::shared_ptr<seal::Evaluator> &evaluator()
-            {
-                return evaluator_;
-            }
+            //std::shared_ptr<seal::Evaluator> &evaluator()
+            //{
+            //    return evaluator_;
+            //}
 
-            void set_evaluator(std::shared_ptr<seal::Evaluator> evaluator)
-            {
-                evaluator_ = std::move(evaluator);
-            }
+            //void set_evaluator(std::shared_ptr<seal::Evaluator> evaluator)
+            //{
+            //    evaluator_ = std::move(evaluator);
+            //}
 
             std::shared_ptr<seal::util::ExFieldPolyCRTBuilder> &exbuilder()
             {
@@ -90,18 +115,24 @@ namespace apsi
                 exbuilder_ = std::move(batcher);
             }
 
-            std::shared_ptr<seal::PolyCRTBuilder> &builder()
-            {
-                return builder_;
-            }
+            //std::shared_ptr<seal::PolyCRTBuilder> &builder()
+            //{
+            //    return builder_;
+            //}
 
-            void set_builder(std::shared_ptr<seal::PolyCRTBuilder> builder)
-            {
-                builder_ = std::move(builder);
-            }
+            //void set_builder(std::shared_ptr<seal::PolyCRTBuilder> builder)
+            //{
+            //    builder_ = std::move(builder);
+            //}
 
-            void construct_variables(PSIParams& params)
+            inline void construct_variables(PSIParams& params)
             {
+                // Is the MPH initialized? It better be.
+                if (!pool_)
+                {
+                    throw std::logic_error("MemoryPoolHandle is null");
+                }
+
                 if (symm_block_.size() == 0)
                 {
                     symm_block_vec_ = std::move(exfield_->allocate_elements(params.batch_size() * (params.split_size() + 1), symm_block_backing_));
@@ -112,17 +143,17 @@ namespace apsi
                 }
             }
 
-            oc::MatrixView<seal::util::ExFieldElement> symm_block()
+            inline oc::MatrixView<seal::util::ExFieldElement> symm_block()
             {
                 return symm_block_;
             }
 
-            std::vector<seal::util::ExFieldElement>& batch_vector()
+            inline std::vector<seal::util::ExFieldElement>& batch_vector()
             {
                 return batch_vector_;
             }
 
-            std::vector<uint64_t>& integer_batch_vector()
+            inline std::vector<uint64_t>& integer_batch_vector()
             {
                 return integer_batch_vector_;
             }
@@ -132,9 +163,9 @@ namespace apsi
             seal::MemoryPoolHandle pool_;
 
             std::shared_ptr<seal::util::ExField> exfield_;
-            std::shared_ptr<seal::Evaluator> evaluator_;
-            std::shared_ptr<seal::Encryptor> encryptor_;
-            std::shared_ptr<seal::PolyCRTBuilder> builder_;
+            //std::shared_ptr<seal::Evaluator> evaluator_;
+            //std::shared_ptr<seal::Encryptor> encryptor_;
+            //std::shared_ptr<seal::PolyCRTBuilder> builder_;
             std::shared_ptr<seal::util::ExFieldPolyCRTBuilder> exbuilder_;
             
             seal::util::Pointer symm_block_backing_;

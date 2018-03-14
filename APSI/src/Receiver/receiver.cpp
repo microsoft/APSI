@@ -20,8 +20,8 @@ namespace apsi
 {
     namespace receiver
     {
-        Receiver::Receiver(const PSIParams &params, const MemoryPoolHandle &pool)
-            :params_(params),
+        Receiver::Receiver(const PSIParams &params, const MemoryPoolHandle &pool) :
+            params_(params),
             pool_(pool),
             ex_field_(ExField::Acquire(params.exfield_characteristic(), params.exfield_polymod(), pool))
         {
@@ -86,16 +86,17 @@ namespace apsi
                     {
                         if (result[j][i] == zero)
                         {
-                            if (table_to_input_map[i] == -1)
-                            {
-                                ostreamLock o(std::cout);
-                                o << " **** False positive match at empty cuckoo[" << i << "] and response ciphtertext #" << j << std::endl;
-                            }
-                            else
-                            {
-                                intersection[table_to_input_map[i]] = true;
-                            }
-                            break;
+                            //if (table_to_input_map[i] == -1)
+                            //{
+                            //    ostreamLock o(std::cout);
+                            //    o << " **** False positive match at empty cuckoo[" << i << "] and response ciphtertext #" << j << std::endl;
+                            //}
+                            //else
+                            //{
+                            //    intersection[table_to_input_map[i]] = true;
+                            //}
+                            //break;
+                            intersection[table_to_input_map[i]] = true;
                         }
                     }
                 }

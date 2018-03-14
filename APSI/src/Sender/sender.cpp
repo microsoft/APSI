@@ -4,6 +4,9 @@
 #include <thread>
 #include <mutex>
 
+#include "seal/polycrt.h"
+#include "seal/evaluator.h"
+
 #include "Network/network_utils.h"
 #include "cryptoTools/Common/Log.h"
 
@@ -34,11 +37,18 @@ namespace apsi
             enc_params_.set_plain_modulus(ex_field_->coeff_modulus());
 
             seal_context_.reset(new SEALContext(enc_params_));
-            local_session_.reset(new SenderSessionContext(seal_context_, params_.sender_total_thread_count()));
+            //local_session_.reset(new SenderSessionContext(seal_context_, params_.sender_total_thread_count()));
 
             ex_field_->init_frob_table();
+
+            // Create the poly_mod like this since seal::ExField constructor takes seal::BigPoly instead 
+            // of seal::PolyModulus. Reason for this is that seal::PolyModulus does not manage its own memory.
             const BigPoly poly_mod(ex_field_->coeff_count(), ex_field_->coeff_uint64_count() * bits_per_uint64,
                 const_cast<uint64_t*>(ex_field_->poly_modulus().get()));
+
+            // Construct shared Evaluator and PolyCRTBuilder
+            evaluator_.reset(new seal::Evaluator(*seal_context_));
+            builder_.reset(new seal::PolyCRTBuilder(*seal_context_));
 
             std::vector<std::thread> thrds(params_.sender_total_thread_count());
 
@@ -48,16 +58,22 @@ namespace apsi
                 available_thread_contexts_.push_back(i);
                 thrds[i] = std::thread([&, i]()
                 {
-                    auto local_mph = MemoryPoolHandle::New(false);
+                    auto local_pool = MemoryPoolHandle::New(false);
                     thread_contexts_[i].set_id(i);
-                    thread_contexts_[i].set_exfield(ExField::Acquire(ex_field_->characteristic(), poly_mod, local_mph));
+                    thread_contexts_[i].set_pool(local_pool);
+                    thread_contexts_[i].set_exfield(ExField::Acquire(ex_field_->characteristic(), poly_mod, local_pool));
                     thread_contexts_[i].exfield()->set_frob_table(ex_field_->frobe_table());
 
-                    if (seal_context_->qualifiers().enable_batching)
-                    {
-                        thread_contexts_[i].set_builder(make_shared<PolyCRTBuilder>(*seal_context_, local_mph));
-                    }
+                    //if (seal_context_->qualifiers().enable_batching)
+                    //{
+                    //    thread_contexts_[i].set_builder(make_shared<PolyCRTBuilder>(*seal_context_, local_pool));
+                    //}
+
+                    // We need the ExFIeldPolyCRTBuilder here since it creates ExFieldElements from the memory
+                    // pool of its ExField. Cannot have a shared ExFieldPolyCRTBuilder with this design.
                     thread_contexts_[i].set_exbuilder(make_shared<ExFieldPolyCRTBuilder>(thread_contexts_[i].exfield(), params_.log_poly_degree()));
+                    
+                    // Allocate memory for repeated use from the given memory pool.
                     thread_contexts_[i].construct_variables(params_);
                 });
             }
@@ -76,30 +92,30 @@ namespace apsi
             //apsi_endpoint_->stop();
         }
 
-        void Sender::set_public_key(const PublicKey &public_key)
-        {
-            local_session_->set_public_key(public_key);
-        }
+        //void Sender::set_public_key(const PublicKey &public_key)
+        //{
+        //    local_session_->set_public_key(public_key);
+        //}
 
-        void Sender::set_evaluation_keys(const seal::EvaluationKeys &evaluation_keys)
-        {
-            /* This is a special local session with maximum threads. */
-            local_session_->set_evaluation_keys(evaluation_keys);
-        }
+        //void Sender::set_evaluation_keys(const seal::EvaluationKeys &evaluation_keys)
+        //{
+        //    /* This is a special local session with maximum threads. */
+        //    local_session_->set_evaluation_keys(evaluation_keys);
+        //}
 
-        void Sender::set_secret_key(const SecretKey &secret_key)
-        {
-            local_session_->set_secret_key(secret_key);
-        }
+        //void Sender::set_secret_key(const SecretKey &secret_key)
+        //{
+        //    local_session_->set_secret_key(secret_key);
+        //}
 
         void Sender::load_db(const std::vector<Item> &data)
         {
             sender_db_.set_data(data);
             stop_watch.set_time_point("Sender set-data");
 
+            // Compute symmetric polys and batch
             offline_compute();
         }
-
 
         void Sender::offline_compute()
         {
@@ -111,14 +127,14 @@ namespace apsi
                     int thread_context_idx = acquire_thread_context();
                     auto& context = thread_contexts_[thread_context_idx];
 
-                    // Should already be constructed; if so, this does nothing.
-                    context.construct_variables(params_);
+                    //// Should already be constructed; if so, this does nothing.
+                    //context.construct_variables(params_);
 
-                    // Update the context with the session's specific keys.
-                    context.set_encryptor(local_session_->encryptor_);
-                    context.set_evaluator(local_session_->evaluator_);
+                    //// Update the context with the session's specific keys.
+                    //context.set_encryptor(local_session_->encryptor_);
+                    //context.set_evaluator(local_session_->evaluator_);
 
-                    sender_db_.batched_randomized_symmetric_polys(context);
+                    sender_db_.batched_randomized_symmetric_polys(context, evaluator_, builder_);
 
                     release_thread_context(context.id());
                 });
@@ -260,7 +276,7 @@ namespace apsi
         {
             //vector<vector<Ciphertext>> resultVec(params_.number_of_splits());
             //for (auto& v : resultVec) v.resize(params_.number_of_batches());
-            vector<vector<Ciphertext>> powers(params_.number_of_batches());
+            vector<vector<Ciphertext> > powers(params_.number_of_batches());
 
             std::vector<std::pair<std::promise<void>, std::shared_future<void>>>
                 batch_powers_computed(params_.number_of_batches());
@@ -279,22 +295,22 @@ namespace apsi
                 {
                     /* Multiple client sessions can enter this function to compete for thread context resources. */
                     int thread_context_idx = acquire_thread_context();
-                    auto& context = thread_contexts_[thread_context_idx];
-                    context.construct_variables(params_);
+                    auto& thread_context = thread_contexts_[thread_context_idx];
+                    thread_context.construct_variables(params_);
 
-                    /* Update the context with the session's specific keys. */
-                    context.set_encryptor(session_context.encryptor_);
-                    context.set_evaluator(session_context.evaluator_);
+                    ///* Update the context with the session's specific keys. */
+                    //context.set_encryptor(session_context.encryptor_);
+                    //context.set_evaluator(session_context.evaluator_);
 
-                    Ciphertext tmp;
-                    shared_ptr<Evaluator>& local_evaluator = context.evaluator();
+                    Ciphertext tmp(thread_context.pool());
+                    //shared_ptr<Evaluator>& local_evaluator = context.evaluator();
 
                     auto batch_start = i * number_of_batches / thread_pool.size();
                     auto batch_end = (i + 1) * number_of_batches / thread_pool.size();
 
                     for (auto batch = batch_start; batch < batch_end; ++batch)
                     {
-                        compute_batch_powers(batch, query, powers[batch], context);
+                        compute_batch_powers(batch, query, powers[batch], session_context, thread_context);
                         batch_powers_computed[batch].first.set_value();
                     }
 
@@ -329,22 +345,18 @@ namespace apsi
                         //  Iterate over the coeffs multiplying them with the query powers  and summing the results
                         char currResult = 0;
 
-                        local_evaluator->multiply_plain_ntt(powers[batch][0], sender_coeffs[0], runningResults[currResult]);
+                        evaluator_->multiply_plain_ntt(powers[batch][0], sender_coeffs[0], runningResults[currResult]);
                         for (int s = 1; s <= params_.split_size(); s++)
                         {
-                            local_evaluator->multiply_plain_ntt(
-                                powers[batch][s],
-                                sender_coeffs[s],
-                                tmp);
-                            local_evaluator->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
-
+                            evaluator_->multiply_plain_ntt(powers[batch][s], sender_coeffs[s], tmp);
+                            evaluator_->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
                             currResult ^= 1;
                         }
                         //auto& result = resultVec[split][batch];
                         //result = runningResults[currResult];
 
                         // transform back from ntt form.
-                        local_evaluator->transform_from_ntt(runningResults[currResult]);
+                        evaluator_->transform_from_ntt(runningResults[currResult]);
 
                         // send the result over the network if needed.
                         unique_lock<mutex> net_lock2(mtx);
@@ -354,7 +366,7 @@ namespace apsi
                     }
 
                     /* After this point, this thread will no longer use the context resource, so it is free to return it. */
-                    release_thread_context(context.id());
+                    release_thread_context(thread_context.id());
                 });
             }
 
@@ -364,12 +376,16 @@ namespace apsi
             //return std::move(resultVec);
         }
 
-        void Sender::compute_batch_powers(int batch, const std::map<uint64_t, std::vector<seal::Ciphertext>> &input,
-            std::vector<seal::Ciphertext> &batch_powers, SenderThreadContext &context)
+        void Sender::compute_batch_powers(int batch, const std::map<uint64_t, 
+            std::vector<seal::Ciphertext>> &input, std::vector<seal::Ciphertext> &batch_powers, 
+            SenderSessionContext &session_context, SenderThreadContext &thread_context)
         {
             batch_powers.resize(params_.split_size() + 1);
-            shared_ptr<Evaluator> local_evaluator = context.evaluator();
-            context.encryptor()->encrypt(BigPoly("1"), batch_powers[0], pool_);
+            MemoryPoolHandle local_pool = thread_context.pool();
+
+            //shared_ptr<Evaluator> local_evaluator = context.evaluator();
+            session_context.encryptor()->encrypt(BigPoly("1"), batch_powers[0], local_pool);
+
             for (int i = 1; i <= params_.split_size(); i++)
             {
                 int i1 = optimal_split(i, 1 << params_.window_size());
@@ -380,13 +396,15 @@ namespace apsi
                 }
                 else
                 {
-                    local_evaluator->multiply(batch_powers[i1], batch_powers[i2], batch_powers[i]);
-                    local_evaluator->relinearize(batch_powers[i], local_session_->evaluation_keys_, batch_powers[i]);
+                    evaluator_->multiply(batch_powers[i1], batch_powers[i2], batch_powers[i], local_pool);
+                    evaluator_->relinearize(batch_powers[i], session_context.evaluation_keys_, batch_powers[i], local_pool);
                 }
 
             }
             for (int i = 0; i <= params_.split_size(); i++)
-                local_evaluator->transform_to_ntt(batch_powers[i]);
+            {
+                evaluator_->transform_to_ntt(batch_powers[i]);
+            }
         }
 
         //void Sender::compute_dot_product(int split, int batch, const vector<vector<Ciphertext>> &all_powers, 
