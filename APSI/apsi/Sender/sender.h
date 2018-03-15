@@ -57,15 +57,15 @@ namespace apsi
 
             void stop();
 
-            void save_db(std::ostream &stream) const
-            {
-                sender_db_.save(stream);
-            }
+            //void save_db(std::ostream &stream) const
+            //{
+            //    sender_db_.save(stream);
+            //}
 
-            void load_db(std::istream &stream)
-            {
-                sender_db_.load(stream);
-            }
+            //void load_db(std::istream &stream)
+            //{
+            //    sender_db_.load(stream);
+            //}
 
         private:
             void initialize();
@@ -90,21 +90,6 @@ namespace apsi
                 sender_db_.add_data(item);
             }
 
-            /**
-            Deletes the data items in sender's database. Items are ignored if they don't exist in the database.
-            */
-            void delete_data(const std::vector<Item> &data)
-            {
-                sender_db_.delete_data(data);
-            }
-
-            /**
-            Deletes one item in sender's database. The item is ignored if it doesn't exist in the database.
-            */
-            void delete_data(const Item &item)
-            {
-                sender_db_.delete_data(item);
-            }
 
             /**
             Precomputes all necessary components for the PSI protocol, including symmetric polynomials, batching, etc.
