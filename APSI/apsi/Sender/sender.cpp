@@ -49,15 +49,24 @@ namespace apsi
             builder_.reset(new PolyCRTBuilder(*seal_context_));
 
             vector<thread> thrds(params_.sender_total_thread_count());
+            
+#ifdef USE_SECURE_SEED
+            prng_.SetSeed(oc::sysRandomSeed());
+#else
+            TODO("***************** INSECURE *****************, define USE_SECURE_SEED to fix");
+            prng_.SetSeed(oc::ZeroBlock);
+#endif
 
             // Set local exfields for multi-threaded efficient use of memory pools.
             for (int i = 0; i < params_.sender_total_thread_count(); i++)
             {
                 available_thread_contexts_.push_back(i);
-                thrds[i] = thread([&, i]()
+                auto seed = prng_.get<oc::block>();
+                thrds[i] = thread([&, i, seed]()
                 {
                     auto local_pool = MemoryPoolHandle::New(false);
                     thread_contexts_[i].set_id(i);
+                    thread_contexts_[i].set_prng(seed);
                     thread_contexts_[i].set_pool(local_pool);
                     thread_contexts_[i].set_exfield(ExField::Acquire(ex_field_->characteristic(), poly_mod, local_pool));
                     thread_contexts_[i].exfield()->set_frob_table(ex_field_->frobe_table());

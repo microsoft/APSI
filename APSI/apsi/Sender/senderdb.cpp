@@ -291,19 +291,24 @@ namespace apsi
             }
         }
 
-        void SenderDB::randomized_symmetric_polys(int split, int batch, SenderThreadContext &context, MatrixView<ExFieldElement> symm_block)
+        void SenderDB::randomized_symmetric_polys(
+            int split, 
+            int batch, 
+            SenderThreadContext &context, 
+            MatrixView<ExFieldElement> symm_block)
         {
             int split_size = params_.split_size();
             symmetric_polys(split, batch, context, symm_block);
             auto num_rows = symm_block.bounds()[0];
+            oc::PRNG& prng = context.prng();
+            ExFieldElement r(context.exfield());
 
             for (int i = 0; i < num_rows; i++)
             {
                 // Sample non-zero randomness
-                ExFieldElement r;
                 do
                 {
-                    r = context.exfield()->random_element();
+                    context.exfield()->random_element(r, prng);
                 } while (r.is_zero());
 
                 for (int j = 0; j < split_size + 1; j++)

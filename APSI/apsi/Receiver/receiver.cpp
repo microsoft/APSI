@@ -410,6 +410,21 @@ namespace apsi
             Plaintext p;
             Ciphertext tmp;
 
+            struct RecvPackage
+            {
+                int split_idx, batch_idx;
+                std::string data;
+                std::future<void> fut;
+            };
+
+            std::vector<RecvPackage> recvPackages(block_count);
+            for (auto& pkg : recvPackages)
+            {
+                channel.asyncRecv(pkg.split_idx);
+                channel.asyncRecv(pkg.batch_idx);
+                pkg.fut = channel.asyncRecv(pkg.data);
+            }
+
             result = ex_field_->allocate_elements(num_of_splits, num_of_batches * slot_count, backing);
             Pointer batch_backing;
             vector<ExFieldElement> batch;
@@ -423,14 +438,21 @@ namespace apsi
             bool first = true;
 
             cout << "Decrypting " << block_count << " blocks (splits = " << num_of_splits << ")" << endl;
-            while (block_count-- > 0)
+            for (auto& pkg : recvPackages)
+            //while (block_count-- > 0)
             {
-                //unique_ptr<Ciphertext> tmp(new Ciphertext());
+                pkg.fut.get();
+                std::stringstream ss(pkg.data);
+                tmp.load(ss);
+                split_idx = pkg.split_idx;
+                batch_idx = pkg.batch_idx;
 
-                channel.recv(split_idx);
-                channel.recv(batch_idx);
-                receive_ciphertext(tmp, channel);
+                //channel.recv(split_idx);
+                //channel.recv(batch_idx);
+                //receive_ciphertext(tmp, channel);
+
                 decrypt(tmp, p);
+
                 auto& rr = result[split_idx];
 
                 if (first)

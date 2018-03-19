@@ -10,7 +10,7 @@ namespace apsi
 {
 	void send_plaintext(const Plaintext &plaintext, Channel &channel)
 	{
-		stringstream ss;
+        stringstream ss;
 		plaintext.save(ss);
 		channel.asyncSend(std::move(ss.str()));
 	}
@@ -25,7 +25,7 @@ namespace apsi
 
 	void send_ciphertext(const Ciphertext &ciphertext, Channel &channel)
 	{
-		stringstream ss;
+        stringstream ss;
 		ciphertext.save(ss);
 		channel.asyncSend(std::move(ss.str()));
 	}

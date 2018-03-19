@@ -476,6 +476,8 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
         sender.query_session(sendChl); 
     });
 
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
     // Receiver's query
     vector<bool> intersection = receiver.query(c1, recvChl);
     senderQuerySessionTh.join();

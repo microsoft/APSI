@@ -15,6 +15,7 @@
 
 // CryptoTools
 #include "cryptoTools/Common/MatrixView.h"
+#include "cryptoTools/Crypto/PRNG.h"
 
 namespace apsi
 {
@@ -27,6 +28,7 @@ namespace apsi
         class SenderThreadContext
         {
         public:
+
             inline int id() const
             {
                 return id_;
@@ -55,6 +57,11 @@ namespace apsi
             inline void set_exfield(std::shared_ptr<seal::util::ExField> exfield)
             {
                 exfield_ = std::move(exfield);
+            }
+
+            void set_prng(oc::block block)
+            {
+                prng_.SetSeed(block, 256);
             }
 
             std::shared_ptr<seal::util::ExFieldPolyCRTBuilder> &exbuilder()
@@ -100,6 +107,11 @@ namespace apsi
                 return integer_batch_vector_;
             }
 
+            oc::PRNG& prng()
+            {
+                return prng_;
+            }
+
         private:
             int id_;
 
@@ -120,6 +132,8 @@ namespace apsi
             std::vector<seal::util::ExFieldElement> batch_vector_;
 
             std::vector<std::uint64_t> integer_batch_vector_;
+
+            oc::PRNG prng_;
         };
     }
 }
