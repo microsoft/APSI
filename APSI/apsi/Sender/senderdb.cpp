@@ -24,6 +24,20 @@ namespace apsi
 {
     namespace sender
     {
+        namespace
+        {
+            void randomize_element(ExFieldElement &element, PRNG &prng)
+            {
+                const uint64_t characteristic = element.ex_field()->characteristic().value();
+                prng.get<uint64_t>(element.pointer(), element.ex_field()->coeff_count() - 1);
+                for (int i = 0; i < element.ex_field()->coeff_count() - 1; i++)
+                {
+                    element[i] %= characteristic;
+                }
+            }
+        }
+
+
         SenderDB::SenderDB(const PSIParams &params, shared_ptr<ExField> &ex_field) :
             params_(params),
             encoder_(params.log_table_size(), params.hash_func_count(), params.item_bit_length()),
@@ -33,7 +47,7 @@ namespace apsi
             next_locs_(params.table_size(), 0),
             batch_random_symm_polys_(params.number_of_splits() * params.number_of_batches() * (params.split_size() + 1))
         {
-            for (auto& plain : batch_random_symm_polys_)
+            for (auto &plain : batch_random_symm_polys_)
             {
                 // Reserve memory for ciphertext size plaintexts (NTT transformed mod q)
                 plain.reserve(params_.coeff_modulus().size() * (params_.poly_degree() + 1));
@@ -59,7 +73,6 @@ namespace apsi
             neg_null_element_ = ExFieldElement(global_ex_field_);
             global_ex_field_->negate(null_element_, neg_null_element_);
 
-
             //std::cout << "neg_null_element_: " << neg_null_element_ << std::endl;
         }
 
@@ -78,26 +91,26 @@ namespace apsi
             }
         }
 
-        void SenderDB::set_data(oc::span<const Item> data)
+        void SenderDB::set_data(oc::span<const Item> data, int thread_count)
         {
-            set_data(data, {});
+            set_data(data, {}, thread_count);
         }
 
-        void SenderDB::set_data(oc::span<const Item> data, oc::span<const Item> vals)
+        void SenderDB::set_data(oc::span<const Item> data, oc::span<const Item> vals, int thread_count)
         {
             clear_db();
-            add_data(data, vals);
+            add_data(data, vals, thread_count);
             stop_watch.set_time_point("Sender add-data");
         }
 
-        void SenderDB::add_data(oc::span<const Item> data)
+        void SenderDB::add_data(oc::span<const Item> data, int thread_count)
         {
-            add_data(data, {});
+            add_data(data, {}, thread_count);
         }
 
-        void SenderDB::add_data(oc::span<const Item> data, oc::span<const Item> values)
+        void SenderDB::add_data(oc::span<const Item> data, oc::span<const Item> values, int thread_count)
         {
-            vector<thread> thrds(params_.sender_total_thread_count());
+            vector<thread> thrds(thread_count);
             for (int t = 0; t < thrds.size(); t++)
             {
                 auto seed = prng_.get<oc::block>();
@@ -226,9 +239,9 @@ namespace apsi
             return simple_hashing_db_has_item_[start + position];
         }
 
-        void SenderDB::add_data(const Item &item)
+        void SenderDB::add_data(const Item &item, int thread_count)
         {
-            add_data(vector<Item>(1, item));
+            add_data(vector<Item>(1, item), thread_count);
         }
 
         //void SenderDB::delete_data(const vector<Item> &data)
@@ -300,7 +313,8 @@ namespace apsi
             int split_size = params_.split_size();
             symmetric_polys(split, batch, context, symm_block);
             auto num_rows = symm_block.bounds()[0];
-            oc::PRNG& prng = context.prng();
+            oc::PRNG &prng = context.prng();
+
             ExFieldElement r(context.exfield());
 
             for (int i = 0; i < num_rows; i++)
@@ -308,7 +322,7 @@ namespace apsi
                 // Sample non-zero randomness
                 do
                 {
-                    context.exfield()->random_element(r, prng);
+                    randomize_element(r, prng);
                 } while (r.is_zero());
 
                 for (int j = 0; j < split_size + 1; j++)
@@ -319,7 +333,7 @@ namespace apsi
         }
 
         void SenderDB::batched_randomized_symmetric_polys(SenderThreadContext &context, 
-            shared_ptr<Evaluator> evaluator, shared_ptr<PolyCRTBuilder> builder)
+            shared_ptr<Evaluator> evaluator, shared_ptr<PolyCRTBuilder> builder, int thread_count)
         {
             // Get the symmetric block
             auto symm_block = context.symm_block();
@@ -343,8 +357,8 @@ namespace apsi
             MemoryPoolHandle local_pool = context.pool();
 
             int total_blocks = params_.number_of_splits() * params_.number_of_batches();
-            int start_block = context.id() * total_blocks / params_.sender_total_thread_count();
-            int end_block = (context.id() + 1) * total_blocks / params_.sender_total_thread_count();
+            int start_block = context.id() * total_blocks / thread_count;
+            int end_block = (context.id() + 1) * total_blocks / thread_count;
 
             for (int next_block = start_block; next_block < end_block; next_block++)
             {

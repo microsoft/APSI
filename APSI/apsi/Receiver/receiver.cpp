@@ -20,11 +20,16 @@ namespace apsi
 {
     namespace receiver
     {
-        Receiver::Receiver(const PSIParams &params, const MemoryPoolHandle &pool) :
+        Receiver::Receiver(const PSIParams &params, int thread_count, const MemoryPoolHandle &pool) :
             params_(params),
+            thread_count_(thread_count),
             pool_(pool),
             ex_field_(ExField::Acquire(params.exfield_characteristic(), params.exfield_polymod(), pool))
         {
+            if (thread_count_ <= 0)
+            {
+                throw invalid_argument("thread_count must be positive");
+            }
             initialize();
         }
 

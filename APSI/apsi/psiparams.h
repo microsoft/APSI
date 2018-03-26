@@ -30,9 +30,6 @@ namespace apsi
     {
     public:
         PSIParams(
-            int sender_total_thread_count,
-            int sender_session_thread_count,
-            int receiver_thread_count,
             int log_table_size,
             int sender_bin_size,
             int window_size,
@@ -49,11 +46,7 @@ namespace apsi
             int log_poly_degree = 12,
             int coeff_mod_bit_count = 116,
             uint32_t port = 4000,
-            std::string endpoint = "APSI")
-            :
-            sender_total_thread_count_(sender_total_thread_count),
-            sender_session_thread_count_(sender_session_thread_count),
-            receiver_thread_count_(receiver_thread_count),
+            std::string endpoint = "APSI") :
             log_table_size_(log_table_size), table_size_(1 << log_table_size),
             sender_bin_size_(sender_bin_size), window_size_(window_size),
             number_of_splits_(number_of_splits),
@@ -228,36 +221,6 @@ namespace apsi
             poly_degree_ = 1 << log_poly_degree_;
         }
 
-        inline int sender_total_thread_count() const
-        {
-            return sender_total_thread_count_;
-        }
-
-        void set_sender_total_thread_count(int sender_total_thread_count)
-        {
-            sender_total_thread_count_ = sender_total_thread_count;
-        }
-
-        inline int sender_session_thread_count() const
-        {
-            return sender_session_thread_count_;
-        }
-
-        void set_sender_session_thread_count(int sender_session_thread_count)
-        {
-            sender_session_thread_count_ = sender_session_thread_count;
-        }
-
-        inline int receiver_thread_count() const
-        {
-            return receiver_thread_count_;
-        }
-
-        void set_receiver_thread_count(int receiver_thread_count)
-        {
-            receiver_thread_count_ = receiver_thread_count;
-        }
-
         inline void set_coeff_mod_bit_count(int coeff_mod_bit_count)
         {
             coeff_mod_bit_count_ = coeff_mod_bit_count;
@@ -322,14 +285,6 @@ namespace apsi
 
         /* Should not exceed 128. Moreover, should reserve several bits because of the requirement of current Cuckoo hashing impl. */
         int item_bit_length_;
-
-        //int reduced_item_bit_length_;
-
-        int sender_total_thread_count_;
-
-        int sender_session_thread_count_;
-
-        int receiver_thread_count_;
 
         std::uint64_t exfield_characteristic_;
 

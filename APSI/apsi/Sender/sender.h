@@ -37,6 +37,8 @@ namespace apsi
         {
         public:
             Sender(const PSIParams &params,
+                int total_thread_count,
+                int session_thread_count,
                 const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::Global());
 
             /**
@@ -77,19 +79,18 @@ namespace apsi
             /**
             Adds the data items to sender's database.
             */
-            void add_data(const std::vector<Item> &data)
+            inline void add_data(const std::vector<Item> &data)
             {
-                sender_db_.add_data(data);
+                sender_db_.add_data(data, total_thread_count_);
             }
 
             /**
             Adds one item to sender's database.
             */
-            void add_data(const Item &item)
+            inline void add_data(const Item &item)
             {
-                sender_db_.add_data(item);
+                sender_db_.add_data(item, total_thread_count_);
             }
-
 
             /**
             Precomputes all necessary components for the PSI protocol, including symmetric polynomials, batching, etc.
@@ -122,6 +123,10 @@ namespace apsi
                 SenderSessionContext &session_context, SenderThreadContext &thread_context);
 
             PSIParams params_;
+
+            int total_thread_count_;
+
+            int session_thread_count_;
 
             seal::MemoryPoolHandle pool_;
 

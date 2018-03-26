@@ -18,14 +18,21 @@ namespace apsi
 {
     namespace sender
     {
-        Sender::Sender(const PSIParams &params, const MemoryPoolHandle &pool) : 
+        Sender::Sender(const PSIParams &params, int total_thread_count, 
+            int session_thread_count, const MemoryPoolHandle &pool) :
             params_(params),
             pool_(pool),
+            total_thread_count_(total_thread_count),
+            session_thread_count_(session_thread_count),
             ex_field_(ExField::Acquire(params.exfield_characteristic(), params.exfield_polymod(), pool)),
             sender_db_(params, ex_field_),
-            thread_contexts_(params.sender_total_thread_count()),
+            thread_contexts_(total_thread_count_),
             stopped_(false)
         {
+            if (session_thread_count_ <= 0 || (session_thread_count_ > total_thread_count_))
+            {
+                throw invalid_argument("invalid thread count");
+            }
             initialize();
         }
 
@@ -48,7 +55,7 @@ namespace apsi
             evaluator_.reset(new Evaluator(*seal_context_));
             builder_.reset(new PolyCRTBuilder(*seal_context_));
 
-            vector<thread> thrds(params_.sender_total_thread_count());
+            vector<thread> thrds(total_thread_count_);
             
 #ifdef USE_SECURE_SEED
             prng_.SetSeed(oc::sysRandomSeed());
@@ -58,7 +65,7 @@ namespace apsi
 #endif
 
             // Set local exfields for multi-threaded efficient use of memory pools.
-            for (int i = 0; i < params_.sender_total_thread_count(); i++)
+            for (int i = 0; i < total_thread_count_; i++)
             {
                 available_thread_contexts_.push_back(i);
                 auto seed = prng_.get<oc::block>();
@@ -93,7 +100,7 @@ namespace apsi
 
         void Sender::load_db(const vector<Item> &data)
         {
-            sender_db_.set_data(data);
+            sender_db_.set_data(data, total_thread_count_);
             stop_watch.set_time_point("Sender set-data");
 
             // Compute symmetric polys and batch
@@ -102,16 +109,14 @@ namespace apsi
 
         void Sender::offline_compute()
         {
-            vector<thread> thread_pool(params_.sender_total_thread_count());
-            for (int i = 0; i < params_.sender_total_thread_count(); i++)
+            vector<thread> thread_pool(total_thread_count_);
+            for (int i = 0; i < total_thread_count_; i++)
             {
                 thread_pool[i] = thread([&, i]()
                 {
                     int thread_context_idx = acquire_thread_context();
                     SenderThreadContext &context = thread_contexts_[thread_context_idx];
-
-                    sender_db_.batched_randomized_symmetric_polys(context, evaluator_, builder_);
-
+                    sender_db_.batched_randomized_symmetric_polys(context, evaluator_, builder_, total_thread_count_);
                     release_thread_context(context.id());
                 });
             }
@@ -197,7 +202,7 @@ namespace apsi
             int total_blocks = params_.number_of_splits() * params_.number_of_batches();
 
             mutex mtx;
-            vector<thread> thread_pool(params_.sender_session_thread_count());
+            vector<thread> thread_pool(session_thread_count_);
             for (int i = 0; i < thread_pool.size(); i++)
             {
                 thread_pool[i] = thread([&, i]()
@@ -229,8 +234,8 @@ namespace apsi
                     // Check if we need to re-batch things. This happens if we do an update.
                     //sender_db_.batched_randomized_symmetric_polys(context);
 
-                    int start_block = i * total_blocks / params_.sender_total_thread_count();
-                    int end_block = (i + 1) * total_blocks / params_.sender_total_thread_count();
+                    int start_block = i * total_blocks / total_thread_count_;
+                    int end_block = (i + 1) * total_blocks / total_thread_count_;
 
                     // constuct two ciphertext to store the result.  One keeps track of the current result, 
                     // one is used as a temp. Their roles switch each iteration. Saved needing to make a 

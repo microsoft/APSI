@@ -414,7 +414,7 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
     /*
     Creating the PSIParams class.
     */
-    PSIParams params(numThreads, numThreads, 1, log_table_size, bin_size, window_size, num_splits, oprf_type);
+    PSIParams params(log_table_size, bin_size, window_size, num_splits, oprf_type);
     params.set_item_bit_length(item_bit_length); // The effective item bit length will be limited by ExField's p.
     params.set_exfield_polymod(string("1x^1")); // f(x) = x
     params.set_exfield_characteristic(0x820001); // p = 8519681. NOTE: p=1 (mod 2n)
@@ -427,11 +427,11 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
     params.validate();
 
     // Set up receiver
-    Receiver receiver(params, MemoryPoolHandle::New(true));
+    Receiver receiver(params, 1, MemoryPoolHandle::New(true));
     stop_watch.set_time_point("Receiver constructor");
 
     // Set up sender
-    Sender sender(params, MemoryPoolHandle::New(true));
+    Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New(true));
     stop_watch.set_time_point("Sender constructor");
 
     // For testing only insert a couple of elements in the sender's dataset
@@ -568,7 +568,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     cout << "Binning security level: " << binning_sec_level << endl;
     cout << "Window size: " << window_size << endl;
 
-    PSIParams params(numThreads, numThreads, 1, log_table_size, bin_size, window_size, num_splits, oprf_type);
+    PSIParams params(log_table_size, bin_size, window_size, num_splits, oprf_type);
     params.set_item_bit_length(90); // We can handle very long items in the following ExField.
     params.set_exfield_polymod(string("1x^8 + 3"));
     params.set_exfield_characteristic(0xE801);
@@ -605,8 +605,8 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     //params.validate();
 
 
-    Receiver receiver(params, MemoryPoolHandle::New(true));
-    Sender sender(params, MemoryPoolHandle::New(true));
+    Receiver receiver(params, 1, MemoryPoolHandle::New(true));
+    Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New(true));
     //sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
     //sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 

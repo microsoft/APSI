@@ -42,20 +42,20 @@ namespace apsi
             /**
             Sets the sender's database by hashing the data items with all hash functions.
             */
-            void set_data(oc::span<const Item> keys);
-            void set_data(oc::span<const Item> keys, oc::span<const Item> values);
+            void set_data(oc::span<const Item> keys, int thread_count);
+            void set_data(oc::span<const Item> keys, oc::span<const Item> values, int thread_count);
 
 
             /**
             Adds the data items to sender's database.
             */
-            void add_data(oc::span<const Item> keys);
-            void add_data(oc::span<const Item> keys, oc::span<const Item> values);
+            void add_data(oc::span<const Item> keys, int thread_count);
+            void add_data(oc::span<const Item> keys, oc::span<const Item> values, int thread_count);
 
             /**
             Adds one item to sender's database.
             */
-            void add_data(const Item &item);
+            void add_data(const Item &item, int thread_count);
 
             /**
             Deletes the data items in the sender's database. Items are ignored if they don't exist in the database.
@@ -84,7 +84,8 @@ namespace apsi
             void batched_randomized_symmetric_polys(
                 SenderThreadContext &context,
                 std::shared_ptr<seal::Evaluator> evaluator, 
-                std::shared_ptr<seal::PolyCRTBuilder> builder);
+                std::shared_ptr<seal::PolyCRTBuilder> builder,
+                int thread_count);
 
 
 

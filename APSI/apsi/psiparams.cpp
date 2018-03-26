@@ -74,13 +74,12 @@ namespace apsi
     void PSIParams::validate()
     {
         if (sender_bin_size_ % number_of_splits_ != 0)
+        {
             throw invalid_argument("sender bin size must be a multiple of number of splits.");
-
-
+        }
         if ((item_bit_length_ + 63) / 64 != (item_bit_length_ + (int)floor(log2(hash_func_count_)) + 1 + 1 + 63) / 64)
+        {
             throw invalid_argument("invalid for cuckoo: null bit and location index overflow to new uint64_t.");
-
-        if (sender_session_thread_count_ > sender_total_thread_count_)
-            throw invalid_argument("invalid thread count for sender.");
+        }
     }
 }

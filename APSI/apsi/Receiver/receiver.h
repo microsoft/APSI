@@ -14,7 +14,6 @@
 #include "apsi/item.h"
 #include "apsi/psiparams.h"
 #include "cuckoo/cuckoo.h"
-//#include "Sender/sender.h"
 #include "cryptoTools/Network/Channel.h"
 
 namespace apsi
@@ -24,7 +23,8 @@ namespace apsi
         class Receiver
         {
         public:
-            Receiver(const PSIParams &params, const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::Global());
+            Receiver(const PSIParams &params, int thread_count,
+                const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::Global());
 
             /**
             Sends a query to the remote sender, and get the intersection result. The query is a vector of items, and the result
@@ -151,15 +151,12 @@ namespace apsi
                 return secret_key_;
             }
 
-            //void clear_memory_backing()
-            //{
-            //    memory_backing_.clear();
-            //}
-
         private:
             void initialize();
 
             PSIParams params_;
+
+            int thread_count_;
 
             seal::MemoryPoolHandle pool_;
             
