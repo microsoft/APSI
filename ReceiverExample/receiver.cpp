@@ -18,6 +18,7 @@ using namespace seal;
 using namespace oc;
 
 void print_example_banner(string title);
+void print_parameters(const PSIParams &psi_params);
 void example_basics();
 void example_update();
 void example_save_db();
@@ -101,11 +102,11 @@ int main(int argc, char *argv[])
 
 
     // Example: Fast batching
-    if (none || fastBatching)
-        example_fast_batching(cmd, clientChl, serverChl);
+    //if (none || fastBatching)
+    //    example_fast_batching(cmd, clientChl, serverChl);
 
     // Example: Slow batching
-    if (slowBatching)
+    //if (slowBatching)
         example_slow_batching(cmd, clientChl, serverChl);
 
     // Example: Slow batching vs. Fast batching
@@ -377,51 +378,76 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
     */
 
     // Thread count
-    int numThreads = cmd.get<int>("t");
-
-    // Length of items
-    int item_bit_length = 20;
-
-    // Log of size of full hash table
-    int log_table_size = 14;
+    unsigned numThreads = cmd.get<int>("t");
 
     // Larger set size
-    int sender_set_size = 1 << 20;
-
-    // Cuckoo hash function count
-    int num_hash_func = 3;
+    unsigned sender_set_size = 1 << 20;
 
     // Negative log failure probability for simple hashing
-    int binning_sec_level = 10;
+    unsigned binning_sec_level = 10;
 
-    // Number of splits to use
-    // Larger means lower depth but bigger S-->R communication
-    int num_splits = 256;
+    // Length of items
+    unsigned item_bit_length = 20;
 
-    // Required width of the table (divisible by num_splits)
-    int bin_size = round_up_to(get_bin_size(1 << log_table_size, sender_set_size * num_hash_func, binning_sec_level), num_splits);
-    
-    // Window size parameter
-    // Larger means lower depth but bigger R-->S communication
-    int window_size = 1;
+    // Cuckoo hash parameters
+    CuckooParams cuckoo_params;
+    {
+        // Use standard Cuckoo or PermutationBasedCuckoo
+        cuckoo_params.cuckoo_mode = cuckoo::CuckooMode::Normal;
+
+        // Cuckoo hash function count
+        cuckoo_params.hash_func_count = 3;
+
+        // Set the hash function seed
+        cuckoo_params.hash_func_seed = 0;
+
+        // Set max_probe count for Cuckoo hashing
+        cuckoo_params.max_probe = 100;
+    }
+
+    // Create TableParams and populate.    
+    TableParams table_params;
+    {
+        // Log of size of full hash table
+        table_params.log_table_size = 14;
+
+        // Number of splits to use
+        // Larger means lower depth but bigger S-->R communication
+        table_params.split_count = 256;
+
+        // Get secure bin size
+        table_params.sender_bin_size = round_up_to(get_bin_size(
+            1 << table_params.log_table_size,
+            sender_set_size * cuckoo_params.hash_func_count,
+            binning_sec_level),
+            table_params.split_count);
+
+        // Window size parameter
+        // Larger means lower depth but bigger R-->S communication
+        table_params.window_size = 1;
+    }
+
+    SEALParams seal_params;
+    {
+        seal_params.encryption_params.set_poly_modulus("1x^16384 + 1");
+        seal_params.encryption_params.set_coeff_modulus(
+            coeff_modulus_128(seal_params.encryption_params.poly_modulus().coeff_count() - 1));
+        seal_params.encryption_params.set_plain_modulus(0x820001);
+
+        // This must be equal to plain_modulus
+        seal_params.exfield_params.exfield_characteristic = seal_params.encryption_params.plain_modulus().value();
+        seal_params.exfield_params.exfield_polymod = string("1x^1");
+
+        seal_params.decomposition_bit_count = 60;
+    }
 
     // Use OPRF to eliminate need for noise flooding for sender's security
     auto oprf_type = OprfType::None;
 
-    // Use standard Cuckoo or PermutationBasedCuckoo
-    auto cuckoo_mode = cuckoo::CuckooMode::Normal;
-
     /*
     Creating the PSIParams class.
     */
-    PSIParams params(log_table_size, bin_size, window_size, num_splits, oprf_type);
-    params.set_item_bit_length(item_bit_length); // The effective item bit length will be limited by ExField's p.
-    params.set_exfield_polymod(string("1x^1")); // f(x) = x
-    params.set_exfield_characteristic(0x820001); // p = 8519681. NOTE: p=1 (mod 2n)
-    params.set_log_poly_degree(14); /* n = 2^14 = 16384, in SEAL's poly modulus "x^n + 1". */
-    params.set_coeff_mod_bit_count(226);  // SEAL param: when n = 16384, q has 189 or 226 bits.
-    params.set_decomposition_bit_count(60);
-    params.set_cuckoo_mode(cuckoo_mode);
+    PSIParams params(item_bit_length, table_params, cuckoo_params, seal_params, oprf_type);
 
     // Check that the parameters are OK
     params.validate();
@@ -550,31 +576,80 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     //params.set_decomposition_bit_count(60);
     //params.validate();
 
-    int numThreads = cmd.get<int>("t");
-    int log_table_size = 14;
-    int sender_set_size = 1 << 16;
-    int num_hash_func = 3;
-    int binning_sec_level = 30;
-    int num_splits = 8;
-    int bin_size = round_up_to(get_bin_size(1 << log_table_size, sender_set_size * num_hash_func, binning_sec_level), num_splits);
-    int window_size = 2;
+
+    // Thread count
+    unsigned numThreads = cmd.get<int>("t");
+
+    // Larger set size
+    unsigned sender_set_size = 1 << 16;
+
+    // Negative log failure probability for simple hashing
+    unsigned binning_sec_level = 30;
+
+    // Length of items
+    unsigned item_bit_length = 90;
+
+    // Cuckoo hash parameters
+    CuckooParams cuckoo_params;
+    {
+        // Use standard Cuckoo or PermutationBasedCuckoo
+        cuckoo_params.cuckoo_mode = cuckoo::CuckooMode::Normal;
+
+        // Cuckoo hash function count
+        cuckoo_params.hash_func_count = 3;
+
+        // Set the hash function seed
+        cuckoo_params.hash_func_seed = 0;
+
+        // Set max_probe count for Cuckoo hashing
+        cuckoo_params.max_probe = 100;
+
+    }
+
+    // Create TableParams and populate.    
+    TableParams table_params;
+    {
+        // Log of size of full hash table
+        table_params.log_table_size = 14;
+
+        // Number of splits to use
+        // Larger means lower depth but bigger S-->R communication
+        table_params.split_count = 8;
+
+        // Get secure bin size
+        table_params.sender_bin_size = round_up_to(get_bin_size(
+            1 << table_params.log_table_size,
+            sender_set_size * cuckoo_params.hash_func_count,
+            binning_sec_level),
+            table_params.split_count);
+
+        // Window size parameter
+        // Larger means lower depth but bigger R-->S communication
+        table_params.window_size = 2;
+    }
+
+    SEALParams seal_params;
+    {
+        seal_params.encryption_params.set_poly_modulus("1x^8192 + 1");
+        seal_params.encryption_params.set_coeff_modulus(
+            coeff_modulus_128(seal_params.encryption_params.poly_modulus().coeff_count() - 1));
+        seal_params.encryption_params.set_plain_modulus(0xE801);
+
+        // This must be equal to plain_modulus
+        seal_params.exfield_params.exfield_characteristic = seal_params.encryption_params.plain_modulus().value();
+        seal_params.exfield_params.exfield_polymod = string("1x^8 + 3");
+
+        seal_params.decomposition_bit_count = 60;
+    }
+
+    // Use OPRF to eliminate need for noise flooding for sender's security
     auto oprf_type = OprfType::None;
 
-    cout << "Thread count: " << numThreads << endl;
-    cout << "Log table size: " << log_table_size << endl;
-    cout << "Sender set size: " << sender_set_size << endl;
-    cout << "Splits: " << num_splits << endl;
-    cout << "Bin size: " << bin_size << endl;
-    cout << "Binning security level: " << binning_sec_level << endl;
-    cout << "Window size: " << window_size << endl;
+    /*
+    Creating the PSIParams class.
+    */
+    PSIParams params(item_bit_length, table_params, cuckoo_params, seal_params, oprf_type);
 
-    PSIParams params(log_table_size, bin_size, window_size, num_splits, oprf_type);
-    params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    params.set_exfield_polymod(string("1x^8 + 3"));
-    params.set_exfield_characteristic(0xE801);
-    params.set_log_poly_degree(13);
-    params.set_coeff_mod_bit_count(189);
-    params.set_decomposition_bit_count(60);
     params.validate();
 
     //PSIParams params(1, 1, 1, 9, 7936, 1, 256);
@@ -603,7 +678,6 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     //params.set_coeff_mod_bit_count(189);
     //params.set_decomposition_bit_count(60);
     //params.validate();
-
 
     Receiver receiver(params, 1, MemoryPoolHandle::New(true));
     Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New(true));

@@ -10,70 +10,46 @@ using namespace seal::util;
 
 namespace apsi
 {
-    map<string, int> PSIParams::upperbound_on_B
-    {
-        { "(4096, 8)", 10 },
-        { "(4096, 12)", 26 },
-        { "(4096, 16)", 114 },
-        { "(4096, 20)", 1004 },
-        { "(4096, 24)", 13199 },
-        { "(4096, 28)", 200221 },
-
-        { "(8192, 8)", 9 },
-        { "(8192, 12)", 20 },
-        { "(8192, 16)", 74 },
-        { "(8192, 20)", 556 },
-        { "(8192, 24)", 6798 },
-        { "(8192, 28)", 100890 },
-
-        { "(16384, 8)", 8 },
-        { "(16384, 12)", 16 },
-        { "(16384, 16)", 51 },
-        { "(16384, 20)", 318 },
-        { "(16384, 24)", 3543 },
-        { "(16384, 28)", 51002 }
-    };
-
-    vector<SmallModulus> PSIParams::coeff_modulus()
-    {
-        int num_coeff_mod;
-        if (coeff_mod_bit_count_ == 120)
-        {
-            num_coeff_mod = 2;
-        }
-        else if (coeff_mod_bit_count_ == 125) {
-            num_coeff_mod = 2;
-        }
-        else if (coeff_mod_bit_count_ == 189) {
-            num_coeff_mod = 3;
-        }
-        else if (coeff_mod_bit_count_ == 435) {
-            num_coeff_mod = 7;
-        }
-        else if (coeff_mod_bit_count_ == 226) {
-            num_coeff_mod = 4;
-        }
-        else if (coeff_mod_bit_count_ == 116) {
-            num_coeff_mod = 2;
-        }
-        else if (coeff_mod_bit_count_ == 60)
-        {
-            num_coeff_mod = 1;
-        }
-        else {
-            throw runtime_error("bad coeff modulus.");
-        }
-        vector<SmallModulus> coeff_mod_array(num_coeff_mod);
-        for (int i = 0; i < num_coeff_mod; i++)
-        {
-            coeff_mod_array[i] = small_mods_60bit(i);
-        }
-        return coeff_mod_array;
-    }
+    //vector<SmallModulus> PSIParams::coeff_modulus()
+    //{
+    //    int num_coeff_mod;
+    //    if (coeff_mod_bit_count_ == 120)
+    //    {
+    //        num_coeff_mod = 2;
+    //    }
+    //    else if (coeff_mod_bit_count_ == 125) {
+    //        num_coeff_mod = 2;
+    //    }
+    //    else if (coeff_mod_bit_count_ == 189) {
+    //        num_coeff_mod = 3;
+    //    }
+    //    else if (coeff_mod_bit_count_ == 435) {
+    //        num_coeff_mod = 7;
+    //    }
+    //    else if (coeff_mod_bit_count_ == 226) {
+    //        num_coeff_mod = 4;
+    //    }
+    //    else if (coeff_mod_bit_count_ == 116) {
+    //        num_coeff_mod = 2;
+    //    }
+    //    else if (coeff_mod_bit_count_ == 60)
+    //    {
+    //        num_coeff_mod = 1;
+    //    }
+    //    else {
+    //        throw runtime_error("bad coeff modulus.");
+    //    }
+    //    vector<SmallModulus> coeff_mod_array(num_coeff_mod);
+    //    for (int i = 0; i < num_coeff_mod; i++)
+    //    {
+    //        coeff_mod_array[i] = small_mods_60bit(i);
+    //    }
+    //    return coeff_mod_array;
+    //}
 
     void PSIParams::validate()
     {
-        if (sender_bin_size_ % number_of_splits_ != 0)
+        if (sender_bin_size_ % split_count_ != 0)
         {
             throw invalid_argument("sender bin size must be a multiple of number of splits.");
         }

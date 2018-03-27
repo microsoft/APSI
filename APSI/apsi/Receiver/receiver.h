@@ -141,7 +141,7 @@ namespace apsi
                 return public_key_;
             }
 
-            const seal::EvaluationKeys& evaluation_keys() const
+            const seal::EvaluationKeys &evaluation_keys() const
             {
                 return evaluation_keys_;
             }
@@ -175,12 +175,6 @@ namespace apsi
             std::shared_ptr<seal::util::ExFieldPolyCRTBuilder> exfieldpolycrtbuilder_;
 
             std::unique_ptr<seal::PolyCRTBuilder> polycrtbuilder_;
-
-
-            /* Pointers to temporary memory allocated during execution of queries. */
-            //std::vector<seal::util::Pointer> memory_backing_;
-
-
         };
 
     }

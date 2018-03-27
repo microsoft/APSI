@@ -45,12 +45,13 @@ namespace apsi
             keys_(params.sender_bin_size(), params.table_size()),
             values_(params.sender_bin_size(), params.table_size()),
             next_locs_(params.table_size(), 0),
-            batch_random_symm_polys_(params.number_of_splits() * params.number_of_batches() * (params.split_size() + 1))
+            batch_random_symm_polys_(params.split_count() * params.number_of_batches() * (params.split_size() + 1))
         {
             for (auto &plain : batch_random_symm_polys_)
             {
                 // Reserve memory for ciphertext size plaintexts (NTT transformed mod q)
-                plain.reserve(params_.coeff_modulus().size() * (params_.poly_degree() + 1));
+                plain.reserve(params_.encryption_params().coeff_modulus().size() * 
+                    (params_.encryption_params().poly_modulus().coeff_count()));
             }
 
             oc::block seed;
@@ -65,7 +66,7 @@ namespace apsi
 
 
             // What is the actual length of strings stored in the hash table
-            encoding_bit_length_ = params.get_cuckoo_mode() == cuckoo::CuckooMode::Normal
+            encoding_bit_length_ = (params.get_cuckoo_mode() == cuckoo::CuckooMode::Normal)
                 ? params.item_bit_length() : encoder_.encoding_bit_length_;
 
             // Create the null ExFieldElement (note: encoding truncation affects high bits)
@@ -356,7 +357,7 @@ namespace apsi
 
             MemoryPoolHandle local_pool = context.pool();
 
-            int total_blocks = params_.number_of_splits() * params_.number_of_batches();
+            int total_blocks = params_.split_count() * params_.number_of_batches();
             int start_block = context.id() * total_blocks / thread_count;
             int end_block = (context.id() + 1) * total_blocks / thread_count;
 
@@ -426,7 +427,7 @@ namespace apsi
         //    **/
 
         //    int32_t bin_size = params_.sender_bin_size(), table_size = params_.table_size(),
-        //        num_splits = params_.number_of_splits(), num_batches = params_.number_of_batches(),
+        //        num_splits = params_.split_count(), num_batches = params_.number_of_batches(),
         //        split_size_plus_one = params_.split_size() + 1;
 
         //    stream.write(reinterpret_cast<const char*>(&bin_size), sizeof(int32_t));
@@ -474,7 +475,7 @@ namespace apsi
         //    stream.read(reinterpret_cast<char*>(&split_size_plus_one), sizeof(int32_t));
 
         //    if (bin_size != params_.sender_bin_size() || table_size != params_.table_size() ||
-        //        num_splits != params_.number_of_splits() || num_batches != params_.number_of_batches()
+        //        num_splits != params_.split_count() || num_batches != params_.number_of_batches()
         //        || split_size_plus_one != params_.split_size() + 1)
         //        throw runtime_error("Unexpected params.");
 

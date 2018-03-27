@@ -35,13 +35,13 @@ namespace apsi
 
         void Receiver::initialize()
         {
-            EncryptionParameters enc_params;
+            //EncryptionParameters enc_params;
 
-            enc_params.set_poly_modulus("1x^" + to_string(params_.poly_degree()) + " + 1");
-            enc_params.set_coeff_modulus(params_.coeff_modulus());
-            enc_params.set_plain_modulus(ex_field_->coeff_modulus());
+            //enc_params.set_poly_modulus("1x^" + to_string(params_.poly_degree()) + " + 1");
+            //enc_params.set_coeff_modulus(params_.coeff_modulus());
+            //enc_params.set_plain_modulus(ex_field_->coeff_modulus());
 
-            SEALContext seal_context(enc_params);
+            SEALContext seal_context(params_.encryption_params());
             KeyGenerator generator(seal_context);
 
             public_key_ = generator.public_key();
@@ -52,10 +52,13 @@ namespace apsi
 
             generator.generate_evaluation_keys(params_.decomposition_bit_count(), evaluation_keys_);
 
-            exfieldpolycrtbuilder_.reset(new ExFieldPolyCRTBuilder(ex_field_, params_.log_poly_degree()));
+            exfieldpolycrtbuilder_.reset(new ExFieldPolyCRTBuilder(ex_field_, 
+                get_power_of_two(params_.encryption_params().poly_modulus().coeff_count() - 1)));
 
             if (seal_context.qualifiers().enable_batching)
+            {
                 polycrtbuilder_.reset(new PolyCRTBuilder(seal_context));
+            }
 
             ex_field_->init_frob_table();
         }
@@ -87,20 +90,10 @@ namespace apsi
             {
                 //if (table_to_input_map[i] == -1)
                 {
-                    for (int j = 0; j < params_.number_of_splits(); j++)
+                    for (int j = 0; j < params_.split_count(); j++)
                     {
                         if (result[j][i] == zero)
                         {
-                            //if (table_to_input_map[i] == -1)
-                            //{
-                            //    ostreamLock o(cout);
-                            //    o << " **** False positive match at empty cuckoo[" << i << "] and response ciphtertext #" << j << endl;
-                            //}
-                            //else
-                            //{
-                            //    intersection[table_to_input_map[i]] = true;
-                            //}
-                            //break;
                             intersection[table_to_input_map[i]] = true;
                         }
                     }
@@ -116,7 +109,7 @@ namespace apsi
         }
 
         pair<
-            map<uint64_t, vector<Ciphertext>>,
+            map<uint64_t, vector<Ciphertext> >,
             unique_ptr<CuckooInterface>
         > Receiver::preprocess(vector<Item> &items, Channel& channel)
         {
@@ -145,7 +138,6 @@ namespace apsi
                     x.toBytes(iter);
                     iter += step;
                 }
-
 
                 // send the data over the network and prep for the response.
                 channel.asyncSend(move(buff));
@@ -309,7 +301,7 @@ namespace apsi
             map<uint64_t, vector<::ExFieldElement> >& result,
             list<Pointer>& data)
         {
-            int split_size = (params_.sender_bin_size() + params_.number_of_splits() - 1) / params_.number_of_splits();
+            int split_size = (params_.sender_bin_size() + params_.split_count() - 1) / params_.split_count();
             int window_size = params_.window_size();
             int radix = 1 << window_size;
             int bound = floor(log2(split_size) / window_size) + 1;
@@ -375,7 +367,7 @@ namespace apsi
 
         //vector<vector<ExFieldElement>> Receiver::bulk_decrypt(const vector<vector<Ciphertext>> &result_ciphers)
         //{
-        //    if (result_ciphers.size() != params_.number_of_splits() || result_ciphers[0].size() != params_.number_of_batches())
+        //    if (result_ciphers.size() != params_.split_count() || result_ciphers[0].size() != params_.number_of_batches())
         //        throw invalid_argument("Result ciphers have unexpexted sizes.");
 
         //    int slot_count = exfieldpolycrtbuilder_->slot_count();
@@ -401,11 +393,11 @@ namespace apsi
         void Receiver::stream_decrypt(
             oc::Channel &channel,
             vector<vector<ExFieldElement>> &result,
-            ::Pointer& backing)
+            Pointer &backing)
         {
             vector<vector<Plaintext>> plaintext_matrix;
 
-            int num_of_splits = params_.number_of_splits(),
+            int num_of_splits = params_.split_count(),
                 num_of_batches = params_.number_of_batches(),
                 block_count = num_of_splits * num_of_batches,
                 split_idx = 0,
@@ -490,7 +482,7 @@ namespace apsi
         //void Receiver::decompose(const vector<vector<Plaintext>> &plain_matrix,
         //	vector<vector<::ExFieldElement>> &result)
         //{
-        //	int num_of_splits = params_.number_of_splits(),
+        //	int num_of_splits = params_.split_count(),
         //		num_of_batches = params_.number_of_batches(),
         //		slot_count = exfieldpolycrtbuilder_->slot_count();
 

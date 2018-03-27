@@ -132,8 +132,6 @@ namespace apsi
 
             std::shared_ptr<seal::util::ExField> ex_field_;
 
-            seal::EncryptionParameters enc_params_;
-
             std::shared_ptr<seal::SEALContext> seal_context_;
 
             std::shared_ptr<seal::Evaluator> evaluator_;

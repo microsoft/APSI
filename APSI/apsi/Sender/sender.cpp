@@ -38,11 +38,7 @@ namespace apsi
 
         void Sender::initialize()
         {
-            enc_params_.set_poly_modulus("1x^" + to_string(params_.poly_degree()) + " + 1");
-            enc_params_.set_coeff_modulus(params_.coeff_modulus());
-            enc_params_.set_plain_modulus(ex_field_->coeff_modulus());
-
-            seal_context_.reset(new SEALContext(enc_params_));
+            seal_context_.reset(new SEALContext(params_.encryption_params()));
 
             ex_field_->init_frob_table();
 
@@ -78,11 +74,11 @@ namespace apsi
                     thread_contexts_[i].set_exfield(ExField::Acquire(ex_field_->characteristic(), poly_mod, local_pool));
                     thread_contexts_[i].exfield()->set_frob_table(ex_field_->frobe_table());
 
-                    // We need the ExFIeldPolyCRTBuilder here since it creates ExFieldElements from the memory
+                    // We need the ExFieldPolyCRTBuilder here since it creates ExFieldElements from the memory
                     // pool of its ExField. Cannot have a shared ExFieldPolyCRTBuilder with this design.
                     thread_contexts_[i].set_exbuilder(
                         make_shared<ExFieldPolyCRTBuilder>(thread_contexts_[i].exfield(), 
-                            params_.log_poly_degree())
+                            get_power_of_two(params_.encryption_params().poly_modulus().coeff_count() - 1))
                     );
                     
                     // Allocate memory for repeated use from the given memory pool.
@@ -188,7 +184,7 @@ namespace apsi
             SenderSessionContext &session_context,
             Channel &channel)
         {
-            //vector<vector<Ciphertext>> resultVec(params_.number_of_splits());
+            //vector<vector<Ciphertext>> resultVec(params_.split_count());
             //for (auto& v : resultVec) v.resize(params_.number_of_batches());
             vector<vector<Ciphertext> > powers(params_.number_of_batches());
 
@@ -199,7 +195,7 @@ namespace apsi
             auto number_of_batches = params_.number_of_batches();
             int split_size_plus_one = params_.split_size() + 1;
             int	splitStep = params_.number_of_batches() * split_size_plus_one;
-            int total_blocks = params_.number_of_splits() * params_.number_of_batches();
+            int total_blocks = params_.split_count() * params_.number_of_batches();
 
             mutex mtx;
             vector<thread> thread_pool(session_thread_count_);
@@ -244,8 +240,8 @@ namespace apsi
 
                     for (int block = start_block; block < end_block; block++)
                     {
-                        int batch = block / params_.number_of_splits(),
-                            split = block % params_.number_of_splits();
+                        int batch = block / params_.split_count(),
+                            split = block % params_.split_count();
 
                         // Get the pointer to the first poly of this batch.
                         Plaintext* sender_coeffs(&sender_db_.batch_random_symm_polys()[split * splitStep + batch * split_size_plus_one]);
