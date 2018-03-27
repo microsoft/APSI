@@ -37,7 +37,6 @@ namespace apsi
             }
         }
 
-
         SenderDB::SenderDB(const PSIParams &params, shared_ptr<ExField> &ex_field) :
             params_(params),
             encoder_(params.log_table_size(), params.hash_func_count(), params.item_bit_length()),
@@ -73,8 +72,6 @@ namespace apsi
             null_element_ = sender_null_item_.to_exfield_element(global_ex_field_, encoding_bit_length_);
             neg_null_element_ = ExFieldElement(global_ex_field_);
             global_ex_field_->negate(null_element_, neg_null_element_);
-
-            //std::cout << "neg_null_element_: " << neg_null_element_ << std::endl;
         }
 
         void SenderDB::clear_db()
@@ -85,10 +82,7 @@ namespace apsi
             // Make sure all entries are false
             for (int i = 0; i < ss; i++)
             {
-                if (simple_hashing_db_has_item_[i])
-                {
-                    throw runtime_error(LOCATION);
-                }
+                simple_hashing_db_has_item_[i] = false;
             }
         }
 
@@ -182,7 +176,9 @@ namespace apsi
                                 get_key(cuckoo_loc, position) = encoder_.encode(data[i], j, true);
 
                                 if (values.size())
+                                {
                                     get_value(cuckoo_loc, position) = values[i];
+                                }
                             }
                         }
                     };

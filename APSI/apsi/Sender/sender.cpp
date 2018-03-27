@@ -49,8 +49,10 @@ namespace apsi
 
             // Construct shared Evaluator and PolyCRTBuilder
             evaluator_.reset(new Evaluator(*seal_context_));
-            builder_.reset(new PolyCRTBuilder(*seal_context_));
-
+            if (seal_context_->qualifiers().enable_batching)
+            {
+                builder_.reset(new PolyCRTBuilder(*seal_context_));
+            }
             vector<thread> thrds(total_thread_count_);
             
 #ifdef USE_SECURE_SEED

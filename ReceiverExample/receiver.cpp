@@ -102,11 +102,11 @@ int main(int argc, char *argv[])
 
 
     // Example: Fast batching
-    //if (none || fastBatching)
-    //    example_fast_batching(cmd, clientChl, serverChl);
+    if (none || fastBatching)
+        example_fast_batching(cmd, clientChl, serverChl);
 
     // Example: Slow batching
-    //if (slowBatching)
+    if (slowBatching)
         example_slow_batching(cmd, clientChl, serverChl);
 
     // Example: Slow batching vs. Fast batching

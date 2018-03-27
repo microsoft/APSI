@@ -1,7 +1,17 @@
 #pragma once
 
+// STD
 #include <map>
 #include <memory>
+
+// APSI
+#include "apsi/item.h"
+#include "apsi/psiparams.h"
+
+// Cuckoo
+#include "cuckoo/cuckoo.h"
+
+// SEAL
 #include "seal/biguint.h"
 #include "seal/bigpolyarray.h"
 #include "seal/encryptor.h"
@@ -11,9 +21,8 @@
 #include "seal/secretkey.h"
 #include "seal/evaluationkeys.h"
 #include "seal/polycrt.h"
-#include "apsi/item.h"
-#include "apsi/psiparams.h"
-#include "cuckoo/cuckoo.h"
+
+// CryptoTools
 #include "cryptoTools/Network/Channel.h"
 
 namespace apsi

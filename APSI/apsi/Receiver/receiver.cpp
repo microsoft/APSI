@@ -1,11 +1,19 @@
+// STD
 #include <sstream>
+#include <map>
+
+// APSI
 #include "apsi/sender/sender.h"
 #include "apsi/receiver/receiver.h"
 #include "apsi/apsidefines.h"
 #include "apsi/network/network_utils.h"
+
+// SEAL
 #include "seal/util/uintcore.h"
 #include "seal/encryptionparams.h"
 #include "seal/keygenerator.h"
+
+// CryptoTools
 #include "cryptoTools/Crypto/sha1.h"
 #include "cryptoTools/Common/Log.h"
 
@@ -110,8 +118,8 @@ namespace apsi
 
         pair<
             map<uint64_t, vector<Ciphertext> >,
-            unique_ptr<CuckooInterface>
-        > Receiver::preprocess(vector<Item> &items, Channel& channel)
+            unique_ptr<CuckooInterface> > 
+            Receiver::preprocess(vector<Item> &items, Channel &channel)
         {
             if (params_.use_pk_oprf())
             {
