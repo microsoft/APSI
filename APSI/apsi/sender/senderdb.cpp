@@ -1,20 +1,22 @@
-
-#include "apsi/sender/senderdb.h"
-#include "apsi/apsidefines.h"
-#include "seal/util/uintcore.h"
 #include <fstream>
 #include <algorithm>
 #include <memory>
+#include <thread>
+#include <unordered_map>
+
+#include "apsi/sender/senderdb.h"
+#include "apsi/apsidefines.h"
+#include "apsi/tools/interpolate.h"
+
 #include "cryptoTools/Crypto/Curve.h"
 #include "cryptoTools/Crypto/PRNG.h"
 #include "cryptoTools/Common/MatrixView.h"
 #include "cryptoTools/Common/Log.h"
-#include <thread>
-#include <cryptoTools/Crypto/sha1.h>
-#include <unordered_map>
+#include "cryptoTools/Crypto/sha1.h"
+
 #include "seal/evaluator.h"
 #include "seal/polycrt.h"
-#include "apsi/Tools/interpolate.h"
+#include "seal/util/uintcore.h"
 
 using namespace std;
 using namespace seal;

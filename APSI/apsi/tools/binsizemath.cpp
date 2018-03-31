@@ -33,7 +33,7 @@ namespace apsi
             sum += num_bins * boost::math::binomial_coefficient<T>(static_cast<int>(num_balls), static_cast<int>(i))
                 * boost::multiprecision::pow(T(1.0) / num_bins, i) * boost::multiprecision::pow(1 - T(1.0) / num_bins, num_balls - i);
 
-            T sec2 = boost::multiprecision::log2(sum);
+            T sec2 = boost::multiprecision::logb(sum);
             diff = boost::multiprecision::abs(sec - sec2);
             sec = sec2;
 

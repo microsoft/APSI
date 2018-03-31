@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
     CLP cmd(argc, argv);
 
     // Thread count
-    cmd.setDefault("t", 4);
+    cmd.setDefault("t", 1);
 
     IOService ios;
 
@@ -119,23 +119,24 @@ int main(int argc, char *argv[])
 
     if (unitTest)
     {
-        auto tests = apsi_tests;
-        //tests += tests_cryptoTools::Tests;
-
-        if (cmd.isSet("list"))
-        {
-            tests.list();
-        }
-        else
-        {
-            cmd.setDefault("loop", 1);
-            auto loop = cmd.get<u64>("loop");
-
-            if (cmd.hasValue(unitTestTag))
-                tests.run(cmd.getMany<u64>(unitTestTag), loop);
-            else
-                tests.runAll(loop);
-        }
+        assert("NOT IMPLEMENTED");
+        // auto tests = apsi_tests;
+        // //tests += tests_cryptoTools::Tests;
+        //
+        // if (cmd.isSet("list"))
+        // {
+        //     tests.list();
+        // }
+        // else
+        // {
+        //     cmd.setDefault("loop", 1);
+        //     auto loop = cmd.get<u64>("loop");
+        //
+        //     if (cmd.hasValue(unitTestTag))
+        //         tests.run(cmd.getMany<u64>(unitTestTag), loop);
+        //     else
+        //         tests.runAll(loop);
+        // }
     }
 
     // Example: Slow batching vs. Fast batching

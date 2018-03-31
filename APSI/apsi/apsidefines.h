@@ -1,14 +1,19 @@
 #pragma once
 
+// STD
 #include <wmmintrin.h>
 #include <utility>
 #include <cstdint>
 #include <vector>
-#include "Tools/stopwatch.h"
 #include <memory>
+#include <string>
+
+// APSI
+#include "tools/stopwatch.h"
+
+// SEAL
 #include "seal/plaintext.h"
 #include "seal/context.h"
-#include <string>
 
 namespace apsi
 {
@@ -37,5 +42,4 @@ namespace apsi
     seal::Plaintext random_plaintext(const seal::SEALContext &context);
 
     extern apsi::tools::Stopwatch stop_watch;
-
 }
