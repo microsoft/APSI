@@ -9,6 +9,10 @@
 #include "cryptoTools/Network/IOService.h"
 #include "tests/collection.h"
 
+#ifdef _MSC_VER
+#include "windows.h"
+#endif
+
 using namespace std;
 using namespace apsi;
 using namespace apsi::tools;
@@ -144,10 +148,13 @@ int main(int argc, char *argv[])
     //example_remote_multiple();
 
 #ifdef _MSC_VER
-    // Wait for ENTER before closing screen.
-    cout << endl << "Press ENTER to exit" << endl;
-    char ignore;
-    cin.get(ignore);
+    if (IsDebuggerPresent())
+    {
+        // Wait for ENTER before closing screen.
+        cout << endl << "Press ENTER to exit" << endl;
+        char ignore;
+        cin.get(ignore);
+    }
 #endif
     return 0;
 }

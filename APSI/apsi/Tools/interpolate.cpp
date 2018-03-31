@@ -194,4 +194,61 @@ namespace apsi
             }
         }
     }
+    void u64_newton_interpolate_poly(
+        std::vector<std::pair<uint64_t, uint64_t>>& input,
+        std::vector<uint64_t>& result,
+        const seal::SmallModulus & plain_modulus)
+    {
+        using namespace seal;
+        using namespace seal::util;
+        using std::vector;
+
+        int size = input.size();
+        vector<vector<uint64_t>> divided_differences(size);
+        uint64_t numerator;
+        uint64_t denominator;
+        uint64_t inverse;
+        // Plaintext quotient(coeff_count);
+
+        for (int i = 0; i < size; i++) {
+            divided_differences[i].resize(size - i);
+            divided_differences[i][0] = input[i].second;
+        }
+        for (int j = 1; j < size; j++) {
+            for (int i = 0; i < size - j; i++) {
+                {
+                    numerator = sub_uint_uint_mod(divided_differences[i + 1][j - 1], divided_differences[i][j - 1], plain_modulus);
+                    denominator = sub_uint_uint_mod(input[i + j].first, input[i].first, plain_modulus);
+                    // dd[(i, j)] = (dd[(i + 1, j - 1)] - dd[(i, j - 1)]) / (xvec[i + j] - xvec[i])
+                    // multiply numerator with inverted denominator .... . FIXME: this should be multiplication modulo....
+                    // FIXME (mod t)
+                    try_invert_uint_mod(denominator, plain_modulus, inverse);
+                    divided_differences[i][j] = multiply_uint_uint_mod(numerator, inverse, plain_modulus);
+
+                }
+            }
+
+        }
+
+        // Horner's method 
+        result.resize(size);
+        result[0] = divided_differences[0][size - 1];
+        for (int i = 1; i < size; i++) {
+
+            // first, multiply by (x - x_{n-i})
+
+
+            // shift first 
+            for (int j = i - 1; j >= 0; j--) {
+                result[j + 1] = result[j];
+            }
+            result[0] = 0;
+            for (int j = 0; j < i; j++) {
+                result[j] = sub_uint_uint_mod(result[j], multiply_uint_uint_mod(input[size - 1 - i].first, result[j + 1], plain_modulus), plain_modulus);
+            }
+            result[0] = add_uint_uint_mod(result[0], divided_differences[0][size - 1 - i], plain_modulus);
+        }
+    }
+
+
 }

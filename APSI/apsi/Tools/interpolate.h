@@ -20,4 +20,11 @@ namespace apsi
         const seal::SmallModulus &plain_modulus,
         seal::util::MemoryPool &pool,
         bool print = false);
+
+
+
+    void u64_newton_interpolate_poly(
+        std::vector<std::pair<uint64_t, uint64_t>>& input,
+        std::vector<uint64_t>& result,
+        const seal::SmallModulus & plain_modulus);
 }

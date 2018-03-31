@@ -3,5 +3,5 @@
 
 oc::TestCollection apsi_tests([](oc::TestCollection& tc)
 {
-    tc.add("plaintext_interpolate_test", plaintext_interpolate_test);
+    tc.add("u64_interpolate_test", u64_interpolate_test);
 });
