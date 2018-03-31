@@ -115,6 +115,7 @@ namespace apsi
                     int thread_context_idx = acquire_thread_context();
                     SenderThreadContext &context = thread_contexts_[thread_context_idx];
                     sender_db_.batched_randomized_symmetric_polys(context, evaluator_, builder_, total_thread_count_);
+                    sender_db_.batched_interpolate_polys(context);
                     release_thread_context(context.id());
                 });
             }

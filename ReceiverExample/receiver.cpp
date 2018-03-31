@@ -7,6 +7,7 @@
 
 #include "cryptoTools/Common/CLP.h"
 #include "cryptoTools/Network/IOService.h"
+#include "tests/collection.h"
 
 using namespace std;
 using namespace apsi;
@@ -16,6 +17,8 @@ using namespace apsi::sender;
 using namespace seal::util;
 using namespace seal;
 using namespace oc;
+
+std::vector<std::string> unitTestTag{ "u" };
 
 void print_example_banner(string title);
 void print_parameters(const PSIParams &psi_params);
@@ -73,6 +76,7 @@ vector<Item> randSubset(const vector<Item>& items, int size)
 
 int main(int argc, char *argv[])
 {
+
     CLP cmd(argc, argv);
 
     // Thread count
@@ -89,7 +93,7 @@ int main(int argc, char *argv[])
     auto none = true;
     auto fastBatching = cmd.isSet("fast"); none &= !fastBatching;
     auto slowBatching = cmd.isSet("slow"); none &= !slowBatching;
-
+    auto unitTest = cmd.isSet(unitTestTag); none &= !unitTest;
     //// Example: Basics
     //example_basics();
 
@@ -109,6 +113,27 @@ int main(int argc, char *argv[])
     if (slowBatching)
         example_slow_batching(cmd, clientChl, serverChl);
 
+    if (unitTest)
+    {
+        auto tests = apsi_tests;
+        //tests += tests_cryptoTools::Tests;
+
+        if (cmd.isSet("list"))
+        {
+            tests.list();
+        }
+        else
+        {
+            cmd.setDefault("loop", 1);
+            auto loop = cmd.get<u64>("loop");
+
+            if (cmd.hasValue(unitTestTag))
+                tests.run(cmd.getMany<u64>(unitTestTag), loop);
+            else
+                tests.runAll(loop);
+        }
+    }
+
     // Example: Slow batching vs. Fast batching
     //example_slow_vs_fast();
 
@@ -126,6 +151,372 @@ int main(int argc, char *argv[])
 #endif
     return 0;
 }
+
+void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
+{
+    print_example_banner("Example: Fast batching");
+    stop_watch.time_points.clear();
+
+    /*
+    Use generalized batching in integer mode. This requires using an ExField with f(x) = x,
+    which makes ExField become an integer field. Then generalized batching is essentially
+    equivalent to SEAL's PolyCRTBuilder, which is slightly faster due to David Harvey's
+    optimization of NTT butterfly operation on integers.
+
+    However, in this case, we can only use short PSI items such that the reduced item length
+    is smaller than bit length of 'p' in ExField (also the plain modulus in SEAL).
+    "Reduced item" refers to the permutation-based cuckoo hashing items.
+    */
+
+    // Thread count
+    unsigned numThreads = cmd.get<int>("t");
+
+    // Larger set size
+    unsigned sender_set_size = 1 << 20;
+
+    // Negative log failure probability for simple hashing
+    unsigned binning_sec_level = 10;
+
+    // Length of items
+    unsigned item_bit_length = 20;
+
+    // Cuckoo hash parameters
+    CuckooParams cuckoo_params;
+    {
+        // Use standard Cuckoo or PermutationBasedCuckoo
+        cuckoo_params.cuckoo_mode = cuckoo::CuckooMode::Normal;
+
+        // Cuckoo hash function count
+        cuckoo_params.hash_func_count = 3;
+
+        // Set the hash function seed
+        cuckoo_params.hash_func_seed = 0;
+
+        // Set max_probe count for Cuckoo hashing
+        cuckoo_params.max_probe = 100;
+    }
+
+    // Create TableParams and populate.    
+    TableParams table_params;
+    {
+        // Log of size of full hash table
+        table_params.log_table_size = 14;
+
+        // Number of splits to use
+        // Larger means lower depth but bigger S-->R communication
+        table_params.split_count = 256;
+
+        // Get secure bin size
+        table_params.sender_bin_size = round_up_to(get_bin_size(
+            1 << table_params.log_table_size,
+            sender_set_size * cuckoo_params.hash_func_count,
+            binning_sec_level),
+            table_params.split_count);
+
+        // Window size parameter
+        // Larger means lower depth but bigger R-->S communication
+        table_params.window_size = 1;
+    }
+
+    SEALParams seal_params;
+    {
+        seal_params.encryption_params.set_poly_modulus("1x^16384 + 1");
+        seal_params.encryption_params.set_coeff_modulus(
+            coeff_modulus_128(seal_params.encryption_params.poly_modulus().coeff_count() - 1));
+        seal_params.encryption_params.set_plain_modulus(0x820001);
+
+        // This must be equal to plain_modulus
+        seal_params.exfield_params.exfield_characteristic = seal_params.encryption_params.plain_modulus().value();
+        seal_params.exfield_params.exfield_polymod = string("1x^1");
+
+        seal_params.decomposition_bit_count = 60;
+    }
+
+    // Use OPRF to eliminate need for noise flooding for sender's security
+    auto oprf_type = OprfType::None;
+
+    /*
+    Creating the PSIParams class.
+    */
+    PSIParams params(item_bit_length, table_params, cuckoo_params, seal_params, oprf_type);
+
+    // Check that the parameters are OK
+    params.validate();
+
+    // Set up receiver
+    Receiver receiver(params, 1, MemoryPoolHandle::New(true));
+    stop_watch.set_time_point("Receiver constructor");
+
+    // Set up sender
+    Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New(true));
+    stop_watch.set_time_point("Sender constructor");
+
+    // For testing only insert a couple of elements in the sender's dataset
+    int sendersActualSize = 40;
+
+    // Sender's dataset
+    vector<Item> s1(sendersActualSize);
+    for (int i = 0; i < s1.size(); i++)
+    {
+        s1[i] = i;
+        //// Insert random string
+        //s1[i] = oc::mAesFixedKey.ecbEncBlock(oc::toBlock(i));
+    }
+
+    // Receiver's dataset
+    int receiversActualSize = 40;
+    int intersectionSize = 20;
+    int rem = receiversActualSize - intersectionSize;
+
+    /*
+    Set receiver's dataset to be a random subset of sender's actual data
+    (this is where we get the intersection) and some data that won't match.
+    */
+    auto c1 = randSubset(s1, intersectionSize);
+    c1.reserve(c1.size() + rem);
+    for (u64 i = 0; i < rem; i++)
+    {
+        c1.emplace_back(i + s1.size());
+        //// Insert random string
+        //c1.emplace_back(oc::mAesFixedKey.ecbEncBlock(oc::toBlock(i + s1.size()) & toBlock(0, -1)));
+    }
+
+    // We are done with constructing the datasets but no preprocessing done yet.
+    stop_watch.set_time_point("Application preparation");
+
+    // Now construct the sender's database
+    sender.load_db(s1);
+    stop_watch.set_time_point("Sender pre-processing");
+
+    // Start the sender's query session in a separate thread
+    auto senderQuerySessionTh = thread([&]() {
+        sender.query_session(sendChl);
+    });
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+
+    // Receiver's query
+    vector<bool> intersection = receiver.query(c1, recvChl);
+    senderQuerySessionTh.join();
+
+    // Done with everything. Print the results!
+    bool correct = true;
+    for (int i = 0; i < intersection.size(); i++)
+    {
+        if (intersection[i] != (i < intersectionSize))
+        {
+            cout << "Incorrect result for receiver's item at index: " << i << endl;
+            correct = false;
+        }
+    }
+    cout << "Intersection results: " << (correct ? "Correct" : "Incorrect") << endl;
+
+    //cout << '[';
+    //for (int i = 0; i < intersection.size(); i++)
+    //    cout << intersection[i] << ", ";
+    //cout << ']' << endl;
+
+
+    /* Test different update performance. */
+    /*vector<int> updates{1, 10, 30, 50, 70, 100};
+    random_device rd;
+    for (int i = 0; i < updates.size(); i++)
+    {
+        vector<Item> items;
+        for (int j = 0; j < updates[i]; j++)
+            items.emplace_back(to_string(rd()));
+        sender.add_data(items);
+        sender.offline_compute();
+
+        stop_watch.set_time_point(string("Add ") + to_string(updates[i]) + " records done");
+    }*/
+
+    cout << stop_watch << endl;
+}
+
+void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
+{
+    print_example_banner("Example: Slow batching");
+    stop_watch.time_points.clear();
+
+    /* Use generalized batching. */
+
+    //PSIParams params(1, 1, 1, 10, 448, 1, 32);
+    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+    //params.set_exfield_polymod(string("1x^8 + 3"));
+    //params.set_exfield_characteristic(0xE801);
+    //params.set_log_poly_degree(13);
+    //params.set_coeff_mod_bit_count(189); 
+    //params.set_decomposition_bit_count(60);
+    //params.validate();
+    //PSIParams params(1, 1, 1, 9, 896, 1, 64);
+    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+    //params.set_exfield_polymod(string("1x^8 + 7"));
+    //params.set_exfield_characteristic(0x3401);
+    //params.set_log_poly_degree(12);
+    //params.set_coeff_mod_bit_count(189); 
+    //params.set_decomposition_bit_count(60);
+    //params.validate();
+
+    //PSIParams params(1, 1, 1, 8, 1792, 1, 128);
+    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+    //params.set_exfield_polymod(string("1x^8 + 7"));
+    //params.set_exfield_characteristic(0x3401);
+    //params.set_log_poly_degree(12);
+    //params.set_coeff_mod_bit_count(189); 
+    //params.set_decomposition_bit_count(60);
+    //params.validate();
+
+
+    // Thread count
+    unsigned numThreads = cmd.get<int>("t");
+
+    // Larger set size
+    unsigned sender_set_size = 1 << 16;
+
+    // Negative log failure probability for simple hashing
+    unsigned binning_sec_level = 30;
+
+    // Length of items
+    unsigned item_bit_length = 90;
+
+    // Cuckoo hash parameters
+    CuckooParams cuckoo_params;
+    {
+        // Use standard Cuckoo or PermutationBasedCuckoo
+        cuckoo_params.cuckoo_mode = cuckoo::CuckooMode::Normal;
+
+        // Cuckoo hash function count
+        cuckoo_params.hash_func_count = 3;
+
+        // Set the hash function seed
+        cuckoo_params.hash_func_seed = 0;
+
+        // Set max_probe count for Cuckoo hashing
+        cuckoo_params.max_probe = 100;
+
+    }
+
+    // Create TableParams and populate.    
+    TableParams table_params;
+    {
+        // Log of size of full hash table
+        table_params.log_table_size = 14;
+
+        // Number of splits to use
+        // Larger means lower depth but bigger S-->R communication
+        table_params.split_count = 8;
+
+        // Get secure bin size
+        table_params.sender_bin_size = round_up_to(get_bin_size(
+            1 << table_params.log_table_size,
+            sender_set_size * cuckoo_params.hash_func_count,
+            binning_sec_level),
+            table_params.split_count);
+
+        // Window size parameter
+        // Larger means lower depth but bigger R-->S communication
+        table_params.window_size = 2;
+    }
+
+    SEALParams seal_params;
+    {
+        seal_params.encryption_params.set_poly_modulus("1x^8192 + 1");
+        seal_params.encryption_params.set_coeff_modulus(
+            coeff_modulus_128(seal_params.encryption_params.poly_modulus().coeff_count() - 1));
+        seal_params.encryption_params.set_plain_modulus(0xE801);
+
+        // This must be equal to plain_modulus
+        seal_params.exfield_params.exfield_characteristic = seal_params.encryption_params.plain_modulus().value();
+        seal_params.exfield_params.exfield_polymod = string("1x^8 + 3");
+
+        seal_params.decomposition_bit_count = 60;
+    }
+
+    // Use OPRF to eliminate need for noise flooding for sender's security
+    auto oprf_type = OprfType::None;
+
+    /*
+    Creating the PSIParams class.
+    */
+    PSIParams params(item_bit_length, table_params, cuckoo_params, seal_params, oprf_type);
+
+    params.validate();
+
+    //PSIParams params(1, 1, 1, 9, 7936, 1, 256);
+    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+    //params.set_exfield_polymod(string("1x^8 + 7"));
+    //params.set_exfield_characteristic(0x3401);
+    //params.set_log_poly_degree(12);
+    //params.set_coeff_mod_bit_count(189);
+    //params.set_decomposition_bit_count(60);
+    //params.validate();
+
+    //PSIParams params(8, 8, 1, 10, 52736, 2, 256);
+    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+    //params.set_exfield_polymod(string("1x^8 + 3"));
+    //params.set_exfield_characteristic(0xE801);
+    //params.set_log_poly_degree(13);
+    //params.set_coeff_mod_bit_count(189);
+    //params.set_decomposition_bit_count(60);
+    //params.validate();
+
+    //PSIParams params(2, 2, 1, 10, 13056, 2, 256);
+    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
+    //params.set_exfield_polymod(string("1x^8 + 3"));
+    //params.set_exfield_characteristic(0xE801);
+    //params.set_log_poly_degree(13);
+    //params.set_coeff_mod_bit_count(189);
+    //params.set_decomposition_bit_count(60);
+    //params.validate();
+
+    Receiver receiver(params, 1, MemoryPoolHandle::New(true));
+    Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New(true));
+    //sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
+    //sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
+
+    auto actual_size = 1000;// sender_set_size;
+
+    auto s1 = vector<Item>(actual_size);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
+    for (int i = 0; i < s1.size(); ++i)
+        s1[i][0] = i;
+
+    auto intersectSize = 100;
+    auto c1 = randSubset(s1, intersectSize);
+    c1.reserve(c1.size() + 100);
+    for (u64 i = 0; i < 100; ++i)
+        c1.emplace_back(i + s1.size());
+
+    stop_watch.set_time_point("Application preparation");
+    sender.load_db(s1);
+    stop_watch.set_time_point("Sender pre-processing");
+
+    auto thrd = thread([&]() {sender.query_session(sendChl); });
+    vector<bool> intersection = receiver.query(c1, recvChl);
+    thrd.join();
+
+    cout << "Intersection result: ";
+    bool correct = true;
+    for (int i = 0; i < intersection.size(); ++i)
+    {
+        if (intersection[i] != (i < intersectSize))
+        {
+            cout << i << " ";
+            correct = false;
+        }
+    }
+    cout << (correct ? "correct" : "incorrect") << endl;
+
+    //cout << "Intersection result: ";
+    //cout << '[';
+    //for (int i = 0; i < intersection.size(); i++)
+    //    cout << intersection[i] << ", ";
+    //cout << ']' << endl;
+
+    cout << stop_watch << endl;
+}
+
+
 
 //void example_basics()
 //{
@@ -361,369 +752,7 @@ int main(int argc, char *argv[])
 //    cout << stop_watch << endl;
 //}
 
-void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
-{
-    print_example_banner("Example: Fast batching");
-    stop_watch.time_points.clear();
 
-    /* 
-    Use generalized batching in integer mode. This requires using an ExField with f(x) = x,
-    which makes ExField become an integer field. Then generalized batching is essentially 
-    equivalent to SEAL's PolyCRTBuilder, which is slightly faster due to David Harvey's 
-    optimization of NTT butterfly operation on integers.
-
-    However, in this case, we can only use short PSI items such that the reduced item length 
-    is smaller than bit length of 'p' in ExField (also the plain modulus in SEAL). 
-    "Reduced item" refers to the permutation-based cuckoo hashing items.
-    */
-
-    // Thread count
-    unsigned numThreads = cmd.get<int>("t");
-
-    // Larger set size
-    unsigned sender_set_size = 1 << 20;
-
-    // Negative log failure probability for simple hashing
-    unsigned binning_sec_level = 10;
-
-    // Length of items
-    unsigned item_bit_length = 20;
-
-    // Cuckoo hash parameters
-    CuckooParams cuckoo_params;
-    {
-        // Use standard Cuckoo or PermutationBasedCuckoo
-        cuckoo_params.cuckoo_mode = cuckoo::CuckooMode::Normal;
-
-        // Cuckoo hash function count
-        cuckoo_params.hash_func_count = 3;
-
-        // Set the hash function seed
-        cuckoo_params.hash_func_seed = 0;
-
-        // Set max_probe count for Cuckoo hashing
-        cuckoo_params.max_probe = 100;
-    }
-
-    // Create TableParams and populate.    
-    TableParams table_params;
-    {
-        // Log of size of full hash table
-        table_params.log_table_size = 14;
-
-        // Number of splits to use
-        // Larger means lower depth but bigger S-->R communication
-        table_params.split_count = 256;
-
-        // Get secure bin size
-        table_params.sender_bin_size = round_up_to(get_bin_size(
-            1 << table_params.log_table_size,
-            sender_set_size * cuckoo_params.hash_func_count,
-            binning_sec_level),
-            table_params.split_count);
-
-        // Window size parameter
-        // Larger means lower depth but bigger R-->S communication
-        table_params.window_size = 1;
-    }
-
-    SEALParams seal_params;
-    {
-        seal_params.encryption_params.set_poly_modulus("1x^16384 + 1");
-        seal_params.encryption_params.set_coeff_modulus(
-            coeff_modulus_128(seal_params.encryption_params.poly_modulus().coeff_count() - 1));
-        seal_params.encryption_params.set_plain_modulus(0x820001);
-
-        // This must be equal to plain_modulus
-        seal_params.exfield_params.exfield_characteristic = seal_params.encryption_params.plain_modulus().value();
-        seal_params.exfield_params.exfield_polymod = string("1x^1");
-
-        seal_params.decomposition_bit_count = 60;
-    }
-
-    // Use OPRF to eliminate need for noise flooding for sender's security
-    auto oprf_type = OprfType::None;
-
-    /*
-    Creating the PSIParams class.
-    */
-    PSIParams params(item_bit_length, table_params, cuckoo_params, seal_params, oprf_type);
-
-    // Check that the parameters are OK
-    params.validate();
-
-    // Set up receiver
-    Receiver receiver(params, 1, MemoryPoolHandle::New(true));
-    stop_watch.set_time_point("Receiver constructor");
-
-    // Set up sender
-    Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New(true));
-    stop_watch.set_time_point("Sender constructor");
-
-    // For testing only insert a couple of elements in the sender's dataset
-    int sendersActualSize = 40;
-
-    // Sender's dataset
-    vector<Item> s1(sendersActualSize);
-    for (int i = 0; i < s1.size(); i++)
-    {
-        s1[i] = i;
-        //// Insert random string
-        //s1[i] = oc::mAesFixedKey.ecbEncBlock(oc::toBlock(i));
-    }
-
-    // Receiver's dataset
-    int receiversActualSize = 40;
-    int intersectionSize = 20;
-    int rem = receiversActualSize - intersectionSize;
-
-    /*
-    Set receiver's dataset to be a random subset of sender's actual data
-    (this is where we get the intersection) and some data that won't match.
-    */
-    auto c1 = randSubset(s1, intersectionSize);
-    c1.reserve(c1.size() + rem);
-    for (u64 i = 0; i < rem; i++)
-    {
-        c1.emplace_back(i + s1.size());
-        //// Insert random string
-        //c1.emplace_back(oc::mAesFixedKey.ecbEncBlock(oc::toBlock(i + s1.size()) & toBlock(0, -1)));
-    }
-
-    // We are done with constructing the datasets but no preprocessing done yet.
-    stop_watch.set_time_point("Application preparation");
-
-    // Now construct the sender's database
-    sender.load_db(s1);
-    stop_watch.set_time_point("Sender pre-processing");
-
-    // Start the sender's query session in a separate thread
-    auto senderQuerySessionTh = thread([&]() {
-        sender.query_session(sendChl); 
-    });
-
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-
-    // Receiver's query
-    vector<bool> intersection = receiver.query(c1, recvChl);
-    senderQuerySessionTh.join();
-
-    // Done with everything. Print the results!
-    bool correct = true;
-    for (int i = 0; i < intersection.size(); i++)
-    {
-        if (intersection[i] != (i < intersectionSize))
-        {
-            cout << "Incorrect result for receiver's item at index: " << i << endl;
-            correct = false;
-        }
-    }
-    cout << "Intersection results: " << (correct ? "Correct" : "Incorrect") << endl;
-
-    //cout << '[';
-    //for (int i = 0; i < intersection.size(); i++)
-    //    cout << intersection[i] << ", ";
-    //cout << ']' << endl;
-
-
-    /* Test different update performance. */
-    /*vector<int> updates{1, 10, 30, 50, 70, 100};
-    random_device rd;
-    for (int i = 0; i < updates.size(); i++)
-    {
-        vector<Item> items;
-        for (int j = 0; j < updates[i]; j++)
-            items.emplace_back(to_string(rd()));
-        sender.add_data(items);
-        sender.offline_compute();
-
-        stop_watch.set_time_point(string("Add ") + to_string(updates[i]) + " records done");
-    }*/
-
-    cout << stop_watch << endl;
-}
-
-void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
-{
-    print_example_banner("Example: Slow batching");
-    stop_watch.time_points.clear();
-
-    /* Use generalized batching. */
-
-    //PSIParams params(1, 1, 1, 10, 448, 1, 32);
-    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    //params.set_exfield_polymod(string("1x^8 + 3"));
-    //params.set_exfield_characteristic(0xE801);
-    //params.set_log_poly_degree(13);
-    //params.set_coeff_mod_bit_count(189); 
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
-    //PSIParams params(1, 1, 1, 9, 896, 1, 64);
-    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    //params.set_exfield_polymod(string("1x^8 + 7"));
-    //params.set_exfield_characteristic(0x3401);
-    //params.set_log_poly_degree(12);
-    //params.set_coeff_mod_bit_count(189); 
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
-
-    //PSIParams params(1, 1, 1, 8, 1792, 1, 128);
-    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    //params.set_exfield_polymod(string("1x^8 + 7"));
-    //params.set_exfield_characteristic(0x3401);
-    //params.set_log_poly_degree(12);
-    //params.set_coeff_mod_bit_count(189); 
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
-
-
-    // Thread count
-    unsigned numThreads = cmd.get<int>("t");
-
-    // Larger set size
-    unsigned sender_set_size = 1 << 16;
-
-    // Negative log failure probability for simple hashing
-    unsigned binning_sec_level = 30;
-
-    // Length of items
-    unsigned item_bit_length = 90;
-
-    // Cuckoo hash parameters
-    CuckooParams cuckoo_params;
-    {
-        // Use standard Cuckoo or PermutationBasedCuckoo
-        cuckoo_params.cuckoo_mode = cuckoo::CuckooMode::Normal;
-
-        // Cuckoo hash function count
-        cuckoo_params.hash_func_count = 3;
-
-        // Set the hash function seed
-        cuckoo_params.hash_func_seed = 0;
-
-        // Set max_probe count for Cuckoo hashing
-        cuckoo_params.max_probe = 100;
-
-    }
-
-    // Create TableParams and populate.    
-    TableParams table_params;
-    {
-        // Log of size of full hash table
-        table_params.log_table_size = 14;
-
-        // Number of splits to use
-        // Larger means lower depth but bigger S-->R communication
-        table_params.split_count = 8;
-
-        // Get secure bin size
-        table_params.sender_bin_size = round_up_to(get_bin_size(
-            1 << table_params.log_table_size,
-            sender_set_size * cuckoo_params.hash_func_count,
-            binning_sec_level),
-            table_params.split_count);
-
-        // Window size parameter
-        // Larger means lower depth but bigger R-->S communication
-        table_params.window_size = 2;
-    }
-
-    SEALParams seal_params;
-    {
-        seal_params.encryption_params.set_poly_modulus("1x^8192 + 1");
-        seal_params.encryption_params.set_coeff_modulus(
-            coeff_modulus_128(seal_params.encryption_params.poly_modulus().coeff_count() - 1));
-        seal_params.encryption_params.set_plain_modulus(0xE801);
-
-        // This must be equal to plain_modulus
-        seal_params.exfield_params.exfield_characteristic = seal_params.encryption_params.plain_modulus().value();
-        seal_params.exfield_params.exfield_polymod = string("1x^8 + 3");
-
-        seal_params.decomposition_bit_count = 60;
-    }
-
-    // Use OPRF to eliminate need for noise flooding for sender's security
-    auto oprf_type = OprfType::None;
-
-    /*
-    Creating the PSIParams class.
-    */
-    PSIParams params(item_bit_length, table_params, cuckoo_params, seal_params, oprf_type);
-
-    params.validate();
-
-    //PSIParams params(1, 1, 1, 9, 7936, 1, 256);
-    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    //params.set_exfield_polymod(string("1x^8 + 7"));
-    //params.set_exfield_characteristic(0x3401);
-    //params.set_log_poly_degree(12);
-    //params.set_coeff_mod_bit_count(189);
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
-
-    //PSIParams params(8, 8, 1, 10, 52736, 2, 256);
-    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    //params.set_exfield_polymod(string("1x^8 + 3"));
-    //params.set_exfield_characteristic(0xE801);
-    //params.set_log_poly_degree(13);
-    //params.set_coeff_mod_bit_count(189);
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
-
-    //PSIParams params(2, 2, 1, 10, 13056, 2, 256);
-    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    //params.set_exfield_polymod(string("1x^8 + 3"));
-    //params.set_exfield_characteristic(0xE801);
-    //params.set_log_poly_degree(13);
-    //params.set_coeff_mod_bit_count(189);
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
-
-    Receiver receiver(params, 1, MemoryPoolHandle::New(true));
-    Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New(true));
-    //sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
-    //sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
-
-    auto actual_size = 1000;// sender_set_size;
-
-    auto s1 = vector<Item>(actual_size);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
-    for (int i = 0; i < s1.size(); ++i)
-        s1[i][0] = i;
-
-    auto intersectSize = 100;
-    auto c1 = randSubset(s1, intersectSize);
-    c1.reserve(c1.size() + 100);
-    for (u64 i = 0; i < 100; ++i)
-        c1.emplace_back(i + s1.size());
-
-    stop_watch.set_time_point("Application preparation");
-    sender.load_db(s1);
-    stop_watch.set_time_point("Sender pre-processing");
-
-    auto thrd = thread([&]() {sender.query_session(sendChl); });
-    vector<bool> intersection = receiver.query(c1, recvChl);
-    thrd.join();
-
-    cout << "Intersection result: ";
-    bool correct = true;
-    for (int i = 0; i < intersection.size(); ++i)
-    {
-        if (intersection[i] != (i < intersectSize))
-        {
-            cout << i << " ";
-            correct = false;
-        }
-    }
-    cout << (correct ? "correct" : "incorrect") << endl;
-
-    //cout << "Intersection result: ";
-    //cout << '[';
-    //for (int i = 0; i < intersection.size(); i++)
-    //    cout << intersection[i] << ", ";
-    //cout << ']' << endl;
-
-    cout << stop_watch << endl;
-}
 //
 //void example_slow_vs_fast()
 //{

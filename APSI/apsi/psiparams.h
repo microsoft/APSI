@@ -21,6 +21,13 @@
 
 namespace apsi
 {
+    enum class InterpolateMode
+    {
+        None,
+        ShortStrings,
+        LongStrings
+    };
+
     enum class OprfType
     {
         None,
@@ -203,6 +210,16 @@ namespace apsi
             return cuckoo_mode_; 
         }
 
+        inline InterpolateMode get_interpolate_mode() const
+        {
+            return interpolate_mode_;
+        }
+
+        void set_interpolate_mode(InterpolateMode mode)
+        {
+            interpolate_mode_ = mode;
+        }
+
     private:
         int log_table_size_;
 
@@ -223,6 +240,8 @@ namespace apsi
         OprfType oprf_type_;
 
         cuckoo::CuckooMode cuckoo_mode_;
+
+        InterpolateMode interpolate_mode_ = InterpolateMode::ShortStrings;
 
         seal::EncryptionParameters encryption_params_;
 

@@ -118,10 +118,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="receiver.h" />
+    <ClInclude Include="tests\interpolate_tests.h" />
+    <ClInclude Include="tests\collection.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="tests\interpolate_tests.cpp" />
     <ClCompile Include="receiver.cpp" />
+    <ClCompile Include="tests\collection.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

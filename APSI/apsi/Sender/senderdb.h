@@ -87,7 +87,7 @@ namespace apsi
                 std::shared_ptr<seal::PolyCRTBuilder> builder,
                 int thread_count);
 
-
+            void batched_interpolate_polys(SenderThreadContext& context);
 
             Item& get_key(u64 cuckoo_index, u64 position_idx) {
                 return keys_(position_idx, cuckoo_index);

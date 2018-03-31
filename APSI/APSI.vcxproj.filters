@@ -81,6 +81,9 @@
     <ClInclude Include="apsi\tools\binsizemath.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
+    <ClInclude Include="apsi\Tools\interpolate.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp">
@@ -112,6 +115,9 @@
     </ClCompile>
     <ClCompile Include="apsi\tools\binsizemath.cpp">
       <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\Tools\interpolate.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

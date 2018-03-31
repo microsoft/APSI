@@ -14,6 +14,7 @@
 #include <unordered_map>
 #include "seal/evaluator.h"
 #include "seal/polycrt.h"
+#include "apsi/Tools/interpolate.h"
 
 using namespace std;
 using namespace seal;
@@ -400,6 +401,24 @@ namespace apsi
                         evaluator->transform_to_ntt(temp_plain, local_pool);
                     }
                 }
+            }
+        }
+
+        void SenderDB::batched_interpolate_polys(
+            SenderThreadContext & context)
+        {
+            switch (params_.get_interpolate_mode())
+            {
+            case InterpolateMode::None:
+                break;
+            case InterpolateMode::ShortStrings:
+
+
+                throw std::runtime_error("not impl");
+
+                break;
+            default:
+                throw std::runtime_error("not impl");
             }
         }
 
