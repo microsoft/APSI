@@ -1,18 +1,18 @@
 # Makefile for the SEAL library
-UTIL_DIR=src src/Network src/Receiver src/Sender src/Tools
+SRC_DIRS=apsi apsi/network apsi/receiver apsi/sender apsi/tools
 BIN_DIR=../bin
 OBJ_DIR=obj
-INCLUDE_DIRS=include ../thirdparty/boost ../../Cuckoo/Cuckoo/include ../../SEAL-dev-new/SEAL/include ../../../libOTe/cryptoTools ../../../libOTe/thirdparty/linux/miracl
-SRCS=$(wildcard *.cpp) $(foreach d,$(UTIL_DIR),$(wildcard $d/*.cpp))
+INCLUDE_DIRS=. ../../cryptoTools/thirdparty/boost ../../Cuckoo/Cuckoo ../../SEAL-dev/SEAL ../../cryptoTools ../../cryptoTools/thirdparty/linux/miracl
+SRCS=$(wildcard *.cpp) $(foreach d,$(SRC_DIRS),$(wildcard $d/*.cpp))
 OBJS=$(SRCS:%.cpp=$(OBJ_DIR)/%.o)
 DEPS=$(OBJS:.o=.d)
 INSTALL_DIR=APSI
 APSILIB=libapsi.a
 CXX=g++
-CXXFLAGS=-O3 -DHAVE_CONFIG -march=native -std=c++14  -maes -msse2 -msse4.1 -mpclmul
+CXXFLAGS=-O3 -g -DHAVE_CONFIG -march=native -std=c++14  -maes -msse2 -msse4.1 -mpclmul
 PREFIX=/usr/local
 LDFLAGS=-lseal -lboost_system -lcuckoo -lpthread -lcryptoTools -lmiracl
-LIBRARY_PATHS=../../SEAL-dev-new/bin ../../Cuckoo/bin ../thirdparty/boost/stage/lib ../../libOTe/lib
+LIBRARY_PATHS=../../SEAL-dev/bin ../../Cuckoo/bin ../../cryptoTools/thirdparty/linux/boost/stage/lib ../../cryptoTools/lib ../../cryptoTools/thirdparty/linux/miracl/miracl/source
 
 .PHONY : all clean install uninstall
 
@@ -23,7 +23,7 @@ $(OBJ_DIR)/%.d : %.cpp
 	@set -e; \
 	rm -f $@; \
 	$(CXX) -MM $< $(CXXFLAGS) -I. $(addprefix -I,$(INCLUDE_DIRS)) $(addprefix -L,$(LIBRARY_PATHS))  $(LDFLAGS) > $@.temp; \
-	SUBDIR_NAME=`echo $@|sed -e 's,\.,,' -e 's,$(UTIL_DIR),$(UTIL_DIR)/,'`; \
+	SUBDIR_NAME=`echo $@|sed -e 's,\.,,' -e 's,$(SRC_DIRS),$(SRC_DIRS)/,'`; \
 	sed 's,\($(*F)\)\.o[ :]*,$(OBJ_DIR)/$(SUBDIR_NAME)\1.o $@ : ,g' < $@.temp > $@; \
 	rm -f $@.temp
 
@@ -44,7 +44,7 @@ install : $(BIN_DIR)/$(APSILIB)
 	@-mkdir -p $(PREFIX)/include/$(INSTALL_DIR)/util
 	cp -f $(BIN_DIR)/$(APSILIB) $(PREFIX)/lib/$(INSTALL_DIR)/$(APSILIB)
 	cp -f *.h $(PREFIX)/include/$(INSTALL_DIR)
-	cp -f $(UTIL_DIR)/*.h $(PREFIX)/include/$(INSTALL_DIR)/$(UTIL_DIR)
+	cp -f $(SRC_DIRS)/*.h $(PREFIX)/include/$(INSTALL_DIR)/$(SRC_DIRS)
 
 uninstall :
 	rm -rf $(PREFIX)/lib/$(INSTALL_DIR)

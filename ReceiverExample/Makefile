@@ -1,9 +1,9 @@
 CXX = g++
-CFLAGS = -g  -march=native -std=c++14  -maes -msse2 -msse4.1 -mpclmul
+CFLAGS = -g -O3 -march=native -std=c++14  -maes -msse2 -msse4.1 -mpclmul
 
-INCLUDES =  -I../APSI/include/ -I../../Cuckoo/Cuckoo/include  -I../../SEAL-dev-new/SEAL/include/
-LIB_DIRS = -L../bin/ -L../../SEAL-dev-new/bin/ -L../../Cuckoo/Cuckoo/src/ -L../../../libOTe/libs  -L../../../libOTe/cryptoTools/thirdparty/linux/boost/stage/lib/ -L../../../libOTe/cryptoTools/thirdparty/linux/miracl/miracl/source/
-LIBS =  -lapsi -lseal -lcuckoo  -lcryptoTools -lmiracl -lboost_system -lboost_thread -pthread  
+INCLUDES = -I../APSI -I../../SEAL-dev/SEAL -I../../Cuckoo/Cuckoo -I../../cryptoTools -I../../cryptoTools/thirdparty/linux/miracl
+LIB_DIRS = -L../bin -L../../SEAL-dev/bin -L../../Cuckoo/bin -L../../cryptoTools/lib -L../../cryptoTools/thirdparty/linux/boost/stage/lib -L../../cryptoTools/thirdparty/linux/miracl/miracl/source 
+LIBS = -lapsi -lseal -lcuckoo -lcryptoTools -lmiracl -lboost_system -lpthread
 
 all:
-	$(CXX)  receiver.cpp  $(CFLAGS) $(INCLUDES) $(LIB_DIRS) $(LIBS)
+	$(CXX) -o receiver receiver.cpp  $(CFLAGS) $(INCLUDES) $(LIB_DIRS) $(LIBS)
