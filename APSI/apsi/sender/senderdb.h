@@ -29,6 +29,117 @@ namespace apsi
 {
     namespace sender
     {
+        // represents a specific batch/split and stores the associated data.
+        struct DBBlock
+        {
+            struct Position
+            {
+                int batch_offset;
+                int split_offset = -1;
+
+                explicit operator bool() const
+                {
+                    return split_offset != -1;
+                }
+            };
+
+            void init(
+                int batch_idx,
+                int split_idx,
+                int value_byte_length,
+                int batch_size,
+                int items_per_split)
+            {
+                label_data_.resize(batch_size * items_per_split * value_byte_length);
+                key_data_.resize(batch_size * items_per_split);
+
+                batch_idx_ = batch_idx;
+                split_idx_ = split_idx;
+                value_byte_length_ = value_byte_length;
+                items_per_batch_ = batch_size;
+                items_per_split_ = items_per_split;
+            }
+
+            std::vector<u8> label_data_;
+            std::vector<Item> key_data_;
+
+            std::unique_ptr<std::atomic_bool[]> has_item_;
+            // the index of this region
+            int batch_idx_, split_idx_;
+
+            // the number of bytes that each label is
+            int value_byte_length_;
+
+            // the number of cuckoo slots that this regions spans.
+            int items_per_batch_;
+
+            // the number of items that are in a split. 
+            int items_per_split_;
+
+            //u8* get_value()
+
+
+
+            /**
+            Computes the symmetric polynomials for the specified split and the specified batch in sender's database.
+            One symmetric polynomial is computed for one sub-bin (because a bin is separated into splits).
+            Input sub-bin: (a_1, a_2, ..., a_n)
+            Output polynomial terms: (1, \sum_i a_i, \sum_{i,j} a_i*a_j, ...).
+            */
+            void symmetric_polys(
+                SenderThreadContext &context,
+                oc::MatrixView<seal::util::ExFieldElement> symm_block,
+                int encoding_bit_length,
+                seal::util::ExFieldElement& neg_null_element);
+
+            /**
+            Computes the randomized symmetric polynomials for the specified split and the specified batch in sender's database. Basically, it
+            multiplies each term in a symmetric polynomial with the same random number. Different symmetric polynomials are multiplied with
+            different random numbers.
+
+            @see symmetric_polys for computing symmetric polynomials.
+            */
+            void randomized_symmetric_polys(
+                SenderThreadContext &context,
+                oc::MatrixView<seal::util::ExFieldElement>symm_block,
+                int encoding_bit_length,
+                seal::util::ExFieldElement& neg_null_element);
+
+            Position try_aquire_position(int cuckoo_loc, oc::PRNG& prng);
+
+            void check(const Position& pos);
+
+            bool has_item(const Position& pos)
+            {
+#ifndef NDEBUG
+                check(pos);
+#endif
+                return has_item_.get()[pos.batch_offset * items_per_split_ + pos.split_offset];
+            }
+
+
+
+            Item& get_key(const Position& pos)
+            {
+#ifndef NDEBUG
+                check(pos);
+#endif
+                return key_data_[pos.batch_offset * items_per_split_ + pos.split_offset];
+            }
+
+            u8* get_label(const Position& pos)
+            {
+#ifndef NDEBUG
+                check(pos);
+#endif
+
+                return &label_data_[pos.batch_offset * items_per_split_ + pos.split_offset];
+            }
+
+            void clear();
+        };
+
+
         class SenderDB
         {
         public:
@@ -43,14 +154,14 @@ namespace apsi
             Sets the sender's database by hashing the data items with all hash functions.
             */
             void set_data(oc::span<const Item> keys, int thread_count);
-            void set_data(oc::span<const Item> keys, oc::span<const Item> values, int thread_count);
+            void set_data(oc::span<const Item> keys, oc::MatrixView<const u8> values, int thread_count);
 
 
             /**
             Adds the data items to sender's database.
             */
             void add_data(oc::span<const Item> keys, int thread_count);
-            void add_data(oc::span<const Item> keys, oc::span<const Item> values, int thread_count);
+            void add_data(oc::span<const Item> keys, oc::MatrixView<const u8> values, int thread_count);
 
             /**
             Adds one item to sender's database.
@@ -87,48 +198,35 @@ namespace apsi
                 std::shared_ptr<seal::PolyCRTBuilder> builder,
                 int thread_count);
 
-            void batched_interpolate_polys(SenderThreadContext& context);
+            void batched_interpolate_polys(
+                SenderThreadContext& context,
+                int thread_count);
 
-            Item& get_key(u64 cuckoo_index, u64 position_idx) {
-                return keys_(position_idx, cuckoo_index);
-            }
-            Item& get_value(u64 cuckoo_index, u64 position_idx) {
-                return values_(position_idx, cuckoo_index);
-            }
+            //Item& get_key(u64 cuckoo_index, u64 position_idx) {
+            //    return keys_(position_idx, cuckoo_index);
+            //}
 
-            const Item& get_key(u64 cuckoo_index, u64 position_idx) const {
-                return keys_(position_idx, cuckoo_index);
-            }
-            const Item& get_value(u64 cuckoo_index, u64 position_idx) const {
-                return values_(position_idx, cuckoo_index);
-            }
+            //DBBlock& get_associated_block(u64 cuckoo_idx, u64 position)
+            //{
+            //    return db_blocks_(cuckoo_idx / params_.batch_size(), position / params_.split_size());
+            //}
+            //u8* get_value(u64 cuckoo_index, u64 position_idx) 
+            //{
+            //    auto idx = params_.sender_bin_size() * cuckoo_index + position_idx;
+            //    return values_ptr_.get()  + idx * params_.get_value_bit_length;
+            //}
+
+            //const Item& get_key(u64 cuckoo_index, u64 position_idx) const {
+            //    return keys_(position_idx, cuckoo_index);
+            //}
+            //const u8* get_value(u64 cuckoo_index, u64 position_idx) const {
+            //    auto idx = params_.sender_bin_size() * cuckoo_index + position_idx;
+            //    return values_ptr_.get() + idx * params_.get_value_bit_length;
+            //}
 
 
         private:
-            /**
-            Computes the symmetric polynomials for the specified split and the specified batch in sender's database.
-            One symmetric polynomial is computed for one sub-bin (because a bin is separated into splits).
-            Input sub-bin: (a_1, a_2, ..., a_n)
-            Output polynomial terms: (1, \sum_i a_i, \sum_{i,j} a_i*a_j, ...).
-            */
-            void symmetric_polys(
-                int split, 
-                int batch, 
-                SenderThreadContext &context, 
-                oc::MatrixView<seal::util::ExFieldElement> symm_block);
 
-            /**
-            Computes the randomized symmetric polynomials for the specified split and the specified batch in sender's database. Basically, it
-            multiplies each term in a symmetric polynomial with the same random number. Different symmetric polynomials are multiplied with 
-            different random numbers.
-
-            @see symmetric_polys for computing symmetric polynomials.
-            */
-            void randomized_symmetric_polys(
-                int split, 
-                int batch, 
-                SenderThreadContext &context, 
-                oc::MatrixView<seal::util::ExFieldElement>symm_block);
 
             //const oc::Matrix<Item>& simple_hashing_db2() const
             //{
@@ -158,20 +256,24 @@ namespace apsi
             view so that multi-threading is more efficient for accessing data, 
             i.e., one thread will take care of several continuous complete rows. 
             */
-            oc::Matrix<Item> keys_, values_;
+            //oc::Matrix<Item> keys_;
 
-            std::unique_ptr<std::atomic_bool[]> simple_hashing_db_has_item_;
+            oc::Matrix<DBBlock> db_blocks_;
+            //std::vector<DBRegion> regions_;
+            //std::shared_ptr<u8[]> values_ptr_;
+
+            
 
             /* 
             Thread safe function to insert an item into the bin 
             index by cockooIndex. The PRNG and be any PRNG.  
             */
-            int aquire_bin_location(int cockooIndex, oc::PRNG& prng);
+            std::pair<DBBlock*, DBBlock::Position> aquire_db_position(int cockooIndex, oc::PRNG& prng);
             
             /* 
             Returns true if the position'th slot within the bin at cockooIndex 
             currently has an item. */
-            bool has_item(int cockooIndex, int position);
+            //bool has_item(int cockooIndex, int position);
 
             /* 
             Size m vector, where m is the table size. Each value is an incremental counter for the 
