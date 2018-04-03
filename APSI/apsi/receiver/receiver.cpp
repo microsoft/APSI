@@ -60,7 +60,7 @@ namespace apsi
 
             generator.generate_evaluation_keys(params_.decomposition_bit_count(), evaluation_keys_);
 
-            exfieldpolycrtbuilder_.reset(new ExFieldPolyCRTBuilder(ex_field_, 
+            exfieldpolycrtbuilder_.reset(new ExFieldPolyCRTBuilder(ex_field_,
                 get_power_of_two(params_.encryption_params().poly_modulus().coeff_count() - 1)));
 
             if (seal_context.qualifiers().enable_batching)
@@ -71,7 +71,7 @@ namespace apsi
             ex_field_->init_frob_table();
         }
 
-        vector<bool> Receiver::query(vector<Item>& items, oc::Channel& chl)
+        vector<std::pair<int, ExFieldElement>> Receiver::query(vector<Item>& items, oc::Channel& chl)
         {
 
             auto qq = preprocess(items, chl);
@@ -85,13 +85,13 @@ namespace apsi
             stop_watch.set_time_point("receiver pre-process/sent");
 
             /* Receive results in a streaming fashion. */
-            vector<vector<ExFieldElement>> result;
-            Pointer backing;
-            stream_decrypt(chl, result, backing);
+            vector<vector<ExFieldElement>> result, labels;
+            Pointer backing, label_bacing;
+            stream_decrypt(chl, result, labels, backing, label_bacing);
             stop_watch.set_time_point("receiver decrypt");
 
             ExFieldElement zero(ex_field_);
-            vector<bool> intersection(items.size(), false);
+            vector<std::pair<int, ExFieldElement>> intersection(items.size());
 
 
             for (int i = 0; i < params_.table_size(); i++)
@@ -102,7 +102,14 @@ namespace apsi
                     {
                         if (result[j][i] == zero)
                         {
-                            intersection[table_to_input_map[i]] = true;
+                            auto idx = table_to_input_map[i];
+                            intersection.emplace_back();
+                            intersection.back().first = idx;
+
+                            if (params_.get_label_bit_count())
+                            {
+                                intersection.back().second = labels[j][i];
+                            }
                         }
                     }
                 }
@@ -118,7 +125,7 @@ namespace apsi
 
         pair<
             map<uint64_t, vector<Ciphertext> >,
-            unique_ptr<CuckooInterface> > 
+            unique_ptr<CuckooInterface> >
             Receiver::preprocess(vector<Item> &items, Channel &channel)
         {
             if (params_.use_pk_oprf())
@@ -219,7 +226,7 @@ namespace apsi
                     params_.hash_func_count(),
                     params_.hash_func_seed(),
                     params_.log_table_size(),
-                    params_.item_bit_length(),
+                    params_.item_bit_count(),
                     params_.max_probe(),
                     receiver_null_item))
                 :
@@ -227,7 +234,7 @@ namespace apsi
                     params_.hash_func_count(),
                     params_.hash_func_seed(),
                     params_.log_table_size(),
-                    params_.item_bit_length(),
+                    params_.item_bit_count(),
                     params_.max_probe(),
                     receiver_null_item))
             );
@@ -261,7 +268,7 @@ namespace apsi
             vector<int> indice(cuckoo.capacity(), -1);
             auto& encodings = cuckoo.get_encodings();
 
-            cuckoo::PermutationBasedCuckoo::Encoder encoder(cuckoo.log_capacity(), cuckoo.loc_func_count(), params_.item_bit_length());
+            cuckoo::PermutationBasedCuckoo::Encoder encoder(cuckoo.log_capacity(), cuckoo.loc_func_count(), params_.item_bit_count());
 
 
             for (int i = 0; i < items.size(); i++)
@@ -375,7 +382,7 @@ namespace apsi
 
         //vector<vector<ExFieldElement>> Receiver::bulk_decrypt(const vector<vector<Ciphertext>> &result_ciphers)
         //{
-        //    if (result_ciphers.size() != params_.split_count() || result_ciphers[0].size() != params_.number_of_batches())
+        //    if (result_ciphers.size() != params_.split_count() || result_ciphers[0].size() != params_.batch_count())
         //        throw invalid_argument("Result ciphers have unexpexted sizes.");
 
         //    int slot_count = exfieldpolycrtbuilder_->slot_count();
@@ -401,25 +408,27 @@ namespace apsi
         void Receiver::stream_decrypt(
             oc::Channel &channel,
             vector<vector<ExFieldElement>> &result,
-            Pointer &backing)
+            vector<vector<ExFieldElement>> &labels,
+            Pointer &backing,
+            Pointer & label_backing)
         {
             vector<vector<Plaintext>> plaintext_matrix;
+            Plaintext p;
 
             int num_of_splits = params_.split_count(),
-                num_of_batches = params_.number_of_batches(),
+                num_of_batches = params_.batch_count(),
                 block_count = num_of_splits * num_of_batches,
                 split_idx = 0,
                 batch_idx = 0,
                 slot_count = exfieldpolycrtbuilder_->slot_count();
 
-            Plaintext p;
             Ciphertext tmp;
 
             struct RecvPackage
             {
                 int split_idx, batch_idx;
-                std::string data;
-                std::future<void> fut;
+                std::string data, label_data;
+                std::future<void> fut, label_fut;
             };
 
             std::vector<RecvPackage> recvPackages(block_count);
@@ -428,9 +437,21 @@ namespace apsi
                 channel.asyncRecv(pkg.split_idx);
                 channel.asyncRecv(pkg.batch_idx);
                 pkg.fut = channel.asyncRecv(pkg.data);
+
+                if (params_.get_label_bit_count())
+                {
+                    pkg.label_fut = channel.asyncRecv(pkg.label_data);
+                }
             }
 
             result = ex_field_->allocate_elements(num_of_splits, num_of_batches * slot_count, backing);
+
+            if (params_.get_label_bit_count())
+            {
+                labels = ex_field_->allocate_elements(num_of_splits, num_of_batches * slot_count, label_backing);
+            }
+
+
             Pointer batch_backing;
             vector<ExFieldElement> batch;
 
@@ -441,21 +462,28 @@ namespace apsi
             vector<uint64_t> integer_batch((!!polycrtbuilder_) * slot_count);
 
             bool first = true;
+            std::stringstream ss;
 
             cout << "Decrypting " << block_count << " blocks (splits = " << num_of_splits << ")" << endl;
             for (auto& pkg : recvPackages)
-            //while (block_count-- > 0)
+                //while (block_count-- > 0)
             {
-                pkg.fut.get();
-                std::stringstream ss(pkg.data);
-                tmp.load(ss);
+                if (first)
+                {
+                    first = false;
+                    stop_watch.set_time_point("receiver recv-start");
+                }
+
                 split_idx = pkg.split_idx;
                 batch_idx = pkg.batch_idx;
 
-                //channel.recv(split_idx);
-                //channel.recv(batch_idx);
-                //receive_ciphertext(tmp, channel);
 
+
+
+
+                pkg.fut.get();
+                ss.str(pkg.data);
+                tmp.load(ss);
                 decrypt(tmp, p);
 
                 auto& rr = result[split_idx];
@@ -482,6 +510,46 @@ namespace apsi
                         rr[batch_idx * slot_count + k] = batch[k];
                 }
 
+                //{
+                //    pkg.fut.get();
+                //    ss.str(pkg.data);
+                //    tmp.load(ss);
+
+                //    auto& rr = result[split_idx];
+                //    decrypt(tmp, p, integer_batch, rr, batch_idx, slot_count, batch);
+                //}
+
+
+                if (params_.get_label_bit_count())
+                {
+
+                    pkg.label_fut.get();
+                    ss.str(pkg.label_data);
+                    tmp.load(ss);
+
+                    auto& rr = labels[split_idx];
+                    decrypt(tmp, p, integer_batch, rr, batch_idx, slot_count, batch);
+                }
+            }
+        }
+
+        void Receiver::decrypt(seal::Ciphertext &tmp, seal::Plaintext &p, std::vector<uint64_t> &integer_batch, std::vector<seal::util::ExFieldElement> & rr, int batch_idx, int slot_count, std::vector<seal::util::ExFieldElement> &batch)
+        {
+            decrypt(tmp, p);
+
+            if (polycrtbuilder_)
+            {
+                std::vector<u64> integer_batch;
+                polycrtbuilder_->decompose(p, integer_batch, pool_);
+
+                for (int k = 0; k < integer_batch.size(); k++)
+                    *rr[batch_idx * slot_count + k].pointer(0) = integer_batch[k];
+            }
+            else
+            {
+                exfieldpolycrtbuilder_->decompose(p, batch);
+                for (int k = 0; k < batch.size(); k++)
+                    rr[batch_idx * slot_count + k] = batch[k];
             }
         }
 
@@ -491,7 +559,7 @@ namespace apsi
         //	vector<vector<::ExFieldElement>> &result)
         //{
         //	int num_of_splits = params_.split_count(),
-        //		num_of_batches = params_.number_of_batches(),
+        //		num_of_batches = params_.batch_count(),
         //		slot_count = exfieldpolycrtbuilder_->slot_count();
 
         //	memory_backing_.emplace_back(Pointer());
@@ -553,6 +621,12 @@ namespace apsi
             decryptor_->decrypt(cipher, plain);
             //cout << "Noise budget: " << decryptor_->invariant_noise_budget(cipher) << endl;
         }
+
+        //void Receiver::decrypt(const seal::Ciphertext & cipher, std::vector<seal::util::ExFieldElement>& elements)
+        //{
+        //    Plaintext p;
+
+        //}
 
         //void Receiver::decompose(const Plaintext &plain, vector<::ExFieldElement> &batch)
         //{

@@ -304,19 +304,37 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
     // Receiver's query
-    vector<bool> intersection = receiver.query(c1, recvChl);
+    vector<std::pair<int, ExFieldElement>> intersection = receiver.query(c1, recvChl);
     senderQuerySessionTh.join();
+
 
     // Done with everything. Print the results!
     bool correct = true;
-    for (int i = 0; i < intersection.size(); i++)
+
+    std::unordered_map<int, ExFieldElement> in(intersection.begin(), intersection.end());
+    for (int i = 0; i < c1.size(); i++)
     {
-        if (intersection[i] != (i < intersectionSize))
+        auto f = in.find(i);
+
+        if (i < intersectionSize)
         {
-            cout << "Incorrect result for receiver's item at index: " << i << endl;
-            correct = false;
+            if (f == in.end())
+            {
+                cout << "Miss result for receiver's item at index: " << i << endl;  
+                correct = false;
+            }
+        }
+        else
+        {
+            if (f != in.end())
+            {
+                cout << "Incorrect result for receiver's item at index: " << i << endl;
+                correct = false;
+            }
         }
     }
+    correct &= intersection.size() == intersectionSize;
+
     cout << "Intersection results: " << (correct ? "Correct" : "Incorrect") << endl;
 
     //cout << '[';
@@ -489,8 +507,8 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     for (int i = 0; i < s1.size(); ++i)
         s1[i][0] = i;
 
-    auto intersectSize = 100;
-    auto c1 = randSubset(s1, intersectSize);
+    auto intersectionSize = 100;
+    auto c1 = randSubset(s1, intersectionSize);
     c1.reserve(c1.size() + 100);
     for (u64 i = 0; i < 100; ++i)
         c1.emplace_back(i + s1.size());
@@ -500,19 +518,20 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     stop_watch.set_time_point("Sender pre-processing");
 
     auto thrd = thread([&]() {sender.query_session(sendChl); });
-    vector<bool> intersection = receiver.query(c1, recvChl);
+    auto intersection = receiver.query(c1, recvChl);
     thrd.join();
 
     cout << "Intersection result: ";
     bool correct = true;
-    for (int i = 0; i < intersection.size(); ++i)
+    for (int i = 0; i < intersection.size(); i++)
     {
-        if (intersection[i] != (i < intersectSize))
+        if (intersection[i].first != (i < intersectionSize))
         {
-            cout << i << " ";
+            cout << "Incorrect result for receiver's item at index: " << i << endl;
             correct = false;
         }
     }
+    correct &= intersection.size() == intersectionSize;
     cout << (correct ? "correct" : "incorrect") << endl;
 
     //cout << "Intersection result: ";

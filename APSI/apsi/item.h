@@ -22,17 +22,17 @@ namespace apsi
         Item(const Item&) = default;
 
         /**
-        Constructs an item by hahsing the uint64_t array and using 'item_bit_length_' bits of the hash.
+        Constructs an item by hahsing the uint64_t array and using 'item_bit_count_' bits of the hash.
         */
         Item(uint64_t *pointer);
 
         /**
-        Constructs an item by hashing the string and using 'item_bit_length_' bits of the hash.
+        Constructs an item by hashing the string and using 'item_bit_count_' bits of the hash.
         */
         Item(const std::string &str);
 
         /**
-        Constructs a short item (without hashing) by using 'item_bit_length_' bits of the specified uint64_t value.
+        Constructs a short item (without hashing) by using 'item_bit_count_' bits of the specified uint64_t value.
         */
         Item(uint64_t item);
 

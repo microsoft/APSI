@@ -195,8 +195,8 @@ namespace apsi
         }
     }
     void u64_newton_interpolate_poly(
-        std::vector<std::pair<uint64_t, uint64_t>>& input,
-        std::vector<uint64_t>& result,
+        oc::span<std::pair<uint64_t, uint64_t>> input,
+        oc::span<uint64_t> result,
         const seal::SmallModulus & plain_modulus)
     {
         using namespace seal;
@@ -231,7 +231,9 @@ namespace apsi
         }
 
         // Horner's method 
-        result.resize(size);
+        if (result.size() != size)
+            throw std::runtime_error("bad size");
+
         result[0] = divided_differences[0][size - 1];
         for (int i = 1; i < size; i++) {
 

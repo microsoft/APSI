@@ -85,7 +85,7 @@ void u64_interpolate_test()
         //        cout << endl;
         //}
         auto pool = seal::MemoryPoolHandle::Global();
-        std::vector<u64> result;
+        std::vector<u64> result(points.size());
 
         apsi::u64_newton_interpolate_poly(points, result, plain_modulus);
         //apsi::plaintext_newton_interpolate_poly(points, result, poly_modulus.pointer(), plain_modulus, pool, true);

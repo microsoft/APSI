@@ -42,12 +42,12 @@ namespace apsi
 
         SenderDB::SenderDB(const PSIParams &params, shared_ptr<ExField> &ex_field) :
             params_(params),
-            encoder_(params.log_table_size(), params.hash_func_count(), params.item_bit_length()),
+            encoder_(params.log_table_size(), params.hash_func_count(), params.item_bit_count()),
             global_ex_field_(ex_field),
             //keys_(params.sender_bin_size(), params.table_size()),
             //values_(params.sender_bin_size(), params.table_size()),
             next_locs_(params.table_size(), 0),
-            batch_random_symm_polys_(params.split_count() * params.number_of_batches() * (params.split_size() + 1))
+            batch_random_symm_polys_(params.split_count() * params.batch_count() * (params.split_size() + 1))
         {
             for (auto &plain : batch_random_symm_polys_)
             {
@@ -69,7 +69,7 @@ namespace apsi
 
             // What is the actual length of strings stored in the hash table
             encoding_bit_length_ = (params.get_cuckoo_mode() == cuckoo::CuckooMode::Normal)
-                ? params.item_bit_length() : encoder_.encoding_bit_length_;
+                ? params.item_bit_count() : encoder_.encoding_bit_length_;
 
             // Create the null ExFieldElement (note: encoding truncation affects high bits)
             null_element_ = sender_null_item_.to_exfield_element(global_ex_field_, encoding_bit_length_);
@@ -80,8 +80,8 @@ namespace apsi
             {
                 int batch_size = params_.batch_size();
                 int split_size = params_.split_size();
-                int byte_length = oc::roundUpTo(params_.get_value_bit_length(), 8) / 8;
-                int nb = params_.number_of_batches();
+                int byte_length = oc::roundUpTo(params_.get_label_bit_count(), 8) / 8;
+                int nb = params_.batch_count();
                 int ns = params_.split_count();
                 db_blocks_.resize(nb, ns);
 
@@ -90,9 +90,9 @@ namespace apsi
                     for (u64 s_idx = 0; s_idx < ns; ++s_idx)
                     {
                         db_blocks_(b_idx, s_idx).init(
-                            b_idx, s_idx, 
-                            byte_length, 
-                            batch_size, 
+                            b_idx, s_idx,
+                            byte_length,
+                            batch_size,
                             split_size);
                     }
                 }
@@ -132,7 +132,7 @@ namespace apsi
 
         void SenderDB::add_data(oc::span<const Item> data, oc::MatrixView<const u8> values, int thread_count)
         {
-            if (values.stride() != 0 && values.stride() != params_.get_value_byte_length())
+            if (values.stride() != 0 && values.stride() != params_.get_value_byte_count())
                 throw std::invalid_argument("values.stride()");
 
             vector<thread> thrds(thread_count);
@@ -210,7 +210,7 @@ namespace apsi
                             if (values.size())
                             {
                                 auto dest = db_block.get_label(pos);
-                                memcpy(dest, values[i].data(), params_.get_value_byte_length());
+                                memcpy(dest, values[i].data(), params_.get_value_byte_count());
                             }
                         }
                     };
@@ -228,7 +228,7 @@ namespace apsi
         {
             auto batch_idx = cuckoo_loc / params_.batch_size();
 
-            
+
             auto batch_offset = cuckoo_loc % params_.batch_size();
 
             auto s_idx = prng.get<u32>() % db_blocks_.stride();
@@ -285,6 +285,7 @@ namespace apsi
             return {};
         }
 
+
         void DBBlock::check(const Position & pos)
         {
             if (!pos ||
@@ -293,7 +294,7 @@ namespace apsi
             {
                 std::cout
                     << !pos << "\n"
-                    << pos.batch_offset<<" >= "<<items_per_batch_ << "\n"
+                    << pos.batch_offset << " >= " << items_per_batch_ << "\n"
                     << pos.split_offset << " >= " << items_per_split_ << std::endl;
                 throw std::runtime_error("bad index");
             }
@@ -323,7 +324,7 @@ namespace apsi
         void DBBlock::symmetric_polys(
             SenderThreadContext &context,
             MatrixView<ExFieldElement> symm_block,
-            int encoding_bit_length, 
+            int encoding_bit_length,
             seal::util::ExFieldElement& neg_null_element)
         {
             int split_size = items_per_split_;
@@ -431,23 +432,21 @@ namespace apsi
                 split_size_plus_one = params_.split_size() + 1;
 
             // Data in batch-split table is stored in "batch-major order"
-            auto indexer = [splitStep = params_.number_of_batches() * split_size_plus_one,
+            auto indexer = [splitStep = params_.batch_count() * split_size_plus_one,
                 batchStep = split_size_plus_one](int splitIdx, int batchIdx, int i)
             {
                 return splitIdx * splitStep + batchIdx * batchStep + i;
             };
 
             MemoryPoolHandle local_pool = context.pool();
-
-            int total_blocks = params_.split_count() * params_.number_of_batches();
-            int start_block = context.id() * total_blocks / thread_count;
-            int end_block = (context.id() + 1) * total_blocks / thread_count;
+            int start_block = context.id() * db_blocks_.size() / thread_count;
+            int end_block = (context.id() + 1) * db_blocks_.size() / thread_count;
 
             for (int next_block = start_block; next_block < end_block; next_block++)
             {
 
-                int split = next_block / params_.number_of_batches();
-                int batch = next_block % params_.number_of_batches();
+                int split = next_block / params_.batch_count();
+                int batch = next_block % params_.batch_count();
 
                 //if (!symm_polys_stale_[split][batch])
                 //	continue;
@@ -494,125 +493,219 @@ namespace apsi
 
         void SenderDB::batched_interpolate_polys(
             SenderThreadContext & context,
-            int thread_count)
+            int thread_count,
+            shared_ptr<Evaluator> evaluator,
+            shared_ptr<PolyCRTBuilder>& builder)
         {
-
-            int table_size = params_.table_size(),
-                split_size = params_.split_size(),
-                batch_size = params_.batch_size(),
-                split_size_plus_one = params_.split_size() + 1;
-
-            // Data in batch-split table is stored in "batch-major order"
-            auto indexer = [splitStep = params_.number_of_batches() * split_size_plus_one,
-                batchStep = split_size_plus_one](int splitIdx, int batchIdx, int i)
+            auto& mod = params_.encryption_params().plain_modulus();
+            if (params_.get_label_bit_count() >= seal::util::get_significant_bit_count(mod.value()))
             {
-                return splitIdx * splitStep + batchIdx * batchStep + i;
-            };
+                throw std::runtime_error("labels are too large for exfield.");
+            }
 
-            MemoryPoolHandle local_pool = context.pool();
+            if (params_.get_label_bit_count() >= 64)
+            {
+                throw std::runtime_error("labels are too large u64 interpolation.");
+            }
 
+            int start = context.id() * db_blocks_.size() / thread_count;
+            int end = (context.id() + 1) * db_blocks_.size() / thread_count;
 
-            //int start_block = context.id() * regions_.size() / thread_count;
-            //int end_block = (context.id() + 1) * regions_.size() / thread_count;
-
+            for (int bIdx = start; bIdx < end; bIdx++)
+            {
+                auto& block = db_blocks_(bIdx);
+                block.batch_interpolate(context, mod, evaluator, builder, params_);
+            }
 
         }
-    
 
-    //void SenderDB::save(ostream &stream) const
-    //{
-    //    /** Save the following data.
-    //    B x m
-    //    vector<vector<Item>> simple_hashing_db_;
+        void DBBlock::batch_interpolate(
+            SenderThreadContext & context,
+            const seal::SmallModulus& mod,
+            shared_ptr<Evaluator> evaluator,
+            shared_ptr<PolyCRTBuilder>& builder,
+            const PSIParams& params)
+        {
+            bool test = true;
 
-    //    m x B
-    //    vector<vector<int>> shuffle_index_;
+            std::vector<std::pair<u64, u64>> inputs(items_per_split_), test_points;
+            oc::Matrix<u64> poly(items_per_batch_, items_per_split_);
+            MemoryPoolHandle local_pool = context.pool();
+            Position pos;
 
-    //    size m vector
-    //    vector<int> next_shuffle_locs_;
+            if (value_byte_length_ > sizeof(u64))
+            {
+                throw std::runtime_error("labels too large");
+            }
 
-    //    #splits x #batches x (split_size + 1).
-    //    vector<vector<vector<seal::Plaintext>>> batch_random_symm_polys_;
+            for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
+            {
+                //memset(inputs.data(), 0, inputs.size() * sizeof(std::pair<u64, u64>));
 
-    //    #splits x #batches.
-    //    vector<vector<bool>> symm_polys_stale_;
-    //    **/
+                for (pos.split_offset = 0; pos.split_offset < items_per_split_; ++pos.split_offset)
+                {
+                    auto& key = inputs[pos.split_offset].first;
+                    auto& label = inputs[pos.split_offset].second;
+                    key = 0;
+                    label = 0;
 
-    //    int32_t bin_size = params_.sender_bin_size(), table_size = params_.table_size(),
-    //        num_splits = params_.split_count(), num_batches = params_.number_of_batches(),
-    //        split_size_plus_one = params_.split_size() + 1;
 
-    //    stream.write(reinterpret_cast<const char*>(&bin_size), sizeof(int32_t));
-    //    stream.write(reinterpret_cast<const char*>(&table_size), sizeof(int32_t));
-    //    stream.write(reinterpret_cast<const char*>(&num_splits), sizeof(int32_t));
-    //    stream.write(reinterpret_cast<const char*>(&num_batches), sizeof(int32_t));
-    //    stream.write(reinterpret_cast<const char*>(&split_size_plus_one), sizeof(int32_t));
+                    if (has_item(pos))
+                    {
+                        auto key_item = *(std::array<u64, 2>*)&get_key(pos);
 
-    //    for (int i = 0; i < bin_size; i++)
-    //        for (int j = 0; j < table_size; j++)
-    //            simple_hashing_db2_(i, j).save(stream);
+                        if (key_item[1] || key_item[0] >= mod.value())
+                        {
+                            std::cout << get_key(pos) << std::endl;
+                            std::cout << key_item[0] << " " << key_item[1] << std::endl;
 
-    //    //for (int i = 0; i < table_size; i++)
-    //    //	for (int j = 0; j < bin_size; j++)
-    //    //		stream.write(reinterpret_cast<const char*>(&(shuffle_index_[i][j])), sizeof(int));
+                            throw std::runtime_error("key too large");
+                        }
 
-    //    //for (int i = 0; i < table_size; i++)
-    //    //	stream.write(reinterpret_cast<const char*>(&(next_shuffle_locs_[i])), sizeof(int));
+                        inputs[pos.split_offset].first = key_item[0];
 
-    //    //for (int i = 0; i < num_splits; i++)
-    //    //    for (int j = 0; j < num_batches; j++)
-    //    //        for (int k = 0; k < split_size_plus_one; k++)
-    //    //            batch_random_symm_polys_[i][j][k].save(stream);
-    //    for (auto& p : batch_random_symm_polys_)
-    //        p.save(stream);
+                        auto src = get_label(pos);
+                        memcpy(&label, src, value_byte_length_);
 
-    //    //for (int i = 0; i < num_splits; i++)
-    //    //	for (int j = 0; j < num_batches; j++)
-    //    //	{
-    //    //		uint8_t c = (uint8_t)symm_polys_stale_[i][j];
-    //    //		stream.write(reinterpret_cast<const char*>(&c), 1);
-    //    //	}
-    //}
 
-    //void SenderDB::load(istream &stream)
-    //{
-    //    int32_t bin_size = 0, table_size = 0,
-    //        num_splits = 0, num_batches = 0,
-    //        split_size_plus_one = 0;
+                        if (label >= mod.value())
+                        {
+                            throw std::runtime_error("label too large");
+                        }
 
-    //    stream.read(reinterpret_cast<char*>(&bin_size), sizeof(int32_t));
-    //    stream.read(reinterpret_cast<char*>(&table_size), sizeof(int32_t));
-    //    stream.read(reinterpret_cast<char*>(&num_splits), sizeof(int32_t));
-    //    stream.read(reinterpret_cast<char*>(&num_batches), sizeof(int32_t));
-    //    stream.read(reinterpret_cast<char*>(&split_size_plus_one), sizeof(int32_t));
+                        if (test)
+                        {
+                            test_points.push_back({key, label});
+                        }
+                    }
+                }
 
-    //    if (bin_size != params_.sender_bin_size() || table_size != params_.table_size() ||
-    //        num_splits != params_.split_count() || num_batches != params_.number_of_batches()
-    //        || split_size_plus_one != params_.split_size() + 1)
-    //        throw runtime_error("Unexpected params.");
+                u64_newton_interpolate_poly(inputs, poly[pos.batch_offset], mod);
+            }
 
-    //    for (int i = 0; i < bin_size; i++)
-    //        for (int j = 0; j < table_size; j++)
-    //            simple_hashing_db2_(i, j).load(stream);
+            batched_label_coeffs.resize(items_per_split_);
+            std::vector<u64> temp(items_per_batch_);
 
-    //    //for (int i = 0; i < table_size; i++)
-    //    //	for (int j = 0; j < bin_size; j++)
-    //    //		stream.read(reinterpret_cast<char*>(&(shuffle_index_[i][j])), sizeof(int));
+            for (int s = 0; s < items_per_split_; ++s)
+            {
+                Plaintext& batched_coeff = batched_label_coeffs[s];
 
-    //    //for (int i = 0; i < table_size; i++)
-    //    //	stream.read(reinterpret_cast<char*>(&(next_shuffle_locs_[i])), sizeof(int));
+                for (int b = 0; b < items_per_batch_; ++b)
+                {
+                    temp[b] = poly(b, s);
+                }
 
-    //    //for (int i = 0; i < num_splits; i++)
-    //    //    for (int j = 0; j < num_batches; j++)
-    //    //        for (int k = 0; k < split_size_plus_one; k++)
-    //    //            batch_random_symm_polys_[i][j][k].load(stream);
-    //    for (auto& p : batch_random_symm_polys_)
-    //        p.load(stream);
+                batched_coeff.reserve(
+                    params.encryption_params().coeff_modulus().size() *
+                    params.encryption_params().poly_modulus().coeff_count());
 
-    //    //for (int i = 0; i < num_splits; i++)
-    //    //	for (int j = 0; j < num_batches; j++)
-    //    //		stream.read(reinterpret_cast<char*>(&symm_polys_stale_[i][j]), sizeof(bool));
-    //}
+                builder->compose(temp, batched_coeff);
+                evaluator->transform_to_ntt(batched_coeff);
+            }
+
+
+            if (test)
+            {
+                Plaintext x;
+                Plaintext r;
+                
+            }
+        }
+
+        //void SenderDB::save(ostream &stream) const
+        //{
+        //    /** Save the following data.
+        //    B x m
+        //    vector<vector<Item>> simple_hashing_db_;
+
+        //    m x B
+        //    vector<vector<int>> shuffle_index_;
+
+        //    size m vector
+        //    vector<int> next_shuffle_locs_;
+
+        //    #splits x #batches x (split_size + 1).
+        //    vector<vector<vector<seal::Plaintext>>> batch_random_symm_polys_;
+
+        //    #splits x #batches.
+        //    vector<vector<bool>> symm_polys_stale_;
+        //    **/
+
+        //    int32_t bin_size = params_.sender_bin_size(), table_size = params_.table_size(),
+        //        num_splits = params_.split_count(), num_batches = params_.batch_count(),
+        //        split_size_plus_one = params_.split_size() + 1;
+
+        //    stream.write(reinterpret_cast<const char*>(&bin_size), sizeof(int32_t));
+        //    stream.write(reinterpret_cast<const char*>(&table_size), sizeof(int32_t));
+        //    stream.write(reinterpret_cast<const char*>(&num_splits), sizeof(int32_t));
+        //    stream.write(reinterpret_cast<const char*>(&num_batches), sizeof(int32_t));
+        //    stream.write(reinterpret_cast<const char*>(&split_size_plus_one), sizeof(int32_t));
+
+        //    for (int i = 0; i < bin_size; i++)
+        //        for (int j = 0; j < table_size; j++)
+        //            simple_hashing_db2_(i, j).save(stream);
+
+        //    //for (int i = 0; i < table_size; i++)
+        //    //	for (int j = 0; j < bin_size; j++)
+        //    //		stream.write(reinterpret_cast<const char*>(&(shuffle_index_[i][j])), sizeof(int));
+
+        //    //for (int i = 0; i < table_size; i++)
+        //    //	stream.write(reinterpret_cast<const char*>(&(next_shuffle_locs_[i])), sizeof(int));
+
+        //    //for (int i = 0; i < num_splits; i++)
+        //    //    for (int j = 0; j < num_batches; j++)
+        //    //        for (int k = 0; k < split_size_plus_one; k++)
+        //    //            batch_random_symm_polys_[i][j][k].save(stream);
+        //    for (auto& p : batch_random_symm_polys_)
+        //        p.save(stream);
+
+        //    //for (int i = 0; i < num_splits; i++)
+        //    //	for (int j = 0; j < num_batches; j++)
+        //    //	{
+        //    //		uint8_t c = (uint8_t)symm_polys_stale_[i][j];
+        //    //		stream.write(reinterpret_cast<const char*>(&c), 1);
+        //    //	}
+        //}
+
+        //void SenderDB::load(istream &stream)
+        //{
+        //    int32_t bin_size = 0, table_size = 0,
+        //        num_splits = 0, num_batches = 0,
+        //        split_size_plus_one = 0;
+
+        //    stream.read(reinterpret_cast<char*>(&bin_size), sizeof(int32_t));
+        //    stream.read(reinterpret_cast<char*>(&table_size), sizeof(int32_t));
+        //    stream.read(reinterpret_cast<char*>(&num_splits), sizeof(int32_t));
+        //    stream.read(reinterpret_cast<char*>(&num_batches), sizeof(int32_t));
+        //    stream.read(reinterpret_cast<char*>(&split_size_plus_one), sizeof(int32_t));
+
+        //    if (bin_size != params_.sender_bin_size() || table_size != params_.table_size() ||
+        //        num_splits != params_.split_count() || num_batches != params_.batch_count()
+        //        || split_size_plus_one != params_.split_size() + 1)
+        //        throw runtime_error("Unexpected params.");
+
+        //    for (int i = 0; i < bin_size; i++)
+        //        for (int j = 0; j < table_size; j++)
+        //            simple_hashing_db2_(i, j).load(stream);
+
+        //    //for (int i = 0; i < table_size; i++)
+        //    //	for (int j = 0; j < bin_size; j++)
+        //    //		stream.read(reinterpret_cast<char*>(&(shuffle_index_[i][j])), sizeof(int));
+
+        //    //for (int i = 0; i < table_size; i++)
+        //    //	stream.read(reinterpret_cast<char*>(&(next_shuffle_locs_[i])), sizeof(int));
+
+        //    //for (int i = 0; i < num_splits; i++)
+        //    //    for (int j = 0; j < num_batches; j++)
+        //    //        for (int k = 0; k < split_size_plus_one; k++)
+        //    //            batch_random_symm_polys_[i][j][k].load(stream);
+        //    for (auto& p : batch_random_symm_polys_)
+        //        p.load(stream);
+
+        //    //for (int i = 0; i < num_splits; i++)
+        //    //	for (int j = 0; j < num_batches; j++)
+        //    //		stream.read(reinterpret_cast<char*>(&symm_polys_stale_[i][j]), sizeof(bool));
+        //}
 
     }
 }

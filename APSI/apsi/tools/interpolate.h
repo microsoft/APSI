@@ -1,7 +1,7 @@
 #pragma once
 #include "seal//util/exfield.h"
 #include "seal/plaintext.h"
-
+#include "cryptoTools/Common/Defines.h"
 
 namespace apsi
 {
@@ -24,7 +24,7 @@ namespace apsi
 
 
     void u64_newton_interpolate_poly(
-        std::vector<std::pair<uint64_t, uint64_t>>& input,
-        std::vector<uint64_t>& result,
+        oc::span<std::pair<uint64_t, uint64_t>> input,
+        oc::span<uint64_t> result,
         const seal::SmallModulus & plain_modulus);
 }

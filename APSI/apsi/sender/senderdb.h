@@ -76,8 +76,7 @@ namespace apsi
             // the number of items that are in a split. 
             int items_per_split_;
 
-            //u8* get_value()
-
+            std::vector<seal::Plaintext> batched_label_coeffs;
 
 
             /**
@@ -106,6 +105,14 @@ namespace apsi
                 seal::util::ExFieldElement& neg_null_element);
 
             Position try_aquire_position(int cuckoo_loc, oc::PRNG& prng);
+
+            void batch_interpolate(
+                SenderThreadContext & context,
+                const seal::SmallModulus& mod,
+                shared_ptr <seal::Evaluator > evaluator,
+                shared_ptr<seal::PolyCRTBuilder>& builder,
+                const PSIParams& params);
+
 
             void check(const Position& pos);
 
@@ -200,7 +207,9 @@ namespace apsi
 
             void batched_interpolate_polys(
                 SenderThreadContext& context,
-                int thread_count);
+                int thread_count,
+                shared_ptr<seal::Evaluator> evaluator,
+                shared_ptr<seal::PolyCRTBuilder>& builder);
 
             //Item& get_key(u64 cuckoo_index, u64 position_idx) {
             //    return keys_(position_idx, cuckoo_index);
@@ -213,7 +222,7 @@ namespace apsi
             //u8* get_value(u64 cuckoo_index, u64 position_idx) 
             //{
             //    auto idx = params_.sender_bin_size() * cuckoo_index + position_idx;
-            //    return values_ptr_.get()  + idx * params_.get_value_bit_length;
+            //    return values_ptr_.get()  + idx * params_.get_label_bit_count;
             //}
 
             //const Item& get_key(u64 cuckoo_index, u64 position_idx) const {
@@ -221,9 +230,13 @@ namespace apsi
             //}
             //const u8* get_value(u64 cuckoo_index, u64 position_idx) const {
             //    auto idx = params_.sender_bin_size() * cuckoo_index + position_idx;
-            //    return values_ptr_.get() + idx * params_.get_value_bit_length;
+            //    return values_ptr_.get() + idx * params_.get_label_bit_count;
             //}
 
+            DBBlock& get_block(int batch, int split)
+            {
+                return db_blocks_(batch, split);
+            }
 
         private:
 

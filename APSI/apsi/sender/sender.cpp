@@ -18,7 +18,7 @@ namespace apsi
 {
     namespace sender
     {
-        Sender::Sender(const PSIParams &params, int total_thread_count, 
+        Sender::Sender(const PSIParams &params, int total_thread_count,
             int session_thread_count, const MemoryPoolHandle &pool) :
             params_(params),
             pool_(pool),
@@ -54,7 +54,7 @@ namespace apsi
                 builder_.reset(new PolyCRTBuilder(*seal_context_));
             }
             vector<thread> thrds(total_thread_count_);
-            
+
 #ifdef USE_SECURE_SEED
             prng_.SetSeed(oc::sysRandomSeed());
 #else
@@ -79,10 +79,10 @@ namespace apsi
                     // We need the ExFieldPolyCRTBuilder here since it creates ExFieldElements from the memory
                     // pool of its ExField. Cannot have a shared ExFieldPolyCRTBuilder with this design.
                     thread_contexts_[i].set_exbuilder(
-                        make_shared<ExFieldPolyCRTBuilder>(thread_contexts_[i].exfield(), 
+                        make_shared<ExFieldPolyCRTBuilder>(thread_contexts_[i].exfield(),
                             get_power_of_two(params_.encryption_params().poly_modulus().coeff_count() - 1))
                     );
-                    
+
                     // Allocate memory for repeated use from the given memory pool.
                     thread_contexts_[i].construct_variables(params_);
                 });
@@ -115,12 +115,12 @@ namespace apsi
                     int thread_context_idx = acquire_thread_context();
                     SenderThreadContext &context = thread_contexts_[thread_context_idx];
                     sender_db_.batched_randomized_symmetric_polys(context, evaluator_, builder_, total_thread_count_);
-                    sender_db_.batched_interpolate_polys(context, total_thread_count_);
+                    sender_db_.batched_interpolate_polys(context, total_thread_count_, evaluator_, builder_);
                     release_thread_context(context.id());
                 });
             }
 
-            for (int i = 0; i < thread_pool.size(); i++) 
+            for (int i = 0; i < thread_pool.size(); i++)
             {
                 thread_pool[i].join();
             }
@@ -183,22 +183,22 @@ namespace apsi
         }
 
         void Sender::respond(
-            const map<uint64_t, vector<Ciphertext> > &query, 
+            const map<uint64_t, vector<Ciphertext> > &query,
             SenderSessionContext &session_context,
             Channel &channel)
         {
             //vector<vector<Ciphertext>> resultVec(params_.split_count());
-            //for (auto& v : resultVec) v.resize(params_.number_of_batches());
-            vector<vector<Ciphertext> > powers(params_.number_of_batches());
+            //for (auto& v : resultVec) v.resize(params_.batch_count());
+            vector<vector<Ciphertext> > powers(params_.batch_count());
 
             vector<pair<promise<void>, shared_future<void> > >
-                batch_powers_computed(params_.number_of_batches());
+                batch_powers_computed(params_.batch_count());
             for (auto& pf : batch_powers_computed) pf.second = pf.first.get_future();
 
-            auto number_of_batches = params_.number_of_batches();
+            auto batch_count = params_.batch_count();
             int split_size_plus_one = params_.split_size() + 1;
-            int	splitStep = params_.number_of_batches() * split_size_plus_one;
-            int total_blocks = params_.split_count() * params_.number_of_batches();
+            int	splitStep = params_.batch_count() * split_size_plus_one;
+            int total_blocks = params_.split_count() * params_.batch_count();
 
             mutex mtx;
             vector<thread> thread_pool(session_thread_count_);
@@ -218,8 +218,8 @@ namespace apsi
                     Ciphertext tmp(thread_context.pool());
                     //shared_ptr<Evaluator>& local_evaluator = context.evaluator();
 
-                    auto batch_start = i * number_of_batches / thread_pool.size();
-                    auto batch_end = (i + 1) * number_of_batches / thread_pool.size();
+                    auto batch_start = i * batch_count / thread_pool.size();
+                    auto batch_end = (i + 1) * batch_count / thread_pool.size();
 
                     for (auto batch = batch_start; batch < batch_end; ++batch)
                     {
@@ -239,7 +239,7 @@ namespace apsi
                     // constuct two ciphertext to store the result.  One keeps track of the current result, 
                     // one is used as a temp. Their roles switch each iteration. Saved needing to make a 
                     // copy in eval->add(...)
-                    array<Ciphertext, 2> runningResults;
+                    array<Ciphertext, 2> runningResults, label_results;
 
                     for (int block = start_block; block < end_block; block++)
                     {
@@ -250,7 +250,7 @@ namespace apsi
                         Plaintext* sender_coeffs(&sender_db_.batch_random_symm_polys()[split * splitStep + batch * split_size_plus_one]);
 
                         // Iterate over the coeffs multiplying them with the query powers  and summing the results
-                        char currResult = 0;
+                        char currResult = 0, curr_label = 0;
 
                         evaluator_->multiply_plain_ntt(powers[batch][0], sender_coeffs[0], runningResults[currResult]);
                         for (int s = 1; s <= params_.split_size(); s++)
@@ -260,14 +260,46 @@ namespace apsi
                             currResult ^= 1;
                         }
 
+
+                        if (params_.get_label_bit_count())
+                        {
+                            auto& block = sender_db_.get_block(batch, split);
+
+                            // label_result = coeff[1] * x^1;
+                            evaluator_->multiply_plain_ntt(powers[batch][1], block.batched_label_coeffs[1], label_results[curr_label]);
+                            for (int s = 2; s <= params_.split_size(); s++)
+                            {
+                                // label_result += coeff[s] * x^s;
+                                evaluator_->multiply_plain_ntt(powers[batch][s], block.batched_label_coeffs[s], tmp);
+                                evaluator_->add(tmp, label_results[curr_label], label_results[curr_label ^ 1]);
+                                curr_label ^= 1;
+                            }
+
+                            // label_result += coeff[0];
+                            evaluator_->add_plain(label_results[curr_label], block.batched_label_coeffs[0], label_results[curr_label ^ 1]);
+                            curr_label ^= 1;
+
+                            // TODO: multiply with running_result
+
+
+                            evaluator_->transform_from_ntt(label_results[curr_label]);
+
+                        }
+
                         // Transform back from ntt form.
                         evaluator_->transform_from_ntt(runningResults[currResult]);
 
                         // Send the result over the network if needed.
+
                         unique_lock<mutex> net_lock2(mtx);
                         channel.asyncSendCopy(split);
                         channel.asyncSendCopy(batch);
                         send_ciphertext(runningResults[currResult], channel);
+
+                        if (params_.get_label_bit_count())
+                        {
+                            send_ciphertext(label_results[curr_label], channel);
+                        }
                     }
 
                     /* After this point, this thread will no longer use the context resource, so it is free to return it. */
@@ -276,16 +308,16 @@ namespace apsi
             }
 
             for (int i = 0; i < thread_pool.size(); i++)
-            { 
+            {
                 thread_pool[i].join();
             }
         }
 
         void Sender::compute_batch_powers(
-            int batch, 
-            const map<uint64_t, vector<Ciphertext> > &input, 
-            vector<Ciphertext> &batch_powers, 
-            SenderSessionContext &session_context, 
+            int batch,
+            const map<uint64_t, vector<Ciphertext> > &input,
+            vector<Ciphertext> &batch_powers,
+            SenderSessionContext &session_context,
             SenderThreadContext &thread_context)
         {
             batch_powers.resize(params_.split_size() + 1);

@@ -40,7 +40,7 @@ namespace apsi
             is a same-size vector of bool values. If an item is in the intersection, the corresponding bool value is true on the
             same position in the result vector .
             */
-            std::vector<bool> query(std::vector<Item> &items, oc::Channel& chl);
+            std::vector < std::pair<int, seal::util::ExFieldElement >> query(std::vector<Item> &items, oc::Channel& chl);
 
             /**
             Preprocesses the PSI items. Returns the powr map of the items, and the indices of them in the hash table.
@@ -107,7 +107,11 @@ namespace apsi
             void stream_decrypt(
                 oc::Channel &channel, 
                 std::vector<std::vector<seal::util::ExFieldElement>> &result,
-                seal::util::Pointer& backing);
+                std::vector<std::vector<seal::util::ExFieldElement>> &labels,
+                seal::util::Pointer& backing,
+                seal::util::Pointer & label_backing);
+
+            void decrypt(seal::Ciphertext &tmp, seal::Plaintext &p, std::vector<uint64_t> &integer_batch, std::vector<seal::util::ExFieldElement> & rr, int batch_idx, int slot_count, std::vector<seal::util::ExFieldElement> &batch);
 
             /**
             Stream decryption of ciphers from the sender. Ciphertext will be acquired from the sender in a streaming fashion one by one in
@@ -124,6 +128,10 @@ namespace apsi
             @param[out] plain The plaintext to hold the decrypted data.
             */
             void decrypt(const seal::Ciphertext &cipher, seal::Plaintext &plain);
+
+
+            // decrypts the cipher text and unbatched it into the exfield elements.
+            //void decrypt(const seal::Ciphertext& cipher, std::vector<seal::util::ExFieldElement>& elements);
 
             /**
             Decomposes a SEAL plaintext to a batch of ExField elements, using generalized un-batching. One plaintext will be

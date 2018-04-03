@@ -53,7 +53,7 @@ namespace apsi
         {
             throw invalid_argument("sender bin size must be a multiple of number of splits.");
         }
-        if ((item_bit_length_ + 63) / 64 != (item_bit_length_ + (int)floor(log2(hash_func_count_)) + 1 + 1 + 63) / 64)
+        if ((item_bit_count_ + 63) / 64 != (item_bit_count_ + (int)floor(log2(hash_func_count_)) + 1 + 1 + 63) / 64)
         {
             throw invalid_argument("invalid for cuckoo: null bit and location index overflow to new uint64_t.");
         }

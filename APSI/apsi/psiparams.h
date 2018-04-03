@@ -65,7 +65,7 @@ namespace apsi
     {
     public:
         PSIParams(
-            unsigned item_bit_length,
+            unsigned item_bit_count,
             TableParams table_params,
             CuckooParams cuckoo_params,
             SEALParams seal_params,
@@ -83,7 +83,7 @@ namespace apsi
             hash_func_count_(cuckoo_params.hash_func_count), 
             hash_func_seed_(cuckoo_params.hash_func_seed), 
             max_probe_(cuckoo_params.max_probe),
-            item_bit_length_(item_bit_length), 
+            item_bit_count_(item_bit_count), 
             exfield_characteristic_(seal_params.exfield_params.exfield_characteristic), 
             exfield_polymod_(seal_params.exfield_params.exfield_polymod),
             encryption_params_(seal_params.encryption_params),
@@ -127,9 +127,9 @@ namespace apsi
             return max_probe_;
         }
 
-        inline int item_bit_length() const
+        inline int item_bit_count() const
         {
-            return item_bit_length_;
+            return item_bit_count_;
         }
 
         inline std::uint64_t exfield_characteristic() const
@@ -157,7 +157,7 @@ namespace apsi
             return (encryption_params_.poly_modulus().coeff_count() - 1) / (exfield_polymod_.significant_coeff_count() - 1);
         }
 
-        inline int number_of_batches() const
+        inline int batch_count() const
         {
             int batch = batch_size();
             return (table_size_ + batch - 1) / batch;
@@ -210,18 +210,18 @@ namespace apsi
             return cuckoo_mode_; 
         }
 
-        inline int get_value_bit_length() const
+        inline int get_label_bit_count() const
         {
             return value_bit_length_;
         }
 
-        inline int get_value_byte_length() const
+        inline int get_value_byte_count() const
         {
             return value_byte_length_;
         }
 
 
-        void set_value_bit_length(int bits)
+        void set_value_bit_count(int bits)
         {
             value_bit_length_ = bits;
             value_byte_length_ = (bits + 7) / 8;
@@ -255,7 +255,7 @@ namespace apsi
         int decomposition_bit_count_;
 
         /* Should not be too big, both due to the performance consideration and the requirement of current Cuckoo hashing impl.
-        For example, if item_bit_length = 120, then hash_func_count should be smaller than 2^6 = 64. But typically, 3 is enough. */
+        For example, if item_bit_count = 120, then hash_func_count should be smaller than 2^6 = 64. But typically, 3 is enough. */
         int hash_func_count_;
 
         int hash_func_seed_;
@@ -263,7 +263,7 @@ namespace apsi
         int max_probe_;
 
         /* Should not exceed 128. Moreover, should reserve several bits because of the requirement of current Cuckoo hashing impl. */
-        int item_bit_length_;
+        int item_bit_count_;
 
         std::uint64_t exfield_characteristic_;
 
