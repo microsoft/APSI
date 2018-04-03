@@ -91,7 +91,7 @@ namespace apsi
             stop_watch.set_time_point("receiver decrypt");
 
             ExFieldElement zero(ex_field_);
-            vector<std::pair<int, ExFieldElement>> intersection(items.size());
+            vector<std::pair<int, ExFieldElement>> intersection;//(items.size());
 
 
             for (int i = 0; i < params_.table_size(); i++)
@@ -413,7 +413,6 @@ namespace apsi
             Pointer & label_backing)
         {
             vector<vector<Plaintext>> plaintext_matrix;
-            Plaintext p;
 
             int num_of_splits = params_.split_count(),
                 num_of_batches = params_.batch_count(),
@@ -422,6 +421,7 @@ namespace apsi
                 batch_idx = 0,
                 slot_count = exfieldpolycrtbuilder_->slot_count();
 
+            Plaintext p;
             Ciphertext tmp;
 
             struct RecvPackage
@@ -462,69 +462,31 @@ namespace apsi
             vector<uint64_t> integer_batch((!!polycrtbuilder_) * slot_count);
 
             bool first = true;
-            std::stringstream ss;
 
             cout << "Decrypting " << block_count << " blocks (splits = " << num_of_splits << ")" << endl;
             for (auto& pkg : recvPackages)
                 //while (block_count-- > 0)
             {
+                pkg.fut.get();
                 if (first)
                 {
                     first = false;
                     stop_watch.set_time_point("receiver recv-start");
                 }
 
+                std::stringstream ss(pkg.data);
+                tmp.load(ss);
                 split_idx = pkg.split_idx;
                 batch_idx = pkg.batch_idx;
 
 
-
-
-
-                pkg.fut.get();
-                ss.str(pkg.data);
-                tmp.load(ss);
-                decrypt(tmp, p);
-
                 auto& rr = result[split_idx];
-
-                if (first)
-                {
-                    first = false;
-                    stop_watch.set_time_point("receiver recv-start");
-                }
-
-
-                if (polycrtbuilder_)
-                {
-                    vector<uint64_t> integer_batch;
-                    polycrtbuilder_->decompose(p, integer_batch, pool_);
-
-                    for (int k = 0; k < integer_batch.size(); k++)
-                        *rr[batch_idx * slot_count + k].pointer(0) = integer_batch[k];
-                }
-                else
-                {
-                    exfieldpolycrtbuilder_->decompose(p, batch);
-                    for (int k = 0; k < batch.size(); k++)
-                        rr[batch_idx * slot_count + k] = batch[k];
-                }
-
-                //{
-                //    pkg.fut.get();
-                //    ss.str(pkg.data);
-                //    tmp.load(ss);
-
-                //    auto& rr = result[split_idx];
-                //    decrypt(tmp, p, integer_batch, rr, batch_idx, slot_count, batch);
-                //}
-
+                decrypt(tmp, p, integer_batch, rr, batch_idx, slot_count, batch);
 
                 if (params_.get_label_bit_count())
                 {
-
                     pkg.label_fut.get();
-                    ss.str(pkg.label_data);
+                    std::stringstream ss(pkg.label_data);
                     tmp.load(ss);
 
                     auto& rr = labels[split_idx];
@@ -532,6 +494,7 @@ namespace apsi
                 }
             }
         }
+
 
         void Receiver::decrypt(seal::Ciphertext &tmp, seal::Plaintext &p, std::vector<uint64_t> &integer_batch, std::vector<seal::util::ExFieldElement> & rr, int batch_idx, int slot_count, std::vector<seal::util::ExFieldElement> &batch)
         {
@@ -552,7 +515,6 @@ namespace apsi
                     rr[batch_idx * slot_count + k] = batch[k];
             }
         }
-
 
 
         //void Receiver::decompose(const vector<vector<Plaintext>> &plain_matrix,
@@ -621,12 +583,6 @@ namespace apsi
             decryptor_->decrypt(cipher, plain);
             //cout << "Noise budget: " << decryptor_->invariant_noise_budget(cipher) << endl;
         }
-
-        //void Receiver::decrypt(const seal::Ciphertext & cipher, std::vector<seal::util::ExFieldElement>& elements)
-        //{
-        //    Plaintext p;
-
-        //}
 
         //void Receiver::decompose(const Plaintext &plain, vector<::ExFieldElement> &batch)
         //{

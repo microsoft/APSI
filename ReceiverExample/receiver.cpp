@@ -335,7 +335,7 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
     }
     correct &= intersection.size() == intersectionSize;
 
-    cout << "Intersection results: " << (correct ? "Correct" : "Incorrect") << endl;
+    cout << "Intersection results: " << (correct ? "Correct" : "Incorrect") << " " << intersection.size() <<" =? "<< intersectionSize << endl;
 
     //cout << '[';
     //for (int i = 0; i < intersection.size(); i++)

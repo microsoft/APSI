@@ -248,7 +248,7 @@ namespace apsi
 
         cuckoo::CuckooMode cuckoo_mode_;
 
-        int value_bit_length_, value_byte_length_;
+        int value_bit_length_ = 0, value_byte_length_ = 0;
 
         seal::EncryptionParameters encryption_params_;
 

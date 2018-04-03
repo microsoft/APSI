@@ -46,7 +46,7 @@ namespace apsi
             Preprocesses the PSI items. Returns the powr map of the items, and the indices of them in the hash table.
             */
             std::pair<
-                std::map<uint64_t, std::vector<seal::Ciphertext>>, 
+                std::map<uint64_t, std::vector<seal::Ciphertext>>,
                 std::unique_ptr<cuckoo::CuckooInterface>
             > preprocess(std::vector<Item> &items, oc::Channel& channel);
 
@@ -71,8 +71,8 @@ namespace apsi
                 seal::util::Pointer& data);
 
             /**
-            Generates powers y^k, where y is an element in the input vector, k = i*2^{jw}, (i = 1, 2, ..., 2^w - 1), 
-            (j = 0, 1, ..., bound - 1), (w is the window size in PSIParams), (bound is the number of segments when 
+            Generates powers y^k, where y is an element in the input vector, k = i*2^{jw}, (i = 1, 2, ..., 2^w - 1),
+            (j = 0, 1, ..., bound - 1), (w is the window size in PSIParams), (bound is the number of segments when
             we break the bits of sender's split_size into segment of window size).
             The return result is a map from k to y^k.
             */
@@ -81,15 +81,15 @@ namespace apsi
                 std::list<seal::util::Pointer>& data);
 
             /**
-            Encrypts every vector of elements in the input map to a corresponding vector of SEAL Ciphertext, using generalized batching. The number of 
-            ciphertexts in a vector depends on the slot count in generalized batching. For example, if an input vector has size 1024, the slot count 
+            Encrypts every vector of elements in the input map to a corresponding vector of SEAL Ciphertext, using generalized batching. The number of
+            ciphertexts in a vector depends on the slot count in generalized batching. For example, if an input vector has size 1024, the slot count
             is 256, then there are 1024/256 = 4 ciphertext in the Ciphertext vector.
             */
             void encrypt(std::map<uint64_t, std::vector<seal::util::ExFieldElement>> &input, std::map<std::uint64_t, std::vector<seal::Ciphertext>> &destination);
 
             /**
             Encrypts a vector of elements to a corresponding vector of SEAL Ciphertext, using generalized batching. The number of
-            ciphertexts in the vector depends on the slot count in generalized batching. For example, if an input vector has size 1024, 
+            ciphertexts in the vector depends on the slot count in generalized batching. For example, if an input vector has size 1024,
             the slot count is 256, then there are 1024/256 = 4 ciphertext in the Ciphertext vector.
             */
             void encrypt(const std::vector<seal::util::ExFieldElement> &input, std::vector<seal::Ciphertext> &destination);
@@ -102,16 +102,14 @@ namespace apsi
             ciphertext is decrypted into 256 elements.
 
             @result Matrix of size (#splits x table_size_ceiling). Here table_size_ceiling is defined as (#batches x batch_size), which might be
-                    larger than table_size.
+            larger than table_size.
             */
             void stream_decrypt(
-                oc::Channel &channel, 
+                oc::Channel &channel,
                 std::vector<std::vector<seal::util::ExFieldElement>> &result,
-                std::vector<std::vector<seal::util::ExFieldElement>> &labels,
+                std::vector<std::vector<seal::util::ExFieldElement>> &lresult,
                 seal::util::Pointer& backing,
-                seal::util::Pointer & label_backing);
-
-            void decrypt(seal::Ciphertext &tmp, seal::Plaintext &p, std::vector<uint64_t> &integer_batch, std::vector<seal::util::ExFieldElement> & rr, int batch_idx, int slot_count, std::vector<seal::util::ExFieldElement> &batch);
+                seal::util::Pointer& lbacking);
 
             /**
             Stream decryption of ciphers from the sender. Ciphertext will be acquired from the sender in a streaming fashion one by one in
@@ -129,9 +127,8 @@ namespace apsi
             */
             void decrypt(const seal::Ciphertext &cipher, seal::Plaintext &plain);
 
+            void decrypt(seal::Ciphertext &tmp, seal::Plaintext &p, std::vector<uint64_t> &integer_batch, std::vector<seal::util::ExFieldElement> & rr, int batch_idx, int slot_count, std::vector<seal::util::ExFieldElement> &batch);
 
-            // decrypts the cipher text and unbatched it into the exfield elements.
-            //void decrypt(const seal::Ciphertext& cipher, std::vector<seal::util::ExFieldElement>& elements);
 
             /**
             Decomposes a SEAL plaintext to a batch of ExField elements, using generalized un-batching. One plaintext will be
@@ -176,7 +173,7 @@ namespace apsi
             int thread_count_;
 
             seal::MemoryPoolHandle pool_;
-            
+
             std::shared_ptr<seal::util::ExField> ex_field_;
 
             seal::PublicKey public_key_;
