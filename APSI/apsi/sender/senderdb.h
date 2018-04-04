@@ -78,6 +78,7 @@ namespace apsi
 
             std::vector<seal::Plaintext> batched_label_coeffs;
 
+            oc::Matrix<u64> label_coeffs;
 
             /**
             Computes the symmetric polynomials for the specified split and the specified batch in sender's database.

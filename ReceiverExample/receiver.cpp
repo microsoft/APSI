@@ -327,6 +327,13 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
                 cout << "Miss result for receiver's item at index: " << i << endl;  
                 correct = false;
             }
+            else
+            {
+                if (f->second[0] != i)
+                {
+                    std::cout << "incorrect label at index: " << i << ". actual: " << f->second[0] << ", expected: " << i << std::endl;
+                }
+            }
         }
         else
         {

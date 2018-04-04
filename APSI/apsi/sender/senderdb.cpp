@@ -533,7 +533,7 @@ namespace apsi
             int max_size = 0;
             std::vector<int> poly_size(items_per_batch_);
             std::vector<std::pair<u64, u64>> inputs; inputs.resize(items_per_split_);
-            oc::Matrix<u64> poly(items_per_batch_, items_per_split_);
+            label_coeffs.resize(items_per_batch_, items_per_split_);
             MemoryPoolHandle local_pool = context.pool();
             Position pos;
 
@@ -615,7 +615,7 @@ namespace apsi
                 {
                     max_size = std::max<int>(max_size, inputs.size());
                     poly_size[pos.batch_offset] = inputs.size();
-                    auto px = poly[pos.batch_offset].subspan(0, inputs.size());
+                    auto px = label_coeffs[pos.batch_offset].subspan(0, inputs.size());
 
                     if (px.size() != inputs.size())
                         throw std::runtime_error("");
@@ -633,7 +633,7 @@ namespace apsi
                 for (int b = 0; b < items_per_batch_; ++b)
                 {
                     if (poly_size[b] > s)
-                        temp[b] = poly(b, s);
+                        temp[b] = label_coeffs(b, s);
                     else
                         temp[b] = 0;
                 }

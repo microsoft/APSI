@@ -417,8 +417,6 @@ namespace apsi
             int num_of_splits = params_.split_count(),
                 num_of_batches = params_.batch_count(),
                 block_count = num_of_splits * num_of_batches,
-                split_idx = 0,
-                batch_idx = 0,
                 slot_count = exfieldpolycrtbuilder_->slot_count();
 
             Plaintext p;
@@ -476,12 +474,10 @@ namespace apsi
 
                 std::stringstream ss(pkg.data);
                 tmp.load(ss);
-                split_idx = pkg.split_idx;
-                batch_idx = pkg.batch_idx;
 
 
-                auto& rr = result[split_idx];
-                decrypt(tmp, p, integer_batch, rr, batch_idx, slot_count, batch);
+                auto& rr = result[pkg.split_idx];
+                decrypt(tmp, p, integer_batch, rr, pkg.batch_idx, slot_count, batch);
 
                 if (params_.get_label_bit_count())
                 {
@@ -489,8 +485,8 @@ namespace apsi
                     std::stringstream ss(pkg.label_data);
                     tmp.load(ss);
 
-                    auto& rr = labels[split_idx];
-                    decrypt(tmp, p, integer_batch, rr, batch_idx, slot_count, batch);
+                    auto& ll = labels[pkg.split_idx];
+                    decrypt(tmp, p, integer_batch, ll, pkg.batch_idx, slot_count, batch);
                 }
             }
         }

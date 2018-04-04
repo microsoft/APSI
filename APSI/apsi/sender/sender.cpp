@@ -182,6 +182,50 @@ namespace apsi
             stopped_ = true;
         }
 
+        void Sender::debug_decrypt(
+            SenderSessionContext &session_context,
+            Ciphertext& c,
+            std::vector<u64>& dest)
+        {
+            Plaintext p;
+            session_context.decryptor_->decrypt(c, p);
+
+            if (true)
+            {
+                //std::vector<u64> integer_batch;
+                builder_->decompose(p, dest, pool_);
+
+                //for (int k = 0; k < integer_batch.size(); k++)
+                //    *dest[k].pointer(0) = integer_batch[k];
+            }
+            else
+            {
+                //exfieldpolycrtbuilder_->decompose(p, batch);
+                //for (int k = 0; k < batch.size(); k++)
+                //    rr[batch_idx * slot_count + k] = batch[k];
+            }
+        }
+
+        u64 pow(u64 x, u64 p)
+        {
+            u64 r = 1;
+            while (p)
+            {
+                r *= x;
+            }
+            return x;
+        }
+        std::vector<oc::u64> Sender::debug_eval_term(int term, oc::MatrixView<u64> coeffs, oc::span<u64> x, const seal::SmallModulus& mod)
+        {
+
+            for (int i = 0; i < x.size(); ++i)
+            {
+                auto xx = pow(x[i], term);
+
+            }
+
+        }
+
         void Sender::respond(
             const map<uint64_t, vector<Ciphertext> > &query,
             SenderSessionContext &session_context,
@@ -200,6 +244,8 @@ namespace apsi
             int split_size_plus_one = params_.split_size() + 1;
             int	splitStep = params_.batch_count() * split_size_plus_one;
             int total_blocks = params_.split_count() * params_.batch_count();
+
+            //std::vector<std::vector<u64>> plain_query(params_.batch_count());
 
             mutex mtx;
             vector<thread> thread_pool(session_thread_count_);
@@ -226,10 +272,17 @@ namespace apsi
                     {
                         compute_batch_powers(batch, query, powers[batch], session_context, thread_context);
                         batch_powers_computed[batch].first.set_value();
+
+                        //plain_query[batch].resize(params_.batch_size());
+                        //debug_decrypt(session_context, powers[batch][1], plain_query[batch]);
                     }
 
                     for (auto& b : batch_powers_computed)
                         b.second.get();
+
+
+                    //debug_decrypt(powers, plain_query);
+
 
                     // Check if we need to re-batch things. This happens if we do an update.
                     //sender_db_.batched_randomized_symmetric_polys(context);
@@ -241,6 +294,7 @@ namespace apsi
                     // one is used as a temp. Their roles switch each iteration. Saved needing to make a 
                     // copy in eval->add(...)
                     array<Ciphertext, 2> runningResults, label_results;
+                    //std::vector<u64> debug_label_results(params_.batch_size());
 
                     for (int block_idx = start_block; block_idx < end_block; block_idx++)
                     {
@@ -253,6 +307,10 @@ namespace apsi
                         // Iterate over the coeffs multiplying them with the query powers  and summing the results
                         char currResult = 0, curr_label = 0;
 
+                        // TODO: optimize this to allow low degree poly? need to take into account noise levels.
+
+                        // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
+                        // Observe that the first call to mult is always multiplying coeff[0] by 1....
                         evaluator_->multiply_plain_ntt(powers[batch][0], sender_coeffs[0], runningResults[currResult]);
                         for (int s = 1; s <= params_.split_size(); s++)
                         {
@@ -278,6 +336,12 @@ namespace apsi
                                 while (block.batched_label_coeffs[s].is_zero()) ++s;
 
                                 evaluator_->multiply_plain_ntt(powers[batch][s], block.batched_label_coeffs[s], label_results[curr_label]);
+
+
+                                auto& mod = params_.encryption_params().plain_modulus();
+
+                                //auto debug_result = debug_eval_term(s, block.label_coeffs, plain_query[batch], mod);
+
                                 for (; s < block.batched_label_coeffs.size(); s++)
                                 {
                                     // label_result += coeff[s] * x^s;
