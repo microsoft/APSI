@@ -96,7 +96,7 @@ namespace apsi
             prng_.SetSeed(oc::ZeroBlock);
         }
 
-        void Sender::load_db(const vector<Item> &data)
+        void Sender::load_db(const vector<Item> &data, oc::MatrixView<const u8> vals)
         {
             sender_db_.set_data(data, total_thread_count_);
             stop_watch.set_time_point("Sender set-data");
@@ -232,7 +232,7 @@ namespace apsi
 
                     // Check if we need to re-batch things. This happens if we do an update.
                     //sender_db_.batched_randomized_symmetric_polys(context);
-
+                    Encryptor enc(*seal_context_, session_context.public_key_, thread_context.pool());
                     int start_block = i * total_blocks / total_thread_count_;
                     int end_block = (i + 1) * total_blocks / total_thread_count_;
 
@@ -241,10 +241,10 @@ namespace apsi
                     // copy in eval->add(...)
                     array<Ciphertext, 2> runningResults, label_results;
 
-                    for (int block = start_block; block < end_block; block++)
+                    for (int block_idx = start_block; block_idx < end_block; block_idx++)
                     {
-                        int batch = block / params_.split_count(),
-                            split = block % params_.split_count();
+                        int batch = block_idx / params_.split_count(),
+                            split = block_idx % params_.split_count();
 
                         // Get the pointer to the first poly of this batch.
                         Plaintext* sender_coeffs(&sender_db_.batch_random_symm_polys()[split * splitStep + batch * split_size_plus_one]);
@@ -265,19 +265,31 @@ namespace apsi
                         {
                             auto& block = sender_db_.get_block(batch, split);
 
-                            // label_result = coeff[1] * x^1;
-                            evaluator_->multiply_plain_ntt(powers[batch][1], block.batched_label_coeffs[1], label_results[curr_label]);
-                            for (int s = 2; s <= params_.split_size(); s++)
+                            if (block.batched_label_coeffs.size() > 1)
                             {
-                                // label_result += coeff[s] * x^s;
-                                evaluator_->multiply_plain_ntt(powers[batch][s], block.batched_label_coeffs[s], tmp);
-                                evaluator_->add(tmp, label_results[curr_label], label_results[curr_label ^ 1]);
+                                // label_result = coeff[1] * x^1;
+                                evaluator_->multiply_plain_ntt(powers[batch][1], block.batched_label_coeffs[1], label_results[curr_label]);
+                                for (int s = 2; s <= block.batched_label_coeffs.size(); s++)
+                                {
+                                    // label_result += coeff[s] * x^s;
+                                    evaluator_->multiply_plain_ntt(powers[batch][s], block.batched_label_coeffs[s], tmp);
+                                    evaluator_->add(tmp, label_results[curr_label], label_results[curr_label ^ 1]);
+                                    curr_label ^= 1;
+                                }
+                                // label_result += coeff[0];
+                                evaluator_->add_plain(label_results[curr_label], block.batched_label_coeffs[0], label_results[curr_label ^ 1]);
                                 curr_label ^= 1;
                             }
-
-                            // label_result += coeff[0];
-                            evaluator_->add_plain(label_results[curr_label], block.batched_label_coeffs[0], label_results[curr_label ^ 1]);
-                            curr_label ^= 1;
+                            else if (block.batched_label_coeffs.size())
+                            {
+                                // label_result = coeff[0];
+                                enc.encrypt(block.batched_label_coeffs[0], label_results[curr_label]);
+                            }
+                            else
+                            {
+                                // doesn't matter what we set... this will due.
+                                label_results[curr_label] = powers[batch][0];
+                            }
 
                             // TODO: multiply with running_result
 

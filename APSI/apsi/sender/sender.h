@@ -53,7 +53,7 @@ namespace apsi
             Loads the input data into sender's database, and precomputes all necessary components for the PSI protocol,
             including symmetric polynomials, batching, etc.
             */
-            void load_db(const std::vector<Item> &data);
+            void load_db(const std::vector<Item> &data, oc::MatrixView<const u8> vals = {});
 
             void query_session(oc::Channel& channel);
 

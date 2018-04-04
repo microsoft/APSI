@@ -3,6 +3,8 @@
 #include <memory>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
+
 
 #include "apsi/sender/senderdb.h"
 #include "apsi/apsidefines.h"
@@ -56,10 +58,12 @@ namespace apsi
                     (params_.encryption_params().poly_modulus().coeff_count()));
             }
 
-            oc::block seed;
-            random_device rd;
-            *reinterpret_cast<array<unsigned int, 4>*>(&seed) = { rd(), rd(), rd(), rd() };
-            prng_.SetSeed(seed, 256);
+#ifdef USE_SECURE_SEED
+            prng_.SetSeed(oc::sysRandomSeed());
+#else
+            TODO("***************** INSECURE *****************, define USE_SECURE_SEED to fix");
+            prng_.SetSeed(oc::OneBlock, 256);
+#endif
 
             // Set null value for sender: 1111...1110 (128 bits)
             // Receiver's null value comes from the Cuckoo class: 1111...1111
@@ -526,9 +530,9 @@ namespace apsi
             shared_ptr<PolyCRTBuilder>& builder,
             const PSIParams& params)
         {
-            bool test = true;
-
-            std::vector<std::pair<u64, u64>> inputs(items_per_split_), test_points;
+            int max_size = 0;
+            std::vector<int> poly_size(items_per_batch_);
+            std::vector<std::pair<u64, u64>> inputs; inputs.resize(items_per_split_);
             oc::Matrix<u64> poly(items_per_batch_, items_per_split_);
             MemoryPoolHandle local_pool = context.pool();
             Position pos;
@@ -541,17 +545,22 @@ namespace apsi
             for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
             {
                 //memset(inputs.data(), 0, inputs.size() * sizeof(std::pair<u64, u64>));
+                inputs.clear();
 
                 for (pos.split_offset = 0; pos.split_offset < items_per_split_; ++pos.split_offset)
                 {
-                    auto& key = inputs[pos.split_offset].first;
-                    auto& label = inputs[pos.split_offset].second;
-                    key = 0;
-                    label = 0;
+                    //auto& key = inputs[pos.split_offset].first;
+                    //auto& label = inputs[pos.split_offset].second;
+                    //key = pos.split_offset;
+                    //label = 0;
 
 
                     if (has_item(pos))
                     {
+                        inputs.emplace_back();
+                        auto& key = inputs.back().first;
+                        auto& label = inputs.back().second;
+
                         auto key_item = *(std::array<u64, 2>*)&get_key(pos);
 
                         if (key_item[1] || key_item[0] >= mod.value())
@@ -562,7 +571,7 @@ namespace apsi
                             throw std::runtime_error("key too large");
                         }
 
-                        inputs[pos.split_offset].first = key_item[0];
+                        key = key_item[0];
 
                         auto src = get_label(pos);
                         memcpy(&label, src, value_byte_length_);
@@ -573,26 +582,38 @@ namespace apsi
                             throw std::runtime_error("label too large");
                         }
 
-                        if (test)
-                        {
-                            test_points.push_back({key, label});
-                        }
+                        //if (test)
+                        //{
+                        //    test_points.push_back({key, label});
+                        //}
                     }
                 }
 
-                u64_newton_interpolate_poly(inputs, poly[pos.batch_offset], mod);
+                if (inputs.size())
+                {
+                    max_size = std::max<int>(max_size, inputs.size());
+                    poly_size[pos.batch_offset] = inputs.size();
+                    auto px = poly[pos.batch_offset].subspan(0, inputs.size());
+
+                    if (px.size() != inputs.size())
+                        throw std::runtime_error("");
+                    u64_newton_interpolate_poly(inputs, px, mod);
+                }
             }
 
-            batched_label_coeffs.resize(items_per_split_);
+            batched_label_coeffs.resize(max_size);
             std::vector<u64> temp(items_per_batch_);
 
-            for (int s = 0; s < items_per_split_; ++s)
+            for (int s = 0; s < max_size; ++s)
             {
                 Plaintext& batched_coeff = batched_label_coeffs[s];
 
                 for (int b = 0; b < items_per_batch_; ++b)
                 {
-                    temp[b] = poly(b, s);
+                    if (poly_size[b] > s)
+                        temp[b] = poly(b, s);
+                    else
+                        temp[b] = 0;
                 }
 
                 batched_coeff.reserve(
@@ -601,14 +622,6 @@ namespace apsi
 
                 builder->compose(temp, batched_coeff);
                 evaluator->transform_to_ntt(batched_coeff);
-            }
-
-
-            if (test)
-            {
-                Plaintext x;
-                Plaintext r;
-                
             }
         }
 

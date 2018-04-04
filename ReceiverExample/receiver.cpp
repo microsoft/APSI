@@ -247,6 +247,9 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
     Creating the PSIParams class.
     */
     PSIParams params(item_bit_length, table_params, cuckoo_params, seal_params, oprf_type);
+    {
+        params.set_value_bit_count(20);
+    }
 
     // Check that the parameters are OK
     params.validate();
@@ -270,6 +273,7 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
         //// Insert random string
         //s1[i] = oc::mAesFixedKey.ecbEncBlock(oc::toBlock(i));
     }
+    oc::MatrixView<const u8> labels((u8*)s1.data(), s1.size(), sizeof(Item));
 
     // Receiver's dataset
     int receiversActualSize = 40;
@@ -293,7 +297,7 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
     stop_watch.set_time_point("Application preparation");
 
     // Now construct the sender's database
-    sender.load_db(s1);
+    sender.load_db(s1, labels);
     stop_watch.set_time_point("Sender pre-processing");
 
     // Start the sender's query session in a separate thread
