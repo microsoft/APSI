@@ -190,6 +190,7 @@ namespace apsi
             //vector<vector<Ciphertext>> resultVec(params_.split_count());
             //for (auto& v : resultVec) v.resize(params_.batch_count());
             vector<vector<Ciphertext> > powers(params_.batch_count());
+            Ciphertext zero;
 
             vector<pair<promise<void>, shared_future<void> > >
                 batch_powers_computed(params_.batch_count());
@@ -232,7 +233,7 @@ namespace apsi
 
                     // Check if we need to re-batch things. This happens if we do an update.
                     //sender_db_.batched_randomized_symmetric_polys(context);
-                    Encryptor enc(*seal_context_, session_context.public_key_, thread_context.pool());
+                    //Encryptor enc(*seal_context_, session_context.public_key_, thread_context.pool());
                     int start_block = i * total_blocks / total_thread_count_;
                     int end_block = (i + 1) * total_blocks / total_thread_count_;
 
@@ -267,26 +268,45 @@ namespace apsi
 
                             if (block.batched_label_coeffs.size() > 1)
                             {
-                                // label_result = coeff[1] * x^1;
-                                evaluator_->multiply_plain_ntt(powers[batch][1], block.batched_label_coeffs[1], label_results[curr_label]);
-                                for (int s = 2; s <= block.batched_label_coeffs.size(); s++)
+                                // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
+                                // Observe that the first call to mult is always multiplying coeff[0] by 1....
+
+                                // TODO: edge case where all block.batched_label_coeffs[s] are zero.
+
+                                // label_result = coeff[0] * x^0 = coeff[0];
+                                int s = 0;
+                                while (block.batched_label_coeffs[s].is_zero()) ++s;
+
+                                evaluator_->multiply_plain_ntt(powers[batch][s], block.batched_label_coeffs[s], label_results[curr_label]);
+                                for (; s < block.batched_label_coeffs.size(); s++)
                                 {
                                     // label_result += coeff[s] * x^s;
-                                    evaluator_->multiply_plain_ntt(powers[batch][s], block.batched_label_coeffs[s], tmp);
-                                    evaluator_->add(tmp, label_results[curr_label], label_results[curr_label ^ 1]);
-                                    curr_label ^= 1;
+                                    if (block.batched_label_coeffs[s].is_zero() == false)
+                                    {
+
+                                        evaluator_->multiply_plain_ntt(powers[batch][s], block.batched_label_coeffs[s], tmp);
+                                        evaluator_->add(tmp, label_results[curr_label], label_results[curr_label ^ 1]);
+                                        curr_label ^= 1;
+                                    }
                                 }
-                                // label_result += coeff[0];
-                                evaluator_->add_plain(label_results[curr_label], block.batched_label_coeffs[0], label_results[curr_label ^ 1]);
-                                curr_label ^= 1;
+                                //// label_result += coeff[0];
+                                //evaluator_->add_plain(label_results[curr_label], block.batched_label_coeffs[0], label_results[curr_label ^ 1]);
+                                //curr_label ^= 1;
                             }
                             else if (block.batched_label_coeffs.size())
                             {
-                                // label_result = coeff[0];
-                                enc.encrypt(block.batched_label_coeffs[0], label_results[curr_label]);
+                                // only reachable if user calls PSIParams.set_use_low_degree_poly(true);
+
+                                // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
+                                // Observe that the first call to mult is always multiplying coeff[0] by 1....
+
+                                // TODO: edge case where block.batched_label_coeffs[0] is zero. 
+
+                                evaluator_->multiply_plain_ntt(powers[batch][0], block.batched_label_coeffs[0], label_results[curr_label]);
                             }
                             else
                             {
+                                // only reachable if user calls PSIParams.set_use_low_degree_poly(true);
                                 // doesn't matter what we set... this will due.
                                 label_results[curr_label] = powers[batch][0];
                             }

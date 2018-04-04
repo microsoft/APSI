@@ -589,6 +589,28 @@ namespace apsi
                     }
                 }
 
+                if (params.use_low_degree_poly() == false)
+                {
+                    // pad the points to have max degree (split_size)
+                    // with (x,x) points where x is unique.
+
+                    std::unordered_set<u64> key_set;
+                    for (auto& xy : inputs)
+                        key_set.emplace(xy.first);
+
+                    u64 x = 0;
+                    while (inputs.size() != items_per_split_)
+                    {
+                        if (key_set.find(x) == key_set.end())
+                            inputs.push_back({ x,x });
+
+                        ++x;
+                    }
+
+                    max_size = inputs.size();
+                }
+
+
                 if (inputs.size())
                 {
                     max_size = std::max<int>(max_size, inputs.size());

@@ -210,22 +210,16 @@ namespace apsi
             return cuckoo_mode_; 
         }
 
-        inline int get_label_bit_count() const
-        {
-            return value_bit_length_;
-        }
-
-        inline int get_value_byte_count() const
-        {
-            return value_byte_length_;
-        }
-
-
+        inline int get_label_bit_count() const { return value_bit_length_; }
+        inline int get_value_byte_count() const { return value_byte_length_; }
         void set_value_bit_count(int bits)
         {
             value_bit_length_ = bits;
             value_byte_length_ = (bits + 7) / 8;
         }
+
+        bool use_low_degree_poly() const { return use_low_degree_poly_; }
+        void set_use_low_degree_poly(bool b) { use_low_degree_poly_ = b; }
 
     private:
         int log_table_size_;
@@ -249,6 +243,8 @@ namespace apsi
         cuckoo::CuckooMode cuckoo_mode_;
 
         int value_bit_length_ = 0, value_byte_length_ = 0;
+
+        bool use_low_degree_poly_ = false;
 
         seal::EncryptionParameters encryption_params_;
 
