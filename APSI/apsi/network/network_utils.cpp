@@ -85,6 +85,21 @@ namespace apsi
 		pubkey.load(ss);
 	}
 
+    void send_prvkey(const seal::SecretKey &k, oc::Channel &channel)
+    {
+        stringstream ss;
+        k.save(ss);
+        channel.asyncSend(std::move(ss.str()));
+    }
+
+    void receive_prvkey(seal::SecretKey &k, oc::Channel &channel)
+    {
+        string buff;
+        channel.recv(buff);
+        stringstream ss(buff);
+        k.load(ss);
+    }
+
 	void send_item(const apsi::Item &item, Channel &channel)
 	{
 		static_assert(sizeof(apsi::Item) == sizeof(block), "");

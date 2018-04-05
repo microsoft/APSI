@@ -211,7 +211,7 @@ namespace apsi
         }
 
         inline int get_label_bit_count() const { return value_bit_length_; }
-        inline int get_value_byte_count() const { return value_byte_length_; }
+        inline int get_label_byte_count() const { return value_byte_length_; }
         void set_value_bit_count(int bits)
         {
             value_bit_length_ = bits;

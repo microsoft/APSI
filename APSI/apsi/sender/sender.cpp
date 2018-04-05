@@ -161,6 +161,13 @@ namespace apsi
             receive_evalkeys(eval, chl);
             SenderSessionContext session_context(seal_context_, pub, eval);
 
+            if (true)
+            {
+                seal::SecretKey k;
+                receive_prvkey(k, chl);
+                session_context.set_secret_key(k);
+            }
+
             /* Receive client's query data. */
             int num_of_powers = 0;
             chl.recv(num_of_powers);
@@ -184,10 +191,13 @@ namespace apsi
 
         void Sender::debug_decrypt(
             SenderSessionContext &session_context,
-            Ciphertext& c,
+            const Ciphertext& c,
             std::vector<u64>& dest)
         {
             Plaintext p;
+            if (!session_context.decryptor_)
+                throw std::runtime_error(LOCATION);
+
             session_context.decryptor_->decrypt(c, p);
 
             if (true)
@@ -206,24 +216,54 @@ namespace apsi
             }
         }
 
-        u64 pow(u64 x, u64 p)
+        u64 pow(u64 x, u64 p, const seal::SmallModulus& mod)
         {
             u64 r = 1;
-            while (p)
+            while (p--)
             {
-                r *= x;
+                r = (r * x) % mod.value();
             }
             return x;
         }
         std::vector<oc::u64> Sender::debug_eval_term(int term, oc::MatrixView<u64> coeffs, oc::span<u64> x, const seal::SmallModulus& mod)
         {
 
+            std::vector<u64> r(x.size());
+
             for (int i = 0; i < x.size(); ++i)
             {
-                auto xx = pow(x[i], term);
+                auto xx = pow(x[i], term, mod);
 
+                r[i] = (xx * coeffs(term, i)) % mod.value();
             }
 
+        }
+
+
+        bool Sender::debug_not_equals(span<u64> true_x, const Ciphertext& c, SenderSessionContext& ctx)
+        {
+            std::vector<u64> cc;
+            debug_decrypt(ctx, c, cc);
+
+            for (int i = 0; i < true_x.size(); ++i)
+            {
+                if (true_x[i] != cc[i])
+                    return false;
+            }
+
+            return true_x.size() == cc.size();
+        }
+
+
+        std::vector<u64> add(span<u64> x, span<u64> y, const seal::SmallModulus& mod)
+        {
+            std::vector<u64> r(x.size());
+            for (int i = 0; i < r.size(); ++i)
+            {
+                r[i] = x[i] + y[i] % mod.value();
+            }
+
+            return r;
         }
 
         void Sender::respond(
@@ -245,7 +285,8 @@ namespace apsi
             int	splitStep = params_.batch_count() * split_size_plus_one;
             int total_blocks = params_.split_count() * params_.batch_count();
 
-            //std::vector<std::vector<u64>> plain_query(params_.batch_count());
+            std::vector<std::vector<u64>> debug_query(params_.batch_count());
+            auto& plain_mod = params_.encryption_params().plain_modulus();
 
             mutex mtx;
             vector<thread> thread_pool(session_thread_count_);
@@ -273,8 +314,8 @@ namespace apsi
                         compute_batch_powers(batch, query, powers[batch], session_context, thread_context);
                         batch_powers_computed[batch].first.set_value();
 
-                        //plain_query[batch].resize(params_.batch_size());
-                        //debug_decrypt(session_context, powers[batch][1], plain_query[batch]);
+                        debug_query[batch].resize(params_.batch_size());
+                        debug_decrypt(session_context, powers[batch][1], debug_query[batch]);
                     }
 
                     for (auto& b : batch_powers_computed)
@@ -294,7 +335,7 @@ namespace apsi
                     // one is used as a temp. Their roles switch each iteration. Saved needing to make a 
                     // copy in eval->add(...)
                     array<Ciphertext, 2> runningResults, label_results;
-                    //std::vector<u64> debug_label_results(params_.batch_size());
+                    
 
                     for (int block_idx = start_block; block_idx < end_block; block_idx++)
                     {
@@ -337,20 +378,31 @@ namespace apsi
 
                                 evaluator_->multiply_plain_ntt(powers[batch][s], block.batched_label_coeffs[s], label_results[curr_label]);
 
+                                // debug
+                                std::vector<u64> debug_label_results = debug_eval_term(s, block.label_coeffs, debug_query[batch], plain_mod);
+                                if (debug_not_equals(debug_label_results, label_results[curr_label], session_context))
+                                    throw std::runtime_error(LOCATION);
 
-                                auto& mod = params_.encryption_params().plain_modulus();
-
-                                //auto debug_result = debug_eval_term(s, block.label_coeffs, plain_query[batch], mod);
-
-                                for (; s < block.batched_label_coeffs.size(); s++)
+                                while(++s < block.batched_label_coeffs.size())
                                 {
                                     // label_result += coeff[s] * x^s;
                                     if (block.batched_label_coeffs[s].is_zero() == false)
                                     {
-
                                         evaluator_->multiply_plain_ntt(powers[batch][s], block.batched_label_coeffs[s], tmp);
                                         evaluator_->add(tmp, label_results[curr_label], label_results[curr_label ^ 1]);
                                         curr_label ^= 1;
+
+
+                                        // debug
+                                        {
+                                            auto debug_term = debug_eval_term(s, block.label_coeffs, debug_query[batch], plain_mod);
+                                            if (debug_not_equals(debug_term, tmp, session_context))
+                                                throw std::runtime_error(LOCATION);
+
+                                            debug_label_results = add(debug_label_results, debug_term, plain_mod);
+                                            if (debug_not_equals(debug_label_results, label_results[curr_label], session_context))
+                                                throw std::runtime_error(LOCATION);
+                                        }
                                     }
                                 }
                                 //// label_result += coeff[0];

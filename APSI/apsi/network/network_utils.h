@@ -3,6 +3,7 @@
 #include "seal/ciphertext.h"
 #include "seal/evaluationkeys.h"
 #include "seal/publickey.h"
+#include "seal/secretkey.h"
 #include "seal/plaintext.h"
 #include "cryptoTools/Network/Channel.h"
 #include "apsi/item.h"
@@ -25,9 +26,13 @@ namespace apsi
 
 	void receive_evalkeys(seal::EvaluationKeys &keys, oc::Channel &channel);
 
-	void send_pubkey(const seal::PublicKey &pubkey, oc::Channel &channel);
+    void send_pubkey(const seal::PublicKey &pubkey, oc::Channel &channel);
 
-	void receive_pubkey(seal::PublicKey &pubkey, oc::Channel &channel);
+    void receive_pubkey(seal::PublicKey &pubkey, oc::Channel &channel);
+
+    void send_prvkey(const seal::SecretKey &k, oc::Channel &channel);
+
+    void receive_prvkey(seal::SecretKey &k, oc::Channel &channel);
 
 	void send_item(const apsi::Item &item, oc::Channel &channel);
 

@@ -24,6 +24,7 @@
 
 // CryptoTools
 #include "cryptoTools/Network/Channel.h"
+#include "cryptoTools/Common/Matrix.h"
 
 namespace apsi
 {
@@ -40,7 +41,7 @@ namespace apsi
             is a same-size vector of bool values. If an item is in the intersection, the corresponding bool value is true on the
             same position in the result vector .
             */
-            std::vector < std::pair<int, seal::util::ExFieldElement >> query(std::vector<Item> &items, oc::Channel& chl);
+            std::pair<std::vector<bool>, oc::Matrix<u8>> query(std::vector<Item> &items, oc::Channel& chl);
 
             /**
             Preprocesses the PSI items. Returns the powr map of the items, and the indices of them in the hash table.
@@ -104,12 +105,10 @@ namespace apsi
             @result Matrix of size (#splits x table_size_ceiling). Here table_size_ceiling is defined as (#batches x batch_size), which might be
             larger than table_size.
             */
-            void stream_decrypt(
+            std::pair<std::vector<bool>, oc::Matrix<u8>> stream_decrypt(
                 oc::Channel &channel,
-                std::vector<std::vector<seal::util::ExFieldElement>> &result,
-                std::vector<std::vector<seal::util::ExFieldElement>> &lresult,
-                seal::util::Pointer& backing,
-                seal::util::Pointer& lbacking);
+                const std::vector<int>& table_to_input_map,
+                 int set_size);
 
             /**
             Stream decryption of ciphers from the sender. Ciphertext will be acquired from the sender in a streaming fashion one by one in
@@ -127,7 +126,12 @@ namespace apsi
             */
             void decrypt(const seal::Ciphertext &cipher, seal::Plaintext &plain);
 
-            void decrypt(seal::Ciphertext &tmp, seal::Plaintext &p, std::vector<uint64_t> &integer_batch, std::vector<seal::util::ExFieldElement> & rr, int batch_idx, int slot_count, std::vector<seal::util::ExFieldElement> &batch);
+            void decrypt(
+                seal::Ciphertext &tmp, 
+                std::vector<bool> & rr, 
+                seal::Plaintext &p, 
+                std::vector<uint64_t> &integer_batch, 
+                std::vector<seal::util::ExFieldElement> &batch);
 
 
             /**

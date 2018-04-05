@@ -136,7 +136,7 @@ namespace apsi
 
         void SenderDB::add_data(oc::span<const Item> data, oc::MatrixView<const u8> values, int thread_count)
         {
-            if (values.stride() != 0 && values.stride() != params_.get_value_byte_count())
+            if (values.stride() != 0 && values.stride() != params_.get_label_byte_count())
                 throw std::invalid_argument("values.stride()");
 
             vector<thread> thrds(thread_count);
@@ -214,7 +214,7 @@ namespace apsi
                             if (values.size())
                             {
                                 auto dest = db_block.get_label(pos);
-                                memcpy(dest, values[i].data(), params_.get_value_byte_count());
+                                memcpy(dest, values[i].data(), params_.get_label_byte_count());
                             }
                         }
                     };

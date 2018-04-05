@@ -1,5 +1,6 @@
 #include <iostream>
 #include <string>
+#include <iomanip>
 #include <fstream>
 #include <vector>
 
@@ -160,6 +161,18 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+std::string print(span<u8> s)
+{
+    std::stringstream ss;
+    for (int i = 0; i < s.size(); ++i)
+    {
+        ss << (i ? ", " : "{ ") << std::setw(2) << std::setfill('0') << std::hex<< s[i];
+    }
+
+    ss << " }";
+    return ss.str();
+}
+
 void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
 {
     print_example_banner("Example: Fast batching");
@@ -308,45 +321,44 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
     // Receiver's query
-    vector<std::pair<int, ExFieldElement>> intersection = receiver.query(c1, recvChl);
+    auto intersection = receiver.query(c1, recvChl);
     senderQuerySessionTh.join();
 
 
     // Done with everything. Print the results!
     bool correct = true;
 
-    std::unordered_map<int, ExFieldElement> in(intersection.begin(), intersection.end());
+    //std::unordered_map<int, ExFieldElement> in(intersection.begin(), intersection.end());
     for (int i = 0; i < c1.size(); i++)
     {
-        auto f = in.find(i);
 
         if (i < intersectionSize)
         {
-            if (f == in.end())
+            if (intersection.first[i] == false)
             {
                 cout << "Miss result for receiver's item at index: " << i << endl;  
                 correct = false;
             }
             else
             {
-                if (f->second[0] != i)
+                auto label = intersection.second[i];
+                if (memcmp(label.data(), &i, label.size()))
                 {
-                    std::cout << "incorrect label at index: " << i << ". actual: " << f->second[0] << ", expected: " << i << std::endl;
+                    std::cout << "incorrect label at index: " << i << ". actual: " << print(label) << ", expected: " << i << std::endl;
                 }
             }
         }
         else
         {
-            if (f != in.end())
+            if (intersection.first[i])
             {
                 cout << "Incorrect result for receiver's item at index: " << i << endl;
                 correct = false;
             }
         }
     }
-    correct &= intersection.size() == intersectionSize;
 
-    cout << "Intersection results: " << (correct ? "Correct" : "Incorrect") << " " << intersection.size() <<" =? "<< intersectionSize << endl;
+    cout << "Intersection results: " << (correct ? "Correct" : "Incorrect") << endl;
 
     //cout << '[';
     //for (int i = 0; i < intersection.size(); i++)
@@ -533,17 +545,17 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     thrd.join();
 
     cout << "Intersection result: ";
-    bool correct = true;
-    for (int i = 0; i < intersection.size(); i++)
-    {
-        if (intersection[i].first != (i < intersectionSize))
-        {
-            cout << "Incorrect result for receiver's item at index: " << i << endl;
-            correct = false;
-        }
-    }
-    correct &= intersection.size() == intersectionSize;
-    cout << (correct ? "correct" : "incorrect") << endl;
+    //bool correct = true;
+    //for (int i = 0; i < intersection.size(); i++)
+    //{
+    //    if (intersection[i].first != (i < intersectionSize))
+    //    {
+    //        cout << "Incorrect result for receiver's item at index: " << i << endl;
+    //        correct = false;
+    //    }
+    //}
+    //correct &= intersection.size() == intersectionSize;
+    //cout << (correct ? "correct" : "incorrect") << endl;
 
     //cout << "Intersection result: ";
     //cout << '[';
