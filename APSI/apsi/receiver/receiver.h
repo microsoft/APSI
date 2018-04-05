@@ -108,7 +108,7 @@ namespace apsi
             std::pair<std::vector<bool>, oc::Matrix<u8>> stream_decrypt(
                 oc::Channel &channel,
                 const std::vector<int>& table_to_input_map,
-                 int set_size);
+                std::vector<Item>& items);
 
             /**
             Stream decryption of ciphers from the sender. Ciphertext will be acquired from the sender in a streaming fashion one by one in

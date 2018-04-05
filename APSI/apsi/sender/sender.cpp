@@ -96,9 +96,9 @@ namespace apsi
             prng_.SetSeed(oc::ZeroBlock);
         }
 
-        void Sender::load_db(const vector<Item> &data, oc::MatrixView<const u8> vals)
+        void Sender::load_db(const vector<Item> &data, oc::MatrixView<u8> vals)
         {
-            sender_db_.set_data(data, total_thread_count_);
+            sender_db_.set_data(data, vals, total_thread_count_);
             stop_watch.set_time_point("Sender set-data");
 
             // Compute symmetric polys and batch
@@ -225,18 +225,32 @@ namespace apsi
             }
             return x;
         }
-        std::vector<oc::u64> Sender::debug_eval_term(int term, oc::MatrixView<u64> coeffs, oc::span<u64> x, const seal::SmallModulus& mod)
+        std::vector<oc::u64> Sender::debug_eval_term(
+            int term, 
+            oc::MatrixView<u64> coeffs, 
+            oc::span<u64> x, 
+            const seal::SmallModulus& mod, 
+            bool print)
         {
+            if (x.size() != coeffs.rows())
+                throw std::runtime_error(LOCATION);
 
             std::vector<u64> r(x.size());
 
             for (int i = 0; i < x.size(); ++i)
             {
                 auto xx = pow(x[i], term, mod);
-
+                
                 r[i] = (xx * coeffs(term, i)) % mod.value();
+
+                if (i == 0 && print)
+                {
+                    std::cout << xx << " * " << coeffs(term, i) << " -> " << r[i]  << " " << term << std::endl;
+                }
             }
 
+
+            return r;
         }
 
 
@@ -376,12 +390,18 @@ namespace apsi
                                 int s = 0;
                                 while (block.batched_label_coeffs[s].is_zero()) ++s;
 
+
                                 evaluator_->multiply_plain_ntt(powers[batch][s], block.batched_label_coeffs[s], label_results[curr_label]);
 
                                 // debug
-                                std::vector<u64> debug_label_results = debug_eval_term(s, block.label_coeffs, debug_query[batch], plain_mod);
-                                if (debug_not_equals(debug_label_results, label_results[curr_label], session_context))
-                                    throw std::runtime_error(LOCATION);
+                                //bool print = batch == 0 && split == 0;
+                                //std::vector<u64> debug_label_results = debug_eval_term(s, block.label_coeffs, debug_query[batch], plain_mod, print);
+                                //if (debug_not_equals(debug_label_results, label_results[curr_label], session_context))
+                                //    throw std::runtime_error(LOCATION);
+
+                                //if(debug_label_results.size() != params_.batch_size())
+                                //    throw std::runtime_error(LOCATION);
+
 
                                 while(++s < block.batched_label_coeffs.size())
                                 {
@@ -394,17 +414,19 @@ namespace apsi
 
 
                                         // debug
-                                        {
-                                            auto debug_term = debug_eval_term(s, block.label_coeffs, debug_query[batch], plain_mod);
-                                            if (debug_not_equals(debug_term, tmp, session_context))
-                                                throw std::runtime_error(LOCATION);
+                                        //{
+                                        //    auto debug_term = debug_eval_term(s, block.label_coeffs, debug_query[batch], plain_mod, print);
+                                        //    if (debug_not_equals(debug_term, tmp, session_context))
+                                        //        throw std::runtime_error(LOCATION);
 
-                                            debug_label_results = add(debug_label_results, debug_term, plain_mod);
-                                            if (debug_not_equals(debug_label_results, label_results[curr_label], session_context))
-                                                throw std::runtime_error(LOCATION);
-                                        }
+                                        //    debug_label_results = add(debug_label_results, debug_term, plain_mod);
+                                        //    if (debug_not_equals(debug_label_results, label_results[curr_label], session_context))
+                                        //        throw std::runtime_error(LOCATION);
+                                        //}
                                     }
                                 }
+
+
                                 //// label_result += coeff[0];
                                 //evaluator_->add_plain(label_results[curr_label], block.batched_label_coeffs[0], label_results[curr_label ^ 1]);
                                 //curr_label ^= 1;

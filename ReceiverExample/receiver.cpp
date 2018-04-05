@@ -280,13 +280,14 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
 
     // Sender's dataset
     vector<Item> s1(sendersActualSize);
+    oc::Matrix<u8> labels(sendersActualSize, params.get_label_byte_count());
     for (int i = 0; i < s1.size(); i++)
     {
         s1[i] = i;
+        memcpy(labels[i].data(), &s1[i], labels[i].size());
         //// Insert random string
         //s1[i] = oc::mAesFixedKey.ecbEncBlock(oc::toBlock(i));
     }
-    oc::MatrixView<const u8> labels((u8*)s1.data(), s1.size(), sizeof(Item));
 
     // Receiver's dataset
     int receiversActualSize = 40;
@@ -341,10 +342,14 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
             }
             else
             {
+                u64 l = 0, exp = *(u64*)&c1[i];
                 auto label = intersection.second[i];
-                if (memcmp(label.data(), &i, label.size()))
+                memcpy(&l, label.data(), label.size());
+                
+
+                if (l != exp)
                 {
-                    std::cout << "incorrect label at index: " << i << ". actual: " << print(label) << ", expected: " << i << std::endl;
+                    std::cout << "incorrect label at index: " << i << ". actual: " << print(label) <<" " << l << ", expected: " << exp << std::endl;
                 }
             }
         }

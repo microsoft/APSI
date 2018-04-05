@@ -122,7 +122,7 @@ namespace apsi
             set_data(data, {}, thread_count);
         }
 
-        void SenderDB::set_data(oc::span<const Item> data, oc::MatrixView<const u8> vals, int thread_count)
+        void SenderDB::set_data(oc::span<const Item> data, oc::MatrixView<u8> vals, int thread_count)
         {
             clear_db();
             add_data(data, vals, thread_count);
@@ -134,7 +134,7 @@ namespace apsi
             add_data(data, {}, thread_count);
         }
 
-        void SenderDB::add_data(oc::span<const Item> data, oc::MatrixView<const u8> values, int thread_count)
+        void SenderDB::add_data(oc::span<const Item> data, oc::MatrixView<u8> values, int thread_count)
         {
             if (values.stride() != 0 && values.stride() != params_.get_label_byte_count())
                 throw std::invalid_argument("values.stride()");
@@ -207,6 +207,7 @@ namespace apsi
                             auto pos = block_pos.second;
 
                             db_block.get_key(pos) = key;
+
                             //std::cout << "key " << key << " -> block ("
                             //    << db_block.batch_idx_ << ", " << db_block.split_idx_ << ") "
                             //    << " @ " << pos.batch_offset << " " << pos.split_offset << std::endl;
@@ -602,7 +603,7 @@ namespace apsi
                     while (inputs.size() != items_per_split_)
                     {
                         if (key_set.find(x) == key_set.end())
-                            inputs.push_back({ x,x });
+                            inputs.push_back({ x, 1 });
 
                         ++x;
                     }
@@ -645,6 +646,128 @@ namespace apsi
                 builder->compose(temp, batched_coeff);
                 evaluator->transform_to_ntt(batched_coeff);
             }
+
+
+            //test_eval(context, mod, evaluator, builder, params);
+        }
+
+        std::vector<u64> add_(span<u64> x, span<u64> y, const seal::SmallModulus& mod)
+        {
+            std::vector<u64> r(x.size());
+            for (int i = 0; i < r.size(); ++i)
+            {
+                r[i] = x[i] + y[i] % mod.value();
+            }
+
+            return r;
+        }
+
+        u64 pow_(u64 x, u64 p, const seal::SmallModulus& mod)
+        {
+            u64 r = 1;
+            while (p--)
+            {
+                r = (r * x) % mod.value();
+            }
+            return x;
+        }
+
+        std::vector<oc::u64> debug_eval_term(
+            int term,
+            oc::MatrixView<u64> coeffs,
+            oc::span<u64> x,
+            const seal::SmallModulus& mod)
+        {
+            if (x.size() != coeffs.rows())
+                throw std::runtime_error(LOCATION);
+
+            std::vector<u64> r(x.size());
+
+            for (int i = 0; i < x.size(); ++i)
+            {
+                auto xx = pow_(x[i], term, mod);
+
+                r[i] = (xx * coeffs(term, i)) % mod.value();
+
+                //if (i == 0 && print)
+                //{
+                //    std::cout << xx << " * " << coeffs(term, i) << " -> " << r[i] << " " << term << std::endl;
+                //}
+            }
+
+
+            return r;
+        }
+
+        void print_poly(int b, MatrixView<u64> polys)
+        {
+            std::cout << "P" << b << "(x) = ";
+            for (u64 i = polys.stride(); i != -1 ; --i)
+            {
+                std::cout << polys(b, i) << " * x^" << i << " " << (i? " + " :"");
+            }
+            std::cout << std::endl;
+        }
+
+        void DBBlock::test_eval(
+            SenderThreadContext & context,
+            const seal::SmallModulus & plain_mod,
+            shared_ptr<seal::Evaluator> evaluator,
+            shared_ptr<seal::PolyCRTBuilder>& builder,
+            const PSIParams & params)
+        {
+
+
+            //for (int i = 0; i < items_per_split_; ++i)
+            //{
+            //    std::vector<u64> debug_query(items_per_batch_, 0);
+
+            //    for (int b = 0; b < items_per_batch_; ++b)
+            //    {
+            //        if (has_item({ b,i }))
+            //        {
+            //            debug_query[b] = get_key_u64({ b,i });
+            //        }
+
+            //    }
+
+            //    int s = 0;
+            //    while (batched_label_coeffs[s].is_zero()) ++s;
+
+            //    // evaluator->multiply_plain_ntt(powers[batch][s], batched_label_coeffs[s], label_results[curr_label]);
+            //    // debug
+            //    std::vector<u64> debug_label_results = debug_eval_term(s, label_coeffs, debug_query, plain_mod);
+
+
+            //    while (++s < batched_label_coeffs.size())
+            //    {
+            //        // label_result += coeff[s] * x^s;
+            //        if (batched_label_coeffs[s].is_zero() == false)
+            //        {
+            //            auto debug_term = debug_eval_term(s, label_coeffs, debug_query, plain_mod);
+            //            debug_label_results = add_(debug_label_results, debug_term, plain_mod);
+            //        }
+            //    }
+
+
+            //    for (int b = 0; b < items_per_batch_; ++b)
+            //    {
+            //        if (has_item({ b,i }))
+            //        {
+            //            u64 label = get_label_u64({ b,i });
+            //            if (debug_label_results[b] != label)
+            //            {
+            //                
+            //                std::cout << "block(" << batch_idx_ << ", " << split_idx_ << ") @ " << b << " " << i<<std::endl;
+            //                print_poly(b, label_coeffs);
+            //                std::cout << "P" << b << "(" << debug_query[b] << ") = " << debug_label_results[b] << "      exp " << label << std::endl;
+            //                //throw std::runtime_error(LOCATION);
+            //            }
+            //        }
+            //    }
+
+            //}
+
         }
 
         //void SenderDB::save(ostream &stream) const

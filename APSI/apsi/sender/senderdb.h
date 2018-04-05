@@ -115,6 +115,14 @@ namespace apsi
                 const PSIParams& params);
 
 
+            void test_eval(
+                SenderThreadContext & context,
+                const seal::SmallModulus& mod,
+                shared_ptr <seal::Evaluator > evaluator,
+                shared_ptr<seal::PolyCRTBuilder>& builder,
+                const PSIParams& params);
+
+
             void check(const Position& pos);
 
             bool has_item(const Position& pos)
@@ -144,6 +152,20 @@ namespace apsi
                 return &label_data_[pos.batch_offset * items_per_split_ + pos.split_offset];
             }
 
+            u64 get_key_u64(const Position& pos)
+            {
+                auto& i = get_key(pos);
+                return *(u64*)&i;
+            }
+
+            u64 get_label_u64(const Position& pos)
+            {
+                auto l = get_label(pos);
+                u64 r = 0;
+                memcpy(&r, l, value_byte_length_);
+                return r;
+            }
+
             void clear();
         };
 
@@ -162,14 +184,14 @@ namespace apsi
             Sets the sender's database by hashing the data items with all hash functions.
             */
             void set_data(oc::span<const Item> keys, int thread_count);
-            void set_data(oc::span<const Item> keys, oc::MatrixView<const u8> values, int thread_count);
+            void set_data(oc::span<const Item> keys, oc::MatrixView<u8> values, int thread_count);
 
 
             /**
             Adds the data items to sender's database.
             */
             void add_data(oc::span<const Item> keys, int thread_count);
-            void add_data(oc::span<const Item> keys, oc::MatrixView<const u8> values, int thread_count);
+            void add_data(oc::span<const Item> keys, oc::MatrixView<u8> values, int thread_count);
 
             /**
             Adds one item to sender's database.

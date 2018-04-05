@@ -88,7 +88,7 @@ namespace apsi
             //std::vector<int> cuckoo_position;
             //vector<ExFieldElement> result, labels;
             //Pointer backing, label_bacing;
-            auto intersection = stream_decrypt(chl, table_to_input_map, items.size());
+            auto intersection = stream_decrypt(chl, table_to_input_map, items);
             //stop_watch.set_time_point("receiver decrypt");
 
             //ExFieldElement zero(ex_field_);
@@ -415,7 +415,7 @@ namespace apsi
         std::pair<std::vector<bool>, oc::Matrix<u8>> Receiver::stream_decrypt(
             oc::Channel &channel,
             const std::vector<int>& table_to_input_map,
-            int set_size)
+            std::vector<Item>& items)
         {
             //vector<vector<ExFieldElement>> result;
             //vector<vector<ExFieldElement>> labels;
@@ -426,10 +426,10 @@ namespace apsi
             auto& ret_labels = ret.second;
 
 
-            ret_bools.resize(set_size, false);
+            ret_bools.resize(items.size(), false);
 
             if (params_.get_label_bit_count())
-                ret_labels.resize(set_size, params_.get_label_byte_count());
+                ret_labels.resize(items.size(), params_.get_label_byte_count());
 
             //ret.reserve(params_.)
             //vector<vector<Plaintext>> plaintext_matrix;
@@ -515,7 +515,7 @@ namespace apsi
                             has_result = true;
                             auto idx = table_to_input_map[base_idx + k];
 
-                            std::cout << "hit @ " << idx << " " << k << " " << base_idx + k << std::endl;
+                            //std::cout << "hit   "<< items[idx] <<" @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << std::endl;
                             ret_bools[idx] = true;
                         }
 
@@ -546,7 +546,7 @@ namespace apsi
                         {
                             auto idx = table_to_input_map[base_idx + k];
 
-                            std::cout << "label @ " << idx << " " << k << " " << base_idx + k  << "  ~  " << integer_batch[k] << std::endl;
+                            //std::cout << "label["<< idx<<"] " << items[idx] << " @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << "  ~  " <<std::hex<< integer_batch[k] <<std::dec << std::endl;
                             auto dest = &ret_labels(idx, 0);
                             u8* src;
                             if (short_strings)

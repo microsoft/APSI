@@ -53,7 +53,7 @@ namespace apsi
             Loads the input data into sender's database, and precomputes all necessary components for the PSI protocol,
             including symmetric polynomials, batching, etc.
             */
-            void load_db(const std::vector<Item> &data, oc::MatrixView<const u8> vals = {});
+            void load_db(const std::vector<Item> &data, oc::MatrixView<u8> vals = {});
 
             void query_session(oc::Channel& channel);
 
@@ -159,8 +159,16 @@ namespace apsi
                 const seal::Ciphertext& c,
                 std::vector<oc::u64>& dest);
 
-            std::vector<oc::u64> Sender::debug_eval_term(int term, oc::MatrixView<apsi::u64> coeffs, oc::span<oc::u64> x, const seal::SmallModulus& mod);
-            bool Sender::debug_not_equals(oc::span<u64> true_x, const seal::Ciphertext& c, SenderSessionContext& ctx);
+            std::vector<oc::u64> Sender::debug_eval_term(
+                int term, oc::MatrixView<apsi::u64> coeffs, 
+                oc::span<oc::u64> x,
+                const seal::SmallModulus& mod,
+                bool print = false);
+
+            bool Sender::debug_not_equals(
+                oc::span<u64> true_x,
+                const seal::Ciphertext& c,
+                SenderSessionContext& ctx);
 
         };
     }
