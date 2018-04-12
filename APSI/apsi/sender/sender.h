@@ -154,18 +154,18 @@ namespace apsi
 
 
 
-            void Sender::debug_decrypt(
+            void debug_decrypt(
                 SenderSessionContext &session_context,
                 const seal::Ciphertext& c,
                 std::vector<oc::u64>& dest);
 
-            std::vector<oc::u64> Sender::debug_eval_term(
+            std::vector<oc::u64> debug_eval_term(
                 int term, oc::MatrixView<apsi::u64> coeffs, 
                 oc::span<oc::u64> x,
                 const seal::SmallModulus& mod,
                 bool print = false);
 
-            bool Sender::debug_not_equals(
+            bool debug_not_equals(
                 oc::span<u64> true_x,
                 const seal::Ciphertext& c,
                 SenderSessionContext& ctx);

@@ -566,7 +566,6 @@ namespace apsi
 
                         if (key_item[1] || key_item[0] >= mod.value())
                         {
-                            std::cout << get_key(pos) << std::endl;
                             std::cout << key_item[0] << " " << key_item[1] << std::endl;
 
                             throw std::runtime_error("key too large");

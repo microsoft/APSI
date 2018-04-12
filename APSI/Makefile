@@ -2,17 +2,17 @@
 SRC_DIRS=apsi apsi/network apsi/receiver apsi/sender apsi/tools
 BIN_DIR=../bin
 OBJ_DIR=obj
-INCLUDE_DIRS=. ../../cryptoTools/thirdparty/boost ../../Cuckoo/Cuckoo ../../SEAL-dev/SEAL ../../cryptoTools ../../cryptoTools/thirdparty/linux/miracl
+INCLUDE_DIRS=. ../../cryptoTools/thirdparty/boost ../../Cuckoo/Cuckoo ../../SEAL-dev/SEAL ../../cryptoTools ../../cryptoTools/thirdparty/linux/miracl ../../flint2
 SRCS=$(wildcard *.cpp) $(foreach d,$(SRC_DIRS),$(wildcard $d/*.cpp))
 OBJS=$(SRCS:%.cpp=$(OBJ_DIR)/%.o)
 DEPS=$(OBJS:.o=.d)
 INSTALL_DIR=APSI
 APSILIB=libapsi.a
 CXX=g++
-CXXFLAGS=-O3 -g -DHAVE_CONFIG -march=native -std=c++14  -maes -msse2 -msse4.1 -mpclmul
+CXXFLAGS=-Ofast -g -DHAVE_CONFIG -march=native -std=c++14  -maes -msse2 -msse4.1 -mpclmul
 PREFIX=/usr/local
-LDFLAGS=-lseal -lboost_system -lcuckoo -lpthread -lcryptoTools -lmiracl
-LIBRARY_PATHS=../../SEAL-dev/bin ../../Cuckoo/bin ../../cryptoTools/thirdparty/linux/boost/stage/lib ../../cryptoTools/lib ../../cryptoTools/thirdparty/linux/miracl/miracl/source
+LDFLAGS=-lseal -lboost_system -lcuckoo -lpthread -lcryptoTools -lmiracl -lflint -lgmp
+LIBRARY_PATHS=../../SEAL-dev/bin ../../Cuckoo/bin ../../cryptoTools/thirdparty/linux/boost/stage/lib ../../cryptoTools/lib ../../cryptoTools/thirdparty/linux/miracl/miracl/source ../../flint2/lib
 
 .PHONY : all clean install uninstall
 
