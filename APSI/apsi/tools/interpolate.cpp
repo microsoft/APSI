@@ -1,5 +1,6 @@
-#include "interpolate.h"
 #include "seal/util/polyarithsmallmod.h"
+#include "apsi/tools/interpolate.h"
+#include "apsi/ffield/ffield.h"
 
 using namespace std;
 using namespace seal;
@@ -65,6 +66,63 @@ namespace apsi
                 result.set(j + 1, result.get(j));
             }
             result.set_zero(0);
+            for (size_t j = 0; j < i; j++) 
+            {
+                result.set(j, result.get(j) - points.get(size - 1 - i) * result.get(j + 1));
+            }
+            result.set(0, result.get(0) + divided_differences[0].get(size - 1 - i));
+        }
+    }
+
+    void ffield_newton_interpolate_poly(
+        const FFieldArray &points, const FFieldArray &values,
+        FFieldPoly& result)
+    {
+#ifndef NDEBUG
+        if(points.size() != values.size())
+        {   
+            throw invalid_argument("incompatible array sizes");
+        }
+        if(points.field() != values.field() || result.field() != points.field())
+        {
+           throw invalid_argument("incompatible fields"); 
+        } 
+#endif
+        result.set_zero();
+
+        auto size = points.size();
+        auto field = points.field();
+
+        FFieldElt numerator(field);
+        FFieldElt denominator(field);
+
+        vector<FFieldArray> divided_differences;
+        for(size_t i = 0; i < size; i++)
+        {
+            divided_differences.emplace_back(field, size - i);
+            divided_differences[i].set(0, values.get(i));
+        }
+
+        for(size_t j = 0; j < size; j++)
+        {
+            for(size_t i = 0; i < size - j; i++)
+            {
+                numerator = divided_differences[i + 1].get(j - 1) - divided_differences[i].get(j - 1);
+                denominator = points.get(i + j) - points.get(i);
+                divided_differences[i].set(j, numerator / denominator);
+            }
+        }
+
+        // Horner's method
+        result.set(0, divided_differences[0].get(size - 1));
+        auto zero = field->zero(); 
+        for(size_t i = 1; i < size; i++)
+        {
+            for(int64_t j = i - 1; j >= 0; j--)
+            {
+                result.set(j + 1, result.get(j));
+            }
+            result.set(0, zero);
             for (size_t j = 0; j < i; j++) 
             {
                 result.set(j, result.get(j) - points.get(size - 1 - i) * result.get(j + 1));

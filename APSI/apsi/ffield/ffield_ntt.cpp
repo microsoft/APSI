@@ -135,8 +135,7 @@ namespace apsi
 
     bool FFieldNTT::is_primitive_root(FFieldElt zeta) const
     {
-        FFieldElt one(field_);
-        one.set_one();
+        FFieldElt one(field_->one());
         zeta ^= (n_ / 2);
         return !(zeta + one).is_zero() && ((zeta^2) + one).is_zero();
     }

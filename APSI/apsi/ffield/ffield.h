@@ -34,6 +34,7 @@ namespace apsi
     using _ffield_array_t = fq_nmod_struct *;
     using _ffield_array_elt_t = fq_nmod_struct;
     using _ffield_poly_t = fq_nmod_poly_t;
+    using _ffield_poly_coeff_t = nmod_poly_struct;
     using _ffield_poly_array_t = fq_nmod_poly_struct *;
     using _ffield_poly_array_elt_t = fq_nmod_poly_struct;
    
@@ -106,7 +107,9 @@ namespace apsi
         }
     }
 
-    class FField
+    class FFieldElt;
+
+    class FField : public std::enable_shared_from_this<FField>
     {
         friend class FFieldElt;
         friend class FFieldArray;
@@ -168,6 +171,10 @@ namespace apsi
         {
             return !operator ==(compare);
         }
+
+        FFieldElt zero();
+
+        FFieldElt one();
 
     private:
         FField(std::uint64_t ch, unsigned d); 

@@ -1,5 +1,6 @@
 #include <stdexcept>
 #include "apsi/ffield/ffield.h"
+#include "apsi/ffield/ffield_elt.h"
 #include "cryptoTools/Crypto/PRNG.h"
 
 using namespace seal;
@@ -66,7 +67,6 @@ namespace apsi
 
         // Pre-compute action of Frobenius on monomials for quick evaluation 
         frob_table_backing_ = _fq_nmod_vec_init(d_ * d_, ctx_);
-        cout << "Frob table address: " << hex << frob_table_backing_ << dec <<endl;
         frob_table_ = MatrixView<_ffield_array_elt_t>(frob_table_backing_, d_, d_);
         populate_frob_table();
 
@@ -77,6 +77,18 @@ namespace apsi
     FField::FField(uint64_t ch, string modulus) :
         FField(ch, BigPoly(modulus))
     {
+    }
+
+    FFieldElt FField::zero()
+    {
+        return FFieldElt(shared_from_this());
+    }
+
+    FFieldElt FField::one()
+    {
+        FFieldElt one(shared_from_this());
+        one.set_one();
+        return one;
     }
 
     void FField::populate_frob_table()

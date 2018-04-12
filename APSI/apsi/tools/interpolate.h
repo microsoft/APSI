@@ -10,6 +10,7 @@
 
 // APSI
 #include "apsi/ffield/ffield_array.h"
+#include "apsi/ffield/ffield_poly.h"
 
 // CryptoTools
 #include "cryptoTools/Common/Defines.h"
@@ -21,6 +22,10 @@ namespace apsi
     void ffield_newton_interpolate_poly(
         const FFieldArray &points, const FFieldArray &values,
         FFieldArray& result);
+
+    void ffield_newton_interpolate_poly(
+        const FFieldArray &points, const FFieldArray &values,
+        FFieldPoly& result);
 
     void exfield_newton_interpolate_poly(
         const std::vector<std::pair<seal::util::ExFieldElement, seal::util::ExFieldElement> > &input,

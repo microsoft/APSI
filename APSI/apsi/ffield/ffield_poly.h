@@ -119,6 +119,14 @@ namespace apsi
             fq_nmod_poly_zero(poly_, field_->ctx_);
         }
 
+        inline void set_zero(std::size_t index)
+        {
+            _ffield_elt_t zero;
+            fq_nmod_init(zero, field_->ctx_);
+            fq_nmod_poly_set_coeff(poly_, index, zero, field_->ctx_);
+            fq_nmod_clear(zero, field_->ctx_);
+        }
+
         inline void set_one()
         {
             fq_nmod_poly_one(poly_, field_->ctx_);
