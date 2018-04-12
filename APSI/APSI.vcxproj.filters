@@ -84,6 +84,24 @@
     <ClInclude Include="apsi\Tools\interpolate.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="apsi\ffield\ffield.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\ffield\ffield_array.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\ffield\ffield_crt_builder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\ffield\ffield_elt.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\ffield\ffield_ntt.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\ffield\ffield_poly.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp">
@@ -117,6 +135,15 @@
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
     <ClCompile Include="apsi\Tools\interpolate.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\ffield\ffield.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\ffield\ffield_crt_builder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\ffield\ffield_ntt.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
