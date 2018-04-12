@@ -89,7 +89,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);C:\libs\boost;$(SolutionDir)..\Cuckoo\Cuckoo;..\..\SEAL-dev\SEAL\;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;$(ProjectDir)../../cryptoTools/thirdparty/win/miracl;$(ProjectDir)../../cryptoTools;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);C:\libs\boost;$(SolutionDir)..\Cuckoo\Cuckoo;..\..\SEAL-dev\SEAL\;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;$(ProjectDir)../../cryptoTools/thirdparty/win/miracl;$(ProjectDir)../../cryptoTools;$(ProjectDir)../../flint2/lib/x64/$(Configuration)/;$(ProjectDir)../../mpfr/lib/x64/$(Configuration)/;$(ProjectDir)../../mpir/lib/x64/$(Configuration)/;$(ProjectDir)../../pthreads\Pre-built.2\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Lib>
       <AdditionalDependencies>SEAL.lib;miracl.lib;cryptoTools.lib;cuckoo.lib</AdditionalDependencies>
@@ -118,7 +118,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);C:\libs\boost;$(SolutionDir)..\Cuckoo\Cuckoo;..\..\SEAL-dev\SEAL\;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;$(ProjectDir)../../cryptoTools/thirdparty/win/miracl;$(ProjectDir)../../cryptoTools;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);C:\libs\boost;$(SolutionDir)..\Cuckoo\Cuckoo;..\..\SEAL-dev\SEAL\;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;$(ProjectDir)../../cryptoTools/thirdparty/win/miracl;$(ProjectDir)../../cryptoTools;$(ProjectDir)../../flint2/lib/x64/$(Configuration)/;$(ProjectDir)../../mpfr/lib/x64/$(Configuration)/;$(ProjectDir)../../mpir/lib/x64/$(Configuration)/;$(ProjectDir)../../pthreads\Pre-built.2\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -134,6 +134,12 @@
   <ItemGroup>
     <ClInclude Include="apsi\apsi.h" />
     <ClInclude Include="apsi\apsidefines.h" />
+    <ClInclude Include="apsi\ffield\ffield.h" />
+    <ClInclude Include="apsi\ffield\ffield_array.h" />
+    <ClInclude Include="apsi\ffield\ffield_crt_builder.h" />
+    <ClInclude Include="apsi\ffield\ffield_elt.h" />
+    <ClInclude Include="apsi\ffield\ffield_ntt.h" />
+    <ClInclude Include="apsi\ffield\ffield_poly.h" />
     <ClInclude Include="apsi\item.h" />
     <ClInclude Include="apsi\Network\network_utils.h" />
     <ClInclude Include="apsi\plaintextarith.h" />
@@ -150,6 +156,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp" />
+    <ClCompile Include="apsi\ffield\ffield.cpp" />
+    <ClCompile Include="apsi\ffield\ffield_crt_builder.cpp" />
+    <ClCompile Include="apsi\ffield\ffield_ntt.cpp" />
     <ClCompile Include="apsi\item.cpp" />
     <ClCompile Include="apsi\Network\network_utils.cpp" />
     <ClCompile Include="apsi\plaintextarith.cpp" />
