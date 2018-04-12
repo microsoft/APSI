@@ -1,8 +1,8 @@
 # Makefile for the SEAL library
-SRC_DIRS=apsi apsi/network apsi/receiver apsi/sender apsi/tools
+SRC_DIRS=apsi apsi/network apsi/receiver apsi/sender apsi/tools apsi/ffield
 BIN_DIR=../bin
 OBJ_DIR=obj
-INCLUDE_DIRS=. ../../cryptoTools/thirdparty/boost ../../Cuckoo/Cuckoo ../../SEAL-dev/SEAL ../../cryptoTools ../../cryptoTools/thirdparty/linux/miracl ../../flint2
+INCLUDE_DIRS=. ../../cryptoTools/thirdparty/boost ../../Cuckoo/Cuckoo ../../SEAL-dev/SEAL ../../cryptoTools ../../cryptoTools/thirdparty/linux/miracl /usr/include/flint
 SRCS=$(wildcard *.cpp) $(foreach d,$(SRC_DIRS),$(wildcard $d/*.cpp))
 OBJS=$(SRCS:%.cpp=$(OBJ_DIR)/%.o)
 DEPS=$(OBJS:.o=.d)
@@ -12,7 +12,7 @@ CXX=g++
 CXXFLAGS=-Ofast -g -DHAVE_CONFIG -march=native -std=c++14  -maes -msse2 -msse4.1 -mpclmul
 PREFIX=/usr/local
 LDFLAGS=-lseal -lboost_system -lcuckoo -lpthread -lcryptoTools -lmiracl -lflint -lgmp
-LIBRARY_PATHS=../../SEAL-dev/bin ../../Cuckoo/bin ../../cryptoTools/thirdparty/linux/boost/stage/lib ../../cryptoTools/lib ../../cryptoTools/thirdparty/linux/miracl/miracl/source ../../flint2/lib
+LIBRARY_PATHS=../../SEAL-dev/bin ../../Cuckoo/bin ../../cryptoTools/thirdparty/linux/boost/stage/lib ../../cryptoTools/lib ../../cryptoTools/thirdparty/linux/miracl/miracl/source /usr/lib
 
 .PHONY : all clean install uninstall
 

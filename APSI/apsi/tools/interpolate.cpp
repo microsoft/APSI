@@ -8,7 +8,6 @@ using namespace oc;
 
 namespace apsi
 {
-
     void print_ptxt(seal::Plaintext &ptxt, int coeff_count = 0) {
         if (coeff_count == 0) {
             coeff_count = ptxt.coeff_count();
