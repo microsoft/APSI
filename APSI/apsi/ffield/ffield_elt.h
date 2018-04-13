@@ -360,6 +360,16 @@ namespace apsi
             return !operator ==(compare);
         }
 
+        inline _ffield_elt_ptr_t data()
+        {
+            return &elt_[0];
+        }
+
+        inline _ffield_elt_const_ptr_t data() const
+        {
+            return &elt_[0];
+        }
+
     private:
         FFieldElt(std::shared_ptr<FField> field, const _ffield_elt_t in) : 
             field_(std::move(field)) 

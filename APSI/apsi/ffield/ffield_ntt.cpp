@@ -152,11 +152,12 @@ namespace apsi
 
     void FFieldNTT::negacyclic_ntt(FFieldArray &sequence) const
     {
+#ifndef NDEBUG
         if(sequence.size_ != n_)
         {
             throw invalid_argument("invalid array size");
         }
-
+#endif
         uint64_t t = n_;
         FFieldElt temp(field_);
         
@@ -184,11 +185,12 @@ namespace apsi
 
     void FFieldNTT::inverse_negacyclic_ntt(FFieldArray &sequence) const
     {
+#ifndef NDEBUG
         if(sequence.size_ != n_)
         {
             throw invalid_argument("invalid array size");
         }
-
+#endif
         uint64_t t = 1;
         FFieldElt temp(field_);
         

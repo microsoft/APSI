@@ -74,10 +74,12 @@ namespace apsi
 
         inline void set(std::size_t index, const seal::BigPoly &in)
         {
+#ifndef NDEBUG
             if(static_cast<unsigned>(in.coeff_count()) > field_->d_)
             {
                 throw std::invalid_argument("input too large");
             }
+#endif
             _ffield_elt_t coeff;
             fq_nmod_init2(coeff, field_->ctx_);
             bigpoly_to_nmod_poly(in, coeff);
@@ -102,10 +104,12 @@ namespace apsi
 
         inline void set_coeff_of(std::size_t poly_index, std::size_t elt_index, _ffield_elt_coeff_t in) 
         {
+#ifndef NDEBUG
             if(elt_index >= field_->d_)
             {
                 throw std::out_of_range("elt_index");
             }
+#endif
             _ffield_elt_t coeff;
             fq_nmod_init2(coeff, field_->ctx_);
             fq_nmod_poly_get_coeff(coeff, poly_, poly_index, field_->ctx_);

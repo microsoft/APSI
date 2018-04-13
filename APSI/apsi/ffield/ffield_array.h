@@ -41,24 +41,44 @@ namespace apsi
 
         inline FFieldElt get(std::size_t index) const
         {
+#ifndef NDEBUG
             if(index > size_)
             {
                 throw std::out_of_range("index");
             }
+#endif
             return FFieldElt(field_, array_ + index);
         }
 
         inline void set(std::size_t index, const FFieldElt &in)
         {
+#ifndef NDEBUG
             if(index > size_)
             {
                 throw std::out_of_range("index");
             }
+#endif
             fq_nmod_set(array_ + index, in.elt_, field_->ctx_);
+        }
+
+        inline void set(std::size_t dest_index, std::size_t src_index, const FFieldArray &in)
+        {
+#ifndef NDEBUG
+            if(dest_index > size_)
+            {
+                throw std::out_of_range("dest_index");
+            }
+            if(src_index > in.size_)
+            {
+                throw std::out_of_range("src_index");
+            }
+#endif
+            fq_nmod_set(array_ + dest_index, in.array_ + src_index, field_->ctx_);
         }
 
         inline void set(std::size_t index, const seal::BigPoly &in)
         {
+#ifndef NDEBUG
             if(index > size_)
             {
                 throw std::out_of_range("index");
@@ -67,6 +87,7 @@ namespace apsi
             {
                 throw std::invalid_argument("input too large");
             }
+#endif
             bigpoly_to_nmod_poly(in, array_ + index);
         }
 
@@ -82,6 +103,7 @@ namespace apsi
 
         inline void set_coeff_of(std::size_t array_index, std::size_t elt_index, _ffield_elt_coeff_t in) 
         {
+#ifndef NDEBUG
             if(array_index > size_)
             {
                 throw std::out_of_range("array_index");
@@ -90,6 +112,7 @@ namespace apsi
             {
                 throw std::out_of_range("elt_index");
             }
+#endif
             nmod_poly_set_coeff_ui(array_ + array_index, elt_index, in);
         }
 
@@ -100,10 +123,12 @@ namespace apsi
 
         inline void set_zero(std::size_t index)
         {
+#ifndef NDEBUG
             if(index > size_)
             {
                 throw std::out_of_range("index");
             }
+#endif
             fq_nmod_zero(array_ + index, field_->ctx_);
         }
 
@@ -323,6 +348,16 @@ namespace apsi
         inline bool operator !=(const FFieldArray &compare) const 
         {
             return !operator ==(compare);
+        }
+
+        inline _ffield_array_t data()
+        {
+            return array_;
+        }
+
+        inline _ffield_array_const_t data() const
+        {
+            return array_;
         }
 
     private:

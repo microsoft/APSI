@@ -90,7 +90,7 @@ namespace apsi
             */
             void symmetric_polys(
                 SenderThreadContext &context,
-                oc::MatrixView<FFieldElt> symm_block,
+                FFieldArray &symm_block,
                 int encoding_bit_length,
                 FFieldElt& neg_null_element);
 
@@ -103,7 +103,7 @@ namespace apsi
             */
             void randomized_symmetric_polys(
                 SenderThreadContext &context,
-                oc::MatrixView<FFieldElt> symm_block,
+                FFieldArray &symm_block,
                 int encoding_bit_length,
                 FFieldElt& neg_null_element);
 

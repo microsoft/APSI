@@ -31,7 +31,10 @@ namespace apsi
     using _ffield_ctx_t = fq_nmod_ctx_t;
     using _ffield_elt_coeff_t = mp_limb_t; 
     using _ffield_elt_t = fq_nmod_t;
+    using _ffield_elt_ptr_t = fq_nmod_struct *;
+    using _ffield_elt_const_ptr_t = const fq_nmod_struct *;
     using _ffield_array_t = fq_nmod_struct *;
+    using _ffield_array_const_t = const fq_nmod_struct *;
     using _ffield_array_elt_t = fq_nmod_struct;
     using _ffield_poly_t = fq_nmod_poly_t;
     using _ffield_poly_coeff_t = nmod_poly_struct;
@@ -175,6 +178,16 @@ namespace apsi
         FFieldElt zero();
 
         FFieldElt one();
+
+        inline _ffield_ctx_t &ctx()
+        {
+            return ctx_;
+        }
+
+        inline const _ffield_ctx_t &ctx() const
+        {
+            return ctx_;
+        }
 
     private:
         FField(std::uint64_t ch, unsigned d); 

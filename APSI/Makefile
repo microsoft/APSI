@@ -9,7 +9,7 @@ DEPS=$(OBJS:.o=.d)
 INSTALL_DIR=APSI
 APSILIB=libapsi.a
 CXX=g++
-CXXFLAGS=-Ofast -g -DHAVE_CONFIG -march=native -std=c++14  -maes -msse2 -msse4.1 -mpclmul
+CXXFLAGS=-Ofast -g -DHAVE_CONFIG -march=native -std=c++14  -maes -msse2 -msse4.1 -mpclmul -DNDEBUG
 PREFIX=/usr/local
 LDFLAGS=-lseal -lboost_system -lcuckoo -lpthread -lcryptoTools -lmiracl -lflint -lgmp
 LIBRARY_PATHS=../../SEAL-dev/bin ../../Cuckoo/bin ../../cryptoTools/thirdparty/linux/boost/stage/lib ../../cryptoTools/lib ../../cryptoTools/thirdparty/linux/miracl/miracl/source /usr/lib
