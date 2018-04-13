@@ -348,13 +348,14 @@ namespace apsi
                         temp1->neg();
                     }
 
-                    fq_nmod_mul(
-                        symm_block.data() + pos.batch_offset * split_size_plus_one + pos.split_offset, 
-                        symm_block.data() + pos.batch_offset * split_size_plus_one + (pos.split_offset + 1),
-                        temp1->data(), exfield->ctx());
-                    // symm_block.set(pos.batch_offset * split_size_plus_one + pos.split_offset, symm_block.get(pos.batch_offset * split_size_plus_one + (pos.split_offset + 1)) * *temp1);
-
                     auto symm_block_ptr = symm_block.data() + pos.batch_offset * split_size_plus_one + pos.split_offset + 1;
+
+                    // symm_block.set(pos.batch_offset * split_size_plus_one + pos.split_offset, symm_block.get(pos.batch_offset * split_size_plus_one + (pos.split_offset + 1)) * *temp1);
+                    fq_nmod_mul(
+                        symm_block_ptr - 1, 
+                        symm_block_ptr,
+                        temp1->data(), exfield->ctx());
+
                     for (int k = pos.split_offset + 1; k < split_size; k++, symm_block_ptr++)
                     {
                         // temp2 = symm_block.get(pos.batch_offset * split_size_plus_one + (k + 1)) * *temp1;
@@ -385,11 +386,13 @@ namespace apsi
             FFieldArray r(context.exfield(), num_rows);
             r.set_random_nonzero(prng);
 
+            auto symm_block_ptr = symm_block.data();
+            auto &field_ctx = context.exfield()->ctx();
             for (int i = 0; i < num_rows; i++)
             {
-                for (int j = 0; j < split_size_plus_one; j++)
+                for (int j = 0; j < split_size_plus_one; j++, symm_block_ptr++)
                 {
-                    fq_nmod_mul(symm_block.data() + i * split_size_plus_one + j, symm_block.data() + i * split_size_plus_one + j, r.data() + i, context.exfield()->ctx()); 
+                    fq_nmod_mul(symm_block_ptr, symm_block_ptr, r.data() + i, field_ctx); 
                 }
             }
             // FFieldElt r(context.exfield());

@@ -369,7 +369,7 @@ namespace apsi
                 {
                     for (int j = 0; (j < batch_size) && ((i * batch_size + j) < input.size()); j++)
                     {
-                        batch.set(j, input.get(i * batch_size + j));
+                        batch.set(j, i * batch_size + j, input);
                     }
                     exfieldpolycrtbuilder_->compose(plain, batch);
                 }
