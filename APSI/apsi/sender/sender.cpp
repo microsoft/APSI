@@ -6,6 +6,7 @@
 #include "apsi/sender/sender.h"
 #include "apsi/apsidefines.h"
 #include "apsi/network/network_utils.h"
+#include "apsi/ffield/ffield_crt_builder.h"
 
 #include "cryptoTools/Common/Log.h"
 
@@ -24,7 +25,7 @@ namespace apsi
             pool_(pool),
             total_thread_count_(total_thread_count),
             session_thread_count_(session_thread_count),
-            ex_field_(ExField::Acquire(params.exfield_characteristic(), params.exfield_polymod(), pool)),
+            ex_field_(FField::Acquire(params.exfield_characteristic(), params.exfield_polymod())),
             sender_db_(params, ex_field_),
             thread_contexts_(total_thread_count_),
             stopped_(false)
@@ -40,18 +41,20 @@ namespace apsi
         {
             seal_context_.reset(new SEALContext(params_.encryption_params()));
 
-            ex_field_->init_frob_table();
-
-            // Create the poly_mod like this since seal::ExField constructor takes seal::BigPoly instead 
+            // Create the poly_mod like this since FField constructor takes seal::BigPoly instead 
             // of seal::PolyModulus. Reason for this is that seal::PolyModulus does not manage its own memory.
-            const BigPoly poly_mod(ex_field_->coeff_count(), ex_field_->coeff_uint64_count() * bits_per_uint64,
-                const_cast<uint64_t*>(ex_field_->poly_modulus().get()));
+            // const BigPoly poly_mod(ex_field_->length(), ex_field_->ch().bit_count(),
+            //     const_cast<uint64_t*>(ex_field_->poly_modulus().get()));
 
             // Construct shared Evaluator and PolyCRTBuilder
             evaluator_.reset(new Evaluator(*seal_context_));
             if (seal_context_->qualifiers().enable_batching)
             {
                 builder_.reset(new PolyCRTBuilder(*seal_context_));
+            }
+            else
+            {
+                ex_builder_.reset(new FFieldCRTBuilder(ex_field_, params_.encryption_params().poly_modulus().coeff_count() - 1, FFieldElt(ex_field_, "1x^1")));
             }
             vector<thread> thrds(total_thread_count_);
 
@@ -73,15 +76,14 @@ namespace apsi
                     thread_contexts_[i].set_id(i);
                     thread_contexts_[i].set_prng(seed);
                     thread_contexts_[i].set_pool(local_pool);
-                    thread_contexts_[i].set_exfield(ExField::Acquire(ex_field_->characteristic(), poly_mod, local_pool));
-                    thread_contexts_[i].exfield()->set_frob_table(ex_field_->frobe_table());
+                    thread_contexts_[i].set_exfield(ex_field_);
 
-                    // We need the ExFieldPolyCRTBuilder here since it creates ExFieldElements from the memory
-                    // pool of its ExField. Cannot have a shared ExFieldPolyCRTBuilder with this design.
-                    thread_contexts_[i].set_exbuilder(
-                        make_shared<ExFieldPolyCRTBuilder>(thread_contexts_[i].exfield(),
-                            get_power_of_two(params_.encryption_params().poly_modulus().coeff_count() - 1))
-                    );
+                    // // We need the EdPolyCRTBuilder here since it creates ExFieldElements from the memory
+                    // // pool of its ExField. Cannot have a shared ExFieldPolyCRTBuilder with this design.
+                    // thread_contexts_[i].set_exbuilder(
+                    //     make_shared<FFieldCRTBuilder>(thread_contexts_[i].exfield(),
+                    //         get_power_of_two(params_.encryption_params().poly_modulus().coeff_count() - 1), FFieldElt(thread_contexts_[i].exfield(), "1x^1")
+                    // ));
 
                     // Allocate memory for repeated use from the given memory pool.
                     thread_contexts_[i].construct_variables(params_);
@@ -114,8 +116,8 @@ namespace apsi
                 {
                     int thread_context_idx = acquire_thread_context();
                     SenderThreadContext &context = thread_contexts_[thread_context_idx];
-                    sender_db_.batched_randomized_symmetric_polys(context, evaluator_, builder_, total_thread_count_);
-                    sender_db_.batched_interpolate_polys(context, total_thread_count_, evaluator_, builder_);
+                    sender_db_.batched_randomized_symmetric_polys(context, evaluator_, builder_, ex_builder_, total_thread_count_);
+                    sender_db_.batched_interpolate_polys(context, total_thread_count_, evaluator_, builder_, ex_builder_);
                     release_thread_context(context.id());
                 });
             }
@@ -299,7 +301,7 @@ namespace apsi
             int	splitStep = params_.batch_count() * split_size_plus_one;
             int total_blocks = params_.split_count() * params_.batch_count();
 
-            std::vector<std::vector<u64>> debug_query(params_.batch_count());
+            std::vector<std::vector<u64> > debug_query(params_.batch_count());
             auto& plain_mod = params_.encryption_params().plain_modulus();
 
             mutex mtx;

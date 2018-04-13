@@ -11,6 +11,9 @@
 #include "apsi/apsidefines.h"
 #include "apsi/psiparams.h"
 #include "apsi/sender/senderthreadcontext.h"
+#include "apsi/ffield/ffield.h"
+#include "apsi/ffield/ffield_elt.h"
+#include "apsi/ffield/ffield_crt_builder.h"
 
 // Cuckoo
 #include "cuckoo/cuckoo.h"
@@ -19,7 +22,6 @@
 #include "seal/plaintext.h"
 #include "seal/evaluator.h"
 #include "seal/polycrt.h"
-#include "seal/util/exfield.h"
 
 // CryptoTools
 #include "cryptoTools/Common/Matrix.h"
@@ -88,9 +90,9 @@ namespace apsi
             */
             void symmetric_polys(
                 SenderThreadContext &context,
-                oc::MatrixView<seal::util::ExFieldElement> symm_block,
+                oc::MatrixView<FFieldElt> symm_block,
                 int encoding_bit_length,
-                seal::util::ExFieldElement& neg_null_element);
+                FFieldElt& neg_null_element);
 
             /**
             Computes the randomized symmetric polynomials for the specified split and the specified batch in sender's database. Basically, it
@@ -101,27 +103,27 @@ namespace apsi
             */
             void randomized_symmetric_polys(
                 SenderThreadContext &context,
-                oc::MatrixView<seal::util::ExFieldElement>symm_block,
+                oc::MatrixView<FFieldElt> symm_block,
                 int encoding_bit_length,
-                seal::util::ExFieldElement& neg_null_element);
+                FFieldElt& neg_null_element);
 
             Position try_aquire_position(int cuckoo_loc, oc::PRNG& prng);
 
             void batch_interpolate(
-                SenderThreadContext & context,
+                SenderThreadContext &context,
                 const seal::SmallModulus& mod,
-                shared_ptr <seal::Evaluator > evaluator,
-                shared_ptr<seal::PolyCRTBuilder>& builder,
+                std::shared_ptr<seal::Evaluator> evaluator,
+                std::shared_ptr<seal::PolyCRTBuilder> builder,
+                std::shared_ptr<FFieldCRTBuilder> ex_builder,
                 const PSIParams& params);
-
 
             void test_eval(
                 SenderThreadContext & context,
                 const seal::SmallModulus& mod,
-                shared_ptr <seal::Evaluator > evaluator,
-                shared_ptr<seal::PolyCRTBuilder>& builder,
+                std::shared_ptr<seal::Evaluator> evaluator,
+                std::shared_ptr<seal::PolyCRTBuilder> builder,
+                std::shared_ptr<FFieldCRTBuilder> ex_builder,
                 const PSIParams& params);
-
 
             void check(const Position& pos);
 
@@ -132,8 +134,6 @@ namespace apsi
 #endif
                 return has_item_.get()[pos.batch_offset * items_per_split_ + pos.split_offset];
             }
-
-
 
             Item& get_key(const Position& pos)
             {
@@ -169,11 +169,10 @@ namespace apsi
             void clear();
         };
 
-
         class SenderDB
         {
         public:
-            SenderDB(const PSIParams &params, std::shared_ptr<seal::util::ExField> &ex_field);
+            SenderDB(const PSIParams &params, std::shared_ptr<FField> &ex_field);
 
             /**
             Clears sender's database and set all entries to sender's null item.
@@ -226,13 +225,16 @@ namespace apsi
                 SenderThreadContext &context,
                 std::shared_ptr<seal::Evaluator> evaluator, 
                 std::shared_ptr<seal::PolyCRTBuilder> builder,
+                std::shared_ptr<FFieldCRTBuilder> ex_builder,
                 int thread_count);
 
             void batched_interpolate_polys(
                 SenderThreadContext& context,
                 int thread_count,
-                shared_ptr<seal::Evaluator> evaluator,
-                shared_ptr<seal::PolyCRTBuilder>& builder);
+                std::shared_ptr<seal::Evaluator> evaluator,
+                std::shared_ptr<seal::PolyCRTBuilder> builder,
+                std::shared_ptr<FFieldCRTBuilder> ex_builder
+                );
 
             //Item& get_key(u64 cuckoo_index, u64 position_idx) {
             //    return keys_(position_idx, cuckoo_index);
@@ -262,18 +264,26 @@ namespace apsi
             }
 
         private:
-
-
-            //const oc::Matrix<Item>& simple_hashing_db2() const
-            //{
-            //    return simple_hashing_db2_;
-            //}
-
             PSIParams params_;
-
             cuckoo::PermutationBasedCuckoo::Encoder encoder_;
-
+            std::shared_ptr<FField> global_ex_field_;
+            FFieldElt null_element_;
+            FFieldElt neg_null_element_;
             int encoding_bit_length_;
+
+            /* 
+            Size m vector, where m is the table size. Each value is an incremental counter for the 
+            corresponding bin in shuffle_index_. It points to the next value to be taken from shuffle_index_
+            in the corresponding bin. */
+            std::vector<int> next_locs_;
+
+            /* 
+            Batched randomized symmetric polynomial terms.
+            #splits x #batches x (split_size + 1). In fact, B = #splits x split_size. The table is
+            essentially split into '#splits x #batches' blocks. Each block is related with a split
+            and a batch.
+            */
+            std::vector<seal::Plaintext> batch_random_symm_polys_;
 
             /* 
             Null value for sender: 00..0011..11. The number of 1 is itemL.
@@ -282,9 +292,6 @@ namespace apsi
             Item sender_null_item_;
 
             /* The ExField encoding of the sender null value. */
-            seal::util::ExFieldElement null_element_, neg_null_element_;
-
-            std::shared_ptr<seal::util::ExField> global_ex_field_;
 
             /* 
             B x m, where B is sender's bin size, m is table size.
@@ -310,20 +317,6 @@ namespace apsi
             Returns true if the position'th slot within the bin at cockooIndex 
             currently has an item. */
             //bool has_item(int cockooIndex, int position);
-
-            /* 
-            Size m vector, where m is the table size. Each value is an incremental counter for the 
-            corresponding bin in shuffle_index_. It points to the next value to be taken from shuffle_index_
-            in the corresponding bin. */
-            std::vector<int> next_locs_;
-
-            /* 
-            Batched randomized symmetric polynomial terms.
-            #splits x #batches x (split_size + 1). In fact, B = #splits x split_size. The table is
-            essentially split into '#splits x #batches' blocks. Each block is related with a split
-            and a batch.
-            */
-            std::vector<seal::Plaintext> batch_random_symm_polys_;
 
             oc::PRNG prng_;
         };

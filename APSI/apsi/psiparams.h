@@ -74,19 +74,19 @@ namespace apsi
             std::string endpoint = "APSI") :
             log_table_size_(table_params.log_table_size), 
             table_size_(1 << log_table_size_),
-            sender_bin_size_(table_params.sender_bin_size), 
             window_size_(table_params.window_size),
+            sender_bin_size_(table_params.sender_bin_size), 
             split_count_(table_params.split_count),
             oprf_type_(oprfType),
-            decomposition_bit_count_(seal_params.decomposition_bit_count),
             cuckoo_mode_(cuckoo_params.cuckoo_mode),
+            encryption_params_(seal_params.encryption_params),
+            decomposition_bit_count_(seal_params.decomposition_bit_count),
             hash_func_count_(cuckoo_params.hash_func_count), 
             hash_func_seed_(cuckoo_params.hash_func_seed), 
             max_probe_(cuckoo_params.max_probe),
             item_bit_count_(item_bit_count), 
             exfield_characteristic_(seal_params.exfield_params.exfield_characteristic), 
             exfield_polymod_(seal_params.exfield_params.exfield_polymod),
-            encryption_params_(seal_params.encryption_params),
             //log_poly_degree_(seal_params.log_poly_degree), 
             //poly_degree_(seal_params.encryption_params.poly_modulus().coeff_count() - 1),
             //coeff_mod_bit_count_(seal_params.coeff_mod_bit_count),
@@ -205,7 +205,7 @@ namespace apsi
             return apsi_endpoint_;
         }
 
-        inline const cuckoo::CuckooMode get_cuckoo_mode() const
+        inline cuckoo::CuckooMode get_cuckoo_mode() const
         { 
             return cuckoo_mode_; 
         }

@@ -7,14 +7,13 @@
 
 // APSI
 #include "apsi/psiparams.h"
+#include "apsi/ffield/ffield_elt.h"
+#include "apsi/ffield/ffield_crt_builder.h"
 
-// SEAL
 #include "seal/memorypoolhandle.h"
-#include "seal/util/exfield.h"
-#include "seal/util/exfieldpolycrt.h"
 
 // CryptoTools
-#include "cryptoTools/Common/MatrixView.h"
+#include "cryptoTools/Common/Matrix.h"
 #include "cryptoTools/Crypto/PRNG.h"
 
 namespace apsi
@@ -28,7 +27,6 @@ namespace apsi
         class SenderThreadContext
         {
         public:
-
             inline int id() const
             {
                 return id_;
@@ -49,12 +47,12 @@ namespace apsi
                 pool_ = pool;
             }
 
-            inline std::shared_ptr<seal::util::ExField> &exfield()
+            inline std::shared_ptr<FField> &exfield()
             {
                 return exfield_;
             }
 
-            inline void set_exfield(std::shared_ptr<seal::util::ExField> exfield)
+            inline void set_exfield(std::shared_ptr<FField> exfield)
             {
                 exfield_ = std::move(exfield);
             }
@@ -64,15 +62,15 @@ namespace apsi
                 prng_.SetSeed(block, 256);
             }
 
-            std::shared_ptr<seal::util::ExFieldPolyCRTBuilder> &exbuilder()
-            {
-                return exbuilder_;
-            }
-
-            void set_exbuilder(std::shared_ptr<seal::util::ExFieldPolyCRTBuilder> batcher)
-            {
-                exbuilder_ = std::move(batcher);
-            }
+            // std::shared_ptr<FFieldCRTBuilder> &exbuilder()
+            // {
+            //     return exbuilder_;
+            // }
+            //
+            // void set_exbuilder(std::shared_ptr<FFieldCRTBuilder> batcher)
+            // {
+            //     exbuilder_ = std::move(batcher);
+            // }
 
             inline void construct_variables(PSIParams &params)
             {
@@ -84,27 +82,14 @@ namespace apsi
 
                 if (symm_block_.size() == 0)
                 {
-                    symm_block_vec_ = std::move(exfield_->allocate_elements(params.batch_size() * (params.split_size() + 1), symm_block_backing_));
-                    symm_block_ = oc::MatrixView<seal::util::ExFieldElement>(symm_block_vec_.begin(), symm_block_vec_.end(), params.split_size() + 1);
-
-                    batch_vector_ = std::move(exfield_->allocate_elements(params.batch_size(), batch_backing_));
-                    integer_batch_vector_.resize(params.batch_size(), 0);
+                    symm_block_vec_.resize(params.batch_size() * (params.split_size() + 1), FFieldElt(exfield_));
+                    symm_block_ = oc::MatrixView<FFieldElt>(symm_block_vec_.begin(), symm_block_vec_.end(), params.split_size() + 1);
                 }
             }
 
-            inline oc::MatrixView<seal::util::ExFieldElement> symm_block()
+            inline oc::MatrixView<FFieldElt> symm_block()
             {
                 return symm_block_;
-            }
-
-            inline std::vector<seal::util::ExFieldElement> &batch_vector()
-            {
-                return batch_vector_;
-            }
-
-            inline std::vector<std::uint64_t> &integer_batch_vector()
-            {
-                return integer_batch_vector_;
             }
 
             oc::PRNG& prng()
@@ -117,21 +102,17 @@ namespace apsi
 
             seal::MemoryPoolHandle pool_;
 
-            std::shared_ptr<seal::util::ExField> exfield_;
+            std::shared_ptr<FField> exfield_;
 
-            std::shared_ptr<seal::util::ExFieldPolyCRTBuilder> exbuilder_;
+            // std::shared_ptr<FFieldCRTBuilder> exbuilder_;
             
             seal::util::Pointer symm_block_backing_;
 
-            std::vector<seal::util::ExFieldElement> symm_block_vec_;
+            std::vector<FFieldElt> symm_block_vec_;
             
-            oc::MatrixView<seal::util::ExFieldElement> symm_block_;
+            oc::MatrixView<FFieldElt> symm_block_;
 
             seal::util::Pointer batch_backing_;
-
-            std::vector<seal::util::ExFieldElement> batch_vector_;
-
-            std::vector<std::uint64_t> integer_batch_vector_;
 
             oc::PRNG prng_;
         };

@@ -9,6 +9,7 @@
 #include "apsi/sender/senderdb.h"
 #include "apsi/apsidefines.h"
 #include "apsi/tools/interpolate.h"
+#include "apsi/ffield/ffield_array.h"
 
 #include "cryptoTools/Crypto/Curve.h"
 #include "cryptoTools/Crypto/PRNG.h"
@@ -29,23 +30,12 @@ namespace apsi
 {
     namespace sender
     {
-        namespace
-        {
-            void randomize_element(ExFieldElement &element, PRNG &prng)
-            {
-                const uint64_t characteristic = element.ex_field()->characteristic().value();
-                prng.get<uint64_t>(element.pointer(), element.ex_field()->coeff_count() - 1);
-                for (int i = 0; i < element.ex_field()->coeff_count() - 1; i++)
-                {
-                    element[i] %= characteristic;
-                }
-            }
-        }
-
-        SenderDB::SenderDB(const PSIParams &params, shared_ptr<ExField> &ex_field) :
+        SenderDB::SenderDB(const PSIParams &params, shared_ptr<FField> &ex_field) :
             params_(params),
             encoder_(params.log_table_size(), params.hash_func_count(), params.item_bit_count()),
             global_ex_field_(ex_field),
+            null_element_(global_ex_field_),
+            neg_null_element_(global_ex_field_),
             //keys_(params.sender_bin_size(), params.table_size()),
             //values_(params.sender_bin_size(), params.table_size()),
             next_locs_(params.table_size(), 0),
@@ -70,35 +60,30 @@ namespace apsi
             sender_null_item_[0] = ~1;
             sender_null_item_[1] = ~0;
 
-
             // What is the actual length of strings stored in the hash table
             encoding_bit_length_ = (params.get_cuckoo_mode() == cuckoo::CuckooMode::Normal)
                 ? params.item_bit_count() : encoder_.encoding_bit_length_;
 
             // Create the null ExFieldElement (note: encoding truncation affects high bits)
             null_element_ = sender_null_item_.to_exfield_element(global_ex_field_, encoding_bit_length_);
-            neg_null_element_ = ExFieldElement(global_ex_field_);
-            global_ex_field_->negate(null_element_, neg_null_element_);
+            neg_null_element_ = -null_element_;
 
+            int batch_size = params_.batch_size();
+            int split_size = params_.split_size();
+            int byte_length = oc::roundUpTo(params_.get_label_bit_count(), 8) / 8;
+            int nb = params_.batch_count();
+            int ns = params_.split_count();
+            db_blocks_.resize(nb, ns);
 
+            for (u64 b_idx = 0; b_idx < nb; b_idx++)
             {
-                int batch_size = params_.batch_size();
-                int split_size = params_.split_size();
-                int byte_length = oc::roundUpTo(params_.get_label_bit_count(), 8) / 8;
-                int nb = params_.batch_count();
-                int ns = params_.split_count();
-                db_blocks_.resize(nb, ns);
-
-                for (u64 b_idx = 0; b_idx < nb; ++b_idx)
+                for (u64 s_idx = 0; s_idx < ns; s_idx++)
                 {
-                    for (u64 s_idx = 0; s_idx < ns; ++s_idx)
-                    {
-                        db_blocks_(b_idx, s_idx).init(
-                            b_idx, s_idx,
-                            byte_length,
-                            batch_size,
-                            split_size);
-                    }
+                    db_blocks_(b_idx, s_idx).init(
+                        b_idx, s_idx,
+                        byte_length,
+                        batch_size,
+                        split_size);
                 }
             }
         }
@@ -127,11 +112,6 @@ namespace apsi
             clear_db();
             add_data(data, vals, thread_count);
             stop_watch.set_time_point("Sender add-data");
-        }
-
-        void SenderDB::add_data(oc::span<const Item> data, int thread_count)
-        {
-            add_data(data, {}, thread_count);
         }
 
         void SenderDB::add_data(oc::span<const Item> data, oc::MatrixView<u8> values, int thread_count)
@@ -228,21 +208,25 @@ namespace apsi
             }
         }
 
+        void SenderDB::add_data(oc::span<const Item> data, int thread_count)
+        {
+            add_data(data, {}, thread_count);
+        }
+
         std::pair<DBBlock*, DBBlock::Position>
             SenderDB::aquire_db_position(int cuckoo_loc, oc::PRNG &prng)
         {
             auto batch_idx = cuckoo_loc / params_.batch_size();
-
-
             auto batch_offset = cuckoo_loc % params_.batch_size();
 
             auto s_idx = prng.get<u32>() % db_blocks_.stride();
             for (int i = 0; i < db_blocks_.stride(); ++i)
             {
                 auto pos = db_blocks_(batch_idx, s_idx).try_aquire_position(batch_offset, prng);
-
                 if (pos)
+                {
                     return { &db_blocks_(batch_idx, s_idx) , pos };
+                }
 
                 s_idx = (s_idx + 1) % db_blocks_.stride();
             }
@@ -328,22 +312,22 @@ namespace apsi
 
         void DBBlock::symmetric_polys(
             SenderThreadContext &context,
-            MatrixView<ExFieldElement> symm_block,
+            MatrixView<FFieldElt> symm_block,
             int encoding_bit_length,
-            seal::util::ExFieldElement& neg_null_element)
+            FFieldElt &neg_null_element)
         {
             int split_size = items_per_split_;
             int batch_size = items_per_batch_;
-            shared_ptr<ExField> &exfield = context.exfield();
+            shared_ptr<FField> &exfield = context.exfield();
 
             auto num_rows = symm_block.bounds()[0];
 
-            ExFieldElement one(exfield, "1");
-            ExFieldElement temp11(exfield), temp2(exfield), *temp1;
+            FFieldElt one(exfield->one());
+            FFieldElt temp11(exfield), temp2(exfield), *temp1;
 
             Position pos;
 
-            for (pos.batch_offset = 0; pos.batch_offset < num_rows; ++pos.batch_offset)
+            for (pos.batch_offset = 0; pos.batch_offset < num_rows; pos.batch_offset++)
             {
                 symm_block(pos.batch_offset, split_size) = one;
 
@@ -360,20 +344,14 @@ namespace apsi
                         get_key(pos).to_exfield_element(temp11, encoding_bit_length);
                         //ostreamLock(std::cout) << "sender(" << pos.batch_offset << ", " << pos.split_offset<< ") " << get_key(pos) << std::endl;
                         temp1 = &temp11;
-                        exfield->negate(*temp1, *temp1);
+                        temp1->neg();
                     }
 
-                    exfield->multiply(
-                        symm_block(pos.batch_offset, pos.split_offset + 1),
-                        *temp1,
-                        symm_block(pos.batch_offset, pos.split_offset));
+                    symm_block(pos.batch_offset, pos.split_offset) = symm_block(pos.batch_offset, pos.split_offset + 1) * *temp1;
 
                     for (int k = pos.split_offset + 1; k < split_size; k++)
                     {
-                        exfield->multiply(
-                            symm_block(pos.batch_offset, k + 1),
-                            *temp1,
-                            temp2);
+                        temp2 = symm_block(pos.batch_offset, k + 1) * *temp1;
                         symm_block(pos.batch_offset, k) += temp2;
                     }
                 }
@@ -382,9 +360,9 @@ namespace apsi
 
         void DBBlock::randomized_symmetric_polys(
             SenderThreadContext &context,
-            MatrixView<ExFieldElement> symm_block,
+            MatrixView<FFieldElt> symm_block,
             int encoding_bit_length,
-            seal::util::ExFieldElement& neg_null_element)
+            FFieldElt &neg_null_element)
         {
             int split_size = items_per_split_;
             symmetric_polys(context, symm_block, encoding_bit_length, neg_null_element);
@@ -392,19 +370,14 @@ namespace apsi
             auto num_rows = symm_block.bounds()[0];
             oc::PRNG &prng = context.prng();
 
-            ExFieldElement r(context.exfield());
+            FFieldElt r(context.exfield());
 
             for (int i = 0; i < num_rows; i++)
             {
-                // Sample non-zero randomness
-                do
-                {
-                    randomize_element(r, prng);
-                } while (r.is_zero());
-
+                r.set_random_nonzero(prng);
                 for (int j = 0; j < split_size + 1; j++)
                 {
-                    context.exfield()->multiply(symm_block(i, j), r, symm_block(i, j));
+                    symm_block(i,j) *= r;
                 }
             }
         }
@@ -421,20 +394,23 @@ namespace apsi
             }
         }
 
-        void SenderDB::batched_randomized_symmetric_polys(SenderThreadContext &context,
-            shared_ptr<Evaluator> evaluator, shared_ptr<PolyCRTBuilder> builder, int thread_count)
+        void SenderDB::batched_randomized_symmetric_polys(
+                SenderThreadContext &context,
+                shared_ptr<Evaluator> evaluator, 
+                shared_ptr<PolyCRTBuilder> builder, 
+                shared_ptr<FFieldCRTBuilder> ex_builder, 
+                int thread_count)
         {
             // Get the symmetric block
             auto symm_block = context.symm_block();
-
-            // The data is allocated in SenderThreadContext
-            vector<ExFieldElement> &batch_vector = context.batch_vector();
-            vector<uint64_t> &integer_batch_vector = context.integer_batch_vector();
 
             int table_size = params_.table_size(),
                 split_size = params_.split_size(),
                 batch_size = params_.batch_size(),
                 split_size_plus_one = params_.split_size() + 1;
+
+            FFieldArray batch_vector(context.exfield(), batch_size);
+            vector<uint64_t> integer_batch_vector(batch_size);
 
             // Data in batch-split table is stored in "batch-major order"
             auto indexer = [splitStep = params_.batch_count() * split_size_plus_one,
@@ -449,7 +425,6 @@ namespace apsi
 
             for (int next_block = start_block; next_block < end_block; next_block++)
             {
-
                 int split = next_block / params_.batch_count();
                 int batch = next_block % params_.batch_count();
 
@@ -460,7 +435,7 @@ namespace apsi
                     batch_start = batch * batch_size,
                     batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
 
-                auto& block = db_blocks_.data()[next_block];
+                auto &block = db_blocks_.data()[next_block];
                 block.randomized_symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
                 //randomized_symmetric_polys(split, batch, context, symm_block);
 
@@ -472,13 +447,13 @@ namespace apsi
                         Plaintext &poly = batch_random_symm_polys_[idx];
                         for (int k = 0; batch_start + k < batch_end; k++)
                         {
-                            integer_batch_vector[k] = *symm_block(k, i).pointer(0);
+                            integer_batch_vector[k] = symm_block(k, i).get_coeff(0);
                         }
                         builder->compose(integer_batch_vector, poly);
                         evaluator->transform_to_ntt(poly, local_pool);
                     }
                 }
-                else if (context.exbuilder())
+                else
                 {
                     for (int i = 0; i < split_size + 1; i++, idx++)
                     {
@@ -487,9 +462,9 @@ namespace apsi
                         // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
                         for (int k = 0; batch_start + k < batch_end; k++)
                         {
-                            batch_vector[k] = symm_block(k, i);
+                            batch_vector.set(k, symm_block(k, i));
                         }
-                        context.exbuilder()->compose(batch_vector, poly);
+                        ex_builder->compose(poly, batch_vector);
                         evaluator->transform_to_ntt(poly, local_pool);
                     }
                 }
@@ -497,10 +472,11 @@ namespace apsi
         }
 
         void SenderDB::batched_interpolate_polys(
-            SenderThreadContext & context,
+            SenderThreadContext &context,
             int thread_count,
             shared_ptr<Evaluator> evaluator,
-            shared_ptr<PolyCRTBuilder>& builder)
+            shared_ptr<PolyCRTBuilder> builder,
+            shared_ptr<FFieldCRTBuilder> ex_builder)
         {
             auto& mod = params_.encryption_params().plain_modulus();
             if (params_.get_label_bit_count() >= seal::util::get_significant_bit_count(mod.value()))
@@ -519,7 +495,7 @@ namespace apsi
             for (int bIdx = start; bIdx < end; bIdx++)
             {
                 auto& block = db_blocks_(bIdx);
-                block.batch_interpolate(context, mod, evaluator, builder, params_);
+                block.batch_interpolate(context, mod, evaluator, builder, ex_builder, params_);
             }
 
         }
@@ -528,7 +504,8 @@ namespace apsi
             SenderThreadContext & context,
             const seal::SmallModulus& mod,
             shared_ptr<Evaluator> evaluator,
-            shared_ptr<PolyCRTBuilder>& builder,
+            shared_ptr<PolyCRTBuilder> builder,
+            shared_ptr<FFieldCRTBuilder> ex_builder,
             const PSIParams& params)
         {
             int max_size = 0;
@@ -538,7 +515,7 @@ namespace apsi
             MemoryPoolHandle local_pool = context.pool();
             Position pos;
 
-            if (value_byte_length_ > sizeof(u64))
+            if (value_byte_length_> sizeof(u64))
             {
                 throw std::runtime_error("labels too large");
             }
@@ -626,16 +603,20 @@ namespace apsi
             batched_label_coeffs.resize(max_size);
             std::vector<u64> temp(items_per_batch_);
 
-            for (int s = 0; s < max_size; ++s)
+            for (int s = 0; s < max_size; s++)
             {
-                Plaintext& batched_coeff = batched_label_coeffs[s];
+                Plaintext &batched_coeff = batched_label_coeffs[s];
 
-                for (int b = 0; b < items_per_batch_; ++b)
+                for (int b = 0; b < items_per_batch_; b++)
                 {
                     if (poly_size[b] > s)
+                    {
                         temp[b] = label_coeffs(b, s);
+                    }
                     else
+                    {
                         temp[b] = 0;
+                    }
                 }
 
                 batched_coeff.reserve(
@@ -710,159 +691,12 @@ namespace apsi
 
         void DBBlock::test_eval(
             SenderThreadContext & context,
-            const seal::SmallModulus & plain_mod,
+            const seal::SmallModulus &plain_mod,
             shared_ptr<seal::Evaluator> evaluator,
-            shared_ptr<seal::PolyCRTBuilder>& builder,
-            const PSIParams & params)
+            shared_ptr<seal::PolyCRTBuilder> builder,
+            shared_ptr<FFieldCRTBuilder> ex_builder,
+            const PSIParams &params)
         {
-
-
-            //for (int i = 0; i < items_per_split_; ++i)
-            //{
-            //    std::vector<u64> debug_query(items_per_batch_, 0);
-
-            //    for (int b = 0; b < items_per_batch_; ++b)
-            //    {
-            //        if (has_item({ b,i }))
-            //        {
-            //            debug_query[b] = get_key_u64({ b,i });
-            //        }
-
-            //    }
-
-            //    int s = 0;
-            //    while (batched_label_coeffs[s].is_zero()) ++s;
-
-            //    // evaluator->multiply_plain_ntt(powers[batch][s], batched_label_coeffs[s], label_results[curr_label]);
-            //    // debug
-            //    std::vector<u64> debug_label_results = debug_eval_term(s, label_coeffs, debug_query, plain_mod);
-
-
-            //    while (++s < batched_label_coeffs.size())
-            //    {
-            //        // label_result += coeff[s] * x^s;
-            //        if (batched_label_coeffs[s].is_zero() == false)
-            //        {
-            //            auto debug_term = debug_eval_term(s, label_coeffs, debug_query, plain_mod);
-            //            debug_label_results = add_(debug_label_results, debug_term, plain_mod);
-            //        }
-            //    }
-
-
-            //    for (int b = 0; b < items_per_batch_; ++b)
-            //    {
-            //        if (has_item({ b,i }))
-            //        {
-            //            u64 label = get_label_u64({ b,i });
-            //            if (debug_label_results[b] != label)
-            //            {
-            //                
-            //                std::cout << "block(" << batch_idx_ << ", " << split_idx_ << ") @ " << b << " " << i<<std::endl;
-            //                print_poly(b, label_coeffs);
-            //                std::cout << "P" << b << "(" << debug_query[b] << ") = " << debug_label_results[b] << "      exp " << label << std::endl;
-            //                //throw std::runtime_error(LOCATION);
-            //            }
-            //        }
-            //    }
-
-            //}
-
         }
-
-        //void SenderDB::save(ostream &stream) const
-        //{
-        //    /** Save the following data.
-        //    B x m
-        //    vector<vector<Item>> simple_hashing_db_;
-
-        //    m x B
-        //    vector<vector<int>> shuffle_index_;
-
-        //    size m vector
-        //    vector<int> next_shuffle_locs_;
-
-        //    #splits x #batches x (split_size + 1).
-        //    vector<vector<vector<seal::Plaintext>>> batch_random_symm_polys_;
-
-        //    #splits x #batches.
-        //    vector<vector<bool>> symm_polys_stale_;
-        //    **/
-
-        //    int32_t bin_size = params_.sender_bin_size(), table_size = params_.table_size(),
-        //        num_splits = params_.split_count(), num_batches = params_.batch_count(),
-        //        split_size_plus_one = params_.split_size() + 1;
-
-        //    stream.write(reinterpret_cast<const char*>(&bin_size), sizeof(int32_t));
-        //    stream.write(reinterpret_cast<const char*>(&table_size), sizeof(int32_t));
-        //    stream.write(reinterpret_cast<const char*>(&num_splits), sizeof(int32_t));
-        //    stream.write(reinterpret_cast<const char*>(&num_batches), sizeof(int32_t));
-        //    stream.write(reinterpret_cast<const char*>(&split_size_plus_one), sizeof(int32_t));
-
-        //    for (int i = 0; i < bin_size; i++)
-        //        for (int j = 0; j < table_size; j++)
-        //            simple_hashing_db2_(i, j).save(stream);
-
-        //    //for (int i = 0; i < table_size; i++)
-        //    //	for (int j = 0; j < bin_size; j++)
-        //    //		stream.write(reinterpret_cast<const char*>(&(shuffle_index_[i][j])), sizeof(int));
-
-        //    //for (int i = 0; i < table_size; i++)
-        //    //	stream.write(reinterpret_cast<const char*>(&(next_shuffle_locs_[i])), sizeof(int));
-
-        //    //for (int i = 0; i < num_splits; i++)
-        //    //    for (int j = 0; j < num_batches; j++)
-        //    //        for (int k = 0; k < split_size_plus_one; k++)
-        //    //            batch_random_symm_polys_[i][j][k].save(stream);
-        //    for (auto& p : batch_random_symm_polys_)
-        //        p.save(stream);
-
-        //    //for (int i = 0; i < num_splits; i++)
-        //    //	for (int j = 0; j < num_batches; j++)
-        //    //	{
-        //    //		uint8_t c = (uint8_t)symm_polys_stale_[i][j];
-        //    //		stream.write(reinterpret_cast<const char*>(&c), 1);
-        //    //	}
-        //}
-
-        //void SenderDB::load(istream &stream)
-        //{
-        //    int32_t bin_size = 0, table_size = 0,
-        //        num_splits = 0, num_batches = 0,
-        //        split_size_plus_one = 0;
-
-        //    stream.read(reinterpret_cast<char*>(&bin_size), sizeof(int32_t));
-        //    stream.read(reinterpret_cast<char*>(&table_size), sizeof(int32_t));
-        //    stream.read(reinterpret_cast<char*>(&num_splits), sizeof(int32_t));
-        //    stream.read(reinterpret_cast<char*>(&num_batches), sizeof(int32_t));
-        //    stream.read(reinterpret_cast<char*>(&split_size_plus_one), sizeof(int32_t));
-
-        //    if (bin_size != params_.sender_bin_size() || table_size != params_.table_size() ||
-        //        num_splits != params_.split_count() || num_batches != params_.batch_count()
-        //        || split_size_plus_one != params_.split_size() + 1)
-        //        throw runtime_error("Unexpected params.");
-
-        //    for (int i = 0; i < bin_size; i++)
-        //        for (int j = 0; j < table_size; j++)
-        //            simple_hashing_db2_(i, j).load(stream);
-
-        //    //for (int i = 0; i < table_size; i++)
-        //    //	for (int j = 0; j < bin_size; j++)
-        //    //		stream.read(reinterpret_cast<char*>(&(shuffle_index_[i][j])), sizeof(int));
-
-        //    //for (int i = 0; i < table_size; i++)
-        //    //	stream.read(reinterpret_cast<char*>(&(next_shuffle_locs_[i])), sizeof(int));
-
-        //    //for (int i = 0; i < num_splits; i++)
-        //    //    for (int j = 0; j < num_batches; j++)
-        //    //        for (int k = 0; k < split_size_plus_one; k++)
-        //    //            batch_random_symm_polys_[i][j][k].load(stream);
-        //    for (auto& p : batch_random_symm_polys_)
-        //        p.load(stream);
-
-        //    //for (int i = 0; i < num_splits; i++)
-        //    //	for (int j = 0; j < num_batches; j++)
-        //    //		stream.read(reinterpret_cast<char*>(&symm_polys_stale_[i][j]), sizeof(bool));
-        //}
-
     }
 }

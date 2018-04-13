@@ -75,7 +75,7 @@ namespace apsi
             set(index, seal::BigPoly(in));
         }
 
-        inline _ffield_elt_coeff_t get_coeff_of(std::size_t array_index, std::size_t elt_index) 
+        inline _ffield_elt_coeff_t get_coeff_of(std::size_t array_index, std::size_t elt_index) const
         {
             return nmod_poly_get_coeff_ui(array_ + array_index, elt_index);
         }
@@ -139,6 +139,11 @@ namespace apsi
             return _fq_nmod_vec_is_zero(array_, size_, field_->ctx_);
         }
 
+        inline bool is_zero(std::size_t index) const
+        {
+            return nmod_poly_is_zero(array_ + index);
+        }
+
         inline void set(const FFieldArray &in) 
         {
             _fq_nmod_vec_set(array_, in.array_, size_, field_->ctx_);
@@ -196,6 +201,15 @@ namespace apsi
             }
         }
 
+        inline void inv()
+        {
+            auto ptr = array_;
+            for(std::size_t i = 0; i < size_; i++, ptr++)
+            {
+                fq_nmod_inv(ptr, ptr, field_->ctx_);
+            }
+        }
+
         inline void neg(FFieldArray &out) const
         {
             auto ptr = array_;
@@ -203,6 +217,34 @@ namespace apsi
             for(std::size_t i = 0; i < size_; i++, ptr++, out_ptr++)
             {
                 fq_nmod_neg(out_ptr, ptr, field_->ctx_);
+            }
+        }
+        
+        inline void neg()
+        {
+            auto ptr = array_;
+            for(std::size_t i = 0; i < size_; i++, ptr++)
+            {
+                fq_nmod_neg(ptr, ptr, field_->ctx_);
+            }
+        }
+
+        inline void sq(FFieldArray &out) const
+        {
+            auto ptr = array_;
+            auto out_ptr = out.array_;
+            for(std::size_t i = 0; i < size_; i++, ptr++, out_ptr++)
+            {
+                fq_nmod_sqr(out_ptr, ptr, field_->ctx_);
+            }
+        }
+
+        inline void sq() 
+        {
+            auto ptr = array_;
+            for(std::size_t i = 0; i < size_; i++, ptr++)
+            {
+                fq_nmod_sqr(ptr, ptr, field_->ctx_);
             }
         }
 

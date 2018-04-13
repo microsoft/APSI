@@ -1,8 +1,9 @@
-
 #include "item.h"
 #include <stdexcept>
 #include "apsidefines.h"
 #include "cryptoTools/Crypto/RandomOracle.h"
+#include "seal/util/uintcore.h"
+#include "seal/util/common.h"
 
 using namespace std;
 using namespace seal;
@@ -75,34 +76,34 @@ namespace apsi
     }
 
 
-    ExFieldElement Item::to_exfield_element(shared_ptr<ExField> &exfield, int bit_length)
+    FFieldElt Item::to_exfield_element(shared_ptr<FField> &exfield, int bit_length)
     {
-        ExFieldElement ring_item(exfield);
+        FFieldElt ring_item(exfield);
         to_exfield_element(ring_item, bit_length);
         return ring_item;
     }
 
-    void Item::to_exfield_element(ExFieldElement &ring_item, int bit_length)
+    void Item::to_exfield_element(FFieldElt &ring_item, int bit_length)
     {
-        auto &exfield = ring_item.ex_field();
+        auto exfield = ring_item.field();
 
         // Should minus 1 to avoid wrapping around p
-        int split_length = exfield->coeff_modulus().bit_count() - 1;
+        int split_length = get_significant_bit_count(exfield->ch()) - 1;
 
         // How many coefficients do we need in the ExFieldElement
         int split_index_bound = (bit_length + split_length - 1) / split_length;
 
         int j = 0;
-        for (; j < (exfield->coeff_count() - 1) && j < split_index_bound; j++)
+        for (; j < exfield->degree() && j < split_index_bound; j++)
         {
-            *ring_item.pointer(j) = item_part(j, split_length);
+            ring_item.set_coeff(j, item_part(j, split_length));
         }
 
-        // Fill remaining ExFieldElement coefficients with zero
-        for (; j < (exfield->coeff_count() - 1); j++)
-        {
-            *ring_item.pointer(j) = 0;
-        }
+        // // Fill remaining ExFieldElement coefficients with zero
+        // for (; j < (exfield->coeff_count() - 1); j++)
+        // {
+        //     *ring_item.pointer(j) = 0;
+        // }
     }
 
     uint64_t Item::item_part(uint32_t i, uint32_t split_length)

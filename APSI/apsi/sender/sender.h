@@ -14,6 +14,8 @@
 #include "apsi/sender/senderdb.h"
 #include "apsi/sender/sendersessioncontext.h"
 #include "apsi/sender/senderthreadcontext.h"
+#include "apsi/ffield/ffield.h"
+#include "apsi/ffield/ffield_crt_builder.h"
 
 // SEAL
 #include "seal/memorypoolhandle.h"
@@ -21,8 +23,6 @@
 #include "seal/ciphertext.h"
 #include "seal/context.h"
 #include "seal/polycrt.h"
-#include "seal/util/exfield.h"
-#include "seal/util/exfieldpolycrt.h"
 
 // CryptoTools
 #include "cryptoTools/Network/IOService.h"
@@ -130,13 +130,15 @@ namespace apsi
 
             seal::MemoryPoolHandle pool_;
 
-            std::shared_ptr<seal::util::ExField> ex_field_;
+            std::shared_ptr<FField> ex_field_;
 
             std::shared_ptr<seal::SEALContext> seal_context_;
 
             std::shared_ptr<seal::Evaluator> evaluator_;
 
             std::shared_ptr<seal::PolyCRTBuilder> builder_;
+
+            std::shared_ptr<FFieldCRTBuilder> ex_builder_;
 
             /* Sender's database, including raw data, hashed data, ExField data, and symmetric polynomials. */
             SenderDB sender_db_;
