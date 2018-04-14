@@ -8,6 +8,8 @@
 #include "apsi/network/network_utils.h"
 #include "apsi/ffield/ffield_crt_builder.h"
 
+#include "seal/util/common.h"
+
 #include "cryptoTools/Common/Log.h"
 
 using namespace std;
@@ -54,7 +56,11 @@ namespace apsi
             }
             else
             {
-                ex_builder_.reset(new FFieldCRTBuilder(ex_field_, params_.encryption_params().poly_modulus().coeff_count() - 1, FFieldElt(ex_field_, "1x^1")));
+                ex_builder_.reset(new FFieldCRTBuilder(
+                    ex_field_, 
+                    get_power_of_two(params_.encryption_params().poly_modulus().coeff_count() - 1), 
+                    FFieldElt(ex_field_, "1x^1"))
+                );
             }
             vector<thread> thrds(total_thread_count_);
 
@@ -205,7 +211,15 @@ namespace apsi
             if (true)
             {
                 //std::vector<u64> integer_batch;
-                builder_->decompose(p, dest, pool_);
+                if(builder_)
+                {
+                    builder_->decompose(p, dest, pool_);
+                }
+                else
+                {
+                    throw runtime_error("not implemented");
+                    // ex_builder_->decompose(dest, p);
+                }
 
                 //for (int k = 0; k < integer_batch.size(); k++)
                 //    *dest[k].pointer(0) = integer_batch[k];
@@ -330,8 +344,8 @@ namespace apsi
                         compute_batch_powers(batch, query, powers[batch], session_context, thread_context);
                         batch_powers_computed[batch].first.set_value();
 
-                        debug_query[batch].resize(params_.batch_size());
-                        debug_decrypt(session_context, powers[batch][1], debug_query[batch]);
+                        // debug_query[batch].resize(params_.batch_size());
+                        // debug_decrypt(session_context, powers[batch][1], debug_query[batch]);
                     }
 
                     for (auto& b : batch_powers_computed)

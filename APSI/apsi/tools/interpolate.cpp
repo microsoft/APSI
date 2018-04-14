@@ -1,6 +1,7 @@
 #include "seal/util/polyarithsmallmod.h"
 #include "apsi/tools/interpolate.h"
 #include "apsi/ffield/ffield.h"
+#include "apsi/ffield/ffield_array.h"
 
 using namespace std;
 using namespace seal;
@@ -43,33 +44,41 @@ namespace apsi
         for(size_t i = 0; i < size; i++)
         {
             divided_differences.emplace_back(field, size - i);
-            divided_differences[i].set(0, values.get(i));
+            divided_differences[i].set(0, i, values);
         }
 
         for(size_t j = 0; j < size; j++)
         {
             for(size_t i = 0; i < size - j; i++)
             {
-                numerator = divided_differences[i + 1].get(j - 1) - divided_differences[i].get(j - 1);
-                denominator = points.get(i + j) - points.get(i);
-                divided_differences[i].set(j, numerator / denominator);
+                fq_nmod_sub(numerator.data(), divided_differences[i + 1].data() + (j - 1), divided_differences[i].data() + (j - 1), field->ctx());
+                // numerator = divided_differences[i + 1].get(j - 1) - divided_differences[i].get(j - 1);
+                fq_nmod_sub(denominator.data(), points.data() + (i + j), points.data() + i, field->ctx());
+                // denominator = points.get(i + j) - points.get(i);
+                // divided_differences[i].set(j, numerator / denominator);
+                fq_nmod_div(divided_differences[i].data() + j, numerator.data(), denominator.data(), field->ctx());
             }
         }
 
         // Horner's method
+        FFieldElt temp(field);
         result.set(0, divided_differences[0].get(size - 1));
         for(size_t i = 1; i < size; i++)
         {
             for(int64_t j = i - 1; j >= 0; j--)
             {
-                result.set(j + 1, result.get(j));
+                result.set(j + 1, j, result);
             }
             result.set_zero(0);
             for (size_t j = 0; j < i; j++) 
             {
-                result.set(j, result.get(j) - points.get(size - 1 - i) * result.get(j + 1));
+                fq_nmod_mul(temp.data(), points.data() + (size - 1 - i), result.data() + (j + 1), field->ctx());
+                fq_nmod_sub(result.data() + j, result.data() + j, temp.data(), field->ctx());
+                // temp = points.get(size - 1 - i) * result.get(j + 1);
+                // result.set(j, result.get(j) - points.get(size - 1 - i) * result.get(j + 1));
             }
-            result.set(0, result.get(0) + divided_differences[0].get(size - 1 - i));
+            fq_nmod_add(result.data(), result.data(), divided_differences[0].data() + (size - 1 - i), field->ctx());
+            // result.set(0, result.get(0) + divided_differences[0].get(size - 1 - i));
         }
     }
 

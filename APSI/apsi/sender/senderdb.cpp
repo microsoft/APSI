@@ -625,30 +625,59 @@ namespace apsi
             }
 
             batched_label_coeffs.resize(max_size);
-            std::vector<u64> temp(items_per_batch_);
 
-            for (int s = 0; s < max_size; s++)
+            if(builder)
             {
-                Plaintext &batched_coeff = batched_label_coeffs[s];
-
-                for (int b = 0; b < items_per_batch_; b++)
+                std::vector<u64> temp(items_per_batch_);
+                for (int s = 0; s < max_size; s++)
                 {
-                    if (poly_size[b] > s)
+                    Plaintext &batched_coeff = batched_label_coeffs[s];
+                    for (int b = 0; b < items_per_batch_; b++)
                     {
-                        temp[b] = label_coeffs(b, s);
+                        if (poly_size[b] > s)
+                        {
+                            temp[b] = label_coeffs(b, s);
+                        }
+                        else
+                        {
+                            temp[b] = 0;
+                        }
                     }
-                    else
-                    {
-                        temp[b] = 0;
-                    }
+
+                    batched_coeff.reserve(
+                        params.encryption_params().coeff_modulus().size() *
+                        params.encryption_params().poly_modulus().coeff_count());
+
+                    builder->compose(temp, batched_coeff);
+                    evaluator->transform_to_ntt(batched_coeff);
                 }
-
-                batched_coeff.reserve(
-                    params.encryption_params().coeff_modulus().size() *
-                    params.encryption_params().poly_modulus().coeff_count());
-
-                builder->compose(temp, batched_coeff);
-                evaluator->transform_to_ntt(batched_coeff);
+            }
+            else
+            {
+                throw runtime_error("not implemented");
+                // FFieldArray temp(context.exfield(), items_per_batch_);
+                // for (int s = 0; s < max_size; s++)
+                // {
+                //     Plaintext &batched_coeff = batched_label_coeffs[s];
+                //     for (int b = 0; b < items_per_batch_; b++)
+                //     {
+                //         if (poly_size[b] > s)
+                //         {
+                //             temp.set(b, label_coeffs(b, s));
+                //         }
+                //         else
+                //         {
+                //             temp.set_zero(b);
+                //         }
+                //     }
+                //
+                //     batched_coeff.reserve(
+                //         params.encryption_params().coeff_modulus().size() *
+                //         params.encryption_params().poly_modulus().coeff_count());
+                //
+                //     ex_builder->compose(batched_coeff, temp);
+                //     evaluator->transform_to_ntt(batched_coeff);
+                // }
             }
 
 
