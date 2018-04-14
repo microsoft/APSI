@@ -13,7 +13,7 @@
 #include "seal/memorypoolhandle.h"
 
 // CryptoTools
-#include "cryptoTools/Common/Matrix.h"
+#include "cryptoTools/Common/MatrixView.h"
 #include "cryptoTools/Crypto/PRNG.h"
 
 namespace apsi
@@ -79,18 +79,17 @@ namespace apsi
                 {
                     throw std::logic_error("MemoryPoolHandle is null");
                 }
-
-                if (!symm_block_)
+                if (!symm_block_vec_)
                 {
-                    symm_block_.reset(new FFieldArray(exfield_, params.batch_size() * (params.split_size() + 1)));
+                    symm_block_vec_.reset(new FFieldArray(exfield_, params.batch_size() * (params.split_size() + 1)));
                     // symm_block_vec_.resize(params.batch_size() * (params.split_size() + 1), FFieldElt(exfield_));
-                    // symm_block_ = oc::MatrixView<FFieldElt>(symm_block_vec_.begin(), symm_block_vec_.end(), params.split_size() + 1);
+                    symm_block_ = oc::MatrixView<_ffield_array_elt_t>(symm_block_vec_->data(), params.batch_size(), params.split_size() + 1);
                 }
             }
 
-            inline FFieldArray &symm_block()
+            inline oc::MatrixView<_ffield_array_elt_t> symm_block()
             {
-                return *symm_block_;
+                return symm_block_;
             }
 
             oc::PRNG& prng()
@@ -105,7 +104,9 @@ namespace apsi
 
             std::shared_ptr<FField> exfield_;
 
-            std::unique_ptr<FFieldArray> symm_block_;
+            std::unique_ptr<FFieldArray> symm_block_vec_;
+
+            oc::MatrixView<_ffield_array_elt_t> symm_block_;
             
             oc::PRNG prng_;
         };

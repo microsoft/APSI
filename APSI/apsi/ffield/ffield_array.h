@@ -350,12 +350,12 @@ namespace apsi
             return !operator ==(compare);
         }
 
-        inline _ffield_array_t data()
+        inline _ffield_array_elt_t *data()
         {
             return array_;
         }
 
-        inline _ffield_array_const_t data() const
+        inline const _ffield_array_elt_t *data() const
         {
             return array_;
         }

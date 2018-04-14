@@ -312,25 +312,22 @@ namespace apsi
 
         void DBBlock::symmetric_polys(
             SenderThreadContext &context,
-            FFieldArray &symm_block,
+            MatrixView<_ffield_array_elt_t> symm_block,
             int encoding_bit_length,
             FFieldElt &neg_null_element)
         {
             int split_size = items_per_split_;
             int split_size_plus_one = split_size + 1;
             int batch_size = items_per_batch_;
-            shared_ptr<FField> &exfield = context.exfield();
-
             auto num_rows = batch_size;
+            auto &ctx = context.exfield()->ctx();
 
-            FFieldElt one(exfield->one());
-            FFieldElt temp11(exfield), temp2(exfield), *temp1;
-
+            FFieldElt temp11(context.exfield()), temp2(context.exfield()), *temp1;
             Position pos;
-
             for (pos.batch_offset = 0; pos.batch_offset < num_rows; pos.batch_offset++)
             {
-                symm_block.set(pos.batch_offset * split_size_plus_one + split_size, one);
+                fq_nmod_one(&symm_block(pos.batch_offset, split_size), ctx);
+                // symm_block.set(pos.batch_offset * split_size_plus_one + split_size, one);
 
                 for (pos.split_offset = split_size - 1; pos.split_offset >= 0; pos.split_offset--)
                 {
@@ -348,23 +345,23 @@ namespace apsi
                         temp1->neg();
                     }
 
-                    auto symm_block_ptr = symm_block.data() + pos.batch_offset * split_size_plus_one + pos.split_offset + 1;
+                    auto symm_block_ptr = &symm_block(pos.batch_offset, pos.split_offset + 1);
 
                     // symm_block.set(pos.batch_offset * split_size_plus_one + pos.split_offset, symm_block.get(pos.batch_offset * split_size_plus_one + (pos.split_offset + 1)) * *temp1);
                     fq_nmod_mul(
                         symm_block_ptr - 1, 
                         symm_block_ptr,
-                        temp1->data(), exfield->ctx());
+                        temp1->data(), ctx);
 
                     for (int k = pos.split_offset + 1; k < split_size; k++, symm_block_ptr++)
                     {
                         // temp2 = symm_block.get(pos.batch_offset * split_size_plus_one + (k + 1)) * *temp1;
                         // symm_block.set(pos.batch_offset * split_size_plus_one + k, symm_block.get(pos.batch_offset * split_size_plus_one + k) + temp2);
-                        fq_nmod_mul(temp2.data(), temp1->data(), symm_block_ptr + 1, exfield->ctx());
+                        fq_nmod_mul(temp2.data(), temp1->data(), symm_block_ptr + 1, ctx);
                         fq_nmod_add(
                             symm_block_ptr, 
                             symm_block_ptr,
-                            temp2.data(), exfield->ctx());
+                            temp2.data(), ctx);
                     }
                 }
             }
@@ -372,7 +369,7 @@ namespace apsi
 
         void DBBlock::randomized_symmetric_polys(
             SenderThreadContext &context,
-            FFieldArray &symm_block,
+            MatrixView<_ffield_array_elt_t> symm_block,
             int encoding_bit_length,
             FFieldElt &neg_null_element)
         {
@@ -428,6 +425,7 @@ namespace apsi
         {
             // Get the symmetric block
             auto symm_block = context.symm_block();
+            auto &ctx = context.exfield()->ctx();
 
             int table_size = params_.table_size(),
                 split_size = params_.split_size(),
@@ -472,7 +470,7 @@ namespace apsi
                         Plaintext &poly = batch_random_symm_polys_[idx];
                         for (int k = 0; batch_start + k < batch_end; k++)
                         {
-                            integer_batch_vector[k] = symm_block.get_coeff_of(k * split_size_plus_one + i, 0);
+                            integer_batch_vector[k] = symm_block(k, i).coeffs[0];
                         }
                         builder->compose(integer_batch_vector, poly);
                         evaluator->transform_to_ntt(poly, local_pool);
@@ -487,7 +485,8 @@ namespace apsi
                         // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
                         for (int k = 0; batch_start + k < batch_end; k++)
                         {
-                            batch_vector.set(k, k * split_size_plus_one + i, symm_block);
+                            fq_nmod_set(batch_vector.data() + k, &symm_block(k, i), ctx); 
+                            // batch_vector.set(k, k * split_size_plus_one + i, symm_block);
                         }
                         ex_builder->compose(poly, batch_vector);
                         evaluator->transform_to_ntt(poly, local_pool);

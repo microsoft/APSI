@@ -19,7 +19,6 @@ namespace apsi
         cout << endl;
     }
 
-
     void ffield_newton_interpolate_poly(
         const FFieldArray &points, const FFieldArray &values,
         FFieldArray& result)
