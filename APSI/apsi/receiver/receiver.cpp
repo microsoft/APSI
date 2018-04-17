@@ -244,10 +244,13 @@ namespace apsi
                     receiver_null_item))
             );
 
-            if (cuckoo->encoding_bit_length() >= seal::util::get_significant_bit_count(ex_field_->ch()) * ex_field_->degree())
+            auto coeff_bit_count = seal::util::get_significant_bit_count(ex_field_->ch()) - 1;
+            auto degree = ex_field_ ? ex_field_->degree() : 1;
+
+            if (cuckoo->encoding_bit_length() > coeff_bit_count * degree)
             {
                 cout << "Reduced items too long. Only have " <<
-                    seal::util::get_significant_bit_count(params_.exfield_characteristic()) - 1 << " bits." << endl;
+                    coeff_bit_count * degree << " bits." << endl;
                 throw runtime_error(LOCATION);
             }
             else
@@ -492,6 +495,7 @@ namespace apsi
                 for (int k = 0; k < integer_batch.size(); k++)
                 {
                     auto &is_zero = has_label[k];
+                    auto idx = table_to_input_map[base_idx + k];
 
                     if (short_strings)
                         is_zero = integer_batch[k] == 0;
@@ -501,12 +505,18 @@ namespace apsi
                     if (is_zero)
                     {
                         has_result = true;
-                        auto idx = table_to_input_map[base_idx + k];
 
-                        //std::cout << "hit   "<< items[idx] <<" @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << std::endl;
+                        std::cout << "hit   " << (block)items[idx] <<" @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << std::endl;
                         ret_bools[idx] = true;
                     }
 
+
+                    if (idx!= -1 && short_strings == false)
+                    {
+                        std::cout << "item[" << idx << "]  " << (block)items[idx] << " @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << std::endl
+                            << "     " << batch.get(k) << std::endl;;
+
+                    }
                     //if (k < 10) std::cout << (k ? ", " : "") << integer_batch[k];
                 }
                 //std::cout << "..." << endl;
@@ -533,16 +543,16 @@ namespace apsi
                             auto idx = table_to_input_map[base_idx + k];
 
                             //std::cout << "label["<< idx<<"] " << items[idx] << " @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << "  ~  " <<std::hex<< integer_batch[k] <<std::dec << std::endl;
-                            auto dest = &ret_labels(idx, 0);
                             u8* src;
                             if (short_strings)
                             {
                                 src = (u8*)&integer_batch[k];
-                                memcpy(dest, src, ret_labels.stride());
+                                memcpy(&ret_labels(idx, 0), src, ret_labels.stride());
                             }
                             else
                             {
-                                throw runtime_error("not implemented");
+                                batch.get(k).decode(ret_labels[idx], params_.get_label_bit_count());
+                                //throw runtime_error("not implemented");
                                 // src = (u8*)batch[k].pointer(0);
                             }
 
@@ -562,6 +572,7 @@ namespace apsi
             std::vector<uint64_t> &integer_batch,
             FFieldArray &batch)
         {
+            throw std::runtime_error("outdated code");
             decrypt(tmp, p);
 
             if (polycrtbuilder_)

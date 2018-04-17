@@ -78,9 +78,9 @@ namespace apsi
             // the number of items that are in a split. 
             int items_per_split_;
 
-            std::vector<seal::Plaintext> batched_label_coeffs;
+            std::vector<seal::Plaintext> batched_label_coeffs_;
 
-            oc::Matrix<u64> label_coeffs;
+            oc::Matrix<u64> label_coeffs_;
 
             /**
             Computes the symmetric polynomials for the specified split and the specified batch in sender's database.

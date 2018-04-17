@@ -58,7 +58,7 @@ void print_example_banner(string title)
             << endl;
     }
 }
-
+ 
 vector<Item> randSubset(const vector<Item>& items, int size)
 {
     oc::PRNG prn(oc::ZeroBlock);
@@ -79,9 +79,12 @@ vector<Item> randSubset(const vector<Item>& items, int size)
     return ret;
 }
 
+
+
+
+
 int main(int argc, char *argv[])
 {
-
     CLP cmd(argc, argv);
 
     // Thread count
@@ -120,24 +123,24 @@ int main(int argc, char *argv[])
 
     if (unitTest)
     {
-        assert("NOT IMPLEMENTED");
-        // auto tests = apsi_tests;
-        // //tests += tests_cryptoTools::Tests;
-        //
-        // if (cmd.isSet("list"))
-        // {
-        //     tests.list();
-        // }
-        // else
-        // {
-        //     cmd.setDefault("loop", 1);
-        //     auto loop = cmd.get<u64>("loop");
-        //
-        //     if (cmd.hasValue(unitTestTag))
-        //         tests.run(cmd.getMany<u64>(unitTestTag), loop);
-        //     else
-        //         tests.runAll(loop);
-        // }
+        //assert("NOT IMPLEMENTED");
+         auto tests = apsi_tests;
+         //tests += tests_cryptoTools::Tests;
+        
+         if (cmd.isSet("list"))
+         {
+             tests.list();
+         }
+         else
+         {
+             cmd.setDefault("loop", 1);
+             auto loop = cmd.get<u64>("loop");
+        
+             if (cmd.hasValue(unitTestTag))
+                 tests.run(cmd.getMany<u64>(unitTestTag), loop);
+             else
+                 tests.runAll(loop);
+         }
     }
 
     // Example: Slow batching vs. Fast batching
@@ -166,7 +169,7 @@ std::string print(span<u8> s)
     std::stringstream ss;
     for (int i = 0; i < s.size(); ++i)
     {
-        ss << (i ? ", " : "{ ") << std::setw(2) << std::setfill('0') << std::hex<< s[i];
+        ss << (i ? ", " : "{ ") << std::setw(2) << std::setfill('0') << std::hex << s[i];
     }
 
     ss << " }";
@@ -328,8 +331,6 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
 
     // Done with everything. Print the results!
     bool correct = true;
-
-    //std::unordered_map<int, ExFieldElement> in(intersection.begin(), intersection.end());
     for (int i = 0; i < c1.size(); i++)
     {
 
@@ -337,7 +338,7 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
         {
             if (intersection.first[i] == false)
             {
-                cout << "Miss result for receiver's item at index: " << i << endl;  
+                cout << "Miss result for receiver's item at index: " << i << endl;
                 correct = false;
             }
             else
@@ -345,11 +346,11 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
                 u64 l = 0, exp = *(u64*)&c1[i];
                 auto label = intersection.second[i];
                 memcpy(&l, label.data(), label.size());
-                
+
 
                 if (l != exp)
                 {
-                    std::cout << "incorrect label at index: " << i << ". actual: " << print(label) <<" " << l << ", expected: " << exp << std::endl;
+                    std::cout << "incorrect label at index: " << i << ". actual: " << print(label) << " " << l << ", expected: " << exp << std::endl;
                 }
             }
         }
@@ -362,7 +363,6 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
             }
         }
     }
-
     cout << "Intersection results: " << (correct ? "Correct" : "Incorrect") << endl;
 
     //cout << '[';
@@ -393,34 +393,6 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     print_example_banner("Example: Slow batching");
     stop_watch.time_points.clear();
 
-    /* Use generalized batching. */
-
-    //PSIParams params(1, 1, 1, 10, 448, 1, 32);
-    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    //params.set_exfield_polymod(string("1x^8 + 3"));
-    //params.set_exfield_characteristic(0xE801);
-    //params.set_log_poly_degree(13);
-    //params.set_coeff_mod_bit_count(189); 
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
-    //PSIParams params(1, 1, 1, 9, 896, 1, 64);
-    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    //params.set_exfield_polymod(string("1x^8 + 7"));
-    //params.set_exfield_characteristic(0x3401);
-    //params.set_log_poly_degree(12);
-    //params.set_coeff_mod_bit_count(189); 
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
-
-    //PSIParams params(1, 1, 1, 8, 1792, 1, 128);
-    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    //params.set_exfield_polymod(string("1x^8 + 7"));
-    //params.set_exfield_characteristic(0x3401);
-    //params.set_log_poly_degree(12);
-    //params.set_coeff_mod_bit_count(189); 
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
-
 
     // Thread count
     unsigned numThreads = cmd.get<int>("t");
@@ -432,7 +404,9 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     unsigned binning_sec_level = 30;
 
     // Length of items
-    unsigned item_bit_length = 90;
+    unsigned item_bit_length = 60;
+
+    unsigned label_bit_length = cmd.isSet("useLabels") ? item_bit_length : 0;
 
     // Cuckoo hash parameters
     CuckooParams cuckoo_params;
@@ -494,79 +468,85 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     Creating the PSIParams class.
     */
     PSIParams params(item_bit_length, table_params, cuckoo_params, seal_params, oprf_type);
-
+    params.set_value_bit_count(label_bit_length);
     params.validate();
 
-    //PSIParams params(1, 1, 1, 9, 7936, 1, 256);
-    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    //params.set_exfield_polymod(string("1x^8 + 7"));
-    //params.set_exfield_characteristic(0x3401);
-    //params.set_log_poly_degree(12);
-    //params.set_coeff_mod_bit_count(189);
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
-
-    //PSIParams params(8, 8, 1, 10, 52736, 2, 256);
-    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    //params.set_exfield_polymod(string("1x^8 + 3"));
-    //params.set_exfield_characteristic(0xE801);
-    //params.set_log_poly_degree(13);
-    //params.set_coeff_mod_bit_count(189);
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
-
-    //PSIParams params(2, 2, 1, 10, 13056, 2, 256);
-    //params.set_item_bit_length(90); // We can handle very long items in the following ExField.
-    //params.set_exfield_polymod(string("1x^8 + 3"));
-    //params.set_exfield_characteristic(0xE801);
-    //params.set_log_poly_degree(13);
-    //params.set_coeff_mod_bit_count(189);
-    //params.set_decomposition_bit_count(60);
-    //params.validate();
 
     Receiver receiver(params, 1, MemoryPoolHandle::New(true));
     Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New(true));
     //sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
     //sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 
-    auto actual_size = 1000;// sender_set_size;
+    auto sendersActualSize = 10;// sender_set_size;
+    auto recversActualSize = 1;
+    auto intersectionSize = 1;
 
-    auto s1 = vector<Item>(actual_size);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
-    for (int i = 0; i < s1.size(); ++i)
-        s1[i][0] = i;
+    auto s1 = vector<Item>(sendersActualSize);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
+    oc::Matrix<u8> labels(sendersActualSize, params.get_label_byte_count());
+    for (int i = 0; i < s1.size(); i++)
+    {
+        s1[i] = i;
 
-    auto intersectionSize = 100;
+        if(label_bit_length)
+            memcpy(labels[i].data(), &s1[i], labels[i].size());
+        //// Insert random string
+        //s1[i] = oc::mAesFixedKey.ecbEncBlock(oc::toBlock(i));
+    }
+
     auto c1 = randSubset(s1, intersectionSize);
-    c1.reserve(c1.size() + 100);
-    for (u64 i = 0; i < 100; ++i)
+    for (int i = 0; i < c1.size(); ++i)
+        if(label_bit_length)
+            std::cout << "exp intersection[" << i << "] = " << s1[i] << ", label = " << print(labels[i]) << std::endl;
+        else
+            std::cout << "exp intersection[" << i << "] = " << s1[i] << std::endl;
+
+    c1.reserve(recversActualSize);
+    for (int i = 0; i < (recversActualSize - intersectionSize); ++i)
         c1.emplace_back(i + s1.size());
 
     stop_watch.set_time_point("Application preparation");
-    sender.load_db(s1);
+    sender.load_db(s1, labels);
     stop_watch.set_time_point("Sender pre-processing");
 
     auto thrd = thread([&]() {sender.query_session(sendChl); });
     auto intersection = receiver.query(c1, recvChl);
     thrd.join();
 
-    cout << "Intersection result: ";
-    //bool correct = true;
-    //for (int i = 0; i < intersection.size(); i++)
-    //{
-    //    if (intersection[i].first != (i < intersectionSize))
-    //    {
-    //        cout << "Incorrect result for receiver's item at index: " << i << endl;
-    //        correct = false;
-    //    }
-    //}
-    //correct &= intersection.size() == intersectionSize;
-    //cout << (correct ? "correct" : "incorrect") << endl;
+    // Done with everything. Print the results!
+    bool correct = true;
+    for (int i = 0; i < c1.size(); i++)
+    {
 
-    //cout << "Intersection result: ";
-    //cout << '[';
-    //for (int i = 0; i < intersection.size(); i++)
-    //    cout << intersection[i] << ", ";
-    //cout << ']' << endl;
+        if (i < intersectionSize)
+        {
+            if (intersection.first[i] == false)
+            {
+                cout << "Miss result for receiver's item at index: " << i << endl;
+                correct = false;
+            }
+            else if(label_bit_length)
+            {
+                u64 l = 0, exp = *(u64*)&c1[i];
+                auto label = intersection.second[i];
+                memcpy(&l, label.data(), label.size());
+
+
+                if (l != exp)
+                {
+                    std::cout << "incorrect label at index: " << i << ". actual: " << print(label) << " " << l << ", expected: " << exp << std::endl;
+                }
+            }
+        }
+        else
+        {
+            if (intersection.first[i])
+            {
+                cout << "Incorrect result for receiver's item at index: " << i << endl;
+                correct = false;
+            }
+        }
+    }
+    cout << "Intersection results: " << (correct ? "Correct" : "Incorrect") << endl;
 
     cout << stop_watch << endl;
 }
@@ -998,3 +978,4 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 //
 //    cout << stop_watch << endl;
 //}
+ 

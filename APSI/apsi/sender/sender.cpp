@@ -123,7 +123,9 @@ namespace apsi
                     int thread_context_idx = acquire_thread_context();
                     SenderThreadContext &context = thread_contexts_[thread_context_idx];
                     sender_db_.batched_randomized_symmetric_polys(context, evaluator_, builder_, ex_builder_, total_thread_count_);
-                    sender_db_.batched_interpolate_polys(context, total_thread_count_, evaluator_, builder_, ex_builder_);
+
+                    if(params_.get_label_bit_count())   
+                        sender_db_.batched_interpolate_polys(context, total_thread_count_, evaluator_, builder_, ex_builder_);
                     release_thread_context(context.id());
                 });
             }
@@ -395,19 +397,19 @@ namespace apsi
                         {
                             auto& block = sender_db_.get_block(batch, split);
 
-                            if (block.batched_label_coeffs.size() > 1)
+                            if (block.batched_label_coeffs_.size() > 1)
                             {
                                 // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
                                 // Observe that the first call to mult is always multiplying coeff[0] by 1....
 
-                                // TODO: edge case where all block.batched_label_coeffs[s] are zero.
+                                // TODO: edge case where all block.batched_label_coeffs_[s] are zero.
 
                                 // label_result = coeff[0] * x^0 = coeff[0];
                                 int s = 0;
-                                while (block.batched_label_coeffs[s].is_zero()) ++s;
+                                while (block.batched_label_coeffs_[s].is_zero()) ++s;
 
 
-                                evaluator_->multiply_plain_ntt(powers[batch][s], block.batched_label_coeffs[s], label_results[curr_label]);
+                                evaluator_->multiply_plain_ntt(powers[batch][s], block.batched_label_coeffs_[s], label_results[curr_label]);
 
                                 // debug
                                 //bool print = batch == 0 && split == 0;
@@ -419,12 +421,12 @@ namespace apsi
                                 //    throw std::runtime_error(LOCATION);
 
 
-                                while(++s < block.batched_label_coeffs.size())
+                                while(++s < block.batched_label_coeffs_.size())
                                 {
                                     // label_result += coeff[s] * x^s;
-                                    if (block.batched_label_coeffs[s].is_zero() == false)
+                                    if (block.batched_label_coeffs_[s].is_zero() == false)
                                     {
-                                        evaluator_->multiply_plain_ntt(powers[batch][s], block.batched_label_coeffs[s], tmp);
+                                        evaluator_->multiply_plain_ntt(powers[batch][s], block.batched_label_coeffs_[s], tmp);
                                         evaluator_->add(tmp, label_results[curr_label], label_results[curr_label ^ 1]);
                                         curr_label ^= 1;
 
@@ -444,19 +446,19 @@ namespace apsi
 
 
                                 //// label_result += coeff[0];
-                                //evaluator_->add_plain(label_results[curr_label], block.batched_label_coeffs[0], label_results[curr_label ^ 1]);
+                                //evaluator_->add_plain(label_results[curr_label], block.batched_label_coeffs_[0], label_results[curr_label ^ 1]);
                                 //curr_label ^= 1;
                             }
-                            else if (block.batched_label_coeffs.size())
+                            else if (block.batched_label_coeffs_.size())
                             {
                                 // only reachable if user calls PSIParams.set_use_low_degree_poly(true);
 
                                 // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
                                 // Observe that the first call to mult is always multiplying coeff[0] by 1....
 
-                                // TODO: edge case where block.batched_label_coeffs[0] is zero. 
+                                // TODO: edge case where block.batched_label_coeffs_[0] is zero. 
 
-                                evaluator_->multiply_plain_ntt(powers[batch][0], block.batched_label_coeffs[0], label_results[curr_label]);
+                                evaluator_->multiply_plain_ntt(powers[batch][0], block.batched_label_coeffs_[0], label_results[curr_label]);
                             }
                             else
                             {

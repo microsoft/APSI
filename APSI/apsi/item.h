@@ -62,7 +62,7 @@ namespace apsi
         @param[in] i The i-th part.
         @param[in] split_length Bit length of each part.
         */
-        std::uint64_t item_part(std::uint32_t i, std::uint32_t split_length);
+        //std::uint64_t item_part(std::uint32_t i, std::uint32_t split_length);
 
         Item& operator =(const std::string &assign);
 

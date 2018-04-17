@@ -116,8 +116,8 @@ namespace apsi
 
         void SenderDB::add_data(oc::span<const Item> data, oc::MatrixView<u8> values, int thread_count)
         {
-            if (values.stride() != 0 && values.stride() != params_.get_label_byte_count())
-                throw std::invalid_argument("values.stride()");
+            if (values.stride() != params_.get_label_byte_count())
+                throw std::invalid_argument("unexpacted label length");
 
             vector<thread> thrds(thread_count);
             for (int t = 0; t < thrds.size(); t++)
@@ -192,7 +192,7 @@ namespace apsi
                             //    << db_block.batch_idx_ << ", " << db_block.split_idx_ << ") "
                             //    << " @ " << pos.batch_offset << " " << pos.split_offset << std::endl;
 
-                            if (values.size())
+                            if (params_.get_label_bit_count())
                             {
                                 auto dest = db_block.get_label(pos);
                                 memcpy(dest, values[i].data(), params_.get_label_byte_count());
@@ -340,6 +340,14 @@ namespace apsi
                     else
                     {
                         get_key(pos).to_exfield_element(temp11, encoding_bit_length);
+
+#ifdef _DEBUG
+                        // check that decode results in the same value;
+                        std::vector<u8> buff((encoding_bit_length + 7) / 8);
+                        temp11.decode(span<u8>{buff}, encoding_bit_length);
+                        if (memcmp(get_key(pos).data(), buff.data(), buff.size()))
+                            throw std::runtime_error("");
+#endif
                         //ostreamLock(std::cout) << "sender(" << pos.batch_offset << ", " << pos.split_offset<< ") " << get_key(pos) << std::endl;
                         temp1 = &temp11;
                         temp1->neg();
@@ -503,7 +511,16 @@ namespace apsi
             shared_ptr<FFieldCRTBuilder> ex_builder)
         {
             auto& mod = params_.encryption_params().plain_modulus();
-            if (params_.get_label_bit_count() >= seal::util::get_significant_bit_count(mod.value()))
+
+            // minus 1 to be safe.
+            auto coeffBitCount = seal::util::get_significant_bit_count(mod.value()) - 1;
+            auto degree = 1;
+            if (ex_builder)
+            {
+                degree = ex_builder->field()->degree();
+            }
+
+            if (params_.get_label_bit_count() >= coeffBitCount * degree)
             {
                 throw std::runtime_error("labels are too large for exfield.");
             }
@@ -535,14 +552,15 @@ namespace apsi
             int max_size = 0;
             std::vector<int> poly_size(items_per_batch_);
             std::vector<std::pair<u64, u64>> inputs; inputs.resize(items_per_split_);
-            label_coeffs.resize(items_per_batch_, items_per_split_);
+            label_coeffs_.resize(items_per_batch_, items_per_split_);
             MemoryPoolHandle local_pool = context.pool();
             Position pos;
 
-            if (value_byte_length_> sizeof(u64))
+            if (params.get_label_bit_count() > 63)
             {
-                throw std::runtime_error("labels too large");
+                throw std::runtime_error("need a different interpolation code to handle more than 64 bits");
             }
+
 
             for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
             {
@@ -616,7 +634,7 @@ namespace apsi
                 {
                     max_size = std::max<int>(max_size, inputs.size());
                     poly_size[pos.batch_offset] = inputs.size();
-                    auto px = label_coeffs[pos.batch_offset].subspan(0, inputs.size());
+                    auto px = label_coeffs_[pos.batch_offset].subspan(0, inputs.size());
 
                     if (px.size() != inputs.size())
                         throw std::runtime_error("");
@@ -624,19 +642,19 @@ namespace apsi
                 }
             }
 
-            batched_label_coeffs.resize(max_size);
+            batched_label_coeffs_.resize(max_size);
 
             if(builder)
             {
                 std::vector<u64> temp(items_per_batch_);
                 for (int s = 0; s < max_size; s++)
                 {
-                    Plaintext &batched_coeff = batched_label_coeffs[s];
+                    Plaintext &batched_coeff = batched_label_coeffs_[s];
                     for (int b = 0; b < items_per_batch_; b++)
                     {
                         if (poly_size[b] > s)
                         {
-                            temp[b] = label_coeffs(b, s);
+                            temp[b] = label_coeffs_(b, s);
                         }
                         else
                         {
@@ -654,34 +672,34 @@ namespace apsi
             }
             else
             {
-                throw runtime_error("not implemented");
-                // FFieldArray temp(context.exfield(), items_per_batch_);
-                // for (int s = 0; s < max_size; s++)
-                // {
-                //     Plaintext &batched_coeff = batched_label_coeffs[s];
-                //     for (int b = 0; b < items_per_batch_; b++)
-                //     {
-                //         if (poly_size[b] > s)
-                //         {
-                //             temp.set(b, label_coeffs(b, s));
-                //         }
-                //         else
-                //         {
-                //             temp.set_zero(b);
-                //         }
-                //     }
-                //
-                //     batched_coeff.reserve(
-                //         params.encryption_params().coeff_modulus().size() *
-                //         params.encryption_params().poly_modulus().coeff_count());
-                //
-                //     ex_builder->compose(batched_coeff, temp);
-                //     evaluator->transform_to_ntt(batched_coeff);
-                // }
+
+                 FFieldArray temp(context.exfield(), items_per_batch_);
+                 FFieldElt elem(context.exfield());
+                 for (int s = 0; s < max_size; s++)
+                 {
+                     Plaintext &batched_coeff = batched_label_coeffs_[s];
+                     for (int b = 0; b < items_per_batch_; b++)
+                     {
+                         if (poly_size[b] > s)
+                         {
+                             oc::span<const u64> dest{ &label_coeffs_(b, s), 1 };
+                             elem.encode(dest, params.get_label_bit_count());
+                             temp.set(b, elem);
+                         }
+                         else
+                         {
+                             temp.set_zero(b);
+                         }
+                     }
+                
+                     batched_coeff.reserve(
+                         params.encryption_params().coeff_modulus().size() *
+                         params.encryption_params().poly_modulus().coeff_count());
+                
+                     ex_builder->compose(batched_coeff, temp);
+                     evaluator->transform_to_ntt(batched_coeff);
+                 }
             }
-
-
-            //test_eval(context, mod, evaluator, builder, params);
         }
 
         std::vector<u64> add_(span<u64> x, span<u64> y, const seal::SmallModulus& mod)

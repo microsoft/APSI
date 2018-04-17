@@ -83,30 +83,53 @@ namespace apsi
         return ring_item;
     }
 
-    void Item::to_exfield_element(FFieldElt &ring_item, int bit_length)
+
+    void bitPrint(u8* data, int length, int offset = 0)
     {
-        auto exfield = ring_item.field();
+        oc::BitIterator iter(data, offset);
+
+        for (int i = 0; i < length; ++i)
+        {
+            std::cout << int(*iter);
+            ++iter;
+        }
+        std::cout << std::endl;
+    }
+
+
+    template<typename T>
+    typename std::enable_if<std::is_pod<T>::value>::type
+        encode(FFieldElt &ring_item, oc::span<const T> value, int bit_length)
+    {
+        oc::span<const oc::u8> v2((oc::u8*)value.data(), value.size() * sizeof(T));
 
         // Should minus 1 to avoid wrapping around p
-        int split_length = get_significant_bit_count(exfield->ch()) - 1;
+        int split_length = seal::util::get_significant_bit_count(ring_item.field()->ch()) - 1;
 
         // How many coefficients do we need in the ExFieldElement
         int split_index_bound = (bit_length + split_length - 1) / split_length;
 
-        int j = 0;
-        for (; j < exfield->degree() && j < split_index_bound; j++)
-        {
-            ring_item.set_coeff(j, item_part(j, split_length));
-        }
+        static_assert(std::is_pod<_ffield_elt_coeff_t>::value, "must be pod type");
+        _ffield_elt_coeff_t coeff = 0;
+        oc::span<oc::u8> temp_span((oc::u8*)&coeff, sizeof(_ffield_elt_coeff_t));
 
-        // // Fill remaining ExFieldElement coefficients with zero
-        // for (; j < (exfield->coeff_count() - 1); j++)
-        // {
-        //     *ring_item.pointer(j) = 0;
-        // }
+        auto end = std::min<int>(ring_item.field()->degree(), split_index_bound);
+        for (int j = 0; j < end; j++)
+        {
+            // copy the j'th set of bits in value to temp
+            details::copy_with_bit_offset(v2, j * split_length, split_length, temp_span);
+            //std::cout << j << " " << temp << std::endl;
+
+            std::cout << std::string(j * split_length, ' ');
+            bitPrint((u8*)& coeff, split_length);
+            // the the coeff
+            ring_item.set_coeff(j, coeff);
+        }
     }
 
-    uint64_t Item::item_part(uint32_t i, uint32_t split_length)
+
+
+    uint64_t item_part(const std::array<oc::u64, 2>& value_, uint32_t i, uint32_t split_length)
     {
         int i1 = (i * split_length) >> 6,
             i2 = ((i + 1) * split_length) >> 6,
@@ -129,6 +152,55 @@ namespace apsi
         }
     }
 
+
+    void Item::to_exfield_element(FFieldElt &ring_item, int bit_length)
+    {
+        //ring_item.encode(oc::span<u64>{value_}, bit_length);
+       // bitPrint((u8*)value_.data(), bit_length);
+
+
+
+        auto exfield = ring_item.field();
+
+        // Should minus 1 to avoid wrapping around p
+        int split_length = get_significant_bit_count(exfield->ch()) - 1;
+
+        // How many coefficients do we need in the ExFieldElement
+        int split_index_bound = (bit_length + split_length - 1) / split_length;
+
+        //for (int j = 0; j < exfield->degree() && j < split_index_bound; j++)
+        //{
+        //    std::cout << std::string(split_length - 1, ' ') << '^';
+        //}
+        //std::cout << std::endl;
+
+        int j = 0;
+        for (; j < exfield->degree() && j < split_index_bound; j++)
+        {
+            auto coeff = item_part(value_, j, split_length);
+
+
+            //std::cout << std::string(j * split_length, ' ');
+            //bitPrint((u8*)& coeff, split_length);
+            //std::cout << j << " " << coeff << std::endl;
+
+            ring_item.set_coeff(j, coeff);
+        }
+
+
+        //auto copy = ring_item;
+        //copy.encode(oc::span<const u64>{value_}, bit_length);
+        //if (copy != ring_item)
+        //    throw std::runtime_error(LOCATION);
+
+        // // Fill remaining ExFieldElement coefficients with zero
+        // for (; j < (exfield->coeff_count() - 1); j++)
+        // {
+        //     *ring_item.pointer(j) = 0;
+        // }
+    }
+
+//
     void Item::save(ostream &stream) const
     {
         stream.write(reinterpret_cast<const char*>(&value_), sizeof(value_));
