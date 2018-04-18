@@ -13,6 +13,7 @@
 #include "apsi/sender/senderthreadcontext.h"
 #include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_elt.h"
+#include "apsi/ffield/ffield_array.h"
 #include "apsi/ffield/ffield_crt_builder.h"
 
 // Cuckoo
@@ -80,7 +81,8 @@ namespace apsi
 
             std::vector<seal::Plaintext> batched_label_coeffs_;
 
-            oc::Matrix<u64> label_coeffs_;
+            oc::Matrix<u64> debug_label_coeffs_;
+            std::vector<FFieldArray> debug_sym_block_;
 
             /**
             Computes the symmetric polynomials for the specified split and the specified batch in sender's database.

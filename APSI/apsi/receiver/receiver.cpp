@@ -199,10 +199,10 @@ namespace apsi
 
             if (params_.debug())
             {
-                for (u64 j = 0; j < exfield_items.size(); ++j)
-                {
-                    std::cout << "Exp[" << j << "]: " << exfield_items.get(j) << std::endl;
-                }
+                //for (u64 j = 0; j < exfield_items.size(); ++j)
+                //{
+                //    std::cout << "Exp[" << j << "]: " << exfield_items.get(j) << std::endl;
+                //}
 
                 send_ffield_array(exfield_items, channel);
             }

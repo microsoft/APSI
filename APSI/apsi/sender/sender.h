@@ -159,7 +159,7 @@ namespace apsi
             void debug_decrypt(
                 SenderSessionContext &session_context,
                 const seal::Ciphertext& c,
-                std::vector<oc::u64>& dest);
+                FFieldArray& dest);
 
             std::vector<oc::u64> debug_eval_term(
                 int term, oc::MatrixView<apsi::u64> coeffs, 
@@ -168,7 +168,7 @@ namespace apsi
                 bool print = false);
 
             bool debug_not_equals(
-                oc::span<u64> true_x,
+                FFieldArray& true_x,
                 const seal::Ciphertext& c,
                 SenderSessionContext& ctx);
 

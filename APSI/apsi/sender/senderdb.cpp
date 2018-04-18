@@ -357,7 +357,7 @@ namespace apsi
 
                     // symm_block.set(pos.batch_offset * split_size_plus_one + pos.split_offset, symm_block.get(pos.batch_offset * split_size_plus_one + (pos.split_offset + 1)) * *temp1);
                     fq_nmod_mul(
-                        symm_block_ptr - 1, 
+                        symm_block_ptr - 1,
                         symm_block_ptr,
                         temp1->data(), ctx);
 
@@ -367,7 +367,7 @@ namespace apsi
                         // symm_block.set(pos.batch_offset * split_size_plus_one + k, symm_block.get(pos.batch_offset * split_size_plus_one + k) + temp2);
                         fq_nmod_mul(temp2.data(), temp1->data(), symm_block_ptr + 1, ctx);
                         fq_nmod_add(
-                            symm_block_ptr, 
+                            symm_block_ptr,
                             symm_block_ptr,
                             temp2.data(), ctx);
                     }
@@ -397,7 +397,7 @@ namespace apsi
             {
                 for (int j = 0; j < split_size_plus_one; j++, symm_block_ptr++)
                 {
-                    fq_nmod_mul(symm_block_ptr, symm_block_ptr, r.data() + i, field_ctx); 
+                    fq_nmod_mul(symm_block_ptr, symm_block_ptr, r.data() + i, field_ctx);
                 }
             }
             // FFieldElt r(context.exfield());
@@ -425,11 +425,11 @@ namespace apsi
         }
 
         void SenderDB::batched_randomized_symmetric_polys(
-                SenderThreadContext &context,
-                shared_ptr<Evaluator> evaluator, 
-                shared_ptr<PolyCRTBuilder> builder, 
-                shared_ptr<FFieldCRTBuilder> ex_builder, 
-                int thread_count)
+            SenderThreadContext &context,
+            shared_ptr<Evaluator> evaluator,
+            shared_ptr<PolyCRTBuilder> builder,
+            shared_ptr<FFieldCRTBuilder> ex_builder,
+            int thread_count)
         {
             // Get the symmetric block
             auto symm_block = context.symm_block();
@@ -470,6 +470,12 @@ namespace apsi
                 block.randomized_symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
                 //randomized_symmetric_polys(split, batch, context, symm_block);
 
+                if (params_.debug())
+                {
+                    block.debug_sym_block_.clear();
+                    block.debug_sym_block_.reserve(split_size_plus_one);
+                }
+
                 auto idx = indexer(split, batch, 0);
                 if (builder)
                 {
@@ -486,6 +492,8 @@ namespace apsi
                 }
                 else
                 {
+
+
                     for (int i = 0; i < split_size_plus_one; i++, idx++)
                     {
                         Plaintext &poly = batch_random_symm_polys_[idx];
@@ -493,11 +501,16 @@ namespace apsi
                         // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
                         for (int k = 0; batch_start + k < batch_end; k++)
                         {
-                            fq_nmod_set(batch_vector.data() + k, &symm_block(k, i), ctx); 
+                            fq_nmod_set(batch_vector.data() + k, &symm_block(k, i), ctx);
                             // batch_vector.set(k, k * split_size_plus_one + i, symm_block);
                         }
                         ex_builder->compose(poly, batch_vector);
                         evaluator->transform_to_ntt(poly, local_pool);
+
+                        if (params_.debug())
+                        {
+                            block.debug_sym_block_.push_back(batch_vector);
+                        }
                     }
                 }
             }
@@ -552,7 +565,7 @@ namespace apsi
             int max_size = 0;
             std::vector<int> poly_size(items_per_batch_);
             std::vector<std::pair<u64, u64>> inputs; inputs.resize(items_per_split_);
-            label_coeffs_.resize(items_per_batch_, items_per_split_);
+            debug_label_coeffs_.resize(items_per_batch_, items_per_split_);
             MemoryPoolHandle local_pool = context.pool();
             Position pos;
 
@@ -634,7 +647,7 @@ namespace apsi
                 {
                     max_size = std::max<int>(max_size, inputs.size());
                     poly_size[pos.batch_offset] = inputs.size();
-                    auto px = label_coeffs_[pos.batch_offset].subspan(0, inputs.size());
+                    auto px = debug_label_coeffs_[pos.batch_offset].subspan(0, inputs.size());
 
                     if (px.size() != inputs.size())
                         throw std::runtime_error("");
@@ -644,7 +657,7 @@ namespace apsi
 
             batched_label_coeffs_.resize(max_size);
 
-            if(builder)
+            if (builder)
             {
                 std::vector<u64> temp(items_per_batch_);
                 for (int s = 0; s < max_size; s++)
@@ -654,7 +667,7 @@ namespace apsi
                     {
                         if (poly_size[b] > s)
                         {
-                            temp[b] = label_coeffs_(b, s);
+                            temp[b] = debug_label_coeffs_(b, s);
                         }
                         else
                         {
@@ -673,32 +686,32 @@ namespace apsi
             else
             {
 
-                 FFieldArray temp(context.exfield(), items_per_batch_);
-                 FFieldElt elem(context.exfield());
-                 for (int s = 0; s < max_size; s++)
-                 {
-                     Plaintext &batched_coeff = batched_label_coeffs_[s];
-                     for (int b = 0; b < items_per_batch_; b++)
-                     {
-                         if (poly_size[b] > s)
-                         {
-                             oc::span<const u64> dest{ &label_coeffs_(b, s), 1 };
-                             elem.encode(dest, params.get_label_bit_count());
-                             temp.set(b, elem);
-                         }
-                         else
-                         {
-                             temp.set_zero(b);
-                         }
-                     }
-                
-                     batched_coeff.reserve(
-                         params.encryption_params().coeff_modulus().size() *
-                         params.encryption_params().poly_modulus().coeff_count());
-                
-                     ex_builder->compose(batched_coeff, temp);
-                     evaluator->transform_to_ntt(batched_coeff);
-                 }
+                FFieldArray temp(context.exfield(), items_per_batch_);
+                FFieldElt elem(context.exfield());
+                for (int s = 0; s < max_size; s++)
+                {
+                    Plaintext &batched_coeff = batched_label_coeffs_[s];
+                    for (int b = 0; b < items_per_batch_; b++)
+                    {
+                        if (poly_size[b] > s)
+                        {
+                            oc::span<const u64> dest{ &debug_label_coeffs_(b, s), 1 };
+                            elem.encode(dest, params.get_label_bit_count());
+                            temp.set(b, elem);
+                        }
+                        else
+                        {
+                            temp.set_zero(b);
+                        }
+                    }
+
+                    batched_coeff.reserve(
+                        params.encryption_params().coeff_modulus().size() *
+                        params.encryption_params().poly_modulus().coeff_count());
+
+                    ex_builder->compose(batched_coeff, temp);
+                    evaluator->transform_to_ntt(batched_coeff);
+                }
             }
         }
 
@@ -753,9 +766,9 @@ namespace apsi
         void print_poly(int b, MatrixView<u64> polys)
         {
             std::cout << "P" << b << "(x) = ";
-            for (u64 i = polys.stride(); i != -1 ; --i)
+            for (u64 i = polys.stride(); i != -1; --i)
             {
-                std::cout << polys(b, i) << " * x^" << i << " " << (i? " + " :"");
+                std::cout << polys(b, i) << " * x^" << i << " " << (i ? " + " : "");
             }
             std::cout << std::endl;
         }

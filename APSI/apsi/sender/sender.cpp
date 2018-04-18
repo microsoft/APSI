@@ -210,7 +210,7 @@ namespace apsi
         void Sender::debug_decrypt(
             SenderSessionContext &session_context,
             const Ciphertext& c,
-            std::vector<u64>& dest)
+            FFieldArray& dest)
         {
             Plaintext p;
             if (!session_context.decryptor_)
@@ -218,29 +218,24 @@ namespace apsi
 
             session_context.decryptor_->decrypt(c, p);
 
-            if (true)
+            if(builder_)
             {
-                //std::vector<u64> integer_batch;
-                if(builder_)
-                {
-                    builder_->decompose(p, dest, pool_);
-                }
-                else
-                {
-                    //ex_builder_->decompose(dest)
-                    //ex_builder_->decompose(dest, p);
-                    throw runtime_error("not implemented");
-                }
+                std::vector<u64> integer_batch;
+                builder_->decompose(p, integer_batch, pool_);
 
-                //for (int k = 0; k < integer_batch.size(); k++)
-                //    *dest[k].pointer(0) = integer_batch[k];
+                dest.set_zero();
+
+                for (int i = 0; i < dest.size(); ++i)
+                {
+                    dest.set_coeff_of(i, 0, integer_batch[i]);
+                }
             }
             else
             {
-                //exfieldpolycrtbuilder_->decompose(p, batch);
-                //for (int k = 0; k < batch.size(); k++)
-                //    rr[batch_idx * slot_count + k] = batch[k];
+                ex_builder_->decompose(dest, p);
             }
+
+
         }
 
         u64 pow(u64 x, u64 p, const seal::SmallModulus& mod)
@@ -281,18 +276,18 @@ namespace apsi
         }
 
 
-        bool Sender::debug_not_equals(span<u64> true_x, const Ciphertext& c, SenderSessionContext& ctx)
+        bool Sender::debug_not_equals(FFieldArray& true_x, const Ciphertext& c, SenderSessionContext& ctx)
         {
-            std::vector<u64> cc;
+            FFieldArray cc(true_x.field(), true_x.size());
             debug_decrypt(ctx, c, cc);
 
-            for (int i = 0; i < true_x.size(); ++i)
-            {
-                if (true_x[i] != cc[i])
-                    return false;
-            }
+            //for (int i = 0; i < true_x.size(); ++i)
+            //{
+            //    if (true_x[i] != cc[i])
+            //        return false;
+            //}
 
-            return true_x.size() == cc.size();
+            return true_x == cc;
         }
 
 
@@ -340,12 +335,9 @@ namespace apsi
                     auto& thread_context = thread_contexts_[thread_context_idx];
                     thread_context.construct_variables(params_);
 
-                    ///* Update the context with the session's specific keys. */
-                    //context.set_encryptor(session_context.encryptor_);
-                    //context.set_evaluator(session_context.evaluator_);
+
 
                     Ciphertext tmp(thread_context.pool());
-                    //shared_ptr<Evaluator>& local_evaluator = context.evaluator();
 
                     auto batch_start = i * batch_count / thread_pool.size();
                     auto batch_end = (i + 1) * batch_count / thread_pool.size();
@@ -355,20 +347,11 @@ namespace apsi
                         compute_batch_powers(batch, query, powers[batch], session_context, thread_context);
                         batch_powers_computed[batch].first.set_value();
 
-                        // debug_query[batch].resize(params_.batch_size());
-                        // debug_decrypt(session_context, powers[batch][1], debug_query[batch]);
                     }
 
                     for (auto& b : batch_powers_computed)
                         b.second.get();
 
-
-                    //debug_decrypt(powers, plain_query);
-
-
-                    // Check if we need to re-batch things. This happens if we do an update.
-                    //sender_db_.batched_randomized_symmetric_polys(context);
-                    //Encryptor enc(*seal_context_, session_context.public_key_, thread_context.pool());
                     int start_block = i * total_blocks / total_thread_count_;
                     int end_block = (i + 1) * total_blocks / total_thread_count_;
 
@@ -382,6 +365,7 @@ namespace apsi
                     {
                         int batch = block_idx / params_.split_count(),
                             split = block_idx % params_.split_count();
+                        auto& block = sender_db_.get_block(batch, split);
 
                         // Get the pointer to the first poly of this batch.
                         Plaintext* sender_coeffs(&sender_db_.batch_random_symm_polys()[split * splitStep + batch * split_size_plus_one]);
@@ -389,22 +373,85 @@ namespace apsi
                         // Iterate over the coeffs multiplying them with the query powers  and summing the results
                         char currResult = 0, curr_label = 0;
 
+#define DEBUG_EVAL
+#ifdef DEBUG_EVAL
+                        auto& query = *session_context.debug_plain_query_;
+                        FFieldArray plain_batch(ex_field_, params_.batch_size()), dest(ex_field_, params_.batch_size());
+                        for (int i = 0, j = plain_batch.size() * batch; i < plain_batch.size(); ++i, ++j)
+                        {
+                            auto xj = query.get(j);
+                            plain_batch.set(i, xj);
+                        }
+                        auto power = plain_batch;
+                        auto sum = block.debug_sym_block_[0];
+                        
+                        auto temp = powers[batch][1];
+                        evaluator_->transform_from_ntt(temp);
+                        debug_decrypt(session_context, temp, dest);
+                        if (dest != plain_batch)
+                        {
+                            std::cout << "bad query "<< std::endl;
+
+                            for (int i = 0; i < plain_batch.size(); ++i)
+                            {
+                                std::cout << i << "\n   exp[" << i << "]: " << sum.get(i) << "\n   act[" << i << "]: " << dest.get(i) << std::endl;
+                            }
+                            throw std::runtime_error("");
+                        }
+
+#endif
+
                         // TODO: optimize this to allow low degree poly? need to take into account noise levels.
 
                         // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
                         // Observe that the first call to mult is always multiplying coeff[0] by 1....
                         evaluator_->multiply_plain_ntt(powers[batch][0], sender_coeffs[0], runningResults[currResult]);
+
+                        temp = runningResults[currResult];
+                        evaluator_->transform_from_ntt(temp);
+                        debug_decrypt(session_context, temp, dest);
+                        if (sum != dest)
+                        {
+                            std::cout << "power " << 0 << std::endl;
+
+                            for (int i = 0; i < plain_batch.size(); ++i)
+                            {
+                                std::cout << i << "\n   exp[" << i << "]: " << sum.get(i) << "\n   act[" << i << "]: " << dest.get(i) << std::endl;
+                            }
+                            throw std::runtime_error("");
+                        }
+
+
                         for (int s = 1; s <= params_.split_size(); s++)
                         {
                             evaluator_->multiply_plain_ntt(powers[batch][s], sender_coeffs[s], tmp);
                             evaluator_->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
                             currResult ^= 1;
+#ifdef DEBUG_EVAL
+                            sum = sum + power * block.debug_sym_block_[s];
+
+                            temp = runningResults[currResult];
+                            evaluator_->transform_from_ntt(temp);
+                            debug_decrypt(session_context, temp, dest);
+                            if (sum != dest)
+                            {
+                                std::cout << "power " << s << std::endl;
+
+                                for (int i = 0; i < plain_batch.size(); ++i)
+                                {
+                                    std::cout << i << "\n   exp[" << i << "]: " << sum.get(i) << "\n   act[" << i << "]: " << dest.get(i) << std::endl;
+                                }
+                                throw std::runtime_error("");
+                            }
+
+                            // x^s+1 = x^s * x
+                            power = power * plain_batch;
+#endif
                         }
 
 
                         if (params_.get_label_bit_count())
                         {
-                            auto& block = sender_db_.get_block(batch, split);
 
                             if (block.batched_label_coeffs_.size() > 1)
                             {
