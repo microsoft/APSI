@@ -164,6 +164,12 @@ namespace apsi
                 chl.asyncSend(buff);
             }
 
+            FFieldArray* ptr = nullptr;
+            if (params_.debug())
+            {
+                ptr =new FFieldArray(ex_field_, params_.table_size());
+                receive_ffield_array(*ptr, chl);
+            }
             /* Set up and receive keys. */
             PublicKey pub;
             EvaluationKeys eval;
@@ -171,11 +177,14 @@ namespace apsi
             receive_evalkeys(eval, chl);
             SenderSessionContext session_context(seal_context_, pub, eval);
 
-            if (true)
+            if (params_.debug())
             {
+
                 seal::SecretKey k;
                 receive_prvkey(k, chl);
                 session_context.set_secret_key(k);
+
+                session_context.debug_plain_query_.reset(ptr);
             }
 
             /* Receive client's query data. */
@@ -186,7 +195,6 @@ namespace apsi
             {
                 uint64_t power = 0;
                 chl.recv(power);
-                query[power] = vector<Ciphertext>();
                 receive_ciphertext(query[power], chl);
             }
 
@@ -219,8 +227,9 @@ namespace apsi
                 }
                 else
                 {
+                    //ex_builder_->decompose(dest)
+                    //ex_builder_->decompose(dest, p);
                     throw runtime_error("not implemented");
-                    // ex_builder_->decompose(dest, p);
                 }
 
                 //for (int k = 0; k < integer_batch.size(); k++)
@@ -306,10 +315,10 @@ namespace apsi
             //vector<vector<Ciphertext>> resultVec(params_.split_count());
             //for (auto& v : resultVec) v.resize(params_.batch_count());
             vector<vector<Ciphertext> > powers(params_.batch_count());
-            Ciphertext zero;
 
-            vector<pair<promise<void>, shared_future<void> > >
+            vector<pair<promise<void>, shared_future<void>>>
                 batch_powers_computed(params_.batch_count());
+
             for (auto& pf : batch_powers_computed) pf.second = pf.first.get_future();
 
             auto batch_count = params_.batch_count();
@@ -529,6 +538,48 @@ namespace apsi
                 }
 
             }
+
+
+            if (params_.debug() && session_context.debug_plain_query_)
+            {
+
+                Plaintext p;
+                if (!session_context.decryptor_)
+                    throw std::runtime_error(LOCATION);
+
+
+                auto& query = *session_context.debug_plain_query_;
+                FFieldArray plain_batch(ex_field_, params_.batch_size()), dest(ex_field_, params_.batch_size());
+                for (int i = 0, j = plain_batch.size() * batch; i < plain_batch.size(); ++i, ++j)
+                {
+                    auto xj = query.get(j);
+                    plain_batch.set(i, xj);
+                }
+
+                auto cur_power = plain_batch;
+                for (int i = 1; i < batch_powers.size(); ++i)
+                {
+                    session_context.decryptor_->decrypt(batch_powers[i], p);
+                    ex_builder_->decompose(dest, p);
+
+                    if (dest != cur_power)
+                    {
+                        std::cout << "power = " <<i << std::endl;
+
+                        for (u64 j = 0; j < cur_power.size(); ++j)
+                        {
+                            std::cout << "exp["<<j<<"]: " << cur_power.get(j) << "\t act[" << j << "]: " << dest.get(j) << std::endl;
+
+                        }
+
+                        throw std::runtime_error("bad power");
+                    }
+
+                    cur_power = cur_power * plain_batch;
+                }
+            }
+
+
             for (int i = 0; i <= params_.split_size(); i++)
             {
                 evaluator_->transform_to_ntt(batch_powers[i]);

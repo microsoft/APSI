@@ -469,6 +469,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     */
     PSIParams params(item_bit_length, table_params, cuckoo_params, seal_params, oprf_type);
     params.set_value_bit_count(label_bit_length);
+    params.enable_debug();
     params.validate();
 
 

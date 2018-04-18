@@ -195,6 +195,18 @@ namespace apsi
             map<uint64_t, FFieldArray> powers;
             generate_powers(exfield_items, powers);
 
+
+
+            if (params_.debug())
+            {
+                for (u64 j = 0; j < exfield_items.size(); ++j)
+                {
+                    std::cout << "Exp[" << j << "]: " << exfield_items.get(j) << std::endl;
+                }
+
+                send_ffield_array(exfield_items, channel);
+            }
+
             map<uint64_t, vector<Ciphertext> > ciphers;
             encrypt(powers, ciphers);
 
@@ -207,7 +219,7 @@ namespace apsi
             send_pubkey(public_key_, channel);
             send_evalkeys(evaluation_keys_, channel);
 
-            if (true)
+            if (params_.debug())
             {
                 send_prvkey(secret_key_, channel);
             }

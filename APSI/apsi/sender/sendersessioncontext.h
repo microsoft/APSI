@@ -2,6 +2,7 @@
 
 // STD
 #include <memory>
+#include <unordered_map>
 
 // SEAL
 #include "seal/context.h"
@@ -10,6 +11,9 @@
 #include "seal/evaluationkeys.h"
 #include "seal/encryptor.h"
 #include "seal/decryptor.h"
+
+// apsi
+#include  "apsi/ffield/ffield_array.h"
 
 namespace apsi
 {
@@ -58,6 +62,9 @@ namespace apsi
             {
                 return encryptor_;
             }
+            
+            // the plaintext of the receiver's query. Used to debug.
+            std::unique_ptr<FFieldArray> debug_plain_query_;
 
         private:
             std::shared_ptr<seal::SEALContext> seal_context_;

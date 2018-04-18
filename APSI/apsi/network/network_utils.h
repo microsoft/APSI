@@ -7,6 +7,7 @@
 #include "seal/plaintext.h"
 #include "cryptoTools/Network/Channel.h"
 #include "apsi/item.h"
+#include "apsi/ffield/ffield_array.h"
 
 namespace apsi
 {
@@ -37,5 +38,9 @@ namespace apsi
 	void send_item(const apsi::Item &item, oc::Channel &channel);
 
 	void receive_item(apsi::Item &item, oc::Channel &channel);
+
+    void send_ffield_array(const FFieldArray& powers, oc::Channel &channel);
+
+    void receive_ffield_array(FFieldArray& powers, oc::Channel &channel);
 
 }

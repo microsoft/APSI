@@ -163,7 +163,7 @@ namespace apsi
                     mask = ~(mask << destOffset);
                     mid = mid << destOffset;
 
-                    destVal = destVal & mask | mid;
+                    destVal = (destVal & mask) | mid;
                 }
                 else
                 {
@@ -181,7 +181,7 @@ namespace apsi
 
                     u8 mask = ~(((1 << diff) - 1) << destOffset);
 
-                    destVal = destVal & mask | low | high;
+                    destVal = (destVal & mask) | low | high;
                 }
             }
         }

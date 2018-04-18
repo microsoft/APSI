@@ -221,6 +221,10 @@ namespace apsi
         bool use_low_degree_poly() const { return use_low_degree_poly_; }
         void set_use_low_degree_poly(bool b) { use_low_degree_poly_ = b; }
 
+        bool debug() const { return debug_; }
+        void enable_debug() { debug_ = true; }
+        void disable_debug() { debug_ = false; }
+
     private:
         int log_table_size_;
 
@@ -244,7 +248,7 @@ namespace apsi
 
         int value_bit_length_ = 0, value_byte_length_ = 0;
 
-        bool use_low_degree_poly_ = false;
+        bool use_low_degree_poly_ = false, debug_ = false;
 
         seal::EncryptionParameters encryption_params_;
 
