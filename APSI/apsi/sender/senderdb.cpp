@@ -563,103 +563,205 @@ namespace apsi
             shared_ptr<FFieldCRTBuilder> ex_builder,
             const PSIParams& params)
         {
-            int max_size = 0;
-            std::vector<int> poly_size(items_per_batch_);
-            std::vector<std::pair<u64, u64>> inputs; inputs.resize(items_per_split_);
-            debug_label_coeffs_.resize(items_per_batch_, items_per_split_);
+
             MemoryPoolHandle local_pool = context.pool();
             Position pos;
 
-            if (params.get_label_bit_count() > 63)
+            if (ex_builder)
             {
-                throw std::runtime_error("need a different interpolation code to handle more than 64 bits");
+                //std::vector<std::pair<u64, u64>> inputs(items_per_split_);
+
+
+                //for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
+                //{
+                //    inputs.clear();
+
+                //    for (pos.split_offset = 0; pos.split_offset < items_per_split_; ++pos.split_offset)
+                //    {
+                //        if (has_item(pos))
+                //        {
+                //            inputs.emplace_back();
+                //            auto& key = inputs.back().first;
+                //            auto& label = inputs.back().second;
+
+                //            auto key_item = *(std::array<u64, 2>*)&get_key(pos);
+
+                //            key = key_item[0];
+
+                //            auto src = get_label(pos);
+                //            memcpy(&label, src, value_byte_length_);
+
+
+                //            if (label >= mod.value())
+                //            {
+                //                throw std::runtime_error("label too large");
+                //            }
+
+                //            //if (test)
+                //            //{
+                //            //    test_points.push_back({key, label});
+                //            //}
+                //        }
+                //    }
+
+                //    if (params.use_low_degree_poly() == false)
+                //    {
+                //        // pad the points to have max degree (split_size)
+                //        // with (x,x) points where x is unique.
+
+                //        std::unordered_set<u64> key_set;
+                //        for (auto& xy : inputs)
+                //            key_set.emplace(xy.first);
+
+                //        u64 x = 0;
+                //        while (inputs.size() != items_per_split_)
+                //        {
+                //            if (key_set.find(x) == key_set.end())
+                //                inputs.push_back({ x, 1 });
+
+                //            ++x;
+                //        }
+
+                //        max_size = inputs.size();
+                //    }
+
+
+                //    if (inputs.size())
+                //    {
+                //        max_size = std::max<int>(max_size, inputs.size());
+                //        poly_size[pos.batch_offset] = inputs.size();
+
+
+                //        auto px = label_coeffs[pos.batch_offset].subspan(0, inputs.size());
+
+                //        if (px.size() != inputs.size())
+                //            throw std::runtime_error("");
+                //        u64_newton_interpolate_poly(inputs, px, mod);
+                //    }
+                //}
+
+                //FFieldArray temp(context.exfield(), items_per_batch_);
+                //FFieldElt elem(context.exfield());
+                //for (int s = 0; s < max_size; s++)
+                //{
+                //    Plaintext &batched_coeff = batched_label_coeffs_[s];
+                //    for (int b = 0; b < items_per_batch_; b++)
+                //    {
+                //        if (poly_size[b] > s)
+                //        {
+                //            oc::span<const u64> dest{ &debug_label_coeffs_(b, s), 1 };
+                //            elem.encode(dest, params.get_label_bit_count());
+                //            temp.set(b, elem);
+                //        }
+                //        else
+                //        {
+                //            temp.set_zero(b);
+                //        }
+                //    }
+
+                //    batched_coeff.reserve(
+                //        params.encryption_params().coeff_modulus().size() *
+                //        params.encryption_params().poly_modulus().coeff_count());
+
+                //    ex_builder->compose(batched_coeff, temp);
+                //    evaluator->transform_to_ntt(batched_coeff);
+                //}
+
             }
-
-
-            for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
+            else
             {
-                //memset(inputs.data(), 0, inputs.size() * sizeof(std::pair<u64, u64>));
-                inputs.clear();
+                if (params.get_label_bit_count() >= 64 || 1ull << params.get_label_bit_count() > mod.value())
+                    throw std::runtime_error("labels too large for short string code");
 
-                for (pos.split_offset = 0; pos.split_offset < items_per_split_; ++pos.split_offset)
+                int max_size = 0;
+                std::vector<int> poly_size(items_per_batch_);
+                std::vector<std::pair<u64, u64>> inputs; inputs.resize(items_per_split_);
+                Matrix<u64> label_coeffs(items_per_batch_, items_per_split_);
+
+                for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
                 {
-                    //auto& key = inputs[pos.split_offset].first;
-                    //auto& label = inputs[pos.split_offset].second;
-                    //key = pos.split_offset;
-                    //label = 0;
+                    //memset(inputs.data(), 0, inputs.size() * sizeof(std::pair<u64, u64>));
+                    inputs.clear();
 
-
-                    if (has_item(pos))
+                    for (pos.split_offset = 0; pos.split_offset < items_per_split_; ++pos.split_offset)
                     {
-                        inputs.emplace_back();
-                        auto& key = inputs.back().first;
-                        auto& label = inputs.back().second;
+                        //auto& key = inputs[pos.split_offset].first;
+                        //auto& label = inputs[pos.split_offset].second;
+                        //key = pos.split_offset;
+                        //label = 0;
 
-                        auto key_item = *(std::array<u64, 2>*)&get_key(pos);
 
-                        if (key_item[1] || key_item[0] >= mod.value())
+                        if (has_item(pos))
                         {
-                            std::cout << key_item[0] << " " << key_item[1] << std::endl;
+                            inputs.emplace_back();
+                            auto& key = inputs.back().first;
+                            auto& label = inputs.back().second;
 
-                            throw std::runtime_error("key too large");
+                            auto key_item = *(std::array<u64, 2>*)&get_key(pos);
+
+                            if (key_item[1] || key_item[0] >= mod.value())
+                            {
+                                std::cout << key_item[0] << " " << key_item[1] << std::endl;
+
+                                throw std::runtime_error("key too large");
+                            }
+
+                            key = key_item[0];
+
+                            auto src = get_label(pos);
+                            memcpy(&label, src, value_byte_length_);
+
+
+                            if (label >= mod.value())
+                            {
+                                throw std::runtime_error("label too large");
+                            }
+
+                            //if (test)
+                            //{
+                            //    test_points.push_back({key, label});
+                            //}
+                        }
+                    }
+
+                    if (params.use_low_degree_poly() == false)
+                    {
+                        // pad the points to have max degree (split_size)
+                        // with (x,x) points where x is unique.
+
+                        std::unordered_set<u64> key_set;
+                        for (auto& xy : inputs)
+                            key_set.emplace(xy.first);
+
+                        u64 x = 0;
+                        while (inputs.size() != items_per_split_)
+                        {
+                            if (key_set.find(x) == key_set.end())
+                                inputs.push_back({ x, 1 });
+
+                            ++x;
                         }
 
-                        key = key_item[0];
-
-                        auto src = get_label(pos);
-                        memcpy(&label, src, value_byte_length_);
+                        max_size = inputs.size();
+                    }
 
 
-                        if (label >= mod.value())
-                        {
-                            throw std::runtime_error("label too large");
-                        }
+                    if (inputs.size())
+                    {
+                        max_size = std::max<int>(max_size, inputs.size());
+                        poly_size[pos.batch_offset] = inputs.size();
 
-                        //if (test)
-                        //{
-                        //    test_points.push_back({key, label});
-                        //}
+
+                        auto px = label_coeffs[pos.batch_offset].subspan(0, inputs.size());
+
+                        if (px.size() != inputs.size())
+                            throw std::runtime_error("");
+                        u64_newton_interpolate_poly(inputs, px, mod);
                     }
                 }
 
-                if (params.use_low_degree_poly() == false)
-                {
-                    // pad the points to have max degree (split_size)
-                    // with (x,x) points where x is unique.
+                batched_label_coeffs_.resize(max_size);
 
-                    std::unordered_set<u64> key_set;
-                    for (auto& xy : inputs)
-                        key_set.emplace(xy.first);
-
-                    u64 x = 0;
-                    while (inputs.size() != items_per_split_)
-                    {
-                        if (key_set.find(x) == key_set.end())
-                            inputs.push_back({ x, 1 });
-
-                        ++x;
-                    }
-
-                    max_size = inputs.size();
-                }
-
-
-                if (inputs.size())
-                {
-                    max_size = std::max<int>(max_size, inputs.size());
-                    poly_size[pos.batch_offset] = inputs.size();
-                    auto px = debug_label_coeffs_[pos.batch_offset].subspan(0, inputs.size());
-
-                    if (px.size() != inputs.size())
-                        throw std::runtime_error("");
-                    u64_newton_interpolate_poly(inputs, px, mod);
-                }
-            }
-
-            batched_label_coeffs_.resize(max_size);
-
-            if (builder)
-            {
                 std::vector<u64> temp(items_per_batch_);
                 for (int s = 0; s < max_size; s++)
                 {
@@ -668,7 +770,7 @@ namespace apsi
                     {
                         if (poly_size[b] > s)
                         {
-                            temp[b] = debug_label_coeffs_(b, s);
+                            temp[b] = label_coeffs(b, s);
                         }
                         else
                         {
@@ -681,36 +783,6 @@ namespace apsi
                         params.encryption_params().poly_modulus().coeff_count());
 
                     builder->compose(temp, batched_coeff);
-                    evaluator->transform_to_ntt(batched_coeff);
-                }
-            }
-            else
-            {
-
-                FFieldArray temp(context.exfield(), items_per_batch_);
-                FFieldElt elem(context.exfield());
-                for (int s = 0; s < max_size; s++)
-                {
-                    Plaintext &batched_coeff = batched_label_coeffs_[s];
-                    for (int b = 0; b < items_per_batch_; b++)
-                    {
-                        if (poly_size[b] > s)
-                        {
-                            oc::span<const u64> dest{ &debug_label_coeffs_(b, s), 1 };
-                            elem.encode(dest, params.get_label_bit_count());
-                            temp.set(b, elem);
-                        }
-                        else
-                        {
-                            temp.set_zero(b);
-                        }
-                    }
-
-                    batched_coeff.reserve(
-                        params.encryption_params().coeff_modulus().size() *
-                        params.encryption_params().poly_modulus().coeff_count());
-
-                    ex_builder->compose(batched_coeff, temp);
                     evaluator->transform_to_ntt(batched_coeff);
                 }
             }

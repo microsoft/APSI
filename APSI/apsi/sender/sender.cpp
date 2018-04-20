@@ -373,8 +373,8 @@ namespace apsi
                         // Iterate over the coeffs multiplying them with the query powers  and summing the results
                         char currResult = 0, curr_label = 0;
 
-#define DEBUG_EVAL
-#ifdef DEBUG_EVAL
+//#define DEBUG_SYMM_EVAL
+#ifdef DEBUG_SYMM_EVAL
                         auto& query = *session_context.debug_plain_query_;
                         FFieldArray plain_batch(ex_field_, params_.batch_size()), dest(ex_field_, params_.batch_size());
                         for (int i = 0, j = plain_batch.size() * batch; i < plain_batch.size(); ++i, ++j)
@@ -406,7 +406,7 @@ namespace apsi
                         // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
                         // Observe that the first call to mult is always multiplying coeff[0] by 1....
                         evaluator_->multiply_plain_ntt(powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
-
+#ifdef DEBUG_SYMM_EVAL
                         temp = runningResults[currResult];
                         evaluator_->transform_from_ntt(temp);
                         debug_decrypt(session_context, temp, dest);
@@ -420,6 +420,7 @@ namespace apsi
                             }
                             throw std::runtime_error("");
                         }
+#endif
 
 
                         for (int s = 1; s <= params_.split_size(); s++)
@@ -427,7 +428,8 @@ namespace apsi
                             evaluator_->multiply_plain_ntt(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
                             evaluator_->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
                             currResult ^= 1;
-#ifdef DEBUG_EVAL
+
+#ifdef DEBUG_SYMM_EVAL
                             sum = sum + power * block.debug_sym_block_[s];
 
                             temp = runningResults[currResult];
@@ -586,7 +588,7 @@ namespace apsi
 
             }
 
-
+#ifdef DEBUG_POWERS
             if (params_.debug() && session_context.debug_plain_query_)
             {
 
@@ -625,7 +627,7 @@ namespace apsi
                     cur_power = cur_power * plain_batch;
                 }
             }
-
+#endif
 
             for (int i = 0; i <= params_.split_size(); i++)
             {

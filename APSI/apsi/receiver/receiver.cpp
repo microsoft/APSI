@@ -518,17 +518,17 @@ namespace apsi
                     {
                         has_result = true;
 
-                        std::cout << "hit   " << (block)items[idx] <<" @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << std::endl;
+                        //std::cout << "hit   " << (block)items[idx] <<" @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << std::endl;
                         ret_bools[idx] = true;
                     }
 
 
-                    if (idx!= -1 && short_strings == false)
-                    {
-                        std::cout << "item[" << idx << "]  " << (block)items[idx] << " @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << std::endl
-                            << "     " << batch.get(k) << std::endl;;
+                    //if (idx!= -1 && short_strings == false)
+                    //{
+                    //    std::cout << "item[" << idx << "]  " << (block)items[idx] << " @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << std::endl
+                    //        << "     " << batch.get(k) << std::endl;;
 
-                    }
+                    //}
                     //if (k < 10) std::cout << (k ? ", " : "") << integer_batch[k];
                 }
                 //std::cout << "..." << endl;
@@ -543,10 +543,17 @@ namespace apsi
 
                     decryptor_->decrypt(tmp, p);
 
+
+                    
                     if (short_strings)
                         polycrtbuilder_->decompose(p, integer_batch, pool_);
                     else
+                    {
+                        // make sure its the right size. decrypt will shorted when there are zero coeffs at the top.
+                        p.resize(exfieldpolycrtbuilder_->n());
+
                         exfieldpolycrtbuilder_->decompose(batch, p);
+                    }
 
                     for (int k = 0; k < integer_batch.size(); k++)
                     {

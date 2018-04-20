@@ -169,7 +169,7 @@ std::string print(span<u8> s)
     std::stringstream ss;
     for (int i = 0; i < s.size(); ++i)
     {
-        ss << (i ? ", " : "{ ") << std::setw(2) << std::setfill('0') << std::hex << s[i];
+        ss << (i ? ", " : "{ ") << std::setw(2) << std::setfill('0') << std::hex << int(s[i]);
     }
 
     ss << " }";
@@ -478,9 +478,9 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     //sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
     //sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 
-    auto sendersActualSize = 10;// sender_set_size;
-    auto recversActualSize = 1;
-    auto intersectionSize = 1;
+    auto sendersActualSize = 100;// sender_set_size;
+    auto recversActualSize = 50;
+    auto intersectionSize = 25;
 
     auto s1 = vector<Item>(sendersActualSize);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
     oc::Matrix<u8> labels(sendersActualSize, params.get_label_byte_count());
@@ -534,7 +534,8 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 
                 if (l != exp)
                 {
-                    std::cout << "incorrect label at index: " << i << ". actual: " << print(label) << " " << l << ", expected: " << exp << std::endl;
+                    std::cout <<oc::Color::Red << "incorrect label at index: " << i << ". actual: " << print(label) << " " << l << ", expected: " << exp << std::endl << oc::ColorDefault;
+                    correct = false;
                 }
             }
         }
@@ -542,12 +543,20 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
         {
             if (intersection.first[i])
             {
-                cout << "Incorrect result for receiver's item at index: " << i << endl;
+                cout << oc::Color::Red << "Incorrect result for receiver's item at index: " << i << endl << oc::ColorDefault;
                 correct = false;
             }
         }
     }
-    cout << "Intersection results: " << (correct ? "Correct" : "Incorrect") << endl;
+    cout << "Intersection results: ";
+    
+    if (correct)
+        cout << oc::Color::Green << "Correct";
+
+    else
+        cout << oc::Color::Red << "Incorrect";
+    
+    cout << oc::ColorDefault << endl;
 
     cout << stop_watch << endl;
 }
