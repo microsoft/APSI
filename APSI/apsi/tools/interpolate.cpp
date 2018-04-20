@@ -47,7 +47,7 @@ namespace apsi
             divided_differences[i].set(0, i, values);
         }
 
-        for(size_t j = 0; j < size; j++)
+        for(size_t j = 1; j < size; j++)
         {
             for(size_t i = 0; i < size - j; i++)
             {

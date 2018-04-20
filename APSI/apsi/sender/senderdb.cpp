@@ -636,6 +636,8 @@ namespace apsi
                     ffield_newton_interpolate_poly(x, y, coeffs.back());
                 }
 
+                batched_label_coeffs_.resize(items_per_split_);
+
                 auto degree = context.exfield()->degree();
                 FFieldArray temp_array(context.exfield(), items_per_batch_);
                 //FFieldElt elem(context.exfield());
@@ -653,7 +655,7 @@ namespace apsi
 
                     batched_coeff.reserve(
                         params.encryption_params().coeff_modulus().size() *
-                        params.encryption_params().poly_modulus().coeff_count());
+                        params.encryption_params().poly_modulus().coeff_count(), local_pool);
 
                     ex_builder->compose(batched_coeff, temp_array);
                     evaluator->transform_to_ntt(batched_coeff);
@@ -772,7 +774,7 @@ namespace apsi
 
                     batched_coeff.reserve(
                         params.encryption_params().coeff_modulus().size() *
-                        params.encryption_params().poly_modulus().coeff_count());
+                        params.encryption_params().poly_modulus().coeff_count(), local_pool);
 
                     builder->compose(temp, batched_coeff);
                     evaluator->transform_to_ntt(batched_coeff);
