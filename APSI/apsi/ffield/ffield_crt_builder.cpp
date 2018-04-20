@@ -193,16 +193,26 @@ namespace apsi
             throw invalid_argument("invalid array size");
         }
         uint64_t plain_coeff_count = plain.coeff_count();
-        if(plain_coeff_count != ntt_ctx_.n_)
+        if (plain_coeff_count > ntt_ctx_.n_ || (plain_coeff_count == ntt_ctx_.n_ && plain[ntt_ctx_.n_ - 1] != 0))
         {
-            throw invalid_argument("plain has unexpected coefficient count");
+            throw invalid_argument("plain is not valid for encryption parameters");
         }
-
+#ifndef NDEBUG
+        if (plain.significant_coeff_count() >= ntt_ctx_.n_ || !are_poly_coefficients_less_than(plain.pointer(), 
+            plain_coeff_count, 1, &field_.ch(), 1))
+        {
+            throw invalid_argument("plain is not valid for encryption parameters");
+        }
+#endif
         FFieldArray expanded(field_, ntt_ctx_.n_);
         auto plain_ptr = plain.pointer();
-        for(uint64_t i = 0; i < ntt_ctx_.n_; i++, plain_ptr++)
+        for(uint64_t i = 0; i < plain_coeff_count; i++, plain_ptr++)
         {
             fq_nmod_set_ui(expanded.array_ + i, *plain_ptr, field_->ctx_);
+        }
+        for(uint64_t i = plain_coeff_count; i < ntt_ctx_.n_; i++)
+        {
+            fq_nmod_zero(expanded.array_ + i, field_->ctx_);
         }
         ntt_ctx_.negacyclic_ntt(expanded);
         bit_reversal_permutation(expanded);

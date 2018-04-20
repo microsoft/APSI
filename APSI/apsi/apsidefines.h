@@ -15,6 +15,14 @@
 #include "seal/plaintext.h"
 #include "seal/context.h"
 
+#ifdef _MSC_VER
+#ifdef _DEBUG
+#undef NDEBUG
+#else
+#define NDEBUG
+#endif
+#endif
+
 namespace apsi
 {
     typedef __m128i block;
