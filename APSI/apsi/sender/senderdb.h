@@ -79,6 +79,8 @@ namespace apsi
             // the number of items that are in a split. 
             int items_per_split_;
 
+            oc::span<seal::Plaintext> batch_random_symm_poly_;
+
             std::vector<seal::Plaintext> batched_label_coeffs_;
 
             oc::Matrix<u64> debug_label_coeffs_;
@@ -213,11 +215,6 @@ namespace apsi
 
             //void load(std::istream &stream);
 
-            std::vector<seal::Plaintext> &batch_random_symm_polys()
-            {
-                return batch_random_symm_polys_;
-            }
-
             /**
             Batches the randomized symmetric polynonmials for the specified split and the specified batch in sender's database.
 
@@ -285,7 +282,7 @@ namespace apsi
             essentially split into '#splits x #batches' blocks. Each block is related with a split
             and a batch.
             */
-            std::vector<seal::Plaintext> batch_random_symm_polys_;
+            std::vector<seal::Plaintext> batch_random_symm_poly_storage_;
 
             /* 
             Null value for sender: 00..0011..11. The number of 1 is itemL.

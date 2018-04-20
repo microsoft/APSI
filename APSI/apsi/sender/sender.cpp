@@ -368,7 +368,7 @@ namespace apsi
                         auto& block = sender_db_.get_block(batch, split);
 
                         // Get the pointer to the first poly of this batch.
-                        Plaintext* sender_coeffs(&sender_db_.batch_random_symm_polys()[split * splitStep + batch * split_size_plus_one]);
+                        //Plaintext* sender_coeffs(&sender_db_.batch_random_symm_polys()[split * splitStep + batch * split_size_plus_one]);
 
                         // Iterate over the coeffs multiplying them with the query powers  and summing the results
                         char currResult = 0, curr_label = 0;
@@ -405,7 +405,7 @@ namespace apsi
 
                         // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
                         // Observe that the first call to mult is always multiplying coeff[0] by 1....
-                        evaluator_->multiply_plain_ntt(powers[batch][0], sender_coeffs[0], runningResults[currResult]);
+                        evaluator_->multiply_plain_ntt(powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
 
                         temp = runningResults[currResult];
                         evaluator_->transform_from_ntt(temp);
@@ -424,7 +424,7 @@ namespace apsi
 
                         for (int s = 1; s <= params_.split_size(); s++)
                         {
-                            evaluator_->multiply_plain_ntt(powers[batch][s], sender_coeffs[s], tmp);
+                            evaluator_->multiply_plain_ntt(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
                             evaluator_->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
                             currResult ^= 1;
 #ifdef DEBUG_EVAL

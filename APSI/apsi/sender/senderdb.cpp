@@ -39,9 +39,9 @@ namespace apsi
             //keys_(params.sender_bin_size(), params.table_size()),
             //values_(params.sender_bin_size(), params.table_size()),
             next_locs_(params.table_size(), 0),
-            batch_random_symm_polys_(params.split_count() * params.batch_count() * (params.split_size() + 1))
+            batch_random_symm_poly_storage_(params.split_count() * params.batch_count() * (params.split_size() + 1))
         {
-            for (auto &plain : batch_random_symm_polys_)
+            for (auto &plain : batch_random_symm_poly_storage_)
             {
                 // Reserve memory for ciphertext size plaintexts (NTT transformed mod q)
                 plain.reserve(params_.encryption_params().coeff_modulus().size() *
@@ -468,6 +468,8 @@ namespace apsi
 
                 auto &block = db_blocks_.data()[next_block];
                 block.randomized_symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
+                block.batch_random_symm_poly_ = { &batch_random_symm_poly_storage_[indexer(split, batch, 0)] , split_size_plus_one };
+
                 //randomized_symmetric_polys(split, batch, context, symm_block);
 
                 if (params_.debug())
@@ -476,12 +478,11 @@ namespace apsi
                     block.debug_sym_block_.reserve(split_size_plus_one);
                 }
 
-                auto idx = indexer(split, batch, 0);
                 if (builder)
                 {
-                    for (int i = 0; i < split_size_plus_one; i++, idx++)
+                    for (int i = 0; i < split_size_plus_one; i++)
                     {
-                        Plaintext &poly = batch_random_symm_polys_[idx];
+                        Plaintext &poly = block.batch_random_symm_poly_[i];
                         for (int k = 0; batch_start + k < batch_end; k++)
                         {
                             integer_batch_vector[k] = symm_block(k, i).coeffs[0];
@@ -494,9 +495,9 @@ namespace apsi
                 {
 
 
-                    for (int i = 0; i < split_size_plus_one; i++, idx++)
+                    for (int i = 0; i < split_size_plus_one; i++)
                     {
-                        Plaintext &poly = batch_random_symm_polys_[idx];
+                        Plaintext &poly = block.batch_random_symm_poly_[i];
 
                         // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
                         for (int k = 0; batch_start + k < batch_end; k++)
