@@ -198,8 +198,9 @@ namespace apsi
             throw invalid_argument("plain is not valid for encryption parameters");
         }
 #ifndef NDEBUG
+        auto c = field_->ch();
         if (plain.significant_coeff_count() >= ntt_ctx_.n_ || !are_poly_coefficients_less_than(plain.pointer(), 
-            plain_coeff_count, 1, &field_.ch(), 1))
+            plain_coeff_count, 1, &c, 1))
         {
             throw invalid_argument("plain is not valid for encryption parameters");
         }

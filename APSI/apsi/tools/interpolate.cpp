@@ -51,6 +51,9 @@ namespace apsi
         {
             for(size_t i = 0; i < size - j; i++)
             {
+                if (field == nullptr)
+                    throw std::runtime_error("");
+
                 fq_nmod_sub(numerator.data(), divided_differences[i + 1].data() + (j - 1), divided_differences[i].data() + (j - 1), field->ctx());
                 // numerator = divided_differences[i + 1].get(j - 1) - divided_differences[i].get(j - 1);
                 fq_nmod_sub(denominator.data(), points.data() + (i + j), points.data() + i, field->ctx());

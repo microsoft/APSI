@@ -269,6 +269,7 @@ namespace apsi
             {
                 cout << "Using " << cuckoo->encoding_bit_length()
                     << " out of " << seal::util::get_significant_bit_count(params_.exfield_characteristic()) - 1
+                    << "x"<< degree
                     << " bits of exfield element." << endl;
             }
             bool insertionSuccess;

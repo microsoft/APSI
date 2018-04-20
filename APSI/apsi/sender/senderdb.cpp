@@ -569,103 +569,95 @@ namespace apsi
 
             if (ex_builder)
             {
+                if (params.use_low_degree_poly())
+                    throw std::runtime_error("not impl");
+
+                std::vector<FFieldArray> coeffs;
+                coeffs.reserve(items_per_batch_);
+
                 //std::vector<std::pair<u64, u64>> inputs(items_per_split_);
+                FFieldArray x(ex_builder->field(), items_per_split_);
+                FFieldArray y(ex_builder->field(), items_per_split_);
 
+                FFieldElt temp(ex_builder->field());
+                std::vector<u64> temp_vec((value_byte_length_ + sizeof(u64)) / sizeof(u64), 0);
+                std::unordered_set<u64> key_set;
+                key_set.reserve(items_per_split_);
 
-                //for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
-                //{
-                //    inputs.clear();
+                for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
+                {
+                    int size = 0;
+                    for (pos.split_offset = 0; pos.split_offset < items_per_split_; ++pos.split_offset)
+                    {
+                        if (has_item(pos))
+                        {
+                            auto& key_item = get_key(pos);
+                            temp.encode(span<u64>{key_item.value_}, params.get_label_bit_count());
+                            x.set(size, temp);
 
-                //    for (pos.split_offset = 0; pos.split_offset < items_per_split_; ++pos.split_offset)
-                //    {
-                //        if (has_item(pos))
-                //        {
-                //            inputs.emplace_back();
-                //            auto& key = inputs.back().first;
-                //            auto& label = inputs.back().second;
+                            auto src = get_label(pos);
+                            temp.encode(span<u8>{src, value_byte_length_}, params.get_label_bit_count());
+                            y.set(size, temp);
 
-                //            auto key_item = *(std::array<u64, 2>*)&get_key(pos);
+                            ++size;
+                        }
+                    }
 
-                //            key = key_item[0];
+                    // pad the points to have max degree (split_size)
+                    // with (x,x) points where x is unique.
+                    key_set.clear();
 
-                //            auto src = get_label(pos);
-                //            memcpy(&label, src, value_byte_length_);
+                    for (int i = 0; i < size; ++i)
+                        key_set.emplace(x.get_coeff_of(i, 0));
 
+                    temp_vec[0] = 0;
+                    while (size != items_per_split_)
+                    {
+                        if (temp_vec[0] >= mod.value())
+                        {
+                            std::cout << temp_vec[0] << " >= " << mod.value();
+                            throw std::runtime_error("");
+                        }
 
-                //            if (label >= mod.value())
-                //            {
-                //                throw std::runtime_error("label too large");
-                //            }
+                        if (key_set.find(temp_vec[0]) == key_set.end())
+                        {
+                            temp.encode(span<u64>{temp_vec}, params.get_label_bit_count());
 
-                //            //if (test)
-                //            //{
-                //            //    test_points.push_back({key, label});
-                //            //}
-                //        }
-                //    }
+                            x.set(size, temp);
+                            y.set(size, temp);
+                            ++size;
+                        }
 
-                //    if (params.use_low_degree_poly() == false)
-                //    {
-                //        // pad the points to have max degree (split_size)
-                //        // with (x,x) points where x is unique.
+                        ++temp_vec[0];
+                    }
 
-                //        std::unordered_set<u64> key_set;
-                //        for (auto& xy : inputs)
-                //            key_set.emplace(xy.first);
+                    coeffs.emplace_back(ex_builder->field(), items_per_split_);
 
-                //        u64 x = 0;
-                //        while (inputs.size() != items_per_split_)
-                //        {
-                //            if (key_set.find(x) == key_set.end())
-                //                inputs.push_back({ x, 1 });
+                    ffield_newton_interpolate_poly(x, y, coeffs.back());
+                }
 
-                //            ++x;
-                //        }
-
-                //        max_size = inputs.size();
-                //    }
-
-
-                //    if (inputs.size())
-                //    {
-                //        max_size = std::max<int>(max_size, inputs.size());
-                //        poly_size[pos.batch_offset] = inputs.size();
-
-
-                //        auto px = label_coeffs[pos.batch_offset].subspan(0, inputs.size());
-
-                //        if (px.size() != inputs.size())
-                //            throw std::runtime_error("");
-                //        u64_newton_interpolate_poly(inputs, px, mod);
-                //    }
-                //}
-
-                //FFieldArray temp(context.exfield(), items_per_batch_);
+                auto degree = context.exfield()->degree();
+                FFieldArray temp_array(context.exfield(), items_per_batch_);
                 //FFieldElt elem(context.exfield());
-                //for (int s = 0; s < max_size; s++)
-                //{
-                //    Plaintext &batched_coeff = batched_label_coeffs_[s];
-                //    for (int b = 0; b < items_per_batch_; b++)
-                //    {
-                //        if (poly_size[b] > s)
-                //        {
-                //            oc::span<const u64> dest{ &debug_label_coeffs_(b, s), 1 };
-                //            elem.encode(dest, params.get_label_bit_count());
-                //            temp.set(b, elem);
-                //        }
-                //        else
-                //        {
-                //            temp.set_zero(b);
-                //        }
-                //    }
+                for (int s = 0; s < items_per_split_; s++)
+                {
+                    Plaintext &batched_coeff = batched_label_coeffs_[s];
 
-                //    batched_coeff.reserve(
-                //        params.encryption_params().coeff_modulus().size() *
-                //        params.encryption_params().poly_modulus().coeff_count());
+                    // transpose the coeffs into temp_array
+                    for (int b = 0; b < items_per_batch_; b++)
+                    {
+                        for (int c = 0; c < degree; ++c)
+                            temp_array.set_coeff_of(b, c, coeffs[b].get_coeff_of(s, c));
+                    }
 
-                //    ex_builder->compose(batched_coeff, temp);
-                //    evaluator->transform_to_ntt(batched_coeff);
-                //}
+
+                    batched_coeff.reserve(
+                        params.encryption_params().coeff_modulus().size() *
+                        params.encryption_params().poly_modulus().coeff_count());
+
+                    ex_builder->compose(batched_coeff, temp_array);
+                    evaluator->transform_to_ntt(batched_coeff);
+                }
 
             }
             else

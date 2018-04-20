@@ -106,7 +106,6 @@ namespace apsi
 
         void load(std::istream &stream);
 
-    private:
         std::array<std::uint64_t, 2> value_;
     };
 }
