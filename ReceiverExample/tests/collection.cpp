@@ -1,5 +1,6 @@
-#include "collection.h"
-#include "interpolate_tests.h"
+#include "tests/collection.h"
+#include "tests/interpolate_tests.h"
+
 void bit_copy_test();
 
 oc::TestCollection apsi_tests([](oc::TestCollection& tc)

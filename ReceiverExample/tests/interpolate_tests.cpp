@@ -1,6 +1,6 @@
 #include "interpolate_tests.h"
 
-#include "apsi/Tools/interpolate.h"
+#include "apsi/tools/interpolate.h"
 #include "seal/context.h"
 #include "seal/util/mempool.h"
 

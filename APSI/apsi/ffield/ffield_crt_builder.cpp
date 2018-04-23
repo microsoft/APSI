@@ -186,7 +186,6 @@ namespace apsi
         }
     }
 
-
     void FFieldCRTBuilder::decompose(FFieldArray &destination, const Plaintext &plain) const
     {
         if (destination.size_ != ntt_ctx_.slot_count_)
@@ -194,13 +193,14 @@ namespace apsi
             throw invalid_argument("invalid array size");
         }
         uint64_t plain_coeff_count = plain.coeff_count();
-        if (plain_coeff_count > ntt_ctx_.n_ || (plain_coeff_count == ntt_ctx_.n_ && plain[ntt_ctx_.n_ - 1] != 0))
+        uint64_t max_coeff_count = ntt_ctx_.n_ + 1;
+        if (plain_coeff_count > max_coeff_count || (plain_coeff_count == max_coeff_count && (plain[ntt_ctx_.n_] != 0)))
         {
             throw invalid_argument("plain is not valid for encryption parameters");
         }
 #ifndef NDEBUG
         auto c = field_->ch();
-        if (plain.significant_coeff_count() >= ntt_ctx_.n_ || !are_poly_coefficients_less_than(plain.pointer(),
+        if (plain.significant_coeff_count() >= max_coeff_count || !are_poly_coefficients_less_than(plain.pointer(),
             plain_coeff_count, 1, &c, 1))
         {
             throw invalid_argument("plain is not valid for encryption parameters");
