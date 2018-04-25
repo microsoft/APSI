@@ -20,6 +20,7 @@ namespace apsi
     class FFieldPoly
     {
         friend class FFieldCRTBuilder;
+        friend class FFieldFastCRTBuilder;
 
     public:
         FFieldPoly(std::shared_ptr<FField> field, std::size_t capacity = 0) :

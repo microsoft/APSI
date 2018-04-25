@@ -12,6 +12,9 @@
 // SEAL
 #include "seal/plaintext.h"
 
+// CryptoTools
+#include "cryptoTools/Crypto/PRNG.h"
+
 namespace apsi
 {
     class FFieldCRTBuilder

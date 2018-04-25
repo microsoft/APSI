@@ -40,6 +40,7 @@ namespace apsi
     using _ffield_poly_coeff_t = nmod_poly_struct;
     using _ffield_poly_array_t = fq_nmod_poly_struct *;
     using _ffield_poly_array_elt_t = fq_nmod_poly_struct;
+    using _ffield_poly_factor_t = nmod_poly_factor_t;
    
     // Symbol to use in internal representation of field elements
     const char field_elt_var[]{ 'Y' };
@@ -119,6 +120,7 @@ namespace apsi
         friend class FFieldPoly;
         friend class FFieldCRTBuilder;
         friend class FFieldNTT;
+        friend class FFieldFastCRTBuilder;
 
     public:
         FField(const FField &) = delete;
@@ -136,6 +138,11 @@ namespace apsi
         static std::shared_ptr<FField> Acquire(std::uint64_t ch, unsigned d)
         {
             return std::shared_ptr<FField>{ new FField(ch, d) };
+        }
+
+        static std::shared_ptr<FField> Acquire(std::uint64_t ch, const _ffield_modulus_t field_poly)
+        {
+            return std::shared_ptr<FField>{ new FField(ch, field_poly) };
         }
 
         static std::shared_ptr<FField> Acquire(std::uint64_t ch, const seal::BigPoly &field_poly)
@@ -190,9 +197,10 @@ namespace apsi
         }
 
     private:
-        FField(std::uint64_t ch, unsigned d); 
-        FField(std::uint64_t ch, seal::BigPoly field_poly); 
-        FField(std::uint64_t ch, std::string field_poly);
+        explicit FField(std::uint64_t ch, unsigned d); 
+        explicit FField(std::uint64_t ch, const _ffield_modulus_t modulus); 
+        FField(std::uint64_t ch, seal::BigPoly modulus); 
+        FField(std::uint64_t ch, std::string modulus);
         
         void populate_frob_table();
 

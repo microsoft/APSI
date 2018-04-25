@@ -24,7 +24,7 @@ namespace apsi
         populate_frob_table();
     }
 
-    FField::FField(uint64_t ch, BigPoly modulus) : 
+    FField::FField(uint64_t ch, BigPoly modulus) :
         modulus_(modulus) 
     {
         // We only support word-size coefficients
@@ -39,14 +39,14 @@ namespace apsi
             throw invalid_argument("ch is not prime");
         }
         fmpz_init_set_ui(ch_, ch);
-       
+
         // Create the modulus
         _ffield_modulus_t flint_modulus;
         nmod_poly_init(flint_modulus, ch);
 
         // Set the value; also checks that coeffs are not too big
         bigpoly_to_nmod_poly(modulus, flint_modulus); 
-
+        
         // Check that modulus is monic
         if(nmod_poly_get_coeff_ui(flint_modulus, flint_modulus->length - 1) != 1ULL)
         {
@@ -72,6 +72,39 @@ namespace apsi
 
         // Clear up locals
         nmod_poly_clear(flint_modulus);
+    }
+
+    FField::FField(uint64_t ch, const _ffield_modulus_t modulus) 
+    {
+        // Check that we have a prime modulus
+        if(!n_is_probabprime(ch))
+        {
+            throw invalid_argument("ch is not prime");
+        }
+        fmpz_init_set_ui(ch_, ch);
+       
+        // Check that modulus is monic
+        if(nmod_poly_get_coeff_ui(modulus, modulus->length - 1) != 1ULL)
+        {
+            throw invalid_argument("modulus is not monic");
+        }
+
+        // Check irreducibility of modulus
+        if(!nmod_poly_is_irreducible(modulus))
+        {
+            throw invalid_argument("modulus is not irreducible");
+        }
+       
+        // All is good so create the field context
+        fq_nmod_ctx_init_modulus(ctx_, modulus, field_elt_var);
+
+        // Set the degree
+        d_ = fq_nmod_ctx_degree(ctx_);
+
+        // Pre-compute action of Frobenius on monomials for quick evaluation 
+        frob_table_backing_ = _fq_nmod_vec_init(d_ * d_, ctx_);
+        frob_table_ = MatrixView<_ffield_array_elt_t>(frob_table_backing_, d_, d_);
+        populate_frob_table();
     }
 
     FField::FField(uint64_t ch, string modulus) :
