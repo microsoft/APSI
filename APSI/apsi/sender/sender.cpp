@@ -120,12 +120,23 @@ namespace apsi
             {
                 thread_pool[i] = thread([&, i]()
                 {
+                    if(i == 0)
+                        stop_watch.set_time_point("symmpoly_start");
+
+                    setThreadName("sender_offline_" + std::to_string(i));
                     int thread_context_idx = acquire_thread_context();
                     SenderThreadContext &context = thread_contexts_[thread_context_idx];
                     sender_db_.batched_randomized_symmetric_polys(context, evaluator_, builder_, ex_builder_, total_thread_count_);
 
-                    if(params_.get_label_bit_count())   
+                    if (i == 0)
+                        stop_watch.set_time_point("symmpoly_done");
+                    if (params_.get_label_bit_count())
+                    {
                         sender_db_.batched_interpolate_polys(context, total_thread_count_, evaluator_, builder_, ex_builder_);
+
+                        if (i == 0)
+                            stop_watch.set_time_point("interpolation_done");
+                    }
                     release_thread_context(context.id());
                 });
             }

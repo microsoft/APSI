@@ -146,5 +146,8 @@
     <ClCompile Include="apsi\ffield\ffield_ntt.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="apsi\ffield\ffield_elt.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

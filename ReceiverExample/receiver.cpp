@@ -390,6 +390,7 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
 
 void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 {
+    setThreadName("receiver_main");
     print_example_banner("Example: Slow batching");
     stop_watch.time_points.clear();
 
@@ -509,7 +510,10 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     sender.load_db(s1, labels);
     stop_watch.set_time_point("Sender pre-processing");
 
-    auto thrd = thread([&]() {sender.query_session(sendChl); });
+    auto thrd = thread([&]() {
+        setThreadName("sender_main");
+        sender.query_session(sendChl); 
+    });
     auto intersection = receiver.query(c1, recvChl);
     thrd.join();
 
