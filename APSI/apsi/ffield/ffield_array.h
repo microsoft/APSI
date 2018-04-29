@@ -54,6 +54,11 @@ namespace apsi
             }
         } 
 
+        FFieldArray(const std::vector<std::shared_ptr<FField> > &fields) : 
+            FFieldArray(gsl::span<const std::shared_ptr<FField> >(fields.data(), fields.size()))
+        {
+        }
+
         ~FFieldArray()
         {
             for(std::size_t i = 0; i < size_; i++)
@@ -273,6 +278,11 @@ namespace apsi
         inline std::shared_ptr<FField> field(std::size_t index) const
         {
             return fields_[index];
+        }
+
+        inline const std::vector<std::shared_ptr<FField> > &fields() const
+        {
+            return fields_;
         }
 
         inline void add(FFieldArray &out, const FFieldArray &in) const

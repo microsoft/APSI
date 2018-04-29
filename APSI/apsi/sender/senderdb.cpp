@@ -320,13 +320,16 @@ namespace apsi
             int split_size_plus_one = split_size + 1;
             int batch_size = items_per_batch_;
             auto num_rows = batch_size;
-            auto &ctx = context.exfield()->ctx();
+            auto &field_vec = context.exfield();
 
-            FFieldElt temp11(context.exfield()), temp2(context.exfield()), *temp1;
             Position pos;
             for (pos.batch_offset = 0; pos.batch_offset < num_rows; pos.batch_offset++)
             {
-                fq_nmod_one(&symm_block(pos.batch_offset, split_size), ctx);
+                FFieldElt temp11(field_vec[pos.batch_offset]);
+                FFieldElt temp2(field_vec[pos.batch_offset]);
+                FFieldElt *temp1;
+                auto &ctx = field_vec[pos.batch_offset]->ctx();
+                fq_nmod_one(&symm_block(pos.batch_offset, split_size), field_vec[pos.batch_offset]->ctx());
                 // symm_block.set(pos.batch_offset * split_size_plus_one + split_size, one);
 
                 for (pos.split_offset = split_size - 1; pos.split_offset >= 0; pos.split_offset--)
@@ -388,13 +391,13 @@ namespace apsi
             auto num_rows = items_per_batch_;
             oc::PRNG &prng = context.prng();
 
-            FFieldArray r(context.exfield(), num_rows);
+            FFieldArray r(context.exfield());
             r.set_random_nonzero(prng);
 
             auto symm_block_ptr = symm_block.data();
-            auto &field_ctx = context.exfield()->ctx();
             for (int i = 0; i < num_rows; i++)
             {
+                auto &field_ctx = context.exfield()[i]->ctx();
                 for (int j = 0; j < split_size_plus_one; j++, symm_block_ptr++)
                 {
                     fq_nmod_mul(symm_block_ptr, symm_block_ptr, r.data() + i, field_ctx);
@@ -428,19 +431,18 @@ namespace apsi
             SenderThreadContext &context,
             shared_ptr<Evaluator> evaluator,
             shared_ptr<PolyCRTBuilder> builder,
-            shared_ptr<FFieldCRTBuilder> ex_builder,
+            shared_ptr<FFieldFastCRTBuilder> ex_builder,
             int thread_count)
         {
             // Get the symmetric block
             auto symm_block = context.symm_block();
-            auto &ctx = context.exfield()->ctx();
 
             int table_size = params_.table_size(),
                 split_size = params_.split_size(),
                 batch_size = params_.batch_size(),
                 split_size_plus_one = split_size + 1;
 
-            FFieldArray batch_vector(context.exfield(), batch_size);
+            FFieldArray batch_vector(context.exfield());
             vector<uint64_t> integer_batch_vector(batch_size);
 
             // Data in batch-split table is stored in "batch-major order"
@@ -493,8 +495,6 @@ namespace apsi
                 }
                 else
                 {
-
-
                     for (int i = 0; i < split_size_plus_one; i++)
                     {
                         Plaintext &poly = block.batch_random_symm_poly_[i];
@@ -502,10 +502,10 @@ namespace apsi
                         // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
                         for (int k = 0; batch_start + k < batch_end; k++)
                         {
-                            fq_nmod_set(batch_vector.data() + k, &symm_block(k, i), ctx);
+                            fq_nmod_set(batch_vector.data() + k, &symm_block(k, i), batch_vector.field(k)->ctx());
                             // batch_vector.set(k, k * split_size_plus_one + i, symm_block);
                         }
-                        ex_builder->compose(poly, batch_vector);
+                        ex_builder->compose(batch_vector, poly);
                         evaluator->transform_to_ntt(poly, local_pool);
 
                         if (params_.debug())
@@ -522,7 +522,7 @@ namespace apsi
             int thread_count,
             shared_ptr<Evaluator> evaluator,
             shared_ptr<PolyCRTBuilder> builder,
-            shared_ptr<FFieldCRTBuilder> ex_builder)
+            shared_ptr<FFieldFastCRTBuilder> ex_builder)
         {
             auto& mod = params_.encryption_params().plain_modulus();
 
@@ -531,7 +531,7 @@ namespace apsi
             auto degree = 1;
             if (ex_builder)
             {
-                degree = ex_builder->field()->degree();
+                degree = ex_builder->d();
             }
 
             if (params_.get_label_bit_count() >= coeffBitCount * degree)
@@ -560,7 +560,7 @@ namespace apsi
             const seal::SmallModulus& mod,
             shared_ptr<Evaluator> evaluator,
             shared_ptr<PolyCRTBuilder> builder,
-            shared_ptr<FFieldCRTBuilder> ex_builder,
+            shared_ptr<FFieldFastCRTBuilder> ex_builder,
             const PSIParams& params)
         {
 
@@ -576,16 +576,17 @@ namespace apsi
                 coeffs.reserve(items_per_batch_);
 
                 //std::vector<std::pair<u64, u64>> inputs(items_per_split_);
-                FFieldArray x(ex_builder->field(), items_per_split_);
-                FFieldArray y(ex_builder->field(), items_per_split_);
-
-                FFieldElt temp(ex_builder->field());
                 std::vector<u64> temp_vec((value_byte_length_ + sizeof(u64)) / sizeof(u64), 0);
                 std::unordered_set<u64> key_set;
                 key_set.reserve(items_per_split_);
 
                 for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
                 {
+                    FFieldArray x(ex_builder->field(pos.batch_offset), items_per_split_);
+                    FFieldArray y(ex_builder->field(pos.batch_offset), items_per_split_);
+
+                    FFieldElt temp(ex_builder->field(pos.batch_offset));
+
                     int size = 0;
                     for (pos.split_offset = 0; pos.split_offset < items_per_split_; ++pos.split_offset)
                     {
@@ -631,15 +632,16 @@ namespace apsi
                         ++temp_vec[0];
                     }
 
-                    coeffs.emplace_back(ex_builder->field(), items_per_split_);
+                    coeffs.emplace_back(ex_builder->field(pos.batch_offset), items_per_split_);
 
                     ffield_newton_interpolate_poly(x, y, coeffs.back());
                 }
 
                 batched_label_coeffs_.resize(items_per_split_);
 
-                auto degree = context.exfield()->degree();
-                FFieldArray temp_array(context.exfield(), items_per_batch_);
+                /// We assume there are all the same
+                auto degree = context.exfield()[0]->d();
+                FFieldArray temp_array(ex_builder->create_array());
                 //FFieldElt elem(context.exfield());
                 for (int s = 0; s < items_per_split_; s++)
                 {
@@ -657,7 +659,7 @@ namespace apsi
                         params.encryption_params().coeff_modulus().size() *
                         params.encryption_params().poly_modulus().coeff_count(), local_pool);
 
-                    ex_builder->compose(batched_coeff, temp_array);
+                    ex_builder->compose(temp_array, batched_coeff);
                     evaluator->transform_to_ntt(batched_coeff);
                 }
 
@@ -845,7 +847,7 @@ namespace apsi
             const seal::SmallModulus &plain_mod,
             shared_ptr<seal::Evaluator> evaluator,
             shared_ptr<seal::PolyCRTBuilder> builder,
-            shared_ptr<FFieldCRTBuilder> ex_builder,
+            shared_ptr<FFieldFastCRTBuilder> ex_builder,
             const PSIParams &params)
         {
         }

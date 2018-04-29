@@ -8,7 +8,7 @@
 // APSI
 #include "apsi/psiparams.h"
 #include "apsi/ffield/ffield_elt.h"
-#include "apsi/ffield/ffield_crt_builder.h"
+#include "apsi/ffield/ffield_array.h"
 
 #include "seal/memorypoolhandle.h"
 
@@ -47,12 +47,12 @@ namespace apsi
                 pool_ = pool;
             }
 
-            inline std::shared_ptr<FField> &exfield()
+            inline std::vector<std::shared_ptr<FField> > &exfield()
             {
                 return exfield_;
             }
 
-            inline void set_exfield(std::shared_ptr<FField> exfield)
+            inline void set_exfield(std::vector<std::shared_ptr<FField> > exfield)
             {
                 exfield_ = std::move(exfield);
             }
@@ -81,7 +81,14 @@ namespace apsi
                 }
                 if (!symm_block_vec_)
                 {
-                    symm_block_vec_.reset(new FFieldArray(exfield_, params.batch_size() * (params.split_size() + 1)));
+                    // Append field vectors after each other to form the matrix
+                    std::vector<std::shared_ptr<FField> > field_matrix;
+                    for(int i = 0; i < params.split_size() + 1; i++)
+                    {
+                        field_matrix.insert(field_matrix.end(), exfield_.begin(), exfield_.end()); 
+                    }
+
+                    symm_block_vec_.reset(new FFieldArray(field_matrix));
                     // symm_block_vec_.resize(params.batch_size() * (params.split_size() + 1), FFieldElt(exfield_));
                     symm_block_ = oc::MatrixView<_ffield_array_elt_t>(symm_block_vec_->data(), params.batch_size(), params.split_size() + 1);
                 }
@@ -102,7 +109,7 @@ namespace apsi
 
             seal::MemoryPoolHandle pool_;
 
-            std::shared_ptr<FField> exfield_;
+            std::vector<std::shared_ptr<FField> > exfield_;
 
             std::unique_ptr<FFieldArray> symm_block_vec_;
 

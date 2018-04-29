@@ -69,8 +69,8 @@ namespace apsi
 
             if(!polycrtbuilder_)
             {
-                exfieldpolycrtbuilder_.reset(new FFieldCRTBuilder(ex_field_,
-                    get_power_of_two(params_.encryption_params().poly_modulus().coeff_count() - 1), FFieldElt(ex_field_, "1x^1")));
+                exbuilder_.reset(new FFieldFastCRTBuilder(ex_field_->ch(), ex_field_->d(),
+                    get_power_of_two(params_.encryption_params().poly_modulus().coeff_count() - 1)));
             }
         }
 
@@ -189,13 +189,26 @@ namespace apsi
 
             //vector<int> indices = cuckoo_indices(items, *cuckoo);
 
-            FFieldArray exfield_items(ex_field_, cuckoo->capacity());
-            exfield_encoding(*cuckoo, exfield_items);
+            unique_ptr<FFieldArray> exfield_items;
+            unsigned padded_cuckoo_capacity = ((cuckoo->capacity() + slot_count_ - 1) / slot_count_) * slot_count_;
+            if(polycrtbuilder_)
+            {
+                exfield_items.reset(new FFieldArray(ex_field_, padded_cuckoo_capacity));
+            }
+            else
+            {
+                vector<shared_ptr<FField> > field_vec;
+                field_vec.reserve(padded_cuckoo_capacity);
+                for(unsigned i = 0; i < padded_cuckoo_capacity; i++)
+                {
+                    field_vec.emplace_back(exbuilder_->field(i % slot_count_));
+                }
+                exfield_items.reset(new FFieldArray(field_vec));
+            }
+            exfield_encoding(*cuckoo, *exfield_items);
 
             map<uint64_t, FFieldArray> powers;
-            generate_powers(exfield_items, powers);
-
-
+            generate_powers(*exfield_items, powers);
 
             if (params_.debug())
             {
@@ -204,7 +217,7 @@ namespace apsi
                 //    std::cout << "Exp[" << j << "]: " << exfield_items.get(j) << std::endl;
                 //}
 
-                send_ffield_array(exfield_items, channel);
+                send_ffield_array(*exfield_items, channel);
             }
 
             map<uint64_t, vector<Ciphertext> > ciphers;
@@ -257,7 +270,7 @@ namespace apsi
             );
 
             auto coeff_bit_count = seal::util::get_significant_bit_count(ex_field_->ch()) - 1;
-            auto degree = ex_field_ ? ex_field_->degree() : 1;
+            auto degree = ex_field_ ? ex_field_->d() : 1;
 
             if (cuckoo->encoding_bit_length() > coeff_bit_count * degree)
             {
@@ -325,7 +338,11 @@ namespace apsi
             for (int i = 0; i < cuckoo.capacity(); i++)
             {
                 //if(cuckoo.has_item_at(i))
-                ret.set(i, Item(encodings[i]).to_exfield_element(ex_field_, encoding_bit_length));
+                ret.set(i, Item(encodings[i]).to_exfield_element(ret.field(i), encoding_bit_length));
+            }
+            for(int i = cuckoo.capacity(); i < ret.size(); i++)
+            {
+                ret.set(i, Item(cuckoo.null_value()).to_exfield_element(ret.field(i), encoding_bit_length));
             }
         }
 
@@ -369,28 +386,37 @@ namespace apsi
         void Receiver::encrypt(const FFieldArray &input, vector<Ciphertext> &destination)
         {
             int batch_size = slot_count_, num_of_batches = (input.size() + batch_size - 1) / batch_size;
-            FFieldArray batch(ex_field_, batch_size);
             vector<uint64_t> integer_batch(batch_size, 0);
             destination.clear();
-            for (int i = 0; i < num_of_batches; i++)
+            destination.reserve(num_of_batches);
+            Plaintext plain(pool_);
+            if(polycrtbuilder_)
             {
-                Plaintext plain;
-                if (polycrtbuilder_)
+                for (int i = 0; i < num_of_batches; i++)
                 {
-                    for (int j = 0; (j < batch_size) && ((i * batch_size + j) < input.size()); j++)
+                    // This is a bit silly; PolyCRTBuilder only takes vector inputs
+                    for (int j = 0; j < batch_size; j++)
+                    {
                         integer_batch[j] = input.get_coeff_of(i * batch_size + j, 0);
+                    }
                     polycrtbuilder_->compose(integer_batch, plain);
+                    destination.emplace_back(params_.encryption_params(), pool_);
+                    encryptor_->encrypt(plain, destination.back(), pool_);
                 }
-                else // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
+            }
+            else
+            {
+                FFieldArray batch(exbuilder_->create_array());
+                for (int i = 0; i < num_of_batches; i++)
                 {
-                    for (int j = 0; (j < batch_size) && ((i * batch_size + j) < input.size()); j++)
+                    for (int j = 0; j < batch_size; j++)
                     {
                         batch.set(j, i * batch_size + j, input);
                     }
-                    exfieldpolycrtbuilder_->compose(plain, batch);
+                    exbuilder_->compose(batch, plain);
+                    destination.emplace_back(params_.encryption_params(), pool_);
+                    encryptor_->encrypt(plain, destination.back(), pool_);
                 }
-                destination.emplace_back();
-                encryptor_->encrypt(plain, destination.back(), pool_);
             }
         }
 
@@ -399,7 +425,7 @@ namespace apsi
         //    if (result_ciphers.size() != params_.split_count() || result_ciphers[0].size() != params_.batch_count())
         //        throw invalid_argument("Result ciphers have unexpexted sizes.");
 
-        //    int slot_count = exfieldpolycrtbuilder_->slot_count();
+        //    int slot_count = exbuilder_->slot_count();
         //    memory_backing_.emplace_back(Pointer());
         //    vector<vector<ExFieldElement>> result = ex_field_->allocate_elements(
         //        result_ciphers.size(), result_ciphers[0].size() * slot_count, memory_backing_.back());
@@ -448,8 +474,8 @@ namespace apsi
                 block_count = num_of_splits * num_of_batches,
                 batch_size = slot_count_;
 
-            Plaintext p;
-            Ciphertext tmp;
+            Plaintext p(pool_);
+            Ciphertext tmp(pool_);
 
             struct RecvPackage
             {
@@ -472,7 +498,11 @@ namespace apsi
             }
 
             const bool short_strings = !!polycrtbuilder_;
-            FFieldArray batch(ex_field_, batch_size);
+            unique_ptr<FFieldArray> batch;
+            if(!short_strings)
+            {
+                batch.reset(new FFieldArray(exbuilder_->create_array()));
+            }
             vector<uint64_t> integer_batch(batch_size);
 
             bool has_result;
@@ -484,12 +514,6 @@ namespace apsi
             for (auto& pkg : recvPackages)
             {
                 pkg.fut.get();
-                if (first)
-                {
-                    first = false;
-                    stop_watch.set_time_point("receiver recv-start");
-                }
-
                 auto base_idx = pkg.batch_idx * batch_size;
 
                 // recover the sym poly values 
@@ -497,13 +521,20 @@ namespace apsi
                 stringstream ss(pkg.data);
                 tmp.load(ss);
 
+                if (first)
+                {
+                    first = false;
+                    cout << "Noise budget: " << decryptor_->invariant_noise_budget(tmp) << " bits" << endl;
+                    stop_watch.set_time_point("receiver recv-start");
+                }
+
                 decryptor_->decrypt(tmp, p);
 
                 //vector<uint64_t> integer_batch(batch_size);
                 if (short_strings)
                     polycrtbuilder_->decompose(p, integer_batch, pool_);
                 else
-                    exfieldpolycrtbuilder_->decompose(batch, p);
+                    exbuilder_->decompose(p, *batch);
 
                 for (int k = 0; k < integer_batch.size(); k++)
                 {
@@ -513,7 +544,7 @@ namespace apsi
                     if (short_strings)
                         is_zero = integer_batch[k] == 0;
                     else
-                        is_zero = batch.is_zero(k);
+                        is_zero = batch->is_zero(k);
 
                     if (is_zero)
                     {
@@ -551,9 +582,9 @@ namespace apsi
                     else
                     {
                         // make sure its the right size. decrypt will shorted when there are zero coeffs at the top.
-                        p.resize(exfieldpolycrtbuilder_->n());
+                        p.resize(exbuilder_->n());
 
-                        exfieldpolycrtbuilder_->decompose(batch, p);
+                        exbuilder_->decompose(p, *batch);
                     }
 
                     for (int k = 0; k < integer_batch.size(); k++)
@@ -571,7 +602,7 @@ namespace apsi
                             }
                             else
                             {
-                                batch.get(k).decode(ret_labels[idx], params_.get_label_bit_count());
+                                batch->get(k).decode(ret_labels[idx], params_.get_label_bit_count());
                                 //throw runtime_error("not implemented");
                                 // src = (u8*)batch[k].pointer(0);
                             }
@@ -612,7 +643,7 @@ namespace apsi
             }
             else
             {
-                exfieldpolycrtbuilder_->decompose(batch, p);
+                exbuilder_->decompose(p, batch);
                 for (int k = 0; k < batch.size(); k++)
                 {
                     rr[k] = batch.is_zero(k);
@@ -626,7 +657,7 @@ namespace apsi
         //{
         //	int num_of_splits = params_.split_count(),
         //		num_of_batches = params_.batch_count(),
-        //		slot_count = exfieldpolycrtbuilder_->slot_count();
+        //		slot_count = exbuilder_->slot_count();
 
         //	memory_backing_.emplace_back(Pointer());
         //	result = ex_field_->allocate_elements(
@@ -652,7 +683,7 @@ namespace apsi
         //vector<::ExFieldElement>& result,
         //::Pointer& backing)
         //     {
-        //         int slot_count = exfieldpolycrtbuilder_->slot_count();
+        //         int slot_count = exbuilder_->slot_count();
         //         
         //         vector<ExFieldElement> result = ex_field_->allocate_elements(ciphers.size() * slot_count, backing);
         //         Pointer tmp_backing;
@@ -667,7 +698,7 @@ namespace apsi
         //             }
         //             else
         //             {
-        //                 exfieldpolycrtbuilder_->decompose(decryptor_->decrypt(ciphers[i]), temp);
+        //                 exbuilder_->decompose(decryptor_->decrypt(ciphers[i]), temp);
         //             }
         //             for(int j = 0; j < temp.size(); j++)
         //                 result[i * slot_count + j] = temp[j];

@@ -25,16 +25,6 @@ namespace apsi
             nmod_poly_clear(modulus_tree_ + i);
         }
         delete[] modulus_tree_;
-
-        // Clear result_tree_
-        for(uint64_t i = 0; i < 2 * slot_count_ - 1; i++)
-        {
-            nmod_poly_clear(result_tree_ + i);
-        }
-        delete[] result_tree_;
-
-        // Clear temp_poly_
-        nmod_poly_clear(temp_poly_);
     }
 
     FFieldFastCRTBuilder::FFieldFastCRTBuilder(std::uint64_t ch, std::uint64_t d, unsigned log_n) :
@@ -99,16 +89,6 @@ namespace apsi
         }
         build_modulus_tree(0);
 
-        // Initialize result_tree_
-        result_tree_ = new nmod_poly_struct[2 * slot_count_ - 1];
-        for(uint64_t i = 0; i < 2 * slot_count_ - 1; i++)
-        {
-            nmod_poly_init(result_tree_ + i, ch_);
-        }
-
-        // Initialize temp_poly_
-        nmod_poly_init(temp_poly_, ch_);
-
         // Clear locals
         fmpz_clear(mult_grp_size);
         nmod_poly_clear(cyclotomic_poly);
@@ -131,7 +111,7 @@ namespace apsi
         }
     }
 
-    void FFieldFastCRTBuilder::interpolate(uint64_t node)
+    void FFieldFastCRTBuilder::interpolate(uint64_t node, nmod_poly_struct *result_tree) const
     {
         // Do nothing for leaf nodes; they are already there.
         if(node >= slot_count_ - 1)
@@ -140,48 +120,46 @@ namespace apsi
         }
         else
         {
+            // Initialize temp_poly
+            nmod_poly_t temp_poly;
+            nmod_poly_init(temp_poly, ch_);
+
             auto child1 = 2 * node + 1;
             auto child2 = 2 * node + 2;
-            interpolate(child1);
-            interpolate(child2);
-            nmod_poly_mul(temp_poly_, result_tree_ + child1, modulus_tree_ + child2);
-            nmod_poly_mul(result_tree_ + node, result_tree_ + child2, modulus_tree_ + child1);
-            nmod_poly_add(result_tree_ + node, result_tree_ + node, temp_poly_);
+            interpolate(child1, result_tree);
+            interpolate(child2, result_tree);
+            nmod_poly_mul(temp_poly, result_tree + child1, modulus_tree_ + child2);
+            nmod_poly_mul(result_tree + node, result_tree + child2, modulus_tree_ + child1);
+            nmod_poly_add(result_tree + node, result_tree + node, temp_poly);
+
+            // Clear temp_poly
+            nmod_poly_clear(temp_poly);
         }
     }
 
-    void FFieldFastCRTBuilder::compose(span<const FFieldElt> values, Plaintext &destination)
+    void FFieldFastCRTBuilder::reduce(uint64_t node, nmod_poly_struct *result_tree, nmod_poly_struct *destination) const
     {
-        if(values.size() != slot_count_)
+        // Do nothing for leaf nodes; they are already there.
+        if(node >= slot_count_ - 1)
         {
-            throw invalid_argument("values has incorrect size");
+            nmod_poly_set(destination + (node - slot_count_ + 1), result_tree + node);
         }
-#ifndef NDEBUG
-        // Test that fields are all matching
-        for(uint64_t i = 0; i < slot_count_; i++)
+        else
         {
-            if(values[i].field_ != fields_[i])
-            {
-                throw invalid_argument("field mismatch");
-            }
-        }
-#endif
-        auto result_tree_ptr = result_tree_ + slot_count_ -  1;
-        auto values_ptr = values.data();
-        auto inv_punct_prod_ptr = inv_punct_prod_;
-        for(uint64_t i = 0; i < slot_count_; i++, result_tree_ptr++, values_ptr++, inv_punct_prod_ptr++)
-        {
-            nmod_poly_mul(result_tree_ptr, values_ptr->elt_, inv_punct_prod_ptr);
-        }
-        interpolate(0);
+            auto child1 = 2 * node + 1;
+            auto child2 = 2 * node + 2;
 
-        // Copy result to destination
-        uint64_t coeff_count = result_tree_[0].length;
-        destination.resize(coeff_count);
-        memcpy(destination.pointer(), result_tree_->coeffs, 8 * coeff_count);
+            // Compute reductions down the tree
+            nmod_poly_rem(result_tree + child1, result_tree + node, modulus_tree_ + child1);
+            nmod_poly_rem(result_tree + child2, result_tree + node, modulus_tree_ + child2);
+
+            // Iterate
+            reduce(child1, result_tree, destination);
+            reduce(child2, result_tree, destination);
+        }
     }
 
-    void FFieldFastCRTBuilder::compose(const FFieldArray &values, Plaintext &destination)
+    void FFieldFastCRTBuilder::compose(const FFieldArray &values, Plaintext &destination) const
     {
         if(values.size() != slot_count_)
         {
@@ -197,64 +175,33 @@ namespace apsi
             }
         }
 #endif
-        auto result_tree_ptr = result_tree_ + slot_count_ -  1;
-        auto values_ptr = values.array_;
+        // Initialize result_tree
+        auto result_tree = new nmod_poly_struct[2 * slot_count_ - 1];
+        for(uint64_t i = 0; i < 2 * slot_count_ - 1; i++)
+        {
+            nmod_poly_init(result_tree + i, ch_);
+        }
+
+        auto result_tree_ptr = result_tree + slot_count_ -  1;
+        auto values_ptr = values.data();
         auto inv_punct_prod_ptr = inv_punct_prod_;
         for(uint64_t i = 0; i < slot_count_; i++, result_tree_ptr++, values_ptr++, inv_punct_prod_ptr++)
         {
             nmod_poly_mul(result_tree_ptr, values_ptr, inv_punct_prod_ptr);
         }
-        interpolate(0);
+        interpolate(0, result_tree);
 
         // Copy result to destination
-        uint64_t coeff_count = result_tree_[0].length;
+        uint64_t coeff_count = result_tree[0].length;
         destination.resize(coeff_count);
-        memcpy(destination.pointer(), result_tree_->coeffs, 8 * coeff_count);
-    }
+        memcpy(destination.pointer(), result_tree->coeffs, 8 * coeff_count);
 
-    void FFieldFastCRTBuilder::decompose(const Plaintext &plain, span<FFieldElt> destination) const
-    {
-        if(destination.size() != slot_count_)
+        // Clear result_tree
+        for(uint64_t i = 0; i < 2 * slot_count_ - 1; i++)
         {
-            throw invalid_argument("destination has incorrect size");
+            nmod_poly_clear(result_tree + i);
         }
-#ifndef NDEBUG
-        // Test that fields are all matching
-        for(uint64_t i = 0; i < slot_count_; i++)
-        {
-            if(destination[i].field_ != fields_[i])
-            {
-                throw invalid_argument("field mismatch");
-            }
-        }
-#endif
-        uint64_t plain_coeff_count = plain.coeff_count();
-        uint64_t max_coeff_count = n_ + 1;
-        if (plain_coeff_count > max_coeff_count || (plain_coeff_count == max_coeff_count && (plain[n_] != 0)))
-        {
-            throw invalid_argument("plain is not valid for encryption parameters");
-        }
-#ifndef NDEBUG
-        if (static_cast<uint64_t>(plain.significant_coeff_count()) >= max_coeff_count || !are_poly_coefficients_less_than(plain.pointer(),
-            plain_coeff_count, 1, &ch_, 1))
-        {
-            throw invalid_argument("plain is not valid for encryption parameters");
-        }
-#endif
-        // First copy over input to result_tree_[0]
-        auto plain_ptr = plain.pointer();
-        for(uint64_t i = 0; i < plain_coeff_count; i++, plain_ptr++)
-        {
-            nmod_poly_set_coeff_ui(result_tree_, i, *plain_ptr);
-        }
-
-        // Then reduce modulo different factors
-        auto destination_ptr = destination.data();
-        auto modulus_poly_ptr = factorization_->p;
-        for(uint64_t i = 0; i < slot_count_; i++, destination_ptr++, modulus_poly_ptr++)
-        {
-            nmod_poly_rem(destination_ptr->elt_, result_tree_, modulus_poly_ptr);
-        }
+        delete[] result_tree;
     }
 
     void FFieldFastCRTBuilder::decompose(const Plaintext &plain, FFieldArray &destination) const
@@ -286,19 +233,29 @@ namespace apsi
             throw invalid_argument("plain is not valid for encryption parameters");
         }
 #endif
-        // First copy over input to result_tree_[0]
+        // Initialize result_tree
+        auto result_tree = new nmod_poly_struct[2 * slot_count_ - 1];
+        for(uint64_t i = 0; i < 2 * slot_count_ - 1; i++)
+        {
+            nmod_poly_init(result_tree + i, ch_);
+        }
+
+        // First copy over input to result_tree[0]
+        nmod_poly_realloc(result_tree, plain_coeff_count);
         auto plain_ptr = plain.pointer();
         for(uint64_t i = 0; i < plain_coeff_count; i++, plain_ptr++)
         {
-            nmod_poly_set_coeff_ui(result_tree_, i, *plain_ptr);
+            nmod_poly_set_coeff_ui(result_tree, i, *plain_ptr);
         }
 
-        // Then reduce modulo different factors
-        auto destination_ptr = destination.array_;
-        auto modulus_poly_ptr = factorization_->p;
-        for(uint64_t i = 0; i < slot_count_; i++, destination_ptr++, modulus_poly_ptr++)
+        // Now reduce
+        reduce(0, result_tree, destination.array_);
+
+        // Clear result_tree
+        for(uint64_t i = 0; i < 2 * slot_count_ - 1; i++)
         {
-            nmod_poly_rem(destination_ptr, result_tree_, modulus_poly_ptr);
+            nmod_poly_clear(result_tree + i);
         }
+        delete[] result_tree;
     }
 }

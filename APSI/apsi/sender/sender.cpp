@@ -6,7 +6,6 @@
 #include "apsi/sender/sender.h"
 #include "apsi/apsidefines.h"
 #include "apsi/network/network_utils.h"
-#include "apsi/ffield/ffield_crt_builder.h"
 
 #include "seal/util/common.h"
 
@@ -50,17 +49,23 @@ namespace apsi
 
             // Construct shared Evaluator and PolyCRTBuilder
             evaluator_.reset(new Evaluator(*seal_context_));
+            vector<shared_ptr<FField> > field_vec;
             if (seal_context_->qualifiers().enable_batching)
             {
                 builder_.reset(new PolyCRTBuilder(*seal_context_));
+                for(unsigned i = 0; i < builder_->slot_count(); i++)
+                {
+                    field_vec.emplace_back(ex_field_);
+                }
             }
             else
             {
-                ex_builder_.reset(new FFieldCRTBuilder(
-                    ex_field_, 
-                    get_power_of_two(params_.encryption_params().poly_modulus().coeff_count() - 1), 
-                    FFieldElt(ex_field_, "1x^1"))
-                );
+                ex_builder_.reset(new FFieldFastCRTBuilder(
+                    ex_field_->ch(),
+                    ex_field_->d(), 
+                    get_power_of_two(params_.encryption_params().poly_modulus().coeff_count() - 1) 
+                ));
+                field_vec = ex_builder_->fields();
             }
             vector<thread> thrds(total_thread_count_);
 
@@ -82,7 +87,7 @@ namespace apsi
                     thread_contexts_[i].set_id(i);
                     thread_contexts_[i].set_prng(seed);
                     thread_contexts_[i].set_pool(local_pool);
-                    thread_contexts_[i].set_exfield(ex_field_);
+                    thread_contexts_[i].set_exfield(field_vec);
 
                     // // We need the EdPolyCRTBuilder here since it creates ExFieldElements from the memory
                     // // pool of its ExField. Cannot have a shared ExFieldPolyCRTBuilder with this design.
@@ -178,7 +183,7 @@ namespace apsi
             FFieldArray* ptr = nullptr;
             if (params_.debug())
             {
-                ptr =new FFieldArray(ex_field_, params_.table_size());
+                ptr = new FFieldArray(ex_field_, params_.table_size());
                 receive_ffield_array(*ptr, chl);
             }
             /* Set up and receive keys. */
@@ -243,7 +248,7 @@ namespace apsi
             }
             else
             {
-                ex_builder_->decompose(dest, p);
+                ex_builder_->decompose(p, dest);
             }
 
 
@@ -346,8 +351,6 @@ namespace apsi
                     auto& thread_context = thread_contexts_[thread_context_idx];
                     thread_context.construct_variables(params_);
 
-
-
                     Ciphertext tmp(thread_context.pool());
 
                     auto batch_start = i * batch_count / thread_pool.size();
@@ -369,7 +372,8 @@ namespace apsi
                     // constuct two ciphertext to store the result.  One keeps track of the current result, 
                     // one is used as a temp. Their roles switch each iteration. Saved needing to make a 
                     // copy in eval->add(...)
-                    array<Ciphertext, 2> runningResults, label_results;
+                    array<Ciphertext, 2> runningResults{ thread_context.pool(), thread_context.pool() }, 
+                        label_results { thread_context.pool(), thread_context.pool() };
                     
 
                     for (int block_idx = start_block; block_idx < end_block; block_idx++)
@@ -577,11 +581,14 @@ namespace apsi
             SenderSessionContext &session_context,
             SenderThreadContext &thread_context)
         {
-            batch_powers.resize(params_.split_size() + 1);
+            batch_powers.clear();
+            batch_powers.reserve(params_.split_size() + 1);
             MemoryPoolHandle local_pool = thread_context.pool();
 
             //shared_ptr<Evaluator> local_evaluator = context.evaluator();
-            session_context.encryptor()->encrypt(BigPoly("1"), batch_powers[0], local_pool);
+            Ciphertext temp(local_pool);
+            session_context.encryptor()->encrypt(BigPoly("1"), temp, local_pool);
+            batch_powers.push_back(temp);
 
             for (int i = 1; i <= params_.split_size(); i++)
             {
@@ -589,12 +596,13 @@ namespace apsi
                 int i2 = i - i1;
                 if (i1 == 0 || i2 == 0)
                 {
-                    batch_powers[i] = input.at(i)[batch];
+                    batch_powers.emplace_back(input.at(i)[batch]);
                 }
                 else
                 {
-                    evaluator_->multiply(batch_powers[i1], batch_powers[i2], batch_powers[i], local_pool);
-                    evaluator_->relinearize(batch_powers[i], session_context.evaluation_keys_, batch_powers[i], local_pool);
+                    batch_powers.emplace_back(local_pool);
+                    evaluator_->multiply(batch_powers[i1], batch_powers[i2], batch_powers.back(), local_pool);
+                    evaluator_->relinearize(batch_powers[i], session_context.evaluation_keys_, batch_powers.back(), local_pool);
                 }
 
             }

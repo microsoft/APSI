@@ -12,9 +12,6 @@
 // SEAL
 #include "seal/plaintext.h"
 
-// GSL
-#include <gsl/span>
-
 namespace apsi
 {
     class FFieldFastCRTBuilder
@@ -29,7 +26,7 @@ namespace apsi
             return ch_;
         }
 
-        inline std::uint64_t degree() const
+        inline std::uint64_t d() const
         {
             return d_;
         }
@@ -59,19 +56,23 @@ namespace apsi
             return fields_[index];
         }
 
+        inline const std::vector<std::shared_ptr<FField> > &fields() const
+        {
+            return fields_;
+        }
+
         inline FFieldArray create_array() const
         {
             return FFieldArray(fields_);
         }
 
-        void compose(gsl::span<const FFieldElt> values, seal::Plaintext &destination);
-        void decompose(const seal::Plaintext &plain, gsl::span<FFieldElt> destination) const;
-        void compose(const FFieldArray &values, seal::Plaintext &destination);
+        void compose(const FFieldArray &values, seal::Plaintext &destination) const;
         void decompose(const seal::Plaintext &plain, FFieldArray &destination) const;
 
     private:
         void build_modulus_tree(std::uint64_t node);
-        void interpolate(std::uint64_t node);
+        void interpolate(std::uint64_t node, nmod_poly_struct *result_tree) const;
+        void reduce(std::uint64_t node, nmod_poly_struct *result_tree, nmod_poly_struct *destination) const;
 
         const std::uint64_t ch_;
         const std::uint64_t d_;
@@ -83,7 +84,5 @@ namespace apsi
         std::vector<std::shared_ptr<FField> > fields_;
         nmod_poly_struct *inv_punct_prod_;
         nmod_poly_struct *modulus_tree_;
-        nmod_poly_struct *result_tree_;
-        nmod_poly_t temp_poly_;
     };
 }

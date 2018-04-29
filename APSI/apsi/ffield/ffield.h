@@ -165,7 +165,7 @@ namespace apsi
             return modulus_;
         }
 
-        inline unsigned degree() const
+        inline unsigned d() const
         {
             return d_;
         }

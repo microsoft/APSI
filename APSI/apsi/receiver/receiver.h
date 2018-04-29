@@ -7,7 +7,7 @@
 // APSI
 #include "apsi/item.h"
 #include "apsi/psiparams.h"
-#include "apsi/ffield/ffield_crt_builder.h"
+#include "apsi/ffield/ffield_fast_crt_builder.h"
 #include "apsi/ffield/ffield_array.h"
 
 // Cuckoo
@@ -148,9 +148,9 @@ namespace apsi
                 return ex_field_;
             }
 
-            std::shared_ptr<FFieldCRTBuilder> ex_builder() const
+            std::shared_ptr<FFieldFastCRTBuilder> ex_builder() const
             {
-                return exfieldpolycrtbuilder_;
+                return exbuilder_;
             }
 
             const seal::PublicKey& public_key() const
@@ -189,7 +189,7 @@ namespace apsi
 
             seal::EvaluationKeys evaluation_keys_;
 
-            std::shared_ptr<FFieldCRTBuilder> exfieldpolycrtbuilder_;
+            std::shared_ptr<FFieldFastCRTBuilder> exbuilder_;
 
             std::unique_ptr<seal::PolyCRTBuilder> polycrtbuilder_;
 

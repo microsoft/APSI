@@ -75,14 +75,12 @@ namespace apsi
         return *this;
     }
 
-
-    FFieldElt Item::to_exfield_element(shared_ptr<FField> &exfield, int bit_length)
+    FFieldElt Item::to_exfield_element(const shared_ptr<FField> &exfield, int bit_length)
     {
         FFieldElt ring_item(exfield);
         to_exfield_element(ring_item, bit_length);
         return ring_item;
     }
-
 
     void bitPrint(u8* data, int length, int offset = 0)
     {
@@ -113,7 +111,7 @@ namespace apsi
         _ffield_elt_coeff_t coeff = 0;
         oc::span<oc::u8> temp_span((oc::u8*)&coeff, sizeof(_ffield_elt_coeff_t));
 
-        auto end = std::min<int>(ring_item.field()->degree(), split_index_bound);
+        auto end = std::min<int>(ring_item.field()->d(), split_index_bound);
         for (int j = 0; j < end; j++)
         {
             // copy the j'th set of bits in value to temp
@@ -168,14 +166,14 @@ namespace apsi
         // How many coefficients do we need in the ExFieldElement
         int split_index_bound = (bit_length + split_length - 1) / split_length;
 
-        //for (int j = 0; j < exfield->degree() && j < split_index_bound; j++)
+        //for (int j = 0; j < exfield->d() && j < split_index_bound; j++)
         //{
         //    std::cout << std::string(split_length - 1, ' ') << '^';
         //}
         //std::cout << std::endl;
 
         int j = 0;
-        for (; j < exfield->degree() && j < split_index_bound; j++)
+        for (; j < exfield->d() && j < split_index_bound; j++)
         {
             auto coeff = item_part(value_, j, split_length);
 

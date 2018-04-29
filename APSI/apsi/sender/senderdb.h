@@ -14,7 +14,7 @@
 #include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_elt.h"
 #include "apsi/ffield/ffield_array.h"
-#include "apsi/ffield/ffield_crt_builder.h"
+#include "apsi/ffield/ffield_fast_crt_builder.h"
 
 // Cuckoo
 #include "cuckoo/cuckoo.h"
@@ -118,7 +118,7 @@ namespace apsi
                 const seal::SmallModulus& mod,
                 std::shared_ptr<seal::Evaluator> evaluator,
                 std::shared_ptr<seal::PolyCRTBuilder> builder,
-                std::shared_ptr<FFieldCRTBuilder> ex_builder,
+                std::shared_ptr<FFieldFastCRTBuilder> ex_builder,
                 const PSIParams& params);
 
             void test_eval(
@@ -126,7 +126,7 @@ namespace apsi
                 const seal::SmallModulus& mod,
                 std::shared_ptr<seal::Evaluator> evaluator,
                 std::shared_ptr<seal::PolyCRTBuilder> builder,
-                std::shared_ptr<FFieldCRTBuilder> ex_builder,
+                std::shared_ptr<FFieldFastCRTBuilder> ex_builder,
                 const PSIParams& params);
 
             void check(const Position& pos);
@@ -224,7 +224,7 @@ namespace apsi
                 SenderThreadContext &context,
                 std::shared_ptr<seal::Evaluator> evaluator, 
                 std::shared_ptr<seal::PolyCRTBuilder> builder,
-                std::shared_ptr<FFieldCRTBuilder> ex_builder,
+                std::shared_ptr<FFieldFastCRTBuilder> ex_builder,
                 int thread_count);
 
             void batched_interpolate_polys(
@@ -232,7 +232,7 @@ namespace apsi
                 int thread_count,
                 std::shared_ptr<seal::Evaluator> evaluator,
                 std::shared_ptr<seal::PolyCRTBuilder> builder,
-                std::shared_ptr<FFieldCRTBuilder> ex_builder
+                std::shared_ptr<FFieldFastCRTBuilder> ex_builder
                 );
 
             //Item& get_key(u64 cuckoo_index, u64 position_idx) {
