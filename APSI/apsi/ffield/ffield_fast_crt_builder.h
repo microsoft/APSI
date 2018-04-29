@@ -59,8 +59,15 @@ namespace apsi
             return fields_[index];
         }
 
-        void compose(seal::Plaintext &destination, gsl::span<const FFieldElt> values);
-        void decompose(gsl::span<FFieldElt> destination, const seal::Plaintext &plain) const;
+        inline FFieldArray create_array() const
+        {
+            return FFieldArray(fields_);
+        }
+
+        void compose(gsl::span<const FFieldElt> values, seal::Plaintext &destination);
+        void decompose(const seal::Plaintext &plain, gsl::span<FFieldElt> destination) const;
+        void compose(const FFieldArray &values, seal::Plaintext &destination);
+        void decompose(const seal::Plaintext &plain, FFieldArray &destination) const;
 
     private:
         void build_modulus_tree(std::uint64_t node);

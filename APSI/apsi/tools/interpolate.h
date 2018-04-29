@@ -5,7 +5,6 @@
 #include <vector>
 
 // SEAL
-#include "seal/util/exfield.h"
 #include "seal/plaintext.h"
 
 // APSI
@@ -27,9 +26,9 @@ namespace apsi
         const FFieldArray &points, const FFieldArray &values,
         FFieldPoly& result);
 
-    void exfield_newton_interpolate_poly(
-        const std::vector<std::pair<seal::util::ExFieldElement, seal::util::ExFieldElement> > &input,
-        std::vector<seal::util::ExFieldElement> &result);
+    // void exfield_newton_interpolate_poly(
+    //     const std::vector<std::pair<seal::util::ExFieldElement, seal::util::ExFieldElement> > &input,
+    //     std::vector<seal::util::ExFieldElement> &result);
 
     // // compute the coefficients of the polynomial which intercepts 
     // // the provided extension field points (input).

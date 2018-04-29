@@ -115,15 +115,17 @@ namespace apsi
     {
         //channel.asyncSendCopy(val.data(), val.size());// *val.field()->degree());
 
-        std::vector<_ffield_elt_coeff_t> coeffs(val.size() * val.field()->degree());
-        auto iter = coeffs.begin();
-        for (int i = 0; i < val.size(); ++i)
-        {
-            for (int j = 0; j < val.field()->degree(); ++j)
-            {
-                *iter++ = val.get_coeff_of(i, j);
-            }
+        // std::vector<_ffield_elt_coeff_t> coeffs(val.size() * val.field()->degree());
+        std::vector<_ffield_elt_coeff_t> coeffs;
 
+        // All fields SHOULD have the same degree
+        coeffs.reserve(val.size() * val.field(0)->degree());
+        for (unsigned i = 0; i < val.size(); ++i)
+        {
+            for (int j = 0; j < val.field(i)->degree(); ++j)
+            {
+                coeffs.emplace_back(val.get_coeff_of(i, j));
+            }
         }
         channel.asyncSend(std::move(coeffs));
 
@@ -144,13 +146,18 @@ namespace apsi
         if (val.size() == 0)
             throw std::runtime_error("resizeing is not performed");
 
-        std::vector<_ffield_elt_coeff_t> coeffs(val.size() * val.field()->degree());
+        // std::vector<_ffield_elt_coeff_t> coeffs(val.size() * val.field()->degree());
+        std::vector<_ffield_elt_coeff_t> coeffs;
+
+        // All fields SHOULD have the same degree
+        coeffs.reserve(val.size() * val.field(0)->degree());
+
         channel.recv(coeffs);
 
         auto iter = coeffs.begin();
         for (int i = 0; i < val.size(); ++i)
         {
-            for (int j = 0; j < val.field()->degree(); ++j)
+            for (int j = 0; j < val.field(i)->degree(); ++j)
             {
                 val.set_coeff_of(i, j, *iter++);
             }

@@ -451,7 +451,7 @@ namespace apsi
         }
 
     private:
-        FFieldElt(std::shared_ptr<FField> field, const _ffield_elt_t in) :
+        FFieldElt(std::shared_ptr<FField> field, const _ffield_elt_ptr_t in) :
             field_(std::move(field))
         {
             // Allocate enough space to be an element of the field

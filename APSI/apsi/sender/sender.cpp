@@ -289,7 +289,7 @@ namespace apsi
 
         bool Sender::debug_not_equals(FFieldArray& true_x, const Ciphertext& c, SenderSessionContext& ctx)
         {
-            FFieldArray cc(true_x.field(), true_x.size());
+            FFieldArray cc(true_x.field(0), true_x.size());
             debug_decrypt(ctx, c, cc);
 
             //for (int i = 0; i < true_x.size(); ++i)

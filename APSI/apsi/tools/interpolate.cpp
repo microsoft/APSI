@@ -35,7 +35,9 @@ namespace apsi
         } 
 #endif
         auto size = points.size();
-        auto field = points.field();
+
+        // The fields should all be the same
+        auto field = points.field(0);
 
         FFieldElt numerator(field);
         FFieldElt denominator(field);
@@ -102,7 +104,9 @@ namespace apsi
         result.set_zero();
 
         auto size = points.size();
-        auto field = points.field();
+
+        // The fields SHOULD all be the same
+        auto field = points.field(0);
 
         FFieldElt numerator(field);
         FFieldElt denominator(field);
@@ -142,57 +146,57 @@ namespace apsi
         }
     }
 
-    void exfield_newton_interpolate_poly(
-        const vector<pair<seal::util::ExFieldElement, seal::util::ExFieldElement>>& input,
-        vector<seal::util::ExFieldElement>& result)
-    {
-        int size = input.size();
-        vector<vector<ExFieldElement>> divided_differences(size);
-        ExFieldElement numerator;
-        ExFieldElement denominator;
-        // Plaintext quotient(coeff_count);
-
-        for (int i = 0; i < size; i++) {
-            divided_differences[i].resize(size - i);
-            divided_differences[i][0] = input[i].second;
-        }
-        for (int j = 1; j < size; j++) {
-            for (int i = 0; i < size - j; i++) {
-                {
-                    numerator = divided_differences[i + 1][j - 1] - divided_differences[i][j - 1];
-                    denominator = input[i + j].first - input[i].first;
-                    // dd[(i, j)] = (dd[(i + 1, j - 1)] - dd[(i, j - 1)]) / (xvec[i + j] - xvec[i])
-                    // multiply numerator with inverted denominator .... . FIXME: this should be multiplication modulo....
-                    //divided_differences[i][j] =  numerator / denominator; 
-                }
-            }
-
-        }
-
-        // Horner's method 
-        result.resize(size);
-        result[0] = divided_differences[0][size - 1];
-        for (int i = 1; i < size; i++) {
-
-            // first, multiply by (x - x_{n-i})
-
-
-            // shift first 
-            for (int j = i - 1; j >= 0; j--) {
-                result[j + 1] = result[j];
-            }
-            result[0] = ExFieldElement();
-            for (int j = 0; j < i; j++) {
-                result[j] = result[j] - input[size - 1 - i].first * result[j + 1];
-            }
-            result[0] = result[0] + divided_differences[0][size - 1 - i];
-
-            //for (int i = 0; i < result.size(); i++) {
-            //        cout << "current result [ " << i << " ] =";
-            //        print_ptxt(result[i], 1);
-            //}
-        }
-    }
+    // void exfield_newton_interpolate_poly(
+    //     const vector<pair<seal::util::ExFieldElement, seal::util::ExFieldElement>>& input,
+    //     vector<seal::util::ExFieldElement>& result)
+    // {
+    //     int size = input.size();
+    //     vector<vector<ExFieldElement>> divided_differences(size);
+    //     ExFieldElement numerator;
+    //     ExFieldElement denominator;
+    //     // Plaintext quotient(coeff_count);
+    //
+    //     for (int i = 0; i < size; i++) {
+    //         divided_differences[i].resize(size - i);
+    //         divided_differences[i][0] = input[i].second;
+    //     }
+    //     for (int j = 1; j < size; j++) {
+    //         for (int i = 0; i < size - j; i++) {
+    //             {
+    //                 numerator = divided_differences[i + 1][j - 1] - divided_differences[i][j - 1];
+    //                 denominator = input[i + j].first - input[i].first;
+    //                 // dd[(i, j)] = (dd[(i + 1, j - 1)] - dd[(i, j - 1)]) / (xvec[i + j] - xvec[i])
+    //                 // multiply numerator with inverted denominator .... . FIXME: this should be multiplication modulo....
+    //                 //divided_differences[i][j] =  numerator / denominator; 
+    //             }
+    //         }
+    //
+    //     }
+    //
+    //     // Horner's method 
+    //     result.resize(size);
+    //     result[0] = divided_differences[0][size - 1];
+    //     for (int i = 1; i < size; i++) {
+    //
+    //         // first, multiply by (x - x_{n-i})
+    //
+    //
+    //         // shift first 
+    //         for (int j = i - 1; j >= 0; j--) {
+    //             result[j + 1] = result[j];
+    //         }
+    //         result[0] = ExFieldElement();
+    //         for (int j = 0; j < i; j++) {
+    //             result[j] = result[j] - input[size - 1 - i].first * result[j + 1];
+    //         }
+    //         result[0] = result[0] + divided_differences[0][size - 1 - i];
+    //
+    //         //for (int i = 0; i < result.size(); i++) {
+    //         //        cout << "current result [ " << i << " ] =";
+    //         //        print_ptxt(result[i], 1);
+    //         //}
+    //     }
+    // }
 
     // // Performs a Newton Interpolation
     // void plaintext_newton_interpolate_poly(
