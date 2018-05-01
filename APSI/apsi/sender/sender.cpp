@@ -325,6 +325,7 @@ namespace apsi
         {
             //vector<vector<Ciphertext>> resultVec(params_.split_count());
             //for (auto& v : resultVec) v.resize(params_.batch_count());
+            stop_watch.set_time_point("sender online start");
             vector<vector<Ciphertext> > powers(params_.batch_count());
 
             vector<pair<promise<void>, shared_future<void>>>
@@ -572,6 +573,9 @@ namespace apsi
             {
                 thread_pool[i].join();
             }
+
+            stop_watch.set_time_point("sender online done");
+
         }
 
         void Sender::compute_batch_powers(

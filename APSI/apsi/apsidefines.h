@@ -49,5 +49,5 @@ namespace apsi
 
     seal::Plaintext random_plaintext(const seal::SEALContext &context);
 
-    extern apsi::tools::Stopwatch stop_watch;
+    extern apsi::tools::Stopwatch stop_watch, recv_stop_watch;
 }

@@ -83,8 +83,14 @@ vector<Item> randSubset(const vector<Item>& items, int size)
 
 
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]){
+    auto b = 4096;
+    auto n = 1*(1 << 20);
+   auto s = apsi::get_bin_size(b, n, 40);
+   std::cout << s << " " << n / b << " " << std::endl;
+
+
+
     CLP cmd(argc, argv);
 
     // Thread count
@@ -288,6 +294,7 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
     {
         s1[i] = i;
         memcpy(labels[i].data(), &s1[i], labels[i].size());
+        labels[i][4] ^= 0xcc;
         //// Insert random string
         //s1[i] = oc::mAesFixedKey.ecbEncBlock(oc::toBlock(i));
     }
@@ -325,6 +332,7 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
     // Receiver's query
+    recv_stop_watch.set_time_point("recevier start");
     auto intersection = receiver.query(c1, recvChl);
     senderQuerySessionTh.join();
 
@@ -386,6 +394,7 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
     }*/
 
     cout << stop_watch << endl;
+    cout << recv_stop_watch << endl;
 }
 
 void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
@@ -470,7 +479,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     */
     PSIParams params(item_bit_length, table_params, cuckoo_params, seal_params, oprf_type);
     params.set_value_bit_count(label_bit_length);
-    params.enable_debug();
+    //params.enable_debug();
     params.validate();
 
 
@@ -489,8 +498,11 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     {
         s1[i] = i;
 
-        if(label_bit_length)
+        if (label_bit_length) {
             memcpy(labels[i].data(), &s1[i], labels[i].size());
+            //labels[i][0] ^= 0xcc;
+
+        }
         //// Insert random string
         //s1[i] = oc::mAesFixedKey.ecbEncBlock(oc::toBlock(i));
     }
@@ -514,6 +526,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
         setThreadName("sender_main");
         sender.query_session(sendChl); 
     });
+    recv_stop_watch.set_time_point("recevier start");
     auto intersection = receiver.query(c1, recvChl);
     thrd.join();
 
@@ -563,6 +576,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     cout << oc::ColorDefault << endl;
 
     cout << stop_watch << endl;
+    cout << recv_stop_watch << endl;
 }
 
 

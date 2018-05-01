@@ -85,14 +85,14 @@ namespace apsi
             send(ciphertexts, chl);
 
             auto table_to_input_map = cuckoo_indices(items, cuckoo);
-            stop_watch.set_time_point("receiver pre-process/sent");
+            recv_stop_watch.set_time_point("receiver pre-process/sent");
 
             /* Receive results in a streaming fashion. */
             //std::vector<int> cuckoo_position;
             //vector<ExFieldElement> result, labels;
             //Pointer backing, label_bacing;
             auto intersection = stream_decrypt(chl, table_to_input_map, items);
-            //stop_watch.set_time_point("receiver decrypt");
+            //recv_stop_watch.set_time_point("receiver decrypt");
 
             //ExFieldElement zero(ex_field_);
             ;//(items.size());
@@ -124,7 +124,7 @@ namespace apsi
 
 
              /* Now we need to shorten and convert this tmp vector to match the length and indice of the query "items". */
-            stop_watch.set_time_point("receiver intersect");
+            recv_stop_watch.set_time_point("receiver intersect");
             return intersection;
         }
 
@@ -525,7 +525,7 @@ namespace apsi
                 {
                     first = false;
                     cout << "Noise budget: " << decryptor_->invariant_noise_budget(tmp) << " bits" << endl;
-                    stop_watch.set_time_point("receiver recv-start");
+                    recv_stop_watch.set_time_point("receiver recv-start");
                 }
 
                 decryptor_->decrypt(tmp, p);

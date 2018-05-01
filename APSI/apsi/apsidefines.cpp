@@ -6,7 +6,7 @@ using namespace std;
 
 namespace apsi
 {
-    apsi::tools::Stopwatch stop_watch;
+    apsi::tools::Stopwatch stop_watch, recv_stop_watch;
 
     //void right_shift_uint(const u64 *source, u64 *destination, u64 shift_amount, u64 u64_count)
     //{

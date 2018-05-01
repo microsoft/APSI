@@ -1,5 +1,7 @@
 #include "apsi/tools/stopwatch.h"
 #include <cstdint>
+#include <algorithm>
+#include <iomanip>
 
 using namespace std;
 
@@ -17,15 +19,21 @@ namespace apsi
 
 		ostream &operator <<(ostream &out, const Stopwatch &stopwatch)
 		{
+            auto length = 0; 
+            for (auto tp : stopwatch.time_points)
+            {
+                length = std::max<int>(tp.second.size(), length);
+            }
+
 			auto prev_time = stopwatch.start_time;
 			for (auto tp : stopwatch.time_points)
 			{
-				out << tp.second
+				out << std::setw(length) << std::setfill(' ') << tp.second
 					<< " | Since last: "
-					<< chrono::duration_cast<chrono::milliseconds>(tp.first - prev_time).count()
+					<< std::setw(5) << std::setfill(' ') << chrono::duration_cast<chrono::milliseconds>(tp.first - prev_time).count()
 					<< " milliseconds"
 					<< " | Total: "
-					<< chrono::duration_cast<chrono::milliseconds>(tp.first - stopwatch.start_time).count()
+					<< std::setw(5) << std::setfill(' ') << chrono::duration_cast<chrono::milliseconds>(tp.first - stopwatch.start_time).count()
 					<< " milliseconds"
 					<< endl;
 				prev_time = tp.first;
