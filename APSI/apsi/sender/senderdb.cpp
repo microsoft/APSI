@@ -4,7 +4,7 @@
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
-
+#include <iomanip>
 
 #include "apsi/sender/senderdb.h"
 #include "apsi/apsidefines.h"
@@ -114,10 +114,26 @@ namespace apsi
             stop_watch.set_time_point("Sender add-data");
         }
 
+        std::string hexStr(u8* data, u64 size)
+        {
+            std::stringstream ss;
+
+            ss << '{';
+            for (u64 i = 0; i < size; ++i)
+            {
+                ss << ' ' << std::setw(2) << std::hex << std::setfill('0') << int(data[i]);
+            }
+            ss << '}';
+            return ss.str();
+        }
+
         void SenderDB::add_data(oc::span<const Item> data, oc::MatrixView<u8> values, int thread_count)
         {
             if (values.stride() != params_.get_label_byte_count())
                 throw std::invalid_argument("unexpacted label length");
+
+            //std::vector<DBBlock*> blk_;
+            //std::vector<DBBlock::Position> pos_;
 
             vector<thread> thrds(thread_count);
             for (int t = 0; t < thrds.size(); t++)
@@ -180,11 +196,11 @@ namespace apsi
                                 cuckoo_loc = perm_loc_func[j].location(data[i]);
                                 key = encoder_.encode(data[i], j, true);
                             }
-
                             // Lock-free thread-safe bin position search
                             auto block_pos = aquire_db_position(cuckoo_loc, prng);
                             auto& db_block = *block_pos.first;
                             auto pos = block_pos.second;
+       
 
                             db_block.get_key(pos) = key;
 
@@ -197,6 +213,19 @@ namespace apsi
                                 auto dest = db_block.get_label(pos);
                                 memcpy(dest, values[i].data(), params_.get_label_byte_count());
                             }
+
+                            //if (i == 3)
+                            //{
+                            //    blk_.push_back(&db_block);
+                            //    pos_.push_back(pos);
+
+
+
+                            //    std::cout << "key " << (block)key << " -> block ("
+                            //        << db_block.batch_idx_ << ", " << db_block.split_idx_ << ") "
+                            //        << " @ " << pos.batch_offset << " " << pos.split_offset 
+                            //        << " " << hexStr(db_block.get_label(pos), params_.get_label_byte_count())<< std::endl;
+                            //}
                         }
                     };
                 });
@@ -206,6 +235,20 @@ namespace apsi
             {
                 t.join();
             }
+
+            //for (u64 i = 0; i < blk_.size(); ++i)
+            //{
+
+            //    auto& pos = pos_[i];
+            //    auto& db_block = *blk_[i];
+            //    auto key = db_block.get_key(pos_[i]);
+
+
+            //    std::cout << "key " << (block)key << " -> block ("
+            //        << db_block.batch_idx_ << ", " << db_block.split_idx_ << ") "
+            //        << " @ " << pos.batch_offset << " " << pos.split_offset
+            //        << " " << hexStr(db_block.get_label(pos), params_.get_label_byte_count()) << std::endl;
+            //}
         }
 
         void SenderDB::add_data(oc::span<const Item> data, int thread_count)

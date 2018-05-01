@@ -29,7 +29,7 @@ namespace apsi
         {   
             throw invalid_argument("incompatible array sizes");
         }
-        if(points.field() != values.field() || result.field() != points.field())
+        if(points.field(0) != values.field(0) || result.field(0) != points.field(0))
         {
            throw invalid_argument("incompatible fields"); 
         } 
@@ -96,7 +96,7 @@ namespace apsi
         {   
             throw invalid_argument("incompatible array sizes");
         }
-        if(points.field() != values.field() || result.field() != points.field())
+        if(points.field(0) != values.field(0) || result.field() != points.field(0))
         {
            throw invalid_argument("incompatible fields"); 
         } 

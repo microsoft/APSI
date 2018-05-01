@@ -470,7 +470,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     */
     PSIParams params(item_bit_length, table_params, cuckoo_params, seal_params, oprf_type);
     params.set_value_bit_count(label_bit_length);
-    //params.enable_debug();
+    params.enable_debug();
     params.validate();
 
 
@@ -479,7 +479,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     //sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
     //sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 
-    auto sendersActualSize = 100;// sender_set_size;
+    auto sendersActualSize = sender_set_size;// 10000;// sender_set_size;
     auto recversActualSize = 50;
     auto intersectionSize = 25;
 

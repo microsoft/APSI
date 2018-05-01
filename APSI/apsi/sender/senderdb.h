@@ -153,7 +153,7 @@ namespace apsi
                 check(pos);
 #endif
 
-                return &label_data_[pos.batch_offset * items_per_split_ + pos.split_offset];
+                return &label_data_[(pos.batch_offset * items_per_split_ + pos.split_offset) * value_byte_length_];
             }
 
             u64 get_key_u64(const Position& pos)
