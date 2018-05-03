@@ -122,7 +122,7 @@ namespace apsi
         {
             // Initialize temp_poly
             nmod_poly_t temp_poly;
-            nmod_poly_init2(temp_poly, ch_, d_);
+            nmod_poly_init(temp_poly, ch_);
 
             auto child1 = 2 * node + 1;
             auto child2 = 2 * node + 2;
@@ -179,7 +179,7 @@ namespace apsi
         auto result_tree = new nmod_poly_struct[2 * slot_count_ - 1];
         for(uint64_t i = 0; i < 2 * slot_count_ - 1; i++)
         {
-            nmod_poly_init2(result_tree + i, ch_, d_);
+            nmod_poly_init(result_tree + i, ch_);
         }
 
         auto result_tree_ptr = result_tree + slot_count_ -  1;
@@ -237,7 +237,7 @@ namespace apsi
         auto result_tree = new nmod_poly_struct[2 * slot_count_ - 1];
         for(uint64_t i = 0; i < 2 * slot_count_ - 1; i++)
         {
-            nmod_poly_init2(result_tree + i, ch_, d_);
+            nmod_poly_init(result_tree + i, ch_);
         }
 
         // First copy over input to result_tree[0]
