@@ -6,3 +6,4 @@
 #include "receiver/receiver.h"
 #include "sender/sender.h"
 #include "tools/binsizemath.h"
+#include "tools/sealcompress.h"

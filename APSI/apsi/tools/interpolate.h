@@ -36,7 +36,7 @@ namespace apsi
         std::vector<FFieldArray>& divided_differences,
         FFieldPoly& result);
 
-    std::vector<FFieldArray> get_div_diff_temp(std::shared_ptr<FField>& field, int size);
+    std::vector<FFieldArray> get_div_diff_temp(const std::shared_ptr<FField>& field, int size);
 
 
     // void exfield_newton_interpolate_poly(

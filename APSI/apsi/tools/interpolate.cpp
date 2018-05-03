@@ -123,7 +123,7 @@ namespace apsi
         }
     }
 
-    vector<FFieldArray> get_div_diff_temp(std::shared_ptr<FField>& field, int size)
+    vector<FFieldArray> get_div_diff_temp(const std::shared_ptr<FField>& field, int size)
     {
         vector<FFieldArray> divided_differences;
         divided_differences.reserve(size);
