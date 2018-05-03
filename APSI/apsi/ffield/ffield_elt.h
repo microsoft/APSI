@@ -413,12 +413,27 @@ namespace apsi
             _ffield_elt_coeff_t temp = 0;
             gsl::span<oc::u8> temp_span(reinterpret_cast<oc::u8*>(&temp), sizeof(_ffield_elt_coeff_t));
 
-            auto end = std::min<unsigned>(field_->d_, split_index_bound);
-            for (unsigned j = 0; j < end; j++)
+            //auto end = std::min<unsigned>(field_->d_, split_index_bound);
+            if (field_->d_ < split_index_bound)
+                throw std::invalid_argument("bit_length too large for extension field");
+
+            auto offset = 0;
+            for (unsigned j = 0; j < split_index_bound; j++)
             {
-                details::copy_with_bit_offset(v2, j * split_length, split_length, temp_span);
+                auto size = std::min<int>(split_length, bit_length);
+                temp = 0;
+                details::copy_with_bit_offset(v2, offset, size, temp_span);
                 nmod_poly_set_coeff_ui(elt_, j, temp);
+
+                offset += split_length;
+                bit_length -= split_length;
             }
+
+            //temp = 0;
+            //for (auto j = split_index_bound; j < field_->d_; ++j)
+            //{
+            //    nmod_poly_set_coeff_ui(elt_, j, temp);
+            //}
         }
 
         template<typename T>
@@ -440,13 +455,18 @@ namespace apsi
 #endif
             static_assert(std::is_pod<_ffield_elt_coeff_t>::value, "must be pod type");
             _ffield_elt_coeff_t temp = 0;
+            auto offset = 0;
             gsl::span<const oc::u8> temp_span(reinterpret_cast<oc::u8*>(&temp), sizeof(_ffield_elt_coeff_t));
 
-            auto end = std::min<unsigned>(field_->d_, split_index_bound);
-            for (unsigned j = 0; j < end; j++)
+            for (unsigned j = 0; j < split_index_bound; j++)
             {
+                auto size = std::min<int>(split_length, bit_length);
+
                 temp = nmod_poly_get_coeff_ui(elt_, j);
-                details::copy_with_bit_offset(temp_span, 0, j * split_length, split_length, v2);
+                details::copy_with_bit_offset(temp_span, 0, offset, size, v2);
+
+                offset += split_length;
+                bit_length -= split_length;
             }
         }
 

@@ -24,15 +24,30 @@ namespace apsi
         const FFieldArray &points, const FFieldArray &values,
         FFieldArray& result)
     {
+        auto size = points.size();
+        auto field = points.field(0);
+        vector<FFieldArray> divided_differences = get_div_diff_temp(field, size);
+        ffield_newton_interpolate_poly(points, values, divided_differences, result);
+    }
+
+    void ffield_newton_interpolate_poly(
+        const FFieldArray &points,
+        const FFieldArray &values,
+        vector<FFieldArray>& divided_differences,
+        FFieldArray& result)
+    {
 #ifndef NDEBUG
-        if(points.size() != values.size() || result.size() != points.size())
-        {   
+        if (points.size() != values.size() || result.size() != points.size())
+        {
             throw invalid_argument("incompatible array sizes");
         }
-        if(points.field(0) != values.field(0) || result.field(0) != points.field(0))
+        if (points.field(0) != values.field(0) || result.field(0) != points.field(0))
         {
-           throw invalid_argument("incompatible fields"); 
-        } 
+            throw invalid_argument("incompatible fields");
+        }
+
+        if (divided_differences.size() != points.size())
+            throw std::runtime_error("");
 #endif
         auto size = points.size();
 
@@ -42,16 +57,21 @@ namespace apsi
         FFieldElt numerator(field);
         FFieldElt denominator(field);
 
-        vector<FFieldArray> divided_differences;
-        for(size_t i = 0; i < size; i++)
+        //vector<FFieldArray> divided_differences;
+        //divided_differences.reserve(size);
+        for (size_t i = 0; i < size; i++)
         {
-            divided_differences.emplace_back(field, size - i);
+#ifndef NDEBUG
+            if (divided_differences[i].size() != size - i)
+                throw std::runtime_error("");
+#endif
+            //divided_differences.emplace_back(field, size - i);
             divided_differences[i].set(0, i, values);
         }
 
-        for(size_t j = 1; j < size; j++)
+        for (size_t j = 1; j < size; j++)
         {
-            for(size_t i = 0; i < size - j; i++)
+            for (size_t i = 0; i < size - j; i++)
             {
                 if (field == nullptr)
                     throw std::runtime_error("");
@@ -68,14 +88,14 @@ namespace apsi
         // Horner's method
         FFieldElt temp(field);
         result.set(0, divided_differences[0].get(size - 1));
-        for(size_t i = 1; i < size; i++)
+        for (size_t i = 1; i < size; i++)
         {
-            for(int64_t j = i - 1; j >= 0; j--)
+            for (int64_t j = i - 1; j >= 0; j--)
             {
                 result.set(j + 1, j, result);
             }
             result.set_zero(0);
-            for (size_t j = 0; j < i; j++) 
+            for (size_t j = 0; j < i; j++)
             {
                 fq_nmod_mul(temp.data(), points.data() + (size - 1 - i), result.data() + (j + 1), field->ctx());
                 fq_nmod_sub(result.data() + j, result.data() + j, temp.data(), field->ctx());
@@ -87,20 +107,53 @@ namespace apsi
         }
     }
 
+    vector<FFieldArray> get_div_diff_temp(std::shared_ptr<FField>& field, int size)
+    {
+        vector<FFieldArray> divided_differences;
+        divided_differences.reserve(size);
+
+        for (int i = 0; i < size; ++i)
+        {
+            divided_differences.emplace_back(field, size - i);
+        }
+
+        return std::move(divided_differences);
+    }
+
     void ffield_newton_interpolate_poly(
         const FFieldArray &points, const FFieldArray &values,
         FFieldPoly& result)
+
     {
+        auto size = points.size();
+        auto field = points.field(0);
+        vector<FFieldArray> divided_differences = get_div_diff_temp(field, size);
+        ffield_newton_interpolate_poly(points, values, divided_differences, result);
+    }
+
+
+    void ffield_newton_interpolate_poly(
+        const FFieldArray &points,
+        const FFieldArray &values,
+        vector<FFieldArray>& divided_differences,
+        FFieldPoly& result)
+    {
+
 #ifndef NDEBUG
-        if(points.size() != values.size())
-        {   
+        if (points.size() != values.size())
+        {
             throw invalid_argument("incompatible array sizes");
         }
-        if(points.field(0) != values.field(0) || result.field() != points.field(0))
+        if (points.field(0) != values.field(0) || result.field() != points.field(0))
         {
-           throw invalid_argument("incompatible fields"); 
-        } 
+            throw invalid_argument("incompatible fields");
+        }
+
+        if (divided_differences.size() != points.size())
+            throw std::runtime_error("");
 #endif
+
+
         result.set_zero();
 
         auto size = points.size();
@@ -111,16 +164,23 @@ namespace apsi
         FFieldElt numerator(field);
         FFieldElt denominator(field);
 
-        vector<FFieldArray> divided_differences;
-        for(size_t i = 0; i < size; i++)
+        //vector<FFieldArray> divided_differences; 
+        //divided_differences.reserve(size);
+
+
+        for (size_t i = 0; i < size; i++)
         {
-            divided_differences.emplace_back(field, size - i);
+#ifndef NDEBUG
+            if (divided_differences[i].size() != size - i)
+                throw std::runtime_error("");
+#endif
+            //divided_differences.emplace_back(field, size - i);
             divided_differences[i].set(0, values.get(i));
         }
 
-        for(size_t j = 0; j < size; j++)
+        for (size_t j = 0; j < size; j++)
         {
-            for(size_t i = 0; i < size - j; i++)
+            for (size_t i = 0; i < size - j; i++)
             {
                 numerator = divided_differences[i + 1].get(j - 1) - divided_differences[i].get(j - 1);
                 denominator = points.get(i + j) - points.get(i);
@@ -130,15 +190,15 @@ namespace apsi
 
         // Horner's method
         result.set(0, divided_differences[0].get(size - 1));
-        auto zero = field->zero(); 
-        for(size_t i = 1; i < size; i++)
+        auto zero = field->zero();
+        for (size_t i = 1; i < size; i++)
         {
-            for(int64_t j = i - 1; j >= 0; j--)
+            for (int64_t j = i - 1; j >= 0; j--)
             {
                 result.set(j + 1, result.get(j));
             }
             result.set(0, zero);
-            for (size_t j = 0; j < i; j++) 
+            for (size_t j = 0; j < i; j++)
             {
                 result.set(j, result.get(j) - points.get(size - 1 - i) * result.get(j + 1));
             }

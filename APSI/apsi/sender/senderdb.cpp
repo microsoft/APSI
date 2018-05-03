@@ -514,6 +514,7 @@ namespace apsi
                 auto &block = db_blocks_.data()[next_block];
                 block.randomized_symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
                 block.batch_random_symm_poly_ = { &batch_random_symm_poly_storage_[indexer(split, batch, 0)] , split_size_plus_one };
+                //block.batch_random_symm_poly_.resize(split_size_plus_one);// = { &batch_random_symm_poly_storage_[indexer(split, batch, 0)] , split_size_plus_one };
 
                 //randomized_symmetric_polys(split, batch, context, symm_block);
 
@@ -569,6 +570,7 @@ namespace apsi
         {
             auto& mod = params_.encryption_params().plain_modulus();
 
+            DBInterpolationCache cache(ex_builder, params_.batch_size(), params_.split_size(),params_.get_label_byte_count());
             // minus 1 to be safe.
             auto coeffBitCount = seal::util::get_significant_bit_count(mod.value()) - 1;
             auto degree = 1;
@@ -593,9 +595,53 @@ namespace apsi
             for (int bIdx = start; bIdx < end; bIdx++)
             {
                 auto& block = db_blocks_(bIdx);
-                block.batch_interpolate(context, mod, evaluator, builder, ex_builder, params_);
+                block.batch_interpolate(context, mod, evaluator, builder, ex_builder, cache, params_);
             }
 
+        }
+
+
+        DBInterpolationCache::DBInterpolationCache(
+            std::shared_ptr<FFieldFastCRTBuilder> ex_builder, 
+            int items_per_batch_,
+            int items_per_split_,
+            int value_byte_length_)
+        {
+            coeff_temp.reserve(items_per_batch_);
+            x_temp.reserve(items_per_batch_);
+            y_temp.reserve(items_per_batch_);
+            div_diff_temp.resize(items_per_batch_);
+
+            for (u64 i = 0; i < items_per_batch_; ++i)
+            {
+                div_diff_temp[i] = get_div_diff_temp(ex_builder->field(i), items_per_split_);
+                coeff_temp.emplace_back(ex_builder->field(i), items_per_split_);
+                x_temp.emplace_back(ex_builder->field(i), items_per_split_);
+                y_temp.emplace_back(ex_builder->field(i), items_per_split_);
+            }
+
+            temp_vec.resize((value_byte_length_ + sizeof(u64)) / sizeof(u64), 0);
+            key_set.reserve(items_per_split_);
+        }
+
+
+        void test_interp_poly(FFieldArray& x, FFieldArray& y, FFieldArray& poly)
+        {
+            for (u64 i = 0; i < x.size(); ++i)
+            {
+                auto sum = poly.get(0);
+                auto xx = x.get(i);
+                for (u64 j = 1; j < poly.size(); ++j)
+                {
+                    sum += xx * poly.get(j);
+                    xx = xx * x.get(i);
+                }
+
+                if (sum != y.get(i))
+                {
+                    throw std::runtime_error("bad interpolation");
+                }
+            }
         }
 
         void DBBlock::batch_interpolate(
@@ -604,6 +650,7 @@ namespace apsi
             shared_ptr<Evaluator> evaluator,
             shared_ptr<PolyCRTBuilder> builder,
             shared_ptr<FFieldFastCRTBuilder> ex_builder,
+            DBInterpolationCache& cache,
             const PSIParams& params)
         {
 
@@ -615,20 +662,28 @@ namespace apsi
                 if (params.use_low_degree_poly())
                     throw std::runtime_error("not impl");
 
-                std::vector<FFieldArray> coeffs;
-                coeffs.reserve(items_per_batch_);
 
-                //std::vector<std::pair<u64, u64>> inputs(items_per_split_);
-                std::vector<u64> temp_vec((value_byte_length_ + sizeof(u64)) / sizeof(u64), 0);
-                std::unordered_set<u64> key_set;
-                key_set.reserve(items_per_split_);
+
+                //std::vector<FFieldArray> coeffs;
+                //coeffs.reserve(items_per_batch_);
+
+                ////std::vector<std::pair<u64, u64>> inputs(items_per_split_);
+                //std::vector<u64> temp_vec((value_byte_length_ + sizeof(u64)) / sizeof(u64), 0);
+                //std::unordered_set<u64> key_set;
+                //key_set.reserve(items_per_split_);
 
                 for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
                 {
-                    FFieldArray x(ex_builder->field(pos.batch_offset), items_per_split_);
-                    FFieldArray y(ex_builder->field(pos.batch_offset), items_per_split_);
+                    //FFieldArray x(ex_builder->field(pos.batch_offset), items_per_split_);
+                    //FFieldArray y(ex_builder->field(pos.batch_offset), items_per_split_);
 
                     FFieldElt temp(ex_builder->field(pos.batch_offset));
+
+
+                    FFieldArray& x = cache.x_temp[pos.batch_offset]; 
+                    FFieldArray& y = cache.y_temp[pos.batch_offset];
+                    //std::vector<u8> temp_vec2(value_byte_length_);
+
 
                     int size = 0;
                     for (pos.split_offset = 0; pos.split_offset < items_per_split_; ++pos.split_offset)
@@ -643,41 +698,76 @@ namespace apsi
                             temp.encode(span<u8>{src, value_byte_length_}, params.get_label_bit_count());
                             y.set(size, temp);
 
+                            //if (key_item.data()[0] < 25)
+                            //{
+                            //        std::cout << "lbl {";
+                            //        for (u64 i = 0; i < value_byte_length_; ++i)
+                            //            std::cout << ' ' << std::setw(2) << std::setfill('0') << std::hex
+                            //            << int(src[i]);
+                            //        std::cout << "\}\nkey {";
+                            //        auto d = (u8*)&key_item;
+                            //        for (u64 i = 0; i < 16; ++i)
+                            //            std::cout << ' ' << std::setw(2) << std::setfill('0') << std::hex 
+                            //            << int(d[i]);
+                            //        std::cout << "}\n";
+                            //}
+
+                            //temp.decode(span<u8>{temp_vec2}, params.get_label_bit_count());
+                            //if (memcmp(src, temp_vec2.data(), value_byte_length_))
+                            //{
+                            //    std::cout << "exp {";
+                            //    for (u64 i = 0; i < temp_vec2.size(); ++i)
+                            //        std::cout << ' ' << std::setw(2) << std::setfill('0') << std::hex << int(src[i]);
+                            //    std::cout << "\}\nact {";
+                            //    for (u64 i = 0; i < temp_vec2.size(); ++i)
+                            //        std::cout << ' ' << std::setw(2) << std::setfill('0') << std::hex << int(temp_vec2[i]);
+                            //    std::cout << "}\n";
+                            //}
+                                //throw std::runtime_error("");
+
                             ++size;
                         }
                     }
 
                     // pad the points to have max degree (split_size)
                     // with (x,x) points where x is unique.
-                    key_set.clear();
+                    cache.key_set.clear();
 
                     for (int i = 0; i < size; ++i)
-                        key_set.emplace(x.get_coeff_of(i, 0));
+                        cache.key_set.emplace(x.get_coeff_of(i, 0));
 
-                    temp_vec[0] = 0;
+                    cache.temp_vec[0] = 0;
                     while (size != items_per_split_)
                     {
-                        if (temp_vec[0] >= mod.value())
+                        if (cache.temp_vec[0] >= mod.value())
                         {
-                            std::cout << temp_vec[0] << " >= " << mod.value();
+                            std::cout << cache.temp_vec[0] << " >= " << mod.value();
                             throw std::runtime_error("");
                         }
 
-                        if (key_set.find(temp_vec[0]) == key_set.end())
+                        if (cache.key_set.find(cache.temp_vec[0]) == cache.key_set.end())
                         {
-                            temp.encode(span<u64>{temp_vec}, params.get_label_bit_count());
+                            temp.encode(span<u64>{cache.temp_vec}, params.get_label_bit_count());
 
                             x.set(size, temp);
                             y.set(size, temp);
                             ++size;
                         }
 
-                        ++temp_vec[0];
+                        ++cache.temp_vec[0];
                     }
 
-                    coeffs.emplace_back(ex_builder->field(pos.batch_offset), items_per_split_);
+                    //coeffs.emplace_back(ex_builder->field(pos.batch_offset), items_per_split_);
 
-                    ffield_newton_interpolate_poly(x, y, coeffs.back());
+                    //ffield_newton_interpolate_poly(x, y, coeffs.back());
+
+
+                    ffield_newton_interpolate_poly(
+                        x, y, 
+                        cache.div_diff_temp[pos.batch_offset], 
+                        cache.coeff_temp[pos.batch_offset]);
+
+                    //test_interp_poly(x, y, cache.coeff_temp[pos.batch_offset]);
                 }
 
                 batched_label_coeffs_.resize(items_per_split_);
@@ -694,7 +784,7 @@ namespace apsi
                     for (int b = 0; b < items_per_batch_; b++)
                     {
                         for (int c = 0; c < degree; ++c)
-                            temp_array.set_coeff_of(b, c, coeffs[b].get_coeff_of(s, c));
+                            temp_array.set_coeff_of(b, c, cache.coeff_temp[b].get_coeff_of(s, c));
                     }
 
 
@@ -894,5 +984,6 @@ namespace apsi
             const PSIParams &params)
         {
         }
-    }
+
+}
 }

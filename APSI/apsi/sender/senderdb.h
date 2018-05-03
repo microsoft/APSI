@@ -5,6 +5,7 @@
 #include <vector>
 #include <iostream>
 #include <atomic>
+#include <unordered_set>
 
 // APSI
 #include "apsi/item.h"
@@ -32,6 +33,22 @@ namespace apsi
 {
     namespace sender
     {
+        struct DBInterpolationCache
+        {
+            DBInterpolationCache(
+                std::shared_ptr<FFieldFastCRTBuilder> ex_builder,
+                int batch_size,
+                int items_per_split,
+                int value_byte_length
+                );
+
+
+            std::vector<std::vector<FFieldArray>> div_diff_temp;
+            std::vector<FFieldArray> coeff_temp, x_temp, y_temp;
+            std::unordered_set<u64> key_set;
+            std::vector<u64> temp_vec;
+        }; 
+
         // represents a specific batch/split and stores the associated data.
         struct DBBlock
         {
@@ -119,6 +136,7 @@ namespace apsi
                 std::shared_ptr<seal::Evaluator> evaluator,
                 std::shared_ptr<seal::PolyCRTBuilder> builder,
                 std::shared_ptr<FFieldFastCRTBuilder> ex_builder,
+                DBInterpolationCache& cache,
                 const PSIParams& params);
 
             void test_eval(

@@ -414,7 +414,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     unsigned binning_sec_level = 30;
 
     // Length of items
-    unsigned item_bit_length = 60;
+    unsigned item_bit_length = 56;
 
     unsigned label_bit_length = cmd.isSet("useLabels") ? item_bit_length : 0;
 
@@ -499,9 +499,16 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
         s1[i] = i;
 
         if (label_bit_length) {
-            memcpy(labels[i].data(), &s1[i], labels[i].size());
-            //labels[i][0] ^= 0xcc;
+            //memcpy(labels[i].data(), &s1[i], labels[i].size());
+            memset(labels[i].data(), 0, labels[i].size());
 
+            labels[i][i% labels.cols()] = i;
+            labels[i][(i+1)% labels.cols()] = 0xcc;
+
+            //for (int j = 0; j < labels[i].size(); ++j)
+            //{
+            //    labels[i][j] ^= 0xcc ^ i;
+            //}
         }
         //// Insert random string
         //s1[i] = oc::mAesFixedKey.ecbEncBlock(oc::toBlock(i));
@@ -544,14 +551,17 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
             }
             else if(label_bit_length)
             {
-                u64 l = 0, exp = *(u64*)&c1[i];
-                auto label = intersection.second[i];
-                memcpy(&l, label.data(), label.size());
+                //u64 l = 0, exp = *(u64*)&c1[i];
+                //auto label = intersection.second[i];
+                //memcpy(&l, label.data(), label.size());
 
 
-                if (l != exp)
+                //if (l != exp)
+                if(memcmp(intersection.second[i].data(), labels[i].data(), labels[i].size()))
                 {
-                    std::cout <<oc::Color::Red << "incorrect label at index: " << i << ". actual: " << print(label) << " " << l << ", expected: " << exp << std::endl << oc::ColorDefault;
+                    std::cout <<oc::Color::Red << "incorrect label at index: " << i 
+                        << ". actual: " << print(intersection.second[i])
+                        << ", expected: " << print(labels[i]) << std::endl << oc::ColorDefault;
                     correct = false;
                 }
             }

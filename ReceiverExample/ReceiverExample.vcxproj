@@ -123,6 +123,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="tests\bit_copy_test.cpp" />
+    <ClCompile Include="tests\FField_tests.cpp" />
     <ClCompile Include="tests\interpolate_tests.cpp" />
     <ClCompile Include="receiver.cpp" />
     <ClCompile Include="tests\collection.cpp" />

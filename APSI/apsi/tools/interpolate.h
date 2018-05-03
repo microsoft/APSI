@@ -21,10 +21,23 @@ namespace apsi
     void ffield_newton_interpolate_poly(
         const FFieldArray &points, const FFieldArray &values,
         FFieldArray& result);
+    void ffield_newton_interpolate_poly(
+        const FFieldArray &points, const FFieldArray &values,
+        std::vector<FFieldArray>& divided_differences,
+        FFieldArray& result);
 
     void ffield_newton_interpolate_poly(
         const FFieldArray &points, const FFieldArray &values,
         FFieldPoly& result);
+
+    void ffield_newton_interpolate_poly(
+        const FFieldArray &points, 
+        const FFieldArray &values,
+        std::vector<FFieldArray>& divided_differences,
+        FFieldPoly& result);
+
+    std::vector<FFieldArray> get_div_diff_temp(std::shared_ptr<FField>& field, int size);
+
 
     // void exfield_newton_interpolate_poly(
     //     const std::vector<std::pair<seal::util::ExFieldElement, seal::util::ExFieldElement> > &input,

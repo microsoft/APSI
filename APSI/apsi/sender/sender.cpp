@@ -485,16 +485,7 @@ namespace apsi
 
                                 evaluator_->multiply_plain_ntt(powers[batch][s], block.batched_label_coeffs_[s], label_results[curr_label]);
 
-                                // debug
-                                //bool print = batch == 0 && split == 0;
-                                //std::vector<u64> debug_label_results = debug_eval_term(s, block.label_coeffs, debug_query[batch], plain_mod, print);
-                                //if (debug_not_equals(debug_label_results, label_results[curr_label], session_context))
-                                //    throw std::runtime_error(LOCATION);
-
-                                //if(debug_label_results.size() != params_.batch_size())
-                                //    throw std::runtime_error(LOCATION);
-
-
+                                    
                                 while(++s < block.batched_label_coeffs_.size())
                                 {
                                     // label_result += coeff[s] * x^s;
@@ -541,8 +532,10 @@ namespace apsi
                                 label_results[curr_label] = powers[batch][0];
                             }
 
-                            // TODO: multiply with running_result
-
+                            // TODO: We need to randomize the result. This is fine for now.
+                            TODO("------------- Insecure. FIX ME -------------");
+                            evaluator_->add(runningResults[currResult], label_results[curr_label], label_results[curr_label ^ 1]);
+                            curr_label ^= 1;
 
                             evaluator_->transform_from_ntt(label_results[curr_label]);
 
