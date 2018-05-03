@@ -828,14 +828,14 @@ namespace apsi
                         auto r = cache.key_set.emplace(x.get_coeff_of(i, 0));
                     }
 
-                    for (int i = 0; i < size; ++i)
-                    {
-                        for (u64 j = 0; j < i; ++j)
-                        {
-                            if (x.get(i) == x.get(j))
-                                throw std::runtime_error("duplicate x values");
-                        }
-                    }
+                    //for (int i = 0; i < size; ++i)
+                    //{
+                    //    for (u64 j = 0; j < i; ++j)
+                    //    {
+                    //        if (x.get(i) == x.get(j))
+                    //            throw std::runtime_error("duplicate x values");
+                    //    }
+                    //}
 
 
                     //auto trueSize = size;

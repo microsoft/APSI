@@ -34,7 +34,7 @@ namespace apsi
             thread_count_(thread_count),
             pool_(pool),
             ex_field_(FField::Acquire(params.exfield_characteristic(), params.exfield_polymod())),
-            slot_count_((params_.encryption_params().poly_modulus().coeff_count() - 1)/(params_.exfield_polymod().coeff_count() - 1))
+            slot_count_((params_.encryption_params().poly_modulus().coeff_count() - 1) / (params_.exfield_polymod().coeff_count() - 1))
         {
             if (thread_count_ <= 0)
             {
@@ -67,7 +67,7 @@ namespace apsi
                 polycrtbuilder_.reset(new PolyCRTBuilder(seal_context));
             }
 
-            if(!polycrtbuilder_)
+            if (!polycrtbuilder_)
             {
                 exbuilder_.reset(new FFieldFastCRTBuilder(ex_field_->ch(), ex_field_->d(),
                     get_power_of_two(params_.encryption_params().poly_modulus().coeff_count() - 1)));
@@ -191,7 +191,7 @@ namespace apsi
 
             unique_ptr<FFieldArray> exfield_items;
             unsigned padded_cuckoo_capacity = ((cuckoo->capacity() + slot_count_ - 1) / slot_count_) * slot_count_;
-            if(polycrtbuilder_)
+            if (polycrtbuilder_)
             {
                 exfield_items.reset(new FFieldArray(ex_field_, padded_cuckoo_capacity));
             }
@@ -199,7 +199,7 @@ namespace apsi
             {
                 vector<shared_ptr<FField> > field_vec;
                 field_vec.reserve(padded_cuckoo_capacity);
-                for(unsigned i = 0; i < padded_cuckoo_capacity; i++)
+                for (unsigned i = 0; i < padded_cuckoo_capacity; i++)
                 {
                     field_vec.emplace_back(exbuilder_->field(i % slot_count_));
                 }
@@ -282,7 +282,7 @@ namespace apsi
             {
                 cout << "Using " << cuckoo->encoding_bit_length()
                     << " out of " << seal::util::get_significant_bit_count(params_.exfield_characteristic()) - 1
-                    << "x"<< degree
+                    << "x" << degree
                     << " bits of exfield element." << endl;
             }
             bool insertionSuccess;
@@ -340,7 +340,7 @@ namespace apsi
                 //if(cuckoo.has_item_at(i))
                 ret.set(i, Item(encodings[i]).to_exfield_element(ret.field(i), encoding_bit_length));
             }
-            for(int i = cuckoo.capacity(); i < ret.size(); i++)
+            for (int i = cuckoo.capacity(); i < ret.size(); i++)
             {
                 ret.set(i, Item(cuckoo.null_value()).to_exfield_element(ret.field(i), encoding_bit_length));
             }
@@ -390,7 +390,7 @@ namespace apsi
             destination.clear();
             destination.reserve(num_of_batches);
             Plaintext plain(pool_);
-            if(polycrtbuilder_)
+            if (polycrtbuilder_)
             {
                 for (int i = 0; i < num_of_batches; i++)
                 {
@@ -450,10 +450,7 @@ namespace apsi
             const std::vector<int> &table_to_input_map,
             std::vector<Item> &items)
         {
-            //vector<vector<ExFieldElement>> result;
-            //vector<vector<ExFieldElement>> labels;
-            //Pointer backing;
-            //Pointer  label_backing;
+
             std::pair<std::vector<bool>, oc::Matrix<u8>> ret;
             auto& ret_bools = ret.first;
             auto& ret_labels = ret.second;
@@ -466,16 +463,11 @@ namespace apsi
                 ret_labels.resize(items.size(), params_.get_label_byte_count());
             }
 
-            //ret.reserve(params_.)
-            //vector<vector<Plaintext>> plaintext_matrix;
 
             int num_of_splits = params_.split_count(),
                 num_of_batches = params_.batch_count(),
                 block_count = num_of_splits * num_of_batches,
                 batch_size = slot_count_;
-
-            Plaintext p(pool_);
-            Ciphertext tmp(pool_);
 
             struct RecvPackage
             {
@@ -497,120 +489,143 @@ namespace apsi
                 }
             }
 
-            const bool short_strings = !!polycrtbuilder_;
-            unique_ptr<FFieldArray> batch;
-            if(!short_strings)
+
+            auto numThreads = 4;
+            cout << "Decrypting " << block_count << " blocks (" << num_of_batches << "b x " << num_of_splits << "s) with "<< numThreads<<" threads" << endl;
+
+
+            auto routine = [&](int t)
             {
-                batch.reset(new FFieldArray(exbuilder_->create_array()));
-            }
-            vector<uint64_t> integer_batch(batch_size);
 
-            bool has_result;
-            std::vector<char> has_label(batch_size);
-
-            bool first = true;
-
-            cout << "Decrypting " << block_count << " blocks (" << num_of_batches << "b x " << num_of_splits << "s)" << endl;
-            for (auto& pkg : recvPackages)
-            {
-                pkg.fut.get();
-                auto base_idx = pkg.batch_idx * batch_size;
-
-                // recover the sym poly values 
-                has_result = false;
-                stringstream ss(pkg.data);
-                tmp.load(ss);
-
-                if (first)
+                Plaintext p(pool_);
+                Ciphertext tmp(pool_);
+                const bool short_strings = !!polycrtbuilder_;
+                unique_ptr<FFieldArray> batch;
+                if (!short_strings)
                 {
-                    first = false;
-                    cout << "Noise budget: " << decryptor_->invariant_noise_budget(tmp) << " bits" << endl;
-                    recv_stop_watch.set_time_point("receiver recv-start");
+                    batch.reset(new FFieldArray(exbuilder_->create_array()));
                 }
+                vector<uint64_t> integer_batch(batch_size);
 
-                decryptor_->decrypt(tmp, p);
+                bool has_result;
+                std::vector<char> has_label(batch_size);
 
-                //vector<uint64_t> integer_batch(batch_size);
-                if (short_strings)
-                    polycrtbuilder_->decompose(p, integer_batch, pool_);
-                else
-                    exbuilder_->decompose(p, *batch);
+                bool first = true;
 
-                for (int k = 0; k < integer_batch.size(); k++)
+
+                for (u64 i = t; i < recvPackages.size(); i += numThreads)
                 {
-                    auto &is_zero = has_label[k];
-                    auto idx = table_to_input_map[base_idx + k];
+                    auto& pkg = recvPackages[i];
 
-                    if (short_strings)
-                        is_zero = integer_batch[k] == 0;
-                    else
-                        is_zero = batch->is_zero(k);
+                    pkg.fut.get();
+                    auto base_idx = pkg.batch_idx * batch_size;
 
-                    if (is_zero)
-                    {
-                        has_result = true;
-
-                        //std::cout << "hit   " << (block)items[idx] <<" @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << std::endl;
-                        ret_bools[idx] = true;
-                    }
-
-
-                    //if (idx!= -1 && short_strings == false)
-                    //{
-                    //    std::cout << "item[" << idx << "]  " << (block)items[idx] << " @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << std::endl
-                    //        << "     " << batch.get(k) << std::endl;;
-
-                    //}
-                    //if (k < 10) std::cout << (k ? ", " : "") << integer_batch[k];
-                }
-                //std::cout << "..." << endl;
-
-
-                if (has_result && params_.get_label_bit_count())
-                {
-                    pkg.label_fut.get();
-                    std::stringstream ss(pkg.label_data);
-                    //std::cout << pkg.batch_idx << " " << pkg.split_idx << " " << std::endl;
+                    // recover the sym poly values 
+                    has_result = false;
+                    stringstream ss(pkg.data);
                     tmp.load(ss);
+
+                    if (first && t == 0)
+                    {
+                        first = false;
+                        cout << "Noise budget: " << decryptor_->invariant_noise_budget(tmp) << " bits" << endl;
+                        recv_stop_watch.set_time_point("receiver recv-start");
+                    }
 
                     decryptor_->decrypt(tmp, p);
 
-
-                    
+                    //vector<uint64_t> integer_batch(batch_size);
                     if (short_strings)
                         polycrtbuilder_->decompose(p, integer_batch, pool_);
                     else
-                    {
-                        // make sure its the right size. decrypt will shorted when there are zero coeffs at the top.
-                        p.resize(exbuilder_->n());
-
                         exbuilder_->decompose(p, *batch);
-                    }
 
                     for (int k = 0; k < integer_batch.size(); k++)
                     {
-                        if (has_label[k])
+                        auto &is_zero = has_label[k];
+                        auto idx = table_to_input_map[base_idx + k];
+
+                        if (short_strings)
+                            is_zero = integer_batch[k] == 0;
+                        else
+                            is_zero = batch->is_zero(k);
+
+                        if (is_zero)
                         {
-                            auto idx = table_to_input_map[base_idx + k];
+                            has_result = true;
 
-                            //std::cout << "label["<< idx<<"] " << items[idx] << " @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << "  ~  " <<std::hex<< integer_batch[k] <<std::dec << std::endl;
-                            u8* src;
-                            if (short_strings)
-                            {
-                                src = (u8*)&integer_batch[k];
-                                memcpy(&ret_labels(idx, 0), src, ret_labels.stride());
-                            }
-                            else
-                            {
-                                batch->get(k).decode(ret_labels[idx], params_.get_label_bit_count());
-                                //throw runtime_error("not implemented");
-                                // src = (u8*)batch[k].pointer(0);
-                            }
+                            //std::cout << "hit   " << (block)items[idx] <<" @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << std::endl;
+                            ret_bools[idx] = true;
+                        }
 
+
+                        //if (idx!= -1 && short_strings == false)
+                        //{
+                        //    std::cout << "item[" << idx << "]  " << (block)items[idx] << " @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << std::endl
+                        //        << "     " << batch.get(k) << std::endl;;
+
+                        //}
+                        //if (k < 10) std::cout << (k ? ", " : "") << integer_batch[k];
+                    }
+                    //std::cout << "..." << endl;
+
+
+                    if (has_result && params_.get_label_bit_count())
+                    {
+                        pkg.label_fut.get();
+                        std::stringstream ss(pkg.label_data);
+                        //std::cout << pkg.batch_idx << " " << pkg.split_idx << " " << std::endl;
+                        tmp.load(ss);
+
+                        decryptor_->decrypt(tmp, p);
+
+
+
+                        if (short_strings)
+                            polycrtbuilder_->decompose(p, integer_batch, pool_);
+                        else
+                        {
+                            // make sure its the right size. decrypt will shorted when there are zero coeffs at the top.
+                            p.resize(exbuilder_->n());
+
+                            exbuilder_->decompose(p, *batch);
+                        }
+
+                        for (int k = 0; k < integer_batch.size(); k++)
+                        {
+                            if (has_label[k])
+                            {
+                                auto idx = table_to_input_map[base_idx + k];
+
+                                //std::cout << "label["<< idx<<"] " << items[idx] << " @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << "  ~  " <<std::hex<< integer_batch[k] <<std::dec << std::endl;
+                                u8* src;
+                                if (short_strings)
+                                {
+                                    src = (u8*)&integer_batch[k];
+                                    memcpy(&ret_labels(idx, 0), src, ret_labels.stride());
+                                }
+                                else
+                                {
+                                    batch->get(k).decode(ret_labels[idx], params_.get_label_bit_count());
+                                    //throw runtime_error("not implemented");
+                                    // src = (u8*)batch[k].pointer(0);
+                                }
+
+                            }
                         }
                     }
                 }
+            };
+
+            std::vector<std::thread> thrds(numThreads - 1);
+            for (u64 t = 0; t < thrds.size(); ++t)
+            {
+                thrds[t] = std::thread(routine, t);
             }
+
+            routine(numThreads - 1);
+            for (auto& thrd : thrds)
+                thrd.join();
 
             return std::move(ret);
         }
