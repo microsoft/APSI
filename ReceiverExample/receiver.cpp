@@ -406,7 +406,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 
     // Thread count
     unsigned numThreads = cmd.get<int>("t");
-
+    std::cout << "t=" << numThreads << std::endl;
     // Larger set size
     unsigned sender_set_size = 1 << 16;
 
@@ -482,9 +482,12 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     //params.enable_debug();
     params.validate();
 
-
-    Receiver receiver(params, 1, MemoryPoolHandle::New(true));
+    std::unique_ptr<Receiver> receiver_ptr;
+    auto f = std::async([&]() {receiver_ptr.reset(new Receiver(params, 1, MemoryPoolHandle::New(true))); });
     Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New(true));
+    f.get();
+    Receiver& receiver = *receiver_ptr;
+
     //sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
     //sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 

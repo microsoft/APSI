@@ -134,7 +134,7 @@ namespace apsi
 
             //std::vector<DBBlock*> blk_;
             //std::vector<DBBlock::Position> pos_;
-
+            //thread_count = 1;
             vector<thread> thrds(thread_count);
             for (int t = 0; t < thrds.size(); t++)
             {
@@ -179,53 +179,67 @@ namespace apsi
                             sha.Final(static_cast<oc::block&>(data[i]));
                         }
 
+                        std::array<u64, 3> locs;
+                        std::array<Item, 3> keys;
+                        std::array<bool, 3> skip{ false, false, false };
+                        if (params_.get_cuckoo_mode() == cuckoo::CuckooMode::Normal)
+                        {
+                            // Compute bin locations
+                            locs[0] = normal_loc_func[0].location(data[i]);
+                            locs[1] = normal_loc_func[1].location(data[i]);
+                            locs[2] = normal_loc_func[2].location(data[i]);
+                            keys[0] = keys[1] = keys[2] = data[i];
+                            skip[1] = locs[0] == locs[1];
+                            skip[2] = locs[0] == locs[2] || locs[1] == locs[2];
+                        }
+                        else
+                        {
+                            // Get the permutation-based Cuckoo location and find position
+                            locs[0] = perm_loc_func[0].location(data[i]);
+                            locs[1] = perm_loc_func[1].location(data[i]);
+                            locs[2] = perm_loc_func[2].location(data[i]);
+                            keys[0] = encoder_.encode(data[i], 0, true);
+                            keys[1] = encoder_.encode(data[i], 1, true);
+                            keys[2] = encoder_.encode(data[i], 2, true);
+                        }
+
                         // Claim an emply location in each matching bin
                         for (int j = 0; j < params_.hash_func_count(); j++)
                         {
-                            Item key;
-                            u64 cuckoo_loc;
-                            if (params_.get_cuckoo_mode() == cuckoo::CuckooMode::Normal)
+                            if (skip[j] == false)
                             {
-                                // Compute bin locations
-                                cuckoo_loc = normal_loc_func[j].location(data[i]);
-                                key = data[i];
+
+                                // Lock-free thread-safe bin position search
+                                auto block_pos = aquire_db_position(locs[j], prng);
+                                auto& db_block = *block_pos.first;
+                                auto pos = block_pos.second;
+
+
+                                db_block.get_key(pos) = keys[j];
+
+                                //std::cout << "key " << key << " -> block ("
+                                //    << db_block.batch_idx_ << ", " << db_block.split_idx_ << ") "
+                                //    << " @ " << pos.batch_offset << " " << pos.split_offset << std::endl;
+
+                                if (params_.get_label_bit_count())
+                                {
+                                    auto dest = db_block.get_label(pos);
+                                    memcpy(dest, values[i].data(), params_.get_label_byte_count());
+                                }
+
+                                //if (i == 3)
+                                //{
+                                //    blk_.push_back(&db_block);
+                                //    pos_.push_back(pos);
+
+
+
+                                //    std::cout << "key " << (block)key << " -> block ("
+                                //        << db_block.batch_idx_ << ", " << db_block.split_idx_ << ") "
+                                //        << " @ " << pos.batch_offset << " " << pos.split_offset 
+                                //        << " " << hexStr(db_block.get_label(pos), params_.get_label_byte_count())<< std::endl;
+                                //}
                             }
-                            else
-                            {
-                                // Get the permutation-based Cuckoo location and find position
-                                cuckoo_loc = perm_loc_func[j].location(data[i]);
-                                key = encoder_.encode(data[i], j, true);
-                            }
-                            // Lock-free thread-safe bin position search
-                            auto block_pos = aquire_db_position(cuckoo_loc, prng);
-                            auto& db_block = *block_pos.first;
-                            auto pos = block_pos.second;
-       
-
-                            db_block.get_key(pos) = key;
-
-                            //std::cout << "key " << key << " -> block ("
-                            //    << db_block.batch_idx_ << ", " << db_block.split_idx_ << ") "
-                            //    << " @ " << pos.batch_offset << " " << pos.split_offset << std::endl;
-
-                            if (params_.get_label_bit_count())
-                            {
-                                auto dest = db_block.get_label(pos);
-                                memcpy(dest, values[i].data(), params_.get_label_byte_count());
-                            }
-
-                            //if (i == 3)
-                            //{
-                            //    blk_.push_back(&db_block);
-                            //    pos_.push_back(pos);
-
-
-
-                            //    std::cout << "key " << (block)key << " -> block ("
-                            //        << db_block.batch_idx_ << ", " << db_block.split_idx_ << ") "
-                            //        << " @ " << pos.batch_offset << " " << pos.split_offset 
-                            //        << " " << hexStr(db_block.get_label(pos), params_.get_label_byte_count())<< std::endl;
-                            //}
                         }
                     };
                 });
@@ -234,6 +248,69 @@ namespace apsi
             for (auto &t : thrds)
             {
                 t.join();
+            }
+
+            bool validate = false;
+            if (validate)
+            {
+
+                vector<cuckoo::LocFunc> normal_loc_func(params_.hash_func_count());
+                vector<cuckoo::PermutationBasedLocFunc> perm_loc_func(params_.hash_func_count());
+
+                for (int i = 0; i < normal_loc_func.size(); i++)
+                {
+                    normal_loc_func[i] = cuckoo::LocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
+                    perm_loc_func[i] = cuckoo::PermutationBasedLocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
+                }
+
+
+                for (u64 i = 0; i < data.size(); ++i)
+                {
+
+                    // Claim an emply location in each matching bin
+                    for (int j = 0; j < params_.hash_func_count(); j++)
+                    {
+                        Item key;
+                        u64 cuckoo_loc;
+                        if (params_.get_cuckoo_mode() == cuckoo::CuckooMode::Normal)
+                        {
+                            // Compute bin locations
+                            cuckoo_loc = normal_loc_func[j].location(data[i]);
+                            key = data[i];
+                        }
+                        else
+                        {
+                            // Get the permutation-based Cuckoo location and find position
+                            cuckoo_loc = perm_loc_func[j].location(data[i]);
+                            key = encoder_.encode(data[i], j, true);
+                        }
+                        // Lock-free thread-safe bin position search
+                        DBBlock::Position pos;
+                        auto batch_idx = cuckoo_loc / params_.batch_size();
+                        pos.batch_offset = cuckoo_loc % params_.batch_size();
+
+                        auto count = 0;
+                        for (u64 j = 0; j < db_blocks_.cols(); ++j)
+                        {
+                            auto& blk = db_blocks_(batch_idx, j);
+                            ;
+                            for (pos.split_offset = 0;
+                                pos.split_offset < blk.items_per_split_;
+                                ++pos.split_offset)
+                            {
+                                if (blk.has_item(pos) &&
+                                    blk.get_key(pos) == key)
+                                {
+                                    ++count;
+                                }
+                            }
+                        }
+
+                        if (count != 1)
+                            throw std::runtime_error("");
+                    }
+                }
+
             }
 
             //for (u64 i = 0; i < blk_.size(); ++i)
@@ -570,7 +647,7 @@ namespace apsi
         {
             auto& mod = params_.encryption_params().plain_modulus();
 
-            DBInterpolationCache cache(ex_builder, params_.batch_size(), params_.split_size(),params_.get_label_byte_count());
+            DBInterpolationCache cache(ex_builder, params_.batch_size(), params_.split_size(), params_.get_label_byte_count());
             // minus 1 to be safe.
             auto coeffBitCount = seal::util::get_significant_bit_count(mod.value()) - 1;
             auto degree = 1;
@@ -602,7 +679,7 @@ namespace apsi
 
 
         DBInterpolationCache::DBInterpolationCache(
-            std::shared_ptr<FFieldFastCRTBuilder> ex_builder, 
+            std::shared_ptr<FFieldFastCRTBuilder> ex_builder,
             int items_per_batch_,
             int items_per_split_,
             int value_byte_length_)
@@ -625,7 +702,10 @@ namespace apsi
         }
 
 
-        void test_interp_poly(FFieldArray& x, FFieldArray& y, FFieldArray& poly)
+        void test_interp_poly(FFieldArray& x, FFieldArray& y,
+            FFieldArray& poly,
+            int size,
+            int bit_count)
         {
             for (u64 i = 0; i < x.size(); ++i)
             {
@@ -640,6 +720,16 @@ namespace apsi
                 if (sum != y.get(i))
                 {
                     throw std::runtime_error("bad interpolation");
+                }
+
+                if (i < size)
+                {
+                    std::vector<u8> buff((bit_count + 7) / 8);
+                    x.get(i).decode(span<u8>{buff}, bit_count);
+                    std::cout << "x=" << hexStr(buff.data(), buff.size()) << " -> ";
+
+                    sum.decode(span<u8>{buff}, bit_count);
+                    std::cout << hexStr(buff.data(), buff.size()) << std::endl;
                 }
             }
         }
@@ -680,7 +770,7 @@ namespace apsi
                     FFieldElt temp(ex_builder->field(pos.batch_offset));
 
 
-                    FFieldArray& x = cache.x_temp[pos.batch_offset]; 
+                    FFieldArray& x = cache.x_temp[pos.batch_offset];
                     FFieldArray& y = cache.y_temp[pos.batch_offset];
                     //std::vector<u8> temp_vec2(value_byte_length_);
 
@@ -734,8 +824,21 @@ namespace apsi
                     cache.key_set.clear();
 
                     for (int i = 0; i < size; ++i)
-                        cache.key_set.emplace(x.get_coeff_of(i, 0));
+                    {
+                        auto r = cache.key_set.emplace(x.get_coeff_of(i, 0));
+                    }
 
+                    for (int i = 0; i < size; ++i)
+                    {
+                        for (u64 j = 0; j < i; ++j)
+                        {
+                            if (x.get(i) == x.get(j))
+                                throw std::runtime_error("duplicate x values");
+                        }
+                    }
+
+
+                    //auto trueSize = size;
                     cache.temp_vec[0] = 0;
                     while (size != items_per_split_)
                     {
@@ -763,11 +866,14 @@ namespace apsi
 
 
                     ffield_newton_interpolate_poly(
-                        x, y, 
-                        cache.div_diff_temp[pos.batch_offset], 
+                        x, y,
+                        cache.div_diff_temp[pos.batch_offset],
                         cache.coeff_temp[pos.batch_offset]);
 
-                    //test_interp_poly(x, y, cache.coeff_temp[pos.batch_offset]);
+                    //test_interp_poly(x, y, 
+                    //    cache.coeff_temp[pos.batch_offset], 
+                    //    trueSize,
+                    //    params.get_label_bit_count());
                 }
 
                 batched_label_coeffs_.resize(items_per_split_);
@@ -985,5 +1091,5 @@ namespace apsi
         {
         }
 
-}
+    }
 }

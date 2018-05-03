@@ -2,6 +2,7 @@
 #include "apsi/tools/interpolate.h"
 #include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_array.h"
+#include <mutex>
 
 using namespace std;
 using namespace seal;
@@ -30,12 +31,16 @@ namespace apsi
         ffield_newton_interpolate_poly(points, values, divided_differences, result);
     }
 
+    std::mutex mtx;
+
     void ffield_newton_interpolate_poly(
         const FFieldArray &points,
         const FFieldArray &values,
         vector<FFieldArray>& divided_differences,
         FFieldArray& result)
     {
+        //std::lock_guard<std::mutex> lock(mtx);
+
 #ifndef NDEBUG
         if (points.size() != values.size() || result.size() != points.size())
         {
@@ -53,7 +58,8 @@ namespace apsi
 
         // The fields should all be the same
         auto field = points.field(0);
-
+        //auto field = FField::Acquire(points.field(0)->ch(), points.field(0)->d());
+        
         FFieldElt numerator(field);
         FFieldElt denominator(field);
 
@@ -73,14 +79,24 @@ namespace apsi
         {
             for (size_t i = 0; i < size - j; i++)
             {
-                if (field == nullptr)
-                    throw std::runtime_error("");
+
 
                 fq_nmod_sub(numerator.data(), divided_differences[i + 1].data() + (j - 1), divided_differences[i].data() + (j - 1), field->ctx());
                 // numerator = divided_differences[i + 1].get(j - 1) - divided_differences[i].get(j - 1);
                 fq_nmod_sub(denominator.data(), points.data() + (i + j), points.data() + i, field->ctx());
                 // denominator = points.get(i + j) - points.get(i);
                 // divided_differences[i].set(j, numerator / denominator);
+
+                if (denominator.is_zero())
+                {
+                    for (u64 k = 0; k < size; ++k)
+                    {
+                        std::cout << "(" << points.get(k) << ", " << values.get(k) << ")\n";
+                    }
+                    std::cout << std::flush;
+                }
+                //    throw std::runtime_error("");
+
                 fq_nmod_div(divided_differences[i].data() + j, numerator.data(), denominator.data(), field->ctx());
             }
         }
