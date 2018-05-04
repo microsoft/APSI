@@ -53,7 +53,7 @@ namespace apsi
             if (seal_context_->qualifiers().enable_batching)
             {
                 builder_.reset(new PolyCRTBuilder(*seal_context_));
-                for(unsigned i = 0; i < builder_->slot_count(); i++)
+                for (unsigned i = 0; i < builder_->slot_count(); i++)
                 {
                     field_vec.emplace_back(ex_field_);
                 }
@@ -62,8 +62,8 @@ namespace apsi
             {
                 ex_builder_.reset(new FFieldFastCRTBuilder(
                     ex_field_->ch(),
-                    ex_field_->d(), 
-                    get_power_of_two(params_.encryption_params().poly_modulus().coeff_count() - 1) 
+                    ex_field_->d(),
+                    get_power_of_two(params_.encryption_params().poly_modulus().coeff_count() - 1)
                 ));
                 field_vec = ex_builder_->fields();
             }
@@ -125,7 +125,7 @@ namespace apsi
             {
                 thread_pool[i] = thread([&, i]()
                 {
-                    if(i == 0)
+                    if (i == 0)
                         stop_watch.set_time_point("symmpoly_start");
 
                     setThreadName("sender_offline_" + std::to_string(i));
@@ -206,16 +206,29 @@ namespace apsi
             /* Receive client's query data. */
             int num_of_powers = 0;
             chl.recv(num_of_powers);
-            map<uint64_t, vector<Ciphertext> > query;
+            vector<vector<Ciphertext>> powers(params_.batch_count());
+            auto split_size_plus_one = params_.split_size() + 1;
+
+            for (u64 i = 0; i < powers.size(); ++i)
+            {
+                powers[i].reserve(split_size_plus_one);
+                for (u64 j = 0; j < split_size_plus_one; ++j)
+                    powers[i].emplace_back();
+
+            }
             while (num_of_powers-- > 0)
             {
                 uint64_t power = 0;
                 chl.recv(power);
-                receive_ciphertext(query[power], chl);
+
+                for (u64 i = 0; i < powers.size(); ++i)
+                {
+                    receive_ciphertext(powers[i][power], chl);
+                }
             }
 
             /* Answer the query. */
-            respond(query, session_context, chl);
+            respond(powers, session_context, chl);
         }
 
         void Sender::stop()
@@ -234,7 +247,7 @@ namespace apsi
 
             session_context.decryptor_->decrypt(c, p);
 
-            if(builder_)
+            if (builder_)
             {
                 std::vector<u64> integer_batch;
                 builder_->decompose(p, integer_batch, pool_);
@@ -264,10 +277,10 @@ namespace apsi
             return x;
         }
         std::vector<oc::u64> Sender::debug_eval_term(
-            int term, 
-            oc::MatrixView<u64> coeffs, 
-            oc::span<u64> x, 
-            const seal::SmallModulus& mod, 
+            int term,
+            oc::MatrixView<u64> coeffs,
+            oc::span<u64> x,
+            const seal::SmallModulus& mod,
             bool print)
         {
             if (x.size() != coeffs.rows())
@@ -278,12 +291,12 @@ namespace apsi
             for (int i = 0; i < x.size(); ++i)
             {
                 auto xx = pow(x[i], term, mod);
-                
+
                 r[i] = (xx * coeffs(term, i)) % mod.value();
 
                 if (i == 0 && print)
                 {
-                    std::cout << xx << " * " << coeffs(term, i) << " -> " << r[i]  << " " << term << std::endl;
+                    std::cout << xx << " * " << coeffs(term, i) << " -> " << r[i] << " " << term << std::endl;
                 }
             }
 
@@ -318,28 +331,43 @@ namespace apsi
             return r;
         }
 
+
+
+
+
         void Sender::respond(
-            const map<uint64_t, vector<Ciphertext> > &query,
+            vector<vector<Ciphertext>>& powers,
             SenderSessionContext &session_context,
             Channel &channel)
         {
             //vector<vector<Ciphertext>> resultVec(params_.split_count());
             //for (auto& v : resultVec) v.resize(params_.batch_count());
             stop_watch.set_time_point("sender online start");
-            vector<vector<Ciphertext> > powers(params_.batch_count());
 
-            vector<pair<promise<void>, shared_future<void>>>
-                batch_powers_computed(params_.batch_count());
-
-            for (auto& pf : batch_powers_computed) pf.second = pf.first.get_future();
+            //vector<pair<promise<void>, shared_future<void>>>
+            //    batch_powers_computed(params_.batch_count());
+            //for (auto& pf : batch_powers_computed) pf.second = pf.first.get_future();
 
             auto batch_count = params_.batch_count();
             int split_size_plus_one = params_.split_size() + 1;
-            int	splitStep = params_.batch_count() * split_size_plus_one;
-            int total_blocks = params_.split_count() * params_.batch_count();
+            int	splitStep = batch_count * split_size_plus_one;
+            int total_blocks = params_.split_count() * batch_count;
 
-            std::vector<std::vector<u64> > debug_query(params_.batch_count());
+
+            session_context.encryptor()->encrypt(BigPoly("1"), powers[0][0]);
+            for (u64 i = 1; i < powers.size(); ++i)
+            {
+                powers[i][0] = powers[0][0];
+            }
+
+
             auto& plain_mod = params_.encryption_params().plain_modulus();
+
+            WindowingDag dag(params_.split_size(), params_.window_size());
+            std::vector<WindowingDag::State> states; states.reserve(batch_count);
+            for (u64 i = 0; i < batch_count; ++i)
+                states.emplace_back(dag);
+
 
             mutex mtx;
             vector<thread> thread_pool(session_thread_count_);
@@ -355,17 +383,12 @@ namespace apsi
                     Ciphertext tmp(thread_context.pool());
 
                     auto batch_start = i * batch_count / thread_pool.size();
-                    auto batch_end = (i + 1) * batch_count / thread_pool.size();
 
-                    for (auto batch = batch_start; batch < batch_end; ++batch)
+                    for (auto batch = batch_start, i = 0ull; i < batch_count; ++batch, ++i)
                     {
-                        compute_batch_powers(batch, query, powers[batch], session_context, thread_context);
-                        batch_powers_computed[batch].first.set_value();
-
+                        compute_batch_powers(batch, powers[batch], session_context, thread_context, dag, states[batch]);
                     }
 
-                    for (auto& b : batch_powers_computed)
-                        b.second.get();
 
                     int start_block = i * total_blocks / total_thread_count_;
                     int end_block = (i + 1) * total_blocks / total_thread_count_;
@@ -373,9 +396,9 @@ namespace apsi
                     // constuct two ciphertext to store the result.  One keeps track of the current result, 
                     // one is used as a temp. Their roles switch each iteration. Saved needing to make a 
                     // copy in eval->add(...)
-                    array<Ciphertext, 2> runningResults{ thread_context.pool(), thread_context.pool() }, 
-                        label_results { thread_context.pool(), thread_context.pool() };
-                    
+                    array<Ciphertext, 2> runningResults{ thread_context.pool(), thread_context.pool() },
+                        label_results{ thread_context.pool(), thread_context.pool() };
+
 
                     for (int block_idx = start_block; block_idx < end_block; block_idx++)
                     {
@@ -389,7 +412,7 @@ namespace apsi
                         // Iterate over the coeffs multiplying them with the query powers  and summing the results
                         char currResult = 0, curr_label = 0;
 
-//#define DEBUG_SYMM_EVAL
+                        //#define DEBUG_SYMM_EVAL
 #ifdef DEBUG_SYMM_EVAL
                         auto& query = *session_context.debug_plain_query_;
                         FFieldArray plain_batch(ex_field_, params_.batch_size()), dest(ex_field_, params_.batch_size());
@@ -400,13 +423,13 @@ namespace apsi
                         }
                         auto power = plain_batch;
                         auto sum = block.debug_sym_block_[0];
-                        
+
                         auto temp = powers[batch][1];
                         evaluator_->transform_from_ntt(temp);
                         debug_decrypt(session_context, temp, dest);
                         if (dest != plain_batch)
                         {
-                            std::cout << "bad query "<< std::endl;
+                            std::cout << "bad query " << std::endl;
 
                             for (int i = 0; i < plain_batch.size(); ++i)
                             {
@@ -485,8 +508,8 @@ namespace apsi
 
                                 evaluator_->multiply_plain_ntt(powers[batch][s], block.batched_label_coeffs_[s], label_results[curr_label]);
 
-                                    
-                                while(++s < block.batched_label_coeffs_.size())
+
+                                while (++s < block.batched_label_coeffs_.size())
                                 {
                                     // label_result += coeff[s] * x^s;
                                     if (block.batched_label_coeffs_[s].is_zero() == false)
@@ -571,39 +594,82 @@ namespace apsi
 
         }
 
+
         void Sender::compute_batch_powers(
             int batch,
-            const map<uint64_t, vector<Ciphertext> > &input,
             vector<Ciphertext> &batch_powers,
             SenderSessionContext &session_context,
-            SenderThreadContext &thread_context)
+            SenderThreadContext &thread_context,
+            const WindowingDag& dag,
+            WindowingDag::State & state)
         {
-            batch_powers.clear();
-            batch_powers.reserve(params_.split_size() + 1);
+            auto thrdIdx = std::this_thread::get_id();
+
+            if (batch_powers.size() != params_.split_size() + 1)
+                throw std::runtime_error("");
+
             MemoryPoolHandle local_pool = thread_context.pool();
 
-            //shared_ptr<Evaluator> local_evaluator = context.evaluator();
-            Ciphertext temp(local_pool);
-            session_context.encryptor()->encrypt(BigPoly("1"), temp, local_pool);
-            batch_powers.push_back(temp);
 
-            for (int i = 1; i <= params_.split_size(); i++)
+            int idx = (*state.next_node_)++;
+            while (idx < dag.nodes_.size())
             {
-                int i1 = optimal_split(i, 1 << params_.window_size());
-                int i2 = i - i1;
-                if (i1 == 0 || i2 == 0)
+                auto& node = dag.nodes_[idx];
+                auto& node_state = state.nodes_[node.output_];
+                //ostreamLock(std::cout) << thrdIdx << " " << idx << " " << node.output_ << std::endl;
+
+                // a simple write should be sufficient but lets be safe
+                auto exp = WindowingDag::NodeState::Ready;
+                bool r = node_state.compare_exchange_strong(exp, WindowingDag::NodeState::Pending);//, std::memory_order::memory_order_relaxed);
+                if (r == false)
                 {
-                    batch_powers.emplace_back(input.at(i)[batch]);
+                    std::cout << int(exp) << std::endl;
+                    throw std::runtime_error("");
                 }
-                else
-                {
-                    batch_powers.emplace_back(local_pool);
-                    evaluator_->multiply(batch_powers[i1], batch_powers[i2], batch_powers.back(), local_pool);
-                    evaluator_->relinearize(batch_powers[i], session_context.evaluation_keys_, batch_powers.back(), local_pool);
-                }
+                // spin lock on the input nodes
+                for (u64 i = 0; i < 2; ++i)
+                    while (state.nodes_[node.inputs_[i]] != WindowingDag::NodeState::Done);//, std::memory_order::memory_order_acquire);
+
+                //std::cout << node.inputs_[0] << " * " << node.inputs_[2] << " -> " << node.output_ << std::endl;
+
+
+                evaluator_->multiply(batch_powers[node.inputs_[0]], batch_powers[node.inputs_[1]], batch_powers[node.output_], local_pool);
+                evaluator_->relinearize(batch_powers[node.output_], session_context.evaluation_keys_, batch_powers[node.output_], local_pool);
+
+                // a simple write should be sufficient but lets be safe
+                exp = WindowingDag::NodeState::Pending;
+                r = node_state.compare_exchange_strong(exp, WindowingDag::NodeState::Done);//, std::memory_order::memory_order_release);
+                if (r == false)
+                    throw std::runtime_error("");
+
+                idx = (*state.next_node_)++;
 
             }
 
+            //// splin lock until all nodes are compute. We may want to do something smarter here.
+            for (u64 i = 0; i < state.nodes_.size(); ++i)
+                while (state.nodes_[i] != WindowingDag::NodeState::Done);// , std::memory_order::memory_order_acquire);
+
+
+            //for (int i = 1; i <= params_.split_size(); i++)
+            //{
+            //    int i1 = optimal_split(i, 1 << params_.window_size());
+            //    int i2 = i - i1;
+            //    if (i1 == 0 || i2 == 0)
+            //    {
+            //        //batch_powers2.emplace_back(batch_powers[i]);
+            //    }
+            //    else
+            //    {
+            //        //batch_powers2.emplace_back(local_pool);
+            //        std::cout << i1 << " * " << i2 << " -> " << i << std::endl;
+            //        //evaluator_->multiply(batch_powers[i1], batch_powers[i2], batch_powers[i], local_pool);
+            //        //evaluator_->relinearize(batch_powers[i], session_context.evaluation_keys_, batch_powers[i], local_pool);
+            //    }
+            //}
+
+
+            //#define DEBUG_POWERS
 #ifdef DEBUG_POWERS
             if (params_.debug() && session_context.debug_plain_query_)
             {
@@ -625,15 +691,15 @@ namespace apsi
                 for (int i = 1; i < batch_powers.size(); ++i)
                 {
                     session_context.decryptor_->decrypt(batch_powers[i], p);
-                    ex_builder_->decompose(dest, p);
+                    ex_builder_->decompose(p, dest);
 
                     if (dest != cur_power)
                     {
-                        std::cout << "power = " <<i << std::endl;
+                        std::cout << "power = " << i << std::endl;
 
                         for (u64 j = 0; j < cur_power.size(); ++j)
                         {
-                            std::cout << "exp["<<j<<"]: " << cur_power.get(j) << "\t act[" << j << "]: " << dest.get(j) << std::endl;
+                            std::cout << "exp[" << j << "]: " << cur_power.get(j) << "\t act[" << j << "]: " << dest.get(j) << std::endl;
 
                         }
 
@@ -645,9 +711,17 @@ namespace apsi
             }
 #endif
 
-            for (int i = 0; i <= params_.split_size(); i++)
+            auto end = dag.nodes_.size() + batch_powers.size();
+            while (idx < end)
             {
+                auto i = idx - dag.nodes_.size();
+
+            //for(u64 i =0; i< batch_powers.size(); ++i)
+            //{
+                //ostreamLock(std::cout) << "transform[" << i << "] " << batch_powers[i].hash_block()[0] << std::endl;
                 evaluator_->transform_to_ntt(batch_powers[i]);
+
+                idx = (*state.next_node_)++;
             }
         }
 
@@ -679,6 +753,135 @@ namespace apsi
         {
             unique_lock<mutex> lock(thread_context_mtx_);
             available_thread_contexts_.push_back(idx);
+        }
+
+        u64 WindowingDag::pow(u64 base, u64 e)
+        {
+            u64 r = 1;
+            while (e--) r *= base;
+            return r;
+        }
+        uint64_t WindowingDag::optimal_split(uint64_t x, int base)
+        {
+            vector<uint64_t> digits = conversion_to_digits(x, base);
+            int ndigits = digits.size();
+            int hammingweight = 0;
+            for (int i = 0; i < ndigits; i++)
+            {
+                hammingweight += static_cast<int>(digits[i] != 0);
+            }
+            int target = hammingweight / 2;
+            int now = 0;
+            uint64_t result = 0;
+            for (int i = 0; i < ndigits; i++)
+            {
+                if (digits[i] != 0)
+                {
+                    now++;
+                    result += pow(base, i)*digits[i];
+                }
+                if (now >= target)
+                {
+                    break;
+                }
+            }
+            return result;
+        }
+        vector<uint64_t> WindowingDag::conversion_to_digits(uint64_t input, int base)
+        {
+            vector<uint64_t> result;
+            while (input > 0)
+            {
+                result.push_back(input % base);
+                input /= base;
+            }
+            return result;
+        }
+        void WindowingDag::compute_dag()
+        {
+            std::vector<int>
+                depth(max_power_ + 1),
+                splits(max_power_ + 1),
+                items_per(max_power_, 0);
+
+            for (int i = 1; i <= max_power_; i++)
+            {
+                int i1 = optimal_split(i, 1 << window_);
+                int i2 = i - i1;
+                splits[i] = i1;
+
+                if (i1 == 0 || i2 == 0)
+                {
+                    base_powers_.emplace_back(i);
+                    //std::cout << "s[" << i << "] = input[" << i << "]" << std::endl;
+                    depth[i] = 1;
+                }
+                else
+                {
+                    depth[i] = depth[i1] + depth[i2];
+                    ++items_per[depth[i]];
+
+                    //std::cout << std::string(depth[i], ' ') << "s[" << i << "] = s[" << i1 << "] s[" << i2 << "]" << std::endl;
+                }
+            }
+
+            for (int i = 3; i < max_power_ && items_per[i]; ++i)
+            {
+                items_per[i] += items_per[i - 1];
+            }
+            //for (int i = 0; i < max_power_; ++i)
+            //{
+            //    std::cout << "items_per[" << i << "] " << items_per[i] << std::endl;
+            //}
+
+            int size = max_power_ - base_powers_.size();
+            nodes_.resize(size);
+
+            for (int i = 1; i <= max_power_; i++)
+            {
+                int i1 = splits[i];
+                int i2 = i - i1;
+
+                if (i1 && i2)
+                {
+                    auto d = depth[i] - 1;
+                    //std::cout
+                    //    << "i " << i
+                    //    << " d" << d
+                    //    << " idx" << items_per[d] << std::endl;
+
+                    auto idx = items_per[d]++;
+                    if (nodes_[idx].output_)
+                        throw std::runtime_error("");
+
+                    nodes_[idx].inputs_ = { i1,i2 };
+                    nodes_[idx].output_ = i;
+
+                }
+            }
+
+            //for (auto& n : nodes_)
+            //{
+            //    std::cout << "n[" << n.output_ << "] = n[" << n.inputs_[0] << "] n[" << n.inputs_[1] << "]" << std::endl;
+            //}
+
+        }
+
+        WindowingDag::State::State(WindowingDag & dag)
+        {
+            next_node_.reset(new std::atomic<int>);
+            *next_node_ = 0;
+            node_state_storage_.reset(new std::atomic<NodeState>[dag.max_power_ + 1]);
+            nodes_ = { node_state_storage_.get(), dag.max_power_ + 1 };
+
+            for (auto& n : nodes_)
+                n = NodeState::Ready;
+
+            nodes_[0] = NodeState::Done;
+            for (auto& n : dag.base_powers_)
+            {
+                nodes_[n] = NodeState::Done;
+            }
         }
     }
 }

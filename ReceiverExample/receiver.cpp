@@ -60,7 +60,7 @@ void print_example_banner(string title)
     }
 }
  
-vector<Item> randSubset(const vector<Item>& items, int size)
+std::pair<vector<Item>, vector<int>> randSubset(const vector<Item>& items, int size)
 {
     oc::PRNG prn(oc::ZeroBlock);
 
@@ -76,8 +76,13 @@ vector<Item> randSubset(const vector<Item>& items, int size)
     {
         ret[i] = items[*ssIter++];
     }
-
-    return ret;
+    auto iter = ss.begin();
+    vector<int> s(size);
+    for (u64 i = 0; i < size; ++i)
+    {
+        s[i] = *iter++;
+    }
+    return { ret, s };
 }
 
 
@@ -309,7 +314,10 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
     Set receiver's dataset to be a random subset of sender's actual data
     (this is where we get the intersection) and some data that won't match.
     */
-    auto c1 = randSubset(s1, intersectionSize);
+
+    auto cc1 = randSubset(s1, intersectionSize);
+    auto& c1 = cc1.first;
+
     c1.reserve(c1.size() + rem);
     for (u64 i = 0; i < rem; i++)
     {
@@ -477,7 +485,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     TableParams table_params;
     {
         // Log of size of full hash table
-        table_params.log_table_size = 14;
+        table_params.log_table_size = 10;
 
         // Number of splits to use
         // Larger means lower depth but bigger S-->R communication
@@ -517,7 +525,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     */
     PSIParams params(item_bit_length, table_params, cuckoo_params, seal_params, oprf_type);
     params.set_value_bit_count(label_bit_length);
-    //params.enable_debug();
+    params.enable_debug();
     params.validate();
 
     std::unique_ptr<Receiver> receiver_ptr;
@@ -543,8 +551,11 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
             //memcpy(labels[i].data(), &s1[i], labels[i].size());
             memset(labels[i].data(), 0, labels[i].size());
 
-            labels[i][i% labels.cols()] = i;
-            labels[i][(i+1)% labels.cols()] = 0xcc;
+            labels[i][0] = i;
+            labels[i][1] = (i >> 8);
+            //labels[i][i% labels.cols()] = i;
+            //labels[i][(i + 1) % labels.cols()] = (i>> 8);
+            //labels[i][(i + 2) % labels.cols()] = 0xcc;
 
             //for (int j = 0; j < labels[i].size(); ++j)
             //{
@@ -555,12 +566,13 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
         //s1[i] = oc::mAesFixedKey.ecbEncBlock(oc::toBlock(i));
     }
 
-    auto c1 = randSubset(s1, intersectionSize);
+    auto cc1 = randSubset(s1, intersectionSize);
+    auto& c1 = cc1.first;
     for (int i = 0; i < c1.size(); ++i)
         if(label_bit_length)
-            std::cout << "exp intersection[" << i << "] = " << s1[i] << ", label = " << print(labels[i]) << std::endl;
+            std::cout << "exp intersection[" << i << "] = s[" << cc1.second[i] << "] = " << s1[cc1.second[i]] << ", label = " << print(labels[cc1.second[i]]) << std::endl;
         else
-            std::cout << "exp intersection[" << i << "] = " << s1[i] << std::endl;
+            std::cout << "exp intersection[" << i << "] = s[" << cc1.second[i] << "] = " << s1[cc1.second[i]] << std::endl;
 
     c1.reserve(recversActualSize);
     for (int i = 0; i < (recversActualSize - intersectionSize); ++i)
@@ -596,9 +608,9 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
                 //auto label = intersection.second[i];
                 //memcpy(&l, label.data(), label.size());
 
-
+                auto idx = cc1.second[i];
                 //if (l != exp)
-                if(memcmp(intersection.second[i].data(), labels[i].data(), labels[i].size()))
+                if(memcmp(intersection.second[i].data(), labels[idx].data(), labels[idx].size()))
                 {
                     std::cout <<oc::Color::Red << "incorrect label at index: " << i 
                         << ". actual: " << print(intersection.second[i])
@@ -616,6 +628,9 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
             }
         }
     }
+/*
+    std::cout << "interp count: " << interp_count << std::endl;
+    std::cout << "summ count:    " << sym_count << std::endl;*/
     cout << "Intersection results: ";
     
     if (correct)
