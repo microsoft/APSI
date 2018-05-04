@@ -11,25 +11,31 @@ using namespace seal::util;
 namespace apsi
 {
     CiphertextCompressor::CiphertextCompressor(
-            const seal::EncryptionParameters &parms,
-            const seal::MemoryPoolHandle &pool) :
+            const EncryptionParameters &parms,
+            const MemoryPoolHandle &pool) :
         pool_(pool),
         parms_(parms),
-        small_parms_(parms)
+        small_parms_(parms_)
     {
-        // Change the coefficient modulus to single modulus size
-        small_parms_.set_coeff_modulus({ parms_.coeff_modulus()[0] });
-
         auto &coeff_mod_array = parms_.coeff_modulus();
         int coeff_mod_count = coeff_mod_array.size();
         coeff_mod_prod_array_.clear();
         coeff_mod_prod_array_.reserve(coeff_mod_count - 1); 
 
+        // Change the coefficient modulus to single modulus size
+        small_parms_.set_coeff_modulus({ coeff_mod_array[0] });
+
         // Compute punctured modulus product
-        uint64_t hatq1 = 1;
+        coeff_mod_prod_ = 1;
         for (int i = 1; i < coeff_mod_count; i++)
         {
-            hatq1 = multiply_uint_uint_mod(hatq1, coeff_mod_array[i].value(), coeff_mod_array[0]);
+            coeff_mod_prod_ = multiply_uint_uint_mod(coeff_mod_prod_, coeff_mod_array[i].value(), coeff_mod_array[0]);
+        }
+
+        // Compute inverse of coeff_mod_prod_
+        if(!try_mod_inverse(coeff_mod_prod_, coeff_mod_array[0].value(), inv_coeff_mod_prod_))
+        {
+            throw invalid_argument("coefficient modulus is invalid");
         }
 
         // Compute hat{q1} * qi^{-1} (mod q1)
@@ -41,19 +47,18 @@ namespace apsi
                 throw invalid_argument("coefficient modulus is invalid");
             }
             coeff_mod_prod_array_.emplace_back(
-                    multiply_uint_uint_mod(hatq1, inv_qi_modq1, coeff_mod_array[0]));
+                    multiply_uint_uint_mod(coeff_mod_prod_, inv_qi_modq1, coeff_mod_array[0]));
         }
 
-        // Compute (hat{qi}/q1)^{-1} = (hat{q1}/qi)^{-1} (mod qi) for 2 <= i
         inv_coeff_mod_prod_array_.clear();
         inv_coeff_mod_prod_array_.reserve(coeff_mod_count - 1); 
         for(int i = 1; i < coeff_mod_count; i++)
         {
-            // Compute hat{q} (mod qi)
+            // Compute hat{qi} (mod qi)
             uint64_t hatqi = 1;
-            for(int j = 0; j < coeff_mod_count; j++)
+            for(int j = 1; j < coeff_mod_count; j++)
             {
-                if(i != j)
+                if(j != i)
                 {
                     hatqi = multiply_uint_uint_mod(hatqi, coeff_mod_array[j].value(), coeff_mod_array[i]);
                 }
@@ -66,9 +71,7 @@ namespace apsi
                 throw invalid_argument("coefficient modulus is invalid");
             }
 
-            // Multiply q1
-            inv_coeff_mod_prod_array_.emplace_back(
-                    multiply_uint_uint_mod(inv_hatqi, coeff_mod_array[0].value(), coeff_mod_array[i]));
+            inv_coeff_mod_prod_array_.emplace_back(inv_hatqi);
         }
     }
 
@@ -91,15 +94,12 @@ namespace apsi
             throw invalid_argument("destination is not valid for encryption parameters");
         }
 
-        // Set destination to (c1 mod q1, c2 mod q1)
-        for(int index = 0; index < encrypted_size; index++)
-        {
-            set_poly_poly(encrypted.pointer(index), coeff_count, 1, destination.mutable_pointer(index));
-        }
-
         Pointer temp(allocate_uint(coeff_count, pool_));
         for(int index = 0; index < encrypted_size; index++)
         {
+            // Set destination to (c1 mod q1, c2 mod q1)
+            set_uint_uint(encrypted.pointer(index), coeff_count, destination.mutable_pointer(index));
+
             for(int i = 1; i < coeff_mod_count; i++)
             {
                 multiply_poly_scalar_coeffmod(
@@ -108,12 +108,6 @@ namespace apsi
                         inv_coeff_mod_prod_array_[i - 1], 
                         coeff_mod_array[i], 
                         temp.get());
-
-                for(int j = 0; j < coeff_count; j++)
-                {
-                    modulo_uint_inplace(temp.get() + j, 1, coeff_mod_array[0]);
-                }
-
                 multiply_poly_scalar_coeffmod(
                         temp.get(), 
                         coeff_count, 
@@ -123,7 +117,7 @@ namespace apsi
                 negate_poly_coeffmod(
                         temp.get(),
                         coeff_count,
-                        coeff_mod_prod_array_[0],
+                        coeff_mod_array[0],
                         temp.get());
                 add_poly_poly_coeffmod(
                         destination.pointer(index),
@@ -132,6 +126,33 @@ namespace apsi
                         coeff_mod_array[0],
                         destination.mutable_pointer(index));
             }
+
+            multiply_poly_scalar_coeffmod(
+                    destination.pointer(index),
+                    coeff_count,
+                    inv_coeff_mod_prod_, 
+                    coeff_mod_array[0], 
+                    destination.mutable_pointer(index));
         }
+    }
+
+    void CiphertextCompressor::mod_switch(
+            const SecretKey &secret_key, 
+            SecretKey &destination)
+    {
+        int coeff_count = parms_.poly_modulus().coeff_count();
+
+        // Verify parameters.
+        if (secret_key.hash_block() != parms_.hash_block())
+        {
+            throw invalid_argument("secret_key is not valid for encryption parameters");
+        }
+
+        // Set destination hash block and resize appropriately
+        destination.mutable_hash_block() = small_parms_.hash_block();
+        destination.mutable_data().resize(coeff_count, bits_per_uint64);
+
+        // Set destination value
+        set_uint_uint(secret_key.data().pointer(), coeff_count, destination.mutable_data().pointer());
     }
 }
