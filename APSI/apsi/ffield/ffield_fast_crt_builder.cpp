@@ -87,64 +87,49 @@ namespace apsi
         {
             nmod_poly_init(modulus_tree_ + i, ch_);
         }
-        build_modulus_tree(0);
+        build_modulus_tree();
 
         // Clear locals
         fmpz_clear(mult_grp_size);
         nmod_poly_clear(cyclotomic_poly);
     }
 
-    void FFieldFastCRTBuilder::build_modulus_tree(uint64_t node)
+    void FFieldFastCRTBuilder::build_modulus_tree()
     {
-        // Is this a leaf node?
-        if(node >= slot_count_ - 1)
+        for(uint64_t node = 2 * slot_count_ - 2; node >= slot_count_ - 1; node--)
         {
+            // Is this a leaf node?
             nmod_poly_set(modulus_tree_ + node, factorization_->p + node - slot_count_ + 1);
         }
-        else
+
+        for(int64_t node = slot_count_ - 2; node >= 0; node--)
         {
             auto child1 = 2 * node + 1;
             auto child2 = 2 * node + 2;
-            build_modulus_tree(child1);
-            build_modulus_tree(child2);
             nmod_poly_mul(modulus_tree_ + node, modulus_tree_ + child1, modulus_tree_ + child2);
         }
     }
 
-    void FFieldFastCRTBuilder::interpolate(uint64_t node, nmod_poly_struct *result_tree) const
+    void FFieldFastCRTBuilder::interpolate(nmod_poly_struct *result_tree) const
     {
-        // Do nothing for leaf nodes; they are already there.
-        if(node >= slot_count_ - 1)
-        {
-            return;
-        }
-        else
-        {
-            // Initialize temp_poly
-            nmod_poly_t temp_poly;
-            nmod_poly_init(temp_poly, ch_);
+        // Initialize temp_poly
+        nmod_poly_t temp_poly;
+        nmod_poly_init(temp_poly, ch_);
 
+        for(int64_t node = slot_count_ - 2; node >= 0; node--)
+        {
             auto child1 = 2 * node + 1;
             auto child2 = 2 * node + 2;
-            interpolate(child1, result_tree);
-            interpolate(child2, result_tree);
+
             nmod_poly_mul(temp_poly, result_tree + child1, modulus_tree_ + child2);
             nmod_poly_mul(result_tree + node, result_tree + child2, modulus_tree_ + child1);
             nmod_poly_add(result_tree + node, result_tree + node, temp_poly);
-
-            // Clear temp_poly
-            nmod_poly_clear(temp_poly);
         }
     }
 
-    void FFieldFastCRTBuilder::reduce(uint64_t node, nmod_poly_struct *result_tree, nmod_poly_struct *destination) const
+    void FFieldFastCRTBuilder::reduce(nmod_poly_struct *result_tree, nmod_poly_struct *destination) const
     {
-        // Do nothing for leaf nodes; they are already there.
-        if(node >= slot_count_ - 1)
-        {
-            nmod_poly_set(destination + (node - slot_count_ + 1), result_tree + node);
-        }
-        else
+        for(uint64_t node = 0; node < slot_count_ - 1; node++)
         {
             auto child1 = 2 * node + 1;
             auto child2 = 2 * node + 2;
@@ -152,10 +137,12 @@ namespace apsi
             // Compute reductions down the tree
             nmod_poly_rem(result_tree + child1, result_tree + node, modulus_tree_ + child1);
             nmod_poly_rem(result_tree + child2, result_tree + node, modulus_tree_ + child2);
+        }
 
-            // Iterate
-            reduce(child1, result_tree, destination);
-            reduce(child2, result_tree, destination);
+        for(uint64_t node = slot_count_ - 1; node < 2 * slot_count_ - 1; node++)
+        {
+            // Do nothing for leaf nodes; they are already there.
+            nmod_poly_set(destination + (node - slot_count_ + 1), result_tree + node);
         }
     }
 
@@ -189,7 +176,7 @@ namespace apsi
         {
             nmod_poly_mul(result_tree_ptr, values_ptr, inv_punct_prod_ptr);
         }
-        interpolate(0, result_tree);
+        interpolate(result_tree);
 
         // Copy result to destination
         uint64_t coeff_count = result_tree[0].length;
@@ -249,7 +236,7 @@ namespace apsi
         }
 
         // Now reduce
-        reduce(0, result_tree, destination.array_);
+        reduce(result_tree, destination.array_);
 
         // Clear result_tree
         for(uint64_t i = 0; i < 2 * slot_count_ - 1; i++)

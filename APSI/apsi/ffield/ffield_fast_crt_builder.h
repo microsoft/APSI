@@ -70,9 +70,9 @@ namespace apsi
         void decompose(const seal::Plaintext &plain, FFieldArray &destination) const;
 
     private:
-        void build_modulus_tree(std::uint64_t node);
-        void interpolate(std::uint64_t node, nmod_poly_struct *result_tree) const;
-        void reduce(std::uint64_t node, nmod_poly_struct *result_tree, nmod_poly_struct *destination) const;
+        void build_modulus_tree();
+        void interpolate(nmod_poly_struct *result_tree) const;
+        void reduce(nmod_poly_struct *result_tree, nmod_poly_struct *destination) const;
 
         const std::uint64_t ch_;
         const std::uint64_t d_;
