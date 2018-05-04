@@ -242,7 +242,9 @@ namespace apsi
             for (map<uint64_t, vector<Ciphertext> >::const_iterator it = query.begin(); it != query.end(); it++)
             {
                 channel.asyncSendCopy(it->first);
-                send_ciphertext(it->second, channel);
+
+                for(auto& c : it->second)
+                    send_ciphertext(c, channel);
             }
         }
 

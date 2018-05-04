@@ -33,6 +33,49 @@ namespace apsi
 {
     namespace sender
     {
+
+
+        struct WindowingDag
+        {
+            enum class NodeState {
+                Ready = 0,
+                Pending = 1,
+                Done = 2
+            };
+
+            struct State
+            {
+                std::unique_ptr<std::atomic<int>> next_node_;
+                std::unique_ptr<std::atomic<NodeState>[]> node_state_storage_;
+                oc::span<std::atomic<NodeState>> nodes_;
+
+                State(WindowingDag& dag);
+            };
+
+            struct Node
+            {
+                std::array<int, 2> inputs_;
+                int output_ = 0;
+            };
+
+            int max_power_, window_;
+            std::vector<int> base_powers_;
+            std::vector<Node> nodes_;
+
+
+            WindowingDag(int max_power, int window)
+            {
+                max_power_ = max_power;
+                window_ = window;
+                compute_dag();
+            }
+
+            u64 pow(u64 base, u64 e);
+            uint64_t optimal_split(uint64_t x, int base);
+            vector<uint64_t> conversion_to_digits(uint64_t input, int base);
+            void compute_dag();
+        };
+
         class Sender
         {
         public:
@@ -106,7 +149,7 @@ namespace apsi
 
             @see compute_dot_product for an explanation of the result.
             */
-            void respond(const std::map<std::uint64_t, std::vector<seal::Ciphertext> > &query,
+            void respond(std::vector<std::vector<seal::Ciphertext>>&query,
                 apsi::sender::SenderSessionContext &session_context, oc::Channel &channel);
 
             /**
@@ -118,9 +161,9 @@ namespace apsi
             The size of the vector is the number of batches.
             @params[out] all_powers All powers computed from the input for the specified batch.
             */
-            void compute_batch_powers(int batch, const std::map<std::uint64_t,
-                std::vector<seal::Ciphertext>> &input, std::vector<seal::Ciphertext> &batch_powers,
-                SenderSessionContext &session_context, SenderThreadContext &thread_context);
+            void compute_batch_powers(int batch, std::vector<seal::Ciphertext> &batch_powers,
+                SenderSessionContext &session_context, SenderThreadContext &thread_context,
+                const WindowingDag& dag, WindowingDag::State& state);
 
             PSIParams params_;
 
