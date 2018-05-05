@@ -16,6 +16,7 @@
 #include "apsi/sender/senderthreadcontext.h"
 #include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_fast_crt_builder.h"
+#include "apsi/tools/sealcompress.h"
 
 // SEAL
 #include "seal/memorypoolhandle.h"
@@ -182,6 +183,9 @@ namespace apsi
             std::shared_ptr<seal::PolyCRTBuilder> builder_;
 
             std::shared_ptr<FFieldFastCRTBuilder> ex_builder_;
+
+            // Objects for compressed ciphertexts
+            std::shared_ptr<CiphertextCompressor> compressor_;
 
             /* Sender's database, including raw data, hashed data, ExField data, and symmetric polynomials. */
             SenderDB sender_db_;

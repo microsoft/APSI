@@ -9,6 +9,7 @@
 #include "apsi/psiparams.h"
 #include "apsi/ffield/ffield_fast_crt_builder.h"
 #include "apsi/ffield/ffield_array.h"
+#include "apsi/tools/sealcompress.h"
 
 // Cuckoo
 #include "cuckoo/cuckoo.h"
@@ -194,6 +195,12 @@ namespace apsi
             std::unique_ptr<seal::PolyCRTBuilder> polycrtbuilder_;
 
             int slot_count_;
+
+            // Objects for compressed ciphertexts
+            std::unique_ptr<CiphertextCompressor> compressor_;
+            seal::EncryptionParameters small_parms_;
+            std::unique_ptr<seal::Decryptor> small_decryptor_;
+            seal::SecretKey small_secret_key_;
         };
 
     }

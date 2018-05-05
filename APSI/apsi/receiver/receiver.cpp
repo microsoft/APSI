@@ -60,6 +60,13 @@ namespace apsi
             encryptor_.reset(new Encryptor(seal_context, public_key_));
             decryptor_.reset(new Decryptor(seal_context, secret_key_));
 
+            // Initializing tools for dealing with compressed ciphertexts
+            compressor_.reset(new CiphertextCompressor(params_.encryption_params(), pool_));
+            small_parms_ = compressor_->small_parms();
+            SEALContext small_seal_context(small_parms_);
+            compressor_->mod_switch(secret_key_, small_secret_key_);
+            small_decryptor_.reset(new Decryptor(small_seal_context, small_secret_key_));
+
             generator.generate_evaluation_keys(params_.decomposition_bit_count(), evaluation_keys_);
 
             if (seal_context.qualifiers().enable_batching)
@@ -491,14 +498,11 @@ namespace apsi
                 }
             }
 
-
-            auto numThreads = 4;
+            auto numThreads = thread_count_;
             cout << "Decrypting " << block_count << " blocks (" << num_of_batches << "b x " << num_of_splits << "s) with "<< numThreads<<" threads" << endl;
-
 
             auto routine = [&](int t)
             {
-
                 Plaintext p(pool_);
                 Ciphertext tmp(pool_);
                 const bool short_strings = !!polycrtbuilder_;
@@ -513,7 +517,6 @@ namespace apsi
                 std::vector<char> has_label(batch_size);
 
                 bool first = true;
-
 
                 for (u64 i = t; i < recvPackages.size(); i += numThreads)
                 {
@@ -530,11 +533,11 @@ namespace apsi
                     if (first && t == 0)
                     {
                         first = false;
-                        cout << "Noise budget: " << decryptor_->invariant_noise_budget(tmp) << " bits" << endl;
+                        cout << "Noise budget: " << small_decryptor_->invariant_noise_budget(tmp) << " bits" << endl;
                         recv_stop_watch.set_time_point("receiver recv-start");
                     }
 
-                    decryptor_->decrypt(tmp, p);
+                    small_decryptor_->decrypt(tmp, p);
 
                     //vector<uint64_t> integer_batch(batch_size);
                     if (short_strings)
@@ -579,7 +582,7 @@ namespace apsi
                         //std::cout << pkg.batch_idx << " " << pkg.split_idx << " " << std::endl;
                         tmp.load(ss);
 
-                        decryptor_->decrypt(tmp, p);
+                        small_decryptor_->decrypt(tmp, p);
 
 
 

@@ -408,43 +408,6 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
 
 void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 {
-    {
-        EncryptionParameters parms;
-        parms.set_poly_modulus("1x^8192 + 1");
-        parms.set_coeff_modulus(coeff_modulus_128(4096));
-        parms.set_plain_modulus(65537);
-        
-        SEALContext context(parms);
-        KeyGenerator keygen(context);
-        auto pk = keygen.public_key();
-        auto sk = keygen.secret_key();
-
-        CiphertextCompressor compressor(parms);
-        auto small_parms = compressor.small_parms();
-
-        Encryptor encryptor(context, pk);
-        Decryptor decryptor(context, sk);
-        Plaintext p("1234x^123 + 456x^89 + 1x^3 + 2x^2 + 3x^1 + 4");
-        Ciphertext c;
-        encryptor.encrypt(p, c);
-        Plaintext p2;
-        decryptor.decrypt(c, p2);
-        cout << "Result: " << p2.to_string() << " (noise budget: " << decryptor.invariant_noise_budget(c) << " bits)" << endl;
-
-        Ciphertext small_c(small_parms);
-        compressor.mod_switch(c, small_c);
-
-        SEALContext small_context(small_parms);
-        SecretKey small_sk;
-        compressor.mod_switch(sk, small_sk);
-
-        Decryptor small_decryptor(small_context, small_sk);
-        Plaintext small_p2;
-        small_decryptor.decrypt(small_c, small_p2);
-        cout << "Small result: " << small_p2.to_string() << " (noise budget: " << small_decryptor.invariant_noise_budget(small_c) << " bits)" << endl;
-        
-        return;
-    }
     setThreadName("receiver_main");
     print_example_banner("Example: Slow batching");
     stop_watch.time_points.clear();

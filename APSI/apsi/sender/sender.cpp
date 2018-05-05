@@ -67,6 +67,9 @@ namespace apsi
                 ));
                 field_vec = ex_builder_->fields();
             }
+
+            compressor_.reset(new CiphertextCompressor(params_.encryption_params()));
+
             vector<thread> thrds(total_thread_count_);
 
 #ifdef USE_SECURE_SEED
@@ -379,12 +382,14 @@ namespace apsi
                     int thread_context_idx = acquire_thread_context();
                     auto& thread_context = thread_contexts_[thread_context_idx];
                     thread_context.construct_variables(params_);
+                    auto local_pool = thread_context.pool();
 
-                    Ciphertext tmp(thread_context.pool());
+                    Ciphertext tmp(local_pool);
+                    Ciphertext compressedResult(compressor_->small_parms(), local_pool);
 
                     auto batch_start = i * batch_count / thread_pool.size();
 
-                    for (auto batch = batch_start, i = 0ull; i < batch_count; ++batch, ++i)
+                    for (auto batch = batch_start, i = 0ul; i < batch_count; ++batch, ++i)
                     {
                         compute_batch_powers(batch, powers[batch], session_context, thread_context, dag, states[batch]);
                     }
@@ -568,15 +573,22 @@ namespace apsi
                         evaluator_->transform_from_ntt(runningResults[currResult]);
 
                         // Send the result over the network if needed.
+                        
+                        // First compress
+                        compressor_->mod_switch(runningResults[currResult], compressedResult);
 
                         unique_lock<mutex> net_lock2(mtx);
                         channel.asyncSendCopy(split);
                         channel.asyncSendCopy(batch);
-                        send_ciphertext(runningResults[currResult], channel);
+
+                        // Send the compressed result
+                        send_ciphertext(compressedResult, channel);
 
                         if (params_.get_label_bit_count())
                         {
-                            send_ciphertext(label_results[curr_label], channel);
+                            // Compress label
+                            compressor_->mod_switch(label_results[currResult], compressedResult);
+                            send_ciphertext(compressedResult, channel);
                         }
                     }
 
