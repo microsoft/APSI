@@ -492,7 +492,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     params.validate();
 
     std::unique_ptr<Receiver> receiver_ptr;
-    auto f = std::async([&]() {receiver_ptr.reset(new Receiver(params, 1, MemoryPoolHandle::New(true))); });
+    auto f = std::async([&]() {receiver_ptr.reset(new Receiver(params, numThreads, MemoryPoolHandle::New(true))); });
     Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New(true));
     f.get();
     Receiver& receiver = *receiver_ptr;
