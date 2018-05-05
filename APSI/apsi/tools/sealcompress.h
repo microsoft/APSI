@@ -2,6 +2,7 @@
 
 // STD
 #include <vector>
+#include <iostream>
 
 // SEAL
 #include "seal/ciphertext.h"
@@ -21,11 +22,22 @@ namespace apsi
 
         void mod_switch(
                 const seal::Ciphertext &encrypted, 
-                seal::Ciphertext &destination);
+                seal::Ciphertext &destination) const;
 
         void mod_switch(
                 const seal::SecretKey &secret_key, 
-                seal::SecretKey &destination);
+                seal::SecretKey &destination) const;
+
+        inline seal::SecretKey mod_switch(const seal::SecretKey &secret_key)
+        {
+            seal::SecretKey result;
+            mod_switch(secret_key, result);
+            return result;
+        }
+
+        void compressed_save(const seal::Ciphertext &encrypted, std::ostream &stream) const;
+
+        void compressed_load(std::istream &stream, seal::Ciphertext &destination) const;
 
         inline const seal::EncryptionParameters &parms() const
         {

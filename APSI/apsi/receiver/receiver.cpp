@@ -504,7 +504,7 @@ namespace apsi
             auto routine = [&](int t)
             {
                 Plaintext p(pool_);
-                Ciphertext tmp(pool_);
+                Ciphertext tmp(small_parms_, pool_);
                 const bool short_strings = !!polycrtbuilder_;
                 unique_ptr<FFieldArray> batch;
                 if (!short_strings)
@@ -528,7 +528,8 @@ namespace apsi
                     // recover the sym poly values 
                     has_result = false;
                     stringstream ss(pkg.data);
-                    tmp.load(ss);
+                    compressor_->compressed_load(ss, tmp);
+                    // tmp.load(ss);
 
                     if (first && t == 0)
                     {
@@ -580,7 +581,8 @@ namespace apsi
                         pkg.label_fut.get();
                         std::stringstream ss(pkg.label_data);
                         //std::cout << pkg.batch_idx << " " << pkg.split_idx << " " << std::endl;
-                        tmp.load(ss);
+                        // tmp.load(ss);
+                        compressor_->compressed_load(ss, tmp);
 
                         small_decryptor_->decrypt(tmp, p);
 

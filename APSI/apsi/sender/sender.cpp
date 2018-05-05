@@ -582,13 +582,15 @@ namespace apsi
                         channel.asyncSendCopy(batch);
 
                         // Send the compressed result
-                        send_ciphertext(compressedResult, channel);
+                        // send_ciphertext(compressedResult, channel);
+                        send_compressed_ciphertext(*compressor_, compressedResult, channel);
 
                         if (params_.get_label_bit_count())
                         {
                             // Compress label
                             compressor_->mod_switch(label_results[currResult], compressedResult);
-                            send_ciphertext(compressedResult, channel);
+                            // send_ciphertext(compressedResult, channel);
+                            send_compressed_ciphertext(*compressor_, compressedResult, channel);
                         }
                     }
 

@@ -8,6 +8,7 @@
 #include "cryptoTools/Network/Channel.h"
 #include "apsi/item.h"
 #include "apsi/ffield/ffield_array.h"
+#include "apsi/tools/sealcompress.h"
 
 namespace apsi
 {
@@ -22,6 +23,14 @@ namespace apsi
 	void send_ciphertext(const std::vector<seal::Ciphertext> &ciphers, oc::Channel &channel);
 
 	void receive_ciphertext(std::vector<seal::Ciphertext> &ciphers, oc::Channel &channel);
+
+	void send_compressed_ciphertext(const CiphertextCompressor &compressor, const seal::Ciphertext &ciphertext, oc::Channel &channel);
+
+	void receive_compressed_ciphertext(const CiphertextCompressor &compressor, seal::Ciphertext &ciphertext, oc::Channel &channel);
+
+	void send_compressed_ciphertext(const CiphertextCompressor &compressor, const std::vector<seal::Ciphertext> &ciphers, oc::Channel &channel);
+
+	void receive_compressed_ciphertext(const CiphertextCompressor &compressor, std::vector<seal::Ciphertext> &ciphers, oc::Channel &channel);
 
 	void send_evalkeys(const seal::EvaluationKeys &keys, oc::Channel &channel);
 

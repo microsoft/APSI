@@ -55,6 +55,38 @@ namespace apsi
 			receive_ciphertext(ciphers[i], channel);
 	}
 
+	void send_compressed_ciphertext(const CiphertextCompressor &compressor, const Ciphertext &ciphertext, Channel &channel)
+	{
+        stringstream ss;
+        compressor.compressed_save(ciphertext, ss);
+		channel.asyncSend(ss.str());
+	}
+
+	void receive_compressed_ciphertext(const CiphertextCompressor &compressor, Ciphertext &ciphertext, Channel &channel)
+	{
+		string buff;
+		channel.recv(buff);
+		stringstream ss(buff);
+        compressor.compressed_load(ss, ciphertext);
+	}
+
+	void send_compressed_ciphertext(const CiphertextCompressor &compressor, const std::vector<seal::Ciphertext> &ciphers, Channel &channel)
+	{
+		int s = ciphers.size();
+		channel.asyncSendCopy(s);
+		for (int i = 0; i < ciphers.size(); i++)
+			send_compressed_ciphertext(compressor, ciphers[i], channel);
+	}
+
+	void receive_compressed_ciphertext(const CiphertextCompressor &compressor, std::vector<seal::Ciphertext> &ciphers, Channel &channel)
+	{
+		int size = 0;
+		channel.recv(size);
+		ciphers.resize(size);
+		for (int i = 0; i < ciphers.size(); i++)
+			receive_compressed_ciphertext(compressor, ciphers[i], channel);
+	}
+
 	void send_evalkeys(const seal::EvaluationKeys &keys, Channel &channel)
 	{
 		stringstream ss;
