@@ -616,6 +616,10 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 
     cout << stop_watch << endl;
     cout << recv_stop_watch << endl;
+
+    cout << "Communication R->S: " << recvChl.getTotalDataSent() / 1024.0 << " KB" << endl;
+    cout << "Communication S->R: " << recvChl.getTotalDataRecv() / 1024.0 << " KB" << endl;
+    cout << "Communication total: " << (recvChl.getTotalDataSent() + recvChl.getTotalDataRecv()) / 1024.0 << " KB" << endl;
 }
 
 
