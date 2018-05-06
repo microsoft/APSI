@@ -541,11 +541,11 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 
     auto cc1 = randSubset(s1, intersectionSize);
     auto& c1 = cc1.first;
-    for (int i = 0; i < c1.size(); ++i)
-        if(label_bit_length)
-            std::cout << "exp intersection[" << i << "] = s[" << cc1.second[i] << "] = " << s1[cc1.second[i]] << ", label = " << print(labels[cc1.second[i]]) << std::endl;
-        else
-            std::cout << "exp intersection[" << i << "] = s[" << cc1.second[i] << "] = " << s1[cc1.second[i]] << std::endl;
+    // for (int i = 0; i < c1.size(); ++i)
+    //     if(label_bit_length)
+    //         std::cout << "exp intersection[" << i << "] = s[" << cc1.second[i] << "] = " << s1[cc1.second[i]] << ", label = " << print(labels[cc1.second[i]]) << std::endl;
+    //     else
+    //         std::cout << "exp intersection[" << i << "] = s[" << cc1.second[i] << "] = " << s1[cc1.second[i]] << std::endl;
 
     c1.reserve(recversActualSize);
     for (int i = 0; i < (recversActualSize - intersectionSize); ++i)
