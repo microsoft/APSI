@@ -1,0 +1,22 @@
+n=2048 plainMod=0xdff log2(plainMod)=11.8069523282107 deg=8 slots=256 log2(fieldSize)=94.4556186256859
+n=2048 plainMod=0x1003ff log2(plainMod)=20.0014068198732 deg=4 slots=512 log2(fieldSize)=80.0056272794930
+n=4096 plainMod=0x13ff log2(plainMod)=12.3216462909914 deg=8 slots=512 log2(fieldSize)=98.5731703279311
+n=4096 plainMod=0x101801 log2(plainMod)=20.0084299899164 deg=4 slots=1024 log2(fieldSize)=80.0337199596656
+n=8192 plainMod=0x17ff log2(plainMod)=12.5847276679639 deg=8 slots=1024 log2(fieldSize)=100.677821343711
+n=8192 plainMod=0x106001 log2(plainMod)=20.0334243458898 deg=4 slots=2048 log2(fieldSize)=80.1336973835590
+n=16384 plainMod=0x1fff log2(plainMod)=12.9998238790157 deg=8 slots=2048 log2(fieldSize)=103.998591032126
+n=16384 plainMod=0x106001 log2(plainMod)=20.0334243458898 deg=4 slots=4096 log2(fieldSize)=80.1336973835590
+
+Command line options:
+-t (default 1)
+-useLabels
+-senderSize (log)
+-secLevel (default 40)
+-itemBitLength (default 60)
+-logTableSize (default 10)
+-splitCount
+-windowSize
+-polyModulus (default 4096)
+-plainModulus (0x13ff)
+-exfieldDegree (default 8)
+-dbc (default 30)

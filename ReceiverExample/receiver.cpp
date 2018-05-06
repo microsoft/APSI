@@ -126,11 +126,11 @@ int main(int argc, char *argv[]){
 
 
     // Example: Fast batching
-    if (none || fastBatching)
+    if (fastBatching)
         example_fast_batching(cmd, clientChl, serverChl);
 
     // Example: Slow batching
-    if (slowBatching)
+    if (none || slowBatching)
         example_slow_batching(cmd, clientChl, serverChl);
 
     if (unitTest)
@@ -416,14 +416,17 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     // Thread count
     unsigned numThreads = cmd.get<int>("t");
     std::cout << "t=" << numThreads << std::endl;
-    // Larger set size
-    unsigned sender_set_size = 1 << 20;
+    // Larger set size 
+    cmd.setDefault("senderSize", 20);
+    unsigned sender_set_size = 1 << cmd.get<int>("senderSize");
 
     // Negative log failure probability for simple hashing
-    unsigned binning_sec_level = 40;
+    cmd.setDefault("secLevel", 40);
+    unsigned binning_sec_level = cmd.get<int>("secLevel");
 
     // Length of items
-    unsigned item_bit_length = 60;
+    cmd.setDefault("itemBitLength", 60);
+    unsigned item_bit_length = cmd.get<int>("itemBitLength");
 
     unsigned label_bit_length = cmd.isSet("useLabels") ? item_bit_length : 0;
 
@@ -448,11 +451,13 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     TableParams table_params;
     {
         // Log of size of full hash table
-        table_params.log_table_size = 10;
+        cmd.setDefault("logTableSize", 10);
+        table_params.log_table_size = cmd.get<int>("logTableSize");
 
         // Number of splits to use
         // Larger means lower depth but bigger S-->R communication
-        table_params.split_count = 128;
+        cmd.setDefault("splitCount", 128);
+        table_params.split_count = cmd.get<int>("splitCount");
 
         // Get secure bin size
         table_params.sender_bin_size = round_up_to(get_bin_size(
@@ -463,21 +468,26 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 
         // Window size parameter
         // Larger means lower depth but bigger R-->S communication
-        table_params.window_size = 1;
+        cmd.setDefault("windowSize", 1);
+        table_params.window_size = cmd.get<int>("windowSize");
     }
 
     SEALParams seal_params;
     {
-        seal_params.encryption_params.set_poly_modulus("1x^4096 + 1");
+        cmd.setDefault("polyModulus", 4096);
+        seal_params.encryption_params.set_poly_modulus("1x^" + to_string(cmd.get<int>("polyModulus")) + " + 1");
         seal_params.encryption_params.set_coeff_modulus(
             coeff_modulus_128(seal_params.encryption_params.poly_modulus().coeff_count() - 1));
-        seal_params.encryption_params.set_plain_modulus(0x13ff);
+        cmd.setDefault("plainModulus", 0x13ff);
+        seal_params.encryption_params.set_plain_modulus(cmd.get<int>("plainModulus"));
 
         // This must be equal to plain_modulus
         seal_params.exfield_params.exfield_characteristic = seal_params.encryption_params.plain_modulus().value();
-        seal_params.exfield_params.exfield_degree = 8;
+        cmd.setDefault("exfieldDegree", 8);
+        seal_params.exfield_params.exfield_degree = cmd.get<int>("exfieldDegree");
 
-        seal_params.decomposition_bit_count = 20;
+        cmd.setDefault("dbc", 30);
+        seal_params.decomposition_bit_count = cmd.get<int>("dbc");
     }
 
     // Use OPRF to eliminate need for noise flooding for sender's security
