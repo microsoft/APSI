@@ -33,8 +33,8 @@ namespace apsi
             params_(params),
             thread_count_(thread_count),
             pool_(pool),
-            ex_field_(FField::Acquire(params.exfield_characteristic(), params.exfield_polymod())),
-            slot_count_((params_.encryption_params().poly_modulus().coeff_count() - 1) / (params_.exfield_polymod().coeff_count() - 1))
+            ex_field_(FField::Acquire(params.exfield_characteristic(), params.exfield_degree())),
+            slot_count_((params_.encryption_params().poly_modulus().coeff_count() - 1) / (params_.exfield_degree()))
         {
             if (thread_count_ <= 0)
             {

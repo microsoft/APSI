@@ -55,7 +55,7 @@ namespace apsi
         struct ExFieldParams
         {
             std::uint64_t exfield_characteristic;
-            seal::BigPoly exfield_polymod;
+            unsigned exfield_degree;
         } exfield_params;
         seal::EncryptionParameters encryption_params;
         unsigned decomposition_bit_count;
@@ -86,7 +86,7 @@ namespace apsi
             max_probe_(cuckoo_params.max_probe),
             item_bit_count_(item_bit_count), 
             exfield_characteristic_(seal_params.exfield_params.exfield_characteristic), 
-            exfield_polymod_(seal_params.exfield_params.exfield_polymod),
+            exfield_degree_(seal_params.exfield_params.exfield_degree),
             //log_poly_degree_(seal_params.log_poly_degree), 
             //poly_degree_(seal_params.encryption_params.poly_modulus().coeff_count() - 1),
             //coeff_mod_bit_count_(seal_params.coeff_mod_bit_count),
@@ -137,9 +137,9 @@ namespace apsi
             return exfield_characteristic_;
         }
 
-        inline const seal::BigPoly &exfield_polymod() const
+        inline unsigned exfield_degree() const
         {
-            return exfield_polymod_;
+            return exfield_degree_;
         }
 
         inline int split_count() const
@@ -154,7 +154,7 @@ namespace apsi
 
         inline int batch_size() const
         {
-            return (encryption_params_.poly_modulus().coeff_count() - 1) / (exfield_polymod_.significant_coeff_count() - 1);
+            return (encryption_params_.poly_modulus().coeff_count() - 1) / (exfield_degree_);
         }
 
         inline int batch_count() const
@@ -267,7 +267,7 @@ namespace apsi
 
         std::uint64_t exfield_characteristic_;
 
-        seal::BigPoly exfield_polymod_;
+        unsigned exfield_degree_;
 
         std::uint32_t apsi_port_;
 

@@ -263,7 +263,7 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
 
         // This must be equal to plain_modulus
         seal_params.exfield_params.exfield_characteristic = seal_params.encryption_params.plain_modulus().value();
-        seal_params.exfield_params.exfield_polymod = string("1x^1");
+        seal_params.exfield_params.exfield_degree = 1;
 
         seal_params.decomposition_bit_count = 60;
     }
@@ -417,13 +417,13 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     unsigned numThreads = cmd.get<int>("t");
     std::cout << "t=" << numThreads << std::endl;
     // Larger set size
-    unsigned sender_set_size = 1 << 16;
+    unsigned sender_set_size = 1 << 20;
 
     // Negative log failure probability for simple hashing
-    unsigned binning_sec_level = 30;
+    unsigned binning_sec_level = 40;
 
     // Length of items
-    unsigned item_bit_length = 56;
+    unsigned item_bit_length = 50;
 
     unsigned label_bit_length = cmd.isSet("useLabels") ? item_bit_length : 0;
 
@@ -468,14 +468,14 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 
     SEALParams seal_params;
     {
-        seal_params.encryption_params.set_poly_modulus("1x^8192 + 1");
+        seal_params.encryption_params.set_poly_modulus("1x^4096 + 1");
         seal_params.encryption_params.set_coeff_modulus(
             coeff_modulus_128(seal_params.encryption_params.poly_modulus().coeff_count() - 1));
-        seal_params.encryption_params.set_plain_modulus(0xE801);
+        seal_params.encryption_params.set_plain_modulus(0x13ff);
 
         // This must be equal to plain_modulus
         seal_params.exfield_params.exfield_characteristic = seal_params.encryption_params.plain_modulus().value();
-        seal_params.exfield_params.exfield_polymod = string("1x^8 + 3");
+        seal_params.exfield_params.exfield_degree = 8;
 
         seal_params.decomposition_bit_count = 60;
     }

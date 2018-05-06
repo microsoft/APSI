@@ -26,7 +26,7 @@ namespace apsi
             pool_(pool),
             total_thread_count_(total_thread_count),
             session_thread_count_(session_thread_count),
-            ex_field_(FField::Acquire(params.exfield_characteristic(), params.exfield_polymod())),
+            ex_field_(FField::Acquire(params.exfield_characteristic(), params.exfield_degree())),
             sender_db_(params, ex_field_),
             thread_contexts_(total_thread_count_),
             stopped_(false)
