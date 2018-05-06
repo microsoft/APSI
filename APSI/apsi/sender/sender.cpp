@@ -393,9 +393,10 @@ namespace apsi
 
                     u64 batch_start = i * batch_count / thread_pool.size();
 
-                    for (u64 batch = batch_start, i = 0ul; i < batch_count; ++batch, ++i)
+                    for (u64 batch = batch_start, i = 0ul; i < batch_count; ++i)
                     {
                         compute_batch_powers(batch, powers[batch], session_context, thread_context, dag, states[batch]);
+                        batch = (batch + 1) % batch_count;
                     }
 
 
@@ -624,8 +625,10 @@ namespace apsi
             auto thrdIdx = std::this_thread::get_id();
 
             if (batch_powers.size() != params_.split_size() + 1)
+            {
+                std::cout << batch_powers.size() << " != " << params_.split_size() + 1 << std::endl;
                 throw std::runtime_error("");
-
+            }
             MemoryPoolHandle local_pool = thread_context.pool();
 
 
