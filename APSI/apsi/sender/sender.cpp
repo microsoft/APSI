@@ -26,8 +26,6 @@ namespace apsi
             pool_(pool),
             total_thread_count_(total_thread_count),
             session_thread_count_(session_thread_count),
-            ex_field_(FField::Acquire(params.exfield_characteristic(), params.exfield_degree())),
-            sender_db_(params, ex_field_),
             thread_contexts_(total_thread_count_),
             stopped_(false)
         {
@@ -52,21 +50,27 @@ namespace apsi
             vector<shared_ptr<FField> > field_vec;
             if (seal_context_->qualifiers().enable_batching)
             {
+                auto ex_field = FField::Acquire(
+                    params_.exfield_characteristic(),
+                    params_.exfield_degree());
                 builder_.reset(new PolyCRTBuilder(*seal_context_));
                 for (unsigned i = 0; i < builder_->slot_count(); i++)
                 {
-                    field_vec.emplace_back(ex_field_);
+                    field_vec.emplace_back(ex_field);
                 }
             }
             else
             {
                 ex_builder_.reset(new FFieldFastCRTBuilder(
-                    ex_field_->ch(),
-                    ex_field_->d(),
+                    params_.exfield_characteristic(),
+                    params_.exfield_degree(),
                     get_power_of_two(params_.encryption_params().poly_modulus().coeff_count() - 1)
                 ));
                 field_vec = ex_builder_->fields();
             }
+
+            // Create SenderDB
+            sender_db_.reset(new SenderDB(params_, field_vec));
 
             compressor_.reset(new CiphertextCompressor(params_.encryption_params()));
 
@@ -114,7 +118,7 @@ namespace apsi
 
         void Sender::load_db(const vector<Item> &data, oc::MatrixView<u8> vals)
         {
-            sender_db_.set_data(data, vals, total_thread_count_);
+            sender_db_->set_data(data, vals, total_thread_count_);
             stop_watch.set_time_point("Sender set-data");
 
             // Compute symmetric polys and batch
@@ -134,13 +138,13 @@ namespace apsi
                     setThreadName("sender_offline_" + std::to_string(i));
                     int thread_context_idx = acquire_thread_context();
                     SenderThreadContext &context = thread_contexts_[thread_context_idx];
-                    sender_db_.batched_randomized_symmetric_polys(context, evaluator_, builder_, ex_builder_, total_thread_count_);
+                    sender_db_->batched_randomized_symmetric_polys(context, evaluator_, builder_, ex_builder_, total_thread_count_);
 
                     if (i == 0)
                         stop_watch.set_time_point("symmpoly_done");
                     if (params_.get_label_bit_count())
                     {
-                        sender_db_.batched_interpolate_polys(context, total_thread_count_, evaluator_, builder_, ex_builder_);
+                        sender_db_->batched_interpolate_polys(context, total_thread_count_, evaluator_, builder_, ex_builder_);
 
                         if (i == 0)
                             stop_watch.set_time_point("interpolation_done");
@@ -186,7 +190,7 @@ namespace apsi
             FFieldArray* ptr = nullptr;
             if (params_.debug())
             {
-                ptr = new FFieldArray(ex_field_, params_.table_size());
+                ptr = new FFieldArray(ex_field_);
                 receive_ffield_array(*ptr, chl);
             }
             /* Set up and receive keys. */
@@ -409,7 +413,7 @@ namespace apsi
                     {
                         int batch = block_idx / params_.split_count(),
                             split = block_idx % params_.split_count();
-                        auto& block = sender_db_.get_block(batch, split);
+                        auto& block = sender_db_->get_block(batch, split);
 
                         // Get the pointer to the first poly of this batch.
                         //Plaintext* sender_coeffs(&sender_db_.batch_random_symm_polys()[split * splitStep + batch * split_size_plus_one]);

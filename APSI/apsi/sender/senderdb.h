@@ -113,7 +113,7 @@ namespace apsi
                 SenderThreadContext &context,
                 oc::MatrixView<_ffield_array_elt_t> symm_block,
                 int encoding_bit_length,
-                FFieldElt& neg_null_element);
+                const FFieldArray &neg_null_element);
 
             /**
             Computes the randomized symmetric polynomials for the specified split and the specified batch in sender's database. Basically, it
@@ -126,7 +126,7 @@ namespace apsi
                 SenderThreadContext &context,
                 oc::MatrixView<_ffield_array_elt_t> symm_block,
                 int encoding_bit_length,
-                FFieldElt& neg_null_element);
+                FFieldArray &neg_null_element);
 
             Position try_aquire_position(int cuckoo_loc, oc::PRNG& prng);
 
@@ -194,7 +194,7 @@ namespace apsi
         class SenderDB
         {
         public:
-            SenderDB(const PSIParams &params, std::shared_ptr<FField> &ex_field);
+            SenderDB(const PSIParams &params, std::vector<std::shared_ptr<FField> > &ex_field);
 
             /**
             Clears sender's database and set all entries to sender's null item.
@@ -283,9 +283,9 @@ namespace apsi
         private:
             PSIParams params_;
             cuckoo::PermutationBasedCuckoo::Encoder encoder_;
-            std::shared_ptr<FField> global_ex_field_;
-            FFieldElt null_element_;
-            FFieldElt neg_null_element_;
+            std::vector<std::shared_ptr<FField> > ex_field_;
+            FFieldArray null_element_;
+            FFieldArray neg_null_element_;
             int encoding_bit_length_;
 
             /* 

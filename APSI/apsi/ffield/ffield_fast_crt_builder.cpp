@@ -1,5 +1,6 @@
 #include "apsi/ffield/ffield_fast_crt_builder.h"
 #include "seal/util/common.h"
+#include <iostream>
 
 using namespace std;
 using namespace seal;
@@ -125,6 +126,9 @@ namespace apsi
             nmod_poly_mul(result_tree + node, result_tree + child2, modulus_tree_ + child1);
             nmod_poly_add(result_tree + node, result_tree + node, temp_poly);
         }
+
+        // Reduce mod x^n + 1
+        nmod_poly_rem(result_tree, result_tree, modulus_tree_);
     }
 
     void FFieldFastCRTBuilder::reduce(nmod_poly_struct *result_tree, nmod_poly_struct *destination) const

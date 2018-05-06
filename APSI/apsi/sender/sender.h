@@ -90,7 +90,7 @@ namespace apsi
             */
             inline void clear_db()
             {
-                sender_db_.clear_db();
+                sender_db_->clear_db();
             }
 
             /**
@@ -125,7 +125,7 @@ namespace apsi
             */
             inline void add_data(const std::vector<Item> &data)
             {
-                sender_db_.add_data(data, total_thread_count_);
+                sender_db_->add_data(data, total_thread_count_);
             }
 
             /**
@@ -133,7 +133,7 @@ namespace apsi
             */
             inline void add_data(const Item &item)
             {
-                sender_db_.add_data(item, total_thread_count_);
+                sender_db_->add_data(item, total_thread_count_);
             }
 
             /**
@@ -174,7 +174,7 @@ namespace apsi
 
             seal::MemoryPoolHandle pool_;
 
-            std::shared_ptr<FField> ex_field_;
+            std::vector<std::shared_ptr<FField> > ex_field_;
 
             std::shared_ptr<seal::SEALContext> seal_context_;
 
@@ -188,7 +188,7 @@ namespace apsi
             std::shared_ptr<CiphertextCompressor> compressor_;
 
             /* Sender's database, including raw data, hashed data, ExField data, and symmetric polynomials. */
-            SenderDB sender_db_;
+            std::unique_ptr<SenderDB> sender_db_;
 
             /* One context for one thread, to improve preformance by using single-thread memory pool. */
             std::vector<SenderThreadContext> thread_contexts_;

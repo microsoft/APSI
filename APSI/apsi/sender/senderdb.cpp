@@ -30,12 +30,12 @@ namespace apsi
 {
     namespace sender
     {
-        SenderDB::SenderDB(const PSIParams &params, shared_ptr<FField> &ex_field) :
+        SenderDB::SenderDB(const PSIParams &params, vector<shared_ptr<FField> > &ex_field) :
             params_(params),
             encoder_(params.log_table_size(), params.hash_func_count(), params.item_bit_count()),
-            global_ex_field_(ex_field),
-            null_element_(global_ex_field_),
-            neg_null_element_(global_ex_field_),
+            ex_field_(ex_field),
+            null_element_(ex_field_),
+            neg_null_element_(ex_field_),
             //keys_(params.sender_bin_size(), params.table_size()),
             //values_(params.sender_bin_size(), params.table_size()),
             next_locs_(params.table_size(), 0),
@@ -65,7 +65,10 @@ namespace apsi
                 ? params.item_bit_count() : encoder_.encoding_bit_length_;
 
             // Create the null ExFieldElement (note: encoding truncation affects high bits)
-            null_element_ = sender_null_item_.to_exfield_element(global_ex_field_, encoding_bit_length_);
+            for(auto i = 0; i < ex_field_.size(); i++)
+            {
+                null_element_.set(i, sender_null_item_.to_exfield_element(ex_field_[i], encoding_bit_length_));
+            }
             neg_null_element_ = -null_element_;
 
             int batch_size = params_.batch_size();
@@ -434,7 +437,7 @@ namespace apsi
             SenderThreadContext &context,
             MatrixView<_ffield_array_elt_t> symm_block,
             int encoding_bit_length,
-            FFieldElt &neg_null_element)
+            const FFieldArray &neg_null_element)
         {
             int split_size = items_per_split_;
             int split_size_plus_one = split_size + 1;
@@ -448,6 +451,7 @@ namespace apsi
                 FFieldElt temp11(field_vec[pos.batch_offset]);
                 FFieldElt temp2(field_vec[pos.batch_offset]);
                 FFieldElt *temp1;
+                FFieldElt curr_neg_null_element(neg_null_element.get(pos.batch_offset));
                 auto &ctx = field_vec[pos.batch_offset]->ctx();
                 fq_nmod_one(&symm_block(pos.batch_offset, split_size), field_vec[pos.batch_offset]->ctx());
                 // symm_block.set(pos.batch_offset * split_size_plus_one + split_size, one);
@@ -458,7 +462,7 @@ namespace apsi
 
                     if (!has_item(pos))
                     {
-                        temp1 = &neg_null_element;
+                        temp1 = &curr_neg_null_element;
                     }
                     else
                     {
@@ -502,7 +506,7 @@ namespace apsi
             SenderThreadContext &context,
             MatrixView<_ffield_array_elt_t> symm_block,
             int encoding_bit_length,
-            FFieldElt &neg_null_element)
+            FFieldArray &neg_null_element)
         {
             int split_size_plus_one = items_per_split_ + 1;
             int batch_size = items_per_batch_;

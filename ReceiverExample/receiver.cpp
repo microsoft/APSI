@@ -423,7 +423,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     unsigned binning_sec_level = 40;
 
     // Length of items
-    unsigned item_bit_length = 50;
+    unsigned item_bit_length = 60;
 
     unsigned label_bit_length = cmd.isSet("useLabels") ? item_bit_length : 0;
 
@@ -452,7 +452,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 
         // Number of splits to use
         // Larger means lower depth but bigger S-->R communication
-        table_params.split_count = 8;
+        table_params.split_count = 128;
 
         // Get secure bin size
         table_params.sender_bin_size = round_up_to(get_bin_size(
@@ -463,7 +463,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 
         // Window size parameter
         // Larger means lower depth but bigger R-->S communication
-        table_params.window_size = 2;
+        table_params.window_size = 1;
     }
 
     SEALParams seal_params;
@@ -477,7 +477,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
         seal_params.exfield_params.exfield_characteristic = seal_params.encryption_params.plain_modulus().value();
         seal_params.exfield_params.exfield_degree = 8;
 
-        seal_params.decomposition_bit_count = 60;
+        seal_params.decomposition_bit_count = 20;
     }
 
     // Use OPRF to eliminate need for noise flooding for sender's security
@@ -488,7 +488,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     */
     PSIParams params(item_bit_length, table_params, cuckoo_params, seal_params, oprf_type);
     params.set_value_bit_count(label_bit_length);
-    params.enable_debug();
+    // params.enable_debug();
     params.validate();
 
     std::unique_ptr<Receiver> receiver_ptr;
