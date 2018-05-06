@@ -105,6 +105,9 @@
     <ClInclude Include="apsi\ffield\ffield_fast_crt_builder.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="apsi\Tools\sealcompress.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp">
@@ -153,6 +156,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="apsi\ffield\ffield_fast_crt_builder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\Tools\sealcompress.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

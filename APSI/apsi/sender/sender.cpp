@@ -391,9 +391,9 @@ namespace apsi
                     Ciphertext tmp(local_pool);
                     Ciphertext compressedResult(compressor_->small_parms(), local_pool);
 
-                    auto batch_start = i * batch_count / thread_pool.size();
+                    u64 batch_start = i * batch_count / thread_pool.size();
 
-                    for (auto batch = batch_start, i = 0ul; i < batch_count; ++batch, ++i)
+                    for (u64 batch = batch_start, i = 0ul; i < batch_count; ++batch, ++i)
                     {
                         compute_batch_powers(batch, powers[batch], session_context, thread_context, dag, states[batch]);
                     }
