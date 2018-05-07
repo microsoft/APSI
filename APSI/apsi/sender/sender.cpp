@@ -188,11 +188,11 @@ namespace apsi
             }
 
             FFieldArray* ptr = nullptr;
-            if (params_.debug())
-            {
-                ptr = new FFieldArray(ex_field_);
-                receive_ffield_array(*ptr, chl);
-            }
+            // if (params_.debug())
+            // {
+            //     ptr = new FFieldArray(ex_field_);
+            //     receive_ffield_array(*ptr, chl);
+            // }
             /* Set up and receive keys. */
             PublicKey pub;
             EvaluationKeys eval;
@@ -202,9 +202,14 @@ namespace apsi
 
             if (params_.debug())
             {
+                session_context.set_small_context(make_shared<SEALContext>(compressor_->small_parms()));
 
                 seal::SecretKey k;
                 receive_prvkey(k, chl);
+                session_context.set_secret_key(k);
+
+                seal::SecretKey small_k;
+                receive_prvkey(small_k, chl);
                 session_context.set_secret_key(k);
 
                 session_context.debug_plain_query_.reset(ptr);
@@ -422,82 +427,17 @@ namespace apsi
                         // Iterate over the coeffs multiplying them with the query powers  and summing the results
                         char currResult = 0, curr_label = 0;
 
-                        //#define DEBUG_SYMM_EVAL
-#ifdef DEBUG_SYMM_EVAL
-                        auto& query = *session_context.debug_plain_query_;
-                        FFieldArray plain_batch(ex_field_, params_.batch_size()), dest(ex_field_, params_.batch_size());
-                        for (int i = 0, j = plain_batch.size() * batch; i < plain_batch.size(); ++i, ++j)
-                        {
-                            auto xj = query.get(j);
-                            plain_batch.set(i, xj);
-                        }
-                        auto power = plain_batch;
-                        auto sum = block.debug_sym_block_[0];
-
-                        auto temp = powers[batch][1];
-                        evaluator_->transform_from_ntt(temp);
-                        debug_decrypt(session_context, temp, dest);
-                        if (dest != plain_batch)
-                        {
-                            std::cout << "bad query " << std::endl;
-
-                            for (int i = 0; i < plain_batch.size(); ++i)
-                            {
-                                std::cout << i << "\n   exp[" << i << "]: " << sum.get(i) << "\n   act[" << i << "]: " << dest.get(i) << std::endl;
-                            }
-                            throw std::runtime_error("");
-                        }
-
-#endif
-
                         // TODO: optimize this to allow low degree poly? need to take into account noise levels.
 
                         // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
                         // Observe that the first call to mult is always multiplying coeff[0] by 1....
                         evaluator_->multiply_plain_ntt(powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
-#ifdef DEBUG_SYMM_EVAL
-                        temp = runningResults[currResult];
-                        evaluator_->transform_from_ntt(temp);
-                        debug_decrypt(session_context, temp, dest);
-                        if (sum != dest)
-                        {
-                            std::cout << "power " << 0 << std::endl;
-
-                            for (int i = 0; i < plain_batch.size(); ++i)
-                            {
-                                std::cout << i << "\n   exp[" << i << "]: " << sum.get(i) << "\n   act[" << i << "]: " << dest.get(i) << std::endl;
-                            }
-                            throw std::runtime_error("");
-                        }
-#endif
-
 
                         for (int s = 1; s <= params_.split_size(); s++)
                         {
                             evaluator_->multiply_plain_ntt(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
                             evaluator_->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
                             currResult ^= 1;
-
-#ifdef DEBUG_SYMM_EVAL
-                            sum = sum + power * block.debug_sym_block_[s];
-
-                            temp = runningResults[currResult];
-                            evaluator_->transform_from_ntt(temp);
-                            debug_decrypt(session_context, temp, dest);
-                            if (sum != dest)
-                            {
-                                std::cout << "power " << s << std::endl;
-
-                                for (int i = 0; i < plain_batch.size(); ++i)
-                                {
-                                    std::cout << i << "\n   exp[" << i << "]: " << sum.get(i) << "\n   act[" << i << "]: " << dest.get(i) << std::endl;
-                                }
-                                throw std::runtime_error("");
-                            }
-
-                            // x^s+1 = x^s * x
-                            power = power * plain_batch;
-#endif
                         }
 
 
@@ -580,7 +520,9 @@ namespace apsi
                         // Send the result over the network if needed.
                         
                         // First compress
+                        ostreamLock(cout) << "Sender's side noise budget: " << session_context.decryptor_->invariant_noise_budget(runningResults[currResult], local_pool) << endl;
                         compressor_->mod_switch(runningResults[currResult], compressedResult);
+                        ostreamLock(cout) << "Sender's side noise budget (compressed): " << session_context.small_decryptor_->invariant_noise_budget(compressedResult, local_pool) << endl;
 
                         unique_lock<mutex> net_lock2(mtx);
                         channel.asyncSendCopy(split);
