@@ -1,14 +1,14 @@
-n =  2048 , plainMod =  12289 , log2(plainMod) =  13.5850799027671 , deg =  8 , slots =  256 , itemLength =  104
-n =  2048 , plainMod =  1073153 , log2(plainMod) =  20.0334243458898 , deg =  4 , slots =  512 , itemLength =  80
-n =  4096 , plainMod =  40961 , log2(plainMod) =  15.3219633165043 , deg =  8 , slots =  512 , itemLength =  120
-n =  4096 , plainMod =  1073153 , log2(plainMod) =  20.0334243458898 , deg =  4 , slots =  1024 , itemLength =  80
-n =  4096 , plainMod =  1099511799809 , log2(plainMod) =  40.0000002257285 , deg =  2 , slots =  2048 , itemLength =  80
-n =  8192 , plainMod =  65537 , log2(plainMod) =  16.0000220136114 , deg =  8 , slots =  1024 , itemLength =  128
-n =  8192 , plainMod =  1097729 , log2(plainMod) =  20.0660905047127 , deg =  4 , slots =  2048 , itemLength =  80
-n =  8192 , plainMod =  1099511922689 , log2(plainMod) =  40.0000003869622 , deg =  2 , slots =  4096 , itemLength =  80
-n =  16384 , plainMod =  65537 , log2(plainMod) =  16.0000220136114 , deg =  8 , slots =  2048 , itemLength =  128
-n =  16384 , plainMod =  1146881 , log2(plainMod) =  20.1292842748747 , deg =  4 , slots =  4096 , itemLength =  80
-n =  16384 , plainMod =  1099511922689 , log2(plainMod) =  40.0000003869622 , deg =  2 , slots =  8192 , itemLength =  80
+n=2048 plainMod=12289 log2(plainMod)=13.5850799027671 deg=8 slots=256 itemLength=104
+n=2048 plainMod=1073153 log2(plainMod)=20.0334243458898 deg=4 slots=512 itemLength=80
+n=4096 plainMod=40961 log2(plainMod)=15.3219633165043 deg=8 slots=512 itemLength=120
+n=4096 plainMod=1073153 log2(plainMod)=20.0334243458898 deg=4 slots=1024 itemLength=80
+n=4096 plainMod=1099511799809 log2(plainMod)=40.0000002257285 deg=2 slots=2048 itemLength=80
+n=8192 plainMod=65537 log2(plainMod)=16.0000220136114 deg=8 slots=1024 itemLength=128
+n=8192 plainMod=1097729 log2(plainMod)=20.0660905047127 deg=4 slots=2048 itemLength=80
+n=8192 plainMod=1099511922689 log2(plainMod)=40.0000003869622 deg=2 slots=4096 itemLength=80
+n=16384 plainMod=65537 log2(plainMod)=16.0000220136114 deg=8 slots=2048 itemLength=128
+n=16384 plainMod=1146881 log2(plainMod)=20.1292842748747 deg=4 slots=4096 itemLength=80
+n=16384 plainMod=1099511922689 log2(plainMod)=40.0000003869622 deg=2 slots=8192 itemLength=80
 
 
 
