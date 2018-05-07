@@ -187,6 +187,7 @@ namespace apsi
                     SHA1 sha(sizeof(block));
                     sha.Update(iter, step);
                     sha.Final((oc::block&)items[i]);
+                    send_prvkey(small_secret_key_, channel);
 
                     iter += step;
                 }
@@ -536,9 +537,9 @@ namespace apsi
                     if (first && t == 0)
                     {
                         first = false;
+                        cout << "Noise budget: " << small_decryptor_->invariant_noise_budget(tmp, local_pool) << " bits" << endl;
                         recv_stop_watch.set_time_point("receiver recv-start");
                     }
-                    cout << "Noise budget: " << small_decryptor_->invariant_noise_budget(tmp, local_pool) << " bits" << endl;
 
                     small_decryptor_->decrypt(tmp, p, local_pool);
 

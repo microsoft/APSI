@@ -210,7 +210,7 @@ namespace apsi
 
                 seal::SecretKey small_k;
                 receive_prvkey(small_k, chl);
-                session_context.set_secret_key(k);
+                session_context.set_small_secret_key(small_k);
 
                 session_context.debug_plain_query_.reset(ptr);
             }
@@ -225,7 +225,7 @@ namespace apsi
             {
                 powers[i].reserve(split_size_plus_one);
                 for (u64 j = 0; j < split_size_plus_one; ++j)
-                    powers[i].emplace_back();
+                    powers[i].emplace_back(params_.encryption_params(), pool_);
 
             }
             while (num_of_powers-- > 0)
@@ -380,6 +380,9 @@ namespace apsi
             for (u64 i = 0; i < batch_count; ++i)
                 states.emplace_back(dag);
 
+            atomic<int> remaining_batches(session_thread_count_);
+            promise<void> batches_done_prom;
+            auto batches_done_fut = batches_done_prom.get_future().share();
 
             mutex mtx;
             vector<thread> thread_pool(session_thread_count_);
@@ -397,13 +400,23 @@ namespace apsi
                     Ciphertext compressedResult(compressor_->small_parms(), local_pool);
 
                     u64 batch_start = i * batch_count / thread_pool.size();
+                    auto thread_idx = std::this_thread::get_id();
 
-                    for (u64 batch = batch_start, i = 0ul; i < batch_count; ++i)
+                    for (u64 batch = batch_start, loop_idx = 0ul; loop_idx < batch_count; ++loop_idx)
                     {
                         compute_batch_powers(batch, powers[batch], session_context, thread_context, dag, states[batch]);
                         batch = (batch + 1) % batch_count;
                     }
 
+                    auto count = remaining_batches--;
+                    if(count == 1)
+                    {
+                        batches_done_prom.set_value();
+                    }
+                    else
+                    {
+                        batches_done_fut.get();
+                    }
 
                     int start_block = i * total_blocks / total_thread_count_;
                     int end_block = (i + 1) * total_blocks / total_thread_count_;
@@ -520,9 +533,7 @@ namespace apsi
                         // Send the result over the network if needed.
                         
                         // First compress
-                        ostreamLock(cout) << "Sender's side noise budget: " << session_context.decryptor_->invariant_noise_budget(runningResults[currResult], local_pool) << endl;
                         compressor_->mod_switch(runningResults[currResult], compressedResult);
-                        ostreamLock(cout) << "Sender's side noise budget (compressed): " << session_context.small_decryptor_->invariant_noise_budget(compressedResult, local_pool) << endl;
 
                         unique_lock<mutex> net_lock2(mtx);
                         channel.asyncSendCopy(split);
@@ -571,8 +582,8 @@ namespace apsi
                 std::cout << batch_powers.size() << " != " << params_.split_size() + 1 << std::endl;
                 throw std::runtime_error("");
             }
-            MemoryPoolHandle local_pool = thread_context.pool();
 
+            MemoryPoolHandle local_pool = thread_context.pool();
 
             int idx = (*state.next_node_)++;
             while (idx < dag.nodes_.size())
@@ -597,7 +608,7 @@ namespace apsi
 
 
                 evaluator_->multiply(batch_powers[node.inputs_[0]], batch_powers[node.inputs_[1]], batch_powers[node.output_], local_pool);
-                evaluator_->relinearize(batch_powers[node.output_], session_context.evaluation_keys_, batch_powers[node.output_], local_pool);
+                evaluator_->relinearize(batch_powers[node.output_], session_context.evaluation_keys_, local_pool);
 
                 // a simple write should be sufficient but lets be safe
                 exp = WindowingDag::NodeState::Pending;
@@ -611,8 +622,7 @@ namespace apsi
 
             //// splin lock until all nodes are compute. We may want to do something smarter here.
             for (u64 i = 0; i < state.nodes_.size(); ++i)
-                while (state.nodes_[i] != WindowingDag::NodeState::Done);// , std::memory_order::memory_order_acquire);
-
+                while (state.nodes_[i] != WindowingDag::NodeState::Done);
 
             //for (int i = 1; i <= params_.split_size(); i++)
             //{
@@ -683,7 +693,6 @@ namespace apsi
             //{
                 //ostreamLock(std::cout) << "transform[" << i << "] " << batch_powers[i].hash_block()[0] << std::endl;
                 evaluator_->transform_to_ntt(batch_powers[i]);
-
                 idx = (*state.next_node_)++;
             }
         }
