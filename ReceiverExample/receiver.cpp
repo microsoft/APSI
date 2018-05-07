@@ -479,7 +479,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
         seal_params.encryption_params.set_coeff_modulus(
             coeff_modulus_128(seal_params.encryption_params.poly_modulus().coeff_count() - 1));
         cmd.setDefault("plainModulus", 0x13ff);
-        seal_params.encryption_params.set_plain_modulus(cmd.get<int>("plainModulus"));
+        seal_params.encryption_params.set_plain_modulus(cmd.get<uint64_t>("plainModulus"));
 
         // This must be equal to plain_modulus
         seal_params.exfield_params.exfield_characteristic = seal_params.encryption_params.plain_modulus().value();

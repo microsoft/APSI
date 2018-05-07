@@ -4,6 +4,7 @@ n=4096 plainMod=5119 log2(plainMod)=12.3216462909914 deg=8 slots=512 log2(fieldS
 n=4096 plainMod=1054721 log2(plainMod)=20.0084299899164 deg=4 slots=1024 log2(fieldSize)=80.0337199596656
 n=8192 plainMod=6143 log2(plainMod)=12.5847276679639 deg=8 slots=1024 log2(fieldSize)=100.677821343711
 n=8192 plainMod=1093633 log2(plainMod)=20.0334243458898 deg=4 slots=2048 log2(fieldSize)=80.1336973835590
+n=8192 plainMod=1099511660543 log2(plainMod)=40.0 deg=2 slots=4096 log2(fieldSize)=80.0
 n=16384 plainMod=12289 log2(plainMod)=12.9998238790157 deg=8 slots=2048 log2(fieldSize)=103.998591032126
 n=16384 plainMod=1073153 log2(plainMod)=20.0334243458898 deg=4 slots=4096 log2(fieldSize)=80.1336973835590
 

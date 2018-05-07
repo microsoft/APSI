@@ -139,7 +139,7 @@ namespace apsi
             throw invalid_argument("invalid split_length, or index out of range");
         }
 #endif
-        int mask = (1 << split_length) - 1;
+        uint64_t mask = (1ULL << split_length) - 1;
         if ((i1 == i2) || (i2 == value_.size()))
         {
             return (value_[i1] >> j1) & mask;
