@@ -228,23 +228,27 @@ namespace apsi
 
         inline FFieldElt frob(unsigned e = 1) const
         {
-            // // Slow Frobenius
-            // FFieldElt result(field_);
-            // fq_nmod_frobenius(result.elt_, elt_, e, field_->ctx_);
-            // return result;
-
-            // Fast lookup approach
             FFieldElt result(field_);
-            if (e == 0)
+
+            if(field_->frob_populated_)
             {
-                fq_nmod_set(result.elt_, elt_, field_->ctx_);
-                return result;
+                // Fast lookup approach
+                if (e == 0)
+                {
+                    fq_nmod_set(result.elt_, elt_, field_->ctx_);
+                    return result;
+                }
+                FFieldElt temp(field_);
+                for (unsigned i = 0; i < elt_->length; i++)
+                {
+                    fq_nmod_mul_ui(temp.elt_, &field_->frob_table_(e, i), elt_->coeffs[i], field_->ctx_);
+                    result += temp;
+                }
             }
-            FFieldElt temp(field_);
-            for (unsigned i = 0; i < elt_->length; i++)
+            else
             {
-                fq_nmod_mul_ui(temp.elt_, &field_->frob_table_(e, i), elt_->coeffs[i], field_->ctx_);
-                result += temp;
+                // Slow Frobenius
+                fq_nmod_frobenius(result.elt_, elt_, e, field_->ctx_);
             }
             return result;
         }

@@ -36,3 +36,5 @@ Command line options:
 -plainModulus (5119)
 -exfieldDegree (default 8)
 -dbc (default 30)
+-coeffModulus (default empty, otherwise list of 60,50,40,30)
+-trec (default 1, receiver's threading)

@@ -503,8 +503,9 @@ namespace apsi
 
             auto routine = [&](int t)
             {
-                Plaintext p(pool_);
-                Ciphertext tmp(small_parms_, pool_);
+                MemoryPoolHandle local_pool(MemoryPoolHandle::New(false));
+                Plaintext p(local_pool);
+                Ciphertext tmp(small_parms_, local_pool);
                 const bool short_strings = !!polycrtbuilder_;
                 unique_ptr<FFieldArray> batch;
                 if (!short_strings)
@@ -534,15 +535,15 @@ namespace apsi
                     if (first && t == 0)
                     {
                         first = false;
-                        cout << "Noise budget: " << small_decryptor_->invariant_noise_budget(tmp) << " bits" << endl;
                         recv_stop_watch.set_time_point("receiver recv-start");
                     }
+                    cout << "Noise budget: " << small_decryptor_->invariant_noise_budget(tmp, local_pool) << " bits" << endl;
 
-                    small_decryptor_->decrypt(tmp, p);
+                    small_decryptor_->decrypt(tmp, p, local_pool);
 
                     //vector<uint64_t> integer_batch(batch_size);
                     if (short_strings)
-                        polycrtbuilder_->decompose(p, integer_batch, pool_);
+                        polycrtbuilder_->decompose(p, integer_batch, local_pool);
                     else
                         exbuilder_->decompose(p, *batch);
 
@@ -584,12 +585,12 @@ namespace apsi
                         // tmp.load(ss);
                         compressor_->compressed_load(ss, tmp);
 
-                        small_decryptor_->decrypt(tmp, p);
+                        small_decryptor_->decrypt(tmp, p, local_pool);
 
 
 
                         if (short_strings)
-                            polycrtbuilder_->decompose(p, integer_batch, pool_);
+                            polycrtbuilder_->decompose(p, integer_batch, local_pool);
                         else
                         {
                             // make sure its the right size. decrypt will shorted when there are zero coeffs at the top.

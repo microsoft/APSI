@@ -129,7 +129,10 @@ namespace apsi
         ~FField()
         {
             fmpz_clear(ch_);
-            _fq_nmod_vec_clear(frob_table_backing_, d_ * d_, ctx_);
+            if(frob_populated_)
+            {
+                _fq_nmod_vec_clear(frob_table_backing_, d_ * d_, ctx_);
+            }
 
             // Last thing to clear up is the context
             fq_nmod_ctx_clear(ctx_);
@@ -162,7 +165,11 @@ namespace apsi
 
         inline seal::BigPoly field_poly() const
         {
-            return modulus_;
+            seal::BigPoly result;
+
+            // Set the bigpoly
+            nmod_poly_to_bigpoly(ctx_->modulus, result);
+            return result;
         }
 
         inline unsigned d() const
@@ -196,6 +203,11 @@ namespace apsi
             return ctx_;
         }
 
+        inline bool fast_frob_enabled() const
+        {
+            return frob_populated_;
+        }
+
     private:
         explicit FField(std::uint64_t ch, unsigned d); 
         explicit FField(std::uint64_t ch, const _ffield_modulus_t modulus); 
@@ -206,7 +218,7 @@ namespace apsi
 
         unsigned d_;
         _ch_t ch_;
-        seal::BigPoly modulus_;
+        bool frob_populated_;
         _ffield_array_t frob_table_backing_;
         oc::MatrixView<_ffield_array_elt_t> frob_table_;
         _ffield_ctx_t ctx_;

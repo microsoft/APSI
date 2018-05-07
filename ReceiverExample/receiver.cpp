@@ -90,13 +90,6 @@ std::pair<vector<Item>, vector<int>> randSubset(const vector<Item>& items, int s
 
 
 int main(int argc, char *argv[]){
-    auto b = 4096;
-    auto n = 1*(1 << 20);
-   auto s = apsi::get_bin_size(b, n, 40);
-   std::cout << s << " " << n / b << " " << std::endl;
-
-
-
     CLP cmd(argc, argv);
 
     // Thread count
@@ -476,8 +469,46 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     {
         cmd.setDefault("polyModulus", 4096);
         seal_params.encryption_params.set_poly_modulus("1x^" + to_string(cmd.get<int>("polyModulus")) + " + 1");
-        seal_params.encryption_params.set_coeff_modulus(
-            coeff_modulus_128(seal_params.encryption_params.poly_modulus().coeff_count() - 1));
+        
+        vector<SmallModulus> coeff_modulus;
+        if(!cmd.isSet("coeffModulus"))
+        {
+            coeff_modulus = coeff_modulus_128(seal_params.encryption_params.poly_modulus().coeff_count() - 1);
+        }
+        else
+        {
+            auto coeff_mod_bit_vector = cmd.getMany<uint64_t>("coeffModulus");
+            unordered_map<int, size_t> mods_added;
+            for(auto bit_size : coeff_mod_bit_vector)
+            {
+                switch(bit_size)
+                {
+                    case 30:
+                        coeff_modulus.emplace_back(small_mods_30bit(mods_added[bit_size]));
+                        mods_added[bit_size]++;
+                        break;
+                
+                    case 40:
+                        coeff_modulus.emplace_back(small_mods_40bit(mods_added[bit_size]));
+                        mods_added[bit_size]++;
+                        break;
+                
+                    case 50:
+                        coeff_modulus.emplace_back(small_mods_50bit(mods_added[bit_size]));
+                        mods_added[bit_size]++;
+                        break;
+                
+                    case 60:
+                        coeff_modulus.emplace_back(small_mods_60bit(mods_added[bit_size]));
+                        mods_added[bit_size]++;
+                        break;
+
+                    default:
+                        throw invalid_argument("invalid coeff modulus bit count");
+                }
+            }
+        }
+        seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
         cmd.setDefault("plainModulus", 0x13ff);
         seal_params.encryption_params.set_plain_modulus(cmd.get<uint64_t>("plainModulus"));
 
@@ -502,7 +533,11 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     params.validate();
 
     std::unique_ptr<Receiver> receiver_ptr;
-    auto f = std::async([&]() {receiver_ptr.reset(new Receiver(params, numThreads, MemoryPoolHandle::New(true))); });
+
+    cmd.setDefault("trec", 1);
+    int recThreads = cmd.get<int>("trec");
+
+    auto f = std::async([&]() {receiver_ptr.reset(new Receiver(params, recThreads, MemoryPoolHandle::New(true))); });
     Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New(true));
     f.get();
     Receiver& receiver = *receiver_ptr;

@@ -14,18 +14,9 @@ namespace apsi
     {
         fmpz_init_set_ui(ch_, ch);
         fq_nmod_ctx_init(ctx_, ch_, d_, field_elt_var);
-
-        // Set the bigpoly
-        nmod_poly_to_bigpoly(ctx_->modulus, modulus_);
-
-        // Pre-compute action of Frobenius on monomials for quick evaluation 
-        frob_table_backing_ = _fq_nmod_vec_init(d_ * d_, ctx_);
-        frob_table_ = MatrixView<_ffield_array_elt_t>(frob_table_backing_, d_, d_);
-        populate_frob_table();
     }
 
-    FField::FField(uint64_t ch, BigPoly modulus) :
-        modulus_(modulus) 
+    FField::FField(uint64_t ch, BigPoly modulus) 
     {
         // We only support word-size coefficients
         if(modulus.coeff_uint64_count() > 1)
@@ -100,11 +91,6 @@ namespace apsi
 
         // Set the degree
         d_ = fq_nmod_ctx_degree(ctx_);
-
-        // Pre-compute action of Frobenius on monomials for quick evaluation 
-        frob_table_backing_ = _fq_nmod_vec_init(d_ * d_, ctx_);
-        frob_table_ = MatrixView<_ffield_array_elt_t>(frob_table_backing_, d_, d_);
-        populate_frob_table();
     }
 
     FField::FField(uint64_t ch, string modulus) :
@@ -126,6 +112,15 @@ namespace apsi
 
     void FField::populate_frob_table()
     {
+        if(frob_populated_)
+        {
+            return;
+        }
+
+        // Pre-compute action of Frobenius on monomials for quick evaluation 
+        frob_table_backing_ = _fq_nmod_vec_init(d_ * d_, ctx_);
+        frob_table_ = MatrixView<_ffield_array_elt_t>(frob_table_backing_, d_, d_);
+
         _ffield_elt_t power_of_x;
         fq_nmod_init(power_of_x, ctx_);
         for(unsigned col = 0; col < d_; col++)
@@ -143,5 +138,7 @@ namespace apsi
 
         // Clear up locals
         fq_nmod_clear(power_of_x, ctx_);
+
+        frob_populated_ = true;
     }
 }
