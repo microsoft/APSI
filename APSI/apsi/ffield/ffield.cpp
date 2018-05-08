@@ -1,4 +1,5 @@
 #include <stdexcept>
+#include <memory>
 #include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_elt.h"
 #include "cryptoTools/Crypto/PRNG.h"
@@ -10,13 +11,16 @@ using namespace oc;
 namespace apsi
 {
     FField::FField(uint64_t ch, unsigned d) : 
-        d_(d) 
+        d_(d), ch_(ch) 
     {
-        fmpz_init_set_ui(ch_, ch);
-        fq_nmod_ctx_init(ctx_, ch_, d_, field_elt_var);
+        fmpz_t flint_ch;
+        fmpz_init_set_ui(flint_ch, ch);
+        fq_nmod_ctx_init(ctx_, flint_ch, d_, field_elt_var);
+        fmpz_clear(flint_ch);
     }
 
-    FField::FField(uint64_t ch, BigPoly modulus) 
+    FField::FField(uint64_t ch, BigPoly modulus) :
+        ch_(ch)
     {
         // We only support word-size coefficients
         if(modulus.coeff_uint64_count() > 1)
@@ -29,7 +33,6 @@ namespace apsi
         {
             throw invalid_argument("ch is not prime");
         }
-        fmpz_init_set_ui(ch_, ch);
 
         // Create the modulus
         _ffield_modulus_t flint_modulus;
@@ -65,14 +68,14 @@ namespace apsi
         nmod_poly_clear(flint_modulus);
     }
 
-    FField::FField(uint64_t ch, const _ffield_modulus_t modulus) 
+    FField::FField(uint64_t ch, const _ffield_modulus_t modulus) :
+       ch_(ch) 
     {
         // Check that we have a prime modulus
         if(!n_is_probabprime(ch))
         {
             throw invalid_argument("ch is not prime");
         }
-        fmpz_init_set_ui(ch_, ch);
        
         // Check that modulus is monic
         if(nmod_poly_get_coeff_ui(modulus, modulus->length - 1) != 1ULL)

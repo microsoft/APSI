@@ -25,7 +25,7 @@ static_assert(std::is_same<mp_limb_t, std::uint64_t>::value, "mp_limb_t != std::
 
 namespace apsi
 {
-    using _ch_t = fmpz_t;
+    using _ch_t = mp_limb_t;
     using _bigint_t = fmpz_t;
     using _ffield_modulus_t = nmod_poly_t;
     using _ffield_ctx_t = fq_nmod_ctx_t;
@@ -128,7 +128,6 @@ namespace apsi
 
         ~FField()
         {
-            fmpz_clear(ch_);
             if(frob_populated_)
             {
                 _fq_nmod_vec_clear(frob_table_backing_, d_ * d_, ctx_);
@@ -160,7 +159,7 @@ namespace apsi
 
         inline std::uint64_t ch() const
         {
-            return fmpz_get_ui(ch_);
+            return ch_;
         }
 
         inline seal::BigPoly field_poly() const
@@ -180,7 +179,7 @@ namespace apsi
         inline bool operator ==(const FField &compare) const
         {
             return (this == &compare) || 
-                (fmpz_equal(ch_, compare.ch_) &&
+                ((ch_ == compare.ch_) &&
                  nmod_poly_equal(ctx_->modulus, compare.ctx_->modulus));
         }
 
