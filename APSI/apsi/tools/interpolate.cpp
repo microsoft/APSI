@@ -36,24 +36,24 @@ namespace apsi
         // The fields should all be the same
         auto field = points.field(0);
         //auto field = FField::Acquire(points.field(0)->ch(), points.field(0)->d());
-        vector<FFieldArray> divided_differences;
-        for(size_t i = 0; i < points.size(); i++)
-        {
-            divided_differences.emplace_back(field, points.size());
-        }
+        //vector<FFieldArray> divided_differences;
+        //for(size_t i = 0; i < points.size(); i++)
+        //{
+        //    divided_differences.emplace_back(field, points.size() - i);
+        //}
         
         FFieldElt numerator(field);
         FFieldElt denominator(field);
 
-        //vector<FFieldArray> divided_differences;
-        //divided_differences.reserve(size);
+        vector<FFieldArray> divided_differences;
+        divided_differences.reserve(size);
         for (size_t i = 0; i < size; i++)
         {
+            divided_differences.emplace_back(field, size - i);
 #ifndef NDEBUG
             if (divided_differences[i].size() != size - i)
                 throw std::runtime_error("");
 #endif
-            //divided_differences.emplace_back(field, size - i);
             divided_differences[i].set(0, i, values);
         }
 

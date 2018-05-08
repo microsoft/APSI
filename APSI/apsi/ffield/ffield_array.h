@@ -65,6 +65,8 @@ namespace apsi
             {
                 fq_nmod_clear(array_ + i, fields_[i]->ctx_);
             }
+
+            delete[] array_;
             array_ = nullptr;
 
             fields_.clear();
