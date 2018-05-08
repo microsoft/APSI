@@ -532,6 +532,12 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     // params.enable_debug();
     params.validate();
 
+    // Check that number of blocks is not smaller than thread count
+    if(numThreads > params.split_count() * params.batch_count())
+    {
+        cout << "WARNING: Using too many threads for block count!" << endl;
+    }
+
     std::unique_ptr<Receiver> receiver_ptr;
 
     cmd.setDefault("trec", 1);
