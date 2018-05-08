@@ -586,9 +586,8 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     for (int i = 0; i < (recversActualSize - intersectionSize); ++i)
         c1.emplace_back(i + s1.size());
 
-    stop_watch.set_time_point("Application preparation");
+    stop_watch.set_time_point("Application preparation done");
     sender.load_db(s1, labels);
-    stop_watch.set_time_point("Sender pre-processing");
 
     auto thrd = thread([&]() {
         setThreadName("sender_main");
