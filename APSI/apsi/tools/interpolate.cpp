@@ -39,6 +39,9 @@ namespace apsi
         vector<FFieldArray>& divided_differences,
         FFieldArray& result)
     {
+        cout << "Divided diff size: " << divided_differences.size() << endl;
+        cout << "points size: " << points.size() << endl;
+
         //std::lock_guard<std::mutex> lock(mtx);
 
 #ifndef NDEBUG
