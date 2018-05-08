@@ -456,9 +456,11 @@ namespace apsi
 
                         if (params_.get_label_bit_count())
                         {
-
                             if (block.batched_label_coeffs_.size() > 1)
                             {
+                                if (i == 0)
+                                    stop_watch.set_time_point("online interpolate start");
+
                                 // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
                                 // Observe that the first call to mult is always multiplying coeff[0] by 1....
 
@@ -499,6 +501,8 @@ namespace apsi
                                 //// label_result += coeff[0];
                                 //evaluator_->add_plain(label_results[curr_label], block.batched_label_coeffs_[0], label_results[curr_label ^ 1]);
                                 //curr_label ^= 1;
+                                if (i == 0)
+                                    stop_watch.set_time_point("online interpolate done");
                             }
                             else if (block.batched_label_coeffs_.size())
                             {
