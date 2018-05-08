@@ -691,11 +691,11 @@ namespace apsi
             coeff_temp.reserve(items_per_batch_);
             x_temp.reserve(items_per_batch_);
             y_temp.reserve(items_per_batch_);
-            div_diff_temp.resize(items_per_batch_);
+            // div_diff_temp.resize(items_per_batch_);
 
             for (u64 i = 0; i < items_per_batch_; ++i)
             {
-                div_diff_temp[i] = get_div_diff_temp(ex_builder->field(i), items_per_split_);
+                // div_diff_temp[i] = get_div_diff_temp(ex_builder->field(i), items_per_split_);
                 coeff_temp.emplace_back(ex_builder->field(i), items_per_split_);
                 x_temp.emplace_back(ex_builder->field(i), items_per_split_);
                 y_temp.emplace_back(ex_builder->field(i), items_per_split_);
@@ -871,7 +871,8 @@ namespace apsi
 
                     ffield_newton_interpolate_poly(
                         x, y,
-                        cache.div_diff_temp[pos.batch_offset],
+                        // We don't use the cache for divided differences.
+                        // cache.div_diff_temp[pos.batch_offset],
                         cache.coeff_temp[pos.batch_offset]);
 
                     //test_interp_poly(x, y, 

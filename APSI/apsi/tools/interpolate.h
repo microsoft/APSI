@@ -23,12 +23,7 @@ namespace apsi
         FFieldArray& result);
     void ffield_newton_interpolate_poly(
         const FFieldArray &points, const FFieldArray &values,
-        std::vector<FFieldArray>& divided_differences,
         FFieldArray& result);
-
-    void ffield_newton_interpolate_poly(
-        const FFieldArray &points, const FFieldArray &values,
-        FFieldPoly& result);
 
     void ffield_newton_interpolate_poly(
         const FFieldArray &points, 
