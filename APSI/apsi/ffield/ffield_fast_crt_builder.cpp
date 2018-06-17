@@ -185,7 +185,7 @@ namespace apsi
         // Copy result to destination
         uint64_t coeff_count = result_tree[0].length;
         destination.resize(coeff_count);
-        memcpy(destination.pointer(), result_tree->coeffs, 8 * coeff_count);
+        memcpy(destination.data(), result_tree->coeffs, 8 * coeff_count);
 
         // Clear result_tree
         for(uint64_t i = 0; i < 2 * slot_count_ - 1; i++)
@@ -218,7 +218,7 @@ namespace apsi
             throw invalid_argument("plain is not valid for encryption parameters");
         }
 #ifndef NDEBUG
-        if (static_cast<uint64_t>(plain.significant_coeff_count()) >= max_coeff_count || !are_poly_coefficients_less_than(plain.pointer(),
+        if (static_cast<uint64_t>(plain.significant_coeff_count()) >= max_coeff_count || !are_poly_coefficients_less_than(plain.data(),
             plain_coeff_count, 1, &ch_, 1))
         {
             throw invalid_argument("plain is not valid for encryption parameters");
@@ -233,7 +233,7 @@ namespace apsi
 
         // First copy over input to result_tree[0]
         nmod_poly_realloc(result_tree, plain_coeff_count);
-        auto plain_ptr = plain.pointer();
+        auto plain_ptr = plain.data();
         for(uint64_t i = 0; i < plain_coeff_count; i++, plain_ptr++)
         {
             nmod_poly_set_coeff_ui(result_tree, i, *plain_ptr);

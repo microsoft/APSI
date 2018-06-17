@@ -276,11 +276,11 @@ void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
     params.validate();
 
     // Set up receiver
-    Receiver receiver(params, 1, MemoryPoolHandle::New(true));
+    Receiver receiver(params, 1, MemoryPoolHandle::New());
     stop_watch.set_time_point("Receiver constructor");
 
     // Set up sender
-    Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New(true));
+    Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New());
     stop_watch.set_time_point("Sender constructor");
 
     // For testing only insert a couple of elements in the sender's dataset
@@ -543,8 +543,8 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
         cout << "WARNING: Using too many threads for block count!" << endl;
     }
 
-    auto f = std::async([&]() {receiver_ptr.reset(new Receiver(params, recThreads, MemoryPoolHandle::New(true))); });
-    Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New(true));
+    auto f = std::async([&]() {receiver_ptr.reset(new Receiver(params, recThreads, MemoryPoolHandle::New())); });
+    Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New());
     f.get();
     Receiver& receiver = *receiver_ptr;
 
@@ -696,9 +696,9 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 //
 //    params.validate();
 //
-//    Receiver receiver(params, MemoryPoolHandle::New(true));
+//    Receiver receiver(params, MemoryPoolHandle::New());
 //
-//    Sender sender(params, MemoryPoolHandle::New(true));
+//    Sender sender(params, MemoryPoolHandle::New());
 //    sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
 //    sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 //    sender.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
@@ -746,9 +746,9 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 //    params.set_exfield_polymod(string("1x^16 + 3"));
 //    params.set_coeff_mod_bit_count(60);  // SEAL param: when n = 2048, q has 60 bits.
 //    params.validate();
-//    Receiver receiver(params, MemoryPoolHandle::New(true));
+//    Receiver receiver(params, MemoryPoolHandle::New());
 //
-//    Sender sender(params, MemoryPoolHandle::New(true));
+//    Sender sender(params, MemoryPoolHandle::New());
 //    sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
 //    sender.set_secret_key(receiver.secret_key());
 //    sender.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
@@ -819,8 +819,8 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 //        cout << "All bits of reduced items are used." << endl;
 //    }
 //
-//    Receiver receiver(params, MemoryPoolHandle::New(true));
-//    Sender sender(params, MemoryPoolHandle::New(true));
+//    Receiver receiver(params, MemoryPoolHandle::New());
+//    Sender sender(params, MemoryPoolHandle::New());
 //    sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
 //    sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 //
@@ -862,8 +862,8 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 //        cout << "All bits of reduced items are used." << endl;
 //    }
 //
-//    Receiver receiver(params, MemoryPoolHandle::New(true));
-//    Sender sender(params, MemoryPoolHandle::New(true));
+//    Receiver receiver(params, MemoryPoolHandle::New());
+//    Sender sender(params, MemoryPoolHandle::New());
 //    sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
 //    sender.set_secret_key(receiver.secret_key());  // This should not be used in real application. Here we use it for outputing noise budget.
 //
@@ -930,8 +930,8 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 //        cout << "All bits of reduced items are used." << endl;
 //    }
 //
-//    Receiver receiver(params, MemoryPoolHandle::New(true));
-//    Sender sender(params, MemoryPoolHandle::New(true));
+//    Receiver receiver(params, MemoryPoolHandle::New());
+//    Sender sender(params, MemoryPoolHandle::New());
 //    sender.set_keys(receiver.public_key(), receiver.evaluation_keys());
 //    sender.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
 //
@@ -965,8 +965,8 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 //        cout << "All bits of reduced items are used." << endl;
 //    }
 //
-//    Receiver receiver2(params2, MemoryPoolHandle::New(true));
-//    Sender sender2(params2, MemoryPoolHandle::New(true));
+//    Receiver receiver2(params2, MemoryPoolHandle::New());
+//    Sender sender2(params2, MemoryPoolHandle::New());
 //    sender2.set_keys(receiver2.public_key(), receiver2.evaluation_keys());
 //    sender2.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
 //
@@ -1014,7 +1014,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 //
 //    params.validate();
 //
-//    Receiver receiver(params, MemoryPoolHandle::New(true));
+//    Receiver receiver(params, MemoryPoolHandle::New());
 //
 //    vector<bool> intersection = receiver.query(vector<Item>{string("1"), string("f"), string("i"), string("c")}, "127.0.0.1", params.apsi_port());
 //    stop_watch.set_time_point("Query done");
@@ -1063,7 +1063,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 //
 //    auto receiver_connection = [&](int id)
 //    {
-//        Receiver receiver(params, MemoryPoolHandle::New(true));
+//        Receiver receiver(params, MemoryPoolHandle::New());
 //        stop_watch.set_time_point("[Receiver " + to_string(id) + "] Initialization done");
 //
 //        vector<bool> intersection = receiver.query(vector<Item>{string("1"), string("f"), string("i"), string("c")}, "127.0.0.1", params.apsi_port());

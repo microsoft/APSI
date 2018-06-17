@@ -156,7 +156,7 @@ namespace apsi
         
         // Copy result to destination
         destination.resize(ntt_ctx_.n_);
-        auto destination_ptr = destination.pointer();
+        auto destination_ptr = destination.data();
         for(uint64_t i = 0; i < ntt_ctx_.n_; i++, destination_ptr++)
         {
             // We are guaranteed that every array element is in base field
@@ -178,7 +178,7 @@ namespace apsi
         
         // Copy result to destination
         destination.resize(ntt_ctx_.n_);
-        auto destination_ptr = destination.pointer();
+        auto destination_ptr = destination.data();
         for(uint64_t i = 0; i < ntt_ctx_.n_; i++, destination_ptr++)
         {
             // We are guaranteed that every array element is in base field
@@ -200,14 +200,14 @@ namespace apsi
         }
 #ifndef NDEBUG
         auto c = field_->ch();
-        if (plain.significant_coeff_count() >= max_coeff_count || !are_poly_coefficients_less_than(plain.pointer(),
+        if (plain.significant_coeff_count() >= max_coeff_count || !are_poly_coefficients_less_than(plain.data(),
             plain_coeff_count, 1, &c, 1))
         {
             throw invalid_argument("plain is not valid for encryption parameters");
         }
 #endif
         FFieldArray expanded(field_, ntt_ctx_.n_);
-        auto plain_ptr = plain.pointer();
+        auto plain_ptr = plain.data();
         for (uint64_t i = 0; i < plain_coeff_count; i++, plain_ptr++)
         {
             fq_nmod_set_ui(expanded.array_ + i, *plain_ptr, field_->ctx_);
@@ -230,7 +230,7 @@ namespace apsi
         }
 
         FFieldArray expanded(field_, ntt_ctx_.n_);
-        auto plain_ptr = plain.pointer();
+        auto plain_ptr = plain.data();
         for(uint64_t i = 0; i < ntt_ctx_.n_; i++, plain_ptr++)
         {
             fq_nmod_set_ui(expanded.array_ + i, *plain_ptr, field_->ctx_);

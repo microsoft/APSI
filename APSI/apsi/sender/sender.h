@@ -19,11 +19,13 @@
 #include "apsi/tools/sealcompress.h"
 
 // SEAL
+#include "seal/bigpoly.h"
 #include "seal/memorypoolhandle.h"
 #include "seal/encryptionparams.h"
 #include "seal/ciphertext.h"
 #include "seal/context.h"
 #include "seal/polycrt.h"
+#include "seal/evaluator.h"
 
 // CryptoTools
 #include "cryptoTools/Network/IOService.h"

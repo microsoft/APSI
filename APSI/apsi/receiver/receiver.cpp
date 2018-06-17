@@ -505,7 +505,7 @@ namespace apsi
 
             auto routine = [&](int t)
             {
-                MemoryPoolHandle local_pool(MemoryPoolHandle::New(false));
+                MemoryPoolHandle local_pool(MemoryPoolHandle::New());
                 Plaintext p(local_pool);
                 Ciphertext tmp(small_parms_, local_pool);
                 const bool short_strings = !!polycrtbuilder_;

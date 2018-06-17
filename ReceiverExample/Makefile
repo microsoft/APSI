@@ -1,5 +1,5 @@
 CXX = g++
-CFLAGS = -g -Ofast -march=native -std=c++14  -maes -msse2 -msse4.1 -mpclmul -DNDEBUG
+CFLAGS = -g -Ofast -march=native -std=c++17  -maes -msse2 -msse4.1 -mpclmul -DNDEBUG
 
 SRCS = receiver.cpp $(wildcard tests/*.cpp)
 INCLUDES = -I. -I../APSI -I../../SEAL-dev/SEAL -I../../Cuckoo/Cuckoo -I../../cryptoTools -I../../cryptoTools/thirdparty/linux/miracl -I/usr/include/flint

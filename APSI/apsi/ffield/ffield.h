@@ -51,7 +51,7 @@ namespace apsi
         auto coeff_count = in->length;
         auto coeff_bit_count = n_sizeinbase(in->mod.n, 2);
         out.resize(coeff_count, coeff_bit_count);
-        auto *poly_ptr = out.pointer();
+        auto *poly_ptr = out.data();
         for(unsigned i = 0; i < coeff_count; i++, poly_ptr++)
         {
             *poly_ptr = nmod_poly_get_coeff_ui(in, i);
@@ -62,7 +62,7 @@ namespace apsi
     {
         nmod_poly_zero(out);
         unsigned coeff_count = in.coeff_count();
-        auto *poly_ptr = in.pointer();
+        auto *poly_ptr = in.data();
         for(unsigned i = 0; i < coeff_count; i++, poly_ptr++)
         {
             nmod_poly_set_coeff_ui(out, i, *poly_ptr);
@@ -81,7 +81,7 @@ namespace apsi
         fmpz_mul2_uiui(word_size, word_size, 1ULL << 32, 1ULL << 32);
         fmpz_t lw;
         fmpz_init(lw);
-        auto out_ptr = out.pointer();
+        auto out_ptr = out.data();
         while(!fmpz_is_zero(in_copy))
         {
             fmpz_mod(lw, in_copy, word_size);
@@ -102,8 +102,8 @@ namespace apsi
             fmpz_zero(out);
             return;
         }
-        fmpz_set_ui(out, *in.pointer());
-        auto *word_ptr = in.pointer() + 1;
+        fmpz_set_ui(out, *in.data());
+        auto *word_ptr = in.data() + 1;
         for(unsigned i = 1; i < word_count; i++, word_ptr++)
         {
             fmpz_mul2_uiui(out, out, 1ULL << 32, 1ULL << 32);

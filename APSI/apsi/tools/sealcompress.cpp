@@ -100,12 +100,12 @@ namespace apsi
         for(int index = 0; index < encrypted_size; index++)
         {
             // Set destination to (c1 mod q1, c2 mod q1)
-            set_uint_uint(encrypted.pointer(index), coeff_count, destination.mutable_pointer(index));
+            set_uint_uint(encrypted.data(index), coeff_count, destination.data(index));
 
             for(int i = 1; i < coeff_mod_count; i++)
             {
                 multiply_poly_scalar_coeffmod(
-                        encrypted.pointer(index) + i * coeff_count,
+                        encrypted.data(index) + i * coeff_count,
                         coeff_count,
                         inv_coeff_mod_prod_array_[i - 1], 
                         coeff_mod_array[i], 
@@ -122,19 +122,19 @@ namespace apsi
                         coeff_mod_array[0],
                         temp.get());
                 add_poly_poly_coeffmod(
-                        destination.pointer(index),
+                        destination.data(index),
                         temp.get(),
                         coeff_count,
                         coeff_mod_array[0],
-                        destination.mutable_pointer(index));
+                        destination.data(index));
             }
 
             multiply_poly_scalar_coeffmod(
-                    destination.pointer(index),
+                    destination.data(index),
                     coeff_count,
                     inv_coeff_mod_prod_, 
                     coeff_mod_array[0], 
-                    destination.mutable_pointer(index));
+                    destination.data(index));
         }
     }
 
@@ -151,11 +151,11 @@ namespace apsi
         }
 
         // Set destination hash block and resize appropriately
-        destination.mutable_hash_block() = small_parms_.hash_block();
-        destination.mutable_data().resize(coeff_count, bits_per_uint64);
+        destination.hash_block() = small_parms_.hash_block();
+        destination.data().resize(coeff_count, bits_per_uint64);
 
         // Set destination value
-        set_uint_uint(secret_key.data().pointer(), coeff_count, destination.mutable_data().pointer());
+        set_uint_uint(secret_key.data().data(), coeff_count, destination.data().data());
     }
 
     void CiphertextCompressor::compressed_save(const seal::Ciphertext &encrypted, std::ostream &stream) const
@@ -189,7 +189,7 @@ namespace apsi
         Pointer compr_poly(allocate_zero_uint(compr_data_uint64_count, pool_));
 
         char *compr_poly_writer_head = reinterpret_cast<char*>(compr_poly.get());
-        const uint64_t *encrypted_coeff_ptr = encrypted.pointer(); 
+        const uint64_t *encrypted_coeff_ptr = encrypted.data(); 
         int encrypted_uint64_count = encrypted_size * encrypted.poly_coeff_count();
         int bit_shift = bits_per_uint64 - coeff_mod_bit_count;
         for(int i = 0; i < encrypted_uint64_count; i++, encrypted_coeff_ptr++)
@@ -247,7 +247,7 @@ namespace apsi
 
         // Finally parse and write to destination
         const char *compr_poly_reader_head = reinterpret_cast<const char*>(compr_poly.get());
-        uint64_t *destination_coeff_ptr = destination.mutable_pointer(); 
+        uint64_t *destination_coeff_ptr = destination.data(); 
         int encrypted_uint64_count = encrypted_size * destination.poly_coeff_count();
         int bit_shift = bits_per_uint64 - coeff_mod_bit_count;
         for(int i = 0; i < encrypted_uint64_count; i++, destination_coeff_ptr++)

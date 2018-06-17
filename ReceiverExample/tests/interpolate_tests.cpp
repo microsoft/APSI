@@ -15,7 +15,7 @@ std::string toString(seal::Plaintext &ptxt, int coeff_count = 0) {
     std::stringstream ss;
     ss << "(";
     for (int j = 0; j < coeff_count; j++) {
-        ss << ptxt.pointer()[j];
+        ss << ptxt.data()[j];
 
         if (j != coeff_count - 1)
             ss << ", ";

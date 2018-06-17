@@ -90,7 +90,7 @@ namespace apsi
                 auto seed = prng_.get<oc::block>();
                 thrds[i] = thread([&, i, seed]()
                 {
-                    auto local_pool = MemoryPoolHandle::New(false);
+                    auto local_pool = MemoryPoolHandle::New();
                     thread_contexts_[i].set_id(i);
                     thread_contexts_[i].set_prng(seed);
                     thread_contexts_[i].set_pool(local_pool);
@@ -366,7 +366,7 @@ namespace apsi
             int total_blocks = params_.split_count() * batch_count;
 
 
-            session_context.encryptor()->encrypt(BigPoly("1"), powers[0][0]);
+            session_context.encryptor()->encrypt(BigPoly(string("1")), powers[0][0]);
             for (u64 i = 1; i < powers.size(); ++i)
             {
                 powers[i][0] = powers[0][0];
