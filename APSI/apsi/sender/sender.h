@@ -19,7 +19,6 @@
 #include "apsi/tools/sealcompress.h"
 
 // SEAL
-#include "seal/bigpoly.h"
 #include "seal/memorypoolhandle.h"
 #include "seal/encryptionparams.h"
 #include "seal/ciphertext.h"

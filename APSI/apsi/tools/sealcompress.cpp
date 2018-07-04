@@ -31,7 +31,8 @@ namespace apsi
         coeff_mod_prod_ = 1;
         for (int i = 1; i < coeff_mod_count; i++)
         {
-            coeff_mod_prod_ = multiply_uint_uint_mod(coeff_mod_prod_, coeff_mod_array[i].value(), coeff_mod_array[0]);
+            coeff_mod_prod_ = multiply_uint_uint_mod(
+                coeff_mod_prod_, coeff_mod_array[i].value(), coeff_mod_array[0]);
         }
 
         // Compute inverse of coeff_mod_prod_
@@ -62,7 +63,8 @@ namespace apsi
             {
                 if(j != i)
                 {
-                    hatqi = multiply_uint_uint_mod(hatqi, coeff_mod_array[j].value(), coeff_mod_array[i]);
+                    hatqi = multiply_uint_uint_mod(hatqi, coeff_mod_array[j].value(), 
+                        coeff_mod_array[i]);
                 }
             }
             
@@ -83,7 +85,7 @@ namespace apsi
     {
         auto &coeff_mod_array = parms_.coeff_modulus();
         int coeff_mod_count = coeff_mod_array.size();
-        int coeff_count = parms_.poly_modulus().coeff_count();
+        int coeff_count = parms_.poly_modulus_degree();
         int encrypted_size = encrypted.size();
 
         // Verify parameters.
@@ -142,7 +144,7 @@ namespace apsi
             const SecretKey &secret_key, 
             SecretKey &destination) const
     {
-        int coeff_count = parms_.poly_modulus().coeff_count();
+        int coeff_count = parms_.poly_modulus_degree();
 
         // Verify parameters.
         if (secret_key.hash_block() != parms_.hash_block())
@@ -158,7 +160,8 @@ namespace apsi
         set_uint_uint(secret_key.data().data(), coeff_count, destination.data().data());
     }
 
-    void CiphertextCompressor::compressed_save(const seal::Ciphertext &encrypted, std::ostream &stream) const
+    void CiphertextCompressor::compressed_save(const seal::Ciphertext &encrypted, 
+        std::ostream &stream) const
     {
         int encrypted_size = encrypted.size();
         if(encrypted_size > 2)
@@ -170,8 +173,9 @@ namespace apsi
             throw invalid_argument("encrypted is not valid for encryption parameters");
         }
         
-        int coeff_count = parms_.poly_modulus().coeff_count();
-        int compr_coeff_bit_count = parms_.plain_modulus().bit_count() + get_significant_bit_count(coeff_count - 1);
+        int coeff_count = parms_.poly_modulus_degree();
+        int compr_coeff_bit_count = parms_.plain_modulus().bit_count() + 
+            get_significant_bit_count(coeff_count);
         int compr_coeff_byte_count = divide_round_up(compr_coeff_bit_count, bits_per_byte);
         int coeff_mod_bit_count = small_parms_.coeff_modulus()[0].bit_count();
         if(compr_coeff_bit_count >= coeff_mod_bit_count)
@@ -181,7 +185,8 @@ namespace apsi
         }
 
         // Write parameter hash
-        stream.write(reinterpret_cast<const char*>(&encrypted.hash_block()), sizeof(EncryptionParameters::hash_block_type));
+        stream.write(reinterpret_cast<const char*>(&encrypted.hash_block()), 
+            sizeof(EncryptionParameters::hash_block_type));
 
         // Create compressed polynomials
         int compr_data_byte_count = compr_coeff_byte_count * encrypted_size * coeff_count;
@@ -190,7 +195,7 @@ namespace apsi
 
         char *compr_poly_writer_head = reinterpret_cast<char*>(compr_poly.get());
         const uint64_t *encrypted_coeff_ptr = encrypted.data(); 
-        int encrypted_uint64_count = encrypted_size * encrypted.poly_coeff_count();
+        int encrypted_uint64_count = encrypted_size * encrypted.poly_modulus_degree();
         int bit_shift = bits_per_uint64 - coeff_mod_bit_count;
         for(int i = 0; i < encrypted_uint64_count; i++, encrypted_coeff_ptr++)
         {
@@ -205,7 +210,8 @@ namespace apsi
         stream.write(reinterpret_cast<const char*>(compr_poly.get()), compr_data_byte_count);
     }
 
-    void CiphertextCompressor::compressed_load(std::istream &stream, seal::Ciphertext &destination) const
+    void CiphertextCompressor::compressed_load(std::istream &stream, 
+        seal::Ciphertext &destination) const
     {
         int encrypted_size = destination.size();
         if(encrypted_size > 2)
@@ -217,8 +223,9 @@ namespace apsi
             throw invalid_argument("destination is not valid for encryption parameters");
         }
 
-        int coeff_count = parms_.poly_modulus().coeff_count();
-        int compr_coeff_bit_count = parms_.plain_modulus().bit_count() + get_significant_bit_count(coeff_count - 1);
+        int coeff_count = parms_.poly_modulus_degree();
+        int compr_coeff_bit_count = parms_.plain_modulus().bit_count() + 
+            get_significant_bit_count(coeff_count);
         int compr_coeff_byte_count = divide_round_up(compr_coeff_bit_count, bits_per_byte);
         int coeff_mod_bit_count = small_parms_.coeff_modulus()[0].bit_count();
         if(compr_coeff_bit_count >= coeff_mod_bit_count)
@@ -229,7 +236,8 @@ namespace apsi
 
         // Read parameter hash
         EncryptionParameters::hash_block_type hash_block;
-        stream.read(reinterpret_cast<char*>(&hash_block), sizeof(EncryptionParameters::hash_block_type));
+        stream.read(reinterpret_cast<char*>(&hash_block), 
+            sizeof(EncryptionParameters::hash_block_type));
 
         // If hash is correct then we assume sizes are all known and correct
         if(hash_block != destination.hash_block())
@@ -248,13 +256,15 @@ namespace apsi
         // Finally parse and write to destination
         const char *compr_poly_reader_head = reinterpret_cast<const char*>(compr_poly.get());
         uint64_t *destination_coeff_ptr = destination.data(); 
-        int encrypted_uint64_count = encrypted_size * destination.poly_coeff_count();
+        int encrypted_uint64_count = encrypted_size * destination.poly_modulus_degree();
         int bit_shift = bits_per_uint64 - coeff_mod_bit_count;
         for(int i = 0; i < encrypted_uint64_count; i++, destination_coeff_ptr++)
         {
             uint64_t shifted_coeff = 0;
-            memcpy(reinterpret_cast<char*>(&shifted_coeff), compr_poly_reader_head, compr_coeff_byte_count); 
-            *destination_coeff_ptr = shifted_coeff << (bits_per_byte * (bytes_per_uint64 - compr_coeff_byte_count) - bit_shift);
+            memcpy(reinterpret_cast<char*>(&shifted_coeff), compr_poly_reader_head, 
+                compr_coeff_byte_count); 
+            *destination_coeff_ptr = shifted_coeff << 
+                (bits_per_byte * (bytes_per_uint64 - compr_coeff_byte_count) - bit_shift);
             compr_poly_reader_head += compr_coeff_byte_count;
         }
     }
