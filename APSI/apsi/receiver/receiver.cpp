@@ -34,7 +34,7 @@ namespace apsi
             thread_count_(thread_count),
             pool_(pool),
             ex_field_(FField::Acquire(params.exfield_characteristic(), params.exfield_degree())),
-            slot_count_((params_.encryption_params().poly_modulus().coeff_count() - 1) / (params_.exfield_degree()))
+            slot_count_((params_.encryption_params().poly_modulus_degree() / params_.exfield_degree()))
         {
             if (thread_count_ <= 0)
             {
@@ -77,7 +77,7 @@ namespace apsi
             if (!polycrtbuilder_)
             {
                 exbuilder_.reset(new FFieldFastCRTBuilder(ex_field_->ch(), ex_field_->d(),
-                    get_power_of_two(params_.encryption_params().poly_modulus().coeff_count() - 1)));
+                    get_power_of_two(params_.encryption_params().poly_modulus_degree())));
             }
         }
 
@@ -198,7 +198,7 @@ namespace apsi
             //vector<int> indices = cuckoo_indices(items, *cuckoo);
 
             unique_ptr<FFieldArray> exfield_items;
-            unsigned padded_cuckoo_capacity = ((cuckoo->capacity() + slot_count_ - 1) / slot_count_) * slot_count_;
+            unsigned padded_cuckoo_capacity = ((cuckoo->table_size() + slot_count_ - 1) / slot_count_) * slot_count_;
             if (polycrtbuilder_)
             {
                 exfield_items.reset(new FFieldArray(ex_field_, padded_cuckoo_capacity));
@@ -263,13 +263,7 @@ namespace apsi
 
             unique_ptr<CuckooInterface> cuckoo(
                 params_.get_cuckoo_mode() == CuckooMode::Permutation ?
-                static_cast<CuckooInterface*>(new PermutationBasedCuckoo(
-                    params_.hash_func_count(),
-                    params_.hash_func_seed(),
-                    params_.log_table_size(),
-                    params_.item_bit_count(),
-                    params_.max_probe(),
-                    receiver_null_item))
+                    nullptr
                 :
                 static_cast<CuckooInterface*>(new Cuckoo(
                     params_.hash_func_count(),
@@ -310,10 +304,10 @@ namespace apsi
 
         vector<int> Receiver::cuckoo_indices(const vector<Item> &items, cuckoo::CuckooInterface &cuckoo)
         {
-            vector<int> indice(cuckoo.capacity(), -1);
+            vector<int> indice(cuckoo.table_size(), -1);
             auto& encodings = cuckoo.get_encodings();
 
-            cuckoo::PermutationBasedCuckoo::Encoder encoder(cuckoo.log_capacity(), cuckoo.loc_func_count(), params_.item_bit_count());
+            // cuckoo::PermutationBasedCuckoo::Encoder encoder(cuckoo.log_table_size(), cuckoo.loc_func_count(), params_.item_bit_count());
 
             for (int i = 0; i < items.size(); i++)
             {
@@ -322,9 +316,7 @@ namespace apsi
 
                 if (params_.get_cuckoo_mode() == CuckooMode::Permutation)
                 {
-                    auto rr = encoder.encode(items[i], q.hash_func_index(), true);
-                    if (neq(oc::block(rr), oc::block(encodings[q.table_index()])))
-                        throw runtime_error(LOCATION);
+                    throw runtime_error("not implemented");
                 }
                 else
                 {
@@ -346,12 +338,12 @@ namespace apsi
 
             auto& encodings = cuckoo.get_encodings();
 
-            for (int i = 0; i < cuckoo.capacity(); i++)
+            for (int i = 0; i < cuckoo.table_size(); i++)
             {
                 //if(cuckoo.has_item_at(i))
                 ret.set(i, Item(encodings[i]).to_exfield_element(ret.field(i), encoding_bit_length));
             }
-            for (int i = cuckoo.capacity(); i < ret.size(); i++)
+            for (int i = cuckoo.table_size(); i < ret.size(); i++)
             {
                 ret.set(i, Item(cuckoo.null_value()).to_exfield_element(ret.field(i), encoding_bit_length));
             }

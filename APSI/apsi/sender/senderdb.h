@@ -282,7 +282,6 @@ namespace apsi
 
         private:
             PSIParams params_;
-            cuckoo::PermutationBasedCuckoo::Encoder encoder_;
             std::vector<std::shared_ptr<FField> > ex_field_;
             FFieldArray null_element_;
             FFieldArray neg_null_element_;

@@ -2,7 +2,7 @@
 #include "apsi/tools/sealcompress.h"
 #include "seal/util/uintarithsmallmod.h"
 #include "seal/util/numth.h"
-#include "seal/util/mempool.h"
+#include "seal/util/pointer.h"
 #include "seal/util/polyarithsmallmod.h"
 #include "seal/util/uintcore.h"
 
@@ -98,7 +98,7 @@ namespace apsi
             throw invalid_argument("destination is not valid for encryption parameters");
         }
 
-        Pointer temp(allocate_uint(coeff_count, pool_));
+        auto temp(allocate_uint(coeff_count, pool_));
         for(int index = 0; index < encrypted_size; index++)
         {
             // Set destination to (c1 mod q1, c2 mod q1)
@@ -191,7 +191,7 @@ namespace apsi
         // Create compressed polynomials
         int compr_data_byte_count = compr_coeff_byte_count * encrypted_size * coeff_count;
         int compr_data_uint64_count = divide_round_up(compr_data_byte_count, bytes_per_uint64);
-        Pointer compr_poly(allocate_zero_uint(compr_data_uint64_count, pool_));
+        auto compr_poly(allocate_zero_uint(compr_data_uint64_count, pool_));
 
         char *compr_poly_writer_head = reinterpret_cast<char*>(compr_poly.get());
         const uint64_t *encrypted_coeff_ptr = encrypted.data(); 
@@ -248,7 +248,7 @@ namespace apsi
         // Create compressed polynomials
         int compr_data_byte_count = compr_coeff_byte_count * encrypted_size * coeff_count;
         int compr_data_uint64_count = divide_round_up(compr_data_byte_count, bytes_per_uint64);
-        Pointer compr_poly(allocate_zero_uint(compr_data_uint64_count, pool_));
+        auto compr_poly(allocate_zero_uint(compr_data_uint64_count, pool_));
 
         // Read data
         stream.read(reinterpret_cast<char*>(compr_poly.get()), compr_data_byte_count);

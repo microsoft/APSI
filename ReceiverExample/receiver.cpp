@@ -120,7 +120,7 @@ int main(int argc, char *argv[]){
 
     // Example: Fast batching
     if (fastBatching)
-        example_fast_batching(cmd, clientChl, serverChl);
+        throw runtime_error("removed");
 
     // Example: Slow batching
     if (none || slowBatching)
@@ -181,223 +181,223 @@ std::string print(span<u8> s)
     return ss.str();
 }
 
-void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
-{
-    print_example_banner("Example: Fast batching");
-    stop_watch.time_points.clear();
-
-    /*
-    Use generalized batching in integer mode. This requires using an ExField with f(x) = x,
-    which makes ExField become an integer field. Then generalized batching is essentially
-    equivalent to SEAL's PolyCRTBuilder, which is slightly faster due to David Harvey's
-    optimization of NTT butterfly operation on integers.
-
-    However, in this case, we can only use short PSI items such that the reduced item length
-    is smaller than bit length of 'p' in ExField (also the plain modulus in SEAL).
-    "Reduced item" refers to the permutation-based cuckoo hashing items.
-    */
-
-    // Thread count
-    unsigned numThreads = cmd.get<int>("t");
-
-    // Larger set size
-    unsigned sender_set_size = 1 << 20;
-
-    // Negative log failure probability for simple hashing
-    unsigned binning_sec_level = 10;
-
-    // Length of items
-    unsigned item_bit_length = 20;
-
-    // Cuckoo hash parameters
-    CuckooParams cuckoo_params;
-    {
-        // Use standard Cuckoo or PermutationBasedCuckoo
-        cuckoo_params.cuckoo_mode = cuckoo::CuckooMode::Normal;
-
-        // Cuckoo hash function count
-        cuckoo_params.hash_func_count = 3;
-
-        // Set the hash function seed
-        cuckoo_params.hash_func_seed = 0;
-
-        // Set max_probe count for Cuckoo hashing
-        cuckoo_params.max_probe = 100;
-    }
-
-    // Create TableParams and populate.    
-    TableParams table_params;
-    {
-        // Log of size of full hash table
-        table_params.log_table_size = 14;
-
-        // Number of splits to use
-        // Larger means lower depth but bigger S-->R communication
-        table_params.split_count = 256;
-
-        // Get secure bin size
-        table_params.sender_bin_size = round_up_to(get_bin_size(
-            1 << table_params.log_table_size,
-            sender_set_size * cuckoo_params.hash_func_count,
-            binning_sec_level),
-            table_params.split_count);
-
-        // Window size parameter
-        // Larger means lower depth but bigger R-->S communication
-        table_params.window_size = 1;
-    }
-
-    SEALParams seal_params;
-    {
-        seal_params.encryption_params.set_poly_modulus("1x^16384 + 1");
-        seal_params.encryption_params.set_coeff_modulus(
-            coeff_modulus_128(seal_params.encryption_params.poly_modulus().coeff_count() - 1));
-        seal_params.encryption_params.set_plain_modulus(0x820001);
-
-        // This must be equal to plain_modulus
-        seal_params.exfield_params.exfield_characteristic = seal_params.encryption_params.plain_modulus().value();
-        seal_params.exfield_params.exfield_degree = 1;
-
-        seal_params.decomposition_bit_count = 60;
-    }
-
-    // Use OPRF to eliminate need for noise flooding for sender's security
-    auto oprf_type = OprfType::None;
-
-    /*
-    Creating the PSIParams class.
-    */
-    PSIParams params(item_bit_length, table_params, cuckoo_params, seal_params, oprf_type);
-    {
-        params.set_value_bit_count(20);
-    }
-
-    // Check that the parameters are OK
-    params.validate();
-
-    // Set up receiver
-    Receiver receiver(params, 1, MemoryPoolHandle::New());
-    stop_watch.set_time_point("Receiver constructor");
-
-    // Set up sender
-    Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New());
-    stop_watch.set_time_point("Sender constructor");
-
-    // For testing only insert a couple of elements in the sender's dataset
-    int sendersActualSize = 40;
-
-    // Sender's dataset
-    vector<Item> s1(sendersActualSize);
-    oc::Matrix<u8> labels(sendersActualSize, params.get_label_byte_count());
-    for (int i = 0; i < s1.size(); i++)
-    {
-        s1[i] = i;
-        memcpy(labels[i].data(), &s1[i], labels[i].size());
-        labels[i][4] ^= 0xcc;
-        //// Insert random string
-        //s1[i] = oc::mAesFixedKey.ecbEncBlock(oc::toBlock(i));
-    }
-
-    // Receiver's dataset
-    int receiversActualSize = 40;
-    int intersectionSize = 20;
-    int rem = receiversActualSize - intersectionSize;
-
-    /*
-    Set receiver's dataset to be a random subset of sender's actual data
-    (this is where we get the intersection) and some data that won't match.
-    */
-
-    auto cc1 = randSubset(s1, intersectionSize);
-    auto& c1 = cc1.first;
-
-    c1.reserve(c1.size() + rem);
-    for (u64 i = 0; i < rem; i++)
-    {
-        c1.emplace_back(i + s1.size());
-        //// Insert random string
-        //c1.emplace_back(oc::mAesFixedKey.ecbEncBlock(oc::toBlock(i + s1.size()) & toBlock(0, -1)));
-    }
-
-    // We are done with constructing the datasets but no preprocessing done yet.
-    stop_watch.set_time_point("Application preparation");
-
-    // Now construct the sender's database
-    sender.load_db(s1, labels);
-    stop_watch.set_time_point("Sender pre-processing");
-
-    // Start the sender's query session in a separate thread
-    auto senderQuerySessionTh = thread([&]() {
-        sender.query_session(sendChl);
-    });
-
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-
-    // Receiver's query
-    recv_stop_watch.set_time_point("recevier start");
-    auto intersection = receiver.query(c1, recvChl);
-    senderQuerySessionTh.join();
-
-
-    // Done with everything. Print the results!
-    bool correct = true;
-    for (int i = 0; i < c1.size(); i++)
-    {
-
-        if (i < intersectionSize)
-        {
-            if (intersection.first[i] == false)
-            {
-                cout << "Miss result for receiver's item at index: " << i << endl;
-                correct = false;
-            }
-            else
-            {
-                u64 l = 0, exp = *(u64*)&c1[i];
-                auto label = intersection.second[i];
-                memcpy(&l, label.data(), label.size());
-
-
-                if (l != exp)
-                {
-                    std::cout << "incorrect label at index: " << i << ". actual: " << print(label) << " " << l << ", expected: " << exp << std::endl;
-                }
-            }
-        }
-        else
-        {
-            if (intersection.first[i])
-            {
-                cout << "Incorrect result for receiver's item at index: " << i << endl;
-                correct = false;
-            }
-        }
-    }
-    cout << "Intersection results: " << (correct ? "Correct" : "Incorrect") << endl;
-
-    //cout << '[';
-    //for (int i = 0; i < intersection.size(); i++)
-    //    cout << intersection[i] << ", ";
-    //cout << ']' << endl;
-
-
-    /* Test different update performance. */
-    /*vector<int> updates{1, 10, 30, 50, 70, 100};
-    random_device rd;
-    for (int i = 0; i < updates.size(); i++)
-    {
-        vector<Item> items;
-        for (int j = 0; j < updates[i]; j++)
-            items.emplace_back(to_string(rd()));
-        sender.add_data(items);
-        sender.offline_compute();
-
-        stop_watch.set_time_point(string("Add ") + to_string(updates[i]) + " records done");
-    }*/
-
-    cout << stop_watch << endl;
-    cout << recv_stop_watch << endl;
-}
+// void example_fast_batching(oc::CLP &cmd, Channel &recvChl, Channel &sendChl)
+// {
+//     print_example_banner("Example: Fast batching");
+//     stop_watch.time_points.clear();
+//
+//     #<{(|
+//     Use generalized batching in integer mode. This requires using an ExField with f(x) = x,
+//     which makes ExField become an integer field. Then generalized batching is essentially
+//     equivalent to SEAL's PolyCRTBuilder, which is slightly faster due to David Harvey's
+//     optimization of NTT butterfly operation on integers.
+//
+//     However, in this case, we can only use short PSI items such that the reduced item length
+//     is smaller than bit length of 'p' in ExField (also the plain modulus in SEAL).
+//     "Reduced item" refers to the permutation-based cuckoo hashing items.
+//     |)}>#
+//
+//     // Thread count
+//     unsigned numThreads = cmd.get<int>("t");
+//
+//     // Larger set size
+//     unsigned sender_set_size = 1 << 20;
+//
+//     // Negative log failure probability for simple hashing
+//     unsigned binning_sec_level = 10;
+//
+//     // Length of items
+//     unsigned item_bit_length = 20;
+//
+//     // Cuckoo hash parameters
+//     CuckooParams cuckoo_params;
+//     {
+//         // Use standard Cuckoo or PermutationBasedCuckoo
+//         cuckoo_params.cuckoo_mode = cuckoo::CuckooMode::Normal;
+//
+//         // Cuckoo hash function count
+//         cuckoo_params.hash_func_count = 3;
+//
+//         // Set the hash function seed
+//         cuckoo_params.hash_func_seed = 0;
+//
+//         // Set max_probe count for Cuckoo hashing
+//         cuckoo_params.max_probe = 100;
+//     }
+//
+//     // Create TableParams and populate.    
+//     TableParams table_params;
+//     {
+//         // Log of size of full hash table
+//         table_params.log_table_size = 14;
+//
+//         // Number of splits to use
+//         // Larger means lower depth but bigger S-->R communication
+//         table_params.split_count = 256;
+//
+//         // Get secure bin size
+//         table_params.sender_bin_size = round_up_to(get_bin_size(
+//             1 << table_params.log_table_size,
+//             sender_set_size * cuckoo_params.hash_func_count,
+//             binning_sec_level),
+//             table_params.split_count);
+//
+//         // Window size parameter
+//         // Larger means lower depth but bigger R-->S communication
+//         table_params.window_size = 1;
+//     }
+//
+//     SEALParams seal_params;
+//     {
+//         seal_params.encryption_params.set_poly_modulus("1x^16384 + 1");
+//         seal_params.encryption_params.set_coeff_modulus(
+//             coeff_modulus_128(seal_params.encryption_params.poly_modulus_degree());
+//         seal_params.encryption_params.set_plain_modulus(0x820001);
+//
+//         // This must be equal to plain_modulus
+//         seal_params.exfield_params.exfield_characteristic = seal_params.encryption_params.plain_modulus().value();
+//         seal_params.exfield_params.exfield_degree = 1;
+//
+//         seal_params.decomposition_bit_count = 60;
+//     }
+//
+//     // Use OPRF to eliminate need for noise flooding for sender's security
+//     auto oprf_type = OprfType::None;
+//
+//     #<{(|
+//     Creating the PSIParams class.
+//     |)}>#
+//     PSIParams params(item_bit_length, table_params, cuckoo_params, seal_params, oprf_type);
+//     {
+//         params.set_value_bit_count(20);
+//     }
+//
+//     // Check that the parameters are OK
+//     params.validate();
+//
+//     // Set up receiver
+//     Receiver receiver(params, 1, MemoryPoolHandle::New());
+//     stop_watch.set_time_point("Receiver constructor");
+//
+//     // Set up sender
+//     Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New());
+//     stop_watch.set_time_point("Sender constructor");
+//
+//     // For testing only insert a couple of elements in the sender's dataset
+//     int sendersActualSize = 40;
+//
+//     // Sender's dataset
+//     vector<Item> s1(sendersActualSize);
+//     oc::Matrix<u8> labels(sendersActualSize, params.get_label_byte_count());
+//     for (int i = 0; i < s1.size(); i++)
+//     {
+//         s1[i] = i;
+//         memcpy(labels[i].data(), &s1[i], labels[i].size());
+//         labels[i][4] ^= 0xcc;
+//         //// Insert random string
+//         //s1[i] = oc::mAesFixedKey.ecbEncBlock(oc::toBlock(i));
+//     }
+//
+//     // Receiver's dataset
+//     int receiversActualSize = 40;
+//     int intersectionSize = 20;
+//     int rem = receiversActualSize - intersectionSize;
+//
+//     #<{(|
+//     Set receiver's dataset to be a random subset of sender's actual data
+//     (this is where we get the intersection) and some data that won't match.
+//     |)}>#
+//
+//     auto cc1 = randSubset(s1, intersectionSize);
+//     auto& c1 = cc1.first;
+//
+//     c1.reserve(c1.size() + rem);
+//     for (u64 i = 0; i < rem; i++)
+//     {
+//         c1.emplace_back(i + s1.size());
+//         //// Insert random string
+//         //c1.emplace_back(oc::mAesFixedKey.ecbEncBlock(oc::toBlock(i + s1.size()) & toBlock(0, -1)));
+//     }
+//
+//     // We are done with constructing the datasets but no preprocessing done yet.
+//     stop_watch.set_time_point("Application preparation");
+//
+//     // Now construct the sender's database
+//     sender.load_db(s1, labels);
+//     stop_watch.set_time_point("Sender pre-processing");
+//
+//     // Start the sender's query session in a separate thread
+//     auto senderQuerySessionTh = thread([&]() {
+//         sender.query_session(sendChl);
+//     });
+//
+//     std::this_thread::sleep_for(std::chrono::seconds(1));
+//
+//     // Receiver's query
+//     recv_stop_watch.set_time_point("recevier start");
+//     auto intersection = receiver.query(c1, recvChl);
+//     senderQuerySessionTh.join();
+//
+//
+//     // Done with everything. Print the results!
+//     bool correct = true;
+//     for (int i = 0; i < c1.size(); i++)
+//     {
+//
+//         if (i < intersectionSize)
+//         {
+//             if (intersection.first[i] == false)
+//             {
+//                 cout << "Miss result for receiver's item at index: " << i << endl;
+//                 correct = false;
+//             }
+//             else
+//             {
+//                 u64 l = 0, exp = *(u64*)&c1[i];
+//                 auto label = intersection.second[i];
+//                 memcpy(&l, label.data(), label.size());
+//
+//
+//                 if (l != exp)
+//                 {
+//                     std::cout << "incorrect label at index: " << i << ". actual: " << print(label) << " " << l << ", expected: " << exp << std::endl;
+//                 }
+//             }
+//         }
+//         else
+//         {
+//             if (intersection.first[i])
+//             {
+//                 cout << "Incorrect result for receiver's item at index: " << i << endl;
+//                 correct = false;
+//             }
+//         }
+//     }
+//     cout << "Intersection results: " << (correct ? "Correct" : "Incorrect") << endl;
+//
+//     //cout << '[';
+//     //for (int i = 0; i < intersection.size(); i++)
+//     //    cout << intersection[i] << ", ";
+//     //cout << ']' << endl;
+//
+//
+//     #<{(| Test different update performance. |)}>#
+//     #<{(|vector<int> updates{1, 10, 30, 50, 70, 100};
+//     random_device rd;
+//     for (int i = 0; i < updates.size(); i++)
+//     {
+//         vector<Item> items;
+//         for (int j = 0; j < updates[i]; j++)
+//             items.emplace_back(to_string(rd()));
+//         sender.add_data(items);
+//         sender.offline_compute();
+//
+//         stop_watch.set_time_point(string("Add ") + to_string(updates[i]) + " records done");
+//     }|)}>#
+//
+//     cout << stop_watch << endl;
+//     cout << recv_stop_watch << endl;
+// }
 
 void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 {
@@ -473,7 +473,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
         vector<SmallModulus> coeff_modulus;
         if(!cmd.isSet("coeffModulus"))
         {
-            coeff_modulus = coeff_modulus_128(seal_params.encryption_params.poly_modulus().coeff_count() - 1);
+            coeff_modulus = coeff_modulus_128(seal_params.encryption_params.poly_modulus_degree());
         }
         else
         {

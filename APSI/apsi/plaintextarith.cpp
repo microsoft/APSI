@@ -9,12 +9,12 @@ using namespace seal::util;
 
 namespace apsi
 {
-    ConstPointer duplicate_poly_if_needed(const Plaintext &poly, int new_coeff_count, bool force, MemoryPool &pool)
+    ConstPointer<std::uint64_t> duplicate_poly_if_needed(const Plaintext &poly, int new_coeff_count, bool force, MemoryPool &pool)
     {
         return util::duplicate_poly_if_needed(poly.data(), poly.coeff_count(), 1, new_coeff_count, 1, force, pool);
     }
 
-    ConstPointer duplicate_poly_if_needed(const BigPoly &poly, bool force, MemoryPool &pool)
+    ConstPointer<std::uint64_t> duplicate_poly_if_needed(const BigPoly &poly, bool force, MemoryPool &pool)
     {
         return util::duplicate_if_needed(poly.data(), poly.coeff_count() * poly.coeff_uint64_count(), force, pool);
     }
@@ -40,8 +40,8 @@ namespace apsi
         int coeff_uint64_count = coeff_mod.uint64_count();
 
         // Get pointer to inputs (duplicated and resized if needed).
-        ConstPointer poly1ptr = duplicate_poly_if_needed(plaintext1, coeff_count, plaintext1.data() == result.data(), pool);
-        ConstPointer poly2ptr = duplicate_poly_if_needed(plaintext2, coeff_count, plaintext2.data() == result.data(), pool);
+        auto poly1ptr = duplicate_poly_if_needed(plaintext1, coeff_count, plaintext1.data() == result.data(), pool);
+        auto poly2ptr = duplicate_poly_if_needed(plaintext2, coeff_count, plaintext2.data() == result.data(), pool);
 
         // Verify destination size.
         resize_destination_if_needed(result, coeff_count);
@@ -59,8 +59,8 @@ namespace apsi
         int coeff_uint64_count = coeff_mod.uint64_count();
 
         // Get pointer to inputs (duplicated and resized if needed).
-        ConstPointer poly1ptr = duplicate_poly_if_needed(plaintext1, coeff_count, plaintext1.data() == result.data(), pool);
-        ConstPointer poly2ptr = duplicate_poly_if_needed(plaintext2, coeff_count, plaintext2.data() == result.data(), pool);
+        auto poly1ptr = duplicate_poly_if_needed(plaintext1, coeff_count, plaintext1.data() == result.data(), pool);
+        auto poly2ptr = duplicate_poly_if_needed(plaintext2, coeff_count, plaintext2.data() == result.data(), pool);
 
         // Verify destination size.
         resize_destination_if_needed(result, coeff_count);
@@ -78,8 +78,8 @@ namespace apsi
         int coeff_uint64_count = coeff_mod.uint64_count();
 
         // Get pointer to inputs (duplicated and resized if needed).
-        ConstPointer poly1ptr = duplicate_poly_if_needed(plaintext1, coeff_count, plaintext1.data() == result.data(), pool);
-        ConstPointer poly2ptr = duplicate_poly_if_needed(plaintext2, coeff_count, plaintext2.data() == result.data(), pool);
+        auto poly1ptr = duplicate_poly_if_needed(plaintext1, coeff_count, plaintext1.data() == result.data(), pool);
+        auto poly2ptr = duplicate_poly_if_needed(plaintext2, coeff_count, plaintext2.data() == result.data(), pool);
 
         // Verify destination size.
         resize_destination_if_needed(result, coeff_count);

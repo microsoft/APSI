@@ -32,7 +32,6 @@ namespace apsi
     {
         SenderDB::SenderDB(const PSIParams &params, vector<shared_ptr<FField> > &ex_field) :
             params_(params),
-            encoder_(params.log_table_size(), params.hash_func_count(), params.item_bit_count()),
             ex_field_(ex_field),
             null_element_(ex_field_),
             neg_null_element_(ex_field_),
@@ -45,7 +44,7 @@ namespace apsi
             {
                 // Reserve memory for ciphertext size plaintexts (NTT transformed mod q)
                 plain.reserve(params_.encryption_params().coeff_modulus().size() *
-                    (params_.encryption_params().poly_modulus().coeff_count()));
+                    params_.encryption_params().poly_modulus_degree());
             }
 
 #ifdef USE_SECURE_SEED
@@ -61,8 +60,9 @@ namespace apsi
             sender_null_item_[1] = ~0;
 
             // What is the actual length of strings stored in the hash table
-            encoding_bit_length_ = (params.get_cuckoo_mode() == cuckoo::CuckooMode::Normal)
-                ? params.item_bit_count() : encoder_.encoding_bit_length_;
+            // encoding_bit_length_ = (params.get_cuckoo_mode() == cuckoo::CuckooMode::Normal)
+            //     ? params.item_bit_count() : encoder_.encoding_bit_length_;
+            encoding_bit_length_ = params.item_bit_count();
 
             // Create the null ExFieldElement (note: encoding truncation affects high bits)
             for(auto i = 0; i < ex_field_.size(); i++)
@@ -154,12 +154,10 @@ namespace apsi
                     oc::EccNumber key_(curve, pp);
 
                     vector<cuckoo::LocFunc> normal_loc_func(params_.hash_func_count());
-                    vector<cuckoo::PermutationBasedLocFunc> perm_loc_func(params_.hash_func_count());
 
                     for (int i = 0; i < normal_loc_func.size(); i++)
                     {
                         normal_loc_func[i] = cuckoo::LocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
-                        perm_loc_func[i] = cuckoo::PermutationBasedLocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
                     }
 
                     for (int i = start; i < end; i++)
@@ -167,8 +165,6 @@ namespace apsi
                         // Do we do OPRF for Sender's security?
                         if (params_.use_pk_oprf())
                         {
-                            static_assert(sizeof(oc::block) == sizeof(Item), LOCATION);
-
                             // Compute EC PRF first for data
                             oc::PRNG p(static_cast<oc::block&>(data[i]), 8);
                             oc::EccPoint a(curve, p);
@@ -197,13 +193,7 @@ namespace apsi
                         }
                         else
                         {
-                            // Get the permutation-based Cuckoo location and find position
-                            locs[0] = perm_loc_func[0].location(data[i]);
-                            locs[1] = perm_loc_func[1].location(data[i]);
-                            locs[2] = perm_loc_func[2].location(data[i]);
-                            keys[0] = encoder_.encode(data[i], 0, true);
-                            keys[1] = encoder_.encode(data[i], 1, true);
-                            keys[2] = encoder_.encode(data[i], 2, true);
+                            throw runtime_error("not implemented");
                         }
 
                         // Claim an emply location in each matching bin
@@ -258,12 +248,10 @@ namespace apsi
             {
 
                 vector<cuckoo::LocFunc> normal_loc_func(params_.hash_func_count());
-                vector<cuckoo::PermutationBasedLocFunc> perm_loc_func(params_.hash_func_count());
 
                 for (int i = 0; i < normal_loc_func.size(); i++)
                 {
                     normal_loc_func[i] = cuckoo::LocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
-                    perm_loc_func[i] = cuckoo::PermutationBasedLocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
                 }
 
 
@@ -283,9 +271,7 @@ namespace apsi
                         }
                         else
                         {
-                            // Get the permutation-based Cuckoo location and find position
-                            cuckoo_loc = perm_loc_func[j].location(data[i]);
-                            key = encoder_.encode(data[i], j, true);
+                            throw runtime_error("not implemented");
                         }
                         // Lock-free thread-safe bin position search
                         DBBlock::Position pos;
@@ -901,7 +887,7 @@ namespace apsi
 
                     batched_coeff.reserve(
                         params.encryption_params().coeff_modulus().size() *
-                        params.encryption_params().poly_modulus().coeff_count(), local_pool);
+                        params.encryption_params().poly_modulus_degree(), local_pool);
 
                     ex_builder->compose(temp_array, batched_coeff);
                     evaluator->transform_to_ntt(batched_coeff);
@@ -1020,7 +1006,7 @@ namespace apsi
 
                     batched_coeff.reserve(
                         params.encryption_params().coeff_modulus().size() *
-                        params.encryption_params().poly_modulus().coeff_count(), local_pool);
+                        params.encryption_params().poly_modulus_degree(), local_pool);
 
                     builder->compose(temp, batched_coeff);
                     evaluator->transform_to_ntt(batched_coeff);

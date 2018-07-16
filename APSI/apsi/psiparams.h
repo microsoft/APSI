@@ -87,9 +87,6 @@ namespace apsi
             item_bit_count_(item_bit_count), 
             exfield_characteristic_(seal_params.exfield_params.exfield_characteristic), 
             exfield_degree_(seal_params.exfield_params.exfield_degree),
-            //log_poly_degree_(seal_params.log_poly_degree), 
-            //poly_degree_(seal_params.encryption_params.poly_modulus().coeff_count() - 1),
-            //coeff_mod_bit_count_(seal_params.coeff_mod_bit_count),
             apsi_port_(port), 
             apsi_endpoint_(endpoint)
         {
@@ -154,7 +151,7 @@ namespace apsi
 
         inline int batch_size() const
         {
-            return (encryption_params_.poly_modulus().coeff_count() - 1) / (exfield_degree_);
+            return encryption_params_.poly_modulus_degree() / exfield_degree_;
         }
 
         inline int batch_count() const

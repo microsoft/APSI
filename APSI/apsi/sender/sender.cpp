@@ -64,7 +64,7 @@ namespace apsi
                 ex_builder_.reset(new FFieldFastCRTBuilder(
                     params_.exfield_characteristic(),
                     params_.exfield_degree(),
-                    get_power_of_two(params_.encryption_params().poly_modulus().coeff_count() - 1)
+                    get_power_of_two(params_.encryption_params().poly_modulus_degree())
                 ));
                 field_vec = ex_builder_->fields();
             }
@@ -95,13 +95,6 @@ namespace apsi
                     thread_contexts_[i].set_prng(seed);
                     thread_contexts_[i].set_pool(local_pool);
                     thread_contexts_[i].set_exfield(field_vec);
-
-                    // // We need the EdPolyCRTBuilder here since it creates ExFieldElements from the memory
-                    // // pool of its ExField. Cannot have a shared ExFieldPolyCRTBuilder with this design.
-                    // thread_contexts_[i].set_exbuilder(
-                    //     make_shared<FFieldCRTBuilder>(thread_contexts_[i].exfield(),
-                    //         get_power_of_two(params_.encryption_params().poly_modulus().coeff_count() - 1), FFieldElt(thread_contexts_[i].exfield(), "1x^1")
-                    // ));
 
                     // Allocate memory for repeated use from the given memory pool.
                     thread_contexts_[i].construct_variables(params_);
