@@ -18,7 +18,7 @@
 #include "cryptoTools/Crypto/sha1.h"
 
 #include "seal/evaluator.h"
-#include "seal/polycrt.h"
+#include "seal/batchencoder.h"
 #include "seal/util/uintcore.h"
 
 using namespace std;
@@ -30,8 +30,11 @@ namespace apsi
 {
     namespace sender
     {
-        SenderDB::SenderDB(const PSIParams &params, vector<shared_ptr<FField> > &ex_field) :
+        SenderDB::SenderDB(const PSIParams &params, 
+            shared_ptr<SEALContext> &seal_context, 
+            vector<shared_ptr<FField> > &ex_field) :
             params_(params),
+            seal_context_(seal_context),
             ex_field_(ex_field),
             null_element_(ex_field_),
             neg_null_element_(ex_field_),
@@ -181,20 +184,14 @@ namespace apsi
                         std::array<u64, 3> locs;
                         std::array<Item, 3> keys;
                         std::array<bool, 3> skip{ false, false, false };
-                        if (params_.get_cuckoo_mode() == cuckoo::CuckooMode::Normal)
-                        {
-                            // Compute bin locations
-                            locs[0] = normal_loc_func[0].location(data[i]);
-                            locs[1] = normal_loc_func[1].location(data[i]);
-                            locs[2] = normal_loc_func[2].location(data[i]);
-                            keys[0] = keys[1] = keys[2] = data[i];
-                            skip[1] = locs[0] == locs[1];
-                            skip[2] = locs[0] == locs[2] || locs[1] == locs[2];
-                        }
-                        else
-                        {
-                            throw runtime_error("not implemented");
-                        }
+
+                        // Compute bin locations
+                        locs[0] = normal_loc_func[0].location(data[i]);
+                        locs[1] = normal_loc_func[1].location(data[i]);
+                        locs[2] = normal_loc_func[2].location(data[i]);
+                        keys[0] = keys[1] = keys[2] = data[i];
+                        skip[1] = locs[0] == locs[1];
+                        skip[2] = locs[0] == locs[2] || locs[1] == locs[2];
 
                         // Claim an emply location in each matching bin
                         for (int j = 0; j < params_.hash_func_count(); j++)
@@ -263,16 +260,11 @@ namespace apsi
                     {
                         Item key;
                         u64 cuckoo_loc;
-                        if (params_.get_cuckoo_mode() == cuckoo::CuckooMode::Normal)
-                        {
-                            // Compute bin locations
-                            cuckoo_loc = normal_loc_func[j].location(data[i]);
-                            key = data[i];
-                        }
-                        else
-                        {
-                            throw runtime_error("not implemented");
-                        }
+
+                        // Compute bin locations
+                        cuckoo_loc = normal_loc_func[j].location(data[i]);
+                        key = data[i];
+
                         // Lock-free thread-safe bin position search
                         DBBlock::Position pos;
                         auto batch_idx = cuckoo_loc / params_.batch_size();
@@ -420,7 +412,7 @@ namespace apsi
         //}
 
         void DBBlock::symmetric_polys(
-            SenderThreadContext &context,
+            SenderThreadContext &th_context,
             MatrixView<_ffield_array_elt_t> symm_block,
             int encoding_bit_length,
             const FFieldArray &neg_null_element)
@@ -429,7 +421,7 @@ namespace apsi
             int split_size_plus_one = split_size + 1;
             int batch_size = items_per_batch_;
             auto num_rows = batch_size;
-            auto &field_vec = context.exfield();
+            auto &field_vec = th_context.exfield();
 
             Position pos;
             for (pos.batch_offset = 0; pos.batch_offset < num_rows; pos.batch_offset++)
@@ -489,25 +481,25 @@ namespace apsi
         }
 
         void DBBlock::randomized_symmetric_polys(
-            SenderThreadContext &context,
+            SenderThreadContext &th_context,
             MatrixView<_ffield_array_elt_t> symm_block,
             int encoding_bit_length,
             FFieldArray &neg_null_element)
         {
             int split_size_plus_one = items_per_split_ + 1;
             int batch_size = items_per_batch_;
-            symmetric_polys(context, symm_block, encoding_bit_length, neg_null_element);
+            symmetric_polys(th_context, symm_block, encoding_bit_length, neg_null_element);
 
             auto num_rows = items_per_batch_;
-            oc::PRNG &prng = context.prng();
+            oc::PRNG &prng = th_context.prng();
 
-            FFieldArray r(context.exfield());
+            FFieldArray r(th_context.exfield());
             r.set_random_nonzero(prng);
 
             auto symm_block_ptr = symm_block.data();
             for (int i = 0; i < num_rows; i++)
             {
-                auto &field_ctx = context.exfield()[i]->ctx();
+                auto &field_ctx = th_context.exfield()[i]->ctx();
                 for (int j = 0; j < split_size_plus_one; j++, symm_block_ptr++)
                 {
                     fq_nmod_mul(symm_block_ptr, symm_block_ptr, r.data() + i, field_ctx);
@@ -540,8 +532,8 @@ namespace apsi
         void SenderDB::batched_randomized_symmetric_polys(
             SenderThreadContext &context,
             shared_ptr<Evaluator> evaluator,
-            shared_ptr<PolyCRTBuilder> builder,
-            shared_ptr<FFieldFastCRTBuilder> ex_builder,
+            shared_ptr<BatchEncoder> batch_encoder,
+            shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
             int thread_count)
         {
             // Get the symmetric block
@@ -591,7 +583,7 @@ namespace apsi
                     block.debug_sym_block_.reserve(split_size_plus_one);
                 }
 
-                if (builder)
+                if (batch_encoder)
                 {
                     for (int i = 0; i < split_size_plus_one; i++)
                     {
@@ -600,8 +592,8 @@ namespace apsi
                         {
                             integer_batch_vector[k] = symm_block(k, i).coeffs[0];
                         }
-                        builder->compose(integer_batch_vector, poly);
-                        evaluator->transform_to_ntt(poly, local_pool);
+                        batch_encoder->compose(integer_batch_vector, poly);
+                        evaluator->transform_to_ntt(poly, seal_context_->first_parms_id(), local_pool);
                     }
                 }
                 else
@@ -616,8 +608,8 @@ namespace apsi
                             fq_nmod_set(batch_vector.data() + k, &symm_block(k, i), batch_vector.field(k)->ctx());
                             // batch_vector.set(k, k * split_size_plus_one + i, symm_block);
                         }
-                        ex_builder->compose(batch_vector, poly);
-                        evaluator->transform_to_ntt(poly, local_pool);
+                        ex_batch_encoder->compose(batch_vector, poly);
+                        evaluator->transform_to_ntt(poly, seal_context_->first_parms_id(), local_pool);
 
                         if (params_.debug())
                         {
@@ -629,21 +621,21 @@ namespace apsi
         }
 
         void SenderDB::batched_interpolate_polys(
-            SenderThreadContext &context,
+            SenderThreadContext &th_context,
             int thread_count,
             shared_ptr<Evaluator> evaluator,
-            shared_ptr<PolyCRTBuilder> builder,
-            shared_ptr<FFieldFastCRTBuilder> ex_builder)
+            shared_ptr<BatchEncoder> batch_encoder,
+            shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder)
         {
-            auto& mod = params_.encryption_params().plain_modulus();
+            auto &mod = params_.encryption_params().plain_modulus();
 
-            DBInterpolationCache cache(ex_builder, params_.batch_size(), params_.split_size(), params_.get_label_byte_count());
+            DBInterpolationCache cache(ex_batch_encoder, params_.batch_size(), params_.split_size(), params_.get_label_byte_count());
             // minus 1 to be safe.
             auto coeffBitCount = seal::util::get_significant_bit_count(mod.value()) - 1;
             auto degree = 1;
-            if (ex_builder)
+            if (ex_batch_encoder)
             {
-                degree = ex_builder->d();
+                degree = ex_batch_encoder->d();
             }
 
             if (params_.get_label_bit_count() >= coeffBitCount * degree)
@@ -656,20 +648,20 @@ namespace apsi
                 throw std::runtime_error("labels are too large u64 interpolation.");
             }
 
-            int start = context.id() * db_blocks_.size() / thread_count;
-            int end = (context.id() + 1) * db_blocks_.size() / thread_count;
+            int start = th_context.id() * db_blocks_.size() / thread_count;
+            int end = (th_context.id() + 1) * db_blocks_.size() / thread_count;
 
             for (int bIdx = start; bIdx < end; bIdx++)
             {
                 auto& block = db_blocks_(bIdx);
-                block.batch_interpolate(context, mod, evaluator, builder, ex_builder, cache, params_);
+                block.batch_interpolate(th_context, seal_context_, evaluator, batch_encoder, ex_batch_encoder, cache, params_);
             }
 
         }
 
 
         DBInterpolationCache::DBInterpolationCache(
-            std::shared_ptr<FFieldFastCRTBuilder> ex_builder,
+            std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
             int items_per_batch_,
             int items_per_split_,
             int value_byte_length_)
@@ -681,10 +673,10 @@ namespace apsi
 
             for (u64 i = 0; i < items_per_batch_; ++i)
             {
-                // div_diff_temp[i] = get_div_diff_temp(ex_builder->field(i), items_per_split_);
-                coeff_temp.emplace_back(ex_builder->field(i), items_per_split_);
-                x_temp.emplace_back(ex_builder->field(i), items_per_split_);
-                y_temp.emplace_back(ex_builder->field(i), items_per_split_);
+                // div_diff_temp[i] = get_div_diff_temp(ex_batch_encoder->field(i), items_per_split_);
+                coeff_temp.emplace_back(ex_batch_encoder->field(i), items_per_split_);
+                x_temp.emplace_back(ex_batch_encoder->field(i), items_per_split_);
+                y_temp.emplace_back(ex_batch_encoder->field(i), items_per_split_);
             }
 
             temp_vec.resize((value_byte_length_ + sizeof(u64)) / sizeof(u64), 0);
@@ -725,19 +717,19 @@ namespace apsi
         }
 
         void DBBlock::batch_interpolate(
-            SenderThreadContext & context,
-            const seal::SmallModulus& mod,
+            SenderThreadContext &th_context,
+            shared_ptr<SEALContext> seal_context,
             shared_ptr<Evaluator> evaluator,
-            shared_ptr<PolyCRTBuilder> builder,
-            shared_ptr<FFieldFastCRTBuilder> ex_builder,
+            shared_ptr<BatchEncoder> batch_encoder,
+            shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
             DBInterpolationCache& cache,
             const PSIParams& params)
         {
-
-            MemoryPoolHandle local_pool = context.pool();
+            auto mod = seal_context->context_data().parms().plain_modulus().value();
+            MemoryPoolHandle local_pool = th_context.pool();
             Position pos;
 
-            if (ex_builder)
+            if (ex_batch_encoder)
             {
                 if (params.use_low_degree_poly())
                     throw std::runtime_error("not impl");
@@ -754,10 +746,10 @@ namespace apsi
 
                 for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
                 {
-                    //FFieldArray x(ex_builder->field(pos.batch_offset), items_per_split_);
-                    //FFieldArray y(ex_builder->field(pos.batch_offset), items_per_split_);
+                    //FFieldArray x(ex_batch_encoder->field(pos.batch_offset), items_per_split_);
+                    //FFieldArray y(ex_batch_encoder->field(pos.batch_offset), items_per_split_);
 
-                    FFieldElt temp(ex_builder->field(pos.batch_offset));
+                    FFieldElt temp(ex_batch_encoder->field(pos.batch_offset));
 
 
                     FFieldArray& x = cache.x_temp[pos.batch_offset];
@@ -832,9 +824,9 @@ namespace apsi
                     cache.temp_vec[0] = 0;
                     while (size != items_per_split_)
                     {
-                        if (cache.temp_vec[0] >= mod.value())
+                        if (cache.temp_vec[0] >= mod)
                         {
-                            std::cout << cache.temp_vec[0] << " >= " << mod.value();
+                            std::cout << cache.temp_vec[0] << " >= " << mod;
                             throw std::runtime_error("");
                         }
 
@@ -850,7 +842,7 @@ namespace apsi
                         ++cache.temp_vec[0];
                     }
 
-                    //coeffs.emplace_back(ex_builder->field(pos.batch_offset), items_per_split_);
+                    //coeffs.emplace_back(ex_batch_encoder->field(pos.batch_offset), items_per_split_);
 
                     //ffield_newton_interpolate_poly(x, y, coeffs.back());
 
@@ -870,8 +862,8 @@ namespace apsi
                 batched_label_coeffs_.resize(items_per_split_);
 
                 /// We assume there are all the same
-                auto degree = context.exfield()[0]->d();
-                FFieldArray temp_array(ex_builder->create_array());
+                auto degree = th_context.exfield()[0]->d();
+                FFieldArray temp_array(ex_batch_encoder->create_array());
                 //FFieldElt elem(context.exfield());
                 for (int s = 0; s < items_per_split_; s++)
                 {
@@ -889,14 +881,14 @@ namespace apsi
                         params.encryption_params().coeff_modulus().size() *
                         params.encryption_params().poly_modulus_degree(), local_pool);
 
-                    ex_builder->compose(temp_array, batched_coeff);
-                    evaluator->transform_to_ntt(batched_coeff);
+                    ex_batch_encoder->compose(temp_array, batched_coeff);
+                    evaluator->transform_to_ntt(batched_coeff, seal_context->first_parms_id());
                 }
 
             }
             else
             {
-                if (params.get_label_bit_count() >= 64 || 1ull << params.get_label_bit_count() > mod.value())
+                if (params.get_label_bit_count() >= 64 || 1ull << params.get_label_bit_count() > mod)
                     throw std::runtime_error("labels too large for short string code");
 
                 int max_size = 0;
@@ -925,7 +917,7 @@ namespace apsi
 
                             auto key_item = *(std::array<u64, 2>*)&get_key(pos);
 
-                            if (key_item[1] || key_item[0] >= mod.value())
+                            if (key_item[1] || key_item[0] >= mod)
                             {
                                 std::cout << key_item[0] << " " << key_item[1] << std::endl;
 
@@ -938,7 +930,7 @@ namespace apsi
                             memcpy(&label, src, value_byte_length_);
 
 
-                            if (label >= mod.value())
+                            if (label >= mod)
                             {
                                 throw std::runtime_error("label too large");
                             }
@@ -1008,8 +1000,8 @@ namespace apsi
                         params.encryption_params().coeff_modulus().size() *
                         params.encryption_params().poly_modulus_degree(), local_pool);
 
-                    builder->compose(temp, batched_coeff);
-                    evaluator->transform_to_ntt(batched_coeff);
+                    batch_encoder->compose(temp, batched_coeff);
+                    evaluator->transform_to_ntt(batched_coeff, seal_context->first_parms_id());
                 }
             }
         }
@@ -1071,16 +1063,5 @@ namespace apsi
             }
             std::cout << std::endl;
         }
-
-        void DBBlock::test_eval(
-            SenderThreadContext & context,
-            const seal::SmallModulus &plain_mod,
-            shared_ptr<seal::Evaluator> evaluator,
-            shared_ptr<seal::PolyCRTBuilder> builder,
-            shared_ptr<FFieldFastCRTBuilder> ex_builder,
-            const PSIParams &params)
-        {
-        }
-
     }
 }

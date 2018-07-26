@@ -1,4 +1,4 @@
-#include "apsi/ffield/ffield_crt_builder.h"
+#include "apsi/ffield/ffield_batch_encoder.h"
 #include "seal/util/common.h"
 
 using namespace std;
@@ -8,21 +8,21 @@ using namespace seal::util;
 
 namespace apsi
 {
-    FFieldCRTBuilder::FFieldCRTBuilder(shared_ptr<FField> field, unsigned log_degree, oc::PRNG &prng) :
+    FFieldBatchEncoder::FFieldBatchEncoder(shared_ptr<FField> field, unsigned log_degree, oc::PRNG &prng) :
         field_(move(field)),
         ntt_ctx_(field_, log_degree, prng)
     {
         compute_cosets();
     }
 
-    FFieldCRTBuilder::FFieldCRTBuilder(shared_ptr<FField> field, unsigned log_degree, FFieldElt zeta) :
+    FFieldBatchEncoder::FFieldBatchEncoder(shared_ptr<FField> field, unsigned log_degree, FFieldElt zeta) :
         field_(move(field)),
         ntt_ctx_(field_, log_degree, zeta)
     {
         compute_cosets();
     }
 
-    void FFieldCRTBuilder::bit_reversal_permutation(FFieldArray &input) const
+    void FFieldBatchEncoder::bit_reversal_permutation(FFieldArray &input) const
     {
         for(uint32_t i = 0; i < ntt_ctx_.n_; i++)
         {
@@ -34,7 +34,7 @@ namespace apsi
         }
     }
 
-    void FFieldCRTBuilder::compute_cosets()
+    void FFieldBatchEncoder::compute_cosets()
     {
         index_map_.clear();
         cosets_.resize(ntt_ctx_.n_);
@@ -67,7 +67,7 @@ namespace apsi
         }
     }
 
-    void FFieldCRTBuilder::expand(FFieldArray &out, const FFieldArray &in) const
+    void FFieldBatchEncoder::expand(FFieldArray &out, const FFieldArray &in) const
     {
         // Manually inlining Frobenius for better performance
         FFieldElt temp(field_);
@@ -93,7 +93,7 @@ namespace apsi
         }
     }
 
-    void FFieldCRTBuilder::expand(FFieldArray &out, const FFieldPoly &in) const
+    void FFieldBatchEncoder::expand(FFieldArray &out, const FFieldPoly &in) const
     {
         // Manually inlining Frobenius for better performance
         FFieldElt temp(field_);
@@ -119,7 +119,7 @@ namespace apsi
         }
     }
 
-    void FFieldCRTBuilder::contract(FFieldArray &out, const FFieldArray &in) const
+    void FFieldBatchEncoder::contract(FFieldArray &out, const FFieldArray &in) const
     {
         for(uint64_t i = 0; i < ntt_ctx_.n_; i++)
         {
@@ -130,7 +130,7 @@ namespace apsi
         }
     }
 
-    void FFieldCRTBuilder::contract(FFieldPoly &out, const FFieldArray &in) const
+    void FFieldBatchEncoder::contract(FFieldPoly &out, const FFieldArray &in) const
     {
         out.set_zero();
         for(uint64_t i = 0; i < ntt_ctx_.n_; i++)
@@ -142,7 +142,7 @@ namespace apsi
         }
     }
 
-    void FFieldCRTBuilder::compose(Plaintext &destination, const FFieldArray &values) const
+    void FFieldBatchEncoder::compose(Plaintext &destination, const FFieldArray &values) const
     {
         if(values.size_ != ntt_ctx_.slot_count_)
         {
@@ -164,7 +164,7 @@ namespace apsi
         }
     }
 
-    void FFieldCRTBuilder::compose(seal::Plaintext &destination, const FFieldPoly &values) const
+    void FFieldBatchEncoder::compose(seal::Plaintext &destination, const FFieldPoly &values) const
     {
         if(values.length() > ntt_ctx_.slot_count())
         {
@@ -186,7 +186,7 @@ namespace apsi
         }
     }
 
-    void FFieldCRTBuilder::decompose(FFieldArray &destination, const Plaintext &plain) const
+    void FFieldBatchEncoder::decompose(FFieldArray &destination, const Plaintext &plain) const
     {
         if (destination.size_ != ntt_ctx_.slot_count_)
         {
@@ -221,7 +221,7 @@ namespace apsi
         contract(destination, expanded);
     }
 
-    void FFieldCRTBuilder::decompose(FFieldPoly &destination, const seal::Plaintext &plain) const
+    void FFieldBatchEncoder::decompose(FFieldPoly &destination, const seal::Plaintext &plain) const
     {
         uint64_t plain_coeff_count = plain.coeff_count();
         if(plain_coeff_count != ntt_ctx_.n_)

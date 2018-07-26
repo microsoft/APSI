@@ -3,6 +3,7 @@
 #include "apsi/tools/interpolate.h"
 #include "seal/context.h"
 #include "seal/util/mempool.h"
+#include "seal/defaultparams.h"
 
 #include  "cryptoTools/Common/TestCollection.h"
 #include  "cryptoTools/Crypto/PRNG.h"
@@ -49,14 +50,14 @@ void u64_interpolate_test()
 {
     using oc::u64;
 
-    seal::EncryptionParameters parms;
-    parms.set_poly_modulus("1x^64 + 1");
+    seal::EncryptionParameters parms(seal::scheme_type::BFV);
+    parms.set_poly_modulus_degree(64);
     parms.set_coeff_modulus(seal::coeff_modulus_128(1024));
     parms.set_plain_modulus(11);
 
-    seal::SEALContext context(parms);
+    auto context = seal::SEALContext::Create(parms);
 
-    auto plain_modulus = context.plain_modulus();
+    auto plain_modulus = context->context_data().parms().plain_modulus();
     int numPoints = std::min<int>(100, plain_modulus.value() - 1);
     int numTrials = 10;
 
@@ -89,15 +90,6 @@ void u64_interpolate_test()
 
         apsi::u64_newton_interpolate_poly(points, result, plain_modulus);
         //apsi::plaintext_newton_interpolate_poly(points, result, poly_modulus.pointer(), plain_modulus, pool, true);
-
-
-        // PolyCRTBuilder crtbuilder(context);
-
-        //std::cout << "result(x) = " << std::endl;
-        //for (int i = result.size() - 1; i; --i)
-        //    std::cout << result[i] << " x^"<<i<<" + ";
-        //std::cout << result[0] << std::endl;
-
 
         bool passed = true;
         for (int i = 0; i < points.size(); ++i)

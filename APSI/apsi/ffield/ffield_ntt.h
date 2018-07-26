@@ -15,7 +15,7 @@ namespace apsi
 {
     class FFieldNTT
     {
-        friend class FFieldCRTBuilder;
+        friend class FFieldBatchEncoder;
 
     public:
         FFieldNTT(std::shared_ptr<FField> field, unsigned log_degree, oc::PRNG &prng);

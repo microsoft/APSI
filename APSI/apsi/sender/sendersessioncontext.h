@@ -30,7 +30,7 @@ namespace apsi
                 public_key_(pub_key), 
                 evaluation_keys_(eval_keys)
             {
-                encryptor_.reset(new seal::Encryptor(*seal_context_, public_key_));
+                encryptor_.reset(new seal::Encryptor(seal_context_, public_key_));
             }
 
             SenderSessionContext(std::shared_ptr<seal::SEALContext> context) : 
@@ -46,7 +46,7 @@ namespace apsi
             void set_public_key(const seal::PublicKey &public_key)
             {
                 public_key_ = public_key;
-                encryptor_.reset(new seal::Encryptor(*seal_context_, public_key_));
+                encryptor_.reset(new seal::Encryptor(seal_context_, public_key_));
             }
 
             void set_evaluation_keys(const seal::EvaluationKeys &evaluation_keys)
@@ -60,13 +60,13 @@ namespace apsi
             void set_secret_key(const seal::SecretKey &secret_key)
             {
                 secret_key_ = secret_key;
-                decryptor_.reset(new seal::Decryptor(*seal_context_, secret_key_));
+                decryptor_.reset(new seal::Decryptor(seal_context_, secret_key_));
             }
 
             void set_small_secret_key(const seal::SecretKey &small_secret_key)
             {
                 small_secret_key_ = small_secret_key;
-                small_decryptor_.reset(new seal::Decryptor(*small_seal_context_, small_secret_key_));
+                small_decryptor_.reset(new seal::Decryptor(small_seal_context_, small_secret_key_));
             }
 
             const std::shared_ptr<seal::Encryptor> &encryptor()

@@ -1,5 +1,4 @@
 #include <stdexcept>
-#include "seal/chooser.h"
 #include "seal/defaultparams.h"
 #include "apsi/psiparams.h"
 #include "apsi/item.h"

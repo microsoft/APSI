@@ -1,4 +1,5 @@
 #include "apsidefines.h"
+#include "seal/context.h"
 #include <sstream>
 #include <random>
 
@@ -124,19 +125,18 @@ namespace apsi
 
     seal::Plaintext random_plaintext(const seal::SEALContext &context)
     {
-        const seal::BigPoly& poly_mod = context.poly_modulus();
-        const seal::SmallModulus& coeff_mod = context.plain_modulus();
-        int coeff_count = poly_mod.significant_coeff_count();
+        std::uint64_t plain_mod = context.context_data().parms().plain_modulus().value();
+        int coeff_count = context.context_data().parms().poly_modulus_degree();
         seal::Plaintext random(coeff_count);
         uint64_t* random_ptr = random.data();
 
         random_device rd;
         for (int i = 0; i < coeff_count - 1; i++)
         {
-            random_ptr[i] = (uint64_t)rd();
+            random_ptr[i] = static_cast<std::uint64_t>(rd());
             random_ptr[i] <<= 32;
-            random_ptr[i] = random_ptr[i] | (uint64_t)rd();
-            random_ptr[i] %= coeff_mod.value();
+            random_ptr[i] = random_ptr[i] | static_cast<std::uint64_t>(rd());
+            random_ptr[i] %= plain_mod;
         }
         random_ptr[coeff_count - 1] = 0;
         return random;

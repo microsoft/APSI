@@ -6,6 +6,7 @@
 #include <cmath>
 #include <numeric>
 #include <stdexcept>
+#include <cstdint>
 
 // APSI
 #include "apsi/tools/binsizemath.h"
@@ -21,13 +22,6 @@
 
 namespace apsi
 {
-    //enum class InterpolateMode
-    //{
-    //    None,
-    //    ShortStrings,
-    //    LongStrings
-    //};
-
     enum class OprfType
     {
         None,
@@ -36,7 +30,6 @@ namespace apsi
 
     struct CuckooParams
     {
-        cuckoo::CuckooMode cuckoo_mode;
         unsigned hash_func_count;
         unsigned hash_func_seed;
         unsigned max_probe;
@@ -57,7 +50,7 @@ namespace apsi
             std::uint64_t exfield_characteristic;
             unsigned exfield_degree;
         } exfield_params;
-        seal::EncryptionParameters encryption_params;
+        seal::EncryptionParameters encryption_params{ seal::scheme_type::BFV };
         unsigned decomposition_bit_count;
     };
 
@@ -78,7 +71,6 @@ namespace apsi
             sender_bin_size_(table_params.sender_bin_size), 
             split_count_(table_params.split_count),
             oprf_type_(oprfType),
-            cuckoo_mode_(cuckoo_params.cuckoo_mode),
             encryption_params_(seal_params.encryption_params),
             decomposition_bit_count_(seal_params.decomposition_bit_count),
             hash_func_count_(cuckoo_params.hash_func_count), 
@@ -175,18 +167,6 @@ namespace apsi
             return window_size_;
         }
 
-        //inline int poly_degree() const
-        //{
-        //    return poly_degree_;
-        //}
-
-        //inline int log_poly_degree() const
-        //{
-        //    return log_poly_degree_;
-        //}
-
-        //std::vector<seal::SmallModulus> coeff_modulus();
-
         inline const seal::EncryptionParameters &encryption_params() const
         {
             return encryption_params_;
@@ -200,11 +180,6 @@ namespace apsi
         inline std::string apsi_endpoint() const
         {
             return apsi_endpoint_;
-        }
-
-        inline cuckoo::CuckooMode get_cuckoo_mode() const
-        { 
-            return cuckoo_mode_; 
         }
 
         inline int get_label_bit_count() const { return value_bit_length_; }
@@ -227,12 +202,6 @@ namespace apsi
 
         int table_size_;
 
-        //int log_poly_degree_;
-
-        //int poly_degree_;
-
-        //int coeff_mod_bit_count_;
-
         int window_size_;
 
         int sender_bin_size_;
@@ -241,11 +210,13 @@ namespace apsi
 
         OprfType oprf_type_;
 
-        cuckoo::CuckooMode cuckoo_mode_;
+        int value_bit_length_ = 0;
+        
+        int value_byte_length_ = 0;
 
-        int value_bit_length_ = 0, value_byte_length_ = 0;
-
-        bool use_low_degree_poly_ = false, debug_ = false;
+        bool use_low_degree_poly_ = false;
+        
+        bool debug_ = false;
 
         seal::EncryptionParameters encryption_params_;
 

@@ -14,12 +14,12 @@
 
 namespace apsi
 {
-    class FFieldFastCRTBuilder
+    class FFieldFastBatchEncoder
     {
     public:
-        FFieldFastCRTBuilder(std::uint64_t ch, std::uint64_t d, unsigned log_n);
+        FFieldFastBatchEncoder(std::uint64_t ch, std::uint64_t d, unsigned log_n);
 
-        ~FFieldFastCRTBuilder();
+        ~FFieldFastBatchEncoder();
 
         inline std::uint64_t ch() const
         {

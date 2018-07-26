@@ -39,8 +39,8 @@ namespace apsi
         friend class FFieldArray;
         friend class FFieldPoly;
         friend class FFieldNTT;
-        friend class FFieldCRTBuilder;
-        friend class FFieldFastCRTBuilder;
+        friend class FFieldBatchEncoder;
+        friend class FFieldFastBatchEncoder;
 
     public:
         FFieldElt(std::shared_ptr<FField> field) :

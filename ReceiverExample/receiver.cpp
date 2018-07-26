@@ -189,7 +189,7 @@ std::string print(span<u8> s)
 //     #<{(|
 //     Use generalized batching in integer mode. This requires using an ExField with f(x) = x,
 //     which makes ExField become an integer field. Then generalized batching is essentially
-//     equivalent to SEAL's PolyCRTBuilder, which is slightly faster due to David Harvey's
+//     equivalent to SEAL's BatchEncoder, which is slightly faster due to David Harvey's
 //     optimization of NTT butterfly operation on integers.
 //
 //     However, in this case, we can only use short PSI items such that the reduced item length
@@ -426,9 +426,6 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     // Cuckoo hash parameters
     CuckooParams cuckoo_params;
     {
-        // Use standard Cuckoo or PermutationBasedCuckoo
-        cuckoo_params.cuckoo_mode = cuckoo::CuckooMode::Normal;
-
         // Cuckoo hash function count
         cuckoo_params.hash_func_count = 3;
 
@@ -468,7 +465,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     SEALParams seal_params;
     {
         cmd.setDefault("polyModulus", 4096);
-        seal_params.encryption_params.set_poly_modulus("1x^" + to_string(cmd.get<int>("polyModulus")) + " + 1");
+        seal_params.encryption_params.set_poly_modulus_degree(cmd.get<int>("polyModulus"));
         
         vector<SmallModulus> coeff_modulus;
         if(!cmd.isSet("coeffModulus"))

@@ -62,14 +62,14 @@ namespace apsi
                 prng_.SetSeed(block, 256);
             }
 
-            // std::shared_ptr<FFieldCRTBuilder> &exbuilder()
+            // std::shared_ptr<FFieldBatchEncoder> &ex_batch_encoder()
             // {
-            //     return exbuilder_;
+            //     return ex_batch_encoder_;
             // }
             //
-            // void set_exbuilder(std::shared_ptr<FFieldCRTBuilder> batcher)
+            // void set_ex_batch_encoder(std::shared_ptr<FFieldBatchEncoder> batcher)
             // {
-            //     exbuilder_ = std::move(batcher);
+            //     ex_batch_encoder_ = std::move(batcher);
             // }
 
             inline void construct_variables(PSIParams &params)

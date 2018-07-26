@@ -20,8 +20,8 @@ namespace apsi
 {
     namespace sender
     {
-        Sender::Sender(const PSIParams &params, int total_thread_count,
-            int session_thread_count, const MemoryPoolHandle &pool) :
+        Sender::Sender(const PSIParams &params, int total_thread_count, 
+                int session_thread_count, const MemoryPoolHandle &pool) :
             params_(params),
             pool_(pool),
             total_thread_count_(total_thread_count),
@@ -38,39 +38,39 @@ namespace apsi
 
         void Sender::initialize()
         {
-            seal_context_.reset(new SEALContext(params_.encryption_params()));
+            seal_context_ = SEALContext::Create(params_.encryption_params());
 
             // Create the poly_mod like this since FField constructor takes seal::BigPoly instead 
             // of seal::PolyModulus. Reason for this is that seal::PolyModulus does not manage its own memory.
             // const BigPoly poly_mod(ex_field_->length(), ex_field_->ch().bit_count(),
             //     const_cast<uint64_t*>(ex_field_->poly_modulus().get()));
 
-            // Construct shared Evaluator and PolyCRTBuilder
-            evaluator_.reset(new Evaluator(*seal_context_));
+            // Construct shared Evaluator and BatchEncoder
+            evaluator_.reset(new Evaluator(seal_context_));
             vector<shared_ptr<FField> > field_vec;
-            if (seal_context_->qualifiers().enable_batching)
+            if (seal_context_->context_data().qualifiers().enable_batching)
             {
                 auto ex_field = FField::Acquire(
                     params_.exfield_characteristic(),
                     params_.exfield_degree());
-                builder_.reset(new PolyCRTBuilder(*seal_context_));
-                for (unsigned i = 0; i < builder_->slot_count(); i++)
+                batch_encoder_.reset(new BatchEncoder(seal_context_));
+                for (unsigned i = 0; i < batch_encoder_->slot_count(); i++)
                 {
                     field_vec.emplace_back(ex_field);
                 }
             }
             else
             {
-                ex_builder_.reset(new FFieldFastCRTBuilder(
+                ex_batch_encoder_.reset(new FFieldFastBatchEncoder(
                     params_.exfield_characteristic(),
                     params_.exfield_degree(),
                     get_power_of_two(params_.encryption_params().poly_modulus_degree())
                 ));
-                field_vec = ex_builder_->fields();
+                field_vec = ex_batch_encoder_->fields();
             }
 
             // Create SenderDB
-            sender_db_.reset(new SenderDB(params_, field_vec));
+            sender_db_.reset(new SenderDB(params_, seal_context_, field_vec));
 
             compressor_.reset(new CiphertextCompressor(params_.encryption_params()));
 
@@ -131,13 +131,13 @@ namespace apsi
                     setThreadName("sender_offline_" + std::to_string(i));
                     int thread_context_idx = acquire_thread_context();
                     SenderThreadContext &context = thread_contexts_[thread_context_idx];
-                    sender_db_->batched_randomized_symmetric_polys(context, evaluator_, builder_, ex_builder_, total_thread_count_);
+                    sender_db_->batched_randomized_symmetric_polys(context, evaluator_, batch_encoder_, ex_batch_encoder_, total_thread_count_);
 
                     if (i == 0)
                         stop_watch.set_time_point("symmpoly_done");
                     if (params_.get_label_bit_count())
                     {
-                        sender_db_->batched_interpolate_polys(context, total_thread_count_, evaluator_, builder_, ex_builder_);
+                        sender_db_->batched_interpolate_polys(context, total_thread_count_, evaluator_, batch_encoder_, ex_batch_encoder_);
 
                         if (i == 0)
                             stop_watch.set_time_point("interpolation_done");
@@ -195,7 +195,7 @@ namespace apsi
 
             if (params_.debug())
             {
-                session_context.set_small_context(make_shared<SEALContext>(compressor_->small_parms()));
+                session_context.set_small_context(SEALContext::Create(compressor_->small_parms()));
 
                 seal::SecretKey k;
                 receive_prvkey(k, chl);
@@ -252,10 +252,10 @@ namespace apsi
 
             session_context.decryptor_->decrypt(c, p);
 
-            if (builder_)
+            if (batch_encoder_)
             {
                 std::vector<u64> integer_batch;
-                builder_->decompose(p, integer_batch, pool_);
+                batch_encoder_->decompose(p, integer_batch, pool_);
 
                 dest.set_zero();
 
@@ -266,7 +266,7 @@ namespace apsi
             }
             else
             {
-                ex_builder_->decompose(p, dest);
+                ex_batch_encoder_->decompose(p, dest);
             }
 
 
@@ -437,11 +437,13 @@ namespace apsi
 
                         // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
                         // Observe that the first call to mult is always multiplying coeff[0] by 1....
-                        evaluator_->multiply_plain_ntt(powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
+                        // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
+                        evaluator_->multiply_plain(powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
 
                         for (int s = 1; s <= params_.split_size(); s++)
                         {
-                            evaluator_->multiply_plain_ntt(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
+                            // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
+                            evaluator_->multiply_plain(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
                             evaluator_->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
                             currResult ^= 1;
                         }
@@ -463,8 +465,8 @@ namespace apsi
                                 int s = 0;
                                 while (block.batched_label_coeffs_[s].is_zero()) ++s;
 
-
-                                evaluator_->multiply_plain_ntt(powers[batch][s], block.batched_label_coeffs_[s], label_results[curr_label]);
+                                // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
+                                evaluator_->multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], label_results[curr_label]);
 
 
                                 while (++s < block.batched_label_coeffs_.size())
@@ -472,7 +474,8 @@ namespace apsi
                                     // label_result += coeff[s] * x^s;
                                     if (block.batched_label_coeffs_[s].is_zero() == false)
                                     {
-                                        evaluator_->multiply_plain_ntt(powers[batch][s], block.batched_label_coeffs_[s], tmp);
+                                        // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
+                                        evaluator_->multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], tmp);
                                         evaluator_->add(tmp, label_results[curr_label], label_results[curr_label ^ 1]);
                                         curr_label ^= 1;
 
@@ -506,7 +509,8 @@ namespace apsi
 
                                 // TODO: edge case where block.batched_label_coeffs_[0] is zero. 
 
-                                evaluator_->multiply_plain_ntt(powers[batch][0], block.batched_label_coeffs_[0], label_results[curr_label]);
+                                // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
+                                evaluator_->multiply_plain(powers[batch][0], block.batched_label_coeffs_[0], label_results[curr_label]);
                             }
                             else
                             {
@@ -661,7 +665,7 @@ namespace apsi
                 for (int i = 1; i < batch_powers.size(); ++i)
                 {
                     session_context.decryptor_->decrypt(batch_powers[i], p);
-                    ex_builder_->decompose(p, dest);
+                    ex_batch_encoder_->decompose(p, dest);
 
                     if (dest != cur_power)
                     {

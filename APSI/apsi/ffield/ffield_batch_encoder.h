@@ -17,12 +17,12 @@
 
 namespace apsi
 {
-    class FFieldCRTBuilder
+    class FFieldBatchEncoder 
     {
     public:
-        FFieldCRTBuilder(std::shared_ptr<FField> field, unsigned log_degree, oc::PRNG &prng);
+        FFieldBatchEncoder(std::shared_ptr<FField> field, unsigned log_degree, oc::PRNG &prng);
 
-        FFieldCRTBuilder(std::shared_ptr<FField> field, unsigned log_degree, FFieldElt zeta);
+        FFieldBatchEncoder(std::shared_ptr<FField> field, unsigned log_degree, FFieldElt zeta);
 
         inline FFieldElt zeta() const
         {

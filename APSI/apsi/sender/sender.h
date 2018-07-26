@@ -15,7 +15,7 @@
 #include "apsi/sender/sendersessioncontext.h"
 #include "apsi/sender/senderthreadcontext.h"
 #include "apsi/ffield/ffield.h"
-#include "apsi/ffield/ffield_fast_crt_builder.h"
+#include "apsi/ffield/ffield_fast_batch_encoder.h"
 #include "apsi/tools/sealcompress.h"
 
 // SEAL
@@ -23,7 +23,7 @@
 #include "seal/encryptionparams.h"
 #include "seal/ciphertext.h"
 #include "seal/context.h"
-#include "seal/polycrt.h"
+#include "seal/batchencoder.h"
 #include "seal/evaluator.h"
 
 // CryptoTools
@@ -35,8 +35,6 @@ namespace apsi
 {
     namespace sender
     {
-
-
         struct WindowingDag
         {
             enum class NodeState {
@@ -104,16 +102,6 @@ namespace apsi
 
             void stop();
 
-            //void save_db(std::ostream &stream) const
-            //{
-            //    sender_db_.save(stream);
-            //}
-
-            //void load_db(std::istream &stream)
-            //{
-            //    sender_db_.load(stream);
-            //}
-
         private:
             void initialize();
 
@@ -151,7 +139,7 @@ namespace apsi
 
             @see compute_dot_product for an explanation of the result.
             */
-            void respond(std::vector<std::vector<seal::Ciphertext>>&query,
+            void respond(std::vector<std::vector<seal::Ciphertext> > &query,
                 apsi::sender::SenderSessionContext &session_context, oc::Channel &channel);
 
             /**
@@ -181,9 +169,9 @@ namespace apsi
 
             std::shared_ptr<seal::Evaluator> evaluator_;
 
-            std::shared_ptr<seal::PolyCRTBuilder> builder_;
+            std::shared_ptr<seal::BatchEncoder> batch_encoder_;
 
-            std::shared_ptr<FFieldFastCRTBuilder> ex_builder_;
+            std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder_;
 
             // Objects for compressed ciphertexts
             std::shared_ptr<CiphertextCompressor> compressor_;
@@ -201,8 +189,6 @@ namespace apsi
             oc::PRNG prng_;
 
             bool stopped_;
-
-
 
             void debug_decrypt(
                 SenderSessionContext &session_context,

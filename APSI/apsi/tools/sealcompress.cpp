@@ -89,11 +89,11 @@ namespace apsi
         int encrypted_size = encrypted.size();
 
         // Verify parameters.
-        if (encrypted.hash_block() != parms_.hash_block())
+        if (encrypted.parms_id() != parms_.parms_id())
         {
             throw invalid_argument("encrypted is not valid for encryption parameters");
         }
-        if (destination.hash_block() != small_parms_.hash_block())
+        if (destination.parms_id() != small_parms_.parms_id())
         {
             throw invalid_argument("destination is not valid for encryption parameters");
         }
@@ -147,13 +147,13 @@ namespace apsi
         int coeff_count = parms_.poly_modulus_degree();
 
         // Verify parameters.
-        if (secret_key.hash_block() != parms_.hash_block())
+        if (secret_key.parms_id() != parms_.parms_id())
         {
             throw invalid_argument("secret_key is not valid for encryption parameters");
         }
 
         // Set destination hash block and resize appropriately
-        destination.hash_block() = small_parms_.hash_block();
+        destination.parms_id() = small_parms_.parms_id();
         destination.data().resize(coeff_count, bits_per_uint64);
 
         // Set destination value
@@ -168,7 +168,7 @@ namespace apsi
         {
             throw invalid_argument("can only compress fully relinearized ciphertexts");
         }
-        if (encrypted.hash_block() != small_parms_.hash_block())
+        if (encrypted.parms_id() != small_parms_.parms_id())
         {
             throw invalid_argument("encrypted is not valid for encryption parameters");
         }
@@ -185,8 +185,8 @@ namespace apsi
         }
 
         // Write parameter hash
-        stream.write(reinterpret_cast<const char*>(&encrypted.hash_block()), 
-            sizeof(EncryptionParameters::hash_block_type));
+        stream.write(reinterpret_cast<const char*>(&encrypted.parms_id()), 
+            sizeof(parms_id_type));
 
         // Create compressed polynomials
         int compr_data_byte_count = compr_coeff_byte_count * encrypted_size * coeff_count;
@@ -218,7 +218,7 @@ namespace apsi
         {
             throw invalid_argument("can only decompress fully relinearized ciphertexts");
         }
-        if (destination.hash_block() != small_parms_.hash_block())
+        if (destination.parms_id() != small_parms_.parms_id())
         {
             throw invalid_argument("destination is not valid for encryption parameters");
         }
@@ -235,12 +235,11 @@ namespace apsi
         }
 
         // Read parameter hash
-        EncryptionParameters::hash_block_type hash_block;
-        stream.read(reinterpret_cast<char*>(&hash_block), 
-            sizeof(EncryptionParameters::hash_block_type));
+        parms_id_type parms_id;
+        stream.read(reinterpret_cast<char*>(&parms_id), sizeof(parms_id_type));
 
         // If hash is correct then we assume sizes are all known and correct
-        if(hash_block != destination.hash_block())
+        if(parms_id != destination.parms_id())
         {
             throw invalid_argument("destination is not valid for loaded ciphertext");
         }

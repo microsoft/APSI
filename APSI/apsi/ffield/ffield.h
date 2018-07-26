@@ -118,9 +118,9 @@ namespace apsi
         friend class FFieldElt;
         friend class FFieldArray;
         friend class FFieldPoly;
-        friend class FFieldCRTBuilder;
+        friend class FFieldBatchEncoder;
         friend class FFieldNTT;
-        friend class FFieldFastCRTBuilder;
+        friend class FFieldFastBatchEncoder;
 
     public:
         FField(const FField &) = delete;

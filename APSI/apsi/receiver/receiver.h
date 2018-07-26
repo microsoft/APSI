@@ -7,7 +7,7 @@
 // APSI
 #include "apsi/item.h"
 #include "apsi/psiparams.h"
-#include "apsi/ffield/ffield_fast_crt_builder.h"
+#include "apsi/ffield/ffield_fast_batch_encoder.h"
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/tools/sealcompress.h"
 
@@ -22,7 +22,7 @@
 #include "seal/publickey.h"
 #include "seal/secretkey.h"
 #include "seal/evaluationkeys.h"
-#include "seal/polycrt.h"
+#include "seal/batchencoder.h"
 
 // CryptoTools
 #include "cryptoTools/Network/Channel.h"
@@ -149,9 +149,9 @@ namespace apsi
                 return ex_field_;
             }
 
-            std::shared_ptr<FFieldFastCRTBuilder> ex_builder() const
+            std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder() const
             {
-                return exbuilder_;
+                return ex_batch_encoder_;
             }
 
             const seal::PublicKey& public_key() const
@@ -190,15 +190,15 @@ namespace apsi
 
             seal::EvaluationKeys evaluation_keys_;
 
-            std::shared_ptr<FFieldFastCRTBuilder> exbuilder_;
+            std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder_;
 
-            std::unique_ptr<seal::PolyCRTBuilder> polycrtbuilder_;
+            std::unique_ptr<seal::BatchEncoder> batch_encoder_;
 
             int slot_count_;
 
             // Objects for compressed ciphertexts
             std::unique_ptr<CiphertextCompressor> compressor_;
-            seal::EncryptionParameters small_parms_;
+            seal::EncryptionParameters small_parms_{seal::scheme_type::BFV};
             std::unique_ptr<seal::Decryptor> small_decryptor_;
             seal::SecretKey small_secret_key_;
         };

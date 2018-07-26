@@ -15,7 +15,7 @@
 #include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_elt.h"
 #include "apsi/ffield/ffield_array.h"
-#include "apsi/ffield/ffield_fast_crt_builder.h"
+#include "apsi/ffield/ffield_fast_batch_encoder.h"
 
 // Cuckoo
 #include "cuckoo/cuckoo.h"
@@ -23,8 +23,7 @@
 // SEAL
 #include "seal/plaintext.h"
 #include "seal/evaluator.h"
-#include "seal/polycrt.h"
-
+#include "seal/batchencoder.h"
 // CryptoTools
 #include "cryptoTools/Common/Matrix.h"
 #include "cryptoTools/Crypto/PRNG.h"
@@ -36,7 +35,7 @@ namespace apsi
         struct DBInterpolationCache
         {
             DBInterpolationCache(
-                std::shared_ptr<FFieldFastCRTBuilder> ex_builder,
+                std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
                 int batch_size,
                 int items_per_split,
                 int value_byte_length
@@ -110,7 +109,7 @@ namespace apsi
             Output polynomial terms: (1, \sum_i a_i, \sum_{i,j} a_i*a_j, ...).
             */
             void symmetric_polys(
-                SenderThreadContext &context,
+                SenderThreadContext &th_context,
                 oc::MatrixView<_ffield_array_elt_t> symm_block,
                 int encoding_bit_length,
                 const FFieldArray &neg_null_element);
@@ -123,7 +122,7 @@ namespace apsi
             @see symmetric_polys for computing symmetric polynomials.
             */
             void randomized_symmetric_polys(
-                SenderThreadContext &context,
+                SenderThreadContext &th_context,
                 oc::MatrixView<_ffield_array_elt_t> symm_block,
                 int encoding_bit_length,
                 FFieldArray &neg_null_element);
@@ -131,21 +130,13 @@ namespace apsi
             Position try_aquire_position(int cuckoo_loc, oc::PRNG& prng);
 
             void batch_interpolate(
-                SenderThreadContext &context,
-                const seal::SmallModulus& mod,
+                SenderThreadContext &th_context,
+                std::shared_ptr<seal::SEALContext> seal_context,
                 std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<seal::PolyCRTBuilder> builder,
-                std::shared_ptr<FFieldFastCRTBuilder> ex_builder,
-                DBInterpolationCache& cache,
-                const PSIParams& params);
-
-            void test_eval(
-                SenderThreadContext & context,
-                const seal::SmallModulus& mod,
-                std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<seal::PolyCRTBuilder> builder,
-                std::shared_ptr<FFieldFastCRTBuilder> ex_builder,
-                const PSIParams& params);
+                std::shared_ptr<seal::BatchEncoder> batch_encoder,
+                std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
+                DBInterpolationCache &cache,
+                const PSIParams &params);
 
             void check(const Position& pos);
 
@@ -194,7 +185,9 @@ namespace apsi
         class SenderDB
         {
         public:
-            SenderDB(const PSIParams &params, std::vector<std::shared_ptr<FField> > &ex_field);
+            SenderDB(const PSIParams &params, 
+                std::shared_ptr<seal::SEALContext> &seal_context,
+                std::vector<std::shared_ptr<FField> > &ex_field);
 
             /**
             Clears sender's database and set all entries to sender's null item.
@@ -239,18 +232,18 @@ namespace apsi
             @see randomized_symmetric_polys for computing randomized symmetric polynomials.
             */
             void batched_randomized_symmetric_polys(
-                SenderThreadContext &context,
+                SenderThreadContext &th_context,
                 std::shared_ptr<seal::Evaluator> evaluator, 
-                std::shared_ptr<seal::PolyCRTBuilder> builder,
-                std::shared_ptr<FFieldFastCRTBuilder> ex_builder,
+                std::shared_ptr<seal::BatchEncoder> batch_encoder,
+                std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
                 int thread_count);
 
             void batched_interpolate_polys(
-                SenderThreadContext& context,
+                SenderThreadContext& th_context,
                 int thread_count,
                 std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<seal::PolyCRTBuilder> builder,
-                std::shared_ptr<FFieldFastCRTBuilder> ex_builder
+                std::shared_ptr<seal::BatchEncoder> batch_encoder,
+                std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder
                 );
 
             //Item& get_key(u64 cuckoo_index, u64 position_idx) {
@@ -282,6 +275,7 @@ namespace apsi
 
         private:
             PSIParams params_;
+            std::shared_ptr<seal::SEALContext> seal_context_;
             std::vector<std::shared_ptr<FField> > ex_field_;
             FFieldArray null_element_;
             FFieldArray neg_null_element_;

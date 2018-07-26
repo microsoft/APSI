@@ -1,4 +1,4 @@
-#include "apsi/ffield/ffield_fast_crt_builder.h"
+#include "apsi/ffield/ffield_fast_batch_encoder.h"
 #include "seal/util/common.h"
 #include <iostream>
 
@@ -9,7 +9,7 @@ using namespace gsl;
 
 namespace apsi
 {
-    FFieldFastCRTBuilder::~FFieldFastCRTBuilder()
+    FFieldFastBatchEncoder::~FFieldFastBatchEncoder()
     {
         nmod_poly_factor_clear(factorization_);
 
@@ -28,7 +28,7 @@ namespace apsi
         delete[] modulus_tree_;
     }
 
-    FFieldFastCRTBuilder::FFieldFastCRTBuilder(std::uint64_t ch, std::uint64_t d, unsigned log_n) :
+    FFieldFastBatchEncoder::FFieldFastBatchEncoder(std::uint64_t ch, std::uint64_t d, unsigned log_n) :
         ch_(ch),
         d_(d),
         log_n_(log_n),
@@ -95,7 +95,7 @@ namespace apsi
         nmod_poly_clear(cyclotomic_poly);
     }
 
-    void FFieldFastCRTBuilder::build_modulus_tree()
+    void FFieldFastBatchEncoder::build_modulus_tree()
     {
         for(uint64_t node = 2 * slot_count_ - 2; node >= slot_count_ - 1; node--)
         {
@@ -111,7 +111,7 @@ namespace apsi
         }
     }
 
-    void FFieldFastCRTBuilder::interpolate(nmod_poly_struct *result_tree) const
+    void FFieldFastBatchEncoder::interpolate(nmod_poly_struct *result_tree) const
     {
         // Initialize temp_poly
         nmod_poly_t temp_poly;
@@ -131,7 +131,7 @@ namespace apsi
         nmod_poly_rem(result_tree, result_tree, modulus_tree_);
     }
 
-    void FFieldFastCRTBuilder::reduce(nmod_poly_struct *result_tree, nmod_poly_struct *destination) const
+    void FFieldFastBatchEncoder::reduce(nmod_poly_struct *result_tree, nmod_poly_struct *destination) const
     {
         for(uint64_t node = 0; node < slot_count_ - 1; node++)
         {
@@ -150,7 +150,7 @@ namespace apsi
         }
     }
 
-    void FFieldFastCRTBuilder::compose(const FFieldArray &values, Plaintext &destination) const
+    void FFieldFastBatchEncoder::compose(const FFieldArray &values, Plaintext &destination) const
     {
         if(values.size() != slot_count_)
         {
@@ -195,7 +195,7 @@ namespace apsi
         delete[] result_tree;
     }
 
-    void FFieldFastCRTBuilder::decompose(const Plaintext &plain, FFieldArray &destination) const
+    void FFieldFastBatchEncoder::decompose(const Plaintext &plain, FFieldArray &destination) const
     {
         if(destination.size() != slot_count_)
         {

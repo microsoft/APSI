@@ -51,8 +51,8 @@ namespace apsi
 
     private:
         seal::MemoryPoolHandle pool_;
-        seal::EncryptionParameters parms_;
-        seal::EncryptionParameters small_parms_;
+        seal::EncryptionParameters parms_{seal::scheme_type::BFV};
+        seal::EncryptionParameters small_parms_{seal::scheme_type::BFV};
 
         // Product of all moduli except q1
         std::uint64_t coeff_mod_prod_;

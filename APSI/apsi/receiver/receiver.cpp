@@ -51,7 +51,7 @@ namespace apsi
             //enc_params.set_coeff_modulus(params_.coeff_modulus());
             //enc_params.set_plain_modulus(ex_field_->coeff_modulus());
 
-            SEALContext seal_context(params_.encryption_params());
+            auto seal_context = SEALContext::Create(params_.encryption_params());
             KeyGenerator generator(seal_context);
 
             public_key_ = generator.public_key();
@@ -63,20 +63,20 @@ namespace apsi
             // Initializing tools for dealing with compressed ciphertexts
             compressor_.reset(new CiphertextCompressor(params_.encryption_params(), pool_));
             small_parms_ = compressor_->small_parms();
-            SEALContext small_seal_context(small_parms_);
+            auto small_seal_context = SEALContext::Create(small_parms_);
             compressor_->mod_switch(secret_key_, small_secret_key_);
             small_decryptor_.reset(new Decryptor(small_seal_context, small_secret_key_));
 
             generator.generate_evaluation_keys(params_.decomposition_bit_count(), evaluation_keys_);
 
-            if (seal_context.qualifiers().enable_batching)
+            if (seal_context->context_data().qualifiers().enable_batching)
             {
-                polycrtbuilder_.reset(new PolyCRTBuilder(seal_context));
+                batch_encoder_.reset(new BatchEncoder(seal_context));
             }
 
-            if (!polycrtbuilder_)
+            if (!batch_encoder_)
             {
-                exbuilder_.reset(new FFieldFastCRTBuilder(ex_field_->ch(), ex_field_->d(),
+                ex_batch_encoder_.reset(new FFieldFastBatchEncoder(ex_field_->ch(), ex_field_->d(),
                     get_power_of_two(params_.encryption_params().poly_modulus_degree())));
             }
         }
@@ -199,7 +199,7 @@ namespace apsi
 
             unique_ptr<FFieldArray> exfield_items;
             unsigned padded_cuckoo_capacity = ((cuckoo->table_size() + slot_count_ - 1) / slot_count_) * slot_count_;
-            if (polycrtbuilder_)
+            if (batch_encoder_)
             {
                 exfield_items.reset(new FFieldArray(ex_field_, padded_cuckoo_capacity));
             }
@@ -209,7 +209,7 @@ namespace apsi
                 field_vec.reserve(padded_cuckoo_capacity);
                 for (unsigned i = 0; i < padded_cuckoo_capacity; i++)
                 {
-                    field_vec.emplace_back(exbuilder_->field(i % slot_count_));
+                    field_vec.emplace_back(ex_batch_encoder_->field(i % slot_count_));
                 }
                 exfield_items.reset(new FFieldArray(field_vec));
             }
@@ -262,9 +262,6 @@ namespace apsi
             auto receiver_null_item = oc::AllOneBlock;
 
             unique_ptr<CuckooInterface> cuckoo(
-                params_.get_cuckoo_mode() == CuckooMode::Permutation ?
-                    nullptr
-                :
                 static_cast<CuckooInterface*>(new Cuckoo(
                     params_.hash_func_count(),
                     params_.hash_func_seed(),
@@ -314,15 +311,8 @@ namespace apsi
                 auto q = cuckoo.query_item(items[i]);
                 indice[q.table_index()] = i;
 
-                if (params_.get_cuckoo_mode() == CuckooMode::Permutation)
-                {
-                    throw runtime_error("not implemented");
-                }
-                else
-                {
-                    if (neq(items[i], encodings[q.table_index()]))
-                        throw runtime_error(LOCATION);
-                }
+                if (neq(items[i], encodings[q.table_index()]))
+                    throw runtime_error(LOCATION);
 
                 //ostreamLock(cout) << "Ritem[" << i << "] = " << items[i] << " -> " << q.hash_func_index() << " " << encodings[q.table_index()] << " @ " << q.table_index() << endl;
             }
@@ -393,30 +383,31 @@ namespace apsi
             destination.clear();
             destination.reserve(num_of_batches);
             Plaintext plain(pool_);
-            if (polycrtbuilder_)
+            if (batch_encoder_)
             {
                 for (int i = 0; i < num_of_batches; i++)
                 {
-                    // This is a bit silly; PolyCRTBuilder only takes vector inputs
+                    // This is a bit silly; BatchEncoder only takes vector inputs
+                    // NO LONGER TRUE! Update to use span
                     for (int j = 0; j < batch_size; j++)
                     {
                         integer_batch[j] = input.get_coeff_of(i * batch_size + j, 0);
                     }
-                    polycrtbuilder_->compose(integer_batch, plain);
+                    batch_encoder_->compose(integer_batch, plain);
                     destination.emplace_back(params_.encryption_params(), pool_);
                     encryptor_->encrypt(plain, destination.back(), pool_);
                 }
             }
             else
             {
-                FFieldArray batch(exbuilder_->create_array());
+                FFieldArray batch(ex_batch_encoder_->create_array());
                 for (int i = 0; i < num_of_batches; i++)
                 {
                     for (int j = 0; j < batch_size; j++)
                     {
                         batch.set(j, i * batch_size + j, input);
                     }
-                    exbuilder_->compose(batch, plain);
+                    ex_batch_encoder_->compose(batch, plain);
                     destination.emplace_back(params_.encryption_params(), pool_);
                     encryptor_->encrypt(plain, destination.back(), pool_);
                 }
@@ -428,7 +419,7 @@ namespace apsi
         //    if (result_ciphers.size() != params_.split_count() || result_ciphers[0].size() != params_.batch_count())
         //        throw invalid_argument("Result ciphers have unexpexted sizes.");
 
-        //    int slot_count = exbuilder_->slot_count();
+        //    int slot_count = ex_batch_encoder_->slot_count();
         //    memory_backing_.emplace_back(Pointer());
         //    vector<vector<ExFieldElement>> result = ex_field_->allocate_elements(
         //        result_ciphers.size(), result_ciphers[0].size() * slot_count, memory_backing_.back());
@@ -500,11 +491,11 @@ namespace apsi
                 MemoryPoolHandle local_pool(MemoryPoolHandle::New());
                 Plaintext p(local_pool);
                 Ciphertext tmp(small_parms_, local_pool);
-                const bool short_strings = !!polycrtbuilder_;
+                const bool short_strings = !!batch_encoder_;
                 unique_ptr<FFieldArray> batch;
                 if (!short_strings)
                 {
-                    batch.reset(new FFieldArray(exbuilder_->create_array()));
+                    batch.reset(new FFieldArray(ex_batch_encoder_->create_array()));
                 }
                 vector<uint64_t> integer_batch(batch_size);
 
@@ -537,9 +528,9 @@ namespace apsi
 
                     //vector<uint64_t> integer_batch(batch_size);
                     if (short_strings)
-                        polycrtbuilder_->decompose(p, integer_batch, local_pool);
+                        batch_encoder_->decompose(p, integer_batch, local_pool);
                     else
-                        exbuilder_->decompose(p, *batch);
+                        ex_batch_encoder_->decompose(p, *batch);
 
                     for (int k = 0; k < integer_batch.size(); k++)
                     {
@@ -584,13 +575,13 @@ namespace apsi
 
 
                         if (short_strings)
-                            polycrtbuilder_->decompose(p, integer_batch, local_pool);
+                            batch_encoder_->decompose(p, integer_batch, local_pool);
                         else
                         {
                             // make sure its the right size. decrypt will shorted when there are zero coeffs at the top.
-                            p.resize(exbuilder_->n());
+                            p.resize(ex_batch_encoder_->n());
 
-                            exbuilder_->decompose(p, *batch);
+                            ex_batch_encoder_->decompose(p, *batch);
                         }
 
                         for (int k = 0; k < integer_batch.size(); k++)
@@ -643,9 +634,9 @@ namespace apsi
             throw std::runtime_error("outdated code");
             decrypt(tmp, p);
 
-            if (polycrtbuilder_)
+            if (batch_encoder_)
             {
-                polycrtbuilder_->decompose(p, integer_batch, pool_);
+                batch_encoder_->decompose(p, integer_batch, pool_);
 
                 for (int k = 0; k < integer_batch.size(); k++)
                 {
@@ -660,7 +651,7 @@ namespace apsi
             }
             else
             {
-                exbuilder_->decompose(p, batch);
+                ex_batch_encoder_->decompose(p, batch);
                 for (int k = 0; k < batch.size(); k++)
                 {
                     rr[k] = batch.is_zero(k);
@@ -674,7 +665,7 @@ namespace apsi
         //{
         //	int num_of_splits = params_.split_count(),
         //		num_of_batches = params_.batch_count(),
-        //		slot_count = exbuilder_->slot_count();
+        //		slot_count = ex_batch_encoder_->slot_count();
 
         //	memory_backing_.emplace_back(Pointer());
         //	result = ex_field_->allocate_elements(
@@ -700,22 +691,22 @@ namespace apsi
         //vector<::ExFieldElement>& result,
         //::Pointer& backing)
         //     {
-        //         int slot_count = exbuilder_->slot_count();
+        //         int slot_count = ex_batch_encoder_->slot_count();
         //         
         //         vector<ExFieldElement> result = ex_field_->allocate_elements(ciphers.size() * slot_count, backing);
         //         Pointer tmp_backing;
         //         vector<ExFieldElement> temp = ex_field_->allocate_elements(slot_count, tmp_backing);
         //         for (int i = 0; i < ciphers.size(); i++)
         //         {
-        //             if (polycrtbuilder_)
+        //             if (batch_encoder_)
         //             {
-        //                 vector<uint64_t> integer_batch = polycrtbuilder_->decompose(decryptor_->decrypt(ciphers[i]));
+        //                 vector<uint64_t> integer_batch = batch_encoder_->decompose(decryptor_->decrypt(ciphers[i]));
         //                 for (int j = 0; j < integer_batch.size(); j++)
         //                     *temp[j].pointer(0) = integer_batch[j];
         //             }
         //             else
         //             {
-        //                 exbuilder_->decompose(decryptor_->decrypt(ciphers[i]), temp);
+        //                 ex_batch_encoder_->decompose(decryptor_->decrypt(ciphers[i]), temp);
         //             }
         //             for(int j = 0; j < temp.size(); j++)
         //                 result[i * slot_count + j] = temp[j];
