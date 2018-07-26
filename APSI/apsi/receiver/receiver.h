@@ -15,6 +15,7 @@
 #include "cuckoo/cuckoo.h"
 
 // SEAL
+#include "seal/context.h"
 #include "seal/biguint.h"
 #include "seal/bigpolyarray.h"
 #include "seal/encryptor.h"
@@ -174,6 +175,8 @@ namespace apsi
 
             PSIParams params_;
 
+            std::shared_ptr<seal::SEALContext> seal_context_;
+
             int thread_count_;
 
             seal::MemoryPoolHandle pool_;
@@ -198,10 +201,6 @@ namespace apsi
 
             // Objects for compressed ciphertexts
             std::unique_ptr<CiphertextCompressor> compressor_;
-            seal::EncryptionParameters small_parms_{seal::scheme_type::BFV};
-            std::unique_ptr<seal::Decryptor> small_decryptor_;
-            seal::SecretKey small_secret_key_;
         };
-
     }
 }

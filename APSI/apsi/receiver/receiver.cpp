@@ -51,27 +51,26 @@ namespace apsi
             //enc_params.set_coeff_modulus(params_.coeff_modulus());
             //enc_params.set_plain_modulus(ex_field_->coeff_modulus());
 
-            auto seal_context = SEALContext::Create(params_.encryption_params());
-            KeyGenerator generator(seal_context);
+            seal_context_ = SEALContext::Create(params_.encryption_params());
+            KeyGenerator generator(seal_context_);
 
             public_key_ = generator.public_key();
             secret_key_ = generator.secret_key();
 
-            encryptor_.reset(new Encryptor(seal_context, public_key_));
-            decryptor_.reset(new Decryptor(seal_context, secret_key_));
+            encryptor_.reset(new Encryptor(seal_context_, public_key_));
+            decryptor_.reset(new Decryptor(seal_context_, secret_key_));
 
             // Initializing tools for dealing with compressed ciphertexts
-            compressor_.reset(new CiphertextCompressor(params_.encryption_params(), pool_));
-            small_parms_ = compressor_->small_parms();
-            auto small_seal_context = SEALContext::Create(small_parms_);
-            compressor_->mod_switch(secret_key_, small_secret_key_);
-            small_decryptor_.reset(new Decryptor(small_seal_context, small_secret_key_));
+            // We don't actually need the evaluator
+            shared_ptr<Evaluator> dummy_evaluator = nullptr;
+            compressor_.reset(new CiphertextCompressor(seal_context_, 
+                dummy_evaluator, pool_));
 
             generator.generate_evaluation_keys(params_.decomposition_bit_count(), evaluation_keys_);
 
-            if (seal_context->context_data().qualifiers().enable_batching)
+            if (seal_context_->context_data().qualifiers().enable_batching)
             {
-                batch_encoder_.reset(new BatchEncoder(seal_context));
+                batch_encoder_.reset(new BatchEncoder(seal_context_));
             }
 
             if (!batch_encoder_)
@@ -187,7 +186,7 @@ namespace apsi
                     SHA1 sha(sizeof(block));
                     sha.Update(iter, step);
                     sha.Final((oc::block&)items[i]);
-                    send_prvkey(small_secret_key_, channel);
+                    send_prvkey(secret_key_, channel);
 
                     iter += step;
                 }
@@ -243,7 +242,7 @@ namespace apsi
             if (params_.debug())
             {
                 send_prvkey(secret_key_, channel);
-                send_prvkey(small_secret_key_, channel);
+                send_prvkey(secret_key_, channel);
             }
 
             /* Send query data. */
@@ -490,7 +489,8 @@ namespace apsi
             {
                 MemoryPoolHandle local_pool(MemoryPoolHandle::New());
                 Plaintext p(local_pool);
-                Ciphertext tmp(small_parms_, local_pool);
+                Ciphertext tmp(seal_context_->context_data(
+                    seal_context_->last_parms_id()).value().get().parms(), local_pool);
                 const bool short_strings = !!batch_encoder_;
                 unique_ptr<FFieldArray> batch;
                 if (!short_strings)
@@ -520,11 +520,11 @@ namespace apsi
                     if (first && t == 0)
                     {
                         first = false;
-                        cout << "Noise budget: " << small_decryptor_->invariant_noise_budget(tmp, local_pool) << " bits" << endl;
+                        cout << "Noise budget: " << decryptor_->invariant_noise_budget(tmp, local_pool) << " bits" << endl;
                         recv_stop_watch.set_time_point("receiver recv-start");
                     }
 
-                    small_decryptor_->decrypt(tmp, p, local_pool);
+                    decryptor_->decrypt(tmp, p, local_pool);
 
                     //vector<uint64_t> integer_batch(batch_size);
                     if (short_strings)
@@ -570,7 +570,7 @@ namespace apsi
                         // tmp.load(ss);
                         compressor_->compressed_load(ss, tmp);
 
-                        small_decryptor_->decrypt(tmp, p, local_pool);
+                        decryptor_->decrypt(tmp, p, local_pool);
 
 
 

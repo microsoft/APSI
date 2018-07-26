@@ -72,7 +72,7 @@ namespace apsi
             // Create SenderDB
             sender_db_.reset(new SenderDB(params_, seal_context_, field_vec));
 
-            compressor_.reset(new CiphertextCompressor(params_.encryption_params()));
+            compressor_.reset(new CiphertextCompressor(seal_context_, evaluator_));
 
             vector<thread> thrds(total_thread_count_);
 
@@ -195,15 +195,9 @@ namespace apsi
 
             if (params_.debug())
             {
-                session_context.set_small_context(SEALContext::Create(compressor_->small_parms()));
-
                 seal::SecretKey k;
                 receive_prvkey(k, chl);
                 session_context.set_secret_key(k);
-
-                seal::SecretKey small_k;
-                receive_prvkey(small_k, chl);
-                session_context.set_small_secret_key(small_k);
 
                 session_context.debug_plain_query_.reset(ptr);
             }
@@ -390,7 +384,8 @@ namespace apsi
                     auto local_pool = thread_context.pool();
 
                     Ciphertext tmp(local_pool);
-                    Ciphertext compressedResult(compressor_->small_parms(), local_pool);
+                    Ciphertext compressedResult(
+                        seal_context_->context_data(seal_context_->last_parms_id()).value().get().parms(), local_pool);
 
                     u64 batch_start = i * batch_count / thread_pool.size();
                     auto thread_idx = std::this_thread::get_id();

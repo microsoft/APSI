@@ -1,10 +1,5 @@
-#include <cstring>
+#include <memory>
 #include "apsi/tools/sealcompress.h"
-#include "seal/util/uintarithsmallmod.h"
-#include "seal/util/numth.h"
-#include "seal/util/pointer.h"
-#include "seal/util/polyarithsmallmod.h"
-#include "seal/util/uintcore.h"
 
 using namespace std;
 using namespace seal;
@@ -12,152 +7,20 @@ using namespace seal::util;
 
 namespace apsi
 {
-    CiphertextCompressor::CiphertextCompressor(
-            const EncryptionParameters &parms,
-            const MemoryPoolHandle &pool) :
-        pool_(pool),
-        parms_(parms),
-        small_parms_(parms_)
+    void CiphertextCompressor::mod_switch(Ciphertext &encrypted) const
     {
-        auto &coeff_mod_array = parms_.coeff_modulus();
-        int coeff_mod_count = coeff_mod_array.size();
-        coeff_mod_prod_array_.clear();
-        coeff_mod_prod_array_.reserve(coeff_mod_count - 1); 
-
-        // Change the coefficient modulus to single modulus size
-        small_parms_.set_coeff_modulus({ coeff_mod_array[0] });
-
-        // Compute punctured modulus product
-        coeff_mod_prod_ = 1;
-        for (int i = 1; i < coeff_mod_count; i++)
+        if(!seal_context_->context_data(encrypted.parms_id()))
         {
-            coeff_mod_prod_ = multiply_uint_uint_mod(
-                coeff_mod_prod_, coeff_mod_array[i].value(), coeff_mod_array[0]);
+            throw invalid_argument("encrypted is not valid for the encryption parameters");
         }
-
-        // Compute inverse of coeff_mod_prod_
-        if(!try_mod_inverse(coeff_mod_prod_, coeff_mod_array[0].value(), inv_coeff_mod_prod_))
+        if(encrypted.is_ntt_transformed())
         {
-            throw invalid_argument("coefficient modulus is invalid");
+            throw invalid_argument(" cannot be NTT transformed");
         }
-
-        // Compute hat{q1} * qi^{-1} (mod q1)
-        for (int i = 1; i < coeff_mod_count; i++)
+        while(encrypted.parms_id() != seal_context_->last_parms_id())
         {
-            uint64_t inv_qi_modq1;
-            if(!try_mod_inverse(coeff_mod_array[i].value(), coeff_mod_array[0].value(), inv_qi_modq1))
-            {
-                throw invalid_argument("coefficient modulus is invalid");
-            }
-            coeff_mod_prod_array_.emplace_back(
-                    multiply_uint_uint_mod(coeff_mod_prod_, inv_qi_modq1, coeff_mod_array[0]));
+            evaluator_->mod_switch_to_next(encrypted, pool_);
         }
-
-        inv_coeff_mod_prod_array_.clear();
-        inv_coeff_mod_prod_array_.reserve(coeff_mod_count - 1); 
-        for(int i = 1; i < coeff_mod_count; i++)
-        {
-            // Compute hat{qi} (mod qi)
-            uint64_t hatqi = 1;
-            for(int j = 1; j < coeff_mod_count; j++)
-            {
-                if(j != i)
-                {
-                    hatqi = multiply_uint_uint_mod(hatqi, coeff_mod_array[j].value(), 
-                        coeff_mod_array[i]);
-                }
-            }
-            
-            // Compute inverse mod qi
-            uint64_t inv_hatqi;
-            if(!try_mod_inverse(hatqi, coeff_mod_array[i].value(), inv_hatqi))
-            {
-                throw invalid_argument("coefficient modulus is invalid");
-            }
-
-            inv_coeff_mod_prod_array_.emplace_back(inv_hatqi);
-        }
-    }
-
-    void CiphertextCompressor::mod_switch(
-            const Ciphertext &encrypted, 
-            Ciphertext &destination) const
-    {
-        auto &coeff_mod_array = parms_.coeff_modulus();
-        int coeff_mod_count = coeff_mod_array.size();
-        int coeff_count = parms_.poly_modulus_degree();
-        int encrypted_size = encrypted.size();
-
-        // Verify parameters.
-        if (encrypted.parms_id() != parms_.parms_id())
-        {
-            throw invalid_argument("encrypted is not valid for encryption parameters");
-        }
-        if (destination.parms_id() != small_parms_.parms_id())
-        {
-            throw invalid_argument("destination is not valid for encryption parameters");
-        }
-
-        auto temp(allocate_uint(coeff_count, pool_));
-        for(int index = 0; index < encrypted_size; index++)
-        {
-            // Set destination to (c1 mod q1, c2 mod q1)
-            set_uint_uint(encrypted.data(index), coeff_count, destination.data(index));
-
-            for(int i = 1; i < coeff_mod_count; i++)
-            {
-                multiply_poly_scalar_coeffmod(
-                        encrypted.data(index) + i * coeff_count,
-                        coeff_count,
-                        inv_coeff_mod_prod_array_[i - 1], 
-                        coeff_mod_array[i], 
-                        temp.get());
-                multiply_poly_scalar_coeffmod(
-                        temp.get(), 
-                        coeff_count, 
-                        coeff_mod_prod_array_[i - 1], 
-                        coeff_mod_array[0],
-                        temp.get());
-                negate_poly_coeffmod(
-                        temp.get(),
-                        coeff_count,
-                        coeff_mod_array[0],
-                        temp.get());
-                add_poly_poly_coeffmod(
-                        destination.data(index),
-                        temp.get(),
-                        coeff_count,
-                        coeff_mod_array[0],
-                        destination.data(index));
-            }
-
-            multiply_poly_scalar_coeffmod(
-                    destination.data(index),
-                    coeff_count,
-                    inv_coeff_mod_prod_, 
-                    coeff_mod_array[0], 
-                    destination.data(index));
-        }
-    }
-
-    void CiphertextCompressor::mod_switch(
-            const SecretKey &secret_key, 
-            SecretKey &destination) const
-    {
-        int coeff_count = parms_.poly_modulus_degree();
-
-        // Verify parameters.
-        if (secret_key.parms_id() != parms_.parms_id())
-        {
-            throw invalid_argument("secret_key is not valid for encryption parameters");
-        }
-
-        // Set destination hash block and resize appropriately
-        destination.parms_id() = small_parms_.parms_id();
-        destination.data().resize(coeff_count, bits_per_uint64);
-
-        // Set destination value
-        set_uint_uint(secret_key.data().data(), coeff_count, destination.data().data());
     }
 
     void CiphertextCompressor::compressed_save(const seal::Ciphertext &encrypted, 
@@ -168,16 +31,27 @@ namespace apsi
         {
             throw invalid_argument("can only compress fully relinearized ciphertexts");
         }
-        if (encrypted.parms_id() != small_parms_.parms_id())
+        if(!seal_context_->context_data(encrypted.parms_id()))
         {
-            throw invalid_argument("encrypted is not valid for encryption parameters");
+            throw invalid_argument("encrypted is not valid for the encryption parameters");
         }
-        
-        int coeff_count = parms_.poly_modulus_degree();
-        int compr_coeff_bit_count = parms_.plain_modulus().bit_count() + 
+        if (encrypted.parms_id() != seal_context_->last_parms_id())
+        {
+            throw invalid_argument("encrypted is not mod switched to lowest level");
+        }
+        if(encrypted.is_ntt_transformed())
+        {
+            throw invalid_argument(" cannot be NTT transformed");
+        }
+
+        auto &context_data = seal_context_->context_data(seal_context_->last_parms_id()).value().get();
+        auto &parms = context_data.parms();
+    
+        int coeff_count = parms.poly_modulus_degree();
+        int compr_coeff_bit_count = parms.plain_modulus().bit_count() + 
             get_significant_bit_count(coeff_count);
         int compr_coeff_byte_count = divide_round_up(compr_coeff_bit_count, bits_per_byte);
-        int coeff_mod_bit_count = small_parms_.coeff_modulus()[0].bit_count();
+        int coeff_mod_bit_count = parms.coeff_modulus()[0].bit_count();
         if(compr_coeff_bit_count >= coeff_mod_bit_count)
         {
             encrypted.save(stream);
@@ -218,16 +92,27 @@ namespace apsi
         {
             throw invalid_argument("can only decompress fully relinearized ciphertexts");
         }
-        if (destination.parms_id() != small_parms_.parms_id())
+        if(!seal_context_->context_data(destination.parms_id()))
         {
-            throw invalid_argument("destination is not valid for encryption parameters");
+            throw invalid_argument("destination is not valid for the encryption parameters");
+        }
+        if (destination.parms_id() != seal_context_->last_parms_id())
+        {
+            throw invalid_argument("destination is not mod switched to lowest level");
+        }
+        if(destination.is_ntt_transformed())
+        {
+            throw invalid_argument("destination cannot be NTT transformed");
         }
 
-        int coeff_count = parms_.poly_modulus_degree();
-        int compr_coeff_bit_count = parms_.plain_modulus().bit_count() + 
+        auto &context_data = seal_context_->context_data(seal_context_->last_parms_id()).value().get();
+        auto &parms = context_data.parms();
+
+        int coeff_count = parms.poly_modulus_degree();
+        int compr_coeff_bit_count = parms.plain_modulus().bit_count() + 
             get_significant_bit_count(coeff_count);
         int compr_coeff_byte_count = divide_round_up(compr_coeff_bit_count, bits_per_byte);
-        int coeff_mod_bit_count = small_parms_.coeff_modulus()[0].bit_count();
+        int coeff_mod_bit_count = parms.coeff_modulus()[0].bit_count();
         if(compr_coeff_bit_count >= coeff_mod_bit_count)
         {
             destination.load(stream);

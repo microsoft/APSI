@@ -38,11 +38,6 @@ namespace apsi
             {
             }
 
-            void set_small_context(std::shared_ptr<seal::SEALContext> small_context)
-            {
-                small_seal_context_ = std::move(small_context);
-            }
-
             void set_public_key(const seal::PublicKey &public_key)
             {
                 public_key_ = public_key;
@@ -63,12 +58,6 @@ namespace apsi
                 decryptor_.reset(new seal::Decryptor(seal_context_, secret_key_));
             }
 
-            void set_small_secret_key(const seal::SecretKey &small_secret_key)
-            {
-                small_secret_key_ = small_secret_key;
-                small_decryptor_.reset(new seal::Decryptor(small_seal_context_, small_secret_key_));
-            }
-
             const std::shared_ptr<seal::Encryptor> &encryptor()
             {
                 return encryptor_;
@@ -80,19 +69,13 @@ namespace apsi
         private:
             std::shared_ptr<seal::SEALContext> seal_context_;
 
-            std::shared_ptr<seal::SEALContext> small_seal_context_;
-
             seal::PublicKey public_key_;
 
             std::shared_ptr<seal::Encryptor> encryptor_;
 
             seal::SecretKey secret_key_;
 
-            seal::SecretKey small_secret_key_;
-
             std::shared_ptr<seal::Decryptor> decryptor_;
-
-            std::shared_ptr<seal::Decryptor> small_decryptor_;
 
             seal::EvaluationKeys evaluation_keys_;
         };
