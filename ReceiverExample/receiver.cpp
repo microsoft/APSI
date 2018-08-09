@@ -520,6 +520,13 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 
     // Use OPRF to eliminate need for noise flooding for sender's security
     auto oprf_type = OprfType::None;
+    cmd.setDefault("oprf", "none");
+    string oprfStr = cmd.get<string>("oprf");
+
+    if (oprfStr == "PK")
+    {
+        oprf_type = OprfType::PK;
+    }
 
     /*
     Creating the PSIParams class.
