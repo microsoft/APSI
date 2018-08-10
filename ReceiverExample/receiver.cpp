@@ -399,29 +399,50 @@ std::string print(span<u8> s)
 //     cout << recv_stop_watch << endl;
 // }
 
+int param_cols = 0;
+
+template<class T>
+void cout_param(std::string param_name, T param)
+{
+    std::ostringstream ss;
+    ss << param_name << "=" << param;
+    cout << setw(20) << left << ss.str();
+    param_cols++;
+    if (param_cols >= 3)
+    {
+        cout << endl;
+        param_cols = 0;
+    }
+}
+
 void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 {
     setThreadName("receiver_main");
     print_example_banner("Example: Slow batching");
     stop_watch.time_points.clear();
 
-
     // Thread count
     unsigned numThreads = cmd.get<int>("t");
-    std::cout << "t=" << numThreads << std::endl;
+    cout_param("t", numThreads);
+
     // Larger set size 
     cmd.setDefault("senderSize", 20);
     unsigned sender_set_size = 1 << cmd.get<int>("senderSize");
+    cout_param("senderSize", cmd.get<int>("senderSize"));
 
     // Negative log failure probability for simple hashing
     cmd.setDefault("secLevel", 40);
     unsigned binning_sec_level = cmd.get<int>("secLevel");
+    cout_param("secLevel", binning_sec_level);
 
     // Length of items
     cmd.setDefault("itemBitLength", 60);
     unsigned item_bit_length = cmd.get<int>("itemBitLength");
+    cout_param("itemBitLength", item_bit_length);
 
-    unsigned label_bit_length = cmd.isSet("useLabels") ? item_bit_length : 0;
+    bool useLabels = cmd.isSet("useLabels");
+    unsigned label_bit_length = useLabels ? item_bit_length : 0;
+    cout_param("useLabels", useLabels ? "true" : "false");
 
     // Cuckoo hash parameters
     CuckooParams cuckoo_params;
@@ -443,11 +464,13 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
         // Log of size of full hash table
         cmd.setDefault("logTableSize", 10);
         table_params.log_table_size = cmd.get<int>("logTableSize");
+        cout_param("logTableSize", table_params.log_table_size);
 
         // Number of splits to use
         // Larger means lower depth but bigger S-->R communication
         cmd.setDefault("splitCount", 128);
         table_params.split_count = cmd.get<int>("splitCount");
+        cout_param("splitCount", table_params.split_count);
 
         // Get secure bin size
         table_params.sender_bin_size = round_up_to(get_bin_size(
@@ -460,16 +483,19 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
         // Larger means lower depth but bigger R-->S communication
         cmd.setDefault("windowSize", 1);
         table_params.window_size = cmd.get<int>("windowSize");
+        cout_param("windowSize", table_params.window_size);
     }
 
     SEALParams seal_params;
     {
         cmd.setDefault("polyModulus", 4096);
         seal_params.encryption_params.set_poly_modulus_degree(cmd.get<int>("polyModulus"));
+        cout_param("polyModulus", seal_params.encryption_params.poly_modulus_degree());
         
         vector<SmallModulus> coeff_modulus;
         if(!cmd.isSet("coeffModulus"))
         {
+            cout_param("coeffModulus", "N/A");
             coeff_modulus = coeff_modulus_128(seal_params.encryption_params.poly_modulus_degree());
         }
         else
@@ -508,14 +534,17 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
         seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
         cmd.setDefault("plainModulus", 0x13ff);
         seal_params.encryption_params.set_plain_modulus(cmd.get<uint64_t>("plainModulus"));
+        cout_param("plainModulus", seal_params.encryption_params.plain_modulus().value());
 
         // This must be equal to plain_modulus
         seal_params.exfield_params.exfield_characteristic = seal_params.encryption_params.plain_modulus().value();
         cmd.setDefault("exfieldDegree", 8);
         seal_params.exfield_params.exfield_degree = cmd.get<int>("exfieldDegree");
+        cout_param("exfieldDegree", seal_params.exfield_params.exfield_degree);
 
         cmd.setDefault("dbc", 30);
         seal_params.decomposition_bit_count = cmd.get<int>("dbc");
+        cout_param("dbc", seal_params.decomposition_bit_count);
     }
 
     // Use OPRF to eliminate need for noise flooding for sender's security
@@ -526,6 +555,11 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     if (oprfStr == "PK")
     {
         oprf_type = OprfType::PK;
+        cout_param("oprf", string("PK"));
+    }
+    else
+    {
+        cout_param("oprf", string("None"));
     }
 
     /*
@@ -540,6 +574,9 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
 
     cmd.setDefault("trec", 1);
     int recThreads = cmd.get<int>("trec");
+    cout_param("recThreads", recThreads);
+
+    cout << endl;
 
     // Check that number of blocks is not smaller than thread count
     if(max<int>(numThreads, recThreads) > params.split_count() * params.batch_count())
@@ -603,7 +640,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
         setThreadName("sender_main");
         sender.query_session(sendChl); 
     });
-    recv_stop_watch.set_time_point("recevier start");
+    recv_stop_watch.set_time_point("receiver start");
     auto intersection = receiver.query(c1, recvChl);
     thrd.join();
 
