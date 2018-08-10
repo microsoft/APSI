@@ -2,7 +2,7 @@
 SRC_DIRS=apsi apsi/network apsi/receiver apsi/sender apsi/tools apsi/ffield
 BIN_DIR=../bin
 OBJ_DIR=obj
-INCLUDE_DIRS=. ../../cryptoTools/thirdparty/boost ../../SEAL-dev/SEAL ../../cryptoTools ../../cryptoTools/thirdparty/linux/miracl /usr/include/flint
+INCLUDE_DIRS=. ../../cryptoTools/thirdparty/boost ../../SEAL-dev/SEAL ../../cryptoTools ../../cryptoTools/thirdparty/linux/miracl /usr/include/flint ../../Cuckoo/Cuckoo
 SRCS=$(wildcard *.cpp) $(foreach d,$(SRC_DIRS),$(wildcard $d/*.cpp))
 OBJS=$(SRCS:%.cpp=$(OBJ_DIR)/%.o)
 DEPS=$(OBJS:.o=.d)
