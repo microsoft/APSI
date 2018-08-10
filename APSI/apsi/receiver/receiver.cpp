@@ -186,7 +186,6 @@ namespace apsi
                     SHA1 sha(sizeof(block));
                     sha.Update(iter, step);
                     sha.Final((oc::block&)items[i]);
-                    send_prvkey(secret_key_, channel);
 
                     iter += step;
                 }

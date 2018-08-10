@@ -177,7 +177,7 @@ namespace apsi
                     iter += step;
                 }
 
-                chl.asyncSend(buff);
+                chl.asyncSend(move(buff));
             }
 
             FFieldArray* ptr = nullptr;
