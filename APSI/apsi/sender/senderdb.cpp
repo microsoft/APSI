@@ -175,18 +175,6 @@ namespace apsi
                         if (params_.use_pk_oprf())
                         {
                             // Compute EC PRF first for data
-                            // oc::PRNG p(static_cast<oc::block&>(data[i]), 8);
-                            // oc::EccPoint a(curve, p);
-
-                            // a *= key_;
-                            // a.toBytes(buff.data());
-
-                            // // Then compress with SHA1
-                            // oc::SHA1 sha(sizeof(block));
-                            // sha.Update(buff.data(), buff.size());
-                            // sha.Final(static_cast<oc::block&>(data[i]));
-
-                            // Compute EC PRF first for data
                             oc::PRNG p(static_cast<oc::block&>(data[i]), 8);
                             digit_t a[NWORDS_ORDER];
                             random_fourq(a, p);

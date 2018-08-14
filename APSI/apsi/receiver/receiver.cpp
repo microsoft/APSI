@@ -145,30 +145,6 @@ namespace apsi
         {
             if (params_.use_pk_oprf())
             {
-
-                // //cout << "start " << endl;
-                // PRNG prng(ZeroBlock);
-                // EllipticCurve curve(p256k1, prng.get<oc::block>());
-                // vector<EccNumber> b;
-                // b.reserve(items.size());
-                // EccPoint x(curve);
-                // //vector<EccPoint> xx; xx.reserve(items.size());
-
-                // auto step = curve.getGenerator().sizeBytes();
-                // vector<u8> buff(items.size() * step);
-                // auto iter = buff.data();
-                // for (u64 i = 0; i < items.size(); ++i)
-                // {
-                //     b.emplace_back(curve, prng);
-                //     PRNG pp((oc::block&)items[i], 8);
-
-                //     x.randomize(pp);
-                //     x *= b[i];
-
-                //     x.toBytes(iter);
-                //     iter += step;
-                // }
-
                 PRNG prng(ZeroBlock);
                 vector<vector<digit_t>> b;
                 b.reserve(items.size());
@@ -191,41 +167,17 @@ namespace apsi
                 }
 
                 // send the data over the network and prep for the response.
-                //channel.asyncSend(move(buff));
                 channel.asyncSend(move(buff));
                 auto f = channel.asyncRecv(buff);
-                //auto g = channel.asyncRecv(buff);
-
-                // // compute 1/b so that we can compute (x^ba)^(1/b) = x^a
-                // for (u64 i = 0; i < items.size(); ++i)
-                // {
-                //     b[i] = move(b[i].inverse());
-                // }
 
                 // compute 1/b so that we can compute (x^ba)^(1/b) = x^a
                 for (u64 i = 0; i < items.size(); ++i)
                 {
-                    vector<digit_t> inv(4);
-                    Montgomery_inversion_mod_order(b[i].data(), inv.data());
-                    b[i] = move(inv);
+                    digit_t inv[NWORDS_ORDER];
+                    Montgomery_inversion_mod_order(b[i].data(), inv);
+                    b[i] = vector<digit_t>(inv, inv + 4);
                 }
-
                 f.get();
-                //g.get();
-
-                // iter = buff.data();
-                // for (u64 i = 0; i < items.size(); ++i)
-                // {
-                //     x.fromBytes(iter);
-                //     x *= b[i];
-
-                //     x.toBytes(iter);
-                //     SHA1 sha(sizeof(block));
-                //     sha.Update(iter, step);
-                //     sha.Final((oc::block&)items[i]);
-
-                //     iter += step;
-                // }
 
                 iter = buff.data();
                 for (u64 i = 0; i < items.size(); i++)

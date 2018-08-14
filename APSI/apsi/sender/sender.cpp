@@ -160,29 +160,8 @@ namespace apsi
             // Send the EC point when using OPRF
             if (params_.use_pk_oprf())
             {
-                // EllipticCurve curve(p256k1, prng_.get<oc::block>());
-                // PRNG pp(oc::CCBlock);
-                // oc::EccNumber key_(curve, pp);
-
-                // auto step = curve.getGenerator().sizeBytes();
-                // vector<u8> buff;
-                // chl.recv(buff);
                 vector<u8> buff;
                 chl.recv(buff);
-
-                //ostreamLock out(cout);
-                // auto iter = buff.data();
-                // oc::EccPoint x(curve);
-                // u64 num = buff.size() / step;
-                // for (u64 i = 0; i < num; i++)
-                // {
-                //     x.fromBytes(iter);
-                //     x *= key_;
-                //     x.toBytes(iter);
-                //     iter += step;
-                // }
-
-                // chl.asyncSend(move(buff));
 
                 PRNG pp(oc::CCBlock);
                 digit_t key[NWORDS_ORDER];
