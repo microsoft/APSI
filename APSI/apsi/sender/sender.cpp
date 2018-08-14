@@ -160,47 +160,48 @@ namespace apsi
             // Send the EC point when using OPRF
             if (params_.use_pk_oprf())
             {
-                EllipticCurve curve(p256k1, prng_.get<oc::block>());
-                PRNG pp(oc::CCBlock);
-                oc::EccNumber key_(curve, pp);
+                // EllipticCurve curve(p256k1, prng_.get<oc::block>());
+                // PRNG pp(oc::CCBlock);
+                // oc::EccNumber key_(curve, pp);
 
-                auto step = curve.getGenerator().sizeBytes();
+                // auto step = curve.getGenerator().sizeBytes();
+                // vector<u8> buff;
+                // chl.recv(buff);
                 vector<u8> buff;
                 chl.recv(buff);
-                vector<u8> buffecc;
-                chl.recv(buffecc);
 
                 //ostreamLock out(cout);
+                // auto iter = buff.data();
+                // oc::EccPoint x(curve);
+                // u64 num = buff.size() / step;
+                // for (u64 i = 0; i < num; i++)
+                // {
+                //     x.fromBytes(iter);
+                //     x *= key_;
+                //     x.toBytes(iter);
+                //     iter += step;
+                // }
+
+                // chl.asyncSend(move(buff));
+
+                PRNG pp(oc::CCBlock);
+                digit_t key[NWORDS_ORDER];
+                random_fourq(key, pp);
                 auto iter = buff.data();
-                oc::EccPoint x(curve);
+                auto step = (sizeof(digit_t) * NWORDS_ORDER) - 1;
+                digit_t x[NWORDS_ORDER];
                 u64 num = buff.size() / step;
+
                 for (u64 i = 0; i < num; i++)
                 {
-                    x.fromBytes(iter);
-                    x *= key_;
-                    x.toBytes(iter);
+                    buffer_to_eccoord(iter, x);
+                    Montgomery_multiply_mod_order(x, key, x);
+                    eccoord_to_buffer(x, iter);
+
                     iter += step;
                 }
 
                 chl.asyncSend(move(buff));
-
-                digit_t key2[4];
-                random_fourq(key2, pp);
-                auto iterecc = buffecc.data();
-                auto stepecc = (sizeof(digit_t) * 4) - 1;
-                digit_t xecc[4];
-                num = buffecc.size() / stepecc;
-
-                for (u64 i = 0; i < num; i++)
-                {
-                    buffer_to_eccoord(iterecc, xecc);
-                    Montgomery_multiply_mod_order(xecc, key2, xecc);
-                    eccoord_to_buffer(xecc, iterecc);
-
-                    iterecc += stepecc;
-                }
-
-                chl.asyncSend(move(buffecc));
             }
 
             FFieldArray* ptr = nullptr;

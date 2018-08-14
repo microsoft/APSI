@@ -154,13 +154,13 @@ namespace apsi
                     auto start = t * data.size() / thrds.size();
                     auto end = (t + 1) * data.size() / thrds.size();
 
-                    EllipticCurve curve(p256k1, prng.get<oc::block>());
-                    vector<u8> buff(curve.getGenerator().sizeBytes());
-                    vector<u8> buffecc((sizeof(digit_t) * 4) - 1);
+                    // EllipticCurve curve(p256k1, prng.get<oc::block>());
+                    // vector<u8> buff(curve.getGenerator().sizeBytes());
+                    vector<u8> buff((sizeof(digit_t) * NWORDS_ORDER) - 1);
                     PRNG pp(oc::CCBlock);
-                    oc::EccNumber key_(curve, pp);
-                    digit_t key2[4];
-                    random_fourq(key2, pp);
+                    // oc::EccNumber key_(curve, pp);
+                    digit_t key[NWORDS_ORDER];
+                    random_fourq(key, pp);
 
                     vector<cuckoo::LocFunc> normal_loc_func(params_.hash_func_count());
 
@@ -175,26 +175,28 @@ namespace apsi
                         if (params_.use_pk_oprf())
                         {
                             // Compute EC PRF first for data
-                            oc::PRNG p(static_cast<oc::block&>(data[i]), 8);
-                            oc::EccPoint a(curve, p);
+                            // oc::PRNG p(static_cast<oc::block&>(data[i]), 8);
+                            // oc::EccPoint a(curve, p);
 
-                            a *= key_;
-                            a.toBytes(buff.data());
+                            // a *= key_;
+                            // a.toBytes(buff.data());
+
+                            // // Then compress with SHA1
+                            // oc::SHA1 sha(sizeof(block));
+                            // sha.Update(buff.data(), buff.size());
+                            // sha.Final(static_cast<oc::block&>(data[i]));
+
+                            // Compute EC PRF first for data
+                            oc::PRNG p(static_cast<oc::block&>(data[i]), 8);
+                            digit_t a[NWORDS_ORDER];
+                            random_fourq(a, p);
+                            Montgomery_multiply_mod_order(a, key, a);
+                            eccoord_to_buffer(a, buff.data());
 
                             // Then compress with SHA1
-                            oc::SHA1 sha(sizeof(block));
+                            oc:SHA1 sha(sizeof(block));
                             sha.Update(buff.data(), buff.size());
                             sha.Final(static_cast<oc::block&>(data[i]));
-
-                            digit_t aecc[4];
-                            random_fourq(aecc, p);
-                            Montgomery_multiply_mod_order(aecc, key2, aecc);
-                            eccoord_to_buffer(aecc, buffecc.data());
-
-                            // Then compress with SHA1
-                            oc:SHA1 shaecc(sizeof(block));
-                            shaecc.Update(buffecc.data(), buffecc.size());
-                            //shaecc.Final(static_cast<oc::block&>(data[i]));
                         }
 
                         std::array<u64, 3> locs;
