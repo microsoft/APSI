@@ -156,7 +156,7 @@ namespace apsi
                 for (u64 i = 0; i < items.size(); i++)
                 {
                     random_fourq(x, prng);
-                    b.emplace_back(x, x + 4);
+                    b.emplace_back(x, x + NWORDS_ORDER);
 
                     PRNG pp((oc::block&)items[i], 8);
 
@@ -175,7 +175,7 @@ namespace apsi
                 {
                     digit_t inv[NWORDS_ORDER];
                     Montgomery_inversion_mod_order(b[i].data(), inv);
-                    b[i] = vector<digit_t>(inv, inv + 4);
+                    b[i] = vector<digit_t>(inv, inv + NWORDS_ORDER);
                 }
                 f.get();
 
