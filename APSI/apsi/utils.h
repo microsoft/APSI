@@ -1,0 +1,18 @@
+#pragma once
+
+// FourQLib
+#include <FourQ_api.h>
+
+#include <cryptoTools/Crypto/PRNG.h>
+
+// Save a point in an Elliptic Curve to a buffer
+void ecpoint_to_buffer(const point_t point, unsigned char* buffer);
+
+// Restore a point in an Elliptic Curve from a buffer
+void buffer_to_ecpoint(const unsigned char* buffer, point_t point);
+
+void eccoord_to_buffer(const digit_t* coord, unsigned char* buffer);
+void buffer_to_eccoord(const unsigned char* buffer, digit_t* coord);
+
+// Generate a random number within FourQ's order
+void random_fourq(digit_t* a, osuCrypto::PRNG& pr);

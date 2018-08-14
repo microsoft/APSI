@@ -10,6 +10,7 @@
 #include "apsi/apsidefines.h"
 #include "apsi/tools/interpolate.h"
 #include "apsi/ffield/ffield_array.h"
+#include "apsi/utils.h"
 
 #include "cryptoTools/Crypto/Curve.h"
 #include "cryptoTools/Crypto/PRNG.h"
@@ -20,6 +21,8 @@
 #include "seal/evaluator.h"
 #include "seal/batchencoder.h"
 #include "seal/util/uintcore.h"
+
+#include "FourQ_api.h"
 
 using namespace std;
 using namespace seal;
@@ -153,8 +156,11 @@ namespace apsi
 
                     EllipticCurve curve(p256k1, prng.get<oc::block>());
                     vector<u8> buff(curve.getGenerator().sizeBytes());
+                    vector<u8> buffecc((sizeof(digit_t) * 4) - 1);
                     PRNG pp(oc::CCBlock);
                     oc::EccNumber key_(curve, pp);
+                    digit_t key2[4];
+                    random_fourq(key2, pp);
 
                     vector<cuckoo::LocFunc> normal_loc_func(params_.hash_func_count());
 
@@ -179,6 +185,16 @@ namespace apsi
                             oc::SHA1 sha(sizeof(block));
                             sha.Update(buff.data(), buff.size());
                             sha.Final(static_cast<oc::block&>(data[i]));
+
+                            digit_t aecc[4];
+                            random_fourq(aecc, p);
+                            Montgomery_multiply_mod_order(aecc, key2, aecc);
+                            eccoord_to_buffer(aecc, buffecc.data());
+
+                            // Then compress with SHA1
+                            oc:SHA1 shaecc(sizeof(block));
+                            shaecc.Update(buffecc.data(), buffecc.size());
+                            //shaecc.Final(static_cast<oc::block&>(data[i]));
                         }
 
                         std::array<u64, 3> locs;

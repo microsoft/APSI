@@ -6,10 +6,13 @@
 #include "apsi/sender/sender.h"
 #include "apsi/apsidefines.h"
 #include "apsi/network/network_utils.h"
+#include "apsi/utils.h"
 
 #include "seal/util/common.h"
 
 #include "cryptoTools/Common/Log.h"
+
+#include "FourQ_api.h"
 
 using namespace std;
 using namespace seal;
@@ -164,6 +167,8 @@ namespace apsi
                 auto step = curve.getGenerator().sizeBytes();
                 vector<u8> buff;
                 chl.recv(buff);
+                vector<u8> buffecc;
+                chl.recv(buffecc);
 
                 //ostreamLock out(cout);
                 auto iter = buff.data();
@@ -178,6 +183,24 @@ namespace apsi
                 }
 
                 chl.asyncSend(move(buff));
+
+                digit_t key2[4];
+                random_fourq(key2, pp);
+                auto iterecc = buffecc.data();
+                auto stepecc = (sizeof(digit_t) * 4) - 1;
+                digit_t xecc[4];
+                num = buffecc.size() / stepecc;
+
+                for (u64 i = 0; i < num; i++)
+                {
+                    buffer_to_eccoord(iterecc, xecc);
+                    Montgomery_multiply_mod_order(xecc, key2, xecc);
+                    eccoord_to_buffer(xecc, iterecc);
+
+                    iterecc += stepecc;
+                }
+
+                chl.asyncSend(move(buffecc));
             }
 
             FFieldArray* ptr = nullptr;

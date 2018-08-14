@@ -7,6 +7,7 @@
 #include "apsi/receiver/receiver.h"
 #include "apsi/apsidefines.h"
 #include "apsi/network/network_utils.h"
+#include "apsi/utils.h"
 
 // SEAL
 #include "seal/util/common.h"
@@ -17,6 +18,9 @@
 // CryptoTools
 #include "cryptoTools/Crypto/sha1.h"
 #include "cryptoTools/Common/Log.h"
+
+// FourQ
+#include "FourQ_api.h"
 
 using namespace std;
 using namespace seal;
@@ -165,16 +169,49 @@ namespace apsi
                     iter += step;
                 }
 
+                PRNG prngecc(ZeroBlock);
+                vector<vector<digit_t>> becc;
+                becc.reserve(items.size());
+                digit_t xecc[4];
+
+                auto stepecc = (sizeof(digit_t) * 4) - 1;
+                vector<u8> buffecc(items.size() * stepecc);
+                auto iterecc = buffecc.data();
+                for (u64 i = 0; i < items.size(); i++)
+                {
+                    random_fourq(xecc, prngecc);
+                    becc.emplace_back(xecc, xecc + 4);
+
+                    PRNG pp((oc::block&)items[i], 8);
+
+                    random_fourq(xecc, pp);
+                    Montgomery_multiply_mod_order(xecc, becc[i].data(), xecc);
+                    eccoord_to_buffer(xecc, iterecc);
+                    iterecc += stepecc;
+                }
+
                 // send the data over the network and prep for the response.
                 channel.asyncSend(move(buff));
+                channel.asyncSend(move(buffecc));
                 auto f = channel.asyncRecv(buff);
+                auto g = channel.asyncRecv(buffecc);
 
                 // compute 1/b so that we can compute (x^ba)^(1/b) = x^a
                 for (u64 i = 0; i < items.size(); ++i)
                 {
                     b[i] = move(b[i].inverse());
                 }
+
+                // compute 1/b so that we can compute (x^ba)^(1/b) = x^a
+                for (u64 i = 0; i < items.size(); ++i)
+                {
+                    vector<digit_t> inv(4);
+                    Montgomery_inversion_mod_order(becc[i].data(), inv.data());
+                    becc[i] = move(inv);
+                }
+
                 f.get();
+                g.get();
 
                 iter = buff.data();
                 for (u64 i = 0; i < items.size(); ++i)
@@ -188,6 +225,21 @@ namespace apsi
                     sha.Final((oc::block&)items[i]);
 
                     iter += step;
+                }
+
+
+                iterecc = buffecc.data();
+                for (u64 i = 0; i < items.size(); i++)
+                {
+                    buffer_to_eccoord(iterecc, xecc);
+                    Montgomery_multiply_mod_order(becc[i].data(), xecc, xecc);
+                    eccoord_to_buffer(xecc, iterecc);
+
+                    SHA1 sha(sizeof(block));
+                    sha.Update(iterecc, stepecc);
+                    //sha.Final((oc::block&)items[i]);
+
+                    iterecc += stepecc;
                 }
             }
 
