@@ -12,7 +12,6 @@
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/utils.h"
 
-#include "cryptoTools/Crypto/Curve.h"
 #include "cryptoTools/Crypto/PRNG.h"
 #include "cryptoTools/Common/MatrixView.h"
 #include "cryptoTools/Common/Log.h"
