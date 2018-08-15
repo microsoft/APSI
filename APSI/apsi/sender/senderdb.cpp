@@ -153,11 +153,8 @@ namespace apsi
                     auto start = t * data.size() / thrds.size();
                     auto end = (t + 1) * data.size() / thrds.size();
 
-                    // EllipticCurve curve(p256k1, prng.get<oc::block>());
-                    // vector<u8> buff(curve.getGenerator().sizeBytes());
                     vector<u8> buff((sizeof(digit_t) * NWORDS_ORDER) - 1);
                     PRNG pp(oc::CCBlock);
-                    // oc::EccNumber key_(curve, pp);
                     digit_t key[NWORDS_ORDER];
                     random_fourq(key, pp);
 
