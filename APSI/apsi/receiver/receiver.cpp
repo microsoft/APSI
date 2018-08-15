@@ -7,6 +7,7 @@
 #include "apsi/receiver/receiver.h"
 #include "apsi/apsidefines.h"
 #include "apsi/network/network_utils.h"
+#include "apsi/utils.h"
 
 // SEAL
 #include "seal/util/common.h"
@@ -17,6 +18,9 @@
 // CryptoTools
 #include "cryptoTools/Crypto/sha1.h"
 #include "cryptoTools/Common/Log.h"
+
+// FourQ
+#include "FourQ_api.h"
 
 using namespace std;
 using namespace seal;
@@ -141,27 +145,24 @@ namespace apsi
         {
             if (params_.use_pk_oprf())
             {
-
-                //cout << "start " << endl;
                 PRNG prng(ZeroBlock);
-                EllipticCurve curve(p256k1, prng.get<oc::block>());
-                vector<EccNumber> b;
+                vector<vector<digit_t>> b;
                 b.reserve(items.size());
-                EccPoint x(curve);
-                //vector<EccPoint> xx; xx.reserve(items.size());
+                digit_t x[NWORDS_ORDER];
 
-                auto step = curve.getGenerator().sizeBytes();
+                auto step = (sizeof(digit_t) * NWORDS_ORDER) - 1;
                 vector<u8> buff(items.size() * step);
                 auto iter = buff.data();
-                for (u64 i = 0; i < items.size(); ++i)
+                for (u64 i = 0; i < items.size(); i++)
                 {
-                    b.emplace_back(curve, prng);
+                    random_fourq(x, prng);
+                    b.emplace_back(x, x + NWORDS_ORDER);
+
                     PRNG pp((oc::block&)items[i], 8);
 
-                    x.randomize(pp);
-                    x *= b[i];
-
-                    x.toBytes(iter);
+                    random_fourq(x, pp);
+                    Montgomery_multiply_mod_order(x, b[i].data(), x);
+                    eccoord_to_buffer(x, iter);
                     iter += step;
                 }
 
@@ -172,17 +173,19 @@ namespace apsi
                 // compute 1/b so that we can compute (x^ba)^(1/b) = x^a
                 for (u64 i = 0; i < items.size(); ++i)
                 {
-                    b[i] = move(b[i].inverse());
+                    digit_t inv[NWORDS_ORDER];
+                    Montgomery_inversion_mod_order(b[i].data(), inv);
+                    b[i] = vector<digit_t>(inv, inv + NWORDS_ORDER);
                 }
                 f.get();
 
                 iter = buff.data();
-                for (u64 i = 0; i < items.size(); ++i)
+                for (u64 i = 0; i < items.size(); i++)
                 {
-                    x.fromBytes(iter);
-                    x *= b[i];
+                    buffer_to_eccoord(iter, x);
+                    Montgomery_multiply_mod_order(x, b[i].data(), x);
+                    eccoord_to_buffer(x, iter);
 
-                    x.toBytes(iter);
                     SHA1 sha(sizeof(block));
                     sha.Update(iter, step);
                     sha.Final((oc::block&)items[i]);

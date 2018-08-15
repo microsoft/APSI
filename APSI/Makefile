@@ -2,17 +2,17 @@
 SRC_DIRS=apsi apsi/network apsi/receiver apsi/sender apsi/tools apsi/ffield
 BIN_DIR=../bin
 OBJ_DIR=obj
-INCLUDE_DIRS=. ../../cryptoTools/thirdparty/boost ../../SEAL-dev/SEAL ../../cryptoTools ../../cryptoTools/thirdparty/linux/miracl /usr/include/flint
+INCLUDE_DIRS=. ../../cryptoTools/thirdparty/boost ../../SEAL-dev/SEAL ../../cryptoTools ../../cryptoTools/thirdparty/linux/miracl /usr/include/flint ../../Cuckoo/Cuckoo ../../FourQlib/FourQ_64bit_and_portable
 SRCS=$(wildcard *.cpp) $(foreach d,$(SRC_DIRS),$(wildcard $d/*.cpp))
 OBJS=$(SRCS:%.cpp=$(OBJ_DIR)/%.o)
 DEPS=$(OBJS:.o=.d)
 INSTALL_DIR=APSI
 APSILIB=libapsi.a
 CXX=g++
-CXXFLAGS=-O0 -g -DHAVE_CONFIG -march=native -std=c++17  -maes -msse2 -msse4.1 -mpclmul -DNDEBUG
+CXXFLAGS=-O0 -g -DHAVE_CONFIG -march=native -std=c++17  -maes -msse2 -msse4.1 -mpclmul -DNDEBUG -D_AMD64_ -D_AVX2_ -D_ASM_ -D__LINUX__
 PREFIX=/usr/local
-LDFLAGS=-lseal -lboost_system -lcuckoo -lpthread -lcryptoTools -lmiracl -lflint -lgmp
-LIBRARY_PATHS=../../SEAL-dev/bin ../../cryptoTools/thirdparty/linux/boost/stage/lib ../../cryptoTools/lib ../../cryptoTools/thirdparty/linux/miracl/miracl/source /usr/lib
+LDFLAGS=-lseal -lboost_system -lcuckoo -lpthread -lcryptoTools -lmiracl -lflint -lgmp -lFourQ
+LIBRARY_PATHS=../../SEAL-dev/bin ../../cryptoTools/thirdparty/linux/boost/stage/lib ../../cryptoTools/lib ../../cryptoTools/thirdparty/linux/miracl/miracl/source /usr/lib ../../FourQlib/FourQ_64bit_and_portable
 
 .PHONY : all clean install uninstall
 

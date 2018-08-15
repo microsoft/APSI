@@ -28,7 +28,6 @@
 
 // CryptoTools
 #include "cryptoTools/Network/IOService.h"
-#include "cryptoTools/Crypto/Curve.h"
 #include "cryptoTools/Crypto/PRNG.h"
 
 namespace apsi

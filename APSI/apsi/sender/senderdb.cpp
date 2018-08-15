@@ -10,8 +10,8 @@
 #include "apsi/apsidefines.h"
 #include "apsi/tools/interpolate.h"
 #include "apsi/ffield/ffield_array.h"
+#include "apsi/utils.h"
 
-#include "cryptoTools/Crypto/Curve.h"
 #include "cryptoTools/Crypto/PRNG.h"
 #include "cryptoTools/Common/MatrixView.h"
 #include "cryptoTools/Common/Log.h"
@@ -20,6 +20,8 @@
 #include "seal/evaluator.h"
 #include "seal/batchencoder.h"
 #include "seal/util/uintcore.h"
+
+#include "FourQ_api.h"
 
 using namespace std;
 using namespace seal;
@@ -151,10 +153,13 @@ namespace apsi
                     auto start = t * data.size() / thrds.size();
                     auto end = (t + 1) * data.size() / thrds.size();
 
-                    EllipticCurve curve(p256k1, prng.get<oc::block>());
-                    vector<u8> buff(curve.getGenerator().sizeBytes());
+                    // EllipticCurve curve(p256k1, prng.get<oc::block>());
+                    // vector<u8> buff(curve.getGenerator().sizeBytes());
+                    vector<u8> buff((sizeof(digit_t) * NWORDS_ORDER) - 1);
                     PRNG pp(oc::CCBlock);
-                    oc::EccNumber key_(curve, pp);
+                    // oc::EccNumber key_(curve, pp);
+                    digit_t key[NWORDS_ORDER];
+                    random_fourq(key, pp);
 
                     vector<cuckoo::LocFunc> normal_loc_func(params_.hash_func_count());
 
@@ -170,13 +175,13 @@ namespace apsi
                         {
                             // Compute EC PRF first for data
                             oc::PRNG p(static_cast<oc::block&>(data[i]), 8);
-                            oc::EccPoint a(curve, p);
-
-                            a *= key_;
-                            a.toBytes(buff.data());
+                            digit_t a[NWORDS_ORDER];
+                            random_fourq(a, p);
+                            Montgomery_multiply_mod_order(a, key, a);
+                            eccoord_to_buffer(a, buff.data());
 
                             // Then compress with SHA1
-                            oc::SHA1 sha(sizeof(block));
+                            oc:SHA1 sha(sizeof(block));
                             sha.Update(buff.data(), buff.size());
                             sha.Final(static_cast<oc::block&>(data[i]));
                         }
