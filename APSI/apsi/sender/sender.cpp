@@ -6,7 +6,7 @@
 #include "apsi/sender/sender.h"
 #include "apsi/apsidefines.h"
 #include "apsi/network/network_utils.h"
-#include "apsi/utils.h"
+#include "apsi/tools/utils.h"
 
 #include "seal/util/common.h"
 

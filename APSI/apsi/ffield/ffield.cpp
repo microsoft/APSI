@@ -61,6 +61,8 @@ namespace apsi
 
         // Pre-compute action of Frobenius on monomials for quick evaluation 
         frob_table_backing_ = _fq_nmod_vec_init(d_ * d_, ctx_);
+        gsl::span<_ffield_array_elt_t> spn = gsl::span<_ffield_array_elt_t>(frob_table_backing_, d_ * d_);
+        auto sth = spn[3];
         frob_table_ = MatrixView<_ffield_array_elt_t>(frob_table_backing_, d_, d_);
         populate_frob_table();
 

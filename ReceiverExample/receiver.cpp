@@ -9,7 +9,7 @@
 
 #include "cryptoTools/Common/CLP.h"
 #include "cryptoTools/Network/IOService.h"
-#include "tests/collection.h"
+#include "tests/unit_tests.h"
 
 #ifdef _MSC_VER
 #include "windows.h"
@@ -128,24 +128,7 @@ int main(int argc, char *argv[]){
 
     if (unitTest)
     {
-        //assert("NOT IMPLEMENTED");
-         auto tests = apsi_tests;
-         //tests += tests_cryptoTools::Tests;
-        
-         if (cmd.isSet("list"))
-         {
-             tests.list();
-         }
-         else
-         {
-             cmd.setDefault("loop", 1);
-             auto loop = cmd.get<u64>("loop");
-        
-             if (cmd.hasValue(unitTestTag))
-                 tests.run(cmd.getMany<u64>(unitTestTag), loop);
-             else
-                 tests.runAll(loop);
-         }
+        run_unit_tests();
     }
 
     // Example: Slow batching vs. Fast batching

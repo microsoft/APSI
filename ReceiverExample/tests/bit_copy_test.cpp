@@ -3,7 +3,7 @@
 
 using namespace oc;
 
-void bit_copy_test()
+void bit_copy_test_v()
 {
     int trials = 1000;
     int size = 10;
@@ -62,4 +62,18 @@ void bit_copy_test()
             ++destIter;
         }
     }
+}
+
+bool bit_copy_test()
+{
+    try
+    {
+        bit_copy_test_v();
+    }
+    catch(...)
+    {
+        return false;
+    }
+
+    return true;
 }

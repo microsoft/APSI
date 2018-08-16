@@ -46,7 +46,7 @@ oc::u64 u64_poly_eval(
     return result;
 }
 
-void u64_interpolate_test()
+void u64_interpolate_test_v()
 {
     using oc::u64;
 
@@ -118,5 +118,18 @@ void u64_interpolate_test()
             throw oc::UnitTestFail();
 
     }
+}
 
+bool u64_interpolate_test()
+{
+    try
+    {
+        u64_interpolate_test_v();
+    }
+    catch(...)
+    {
+        return false;
+    }
+
+    return true;
 }

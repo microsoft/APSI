@@ -10,7 +10,7 @@
 #include "apsi/apsidefines.h"
 #include "apsi/tools/interpolate.h"
 #include "apsi/ffield/ffield_array.h"
-#include "apsi/utils.h"
+#include "apsi/tools/utils.h"
 
 #include "cryptoTools/Crypto/PRNG.h"
 #include "cryptoTools/Common/MatrixView.h"
@@ -415,7 +415,7 @@ namespace apsi
 
         void DBBlock::symmetric_polys(
             SenderThreadContext &th_context,
-            MatrixView<_ffield_array_elt_t> symm_block,
+            oc::MatrixView<_ffield_array_elt_t> symm_block,
             int encoding_bit_length,
             const FFieldArray &neg_null_element)
         {
@@ -484,7 +484,7 @@ namespace apsi
 
         void DBBlock::randomized_symmetric_polys(
             SenderThreadContext &th_context,
-            MatrixView<_ffield_array_elt_t> symm_block,
+            oc::MatrixView<_ffield_array_elt_t> symm_block,
             int encoding_bit_length,
             FFieldArray &neg_null_element)
         {
@@ -896,7 +896,7 @@ namespace apsi
                 int max_size = 0;
                 std::vector<int> poly_size(items_per_batch_);
                 std::vector<std::pair<u64, u64>> inputs; inputs.resize(items_per_split_);
-                Matrix<u64> label_coeffs(items_per_batch_, items_per_split_);
+                oc::Matrix<u64> label_coeffs(items_per_batch_, items_per_split_);
 
                 for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
                 {
@@ -1056,7 +1056,7 @@ namespace apsi
             return r;
         }
 
-        void print_poly(int b, MatrixView<u64> polys)
+        void print_poly(int b, oc::MatrixView<u64> polys)
         {
             std::cout << "P" << b << "(x) = ";
             for (u64 i = polys.stride(); i != -1; --i)

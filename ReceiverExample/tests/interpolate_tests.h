@@ -2,6 +2,4 @@
 
 
 
-void u64_interpolate_test();
-void plaintext_interpolate_test();
-void exfield_interpolate_test();
+bool u64_interpolate_test();
