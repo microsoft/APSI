@@ -1,9 +1,9 @@
-
+#include "bit_copy_test.h"
 #include "apsi/ffield/ffield_elt.h"
 
 using namespace oc;
 
-void bit_copy_test_v()
+void BitCopyTests::bit_copy_test()
 {
     int trials = 1000;
     int size = 10;
@@ -32,22 +32,15 @@ void bit_copy_test_v()
 
         for (int i = 0; i < destOffset; ++i)
         {
-            if (*destIter != (destVal & 1))
-                throw std::runtime_error(LOCATION);
+            CPPUNIT_ASSERT(*destIter == (destVal & 1));
 
             ++destIter;
         }
 
         for (int i = 0; i < bitLength; ++i)
         {
-
-            if (srcIter.mByte >= src.data() + src.size())
-                throw std::runtime_error("");
-            if (*srcIter != *destIter)
-            {
-                std::cout << "act: " << int(*destIter) << "  exp: " << int(*srcIter) << std::endl;
-                throw std::runtime_error(LOCATION);
-            }
+            CPPUNIT_ASSERT(srcIter.mByte < src.data() + src.size());
+            CPPUNIT_ASSERT(*srcIter == *destIter);
 
             ++srcIter;
             ++destIter;
@@ -56,24 +49,9 @@ void bit_copy_test_v()
         auto rem = size * 8 - destOffset - bitLength;
         for (int i = 0; i < rem; ++i)
         {
-            if (*destIter != (destVal & 1))
-                throw std::runtime_error(LOCATION);
+            CPPUNIT_ASSERT(*destIter == (destVal & 1));
 
             ++destIter;
         }
     }
-}
-
-bool bit_copy_test()
-{
-    try
-    {
-        bit_copy_test_v();
-    }
-    catch(...)
-    {
-        return false;
-    }
-
-    return true;
 }

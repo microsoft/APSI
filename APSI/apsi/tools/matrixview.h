@@ -20,7 +20,8 @@ namespace apsi
 
         MatrixView(T* elems, u64 rows, u64 cols) :
             data_(msspan<T>(elems, rows * cols)),
-            stride_(cols)
+            rows_(rows),
+            cols_(cols)
         {
         }
 
@@ -30,7 +31,7 @@ namespace apsi
          */
         constexpr msspan<T> operator[] (u64 row)
         {
-            return data_.subspan(/* offset */ row * stride_, /* count */ stride_);
+            return data_.subspan(/* offset */ row * stride(), /* count */ stride());
         }
 
         /**
@@ -38,7 +39,8 @@ namespace apsi
          */
         constexpr MatrixView& operator=(const MatrixView& other)
         {
-            stride_ = other.stride_;
+            rows_ = other.rows_;
+            cols_ = other.cols_;
             data_ = other.data_;
 
             return *this;
@@ -47,14 +49,30 @@ namespace apsi
         /**
          * Allows accesing elements like so: matrix(row, col)
          */
-        T& operator()(u64 row, u64 col)
+        T& operator()(u64 row, u64 col) const
         {
-            u64 index = row * stride_ + col;
+            u64 index = row * stride() + col;
             return data_[index];
         }
 
+        /**
+         * Get the stride
+         */
+        u64 stride() const { return cols_; }
+
+        /**
+         * Get the rows
+         */
+        u64 rows() const { return rows_; }
+
+        /**
+         * Get the columns
+         */
+        u64 columns() const { return cols_; }
+
     private:
         msspan<T> data_;
-        u64 stride_;
+        u64 rows_;
+        u64 cols_;
     };
 }
