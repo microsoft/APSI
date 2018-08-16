@@ -272,7 +272,7 @@ namespace apsi
                         pos.batch_offset = cuckoo_loc % params_.batch_size();
 
                         auto count = 0;
-                        for (u64 j = 0; j < db_blocks_.cols(); ++j)
+                        for (u64 j = 0; j < db_blocks_.columns(); ++j)
                         {
                             auto& blk = db_blocks_(batch_idx, j);
                             ;
@@ -895,7 +895,7 @@ namespace apsi
                 int max_size = 0;
                 std::vector<int> poly_size(items_per_batch_);
                 std::vector<std::pair<u64, u64>> inputs; inputs.resize(items_per_split_);
-                oc::Matrix<u64> label_coeffs(items_per_batch_, items_per_split_);
+                Matrix<u64> label_coeffs(items_per_batch_, items_per_split_);
 
                 for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
                 {

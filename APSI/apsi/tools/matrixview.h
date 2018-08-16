@@ -2,6 +2,7 @@
 
 #include "apsi/apsidefines.h"
 #include <gsl/span>
+#include <gsl/gsl_assert>
 
 namespace apsi
 {
@@ -15,6 +16,9 @@ namespace apsi
     template<class T>
     class MatrixView
     {
+        // For iterating through the elements in the view
+        using iterator = gsl::details::span_iterator<gsl::span<T>, false>;
+
     public:
         MatrixView() = default;
 
@@ -31,6 +35,7 @@ namespace apsi
          */
         constexpr msspan<T> operator[] (u64 row)
         {
+            Expects(row < rows_);
             return data_.subspan(/* offset */ row * stride(), /* count */ stride());
         }
 
@@ -47,10 +52,21 @@ namespace apsi
         }
 
         /**
+         * Allows accessing elements through a single index
+         */
+        T& operator()(u64 index)
+        {
+            Expects(index < (rows_ * cols_));
+            return data_[index];
+        }
+
+        /**
          * Allows accesing elements like so: matrix(row, col)
          */
         T& operator()(u64 row, u64 col) const
         {
+            Expects(row < rows_);
+            Expects(col < cols_);
             u64 index = row * stride() + col;
             return data_[index];
         }
@@ -74,6 +90,32 @@ namespace apsi
          * Get a pointer to the actual data
          */
         T* data() { return data_.data(); }
+
+        /**
+         * Get the number of elements
+         */
+        u64 size() const { return data_.size(); }
+
+        /**
+         * Get initial iterator
+         */
+        iterator begin() const { return data_.begin(); }
+
+        /**
+         * Get ending iterator
+         */
+        iterator end() const { return data_.end(); }
+
+    protected:
+        /**
+         * Re-initialize the view.
+         */
+        void resize(T* data, u64 rows, u64 cols)
+        {
+            rows_ = rows;
+            cols_ = cols;
+            data_ = msspan<T>(data, rows * cols);
+        }
 
     private:
         msspan<T> data_;

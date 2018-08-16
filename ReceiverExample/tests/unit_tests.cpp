@@ -64,6 +64,7 @@ void run_unit_tests()
     controller.addListener(&progress);
 
     runner.addTest(MatrixViewTests::suite());
+    runner.addTest(MatrixTests::suite());
     runner.addTest(BitCopyTests::suite());
     runner.addTest(InterpolateTests::suite());
 
