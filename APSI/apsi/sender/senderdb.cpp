@@ -13,7 +13,6 @@
 #include "apsi/tools/utils.h"
 
 #include "cryptoTools/Crypto/PRNG.h"
-#include "cryptoTools/Common/MatrixView.h"
 #include "cryptoTools/Common/Log.h"
 #include "cryptoTools/Crypto/sha1.h"
 
@@ -115,7 +114,7 @@ namespace apsi
             set_data(data, {}, thread_count);
         }
 
-        void SenderDB::set_data(oc::span<const Item> data, oc::MatrixView<u8> vals, int thread_count)
+        void SenderDB::set_data(oc::span<const Item> data, MatrixView<u8> vals, int thread_count)
         {
             clear_db();
             add_data(data, vals, thread_count);
@@ -135,7 +134,7 @@ namespace apsi
             return ss.str();
         }
 
-        void SenderDB::add_data(oc::span<const Item> data, oc::MatrixView<u8> values, int thread_count)
+        void SenderDB::add_data(oc::span<const Item> data, MatrixView<u8> values, int thread_count)
         {
             if (values.stride() != params_.get_label_byte_count())
                 throw std::invalid_argument("unexpacted label length");
@@ -415,7 +414,7 @@ namespace apsi
 
         void DBBlock::symmetric_polys(
             SenderThreadContext &th_context,
-            oc::MatrixView<_ffield_array_elt_t> symm_block,
+            MatrixView<_ffield_array_elt_t> symm_block,
             int encoding_bit_length,
             const FFieldArray &neg_null_element)
         {
@@ -484,7 +483,7 @@ namespace apsi
 
         void DBBlock::randomized_symmetric_polys(
             SenderThreadContext &th_context,
-            oc::MatrixView<_ffield_array_elt_t> symm_block,
+            MatrixView<_ffield_array_elt_t> symm_block,
             int encoding_bit_length,
             FFieldArray &neg_null_element)
         {
@@ -1031,7 +1030,7 @@ namespace apsi
 
         std::vector<oc::u64> debug_eval_term(
             int term,
-            oc::MatrixView<u64> coeffs,
+            MatrixView<u64> coeffs,
             oc::span<u64> x,
             const seal::SmallModulus& mod)
         {
@@ -1056,7 +1055,7 @@ namespace apsi
             return r;
         }
 
-        void print_poly(int b, oc::MatrixView<u64> polys)
+        void print_poly(int b, MatrixView<u64> polys)
         {
             std::cout << "P" << b << "(x) = ";
             for (u64 i = polys.stride(); i != -1; --i)

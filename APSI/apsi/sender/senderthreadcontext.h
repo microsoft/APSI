@@ -9,11 +9,11 @@
 #include "apsi/psiparams.h"
 #include "apsi/ffield/ffield_elt.h"
 #include "apsi/ffield/ffield_array.h"
+#include "apsi/tools/matrixview.h"
 
 #include "seal/memorypoolhandle.h"
 
 // CryptoTools
-#include "cryptoTools/Common/MatrixView.h"
 #include "cryptoTools/Crypto/PRNG.h"
 
 namespace apsi
@@ -90,11 +90,11 @@ namespace apsi
 
                     symm_block_vec_.reset(new FFieldArray(field_matrix));
                     // symm_block_vec_.resize(params.batch_size() * (params.split_size() + 1), FFieldElt(exfield_));
-                    symm_block_ = oc::MatrixView<_ffield_array_elt_t>(symm_block_vec_->data(), params.batch_size(), params.split_size() + 1);
+                    symm_block_ = MatrixView<_ffield_array_elt_t>(symm_block_vec_->data(), params.batch_size(), params.split_size() + 1);
                 }
             }
 
-            inline oc::MatrixView<_ffield_array_elt_t> symm_block()
+            inline MatrixView<_ffield_array_elt_t> symm_block()
             {
                 return symm_block_;
             }
@@ -113,7 +113,7 @@ namespace apsi
 
             std::unique_ptr<FFieldArray> symm_block_vec_;
 
-            oc::MatrixView<_ffield_array_elt_t> symm_block_;
+            MatrixView<_ffield_array_elt_t> symm_block_;
             
             oc::PRNG prng_;
         };

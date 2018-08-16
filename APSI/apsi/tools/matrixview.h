@@ -70,6 +70,11 @@ namespace apsi
          */
         u64 columns() const { return cols_; }
 
+        /**
+         * Get a pointer to the actual data
+         */
+        T* data() { return data_.data(); }
+
     private:
         msspan<T> data_;
         u64 rows_;

@@ -112,7 +112,7 @@ namespace apsi
             prng_.SetSeed(oc::ZeroBlock);
         }
 
-        void Sender::load_db(const vector<Item> &data, oc::MatrixView<u8> vals)
+        void Sender::load_db(const vector<Item> &data, MatrixView<u8> vals)
         {
             sender_db_->set_data(data, vals, total_thread_count_);
             stop_watch.set_time_point("Sender set-data");
@@ -280,7 +280,7 @@ namespace apsi
         }
         std::vector<oc::u64> Sender::debug_eval_term(
             int term,
-            oc::MatrixView<u64> coeffs,
+            MatrixView<u64> coeffs,
             oc::span<u64> x,
             const seal::SmallModulus& mod,
             bool print)
