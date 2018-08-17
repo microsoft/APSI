@@ -3,7 +3,6 @@ SRC_DIRS=
 BIN_DIR=../bin
 OBJ_DIR=obj
 INCLUDE_DIRS=. ../APSI ../../SEAL-dev/SEAL /usr/include/flint ../../cryptoTools ../../Cuckoo/Cuckoo
- #../../SEAL-dev/SEAL ../../cryptoTools ../../cryptoTools/thirdparty/linux/miracl /usr/include/flint ../../Cuckoo/Cuckoo ../../FourQlib/FourQ_64bit_and_portable
 SRCS=$(wildcard *.cpp) $(foreach d,$(SRC_DIRS),$(wildcard $d/*.cpp))
 OBJS=$(SRCS:%.cpp=$(OBJ_DIR)/%.o)
 DEPS=$(OBJS:.o=.d)
@@ -11,9 +10,7 @@ APSITESTEXE=unit_tests
 CXX=g++
 CXXFLAGS=-O0 -g -DHAVE_CONFIG -march=native -std=c++17  -maes -msse2 -msse4.1 -mpclmul -DNDEBUG -D_AMD64_ -D_AVX2_ -D_ASM_ -D__LINUX__
 LDFLAGS=-lapsi -lseal -lcryptoTools -lflint -lpthread -lcppunit
-# -lboost_system -lcuckoo -lpthread -lcryptoTools -lmiracl -lflint -lgmp -lFourQ
 LIBRARY_PATHS=-L../bin -L../../SEAL-dev/lib -L../../cryptoTools/lib
-# ../../SEAL-dev/bin ../../cryptoTools/thirdparty/linux/boost/stage/lib ../../cryptoTools/lib ../../cryptoTools/thirdparty/linux/miracl/miracl/source /usr/lib ../../FourQlib/FourQ_64bit_and_portable
 
 .PHONY : all clean
 
