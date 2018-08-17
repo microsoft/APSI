@@ -1,4 +1,4 @@
-# Makefile for the SEAL library
+# Makefile for the APSI library
 SRC_DIRS=apsi apsi/network apsi/receiver apsi/sender apsi/tools apsi/ffield
 BIN_DIR=../bin
 OBJ_DIR=obj

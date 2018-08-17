@@ -10,10 +10,9 @@
 #include "apsi/apsidefines.h"
 #include "apsi/tools/interpolate.h"
 #include "apsi/ffield/ffield_array.h"
-#include "apsi/utils.h"
+#include "apsi/tools/utils.h"
 
 #include "cryptoTools/Crypto/PRNG.h"
-#include "cryptoTools/Common/MatrixView.h"
 #include "cryptoTools/Common/Log.h"
 #include "cryptoTools/Crypto/sha1.h"
 
@@ -115,7 +114,7 @@ namespace apsi
             set_data(data, {}, thread_count);
         }
 
-        void SenderDB::set_data(oc::span<const Item> data, oc::MatrixView<u8> vals, int thread_count)
+        void SenderDB::set_data(oc::span<const Item> data, MatrixView<u8> vals, int thread_count)
         {
             clear_db();
             add_data(data, vals, thread_count);
@@ -135,7 +134,7 @@ namespace apsi
             return ss.str();
         }
 
-        void SenderDB::add_data(oc::span<const Item> data, oc::MatrixView<u8> values, int thread_count)
+        void SenderDB::add_data(oc::span<const Item> data, MatrixView<u8> values, int thread_count)
         {
             if (values.stride() != params_.get_label_byte_count())
                 throw std::invalid_argument("unexpacted label length");
@@ -273,7 +272,7 @@ namespace apsi
                         pos.batch_offset = cuckoo_loc % params_.batch_size();
 
                         auto count = 0;
-                        for (u64 j = 0; j < db_blocks_.cols(); ++j)
+                        for (u64 j = 0; j < db_blocks_.columns(); ++j)
                         {
                             auto& blk = db_blocks_(batch_idx, j);
                             ;
@@ -1031,7 +1030,7 @@ namespace apsi
 
         std::vector<oc::u64> debug_eval_term(
             int term,
-            oc::MatrixView<u64> coeffs,
+            MatrixView<u64> coeffs,
             oc::span<u64> x,
             const seal::SmallModulus& mod)
         {

@@ -16,6 +16,8 @@
 #include "apsi/ffield/ffield_elt.h"
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/ffield/ffield_fast_batch_encoder.h"
+#include "apsi/tools/matrixview.h"
+#include "apsi/tools/matrix.h"
 
 // Cuckoo
 #include "cuckoo/cuckoo.h"
@@ -24,8 +26,8 @@
 #include "seal/plaintext.h"
 #include "seal/evaluator.h"
 #include "seal/batchencoder.h"
+
 // CryptoTools
-#include "cryptoTools/Common/Matrix.h"
 #include "cryptoTools/Crypto/PRNG.h"
 
 namespace apsi
@@ -110,7 +112,7 @@ namespace apsi
             */
             void symmetric_polys(
                 SenderThreadContext &th_context,
-                oc::MatrixView<_ffield_array_elt_t> symm_block,
+                MatrixView<_ffield_array_elt_t> symm_block,
                 int encoding_bit_length,
                 const FFieldArray &neg_null_element);
 
@@ -123,7 +125,7 @@ namespace apsi
             */
             void randomized_symmetric_polys(
                 SenderThreadContext &th_context,
-                oc::MatrixView<_ffield_array_elt_t> symm_block,
+                MatrixView<_ffield_array_elt_t> symm_block,
                 int encoding_bit_length,
                 FFieldArray &neg_null_element);
 
@@ -198,14 +200,14 @@ namespace apsi
             Sets the sender's database by hashing the data items with all hash functions.
             */
             void set_data(oc::span<const Item> keys, int thread_count);
-            void set_data(oc::span<const Item> keys, oc::MatrixView<u8> values, int thread_count);
+            void set_data(oc::span<const Item> keys, MatrixView<u8> values, int thread_count);
 
 
             /**
             Adds the data items to sender's database.
             */
             void add_data(oc::span<const Item> keys, int thread_count);
-            void add_data(oc::span<const Item> keys, oc::MatrixView<u8> values, int thread_count);
+            void add_data(oc::span<const Item> keys, MatrixView<u8> values, int thread_count);
 
             /**
             Adds one item to sender's database.
@@ -309,9 +311,7 @@ namespace apsi
             view so that multi-threading is more efficient for accessing data, 
             i.e., one thread will take care of several continuous complete rows. 
             */
-            //oc::Matrix<Item> keys_;
-
-            oc::Matrix<DBBlock> db_blocks_;
+            Matrix<DBBlock> db_blocks_;
             //std::vector<DBRegion> regions_;
             //std::shared_ptr<u8[]> values_ptr_;
 

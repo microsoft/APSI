@@ -17,6 +17,7 @@
 #include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_fast_batch_encoder.h"
 #include "apsi/tools/sealcompress.h"
+#include "apsi/tools/matrixview.h"
 
 // SEAL
 #include "seal/memorypoolhandle.h"
@@ -95,7 +96,7 @@ namespace apsi
             Loads the input data into sender's database, and precomputes all necessary components for the PSI protocol,
             including symmetric polynomials, batching, etc.
             */
-            void load_db(const std::vector<Item> &data, oc::MatrixView<u8> vals = {});
+            void load_db(const std::vector<Item> &data, MatrixView<u8> vals = {});
 
             void query_session(oc::Channel& channel);
 
@@ -195,7 +196,7 @@ namespace apsi
                 FFieldArray& dest);
 
             std::vector<oc::u64> debug_eval_term(
-                int term, oc::MatrixView<apsi::u64> coeffs, 
+                int term, MatrixView<apsi::u64> coeffs, 
                 oc::span<oc::u64> x,
                 const seal::SmallModulus& mod,
                 bool print = false);

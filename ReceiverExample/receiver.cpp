@@ -9,7 +9,6 @@
 
 #include "cryptoTools/Common/CLP.h"
 #include "cryptoTools/Network/IOService.h"
-#include "tests/collection.h"
 
 #ifdef _MSC_VER
 #include "windows.h"
@@ -23,8 +22,6 @@ using namespace apsi::sender;
 using namespace seal::util;
 using namespace seal;
 using namespace oc;
-
-std::vector<std::string> unitTestTag{ "u" };
 
 void print_example_banner(string title);
 void print_parameters(const PSIParams &psi_params);
@@ -106,7 +103,6 @@ int main(int argc, char *argv[]){
     auto none = true;
     auto fastBatching = cmd.isSet("fast"); none &= !fastBatching;
     auto slowBatching = cmd.isSet("slow"); none &= !slowBatching;
-    auto unitTest = cmd.isSet(unitTestTag); none &= !unitTest;
     //// Example: Basics
     //example_basics();
 
@@ -125,28 +121,6 @@ int main(int argc, char *argv[]){
     // Example: Slow batching
     if (none || slowBatching)
         example_slow_batching(cmd, clientChl, serverChl);
-
-    if (unitTest)
-    {
-        //assert("NOT IMPLEMENTED");
-         auto tests = apsi_tests;
-         //tests += tests_cryptoTools::Tests;
-        
-         if (cmd.isSet("list"))
-         {
-             tests.list();
-         }
-         else
-         {
-             cmd.setDefault("loop", 1);
-             auto loop = cmd.get<u64>("loop");
-        
-             if (cmd.hasValue(unitTestTag))
-                 tests.run(cmd.getMany<u64>(unitTestTag), loop);
-             else
-                 tests.runAll(loop);
-         }
-    }
 
     // Example: Slow batching vs. Fast batching
     //example_slow_vs_fast();
@@ -597,7 +571,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     auto intersectionSize = 25;
 
     auto s1 = vector<Item>(sendersActualSize);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
-    oc::Matrix<u8> labels(sendersActualSize, params.get_label_byte_count());
+    Matrix<u8> labels(sendersActualSize, params.get_label_byte_count());
     for (int i = 0; i < s1.size(); i++)
     {
         s1[i] = i;

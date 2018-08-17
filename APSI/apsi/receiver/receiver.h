@@ -10,6 +10,7 @@
 #include "apsi/ffield/ffield_fast_batch_encoder.h"
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/tools/sealcompress.h"
+#include "apsi/tools/matrix.h"
 
 // Cuckoo
 #include "cuckoo/cuckoo.h"
@@ -27,7 +28,6 @@
 
 // CryptoTools
 #include "cryptoTools/Network/Channel.h"
-#include "cryptoTools/Common/Matrix.h"
 
 namespace apsi
 {
@@ -44,7 +44,7 @@ namespace apsi
             is a same-size vector of bool values. If an item is in the intersection, the corresponding bool value is true on the
             same position in the result vector .
             */
-            std::pair<std::vector<bool>, oc::Matrix<u8>> query(std::vector<Item> &items, oc::Channel& chl);
+            std::pair<std::vector<bool>, Matrix<u8>> query(std::vector<Item> &items, oc::Channel& chl);
 
             /**
             Preprocesses the PSI items. Returns the powr map of the items, and the indices of them in the hash table.
@@ -106,7 +106,7 @@ namespace apsi
             @result Matrix of size (#splits x table_size_ceiling). Here table_size_ceiling is defined as (#batches x batch_size), which might be
             larger than table_size.
             */
-            std::pair<std::vector<bool>, oc::Matrix<u8> > stream_decrypt(
+            std::pair<std::vector<bool>, Matrix<u8> > stream_decrypt(
                 oc::Channel &channel,
                 const std::vector<int>& table_to_input_map,
                 std::vector<Item>& items);

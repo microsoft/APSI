@@ -5,8 +5,11 @@
 #include "seal/util/mempool.h"
 #include "seal/defaultparams.h"
 
-#include  "cryptoTools/Common/TestCollection.h"
 #include  "cryptoTools/Crypto/PRNG.h"
+
+#include <cppunit/extensions/HelperMacros.h>
+
+using namespace APSITests;
 
 std::string toString(seal::Plaintext &ptxt, int coeff_count = 0) {
     if (coeff_count == 0) {
@@ -46,7 +49,7 @@ oc::u64 u64_poly_eval(
     return result;
 }
 
-void u64_interpolate_test()
+void InterpolateTests::u64_interpolate_test()
 {
     using oc::u64;
 
@@ -91,7 +94,6 @@ void u64_interpolate_test()
         apsi::u64_newton_interpolate_poly(points, result, plain_modulus);
         //apsi::plaintext_newton_interpolate_poly(points, result, poly_modulus.pointer(), plain_modulus, pool, true);
 
-        bool passed = true;
         for (int i = 0; i < points.size(); ++i)
         {
             auto& x = points[i].first;
@@ -103,7 +105,7 @@ void u64_interpolate_test()
                 std::cout << " poly(x[" << i << "]) = " << yy
                     << "  != \n"
                     << "y[" << i << "] = " << y << std::endl;
-                passed = false;
+                CPPUNIT_FAIL("Test failed.");
             }
             //else
             //{
@@ -113,10 +115,5 @@ void u64_interpolate_test()
             //        << "y[" << i << "] = " << (y) << std::endl;
             //}
         }
-
-        if (passed == false)
-            throw oc::UnitTestFail();
-
     }
-
 }

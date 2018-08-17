@@ -17,8 +17,9 @@
 // SEAL
 #include "seal/bigpoly.h"
 
-// CryptoTools
-#include "cryptoTools/Common/MatrixView.h"
+// APSI
+#include "apsi/tools/matrixview.h"
+
 
 // Require mp_limb_t equal to std::uint64
 static_assert(std::is_same<mp_limb_t, std::uint64_t>::value, "mp_limb_t != std::uint64_t");
@@ -219,7 +220,7 @@ namespace apsi
         _ch_t ch_;
         bool frob_populated_;
         _ffield_array_t frob_table_backing_;
-        oc::MatrixView<_ffield_array_elt_t> frob_table_;
+        MatrixView<_ffield_array_elt_t> frob_table_;
         _ffield_ctx_t ctx_;
     };
 }
