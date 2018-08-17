@@ -84,7 +84,7 @@ namespace apsi
             }
         }
 
-        std::pair<std::vector<bool>, oc::Matrix<u8>> Receiver::query(vector<Item>& items, oc::Channel& chl)
+        std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, oc::Channel& chl)
         {
 
             auto qq = preprocess(items, chl);
@@ -440,13 +440,13 @@ namespace apsi
 
 
 
-        std::pair<std::vector<bool>, oc::Matrix<u8>> Receiver::stream_decrypt(
+        std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
             oc::Channel &channel,
             const std::vector<int> &table_to_input_map,
             std::vector<Item> &items)
         {
 
-            std::pair<std::vector<bool>, oc::Matrix<u8>> ret;
+            std::pair<std::vector<bool>, Matrix<u8>> ret;
             auto& ret_bools = ret.first;
             auto& ret_labels = ret.second;
 

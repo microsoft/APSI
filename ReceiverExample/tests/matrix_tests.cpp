@@ -73,6 +73,12 @@ void MatrixViewTests::OperatorParenTest()
     CPPUNIT_ASSERT_EQUAL('H', mv(0, 0));
     CPPUNIT_ASSERT_EQUAL('!', mv(5, 1));
     CPPUNIT_ASSERT_EQUAL('l', mv(1, 0));
+
+    // We can also use a single index to iterate
+    CPPUNIT_ASSERT_EQUAL('H', mv(0));
+    CPPUNIT_ASSERT_EQUAL('!', mv(11));
+    CPPUNIT_ASSERT_EQUAL('l', mv(2));
+    CPPUNIT_ASSERT_EQUAL('l', mv(3));
 }
 
 void MatrixViewTests::SizeTest()
@@ -104,6 +110,29 @@ void MatrixViewTests::ResizeTest()
     CPPUNIT_ASSERT_EQUAL(9, mv(1, 3));
     CPPUNIT_ASSERT_EQUAL(13, mv(2, 2));
     CPPUNIT_ASSERT_EQUAL(20, mv(3, 4));
+}
+
+void MatrixViewTests::IteratorTest()
+{
+    int array[10] = { 1,  2,  3,  4,  5,  6,  7,  8,  9,  10 };
+    apsi::MatrixView mv(array, 5, 2);
+    apsi::MatrixView mv2(array, 5, 1);
+
+    apsi::u64 sum = 0;
+    apsi::u64 sum2 = 0;
+
+    for(auto& elem : mv)
+    {
+        sum += elem;
+    }
+
+    for (auto& elem : mv2)
+    {
+        sum2 += elem;
+    }
+
+    CPPUNIT_ASSERT_EQUAL((apsi::u64)55, sum);
+    CPPUNIT_ASSERT_EQUAL((apsi::u64)15, sum2);
 }
 
 void MatrixTests::ResizeTest()

@@ -580,7 +580,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     auto intersectionSize = 25;
 
     auto s1 = vector<Item>(sendersActualSize);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
-    oc::Matrix<u8> labels(sendersActualSize, params.get_label_byte_count());
+    Matrix<u8> labels(sendersActualSize, params.get_label_byte_count());
     for (int i = 0; i < s1.size(); i++)
     {
         s1[i] = i;
@@ -617,7 +617,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
         c1.emplace_back(i + s1.size());
 
     stop_watch.set_time_point("Application preparation done");
-    sender.load_db(s1, apsi::MatrixView(labels.data(), labels.rows(), labels.cols()));
+    sender.load_db(s1, MatrixView(labels.data(), labels.rows(), labels.columns()));
 
     auto thrd = thread([&]() {
         setThreadName("sender_main");
