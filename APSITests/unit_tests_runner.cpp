@@ -14,6 +14,22 @@
 
 namespace APSITests {
 
+namespace {
+    struct Colors {
+        static const std::string Red;
+        static const std::string Green;
+        static const std::string RedBold;
+        static const std::string GreenBold;
+        static const std::string Reset;
+    };
+
+    const std::string Colors::Red       = "\033[31m";
+    const std::string Colors::Green     = "\033[32m";
+    const std::string Colors::RedBold   = "\033[1;31m";
+    const std::string Colors::GreenBold = "\033[1;32m";
+    const std::string Colors::Reset     = "\033[0m";
+}
+
 /**
  * Simple Test Listener class to output each unit test run
  */
@@ -25,17 +41,17 @@ public:
 
     void startTest(CppUnit::Test* test)
     {
-        testResult_ = "OK";
+        testResult_ = Colors::GreenBold + "OK       " + Colors::Reset;
     }
 
     void addFailure(const CppUnit::TestFailure& failure)
     {
-        testResult_ = failure.isError() ? "error" : "assertion";
+        testResult_ = Colors::RedBold + (failure.isError() ? "ERROR    " : "ASSERTION") + Colors::Reset;
     }
 
     void endTest(CppUnit::Test* test)
     {
-        CppUnit::stdCOut() << std::setw(9) << std::left << testResult_ << ": " << test->getName() << std::endl;
+        CppUnit::stdCOut() << testResult_ << ": " << test->getName() << std::endl;
     }
 
 private:
