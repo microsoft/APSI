@@ -2,6 +2,7 @@
 #include "apsi/ffield/ffield_elt.h"
 
 using namespace oc;
+using namespace APSITests;
 
 void BitCopyTests::bit_copy_test()
 {

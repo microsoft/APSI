@@ -2,6 +2,8 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 
+namespace APSITests {
+
 class BitCopyTests : public CppUnit::TestFixture
 {
     CPPUNIT_TEST_SUITE(BitCopyTests);
@@ -11,3 +13,5 @@ class BitCopyTests : public CppUnit::TestFixture
 public:
     void bit_copy_test();
 };
+
+}

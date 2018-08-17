@@ -4,6 +4,8 @@
 
 #include <string>
 
+using namespace APSITests;
+
 /**
  * This class only exists to expose the resize method.
  */

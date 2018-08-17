@@ -9,7 +9,6 @@
 
 #include "cryptoTools/Common/CLP.h"
 #include "cryptoTools/Network/IOService.h"
-#include "tests/unit_tests.h"
 
 #ifdef _MSC_VER
 #include "windows.h"
@@ -23,8 +22,6 @@ using namespace apsi::sender;
 using namespace seal::util;
 using namespace seal;
 using namespace oc;
-
-std::vector<std::string> unitTestTag{ "u" };
 
 void print_example_banner(string title);
 void print_parameters(const PSIParams &psi_params);
@@ -106,7 +103,6 @@ int main(int argc, char *argv[]){
     auto none = true;
     auto fastBatching = cmd.isSet("fast"); none &= !fastBatching;
     auto slowBatching = cmd.isSet("slow"); none &= !slowBatching;
-    auto unitTest = cmd.isSet(unitTestTag); none &= !unitTest;
     //// Example: Basics
     //example_basics();
 
@@ -125,11 +121,6 @@ int main(int argc, char *argv[]){
     // Example: Slow batching
     if (none || slowBatching)
         example_slow_batching(cmd, clientChl, serverChl);
-
-    if (unitTest)
-    {
-        run_unit_tests();
-    }
 
     // Example: Slow batching vs. Fast batching
     //example_slow_vs_fast();

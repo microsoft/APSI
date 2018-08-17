@@ -2,6 +2,8 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 
+namespace APSITests {
+
 class MatrixViewTests : public CppUnit::TestFixture
 {
     CPPUNIT_TEST_SUITE(MatrixViewTests);
@@ -35,3 +37,5 @@ class MatrixTests : public CppUnit::TestFixture
 public:
     void ResizeTest();
 };
+
+}

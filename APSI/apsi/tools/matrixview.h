@@ -115,7 +115,7 @@ namespace apsi
 
     private:
         gsl::span<T> data_;
-        u64 rows_;
-        u64 cols_;
+        u64 rows_ = 0;
+        u64 cols_ = 0;
     };
 }

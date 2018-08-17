@@ -2,6 +2,8 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 
+namespace APSITests {
+
 class InterpolateTests : public CppUnit::TestFixture
 {
     CPPUNIT_TEST_SUITE(InterpolateTests);
@@ -12,3 +14,4 @@ public:
     void u64_interpolate_test();
 };
 
+}
