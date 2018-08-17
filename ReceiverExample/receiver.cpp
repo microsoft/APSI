@@ -617,7 +617,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
         c1.emplace_back(i + s1.size());
 
     stop_watch.set_time_point("Application preparation done");
-    sender.load_db(s1, MatrixView(labels.data(), labels.rows(), labels.columns()));
+    sender.load_db(s1, labels);
 
     auto thrd = thread([&]() {
         setThreadName("sender_main");
