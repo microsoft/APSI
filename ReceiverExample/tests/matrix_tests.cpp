@@ -21,6 +21,23 @@ public:
     }
 };
 
+/**
+ * This class only exists to expose the capacity method.
+ */
+template<class T>
+class MatrixTester : public apsi::Matrix<T>
+{
+public:
+    MatrixTester(apsi::u64 rows, apsi::u64 cols)
+        : apsi::Matrix<T>(rows, cols)
+    {}
+
+    apsi::u64 capacity_test() const
+    {
+        return this->capacity();
+    }
+};
+
 
 void MatrixViewTests::ConstructorTest()
 {
@@ -137,7 +154,7 @@ void MatrixViewTests::IteratorTest()
 
 void MatrixTests::ResizeTest()
 {
-    apsi::Matrix<int> m(5, 5);
+    MatrixTester<int> m(5, 5);
     for (apsi::u64 i = 0; i < m.rows(); i++)
     {
         for(apsi::u64 j = 0; j < m.columns(); j++)
@@ -146,15 +163,23 @@ void MatrixTests::ResizeTest()
         }
     }
 
+    CPPUNIT_ASSERT_EQUAL((apsi::u64)25, m.capacity_test());
+
     m.resize(10, 10);
 
     CPPUNIT_ASSERT_EQUAL((apsi::u64)10, m.rows());
     CPPUNIT_ASSERT_EQUAL((apsi::u64)10, m.columns());
     CPPUNIT_ASSERT_EQUAL((apsi::u64)100, m.size());
+    CPPUNIT_ASSERT_EQUAL((apsi::u64)100, m.capacity_test());
 
-    // Data should still be there
+    // Data should still be there, but in their new positions
     CPPUNIT_ASSERT_EQUAL(25, m(2, 4));
     CPPUNIT_ASSERT_EQUAL(10, m(0, 9));
     CPPUNIT_ASSERT_EQUAL(20, m(1, 9));
-}
 
+    // If we reduce the size the actual capacity should still be the same as before
+    m.resize(2, 2);
+
+    CPPUNIT_ASSERT_EQUAL(4, m(1, 1));
+    CPPUNIT_ASSERT_EQUAL((apsi::u64)100, m.capacity_test());
+}

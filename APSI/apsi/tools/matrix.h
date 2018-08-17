@@ -46,6 +46,13 @@ public:
         }
     }
 
+protected:
+    /**
+     * Get the actual size of the backing vector. This might be different
+     * from the logical size, specially if the matrix has been resized.
+     */
+    u64 capacity() const { return data_.size(); }
+
 private:
     vector<T> data_;
 };

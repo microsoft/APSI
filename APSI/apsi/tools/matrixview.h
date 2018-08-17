@@ -6,10 +6,6 @@
 
 namespace apsi
 {
-    // For now this is necessary to distinguish the standard span class from the one
-    // included in cryptoTools. Once cryptoTools is removed this can go away.
-    template<typename T> using msspan = gsl::span<T>;
-
     /**
      * Simple bi-dimensional Matrix implementation using gsl::span.
      **/
@@ -23,7 +19,7 @@ namespace apsi
         MatrixView() = default;
 
         MatrixView(T* elems, u64 rows, u64 cols) :
-            data_(msspan<T>(elems, rows * cols)),
+            data_(gsl::span<T>(elems, rows * cols)),
             rows_(rows),
             cols_(cols)
         {
@@ -33,7 +29,7 @@ namespace apsi
          * Return a subspan with a row in the matrix. Useful for accesing
          * elements like so: matrix[row][col]
          */
-        constexpr msspan<T> operator[] (u64 row)
+        constexpr gsl::span<T> operator[] (u64 row)
         {
             Expects(row < rows_);
             return data_.subspan(/* offset */ row * stride(), /* count */ stride());
@@ -89,7 +85,7 @@ namespace apsi
         /**
          * Get a pointer to the actual data
          */
-        T* data() { return data_.data(); }
+        T* data() const { return data_.data(); }
 
         /**
          * Get the number of elements
@@ -114,11 +110,11 @@ namespace apsi
         {
             rows_ = rows;
             cols_ = cols;
-            data_ = msspan<T>(data, rows * cols);
+            data_ = gsl::span<T>(data, rows * cols);
         }
 
     private:
-        msspan<T> data_;
+        gsl::span<T> data_;
         u64 rows_;
         u64 cols_;
     };
