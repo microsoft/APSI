@@ -71,11 +71,11 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetExt>.lib</TargetExt>
-    <OutDir>$(SolutionDir)/bin/$(Platform)\$(Configuration)\</OutDir>
+    <OutDir>$(ProjectDir)../bin/$(Platform)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TargetExt>.lib</TargetExt>
-    <OutDir>$(SolutionDir)/bin/$(Platform)\$(Configuration)\</OutDir>
+    <OutDir>$(ProjectDir)../bin/$(Platform)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -89,13 +89,15 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);C:\libs\boost;$(SolutionDir)..\Cuckoo\Cuckoo;..\..\SEAL-dev\SEAL\;$(ProjectDir)../../../libOTe/cryptoTools/;$(ProjectDir)../../../libOTe/cryptoTools/cryptoTools/;C:\libs\miracl\;$(ProjectDir)../../cryptoTools/thirdparty/win/miracl;$(ProjectDir)../../cryptoTools;$(ProjectDir)../../flint2/lib/x64/$(Configuration)/;$(ProjectDir)../../mpfr/lib/x64/$(Configuration)/;$(ProjectDir)../../mpir/lib/x64/$(Configuration)/;$(ProjectDir)../../pthreads\Pre-built.2\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);c:\progs\Libs\SEAL\include;c:\progs\Libs\boost-1.65.1\include;c:\progs\Libs\cppunit\include;c:\progs\Libs\cryptoTools\include;c:\progs\Libs\Cuckoo\include;c:\progs\Libs\flint2\$(IntDir);c:\progs\Libs\FourQlib\include;c:\progs\Libs\GSL;c:\progs\Libs\miracl\include;c:\progs\Libs\mpfr\$(IntDir);c:\progs\Libs\mpir\lib\$(IntDir);c:\progs\Libs\pthreads4w-3.0.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Lib>
-      <AdditionalDependencies>SEAL.lib;miracl.lib;cryptoTools.lib;cuckoo.lib</AdditionalDependencies>
+      <AdditionalDependencies>SEAL.lib;miracl.lib;cryptoTools.lib;cuckoo.lib;FourQ.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>$(ProjectDir)../bin\x64\$(Configuration)\;C:\libs\boost/stage/lib/$(Platform);C:\libs\miracl\x64\$(Configuration)_dllrt/;$(ProjectDir)../../../libOTe/x64/$(Configuration)_dllrt/;$(ProjectDir)../../cryptoTools/x64/$(Configuration)_dllrt/;$(ProjectDir)../../cryptoTools/thirdparty/win\miracl\x64\$(Configuration)_dllrt/;$(SolutionDir)$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\x64\$(Configuration)\;c:\Progs\Libs\SEAL\lib\$(IntDir);c:\Progs\Libs\Cuckoo\lib\$(IntDir);c:\Progs\Libs\cryptoTools\lib\$(Configuration);c:\Progs\Libs\boost-1.65.1\lib;c:\Progs\Libs\miracl\lib\$(IntDir);c:\Progs\Libs\FourQlib\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -118,17 +120,19 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);C:\libs\boost;$(SolutionDir)..\Cuckoo\Cuckoo;..\..\SEAL-dev\SEAL\;$(ProjectDir)../../../libOTe/cryptoTools/;$(ProjectDir)../../../libOTe/cryptoTools/cryptoTools/;C:\libs\miracl\;$(ProjectDir)../../cryptoTools/thirdparty/win/miracl;$(ProjectDir)../../cryptoTools;$(ProjectDir)../../flint2/lib/x64/$(Configuration)/;$(ProjectDir)../../mpfr/lib/x64/$(Configuration)/;$(ProjectDir)../../mpir/lib/x64/$(Configuration)/;$(ProjectDir)../../pthreads\Pre-built.2\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);c:\progs\Libs\SEAL\include;c:\progs\Libs\boost-1.65.1\include;c:\progs\Libs\cppunit\include;c:\progs\Libs\cryptoTools\include;c:\progs\Libs\Cuckoo\include;c:\progs\Libs\flint2\$(IntDir);c:\progs\Libs\FourQlib\include;c:\progs\Libs\GSL;c:\progs\Libs\miracl\include;c:\progs\Libs\mpfr\$(IntDir);c:\progs\Libs\mpir\lib\$(IntDir);c:\progs\Libs\pthreads4w-3.0.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <Lib>
-      <AdditionalDependencies>SEAL.lib;miracl.lib;cryptoTools.lib;cuckoo.lib</AdditionalDependencies>
+      <AdditionalDependencies>SEAL.lib;miracl.lib;cryptoTools.lib;cuckoo.lib;FourQ.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>$(ProjectDir)../bin\x64\$(Configuration)\;C:\libs\boost/stage/lib/$(Platform);C:\libs\miracl\x64\$(Configuration)_dllrt/;$(ProjectDir)../../../libOTe/x64/$(Configuration)_dllrt/;$(ProjectDir)../../cryptoTools/x64/$(Configuration)_dllrt/;$(ProjectDir)../../cryptoTools/thirdparty/win\miracl\x64\$(Configuration)_dllrt/;$(SolutionDir)$(Platform)\$(Configuration)\;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\x64\$(Configuration)\;c:\Progs\Libs\SEAL\lib\$(IntDir);c:\Progs\Libs\Cuckoo\lib\$(IntDir);c:\Progs\Libs\cryptoTools\lib\$(Configuration);c:\Progs\Libs\boost-1.65.1\lib;c:\Progs\Libs\miracl\lib\$(IntDir);c:\Progs\Libs\FourQlib\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -159,9 +163,9 @@
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp" />
     <ClCompile Include="apsi\ffield\ffield.cpp" />
-    <ClCompile Include="apsi\ffield\ffield_crt_batch_encoder.cpp" />
+    <ClCompile Include="apsi\ffield\ffield_batch_encoder.cpp" />
     <ClCompile Include="apsi\ffield\ffield_elt.cpp" />
-    <ClCompile Include="apsi\ffield\ffield_fast_crt_batch_encoder.cpp" />
+    <ClCompile Include="apsi\ffield\ffield_fast_batch_encoder.cpp" />
     <ClCompile Include="apsi\ffield\ffield_ntt.cpp" />
     <ClCompile Include="apsi\item.cpp" />
     <ClCompile Include="apsi\Network\network_utils.cpp" />
@@ -174,6 +178,7 @@
     <ClCompile Include="apsi\Tools\interpolate.cpp" />
     <ClCompile Include="apsi\Tools\sealcompress.cpp" />
     <ClCompile Include="apsi\Tools\stopwatch.cpp" />
+    <ClCompile Include="apsi\tools\utils.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

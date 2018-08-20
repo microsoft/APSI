@@ -125,8 +125,8 @@ namespace apsi
 
     seal::Plaintext random_plaintext(const seal::SEALContext &context)
     {
-        std::uint64_t plain_mod = context.context_data().parms().plain_modulus().value();
-        int coeff_count = context.context_data().parms().poly_modulus_degree();
+        std::uint64_t plain_mod = context.context_data()->parms().plain_modulus().value();
+        int coeff_count = context.context_data()->parms().poly_modulus_degree();
         seal::Plaintext random(coeff_count);
         uint64_t* random_ptr = random.data();
 

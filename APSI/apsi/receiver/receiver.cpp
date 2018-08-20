@@ -72,7 +72,7 @@ namespace apsi
 
             generator.generate_evaluation_keys(params_.decomposition_bit_count(), evaluation_keys_);
 
-            if (seal_context_->context_data().qualifiers().enable_batching)
+            if (seal_context_->context_data()->qualifiers().enable_batching)
             {
                 batch_encoder_.reset(new BatchEncoder(seal_context_));
             }
@@ -492,7 +492,7 @@ namespace apsi
                 MemoryPoolHandle local_pool(MemoryPoolHandle::New());
                 Plaintext p(local_pool);
                 Ciphertext tmp(seal_context_->context_data(
-                    seal_context_->last_parms_id()).value().get().parms(), local_pool);
+                    seal_context_->last_parms_id())->parms(), local_pool);
                 const bool short_strings = !!batch_encoder_;
                 unique_ptr<FFieldArray> batch;
                 if (!short_strings)

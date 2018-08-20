@@ -12,6 +12,10 @@
 #include "matrix_tests.h"
 #include "plaintextarith.h"
 
+#ifdef _MSC_VER
+#include "Windows.h"
+#endif
+
 namespace APSITests {
 
 namespace {
@@ -63,10 +67,36 @@ private:
 using namespace APSITests;
 
 /**
+ * Prepare console for running unit tests.
+ * This only turns on showing colors for Windows.
+ */
+void prepare_console()
+{
+#ifndef _MSC_VER
+    return; // Nothing to do on Linux.
+#else
+
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hConsole == INVALID_HANDLE_VALUE)
+        return;
+
+    DWORD dwMode = 0;
+    if (!GetConsoleMode(hConsole, &dwMode))
+        return;
+
+    dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    SetConsoleMode(hConsole, dwMode);
+
+#endif
+}
+
+/**
  * Run unit tests
  */
 int run_unit_tests()
 {
+    prepare_console();
+
     CppUnit::TestResult controller;
     CppUnit::TestResultCollector result;
     ProgressListener progress;

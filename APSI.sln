@@ -4,16 +4,10 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 15.0.27130.2036
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "APSI", "APSI\APSI.vcxproj", "{6E84A852-E68E-4C1D-8266-08CEEAB6ADE6}"
-	ProjectSection(ProjectDependencies) = postProject
-		{7EA96C25-FC0D-485A-BB71-32B6DA55652A} = {7EA96C25-FC0D-485A-BB71-32B6DA55652A}
-		{34FEA4F8-3ECA-4D09-A506-3871D34B4FB8} = {34FEA4F8-3ECA-4D09-A506-3871D34B4FB8}
-	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ReceiverExample", "ReceiverExample\ReceiverExample.vcxproj", "{CD01F1BD-DF08-49A0-882C-E1D80684D511}"
 	ProjectSection(ProjectDependencies) = postProject
-		{7EA96C25-FC0D-485A-BB71-32B6DA55652A} = {7EA96C25-FC0D-485A-BB71-32B6DA55652A}
 		{6E84A852-E68E-4C1D-8266-08CEEAB6ADE6} = {6E84A852-E68E-4C1D-8266-08CEEAB6ADE6}
-		{34FEA4F8-3ECA-4D09-A506-3871D34B4FB8} = {34FEA4F8-3ECA-4D09-A506-3871D34B4FB8}
 	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "APSITests", "APSITests\APSITests.vcxproj", "{49E062C3-F57A-4BCA-B400-40947E973054}"
@@ -21,14 +15,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "APSITests", "APSITests\APSI
 		{6E84A852-E68E-4C1D-8266-08CEEAB6ADE6} = {6E84A852-E68E-4C1D-8266-08CEEAB6ADE6}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Cuckoo", "..\Cuckoo\Cuckoo\Cuckoo.vcxproj", "{34FEA4F8-3ECA-4D09-A506-3871D34B4FB8}"
-EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SEAL", "..\SEAL-dev\SEAL\SEAL.vcxproj", "{7EA96C25-FC0D-485A-BB71-32B6DA55652A}"
-EndProject
 Global
-	GlobalSection(Performance) = preSolution
-		HasPerformanceSessions = true
-	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
@@ -60,28 +47,15 @@ Global
 		{49E062C3-F57A-4BCA-B400-40947E973054}.Release|x64.Build.0 = Release|x64
 		{49E062C3-F57A-4BCA-B400-40947E973054}.Release|x86.ActiveCfg = Release|Win32
 		{49E062C3-F57A-4BCA-B400-40947E973054}.Release|x86.Build.0 = Release|Win32
-		{34FEA4F8-3ECA-4D09-A506-3871D34B4FB8}.Debug|x64.ActiveCfg = Debug|x64
-		{34FEA4F8-3ECA-4D09-A506-3871D34B4FB8}.Debug|x64.Build.0 = Debug|x64
-		{34FEA4F8-3ECA-4D09-A506-3871D34B4FB8}.Debug|x86.ActiveCfg = Debug|Win32
-		{34FEA4F8-3ECA-4D09-A506-3871D34B4FB8}.Debug|x86.Build.0 = Debug|Win32
-		{34FEA4F8-3ECA-4D09-A506-3871D34B4FB8}.Release|x64.ActiveCfg = Release|x64
-		{34FEA4F8-3ECA-4D09-A506-3871D34B4FB8}.Release|x64.Build.0 = Release|x64
-		{34FEA4F8-3ECA-4D09-A506-3871D34B4FB8}.Release|x86.ActiveCfg = Release|Win32
-		{34FEA4F8-3ECA-4D09-A506-3871D34B4FB8}.Release|x86.Build.0 = Release|Win32
-		{7EA96C25-FC0D-485A-BB71-32B6DA55652A}.Debug|x64.ActiveCfg = Debug|x64
-		{7EA96C25-FC0D-485A-BB71-32B6DA55652A}.Debug|x64.Build.0 = Debug|x64
-		{7EA96C25-FC0D-485A-BB71-32B6DA55652A}.Debug|x86.ActiveCfg = Debug|Win32
-		{7EA96C25-FC0D-485A-BB71-32B6DA55652A}.Debug|x86.Build.0 = Debug|Win32
-		{7EA96C25-FC0D-485A-BB71-32B6DA55652A}.Release|x64.ActiveCfg = Release|x64
-		{7EA96C25-FC0D-485A-BB71-32B6DA55652A}.Release|x64.Build.0 = Release|x64
-		{7EA96C25-FC0D-485A-BB71-32B6DA55652A}.Release|x86.ActiveCfg = Release|Win32
-		{7EA96C25-FC0D-485A-BB71-32B6DA55652A}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {BC2DD916-E361-4A18-A204-E74DAAFFB188}
+	EndGlobalSection
+	GlobalSection(Performance) = preSolution
+		HasPerformanceSessions = true
 	EndGlobalSection
 	GlobalSection(Performance) = preSolution
 		HasPerformanceSessions = true

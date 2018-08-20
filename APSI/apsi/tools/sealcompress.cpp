@@ -44,7 +44,8 @@ namespace apsi
             throw invalid_argument(" cannot be NTT transformed");
         }
 
-        auto &context_data = seal_context_->context_data(seal_context_->last_parms_id()).value().get();
+        //auto &context_data = seal_context_->context_data(seal_context_->last_parms_id()).value().get();
+        auto& context_data = *seal_context_->context_data(seal_context_->last_parms_id());
         auto &parms = context_data.parms();
     
         int coeff_count = parms.poly_modulus_degree();
@@ -105,7 +106,8 @@ namespace apsi
             throw invalid_argument("destination cannot be NTT transformed");
         }
 
-        auto &context_data = seal_context_->context_data(seal_context_->last_parms_id()).value().get();
+        //auto &context_data = seal_context_->context_data(seal_context_->last_parms_id()).value().get();
+        auto& context_data = *seal_context_->context_data(seal_context_->last_parms_id());
         auto &parms = context_data.parms();
 
         int coeff_count = parms.poly_modulus_degree();
