@@ -51,7 +51,7 @@ namespace apsi
             // Construct shared Evaluator and BatchEncoder
             evaluator_.reset(new Evaluator(seal_context_));
             vector<shared_ptr<FField> > field_vec;
-            if (seal_context_->context_data().qualifiers().enable_batching)
+            if (seal_context_->context_data()->qualifiers().enable_batching)
             {
                 auto ex_field = FField::Acquire(
                     params_.exfield_characteristic(),
@@ -388,7 +388,7 @@ namespace apsi
 
                     Ciphertext tmp(local_pool);
                     Ciphertext compressedResult(
-                        seal_context_->context_data(seal_context_->last_parms_id()).value().get().parms(), local_pool);
+                        seal_context_->context_data(seal_context_->last_parms_id())->parms(), local_pool);
 
                     u64 batch_start = i * batch_count / thread_pool.size();
                     auto thread_idx = std::this_thread::get_id();

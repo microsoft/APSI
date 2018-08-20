@@ -448,11 +448,11 @@ namespace apsi
                         get_key(pos).to_exfield_element(temp11, encoding_bit_length);
 
 #ifdef _DEBUG
-                        // check that decode results in the same value;
-                        std::vector<u8> buff((encoding_bit_length + 7) / 8);
-                        temp11.decode(span<u8>{buff}, encoding_bit_length);
-                        if (memcmp(get_key(pos).data(), buff.data(), buff.size()))
-                            throw std::runtime_error("");
+                        //// check that decode results in the same value;
+                        //std::vector<u8> buff((encoding_bit_length + 7) / 8);
+                        //temp11.decode(span<u8>{buff}, encoding_bit_length);
+                        //if (memcmp(get_key(pos).data(), buff.data(), buff.size()))
+                        //    throw std::runtime_error("");
 #endif
                         //ostreamLock(std::cout) << "sender(" << pos.batch_offset << ", " << pos.split_offset<< ") " << get_key(pos) << std::endl;
                         temp1 = &temp11;
@@ -726,7 +726,7 @@ namespace apsi
             DBInterpolationCache& cache,
             const PSIParams& params)
         {
-            auto mod = seal_context->context_data().parms().plain_modulus().value();
+            auto mod = seal_context->context_data()->parms().plain_modulus().value();
             MemoryPoolHandle local_pool = th_context.pool();
             Position pos;
 

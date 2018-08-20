@@ -149,13 +149,7 @@
     <ClCompile Include="apsi\ffield\ffield.cpp">
       <Filter>Source Files\FField</Filter>
     </ClCompile>
-    <ClCompile Include="apsi\ffield\ffield_crt_batch_encoder.cpp">
-      <Filter>Source Files\FField</Filter>
-    </ClCompile>
     <ClCompile Include="apsi\ffield\ffield_elt.cpp">
-      <Filter>Source Files\FField</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\ffield\ffield_fast_crt_batch_encoder.cpp">
       <Filter>Source Files\FField</Filter>
     </ClCompile>
     <ClCompile Include="apsi\ffield\ffield_ntt.cpp">
@@ -165,6 +159,15 @@
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
     <ClCompile Include="apsi\Tools\sealcompress.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\ffield\ffield_batch_encoder.cpp">
+      <Filter>Source Files\FField</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\ffield\ffield_fast_batch_encoder.cpp">
+      <Filter>Source Files\FField</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\tools\utils.cpp">
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
   </ItemGroup>

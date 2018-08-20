@@ -81,11 +81,13 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);C:\libs\boost;..\..\SEAL-dev\SEAL\;$(SolutionDir)..\Cuckoo\Cuckoo;$(SolutionDir)/APSI;$(ProjectDir)../../../libOTe/cryptoTools/;$(ProjectDir)../../../libOTe/cryptoTools/cryptoTools/;$(ProjectDir)../../cryptoTools/;C:\libs\miracl\;$(ProjectDir)../../cryptoTools/thirdparty/win/miracl/;(ProjectDir)../../cryptoTools;$(ProjectDir)../../flint2/lib/x64/$(Configuration)/;$(ProjectDir)../../mpfr/lib/x64/$(Configuration)/;$(ProjectDir)../../mpir/lib/x64/$(Configuration)/;$(ProjectDir)../../pthreads\Pre-built.2\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\APSI;c:\Progs\Libs\SEAL\include;c:\Progs\Libs\flint2\$(IntDir);c:\Progs\Libs\GSL;c:\Progs\Libs\Cuckoo\include;c:\Progs\Libs\cryptoTools\include;c:\Progs\Libs\mpfr\$(IntDir);c:\Progs\Libs\mpir\lib\$(IntDir);c:\Progs\Libs\boost-1.65.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;_ITERATOR_DEBUG_LEVEL=2;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib;$(SolutionDir)/bin/$(Platform)/$(Configuration)/;$(SolutionDir)$(Platform)\$(Configuration)\;(ProjectDir)../../cryptoTools;$(ProjectDir)../../flint2/lib/x64/$(Configuration);$(ProjectDir)../../mpfr/lib/x64/$(Configuration)/;$(ProjectDir)../../mpir/lib/x64/$(Configuration)/;$(ProjectDir)../../pthreads\Pre-built.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>mpfr.lib;mpir.lib;lib_flint.lib;SEAL.lib;Cuckoo.lib;APSI.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\;$(ProjectDir)..\$(Platform)\$(Configuration)\;c:\Progs\Libs\SEAL\lib\$(IntDir);c:\Progs\Libs\mpfr\$(IntDir);c:\Progs\Libs\mpir\lib\$(IntDir);c:\Progs\Libs\FourQlib\lib\$(IntDir);c:\Progs\Libs\boost-1.65.1\lib;c:\Progs\Libs\flint2\$(IntDir);c:\Progs\Libs\Cuckoo\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>mpfr.lib;mpir.lib;dll_flint.lib;SEAL.lib;Cuckoo.lib;APSI.lib;FourQ.lib;boost_system-vc141-mt-1_65_1.lib;boost_date_time-vc141-mt-1_65_1.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -108,24 +110,19 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);C:\libs\boost;..\..\SEAL-dev\SEAL\;$(SolutionDir)..\Cuckoo\Cuckoo;$(SolutionDir)/APSI;$(ProjectDir)../../../libOTe/cryptoTools/;$(ProjectDir)../../../libOTe/cryptoTools/cryptoTools/;$(ProjectDir)../../cryptoTools/;C:\libs\miracl\;$(ProjectDir)../../cryptoTools/thirdparty/win/miracl/;(ProjectDir)../../cryptoTools;$(ProjectDir)../../flint2/lib/x64/$(Configuration)/;$(ProjectDir)../../mpfr/lib/x64/$(Configuration)/;$(ProjectDir)../../mpir/lib/x64/$(Configuration)/;$(ProjectDir)../../pthreads\Pre-built.2\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\APSI;c:\Progs\Libs\SEAL\include;c:\Progs\Libs\flint2\$(IntDir);c:\Progs\Libs\GSL;c:\Progs\Libs\Cuckoo\include;c:\Progs\Libs\cryptoTools\include;c:\Progs\Libs\mpfr\$(IntDir);c:\Progs\Libs\mpir\lib\$(IntDir);c:\Progs\Libs\boost-1.65.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;_ITERATOR_DEBUG_LEVEL=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib;$(SolutionDir)/bin/$(Platform)/$(Configuration)/;$(SolutionDir)$(Platform)\$(Configuration)\;(ProjectDir)../../cryptoTools;$(ProjectDir)../../flint2/lib/x64/$(Configuration);$(ProjectDir)../../mpfr/lib/x64/$(Configuration)/;$(ProjectDir)../../mpir/lib/x64/$(Configuration)/;$(ProjectDir)../../pthreads\Pre-built.2\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>mpfr.lib;mpir.lib;lib_flint.lib;SEAL.lib;Cuckoo.lib;APSI.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\;$(ProjectDir)..\$(Platform)\$(Configuration)\;c:\Progs\Libs\SEAL\lib\$(IntDir);c:\Progs\Libs\mpfr\$(IntDir);c:\Progs\Libs\mpir\lib\$(IntDir);c:\Progs\Libs\FourQlib\lib\$(IntDir);c:\Progs\Libs\boost-1.65.1\lib;c:\Progs\Libs\flint2\$(IntDir);c:\Progs\Libs\Cuckoo\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>mpfr.lib;mpir.lib;dll_flint.lib;SEAL.lib;Cuckoo.lib;APSI.lib;FourQ.lib;boost_system-vc141-mt-1_65_1.lib;boost_date_time-vc141-mt-1_65_1.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="tests\interpolate_tests.h" />
-    <ClInclude Include="tests\collection.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="tests\bit_copy_test.cpp" />
-    <ClCompile Include="tests\interpolate_tests.cpp" />
     <ClCompile Include="receiver.cpp" />
-    <ClCompile Include="tests\collection.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
