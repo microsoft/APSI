@@ -42,14 +42,14 @@
     <UseOfMfc>false</UseOfMfc>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
     <UseOfMfc>false</UseOfMfc>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
@@ -79,12 +79,14 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <TargetExt>.exe</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>true</LinkIncremental>
+    <TargetExt>.exe</TargetExt>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -102,17 +104,18 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>C:\libs\boost;../../Cuckoo/Cuckoo/include;../../SEAL-dev/SEAL;../APSI/include;$(VCInstallDir)UnitTest\include;$(SolutionDir)../cryptoTools/thirdparty/win/miracl;$(SolutionDir)../cryptoTools;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;c:\progs\libs\cppunit\include;c:\progs\libs\SEAL\include;c:\progs\libs\Cuckoo\include;c:\progs\libs\GSL;c:\progs\libs\flint2\$(IntDir);c:\progs\libs\cryptoTools\include;c:\progs\libs\boost-1.65.1\include;c:\progs\libs\mpir\lib\$(IntDir);c:\progs\libs\mpfr\$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions);_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK</PreprocessorDefinitions>
       <UseFullPaths>true</UseFullPaths>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
-      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib/;$(SolutionDir)/$(Platform)/$(Configuration);..\..\Cuckoo\bin\$(Configuration);..\..\SEAL-dev-new\bin\$(Platform)\$(Configuration);$(VCInstallDir)UnitTest\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>APSI.lib;SEAL.lib;Cuckoo.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <SubSystem>Console</SubSystem>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(IntDir);c:\progs\libs\SEAL\lib\$(IntDir);c:\progs\libs\Cuckoo\lib\$(IntDir);c:\progs\libs\cppunit\lib;c:\progs\Libs\flint2\$(IntDir);c:\progs\libs\mpir\lib\$(IntDir);c:\progs\libs\mpfr\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>APSI.lib;SEAL.lib;Cuckoo.lib;dll_flint.lib;mpir.lib;mpfr.lib;cppunitd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -136,37 +139,40 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
-      <PrecompiledHeader>Use</PrecompiledHeader>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>C:\libs\boost;../../Cuckoo/Cuckoo/include;../../SEAL-dev/SEAL;../APSI/include;$(VCInstallDir)UnitTest\include;$(SolutionDir)../cryptoTools/thirdparty/win/miracl;$(SolutionDir)../cryptoTools;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;c:\progs\libs\cppunit\include;c:\progs\libs\SEAL\include;c:\progs\libs\Cuckoo\include;c:\progs\libs\GSL;c:\progs\libs\flint2\$(IntDir);c:\progs\libs\cryptoTools\include;c:\progs\libs\boost-1.65.1\include;c:\progs\libs\mpir\lib\$(IntDir);c:\progs\libs\mpfr\$(IntDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions);_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK</PreprocessorDefinitions>
       <UseFullPaths>true</UseFullPaths>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
-      <SubSystem>Windows</SubSystem>
+      <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>C:\libs\boost/stage/lib/;$(SolutionDir)/$(Platform)/$(Configuration);..\..\Cuckoo\bin\$(Configuration);..\..\SEAL-dev-new\bin\$(Platform)\$(Configuration);$(VCInstallDir)UnitTest\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>APSI.lib;SEAL.lib;Cuckoo.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(IntDir);c:\progs\libs\SEAL\lib\$(IntDir);c:\progs\libs\Cuckoo\lib\$(IntDir);c:\progs\libs\cppunit\lib;c:\progs\Libs\flint2\$(IntDir);c:\progs\libs\mpir\lib\$(IntDir);c:\progs\libs\mpfr\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>APSI.lib;SEAL.lib;Cuckoo.lib;dll_flint.lib;mpir.lib;mpfr.lib;cppunit.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="stdafx.h" />
-    <ClInclude Include="targetver.h" />
+    <ClInclude Include="bit_copy_test.h" />
+    <ClInclude Include="interpolate_tests.h" />
+    <ClInclude Include="item.h" />
+    <ClInclude Include="matrix_tests.h" />
+    <ClInclude Include="plaintextarith.h" />
+    <ClInclude Include="unit_tests_runner.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="bit_copy_test.cpp" />
+    <ClCompile Include="interpolate_tests.cpp" />
     <ClCompile Include="item.cpp" />
+    <ClCompile Include="matrix_tests.cpp" />
     <ClCompile Include="plaintextarith.cpp" />
     <ClCompile Include="receiver.cpp" />
-    <ClCompile Include="stdafx.cpp">
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
-      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
-    </ClCompile>
     <ClCompile Include="sender.cpp" />
+    <ClCompile Include="unit_tests_runner.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
