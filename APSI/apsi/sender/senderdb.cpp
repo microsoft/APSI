@@ -178,7 +178,6 @@ namespace apsi
                             // Then compress with SHA3
                             CryptoPP::SHA3_256 sha;
                             sha.Update(buff.data(), buff.size());
-                            auto ii = data[i];
                             sha.TruncatedFinal(reinterpret_cast<CryptoPP::byte*>(const_cast<Item*>(&data[i])), sizeof(block));
                         }
 
