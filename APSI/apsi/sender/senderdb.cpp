@@ -19,7 +19,7 @@
 #include "seal/util/uintcore.h"
 
 #include "FourQ_api.h"
-#include "crypto++/sha3.h"
+#include "cryptopp/sha3.h"
 
 using namespace std;
 using namespace seal;

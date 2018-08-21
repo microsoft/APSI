@@ -16,7 +16,7 @@
 #include "seal/keygenerator.h"
 
 // CryptoPP
-#include "crypto++/sha3.h"
+#include "cryptopp/sha3.h"
 
 // FourQ
 #include "FourQ_api.h"
