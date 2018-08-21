@@ -13,14 +13,13 @@
 #include "apsi/tools/utils.h"
 
 #include "cryptoTools/Crypto/PRNG.h"
-#include "cryptoTools/Common/Log.h"
-#include "cryptoTools/Crypto/sha1.h"
 
 #include "seal/evaluator.h"
 #include "seal/batchencoder.h"
 #include "seal/util/uintcore.h"
 
 #include "FourQ_api.h"
+#include "sha3.h"
 
 using namespace std;
 using namespace seal;
@@ -176,10 +175,11 @@ namespace apsi
                             Montgomery_multiply_mod_order(a, key, a);
                             eccoord_to_buffer(a, buff.data());
 
-                            // Then compress with SHA1
-                            oc:SHA1 sha(sizeof(block));
+                            // Then compress with SHA3
+                            CryptoPP::SHA3_256 sha;
                             sha.Update(buff.data(), buff.size());
-                            sha.Final(static_cast<oc::block&>(data[i]));
+                            auto ii = data[i];
+                            sha.TruncatedFinal(reinterpret_cast<CryptoPP::byte*>(const_cast<Item*>(&data[i])), sizeof(block));
                         }
 
                         std::array<u64, 3> locs;
