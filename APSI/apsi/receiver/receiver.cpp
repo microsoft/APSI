@@ -15,9 +15,8 @@
 #include "seal/encryptionparams.h"
 #include "seal/keygenerator.h"
 
-// CryptoTools
-#include "cryptoTools/Crypto/sha1.h"
-#include "cryptoTools/Common/Log.h"
+// CryptoPP
+#include "cryptopp/sha3.h"
 
 // FourQ
 #include "FourQ_api.h"
@@ -186,9 +185,10 @@ namespace apsi
                     Montgomery_multiply_mod_order(x, b[i].data(), x);
                     eccoord_to_buffer(x, iter);
 
-                    SHA1 sha(sizeof(block));
+                    // Compress with SHA3
+                    CryptoPP::SHA3_256 sha;
                     sha.Update(iter, step);
-                    sha.Final((oc::block&)items[i]);
+                    sha.TruncatedFinal(reinterpret_cast<CryptoPP::byte*>(&items[i]), sizeof(block));
 
                     iter += step;
                 }
