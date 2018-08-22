@@ -8,6 +8,7 @@
 #include "apsi/apsidefines.h"
 #include "apsi/network/network_utils.h"
 #include "apsi/tools/utils.h"
+#include "apsi/tools/prng.h"
 
 // SEAL
 #include "seal/util/common.h"
@@ -144,7 +145,7 @@ namespace apsi
         {
             if (params_.use_pk_oprf())
             {
-                PRNG prng(ZeroBlock);
+                DPRNG prng(ZeroBlock);
                 vector<vector<digit_t>> b;
                 b.reserve(items.size());
                 digit_t x[NWORDS_ORDER];
@@ -157,7 +158,7 @@ namespace apsi
                     random_fourq(x, prng);
                     b.emplace_back(x, x + NWORDS_ORDER);
 
-                    PRNG pp((oc::block&)items[i], 8);
+                    DPRNG pp(&items[i]);
 
                     random_fourq(x, pp);
                     Montgomery_multiply_mod_order(x, b[i].data(), x);

@@ -11,6 +11,7 @@
 #include "apsi/tools/interpolate.h"
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/tools/utils.h"
+#include "apsi/tools/prng.h"
 
 #include "cryptoTools/Crypto/PRNG.h"
 
@@ -25,6 +26,7 @@ using namespace std;
 using namespace seal;
 using namespace seal::util;
 using namespace oc;
+using namespace apsi::tools;
 
 namespace apsi
 {
@@ -152,7 +154,7 @@ namespace apsi
                     auto end = (t + 1) * data.size() / thrds.size();
 
                     vector<u8> buff((sizeof(digit_t) * NWORDS_ORDER) - 1);
-                    PRNG pp(oc::CCBlock);
+                    DPRNG pp(oc::CCBlock);
                     digit_t key[NWORDS_ORDER];
                     random_fourq(key, pp);
 
@@ -169,7 +171,7 @@ namespace apsi
                         if (params_.use_pk_oprf())
                         {
                             // Compute EC PRF first for data
-                            oc::PRNG p(static_cast<oc::block&>(data[i]), 8);
+                            DPRNG p(&data[i]);
                             digit_t a[NWORDS_ORDER];
                             random_fourq(a, p);
                             Montgomery_multiply_mod_order(a, key, a);

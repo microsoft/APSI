@@ -7,10 +7,9 @@
 #include "apsi/apsidefines.h"
 #include "apsi/network/network_utils.h"
 #include "apsi/tools/utils.h"
+#include "apsi/tools/prng.h"
 
 #include "seal/util/common.h"
-
-#include "cryptoTools/Common/Log.h"
 
 #include "FourQ_api.h"
 
@@ -18,6 +17,7 @@ using namespace std;
 using namespace seal;
 using namespace seal::util;
 using namespace oc;
+using namespace apsi::tools;
 
 namespace apsi
 {
@@ -163,7 +163,7 @@ namespace apsi
                 vector<u8> buff;
                 chl.recv(buff);
 
-                PRNG pp(oc::CCBlock);
+                DPRNG pp(oc::CCBlock);
                 digit_t key[NWORDS_ORDER];
                 random_fourq(key, pp);
                 auto iter = buff.data();
