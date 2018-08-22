@@ -54,7 +54,8 @@ namespace apsi
             prng_.SetSeed(oc::sysRandomSeed());
 #else
             TODO("***************** INSECURE *****************, define USE_SECURE_SEED to fix");
-            prng_.SetSeed(oc::OneBlock, 256);
+            //prng_.SetSeed(oc::OneBlock, 256);
+	    prng_.SetSeed(oc::OneBlock);
 #endif
 
             // Set null value for sender: 1111...1110 (128 bits)
