@@ -6,10 +6,11 @@ using namespace std;
 using namespace oc;
 using namespace seal;
 using namespace seal::util;
+using namespace apsi::tools;
 
 namespace apsi
 {
-    FFieldNTT::FFieldNTT(shared_ptr<FField> field, unsigned log_degree, PRNG &prng) :
+    FFieldNTT::FFieldNTT(shared_ptr<FField> field, unsigned log_degree, DPRNG &prng) :
         field_(move(field)),
         zeta_(field_),
         log_n_(log_degree),

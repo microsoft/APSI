@@ -3,6 +3,7 @@
 
 using namespace oc;
 using namespace APSITests;
+using namespace apsi::tools;
 
 void BitCopyTests::bit_copy_test()
 {
@@ -12,7 +13,7 @@ void BitCopyTests::bit_copy_test()
     std::vector<u8> src(size), dest(size);
     for (int t = 6; t < trials; ++t)
     {
-        PRNG prng(toBlock(t));
+        DPRNG prng(toBlock(t));
 
         auto srcOffset = prng.get<u32>() % (size * 4);
         auto destOffset = prng.get<u32>() % (size * 4);

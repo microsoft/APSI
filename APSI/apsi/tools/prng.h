@@ -1,11 +1,14 @@
 #pragma once
 
-#include "apsi/item.h"
 #include <cstddef>
 #include <cryptopp/drbg.h>
 
+#include "apsi/apsidefines.h"
+
 namespace apsi
 {
+    class Item;
+
     namespace tools
     {
         /**

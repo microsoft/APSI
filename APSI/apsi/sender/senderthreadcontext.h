@@ -10,11 +10,10 @@
 #include "apsi/ffield/ffield_elt.h"
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/tools/matrixview.h"
+#include "apsi/tools/prng.h"
 
 #include "seal/memorypoolhandle.h"
 
-// CryptoTools
-#include "cryptoTools/Crypto/PRNG.h"
 
 namespace apsi
 {
@@ -59,7 +58,8 @@ namespace apsi
 
             void set_prng(oc::block block)
             {
-                prng_.SetSeed(block, 256);
+                //prng_.SetSeed(block, 256);
+                prng_.SetSeed(block);
             }
 
             // std::shared_ptr<FFieldBatchEncoder> &ex_batch_encoder()
@@ -99,7 +99,7 @@ namespace apsi
                 return symm_block_;
             }
 
-            oc::PRNG& prng()
+            apsi::tools::DPRNG& prng()
             {
                 return prng_;
             }
@@ -115,7 +115,7 @@ namespace apsi
 
             MatrixView<_ffield_array_elt_t> symm_block_;
             
-            oc::PRNG prng_;
+            apsi::tools::DPRNG prng_;
         };
     }
 }

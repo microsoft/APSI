@@ -1,4 +1,5 @@
 #include "prng.h"
+#include "apsi/item.h"
 
 using namespace apsi::tools;
 

@@ -493,7 +493,7 @@ namespace apsi
             symmetric_polys(th_context, symm_block, encoding_bit_length, neg_null_element);
 
             auto num_rows = items_per_batch_;
-            oc::PRNG &prng = th_context.prng();
+            DPRNG &prng = th_context.prng();
 
             FFieldArray r(th_context.exfield());
             r.set_random_nonzero(prng);

@@ -93,13 +93,7 @@
     <ClInclude Include="apsi\ffield\ffield_array.h">
       <Filter>Header Files\FField</Filter>
     </ClInclude>
-    <ClInclude Include="apsi\ffield\ffield_crt_batch_encoder.h">
-      <Filter>Header Files\FField</Filter>
-    </ClInclude>
     <ClInclude Include="apsi\ffield\ffield_elt.h">
-      <Filter>Header Files\FField</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\ffield\ffield_fast_crt_batch_encoder.h">
       <Filter>Header Files\FField</Filter>
     </ClInclude>
     <ClInclude Include="apsi\ffield\ffield_ntt.h">
@@ -116,6 +110,12 @@
     </ClInclude>
     <ClInclude Include="apsi\tools\prng.h">
       <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\ffield\ffield_batch_encoder.h">
+      <Filter>Header Files\FField</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\ffield\ffield_fast_batch_encoder.h">
+      <Filter>Header Files\FField</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
