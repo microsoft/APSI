@@ -1,11 +1,10 @@
 #include "interpolate_tests.h"
 
 #include "apsi/tools/interpolate.h"
+#include "apsi/tools/prng.h"
 #include "seal/context.h"
 #include "seal/util/mempool.h"
 #include "seal/defaultparams.h"
-
-#include  "cryptoTools/Crypto/PRNG.h"
 
 #include <cppunit/extensions/HelperMacros.h>
 
@@ -65,7 +64,7 @@ void InterpolateTests::u64_interpolate_test()
     int numTrials = 10;
 
     
-    oc::PRNG prng(oc::ZeroBlock);
+    apsi::tools::DPRNG prng(oc::ZeroBlock);
 
     for (int i = 0; i < numTrials; ++i)
     {
@@ -74,7 +73,7 @@ void InterpolateTests::u64_interpolate_test()
 
         for (int i = 0; i < points.size(); i++) {
             points[i].first = i;
-            points[i].second = prng(plain_modulus.value());
+            points[i].second = prng.get<uint64_t>() % plain_modulus.value();
 
             //std::cout << "( " << points[i].first << ", " << points[i].second << ") ";
         }

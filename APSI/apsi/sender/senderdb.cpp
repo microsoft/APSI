@@ -13,8 +13,6 @@
 #include "apsi/tools/utils.h"
 #include "apsi/tools/prng.h"
 
-#include "cryptoTools/Crypto/PRNG.h"
-
 #include "seal/evaluator.h"
 #include "seal/batchencoder.h"
 #include "seal/util/uintcore.h"
@@ -149,7 +147,8 @@ namespace apsi
                 auto seed = prng_.get<oc::block>();
                 thrds[t] = thread([&, t, seed]()
                 {
-                    oc::PRNG prng(seed, 256);
+                    //oc::PRNG prng(seed, 256);
+                    apsi::tools::DPRNG prng(seed);
                     auto start = t * data.size() / thrds.size();
                     auto end = (t + 1) * data.size() / thrds.size();
 
@@ -317,7 +316,7 @@ namespace apsi
         }
 
         std::pair<DBBlock*, DBBlock::Position>
-            SenderDB::aquire_db_position(int cuckoo_loc, oc::PRNG &prng)
+            SenderDB::aquire_db_position(int cuckoo_loc, DPRNG &prng)
         {
             auto batch_idx = cuckoo_loc / params_.batch_size();
             auto batch_offset = cuckoo_loc % params_.batch_size();
@@ -338,7 +337,7 @@ namespace apsi
             throw runtime_error("simple hashing failed due to bin overflow");
         }
 
-        DBBlock::Position DBBlock::try_aquire_position(int bin_idx, oc::PRNG& prng)
+        DBBlock::Position DBBlock::try_aquire_position(int bin_idx, DPRNG& prng)
         {
             if (bin_idx >= items_per_batch_)
             {
