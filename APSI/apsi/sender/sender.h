@@ -18,6 +18,7 @@
 #include "apsi/ffield/ffield_fast_batch_encoder.h"
 #include "apsi/tools/sealcompress.h"
 #include "apsi/tools/matrixview.h"
+#include "apsi/tools/prng.h"
 
 // SEAL
 #include "seal/memorypoolhandle.h"
@@ -29,7 +30,6 @@
 
 // CryptoTools
 #include "cryptoTools/Network/IOService.h"
-#include "cryptoTools/Crypto/PRNG.h"
 
 namespace apsi
 {
@@ -186,7 +186,7 @@ namespace apsi
 
             std::mutex thread_context_mtx_;
 
-            oc::PRNG prng_;
+            apsi::tools::PRNG prng_;
 
             bool stopped_;
 

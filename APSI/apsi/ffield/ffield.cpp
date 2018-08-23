@@ -2,7 +2,6 @@
 #include <memory>
 #include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_elt.h"
-#include "cryptoTools/Crypto/PRNG.h"
 
 using namespace seal;
 using namespace std;

@@ -8,6 +8,7 @@
 #include "apsi/apsidefines.h"
 #include "apsi/network/network_utils.h"
 #include "apsi/tools/utils.h"
+#include "apsi/tools/prng.h"
 
 // SEAL
 #include "seal/util/common.h"
@@ -26,7 +27,6 @@ using namespace seal;
 using namespace seal::util;
 using namespace cuckoo;
 using namespace apsi::tools;
-using namespace oc;
 
 namespace apsi
 {
@@ -140,7 +140,7 @@ namespace apsi
         pair<
             map<uint64_t, vector<Ciphertext> >,
             unique_ptr<CuckooInterface> >
-            Receiver::preprocess(vector<Item> &items, Channel &channel)
+            Receiver::preprocess(vector<Item> &items, oc::Channel &channel)
         {
             if (params_.use_pk_oprf())
             {
@@ -157,7 +157,7 @@ namespace apsi
                     random_fourq(x, prng);
                     b.emplace_back(x, x + NWORDS_ORDER);
 
-                    PRNG pp((oc::block&)items[i], 8);
+                    PRNG pp(items[i], /* buffer_size */ 8);
 
                     random_fourq(x, pp);
                     Montgomery_multiply_mod_order(x, b[i].data(), x);
@@ -235,7 +235,7 @@ namespace apsi
             return { move(ciphers), move(cuckoo) };
         }
 
-        void Receiver::send(const map<uint64_t, vector<Ciphertext> > &query, Channel &channel)
+        void Receiver::send(const map<uint64_t, vector<Ciphertext> > &query, oc::Channel &channel)
         {
             /* Send keys. */
             send_pubkey(public_key_, channel);
@@ -260,7 +260,7 @@ namespace apsi
 
         unique_ptr<CuckooInterface> Receiver::cuckoo_hashing(const vector<Item> &items)
         {
-            auto receiver_null_item = oc::AllOneBlock;
+            auto receiver_null_item = AllOneBlock;
 
             unique_ptr<CuckooInterface> cuckoo(
                 static_cast<CuckooInterface*>(new Cuckoo(

@@ -8,19 +8,18 @@
 // APSI 
 #include "apsi/ffield/ffield_ntt.h"
 #include "apsi/ffield/ffield_poly.h"
+#include "apsi/tools/prng.h"
 
 // SEAL
 #include "seal/plaintext.h"
 
-// CryptoTools
-#include "cryptoTools/Crypto/PRNG.h"
 
 namespace apsi
 {
     class FFieldBatchEncoder 
     {
     public:
-        FFieldBatchEncoder(std::shared_ptr<FField> field, unsigned log_degree, oc::PRNG &prng);
+        FFieldBatchEncoder(std::shared_ptr<FField> field, unsigned log_degree, apsi::tools::PRNG &prng);
 
         FFieldBatchEncoder(std::shared_ptr<FField> field, unsigned log_degree, FFieldElt zeta);
 

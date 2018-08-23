@@ -7,9 +7,8 @@
 // APSI
 #include "apsi/ffield/ffield_elt.h"
 #include "apsi/ffield/ffield_array.h"
+#include "apsi/tools/prng.h"
 
-// CryptoTools
-#include "cryptoTools/Crypto/PRNG.h"
 
 namespace apsi
 {
@@ -18,7 +17,7 @@ namespace apsi
         friend class FFieldBatchEncoder;
 
     public:
-        FFieldNTT(std::shared_ptr<FField> field, unsigned log_degree, oc::PRNG &prng);
+        FFieldNTT(std::shared_ptr<FField> field, unsigned log_degree, apsi::tools::PRNG &prng);
 
         FFieldNTT(std::shared_ptr<FField> field, unsigned log_degree, FFieldElt zeta);
 

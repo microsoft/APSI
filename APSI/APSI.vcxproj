@@ -140,9 +140,9 @@
     <ClInclude Include="apsi\apsidefines.h" />
     <ClInclude Include="apsi\ffield\ffield.h" />
     <ClInclude Include="apsi\ffield\ffield_array.h" />
-    <ClInclude Include="apsi\ffield\ffield_crt_batch_encoder.h" />
+    <ClInclude Include="apsi\ffield\ffield_batch_encoder.h" />
     <ClInclude Include="apsi\ffield\ffield_elt.h" />
-    <ClInclude Include="apsi\ffield\ffield_fast_crt_batch_encoder.h" />
+    <ClInclude Include="apsi\ffield\ffield_fast_batch_encoder.h" />
     <ClInclude Include="apsi\ffield\ffield_ntt.h" />
     <ClInclude Include="apsi\ffield\ffield_poly.h" />
     <ClInclude Include="apsi\item.h" />
@@ -154,11 +154,14 @@
     <ClInclude Include="apsi\Sender\senderdb.h" />
     <ClInclude Include="apsi\Sender\sendersessioncontext.h" />
     <ClInclude Include="apsi\Sender\senderthreadcontext.h" />
+    <ClInclude Include="apsi\tools\aes.h" />
     <ClInclude Include="apsi\tools\binsizemath.h" />
     <ClInclude Include="apsi\Tools\interpolate.h" />
+    <ClInclude Include="apsi\tools\prng.h" />
     <ClInclude Include="apsi\Tools\sealcompress.h" />
     <ClInclude Include="apsi\Tools\stopwatch.h" />
     <ClInclude Include="apsi\Tools\ThreadPool.h" />
+    <ClInclude Include="apsi\tools\utils.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp" />
@@ -174,8 +177,10 @@
     <ClCompile Include="apsi\Receiver\receiver.cpp" />
     <ClCompile Include="apsi\Sender\sender.cpp" />
     <ClCompile Include="apsi\Sender\senderdb.cpp" />
+    <ClCompile Include="apsi\tools\aes.cpp" />
     <ClCompile Include="apsi\tools\binsizemath.cpp" />
     <ClCompile Include="apsi\Tools\interpolate.cpp" />
+    <ClCompile Include="apsi\tools\prng.cpp" />
     <ClCompile Include="apsi\Tools\sealcompress.cpp" />
     <ClCompile Include="apsi\Tools\stopwatch.cpp" />
     <ClCompile Include="apsi\tools\utils.cpp" />

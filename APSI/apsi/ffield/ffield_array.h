@@ -7,9 +7,7 @@
 // APSI
 #include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_elt.h"
-
-// CryptoTools
-#include "cryptoTools/Crypto/PRNG.h"
+#include "apsi/tools/prng.h"
 
 // GSL
 #include <gsl/span>
@@ -187,7 +185,7 @@ namespace apsi
             fq_nmod_zero(array_ + index, fields_[index]->ctx_);
         }
 
-        inline void set_random(oc::PRNG &prng)
+        inline void set_random(apsi::tools::PRNG &prng)
         {
             for(std::size_t index = 0; index < size_; index++)
             {
@@ -199,7 +197,7 @@ namespace apsi
             }
         }
 
-        inline void set_random_nonzero(oc::PRNG &prng)
+        inline void set_random_nonzero(apsi::tools::PRNG &prng)
         {
             for(std::size_t index = 0; index < size_; index++)
             {

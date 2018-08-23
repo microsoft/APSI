@@ -3,6 +3,7 @@
 
 using namespace oc;
 using namespace APSITests;
+using namespace apsi::tools;
 
 void BitCopyTests::bit_copy_test()
 {

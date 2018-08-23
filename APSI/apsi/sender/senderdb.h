@@ -27,8 +27,6 @@
 #include "seal/evaluator.h"
 #include "seal/batchencoder.h"
 
-// CryptoTools
-#include "cryptoTools/Crypto/PRNG.h"
 
 namespace apsi
 {
@@ -129,7 +127,7 @@ namespace apsi
                 int encoding_bit_length,
                 FFieldArray &neg_null_element);
 
-            Position try_aquire_position(int cuckoo_loc, oc::PRNG& prng);
+            Position try_aquire_position(int cuckoo_loc, apsi::tools::PRNG& prng);
 
             void batch_interpolate(
                 SenderThreadContext &th_context,
@@ -321,14 +319,14 @@ namespace apsi
             Thread safe function to insert an item into the bin 
             index by cockooIndex. The PRNG and be any PRNG.  
             */
-            std::pair<DBBlock*, DBBlock::Position> aquire_db_position(int cockooIndex, oc::PRNG& prng);
+            std::pair<DBBlock*, DBBlock::Position> aquire_db_position(int cockooIndex, apsi::tools::PRNG& prng);
             
             /* 
             Returns true if the position'th slot within the bin at cockooIndex 
             currently has an item. */
             //bool has_item(int cockooIndex, int position);
 
-            oc::PRNG prng_;
+            apsi::tools::PRNG prng_;
         };
     }
 }
