@@ -11,6 +11,8 @@
 #include "interpolate_tests.h"
 #include "matrix_tests.h"
 #include "plaintextarith.h"
+#include "aes_tests.h"
+#include "prng_tests.h"
 
 #ifdef _MSC_VER
 #include "Windows.h"
@@ -110,6 +112,8 @@ int run_unit_tests()
     runner.addTest(BitCopyTests::suite());
     runner.addTest(InterpolateTests::suite());
     runner.addTest(TestPlainArith::suite());
+    runner.addTest(AESTests::suite());
+    runner.addTest(PRNGTests::suite());
 
     runner.run(controller);
 

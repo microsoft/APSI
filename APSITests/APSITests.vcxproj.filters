@@ -33,6 +33,15 @@
     <ClInclude Include="unit_tests_runner.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="aes_tests.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="prng_tests.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="receiver.cpp">
@@ -57,6 +66,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="unit_tests_runner.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="aes_tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="prng_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

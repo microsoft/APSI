@@ -157,19 +157,24 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="aes_tests.h" />
     <ClInclude Include="bit_copy_test.h" />
     <ClInclude Include="interpolate_tests.h" />
     <ClInclude Include="item.h" />
     <ClInclude Include="matrix_tests.h" />
     <ClInclude Include="plaintextarith.h" />
+    <ClInclude Include="prng_tests.h" />
     <ClInclude Include="unit_tests_runner.h" />
+    <ClInclude Include="utils.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="aes_tests.cpp" />
     <ClCompile Include="bit_copy_test.cpp" />
     <ClCompile Include="interpolate_tests.cpp" />
     <ClCompile Include="item.cpp" />
     <ClCompile Include="matrix_tests.cpp" />
     <ClCompile Include="plaintextarith.cpp" />
+    <ClCompile Include="prng_tests.cpp" />
     <ClCompile Include="receiver.cpp" />
     <ClCompile Include="sender.cpp" />
     <ClCompile Include="unit_tests_runner.cpp" />

@@ -9,12 +9,42 @@ namespace apsi
     namespace tools
     {
         /**
-        * An AES-NI implemenation of AES encryption. 
+        * Common properties for encoding/deconding with AES
         */
-        class AES
+        class AESBase
         {
         public:
+            /**
+            * Default constructor leave the class in an invalid state
+            * until setKey(...) is called.
+            */
+            AESBase();
 
+            /**
+            * Clear an instance of this class
+            */
+            void clear();
+
+        protected:
+            // Number of elements in the expanded key
+            static constexpr int key_elem_count = 11;
+
+            // The expanded key.
+            block round_key_[key_elem_count];
+
+            // Indicate whether a seed has been set.
+            bool key_set = false;
+
+            // We need a key to be set before any operation is attempted
+            void throw_if_no_key() const;
+        };
+
+        /**
+        * An AES-NI implemenation of AES encryption. 
+        */
+        class AES : public AESBase
+        {
+        public:
             /**
             * Default constructor leave the class in an invalid state
             * until setKey(...) is called.
@@ -73,23 +103,12 @@ namespace apsi
             * Returns the current key.
             */
             const block& get_key() const { return round_key_[0]; }
-
-            /**
-            * Clears an instance of AES class
-            */
-            static void clear(AES& a);
-
-        private:
-            static constexpr int key_elem_count = 11;
-
-            // The expanded key.
-            block round_key_[key_elem_count];
         };
 
         /**
         * A class to perform AES decryption.
         */
-        class AESDec
+        class AESDec : public AESBase
         {
         public:
             /**
@@ -111,16 +130,12 @@ namespace apsi
             /**
             * Decrypts the cyphertext block and stores the result in plaintext
             */
-            void ecb_dec_block(const block& cyphertext, block& plaintext);
+            void ecb_dec_block(const block& cyphertext, block& plaintext) const;
 
             /**
             * Decrypts the cyphertext block and returns the plaintext
             */
-            block ecb_dec_block(const block& cyphertext);
-
-        private:
-            // The expanded key
-            block round_key_[11];
+            block ecb_dec_block(const block& cyphertext) const;
         };
     }
 }

@@ -1,6 +1,7 @@
 #include "aes.h"
 
 #include <array>
+#include <stdexcept>
 
 using namespace apsi;
 using namespace apsi::tools;
@@ -16,6 +17,26 @@ namespace
         return _mm_xor_si128(key, key_rcon);
     }
 }
+
+AESBase::AESBase()
+{
+    clear();
+}
+
+void AESBase::clear()
+{
+    memset(round_key_, 0, key_elem_count * sizeof(block));
+    key_set = false;
+}
+
+void AESBase::throw_if_no_key() const
+{
+    if (!key_set)
+    {
+        throw new std::runtime_error("Key is not set.");
+    }
+}
+
 
 AES::AES(const block & user_key)
 {
@@ -35,10 +56,14 @@ void AES::set_key(const block & user_key)
     round_key_[8] = key_gen_helper(round_key_[7], _mm_aeskeygenassist_si128(round_key_[7], 0x80));
     round_key_[9] = key_gen_helper(round_key_[8], _mm_aeskeygenassist_si128(round_key_[8], 0x1B));
     round_key_[10] = key_gen_helper(round_key_[9], _mm_aeskeygenassist_si128(round_key_[9], 0x36));
+
+    key_set = true;
 }
 
 void  AES::ecb_enc_block(const block & plaintext, block & cyphertext) const
 {
+    throw_if_no_key();
+
     cyphertext = _mm_xor_si128(plaintext, round_key_[0]);
     cyphertext = _mm_aesenc_si128(cyphertext, round_key_[1]);
     cyphertext = _mm_aesenc_si128(cyphertext, round_key_[2]);
@@ -54,6 +79,8 @@ void  AES::ecb_enc_block(const block & plaintext, block & cyphertext) const
 
 block AES::ecb_enc_block(const block & plaintext) const
 {
+    throw_if_no_key();
+
     block ret;
     ecb_enc_block(plaintext, ret);
     return ret;
@@ -61,7 +88,9 @@ block AES::ecb_enc_block(const block & plaintext) const
 
 void AES::ecb_enc_blocks(const block * plaintexts, u64 block_length, block * cyphertext) const
 {
-    const u64 step = 8;
+    throw_if_no_key();
+
+    constexpr u64 step = 8;
     u64 idx = 0;
     u64 length = block_length - block_length % step;
 
@@ -188,6 +217,8 @@ void AES::ecb_enc_blocks(const block * plaintexts, u64 block_length, block * cyp
 
 void AES::ecb_enc_two_blocks(const block * plaintexts, block * cyphertext) const
 {
+    throw_if_no_key();
+
     cyphertext[0] = _mm_xor_si128(plaintexts[0], round_key_[0]);
     cyphertext[1] = _mm_xor_si128(plaintexts[1], round_key_[0]);
 
@@ -224,6 +255,8 @@ void AES::ecb_enc_two_blocks(const block * plaintexts, block * cyphertext) const
 
 void AES::ecb_enc_four_blocks(const block * plaintexts, block * cyphertext) const
 {
+    throw_if_no_key();
+
     cyphertext[0] = _mm_xor_si128(plaintexts[0], round_key_[0]);
     cyphertext[1] = _mm_xor_si128(plaintexts[1], round_key_[0]);
     cyphertext[2] = _mm_xor_si128(plaintexts[2], round_key_[0]);
@@ -282,6 +315,8 @@ void AES::ecb_enc_four_blocks(const block * plaintexts, block * cyphertext) cons
 
 void AES::ecb_enc_16_blocks(const block * plaintexts, block * cyphertext) const
 {
+    throw_if_no_key();
+
     cyphertext[0] = _mm_xor_si128(plaintexts[0], round_key_[0]);
     cyphertext[1] = _mm_xor_si128(plaintexts[1], round_key_[0]);
     cyphertext[2] = _mm_xor_si128(plaintexts[2], round_key_[0]);
@@ -472,9 +507,11 @@ void AES::ecb_enc_16_blocks(const block * plaintexts, block * cyphertext) const
 
 void AES::ecb_enc_counter_mode(u64 base_idx, u64 block_length, block * cyphertext) const
 {
-    const i32 step = 8;
+    throw_if_no_key();
+
+    constexpr i32 step = 8;
     i32 idx = 0;
-    i32 length = block_length - block_length % step;
+    i32 length = static_cast<i32>(block_length - block_length % step);
 
     block temp[step];
 
@@ -596,11 +633,6 @@ void AES::ecb_enc_counter_mode(u64 base_idx, u64 block_length, block * cyphertex
     }
 }
 
-void AES::clear(AES& a)
-{
-    memset(a.round_key_, 0, key_elem_count * sizeof(block));
-}
-
 
 AESDec::AESDec(const block & user_key)
 {
@@ -633,10 +665,14 @@ void AESDec::set_key(const block & user_key)
     _mm_storeu_si128(round_key_ + 8, _mm_aesimc_si128(v2));
     _mm_storeu_si128(round_key_ + 9, _mm_aesimc_si128(v1));
     _mm_storeu_si128(round_key_ + 10, v0);
+
+    key_set = true;
 }
 
-void  AESDec::ecb_dec_block(const block & cyphertext, block & plaintext)
+void AESDec::ecb_dec_block(const block & cyphertext, block & plaintext) const
 {
+    throw_if_no_key();
+
     plaintext = _mm_xor_si128(cyphertext, round_key_[0]);
     plaintext = _mm_aesdec_si128(plaintext, round_key_[1]);
     plaintext = _mm_aesdec_si128(plaintext, round_key_[2]);
@@ -650,8 +686,10 @@ void  AESDec::ecb_dec_block(const block & cyphertext, block & plaintext)
     plaintext = _mm_aesdeclast_si128(plaintext, round_key_[10]);
 }
 
-block AESDec::ecb_dec_block(const block & cyphertext)
+block AESDec::ecb_dec_block(const block & cyphertext) const
 {
+    throw_if_no_key();
+
     block plaintext;
     ecb_dec_block(cyphertext, plaintext);
     return plaintext;

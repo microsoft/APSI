@@ -92,7 +92,7 @@ void PRNG::refill_buffer()
 void PRNG::clear(PRNG& p)
 {
     p.buffer_.resize(0);
-    AES::clear(p.aes_);
+    p.aes_.clear();
     p.bytes_idx_ = 0;
     p.block_idx_ = 0;
     p.buffer_byte_capacity_ = 0;
