@@ -2,12 +2,19 @@
 #include "seal/context.h"
 #include <sstream>
 #include <random>
+#include <wmmintrin.h>
 
 using namespace std;
 
 namespace apsi
 {
     apsi::tools::Stopwatch stop_watch, recv_stop_watch;
+
+    const block ZeroBlock   = _mm_set_epi64x(0, 0);
+    const block OneBlock    = _mm_set_epi64x(0, 1);
+    const block AllOneBlock = _mm_set_epi64x(0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF);
+    const block CCBlock     = _mm_set_epi64x(0xCCCCCCCCCCCCCCCC, 0xCCCCCCCCCCCCCCCC);
+
 
     //void right_shift_uint(const u64 *source, u64 *destination, u64 shift_amount, u64 u64_count)
     //{

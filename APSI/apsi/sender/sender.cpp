@@ -83,7 +83,7 @@ namespace apsi
             prng_.set_seed(oc::sysRandomSeed());
 #else
             TODO("***************** INSECURE *****************, define USE_SECURE_SEED to fix");
-            prng_.set_seed(oc::ZeroBlock);
+            prng_.set_seed(ZeroBlock);
 #endif
 
             // Set local exfields for multi-threaded efficient use of memory pools.
@@ -109,7 +109,7 @@ namespace apsi
                 thrd.join();
             }
 
-            prng_.set_seed(oc::ZeroBlock);
+            prng_.set_seed(ZeroBlock);
         }
 
         void Sender::load_db(const vector<Item> &data, MatrixView<u8> vals)
@@ -163,7 +163,7 @@ namespace apsi
                 vector<u8> buff;
                 chl.recv(buff);
 
-                PRNG pp(oc::CCBlock);
+                PRNG pp(CCBlock);
                 digit_t key[NWORDS_ORDER];
                 random_fourq(key, pp);
                 auto iter = buff.data();

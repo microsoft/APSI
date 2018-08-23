@@ -1,7 +1,5 @@
 #pragma once
 
-#include <wmmintrin.h>
-
 #include "apsi/apsidefines.h"
 
 namespace apsi

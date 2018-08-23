@@ -27,7 +27,6 @@ using namespace seal;
 using namespace seal::util;
 using namespace cuckoo;
 using namespace apsi::tools;
-using namespace oc;
 
 namespace apsi
 {
@@ -141,7 +140,7 @@ namespace apsi
         pair<
             map<uint64_t, vector<Ciphertext> >,
             unique_ptr<CuckooInterface> >
-            Receiver::preprocess(vector<Item> &items, Channel &channel)
+            Receiver::preprocess(vector<Item> &items, oc::Channel &channel)
         {
             if (params_.use_pk_oprf())
             {
@@ -236,7 +235,7 @@ namespace apsi
             return { move(ciphers), move(cuckoo) };
         }
 
-        void Receiver::send(const map<uint64_t, vector<Ciphertext> > &query, Channel &channel)
+        void Receiver::send(const map<uint64_t, vector<Ciphertext> > &query, oc::Channel &channel)
         {
             /* Send keys. */
             send_pubkey(public_key_, channel);
@@ -261,7 +260,7 @@ namespace apsi
 
         unique_ptr<CuckooInterface> Receiver::cuckoo_hashing(const vector<Item> &items)
         {
-            auto receiver_null_item = oc::AllOneBlock;
+            auto receiver_null_item = AllOneBlock;
 
             unique_ptr<CuckooInterface> cuckoo(
                 static_cast<CuckooInterface*>(new Cuckoo(

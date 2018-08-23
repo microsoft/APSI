@@ -49,5 +49,12 @@ namespace apsi
 
     seal::Plaintext random_plaintext(const seal::SEALContext &context);
 
+    inline u64 roundUpTo(u64 val, u64 step) { return ((val + step - 1) / step) * step; }
+
     extern apsi::tools::Stopwatch stop_watch, recv_stop_watch;
+
+    extern const block ZeroBlock;
+    extern const block OneBlock;
+    extern const block AllOneBlock;
+    extern const block CCBlock;
 }

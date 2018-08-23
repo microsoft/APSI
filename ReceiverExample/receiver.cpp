@@ -21,7 +21,6 @@ using namespace apsi::receiver;
 using namespace apsi::sender;
 using namespace seal::util;
 using namespace seal;
-using namespace oc;
 
 void print_example_banner(string title);
 void print_parameters(const PSIParams &psi_params);
@@ -29,8 +28,8 @@ void example_basics();
 void example_update();
 void example_save_db();
 void example_load_db();
-void example_fast_batching(oc::CLP&, Channel&, Channel&);
-void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl);
+void example_fast_batching(oc::CLP&, oc::Channel&, oc::Channel&);
+void example_slow_batching(oc::CLP& cmd, oc::Channel& recvChl, oc::Channel& sendChl);
 void example_slow_vs_fast();
 void example_remote();
 void example_remote_multiple();
@@ -59,7 +58,7 @@ void print_example_banner(string title)
  
 std::pair<vector<Item>, vector<int>> randSubset(const vector<Item>& items, int size)
 {
-    PRNG prn(oc::ZeroBlock);
+    PRNG prn(ZeroBlock);
 
     set<int> ss;
     while (ss.size() != size)
@@ -87,17 +86,17 @@ std::pair<vector<Item>, vector<int>> randSubset(const vector<Item>& items, int s
 
 
 int main(int argc, char *argv[]){
-    CLP cmd(argc, argv);
+    oc::CLP cmd(argc, argv);
 
     // Thread count
     cmd.setDefault("t", 1);
 
-    IOService ios;
+    oc::IOService ios;
 
-    Session clientSession(ios, "127.0.0.1:1212", oc::SessionMode::Client);
-    Session serverSession(ios, "127.0.0.1:1212", oc::SessionMode::Server);
-    Channel clientChl = clientSession.addChannel();
-    Channel serverChl = serverSession.addChannel();
+    oc::Session clientSession(ios, "127.0.0.1:1212", oc::SessionMode::Client);
+    oc::Session serverSession(ios, "127.0.0.1:1212", oc::SessionMode::Server);
+    oc::Channel clientChl = clientSession.addChannel();
+    oc::Channel serverChl = serverSession.addChannel();
 
 
     auto none = true;
@@ -143,7 +142,7 @@ int main(int argc, char *argv[]){
     return 0;
 }
 
-std::string print(span<u8> s)
+std::string print(oc::span<u8> s)
 {
     std::stringstream ss;
     for (int i = 0; i < s.size(); ++i)
@@ -389,9 +388,9 @@ void cout_param(std::string param_name, T param)
     }
 }
 
-void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
+void example_slow_batching(oc::CLP& cmd, oc::Channel& recvChl, oc::Channel& sendChl)
 {
-    setThreadName("receiver_main");
+    oc::setThreadName("receiver_main");
     print_example_banner("Example: Slow batching");
     stop_watch.time_points.clear();
 
@@ -611,7 +610,7 @@ void example_slow_batching(oc::CLP& cmd, Channel& recvChl, Channel& sendChl)
     sender.load_db(s1, labels);
 
     auto thrd = thread([&]() {
-        setThreadName("sender_main");
+        oc::setThreadName("sender_main");
         sender.query_session(sendChl); 
     });
     recv_stop_watch.set_time_point("receiver start");

@@ -2,6 +2,8 @@
 
 #include <array>
 #include <stdexcept>
+#include <wmmintrin.h>
+
 
 using namespace apsi;
 using namespace apsi::tools;
