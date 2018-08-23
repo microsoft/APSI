@@ -9,7 +9,7 @@ using namespace apsi::tools;
 
 namespace apsi
 {
-    FFieldBatchEncoder::FFieldBatchEncoder(shared_ptr<FField> field, unsigned log_degree, DPRNG &prng) :
+    FFieldBatchEncoder::FFieldBatchEncoder(shared_ptr<FField> field, unsigned log_degree, PRNG &prng) :
         field_(move(field)),
         ntt_ctx_(field_, log_degree, prng)
     {

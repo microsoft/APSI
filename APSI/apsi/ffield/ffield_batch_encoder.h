@@ -19,7 +19,7 @@ namespace apsi
     class FFieldBatchEncoder 
     {
     public:
-        FFieldBatchEncoder(std::shared_ptr<FField> field, unsigned log_degree, apsi::tools::DPRNG &prng);
+        FFieldBatchEncoder(std::shared_ptr<FField> field, unsigned log_degree, apsi::tools::PRNG &prng);
 
         FFieldBatchEncoder(std::shared_ptr<FField> field, unsigned log_degree, FFieldElt zeta);
 

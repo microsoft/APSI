@@ -19,4 +19,4 @@ void eccoord_to_buffer(const digit_t* coord, unsigned char* buffer);
 void buffer_to_eccoord(const unsigned char* buffer, digit_t* coord);
 
 // Generate a random number within FourQ's order
-void random_fourq(digit_t* a, apsi::tools::DPRNG& pr);
+void random_fourq(digit_t* a, apsi::tools::PRNG& pr);

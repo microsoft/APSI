@@ -154,12 +154,14 @@
     <ClInclude Include="apsi\Sender\senderdb.h" />
     <ClInclude Include="apsi\Sender\sendersessioncontext.h" />
     <ClInclude Include="apsi\Sender\senderthreadcontext.h" />
+    <ClInclude Include="apsi\tools\aes.h" />
     <ClInclude Include="apsi\tools\binsizemath.h" />
     <ClInclude Include="apsi\Tools\interpolate.h" />
     <ClInclude Include="apsi\tools\prng.h" />
     <ClInclude Include="apsi\Tools\sealcompress.h" />
     <ClInclude Include="apsi\Tools\stopwatch.h" />
     <ClInclude Include="apsi\Tools\ThreadPool.h" />
+    <ClInclude Include="apsi\tools\utils.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp" />
@@ -175,6 +177,7 @@
     <ClCompile Include="apsi\Receiver\receiver.cpp" />
     <ClCompile Include="apsi\Sender\sender.cpp" />
     <ClCompile Include="apsi\Sender\senderdb.cpp" />
+    <ClCompile Include="apsi\tools\aes.cpp" />
     <ClCompile Include="apsi\tools\binsizemath.cpp" />
     <ClCompile Include="apsi\Tools\interpolate.cpp" />
     <ClCompile Include="apsi\tools\prng.cpp" />

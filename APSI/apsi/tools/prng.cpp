@@ -1,25 +1,99 @@
 #include "prng.h"
+
+#include <algorithm>
+#include <cstring>
+
 #include "apsi/item.h"
 
+
+using namespace apsi;
 using namespace apsi::tools;
 
-
-DPRNG::DPRNG(const std::byte* entropy, size_t entropy_length)
-    : Hash_DRBG(reinterpret_cast<const CryptoPP::byte*>(entropy), entropy_length)
+PRNG::PRNG(const block& seed, u64 buffer_size)
+    : bytes_idx_(0),
+      block_idx_(0)
 {
+    set_seed(seed, buffer_size);
 }
 
-DPRNG::DPRNG(const apsi::Item* item)
-    : Hash_DRBG(reinterpret_cast<const CryptoPP::byte*>(item), sizeof(Item))
+PRNG::PRNG(const Item& seed, u64 buffer_size)
+    : bytes_idx_(0),
+      block_idx_(0)
 {
+    // This works because Item is 128 bits. Ensure this is always true
+    if (sizeof(block) != sizeof(Item))
+    {
+        throw std::runtime_error("Size of block and size of Item are different");
+    }
+
+    block& bseed = static_cast<block&>(seed);
+    set_seed(bseed, buffer_size);
 }
 
-DPRNG::DPRNG(apsi::block block)
-    : Hash_DRBG(reinterpret_cast<const CryptoPP::byte*>(&block), sizeof(apsi::block))
+PRNG::PRNG(PRNG && s) :
+    buffer_(std::move(s.buffer_)),
+    aes_(std::move(s.aes_)),
+    bytes_idx_(s.bytes_idx_),
+    block_idx_(s.block_idx_),
+    buffer_byte_capacity_(s.buffer_byte_capacity_)
 {
+    clear(s);
 }
 
-void DPRNG::SetSeed(apsi::block block)
+void PRNG::operator=(PRNG&&s)
 {
-    IncorporateEntropy(reinterpret_cast<const CryptoPP::byte*>(&block), sizeof(apsi::block));
+    buffer_ = (std::move(s.buffer_));
+    aes_ = (std::move(s.aes_));
+    bytes_idx_ = s.bytes_idx_;
+    block_idx_ = s.block_idx_;
+    buffer_byte_capacity_ = s.buffer_byte_capacity_;
+    
+    clear(s);
+}
+
+void PRNG::set_seed(const block& seed, u64 buffer_size)
+{
+    aes_.set_key(seed);
+    block_idx_ = 0;
+
+    if (buffer_.size() == 0)
+    {
+        buffer_.resize(buffer_size);
+        buffer_byte_capacity_ = (sizeof(block) * buffer_size);
+    }
+
+    refill_buffer();
+}
+
+u8 PRNG::get_bit()
+{
+    u8 ret = get<u8>();
+    return (ret & 0x01);
+}
+
+const block PRNG::get_seed() const
+{
+    if (buffer_.size())
+        return aes_.get_key();
+
+    throw std::runtime_error("PRNG has not been keyed ");
+}
+
+void PRNG::refill_buffer()
+{
+    if (buffer_.size() == 0)
+        throw std::runtime_error("PRNG has not been keyed ");
+
+    aes_.ecb_enc_counter_mode(block_idx_, buffer_.size(), buffer_.data());
+    block_idx_ += buffer_.size();
+    bytes_idx_ = 0;
+}
+
+void PRNG::clear(PRNG& p)
+{
+    p.buffer_.resize(0);
+    AES::clear(p.aes_);
+    p.bytes_idx_ = 0;
+    p.block_idx_ = 0;
+    p.buffer_byte_capacity_ = 0;
 }

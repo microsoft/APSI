@@ -103,7 +103,7 @@ namespace apsi
             fq_nmod_one(elt_, field_->ctx_);
         }
 
-        inline void set_random(apsi::tools::DPRNG &prng)
+        inline void set_random(apsi::tools::PRNG &prng)
         {
             auto field_degree = field_->d_;
             for (unsigned i = 0; i < field_degree; i++)
@@ -112,7 +112,7 @@ namespace apsi
             }
         }
 
-        inline void set_random_nonzero(apsi::tools::DPRNG &prng)
+        inline void set_random_nonzero(apsi::tools::PRNG &prng)
         {
             do
             {

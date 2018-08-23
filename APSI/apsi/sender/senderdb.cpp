@@ -51,11 +51,10 @@ namespace apsi
             }
 
 #ifdef USE_SECURE_SEED
-            prng_.SetSeed(oc::sysRandomSeed());
+            prng_.set_seed(oc::sysRandomSeed());
 #else
             TODO("***************** INSECURE *****************, define USE_SECURE_SEED to fix");
-            //prng_.SetSeed(oc::OneBlock, 256);
-	    prng_.SetSeed(oc::OneBlock);
+            prng_.set_seed(oc::OneBlock, /* buffer_size */ 256);
 #endif
 
             // Set null value for sender: 1111...1110 (128 bits)
@@ -145,16 +144,15 @@ namespace apsi
             vector<thread> thrds(thread_count);
             for (int t = 0; t < thrds.size(); t++)
             {
-                auto seed = prng_.get<oc::block>();
+                auto seed = prng_.get<block>();
                 thrds[t] = thread([&, t, seed]()
                 {
-                    //oc::PRNG prng(seed, 256);
-                    apsi::tools::DPRNG prng(seed);
+                    PRNG prng(seed, /* buffer_size */ 256);
                     auto start = t * data.size() / thrds.size();
                     auto end = (t + 1) * data.size() / thrds.size();
 
                     vector<u8> buff((sizeof(digit_t) * NWORDS_ORDER) - 1);
-                    DPRNG pp(oc::CCBlock);
+                    PRNG pp(oc::CCBlock);
                     digit_t key[NWORDS_ORDER];
                     random_fourq(key, pp);
 
@@ -171,7 +169,7 @@ namespace apsi
                         if (params_.use_pk_oprf())
                         {
                             // Compute EC PRF first for data
-                            DPRNG p(&data[i]);
+                            PRNG p(data[i], /* buffer_size */ 8);
                             digit_t a[NWORDS_ORDER];
                             random_fourq(a, p);
                             Montgomery_multiply_mod_order(a, key, a);
@@ -317,7 +315,7 @@ namespace apsi
         }
 
         std::pair<DBBlock*, DBBlock::Position>
-            SenderDB::aquire_db_position(int cuckoo_loc, DPRNG &prng)
+            SenderDB::aquire_db_position(int cuckoo_loc, PRNG &prng)
         {
             auto batch_idx = cuckoo_loc / params_.batch_size();
             auto batch_offset = cuckoo_loc % params_.batch_size();
@@ -338,7 +336,7 @@ namespace apsi
             throw runtime_error("simple hashing failed due to bin overflow");
         }
 
-        DBBlock::Position DBBlock::try_aquire_position(int bin_idx, DPRNG& prng)
+        DBBlock::Position DBBlock::try_aquire_position(int bin_idx, PRNG& prng)
         {
             if (bin_idx >= items_per_batch_)
             {
@@ -493,7 +491,7 @@ namespace apsi
             symmetric_polys(th_context, symm_block, encoding_bit_length, neg_null_element);
 
             auto num_rows = items_per_batch_;
-            DPRNG &prng = th_context.prng();
+            PRNG &prng = th_context.prng();
 
             FFieldArray r(th_context.exfield());
             r.set_random_nonzero(prng);

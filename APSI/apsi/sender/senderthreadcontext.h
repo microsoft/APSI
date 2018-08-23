@@ -58,19 +58,8 @@ namespace apsi
 
             void set_prng(oc::block block)
             {
-                //prng_.SetSeed(block, 256);
-                prng_.SetSeed(block);
+                prng_.set_seed(block, /* buffer_size */ 256);
             }
-
-            // std::shared_ptr<FFieldBatchEncoder> &ex_batch_encoder()
-            // {
-            //     return ex_batch_encoder_;
-            // }
-            //
-            // void set_ex_batch_encoder(std::shared_ptr<FFieldBatchEncoder> batcher)
-            // {
-            //     ex_batch_encoder_ = std::move(batcher);
-            // }
 
             inline void construct_variables(PSIParams &params)
             {
@@ -99,7 +88,7 @@ namespace apsi
                 return symm_block_;
             }
 
-            apsi::tools::DPRNG& prng()
+            apsi::tools::PRNG& prng()
             {
                 return prng_;
             }
@@ -115,7 +104,7 @@ namespace apsi
 
             MatrixView<_ffield_array_elt_t> symm_block_;
             
-            apsi::tools::DPRNG prng_;
+            apsi::tools::PRNG prng_;
         };
     }
 }

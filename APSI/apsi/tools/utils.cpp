@@ -33,9 +33,9 @@ void buffer_to_eccoord(const unsigned char* buffer, digit_t* coord)
 }
 
 // Generate a random number within FourQ's order
-void random_fourq(digit_t* a, apsi::tools::DPRNG& pr)
+void random_fourq(digit_t* a, apsi::tools::PRNG& pr)
 {
-    pr.GenerateBlock(reinterpret_cast<CryptoPP::byte*>(a), NWORDS_ORDER * sizeof(uint64_t));
+    pr.get(a, NWORDS_ORDER);
     a[NWORDS_ORDER - 1] &= 0x003fffffffffffff;
     subtract_mod_order(a, curve_order, a);
 }

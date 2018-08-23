@@ -80,10 +80,10 @@ namespace apsi
             vector<thread> thrds(total_thread_count_);
 
 #ifdef USE_SECURE_SEED
-            prng_.SetSeed(oc::sysRandomSeed());
+            prng_.set_seed(oc::sysRandomSeed());
 #else
             TODO("***************** INSECURE *****************, define USE_SECURE_SEED to fix");
-            prng_.SetSeed(oc::ZeroBlock);
+            prng_.set_seed(oc::ZeroBlock);
 #endif
 
             // Set local exfields for multi-threaded efficient use of memory pools.
@@ -109,7 +109,7 @@ namespace apsi
                 thrd.join();
             }
 
-            prng_.SetSeed(oc::ZeroBlock);
+            prng_.set_seed(oc::ZeroBlock);
         }
 
         void Sender::load_db(const vector<Item> &data, MatrixView<u8> vals)
@@ -163,7 +163,7 @@ namespace apsi
                 vector<u8> buff;
                 chl.recv(buff);
 
-                DPRNG pp(oc::CCBlock);
+                PRNG pp(oc::CCBlock);
                 digit_t key[NWORDS_ORDER];
                 random_fourq(key, pp);
                 auto iter = buff.data();

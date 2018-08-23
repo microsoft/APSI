@@ -117,6 +117,12 @@
     <ClInclude Include="apsi\ffield\ffield_fast_batch_encoder.h">
       <Filter>Header Files\FField</Filter>
     </ClInclude>
+    <ClInclude Include="apsi\tools\aes.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\utils.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp">
@@ -174,6 +180,9 @@
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
     <ClCompile Include="apsi\tools\prng.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\tools\aes.cpp">
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
   </ItemGroup>

@@ -145,7 +145,7 @@ namespace apsi
         {
             if (params_.use_pk_oprf())
             {
-                DPRNG prng(ZeroBlock);
+                PRNG prng(ZeroBlock);
                 vector<vector<digit_t>> b;
                 b.reserve(items.size());
                 digit_t x[NWORDS_ORDER];
@@ -158,7 +158,7 @@ namespace apsi
                     random_fourq(x, prng);
                     b.emplace_back(x, x + NWORDS_ORDER);
 
-                    DPRNG pp(&items[i]);
+                    PRNG pp(items[i], /* buffer_size */ 8);
 
                     random_fourq(x, pp);
                     Montgomery_multiply_mod_order(x, b[i].data(), x);

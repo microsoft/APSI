@@ -136,7 +136,7 @@ namespace apsi
             fq_nmod_poly_one(poly_, field_->ctx_);
         }
 
-        inline void set_random(std::size_t degree, apsi::tools::DPRNG &prng)
+        inline void set_random(std::size_t degree, apsi::tools::PRNG &prng)
         {
             _ffield_elt_t coeff;
             fq_nmod_init2(coeff, field_->ctx_);
@@ -152,7 +152,7 @@ namespace apsi
             fq_nmod_clear(coeff, field_->ctx_);
         }
 
-        inline void set_random_monic(std::size_t degree, apsi::tools::DPRNG &prng)
+        inline void set_random_monic(std::size_t degree, apsi::tools::PRNG &prng)
         {
             _ffield_elt_t coeff;
             fq_nmod_init2(coeff, field_->ctx_);

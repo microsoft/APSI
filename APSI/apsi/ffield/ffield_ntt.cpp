@@ -10,7 +10,7 @@ using namespace apsi::tools;
 
 namespace apsi
 {
-    FFieldNTT::FFieldNTT(shared_ptr<FField> field, unsigned log_degree, DPRNG &prng) :
+    FFieldNTT::FFieldNTT(shared_ptr<FField> field, unsigned log_degree, PRNG &prng) :
         field_(move(field)),
         zeta_(field_),
         log_n_(log_degree),

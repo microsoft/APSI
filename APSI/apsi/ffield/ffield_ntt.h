@@ -17,7 +17,7 @@ namespace apsi
         friend class FFieldBatchEncoder;
 
     public:
-        FFieldNTT(std::shared_ptr<FField> field, unsigned log_degree, apsi::tools::DPRNG &prng);
+        FFieldNTT(std::shared_ptr<FField> field, unsigned log_degree, apsi::tools::PRNG &prng);
 
         FFieldNTT(std::shared_ptr<FField> field, unsigned log_degree, FFieldElt zeta);
 

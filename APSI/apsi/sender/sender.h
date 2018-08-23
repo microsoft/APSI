@@ -186,7 +186,7 @@ namespace apsi
 
             std::mutex thread_context_mtx_;
 
-            apsi::tools::DPRNG prng_;
+            apsi::tools::PRNG prng_;
 
             bool stopped_;
 

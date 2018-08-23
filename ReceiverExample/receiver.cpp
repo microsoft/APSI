@@ -59,7 +59,7 @@ void print_example_banner(string title)
  
 std::pair<vector<Item>, vector<int>> randSubset(const vector<Item>& items, int size)
 {
-    DPRNG prn(oc::ZeroBlock);
+    PRNG prn(oc::ZeroBlock);
 
     set<int> ss;
     while (ss.size() != size)

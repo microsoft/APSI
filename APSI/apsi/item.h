@@ -106,6 +106,10 @@ namespace apsi
 
         void load(std::istream &stream);
 
+        auto& get_value() { return value_; }
+
+        const auto& get_value() const { return value_; }
+
         std::array<std::uint64_t, 2> value_;
     };
 }

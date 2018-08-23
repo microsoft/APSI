@@ -185,7 +185,7 @@ namespace apsi
             fq_nmod_zero(array_ + index, fields_[index]->ctx_);
         }
 
-        inline void set_random(apsi::tools::DPRNG &prng)
+        inline void set_random(apsi::tools::PRNG &prng)
         {
             for(std::size_t index = 0; index < size_; index++)
             {
@@ -197,7 +197,7 @@ namespace apsi
             }
         }
 
-        inline void set_random_nonzero(apsi::tools::DPRNG &prng)
+        inline void set_random_nonzero(apsi::tools::PRNG &prng)
         {
             for(std::size_t index = 0; index < size_; index++)
             {
