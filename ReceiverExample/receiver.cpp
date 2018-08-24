@@ -101,6 +101,9 @@ namespace
 
 namespace apsi
 {
+    /**
+    * Command Line Processor based on TCLAP
+    */
     class CLP : public TCLAP::CmdLine
     {
     public:
@@ -155,7 +158,7 @@ namespace apsi
             auto exFldDegreeArg = std::make_shared< TCLAP::ValueArg<int>>("", "exfieldDegree", "exField degree", false, 8, "int");
             add_arg(exFldDegreeArg);
 
-            auto oprfArg = std::make_shared< TCLAP::SwitchArg>("", "oprf", "Use OPRF", false);
+            auto oprfArg = std::make_shared< TCLAP::SwitchArg>("o", "oprf", "Use OPRF", false);
             add_arg(oprfArg);
 
             auto recThrArg = std::make_shared< TCLAP::ValueArg<int>>("", "recThreads", "Receiver threads", false, 1, "int");
@@ -170,12 +173,6 @@ namespace apsi
                 std::cout << "Error parsing parameters.";
                 return false;
             }
-            //catch (TCLAP::CmdLineParseException& e)
-            //{
-            //    std::cout << "Error parsing command line: " << e.error() << " for " << e.argId() << std::endl;
-            //    std::cout << e.what() << std::endl;
-            //    return false;
-            //}
 
             return true;
         }
@@ -256,6 +253,9 @@ namespace apsi
             add(*arg);
         }
 
+        // We have to manage the lifetime of the arguments because TCLAP only keeps pointers.
+        // The args_ vector will be used to keep the arguments alive until this CLP object itself
+        // is destroyed.
         std::vector<std::shared_ptr<TCLAP::Arg>> args_;
     };
 }
