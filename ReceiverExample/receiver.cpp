@@ -3,12 +3,14 @@
 #include <iomanip>
 #include <fstream>
 #include <vector>
+#include <set>
 
 #include "apsi/apsi.h"
 #include "seal/seal.h"
 
-#include "cryptoTools/Common/CLP.h"
 #include "cryptoTools/Network/IOService.h"
+
+#include "tclap/CmdLine.h"
 
 #ifdef _MSC_VER
 #include "windows.h"
@@ -22,14 +24,15 @@ using namespace apsi::sender;
 using namespace seal::util;
 using namespace seal;
 
+namespace apsi { class CLP;  }
+
 void print_example_banner(string title);
 void print_parameters(const PSIParams &psi_params);
 void example_basics();
 void example_update();
 void example_save_db();
 void example_load_db();
-void example_fast_batching(oc::CLP&, oc::Channel&, oc::Channel&);
-void example_slow_batching(oc::CLP& cmd, oc::Channel& recvChl, oc::Channel& sendChl);
+void example_slow_batching(apsi::CLP& cmd, oc::Channel& recvChl, oc::Channel& sendChl);
 void example_slow_vs_fast();
 void example_remote();
 void example_remote_multiple();
@@ -48,7 +51,7 @@ void print_example_banner(string title)
         string banner_top(banner_length, '*');
         string banner_middle = string(10, '*') + " " + title + " " + string(10, '*');
 
-        cout << endl
+        std::cout << endl
             << banner_top << endl
             << banner_middle << endl
             << banner_top << endl
@@ -81,15 +84,189 @@ std::pair<vector<Item>, vector<int>> randSubset(const vector<Item>& items, int s
     return { ret, s };
 }
 
+namespace
+{
+    struct find_arg_by_name
+    {
+        find_arg_by_name(const std::string& arg_name) : arg_name_(arg_name) {}
+        std::string arg_name_;
+        bool operator()(const TCLAP::Arg* arg)
+        {
+            if (arg->getName() == arg_name_ || arg->getFlag() == arg_name_)
+                return true;
+            return false;
+        }
+    };
+}
+
+namespace apsi
+{
+    class CLP : public TCLAP::CmdLine
+    {
+    public:
+        CLP(const std::string& desc)
+            : TCLAP::CmdLine(desc)
+        {}
+
+        bool parse_args(int argc, char** argv)
+        {
+            auto threadsArg = std::make_shared<TCLAP::ValueArg<int>>("t", "threads", "Number of threads to use", /* req */ false, /* value */ 1, "int");
+            add_arg(threadsArg);
+
+            auto fastBatchingArg = std::make_shared<TCLAP::SwitchArg>("f", "fast", "Use fast batching for APSI", /* default_val */ false);
+            add_arg(fastBatchingArg);
+
+            auto slowBatchingArg = std::make_shared<TCLAP::SwitchArg>("s", "slow", "Use slow batching for APSI", /* default_val */ false);
+            add_arg(slowBatchingArg);
+
+            auto senderSzArg = std::make_shared<TCLAP::ValueArg<unsigned>>("", "senderSize", "Size of sender database", false, 20, "unsigned");
+            add_arg(senderSzArg);
+
+            auto secLvlArg = std::make_shared<TCLAP::ValueArg<unsigned>>("", "secLevel", "Security level", false, 40, "unsigned");
+            add_arg(secLvlArg);
+
+            auto itmBitLengthArg = std::make_shared<TCLAP::ValueArg<unsigned>>("", "itemBitLength", "Item bit length", false, 60, "unsigned");
+            add_arg(itmBitLengthArg);
+
+            auto labelsArg = std::make_shared<TCLAP::SwitchArg>("", "useLabels", "Use labels", false);
+            add_arg(labelsArg);
+
+            auto logTblSzArg = std::make_shared<TCLAP::ValueArg<int>>("", "logTableSize", "Table Size", false, 10, "int");
+            add_arg(logTblSzArg);
+
+            auto splitCntArg = std::make_shared<TCLAP::ValueArg<int>>("", "splitCount", "Split count", false, 128, "int");
+            add_arg(splitCntArg);
+
+            auto wndSzArg = std::make_shared<TCLAP::ValueArg<int>>("", "windowSize", "Widow size", false, 1, "int");
+            add_arg(wndSzArg);
+
+            auto polyModArg = std::make_shared<TCLAP::ValueArg<int>>("", "polyModulus", "Poly Modulus degree", false, 4096, "int");
+            add_arg(polyModArg);
+
+            auto coeffModArg = std::make_shared< TCLAP::MultiArg<u64>>("", "coeffModulus", "Coefficient Modulus", false, "u64");
+            add_arg(coeffModArg);
+
+            auto plainModArg = std::make_shared< TCLAP::ValueArg<u64>>("", "plainModulus", "Plain Modulus", false, 0x13ff, "u64");
+            add_arg(plainModArg);
+
+            auto dbcArg = std::make_shared< TCLAP::ValueArg<int>>("", "dbc", "Decomposition Bit Count", false, 30, "int");
+            add_arg(dbcArg);
+
+            auto exFldDegreeArg = std::make_shared< TCLAP::ValueArg<int>>("", "exfieldDegree", "exField degree", false, 8, "int");
+            add_arg(exFldDegreeArg);
+
+            auto oprfArg = std::make_shared< TCLAP::SwitchArg>("", "oprf", "Use OPRF", false);
+            add_arg(oprfArg);
+
+            auto recThrArg = std::make_shared< TCLAP::ValueArg<int>>("", "recThreads", "Receiver threads", false, 1, "int");
+            add_arg(recThrArg);
+
+            try
+            {
+                parse(argc, argv);
+            }
+            catch (...)
+            {
+                std::cout << "Error parsing parameters.";
+                return false;
+            }
+            //catch (TCLAP::CmdLineParseException& e)
+            //{
+            //    std::cout << "Error parsing command line: " << e.error() << " for " << e.argId() << std::endl;
+            //    std::cout << e.what() << std::endl;
+            //    return false;
+            //}
+
+            return true;
+        }
+
+        bool get_switch_arg(const std::string& argname)
+        {
+            auto arg = get_arg<TCLAP::SwitchArg>(argname);
+            if (nullptr == arg)
+                throw std::runtime_error("Could not find argument.");
+            bool result = arg->getValue();
+            cout_param(argname, result ? "true" : "false");
+            return result;
+        }
+
+        template <typename T>
+        T get_value_arg(const std::string& argname)
+        {
+            
+            auto arg = get_arg<TCLAP::ValueArg<T>>(argname);
+            if (nullptr == arg)
+                throw std::runtime_error("Could not find argument");
+            T result = arg->getValue();
+            cout_param(argname, result);
+            return result;
+        }
+
+        template <typename T>
+        const vector<T>& get_multi_arg(const std::string& argname)
+        {
+            const vector<T>& result = get_arg<TCLAP::MultiArg<T>>(argname)->getValue();
+            if (result.size() == 0)
+            {
+                cout_param(argname, "N/A");
+            }
+            else
+            {
+                std::stringstream ss;
+                ss << result.size() << " elems";
+                cout_param(argname, ss.str());
+            }
+            return result;
+        }
+
+    private:
+        const int column_number = 4;
+        const int column_width = 20;
+        int param_cols = 0;
+
+        template<class T>
+        void cout_param(std::string param_name, T param)
+        {
+            std::ostringstream ss;
+            ss << param_name << "=" << param;
+            cout << setw(column_width) << left << ss.str();
+            param_cols++;
+            if (param_cols >= column_number)
+            {
+                cout << endl;
+                param_cols = 0;
+            }
+        }
+
+        template <typename T>
+        T* get_arg(const std::string& argname)
+        {
+            auto arg = std::find_if(getArgList().begin(), getArgList().end(), find_arg_by_name(argname));
+            if (arg != getArgList().end())
+            {
+                T* ret = dynamic_cast<T*>(*arg);
+                return ret;
+            }
+            return nullptr;
+        }
+
+        void add_arg(std::shared_ptr<TCLAP::Arg> arg)
+        {
+            args_.push_back(arg);
+            add(*arg);
+        }
+
+        std::vector<std::shared_ptr<TCLAP::Arg>> args_;
+    };
+}
 
 
+int main(int argc, char *argv[])
+{
+    apsi::CLP cmd("Example Implementation of APSI library");
 
-
-int main(int argc, char *argv[]){
-    oc::CLP cmd(argc, argv);
-
-    // Thread count
-    cmd.setDefault("t", 1);
+    if (!cmd.parse_args(argc, argv))
+        return -1;
 
     oc::IOService ios;
 
@@ -100,8 +277,9 @@ int main(int argc, char *argv[]){
 
 
     auto none = true;
-    auto fastBatching = cmd.isSet("fast"); none &= !fastBatching;
-    auto slowBatching = cmd.isSet("slow"); none &= !slowBatching;
+    auto fastBatching = cmd.get_switch_arg("fast"); none &= !fastBatching;
+    auto slowBatching = cmd.get_switch_arg("slow"); none &= !slowBatching;
+
     //// Example: Basics
     //example_basics();
 
@@ -372,50 +550,27 @@ std::string print(oc::span<u8> s)
 //     cout << recv_stop_watch << endl;
 // }
 
-int param_cols = 0;
 
-template<class T>
-void cout_param(std::string param_name, T param)
-{
-    std::ostringstream ss;
-    ss << param_name << "=" << param;
-    cout << setw(20) << left << ss.str();
-    param_cols++;
-    if (param_cols >= 3)
-    {
-        cout << endl;
-        param_cols = 0;
-    }
-}
-
-void example_slow_batching(oc::CLP& cmd, oc::Channel& recvChl, oc::Channel& sendChl)
+void example_slow_batching(CLP& cmd, oc::Channel& recvChl, oc::Channel& sendChl)
 {
     oc::setThreadName("receiver_main");
     print_example_banner("Example: Slow batching");
     stop_watch.time_points.clear();
 
     // Thread count
-    unsigned numThreads = cmd.get<int>("t");
-    cout_param("t", numThreads);
+    unsigned numThreads = cmd.get_value_arg<int>("threads");
 
     // Larger set size 
-    cmd.setDefault("senderSize", 20);
-    unsigned sender_set_size = 1 << cmd.get<int>("senderSize");
-    cout_param("senderSize", cmd.get<int>("senderSize"));
+    unsigned sender_set_size = 1 << cmd.get_value_arg<unsigned>("senderSize");
 
     // Negative log failure probability for simple hashing
-    cmd.setDefault("secLevel", 40);
-    unsigned binning_sec_level = cmd.get<int>("secLevel");
-    cout_param("secLevel", binning_sec_level);
+    unsigned binning_sec_level = cmd.get_value_arg<unsigned>("secLevel");
 
     // Length of items
-    cmd.setDefault("itemBitLength", 60);
-    unsigned item_bit_length = cmd.get<int>("itemBitLength");
-    cout_param("itemBitLength", item_bit_length);
+    unsigned item_bit_length = cmd.get_value_arg<unsigned>("itemBitLength");
 
-    bool useLabels = cmd.isSet("useLabels");
+    bool useLabels = cmd.get_switch_arg("useLabels");
     unsigned label_bit_length = useLabels ? item_bit_length : 0;
-    cout_param("useLabels", useLabels ? "true" : "false");
 
     // Cuckoo hash parameters
     CuckooParams cuckoo_params;
@@ -435,15 +590,11 @@ void example_slow_batching(oc::CLP& cmd, oc::Channel& recvChl, oc::Channel& send
     TableParams table_params;
     {
         // Log of size of full hash table
-        cmd.setDefault("logTableSize", 10);
-        table_params.log_table_size = cmd.get<int>("logTableSize");
-        cout_param("logTableSize", table_params.log_table_size);
+        table_params.log_table_size = cmd.get_value_arg<int>("logTableSize");
 
         // Number of splits to use
         // Larger means lower depth but bigger S-->R communication
-        cmd.setDefault("splitCount", 128);
-        table_params.split_count = cmd.get<int>("splitCount");
-        cout_param("splitCount", table_params.split_count);
+        table_params.split_count = cmd.get_value_arg<int>("splitCount");
 
         // Get secure bin size
         table_params.sender_bin_size = round_up_to(get_bin_size(
@@ -454,26 +605,22 @@ void example_slow_batching(oc::CLP& cmd, oc::Channel& recvChl, oc::Channel& send
 
         // Window size parameter
         // Larger means lower depth but bigger R-->S communication
-        cmd.setDefault("windowSize", 1);
-        table_params.window_size = cmd.get<int>("windowSize");
-        cout_param("windowSize", table_params.window_size);
+        table_params.window_size = cmd.get_value_arg<int>("windowSize");
     }
 
     SEALParams seal_params;
     {
-        cmd.setDefault("polyModulus", 4096);
-        seal_params.encryption_params.set_poly_modulus_degree(cmd.get<int>("polyModulus"));
-        cout_param("polyModulus", seal_params.encryption_params.poly_modulus_degree());
+        seal_params.encryption_params.set_poly_modulus_degree(cmd.get_value_arg<int>("polyModulus"));
         
         vector<SmallModulus> coeff_modulus;
-        if(!cmd.isSet("coeffModulus"))
+        auto coeff_mod_bit_vector = cmd.get_multi_arg<u64>("coeffModulus");
+
+        if (coeff_mod_bit_vector.size() == 0)
         {
-            cout_param("coeffModulus", "N/A");
             coeff_modulus = coeff_modulus_128(seal_params.encryption_params.poly_modulus_degree());
         }
         else
         {
-            auto coeff_mod_bit_vector = cmd.getMany<uint64_t>("coeffModulus");
             unordered_map<int, size_t> mods_added;
             for(auto bit_size : coeff_mod_bit_vector)
             {
@@ -505,34 +652,21 @@ void example_slow_batching(oc::CLP& cmd, oc::Channel& recvChl, oc::Channel& send
             }
         }
         seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
-        cmd.setDefault("plainModulus", 0x13ff);
-        seal_params.encryption_params.set_plain_modulus(cmd.get<uint64_t>("plainModulus"));
-        cout_param("plainModulus", seal_params.encryption_params.plain_modulus().value());
+        seal_params.encryption_params.set_plain_modulus(cmd.get_value_arg<u64>("plainModulus"));
 
         // This must be equal to plain_modulus
         seal_params.exfield_params.exfield_characteristic = seal_params.encryption_params.plain_modulus().value();
-        cmd.setDefault("exfieldDegree", 8);
-        seal_params.exfield_params.exfield_degree = cmd.get<int>("exfieldDegree");
-        cout_param("exfieldDegree", seal_params.exfield_params.exfield_degree);
-
-        cmd.setDefault("dbc", 30);
-        seal_params.decomposition_bit_count = cmd.get<int>("dbc");
-        cout_param("dbc", seal_params.decomposition_bit_count);
+        seal_params.exfield_params.exfield_degree = cmd.get_value_arg<int>("exfieldDegree");
+        seal_params.decomposition_bit_count = cmd.get_value_arg<int>("dbc");
     }
 
     // Use OPRF to eliminate need for noise flooding for sender's security
     auto oprf_type = OprfType::None;
-    cmd.setDefault("oprf", "none");
-    string oprfStr = cmd.get<string>("oprf");
+    auto useOPRF = cmd.get_switch_arg("oprf");
 
-    if (oprfStr == "PK")
+    if (useOPRF)
     {
         oprf_type = OprfType::PK;
-        cout_param("oprf", string("PK"));
-    }
-    else
-    {
-        cout_param("oprf", string("None"));
     }
 
     /*
@@ -545,9 +679,7 @@ void example_slow_batching(oc::CLP& cmd, oc::Channel& recvChl, oc::Channel& send
 
     std::unique_ptr<Receiver> receiver_ptr;
 
-    cmd.setDefault("trec", 1);
-    int recThreads = cmd.get<int>("trec");
-    cout_param("recThreads", recThreads);
+    int recThreads = cmd.get_value_arg<int>("recThreads");
 
     cout << endl;
 
