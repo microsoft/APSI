@@ -7,7 +7,8 @@
 #include "apsi/receiver/receiver.h"
 #include "apsi/apsidefines.h"
 #include "apsi/network/network_utils.h"
-#include "apsi/tools/utils.h"
+#include "apsi/network/channel.h"
+#include "apsi/tools/ec_utils.h"
 #include "apsi/tools/prng.h"
 
 // SEAL
@@ -27,6 +28,7 @@ using namespace seal;
 using namespace seal::util;
 using namespace cuckoo;
 using namespace apsi::tools;
+using namespace apsi::network;
 
 namespace apsi
 {
@@ -83,7 +85,7 @@ namespace apsi
             }
         }
 
-        std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, oc::Channel& chl)
+        std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Channel& chl)
         {
 
             auto qq = preprocess(items, chl);
@@ -140,7 +142,7 @@ namespace apsi
         pair<
             map<uint64_t, vector<Ciphertext> >,
             unique_ptr<CuckooInterface> >
-            Receiver::preprocess(vector<Item> &items, oc::Channel &channel)
+            Receiver::preprocess(vector<Item> &items, Channel &channel)
         {
             if (params_.use_pk_oprf())
             {
@@ -166,8 +168,8 @@ namespace apsi
                 }
 
                 // send the data over the network and prep for the response.
-                channel.asyncSend(move(buff));
-                auto f = channel.asyncRecv(buff);
+                channel.send(buff);
+                auto f = channel.async_receive(buff);
 
                 // compute 1/b so that we can compute (x^ba)^(1/b) = x^a
                 for (u64 i = 0; i < items.size(); ++i)
@@ -235,7 +237,7 @@ namespace apsi
             return { move(ciphers), move(cuckoo) };
         }
 
-        void Receiver::send(const map<uint64_t, vector<Ciphertext> > &query, oc::Channel &channel)
+        void Receiver::send(const map<uint64_t, vector<Ciphertext> > &query, Channel &channel)
         {
             /* Send keys. */
             send_pubkey(public_key_, channel);
@@ -248,10 +250,10 @@ namespace apsi
             }
 
             /* Send query data. */
-            channel.asyncSendCopy(int(query.size()));
+            channel.send(query.size());
             for (map<uint64_t, vector<Ciphertext> >::const_iterator it = query.begin(); it != query.end(); it++)
             {
-                channel.asyncSendCopy(it->first);
+                channel.send(it->first);
 
                 for(auto& c : it->second)
                     send_ciphertext(c, channel);
@@ -441,7 +443,7 @@ namespace apsi
 
 
         std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
-            oc::Channel &channel,
+            Channel &channel,
             const std::vector<int> &table_to_input_map,
             std::vector<Item> &items)
         {
@@ -468,19 +470,20 @@ namespace apsi
             {
                 int split_idx, batch_idx;
                 std::string data, label_data;
-                std::future<void> fut, label_fut;
+                std::future<int> split_fut, batch_fut;
+                std::future<string> data_fut, label_fut;
             };
 
             std::vector<RecvPackage> recvPackages(block_count);
             for (auto& pkg : recvPackages)
             {
-                channel.asyncRecv(pkg.split_idx);
-                channel.asyncRecv(pkg.batch_idx);
-                pkg.fut = channel.asyncRecv(pkg.data);
+                pkg.split_fut = channel.async_receive<int>();
+                pkg.batch_fut = channel.async_receive<int>();
+                pkg.data_fut  = channel.async_receive();
 
                 if (params_.get_label_bit_count())
                 {
-                    pkg.label_fut = channel.asyncRecv(pkg.label_data);
+                    pkg.label_fut = channel.async_receive();
                 }
             }
 
@@ -510,7 +513,9 @@ namespace apsi
                 {
                     auto& pkg = recvPackages[i];
 
-                    pkg.fut.get();
+                    pkg.split_idx = pkg.split_fut.get();
+                    pkg.batch_idx = pkg.batch_fut.get();
+                    pkg.data = pkg.data_fut.get();
                     auto base_idx = pkg.batch_idx * batch_size;
 
                     // recover the sym poly values 
@@ -566,7 +571,7 @@ namespace apsi
 
                     if (has_result && params_.get_label_bit_count())
                     {
-                        pkg.label_fut.get();
+                        pkg.label_data = pkg.label_fut.get();
                         std::stringstream ss(pkg.label_data);
                         //std::cout << pkg.batch_idx << " " << pkg.split_idx << " " << std::endl;
                         // tmp.load(ss);

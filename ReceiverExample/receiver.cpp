@@ -4,11 +4,14 @@
 #include <fstream>
 #include <vector>
 #include <set>
+#include <future>
 
 #include "apsi/apsi.h"
 #include "seal/seal.h"
 
-#include "cryptoTools/Network/IOService.h"
+// Networking
+#include "zmqpp/zmqpp.hpp"
+#include "apsi/network/channel.h"
 
 // Command Line Processor
 #include "clp.h"
@@ -22,6 +25,7 @@ using namespace apsi;
 using namespace apsi::tools;
 using namespace apsi::receiver;
 using namespace apsi::sender;
+using namespace apsi::network;
 using namespace seal::util;
 using namespace seal;
 
@@ -33,14 +37,53 @@ void example_basics();
 void example_update();
 void example_save_db();
 void example_load_db();
-void example_slow_batching(apsi::CLP& cmd, oc::Channel& recvChl, oc::Channel& sendChl);
+void example_slow_batching(CLP& cmd, Channel& recvChl, Channel& sendChl);
 void example_slow_vs_fast();
 void example_remote();
 void example_remote_multiple();
 
+namespace {
+    struct Colors {
+        static const std::string Red;
+        static const std::string Green;
+        static const std::string RedBold;
+        static const std::string GreenBold;
+        static const std::string Reset;
+    };
+
+    const std::string Colors::Red = "\033[31m";
+    const std::string Colors::Green = "\033[32m";
+    const std::string Colors::RedBold = "\033[1;31m";
+    const std::string Colors::GreenBold = "\033[1;32m";
+    const std::string Colors::Reset = "\033[0m";
+}
+
 int round_up_to(int v, int s)
 {
     return (v + s - 1) / s * s;
+}
+
+/**
+ * This only turns on showing colors for Windows.
+ */
+void prepare_console()
+{
+#ifndef _MSC_VER
+    return; // Nothing to do on Linux.
+#else
+
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (hConsole == INVALID_HANDLE_VALUE)
+        return;
+
+    DWORD dwMode = 0;
+    if (!GetConsoleMode(hConsole, &dwMode))
+        return;
+
+    dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    SetConsoleMode(hConsole, dwMode);
+
+#endif
 }
 
 void print_example_banner(string title)
@@ -93,13 +136,14 @@ int main(int argc, char *argv[])
     if (!cmd.parse_args(argc, argv))
         return -1;
 
-    oc::IOService ios;
+    zmqpp::context_t context;
+    Channel clientChl(context);
+    Channel serverChl(context);
 
-    oc::Session clientSession(ios, "127.0.0.1:1212", oc::SessionMode::Client);
-    oc::Session serverSession(ios, "127.0.0.1:1212", oc::SessionMode::Server);
-    oc::Channel clientChl = clientSession.addChannel();
-    oc::Channel serverChl = serverSession.addChannel();
+    serverChl.bind("tcp://localhost:1212");
+    clientChl.connect("tcp://localhost:1212");
 
+    prepare_console();
 
     auto none = true;
     auto fastBatching = cmd.fast(); none &= !fastBatching;
@@ -376,9 +420,8 @@ std::string print(oc::span<u8> s)
 // }
 
 
-void example_slow_batching(CLP& cmd, oc::Channel& recvChl, oc::Channel& sendChl)
+void example_slow_batching(CLP& cmd, Channel& recvChl, Channel& sendChl)
 {
-    oc::setThreadName("receiver_main");
     print_example_banner("Example: Slow batching");
     stop_watch.time_points.clear();
 
@@ -565,7 +608,6 @@ void example_slow_batching(CLP& cmd, oc::Channel& recvChl, oc::Channel& sendChl)
     sender.load_db(s1, labels);
 
     auto thrd = thread([&]() {
-        oc::setThreadName("sender_main");
         sender.query_session(sendChl); 
     });
     recv_stop_watch.set_time_point("receiver start");
@@ -594,9 +636,9 @@ void example_slow_batching(CLP& cmd, oc::Channel& recvChl, oc::Channel& sendChl)
                 //if (l != exp)
                 if(memcmp(intersection.second[i].data(), labels[idx].data(), labels[idx].size()))
                 {
-                    std::cout <<oc::Color::Red << "incorrect label at index: " << i 
+                    std::cout << Colors::Red << "incorrect label at index: " << i 
                         << ". actual: " << print(intersection.second[i])
-                        << ", expected: " << print(labels[i]) << std::endl << oc::ColorDefault;
+                        << ", expected: " << print(labels[i]) << std::endl << Colors::Reset;
                     correct = false;
                 }
             }
@@ -605,7 +647,7 @@ void example_slow_batching(CLP& cmd, oc::Channel& recvChl, oc::Channel& sendChl)
         {
             if (intersection.first[i])
             {
-                cout << oc::Color::Red << "Incorrect result for receiver's item at index: " << i << endl << oc::ColorDefault;
+                cout << Colors::Red << "Incorrect result for receiver's item at index: " << i << endl << Colors::Reset;
                 correct = false;
             }
         }
@@ -616,19 +658,19 @@ void example_slow_batching(CLP& cmd, oc::Channel& recvChl, oc::Channel& sendChl)
     cout << "Intersection results: ";
     
     if (correct)
-        cout << oc::Color::Green << "Correct";
+        cout << Colors::Green << "Correct";
 
     else
-        cout << oc::Color::Red << "Incorrect";
+        cout << Colors::Red << "Incorrect";
     
-    cout << oc::ColorDefault << endl;
+    cout << Colors::Reset << endl;
 
     cout << stop_watch << endl;
     cout << recv_stop_watch << endl;
 
-    cout << "Communication R->S: " << recvChl.getTotalDataSent() / 1024.0 << " KB" << endl;
-    cout << "Communication S->R: " << recvChl.getTotalDataRecv() / 1024.0 << " KB" << endl;
-    cout << "Communication total: " << (recvChl.getTotalDataSent() + recvChl.getTotalDataRecv()) / 1024.0 << " KB" << endl;
+    cout << "Communication R->S: " << recvChl.get_total_data_sent() / 1024.0 << " KB" << endl;
+    cout << "Communication S->R: " << recvChl.get_total_data_received() / 1024.0 << " KB" << endl;
+    cout << "Communication total: " << (recvChl.get_total_data_sent() + recvChl.get_total_data_received()) / 1024.0 << " KB" << endl;
 }
 
 

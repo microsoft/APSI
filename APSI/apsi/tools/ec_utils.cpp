@@ -1,4 +1,4 @@
-#include "apsi/tools/utils.h"
+#include "apsi/tools/ec_utils.h"
 
 #include <FourQ_params.h>
 #include <cstring>

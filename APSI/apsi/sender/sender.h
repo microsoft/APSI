@@ -19,6 +19,7 @@
 #include "apsi/tools/sealcompress.h"
 #include "apsi/tools/matrixview.h"
 #include "apsi/tools/prng.h"
+#include "apsi/network/channel.h"
 
 // SEAL
 #include "seal/memorypoolhandle.h"
@@ -28,8 +29,6 @@
 #include "seal/batchencoder.h"
 #include "seal/evaluator.h"
 
-// CryptoTools
-#include "cryptoTools/Network/IOService.h"
 
 namespace apsi
 {
@@ -98,7 +97,7 @@ namespace apsi
             */
             void load_db(const std::vector<Item> &data, MatrixView<u8> vals = {});
 
-            void query_session(oc::Channel& channel);
+            void query_session(apsi::network::Channel& channel);
 
             void stop();
 
@@ -140,7 +139,7 @@ namespace apsi
             @see compute_dot_product for an explanation of the result.
             */
             void respond(std::vector<std::vector<seal::Ciphertext> > &query,
-                apsi::sender::SenderSessionContext &session_context, oc::Channel &channel);
+                apsi::sender::SenderSessionContext &session_context, apsi::network::Channel &channel);
 
             /**
             Constructs all powers of receiver's items for the specified batch, based on the powers sent from the receiver. For example, if the
@@ -205,7 +204,6 @@ namespace apsi
                 FFieldArray& true_x,
                 const seal::Ciphertext& c,
                 SenderSessionContext& ctx);
-
         };
     }
 }

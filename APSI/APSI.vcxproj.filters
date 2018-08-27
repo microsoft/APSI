@@ -120,7 +120,13 @@
     <ClInclude Include="apsi\tools\aes.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
-    <ClInclude Include="apsi\tools\utils.h">
+    <ClInclude Include="apsi\network\channel.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\ec_utils.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\matrix.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
   </ItemGroup>
@@ -176,13 +182,16 @@
     <ClCompile Include="apsi\ffield\ffield_fast_batch_encoder.cpp">
       <Filter>Source Files\FField</Filter>
     </ClCompile>
-    <ClCompile Include="apsi\tools\utils.cpp">
-      <Filter>Source Files\Tools</Filter>
-    </ClCompile>
     <ClCompile Include="apsi\tools\prng.cpp">
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
     <ClCompile Include="apsi\tools\aes.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\network\channel.cpp">
+      <Filter>Source Files\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\tools\ec_utils.cpp">
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
   </ItemGroup>

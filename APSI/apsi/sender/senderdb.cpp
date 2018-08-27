@@ -10,7 +10,7 @@
 #include "apsi/apsidefines.h"
 #include "apsi/tools/interpolate.h"
 #include "apsi/ffield/ffield_array.h"
-#include "apsi/tools/utils.h"
+#include "apsi/tools/ec_utils.h"
 #include "apsi/tools/prng.h"
 
 #include "seal/evaluator.h"
