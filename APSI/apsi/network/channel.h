@@ -25,6 +25,11 @@ namespace apsi
             Channel();
 
             /**
+            * Create an instance of a Channel with the given context
+            */
+            Channel(const zmqpp::context_t& context);
+
+            /**
             * Destroy an instance of a Channel
             */
             ~Channel();
@@ -59,7 +64,9 @@ namespace apsi
                 if (msg.parts() < 1)
                     throw std::runtime_error("Not enough data");
 
-                result = msg.get<T>(/* part */ 0);
+                const T* pres;
+                msg.get(&pres, /* part */ 0);
+                memcpy(&result, pres, sizeof(T));
                 return result;
             }
 
@@ -67,6 +74,11 @@ namespace apsi
             * Asynchronously receive a buffer.
             */
             std::future<void> async_receive(std::vector<apsi::u8>& buff);
+
+            /**
+            * Asynchronously receive a vector of strings.
+            */
+            std::future<void> async_receive(std::vector<std::string>& buff);
 
             /**
             * Asynchrounously receive a simple POD type.
@@ -114,7 +126,7 @@ namespace apsi
                 throw_if_not_connected();
 
                 zmqpp::message_t msg;
-                msg.add<T>(data);
+                msg.add_raw(&data, sizeof(T));
                 socket_->send(msg);
             }
 
@@ -129,6 +141,11 @@ namespace apsi
             void connect(const std::string& connection_point);
 
             /**
+            * Disconnect from the connection point
+            */
+            void disconnect();
+
+            /**
             * Get the amount of data that has been sent through the channel
             */
             u64 get_total_data_sent() const { return bytes_sent_; }
@@ -137,6 +154,11 @@ namespace apsi
             * Get the amount of data that has been received through the channel
             */
             u64 get_total_data_received() const { return bytes_received_; }
+
+            /**
+            * Indicates whether the channel is connected to the network.
+            */
+            bool is_connected() const { return !end_point_.empty(); }
 
         private:
             u64 bytes_sent_;

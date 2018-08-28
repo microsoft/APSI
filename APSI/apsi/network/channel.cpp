@@ -15,16 +15,24 @@ namespace
 Channel::Channel()
     : bytes_sent_(0),
       bytes_received_(0),
+      end_point_(""),
       socket_(nullptr)
 {
 }
 
+Channel::Channel(const context_t& ctx)
+    : bytes_sent_(0),
+      bytes_received_(0),
+      end_point_("")
+{
+    socket_ = make_unique<socket_t>(ctx, socket_type::pair);
+}
+
 Channel::~Channel()
 {
-    if (nullptr != socket_)
+    if (is_connected())
     {
-        socket_->disconnect(end_point_);
-        socket_ = nullptr;
+        disconnect();
     }
 }
 
@@ -135,7 +143,17 @@ void Channel::send(const vector<string>& data)
 
 future<void> Channel::async_receive(vector<u8>& buff)
 {
-    future ret = async(launch::async, [this, &buff]
+    future<void> ret = async(launch::async, [this, &buff]
+    {
+        receive(buff);
+    });
+
+    return ret;
+}
+
+future<void> Channel::async_receive(vector<string>& buff)
+{
+    future<void> ret = async(launch::async, [this, &buff]
     {
         receive(buff);
     });
@@ -164,7 +182,8 @@ void Channel::bind(const string& end_point)
     throw_if_connected();
 
     end_point_ = end_point;
-    socket_ = make_unique<socket_t>(context_, socket_type::pair);
+    if  (nullptr == socket_)
+        socket_ = make_unique<socket_t>(context_, socket_type::pair);
     socket_->bind(end_point);
 }
 
@@ -173,18 +192,28 @@ void Channel::connect(const string& end_point)
     throw_if_connected();
 
     end_point_ = end_point;
-    socket_ = make_unique<socket_t>(context_, socket_type::pair);
+    if (nullptr == socket_)
+        socket_ = make_unique<socket_t>(context_, socket_type::pair);
     socket_->connect(end_point);
+}
+
+void Channel::disconnect()
+{
+    throw_if_not_connected();
+
+    socket_->close();
+    socket_ = nullptr;
+    end_point_ = "";
 }
 
 void Channel::throw_if_not_connected() const
 {
-    if (socket_ == nullptr)
+    if (!is_connected())
         throw runtime_error("Socket is not connected yet.");
 }
 
 void Channel::throw_if_connected() const
 {
-    if (socket_ != nullptr)
+    if (is_connected())
         throw runtime_error("Socket is already connected");
 }
