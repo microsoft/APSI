@@ -71,7 +71,7 @@ namespace apsi
 
             u64 pow(u64 base, u64 e);
             uint64_t optimal_split(uint64_t x, int base);
-            vector<uint64_t> conversion_to_digits(uint64_t input, int base);
+            std::vector<uint64_t> conversion_to_digits(uint64_t input, int base);
             void compute_dag();
         };
 

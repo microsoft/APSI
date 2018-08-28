@@ -1,6 +1,5 @@
 #include "apsi/network/network_utils.h"
 #include <sstream>
-#include "zmqpp/zmqpp.hpp"
 
 using namespace std;
 using namespace seal;
@@ -40,42 +39,26 @@ namespace apsi
 
     void send_ciphertext(const std::vector<seal::Ciphertext> &ciphers, Channel &channel)
     {
-        // Send the Ciphertext vector as a single message.
-        zmqpp::message_t msg;
-        msg.add(ciphers.size());
-        for (auto& cipher : ciphers)
+        vector<string> cipherstrings(ciphers.size());
+        for (u64 i = 0; i < ciphers.size(); i++)
         {
             stringstream ss;
-            cipher.save(ss);
-            msg.add(ss.str());
+            ciphers[i].save(ss);
+            cipherstrings[i] = ss.str();
         }
 
-        channel.send(msg);
+        channel.send(cipherstrings);
     }
 
     void receive_ciphertext(std::vector<seal::Ciphertext> &ciphers, Channel &channel)
     {
-        size_t size = 0;
+        vector<string> cipherstrings;
+        channel.receive(cipherstrings);
 
-        // Vector is received as a single message
-        zmqpp::message_t msg;
-        channel.receive(msg);
-
-        if (msg.parts() < 1)
-            throw std::runtime_error("Should have at least size");
-
-        // Size is first part
-        size = msg.get<size_t>(0);
-
-        if (msg.parts() < (size + 1))
-            throw std::runtime_error("Not enough parts.");
-
-        // Each additional part is a ciphertext
-        ciphers.resize(size);
-        for (int i = 0; i < size; i++)
+        ciphers.resize(cipherstrings.size());
+        for (u64 i = 0; i < cipherstrings.size(); i++)
         {
-            string str = msg.get(i + 1);
-            stringstream ss(str);
+            stringstream ss(cipherstrings[i]);
             ciphers[i].load(ss);
         }
     }
@@ -97,39 +80,27 @@ namespace apsi
 
     void send_compressed_ciphertext(const CiphertextCompressor &compressor, const std::vector<seal::Ciphertext> &ciphers, Channel &channel)
     {
-        // Vector will be sent as a single message
-        zmqpp::message_t msg;
-        msg.add(ciphers.size());
+        vector<string> cipherstrings(ciphers.size());
 
-        for (auto& cipher : ciphers)
+        for (u64 i = 0; i < ciphers.size(); i++)
         {
             stringstream ss;
-            compressor.compressed_save(cipher, ss);
-            msg.add(ss.str());
+            compressor.compressed_save(ciphers[i], ss);
+            cipherstrings[i] = ss.str();
         }
 
-        channel.send(msg);
+        channel.send(cipherstrings);
     }
 
     void receive_compressed_ciphertext(const CiphertextCompressor &compressor, std::vector<seal::Ciphertext> &ciphers, Channel &channel)
     {
-        // Vector is received as a single message
-        zmqpp::message_t msg;
-        channel.receive(msg);
+        vector<string> cipherstrings;
+        channel.receive(cipherstrings);
 
-        if (msg.parts() < 1)
-            throw std::runtime_error("Should have at least size");
-
-        size_t size = msg.get<size_t>(0);
-
-        if (msg.parts() < (size + 1))
-            throw std::runtime_error("Not enough parts");
-
-        ciphers.resize(size);
-        for (int i = 0; i < size; i++)
+        ciphers.resize(cipherstrings.size());
+        for (u64 i = 0; i < cipherstrings.size(); i++)
         {
-            string str = msg.get(i + 1);
-            stringstream ss(str);
+            stringstream ss(cipherstrings[i]);
             compressor.compressed_load(ss, ciphers[i]);
         }
     }
