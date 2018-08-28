@@ -28,6 +28,8 @@ namespace APSITests
         CPPUNIT_TEST(SendStringVectorAsyncTest);
         CPPUNIT_TEST(SendBufferTest);
         CPPUNIT_TEST(SendBufferAsyncTest);
+        CPPUNIT_TEST(ThrowWithoutConnectTest);
+        CPPUNIT_TEST(DataCountsTest);
 
         CPPUNIT_TEST_SUITE_END();
 
@@ -45,6 +47,8 @@ namespace APSITests
         void SendStringVectorAsyncTest();
         void SendBufferTest();
         void SendBufferAsyncTest();
+        void ThrowWithoutConnectTest();
+        void DataCountsTest();
 
         virtual void setUp();
 

@@ -1,4 +1,5 @@
 #include "channel_tests.h"
+#include "utils.h"
 
 using namespace APSITests;
 using namespace std;
@@ -232,6 +233,110 @@ void ChannelTests::SendBufferAsyncTest()
     {
         CPPUNIT_ASSERT_EQUAL((apsi::u8)(i % 0xFF), result[i]);
     }
+}
+
+void ChannelTests::ThrowWithoutConnectTest()
+{
+    Channel mychannel(ctx_);
+    int result;
+    string str;
+    vector<u8> buff;
+    vector<string> buff2;
+
+    // Receives
+    ASSERT_THROWS(result = mychannel.receive<int>());
+    ASSERT_THROWS(mychannel.receive(str));
+    ASSERT_THROWS(mychannel.receive(buff));
+    ASSERT_THROWS(mychannel.receive(buff2));
+
+    // Sends
+    ASSERT_THROWS(mychannel.send(result));
+    ASSERT_THROWS(mychannel.send(str));
+    ASSERT_THROWS(mychannel.send(buff));
+    ASSERT_THROWS(mychannel.send(buff2));
+}
+
+void ChannelTests::DataCountsTest()
+{
+    Channel svr(ctx_);
+    Channel clt(ctx_);
+
+    svr.bind("tcp://*:5554");
+    clt.connect("tcp://localhost:5554");
+
+    thread serverth([this, &svr]
+    {
+        vector<u8> data1;
+        InitU8Vector(data1, 1000);
+
+        // This should be 1000 bytes
+        svr.send(data1);
+
+        vector<string> data2;
+        InitStringVector(data2, 100);
+
+        // This should be 190 bytes
+        svr.send(data2);
+
+        // 4 bytes
+        u32 data3 = 10;
+        svr.send(data3);
+
+        // 16 bytes
+        block data4 = _mm_set_epi64x(1, 1);
+        svr.send(data4);
+
+        string data5 = "Hello world!";
+        svr.send(data5);
+
+        svr.receive(data1);
+        svr.receive(data2);
+        data3 = svr.receive<u32>();
+        data4 = svr.receive<block>();
+        svr.receive(data5);
+    });
+
+    vector<u8> data1;
+    vector<string> data2;
+    u32 data3;
+    block data4;
+    string data5;
+
+    CPPUNIT_ASSERT_EQUAL((u64)0, clt.get_total_data_received());
+    CPPUNIT_ASSERT_EQUAL((u64)0, clt.get_total_data_sent());
+
+    clt.receive(data1);
+    CPPUNIT_ASSERT_EQUAL((u64)1000, clt.get_total_data_received());
+
+    clt.receive(data2);
+    CPPUNIT_ASSERT_EQUAL((u64)1190, clt.get_total_data_received());
+
+    data3 = clt.receive<u32>();
+    CPPUNIT_ASSERT_EQUAL((u64)1194, clt.get_total_data_received());
+
+    data4 = clt.receive<block>();
+    CPPUNIT_ASSERT_EQUAL((u64)1210, clt.get_total_data_received());
+
+    clt.receive(data5);
+    CPPUNIT_ASSERT_EQUAL((u64)1222, clt.get_total_data_received());
+    CPPUNIT_ASSERT_EQUAL((u64)1222, svr.get_total_data_sent());
+
+    clt.send(data1);
+    CPPUNIT_ASSERT_EQUAL((u64)1000, clt.get_total_data_sent());
+
+    clt.send(data2);
+    CPPUNIT_ASSERT_EQUAL((u64)1190, clt.get_total_data_sent());
+
+    clt.send(data3);
+    CPPUNIT_ASSERT_EQUAL((u64)1194, clt.get_total_data_sent());
+
+    clt.send(data4);
+    CPPUNIT_ASSERT_EQUAL((u64)1210, clt.get_total_data_sent());
+
+    clt.send(data5);
+    CPPUNIT_ASSERT_EQUAL((u64)1222, clt.get_total_data_sent());
+
+    serverth.join();
 }
 
 void ChannelTests::InitStringVector(vector<string>& vec, int size)

@@ -136,8 +136,10 @@ int main(int argc, char *argv[])
     if (!cmd.parse_args(argc, argv))
         return -1;
 
-    Channel clientChl;
-    Channel serverChl;
+    zmqpp::context_t context;
+
+    Channel clientChl(context);
+    Channel serverChl(context);
 
     serverChl.bind("tcp://*:1212");
     clientChl.connect("tcp://localhost:1212");

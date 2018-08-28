@@ -20,9 +20,9 @@ namespace apsi
         {
         public:
             /**
-            * Create an instance of a Channel
+            * A channel should always be initialized with a context.
             */
-            Channel();
+            Channel() = delete;
 
             /**
             * Create an instance of a Channel with the given context
@@ -57,16 +57,20 @@ namespace apsi
             typename std::enable_if<std::is_pod<T>::value, T>::type
                 receive()
             {
+                throw_if_not_connected();
 
                 T result = {};
                 zmqpp::message_t msg;
-                socket_->receive(msg);
+                socket_.receive(msg);
                 if (msg.parts() < 1)
                     throw std::runtime_error("Not enough data");
 
                 const T* pres;
                 msg.get(&pres, /* part */ 0);
                 memcpy(&result, pres, sizeof(T));
+
+                bytes_received_ += sizeof(T);
+
                 return result;
             }
 
@@ -87,6 +91,8 @@ namespace apsi
             typename std::enable_if<std::is_pod<T>::value, std::future<T>>::type
                 async_receive()
             {
+                throw_if_not_connected();
+
                 std::future<T> future = std::async(std::launch::async, [this]
                 {
                     T result = receive<T>();
@@ -127,7 +133,8 @@ namespace apsi
 
                 zmqpp::message_t msg;
                 msg.add_raw(&data, sizeof(T));
-                socket_->send(msg);
+                socket_.send(msg);
+                bytes_sent_ += sizeof(T);
             }
 
             /**
@@ -164,7 +171,7 @@ namespace apsi
             u64 bytes_sent_;
             u64 bytes_received_;
 
-            std::unique_ptr<zmqpp::socket_t> socket_;
+            zmqpp::socket_t socket_;
             std::string end_point_;
 
             void throw_if_not_connected() const;
