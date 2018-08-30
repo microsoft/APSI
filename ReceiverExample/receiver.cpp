@@ -4,7 +4,6 @@
 #include <fstream>
 #include <vector>
 #include <set>
-#include <future>
 
 #include "apsi/apsi.h"
 #include "seal/seal.h"
