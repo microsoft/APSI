@@ -13,7 +13,7 @@ namespace apsi
         {
             throw invalid_argument("encrypted is not valid for the encryption parameters");
         }
-        if(encrypted.is_ntt_transformed())
+        if(encrypted.is_ntt_form())
         {
             throw invalid_argument(" cannot be NTT transformed");
         }
@@ -39,7 +39,7 @@ namespace apsi
         {
             throw invalid_argument("encrypted is not mod switched to lowest level");
         }
-        if(encrypted.is_ntt_transformed())
+        if(encrypted.is_ntt_form())
         {
             throw invalid_argument(" cannot be NTT transformed");
         }
@@ -101,7 +101,7 @@ namespace apsi
         {
             throw invalid_argument("destination is not mod switched to lowest level");
         }
-        if(destination.is_ntt_transformed())
+        if(destination.is_ntt_form())
         {
             throw invalid_argument("destination cannot be NTT transformed");
         }

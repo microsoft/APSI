@@ -23,7 +23,7 @@
 #include "seal/decryptor.h"
 #include "seal/publickey.h"
 #include "seal/secretkey.h"
-#include "seal/evaluationkeys.h"
+#include "seal/relinkeys.h"
 #include "seal/batchencoder.h"
 
 // CryptoTools
@@ -160,9 +160,9 @@ namespace apsi
                 return public_key_;
             }
 
-            const seal::EvaluationKeys &evaluation_keys() const
+            const seal::RelinKeys &relin_keys() const
             {
-                return evaluation_keys_;
+                return relin_keys_;
             }
 
             const seal::SecretKey& secret_key() const
@@ -191,11 +191,9 @@ namespace apsi
 
             std::unique_ptr<seal::Decryptor> decryptor_;
 
-            seal::EvaluationKeys evaluation_keys_;
+            seal::RelinKeys relin_keys_;
 
             std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder_;
-
-            std::unique_ptr<seal::BatchEncoder> batch_encoder_;
 
             int slot_count_;
 

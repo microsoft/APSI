@@ -25,7 +25,6 @@
 // SEAL
 #include "seal/plaintext.h"
 #include "seal/evaluator.h"
-#include "seal/batchencoder.h"
 
 
 namespace apsi
@@ -133,7 +132,6 @@ namespace apsi
                 SenderThreadContext &th_context,
                 std::shared_ptr<seal::SEALContext> seal_context,
                 std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<seal::BatchEncoder> batch_encoder,
                 std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
                 DBInterpolationCache &cache,
                 const PSIParams &params);
@@ -234,7 +232,6 @@ namespace apsi
             void batched_randomized_symmetric_polys(
                 SenderThreadContext &th_context,
                 std::shared_ptr<seal::Evaluator> evaluator, 
-                std::shared_ptr<seal::BatchEncoder> batch_encoder,
                 std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
                 int thread_count);
 
@@ -242,7 +239,6 @@ namespace apsi
                 SenderThreadContext& th_context,
                 int thread_count,
                 std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<seal::BatchEncoder> batch_encoder,
                 std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder
                 );
 

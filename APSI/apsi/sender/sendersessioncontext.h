@@ -8,7 +8,7 @@
 #include "seal/context.h"
 #include "seal/publickey.h"
 #include "seal/secretkey.h"
-#include "seal/evaluationkeys.h"
+#include "seal/relinkeys.h"
 #include "seal/encryptor.h"
 #include "seal/decryptor.h"
 
@@ -25,10 +25,10 @@ namespace apsi
 
         public:
             SenderSessionContext(std::shared_ptr<seal::SEALContext> context, const seal::PublicKey &pub_key, 
-                const seal::EvaluationKeys &eval_keys) : 
+                const seal::RelinKeys &relin_keys) : 
                 seal_context_(std::move(context)), 
                 public_key_(pub_key), 
-                evaluation_keys_(eval_keys)
+                relin_keys_(relin_keys)
             {
                 encryptor_.reset(new seal::Encryptor(seal_context_, public_key_));
             }
@@ -44,9 +44,9 @@ namespace apsi
                 encryptor_.reset(new seal::Encryptor(seal_context_, public_key_));
             }
 
-            void set_evaluation_keys(const seal::EvaluationKeys &evaluation_keys)
+            void set_relin_keys(const seal::RelinKeys &relin_keys)
             {
-                evaluation_keys_ = evaluation_keys;
+                relin_keys_ = relin_keys;
             }
 
             /**
@@ -77,7 +77,7 @@ namespace apsi
 
             std::shared_ptr<seal::Decryptor> decryptor_;
 
-            seal::EvaluationKeys evaluation_keys_;
+            seal::RelinKeys relin_keys_;
         };
     }
 }

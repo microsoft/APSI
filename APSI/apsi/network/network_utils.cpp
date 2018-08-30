@@ -87,14 +87,14 @@ namespace apsi
 			receive_compressed_ciphertext(compressor, ciphers[i], channel);
 	}
 
-	void send_evalkeys(const seal::EvaluationKeys &keys, Channel &channel)
+	void send_relinkeys(const seal::RelinKeys &keys, Channel &channel)
 	{
 		stringstream ss;
 		keys.save(ss);
 		channel.asyncSend(ss.str());
 	}
 
-	void receive_evalkeys(seal::EvaluationKeys &keys, Channel &channel)
+	void receive_relinkeys(seal::RelinKeys &keys, Channel &channel)
 	{
 		string buff;
 		channel.recv(buff);
