@@ -4,13 +4,6 @@
 #include "cppunit/extensions/HelperMacros.h"
 #include "apsi/network/channel.h"
 
-//namespace apsi
-//{
-//    namespace network
-//    {
-//        class Channel;
-//    }
-//}
 
 namespace APSITests
 {
@@ -28,6 +21,10 @@ namespace APSITests
         CPPUNIT_TEST(SendStringVectorAsyncTest);
         CPPUNIT_TEST(SendBufferTest);
         CPPUNIT_TEST(SendBufferAsyncTest);
+        CPPUNIT_TEST(SendResultPackageTest);
+        CPPUNIT_TEST(SendResultPackageAsyncTest);
+        CPPUNIT_TEST(ThrowWithoutConnectTest);
+        CPPUNIT_TEST(DataCountsTest);
 
         CPPUNIT_TEST_SUITE_END();
 
@@ -45,6 +42,10 @@ namespace APSITests
         void SendStringVectorAsyncTest();
         void SendBufferTest();
         void SendBufferAsyncTest();
+        void SendResultPackageTest();
+        void SendResultPackageAsyncTest();
+        void ThrowWithoutConnectTest();
+        void DataCountsTest();
 
         virtual void setUp();
 

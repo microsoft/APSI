@@ -2,12 +2,18 @@
 
 #include <vector>
 #include <future>
+#include <thread>
+#include <mutex>
+
 #include "apsi/apsidefines.h"
+#include "apsi/tools/threadpool.h"
 #include "zmqpp/zmqpp.hpp"
 
 
 namespace apsi
 {
+    struct ResultPackage;
+
     namespace network
     {
         /**
@@ -20,9 +26,9 @@ namespace apsi
         {
         public:
             /**
-            * Create an instance of a Channel
+            * A channel should always be initialized with a context.
             */
-            Channel();
+            Channel() = delete;
 
             /**
             * Create an instance of a Channel with the given context
@@ -51,23 +57,31 @@ namespace apsi
             void receive(std::vector<std::string>& data);
 
             /**
+            * Receive a ResultPackage structure
+            */
+            void receive(apsi::ResultPackage& pkg);
+
+            /**
             * Receive a simple POD type.
             */
             template<typename T>
-            typename std::enable_if<std::is_pod<T>::value, T>::type
-                receive()
+            typename std::enable_if<std::is_pod<T>::value, void>::type
+                receive(T& data)
             {
+                throw_if_not_connected();
 
-                T result = {};
+                data = {};
                 zmqpp::message_t msg;
-                socket_->receive(msg);
+                receive_message(msg);
+
                 if (msg.parts() < 1)
                     throw std::runtime_error("Not enough data");
 
                 const T* pres;
                 msg.get(&pres, /* part */ 0);
-                memcpy(&result, pres, sizeof(T));
-                return result;
+                memcpy(&data, pres, sizeof(T));
+
+                bytes_received_ += sizeof(T);
             }
 
             /**
@@ -81,25 +95,31 @@ namespace apsi
             std::future<void> async_receive(std::vector<std::string>& buff);
 
             /**
+            * Asynchronously receive a ResultPackage structure
+            */
+            std::future<void> async_receive(apsi::ResultPackage& pkg);
+
+            /**
             * Asynchrounously receive a simple POD type.
             */
             template<typename T>
-            typename std::enable_if<std::is_pod<T>::value, std::future<T>>::type
-                async_receive()
+            typename std::enable_if<std::is_pod<T>::value, std::future<void>>::type
+                async_receive(T& data)
             {
-                std::future<T> future = std::async(std::launch::async, [this]
+                throw_if_not_connected();
+
+                std::future<void> ret = thread_pool_.enqueue([this, &data]
                 {
-                    T result = receive<T>();
-                    return result;
+                    receive<T>(data);
                 });
 
-                return future;
+                return ret;
             }
 
             /**
             * Asynchronously receive a string.
             */
-            std::future<std::string> async_receive();
+            std::future<void> async_receive(std::string& str);
 
             /**
             * Send the contents of the buffer. A copy of the data is made.
@@ -112,9 +132,14 @@ namespace apsi
             void send(const std::string& str);
 
             /**
-            * Send a vector of strings.
+            * Send a vector of strings. A copy of the data is made.
             */
             void send(const std::vector<std::string>& data);
+
+            /**
+            * Send a ResultPackage structure
+            */
+            void send(const apsi::ResultPackage& pkg);
 
             /**
             * Send a simple POD type.
@@ -127,7 +152,8 @@ namespace apsi
 
                 zmqpp::message_t msg;
                 msg.add_raw(&data, sizeof(T));
-                socket_->send(msg);
+                send_message(msg);
+                bytes_sent_ += sizeof(T);
             }
 
             /**
@@ -164,11 +190,17 @@ namespace apsi
             u64 bytes_sent_;
             u64 bytes_received_;
 
-            std::unique_ptr<zmqpp::socket_t> socket_;
+            zmqpp::socket_t socket_;
             std::string end_point_;
+
+            ThreadPool thread_pool_;
+            std::mutex receive_mutex_;
+            std::mutex send_mutex_;
 
             void throw_if_not_connected() const;
             void throw_if_connected() const;
+            void receive_message(zmqpp::message_t& msg);
+            void send_message(zmqpp::message_t& msg);
         };
     }
 }

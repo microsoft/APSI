@@ -153,6 +153,7 @@
     <ClInclude Include="apsi\plaintextarith.h" />
     <ClInclude Include="apsi\psiparams.h" />
     <ClInclude Include="apsi\Receiver\receiver.h" />
+    <ClInclude Include="apsi\result_package.h" />
     <ClInclude Include="apsi\Sender\sender.h" />
     <ClInclude Include="apsi\Sender\senderdb.h" />
     <ClInclude Include="apsi\Sender\sendersessioncontext.h" />

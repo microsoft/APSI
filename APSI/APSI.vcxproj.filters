@@ -129,6 +129,9 @@
     <ClInclude Include="apsi\tools\matrix.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
+    <ClInclude Include="apsi\result_package.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp">

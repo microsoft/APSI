@@ -10,6 +10,7 @@
 #include "apsi/network/channel.h"
 #include "apsi/tools/ec_utils.h"
 #include "apsi/tools/prng.h"
+#include "apsi/result_package.h"
 
 // SEAL
 #include "seal/util/common.h"
@@ -466,25 +467,10 @@ namespace apsi
                 block_count = num_of_splits * num_of_batches,
                 batch_size = slot_count_;
 
-            struct RecvPackage
-            {
-                int split_idx, batch_idx;
-                std::string data, label_data;
-                std::future<int> split_fut, batch_fut;
-                std::future<string> data_fut, label_fut;
-            };
-
-            std::vector<RecvPackage> recvPackages(block_count);
+            std::vector<std::pair<ResultPackage, future<void>>> recvPackages(block_count);
             for (auto& pkg : recvPackages)
             {
-                pkg.split_fut = channel.async_receive<int>();
-                pkg.batch_fut = channel.async_receive<int>();
-                pkg.data_fut  = channel.async_receive();
-
-                if (params_.get_label_bit_count())
-                {
-                    pkg.label_fut = channel.async_receive();
-                }
+                pkg.second = channel.async_receive(pkg.first);
             }
 
             auto numThreads = thread_count_;
@@ -513,14 +499,12 @@ namespace apsi
                 {
                     auto& pkg = recvPackages[i];
 
-                    pkg.split_idx = pkg.split_fut.get();
-                    pkg.batch_idx = pkg.batch_fut.get();
-                    pkg.data = pkg.data_fut.get();
-                    auto base_idx = pkg.batch_idx * batch_size;
+                    pkg.second.get();
+                    auto base_idx = pkg.first.batch_idx * batch_size;
 
                     // recover the sym poly values 
                     has_result = false;
-                    stringstream ss(pkg.data);
+                    stringstream ss(pkg.first.data);
                     compressor_->compressed_load(ss, tmp);
                     // tmp.load(ss);
 
@@ -571,8 +555,8 @@ namespace apsi
 
                     if (has_result && params_.get_label_bit_count())
                     {
-                        pkg.label_data = pkg.label_fut.get();
-                        std::stringstream ss(pkg.label_data);
+                        std::stringstream ss(pkg.first.label_data);
+
                         //std::cout << pkg.batch_idx << " " << pkg.split_idx << " " << std::endl;
                         // tmp.load(ss);
                         compressor_->compressed_load(ss, tmp);
