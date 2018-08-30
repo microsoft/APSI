@@ -70,7 +70,6 @@ namespace apsi
             {
                 throw_if_not_connected();
 
-                data = {};
                 zmqpp::message_t msg;
                 receive_message(msg);
 
