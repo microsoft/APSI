@@ -1,5 +1,5 @@
 #include "channel.h"
-//#include "zmqpp/zmqpp.hpp"
+#include "apsi/result_package.h"
 
 using namespace std;
 using namespace apsi;
@@ -11,7 +11,8 @@ Channel::Channel(const context_t& ctx)
     : bytes_sent_(0),
       bytes_received_(0),
       end_point_(""),
-      socket_(ctx, socket_type::pair)
+      socket_(ctx, socket_type::pair),
+      thread_pool_(1)
 {
 }
 
@@ -134,11 +135,50 @@ void Channel::send(const vector<string>& data)
     socket_.send(msg);
 }
 
+void Channel::receive(ResultPackage& pkg)
+{
+    throw_if_not_connected();
+
+    // Use a single message
+    message_t msg;
+    socket_.receive(msg);
+
+    if (msg.parts() < 4)
+    {
+        stringstream ss;
+        ss << "Should have 4 parts, has " << msg.parts();
+        throw runtime_error(ss.str());
+    }
+
+    pkg.split_idx  = msg.get<int>(/* part */ 0);
+    pkg.batch_idx  = msg.get<int>(/* part */ 1);
+    pkg.data       = msg.get(/* part */ 2);
+    pkg.label_data = msg.get(/* part */ 3);
+
+    bytes_received_ += pkg.size();
+}
+
+void Channel::send(const ResultPackage& pkg)
+{
+    throw_if_not_connected();
+
+    message_t msg;
+
+    msg.add(pkg.split_idx);
+    msg.add(pkg.batch_idx);
+    msg.add(pkg.data);
+    msg.add(pkg.label_data);
+
+    socket_.send(msg);
+
+    bytes_sent_ += pkg.size();
+}
+
 future<void> Channel::async_receive(vector<u8>& buff)
 {
     throw_if_not_connected();
 
-    future<void> ret = async(launch::async, [this, &buff]
+    future<void> ret = thread_pool_.push([this, &buff](int)
     {
         receive(buff);
     });
@@ -150,7 +190,7 @@ future<void> Channel::async_receive(vector<string>& buff)
 {
     throw_if_not_connected();
 
-    future<void> ret = async(launch::async, [this, &buff]
+    future<void> ret = thread_pool_.push([this, &buff](int)
     {
         receive(buff);
     });
@@ -162,11 +202,23 @@ future<string> Channel::async_receive()
 {
     throw_if_not_connected();
 
-    future<string> ret = async(launch::async, [this]
+    future<string> ret = thread_pool_.push([this](int)
     {
         string result;
         receive(result);
         return result;
+    });
+
+    return ret;
+}
+
+future<void> Channel::async_receive(ResultPackage& pkg)
+{
+    throw_if_not_connected();
+
+    future<void> ret = thread_pool_.push([this, &pkg](int)
+    {
+        receive(pkg);
     });
 
     return ret;

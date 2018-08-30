@@ -1,5 +1,7 @@
 #include "channel_tests.h"
 #include "utils.h"
+#include <limits>
+#include "apsi/result_package.h"
 
 using namespace APSITests;
 using namespace std;
@@ -233,6 +235,85 @@ void ChannelTests::SendBufferAsyncTest()
     {
         CPPUNIT_ASSERT_EQUAL((apsi::u8)(i % 0xFF), result[i]);
     }
+}
+
+void ChannelTests::SendResultPackageTest()
+{
+    thread serverth([this]
+    {
+        ResultPackage pkg;
+        pkg.split_idx = 1;
+        pkg.batch_idx = 2;
+        pkg.data = "This is data";
+        pkg.label_data = "Not label data";
+
+        server_.send(pkg);
+
+        ResultPackage pkg2;
+        pkg2.split_idx = 3;
+        pkg2.batch_idx = 4;
+        pkg2.data = "small data";
+        pkg2.label_data = "";
+
+        server_.send(pkg2);
+    });
+
+    ResultPackage result;
+    client_.receive(result);
+
+    CPPUNIT_ASSERT_EQUAL(1, result.split_idx);
+    CPPUNIT_ASSERT_EQUAL(2, result.batch_idx);
+    CPPUNIT_ASSERT(result.data == "This is data");
+    CPPUNIT_ASSERT(result.label_data == "Not label data");
+
+    ResultPackage result2;
+    client_.receive(result2);
+
+    CPPUNIT_ASSERT_EQUAL(3, result2.split_idx);
+    CPPUNIT_ASSERT_EQUAL(4, result2.batch_idx);
+    CPPUNIT_ASSERT(result2.data == "small data");
+    CPPUNIT_ASSERT(result2.label_data.empty());
+
+    serverth.join();
+}
+
+void ChannelTests::SendResultPackageAsyncTest()
+{
+    thread serverth([this]
+    {
+        ResultPackage pkg;
+
+        pkg.split_idx = 5;
+        pkg.batch_idx = 6;
+        pkg.data = "data 1";
+        pkg.label_data = "label 1";
+
+        this_thread::sleep_for(50ms);
+
+        server_.send(pkg);
+    });
+
+    ResultPackage result;
+    result.batch_idx = 0;
+    result.split_idx = 0;
+
+    future<void> fut = client_.async_receive(result);
+
+    // At this point nothing should have been received.
+    CPPUNIT_ASSERT_EQUAL(0, result.split_idx);
+    CPPUNIT_ASSERT_EQUAL(0, result.batch_idx);
+    CPPUNIT_ASSERT(result.data.empty());
+    CPPUNIT_ASSERT(result.data.empty());
+
+    fut.get();
+
+    // Now data should be there.
+    CPPUNIT_ASSERT_EQUAL(5, result.split_idx);
+    CPPUNIT_ASSERT_EQUAL(6, result.batch_idx);
+    CPPUNIT_ASSERT(result.data == "data 1");
+    CPPUNIT_ASSERT(result.label_data == "label 1");
+
+    serverth.join();
 }
 
 void ChannelTests::ThrowWithoutConnectTest()

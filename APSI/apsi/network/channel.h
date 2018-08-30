@@ -2,12 +2,16 @@
 
 #include <vector>
 #include <future>
+#include <thread>
 #include "apsi/apsidefines.h"
 #include "zmqpp/zmqpp.hpp"
+#include "ctpl_stl.h"
 
 
 namespace apsi
 {
+    struct ResultPackage;
+
     namespace network
     {
         /**
@@ -51,6 +55,11 @@ namespace apsi
             void receive(std::vector<std::string>& data);
 
             /**
+            * Receive a ResultPackage structure
+            */
+            void receive(apsi::ResultPackage& pkg);
+
+            /**
             * Receive a simple POD type.
             */
             template<typename T>
@@ -85,6 +94,11 @@ namespace apsi
             std::future<void> async_receive(std::vector<std::string>& buff);
 
             /**
+            * Asynchronously receive a ResultPackage structure
+            */
+            std::future<void> async_receive(apsi::ResultPackage& pkg);
+
+            /**
             * Asynchrounously receive a simple POD type.
             */
             template<typename T>
@@ -93,13 +107,13 @@ namespace apsi
             {
                 throw_if_not_connected();
 
-                std::future<T> future = std::async(std::launch::async, [this]
+                std::future<T> ret = thread_pool_.push([this](int)
                 {
                     T result = receive<T>();
                     return result;
                 });
 
-                return future;
+                return ret;
             }
 
             /**
@@ -121,6 +135,11 @@ namespace apsi
             * Send a vector of strings.
             */
             void send(const std::vector<std::string>& data);
+
+            /**
+            * Send a ResultPackage structure
+            */
+            void send(const apsi::ResultPackage& pkg);
 
             /**
             * Send a simple POD type.
@@ -173,6 +192,8 @@ namespace apsi
 
             zmqpp::socket_t socket_;
             std::string end_point_;
+
+            ctpl::thread_pool thread_pool_;
 
             void throw_if_not_connected() const;
             void throw_if_connected() const;
