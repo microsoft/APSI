@@ -210,15 +210,13 @@ future<void> Channel::async_receive(vector<string>& buff)
     return ret;
 }
 
-future<string> Channel::async_receive()
+future<void> Channel::async_receive(string& str)
 {
     throw_if_not_connected();
 
-    future<string> ret = thread_pool_.push([this](int)
+    future<void> ret = thread_pool_.push([this, &str](int)
     {
-        string result;
-        receive(result);
-        return result;
+        receive(str);
     });
 
     return ret;

@@ -119,7 +119,7 @@ namespace apsi
             /**
             * Asynchronously receive a string.
             */
-            std::future<std::string> async_receive();
+            std::future<void> async_receive(std::string& str);
 
             /**
             * Send the contents of the buffer. A copy of the data is made.
@@ -132,7 +132,7 @@ namespace apsi
             void send(const std::string& str);
 
             /**
-            * Send a vector of strings.
+            * Send a vector of strings. A copy of the data is made.
             */
             void send(const std::vector<std::string>& data);
 

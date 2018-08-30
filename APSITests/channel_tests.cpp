@@ -136,12 +136,17 @@ void ChannelTests::SendStringAsyncTest()
     thread serverth([this]
     {
         string hello = "Hello again";
+        this_thread::sleep_for(50ms);
         server_.send(hello);
     });
 
-    auto fut = client_.async_receive();
+    string received = "";
+    auto fut = client_.async_receive(received);
+
+    CPPUNIT_ASSERT(received == "");
+
     string expected = "Hello again";
-    string received = fut.get();
+    fut.get();
 
     serverth.join();
 
