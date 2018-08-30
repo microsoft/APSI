@@ -6,8 +6,8 @@
 #include <mutex>
 
 #include "apsi/apsidefines.h"
+#include "apsi/tools/threadpool.h"
 #include "zmqpp/zmqpp.hpp"
-#include "ctpl_stl.h"
 
 
 namespace apsi
@@ -108,7 +108,7 @@ namespace apsi
             {
                 throw_if_not_connected();
 
-                std::future<void> ret = thread_pool_.push([this, &data](int)
+                std::future<void> ret = thread_pool_.enqueue([this, &data]
                 {
                     receive<T>(data);
                 });
@@ -193,7 +193,7 @@ namespace apsi
             zmqpp::socket_t socket_;
             std::string end_point_;
 
-            ctpl::thread_pool thread_pool_;
+            ThreadPool thread_pool_;
             std::mutex receive_mutex_;
             std::mutex send_mutex_;
 

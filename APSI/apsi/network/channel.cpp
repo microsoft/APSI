@@ -190,7 +190,7 @@ future<void> Channel::async_receive(vector<u8>& buff)
 {
     throw_if_not_connected();
 
-    future<void> ret = thread_pool_.push([this, &buff](int)
+    future<void> ret = thread_pool_.enqueue([this, &buff]
     {
         receive(buff);
     });
@@ -202,7 +202,7 @@ future<void> Channel::async_receive(vector<string>& buff)
 {
     throw_if_not_connected();
 
-    future<void> ret = thread_pool_.push([this, &buff](int)
+    future<void> ret = thread_pool_.enqueue([this, &buff]
     {
         receive(buff);
     });
@@ -214,7 +214,7 @@ future<void> Channel::async_receive(string& str)
 {
     throw_if_not_connected();
 
-    future<void> ret = thread_pool_.push([this, &str](int)
+    future<void> ret = thread_pool_.enqueue([this, &str]
     {
         receive(str);
     });
@@ -226,7 +226,7 @@ future<void> Channel::async_receive(ResultPackage& pkg)
 {
     throw_if_not_connected();
 
-    future<void> ret = thread_pool_.push([this, &pkg](int)
+    future<void> ret = thread_pool_.enqueue([this, &pkg]
     {
         receive(pkg);
     });

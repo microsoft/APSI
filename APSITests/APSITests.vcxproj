@@ -107,7 +107,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;c:\progs\libs\cppunit\include;c:\progs\libs\SEAL\include;c:\progs\libs\Cuckoo\include;c:\progs\libs\GSL;c:\progs\libs\flint2\include;c:\progs\libs\cryptoTools\include;c:\progs\libs\boost-1.65.1\include;c:\progs\libs\mpir\include;c:\progs\libs\mpfr\include;c:\Progs\Libs\cryptopp700\include;c:\Progs\Libs\libzmqpp\include;c:\Progs\Libs\libzmq\include;c:\Progs\Libs\CTPL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;c:\progs\libs\cppunit\include;c:\progs\libs\SEAL\include;c:\progs\libs\Cuckoo\include;c:\progs\libs\GSL;c:\progs\libs\flint2\include;c:\progs\libs\cryptoTools\include;c:\progs\libs\boost-1.65.1\include;c:\progs\libs\mpir\include;c:\progs\libs\mpfr\include;c:\Progs\Libs\cryptopp700\include;c:\Progs\Libs\libzmqpp\include;c:\Progs\Libs\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions);_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK</PreprocessorDefinitions>
       <UseFullPaths>true</UseFullPaths>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -143,7 +143,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;c:\progs\libs\cppunit\include;c:\progs\libs\SEAL\include;c:\progs\libs\Cuckoo\include;c:\progs\libs\GSL;c:\progs\libs\flint2\include;c:\progs\libs\cryptoTools\include;c:\progs\libs\boost-1.65.1\include;c:\progs\libs\mpir\include;c:\progs\libs\mpfr\include;c:\Progs\Libs\cryptopp700\include;c:\Progs\Libs\libzmqpp\include;c:\Progs\Libs\libzmq\include;c:\Progs\Libs\CTPL\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;c:\progs\libs\cppunit\include;c:\progs\libs\SEAL\include;c:\progs\libs\Cuckoo\include;c:\progs\libs\GSL;c:\progs\libs\flint2\include;c:\progs\libs\cryptoTools\include;c:\progs\libs\boost-1.65.1\include;c:\progs\libs\mpir\include;c:\progs\libs\mpfr\include;c:\Progs\Libs\cryptopp700\include;c:\Progs\Libs\libzmqpp\include;c:\Progs\Libs\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions);_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK</PreprocessorDefinitions>
       <UseFullPaths>true</UseFullPaths>
       <LanguageStandard>stdcpp17</LanguageStandard>
