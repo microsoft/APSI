@@ -9,7 +9,7 @@ DEPS=$(OBJS:.o=.d)
 APSITESTEXE=unit_tests
 CXX=g++
 CXXFLAGS=-O0 -g -DHAVE_CONFIG -march=native -std=c++17  -maes -msse2 -msse4.1 -mpclmul -DNDEBUG -D_AMD64_ -D_AVX2_ -D_ASM_ -D__LINUX__
-LDFLAGS=-lapsi -lseal -lcryptoTools -lflint -lpthread -lcppunit -lcryptopp
+LDFLAGS=-lapsi -lseal -lcryptoTools -lflint -lpthread -lcppunit -lcryptopp -lzmqpp -lzmq
 LIBRARY_PATHS=-L../bin -L../../SEAL-dev/lib -L../../cryptoTools/lib
 
 .PHONY : all clean
