@@ -10,7 +10,7 @@
 #include "apsi/apsidefines.h"
 #include "apsi/tools/interpolate.h"
 #include "apsi/ffield/ffield_array.h"
-#include "apsi/tools/utils.h"
+#include "apsi/tools/ec_utils.h"
 #include "apsi/tools/prng.h"
 
 #include "seal/evaluator.h"
@@ -46,8 +46,8 @@ namespace apsi
             for (auto &plain : batch_random_symm_poly_storage_)
             {
                 // Reserve memory for ciphertext size plaintexts (NTT transformed mod q)
-                plain.reserve(params_.encryption_params().coeff_modulus().size() *
-                    params_.encryption_params().poly_modulus_degree());
+                plain.reserve(static_cast<int>(params_.encryption_params().coeff_modulus().size() *
+                    params_.encryption_params().poly_modulus_degree()));
             }
 
 #ifdef USE_SECURE_SEED
@@ -76,14 +76,14 @@ namespace apsi
 
             int batch_size = params_.batch_size();
             int split_size = params_.split_size();
-            int byte_length = oc::roundUpTo(params_.get_label_bit_count(), 8) / 8;
+            int byte_length = static_cast<int>(roundUpTo(params_.get_label_bit_count(), 8) / 8);
             int nb = params_.batch_count();
             int ns = params_.split_count();
             db_blocks_.resize(nb, ns);
 
-            for (u64 b_idx = 0; b_idx < nb; b_idx++)
+            for (int b_idx = 0; b_idx < nb; b_idx++)
             {
-                for (u64 s_idx = 0; s_idx < ns; s_idx++)
+                for (int s_idx = 0; s_idx < ns; s_idx++)
                 {
                     db_blocks_(b_idx, s_idx).init(
                         b_idx, s_idx,

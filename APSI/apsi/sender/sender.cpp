@@ -6,8 +6,9 @@
 #include "apsi/sender/sender.h"
 #include "apsi/apsidefines.h"
 #include "apsi/network/network_utils.h"
-#include "apsi/tools/utils.h"
+#include "apsi/tools/ec_utils.h"
 #include "apsi/tools/prng.h"
+#include "apsi/result_package.h"
 
 #include "seal/util/common.h"
 
@@ -18,6 +19,7 @@ using namespace seal;
 using namespace seal::util;
 using namespace oc;
 using namespace apsi::tools;
+using namespace apsi::network;
 
 namespace apsi
 {
@@ -131,7 +133,7 @@ namespace apsi
                     if (i == 0)
                         stop_watch.set_time_point("symmpoly_start");
 
-                    setThreadName("sender_offline_" + std::to_string(i));
+                    //setThreadName("sender_offline_" + std::to_string(i));
                     int thread_context_idx = acquire_thread_context();
                     SenderThreadContext &context = thread_contexts_[thread_context_idx];
                     sender_db_->batched_randomized_symmetric_polys(context, evaluator_, batch_encoder_, ex_batch_encoder_, total_thread_count_);
@@ -161,7 +163,7 @@ namespace apsi
             if (params_.use_pk_oprf())
             {
                 vector<u8> buff;
-                chl.recv(buff);
+                chl.receive(buff);
 
                 PRNG pp(CCBlock);
                 digit_t key[NWORDS_ORDER];
@@ -180,7 +182,7 @@ namespace apsi
                     iter += step;
                 }
 
-                chl.asyncSend(move(buff));
+                chl.send(buff);
             }
 
             FFieldArray* ptr = nullptr;
@@ -206,8 +208,9 @@ namespace apsi
             }
 
             /* Receive client's query data. */
-            int num_of_powers = 0;
-            chl.recv(num_of_powers);
+            int num_of_powers;
+            chl.receive(num_of_powers);
+
             vector<vector<Ciphertext>> powers(params_.batch_count());
             auto split_size_plus_one = params_.split_size() + 1;
 
@@ -220,8 +223,8 @@ namespace apsi
             }
             while (num_of_powers-- > 0)
             {
-                uint64_t power = 0;
-                chl.recv(power);
+                uint64_t power;
+                chl.receive(power);
 
                 for (u64 i = 0; i < powers.size(); ++i)
                 {
@@ -374,7 +377,6 @@ namespace apsi
             promise<void> batches_done_prom;
             auto batches_done_fut = batches_done_prom.get_future().share();
 
-            mutex mtx;
             vector<thread> thread_pool(session_thread_count_);
             for (int i = 0; i < thread_pool.size(); i++)
             {
@@ -534,21 +536,28 @@ namespace apsi
                         // First compress
                         compressor_->mod_switch(runningResults[currResult], compressedResult);
 
-                        unique_lock<mutex> net_lock2(mtx);
-                        channel.asyncSendCopy(split);
-                        channel.asyncSendCopy(batch);
-
                         // Send the compressed result
-                        // send_ciphertext(compressedResult, channel);
-                        send_compressed_ciphertext(*compressor_, compressedResult, channel);
+                        ResultPackage pkg;
+                        pkg.split_idx = split;
+                        pkg.batch_idx = batch;
+
+                        {
+                            stringstream ss;
+                            compressor_->compressed_save(compressedResult, ss);
+                            pkg.data = ss.str();
+                        }
 
                         if (params_.get_label_bit_count())
                         {
                             // Compress label
                             compressor_->mod_switch(label_results[currResult], compressedResult);
-                            // send_ciphertext(compressedResult, channel);
-                            send_compressed_ciphertext(*compressor_, compressedResult, channel);
+
+                            stringstream ss;
+                            compressor_->compressed_save(compressedResult, ss);
+                            pkg.label_data = ss.str();
                         }
+
+                        channel.send(pkg);
                     }
 
                     /* After this point, this thread will no longer use the context resource, so it is free to return it. */
