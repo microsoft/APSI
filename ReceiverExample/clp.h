@@ -24,12 +24,6 @@ namespace apsi
             TCLAP::ValueArg<int> threadsArg("t", "threads", "Number of threads to use", /* req */ false, /* value */ 1, "int");
             add(threadsArg);
 
-            TCLAP::SwitchArg fastBatchingArg("f", "fast", "Use fast batching for APSI", /* default_val */ false);
-            add(fastBatchingArg);
-
-            TCLAP::SwitchArg slowBatchingArg("s", "slow", "Use slow batching for APSI", /* default_val */ false);
-            add(slowBatchingArg);
-
             TCLAP::ValueArg<unsigned> senderSzArg("", "senderSize", "Size of sender database", false, 20, "unsigned");
             add(senderSzArg);
 
@@ -78,12 +72,6 @@ namespace apsi
 
                 threads_ = threadsArg.getValue();
                 cout_param("threads", threads_);
-
-                fast_ = fastBatchingArg.getValue();
-                cout_param("fast", fast_ ? "true" : "false");
-
-                slow_ = slowBatchingArg.getValue();
-                cout_param("slow", slow_ ? "true" : "false");
 
                 sender_size_ = senderSzArg.getValue();
                 cout_param("senderSize", sender_size_);
@@ -151,8 +139,6 @@ namespace apsi
         }
 
         int threads() const { return threads_; }
-        bool fast() const { return fast_; }
-        bool slow() const { return slow_; }
         unsigned sender_size() const { return sender_size_; }
         unsigned sec_level() const { return sec_level_; }
         unsigned item_bit_length() const { return item_bit_length_; }
@@ -176,8 +162,6 @@ namespace apsi
 
         // Parameters from command line
         int threads_;
-        bool fast_;
-        bool slow_;
         unsigned sender_size_;
         unsigned sec_level_;
         unsigned item_bit_length_;
