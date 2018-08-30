@@ -159,75 +159,7 @@ namespace apsi
     void receive_item(apsi::Item &item, Channel &channel)
     {
         static_assert(sizeof(apsi::Item) == sizeof(block), "Item should be the same size as block");
-        item = channel.receive<block>();
+        channel.receive(static_cast<block&>(item));
     }
 
-    //void send_ffield_array(const FFieldArray & val, Channel & channel)
-    //{
-    //    //channel.asyncSendCopy(val.data(), val.size());// *val.field()->d());
-
-    //    // std::vector<_ffield_elt_coeff_t> coeffs(val.size() * val.field()->d());
-    //    std::vector<_ffield_elt_coeff_t> coeffs;
-
-    //    // All fields SHOULD have the same degree
-    //    coeffs.reserve(val.size() * val.field(0)->d());
-    //    for (unsigned i = 0; i < val.size(); ++i)
-    //    {
-    //        for (int j = 0; j < val.field(i)->d(); ++j)
-    //        {
-    //            coeffs.emplace_back(val.get_coeff_of(i, j));
-    //        }
-    //    }
-    //    channel.asyncSend(std::move(coeffs));
-
-    //    //std::cout << val.get(0).get_coeff( << std::endl;
-    //    //oc::RandomOracle ro(sizeof(block));
-    //    //{
-    //    //    auto str = val.get(i).to_string();
-    //    //    ro.Update(str.data(), str.size());
-    //    //}
-    //    //block b;
-    //    //ro.Final(b);
-
-    //    //std::cout << b<< std::endl;
-    //}
-
-    //void receive_ffield_array(FFieldArray & val, Channel & channel)
-    //{
-    //    if (val.size() == 0)
-    //        throw std::runtime_error("resizeing is not performed");
-
-    //    // std::vector<_ffield_elt_coeff_t> coeffs(val.size() * val.field()->d());
-    //    std::vector<_ffield_elt_coeff_t> coeffs;
-
-    //    // All fields SHOULD have the same degree
-    //    coeffs.reserve(val.size() * val.field(0)->d());
-
-    //    channel.recv(coeffs);
-
-    //    auto iter = coeffs.begin();
-    //    for (int i = 0; i < val.size(); ++i)
-    //    {
-    //        for (int j = 0; j < val.field(i)->d(); ++j)
-    //        {
-    //            val.set_coeff_of(i, j, *iter++);
-    //        }
-    //    }
-
-
-        //channel.recv(val.data(), val.size());// * val.field()->d());
-
-        //std::cout << val.get(0) << std::endl;
-
-        //oc::RandomOracle ro(sizeof(block));
-        //for (int i = 0; i < val.size(); ++i)
-        //{
-        //    auto str = val.get(i).to_string();
-        //    ro.Update(str.data(), str.size());
-        //}
-        //block b;
-        //ro.Final(b);
-
-        //std::cout << b << std::endl;
-    //}
 }

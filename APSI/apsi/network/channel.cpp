@@ -12,7 +12,9 @@ Channel::Channel(const context_t& ctx)
       bytes_received_(0),
       end_point_(""),
       socket_(ctx, socket_type::pair),
-      thread_pool_(1)
+      thread_pool_(thread::hardware_concurrency()),
+      receive_mutex_(),
+      send_mutex_()
 {
 }
 
@@ -29,26 +31,29 @@ void Channel::receive(vector<u8>& buff)
     throw_if_not_connected();
 
     message_t msg;
-    socket_.receive(msg);
+    receive_message(msg);
 
-    // Need to have at least size
+    // Need to have size
     if (msg.parts() < 1)
         throw runtime_error("Should have size at least");
 
-    // First part is vector size
     size_t size = msg.get<size_t>(/* part */ 0);
 
     // If the vector is not empty, we need the part with the data
-    if (size > 0 && msg.parts() < 2)
-        throw runtime_error("Should have data as well.");
+    if (size > 0 && msg.parts() != 2)
+        throw runtime_error("Should have size and data.");
 
-    // Verify the actual data is the size we expect
-    if (msg.size(/* part */ 1) < size)
-        throw runtime_error("Part 1 has less data than expected");
-
-    // The buffer data is in the second part.
     buff.resize(size);
-    memcpy(buff.data(), msg.raw_data(/* part */ 1), size);
+
+    if (size > 0)
+    {
+        // Verify the actual data is the size we expect
+        if (msg.size(/* part */ 1) < size)
+            throw runtime_error("Part 1 has less data than expected");
+
+        memcpy(buff.data(), msg.raw_data(/* part */ 1), size);
+    }
+
     bytes_received_ += size;
 }
 
@@ -61,10 +66,13 @@ void Channel::send(const vector<u8>& buff)
     // First part is size
     msg.add(buff.size());
 
-    // Second part is raw data
-    msg.add_raw(buff.data(), buff.size());
+    if (buff.size() > 0)
+    {
+        // Second part is raw data
+        msg.add_raw(buff.data(), buff.size());
+    }
 
-    socket_.send(msg);
+    send_message(msg);
     bytes_sent_ += buff.size();
 }
 
@@ -73,7 +81,7 @@ void Channel::receive(string& str)
     throw_if_not_connected();
 
     message_t msg;
-    socket_.receive(msg);
+    receive_message(msg);
 
     if (msg.parts() < 1)
         throw runtime_error("Message des not contain data");
@@ -89,7 +97,7 @@ void Channel::send(const string& str)
     message_t msg;
     msg.add(str);
 
-    socket_.send(msg);
+    send_message(msg);
     bytes_sent_ += str.length();
 }
 
@@ -98,16 +106,20 @@ void Channel::receive(vector<string>& data)
     throw_if_not_connected();
 
     message_t msg;
-    socket_.receive(msg);
+    receive_message(msg);
+
+    if (msg.parts() < 1)
+        throw runtime_error("Should have size at least");
 
     // First part is size
     size_t size = msg.get<size_t>(/* part */ 0);
 
-    if (size < 1)
-        throw runtime_error("Should have size at least");
-
-    if (msg.parts() < size + 1)
-        throw runtime_error("Not enough parts");
+    if (msg.parts() != size + 1)
+    {
+        stringstream ss;
+        ss << "Should have " << (size + 1) << " parts, has " << msg.parts() << " parts.";
+        throw runtime_error(ss.str());
+    }
 
     data.resize(size);
     for (int i = 0; i < size; i++)
@@ -132,7 +144,7 @@ void Channel::send(const vector<string>& data)
         bytes_sent_ += str.length();
     }
 
-    socket_.send(msg);
+    send_message(msg);
 }
 
 void Channel::receive(ResultPackage& pkg)
@@ -141,9 +153,9 @@ void Channel::receive(ResultPackage& pkg)
 
     // Use a single message
     message_t msg;
-    socket_.receive(msg);
+    receive_message(msg);
 
-    if (msg.parts() < 4)
+    if (msg.parts() != 4)
     {
         stringstream ss;
         ss << "Should have 4 parts, has " << msg.parts();
@@ -169,7 +181,7 @@ void Channel::send(const ResultPackage& pkg)
     msg.add(pkg.data);
     msg.add(pkg.label_data);
 
-    socket_.send(msg);
+    send_message(msg);
 
     bytes_sent_ += pkg.size();
 }
@@ -258,4 +270,24 @@ void Channel::throw_if_connected() const
 {
     if (is_connected())
         throw runtime_error("Socket is already connected");
+}
+
+void Channel::receive_message(message_t& msg)
+{
+    // Ensure we receive one message at a time.
+    unique_lock<mutex> rec_lock(receive_mutex_);
+    bool received = socket_.receive(msg);
+
+    if (!received)
+        throw runtime_error("Failed to receive message.");
+}
+
+void Channel::send_message(message_t& msg)
+{
+    // Ensure we send one message at a time.
+    unique_lock<mutex> snd_lock(send_mutex_);
+    bool sent = socket_.send(msg);
+
+    if (!sent)
+        throw runtime_error("Failed to send message");
 }

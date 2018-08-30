@@ -3,6 +3,8 @@
 #include <vector>
 #include <future>
 #include <thread>
+#include <mutex>
+
 #include "apsi/apsidefines.h"
 #include "zmqpp/zmqpp.hpp"
 #include "ctpl_stl.h"
@@ -63,24 +65,23 @@ namespace apsi
             * Receive a simple POD type.
             */
             template<typename T>
-            typename std::enable_if<std::is_pod<T>::value, T>::type
-                receive()
+            typename std::enable_if<std::is_pod<T>::value, void>::type
+                receive(T& data)
             {
                 throw_if_not_connected();
 
-                T result = {};
+                data = {};
                 zmqpp::message_t msg;
-                socket_.receive(msg);
+                receive_message(msg);
+
                 if (msg.parts() < 1)
                     throw std::runtime_error("Not enough data");
 
                 const T* pres;
                 msg.get(&pres, /* part */ 0);
-                memcpy(&result, pres, sizeof(T));
+                memcpy(&data, pres, sizeof(T));
 
                 bytes_received_ += sizeof(T);
-
-                return result;
             }
 
             /**
@@ -102,15 +103,14 @@ namespace apsi
             * Asynchrounously receive a simple POD type.
             */
             template<typename T>
-            typename std::enable_if<std::is_pod<T>::value, std::future<T>>::type
-                async_receive()
+            typename std::enable_if<std::is_pod<T>::value, std::future<void>>::type
+                async_receive(T& data)
             {
                 throw_if_not_connected();
 
-                std::future<T> ret = thread_pool_.push([this](int)
+                std::future<void> ret = thread_pool_.push([this, &data](int)
                 {
-                    T result = receive<T>();
-                    return result;
+                    receive<T>(data);
                 });
 
                 return ret;
@@ -152,7 +152,7 @@ namespace apsi
 
                 zmqpp::message_t msg;
                 msg.add_raw(&data, sizeof(T));
-                socket_.send(msg);
+                send_message(msg);
                 bytes_sent_ += sizeof(T);
             }
 
@@ -194,9 +194,13 @@ namespace apsi
             std::string end_point_;
 
             ctpl::thread_pool thread_pool_;
+            std::mutex receive_mutex_;
+            std::mutex send_mutex_;
 
             void throw_if_not_connected() const;
             void throw_if_connected() const;
+            void receive_message(zmqpp::message_t& msg);
+            void send_message(zmqpp::message_t& msg);
         };
     }
 }

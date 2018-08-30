@@ -208,7 +208,8 @@ namespace apsi
             }
 
             /* Receive client's query data. */
-            int num_of_powers = chl.receive<int>();
+            int num_of_powers;
+            chl.receive(num_of_powers);
 
             vector<vector<Ciphertext>> powers(params_.batch_count());
             auto split_size_plus_one = params_.split_size() + 1;
@@ -222,7 +223,8 @@ namespace apsi
             }
             while (num_of_powers-- > 0)
             {
-                uint64_t power = chl.receive<uint64_t>();
+                uint64_t power;
+                chl.receive(power);
 
                 for (u64 i = 0; i < powers.size(); ++i)
                 {

@@ -42,7 +42,8 @@ void ChannelTests::SendIntTest()
     int result = 0;
     thread serverth([this, &result]
     {
-        int sent = server_.receive<int>();
+        int sent;
+        server_.receive(sent);
         result = sent;
     });
 
@@ -61,7 +62,7 @@ void ChannelTests::SendBlockTest()
 
     thread serverth([this, &result]
     {
-        result = server_.receive<block>();
+        server_.receive(result);
     });
 
     block data = _mm_set_epi64x(0, 10);
@@ -77,12 +78,16 @@ void ChannelTests::SendIntAsyncTest()
     thread serverth([this]
     {
         int data = 12345;
+        this_thread::sleep_for(50ms);
         server_.send(data);
     });
 
-    auto fut = client_.async_receive<int>();
-    int result = fut.get();
+    int result = 0;
+    auto fut = client_.async_receive(result);
 
+    CPPUNIT_ASSERT_EQUAL(0, result);
+
+    fut.get();
     serverth.join();
 
     CPPUNIT_ASSERT_EQUAL(12345, result);
@@ -93,13 +98,17 @@ void ChannelTests::SendBlockAsyncTest()
     thread serverth([this]
     {
         block data = _mm_set_epi64x(12345, 54321);
+        this_thread::sleep_for(50ms);
         server_.send(data);
     });
 
-    auto fut = client_.async_receive<block>();
-    block result = fut.get();
-    block expected = _mm_set_epi64x(12345, 54321);
+    block result = ZeroBlock;
+    auto fut = client_.async_receive(result);
 
+    CPPUNIT_ASSERT_EQUAL(0, memcmp(&result, &ZeroBlock, sizeof(block)));
+
+    fut.get();
+    block expected = _mm_set_epi64x(12345, 54321);
     serverth.join();
 
     CPPUNIT_ASSERT_EQUAL(0, memcmp(&expected, &result, sizeof(block)));
@@ -142,18 +151,26 @@ void ChannelTests::SendStringAsyncTest()
 void ChannelTests::SendStringVectorTest()
 {
     vector<string> result;
+    vector<string> result2;
 
-    thread serverth([this, &result]
+    thread serverth([this, &result, &result2]
     {
-        vector<string> received;
-        server_.receive(received);
-        result = received;
+        server_.receive(result);
+        server_.receive(result2);
     });
 
     vector<string> sent;
     InitStringVector(sent, 1000);
 
+    vector<string> empty;
+
+    // Add some data to the result2 vetor. After data is received, it
+    // should become empty.
+    result2.emplace_back("Hello");
+    CPPUNIT_ASSERT_EQUAL((size_t)1, result2.size());
+
     client_.send(sent);
+    client_.send(empty);
 
     serverth.join();
 
@@ -162,6 +179,8 @@ void ChannelTests::SendStringVectorTest()
     {
         CPPUNIT_ASSERT(sent[i] == result[i]);
     }
+
+    CPPUNIT_ASSERT_EQUAL((size_t)0, result2.size());
 }
 
 void ChannelTests::SendStringVectorAsyncTest()
@@ -196,10 +215,19 @@ void ChannelTests::SendBufferTest()
         InitU8Vector(buff, 1000);
 
         server_.send(buff);
+
+        vector<u8> buff2;
+        server_.send(buff2);
     });
 
     vector<u8> result;
     client_.receive(result);
+
+    vector<u8> result2;
+    result2.emplace_back(5);
+    CPPUNIT_ASSERT_EQUAL((size_t)1, result2.size());
+
+    client_.receive(result2);
 
     serverth.join();
 
@@ -208,6 +236,8 @@ void ChannelTests::SendBufferTest()
     {
         CPPUNIT_ASSERT_EQUAL((apsi::u8)(i % 0xFF), result[i]);
     }
+
+    CPPUNIT_ASSERT_EQUAL((size_t)0, result2.size());
 }
 
 void ChannelTests::SendBufferAsyncTest()
@@ -325,7 +355,7 @@ void ChannelTests::ThrowWithoutConnectTest()
     vector<string> buff2;
 
     // Receives
-    ASSERT_THROWS(result = mychannel.receive<int>());
+    ASSERT_THROWS(mychannel.receive(result));
     ASSERT_THROWS(mychannel.receive(str));
     ASSERT_THROWS(mychannel.receive(buff));
     ASSERT_THROWS(mychannel.receive(buff2));
@@ -372,8 +402,8 @@ void ChannelTests::DataCountsTest()
 
         svr.receive(data1);
         svr.receive(data2);
-        data3 = svr.receive<u32>();
-        data4 = svr.receive<block>();
+        svr.receive(data3);
+        svr.receive(data4);
         svr.receive(data5);
     });
 
@@ -392,10 +422,10 @@ void ChannelTests::DataCountsTest()
     clt.receive(data2);
     CPPUNIT_ASSERT_EQUAL((u64)1190, clt.get_total_data_received());
 
-    data3 = clt.receive<u32>();
+    clt.receive(data3);
     CPPUNIT_ASSERT_EQUAL((u64)1194, clt.get_total_data_received());
 
-    data4 = clt.receive<block>();
+    clt.receive(data4);
     CPPUNIT_ASSERT_EQUAL((u64)1210, clt.get_total_data_received());
 
     clt.receive(data5);
