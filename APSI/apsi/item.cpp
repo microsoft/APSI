@@ -93,52 +93,6 @@ namespace apsi
         return ring_item;
     }
 
-    void bitPrint(u8* data, int length, int offset = 0)
-    {
-        throw runtime_error("Outdated method.");
-        //oc::BitIterator iter(data, offset);
-
-        //for (int i = 0; i < length; ++i)
-        //{
-        //    std::cout << int(*iter);
-        //    ++iter;
-        //}
-        //std::cout << std::endl;
-    }
-
-
-    template<typename T>
-    typename std::enable_if<std::is_pod<T>::value>::type
-        encode(FFieldElt &ring_item, gsl::span<const T> value, int bit_length)
-    {
-        gsl::span<const apsi::u8> v2((apsi::u8*)value.data(), value.size() * sizeof(T));
-
-        // Should minus 1 to avoid wrapping around p
-        int split_length = seal::util::get_significant_bit_count(ring_item.field()->ch()) - 1;
-
-        // How many coefficients do we need in the ExFieldElement
-        int split_index_bound = (bit_length + split_length - 1) / split_length;
-
-        static_assert(std::is_pod<_ffield_elt_coeff_t>::value, "must be pod type");
-        _ffield_elt_coeff_t coeff = 0;
-        apsi::span<apsi::u8> temp_span((apsi::u8*)&coeff, sizeof(_ffield_elt_coeff_t));
-
-        auto end = std::min<int>(ring_item.field()->d(), split_index_bound);
-        for (int j = 0; j < end; j++)
-        {
-            // copy the j'th set of bits in value to temp
-            details::copy_with_bit_offset(v2, j * split_length, split_length, temp_span);
-            //std::cout << j << " " << temp << std::endl;
-
-            std::cout << std::string(j * split_length, ' ');
-            bitPrint((u8*)& coeff, split_length);
-            // the the coeff
-            ring_item.set_coeff(j, coeff);
-        }
-    }
-
-
-
     uint64_t item_part(const std::array<apsi::u64, 2>& value_, uint32_t i, uint32_t split_length)
     {
         int i1 = (i * split_length) >> 6,
@@ -181,7 +135,6 @@ namespace apsi
         }
     }
 
-//
     void Item::save(ostream &stream) const
     {
         stream.write(reinterpret_cast<const char*>(&value_), sizeof(value_));
