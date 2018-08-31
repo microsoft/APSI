@@ -111,15 +111,6 @@ namespace apsi
                 std::vector<Item>& items);
 
             /**
-            Stream decryption of ciphers from the sender. Ciphertext will be acquired from the sender in a streaming fashion one by one in
-            this function.
-
-            @param[out] result Plaintext matrix of size (#splits x #batches).
-            */
-            // void stream_decrypt(oc::Channel &channel, std::vector<std::vector<seal::Plaintext>> &result);
-
-
-            /**
             Decrypts a SEAL Ciphertext to a Plaintext.
 
             @param[out] plain The plaintext to hold the decrypted data.

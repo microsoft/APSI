@@ -10,6 +10,7 @@
 #include "apsi/network/channel.h"
 #include "apsi/tools/ec_utils.h"
 #include "apsi/tools/prng.h"
+#include "apsi/tools/utils.h"
 #include "apsi/result_package.h"
 
 // SEAL
@@ -282,7 +283,7 @@ namespace apsi
             {
                 cout << "Reduced items too long. Only have " <<
                     coeff_bit_count * degree << " bits." << endl;
-                throw runtime_error(LOCATION);
+                throw runtime_error("Reduced items too long.");
             }
             else
             {
@@ -315,8 +316,8 @@ namespace apsi
                 auto q = cuckoo.query_item(items[i]);
                 indice[q.table_index()] = i;
 
-                if (neq(items[i], encodings[q.table_index()]))
-                    throw runtime_error(LOCATION);
+                if (not_equal(items[i], encodings[q.table_index()]))
+                    throw runtime_error("items[i] different from encodings[q.table_index()]");
 
                 //ostreamLock(cout) << "Ritem[" << i << "] = " << items[i] << " -> " << q.hash_func_index() << " " << encodings[q.table_index()] << " @ " << q.table_index() << endl;
             }

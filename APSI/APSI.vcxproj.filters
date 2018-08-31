@@ -132,6 +132,9 @@
     <ClInclude Include="apsi\result_package.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="apsi\tools\utils.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp">
@@ -195,6 +198,9 @@
       <Filter>Source Files\Network</Filter>
     </ClCompile>
     <ClCompile Include="apsi\tools\ec_utils.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\tools\utils.cpp">
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
   </ItemGroup>

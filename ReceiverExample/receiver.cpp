@@ -1,3 +1,4 @@
+// STD
 #include <iostream>
 #include <string>
 #include <iomanip>
@@ -5,7 +6,10 @@
 #include <vector>
 #include <set>
 
+// APSI
 #include "apsi/apsi.h"
+
+// SEAL
 #include "seal/seal.h"
 
 // Networking
@@ -189,7 +193,7 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-std::string print(oc::span<u8> s)
+std::string print(gsl::span<u8> s)
 {
     std::stringstream ss;
     for (int i = 0; i < s.size(); ++i)

@@ -1,9 +1,34 @@
 #include "bit_copy_test.h"
 #include "apsi/ffield/ffield_elt.h"
+#include <vector>
 
-using namespace oc;
+using namespace std;
 using namespace APSITests;
+using namespace apsi;
 using namespace apsi::tools;
+
+namespace
+{
+    block to_block(int i)
+    {
+        block result = _mm_set_epi64x(0, (u64)i);
+        return result;
+    }
+
+    u8 get_bit(vector<u8>& vec, u32 position)
+    {
+        if (position >= (vec.size() * 8))
+            throw out_of_range("position");
+
+        u32 byte_idx = position / 8;
+        u32 bit_idx = position % 8;
+        u8 mask = (u8)(1 << bit_idx);
+        if (0 == (vec[byte_idx] & mask))
+            return 0;
+
+        return 1;
+    }
+}
 
 void BitCopyTests::bit_copy_test()
 {
@@ -13,7 +38,7 @@ void BitCopyTests::bit_copy_test()
     std::vector<u8> src(size), dest(size);
     for (int t = 6; t < trials; ++t)
     {
-        PRNG prng(toBlock(t));
+        PRNG prng(to_block(t));
 
         auto srcOffset = prng.get<u32>() % (size * 4);
         auto destOffset = prng.get<u32>() % (size * 4);
@@ -22,38 +47,32 @@ void BitCopyTests::bit_copy_test()
         char srcVal = (t & 1) * ~0;
         char destVal = ~srcVal;
 
-        //prng.get(src.data(), src.size());
         memset(src.data(), srcVal, src.size());
         memset(dest.data(), destVal, dest.size());
 
         apsi::details::copy_with_bit_offset(src, srcOffset, destOffset, bitLength, dest);
 
-        oc::BitIterator srcIter((oc::u8*)src.data(), srcOffset);
-        oc::BitIterator destIter((oc::u8*)dest.data(), 0);
-        oc::BitIterator destEnd((oc::u8*)dest.data(), size * 8);
+        u32 src_idx = srcOffset;
+        u32 dst_idx = 0;
 
         for (int i = 0; i < destOffset; ++i)
         {
-            CPPUNIT_ASSERT(*destIter == (destVal & 1));
-
-            ++destIter;
+            CPPUNIT_ASSERT_EQUAL((u8)(destVal & 1), get_bit(dest, dst_idx));
+            dst_idx++;
         }
 
         for (int i = 0; i < bitLength; ++i)
         {
-            CPPUNIT_ASSERT(srcIter.mByte < src.data() + src.size());
-            CPPUNIT_ASSERT(*srcIter == *destIter);
-
-            ++srcIter;
-            ++destIter;
+            CPPUNIT_ASSERT_EQUAL(get_bit(src, src_idx), get_bit(dest, dst_idx));
+            src_idx++;
+            dst_idx++;
         }
 
         auto rem = size * 8 - destOffset - bitLength;
         for (int i = 0; i < rem; ++i)
         {
-            CPPUNIT_ASSERT(*destIter == (destVal & 1));
-
-            ++destIter;
+            CPPUNIT_ASSERT_EQUAL((u8)(destVal & 1), get_bit(dest, dst_idx));
+            dst_idx++;
         }
     }
 }

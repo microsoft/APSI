@@ -3,7 +3,6 @@
 #include "seal/util/numth.h"
 
 using namespace std;
-using namespace oc;
 using namespace seal;
 using namespace seal::util;
 using namespace apsi::tools;

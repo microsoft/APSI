@@ -12,6 +12,7 @@
 #include "apsi/tools/matrixview.h"
 #include "apsi/tools/prng.h"
 
+// SEAL
 #include "seal/memorypoolhandle.h"
 
 
@@ -56,7 +57,7 @@ namespace apsi
                 exfield_ = std::move(exfield);
             }
 
-            void set_prng(oc::block block)
+            void set_prng(apsi::block block)
             {
                 prng_.set_seed(block, /* buffer_size */ 256);
             }

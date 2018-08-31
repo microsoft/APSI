@@ -1,23 +1,27 @@
+// STD
 #include <thread>
 #include <future>
 #include <chrono>
 #include <array>
 
+// APSI
 #include "apsi/sender/sender.h"
 #include "apsi/apsidefines.h"
 #include "apsi/network/network_utils.h"
 #include "apsi/tools/ec_utils.h"
+#include "apsi/tools/utils.h"
 #include "apsi/tools/prng.h"
 #include "apsi/result_package.h"
 
+// SEAL
 #include "seal/util/common.h"
 
+// FourQ
 #include "FourQ_api.h"
 
 using namespace std;
 using namespace seal;
 using namespace seal::util;
-using namespace oc;
 using namespace apsi::tools;
 using namespace apsi::network;
 
@@ -82,7 +86,7 @@ namespace apsi
             vector<thread> thrds(total_thread_count_);
 
 #ifdef USE_SECURE_SEED
-            prng_.set_seed(oc::sysRandomSeed());
+            prng_.set_seed(sysRandomSeed());
 #else
             TODO("***************** INSECURE *****************, define USE_SECURE_SEED to fix");
             prng_.set_seed(ZeroBlock);
@@ -92,7 +96,7 @@ namespace apsi
             for (int i = 0; i < total_thread_count_; i++)
             {
                 available_thread_contexts_.push_back(i);
-                auto seed = prng_.get<oc::block>();
+                auto seed = prng_.get<block>();
                 thrds[i] = thread([&, i, seed]()
                 {
                     auto local_pool = MemoryPoolHandle::New();
@@ -248,7 +252,7 @@ namespace apsi
         {
             Plaintext p;
             if (!session_context.decryptor_)
-                throw std::runtime_error(LOCATION);
+                throw std::runtime_error("No decryptor available");
 
             session_context.decryptor_->decrypt(c, p);
 
@@ -281,15 +285,15 @@ namespace apsi
             }
             return x;
         }
-        std::vector<oc::u64> Sender::debug_eval_term(
+        std::vector<u64> Sender::debug_eval_term(
             int term,
             MatrixView<u64> coeffs,
-            oc::span<u64> x,
+            gsl::span<u64> x,
             const seal::SmallModulus& mod,
             bool print)
         {
             if (x.size() != coeffs.rows())
-                throw std::runtime_error(LOCATION);
+                throw std::runtime_error("Size of x should be same as coeffs.rows");
 
             std::vector<u64> r(x.size());
 
@@ -325,7 +329,7 @@ namespace apsi
         }
 
 
-        std::vector<u64> add(span<u64> x, span<u64> y, const seal::SmallModulus& mod)
+        std::vector<u64> add(gsl::span<u64> x, gsl::span<u64> y, const seal::SmallModulus& mod)
         {
             std::vector<u64> r(x.size());
             for (int i = 0; i < r.size(); ++i)
@@ -520,7 +524,6 @@ namespace apsi
                             }
 
                             // TODO: We need to randomize the result. This is fine for now.
-                            TODO("------------- Insecure. FIX ME -------------");
                             evaluator_->add(runningResults[currResult], label_results[curr_label], label_results[curr_label ^ 1]);
                             curr_label ^= 1;
 
