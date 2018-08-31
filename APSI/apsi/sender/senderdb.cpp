@@ -524,7 +524,6 @@ namespace apsi
         void SenderDB::batched_randomized_symmetric_polys(
             SenderThreadContext &context,
             shared_ptr<Evaluator> evaluator,
-            shared_ptr<BatchEncoder> batch_encoder,
             shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
             int thread_count)
         {
@@ -575,38 +574,22 @@ namespace apsi
                     block.debug_sym_block_.reserve(split_size_plus_one);
                 }
 
-                if (batch_encoder)
+                for (int i = 0; i < split_size_plus_one; i++)
                 {
-                    for (int i = 0; i < split_size_plus_one; i++)
+                    Plaintext &poly = block.batch_random_symm_poly_[i];
+
+                    // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
+                    for (int k = 0; batch_start + k < batch_end; k++)
                     {
-                        Plaintext &poly = block.batch_random_symm_poly_[i];
-                        for (int k = 0; batch_start + k < batch_end; k++)
-                        {
-                            integer_batch_vector[k] = symm_block(k, i).coeffs[0];
-                        }
-                        batch_encoder->compose(integer_batch_vector, poly);
-                        evaluator->transform_to_ntt(poly, seal_context_->first_parms_id(), local_pool);
+                        fq_nmod_set(batch_vector.data() + k, &symm_block(k, i), batch_vector.field(k)->ctx());
+                        // batch_vector.set(k, k * split_size_plus_one + i, symm_block);
                     }
-                }
-                else
-                {
-                    for (int i = 0; i < split_size_plus_one; i++)
+                    ex_batch_encoder->compose(batch_vector, poly);
+                    evaluator->transform_to_ntt(poly, seal_context_->first_parms_id(), local_pool);
+
+                    if (params_.debug())
                     {
-                        Plaintext &poly = block.batch_random_symm_poly_[i];
-
-                        // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
-                        for (int k = 0; batch_start + k < batch_end; k++)
-                        {
-                            fq_nmod_set(batch_vector.data() + k, &symm_block(k, i), batch_vector.field(k)->ctx());
-                            // batch_vector.set(k, k * split_size_plus_one + i, symm_block);
-                        }
-                        ex_batch_encoder->compose(batch_vector, poly);
-                        evaluator->transform_to_ntt(poly, seal_context_->first_parms_id(), local_pool);
-
-                        if (params_.debug())
-                        {
-                            block.debug_sym_block_.push_back(batch_vector);
-                        }
+                        block.debug_sym_block_.push_back(batch_vector);
                     }
                 }
             }
@@ -616,7 +599,6 @@ namespace apsi
             SenderThreadContext &th_context,
             int thread_count,
             shared_ptr<Evaluator> evaluator,
-            shared_ptr<BatchEncoder> batch_encoder,
             shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder)
         {
             auto &mod = params_.encryption_params().plain_modulus();
@@ -646,7 +628,7 @@ namespace apsi
             for (int bIdx = start; bIdx < end; bIdx++)
             {
                 auto& block = db_blocks_(bIdx);
-                block.batch_interpolate(th_context, seal_context_, evaluator, batch_encoder, ex_batch_encoder, cache, params_);
+                block.batch_interpolate(th_context, seal_context_, evaluator, ex_batch_encoder, cache, params_);
             }
 
         }
@@ -712,7 +694,6 @@ namespace apsi
             SenderThreadContext &th_context,
             shared_ptr<SEALContext> seal_context,
             shared_ptr<Evaluator> evaluator,
-            shared_ptr<BatchEncoder> batch_encoder,
             shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
             DBInterpolationCache& cache,
             const PSIParams& params)
@@ -721,270 +702,148 @@ namespace apsi
             MemoryPoolHandle local_pool = th_context.pool();
             Position pos;
 
-            if (ex_batch_encoder)
+            if (params.use_low_degree_poly())
+                throw std::runtime_error("not impl");
+
+
+
+            //std::vector<FFieldArray> coeffs;
+            //coeffs.reserve(items_per_batch_);
+
+            ////std::vector<std::pair<u64, u64>> inputs(items_per_split_);
+            //std::vector<u64> temp_vec((value_byte_length_ + sizeof(u64)) / sizeof(u64), 0);
+            //std::unordered_set<u64> key_set;
+            //key_set.reserve(items_per_split_);
+
+            for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
             {
-                if (params.use_low_degree_poly())
-                    throw std::runtime_error("not impl");
+                //FFieldArray x(ex_batch_encoder->field(pos.batch_offset), items_per_split_);
+                //FFieldArray y(ex_batch_encoder->field(pos.batch_offset), items_per_split_);
+
+                FFieldElt temp(ex_batch_encoder->field(pos.batch_offset));
 
 
+                FFieldArray& x = cache.x_temp[pos.batch_offset];
+                FFieldArray& y = cache.y_temp[pos.batch_offset];
+                //std::vector<u8> temp_vec2(value_byte_length_);
 
-                //std::vector<FFieldArray> coeffs;
-                //coeffs.reserve(items_per_batch_);
 
-                ////std::vector<std::pair<u64, u64>> inputs(items_per_split_);
-                //std::vector<u64> temp_vec((value_byte_length_ + sizeof(u64)) / sizeof(u64), 0);
-                //std::unordered_set<u64> key_set;
-                //key_set.reserve(items_per_split_);
-
-                for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
+                int size = 0;
+                for (pos.split_offset = 0; pos.split_offset < items_per_split_; ++pos.split_offset)
                 {
-                    //FFieldArray x(ex_batch_encoder->field(pos.batch_offset), items_per_split_);
-                    //FFieldArray y(ex_batch_encoder->field(pos.batch_offset), items_per_split_);
-
-                    FFieldElt temp(ex_batch_encoder->field(pos.batch_offset));
-
-
-                    FFieldArray& x = cache.x_temp[pos.batch_offset];
-                    FFieldArray& y = cache.y_temp[pos.batch_offset];
-                    //std::vector<u8> temp_vec2(value_byte_length_);
-
-
-                    int size = 0;
-                    for (pos.split_offset = 0; pos.split_offset < items_per_split_; ++pos.split_offset)
+                    if (has_item(pos))
                     {
-                        if (has_item(pos))
-                        {
-                            auto& key_item = get_key(pos);
-                            temp.encode(gsl::span<u64>{key_item.value_}, params.get_label_bit_count());
-                            x.set(size, temp);
+                        auto& key_item = get_key(pos);
+                        temp.encode(gsl::span<u64>{key_item.value_}, params.get_label_bit_count());
+                        x.set(size, temp);
 
-                            auto src = get_label(pos);
-                            temp.encode(gsl::span<u8>{src, value_byte_length_}, params.get_label_bit_count());
-                            y.set(size, temp);
+                        auto src = get_label(pos);
+                        temp.encode(gsl::span<u8>{src, value_byte_length_}, params.get_label_bit_count());
+                        y.set(size, temp);
 
-                            //if (key_item.data()[0] < 25)
-                            //{
-                            //        std::cout << "lbl {";
-                            //        for (u64 i = 0; i < value_byte_length_; ++i)
-                            //            std::cout << ' ' << std::setw(2) << std::setfill('0') << std::hex
-                            //            << int(src[i]);
-                            //        std::cout << "\}\nkey {";
-                            //        auto d = (u8*)&key_item;
-                            //        for (u64 i = 0; i < 16; ++i)
-                            //            std::cout << ' ' << std::setw(2) << std::setfill('0') << std::hex 
-                            //            << int(d[i]);
-                            //        std::cout << "}\n";
-                            //}
+                        //if (key_item.data()[0] < 25)
+                        //{
+                        //        std::cout << "lbl {";
+                        //        for (u64 i = 0; i < value_byte_length_; ++i)
+                        //            std::cout << ' ' << std::setw(2) << std::setfill('0') << std::hex
+                        //            << int(src[i]);
+                        //        std::cout << "\}\nkey {";
+                        //        auto d = (u8*)&key_item;
+                        //        for (u64 i = 0; i < 16; ++i)
+                        //            std::cout << ' ' << std::setw(2) << std::setfill('0') << std::hex 
+                        //            << int(d[i]);
+                        //        std::cout << "}\n";
+                        //}
 
-                            //temp.decode(span<u8>{temp_vec2}, params.get_label_bit_count());
-                            //if (memcmp(src, temp_vec2.data(), value_byte_length_))
-                            //{
-                            //    std::cout << "exp {";
-                            //    for (u64 i = 0; i < temp_vec2.size(); ++i)
-                            //        std::cout << ' ' << std::setw(2) << std::setfill('0') << std::hex << int(src[i]);
-                            //    std::cout << "\}\nact {";
-                            //    for (u64 i = 0; i < temp_vec2.size(); ++i)
-                            //        std::cout << ' ' << std::setw(2) << std::setfill('0') << std::hex << int(temp_vec2[i]);
-                            //    std::cout << "}\n";
-                            //}
-                                //throw std::runtime_error("");
+                        //temp.decode(span<u8>{temp_vec2}, params.get_label_bit_count());
+                        //if (memcmp(src, temp_vec2.data(), value_byte_length_))
+                        //{
+                        //    std::cout << "exp {";
+                        //    for (u64 i = 0; i < temp_vec2.size(); ++i)
+                        //        std::cout << ' ' << std::setw(2) << std::setfill('0') << std::hex << int(src[i]);
+                        //    std::cout << "\}\nact {";
+                        //    for (u64 i = 0; i < temp_vec2.size(); ++i)
+                        //        std::cout << ' ' << std::setw(2) << std::setfill('0') << std::hex << int(temp_vec2[i]);
+                        //    std::cout << "}\n";
+                        //}
+                            //throw std::runtime_error("");
 
-                            ++size;
-                        }
+                        ++size;
                     }
-
-                    // pad the points to have max degree (split_size)
-                    // with (x,x) points where x is unique.
-                    cache.key_set.clear();
-
-                    for (int i = 0; i < size; ++i)
-                    {
-                        auto r = cache.key_set.emplace(x.get_coeff_of(i, 0));
-                    }
-
-                    //for (int i = 0; i < size; ++i)
-                    //{
-                    //    for (u64 j = 0; j < i; ++j)
-                    //    {
-                    //        if (x.get(i) == x.get(j))
-                    //            throw std::runtime_error("duplicate x values");
-                    //    }
-                    //}
-
-
-                    //auto trueSize = size;
-                    cache.temp_vec[0] = 0;
-                    while (size != items_per_split_)
-                    {
-                        if (cache.temp_vec[0] >= mod)
-                        {
-                            std::cout << cache.temp_vec[0] << " >= " << mod;
-                            throw std::runtime_error("");
-                        }
-
-                        if (cache.key_set.find(cache.temp_vec[0]) == cache.key_set.end())
-                        {
-                            temp.encode(gsl::span<u64>{cache.temp_vec}, params.get_label_bit_count());
-
-                            x.set(size, temp);
-                            y.set(size, temp);
-                            ++size;
-                        }
-
-                        ++cache.temp_vec[0];
-                    }
-
-
-                    ffield_newton_interpolate_poly(
-                        x, y,
-                        // We don't use the cache for divided differences.
-                        // cache.div_diff_temp[pos.batch_offset],
-                        cache.coeff_temp[pos.batch_offset]);
                 }
 
-                batched_label_coeffs_.resize(items_per_split_);
+                // pad the points to have max degree (split_size)
+                // with (x,x) points where x is unique.
+                cache.key_set.clear();
 
-                // We assume there are all the same
-                auto degree = th_context.exfield()[0]->d();
-                FFieldArray temp_array(ex_batch_encoder->create_array());
-                for (int s = 0; s < items_per_split_; s++)
+                for (int i = 0; i < size; ++i)
                 {
-                    Plaintext &batched_coeff = batched_label_coeffs_[s];
-
-                    // transpose the coeffs into temp_array
-                    for (int b = 0; b < items_per_batch_; b++)
-                    {
-                        for (int c = 0; c < degree; ++c)
-                            temp_array.set_coeff_of(b, c, cache.coeff_temp[b].get_coeff_of(s, c));
-                    }
-
-
-                    batched_coeff.reserve(
-                        params.encryption_params().coeff_modulus().size() *
-                        params.encryption_params().poly_modulus_degree(), local_pool);
-
-                    ex_batch_encoder->compose(temp_array, batched_coeff);
-                    evaluator->transform_to_ntt(batched_coeff, seal_context->first_parms_id());
+                    auto r = cache.key_set.emplace(x.get_coeff_of(i, 0));
                 }
 
+                //for (int i = 0; i < size; ++i)
+                //{
+                //    for (u64 j = 0; j < i; ++j)
+                //    {
+                //        if (x.get(i) == x.get(j))
+                //            throw std::runtime_error("duplicate x values");
+                //    }
+                //}
+
+
+                //auto trueSize = size;
+                cache.temp_vec[0] = 0;
+                while (size != items_per_split_)
+                {
+                    if (cache.temp_vec[0] >= mod)
+                    {
+                        std::cout << cache.temp_vec[0] << " >= " << mod;
+                        throw std::runtime_error("");
+                    }
+
+                    if (cache.key_set.find(cache.temp_vec[0]) == cache.key_set.end())
+                    {
+                        temp.encode(gsl::span<u64>{cache.temp_vec}, params.get_label_bit_count());
+
+                        x.set(size, temp);
+                        y.set(size, temp);
+                        ++size;
+                    }
+
+                    ++cache.temp_vec[0];
+                }
+
+
+                ffield_newton_interpolate_poly(
+                    x, y,
+                    // We don't use the cache for divided differences.
+                    // cache.div_diff_temp[pos.batch_offset],
+                    cache.coeff_temp[pos.batch_offset]);
             }
-            else
+
+            batched_label_coeffs_.resize(items_per_split_);
+
+            // We assume there are all the same
+            auto degree = th_context.exfield()[0]->d();
+            FFieldArray temp_array(ex_batch_encoder->create_array());
+            for (int s = 0; s < items_per_split_; s++)
             {
-                if (params.get_label_bit_count() >= 64 || 1ull << params.get_label_bit_count() > mod)
-                    throw std::runtime_error("labels too large for short string code");
+                Plaintext &batched_coeff = batched_label_coeffs_[s];
 
-                int max_size = 0;
-                std::vector<int> poly_size(items_per_batch_);
-                std::vector<std::pair<u64, u64>> inputs; inputs.resize(items_per_split_);
-                Matrix<u64> label_coeffs(items_per_batch_, items_per_split_);
-
-                for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
+                // transpose the coeffs into temp_array
+                for (int b = 0; b < items_per_batch_; b++)
                 {
-                    //memset(inputs.data(), 0, inputs.size() * sizeof(std::pair<u64, u64>));
-                    inputs.clear();
-
-                    for (pos.split_offset = 0; pos.split_offset < items_per_split_; ++pos.split_offset)
-                    {
-                        //auto& key = inputs[pos.split_offset].first;
-                        //auto& label = inputs[pos.split_offset].second;
-                        //key = pos.split_offset;
-                        //label = 0;
-
-
-                        if (has_item(pos))
-                        {
-                            inputs.emplace_back();
-                            auto& key = inputs.back().first;
-                            auto& label = inputs.back().second;
-
-                            auto key_item = *(std::array<u64, 2>*)&get_key(pos);
-
-                            if (key_item[1] || key_item[0] >= mod)
-                            {
-                                std::cout << key_item[0] << " " << key_item[1] << std::endl;
-
-                                throw std::runtime_error("key too large");
-                            }
-
-                            key = key_item[0];
-
-                            auto src = get_label(pos);
-                            memcpy(&label, src, value_byte_length_);
-
-
-                            if (label >= mod)
-                            {
-                                throw std::runtime_error("label too large");
-                            }
-
-                            //if (test)
-                            //{
-                            //    test_points.push_back({key, label});
-                            //}
-                        }
-                    }
-
-                    if (params.use_low_degree_poly() == false)
-                    {
-                        // pad the points to have max degree (split_size)
-                        // with (x,x) points where x is unique.
-
-                        std::unordered_set<u64> key_set;
-                        for (auto& xy : inputs)
-                            key_set.emplace(xy.first);
-
-                        u64 x = 0;
-                        while (inputs.size() != items_per_split_)
-                        {
-                            if (key_set.find(x) == key_set.end())
-                                inputs.push_back({ x, 1 });
-
-                            ++x;
-                        }
-
-                        max_size = inputs.size();
-                    }
-
-
-                    if (inputs.size())
-                    {
-                        max_size = std::max<int>(max_size, inputs.size());
-                        poly_size[pos.batch_offset] = inputs.size();
-
-
-                        auto px = label_coeffs[pos.batch_offset].subspan(0, inputs.size());
-
-                        if (px.size() != inputs.size())
-                            throw std::runtime_error("");
-                        u64_newton_interpolate_poly(inputs, px, mod);
-                    }
+                    for (int c = 0; c < degree; ++c)
+                        temp_array.set_coeff_of(b, c, cache.coeff_temp[b].get_coeff_of(s, c));
                 }
 
-                batched_label_coeffs_.resize(max_size);
 
-                std::vector<u64> temp(items_per_batch_);
-                for (int s = 0; s < max_size; s++)
-                {
-                    Plaintext &batched_coeff = batched_label_coeffs_[s];
-                    for (int b = 0; b < items_per_batch_; b++)
-                    {
-                        if (poly_size[b] > s)
-                        {
-                            temp[b] = label_coeffs(b, s);
-                        }
-                        else
-                        {
-                            temp[b] = 0;
-                        }
-                    }
+                batched_coeff.reserve(
+                    params.encryption_params().coeff_modulus().size() *
+                    params.encryption_params().poly_modulus_degree(), local_pool);
 
-                    batched_coeff.reserve(
-                        params.encryption_params().coeff_modulus().size() *
-                        params.encryption_params().poly_modulus_degree(), local_pool);
-
-                    batch_encoder->compose(temp, batched_coeff);
-                    evaluator->transform_to_ntt(batched_coeff, seal_context->first_parms_id());
-                }
+                ex_batch_encoder->compose(temp_array, batched_coeff);
+                evaluator->transform_to_ntt(batched_coeff, seal_context->first_parms_id());
             }
         }
 

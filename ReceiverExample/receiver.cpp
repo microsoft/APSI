@@ -148,11 +148,6 @@ int main(int argc, char *argv[])
     clientChl.connect("tcp://localhost:1212");
 
     prepare_console();
-
-    auto none = true;
-    auto fastBatching = cmd.fast(); none &= !fastBatching;
-    auto slowBatching = cmd.slow(); none &= !slowBatching;
-
     //// Example: Basics
     //example_basics();
 
@@ -163,14 +158,8 @@ int main(int argc, char *argv[])
     //example_save_db();
     //example_load_db();
 
-
-    // Example: Fast batching
-    if (fastBatching)
-        throw runtime_error("removed");
-
     // Example: Slow batching
-    if (none || slowBatching)
-        example_slow_batching(cmd, clientChl, serverChl);
+    example_slow_batching(cmd, clientChl, serverChl);
 
     // Example: Slow batching vs. Fast batching
     //example_slow_vs_fast();

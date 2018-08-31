@@ -57,26 +57,12 @@ namespace apsi
             // Construct shared Evaluator and BatchEncoder
             evaluator_.reset(new Evaluator(seal_context_));
             vector<shared_ptr<FField> > field_vec;
-            if (seal_context_->context_data()->qualifiers().enable_batching)
-            {
-                auto ex_field = FField::Acquire(
-                    params_.exfield_characteristic(),
-                    params_.exfield_degree());
-                batch_encoder_.reset(new BatchEncoder(seal_context_));
-                for (unsigned i = 0; i < batch_encoder_->slot_count(); i++)
-                {
-                    field_vec.emplace_back(ex_field);
-                }
-            }
-            else
-            {
-                ex_batch_encoder_.reset(new FFieldFastBatchEncoder(
-                    params_.exfield_characteristic(),
-                    params_.exfield_degree(),
-                    get_power_of_two(params_.encryption_params().poly_modulus_degree())
-                ));
-                field_vec = ex_batch_encoder_->fields();
-            }
+            ex_batch_encoder_.reset(new FFieldFastBatchEncoder(
+                params_.exfield_characteristic(),
+                params_.exfield_degree(),
+                get_power_of_two(params_.encryption_params().poly_modulus_degree())
+            ));
+            field_vec = ex_batch_encoder_->fields();
 
             // Create SenderDB
             sender_db_.reset(new SenderDB(params_, seal_context_, field_vec));
@@ -140,13 +126,13 @@ namespace apsi
                     //setThreadName("sender_offline_" + std::to_string(i));
                     int thread_context_idx = acquire_thread_context();
                     SenderThreadContext &context = thread_contexts_[thread_context_idx];
-                    sender_db_->batched_randomized_symmetric_polys(context, evaluator_, batch_encoder_, ex_batch_encoder_, total_thread_count_);
+                    sender_db_->batched_randomized_symmetric_polys(context, evaluator_, ex_batch_encoder_, total_thread_count_);
 
                     if (i == 0)
                         stop_watch.set_time_point("symmpoly_done");
                     if (params_.get_label_bit_count())
                     {
-                        sender_db_->batched_interpolate_polys(context, total_thread_count_, evaluator_, batch_encoder_, ex_batch_encoder_);
+                        sender_db_->batched_interpolate_polys(context, total_thread_count_, evaluator_, ex_batch_encoder_);
 
                         if (i == 0)
                             stop_watch.set_time_point("interpolation_done");
@@ -197,10 +183,10 @@ namespace apsi
             // }
             /* Set up and receive keys. */
             PublicKey pub;
-            EvaluationKeys eval;
+            RelinKeys relin;
             receive_pubkey(pub, chl);
-            receive_evalkeys(eval, chl);
-            SenderSessionContext session_context(seal_context_, pub, eval);
+            receive_relinkeys(relin, chl);
+            SenderSessionContext session_context(seal_context_, pub, relin);
 
             if (params_.debug())
             {
@@ -256,24 +242,7 @@ namespace apsi
 
             session_context.decryptor_->decrypt(c, p);
 
-            if (batch_encoder_)
-            {
-                std::vector<u64> integer_batch;
-                batch_encoder_->decompose(p, integer_batch, pool_);
-
-                dest.set_zero();
-
-                for (int i = 0; i < dest.size(); ++i)
-                {
-                    dest.set_coeff_of(i, 0, integer_batch[i]);
-                }
-            }
-            else
-            {
-                ex_batch_encoder_->decompose(p, dest);
-            }
-
-
+            ex_batch_encoder_->decompose(p, dest);
         }
 
         u64 pow(u64 x, u64 p, const seal::SmallModulus& mod)
@@ -546,7 +515,8 @@ namespace apsi
 
                         {
                             stringstream ss;
-                            compressor_->compressed_save(compressedResult, ss);
+                            //compressor_->compressed_save(compressedResult, ss);
+                            compressedResult.save(ss);
                             pkg.data = ss.str();
                         }
 
@@ -556,7 +526,8 @@ namespace apsi
                             compressor_->mod_switch(label_results[currResult], compressedResult);
 
                             stringstream ss;
-                            compressor_->compressed_save(compressedResult, ss);
+                            //compressor_->compressed_save(compressedResult, ss);
+                            compressedResult.save(ss);
                             pkg.label_data = ss.str();
                         }
 
@@ -619,7 +590,7 @@ namespace apsi
 
 
                 evaluator_->multiply(batch_powers[node.inputs_[0]], batch_powers[node.inputs_[1]], batch_powers[node.output_], local_pool);
-                evaluator_->relinearize(batch_powers[node.output_], session_context.evaluation_keys_, local_pool);
+                evaluator_->relinearize(batch_powers[node.output_], session_context.relin_keys_, local_pool);
 
                 // a simple write should be sufficient but lets be safe
                 exp = WindowingDag::NodeState::Pending;
@@ -648,7 +619,7 @@ namespace apsi
             //        //batch_powers2.emplace_back(local_pool);
             //        std::cout << i1 << " * " << i2 << " -> " << i << std::endl;
             //        //evaluator_->multiply(batch_powers[i1], batch_powers[i2], batch_powers[i], local_pool);
-            //        //evaluator_->relinearize(batch_powers[i], session_context.evaluation_keys_, batch_powers[i], local_pool);
+            //        //evaluator_->relinearize(batch_powers[i], session_context.relin_keys_, batch_powers[i], local_pool);
             //    }
             //}
 

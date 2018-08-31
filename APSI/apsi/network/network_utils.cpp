@@ -105,14 +105,14 @@ namespace apsi
         }
     }
 
-    void send_evalkeys(const seal::EvaluationKeys &keys, Channel &channel)
+    void send_relinkeys(const seal::RelinKeys &keys, Channel &channel)
     {
         stringstream ss;
         keys.save(ss);
         channel.send(ss.str());
     }
 
-    void receive_evalkeys(seal::EvaluationKeys &keys, Channel &channel)
+    void receive_relinkeys(seal::RelinKeys &keys, Channel &channel)
     {
         string buff;
         channel.receive(buff);

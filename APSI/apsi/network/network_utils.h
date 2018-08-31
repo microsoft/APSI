@@ -1,7 +1,7 @@
 #pragma once
 
 #include "seal/ciphertext.h"
-#include "seal/evaluationkeys.h"
+#include "seal/relinkeys.h"
 #include "seal/publickey.h"
 #include "seal/secretkey.h"
 #include "seal/plaintext.h"
@@ -32,9 +32,9 @@ namespace apsi
 
     void receive_compressed_ciphertext(const CiphertextCompressor &compressor, std::vector<seal::Ciphertext> &ciphers, apsi::network::Channel &channel);
 
-    void send_evalkeys(const seal::EvaluationKeys &keys, apsi::network::Channel &channel);
+    void send_relinkeys(const seal::RelinKeys &keys, apsi::network::Channel &channel);
 
-    void receive_evalkeys(seal::EvaluationKeys &keys, apsi::network::Channel &channel);
+    void receive_relinkeys(seal::RelinKeys &keys, apsi::network::Channel &channel);
 
     void send_pubkey(const seal::PublicKey &pubkey, apsi::network::Channel &channel);
 

@@ -29,7 +29,6 @@
 #include "seal/encryptionparams.h"
 #include "seal/ciphertext.h"
 #include "seal/context.h"
-#include "seal/batchencoder.h"
 #include "seal/evaluator.h"
 
 
@@ -170,8 +169,6 @@ namespace apsi
             std::shared_ptr<seal::SEALContext> seal_context_;
 
             std::shared_ptr<seal::Evaluator> evaluator_;
-
-            std::shared_ptr<seal::BatchEncoder> batch_encoder_;
 
             std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder_;
 

@@ -24,22 +24,16 @@ namespace apsi
             TCLAP::ValueArg<int> threadsArg("t", "threads", "Number of threads to use", /* req */ false, /* value */ 1, "int");
             add(threadsArg);
 
-            TCLAP::SwitchArg fastBatchingArg("f", "fast", "Use fast batching for APSI", /* default_val */ false);
-            add(fastBatchingArg);
-
-            TCLAP::SwitchArg slowBatchingArg("s", "slow", "Use slow batching for APSI", /* default_val */ false);
-            add(slowBatchingArg);
-
-            TCLAP::ValueArg<unsigned> senderSzArg("", "senderSize", "Size of sender database", false, 20, "unsigned");
+            TCLAP::ValueArg<unsigned> senderSzArg("s", "senderSize", "Size of sender database", false, 20, "unsigned");
             add(senderSzArg);
 
             TCLAP::ValueArg<unsigned> secLvlArg("", "secLevel", "Security level", false, 40, "unsigned");
             add(secLvlArg);
 
-            TCLAP::ValueArg<unsigned> itmBitLengthArg("", "itemBitLength", "Item bit length", false, 60, "unsigned");
+            TCLAP::ValueArg<unsigned> itmBitLengthArg("b", "itemBitLength", "Item bit length", false, 60, "unsigned");
             add(itmBitLengthArg);
 
-            TCLAP::SwitchArg labelsArg("", "useLabels", "Use labels", false);
+            TCLAP::SwitchArg labelsArg("l", "useLabels", "Use labels", false);
             add(labelsArg);
 
             TCLAP::ValueArg<int> logTblSzArg("", "logTableSize", "Table Size", false, 10, "int");
@@ -48,7 +42,7 @@ namespace apsi
             TCLAP::ValueArg<int> splitCntArg("", "splitCount", "Split count", false, 128, "int");
             add(splitCntArg);
 
-            TCLAP::ValueArg<int> wndSzArg("", "windowSize", "Widow size", false, 1, "int");
+            TCLAP::ValueArg<int> wndSzArg("w", "windowSize", "Window size", false, 1, "int");
             add(wndSzArg);
 
             TCLAP::ValueArg<int> polyModArg("", "polyModulus", "Poly Modulus degree", false, 4096, "int");
@@ -69,7 +63,7 @@ namespace apsi
             TCLAP::SwitchArg oprfArg("o", "oprf", "Use OPRF", false);
             add(oprfArg);
 
-            TCLAP::ValueArg<int> recThrArg("", "recThreads", "Receiver threads", false, 1, "int");
+            TCLAP::ValueArg<int> recThrArg("r", "recThreads", "Receiver threads", false, 1, "int");
             add(recThrArg);
 
             try
@@ -78,12 +72,6 @@ namespace apsi
 
                 threads_ = threadsArg.getValue();
                 cout_param("threads", threads_);
-
-                fast_ = fastBatchingArg.getValue();
-                cout_param("fast", fast_ ? "true" : "false");
-
-                slow_ = slowBatchingArg.getValue();
-                cout_param("slow", slow_ ? "true" : "false");
 
                 sender_size_ = senderSzArg.getValue();
                 cout_param("senderSize", sender_size_);
@@ -140,6 +128,8 @@ namespace apsi
 
                 rec_threads_ = recThrArg.getValue();
                 cout_param("recThreads", rec_threads_);
+
+                std::cout << std::endl;
             }
             catch (...)
             {
@@ -151,8 +141,6 @@ namespace apsi
         }
 
         int threads() const { return threads_; }
-        bool fast() const { return fast_; }
-        bool slow() const { return slow_; }
         unsigned sender_size() const { return sender_size_; }
         unsigned sec_level() const { return sec_level_; }
         unsigned item_bit_length() const { return item_bit_length_; }
@@ -176,8 +164,6 @@ namespace apsi
 
         // Parameters from command line
         int threads_;
-        bool fast_;
-        bool slow_;
         unsigned sender_size_;
         unsigned sec_level_;
         unsigned item_bit_length_;
@@ -199,11 +185,11 @@ namespace apsi
         {
             std::ostringstream ss;
             ss << param_name << "=" << param;
-            cout << setw(column_width) << left << ss.str();
+            std::cout << std::setw(column_width) << std::left << ss.str();
             param_cols++;
             if (param_cols >= column_number)
             {
-                cout << endl;
+                std::cout << std::endl;
                 param_cols = 0;
             }
         }
