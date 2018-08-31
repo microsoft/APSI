@@ -24,16 +24,16 @@ namespace apsi
             TCLAP::ValueArg<int> threadsArg("t", "threads", "Number of threads to use", /* req */ false, /* value */ 1, "int");
             add(threadsArg);
 
-            TCLAP::ValueArg<unsigned> senderSzArg("", "senderSize", "Size of sender database", false, 20, "unsigned");
+            TCLAP::ValueArg<unsigned> senderSzArg("s", "senderSize", "Size of sender database", false, 20, "unsigned");
             add(senderSzArg);
 
             TCLAP::ValueArg<unsigned> secLvlArg("", "secLevel", "Security level", false, 40, "unsigned");
             add(secLvlArg);
 
-            TCLAP::ValueArg<unsigned> itmBitLengthArg("", "itemBitLength", "Item bit length", false, 60, "unsigned");
+            TCLAP::ValueArg<unsigned> itmBitLengthArg("b", "itemBitLength", "Item bit length", false, 60, "unsigned");
             add(itmBitLengthArg);
 
-            TCLAP::SwitchArg labelsArg("", "useLabels", "Use labels", false);
+            TCLAP::SwitchArg labelsArg("l", "useLabels", "Use labels", false);
             add(labelsArg);
 
             TCLAP::ValueArg<int> logTblSzArg("", "logTableSize", "Table Size", false, 10, "int");
@@ -42,7 +42,7 @@ namespace apsi
             TCLAP::ValueArg<int> splitCntArg("", "splitCount", "Split count", false, 128, "int");
             add(splitCntArg);
 
-            TCLAP::ValueArg<int> wndSzArg("", "windowSize", "Widow size", false, 1, "int");
+            TCLAP::ValueArg<int> wndSzArg("w", "windowSize", "Window size", false, 1, "int");
             add(wndSzArg);
 
             TCLAP::ValueArg<int> polyModArg("", "polyModulus", "Poly Modulus degree", false, 4096, "int");
@@ -63,7 +63,7 @@ namespace apsi
             TCLAP::SwitchArg oprfArg("o", "oprf", "Use OPRF", false);
             add(oprfArg);
 
-            TCLAP::ValueArg<int> recThrArg("", "recThreads", "Receiver threads", false, 1, "int");
+            TCLAP::ValueArg<int> recThrArg("r", "recThreads", "Receiver threads", false, 1, "int");
             add(recThrArg);
 
             try

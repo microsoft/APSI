@@ -515,7 +515,8 @@ namespace apsi
 
                         {
                             stringstream ss;
-                            compressor_->compressed_save(compressedResult, ss);
+                            //compressor_->compressed_save(compressedResult, ss);
+                            compressedResult.save(ss);
                             pkg.data = ss.str();
                         }
 
@@ -525,7 +526,8 @@ namespace apsi
                             compressor_->mod_switch(label_results[currResult], compressedResult);
 
                             stringstream ss;
-                            compressor_->compressed_save(compressedResult, ss);
+                            //compressor_->compressed_save(compressedResult, ss);
+                            compressedResult.save(ss);
                             pkg.label_data = ss.str();
                         }
 

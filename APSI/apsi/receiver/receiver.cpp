@@ -471,8 +471,8 @@ namespace apsi
                     // recover the sym poly values 
                     has_result = false;
                     stringstream ss(pkg.first.data);
-                    compressor_->compressed_load(ss, tmp);
-                    // tmp.load(ss);
+                    //compressor_->compressed_load(ss, tmp);
+                    tmp.load(ss);
 
                     if (first && t == 0)
                     {
@@ -482,8 +482,6 @@ namespace apsi
                     }
 
                     decryptor_->decrypt(tmp, p, local_pool);
-
-                    //vector<uint64_t> integer_batch(batch_size);
                     ex_batch_encoder_->decompose(p, *batch);
 
                     for (int k = 0; k < integer_batch.size(); k++)
@@ -496,30 +494,16 @@ namespace apsi
                         if (is_zero)
                         {
                             has_result = true;
-
-                            //std::cout << "hit   " << (block)items[idx] <<" @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << std::endl;
                             ret_bools[idx] = true;
                         }
-
-
-                        //if (idx!= -1 && short_strings == false)
-                        //{
-                        //    std::cout << "item[" << idx << "]  " << (block)items[idx] << " @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << std::endl
-                        //        << "     " << batch.get(k) << std::endl;;
-
-                        //}
-                        //if (k < 10) std::cout << (k ? ", " : "") << integer_batch[k];
                     }
-                    //std::cout << "..." << endl;
-
 
                     if (has_result && params_.get_label_bit_count())
                     {
                         std::stringstream ss(pkg.first.label_data);
 
-                        //std::cout << pkg.batch_idx << " " << pkg.split_idx << " " << std::endl;
-                        // tmp.load(ss);
-                        compressor_->compressed_load(ss, tmp);
+                        tmp.load(ss);
+                        //compressor_->compressed_load(ss, tmp);
 
                         decryptor_->decrypt(tmp, p, local_pool);
 
@@ -533,11 +517,7 @@ namespace apsi
                             if (has_label[k])
                             {
                                 auto idx = table_to_input_map[base_idx + k];
-
-                                //std::cout << "label["<< idx<<"] " << items[idx] << " @ (" << pkg.batch_idx << ", " << pkg.split_idx << ") @ " << base_idx + k << "  ~  " <<std::hex<< integer_batch[k] <<std::dec << std::endl;
                                 batch->get(k).decode(ret_labels[idx], params_.get_label_bit_count());
-                                //throw runtime_error("not implemented");
-                                // src = (u8*)batch[k].pointer(0);
                             }
                         }
                     }
