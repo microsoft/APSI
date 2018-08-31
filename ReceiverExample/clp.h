@@ -128,6 +128,8 @@ namespace apsi
 
                 rec_threads_ = recThrArg.getValue();
                 cout_param("recThreads", rec_threads_);
+
+                std::cout << std::endl;
             }
             catch (...)
             {
@@ -183,11 +185,11 @@ namespace apsi
         {
             std::ostringstream ss;
             ss << param_name << "=" << param;
-            cout << setw(column_width) << left << ss.str();
+            std::cout << std::setw(column_width) << std::left << ss.str();
             param_cols++;
             if (param_cols >= column_number)
             {
-                cout << endl;
+                std::cout << std::endl;
                 param_cols = 0;
             }
         }
