@@ -1,13 +1,17 @@
-#include "seal/util/polyarithsmallmod.h"
+// STD
+#include <mutex>
+
+// APSI
 #include "apsi/tools/interpolate.h"
 #include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_array.h"
-#include <mutex>
+
+// SEAL
+#include "seal/util/polyarithsmallmod.h"
 
 using namespace std;
 using namespace seal;
 using namespace seal::util;
-using namespace oc;
 
 namespace apsi
 {
@@ -107,8 +111,8 @@ namespace apsi
     }
 
     void u64_newton_interpolate_poly(
-        oc::span<pair<uint64_t, uint64_t> > input,
-        oc::span<uint64_t> result,
+        gsl::span<pair<uint64_t, uint64_t> > input,
+        gsl::span<uint64_t> result,
         const seal::SmallModulus &plain_modulus)
     {
         int size = input.size();

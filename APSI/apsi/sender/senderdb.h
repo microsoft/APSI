@@ -7,6 +7,9 @@
 #include <atomic>
 #include <unordered_set>
 
+// GSL
+#include <gsl/span>
+
 // APSI
 #include "apsi/item.h"
 #include "apsi/apsidefines.h"
@@ -95,7 +98,7 @@ namespace apsi
             // the number of items that are in a split. 
             int items_per_split_;
 
-            oc::span<seal::Plaintext> batch_random_symm_poly_;
+            gsl::span<seal::Plaintext> batch_random_symm_poly_;
 
             std::vector<seal::Plaintext> batched_label_coeffs_;
 
@@ -197,34 +200,20 @@ namespace apsi
             /**
             Sets the sender's database by hashing the data items with all hash functions.
             */
-            void set_data(oc::span<const Item> keys, int thread_count);
-            void set_data(oc::span<const Item> keys, MatrixView<u8> values, int thread_count);
+            void set_data(gsl::span<const Item> keys, int thread_count);
+            void set_data(gsl::span<const Item> keys, MatrixView<u8> values, int thread_count);
 
 
             /**
             Adds the data items to sender's database.
             */
-            void add_data(oc::span<const Item> keys, int thread_count);
-            void add_data(oc::span<const Item> keys, MatrixView<u8> values, int thread_count);
+            void add_data(gsl::span<const Item> keys, int thread_count);
+            void add_data(gsl::span<const Item> keys, MatrixView<u8> values, int thread_count);
 
             /**
             Adds one item to sender's database.
             */
             void add_data(const Item &item, int thread_count);
-
-            /**
-            Deletes the data items in the sender's database. Items are ignored if they don't exist in the database.
-            */
-            //void delete_data(oc::span<const Item> data);
-
-            /**
-            Deletes one item in sender's database. The item is ignored if it doesn't exist in the database.
-            */
-            //void delete_data(const Item &item);
-
-            //void save(std::ostream &stream) const;
-
-            //void load(std::istream &stream);
 
             /**
             Batches the randomized symmetric polynonmials for the specified split and the specified batch in sender's database.

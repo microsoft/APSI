@@ -5,7 +5,6 @@
 
 using namespace seal;
 using namespace std;
-using namespace oc;
 
 namespace apsi
 {

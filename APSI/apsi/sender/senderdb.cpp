@@ -1,3 +1,4 @@
+// STD
 #include <fstream>
 #include <algorithm>
 #include <memory>
@@ -6,24 +7,29 @@
 #include <unordered_set>
 #include <iomanip>
 
+// APSI
 #include "apsi/sender/senderdb.h"
 #include "apsi/apsidefines.h"
 #include "apsi/tools/interpolate.h"
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/tools/ec_utils.h"
 #include "apsi/tools/prng.h"
+#include "apsi/tools/utils.h"
 
+// SEAL
 #include "seal/evaluator.h"
 #include "seal/batchencoder.h"
 #include "seal/util/uintcore.h"
 
+// FourQ
 #include "FourQ_api.h"
+
+// crypto++
 #include "cryptopp/sha3.h"
 
 using namespace std;
 using namespace seal;
 using namespace seal::util;
-using namespace oc;
 using namespace apsi::tools;
 
 namespace apsi
@@ -51,7 +57,7 @@ namespace apsi
             }
 
 #ifdef USE_SECURE_SEED
-            prng_.set_seed(oc::sysRandomSeed());
+            prng_.set_seed(sysRandomSeed());
 #else
             TODO("***************** INSECURE *****************, define USE_SECURE_SEED to fix");
             prng_.set_seed(OneBlock, /* buffer_size */ 256);
@@ -108,12 +114,12 @@ namespace apsi
             //}
         }
 
-        void SenderDB::set_data(oc::span<const Item> data, int thread_count)
+        void SenderDB::set_data(gsl::span<const Item> data, int thread_count)
         {
             set_data(data, {}, thread_count);
         }
 
-        void SenderDB::set_data(oc::span<const Item> data, MatrixView<u8> vals, int thread_count)
+        void SenderDB::set_data(gsl::span<const Item> data, MatrixView<u8> vals, int thread_count)
         {
             clear_db();
             add_data(data, vals, thread_count);
@@ -133,7 +139,7 @@ namespace apsi
             return ss.str();
         }
 
-        void SenderDB::add_data(oc::span<const Item> data, MatrixView<u8> values, int thread_count)
+        void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int thread_count)
         {
             if (values.stride() != params_.get_label_byte_count())
                 throw std::invalid_argument("unexpacted label length");
@@ -293,23 +299,9 @@ namespace apsi
                 }
 
             }
-
-            //for (u64 i = 0; i < blk_.size(); ++i)
-            //{
-
-            //    auto& pos = pos_[i];
-            //    auto& db_block = *blk_[i];
-            //    auto key = db_block.get_key(pos_[i]);
-
-
-            //    std::cout << "key " << (block)key << " -> block ("
-            //        << db_block.batch_idx_ << ", " << db_block.split_idx_ << ") "
-            //        << " @ " << pos.batch_offset << " " << pos.split_offset
-            //        << " " << hexStr(db_block.get_label(pos), params_.get_label_byte_count()) << std::endl;
-            //}
         }
 
-        void SenderDB::add_data(oc::span<const Item> data, int thread_count)
+        void SenderDB::add_data(gsl::span<const Item> data, int thread_count)
         {
             add_data(data, {}, thread_count);
         }
@@ -340,7 +332,7 @@ namespace apsi
         {
             if (bin_idx >= items_per_batch_)
             {
-                throw runtime_error(LOCATION);
+                throw runtime_error("bin_idx should be smaller than items_per_batch");
             }
 
             int idx = 0;
@@ -350,7 +342,7 @@ namespace apsi
             // For 100 tries, guess a bin location can try to insert item there
             for (int i = 0; i < 100; i++)
             {
-                idx = prng.get<oc::u32>() % items_per_split_;
+                idx = prng.get<apsi::u32>() % items_per_split_;
 
                 bool exp = false;
                 if (has_item_[start + idx].compare_exchange_strong(exp, true))
@@ -707,10 +699,10 @@ namespace apsi
                 if (i < size)
                 {
                     std::vector<u8> buff((bit_count + 7) / 8);
-                    x.get(i).decode(span<u8>{buff}, bit_count);
+                    x.get(i).decode(gsl::span<u8>{buff}, bit_count);
                     std::cout << "x=" << hexStr(buff.data(), buff.size()) << " -> ";
 
-                    sum.decode(span<u8>{buff}, bit_count);
+                    sum.decode(gsl::span<u8>{buff}, bit_count);
                     std::cout << hexStr(buff.data(), buff.size()) << std::endl;
                 }
             }
@@ -763,11 +755,11 @@ namespace apsi
                         if (has_item(pos))
                         {
                             auto& key_item = get_key(pos);
-                            temp.encode(span<u64>{key_item.value_}, params.get_label_bit_count());
+                            temp.encode(gsl::span<u64>{key_item.value_}, params.get_label_bit_count());
                             x.set(size, temp);
 
                             auto src = get_label(pos);
-                            temp.encode(span<u8>{src, value_byte_length_}, params.get_label_bit_count());
+                            temp.encode(gsl::span<u8>{src, value_byte_length_}, params.get_label_bit_count());
                             y.set(size, temp);
 
                             //if (key_item.data()[0] < 25)
@@ -832,7 +824,7 @@ namespace apsi
 
                         if (cache.key_set.find(cache.temp_vec[0]) == cache.key_set.end())
                         {
-                            temp.encode(span<u64>{cache.temp_vec}, params.get_label_bit_count());
+                            temp.encode(gsl::span<u64>{cache.temp_vec}, params.get_label_bit_count());
 
                             x.set(size, temp);
                             y.set(size, temp);
@@ -842,29 +834,19 @@ namespace apsi
                         ++cache.temp_vec[0];
                     }
 
-                    //coeffs.emplace_back(ex_batch_encoder->field(pos.batch_offset), items_per_split_);
-
-                    //ffield_newton_interpolate_poly(x, y, coeffs.back());
-
 
                     ffield_newton_interpolate_poly(
                         x, y,
                         // We don't use the cache for divided differences.
                         // cache.div_diff_temp[pos.batch_offset],
                         cache.coeff_temp[pos.batch_offset]);
-
-                    //test_interp_poly(x, y, 
-                    //    cache.coeff_temp[pos.batch_offset], 
-                    //    trueSize,
-                    //    params.get_label_bit_count());
                 }
 
                 batched_label_coeffs_.resize(items_per_split_);
 
-                /// We assume there are all the same
+                // We assume there are all the same
                 auto degree = th_context.exfield()[0]->d();
                 FFieldArray temp_array(ex_batch_encoder->create_array());
-                //FFieldElt elem(context.exfield());
                 for (int s = 0; s < items_per_split_; s++)
                 {
                     Plaintext &batched_coeff = batched_label_coeffs_[s];
@@ -1006,7 +988,7 @@ namespace apsi
             }
         }
 
-        std::vector<u64> add_(span<u64> x, span<u64> y, const seal::SmallModulus& mod)
+        std::vector<u64> add_(gsl::span<u64> x, gsl::span<u64> y, const seal::SmallModulus& mod)
         {
             std::vector<u64> r(x.size());
             for (int i = 0; i < r.size(); ++i)
@@ -1027,14 +1009,14 @@ namespace apsi
             return x;
         }
 
-        std::vector<oc::u64> debug_eval_term(
+        std::vector<apsi::u64> debug_eval_term(
             int term,
             MatrixView<u64> coeffs,
-            oc::span<u64> x,
+            gsl::span<u64> x,
             const seal::SmallModulus& mod)
         {
             if (x.size() != coeffs.rows())
-                throw std::runtime_error(LOCATION);
+                throw std::runtime_error("Size of x should be the same as coeffs.rows");
 
             std::vector<u64> r(x.size());
 

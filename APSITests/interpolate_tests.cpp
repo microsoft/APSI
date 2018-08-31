@@ -9,6 +9,7 @@
 #include <cppunit/extensions/HelperMacros.h>
 
 using namespace APSITests;
+using namespace apsi;
 
 std::string toString(seal::Plaintext &ptxt, int coeff_count = 0) {
     if (coeff_count == 0) {
@@ -32,13 +33,13 @@ std::string toString(seal::Plaintext &ptxt, int coeff_count = 0) {
 
 
 // return poly(x) 
-oc::u64 u64_poly_eval(
-    const std::vector<oc::u64>& poly,
-    const oc::u64& x,
+u64 u64_poly_eval(
+    const std::vector<u64>& poly,
+    const u64& x,
     const seal::SmallModulus& mod)
 {
     //std::cout << "f(" << x << ") = ";
-    oc::u64 result = 0, xx = 1;
+    u64 result = 0, xx = 1;
 
     for (int i = 0; i < poly.size(); ++i)
     {
@@ -50,8 +51,6 @@ oc::u64 u64_poly_eval(
 
 void InterpolateTests::u64_interpolate_test()
 {
-    using oc::u64;
-
     seal::EncryptionParameters parms(seal::scheme_type::BFV);
     parms.set_poly_modulus_degree(64);
     parms.set_coeff_modulus(seal::coeff_modulus_128(1024));
@@ -74,30 +73,17 @@ void InterpolateTests::u64_interpolate_test()
         for (int i = 0; i < points.size(); i++) {
             points[i].first = i;
             points[i].second = prng.get<uint64_t>() % plain_modulus.value();
-
-            //std::cout << "( " << points[i].first << ", " << points[i].second << ") ";
         }
-        //std::cout << std::endl;
-        //points[2].second[0] = 1;
 
-        //for (int i = 0; i < points.size(); i++) {
-        //        for (int j = 0; j < points[i].first.coeff_count(); j++) {
-
-        //                cout << points[i].first.pointer()[j] << ", ";
-        //        }
-        //        cout << endl;
-        //}
         auto pool = seal::MemoryPoolHandle::Global();
         std::vector<u64> result(points.size());
 
         apsi::u64_newton_interpolate_poly(points, result, plain_modulus);
-        //apsi::plaintext_newton_interpolate_poly(points, result, poly_modulus.pointer(), plain_modulus, pool, true);
 
         for (int i = 0; i < points.size(); ++i)
         {
             auto& x = points[i].first;
             auto& y = points[i].second;
-            //auto yy = plaintext_poly_evaluate(result, x, context);
             auto yy = u64_poly_eval(result, x, plain_modulus);
             if (yy != y)
             {
@@ -106,13 +92,6 @@ void InterpolateTests::u64_interpolate_test()
                     << "y[" << i << "] = " << y << std::endl;
                 CPPUNIT_FAIL("Test failed.");
             }
-            //else
-            //{
-
-            //    std::cout << " poly(x[" << i << "]) = " << yy
-            //        << "  == \n"
-            //        << "y[" << i << "] = " << (y) << std::endl;
-            //}
         }
     }
 }

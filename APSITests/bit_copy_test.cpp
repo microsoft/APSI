@@ -1,9 +1,18 @@
 #include "bit_copy_test.h"
 #include "apsi/ffield/ffield_elt.h"
 
-using namespace oc;
 using namespace APSITests;
+using namespace apsi;
 using namespace apsi::tools;
+
+namespace
+{
+    block toBlock(int i)
+    {
+        block result = _mm_set_epi64x(0, (u64)i);
+        return result;
+    }
+}
 
 void BitCopyTests::bit_copy_test()
 {

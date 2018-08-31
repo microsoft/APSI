@@ -8,6 +8,9 @@
 #include <iostream>
 #include <map>
 
+// GSL
+#include <gsl/span>
+
 // APSI
 #include "apsi/item.h"
 #include "apsi/psiparams.h"
@@ -46,7 +49,7 @@ namespace apsi
             {
                 std::unique_ptr<std::atomic<int>> next_node_;
                 std::unique_ptr<std::atomic<NodeState>[]> node_state_storage_;
-                oc::span<std::atomic<NodeState>> nodes_;
+                gsl::span<std::atomic<NodeState>> nodes_;
 
                 State(WindowingDag& dag);
             };
@@ -194,9 +197,9 @@ namespace apsi
                 const seal::Ciphertext& c,
                 FFieldArray& dest);
 
-            std::vector<oc::u64> debug_eval_term(
+            std::vector<apsi::u64> debug_eval_term(
                 int term, MatrixView<apsi::u64> coeffs, 
-                oc::span<oc::u64> x,
+                gsl::span<apsi::u64> x,
                 const seal::SmallModulus& mod,
                 bool print = false);
 
