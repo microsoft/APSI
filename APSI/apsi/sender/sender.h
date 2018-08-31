@@ -8,6 +8,9 @@
 #include <iostream>
 #include <map>
 
+// GSL
+#include <gsl/span>
+
 // APSI
 #include "apsi/item.h"
 #include "apsi/psiparams.h"
@@ -19,6 +22,7 @@
 #include "apsi/tools/sealcompress.h"
 #include "apsi/tools/matrixview.h"
 #include "apsi/tools/prng.h"
+#include "apsi/network/channel.h"
 
 // SEAL
 #include "seal/memorypoolhandle.h"
@@ -27,8 +31,6 @@
 #include "seal/context.h"
 #include "seal/evaluator.h"
 
-// CryptoTools
-#include "cryptoTools/Network/IOService.h"
 
 namespace apsi
 {
@@ -46,7 +48,7 @@ namespace apsi
             {
                 std::unique_ptr<std::atomic<int>> next_node_;
                 std::unique_ptr<std::atomic<NodeState>[]> node_state_storage_;
-                oc::span<std::atomic<NodeState>> nodes_;
+                gsl::span<std::atomic<NodeState>> nodes_;
 
                 State(WindowingDag& dag);
             };
@@ -71,7 +73,7 @@ namespace apsi
 
             u64 pow(u64 base, u64 e);
             uint64_t optimal_split(uint64_t x, int base);
-            vector<uint64_t> conversion_to_digits(uint64_t input, int base);
+            std::vector<uint64_t> conversion_to_digits(uint64_t input, int base);
             void compute_dag();
         };
 
@@ -97,7 +99,7 @@ namespace apsi
             */
             void load_db(const std::vector<Item> &data, MatrixView<u8> vals = {});
 
-            void query_session(oc::Channel& channel);
+            void query_session(apsi::network::Channel& channel);
 
             void stop();
 
@@ -139,7 +141,7 @@ namespace apsi
             @see compute_dot_product for an explanation of the result.
             */
             void respond(std::vector<std::vector<seal::Ciphertext> > &query,
-                apsi::sender::SenderSessionContext &session_context, oc::Channel &channel);
+                apsi::sender::SenderSessionContext &session_context, apsi::network::Channel &channel);
 
             /**
             Constructs all powers of receiver's items for the specified batch, based on the powers sent from the receiver. For example, if the
@@ -192,9 +194,9 @@ namespace apsi
                 const seal::Ciphertext& c,
                 FFieldArray& dest);
 
-            std::vector<oc::u64> debug_eval_term(
+            std::vector<apsi::u64> debug_eval_term(
                 int term, MatrixView<apsi::u64> coeffs, 
-                oc::span<oc::u64> x,
+                gsl::span<apsi::u64> x,
                 const seal::SmallModulus& mod,
                 bool print = false);
 
@@ -202,7 +204,6 @@ namespace apsi
                 FFieldArray& true_x,
                 const seal::Ciphertext& c,
                 SenderSessionContext& ctx);
-
         };
     }
 }

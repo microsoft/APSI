@@ -89,15 +89,16 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);c:\progs\Libs\SEAL\include;c:\progs\Libs\boost-1.65.1\include;c:\progs\Libs\cryptoTools\include;c:\progs\Libs\Cuckoo\include;c:\progs\Libs\flint2\include;c:\progs\Libs\FourQlib\include;c:\progs\Libs\GSL;c:\progs\Libs\miracl\include;c:\progs\Libs\mpfr\include;c:\progs\Libs\mpir\include;c:\progs\Libs\pthreads4w-3.0.0\include;c:\progs\Libs\cryptopp700\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);c:\progs\Libs\SEAL\include;c:\progs\Libs\Cuckoo\include;c:\Progs\Libs\boost-1.65.1\include;c:\progs\Libs\flint2\include;c:\progs\Libs\FourQlib\include;c:\progs\Libs\GSL;c:\progs\Libs\mpfr\include;c:\progs\Libs\mpir\include;c:\progs\Libs\pthreads4w-3.0.0\include;c:\progs\Libs\cryptopp700\include;c:\progs\Libs\libzmqpp\include;c:\progs\Libs\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <ShowIncludes>false</ShowIncludes>
     </ClCompile>
     <Lib>
-      <AdditionalDependencies>SEAL.lib;miracl.lib;cryptoTools.lib;cuckoo.lib;FourQ.lib</AdditionalDependencies>
+      <AdditionalDependencies>SEAL.lib;cuckoo.lib;FourQ.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\x64\$(Configuration)\;c:\Progs\Libs\SEAL\lib\$(IntDir);c:\Progs\Libs\Cuckoo\lib\$(IntDir);c:\Progs\Libs\cryptoTools\lib\$(IntDir);c:\Progs\Libs\boost-1.65.1\lib;c:\Progs\Libs\miracl\lib\$(IntDir);c:\Progs\Libs\FourQlib\lib\$(IntDir);c:\Progs\Libs\cryptopp700\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\x64\$(Configuration)\;c:\Progs\Libs\SEAL\lib\$(IntDir);c:\Progs\Libs\Cuckoo\lib\$(IntDir);c:\Progs\Libs\boost-1.65.1\lib;c:\Progs\Libs\FourQlib\lib\$(IntDir);c:\Progs\Libs\cryptopp700\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -120,19 +121,20 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);c:\progs\Libs\SEAL\include;c:\progs\Libs\boost-1.65.1\include;c:\progs\Libs\cryptoTools\include;c:\progs\Libs\Cuckoo\include;c:\progs\Libs\flint2\include;c:\progs\Libs\FourQlib\include;c:\progs\Libs\GSL;c:\progs\Libs\miracl\include;c:\progs\Libs\mpfr\include;c:\progs\Libs\mpir\include;c:\progs\Libs\pthreads4w-3.0.0\include;c:\progs\Libs\cryptopp700\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);c:\progs\Libs\SEAL\include;c:\progs\Libs\Cuckoo\include;c:\Progs\Libs\boost-1.65.1\include;c:\progs\Libs\flint2\include;c:\progs\Libs\FourQlib\include;c:\progs\Libs\GSL;c:\progs\Libs\mpfr\include;c:\progs\Libs\mpir\include;c:\progs\Libs\pthreads4w-3.0.0\include;c:\progs\Libs\cryptopp700\include;c:\progs\Libs\libzmqpp\include;c:\progs\Libs\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <ShowIncludes>false</ShowIncludes>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <Lib>
-      <AdditionalDependencies>SEAL.lib;miracl.lib;cryptoTools.lib;cuckoo.lib;FourQ.lib</AdditionalDependencies>
+      <AdditionalDependencies>SEAL.lib;cuckoo.lib;FourQ.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\x64\$(Configuration)\;c:\Progs\Libs\SEAL\lib\$(IntDir);c:\Progs\Libs\Cuckoo\lib\$(IntDir);c:\Progs\Libs\cryptoTools\lib\$(IntDir);c:\Progs\Libs\boost-1.65.1\lib;c:\Progs\Libs\miracl\lib\$(IntDir);c:\Progs\Libs\FourQlib\lib\$(IntDir);c:\Progs\Libs\cryptopp700\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\x64\$(Configuration)\;c:\Progs\Libs\SEAL\lib\$(IntDir);c:\Progs\Libs\Cuckoo\lib\$(IntDir);c:\Progs\Libs\boost-1.65.1\lib;c:\Progs\Libs\FourQlib\lib\$(IntDir);c:\Progs\Libs\cryptopp700\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -146,10 +148,12 @@
     <ClInclude Include="apsi\ffield\ffield_ntt.h" />
     <ClInclude Include="apsi\ffield\ffield_poly.h" />
     <ClInclude Include="apsi\item.h" />
+    <ClInclude Include="apsi\network\channel.h" />
     <ClInclude Include="apsi\Network\network_utils.h" />
     <ClInclude Include="apsi\plaintextarith.h" />
     <ClInclude Include="apsi\psiparams.h" />
     <ClInclude Include="apsi\Receiver\receiver.h" />
+    <ClInclude Include="apsi\result_package.h" />
     <ClInclude Include="apsi\Sender\sender.h" />
     <ClInclude Include="apsi\Sender\senderdb.h" />
     <ClInclude Include="apsi\Sender\sendersessioncontext.h" />
@@ -157,10 +161,12 @@
     <ClInclude Include="apsi\tools\aes.h" />
     <ClInclude Include="apsi\tools\binsizemath.h" />
     <ClInclude Include="apsi\Tools\interpolate.h" />
+    <ClInclude Include="apsi\tools\matrix.h" />
     <ClInclude Include="apsi\tools\prng.h" />
     <ClInclude Include="apsi\Tools\sealcompress.h" />
     <ClInclude Include="apsi\Tools\stopwatch.h" />
     <ClInclude Include="apsi\Tools\ThreadPool.h" />
+    <ClInclude Include="apsi\tools\ec_utils.h" />
     <ClInclude Include="apsi\tools\utils.h" />
   </ItemGroup>
   <ItemGroup>
@@ -171,6 +177,7 @@
     <ClCompile Include="apsi\ffield\ffield_fast_batch_encoder.cpp" />
     <ClCompile Include="apsi\ffield\ffield_ntt.cpp" />
     <ClCompile Include="apsi\item.cpp" />
+    <ClCompile Include="apsi\network\channel.cpp" />
     <ClCompile Include="apsi\Network\network_utils.cpp" />
     <ClCompile Include="apsi\plaintextarith.cpp" />
     <ClCompile Include="apsi\psiparams.cpp" />
@@ -183,6 +190,7 @@
     <ClCompile Include="apsi\tools\prng.cpp" />
     <ClCompile Include="apsi\Tools\sealcompress.cpp" />
     <ClCompile Include="apsi\Tools\stopwatch.cpp" />
+    <ClCompile Include="apsi\tools\ec_utils.cpp" />
     <ClCompile Include="apsi\tools\utils.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

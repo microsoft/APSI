@@ -5,8 +5,6 @@
 
 namespace apsi
 {
-using namespace std;
-
 /**
  * Simple bi-dimensional Matrix.
  * 
@@ -54,7 +52,7 @@ protected:
     u64 capacity() const { return data_.size(); }
 
 private:
-    vector<T> data_;
+    std::vector<T> data_;
 };
 
 }

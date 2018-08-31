@@ -13,6 +13,7 @@
 #include "plaintextarith.h"
 #include "aes_tests.h"
 #include "prng_tests.h"
+#include "channel_tests.h"
 
 #ifdef _MSC_VER
 #include "Windows.h"
@@ -114,6 +115,7 @@ int run_unit_tests()
     runner.addTest(TestPlainArith::suite());
     runner.addTest(AESTests::suite());
     runner.addTest(PRNGTests::suite());
+    runner.addTest(ChannelTests::suite());
 
     runner.run(controller);
 

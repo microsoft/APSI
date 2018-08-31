@@ -4,6 +4,9 @@
 #include <utility>
 #include <vector>
 
+// GSL
+#include <gsl/span>
+
 // SEAL
 #include "seal/plaintext.h"
 
@@ -11,8 +14,6 @@
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/ffield/ffield_poly.h"
 
-// CryptoTools
-#include "cryptoTools/Common/Defines.h"
 
 namespace apsi
 {
@@ -40,7 +41,7 @@ namespace apsi
     //     bool print = false);
 
     void u64_newton_interpolate_poly(
-        oc::span<std::pair<std::uint64_t, std::uint64_t> > input,
-        oc::span<std::uint64_t> result,
+        gsl::span<std::pair<std::uint64_t, std::uint64_t> > input,
+        gsl::span<std::uint64_t> result,
         const seal::SmallModulus &plain_modulus);
 }

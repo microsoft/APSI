@@ -1,7 +1,6 @@
 #include "apsi/ffield/ffield_elt.h"
 
 using namespace std;
-using namespace oc;
 using namespace gsl;
 
 namespace apsi

@@ -11,6 +11,7 @@
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/tools/sealcompress.h"
 #include "apsi/tools/matrix.h"
+#include "apsi/network/channel.h"
 
 // Cuckoo
 #include "cuckoo/cuckoo.h"
@@ -26,8 +27,6 @@
 #include "seal/relinkeys.h"
 #include "seal/batchencoder.h"
 
-// CryptoTools
-#include "cryptoTools/Network/Channel.h"
 
 namespace apsi
 {
@@ -44,7 +43,7 @@ namespace apsi
             is a same-size vector of bool values. If an item is in the intersection, the corresponding bool value is true on the
             same position in the result vector .
             */
-            std::pair<std::vector<bool>, Matrix<u8>> query(std::vector<Item> &items, oc::Channel& chl);
+            std::pair<std::vector<bool>, Matrix<u8>> query(std::vector<Item> &items, apsi::network::Channel& chl);
 
             /**
             Preprocesses the PSI items. Returns the powr map of the items, and the indices of them in the hash table.
@@ -52,9 +51,9 @@ namespace apsi
             std::pair<
                 std::map<std::uint64_t, std::vector<seal::Ciphertext>>,
                 std::unique_ptr<cuckoo::CuckooInterface>
-            > preprocess(std::vector<Item> &items, oc::Channel& channel);
+            > preprocess(std::vector<Item> &items, apsi::network::Channel& channel);
 
-            void send(const std::map<std::uint64_t, std::vector<seal::Ciphertext>> &query_data, oc::Channel &channel);
+            void send(const std::map<std::uint64_t, std::vector<seal::Ciphertext>> &query_data, apsi::network::Channel &channel);
 
             /**
             Hash all items in the input vector into a cuckoo hashing table.
@@ -107,18 +106,9 @@ namespace apsi
             larger than table_size.
             */
             std::pair<std::vector<bool>, Matrix<u8> > stream_decrypt(
-                oc::Channel &channel,
+                apsi::network::Channel &channel,
                 const std::vector<int>& table_to_input_map,
                 std::vector<Item>& items);
-
-            /**
-            Stream decryption of ciphers from the sender. Ciphertext will be acquired from the sender in a streaming fashion one by one in
-            this function.
-
-            @param[out] result Plaintext matrix of size (#splits x #batches).
-            */
-            // void stream_decrypt(oc::Channel &channel, std::vector<std::vector<seal::Plaintext>> &result);
-
 
             /**
             Decrypts a SEAL Ciphertext to a Plaintext.

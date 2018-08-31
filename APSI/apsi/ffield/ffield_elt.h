@@ -4,9 +4,6 @@
 #include "apsi/ffield/ffield.h"
 #include "apsi/tools/prng.h"
 
-// CryptoTools
-#include "cryptoTools/Common/BitIterator.h"
-
 // GLS
 #include <gsl/span>
 
@@ -18,20 +15,20 @@ namespace apsi
         // Bits are written to dest starting at the first bit. All other bits in 
         // dest are unchanged, e.g. the bit indexed by  [bitLength, bitLength + 1, ...]
         void copy_with_bit_offset(
-            gsl::span<const oc::u8> src,
+            gsl::span<const apsi::u8> src,
             std::int32_t bitOffset,
             int32_t bitLength,
-            gsl::span<oc::u8> dest);
+            gsl::span<apsi::u8> dest);
 
         // Copies bitLength bits from src starting at the bit index by srcBitOffset.
         // Bits are written to dest starting at the destBitOffset bit. All other bits in 
         // dest are unchanged, e.g. the bit indexed by [0,1,...,destBitOffset - 1], [destBitOffset + bitLength, ...]
         void copy_with_bit_offset(
-            gsl::span<const oc::u8> src,
+            gsl::span<const apsi::u8> src,
             std::int32_t srcBitOffset,
             std::int32_t destBitOffset,
             std::int32_t bitLength,
-            gsl::span<oc::u8> dest);
+            gsl::span<apsi::u8> dest);
     }
 
     class FFieldElt
@@ -405,7 +402,7 @@ namespace apsi
         typename std::enable_if<std::is_pod<T>::value>::type
             encode(gsl::span<T> value, unsigned bit_length)
         {
-            gsl::span<const oc::u8> v2(reinterpret_cast<oc::u8*>(value.data()), value.size() * sizeof(T));
+            gsl::span<const apsi::u8> v2(reinterpret_cast<apsi::u8*>(value.data()), value.size() * sizeof(T));
 
             // Should minus 1 to avoid wrapping around p
             unsigned split_length = seal::util::get_significant_bit_count(field_->ch()) - 1;
@@ -415,7 +412,7 @@ namespace apsi
 
             static_assert(std::is_pod<_ffield_elt_coeff_t>::value, "must be pod type");
             _ffield_elt_coeff_t temp = 0;
-            gsl::span<oc::u8> temp_span(reinterpret_cast<oc::u8*>(&temp), sizeof(_ffield_elt_coeff_t));
+            gsl::span<apsi::u8> temp_span(reinterpret_cast<apsi::u8*>(&temp), sizeof(_ffield_elt_coeff_t));
 
             //auto end = std::min<unsigned>(field_->d_, split_index_bound);
             if (field_->d_ < split_index_bound)
@@ -444,7 +441,7 @@ namespace apsi
         typename std::enable_if<std::is_pod<T>::value>::type
             decode(gsl::span<T> value, unsigned bit_length)
         {
-            gsl::span<oc::u8> v2(reinterpret_cast<oc::u8*>(value.data()), value.size() * sizeof(T));
+            gsl::span<apsi::u8> v2(reinterpret_cast<apsi::u8*>(value.data()), value.size() * sizeof(T));
 
             // Should minus 1 to avoid wrapping around p
             unsigned split_length = seal::util::get_significant_bit_count(field_->ch()) - 1;
@@ -460,7 +457,7 @@ namespace apsi
             static_assert(std::is_pod<_ffield_elt_coeff_t>::value, "must be pod type");
             _ffield_elt_coeff_t temp = 0;
             auto offset = 0;
-            gsl::span<const oc::u8> temp_span(reinterpret_cast<oc::u8*>(&temp), sizeof(_ffield_elt_coeff_t));
+            gsl::span<const apsi::u8> temp_span(reinterpret_cast<apsi::u8*>(&temp), sizeof(_ffield_elt_coeff_t));
 
             for (unsigned j = 0; j < split_index_bound; j++)
             {
