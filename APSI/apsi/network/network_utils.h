@@ -32,9 +32,9 @@ namespace apsi
 
     void receive_compressed_ciphertext(const CiphertextCompressor &compressor, std::vector<seal::Ciphertext> &ciphers, apsi::network::Channel &channel);
 
-    void send_relinkeys(const seal::RelinKeys &keys, oc::Channel &channel);
+    void send_relinkeys(const seal::RelinKeys &keys, apsi::network::Channel &channel);
 
-    void receive_relinkeys(seal::RelinKeys &keys, oc::Channel &channel);
+    void receive_relinkeys(seal::RelinKeys &keys, apsi::network::Channel &channel);
 
     void send_pubkey(const seal::PublicKey &pubkey, apsi::network::Channel &channel);
 
