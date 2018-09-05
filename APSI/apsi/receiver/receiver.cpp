@@ -64,19 +64,19 @@ namespace apsi
             public_key_ = generator.public_key();
             secret_key_ = generator.secret_key();
 
-            encryptor_.reset(new Encryptor(seal_context_, public_key_));
-            decryptor_.reset(new Decryptor(seal_context_, secret_key_));
+            encryptor_ = make_unique<Encryptor>(seal_context_, public_key_);
+            decryptor_ = make_unique<Decryptor>(seal_context_, secret_key_);
 
             // Initializing tools for dealing with compressed ciphertexts
             // We don't actually need the evaluator
             shared_ptr<Evaluator> dummy_evaluator = nullptr;
-            compressor_.reset(new CiphertextCompressor(seal_context_, 
-                dummy_evaluator, pool_));
+            compressor_ = make_unique<CiphertextCompressor>(seal_context_, 
+                dummy_evaluator, pool_);
 
             relin_keys_ = generator.relin_keys(params_.decomposition_bit_count());
 
-            ex_batch_encoder_.reset(new FFieldFastBatchEncoder(ex_field_->ch(), ex_field_->d(),
-                get_power_of_two(params_.encryption_params().poly_modulus_degree())));
+            ex_batch_encoder_ = make_shared<FFieldFastBatchEncoder>(ex_field_->ch(), ex_field_->d(),
+                get_power_of_two(params_.encryption_params().poly_modulus_degree()));
         }
 
         std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Channel& chl)
@@ -204,7 +204,7 @@ namespace apsi
                 field_vec.emplace_back(ex_batch_encoder_->field(i % slot_count_));
             }
 
-            exfield_items.reset(new FFieldArray(field_vec));
+            exfield_items = make_unique<FFieldArray>(field_vec);
             exfield_encoding(*cuckoo, *exfield_items);
 
             map<uint64_t, FFieldArray> powers;
@@ -452,8 +452,7 @@ namespace apsi
                 Plaintext p(local_pool);
                 Ciphertext tmp(seal_context_->context_data(
                     seal_context_->last_parms_id())->parms(), local_pool);
-                unique_ptr<FFieldArray> batch;
-                batch.reset(new FFieldArray(ex_batch_encoder_->create_array()));
+                unique_ptr<FFieldArray> batch = make_unique<FFieldArray>(ex_batch_encoder_->create_array());
                 vector<uint64_t> integer_batch(batch_size);
 
                 bool has_result;

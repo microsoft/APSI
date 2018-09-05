@@ -30,7 +30,7 @@ namespace apsi
                 public_key_(pub_key), 
                 relin_keys_(relin_keys)
             {
-                encryptor_.reset(new seal::Encryptor(seal_context_, public_key_));
+                encryptor_ = std::make_shared<seal::Encryptor>(seal_context_, public_key_);
             }
 
             SenderSessionContext(std::shared_ptr<seal::SEALContext> context) : 
@@ -41,7 +41,7 @@ namespace apsi
             void set_public_key(const seal::PublicKey &public_key)
             {
                 public_key_ = public_key;
-                encryptor_.reset(new seal::Encryptor(seal_context_, public_key_));
+                encryptor_ = std::make_shared<seal::Encryptor>(seal_context_, public_key_);
             }
 
             void set_relin_keys(const seal::RelinKeys &relin_keys)
@@ -55,7 +55,7 @@ namespace apsi
             void set_secret_key(const seal::SecretKey &secret_key)
             {
                 secret_key_ = secret_key;
-                decryptor_.reset(new seal::Decryptor(seal_context_, secret_key_));
+                decryptor_ = std::make_shared<seal::Decryptor>(seal_context_, secret_key_);
             }
 
             const std::shared_ptr<seal::Encryptor> &encryptor()

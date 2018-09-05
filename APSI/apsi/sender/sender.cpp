@@ -55,19 +55,19 @@ namespace apsi
             //     const_cast<uint64_t*>(ex_field_->poly_modulus().get()));
 
             // Construct shared Evaluator and BatchEncoder
-            evaluator_.reset(new Evaluator(seal_context_));
+            evaluator_ = make_shared<Evaluator>(seal_context_);
             vector<shared_ptr<FField> > field_vec;
-            ex_batch_encoder_.reset(new FFieldFastBatchEncoder(
+            ex_batch_encoder_ = make_shared<FFieldFastBatchEncoder>(
                 params_.exfield_characteristic(),
                 params_.exfield_degree(),
                 get_power_of_two(params_.encryption_params().poly_modulus_degree())
-            ));
+            );
             field_vec = ex_batch_encoder_->fields();
 
             // Create SenderDB
-            sender_db_.reset(new SenderDB(params_, seal_context_, field_vec));
+            sender_db_ = make_unique<SenderDB>(params_, seal_context_, field_vec);
 
-            compressor_.reset(new CiphertextCompressor(seal_context_, evaluator_));
+            compressor_ = make_shared<CiphertextCompressor>(seal_context_, evaluator_);
 
             vector<thread> thrds(total_thread_count_);
 
@@ -175,7 +175,6 @@ namespace apsi
                 chl.send(buff);
             }
 
-            FFieldArray* ptr = nullptr;
             // if (params_.debug())
             // {
             //     ptr = new FFieldArray(ex_field_);
@@ -193,8 +192,7 @@ namespace apsi
                 seal::SecretKey k;
                 receive_prvkey(k, chl);
                 session_context.set_secret_key(k);
-
-                session_context.debug_plain_query_.reset(ptr);
+                session_context.debug_plain_query_ = nullptr;
             }
 
             /* Receive client's query data. */
@@ -823,9 +821,9 @@ namespace apsi
 
         WindowingDag::State::State(WindowingDag & dag)
         {
-            next_node_.reset(new std::atomic<int>);
+            next_node_ = make_unique<std::atomic<int>>();
             *next_node_ = 0;
-            node_state_storage_.reset(new std::atomic<NodeState>[dag.max_power_ + 1]);
+            node_state_storage_ = make_unique<std::atomic<NodeState>[]>(dag.max_power_ + 1);
             nodes_ = { node_state_storage_.get(), dag.max_power_ + 1 };
 
             for (auto& n : nodes_)
