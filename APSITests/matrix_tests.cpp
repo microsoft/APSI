@@ -161,7 +161,7 @@ void MatrixTests::ResizeTest()
     {
         for(apsi::u64 j = 0; j < m.columns(); j++)
         {
-            m[i][j] = i * m.columns() + j + 1;
+            m[i][j] = static_cast<int>(i * m.columns() + j + 1);
         }
     }
 

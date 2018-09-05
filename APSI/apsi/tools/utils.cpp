@@ -27,7 +27,7 @@ bool apsi::tools::not_equal(const block& lhs, const block& rhs)
 uint64_t apsi::tools::optimal_split(uint64_t x, int base)
 {
     vector<uint64_t> digits = conversion_to_digits(x, base);
-    int ndigits = digits.size();
+    int ndigits = static_cast<int>(digits.size());
     int hammingweight = 0;
     for (int i = 0; i < ndigits; i++)
     {
@@ -41,7 +41,7 @@ uint64_t apsi::tools::optimal_split(uint64_t x, int base)
         if (digits[i] != 0)
         {
             now++;
-            result += pow(base, i)*digits[i];
+            result += static_cast<uint64_t>(pow(base, i) * digits[i]);
         }
         if (now >= target)
         {

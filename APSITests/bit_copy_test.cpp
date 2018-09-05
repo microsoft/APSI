@@ -55,13 +55,13 @@ void BitCopyTests::bit_copy_test()
         u32 src_idx = srcOffset;
         u32 dst_idx = 0;
 
-        for (int i = 0; i < destOffset; ++i)
+        for (unsigned i = 0; i < destOffset; ++i)
         {
             CPPUNIT_ASSERT_EQUAL((u8)(destVal & 1), get_bit(dest, dst_idx));
             dst_idx++;
         }
 
-        for (int i = 0; i < bitLength; ++i)
+        for (unsigned i = 0; i < bitLength; ++i)
         {
             CPPUNIT_ASSERT_EQUAL(get_bit(src, src_idx), get_bit(dest, dst_idx));
             src_idx++;
@@ -69,7 +69,7 @@ void BitCopyTests::bit_copy_test()
         }
 
         auto rem = size * 8 - destOffset - bitLength;
-        for (int i = 0; i < rem; ++i)
+        for (unsigned i = 0; i < rem; ++i)
         {
             CPPUNIT_ASSERT_EQUAL((u8)(destVal & 1), get_bit(dest, dst_idx));
             dst_idx++;

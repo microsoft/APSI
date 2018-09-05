@@ -103,7 +103,7 @@ namespace apsi
         gsl::span<uint64_t> result,
         const seal::SmallModulus &plain_modulus)
     {
-        int size = input.size();
+        int size = static_cast<int>(input.size());
         vector<vector<uint64_t>> divided_differences(size);
         uint64_t numerator;
         uint64_t denominator;

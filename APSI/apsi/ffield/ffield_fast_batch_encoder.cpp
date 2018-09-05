@@ -184,7 +184,7 @@ namespace apsi
 
         // Copy result to destination
         uint64_t coeff_count = result_tree[0].length;
-        destination.resize(coeff_count);
+        destination.resize(static_cast<Plaintext::size_type>(coeff_count));
         memcpy(destination.data(), result_tree->coeffs, 8 * coeff_count);
 
         // Clear result_tree
@@ -213,13 +213,13 @@ namespace apsi
 #endif
         uint64_t plain_coeff_count = plain.coeff_count();
         uint64_t max_coeff_count = n_ + 1;
-        if (plain_coeff_count > max_coeff_count || (plain_coeff_count == max_coeff_count && (plain[n_] != 0)))
+        if (plain_coeff_count > max_coeff_count || (plain_coeff_count == max_coeff_count && (plain[static_cast<Plaintext::size_type>(n_)] != 0)))
         {
             throw invalid_argument("plain is not valid for encryption parameters");
         }
 #ifndef NDEBUG
         if (static_cast<uint64_t>(plain.significant_coeff_count()) >= max_coeff_count || !are_poly_coefficients_less_than(plain.data(),
-            plain_coeff_count, 1, &ch_, 1))
+            static_cast<int>(plain_coeff_count), 1, &ch_, 1))
         {
             throw invalid_argument("plain is not valid for encryption parameters");
         }

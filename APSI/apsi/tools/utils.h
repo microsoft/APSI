@@ -2,6 +2,7 @@
 
 // STD
 #include <vector>
+#include <type_traits>
 
 // APSI
 #include "stopwatch.h"
@@ -61,7 +62,9 @@ namespace apsi
         /**
         Round up the given value using the given step
         */
-        inline u64 round_up_to(u64 val, u64 step) { return ((val + step - 1) / step) * step; }
+        template<typename T>
+        typename std::enable_if<std::is_pod<T>::value, T>::type
+        round_up_to(T val, T step) { return ((val + step - 1) / step) * step; }
 
         extern apsi::tools::Stopwatch stop_watch, recv_stop_watch;
     }

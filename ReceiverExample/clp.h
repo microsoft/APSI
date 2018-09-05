@@ -3,7 +3,16 @@
 #include <string>
 #include <iostream>
 #include <vector>
+
+#ifdef _MSC_VER
+#pragma warning(push, 0)
+#endif
+
 #include <tclap/CmdLine.h>
+
+#ifdef _MSC_VER
+#pragma warning(pop)
+#endif
 
 #include "apsi/apsidefines.h"
 

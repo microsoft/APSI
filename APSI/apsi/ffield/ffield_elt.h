@@ -4,7 +4,7 @@
 #include "apsi/ffield/ffield.h"
 #include "apsi/tools/prng.h"
 
-// GLS
+// GSL
 #include <gsl/span>
 
 namespace apsi

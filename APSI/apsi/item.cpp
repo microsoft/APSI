@@ -128,7 +128,7 @@ namespace apsi
         int split_index_bound = (bit_length + split_length - 1) / split_length;
 
         int j = 0;
-        for (; j < exfield->d() && j < split_index_bound; j++)
+        for (; static_cast<unsigned>(j) < exfield->d() && j < split_index_bound; j++)
         {
             auto coeff = item_part(value_, j, split_length);
             ring_item.set_coeff(j, coeff);

@@ -59,7 +59,7 @@ void InterpolateTests::u64_interpolate_test()
     auto context = seal::SEALContext::Create(parms);
 
     auto plain_modulus = context->context_data()->parms().plain_modulus();
-    int numPoints = std::min<int>(100, plain_modulus.value() - 1);
+    u64 numPoints = std::min<u64>(100, plain_modulus.value() - 1);
     int numTrials = 10;
 
     

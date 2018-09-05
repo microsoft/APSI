@@ -154,7 +154,7 @@ namespace apsi
                         normal_loc_func[i] = cuckoo::LocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
                     }
 
-                    for (int i = start; i < end; i++)
+                    for (size_t i = start; i < end; i++)
                     {
                         // Do we do OPRF for Sender's security?
                         if (params_.use_pk_oprf())
@@ -191,7 +191,7 @@ namespace apsi
                             {
 
                                 // Lock-free thread-safe bin position search
-                                auto block_pos = aquire_db_position(locs[j], prng);
+                                auto block_pos = aquire_db_position(static_cast<int>(locs[j]), prng);
                                 auto& db_block = *block_pos.first;
                                 auto pos = block_pos.second;
 
@@ -226,7 +226,7 @@ namespace apsi
                 }
 
 
-                for (u64 i = 0; i < data.size(); ++i)
+                for (i64 i = 0; i < data.size(); ++i)
                 {
 
                     // Claim an emply location in each matching bin
@@ -474,8 +474,8 @@ namespace apsi
             };
 
             MemoryPoolHandle local_pool = context.pool();
-            int start_block = context.id() * db_blocks_.size() / thread_count;
-            int end_block = (context.id() + 1) * db_blocks_.size() / thread_count;
+            int start_block = static_cast<int>(context.id() * db_blocks_.size() / thread_count);
+            int end_block = static_cast<int>((context.id() + 1) * db_blocks_.size() / thread_count);
 
             for (int next_block = start_block; next_block < end_block; next_block++)
             {
@@ -527,7 +527,7 @@ namespace apsi
             DBInterpolationCache cache(ex_batch_encoder, params_.batch_size(), params_.split_size(), params_.get_label_byte_count());
             // minus 1 to be safe.
             auto coeffBitCount = seal::util::get_significant_bit_count(mod.value()) - 1;
-            auto degree = 1;
+            u64 degree = 1;
             if (ex_batch_encoder)
             {
                 degree = ex_batch_encoder->d();
@@ -543,8 +543,8 @@ namespace apsi
                 throw std::runtime_error("labels are too large u64 interpolation.");
             }
 
-            int start = th_context.id() * db_blocks_.size() / thread_count;
-            int end = (th_context.id() + 1) * db_blocks_.size() / thread_count;
+            int start = static_cast<int>(th_context.id() * db_blocks_.size() / thread_count);
+            int end = static_cast<int>((th_context.id() + 1) * db_blocks_.size() / thread_count);
 
             for (int bIdx = start; bIdx < end; bIdx++)
             {
@@ -688,7 +688,7 @@ namespace apsi
             batched_label_coeffs_.resize(items_per_split_);
 
             // We assume there are all the same
-            auto degree = th_context.exfield()[0]->d();
+            unsigned degree = th_context.exfield()[0]->d();
             FFieldArray temp_array(ex_batch_encoder->create_array());
             for (int s = 0; s < items_per_split_; s++)
             {
@@ -697,14 +697,14 @@ namespace apsi
                 // transpose the coeffs into temp_array
                 for (int b = 0; b < items_per_batch_; b++)
                 {
-                    for (int c = 0; c < degree; ++c)
+                    for (unsigned c = 0; c < degree; ++c)
                         temp_array.set_coeff_of(b, c, cache.coeff_temp[b].get_coeff_of(s, c));
                 }
 
 
-                batched_coeff.reserve(
-                    params.encryption_params().coeff_modulus().size() *
-                    params.encryption_params().poly_modulus_degree(), local_pool);
+                auto capacity = static_cast<Plaintext::size_type>(params.encryption_params().coeff_modulus().size() *
+                    params.encryption_params().poly_modulus_degree());
+                batched_coeff.reserve(capacity, local_pool);
 
                 ex_batch_encoder->compose(temp_array, batched_coeff);
                 evaluator->transform_to_ntt(batched_coeff, seal_context->first_parms_id());
