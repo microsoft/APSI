@@ -9,10 +9,11 @@ Fast asymmetric PSI library
 * [FourQlib](https://github.com/kiromaru/FourQlib)
 * [FLINT](http://flintlib.org)
 * [GSL](https://github.com/Microsoft/GSL)
+* [boost](https://www.boost.org/)
 * [ZeroMQ](http://zeromq.org)
-    * libzmq - ZeroMQ base
-    * libzmqpp - ZeroMQ C++ wrapper
+    * [libzmq](https://github.com/zeromq/libzmq) - ZeroMQ base
+    * [libzmqpp](https://github.com/zeromq/zmqpp) - ZeroMQ C++ wrapper
 
 ### Additional requirements
-* CppUnit - For unit tests project
-* TCLAP - Command line parser for ReceiverExample executable
+* [CppUnit](https://www.freedesktop.org/wiki/Software/cppunit/) - For unit tests project
+* [TCLAP](https://sourceforge.net/projects/tclap/) - Command line parser for ReceiverExample executable
