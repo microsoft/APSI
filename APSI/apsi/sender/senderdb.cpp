@@ -44,8 +44,6 @@ namespace apsi
             ex_field_(ex_field),
             null_element_(ex_field_),
             neg_null_element_(ex_field_),
-            //keys_(params.sender_bin_size(), params.table_size()),
-            //values_(params.sender_bin_size(), params.table_size()),
             next_locs_(params.table_size(), 0),
             batch_random_symm_poly_storage_(params.split_count() * params.batch_count() * (params.split_size() + 1))
         {
@@ -69,8 +67,6 @@ namespace apsi
             sender_null_item_[1] = ~0;
 
             // What is the actual length of strings stored in the hash table
-            // encoding_bit_length_ = (params.get_cuckoo_mode() == cuckoo::CuckooMode::Normal)
-            //     ? params.item_bit_count() : encoder_.encoding_bit_length_;
             encoding_bit_length_ = params.item_bit_count();
 
             // Create the null ExFieldElement (note: encoding truncation affects high bits)
@@ -136,9 +132,6 @@ namespace apsi
             if (values.stride() != params_.get_label_byte_count())
                 throw std::invalid_argument("unexpacted label length");
 
-            //std::vector<DBBlock*> blk_;
-            //std::vector<DBBlock::Position> pos_;
-            //thread_count = 1;
             vector<thread> thrds(thread_count);
             for (int t = 0; t < thrds.size(); t++)
             {
@@ -205,28 +198,11 @@ namespace apsi
 
                                 db_block.get_key(pos) = keys[j];
 
-                                //std::cout << "key " << key << " -> block ("
-                                //    << db_block.batch_idx_ << ", " << db_block.split_idx_ << ") "
-                                //    << " @ " << pos.batch_offset << " " << pos.split_offset << std::endl;
-
                                 if (params_.get_label_bit_count())
                                 {
                                     auto dest = db_block.get_label(pos);
                                     memcpy(dest, values[i].data(), params_.get_label_byte_count());
                                 }
-
-                                //if (i == 3)
-                                //{
-                                //    blk_.push_back(&db_block);
-                                //    pos_.push_back(pos);
-
-
-
-                                //    std::cout << "key " << (block)key << " -> block ("
-                                //        << db_block.batch_idx_ << ", " << db_block.split_idx_ << ") "
-                                //        << " @ " << pos.batch_offset << " " << pos.split_offset 
-                                //        << " " << hexStr(db_block.get_label(pos), params_.get_label_byte_count())<< std::endl;
-                                //}
                             }
                         }
                     };
@@ -374,26 +350,10 @@ namespace apsi
             }
         }
 
-        //bool SenderDB::has_item(int cuckoo_loc, int position)
-        //{
-        //    auto s = params_.sender_bin_size();
-        //    auto start = cuckoo_loc * s;
-        //    return simple_hashing_db_has_item_[start + position];
-        //}
-
         void SenderDB::add_data(const Item &item, int thread_count)
         {
             add_data(vector<Item>(1, item), thread_count);
         }
-
-        //void SenderDB::delete_data(const vector<Item> &data)
-        //{
-        //    throw runtime_error("not implemented");
-        //}
-        //void SenderDB::delete_data(const Item &item)
-        //{
-        //    delete_data(vector<Item>(1, item));
-        //}
 
         void DBBlock::symmetric_polys(
             SenderThreadContext &th_context,
@@ -416,12 +376,9 @@ namespace apsi
                 FFieldElt curr_neg_null_element(neg_null_element.get(pos.batch_offset));
                 auto &ctx = field_vec[pos.batch_offset]->ctx();
                 fq_nmod_one(&symm_block(pos.batch_offset, split_size), field_vec[pos.batch_offset]->ctx());
-                // symm_block.set(pos.batch_offset * split_size_plus_one + split_size, one);
 
                 for (pos.split_offset = split_size - 1; pos.split_offset >= 0; pos.split_offset--)
                 {
-                    //auto cuckoo_loc = i;
-
                     if (!has_item(pos))
                     {
                         temp1 = &curr_neg_null_element;
@@ -430,21 +387,12 @@ namespace apsi
                     {
                         get_key(pos).to_exfield_element(temp11, encoding_bit_length);
 
-#ifdef _DEBUG
-                        //// check that decode results in the same value;
-                        //std::vector<u8> buff((encoding_bit_length + 7) / 8);
-                        //temp11.decode(span<u8>{buff}, encoding_bit_length);
-                        //if (memcmp(get_key(pos).data(), buff.data(), buff.size()))
-                        //    throw std::runtime_error("");
-#endif
-                        //ostreamLock(std::cout) << "sender(" << pos.batch_offset << ", " << pos.split_offset<< ") " << get_key(pos) << std::endl;
                         temp1 = &temp11;
                         temp1->neg();
                     }
 
                     auto symm_block_ptr = &symm_block(pos.batch_offset, pos.split_offset + 1);
 
-                    // symm_block.set(pos.batch_offset * split_size_plus_one + pos.split_offset, symm_block.get(pos.batch_offset * split_size_plus_one + (pos.split_offset + 1)) * *temp1);
                     fq_nmod_mul(
                         symm_block_ptr - 1,
                         symm_block_ptr,
@@ -452,8 +400,6 @@ namespace apsi
 
                     for (int k = pos.split_offset + 1; k < split_size; k++, symm_block_ptr++)
                     {
-                        // temp2 = symm_block.get(pos.batch_offset * split_size_plus_one + (k + 1)) * *temp1;
-                        // symm_block.set(pos.batch_offset * split_size_plus_one + k, symm_block.get(pos.batch_offset * split_size_plus_one + k) + temp2);
                         fq_nmod_mul(temp2.data(), temp1->data(), symm_block_ptr + 1, ctx);
                         fq_nmod_add(
                             symm_block_ptr,
@@ -489,16 +435,6 @@ namespace apsi
                     fq_nmod_mul(symm_block_ptr, symm_block_ptr, r.data() + i, field_ctx);
                 }
             }
-            // FFieldElt r(context.exfield());
-            //
-            // for (int i = 0; i < num_rows; i++)
-            // {
-            //     r.set_random_nonzero(prng);
-            //     for (int j = 0; j < split_size_plus_one; j++)
-            //     {
-            //         symm_block.set(j * batch_size + i, symm_block.get(j * batch_size + i) * r);
-            //     }
-            // }
         }
 
         void DBBlock::clear()
@@ -546,9 +482,6 @@ namespace apsi
                 int split = next_block / params_.batch_count();
                 int batch = next_block % params_.batch_count();
 
-                //if (!symm_polys_stale_[split][batch])
-                //	continue;
-
                 int split_start = split * split_size,
                     batch_start = batch * batch_size,
                     batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
@@ -556,9 +489,6 @@ namespace apsi
                 auto &block = db_blocks_.data()[next_block];
                 block.randomized_symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
                 block.batch_random_symm_poly_ = { &batch_random_symm_poly_storage_[indexer(split, batch, 0)] , split_size_plus_one };
-                //block.batch_random_symm_poly_.resize(split_size_plus_one);// = { &batch_random_symm_poly_storage_[indexer(split, batch, 0)] , split_size_plus_one };
-
-                //randomized_symmetric_polys(split, batch, context, symm_block);
 
                 if (params_.debug())
                 {
@@ -574,7 +504,6 @@ namespace apsi
                     for (int k = 0; batch_start + k < batch_end; k++)
                     {
                         fq_nmod_set(batch_vector.data() + k, &symm_block(k, i), batch_vector.field(k)->ctx());
-                        // batch_vector.set(k, k * split_size_plus_one + i, symm_block);
                     }
                     ex_batch_encoder->compose(batch_vector, poly);
                     evaluator->transform_to_ntt(poly, seal_context_->first_parms_id(), local_pool);
@@ -635,11 +564,9 @@ namespace apsi
             coeff_temp.reserve(items_per_batch_);
             x_temp.reserve(items_per_batch_);
             y_temp.reserve(items_per_batch_);
-            // div_diff_temp.resize(items_per_batch_);
 
             for (u64 i = 0; i < items_per_batch_; ++i)
             {
-                // div_diff_temp[i] = get_div_diff_temp(ex_batch_encoder->field(i), items_per_split_);
                 coeff_temp.emplace_back(ex_batch_encoder->field(i), items_per_split_);
                 x_temp.emplace_back(ex_batch_encoder->field(i), items_per_split_);
                 y_temp.emplace_back(ex_batch_encoder->field(i), items_per_split_);
@@ -697,28 +624,11 @@ namespace apsi
             if (params.use_low_degree_poly())
                 throw std::runtime_error("not impl");
 
-
-
-            //std::vector<FFieldArray> coeffs;
-            //coeffs.reserve(items_per_batch_);
-
-            ////std::vector<std::pair<u64, u64>> inputs(items_per_split_);
-            //std::vector<u64> temp_vec((value_byte_length_ + sizeof(u64)) / sizeof(u64), 0);
-            //std::unordered_set<u64> key_set;
-            //key_set.reserve(items_per_split_);
-
             for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
             {
-                //FFieldArray x(ex_batch_encoder->field(pos.batch_offset), items_per_split_);
-                //FFieldArray y(ex_batch_encoder->field(pos.batch_offset), items_per_split_);
-
                 FFieldElt temp(ex_batch_encoder->field(pos.batch_offset));
-
-
                 FFieldArray& x = cache.x_temp[pos.batch_offset];
                 FFieldArray& y = cache.y_temp[pos.batch_offset];
-                //std::vector<u8> temp_vec2(value_byte_length_);
-
 
                 int size = 0;
                 for (pos.split_offset = 0; pos.split_offset < items_per_split_; ++pos.split_offset)
@@ -733,33 +643,6 @@ namespace apsi
                         temp.encode(gsl::span<u8>{src, value_byte_length_}, params.get_label_bit_count());
                         y.set(size, temp);
 
-                        //if (key_item.data()[0] < 25)
-                        //{
-                        //        std::cout << "lbl {";
-                        //        for (u64 i = 0; i < value_byte_length_; ++i)
-                        //            std::cout << ' ' << std::setw(2) << std::setfill('0') << std::hex
-                        //            << int(src[i]);
-                        //        std::cout << "\}\nkey {";
-                        //        auto d = (u8*)&key_item;
-                        //        for (u64 i = 0; i < 16; ++i)
-                        //            std::cout << ' ' << std::setw(2) << std::setfill('0') << std::hex 
-                        //            << int(d[i]);
-                        //        std::cout << "}\n";
-                        //}
-
-                        //temp.decode(span<u8>{temp_vec2}, params.get_label_bit_count());
-                        //if (memcmp(src, temp_vec2.data(), value_byte_length_))
-                        //{
-                        //    std::cout << "exp {";
-                        //    for (u64 i = 0; i < temp_vec2.size(); ++i)
-                        //        std::cout << ' ' << std::setw(2) << std::setfill('0') << std::hex << int(src[i]);
-                        //    std::cout << "\}\nact {";
-                        //    for (u64 i = 0; i < temp_vec2.size(); ++i)
-                        //        std::cout << ' ' << std::setw(2) << std::setfill('0') << std::hex << int(temp_vec2[i]);
-                        //    std::cout << "}\n";
-                        //}
-                            //throw std::runtime_error("");
-
                         ++size;
                     }
                 }
@@ -773,17 +656,6 @@ namespace apsi
                     auto r = cache.key_set.emplace(x.get_coeff_of(i, 0));
                 }
 
-                //for (int i = 0; i < size; ++i)
-                //{
-                //    for (u64 j = 0; j < i; ++j)
-                //    {
-                //        if (x.get(i) == x.get(j))
-                //            throw std::runtime_error("duplicate x values");
-                //    }
-                //}
-
-
-                //auto trueSize = size;
                 cache.temp_vec[0] = 0;
                 while (size != items_per_split_)
                 {
@@ -876,11 +748,6 @@ namespace apsi
                 auto xx = pow_(x[i], term, mod);
 
                 r[i] = (xx * coeffs(term, i)) % mod.value();
-
-                //if (i == 0 && print)
-                //{
-                //    std::cout << xx << " * " << coeffs(term, i) << " -> " << r[i] << " " << term << std::endl;
-                //}
             }
 
 

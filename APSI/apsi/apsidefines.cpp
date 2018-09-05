@@ -15,69 +15,6 @@ namespace apsi
     const block AllOneBlock = _mm_set_epi64x(0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF);
     const block CCBlock     = _mm_set_epi64x(0xCCCCCCCCCCCCCCCC, 0xCCCCCCCCCCCCCCCC);
 
-
-    //void right_shift_uint(const u64 *source, u64 *destination, u64 shift_amount, u64 u64_count)
-    //{
-    //    if (source == destination && shift_amount == 0)
-    //    {
-    //        // Fast path to handle inplace no shifting.
-    //        return;
-    //    }
-
-    //    u64 uint64_shift_amount = shift_amount / 64;
-    //    u64 bit_shift_amount = shift_amount - uint64_shift_amount * 64;
-    //    u64 neg_bit_shift_amount = (64 - bit_shift_amount) & (static_cast<uint64_t>(bit_shift_amount == 0) - 1);
-
-    //    for (u64 i = 0; i < u64_count - uint64_shift_amount - 1; i++)
-    //    {
-    //        *destination = *(source + uint64_shift_amount);
-
-    //        *destination >>= bit_shift_amount;
-    //        *destination++ |= (*(++source + uint64_shift_amount) << neg_bit_shift_amount) & static_cast<uint64_t>(-(neg_bit_shift_amount != 0));
-    //    }
-    //    if (uint64_shift_amount < u64_count)
-    //    {
-    //        *destination = *(source + uint64_shift_amount);
-    //        *destination++ >>= bit_shift_amount;
-    //    }
-    //    for (u64 i = u64_count - uint64_shift_amount; i < u64_count; i++)
-    //    {
-    //        *destination++ = 0;
-    //    }
-    //}
-
-    //void left_shift_uint(const u64 *source, u64 *destination, u64 shift_amount, u64 u64_count)
-    //{
-    //    if (source == destination && shift_amount == 0)
-    //    {
-    //        // Fast path to handle inplace no shifting.
-    //        return;
-    //    }
-
-    //    u64 uint64_shift_amount = shift_amount / 64;
-    //    u64 bit_shift_amount = shift_amount - uint64_shift_amount * 64;
-    //    u64 neg_bit_shift_amount = (64 - bit_shift_amount) & (static_cast<uint64_t>(bit_shift_amount == 0) - 1);
-
-    //    destination += (u64_count - 1);
-    //    source += (u64_count - 1);
-
-    //    for (u64 i = 0; i < u64_count - uint64_shift_amount - 1; ++i)
-    //    {
-    //        *destination = *(source - uint64_shift_amount);
-    //        *destination <<= bit_shift_amount;
-    //        *destination-- |= (*(--source - uint64_shift_amount) >> neg_bit_shift_amount) & static_cast<uint64_t>(-(neg_bit_shift_amount != 0));
-    //    }
-    //    if (uint64_shift_amount < u64_count)
-    //    {
-    //        *destination = *(source - uint64_shift_amount);
-    //        *destination-- <<= bit_shift_amount;
-    //    }
-    //    for (u64 i = u64_count - uint64_shift_amount; i < u64_count; ++i)
-    //    {
-    //        *destination-- = 0;
-    //    }
-    //}
-
     uint64_t optimal_split(uint64_t x, int base)
     {
         vector<uint64_t> digits = conversion_to_digits(x, base);

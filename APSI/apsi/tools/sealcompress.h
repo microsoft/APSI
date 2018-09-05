@@ -24,18 +24,13 @@ namespace apsi
 
         void mod_switch(seal::Ciphertext &encrypted) const;
 
-        inline void mod_switch(
-            const seal::Ciphertext &encrypted, seal::Ciphertext &destination) const
+        inline void mod_switch(const seal::Ciphertext &encrypted, seal::Ciphertext &destination) const
         {
             destination = encrypted;
             mod_switch(destination);
         }
 
-        void mod_switch(
-                const seal::SecretKey &secret_key, seal::SecretKey &destination) const;
-
         void compressed_save(const seal::Ciphertext &encrypted, std::ostream &stream) const;
-
         void compressed_load(std::istream &stream, seal::Ciphertext &destination) const;
 
     private:

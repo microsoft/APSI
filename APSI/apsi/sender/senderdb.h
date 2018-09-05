@@ -231,28 +231,6 @@ namespace apsi
                 std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder
                 );
 
-            //Item& get_key(u64 cuckoo_index, u64 position_idx) {
-            //    return keys_(position_idx, cuckoo_index);
-            //}
-
-            //DBBlock& get_associated_block(u64 cuckoo_idx, u64 position)
-            //{
-            //    return db_blocks_(cuckoo_idx / params_.batch_size(), position / params_.split_size());
-            //}
-            //u8* get_value(u64 cuckoo_index, u64 position_idx) 
-            //{
-            //    auto idx = params_.sender_bin_size() * cuckoo_index + position_idx;
-            //    return values_ptr_.get()  + idx * params_.get_label_bit_count;
-            //}
-
-            //const Item& get_key(u64 cuckoo_index, u64 position_idx) const {
-            //    return keys_(position_idx, cuckoo_index);
-            //}
-            //const u8* get_value(u64 cuckoo_index, u64 position_idx) const {
-            //    auto idx = params_.sender_bin_size() * cuckoo_index + position_idx;
-            //    return values_ptr_.get() + idx * params_.get_label_bit_count;
-            //}
-
             DBBlock& get_block(int batch, int split)
             {
                 return db_blocks_(batch, split);
@@ -295,21 +273,12 @@ namespace apsi
             i.e., one thread will take care of several continuous complete rows. 
             */
             Matrix<DBBlock> db_blocks_;
-            //std::vector<DBRegion> regions_;
-            //std::shared_ptr<u8[]> values_ptr_;
-
-            
 
             /* 
             Thread safe function to insert an item into the bin 
             index by cockooIndex. The PRNG and be any PRNG.  
             */
             std::pair<DBBlock*, DBBlock::Position> aquire_db_position(int cockooIndex, apsi::tools::PRNG& prng);
-            
-            /* 
-            Returns true if the position'th slot within the bin at cockooIndex 
-            currently has an item. */
-            //bool has_item(int cockooIndex, int position);
 
             apsi::tools::PRNG prng_;
         };

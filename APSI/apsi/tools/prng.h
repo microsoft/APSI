@@ -1,10 +1,14 @@
 #pragma once
 
+// STD
 #include <vector>
 #include <cstring>
 #include <type_traits>
+
+// GSL
 #include <gsl/span>
 
+// APSI
 #include "aes.h"
 #include "apsi/apsidefines.h"
 
