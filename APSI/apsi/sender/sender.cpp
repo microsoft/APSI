@@ -49,11 +49,6 @@ namespace apsi
         {
             seal_context_ = SEALContext::Create(params_.encryption_params());
 
-            // Create the poly_mod like this since FField constructor takes seal::BigPoly instead 
-            // of seal::PolyModulus. Reason for this is that seal::PolyModulus does not manage its own memory.
-            // const BigPoly poly_mod(ex_field_->length(), ex_field_->ch().bit_count(),
-            //     const_cast<uint64_t*>(ex_field_->poly_modulus().get()));
-
             // Construct shared Evaluator and BatchEncoder
             evaluator_ = make_shared<Evaluator>(seal_context_);
             vector<shared_ptr<FField> > field_vec;
@@ -123,7 +118,6 @@ namespace apsi
                     if (i == 0)
                         stop_watch.set_time_point("symmpoly_start");
 
-                    //setThreadName("sender_offline_" + std::to_string(i));
                     int thread_context_idx = acquire_thread_context();
                     SenderThreadContext &context = thread_contexts_[thread_context_idx];
                     sender_db_->batched_randomized_symmetric_polys(context, evaluator_, ex_batch_encoder_, total_thread_count_);
@@ -175,11 +169,6 @@ namespace apsi
                 chl.send(buff);
             }
 
-            // if (params_.debug())
-            // {
-            //     ptr = new FFieldArray(ex_field_);
-            //     receive_ffield_array(*ptr, chl);
-            // }
             /* Set up and receive keys. */
             PublicKey pub;
             RelinKeys relin;
@@ -286,12 +275,6 @@ namespace apsi
             FFieldArray cc(true_x.field(0), true_x.size());
             debug_decrypt(ctx, c, cc);
 
-            //for (int i = 0; i < true_x.size(); ++i)
-            //{
-            //    if (true_x[i] != cc[i])
-            //        return false;
-            //}
-
             return true_x == cc;
         }
 
@@ -316,13 +299,7 @@ namespace apsi
             SenderSessionContext &session_context,
             Channel &channel)
         {
-            //vector<vector<Ciphertext>> resultVec(params_.split_count());
-            //for (auto& v : resultVec) v.resize(params_.batch_count());
             stop_watch.set_time_point("sender online start");
-
-            //vector<pair<promise<void>, shared_future<void>>>
-            //    batch_powers_computed(params_.batch_count());
-            //for (auto& pf : batch_powers_computed) pf.second = pf.first.get_future();
 
             auto batch_count = params_.batch_count();
             int split_size_plus_one = params_.split_size() + 1;
@@ -448,25 +425,9 @@ namespace apsi
                                         evaluator_->multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], tmp);
                                         evaluator_->add(tmp, label_results[curr_label], label_results[curr_label ^ 1]);
                                         curr_label ^= 1;
-
-
-                                        // debug
-                                        //{
-                                        //    auto debug_term = debug_eval_term(s, block.label_coeffs, debug_query[batch], plain_mod, print);
-                                        //    if (debug_not_equals(debug_term, tmp, session_context))
-                                        //        throw std::runtime_error(LOCATION);
-
-                                        //    debug_label_results = add(debug_label_results, debug_term, plain_mod);
-                                        //    if (debug_not_equals(debug_label_results, label_results[curr_label], session_context))
-                                        //        throw std::runtime_error(LOCATION);
-                                        //}
                                     }
                                 }
 
-
-                                //// label_result += coeff[0];
-                                //evaluator_->add_plain(label_results[curr_label], block.batched_label_coeffs_[0], label_results[curr_label ^ 1]);
-                                //curr_label ^= 1;
                                 if (i == 0)
                                     stop_watch.set_time_point("online interpolate done");
                             }
@@ -494,7 +455,6 @@ namespace apsi
                             curr_label ^= 1;
 
                             evaluator_->transform_from_ntt(label_results[curr_label]);
-
                         }
 
                         // Transform back from ntt form.
@@ -567,56 +527,35 @@ namespace apsi
             {
                 auto& node = dag.nodes_[idx];
                 auto& node_state = state.nodes_[node.output_];
-                //ostreamLock(std::cout) << thrdIdx << " " << idx << " " << node.output_ << std::endl;
 
                 // a simple write should be sufficient but lets be safe
                 auto exp = WindowingDag::NodeState::Ready;
-                bool r = node_state.compare_exchange_strong(exp, WindowingDag::NodeState::Pending);//, std::memory_order::memory_order_relaxed);
+                bool r = node_state.compare_exchange_strong(exp, WindowingDag::NodeState::Pending);
                 if (r == false)
                 {
                     std::cout << int(exp) << std::endl;
                     throw std::runtime_error("");
                 }
+
                 // spin lock on the input nodes
                 for (u64 i = 0; i < 2; ++i)
-                    while (state.nodes_[node.inputs_[i]] != WindowingDag::NodeState::Done);//, std::memory_order::memory_order_acquire);
-
-                //std::cout << node.inputs_[0] << " * " << node.inputs_[2] << " -> " << node.output_ << std::endl;
-
+                    while (state.nodes_[node.inputs_[i]] != WindowingDag::NodeState::Done);
 
                 evaluator_->multiply(batch_powers[node.inputs_[0]], batch_powers[node.inputs_[1]], batch_powers[node.output_], local_pool);
                 evaluator_->relinearize(batch_powers[node.output_], session_context.relin_keys_, local_pool);
 
                 // a simple write should be sufficient but lets be safe
                 exp = WindowingDag::NodeState::Pending;
-                r = node_state.compare_exchange_strong(exp, WindowingDag::NodeState::Done);//, std::memory_order::memory_order_release);
+                r = node_state.compare_exchange_strong(exp, WindowingDag::NodeState::Done);
                 if (r == false)
                     throw std::runtime_error("");
 
                 idx = (*state.next_node_)++;
-
             }
 
-            //// splin lock until all nodes are compute. We may want to do something smarter here.
+            // splin lock until all nodes are compute. We may want to do something smarter here.
             for (u64 i = 0; i < state.nodes_.size(); ++i)
                 while (state.nodes_[i] != WindowingDag::NodeState::Done);
-
-            //for (int i = 1; i <= params_.split_size(); i++)
-            //{
-            //    int i1 = optimal_split(i, 1 << params_.window_size());
-            //    int i2 = i - i1;
-            //    if (i1 == 0 || i2 == 0)
-            //    {
-            //        //batch_powers2.emplace_back(batch_powers[i]);
-            //    }
-            //    else
-            //    {
-            //        //batch_powers2.emplace_back(local_pool);
-            //        std::cout << i1 << " * " << i2 << " -> " << i << std::endl;
-            //        //evaluator_->multiply(batch_powers[i1], batch_powers[i2], batch_powers[i], local_pool);
-            //        //evaluator_->relinearize(batch_powers[i], session_context.relin_keys_, batch_powers[i], local_pool);
-            //    }
-            //}
 
 
             //#define DEBUG_POWERS
@@ -666,9 +605,6 @@ namespace apsi
             {
                 auto i = idx - dag.nodes_.size();
 
-            //for(u64 i =0; i< batch_powers.size(); ++i)
-            //{
-                //ostreamLock(std::cout) << "transform[" << i << "] " << batch_powers[i].hash_block()[0] << std::endl;
                 evaluator_->transform_to_ntt(batch_powers[i]);
                 idx = (*state.next_node_)++;
             }
@@ -710,6 +646,7 @@ namespace apsi
             while (e--) r *= base;
             return r;
         }
+
         uint64_t WindowingDag::optimal_split(uint64_t x, int base)
         {
             vector<uint64_t> digits = conversion_to_digits(x, base);
@@ -736,6 +673,7 @@ namespace apsi
             }
             return result;
         }
+
         vector<uint64_t> WindowingDag::conversion_to_digits(uint64_t input, int base)
         {
             vector<uint64_t> result;
@@ -746,6 +684,7 @@ namespace apsi
             }
             return result;
         }
+
         void WindowingDag::compute_dag()
         {
             std::vector<int>
@@ -762,15 +701,12 @@ namespace apsi
                 if (i1 == 0 || i2 == 0)
                 {
                     base_powers_.emplace_back(i);
-                    //std::cout << "s[" << i << "] = input[" << i << "]" << std::endl;
                     depth[i] = 1;
                 }
                 else
                 {
                     depth[i] = depth[i1] + depth[i2];
                     ++items_per[depth[i]];
-
-                    //std::cout << std::string(depth[i], ' ') << "s[" << i << "] = s[" << i1 << "] s[" << i2 << "]" << std::endl;
                 }
             }
 
@@ -778,10 +714,6 @@ namespace apsi
             {
                 items_per[i] += items_per[i - 1];
             }
-            //for (int i = 0; i < max_power_; ++i)
-            //{
-            //    std::cout << "items_per[" << i << "] " << items_per[i] << std::endl;
-            //}
 
             int size = max_power_ - base_powers_.size();
             nodes_.resize(size);
@@ -794,10 +726,6 @@ namespace apsi
                 if (i1 && i2)
                 {
                     auto d = depth[i] - 1;
-                    //std::cout
-                    //    << "i " << i
-                    //    << " d" << d
-                    //    << " idx" << items_per[d] << std::endl;
 
                     auto idx = items_per[d]++;
                     if (nodes_[idx].output_)
@@ -808,12 +736,6 @@ namespace apsi
 
                 }
             }
-
-            //for (auto& n : nodes_)
-            //{
-            //    std::cout << "n[" << n.output_ << "] = n[" << n.inputs_[0] << "] n[" << n.inputs_[1] << "]" << std::endl;
-            //}
-
         }
 
         WindowingDag::State::State(WindowingDag & dag)

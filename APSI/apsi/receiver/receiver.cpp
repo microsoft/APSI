@@ -52,12 +52,6 @@ namespace apsi
 
         void Receiver::initialize()
         {
-            //EncryptionParameters enc_params;
-
-            //enc_params.set_poly_modulus("1x^" + to_string(params_.poly_degree()) + " + 1");
-            //enc_params.set_coeff_modulus(params_.coeff_modulus());
-            //enc_params.set_plain_modulus(ex_field_->coeff_modulus());
-
             seal_context_ = SEALContext::Create(params_.encryption_params());
             KeyGenerator generator(seal_context_);
 
@@ -93,40 +87,7 @@ namespace apsi
             recv_stop_watch.set_time_point("receiver pre-process/sent");
 
             /* Receive results in a streaming fashion. */
-            //std::vector<int> cuckoo_position;
-            //vector<ExFieldElement> result, labels;
-            //Pointer backing, label_bacing;
             auto intersection = stream_decrypt(chl, table_to_input_map, items);
-            //recv_stop_watch.set_time_point("receiver decrypt");
-
-            //ExFieldElement zero(ex_field_);
-            ;//(items.size());
-
-
-             //for (int i = 0; i < params_.table_size(); i++)
-             //{
-             //    //if (table_to_input_map[i] == -1)
-             //    {
-             //        for (int j = 0; j < params_.split_count(); j++)
-             //        {
-             //            if (result[j][i] == zero)
-             //            {
-             //                auto idx = table_to_input_map[i];
-             //                intersection.emplace_back();
-             //                intersection.back().first = idx;
-
-             //                if (params_.get_label_bit_count())
-             //                {
-             //                    //std::cout << "idx: " << idx << " " << labels[j][i].to_string() << std::endl;
-             //                    intersection.back().second = labels[j][i];
-             //                }
-             //            }
-             //        }
-             //    }
-             //}
-
-             //chl.asyncSendCopy(array<int, 2>{-1,-1});
-
 
              /* Now we need to shorten and convert this tmp vector to match the length and indice of the query "items". */
             recv_stop_watch.set_time_point("receiver intersect");
@@ -192,8 +153,6 @@ namespace apsi
 
             unique_ptr<CuckooInterface> cuckoo = cuckoo_hashing(items);
 
-            //vector<int> indices = cuckoo_indices(items, *cuckoo);
-
             unique_ptr<FFieldArray> exfield_items;
             unsigned padded_cuckoo_capacity = ((cuckoo->table_size() + slot_count_ - 1) / slot_count_) * slot_count_;
 
@@ -209,16 +168,6 @@ namespace apsi
 
             map<uint64_t, FFieldArray> powers;
             generate_powers(*exfield_items, powers);
-
-            // if (params_.debug())
-            // {
-            //     //for (u64 j = 0; j < exfield_items.size(); ++j)
-            //     //{
-            //     //    std::cout << "Exp[" << j << "]: " << exfield_items.get(j) << std::endl;
-            //     //}
-            //
-            //     send_ffield_array(*exfield_items, channel);
-            // }
 
             map<uint64_t, vector<Ciphertext> > ciphers;
             encrypt(powers, ciphers);
@@ -296,8 +245,6 @@ namespace apsi
             vector<int> indice(cuckoo.table_size(), -1);
             auto& encodings = cuckoo.get_encodings();
 
-            // cuckoo::PermutationBasedCuckoo::Encoder encoder(cuckoo.log_table_size(), cuckoo.loc_func_count(), params_.item_bit_count());
-
             for (int i = 0; i < items.size(); i++)
             {
                 auto q = cuckoo.query_item(items[i]);
@@ -305,8 +252,6 @@ namespace apsi
 
                 if (not_equal(items[i], encodings[q.table_index()]))
                     throw runtime_error("items[i] different from encodings[q.table_index()]");
-
-                //ostreamLock(cout) << "Ritem[" << i << "] = " << items[i] << " -> " << q.hash_func_index() << " " << encodings[q.table_index()] << " @ " << q.table_index() << endl;
             }
             return indice;
         }
@@ -322,7 +267,6 @@ namespace apsi
 
             for (int i = 0; i < cuckoo.table_size(); i++)
             {
-                //if(cuckoo.has_item_at(i))
                 ret.set(i, Item(encodings[i]).to_exfield_element(ret.field(i), encoding_bit_length));
             }
             for (int i = cuckoo.table_size(); i < ret.size(); i++)
@@ -387,31 +331,6 @@ namespace apsi
                 encryptor_->encrypt(plain, destination.back(), pool_);
             }
         }
-
-        //vector<vector<ExFieldElement>> Receiver::bulk_decrypt(const vector<vector<Ciphertext>> &result_ciphers)
-        //{
-        //    if (result_ciphers.size() != params_.split_count() || result_ciphers[0].size() != params_.batch_count())
-        //        throw invalid_argument("Result ciphers have unexpexted sizes.");
-
-        //    int slot_count = ex_batch_encoder_->slot_count();
-        //    memory_backing_.emplace_back(Pointer());
-        //    vector<vector<ExFieldElement>> result = ex_field_->allocate_elements(
-        //        result_ciphers.size(), result_ciphers[0].size() * slot_count, memory_backing_.back());
-        //    Pointer tmp_backing;
-        //    vector<ExFieldElement> temp = ex_field_->allocate_elements(slot_count, tmp_backing);
-        //    for (int i = 0; i < result_ciphers.size(); i++)
-        //        for(int j = 0; j < result_ciphers[0].size(); j++)
-        //        {
-        //            decrypt(result_ciphers[i][j], temp);
-        //            for (int k = 0; k < temp.size(); k++)
-        //                result[i][j * slot_count + k] = temp[k];
-        //        }
-        //    cout << "Remaining Nosie Budget: " << decryptor_->invariant_noise_budget(result_ciphers[0][0]) << endl;
-
-        //    return result;
-        //}
-
-
 
         std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
             Channel &channel,
@@ -551,78 +470,9 @@ namespace apsi
             }
         }
 
-
-        //void Receiver::decompose(const vector<vector<Plaintext>> &plain_matrix,
-        //	vector<vector<::ExFieldElement>> &result)
-        //{
-        //	int num_of_splits = params_.split_count(),
-        //		num_of_batches = params_.batch_count(),
-        //		slot_count = ex_batch_encoder_->slot_count();
-
-        //	memory_backing_.emplace_back(Pointer());
-        //	result = ex_field_->allocate_elements(
-        //		num_of_splits, num_of_batches * slot_count, memory_backing_.back());
-        //	Pointer batch_backing;
-        //	vector<ExFieldElement> batch = ex_field_->allocate_elements(slot_count, batch_backing);
-
-        //	for (int i = 0; i < num_of_splits; i++)
-        //	{
-        //		for (int j = 0; j < num_of_batches; j++)
-        //		{
-        //			decompose(plain_matrix[i][j], batch);
-        //			for (int k = 0; k < batch.size(); k++)
-        //			{
-        //				result[i][j * slot_count + k] = batch[k];
-        //			}
-        //		}
-        //	}
-        //}
-
-
-        //     void Receiver::decrypt(const vector<Ciphertext> &ciphers,
-        //vector<::ExFieldElement>& result,
-        //::Pointer& backing)
-        //     {
-        //         int slot_count = ex_batch_encoder_->slot_count();
-        //         
-        //         vector<ExFieldElement> result = ex_field_->allocate_elements(ciphers.size() * slot_count, backing);
-        //         Pointer tmp_backing;
-        //         vector<ExFieldElement> temp = ex_field_->allocate_elements(slot_count, tmp_backing);
-        //         for (int i = 0; i < ciphers.size(); i++)
-        //         {
-        //             if (batch_encoder_)
-        //             {
-        //                 vector<uint64_t> integer_batch = batch_encoder_->decompose(decryptor_->decrypt(ciphers[i]));
-        //                 for (int j = 0; j < integer_batch.size(); j++)
-        //                     *temp[j].pointer(0) = integer_batch[j];
-        //             }
-        //             else
-        //             {
-        //                 ex_batch_encoder_->decompose(decryptor_->decrypt(ciphers[i]), temp);
-        //             }
-        //             for(int j = 0; j < temp.size(); j++)
-        //                 result[i * slot_count + j] = temp[j];
-        //         }
-        //         //return result;
-        //     }
-
-        //void Receiver::decrypt(const Ciphertext &cipher, vector<ExFieldElement> &batch)
-        //{
-        //    Plaintext plain;
-        //    decrypt(cipher, plain);
-        //    decompose(plain, batch);
-        //}
-
         void Receiver::decrypt(const Ciphertext &cipher, Plaintext &plain)
         {
             decryptor_->decrypt(cipher, plain);
-            //cout << "Noise budget: " << decryptor_->invariant_noise_budget(cipher) << endl;
         }
-
-        //void Receiver::decompose(const Plaintext &plain, vector<::ExFieldElement> &batch)
-        //{
-
-        //}
-
     }
 }

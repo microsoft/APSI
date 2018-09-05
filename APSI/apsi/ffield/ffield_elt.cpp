@@ -97,9 +97,6 @@ namespace apsi
 
                     // for everythign together;
                     destWord = low | mid | high;
-
-                    //if (low & mid || mid & high || low & high)
-                    //    throw std::runtime_error("");
                 }
             }
         };

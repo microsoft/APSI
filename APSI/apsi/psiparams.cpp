@@ -9,43 +9,6 @@ using namespace seal::util;
 
 namespace apsi
 {
-    //vector<SmallModulus> PSIParams::coeff_modulus()
-    //{
-    //    int num_coeff_mod;
-    //    if (coeff_mod_bit_count_ == 120)
-    //    {
-    //        num_coeff_mod = 2;
-    //    }
-    //    else if (coeff_mod_bit_count_ == 125) {
-    //        num_coeff_mod = 2;
-    //    }
-    //    else if (coeff_mod_bit_count_ == 189) {
-    //        num_coeff_mod = 3;
-    //    }
-    //    else if (coeff_mod_bit_count_ == 435) {
-    //        num_coeff_mod = 7;
-    //    }
-    //    else if (coeff_mod_bit_count_ == 226) {
-    //        num_coeff_mod = 4;
-    //    }
-    //    else if (coeff_mod_bit_count_ == 116) {
-    //        num_coeff_mod = 2;
-    //    }
-    //    else if (coeff_mod_bit_count_ == 60)
-    //    {
-    //        num_coeff_mod = 1;
-    //    }
-    //    else {
-    //        throw runtime_error("bad coeff modulus.");
-    //    }
-    //    vector<SmallModulus> coeff_mod_array(num_coeff_mod);
-    //    for (int i = 0; i < num_coeff_mod; i++)
-    //    {
-    //        coeff_mod_array[i] = small_mods_60bit(i);
-    //    }
-    //    return coeff_mod_array;
-    //}
-
     void PSIParams::validate()
     {
         if (sender_bin_size_ % split_count_ != 0)

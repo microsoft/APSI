@@ -414,7 +414,6 @@ namespace apsi
             _ffield_elt_coeff_t temp = 0;
             gsl::span<apsi::u8> temp_span(reinterpret_cast<apsi::u8*>(&temp), sizeof(_ffield_elt_coeff_t));
 
-            //auto end = std::min<unsigned>(field_->d_, split_index_bound);
             if (field_->d_ < split_index_bound)
                 throw std::invalid_argument("bit_length too large for extension field");
 
@@ -429,12 +428,6 @@ namespace apsi
                 offset += split_length;
                 bit_length -= split_length;
             }
-
-            //temp = 0;
-            //for (auto j = split_index_bound; j < field_->d_; ++j)
-            //{
-            //    nmod_poly_set_coeff_ui(elt_, j, temp);
-            //}
         }
 
         template<typename T>

@@ -1,12 +1,16 @@
 #pragma once
 
+// STD
 #include <vector>
 #include <future>
 #include <thread>
 #include <mutex>
 
+// APSI
 #include "apsi/apsidefines.h"
 #include "apsi/tools/threadpool.h"
+
+// ZeroMQ
 #include "zmqpp/zmqpp.hpp"
 
 

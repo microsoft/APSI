@@ -124,17 +124,6 @@ namespace apsi
                 std::vector<std::uint64_t> &integer_batch, 
                 FFieldArray &batch);
 
-
-            /**
-            Decomposes a SEAL plaintext to a batch of ExField elements, using generalized un-batching. One plaintext will be
-            decomposed into multiple elements. For example, if the slot count in generalized batching is 256, then a plaintext is decomposed
-            into 256 elements.
-
-            @param[out] batch The vector to hold the decomposed elements. It is assumed to be pre-allocated with appropriate size.
-            */
-            //void decompose(const seal::Plaintext &plain, std::vector<seal::util::ExFieldElement> &batch);
-
-
             std::shared_ptr<FField> ex_field() const
             {
                 return ex_field_;

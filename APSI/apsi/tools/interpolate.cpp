@@ -23,8 +23,6 @@ namespace apsi
         const FFieldArray &values,
         FFieldArray& result)
     {
-        //std::lock_guard<std::mutex> lock(mtx);
-
 #ifndef NDEBUG
         if (points.size() != values.size() || result.size() != points.size())
         {
@@ -39,12 +37,6 @@ namespace apsi
 
         // The fields should all be the same
         auto field = points.field(0);
-        //auto field = FField::Acquire(points.field(0)->ch(), points.field(0)->d());
-        //vector<FFieldArray> divided_differences;
-        //for(size_t i = 0; i < points.size(); i++)
-        //{
-        //    divided_differences.emplace_back(field, points.size() - i);
-        //}
         
         FFieldElt numerator(field);
         FFieldElt denominator(field);
@@ -66,11 +58,7 @@ namespace apsi
             for (size_t i = 0; i < size - j; i++)
             {
                 fq_nmod_sub(numerator.data(), divided_differences[i + 1].data() + (j - 1), divided_differences[i].data() + (j - 1), field->ctx());
-                // numerator = divided_differences[i + 1].get(j - 1) - divided_differences[i].get(j - 1);
                 fq_nmod_sub(denominator.data(), points.data() + (i + j), points.data() + i, field->ctx());
-                // denominator = points.get(i + j) - points.get(i);
-                // divided_differences[i].set(j, numerator / denominator);
-
                 fq_nmod_div(divided_differences[i].data() + j, numerator.data(), denominator.data(), field->ctx());
             }
         }
@@ -84,16 +72,16 @@ namespace apsi
             {
                 result.set(j + 1, j, result);
             }
+
             result.set_zero(0);
+
             for (size_t j = 0; j < i; j++)
             {
                 fq_nmod_mul(numerator.data(), points.data() + (size - 1 - i), result.data() + (j + 1), field->ctx());
                 fq_nmod_sub(result.data() + j, result.data() + j, numerator.data(), field->ctx());
-                // temp = points.get(size - 1 - i) * result.get(j + 1);
-                // result.set(j, result.get(j) - points.get(size - 1 - i) * result.get(j + 1));
             }
+
             fq_nmod_add(result.data(), result.data(), divided_differences[0].data() + (size - 1 - i), field->ctx());
-            // result.set(0, result.get(0) + divided_differences[0].get(size - 1 - i));
         }
     }
 
@@ -120,26 +108,21 @@ namespace apsi
         uint64_t numerator;
         uint64_t denominator;
         uint64_t inverse;
-        // Plaintext quotient(coeff_count);
 
         for (int i = 0; i < size; i++) {
             divided_differences[i].resize(size - i);
             divided_differences[i][0] = input[i].second;
         }
+
         for (int j = 1; j < size; j++) {
             for (int i = 0; i < size - j; i++) {
                 {
                     numerator = sub_uint_uint_mod(divided_differences[i + 1][j - 1], divided_differences[i][j - 1], plain_modulus);
                     denominator = sub_uint_uint_mod(input[i + j].first, input[i].first, plain_modulus);
-                    // dd[(i, j)] = (dd[(i + 1, j - 1)] - dd[(i, j - 1)]) / (xvec[i + j] - xvec[i])
-                    // multiply numerator with inverted denominator .... . FIXME: this should be multiplication modulo....
-                    // FIXME (mod t)
                     try_invert_uint_mod(denominator, plain_modulus, inverse);
                     divided_differences[i][j] = multiply_uint_uint_mod(numerator, inverse, plain_modulus);
-
                 }
             }
-
         }
 
         // Horner's method 
@@ -148,10 +131,6 @@ namespace apsi
 
         result[0] = divided_differences[0][size - 1];
         for (int i = 1; i < size; i++) {
-
-            // first, multiply by (x - x_{n-i})
-
-
             // shift first 
             for (int j = i - 1; j >= 0; j--) {
                 result[j + 1] = result[j];
@@ -163,6 +142,4 @@ namespace apsi
             result[0] = add_uint_uint_mod(result[0], divided_differences[0][size - 1 - i], plain_modulus);
         }
     }
-
-
 }

@@ -53,17 +53,6 @@ namespace apsi
         */
         void to_exfield_element(FFieldElt &ring_item, int bit_length);
 
-        /**
-        Return value of the i-th part of this item. We split the item into small parts,
-        each of which has bit length specified by split_length (not bigger than 64). If
-        split_length is not a factor of 64, the highest split of the item will be prepended
-        with zero bits to most significant positions to match split_length.
-
-        @param[in] i The i-th part.
-        @param[in] split_length Bit length of each part.
-        */
-        //std::uint64_t item_part(std::uint32_t i, std::uint32_t split_length);
-
         Item& operator =(const std::string &assign);
 
         Item& operator =(std::uint64_t assign);
