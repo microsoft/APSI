@@ -1,19 +1,11 @@
 #pragma once
 
 // STD
-#include <wmmintrin.h>
-#include <utility>
 #include <cstdint>
-#include <vector>
-#include <memory>
-#include <string>
 
-// APSI
-#include "tools/stopwatch.h"
+// Intrinsics
+#include <wmmintrin.h>
 
-// SEAL
-#include "seal/plaintext.h"
-#include "seal/context.h"
 
 #ifdef _MSC_VER
 #ifdef _DEBUG

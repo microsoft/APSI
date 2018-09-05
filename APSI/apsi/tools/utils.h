@@ -1,7 +1,15 @@
 #pragma once
 
-#include "utils.h"
+// STD
+#include <vector>
+
+// APSI
+#include "stopwatch.h"
 #include "apsi/apsidefines.h"
+
+// SEAL
+#include "seal/context.h"
+#include "seal/plaintext.h"
 
 namespace apsi
 {
