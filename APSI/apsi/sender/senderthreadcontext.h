@@ -78,7 +78,7 @@ namespace apsi
                         field_matrix.insert(field_matrix.end(), exfield_.begin(), exfield_.end()); 
                     }
 
-                    symm_block_vec_.reset(new FFieldArray(field_matrix));
+                    symm_block_vec_ = std::make_unique<FFieldArray>(field_matrix);
                     // symm_block_vec_.resize(params.batch_size() * (params.split_size() + 1), FFieldElt(exfield_));
                     symm_block_ = MatrixView<_ffield_array_elt_t>(symm_block_vec_->data(), params.batch_size(), params.split_size() + 1);
                 }

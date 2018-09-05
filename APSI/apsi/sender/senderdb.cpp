@@ -104,14 +104,6 @@ namespace apsi
         {
             for (auto& block : db_blocks_)
                 block.clear();
-            //auto ss = params_.sender_bin_size() * params_.table_size();
-            //simple_hashing_db_has_item_.reset(new atomic_bool[ss]);
-
-            //// Make sure all entries are false
-            //for (int i = 0; i < ss; i++)
-            //{
-            //    simple_hashing_db_has_item_[i] = false;
-            //}
         }
 
         void SenderDB::set_data(gsl::span<const Item> data, int thread_count)
@@ -512,7 +504,7 @@ namespace apsi
         void DBBlock::clear()
         {
             auto ss = key_data_.size();
-            has_item_.reset(new atomic_bool[ss]);
+            has_item_ = make_unique<atomic_bool[]>(ss);
 
             // Make sure all entries are false
             for (int i = 0; i < ss; i++)
