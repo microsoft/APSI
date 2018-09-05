@@ -102,10 +102,10 @@ void ChannelTests::SendBlockAsyncTest()
         server_.send(data);
     });
 
-    block result = ZeroBlock;
+    block result = zero_block;
     auto fut = client_.async_receive(result);
 
-    CPPUNIT_ASSERT_EQUAL(0, memcmp(&result, &ZeroBlock, sizeof(block)));
+    CPPUNIT_ASSERT_EQUAL(0, memcmp(&result, &zero_block, sizeof(block)));
 
     fut.get();
     block expected = _mm_set_epi64x(12345, 54321);

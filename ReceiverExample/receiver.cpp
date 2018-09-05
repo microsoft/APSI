@@ -8,13 +8,11 @@
 
 // APSI
 #include "apsi/apsi.h"
+#include "apsi/network/channel.h"
+#include "apsi/tools/utils.h"
 
 // SEAL
 #include "seal/seal.h"
-
-// Networking
-#include "zmqpp/zmqpp.hpp"
-#include "apsi/network/channel.h"
 
 // Command Line Processor
 #include "clp.h"
@@ -35,15 +33,7 @@ using namespace seal;
 namespace apsi { class CLP;  }
 
 void print_example_banner(string title);
-void print_parameters(const PSIParams &psi_params);
-void example_basics();
-void example_update();
-void example_save_db();
-void example_load_db();
 void example_slow_batching(CLP& cmd, Channel& recvChl, Channel& sendChl);
-void example_slow_vs_fast();
-void example_remote();
-void example_remote_multiple();
 
 namespace {
     struct Colors {
@@ -59,11 +49,6 @@ namespace {
     const std::string Colors::RedBold = "\033[1;31m";
     const std::string Colors::GreenBold = "\033[1;32m";
     const std::string Colors::Reset = "\033[0m";
-}
-
-int round_up_to(int v, int s)
-{
-    return (v + s - 1) / s * s;
 }
 
 /**
@@ -108,7 +93,7 @@ void print_example_banner(string title)
  
 std::pair<vector<Item>, vector<int>> randSubset(const vector<Item>& items, int size)
 {
-    PRNG prn(ZeroBlock);
+    PRNG prn(zero_block);
 
     set<int> ss;
     while (ss.size() != size)

@@ -34,27 +34,8 @@ namespace apsi
     typedef std::uint8_t u8;
     typedef std::int8_t i8;
 
-    inline void zero_uint(u64 *destination, u64 u64_count)
-    {
-        std::memset(reinterpret_cast<unsigned char*>(destination), 0, 8 * u64_count);
-    }
-
-    std::uint64_t optimal_split(std::uint64_t x, int base);
-
-    std::vector<std::uint64_t> conversion_to_digits(std::uint64_t input, int base);
-
-    void split(const std::string &s, char delim, std::vector<std::string> &elems);
-
-    std::vector<std::string> split(const std::string &s, char delim);
-
-    seal::Plaintext random_plaintext(const seal::SEALContext &context);
-
-    inline u64 roundUpTo(u64 val, u64 step) { return ((val + step - 1) / step) * step; }
-
-    extern apsi::tools::Stopwatch stop_watch, recv_stop_watch;
-
-    extern const block ZeroBlock;
-    extern const block OneBlock;
-    extern const block AllOneBlock;
-    extern const block CCBlock;
+    extern const block zero_block;
+    extern const block one_block;
+    extern const block all_one_block;
+    extern const block cc_block;
 }

@@ -55,10 +55,10 @@ namespace apsi
             }
 
 #ifdef USE_SECURE_SEED
-            prng_.set_seed(sysRandomSeed());
+            prng_.set_seed(sys_random_seed());
 #else
             TODO("***************** INSECURE *****************, define USE_SECURE_SEED to fix");
-            prng_.set_seed(OneBlock, /* buffer_size */ 256);
+            prng_.set_seed(one_block, /* buffer_size */ 256);
 #endif
 
             // Set null value for sender: 1111...1110 (128 bits)
@@ -78,7 +78,7 @@ namespace apsi
 
             int batch_size = params_.batch_size();
             int split_size = params_.split_size();
-            int byte_length = static_cast<int>(roundUpTo(params_.get_label_bit_count(), 8) / 8);
+            int byte_length = static_cast<int>(round_up_to(params_.get_label_bit_count(), 8) / 8);
             int nb = params_.batch_count();
             int ns = params_.split_count();
             db_blocks_.resize(nb, ns);
@@ -143,7 +143,7 @@ namespace apsi
                     auto end = (t + 1) * data.size() / thrds.size();
 
                     vector<u8> buff((sizeof(digit_t) * NWORDS_ORDER) - 1);
-                    PRNG pp(CCBlock);
+                    PRNG pp(cc_block);
                     digit_t key[NWORDS_ORDER];
                     random_fourq(key, pp);
 

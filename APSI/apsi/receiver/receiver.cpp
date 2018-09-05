@@ -101,7 +101,7 @@ namespace apsi
         {
             if (params_.use_pk_oprf())
             {
-                PRNG prng(ZeroBlock);
+                PRNG prng(zero_block);
                 vector<vector<digit_t>> b;
                 b.reserve(items.size());
                 digit_t x[NWORDS_ORDER];
@@ -200,7 +200,7 @@ namespace apsi
 
         unique_ptr<CuckooInterface> Receiver::cuckoo_hashing(const vector<Item> &items)
         {
-            auto receiver_null_item = AllOneBlock;
+            auto receiver_null_item = all_one_block;
 
             unique_ptr<CuckooInterface> cuckoo(
                 static_cast<CuckooInterface*>(new Cuckoo(
@@ -261,7 +261,7 @@ namespace apsi
             FFieldArray &ret)
         {
             int encoding_bit_length = cuckoo.encoding_bit_length();
-            auto encoding_u64_len = roundUpTo(encoding_bit_length, 64) / 64;
+            auto encoding_u64_len = round_up_to(encoding_bit_length, 64) / 64;
 
             auto& encodings = cuckoo.get_encodings();
 

@@ -63,7 +63,7 @@ void InterpolateTests::u64_interpolate_test()
     int numTrials = 10;
 
     
-    apsi::tools::PRNG prng(apsi::ZeroBlock);
+    apsi::tools::PRNG prng(apsi::zero_block);
 
     for (int i = 0; i < numTrials; ++i)
     {
