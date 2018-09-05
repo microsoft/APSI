@@ -89,6 +89,15 @@ namespace apsi
         seal::Ciphertext &destination) const
     {
         int encrypted_size = destination.size();
+
+        // Resize destination if necessary. If destination is a newly created Ciphertext,
+        // its size will be zero.
+        if (encrypted_size == 0)
+        {
+            encrypted_size = 2;
+            destination.resize(seal_context_, seal_context_->last_parms_id(), encrypted_size);
+        }
+
         if(encrypted_size > 2)
         {
             throw invalid_argument("can only decompress fully relinearized ciphertexts");
@@ -106,7 +115,6 @@ namespace apsi
             throw invalid_argument("destination cannot be NTT transformed");
         }
 
-        //auto &context_data = seal_context_->context_data(seal_context_->last_parms_id()).value().get();
         auto& context_data = *seal_context_->context_data(seal_context_->last_parms_id());
         auto &parms = context_data.parms();
 
@@ -130,6 +138,7 @@ namespace apsi
         {
             throw invalid_argument("destination is not valid for loaded ciphertext");
         }
+
 
         // Create compressed polynomials
         int compr_data_byte_count = compr_coeff_byte_count * encrypted_size * coeff_count;

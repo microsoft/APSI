@@ -206,7 +206,7 @@ namespace apsi
             {
                 powers[i].reserve(split_size_plus_one);
                 for (u64 j = 0; j < split_size_plus_one; ++j)
-                    powers[i].emplace_back(params_.encryption_params(), pool_);
+                    powers[i].emplace_back(seal_context_, pool_);
 
             }
             while (num_of_powers-- > 0)
@@ -360,8 +360,7 @@ namespace apsi
                     auto local_pool = thread_context.pool();
 
                     Ciphertext tmp(local_pool);
-                    Ciphertext compressedResult(
-                        seal_context_->context_data(seal_context_->last_parms_id())->parms(), local_pool);
+                    Ciphertext compressedResult(seal_context_, local_pool);
 
                     u64 batch_start = i * batch_count / thread_pool.size();
                     auto thread_idx = std::this_thread::get_id();
@@ -513,8 +512,7 @@ namespace apsi
 
                         {
                             stringstream ss;
-                            //compressor_->compressed_save(compressedResult, ss);
-                            compressedResult.save(ss);
+                            compressor_->compressed_save(compressedResult, ss);
                             pkg.data = ss.str();
                         }
 
@@ -524,8 +522,7 @@ namespace apsi
                             compressor_->mod_switch(label_results[currResult], compressedResult);
 
                             stringstream ss;
-                            //compressor_->compressed_save(compressedResult, ss);
-                            compressedResult.save(ss);
+                            compressor_->compressed_save(compressedResult, ss);
                             pkg.label_data = ss.str();
                         }
 

@@ -383,7 +383,7 @@ namespace apsi
                     batch.set(j, i * batch_size + j, input);
                 }
                 ex_batch_encoder_->compose(batch, plain);
-                destination.emplace_back(params_.encryption_params(), pool_);
+                destination.emplace_back(seal_context_, pool_);
                 encryptor_->encrypt(plain, destination.back(), pool_);
             }
         }
@@ -450,8 +450,7 @@ namespace apsi
             {
                 MemoryPoolHandle local_pool(MemoryPoolHandle::New());
                 Plaintext p(local_pool);
-                Ciphertext tmp(seal_context_->context_data(
-                    seal_context_->last_parms_id())->parms(), local_pool);
+                Ciphertext tmp(seal_context_, local_pool);
                 unique_ptr<FFieldArray> batch = make_unique<FFieldArray>(ex_batch_encoder_->create_array());
                 vector<uint64_t> integer_batch(batch_size);
 
@@ -470,8 +469,7 @@ namespace apsi
                     // recover the sym poly values 
                     has_result = false;
                     stringstream ss(pkg.first.data);
-                    //compressor_->compressed_load(ss, tmp);
-                    tmp.load(ss);
+                    compressor_->compressed_load(ss, tmp);
 
                     if (first && t == 0)
                     {
@@ -501,8 +499,7 @@ namespace apsi
                     {
                         std::stringstream ss(pkg.first.label_data);
 
-                        tmp.load(ss);
-                        //compressor_->compressed_load(ss, tmp);
+                        compressor_->compressed_load(ss, tmp);
 
                         decryptor_->decrypt(tmp, p, local_pool);
 
