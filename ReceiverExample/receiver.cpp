@@ -548,7 +548,10 @@ void example_slow_batching(CLP& cmd, Channel& recvChl, Channel& sendChl)
         cout << "WARNING: Using too many threads for block count!" << endl;
     }
 
-    auto f = std::async([&]() {receiver_ptr.reset(new Receiver(params, recThreads, MemoryPoolHandle::New())); });
+    auto f = std::async([&]()
+    {
+        receiver_ptr = make_unique<Receiver>(params, recThreads, MemoryPoolHandle::New());
+    });
     Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New());
     f.get();
     Receiver& receiver = *receiver_ptr;
