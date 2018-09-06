@@ -10,6 +10,7 @@
 #include "apsi/apsi.h"
 #include "apsi/network/channel.h"
 #include "apsi/tools/utils.h"
+#include "common_utils.h"
 
 // SEAL
 #include "seal/seal.h"
@@ -17,9 +18,6 @@
 // Command Line Processor
 #include "clp.h"
 
-#ifdef _MSC_VER
-#include "windows.h"
-#endif
 
 using namespace std;
 using namespace apsi;
@@ -32,7 +30,6 @@ using namespace seal;
 
 namespace apsi { class CLP;  }
 
-void print_example_banner(string title);
 void example_slow_batching(CLP& cmd, Channel& recvChl, Channel& sendChl);
 
 namespace {
@@ -51,46 +48,6 @@ namespace {
     const std::string Colors::Reset = "\033[0m";
 }
 
-/**
- * This only turns on showing colors for Windows.
- */
-void prepare_console()
-{
-#ifndef _MSC_VER
-    return; // Nothing to do on Linux.
-#else
-
-    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (hConsole == INVALID_HANDLE_VALUE)
-        return;
-
-    DWORD dwMode = 0;
-    if (!GetConsoleMode(hConsole, &dwMode))
-        return;
-
-    dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-    SetConsoleMode(hConsole, dwMode);
-
-#endif
-}
-
-void print_example_banner(string title)
-{
-    if (!title.empty())
-    {
-        size_t title_length = title.length();
-        size_t banner_length = title_length + 2 + 2 * 10;
-        string banner_top(banner_length, '*');
-        string banner_middle = string(10, '*') + " " + title + " " + string(10, '*');
-
-        std::cout << endl
-            << banner_top << endl
-            << banner_middle << endl
-            << banner_top << endl
-            << endl;
-    }
-}
- 
 std::pair<vector<Item>, vector<int>> randSubset(const vector<Item>& items, int size)
 {
     PRNG prn(zero_block);

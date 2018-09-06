@@ -1,27 +1,33 @@
 #include "sender.h"
-#include "apsi.h"
+
+// STD
 #include <iostream>
 #include <string>
-#include "Sender/sender.h"
-#include "util/exfield.h"
-#include "apsidefines.h"
-#include "Network/network_utils.h"
+
+// APSI
+#include "clp.h"
+#include "apsi/sender/sender.h"
+#include "common_utils.h"
 
 using namespace std;
 using namespace apsi;
 using namespace apsi::tools;
-using namespace apsi::receiver;
 using namespace apsi::sender;
-using namespace seal::util;
-using namespace seal;
 
-void print_example_banner(string title);
-void example_remote();
+
+void example_remote(const CLP& cmd);
+
 
 int main(int argc, char *argv[])
 {
+    prepare_console();
+
+    CLP cmd("Example of a Sender implementation");
+    if (!cmd.parse_args(argc, argv))
+        return -1;
+
     // Example: Remote
-    example_remote();
+    example_remote(cmd);
 
     // Wait for ENTER before closing screen.
     cout << endl << "Press ENTER to exit" << endl;
@@ -30,24 +36,8 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void example_remote()
+void example_remote(const CLP& cmd)
 {
-    throw std::runtime_error("NOT IMPL");
+    print_example_banner("Remote Sender");
 }
 
-void print_example_banner(string title)
-{
-    if (!title.empty())
-    {
-        size_t title_length = title.length();
-        size_t banner_length = title_length + 2 + 2 * 10;
-        string banner_top(banner_length, '*');
-        string banner_middle = string(10, '*') + " " + title + " " + string(10, '*');
-
-        cout << endl
-            << banner_top << endl
-            << banner_middle << endl
-            << banner_top << endl
-            << endl;
-    }
-}
