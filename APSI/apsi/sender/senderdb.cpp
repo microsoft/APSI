@@ -184,7 +184,7 @@ namespace apsi
                         skip[1] = locs[0] == locs[1];
                         skip[2] = locs[0] == locs[2] || locs[1] == locs[2];
 
-                        // Claim an emply location in each matching bin
+                        // Claim an empty location in each matching bin
                         for (int j = 0; j < params_.hash_func_count(); j++)
                         {
                             if (skip[j] == false)

@@ -45,6 +45,9 @@
     <ClInclude Include="channel_tests.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="utils_tests.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="receiver.cpp">
@@ -78,6 +81,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="channel_tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="utils_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

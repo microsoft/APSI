@@ -5,7 +5,6 @@
 #include "Sender/sender.h"
 #include "util/exfield.h"
 #include "apsidefines.h"
-#include "cryptoTools/Network/channel.h"
 #include "Network/network_utils.h"
 
 using namespace std;
@@ -15,14 +14,13 @@ using namespace apsi::receiver;
 using namespace apsi::sender;
 using namespace seal::util;
 using namespace seal;
-using namespace oc;
 
 void print_example_banner(string title);
 void example_remote();
 
 int main(int argc, char *argv[])
 {
-    // Example: Basics
+    // Example: Remote
     example_remote();
 
     // Wait for ENTER before closing screen.
@@ -34,46 +32,7 @@ int main(int argc, char *argv[])
 
 void example_remote()
 {
-	throw std::runtime_error("NOT IMPL");
-
-    //print_example_banner("Example: Remote");
-    //stop_watch.time_points.clear();
-
-    ///* sender threads (8), sender session threads (4), table size (2^8=256), sender bin size (32), window size (2), splits (4). */
-    //PSIParams params(8, 4, 1, 8, 32, 2, 4);
-
-    ///*
-    //Item's bit length. In this example, we will only consider 32 bits of input items.
-    //If we use Item's string or pointer constructor, it means we only consider the first 32 bits of its hash;
-    //If we use Item's integer constructor, it means we only consider the first 32 bits of the integer.
-    //*/
-    //params.set_item_bit_length(32);
-
-    //params.set_decomposition_bit_count(2);
-
-    ///* n = 2^11 = 2048, in SEAL's poly modulus "x^n + 1". */
-    //params.set_log_poly_degree(11);
-
-    ///* The prime p in ExField. It is also the plain modulus in SEAL. */
-    //params.set_exfield_characteristic(0x101);
-
-    ///* f(x) in ExField. It determines the generalized batching slots. */
-    //params.set_exfield_polymod(string("1x^16 + 3"));
-
-    ///* SEAL's coefficient modulus q: when n = 2048, q has 60 bits. */
-    //params.set_coeff_mod_bit_count(60);
-
-    //params.validate();
-
-    //Sender sender(params, MemoryPoolHandle::New(true));
-
-    //sender.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
-    //stop_watch.set_time_point("Precomputation done");
-
-    //sender.query_engine();
-    //stop_watch.set_time_point("Query done");
-
-    //cout << stop_watch << endl;
+    throw std::runtime_error("NOT IMPL");
 }
 
 void print_example_banner(string title)

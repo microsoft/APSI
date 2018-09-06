@@ -15,7 +15,7 @@ block apsi::tools::sys_random_seed()
 {
     std::random_device rd;
     auto ret = std::array<unsigned int, 4> { rd(), rd(), rd(), rd() };
-    return *(block*)&ret;
+    return *(reinterpret_cast<block*>(&ret));
 }
 
 bool apsi::tools::not_equal(const block& lhs, const block& rhs)
@@ -24,9 +24,9 @@ bool apsi::tools::not_equal(const block& lhs, const block& rhs)
     return _mm_test_all_zeros(neq, neq) == 0;
 }
 
-uint64_t apsi::tools::optimal_split(uint64_t x, int base)
+u64 apsi::tools::optimal_split(const u64 x, const int base)
 {
-    vector<uint64_t> digits = conversion_to_digits(x, base);
+    vector<u64> digits = conversion_to_digits(x, base);
     int ndigits = static_cast<int>(digits.size());
     int hammingweight = 0;
     for (int i = 0; i < ndigits; i++)
@@ -35,13 +35,13 @@ uint64_t apsi::tools::optimal_split(uint64_t x, int base)
     }
     int target = hammingweight / 2;
     int now = 0;
-    uint64_t result = 0;
+    u64 result = 0;
     for (int i = 0; i < ndigits; i++)
     {
         if (digits[i] != 0)
         {
             now++;
-            result += static_cast<uint64_t>(pow(base, i) * digits[i]);
+            result += static_cast<u64>(pow(base, i) * digits[i]);
         }
         if (now >= target)
         {
@@ -51,26 +51,32 @@ uint64_t apsi::tools::optimal_split(uint64_t x, int base)
     return result;
 }
 
-vector<uint64_t> apsi::tools::conversion_to_digits(uint64_t input, int base)
+vector<u64> apsi::tools::conversion_to_digits(const u64 input, const int base)
 {
     vector<uint64_t> result;
-    while (input > 0)
+    u64 number = input;
+
+    while (number > 0)
     {
-        result.push_back(input % base);
-        input /= base;
+        result.push_back(number % base);
+        number /= base;
     }
+
     return result;
 }
 
-void apsi::tools::split(const std::string &s, char delim, std::vector<std::string> &elems) {
+void apsi::tools::split(const std::string &s, const char delim, std::vector<std::string> &elems)
+{
     std::stringstream ss(s);
     std::string item;
-    while (std::getline(ss, item, delim)) {
+    while (std::getline(ss, item, delim))
+    {
         elems.push_back(item);
     }
 }
 
-std::vector<std::string> apsi::tools::split(const std::string &s, char delim) {
+std::vector<std::string> apsi::tools::split(const std::string &s, const char delim)
+{
     std::vector<std::string> elems;
     split(s, delim, elems);
     return elems;
@@ -78,17 +84,17 @@ std::vector<std::string> apsi::tools::split(const std::string &s, char delim) {
 
 seal::Plaintext apsi::tools::random_plaintext(const seal::SEALContext &context)
 {
-    std::uint64_t plain_mod = context.context_data()->parms().plain_modulus().value();
+    u64 plain_mod = context.context_data()->parms().plain_modulus().value();
     int coeff_count = context.context_data()->parms().poly_modulus_degree();
     seal::Plaintext random(coeff_count);
-    uint64_t* random_ptr = random.data();
+    u64* random_ptr = random.data();
 
     random_device rd;
     for (int i = 0; i < coeff_count - 1; i++)
     {
-        random_ptr[i] = static_cast<std::uint64_t>(rd());
+        random_ptr[i] = static_cast<u64>(rd());
         random_ptr[i] <<= 32;
-        random_ptr[i] = random_ptr[i] | static_cast<std::uint64_t>(rd());
+        random_ptr[i] = random_ptr[i] | static_cast<u64>(rd());
         random_ptr[i] %= plain_mod;
     }
     random_ptr[coeff_count - 1] = 0;

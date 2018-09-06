@@ -89,7 +89,6 @@ namespace apsi
             /* Receive results in a streaming fashion. */
             auto intersection = stream_decrypt(chl, table_to_input_map, items);
 
-             /* Now we need to shorten and convert this tmp vector to match the length and indice of the query "items". */
             recv_stop_watch.set_time_point("receiver intersect");
             return intersection;
         }

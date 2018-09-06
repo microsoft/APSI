@@ -29,7 +29,7 @@ namespace apsi
         /**
         Fill a given number of 64 bit words with zeros
         */
-        inline void zero_uint(u64 *destination, u64 u64_count)
+        inline void zero_uint(apsi::u64 *destination, const apsi::u64 u64_count)
         {
             std::memset(reinterpret_cast<unsigned char*>(destination), 0, 8 * u64_count);
         }
@@ -37,22 +37,22 @@ namespace apsi
         /**
         Find optimal split
         */
-        std::uint64_t optimal_split(std::uint64_t x, int base);
+        apsi::u64 optimal_split(const apsi::u64 x, const int base);
 
         /**
         Convert the given input to digits
         */
-        std::vector<std::uint64_t> conversion_to_digits(std::uint64_t input, int base);
+        std::vector<apsi::u64> conversion_to_digits(const apsi::u64 input, const int base);
 
         /**
         Split the given string
         */
-        void split(const std::string &s, char delim, std::vector<std::string> &elems);
+        void split(const std::string &s, const char delim, std::vector<std::string> &elems);
 
         /**
         Split the given string
         */
-        std::vector<std::string> split(const std::string &s, char delim);
+        std::vector<std::string> split(const std::string &s, const char delim);
 
         /**
         Generate a random plaintext
@@ -64,7 +64,7 @@ namespace apsi
         */
         template<typename T>
         typename std::enable_if<std::is_pod<T>::value, T>::type
-        round_up_to(T val, T step) { return ((val + step - 1) / step) * step; }
+        round_up_to(const T val, const T step) { return ((val + step - 1) / step) * step; }
 
         extern apsi::tools::Stopwatch stop_watch, recv_stop_watch;
     }
