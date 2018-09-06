@@ -1,5 +1,5 @@
 # Makefile for the APSI library
-SRC_DIRS=.
+SRC_DIRS=
 BIN_DIR=../bin
 OBJ_DIR=obj
 INCLUDE_DIRS=. ../../SEAL-dev/SEAL /usr/include/flint ../../Cuckoo/Cuckoo ../../FourQlib/FourQ_64bit_and_portable
