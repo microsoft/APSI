@@ -9,18 +9,12 @@
 #include <random>
 
 // FLINT
-#ifdef _MSC_VER
 #pragma warning(push, 0)
-#endif
-
 #include "fmpz.h"
 #include "fq_nmod.h"
 #include "fq_nmod_vec.h"
 #include "fq_nmod_poly.h"
-
-#ifdef _MSC_VER
 #pragma warning(pop)
-#endif
 
 // SEAL
 #include "seal/bigpoly.h"
