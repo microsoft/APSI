@@ -3,7 +3,10 @@
 #include <string>
 #include <iostream>
 #include <vector>
+
+#pragma warning(push, 0)
 #include <tclap/CmdLine.h>
+#pragma warning(pop)
 
 #include "apsi/apsidefines.h"
 

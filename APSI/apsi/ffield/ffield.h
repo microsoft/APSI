@@ -9,10 +9,12 @@
 #include <random>
 
 // FLINT
+#pragma warning(push, 0)
 #include "fmpz.h"
 #include "fq_nmod.h"
 #include "fq_nmod_vec.h"
 #include "fq_nmod_poly.h"
+#pragma warning(pop)
 
 // SEAL
 #include "seal/bigpoly.h"
@@ -51,7 +53,7 @@ namespace apsi
         out.set_zero();
         auto coeff_count = in->length;
         auto coeff_bit_count = n_sizeinbase(in->mod.n, 2);
-        out.resize(coeff_count, coeff_bit_count);
+        out.resize(static_cast<int>(coeff_count), coeff_bit_count);
         auto *poly_ptr = out.data();
         for(unsigned i = 0; i < coeff_count; i++, poly_ptr++)
         {
@@ -72,7 +74,7 @@ namespace apsi
 
     inline void fmpz_to_biguint(const fmpz_t in, seal::BigUInt &out)
     {
-        out.resize(fmpz_sizeinbase(in, 2));
+        out.resize(static_cast<int>(fmpz_sizeinbase(in, 2)));
         out.set_zero();
         fmpz_t in_copy;
         fmpz_init(in_copy);

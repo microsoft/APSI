@@ -1,8 +1,4 @@
 #include "apsidefines.h"
-#include "seal/context.h"
-#include <sstream>
-#include <random>
-#include <wmmintrin.h>
 
 using namespace std;
 

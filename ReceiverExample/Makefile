@@ -1,5 +1,5 @@
 CXX = g++
-CFLAGS = -g -Ofast -march=native -std=c++17  -maes -msse2 -msse4.1 -mpclmul -DNDEBUG
+CFLAGS = -g -Ofast -march=native -std=c++17  -maes -msse2 -msse4.1 -mpclmul -DNDEBUG -Wno-ignored-attributes
 
 SRCS = receiver.cpp
 INCLUDES = -I. -I../APSI -I../../SEAL-dev/SEAL -I/usr/include/flint -I../../Cuckoo/Cuckoo

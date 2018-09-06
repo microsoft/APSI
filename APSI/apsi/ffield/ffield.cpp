@@ -55,7 +55,7 @@ namespace apsi
         fq_nmod_ctx_init_modulus(ctx_, flint_modulus, field_elt_var);
 
         // Set the degree
-        d_ = fq_nmod_ctx_degree(ctx_);
+        d_ = static_cast<unsigned>(fq_nmod_ctx_degree(ctx_));
 
         // Pre-compute action of Frobenius on monomials for quick evaluation 
         frob_table_backing_ = _fq_nmod_vec_init(d_ * d_, ctx_);
@@ -91,7 +91,7 @@ namespace apsi
         fq_nmod_ctx_init_modulus(ctx_, modulus, field_elt_var);
 
         // Set the degree
-        d_ = fq_nmod_ctx_degree(ctx_);
+        d_ = static_cast<unsigned>(fq_nmod_ctx_degree(ctx_));
     }
 
     FField::FField(uint64_t ch, string modulus) :

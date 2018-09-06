@@ -344,7 +344,7 @@ namespace apsi
 
                     for (u64 batch = batch_start, loop_idx = 0ul; loop_idx < batch_count; ++loop_idx)
                     {
-                        compute_batch_powers(batch, powers[batch], session_context, thread_context, dag, states[batch]);
+                        compute_batch_powers(static_cast<int>(batch), powers[batch], session_context, thread_context, dag, states[batch]);
                         batch = (batch + 1) % batch_count;
                     }
 
@@ -554,7 +554,7 @@ namespace apsi
             }
 
             // splin lock until all nodes are compute. We may want to do something smarter here.
-            for (u64 i = 0; i < state.nodes_.size(); ++i)
+            for (i64 i = 0; i < state.nodes_.size(); ++i)
                 while (state.nodes_[i] != WindowingDag::NodeState::Done);
 
 
@@ -650,7 +650,7 @@ namespace apsi
         uint64_t WindowingDag::optimal_split(uint64_t x, int base)
         {
             vector<uint64_t> digits = conversion_to_digits(x, base);
-            int ndigits = digits.size();
+            int ndigits = static_cast<int>(digits.size());
             int hammingweight = 0;
             for (int i = 0; i < ndigits; i++)
             {
@@ -694,7 +694,7 @@ namespace apsi
 
             for (int i = 1; i <= max_power_; i++)
             {
-                int i1 = optimal_split(i, 1 << window_);
+                int i1 = static_cast<int>(optimal_split(i, 1 << window_));
                 int i2 = i - i1;
                 splits[i] = i1;
 
@@ -715,7 +715,7 @@ namespace apsi
                 items_per[i] += items_per[i - 1];
             }
 
-            int size = max_power_ - base_powers_.size();
+            int size = static_cast<int>(max_power_ - base_powers_.size());
             nodes_.resize(size);
 
             for (int i = 1; i <= max_power_; i++)

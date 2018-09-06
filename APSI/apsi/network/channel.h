@@ -11,7 +11,9 @@
 #include "apsi/tools/threadpool.h"
 
 // ZeroMQ
+#pragma warning(push, 0)
 #include "zmqpp/zmqpp.hpp"
+#pragma warning(pop)
 
 
 namespace apsi

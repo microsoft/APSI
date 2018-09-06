@@ -154,7 +154,7 @@ namespace apsi
             unique_ptr<CuckooInterface> cuckoo = cuckoo_hashing(items);
 
             unique_ptr<FFieldArray> exfield_items;
-            unsigned padded_cuckoo_capacity = ((cuckoo->table_size() + slot_count_ - 1) / slot_count_) * slot_count_;
+            unsigned padded_cuckoo_capacity = static_cast<unsigned>(((cuckoo->table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
 
             vector<shared_ptr<FField> > field_vec;
             field_vec.reserve(padded_cuckoo_capacity);
@@ -260,7 +260,7 @@ namespace apsi
             CuckooInterface &cuckoo,
             FFieldArray &ret)
         {
-            int encoding_bit_length = cuckoo.encoding_bit_length();
+            int encoding_bit_length = static_cast<int>(cuckoo.encoding_bit_length());
             auto encoding_u64_len = round_up_to(encoding_bit_length, 64) / 64;
 
             auto& encodings = cuckoo.get_encodings();
@@ -269,7 +269,7 @@ namespace apsi
             {
                 ret.set(i, Item(encodings[i]).to_exfield_element(ret.field(i), encoding_bit_length));
             }
-            for (int i = cuckoo.table_size(); i < ret.size(); i++)
+            for (size_t i = cuckoo.table_size(); i < ret.size(); i++)
             {
                 ret.set(i, Item(cuckoo.null_value()).to_exfield_element(ret.field(i), encoding_bit_length));
             }
@@ -281,7 +281,7 @@ namespace apsi
             int split_size = (params_.sender_bin_size() + params_.split_count() - 1) / params_.split_count();
             int window_size = params_.window_size();
             int radix = 1 << window_size;
-            int bound = floor(log2(split_size) / window_size) + 1;
+            int bound = static_cast<int>(floor(log2(split_size) / window_size) + 1);
 
             FFieldArray current_power = exfield_items;
             for (uint64_t j = 0; j < bound; j++)
@@ -314,7 +314,7 @@ namespace apsi
 
         void Receiver::encrypt(const FFieldArray &input, vector<Ciphertext> &destination)
         {
-            int batch_size = slot_count_, num_of_batches = (input.size() + batch_size - 1) / batch_size;
+            int batch_size = slot_count_, num_of_batches = static_cast<int>((input.size() + batch_size - 1) / batch_size);
             vector<uint64_t> integer_batch(batch_size, 0);
             destination.clear();
             destination.reserve(num_of_batches);
@@ -423,7 +423,7 @@ namespace apsi
                         decryptor_->decrypt(tmp, p, local_pool);
 
                         // make sure its the right size. decrypt will shorted when there are zero coeffs at the top.
-                        p.resize(ex_batch_encoder_->n());
+                        p.resize(static_cast<i32>(ex_batch_encoder_->n()));
 
                         ex_batch_encoder_->decompose(p, *batch);
 
@@ -442,7 +442,7 @@ namespace apsi
             std::vector<std::thread> thrds(numThreads - 1);
             for (u64 t = 0; t < thrds.size(); ++t)
             {
-                thrds[t] = std::thread(routine, t);
+                thrds[t] = std::thread(routine, static_cast<int>(t));
             }
 
             routine(numThreads - 1);

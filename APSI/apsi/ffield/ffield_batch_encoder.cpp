@@ -155,7 +155,7 @@ namespace apsi
         ntt_ctx_.inverse_negacyclic_ntt(expanded);
         
         // Copy result to destination
-        destination.resize(ntt_ctx_.n_);
+        destination.resize(static_cast<Plaintext::size_type>(ntt_ctx_.n_));
         auto destination_ptr = destination.data();
         for(uint64_t i = 0; i < ntt_ctx_.n_; i++, destination_ptr++)
         {
@@ -177,7 +177,7 @@ namespace apsi
         ntt_ctx_.inverse_negacyclic_ntt(expanded);
         
         // Copy result to destination
-        destination.resize(ntt_ctx_.n_);
+        destination.resize(static_cast<Plaintext::size_type>(ntt_ctx_.n_));
         auto destination_ptr = destination.data();
         for(uint64_t i = 0; i < ntt_ctx_.n_; i++, destination_ptr++)
         {
@@ -194,14 +194,14 @@ namespace apsi
         }
         uint64_t plain_coeff_count = plain.coeff_count();
         uint64_t max_coeff_count = ntt_ctx_.n_ + 1;
-        if (plain_coeff_count > max_coeff_count || (plain_coeff_count == max_coeff_count && (plain[ntt_ctx_.n_] != 0)))
+        if (plain_coeff_count > max_coeff_count || (plain_coeff_count == max_coeff_count && (plain[static_cast<Plaintext::size_type>(ntt_ctx_.n_)] != 0)))
         {
             throw invalid_argument("plain is not valid for encryption parameters");
         }
 #ifndef NDEBUG
         auto c = field_->ch();
         if (plain.significant_coeff_count() >= max_coeff_count || !are_poly_coefficients_less_than(plain.data(),
-            plain_coeff_count, 1, &c, 1))
+            static_cast<int>(plain_coeff_count), 1, &c, 1))
         {
             throw invalid_argument("plain is not valid for encryption parameters");
         }

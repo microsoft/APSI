@@ -11,8 +11,9 @@
 #include "apsi/tools/prng.h"
 
 // FLINT
+#pragma warning(push, 0)
 #include "fq_nmod_poly.h"
-
+#pragma warning(pop)
 
 namespace apsi
 {

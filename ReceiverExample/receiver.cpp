@@ -98,7 +98,7 @@ std::pair<vector<Item>, vector<int>> randSubset(const vector<Item>& items, int s
     set<int> ss;
     while (ss.size() != size)
     {
-        ss.emplace(prn.get<unsigned int>() % items.size());
+        ss.emplace(static_cast<int>(prn.get<unsigned int>() % items.size()));
     }
     auto ssIter = ss.begin();
 
@@ -206,10 +206,11 @@ void example_slow_batching(CLP& cmd, Channel& recvChl, Channel& sendChl)
         table_params.split_count = cmd.split_count();
 
         // Get secure bin size
-        table_params.sender_bin_size = round_up_to(get_bin_size(
-            1 << table_params.log_table_size,
+        table_params.sender_bin_size = round_up_to(
+            static_cast<unsigned>(get_bin_size(
+            1ull << table_params.log_table_size,
             sender_set_size * cuckoo_params.hash_func_count,
-            binning_sec_level),
+            binning_sec_level)),
             table_params.split_count);
 
         // Window size parameter
@@ -230,28 +231,28 @@ void example_slow_batching(CLP& cmd, Channel& recvChl, Channel& sendChl)
         }
         else
         {
-            unordered_map<int, size_t> mods_added;
+            unordered_map<u64, size_t> mods_added;
             for(auto bit_size : coeff_mod_bit_vector)
             {
                 switch(bit_size)
                 {
                     case 30:
-                        coeff_modulus.emplace_back(small_mods_30bit(mods_added[bit_size]));
+                        coeff_modulus.emplace_back(small_mods_30bit(static_cast<int>(mods_added[bit_size])));
                         mods_added[bit_size]++;
                         break;
                 
                     case 40:
-                        coeff_modulus.emplace_back(small_mods_40bit(mods_added[bit_size]));
+                        coeff_modulus.emplace_back(small_mods_40bit(static_cast<int>(mods_added[bit_size])));
                         mods_added[bit_size]++;
                         break;
                 
                     case 50:
-                        coeff_modulus.emplace_back(small_mods_50bit(mods_added[bit_size]));
+                        coeff_modulus.emplace_back(small_mods_50bit(static_cast<int>(mods_added[bit_size])));
                         mods_added[bit_size]++;
                         break;
                 
                     case 60:
-                        coeff_modulus.emplace_back(small_mods_60bit(mods_added[bit_size]));
+                        coeff_modulus.emplace_back(small_mods_60bit(static_cast<int>(mods_added[bit_size])));
                         mods_added[bit_size]++;
                         break;
 

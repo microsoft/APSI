@@ -1,7 +1,11 @@
 #include "aes.h"
 
+//STD
 #include <array>
+#include <cstring>
 #include <stdexcept>
+
+// Intinsics
 #include <wmmintrin.h>
 
 
