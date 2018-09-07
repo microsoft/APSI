@@ -165,7 +165,7 @@
     <ClInclude Include="apsi\tools\prng.h" />
     <ClInclude Include="apsi\Tools\sealcompress.h" />
     <ClInclude Include="apsi\Tools\stopwatch.h" />
-    <ClInclude Include="apsi\Tools\ThreadPool.h" />
+    <ClInclude Include="apsi\Tools\thread_pool.h" />
     <ClInclude Include="apsi\tools\ec_utils.h" />
     <ClInclude Include="apsi\tools\utils.h" />
   </ItemGroup>

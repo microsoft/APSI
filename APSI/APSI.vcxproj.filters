@@ -78,9 +78,6 @@
     <ClInclude Include="apsi\Tools\stopwatch.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
-    <ClInclude Include="apsi\Tools\ThreadPool.h">
-      <Filter>Header Files\Tools</Filter>
-    </ClInclude>
     <ClInclude Include="apsi\tools\binsizemath.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
@@ -133,6 +130,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="apsi\tools\utils.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\Tools\thread_pool.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
   </ItemGroup>
