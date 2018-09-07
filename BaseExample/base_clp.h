@@ -18,7 +18,7 @@ namespace apsi
     
     This is a base class that contains common arguments.
     */
-    class BaseCLP : protected TCLAP::CmdLine
+    class BaseCLP : public TCLAP::CmdLine
     {
     public:
         BaseCLP(const std::string& description)

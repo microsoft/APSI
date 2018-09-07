@@ -7,12 +7,18 @@
 // APSI
 #include "clp.h"
 #include "apsi/sender/sender.h"
+#include "apsi/network/channel.h"
+#include "apsi/logging/log.h"
 #include "common_utils.h"
+
+
 
 using namespace std;
 using namespace apsi;
 using namespace apsi::tools;
 using namespace apsi::sender;
+using namespace apsi::network;
+using namespace apsi::logging;
 
 
 void example_remote(const CLP& cmd);
@@ -28,16 +34,48 @@ int main(int argc, char *argv[])
 
     // Example: Remote
     example_remote(cmd);
-
-    // Wait for ENTER before closing screen.
-    cout << endl << "Press ENTER to exit" << endl;
-    char ignore;
-    cin.get(ignore);
-    return 0;
 }
 
 void example_remote(const CLP& cmd)
 {
     print_example_banner("Remote Sender");
-}
 
+    Log::info("Building sender");
+
+    PSIParams params = build_psi_params(cmd);
+    Sender sender(params, cmd.threads(), cmd.threads());
+
+    Log::info("Preparing sender DB");
+
+    auto sender_size = 1 << cmd.sender_size();
+    auto label_bit_length = cmd.use_labels() ? cmd.item_bit_length() : 0;
+
+    vector<Item> items(sender_size);
+    Matrix<u8> labels(sender_size, params.get_label_byte_count());
+
+    for (int i = 0; i < items.size(); i++)
+    {
+        items[i] = i;
+
+        if (label_bit_length) {
+            memset(labels[i].data(), 0, labels[i].size());
+
+            labels[i][0] = i;
+            labels[i][1] = (i >> 8);
+        }
+    }
+
+    sender.load_db(items, labels);
+
+    zmqpp::context_t context;
+    Channel channel(context);
+
+    channel.bind("tcp://*:1212");
+
+    // Sender will run forever.
+    while (true)
+    {
+        Log::info("Waiting for request.");
+        sender.query_session(channel);
+    }
+}

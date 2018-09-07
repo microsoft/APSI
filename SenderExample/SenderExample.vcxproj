@@ -83,6 +83,7 @@
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\APSI;$(ProjectDir)..\BaseExample;c:\Progs\Libs\SEAL\include;c:\Progs\Libs\flint2\include;c:\Progs\Libs\GSL;c:\Progs\Libs\Cuckoo\include;c:\Progs\Libs\mpfr\include;c:\Progs\Libs\mpir\include;c:\Progs\Libs\boost-1.65.1\include;c:\Progs\Libs\cryptopp700\include;c:\Progs\Libs\tclap-1.2.2\include;c:\Progs\Libs\libzmqpp\include;c:\Progs\Libs\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <PreprocessorDefinitions>USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\;$(ProjectDir)..\$(Platform)\$(Configuration)\;c:\Progs\Libs\SEAL\lib\$(IntDir);c:\Progs\Libs\mpfr\lib\$(IntDir);c:\Progs\Libs\mpir\lib\$(IntDir);c:\Progs\Libs\FourQlib\lib\$(IntDir);c:\Progs\Libs\boost-1.65.1\lib;c:\Progs\Libs\flint2\lib\$(IntDir);c:\Progs\Libs\Cuckoo\lib\$(IntDir);c:\Progs\Libs\cryptopp700\lib\$(IntDir);c:\Progs\Libs\libzmqpp\lib\$(IntDir);c:\Progs\Libs\libzmq\dll\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -111,6 +112,7 @@
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\APSI;$(ProjectDir)..\BaseExample;c:\Progs\Libs\SEAL\include;c:\Progs\Libs\flint2\include;c:\Progs\Libs\GSL;c:\Progs\Libs\Cuckoo\include;c:\Progs\Libs\mpfr\include;c:\Progs\Libs\mpir\include;c:\Progs\Libs\boost-1.65.1\include;c:\Progs\Libs\cryptopp700\include;c:\Progs\Libs\tclap-1.2.2\include;c:\Progs\Libs\libzmqpp\include;c:\Progs\Libs\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <PreprocessorDefinitions>USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>

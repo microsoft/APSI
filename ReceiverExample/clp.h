@@ -19,24 +19,37 @@ namespace apsi
     public:
         CLP(const std::string& desc)
             : BaseCLP(desc)
-        {}
+        {
+            std::vector<std::string> modes = { "local", "remote" };
+            mode_constraint_ = std::make_unique<TCLAP::ValuesConstraint<std::string>>(modes);
+            mode_arg_ = std::make_unique<TCLAP::ValueArg<std::string>>("m", "mode", "Operation mode", false, "local", mode_constraint_.get(), *this);
+        }
 
         virtual void add_args()
         {
             add(rec_thr_arg_);
+
+            // No need to add mode_arg_. It was already added in the constructor.
         }
 
         virtual void get_args()
         {
             rec_threads_ = rec_thr_arg_.getValue();
             cout_param("recThreads", rec_threads_);
+
+            mode_ = mode_arg_->getValue();
+            cout_param("mode", mode_);
         }
 
         int rec_threads() const { return rec_threads_; }
+        const std::string& mode() const { return mode_; }
 
     private:
         TCLAP::ValueArg<int> rec_thr_arg_ = TCLAP::ValueArg<int>("r", "recThreads", "Receiver threads", false, 1, "int");
+        std::unique_ptr<TCLAP::ValueArg<std::string>> mode_arg_;// = TCLAP::ValueArg<std::string>("m", "mode", "Operation mode", false, "local", "string");
+        std::unique_ptr<TCLAP::ValuesConstraint<std::string>> mode_constraint_;
 
         int rec_threads_;
+        std::string mode_;
     };
 }

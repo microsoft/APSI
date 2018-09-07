@@ -10,6 +10,7 @@
 #include "apsi/apsi.h"
 #include "apsi/network/channel.h"
 #include "apsi/tools/utils.h"
+#include "apsi/logging/log.h"
 #include "common_utils.h"
 
 // SEAL
@@ -25,10 +26,12 @@ using namespace apsi::tools;
 using namespace apsi::receiver;
 using namespace apsi::sender;
 using namespace apsi::network;
+using namespace apsi::logging;
 using namespace seal::util;
 using namespace seal;
 
-void example_slow_batching(CLP& cmd, Channel& recvChl, Channel& sendChl);
+void example_slow_batching(CLP& cmd);
+void example_remote(CLP& cmd);
 
 namespace {
     struct Colors {
@@ -46,7 +49,7 @@ namespace {
     const std::string Colors::Reset = "\033[0m";
 }
 
-std::pair<vector<Item>, vector<int>> randSubset(const vector<Item>& items, int size)
+std::pair<vector<Item>, vector<int>> rand_subset(const vector<Item>& items, int size)
 {
     PRNG prn(zero_block);
 
@@ -79,18 +82,17 @@ int main(int argc, char *argv[])
     if (!cmd.parse_args(argc, argv))
         return -1;
 
-    zmqpp::context_t context;
-
-    Channel clientChl(context);
-    Channel serverChl(context);
-
-    serverChl.bind("tcp://*:1212");
-    clientChl.connect("tcp://localhost:1212");
-
     prepare_console();
 
-    // Example: Slow batching
-    example_slow_batching(cmd, clientChl, serverChl);
+    if (cmd.mode() == "local")
+    {
+        // Example: Slow batching
+        example_slow_batching(cmd);
+    }
+    else
+    {
+        example_remote(cmd);
+    }
 
 #ifdef _MSC_VER
     if (IsDebuggerPresent())
@@ -116,10 +118,18 @@ std::string print(gsl::span<u8> s)
     return ss.str();
 }
 
-void example_slow_batching(CLP& cmd, Channel& recvChl, Channel& sendChl)
+void example_slow_batching(CLP& cmd)
 {
     print_example_banner("Example: Slow batching");
     stop_watch.time_points.clear();
+
+    // Connect the network
+    zmqpp::context_t context;
+    Channel recvChl(context);
+    Channel sendChl(context);
+
+    sendChl.bind("tcp://*:1212");
+    recvChl.connect("tcp://localhost:1212");
 
     // Thread count
     unsigned numThreads = cmd.threads();
@@ -149,7 +159,7 @@ void example_slow_batching(CLP& cmd, Channel& recvChl, Channel& sendChl)
     auto recversActualSize = 50;
     auto intersectionSize = 25;
 
-    auto s1 = vector<Item>(sendersActualSize);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
+    auto s1 = vector<Item>(sendersActualSize);
     Matrix<u8> labels(sendersActualSize, params.get_label_byte_count());
     for (int i = 0; i < s1.size(); i++)
     {
@@ -163,7 +173,7 @@ void example_slow_batching(CLP& cmd, Channel& recvChl, Channel& sendChl)
         }
     }
 
-    auto cc1 = randSubset(s1, intersectionSize);
+    auto cc1 = rand_subset(s1, intersectionSize);
     auto& c1 = cc1.first;
 
     c1.reserve(recversActualSize);
@@ -230,4 +240,21 @@ void example_slow_batching(CLP& cmd, Channel& recvChl, Channel& sendChl)
     cout << "Communication R->S: " << recvChl.get_total_data_sent() / 1024.0 << " KB" << endl;
     cout << "Communication S->R: " << recvChl.get_total_data_received() / 1024.0 << " KB" << endl;
     cout << "Communication total: " << (recvChl.get_total_data_sent() + recvChl.get_total_data_received()) / 1024.0 << " KB" << endl;
+}
+
+void example_remote(CLP& cmd)
+{
+    print_example_banner("Example: Remote connection");
+
+    Log::warning("Only parameter 'recThreads' is used in this mode. All other thread count parameters are ignored.");
+
+    // Connect the network
+    zmqpp::context_t context;
+    Channel channel(context);
+
+    channel.connect("tcp://localhost:1212");
+
+    PSIParams params = build_psi_params(cmd);
+
+    Receiver receiver(params, cmd.rec_threads());
 }

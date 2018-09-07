@@ -4,6 +4,9 @@
 
 namespace apsi
 {
+    /**
+    Command Line Processor for SenderExample
+    */
     class CLP : public BaseCLP
     {
     public:

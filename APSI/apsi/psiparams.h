@@ -165,7 +165,9 @@ namespace apsi
         }
 
         inline int get_label_bit_count() const { return value_bit_length_; }
+
         inline int get_label_byte_count() const { return value_byte_length_; }
+
         void set_value_bit_count(int bits)
         {
             value_bit_length_ = bits;
@@ -173,10 +175,13 @@ namespace apsi
         }
 
         bool use_low_degree_poly() const { return use_low_degree_poly_; }
+
         void set_use_low_degree_poly(bool b) { use_low_degree_poly_ = b; }
 
         bool debug() const { return debug_; }
+
         void enable_debug() { debug_ = true; }
+
         void disable_debug() { debug_ = false; }
 
         // Constants
