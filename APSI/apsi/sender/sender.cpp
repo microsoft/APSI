@@ -144,7 +144,7 @@ namespace apsi
         void Sender::query_session(Channel &chl)
         {
             // Send the EC point when using OPRF
-            if (params_.use_pk_oprf())
+            if (params_.use_oprf())
             {
                 vector<u8> buff;
                 chl.receive(buff);

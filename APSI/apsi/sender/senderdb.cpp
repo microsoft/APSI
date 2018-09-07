@@ -157,7 +157,7 @@ namespace apsi
                     for (size_t i = start; i < end; i++)
                     {
                         // Do we do OPRF for Sender's security?
-                        if (params_.use_pk_oprf())
+                        if (params_.use_oprf())
                         {
                             // Compute EC PRF first for data
                             PRNG p(data[i], /* buffer_size */ 8);

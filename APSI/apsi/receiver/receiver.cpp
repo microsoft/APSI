@@ -98,7 +98,7 @@ namespace apsi
             unique_ptr<CuckooInterface> >
             Receiver::preprocess(vector<Item> &items, Channel &channel)
         {
-            if (params_.use_pk_oprf())
+            if (params_.use_oprf())
             {
                 PRNG prng(zero_block);
                 vector<vector<digit_t>> b;
