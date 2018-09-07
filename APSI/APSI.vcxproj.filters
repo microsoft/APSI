@@ -84,9 +84,6 @@
     <ClInclude Include="apsi\Tools\stopwatch.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
-    <ClInclude Include="apsi\tools\binsizemath.h">
-      <Filter>Header Files\Tools</Filter>
-    </ClInclude>
     <ClInclude Include="apsi\apsidefines.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -171,9 +168,6 @@
       <Filter>Source Files\Sender</Filter>
     </ClCompile>
     <ClCompile Include="apsi\Tools\stopwatch.cpp">
-      <Filter>Source Files\Tools</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\tools\binsizemath.cpp">
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
     <ClCompile Include="apsi\ffield\ffield.cpp">

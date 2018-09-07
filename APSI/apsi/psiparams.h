@@ -10,7 +10,6 @@
 
 // APSI
 #include "apsi/apsidefines.h"
-#include "apsi/tools/binsizemath.h"
 
 // SEAL
 #include "seal/encryptionparams.h"

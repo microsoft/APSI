@@ -10,6 +10,7 @@
 
 // APSI
 #include "base_clp.h"
+#include "apsi/apsidefines.h"
 #include "apsi/psiparams.h"
 #include "apsi/tools/utils.h"
 
@@ -17,9 +18,84 @@
 #include "seal/smallmodulus.h"
 #include "seal/defaultparams.h"
 
+// Boost
+#include <boost/math/special_functions/binomial.hpp>
+#include <boost/multiprecision/cpp_bin_float.hpp>
+
 
 using namespace std;
+using namespace apsi;
 using namespace seal;
+
+namespace
+{
+    double get_bin_overflow_prob(u64 num_bins, u64 num_balls, u64 bin_size, double epsilon = 0.0001)
+    {
+        if (num_balls <= bin_size)
+        {
+            return numeric_limits<double>::max();
+        }
+        if (num_balls > numeric_limits<int>::max())
+        {
+            auto msg = ("boost::math::binomial_coefficient(...) only supports "
+                + to_string(sizeof(unsigned) * 8) + " bit inputs which was exceeded.");
+            throw runtime_error(msg);
+        }
+
+        typedef boost::multiprecision::number<boost::multiprecision::backends::cpp_bin_float<16> > T;
+        T sum = 0.0;
+        T sec = 0.0;
+        T diff = 1;
+        u64 i = bin_size + 1;
+
+        while (diff > T(epsilon) && num_balls >= i)
+        {
+            sum += num_bins * boost::math::binomial_coefficient<T>(static_cast<int>(num_balls), static_cast<int>(i))
+                * boost::multiprecision::pow(T(1.0) / num_bins, i) * boost::multiprecision::pow(1 - T(1.0) / num_bins, num_balls - i);
+
+            T sec2 = boost::multiprecision::logb(sum);
+            diff = boost::multiprecision::abs(sec - sec2);
+            sec = sec2;
+
+            i++;
+        }
+
+        return max<double>(0, (double)-sec);
+    }
+
+    u64 get_bin_size(u64 num_bins, u64 num_balls, u64 stat_sec_param)
+    {
+        auto B = max<u64>(1, num_balls / num_bins);
+        double currentProb = get_bin_overflow_prob(num_bins, num_balls, B);
+        u64 step = 1;
+        bool doubling = true;
+
+        while (currentProb < stat_sec_param || step > 1)
+        {
+            if (stat_sec_param > currentProb)
+            {
+                if (doubling)
+                {
+                    step = max<u64>(1, step * 2);
+                }
+                else
+                {
+                    step = max<u64>(1, step / 2);
+                }
+                B += step;
+            }
+            else
+            {
+                doubling = false;
+                step = max<u64>(1, step / 2);
+                B -= step;
+            }
+            currentProb = get_bin_overflow_prob(num_bins, num_balls, B);
+        }
+
+        return B;
+    }
+}
 
 void apsi::tools::print_example_banner(string title)
 {
