@@ -2,7 +2,8 @@
 #include "log.h" 
 
 // Logging
-#include "log4cplus/log4cplus.h"
+#include "log4cplus/logger.h"
+#include "log4cplus/consoleappender.h"
 
 
 using namespace std;
@@ -15,7 +16,7 @@ namespace
 {
     bool configured_ = false;
 
-    Logger& logger_ = Logger::getInstance("APSI");
+    Logger logger_ = Logger::getInstance("APSI");
 
     void configure()
     {

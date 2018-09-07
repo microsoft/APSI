@@ -1,5 +1,5 @@
 # Makefile for the APSI library
-SRC_DIRS=apsi apsi/network apsi/receiver apsi/sender apsi/tools apsi/ffield
+SRC_DIRS=apsi apsi/network apsi/receiver apsi/sender apsi/tools apsi/ffield apsi/logging
 BIN_DIR=../bin
 OBJ_DIR=obj
 INCLUDE_DIRS=. ../../SEAL-dev/SEAL /usr/include/flint ../../Cuckoo/Cuckoo ../../FourQlib/FourQ_64bit_and_portable
