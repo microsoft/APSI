@@ -30,8 +30,12 @@ using namespace apsi::logging;
 using namespace seal::util;
 using namespace seal;
 
+
 void example_slow_batching(CLP& cmd);
 void example_remote(CLP& cmd);
+void print_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<u8>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<u8>& labels);
+void print_transmitted_data(Channel& channel);
+
 
 namespace {
     struct Colors {
@@ -191,55 +195,12 @@ void example_slow_batching(CLP& cmd)
     thrd.join();
 
     // Done with everything. Print the results!
-    bool correct = true;
-    for (int i = 0; i < c1.size(); i++)
-    {
-
-        if (i < intersectionSize)
-        {
-            if (intersection.first[i] == false)
-            {
-                cout << "Miss result for receiver's item at index: " << i << endl;
-                correct = false;
-            }
-            else if(label_bit_length)
-            {
-                auto idx = cc1.second[i];
-                if(memcmp(intersection.second[i].data(), labels[idx].data(), labels[idx].size()))
-                {
-                    std::cout << Colors::Red << "incorrect label at index: " << i 
-                        << ". actual: " << print(intersection.second[i])
-                        << ", expected: " << print(labels[i]) << std::endl << Colors::Reset;
-                    correct = false;
-                }
-            }
-        }
-        else
-        {
-            if (intersection.first[i])
-            {
-                cout << Colors::Red << "Incorrect result for receiver's item at index: " << i << endl << Colors::Reset;
-                correct = false;
-            }
-        }
-    }
-
-    cout << "Intersection results: ";
-    
-    if (correct)
-        cout << Colors::Green << "Correct";
-
-    else
-        cout << Colors::Red << "Incorrect";
-    
-    cout << Colors::Reset << endl;
+    print_intersection_results(c1, intersectionSize, intersection, label_bit_length > 0, cc1.second, labels);
 
     cout << stop_watch << endl;
     cout << recv_stop_watch << endl;
 
-    cout << "Communication R->S: " << recvChl.get_total_data_sent() / 1024.0 << " KB" << endl;
-    cout << "Communication S->R: " << recvChl.get_total_data_received() / 1024.0 << " KB" << endl;
-    cout << "Communication total: " << (recvChl.get_total_data_sent() + recvChl.get_total_data_received()) / 1024.0 << " KB" << endl;
+    print_transmitted_data(recvChl);
 }
 
 void example_remote(CLP& cmd)
@@ -257,4 +218,79 @@ void example_remote(CLP& cmd)
     PSIParams params = build_psi_params(cmd);
 
     Receiver receiver(params, cmd.rec_threads());
+    vector<Item> items(20);
+    auto sender_size = 1 << cmd.sender_size();
+
+    int i;
+    for (i = 0; i < items.size() / 2; i++)
+    {
+        // Items within sender
+        items[i] = i;
+    }
+
+    for (; i < items.size(); i++)
+    {
+        // Items that should not be within sender
+        items[i] = sender_size + i;
+    }
+
+    auto result = receiver.query(items, channel);
+
+    vector<int> label_idx;
+    Matrix<u8> labels;
+    print_intersection_results(items, static_cast<int>(items.size() / 2), result, /* compare_labels */ false, label_idx, labels);
+    print_transmitted_data(channel);
+}
+
+void print_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<u8>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<u8>& labels)
+{
+    bool correct = true;
+    for (int i = 0; i < client_items.size(); i++)
+    {
+
+        if (i < intersection_size)
+        {
+            if (intersection.first[i] == false)
+            {
+                cout << "Miss result for receiver's item at index: " << i << endl;
+                correct = false;
+            }
+            else if (compare_labels)
+            {
+                auto idx = label_idx[i];
+                if (memcmp(intersection.second[i].data(), labels[idx].data(), labels[idx].size()))
+                {
+                    std::cout << Colors::Red << "incorrect label at index: " << i
+                        << ". actual: " << print(intersection.second[i])
+                        << ", expected: " << print(labels[i]) << std::endl << Colors::Reset;
+                    correct = false;
+                }
+            }
+        }
+        else
+        {
+            if (intersection.first[i])
+            {
+                cout << Colors::Red << "Incorrect result for receiver's item at index: " << i << endl << Colors::Reset;
+                correct = false;
+            }
+        }
+    }
+
+    cout << "Intersection results: ";
+
+    if (correct)
+        cout << Colors::Green << "Correct";
+
+    else
+        cout << Colors::Red << "Incorrect";
+
+    cout << Colors::Reset << endl;
+}
+
+void print_transmitted_data(Channel& channel)
+{
+    cout << "Communication R->S: " << channel.get_total_data_sent() / 1024.0 << " KB" << endl;
+    cout << "Communication S->R: " << channel.get_total_data_received() / 1024.0 << " KB" << endl;
+    cout << "Communication total: " << (channel.get_total_data_sent() + channel.get_total_data_received()) / 1024.0 << " KB" << endl;
 }
