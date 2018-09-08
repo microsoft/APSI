@@ -11,8 +11,8 @@ BASELIB=libbaseexample.a
 CXX=g++
 CXXFLAGS=-O0 -g -DHAVE_CONFIG -DUSE_SECURE_SEED -march=native -std=c++17  -maes -msse2 -msse4.1 -mpclmul -DNDEBUG -D_AMD64_ -D_AVX2_ -D_ASM_ -D__LINUX__ -Wno-ignored-attributes
 PREFIX=/usr/local
-LDFLAGS=
-LIBRARY_PATHS=
+LDFLAGS=-lapsi
+LIBRARY_PATHS=../bin
 
 .PHONY : all clean install uninstall
 
