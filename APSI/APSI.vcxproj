@@ -181,7 +181,6 @@
     <ClCompile Include="apsi\network\channel.cpp" />
     <ClCompile Include="apsi\Network\network_utils.cpp" />
     <ClCompile Include="apsi\plaintextarith.cpp" />
-    <ClCompile Include="apsi\psiparams.cpp" />
     <ClCompile Include="apsi\Receiver\receiver.cpp" />
     <ClCompile Include="apsi\Sender\sender.cpp" />
     <ClCompile Include="apsi\Sender\senderdb.cpp" />

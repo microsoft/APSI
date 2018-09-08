@@ -155,9 +155,6 @@
     <ClCompile Include="apsi\plaintextarith.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="apsi\psiparams.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="apsi\Receiver\receiver.cpp">
       <Filter>Source Files\Receiver</Filter>
     </ClCompile>
