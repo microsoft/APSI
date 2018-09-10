@@ -22,6 +22,7 @@ using namespace apsi::logging;
 
 
 void example_remote(const CLP& cmd);
+string get_bind_address(const CLP& cmd);
 
 
 int main(int argc, char *argv[])
@@ -70,7 +71,9 @@ void example_remote(const CLP& cmd)
     zmqpp::context_t context;
     Channel channel(context);
 
-    channel.bind("tcp://*:1212");
+    string bind_addr = get_bind_address(cmd);
+    Log::info("Binding to address: %s", bind_addr.c_str());
+    channel.bind(bind_addr);
 
     // Sender will run forever.
     while (true)
@@ -78,4 +81,12 @@ void example_remote(const CLP& cmd)
         Log::info("Waiting for request.");
         sender.query_session(channel);
     }
+}
+
+string get_bind_address(const CLP& cmd)
+{
+    stringstream ss;
+    ss << "tcp://*:" << cmd.net_port();
+
+    return ss.str();
 }

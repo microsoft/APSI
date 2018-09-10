@@ -31,10 +31,12 @@ using namespace seal::util;
 using namespace seal;
 
 
-void example_slow_batching(CLP& cmd);
-void example_remote(CLP& cmd);
+void example_slow_batching(const CLP& cmd);
+void example_remote(const CLP& cmd);
 void print_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<u8>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<u8>& labels);
 void print_transmitted_data(Channel& channel);
+string get_bind_addr(const CLP& cmd);
+string get_conn_addr(const CLP& cmd);
 
 
 namespace {
@@ -122,7 +124,7 @@ std::string print(gsl::span<u8> s)
     return ss.str();
 }
 
-void example_slow_batching(CLP& cmd)
+void example_slow_batching(const CLP& cmd)
 {
     print_example_banner("Example: Slow batching");
     stop_watch.time_points.clear();
@@ -132,8 +134,14 @@ void example_slow_batching(CLP& cmd)
     Channel recvChl(context);
     Channel sendChl(context);
 
-    sendChl.bind("tcp://*:1212");
-    recvChl.connect("tcp://localhost:1212");
+    string bind_addr = get_bind_addr(cmd);
+    string conn_addr = get_conn_addr(cmd);
+
+    Log::info("Binding Sender to address: %s", bind_addr.c_str());
+    sendChl.bind(bind_addr);
+
+    Log::info("Connecting receiver to address: %s", conn_addr.c_str());
+    recvChl.connect(conn_addr);
 
     // Thread count
     unsigned numThreads = cmd.threads();
@@ -203,7 +211,7 @@ void example_slow_batching(CLP& cmd)
     print_transmitted_data(recvChl);
 }
 
-void example_remote(CLP& cmd)
+void example_remote(const CLP& cmd)
 {
     print_example_banner("Example: Remote connection");
 
@@ -213,7 +221,9 @@ void example_remote(CLP& cmd)
     zmqpp::context_t context;
     Channel channel(context);
 
-    channel.connect("tcp://localhost:1212");
+    string conn_addr = get_conn_addr(cmd);
+    Log::info("Receiver connecting to address: %s", conn_addr);
+    channel.connect(conn_addr);
 
     PSIParams params = build_psi_params(cmd);
 
@@ -290,7 +300,24 @@ void print_intersection_results(vector<Item>& client_items, int intersection_siz
 
 void print_transmitted_data(Channel& channel)
 {
-    cout << "Communication R->S: " << channel.get_total_data_sent() / 1024.0 << " KB" << endl;
-    cout << "Communication S->R: " << channel.get_total_data_received() / 1024.0 << " KB" << endl;
-    cout << "Communication total: " << (channel.get_total_data_sent() + channel.get_total_data_received()) / 1024.0 << " KB" << endl;
+    Log::info("Communication R->S: %0.3f KB", channel.get_total_data_sent() / 1024.0f);
+    Log::info("Communication S->R: %0.3f KB", channel.get_total_data_received() / 1024.0f);
+    Log::info("Communication total: %0.3f KB", (channel.get_total_data_received() + channel.get_total_data_sent()) / 1024.0f);
 }
+
+string get_bind_addr(const CLP& cmd)
+{
+    stringstream ss;
+    ss << "tcp://*:" << cmd.net_port();
+
+    return ss.str();
+}
+
+string get_conn_addr(const CLP& cmd)
+{
+    stringstream ss;
+    ss << "tcp://" << cmd.net_addr() << ":" << cmd.net_port();
+
+    return ss.str();
+}
+
