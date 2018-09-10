@@ -236,10 +236,10 @@ namespace apsi
             }
             else
             {
-                cout << "Using " << cuckoo->encoding_bit_length()
-                    << " out of " << seal::util::get_significant_bit_count(params_.exfield_characteristic()) - 1
-                    << "x" << degree
-                    << " bits of exfield element." << endl;
+                Log::info("Using %i out of %ix%i bits of exfield element",
+                    cuckoo->encoding_bit_length(),
+                    seal::util::get_significant_bit_count(params_.exfield_characteristic()) - 1,
+                    degree);
             }
             bool insertionSuccess;
             for (int i = 0; i < items.size(); i++)
@@ -376,7 +376,11 @@ namespace apsi
             }
 
             auto numThreads = thread_count_;
-            cout << "Decrypting " << block_count << " blocks (" << num_of_batches << "b x " << num_of_splits << "s) with "<< numThreads<<" threads" << endl;
+            Log::info("Decrypting %i blocks(%ib x %is) with %i threads",
+                block_count,
+                num_of_batches,
+                num_of_splits,
+                numThreads);
 
             auto routine = [&](int t)
             {
@@ -406,7 +410,7 @@ namespace apsi
                     if (first && t == 0)
                     {
                         first = false;
-                        cout << "Noise budget: " << decryptor_->invariant_noise_budget(tmp, local_pool) << " bits" << endl;
+                        Log::info("Noise budget: %i bits", decryptor_->invariant_noise_budget(tmp, local_pool));
                         recv_stop_watch.set_time_point("receiver recv-start");
                     }
 

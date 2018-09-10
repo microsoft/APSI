@@ -27,6 +27,7 @@ namespace
             throw runtime_error("Logger is already configured.");
 
         SharedAppenderPtr appender(new ConsoleAppender);
+        appender->setLayout(make_unique<PatternLayout>("%-5p %D{%H:%M:%S:%Q}: %m%n"));
         logger_.addAppender(appender);
 
         configured_ = true;
