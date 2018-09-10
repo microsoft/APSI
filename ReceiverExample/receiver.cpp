@@ -222,7 +222,7 @@ void example_remote(const CLP& cmd)
     Channel channel(context);
 
     string conn_addr = get_conn_addr(cmd);
-    Log::info("Receiver connecting to address: %s", conn_addr);
+    Log::info("Receiver connecting to address: %s", conn_addr.c_str());
     channel.connect(conn_addr);
 
     PSIParams params = build_psi_params(cmd);

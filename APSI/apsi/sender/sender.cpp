@@ -7,6 +7,7 @@
 // APSI
 #include "apsi/sender/sender.h"
 #include "apsi/apsidefines.h"
+#include "apsi/logging/log.h"
 #include "apsi/network/network_utils.h"
 #include "apsi/tools/ec_utils.h"
 #include "apsi/tools/utils.h"
@@ -22,6 +23,7 @@
 using namespace std;
 using namespace seal;
 using namespace seal::util;
+using namespace apsi::logging;
 using namespace apsi::tools;
 using namespace apsi::network;
 
@@ -149,6 +151,8 @@ namespace apsi
                 vector<u8> buff;
                 chl.receive(buff);
 
+                Log::info("Starting session with OPRF");
+
                 PRNG pp(cc_block);
                 digit_t key[NWORDS_ORDER];
                 random_fourq(key, pp);
@@ -167,6 +171,7 @@ namespace apsi
                 }
 
                 chl.send(buff);
+                Log::info("OPRF pre-processing done");
             }
 
             /* Set up and receive keys. */
@@ -174,6 +179,12 @@ namespace apsi
             RelinKeys relin;
             receive_pubkey(pub, chl);
             receive_relinkeys(relin, chl);
+
+            if (!params_.use_oprf())
+            {
+                Log::info("Starting session");
+            }
+
             SenderSessionContext session_context(seal_context_, pub, relin);
 
             if (params_.debug())
@@ -211,6 +222,7 @@ namespace apsi
 
             /* Answer the query. */
             respond(powers, session_context, chl);
+            Log::info("Finished processing session");
         }
 
         void Sender::stop()
@@ -241,6 +253,7 @@ namespace apsi
             }
             return x;
         }
+
         std::vector<u64> Sender::debug_eval_term(
             int term,
             MatrixView<u64> coeffs,
@@ -269,7 +282,6 @@ namespace apsi
             return r;
         }
 
-
         bool Sender::debug_not_equals(FFieldArray& true_x, const Ciphertext& c, SenderSessionContext& ctx)
         {
             FFieldArray cc(true_x.field(0), true_x.size());
@@ -289,10 +301,6 @@ namespace apsi
 
             return r;
         }
-
-
-
-
 
         void Sender::respond(
             vector<vector<Ciphertext>>& powers,
@@ -500,7 +508,6 @@ namespace apsi
             }
 
             stop_watch.set_time_point("sender online done");
-
         }
 
 

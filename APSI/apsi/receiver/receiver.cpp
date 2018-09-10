@@ -6,6 +6,7 @@
 #include "apsi/sender/sender.h"
 #include "apsi/receiver/receiver.h"
 #include "apsi/apsidefines.h"
+#include "apsi/logging/log.h"
 #include "apsi/network/network_utils.h"
 #include "apsi/network/channel.h"
 #include "apsi/tools/ec_utils.h"
@@ -29,6 +30,7 @@ using namespace std;
 using namespace seal;
 using namespace seal::util;
 using namespace cuckoo;
+using namespace apsi::logging;
 using namespace apsi::tools;
 using namespace apsi::network;
 
@@ -47,11 +49,14 @@ namespace apsi
             {
                 throw invalid_argument("thread_count must be positive");
             }
+
             initialize();
         }
 
         void Receiver::initialize()
         {
+            Log::info("Initializing Receiver");
+
             seal_context_ = SEALContext::Create(params_.encryption_params());
             KeyGenerator generator(seal_context_);
 
@@ -71,10 +76,13 @@ namespace apsi
 
             ex_batch_encoder_ = make_shared<FFieldFastBatchEncoder>(ex_field_->ch(), ex_field_->d(),
                 get_power_of_two(params_.encryption_params().poly_modulus_degree()));
+
+            Log::info("Receiver initialized");
         }
 
         std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Channel& chl)
         {
+            Log::info("Receiver starting query");
 
             auto qq = preprocess(items, chl);
             auto& ciphertexts = qq.first;
@@ -90,6 +98,8 @@ namespace apsi
             auto intersection = stream_decrypt(chl, table_to_input_map, items);
 
             recv_stop_watch.set_time_point("receiver intersect");
+            Log::info("Receiver completed query");
+
             return intersection;
         }
 
@@ -98,6 +108,8 @@ namespace apsi
             unique_ptr<CuckooInterface> >
             Receiver::preprocess(vector<Item> &items, Channel &channel)
         {
+            Log::info("Receiver preprocess start");
+
             if (params_.use_oprf())
             {
                 PRNG prng(zero_block);
@@ -170,6 +182,8 @@ namespace apsi
 
             map<uint64_t, vector<Ciphertext> > ciphers;
             encrypt(powers, ciphers);
+
+            Log::info("Receiver preprocess end");
 
             return { move(ciphers), move(cuckoo) };
         }
