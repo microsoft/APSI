@@ -39,22 +39,52 @@ namespace
 }
 
 
-void Log::info(const string& msg)
+void Log::info(const char* format, ...)
 {
+    va_list ap;
+    va_start(ap, format);
+    string msg = format_msg(format, ap);
+    va_end(ap);
+
     instance().log(INFO_LOG_LEVEL, msg);
 }
 
-void Log::warning(const string& msg)
+void Log::warning(const char* format, ...)
 {
+    va_list ap;
+    va_start(ap, format);
+    string msg = format_msg(format, ap);
+    va_end(ap);
+
     instance().log(WARN_LOG_LEVEL, msg);
 }
 
-void Log::debug(const string& msg)
+void Log::debug(const char* format, ...)
 {
+    va_list ap;
+    va_start(ap, format);
+    string msg = format_msg(format, ap);
+    va_end(ap);
+
     instance().log(DEBUG_LOG_LEVEL, msg);
 }
 
-void Log::error(const string& msg)
+void Log::error(const char* format, ...)
 {
+    va_list ap;
+    va_start(ap, format);
+    string msg = format_msg(format, ap);
+    va_end(ap);
+
     instance().log(ERROR_LOG_LEVEL, msg);
+}
+
+string Log::format_msg(const char* format, va_list ap)
+{
+    string msg;
+    msg.resize(1000);
+
+    vsprintf_s(msg.data(), msg.size(), format, ap);
+
+    return msg;
 }
