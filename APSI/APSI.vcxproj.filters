@@ -43,6 +43,12 @@
     <Filter Include="Source Files\FField">
       <UniqueIdentifier>{2410c2d4-ab26-45d4-8505-d7f3cf1b99c0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Logging">
+      <UniqueIdentifier>{a816c5eb-9d2c-4624-8b09-68f8b09b1512}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Logging">
+      <UniqueIdentifier>{9865b702-dfe7-405d-830a-1a09e38d309f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="apsi\apsi.h">
@@ -76,12 +82,6 @@
       <Filter>Header Files\Sender</Filter>
     </ClInclude>
     <ClInclude Include="apsi\Tools\stopwatch.h">
-      <Filter>Header Files\Tools</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\Tools\ThreadPool.h">
-      <Filter>Header Files\Tools</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\tools\binsizemath.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
     <ClInclude Include="apsi\apsidefines.h">
@@ -135,6 +135,12 @@
     <ClInclude Include="apsi\tools\utils.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
+    <ClInclude Include="apsi\Tools\thread_pool.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\logging\log.h">
+      <Filter>Header Files\Logging</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp">
@@ -149,9 +155,6 @@
     <ClCompile Include="apsi\plaintextarith.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="apsi\psiparams.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="apsi\Receiver\receiver.cpp">
       <Filter>Source Files\Receiver</Filter>
     </ClCompile>
@@ -162,9 +165,6 @@
       <Filter>Source Files\Sender</Filter>
     </ClCompile>
     <ClCompile Include="apsi\Tools\stopwatch.cpp">
-      <Filter>Source Files\Tools</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\tools\binsizemath.cpp">
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
     <ClCompile Include="apsi\ffield\ffield.cpp">
@@ -202,6 +202,9 @@
     </ClCompile>
     <ClCompile Include="apsi\tools\utils.cpp">
       <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\logging\log.cpp">
+      <Filter>Source Files\Logging</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

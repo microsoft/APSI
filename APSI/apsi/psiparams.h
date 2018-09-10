@@ -9,7 +9,7 @@
 #include <cstdint>
 
 // APSI
-#include "apsi/tools/binsizemath.h"
+#include "apsi/apsidefines.h"
 
 // SEAL
 #include "seal/encryptionparams.h"
@@ -22,12 +22,6 @@
 
 namespace apsi
 {
-    enum class OprfType
-    {
-        None,
-        PK
-    };
-
     struct CuckooParams
     {
         unsigned hash_func_count;
@@ -47,9 +41,10 @@ namespace apsi
     {
         struct ExFieldParams
         {
-            std::uint64_t exfield_characteristic;
+            u64 exfield_characteristic;
             unsigned exfield_degree;
         } exfield_params;
+
         seal::EncryptionParameters encryption_params{ seal::scheme_type::BFV };
         unsigned decomposition_bit_count;
     };
@@ -59,36 +54,54 @@ namespace apsi
     public:
         PSIParams(
             unsigned item_bit_count,
+            bool use_oprf,
             TableParams table_params,
             CuckooParams cuckoo_params,
-            SEALParams seal_params,
-            OprfType oprfType,
-            std::uint32_t port = 4000,
-            std::string endpoint = "APSI") :
-            log_table_size_(table_params.log_table_size), 
-            table_size_(1 << log_table_size_),
-            window_size_(table_params.window_size),
-            sender_bin_size_(table_params.sender_bin_size), 
-            split_count_(table_params.split_count),
-            oprf_type_(oprfType),
-            encryption_params_(seal_params.encryption_params),
-            decomposition_bit_count_(seal_params.decomposition_bit_count),
-            hash_func_count_(cuckoo_params.hash_func_count), 
-            hash_func_seed_(cuckoo_params.hash_func_seed), 
-            max_probe_(cuckoo_params.max_probe),
-            item_bit_count_(item_bit_count), 
-            exfield_characteristic_(seal_params.exfield_params.exfield_characteristic), 
-            exfield_degree_(seal_params.exfield_params.exfield_degree),
-            apsi_port_(port), 
-            apsi_endpoint_(endpoint)
+            SEALParams seal_params)
+                : log_table_size_(table_params.log_table_size), 
+                  table_size_(1 << log_table_size_),
+                  window_size_(table_params.window_size),
+                  sender_bin_size_(table_params.sender_bin_size), 
+                  split_count_(table_params.split_count),
+                  use_oprf_(use_oprf),
+                  encryption_params_(seal_params.encryption_params),
+                  decomposition_bit_count_(seal_params.decomposition_bit_count),
+                  hash_func_count_(cuckoo_params.hash_func_count), 
+                  hash_func_seed_(cuckoo_params.hash_func_seed), 
+                  max_probe_(cuckoo_params.max_probe),
+                  item_bit_count_(item_bit_count), 
+                  exfield_characteristic_(seal_params.exfield_params.exfield_characteristic), 
+                  exfield_degree_(seal_params.exfield_params.exfield_degree)
         {
         }
 
-        void validate();
-
-        inline bool use_pk_oprf() const
+        void validate() const
         {
-            return oprf_type_ == OprfType::PK;
+            if (sender_bin_size_ % split_count_ != 0)
+            {
+                throw std::invalid_argument("Sender bin size must be a multiple of number of splits.");
+            }
+
+            if ((item_bit_count_ + 63) / 64 != (item_bit_count_ + static_cast<int>(floor(log2(hash_func_count_))) + 1 + 1 + 63) / 64)
+            {
+                throw std::invalid_argument("Invalid for cuckoo: null bit and location index overflow to new uint64_t.");
+            }
+
+            if (item_bit_count_ > max_item_bit_count)
+            {
+                throw std::invalid_argument("Item bit count cannot exceed max.");
+            }
+
+            if (item_bit_count_ > (max_item_bit_count - 8))
+            {
+                // Not an error, but a warning.
+                std::cout << std::endl << "Item bit count is close to its upper limit. Several bits should be reserved for appropriate Cuckoo hashing." << std::endl;
+            }
+        }
+
+        inline bool use_oprf() const
+        {
+            return use_oprf_;
         }
 
         inline int log_table_size() const
@@ -121,7 +134,7 @@ namespace apsi
             return item_bit_count_;
         }
 
-        inline std::uint64_t exfield_characteristic() const
+        inline u64 exfield_characteristic() const
         {
             return exfield_characteristic_;
         }
@@ -172,18 +185,10 @@ namespace apsi
             return encryption_params_;
         }
 
-        inline std::uint32_t apsi_port() const
-        {
-            return apsi_port_;
-        }
-
-        inline std::string apsi_endpoint() const
-        {
-            return apsi_endpoint_;
-        }
-
         inline int get_label_bit_count() const { return value_bit_length_; }
+
         inline int get_label_byte_count() const { return value_byte_length_; }
+
         void set_value_bit_count(int bits)
         {
             value_bit_length_ = bits;
@@ -191,11 +196,17 @@ namespace apsi
         }
 
         bool use_low_degree_poly() const { return use_low_degree_poly_; }
+
         void set_use_low_degree_poly(bool b) { use_low_degree_poly_ = b; }
 
         bool debug() const { return debug_; }
+
         void enable_debug() { debug_ = true; }
+
         void disable_debug() { debug_ = false; }
+
+        // Constants
+        constexpr static int max_item_bit_count = 128;
 
     private:
         int log_table_size_;
@@ -208,7 +219,7 @@ namespace apsi
 
         int split_count_;
 
-        OprfType oprf_type_;
+        bool use_oprf_;
 
         int value_bit_length_ = 0;
         
@@ -233,12 +244,8 @@ namespace apsi
         /* Should not exceed 128. Moreover, should reserve several bits because of the requirement of current Cuckoo hashing impl. */
         int item_bit_count_;
 
-        std::uint64_t exfield_characteristic_;
+        u64 exfield_characteristic_;
 
         unsigned exfield_degree_;
-
-        std::uint32_t apsi_port_;
-
-        std::string apsi_endpoint_;
     };
 }

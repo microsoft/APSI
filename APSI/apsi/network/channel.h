@@ -8,7 +8,7 @@
 
 // APSI
 #include "apsi/apsidefines.h"
-#include "apsi/tools/threadpool.h"
+#include "apsi/tools/thread_pool.h"
 
 // ZeroMQ
 #pragma warning(push, 0)
@@ -198,7 +198,7 @@ namespace apsi
             zmqpp::socket_t socket_;
             std::string end_point_;
 
-            ThreadPool thread_pool_;
+            apsi::tools::ThreadPool thread_pool_;
             std::mutex receive_mutex_;
             std::mutex send_mutex_;
 

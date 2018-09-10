@@ -81,11 +81,13 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\libs\boost;..\..\SEAL-dev-new\SEAL\include;../../Cuckoo/Cuckoo/include;$(SolutionDir)/APSI/include;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\APSI;$(ProjectDir)..\BaseExample;c:\Progs\Libs\SEAL\include;c:\Progs\Libs\flint2\include;c:\Progs\Libs\GSL;c:\Progs\Libs\Cuckoo\include;c:\Progs\Libs\mpfr\include;c:\Progs\Libs\mpir\include;c:\Progs\Libs\boost-1.65.1\include;c:\Progs\Libs\cryptopp700\include;c:\Progs\Libs\tclap-1.2.2\include;c:\Progs\Libs\libzmqpp\include;c:\Progs\Libs\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <PreprocessorDefinitions>USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>..\..\SEAL-dev-new\bin;C:\libs\boost/stage/lib;$(SolutionDir)/$(Platform)/$(Configuration)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>APSI.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\;$(ProjectDir)..\$(Platform)\$(Configuration)\;c:\Progs\Libs\SEAL\lib\$(IntDir);c:\Progs\Libs\mpfr\lib\$(IntDir);c:\Progs\Libs\mpir\lib\$(IntDir);c:\Progs\Libs\FourQlib\lib\$(IntDir);c:\Progs\Libs\boost-1.65.1\lib;c:\Progs\Libs\flint2\lib\$(IntDir);c:\Progs\Libs\Cuckoo\lib\$(IntDir);c:\Progs\Libs\cryptopp700\lib\$(IntDir);c:\Progs\Libs\libzmqpp\lib\$(IntDir);c:\Progs\Libs\libzmq\dll\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>mpfr.lib;mpir.lib;dll_flint.lib;SEAL.lib;Cuckoo.lib;APSI.lib;FourQ.lib;cryptlib.lib;zmqpp.lib;libzmq.lib;BaseExample.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -108,16 +110,19 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>C:\libs\boost;..\..\SEAL-dev-new\SEAL\include;../../Cuckoo/Cuckoo/include;$(SolutionDir)/APSI/include;$(ProjectDir)../../../libOTe/cryptoTools/;C:\libs\miracl\;</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\APSI;$(ProjectDir)..\BaseExample;c:\Progs\Libs\SEAL\include;c:\Progs\Libs\flint2\include;c:\Progs\Libs\GSL;c:\Progs\Libs\Cuckoo\include;c:\Progs\Libs\mpfr\include;c:\Progs\Libs\mpir\include;c:\Progs\Libs\boost-1.65.1\include;c:\Progs\Libs\cryptopp700\include;c:\Progs\Libs\tclap-1.2.2\include;c:\Progs\Libs\libzmqpp\include;c:\Progs\Libs\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <PreprocessorDefinitions>USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>..\..\SEAL-dev-new\bin;C:\libs\boost/stage/lib;$(SolutionDir)/$(Platform)/$(Configuration)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>APSI.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\;$(ProjectDir)..\$(Platform)\$(Configuration)\;c:\Progs\Libs\SEAL\lib\$(IntDir);c:\Progs\Libs\mpfr\lib\$(IntDir);c:\Progs\Libs\mpir\lib\$(IntDir);c:\Progs\Libs\FourQlib\lib\$(IntDir);c:\Progs\Libs\boost-1.65.1\lib;c:\Progs\Libs\flint2\lib\$(IntDir);c:\Progs\Libs\Cuckoo\lib\$(IntDir);c:\Progs\Libs\cryptopp700\lib\$(IntDir);c:\Progs\Libs\libzmqpp\lib\$(IntDir);c:\Progs\Libs\libzmq\dll\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>mpfr.lib;mpir.lib;dll_flint.lib;SEAL.lib;Cuckoo.lib;APSI.lib;FourQ.lib;cryptlib.lib;zmqpp.lib;libzmq.lib;BaseExample.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="clp.h" />
     <ClInclude Include="sender.h" />
   </ItemGroup>
   <ItemGroup>

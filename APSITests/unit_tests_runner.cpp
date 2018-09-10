@@ -14,6 +14,7 @@
 #include "aes_tests.h"
 #include "prng_tests.h"
 #include "channel_tests.h"
+#include "utils_tests.h"
 
 #ifdef _MSC_VER
 #include "Windows.h"
@@ -116,6 +117,7 @@ int run_unit_tests()
     runner.addTest(AESTests::suite());
     runner.addTest(PRNGTests::suite());
     runner.addTest(ChannelTests::suite());
+    runner.addTest(UtilsTests::suite());
 
     runner.run(controller);
 

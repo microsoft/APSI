@@ -1,94 +1,92 @@
 #include "sender.h"
-#include "apsi.h"
+
+// STD
 #include <iostream>
 #include <string>
-#include "Sender/sender.h"
-#include "util/exfield.h"
-#include "apsidefines.h"
-#include "cryptoTools/Network/channel.h"
-#include "Network/network_utils.h"
+
+// APSI
+#include "clp.h"
+#include "apsi/sender/sender.h"
+#include "apsi/network/channel.h"
+#include "apsi/logging/log.h"
+#include "common_utils.h"
+
+
 
 using namespace std;
 using namespace apsi;
 using namespace apsi::tools;
-using namespace apsi::receiver;
 using namespace apsi::sender;
-using namespace seal::util;
-using namespace seal;
-using namespace oc;
+using namespace apsi::network;
+using namespace apsi::logging;
 
-void print_example_banner(string title);
-void example_remote();
+
+void example_remote(const CLP& cmd);
+string get_bind_address(const CLP& cmd);
+
 
 int main(int argc, char *argv[])
 {
-    // Example: Basics
-    example_remote();
+    prepare_console();
 
-    // Wait for ENTER before closing screen.
-    cout << endl << "Press ENTER to exit" << endl;
-    char ignore;
-    cin.get(ignore);
-    return 0;
+    CLP cmd("Example of a Sender implementation");
+    if (!cmd.parse_args(argc, argv))
+        return -1;
+
+    // Example: Remote
+    example_remote(cmd);
 }
 
-void example_remote()
+void example_remote(const CLP& cmd)
 {
-	throw std::runtime_error("NOT IMPL");
+    print_example_banner("Remote Sender");
 
-    //print_example_banner("Example: Remote");
-    //stop_watch.time_points.clear();
+    Log::info("Building sender");
 
-    ///* sender threads (8), sender session threads (4), table size (2^8=256), sender bin size (32), window size (2), splits (4). */
-    //PSIParams params(8, 4, 1, 8, 32, 2, 4);
+    PSIParams params = build_psi_params(cmd);
+    Sender sender(params, cmd.threads(), cmd.threads());
 
-    ///*
-    //Item's bit length. In this example, we will only consider 32 bits of input items.
-    //If we use Item's string or pointer constructor, it means we only consider the first 32 bits of its hash;
-    //If we use Item's integer constructor, it means we only consider the first 32 bits of the integer.
-    //*/
-    //params.set_item_bit_length(32);
+    Log::info("Preparing sender DB");
 
-    //params.set_decomposition_bit_count(2);
+    auto sender_size = 1 << cmd.sender_size();
+    auto label_bit_length = cmd.use_labels() ? cmd.item_bit_length() : 0;
 
-    ///* n = 2^11 = 2048, in SEAL's poly modulus "x^n + 1". */
-    //params.set_log_poly_degree(11);
+    vector<Item> items(sender_size);
+    Matrix<u8> labels(sender_size, params.get_label_byte_count());
 
-    ///* The prime p in ExField. It is also the plain modulus in SEAL. */
-    //params.set_exfield_characteristic(0x101);
-
-    ///* f(x) in ExField. It determines the generalized batching slots. */
-    //params.set_exfield_polymod(string("1x^16 + 3"));
-
-    ///* SEAL's coefficient modulus q: when n = 2048, q has 60 bits. */
-    //params.set_coeff_mod_bit_count(60);
-
-    //params.validate();
-
-    //Sender sender(params, MemoryPoolHandle::New(true));
-
-    //sender.load_db(vector<Item>{string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h")});
-    //stop_watch.set_time_point("Precomputation done");
-
-    //sender.query_engine();
-    //stop_watch.set_time_point("Query done");
-
-    //cout << stop_watch << endl;
-}
-
-void print_example_banner(string title)
-{
-    if (!title.empty())
+    for (int i = 0; i < items.size(); i++)
     {
-        size_t title_length = title.length();
-        size_t banner_length = title_length + 2 + 2 * 10;
-        string banner_top(banner_length, '*');
-        string banner_middle = string(10, '*') + " " + title + " " + string(10, '*');
+        items[i] = i;
 
-        cout << endl
-            << banner_top << endl
-            << banner_middle << endl
-            << banner_top << endl
-            << endl;
+        if (label_bit_length) {
+            memset(labels[i].data(), 0, labels[i].size());
+
+            labels[i][0] = i;
+            labels[i][1] = (i >> 8);
+        }
     }
+
+    sender.load_db(items, labels);
+
+    zmqpp::context_t context;
+    Channel channel(context);
+
+    string bind_addr = get_bind_address(cmd);
+    Log::info("Binding to address: %s", bind_addr.c_str());
+    channel.bind(bind_addr);
+
+    // Sender will run forever.
+    while (true)
+    {
+        Log::info("Waiting for request.");
+        sender.query_session(channel);
+    }
+}
+
+string get_bind_address(const CLP& cmd)
+{
+    stringstream ss;
+    ss << "tcp://*:" << cmd.net_port();
+
+    return ss.str();
 }

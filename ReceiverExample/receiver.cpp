@@ -10,6 +10,8 @@
 #include "apsi/apsi.h"
 #include "apsi/network/channel.h"
 #include "apsi/tools/utils.h"
+#include "apsi/logging/log.h"
+#include "common_utils.h"
 
 // SEAL
 #include "seal/seal.h"
@@ -17,9 +19,6 @@
 // Command Line Processor
 #include "clp.h"
 
-#ifdef _MSC_VER
-#include "windows.h"
-#endif
 
 using namespace std;
 using namespace apsi;
@@ -27,13 +26,18 @@ using namespace apsi::tools;
 using namespace apsi::receiver;
 using namespace apsi::sender;
 using namespace apsi::network;
+using namespace apsi::logging;
 using namespace seal::util;
 using namespace seal;
 
-namespace apsi { class CLP;  }
 
-void print_example_banner(string title);
-void example_slow_batching(CLP& cmd, Channel& recvChl, Channel& sendChl);
+void example_slow_batching(const CLP& cmd);
+void example_remote(const CLP& cmd);
+void print_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<u8>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<u8>& labels);
+void print_transmitted_data(Channel& channel);
+string get_bind_addr(const CLP& cmd);
+string get_conn_addr(const CLP& cmd);
+
 
 namespace {
     struct Colors {
@@ -51,47 +55,7 @@ namespace {
     const std::string Colors::Reset = "\033[0m";
 }
 
-/**
- * This only turns on showing colors for Windows.
- */
-void prepare_console()
-{
-#ifndef _MSC_VER
-    return; // Nothing to do on Linux.
-#else
-
-    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-    if (hConsole == INVALID_HANDLE_VALUE)
-        return;
-
-    DWORD dwMode = 0;
-    if (!GetConsoleMode(hConsole, &dwMode))
-        return;
-
-    dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-    SetConsoleMode(hConsole, dwMode);
-
-#endif
-}
-
-void print_example_banner(string title)
-{
-    if (!title.empty())
-    {
-        size_t title_length = title.length();
-        size_t banner_length = title_length + 2 + 2 * 10;
-        string banner_top(banner_length, '*');
-        string banner_middle = string(10, '*') + " " + title + " " + string(10, '*');
-
-        std::cout << endl
-            << banner_top << endl
-            << banner_middle << endl
-            << banner_top << endl
-            << endl;
-    }
-}
- 
-std::pair<vector<Item>, vector<int>> randSubset(const vector<Item>& items, int size)
+std::pair<vector<Item>, vector<int>> rand_subset(const vector<Item>& items, int size)
 {
     PRNG prn(zero_block);
 
@@ -124,18 +88,17 @@ int main(int argc, char *argv[])
     if (!cmd.parse_args(argc, argv))
         return -1;
 
-    zmqpp::context_t context;
-
-    Channel clientChl(context);
-    Channel serverChl(context);
-
-    serverChl.bind("tcp://*:1212");
-    clientChl.connect("tcp://localhost:1212");
-
     prepare_console();
 
-    // Example: Slow batching
-    example_slow_batching(cmd, clientChl, serverChl);
+    if (cmd.mode() == "local")
+    {
+        // Example: Slow batching
+        example_slow_batching(cmd);
+    }
+    else
+    {
+        example_remote(cmd);
+    }
 
 #ifdef _MSC_VER
     if (IsDebuggerPresent())
@@ -161,131 +124,29 @@ std::string print(gsl::span<u8> s)
     return ss.str();
 }
 
-void example_slow_batching(CLP& cmd, Channel& recvChl, Channel& sendChl)
+void example_slow_batching(const CLP& cmd)
 {
     print_example_banner("Example: Slow batching");
     stop_watch.time_points.clear();
 
+    // Connect the network
+    zmqpp::context_t context;
+    Channel recvChl(context);
+    Channel sendChl(context);
+
+    string bind_addr = get_bind_addr(cmd);
+    string conn_addr = get_conn_addr(cmd);
+
+    Log::info("Binding Sender to address: %s", bind_addr.c_str());
+    sendChl.bind(bind_addr);
+
+    Log::info("Connecting receiver to address: %s", conn_addr.c_str());
+    recvChl.connect(conn_addr);
+
     // Thread count
     unsigned numThreads = cmd.threads();
 
-    // Larger set size 
-    unsigned sender_set_size = 1 << cmd.sender_size();
-
-    // Negative log failure probability for simple hashing
-    unsigned binning_sec_level = cmd.sec_level();
-
-    // Length of items
-    unsigned item_bit_length = cmd.item_bit_length();
-
-    bool useLabels = cmd.use_labels();
-    unsigned label_bit_length = useLabels ? item_bit_length : 0;
-
-    // Cuckoo hash parameters
-    CuckooParams cuckoo_params;
-    {
-        // Cuckoo hash function count
-        cuckoo_params.hash_func_count = 3;
-
-        // Set the hash function seed
-        cuckoo_params.hash_func_seed = 0;
-
-        // Set max_probe count for Cuckoo hashing
-        cuckoo_params.max_probe = 100;
-
-    }
-
-    // Create TableParams and populate.    
-    TableParams table_params;
-    {
-        // Log of size of full hash table
-        table_params.log_table_size = cmd.log_table_size();
-
-        // Number of splits to use
-        // Larger means lower depth but bigger S-->R communication
-        table_params.split_count = cmd.split_count();
-
-        // Get secure bin size
-        table_params.sender_bin_size = round_up_to(
-            static_cast<unsigned>(get_bin_size(
-            1ull << table_params.log_table_size,
-            sender_set_size * cuckoo_params.hash_func_count,
-            binning_sec_level)),
-            table_params.split_count);
-
-        // Window size parameter
-        // Larger means lower depth but bigger R-->S communication
-        table_params.window_size = cmd.window_size();
-    }
-
-    SEALParams seal_params;
-    {
-        seal_params.encryption_params.set_poly_modulus_degree(cmd.poly_modulus());
-        
-        vector<SmallModulus> coeff_modulus;
-        auto coeff_mod_bit_vector = cmd.coeff_modulus();
-
-        if (coeff_mod_bit_vector.size() == 0)
-        {
-            coeff_modulus = coeff_modulus_128(seal_params.encryption_params.poly_modulus_degree());
-        }
-        else
-        {
-            unordered_map<u64, size_t> mods_added;
-            for(auto bit_size : coeff_mod_bit_vector)
-            {
-                switch(bit_size)
-                {
-                    case 30:
-                        coeff_modulus.emplace_back(small_mods_30bit(static_cast<int>(mods_added[bit_size])));
-                        mods_added[bit_size]++;
-                        break;
-                
-                    case 40:
-                        coeff_modulus.emplace_back(small_mods_40bit(static_cast<int>(mods_added[bit_size])));
-                        mods_added[bit_size]++;
-                        break;
-                
-                    case 50:
-                        coeff_modulus.emplace_back(small_mods_50bit(static_cast<int>(mods_added[bit_size])));
-                        mods_added[bit_size]++;
-                        break;
-                
-                    case 60:
-                        coeff_modulus.emplace_back(small_mods_60bit(static_cast<int>(mods_added[bit_size])));
-                        mods_added[bit_size]++;
-                        break;
-
-                    default:
-                        throw invalid_argument("invalid coeff modulus bit count");
-                }
-            }
-        }
-        seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
-        seal_params.encryption_params.set_plain_modulus(cmd.plain_modulus());
-
-        // This must be equal to plain_modulus
-        seal_params.exfield_params.exfield_characteristic = seal_params.encryption_params.plain_modulus().value();
-        seal_params.exfield_params.exfield_degree = cmd.exfield_degree();
-        seal_params.decomposition_bit_count = cmd.dbc();
-    }
-
-    // Use OPRF to eliminate need for noise flooding for sender's security
-    auto oprf_type = OprfType::None;
-    auto useOPRF = cmd.oprf();
-
-    if (useOPRF)
-    {
-        oprf_type = OprfType::PK;
-    }
-
-    /*
-    Creating the PSIParams class.
-    */
-    PSIParams params(item_bit_length, table_params, cuckoo_params, seal_params, oprf_type);
-    params.set_value_bit_count(label_bit_length);
-    // params.enable_debug();
-    params.validate();
+    PSIParams params = build_psi_params(cmd);
 
     std::unique_ptr<Receiver> receiver_ptr;
 
@@ -305,11 +166,12 @@ void example_slow_batching(CLP& cmd, Channel& recvChl, Channel& sendChl)
     f.get();
     Receiver& receiver = *receiver_ptr;
 
-    auto sendersActualSize = sender_set_size;
+    auto label_bit_length = cmd.use_labels() ? cmd.item_bit_length() : 0;
+    auto sendersActualSize = 1 << cmd.sender_size();
     auto recversActualSize = 50;
     auto intersectionSize = 25;
 
-    auto s1 = vector<Item>(sendersActualSize);// { string("a"), string("b"), string("c"), string("d"), string("e"), string("f"), string("g"), string("h") };
+    auto s1 = vector<Item>(sendersActualSize);
     Matrix<u8> labels(sendersActualSize, params.get_label_byte_count());
     for (int i = 0; i < s1.size(); i++)
     {
@@ -323,7 +185,7 @@ void example_slow_batching(CLP& cmd, Channel& recvChl, Channel& sendChl)
         }
     }
 
-    auto cc1 = randSubset(s1, intersectionSize);
+    auto cc1 = rand_subset(s1, intersectionSize);
     auto& c1 = cc1.first;
 
     c1.reserve(recversActualSize);
@@ -341,23 +203,74 @@ void example_slow_batching(CLP& cmd, Channel& recvChl, Channel& sendChl)
     thrd.join();
 
     // Done with everything. Print the results!
+    print_intersection_results(c1, intersectionSize, intersection, label_bit_length > 0, cc1.second, labels);
+
+    cout << stop_watch << endl;
+    cout << recv_stop_watch << endl;
+
+    print_transmitted_data(recvChl);
+}
+
+void example_remote(const CLP& cmd)
+{
+    print_example_banner("Example: Remote connection");
+
+    Log::warning("Only parameter 'recThreads' is used in this mode. All other thread count parameters are ignored.");
+
+    // Connect the network
+    zmqpp::context_t context;
+    Channel channel(context);
+
+    string conn_addr = get_conn_addr(cmd);
+    Log::info("Receiver connecting to address: %s", conn_addr.c_str());
+    channel.connect(conn_addr);
+
+    PSIParams params = build_psi_params(cmd);
+
+    Receiver receiver(params, cmd.rec_threads());
+    vector<Item> items(20);
+    auto sender_size = 1 << cmd.sender_size();
+
+    int i;
+    for (i = 0; i < items.size() / 2; i++)
+    {
+        // Items within sender
+        items[i] = i;
+    }
+
+    for (; i < items.size(); i++)
+    {
+        // Items that should not be within sender
+        items[i] = sender_size + i;
+    }
+
+    auto result = receiver.query(items, channel);
+
+    vector<int> label_idx;
+    Matrix<u8> labels;
+    print_intersection_results(items, static_cast<int>(items.size() / 2), result, /* compare_labels */ false, label_idx, labels);
+    print_transmitted_data(channel);
+}
+
+void print_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<u8>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<u8>& labels)
+{
     bool correct = true;
-    for (int i = 0; i < c1.size(); i++)
+    for (int i = 0; i < client_items.size(); i++)
     {
 
-        if (i < intersectionSize)
+        if (i < intersection_size)
         {
             if (intersection.first[i] == false)
             {
                 cout << "Miss result for receiver's item at index: " << i << endl;
                 correct = false;
             }
-            else if(label_bit_length)
+            else if (compare_labels)
             {
-                auto idx = cc1.second[i];
-                if(memcmp(intersection.second[i].data(), labels[idx].data(), labels[idx].size()))
+                auto idx = label_idx[i];
+                if (memcmp(intersection.second[i].data(), labels[idx].data(), labels[idx].size()))
                 {
-                    std::cout << Colors::Red << "incorrect label at index: " << i 
+                    std::cout << Colors::Red << "incorrect label at index: " << i
                         << ". actual: " << print(intersection.second[i])
                         << ", expected: " << print(labels[i]) << std::endl << Colors::Reset;
                     correct = false;
@@ -375,19 +288,36 @@ void example_slow_batching(CLP& cmd, Channel& recvChl, Channel& sendChl)
     }
 
     cout << "Intersection results: ";
-    
+
     if (correct)
         cout << Colors::Green << "Correct";
 
     else
         cout << Colors::Red << "Incorrect";
-    
+
     cout << Colors::Reset << endl;
-
-    cout << stop_watch << endl;
-    cout << recv_stop_watch << endl;
-
-    cout << "Communication R->S: " << recvChl.get_total_data_sent() / 1024.0 << " KB" << endl;
-    cout << "Communication S->R: " << recvChl.get_total_data_received() / 1024.0 << " KB" << endl;
-    cout << "Communication total: " << (recvChl.get_total_data_sent() + recvChl.get_total_data_received()) / 1024.0 << " KB" << endl;
 }
+
+void print_transmitted_data(Channel& channel)
+{
+    Log::info("Communication R->S: %0.3f KB", channel.get_total_data_sent() / 1024.0f);
+    Log::info("Communication S->R: %0.3f KB", channel.get_total_data_received() / 1024.0f);
+    Log::info("Communication total: %0.3f KB", (channel.get_total_data_received() + channel.get_total_data_sent()) / 1024.0f);
+}
+
+string get_bind_addr(const CLP& cmd)
+{
+    stringstream ss;
+    ss << "tcp://*:" << cmd.net_port();
+
+    return ss.str();
+}
+
+string get_conn_addr(const CLP& cmd)
+{
+    stringstream ss;
+    ss << "tcp://" << cmd.net_addr() << ":" << cmd.net_port();
+
+    return ss.str();
+}
+

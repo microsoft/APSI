@@ -6,6 +6,7 @@
 #include "apsi/sender/sender.h"
 #include "apsi/receiver/receiver.h"
 #include "apsi/apsidefines.h"
+#include "apsi/logging/log.h"
 #include "apsi/network/network_utils.h"
 #include "apsi/network/channel.h"
 #include "apsi/tools/ec_utils.h"
@@ -29,6 +30,7 @@ using namespace std;
 using namespace seal;
 using namespace seal::util;
 using namespace cuckoo;
+using namespace apsi::logging;
 using namespace apsi::tools;
 using namespace apsi::network;
 
@@ -47,11 +49,14 @@ namespace apsi
             {
                 throw invalid_argument("thread_count must be positive");
             }
+
             initialize();
         }
 
         void Receiver::initialize()
         {
+            Log::info("Initializing Receiver");
+
             seal_context_ = SEALContext::Create(params_.encryption_params());
             KeyGenerator generator(seal_context_);
 
@@ -71,10 +76,13 @@ namespace apsi
 
             ex_batch_encoder_ = make_shared<FFieldFastBatchEncoder>(ex_field_->ch(), ex_field_->d(),
                 get_power_of_two(params_.encryption_params().poly_modulus_degree()));
+
+            Log::info("Receiver initialized");
         }
 
         std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Channel& chl)
         {
+            Log::info("Receiver starting query");
 
             auto qq = preprocess(items, chl);
             auto& ciphertexts = qq.first;
@@ -89,8 +97,9 @@ namespace apsi
             /* Receive results in a streaming fashion. */
             auto intersection = stream_decrypt(chl, table_to_input_map, items);
 
-             /* Now we need to shorten and convert this tmp vector to match the length and indice of the query "items". */
             recv_stop_watch.set_time_point("receiver intersect");
+            Log::info("Receiver completed query");
+
             return intersection;
         }
 
@@ -99,7 +108,9 @@ namespace apsi
             unique_ptr<CuckooInterface> >
             Receiver::preprocess(vector<Item> &items, Channel &channel)
         {
-            if (params_.use_pk_oprf())
+            Log::info("Receiver preprocess start");
+
+            if (params_.use_oprf())
             {
                 PRNG prng(zero_block);
                 vector<vector<digit_t>> b;
@@ -172,6 +183,8 @@ namespace apsi
             map<uint64_t, vector<Ciphertext> > ciphers;
             encrypt(powers, ciphers);
 
+            Log::info("Receiver preprocess end");
+
             return { move(ciphers), move(cuckoo) };
         }
 
@@ -223,10 +236,10 @@ namespace apsi
             }
             else
             {
-                cout << "Using " << cuckoo->encoding_bit_length()
-                    << " out of " << seal::util::get_significant_bit_count(params_.exfield_characteristic()) - 1
-                    << "x" << degree
-                    << " bits of exfield element." << endl;
+                Log::info("Using %i out of %ix%i bits of exfield element",
+                    cuckoo->encoding_bit_length(),
+                    seal::util::get_significant_bit_count(params_.exfield_characteristic()) - 1,
+                    degree);
             }
             bool insertionSuccess;
             for (int i = 0; i < items.size(); i++)
@@ -363,7 +376,11 @@ namespace apsi
             }
 
             auto numThreads = thread_count_;
-            cout << "Decrypting " << block_count << " blocks (" << num_of_batches << "b x " << num_of_splits << "s) with "<< numThreads<<" threads" << endl;
+            Log::info("Decrypting %i blocks(%ib x %is) with %i threads",
+                block_count,
+                num_of_batches,
+                num_of_splits,
+                numThreads);
 
             auto routine = [&](int t)
             {
@@ -393,7 +410,7 @@ namespace apsi
                     if (first && t == 0)
                     {
                         first = false;
-                        cout << "Noise budget: " << decryptor_->invariant_noise_budget(tmp, local_pool) << " bits" << endl;
+                        Log::info("Noise budget: %i bits", decryptor_->invariant_noise_budget(tmp, local_pool));
                         recv_stop_watch.set_time_point("receiver recv-start");
                     }
 

@@ -10,6 +10,7 @@ Fast asymmetric PSI library
 * [FLINT](http://flintlib.org)
 * [GSL](https://github.com/Microsoft/GSL)
 * [boost](https://www.boost.org/)
+* [log4cplus](https://github.com/log4cplus/log4cplus)
 * [ZeroMQ](http://zeromq.org)
     * [libzmq](https://github.com/zeromq/libzmq) - ZeroMQ base
     * [libzmqpp](https://github.com/zeromq/zmqpp) - ZeroMQ C++ wrapper
