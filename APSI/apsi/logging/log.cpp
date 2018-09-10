@@ -1,3 +1,6 @@
+// STD
+#include <cstdio>
+
 // APSI
 #include "log.h" 
 
@@ -84,7 +87,7 @@ string Log::format_msg(const char* format, va_list ap)
     string msg;
     msg.resize(1000);
 
-    vsprintf_s(msg.data(), msg.size(), format, ap);
+    vsnprintf(msg.data(), msg.size(), format, ap);
 
     return msg;
 }
