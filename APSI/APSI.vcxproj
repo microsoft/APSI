@@ -160,6 +160,7 @@
     <ClInclude Include="apsi\Sender\sendersessioncontext.h" />
     <ClInclude Include="apsi\Sender\senderthreadcontext.h" />
     <ClInclude Include="apsi\tools\aes.h" />
+    <ClInclude Include="apsi\tools\csvreader.h" />
     <ClInclude Include="apsi\Tools\interpolate.h" />
     <ClInclude Include="apsi\tools\matrix.h" />
     <ClInclude Include="apsi\tools\prng.h" />
@@ -185,6 +186,7 @@
     <ClCompile Include="apsi\Sender\sender.cpp" />
     <ClCompile Include="apsi\Sender\senderdb.cpp" />
     <ClCompile Include="apsi\tools\aes.cpp" />
+    <ClCompile Include="apsi\tools\csvreader.cpp" />
     <ClCompile Include="apsi\Tools\interpolate.cpp" />
     <ClCompile Include="apsi\tools\prng.cpp" />
     <ClCompile Include="apsi\Tools\sealcompress.cpp" />
