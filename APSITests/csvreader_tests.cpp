@@ -9,7 +9,7 @@ using namespace apsi::tools;
 
 void CSVReaderTests::read_test()
 {
-    CsvReader reader;
+    CSVReader reader;
     stringstream ss("1,2\n3,4\n5,6\n7,8");
 
     vector<Item> items;
@@ -68,7 +68,7 @@ void CSVReaderTests::read_test()
 
 void CSVReaderTests::read_no_label_test()
 {
-    CsvReader reader;
+    CSVReader reader;
     stringstream ss("1\n3\n5\n7");
 
     vector<Item> items;
@@ -91,7 +91,7 @@ void CSVReaderTests::read_no_label_test()
 
 void CSVReaderTests::read_max_bits_test()
 {
-    CsvReader reader;
+    CSVReader reader;
     stringstream ss("432345564227567615,432345564227567614");
 
     vector<Item> items;
@@ -117,7 +117,7 @@ void CSVReaderTests::read_max_bits_test()
 
 void CSVReaderTests::read_empty_file_test()
 {
-    CsvReader reader;
+    CSVReader reader;
     stringstream ss("");
 
     vector<Item> items;

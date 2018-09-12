@@ -11,18 +11,18 @@ using namespace apsi;
 using namespace apsi::tools;
 
 
-CsvReader::CsvReader(const string& file_name)
+CSVReader::CSVReader(const string& file_name)
     : file_name_(file_name)
 {
     throw_if_file_not_present();
 }
 
-CsvReader::CsvReader()
+CSVReader::CSVReader()
     : file_name_("")
 {
 }
 
-void CsvReader::read(std::istream& stream, std::vector<Item>& items, Matrix<u8>& labels, int label_byte_count) const
+void CSVReader::read(std::istream& stream, std::vector<Item>& items, Matrix<u8>& labels, int label_byte_count) const
 {
     string line;
     vector<Item> temp_labels;
@@ -44,14 +44,14 @@ void CsvReader::read(std::istream& stream, std::vector<Item>& items, Matrix<u8>&
     }
 }
 
-void CsvReader::read(vector<Item>& items, Matrix<u8>& labels, int label_byte_count) const
+void CSVReader::read(vector<Item>& items, Matrix<u8>& labels, int label_byte_count) const
 {
     throw_if_file_not_present();
     ifstream file(file_name_);
     read(file, items, labels, label_byte_count);
 }
 
-void CsvReader::process_line(string line, vector<Item>& items, vector<Item>& labels) const
+void CSVReader::process_line(string line, vector<Item>& items, vector<Item>& labels) const
 {
     stringstream ss(line);
     string token;
@@ -82,7 +82,7 @@ void CsvReader::process_line(string line, vector<Item>& items, vector<Item>& lab
     }
 }
 
-void CsvReader::throw_if_file_not_present() const
+void CSVReader::throw_if_file_not_present() const
 {
     filesystem::path pth(file_name_);
     if (!filesystem::exists(pth))

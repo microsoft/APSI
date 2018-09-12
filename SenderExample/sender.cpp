@@ -108,7 +108,7 @@ void initialize_db(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels)
     }
     else
     {
-        CsvReader reader(cmd.db_file());
+        CSVReader reader(cmd.db_file());
         reader.read(items, labels, label_byte_length);
     }
 }

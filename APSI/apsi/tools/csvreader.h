@@ -16,18 +16,18 @@ namespace apsi
         /**
         Simple CSV file parser
         */
-        class CsvReader
+        class CSVReader
         {
         public:
             /**
             Constructor
             */
-            CsvReader();
+            CSVReader();
 
             /**
             Constructor with a given file name
             */
-            CsvReader(const std::string& file_name);
+            CSVReader(const std::string& file_name);
 
             void read(std::istream& stream, std::vector<Item>& items, Matrix<u8>& labels, int label_byte_count) const;
 
