@@ -11,12 +11,14 @@ namespace APSITests
         CPPUNIT_TEST(read_test);
         CPPUNIT_TEST(read_no_label_test);
         CPPUNIT_TEST(read_max_bits_test);
+        CPPUNIT_TEST(read_empty_file_test);
         CPPUNIT_TEST_SUITE_END();
 
     public:
         void read_test();
         void read_no_label_test();
         void read_max_bits_test();
+        void read_empty_file_test();
     };
 
 }

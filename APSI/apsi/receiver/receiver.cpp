@@ -84,6 +84,9 @@ namespace apsi
         {
             Log::info("Receiver starting query");
 
+            // Perform initial communication with Sender
+            handshake(chl);
+
             auto qq = preprocess(items, chl);
             auto& ciphertexts = qq.first;
             auto& cuckoo = *qq.second;
@@ -101,6 +104,24 @@ namespace apsi
             Log::info("Receiver completed query");
 
             return intersection;
+        }
+
+        void Receiver::handshake(Channel& chl)
+        {
+            Log::info("Initial handshake");
+
+            int receiver_version = 1;
+
+            // Start query
+            chl.send(receiver_version);
+
+            // Sender will reply with correct set size, which we need to use.
+            u64 sender_set_size;
+            chl.receive(sender_set_size);
+            params_.set_sender_set_size(sender_set_size);
+            Log::debug("Set sender set size to %i", sender_set_size);
+
+            Log::info("Handshake done");
         }
 
         pair<
@@ -296,6 +317,9 @@ namespace apsi
             int radix = 1 << window_size;
             int bound = static_cast<int>(floor(log2(split_size) / window_size) + 1);
 
+            Log::debug("Generate powers: split_size %i, window_size %i, radix %i, bound %i",
+                split_size, window_size, radix, bound);
+
             FFieldArray current_power = exfield_items;
             for (uint64_t j = 0; j < bound; j++)
             {
@@ -313,7 +337,6 @@ namespace apsi
                     current_power.sq();
                 }
             }
-
         }
 
         void Receiver::encrypt(map<uint64_t, FFieldArray> &input, map<uint64_t, vector<Ciphertext>> &destination)

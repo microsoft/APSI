@@ -114,3 +114,17 @@ void CSVReaderTests::read_max_bits_test()
     CPPUNIT_ASSERT_EQUAL((u8)0xFF, labels[0][6]);
     CPPUNIT_ASSERT_EQUAL((u8)0x05, labels[0][7]);
 }
+
+void CSVReaderTests::read_empty_file_test()
+{
+    CsvReader reader;
+    stringstream ss("");
+
+    vector<Item> items;
+    Matrix<u8> labels;
+    reader.read(ss, items, labels, /* label_byte_count */ 8);
+
+    CPPUNIT_ASSERT_EQUAL((size_t)0, items.size());
+    CPPUNIT_ASSERT_EQUAL((size_t)0, labels.rows());
+    CPPUNIT_ASSERT_EQUAL((size_t)0, labels.columns());
+}

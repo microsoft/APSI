@@ -106,6 +106,8 @@ namespace apsi
         private:
             void initialize();
 
+            void handshake(apsi::network::Channel& channel);
+
             int acquire_thread_context();
 
             void release_thread_context(int idx);

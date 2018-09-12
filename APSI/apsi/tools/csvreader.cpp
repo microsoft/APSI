@@ -34,7 +34,7 @@ void CsvReader::read(std::istream& stream, std::vector<Item>& items, Matrix<u8>&
     }
 
     // Transfer temp_labels to real labels, if needed
-    if (label_byte_count > 0)
+    if (label_byte_count > 0 && temp_labels.size() > 0)
     {
         labels.resize(temp_labels.size(), label_byte_count);
         for (u64 i = 0; i < temp_labels.size(); i++)
@@ -59,6 +59,12 @@ void CsvReader::process_line(string line, vector<Item>& items, vector<Item>& lab
     // First is the item
     getline(ss, token, ',');
 
+    if (token.empty())
+    {
+        // Nothing found.
+        return;
+    }
+
     Item item;
     item[0] = std::stoull(token);
     item[1] = 0;
@@ -68,7 +74,7 @@ void CsvReader::process_line(string line, vector<Item>& items, vector<Item>& lab
     // Second is the label, if present
     getline(ss, token);
 
-    if (token.size() > 0)
+    if (!token.empty())
     {
         item[0] = std::stoull(token);
         item[1] = 0;
