@@ -12,6 +12,7 @@ namespace APSITests
         CPPUNIT_TEST(read_no_label_test);
         CPPUNIT_TEST(read_max_bits_test);
         CPPUNIT_TEST(read_empty_file_test);
+        CPPUNIT_TEST(file_not_exist_test);
         CPPUNIT_TEST_SUITE_END();
 
     public:
@@ -19,6 +20,7 @@ namespace APSITests
         void read_no_label_test();
         void read_max_bits_test();
         void read_empty_file_test();
+        void file_not_exist_test();
     };
 
 }

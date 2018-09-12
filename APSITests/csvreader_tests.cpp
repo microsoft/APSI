@@ -1,5 +1,6 @@
 #include "csvreader_tests.h"
 #include "apsi/tools/csvreader.h"
+#include "utils.h"
 
 using namespace std;
 using namespace APSITests;
@@ -127,4 +128,9 @@ void CSVReaderTests::read_empty_file_test()
     CPPUNIT_ASSERT_EQUAL((size_t)0, items.size());
     CPPUNIT_ASSERT_EQUAL((size_t)0, labels.rows());
     CPPUNIT_ASSERT_EQUAL((size_t)0, labels.columns());
+}
+
+void CSVReaderTests::file_not_exist_test()
+{
+    ASSERT_THROWS(CSVReader reader("this file should not exist"));
 }
