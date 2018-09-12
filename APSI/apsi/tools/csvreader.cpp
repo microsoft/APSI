@@ -12,7 +12,7 @@
 #include "csvreader.h"
 
 
-#if (__GNUC__ < 8)
+#if !_MSC_VER && (__GNUC__ < 8)
 using namespace std::experimental;
 #endif
 
