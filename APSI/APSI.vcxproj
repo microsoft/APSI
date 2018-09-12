@@ -89,7 +89,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);c:\progs\Libs\SEAL\include;c:\progs\Libs\Cuckoo\include;c:\progs\Libs\flint2\include;c:\progs\Libs\FourQlib\include;c:\progs\Libs\GSL;c:\progs\Libs\mpfr\include;c:\progs\Libs\mpir\include;c:\progs\Libs\pthreads4w-3.0.0\include;c:\progs\Libs\cryptopp700\include;c:\progs\Libs\libzmqpp\include;c:\progs\Libs\libzmq\include;c:\Progs\Libs\log4cplus\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);c:\progs\Libs\SEAL\include;c:\progs\Libs\Cuckoo\include;c:\progs\Libs\flint2\include;c:\progs\Libs\FourQlib\include;c:\progs\Libs\GSL;c:\progs\Libs\mpfr\include;c:\progs\Libs\mpir\include;c:\progs\Libs\pthreads4w-3.0.0\include;c:\progs\Libs\cryptopp700\include;c:\progs\Libs\libzmqpp\include;c:\progs\Libs\libzmq\include;c:\Progs\Libs\log4cplus\include;c:\Progs\Libs\boost-1.65.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ShowIncludes>false</ShowIncludes>
@@ -121,7 +121,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);c:\progs\Libs\SEAL\include;c:\progs\Libs\Cuckoo\include;c:\progs\Libs\flint2\include;c:\progs\Libs\FourQlib\include;c:\progs\Libs\GSL;c:\progs\Libs\mpfr\include;c:\progs\Libs\mpir\include;c:\progs\Libs\pthreads4w-3.0.0\include;c:\progs\Libs\cryptopp700\include;c:\progs\Libs\libzmqpp\include;c:\progs\Libs\libzmq\include;c:\Progs\Libs\log4cplus\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);c:\progs\Libs\SEAL\include;c:\progs\Libs\Cuckoo\include;c:\progs\Libs\flint2\include;c:\progs\Libs\FourQlib\include;c:\progs\Libs\GSL;c:\progs\Libs\mpfr\include;c:\progs\Libs\mpir\include;c:\progs\Libs\pthreads4w-3.0.0\include;c:\progs\Libs\cryptopp700\include;c:\progs\Libs\libzmqpp\include;c:\progs\Libs\libzmq\include;c:\Progs\Libs\log4cplus\include;c:\Progs\Libs\boost-1.65.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ShowIncludes>false</ShowIncludes>
@@ -160,6 +160,7 @@
     <ClInclude Include="apsi\Sender\sendersessioncontext.h" />
     <ClInclude Include="apsi\Sender\senderthreadcontext.h" />
     <ClInclude Include="apsi\tools\aes.h" />
+    <ClInclude Include="apsi\tools\csvreader.h" />
     <ClInclude Include="apsi\Tools\interpolate.h" />
     <ClInclude Include="apsi\tools\matrix.h" />
     <ClInclude Include="apsi\tools\prng.h" />
@@ -185,6 +186,7 @@
     <ClCompile Include="apsi\Sender\sender.cpp" />
     <ClCompile Include="apsi\Sender\senderdb.cpp" />
     <ClCompile Include="apsi\tools\aes.cpp" />
+    <ClCompile Include="apsi\tools\csvreader.cpp" />
     <ClCompile Include="apsi\Tools\interpolate.cpp" />
     <ClCompile Include="apsi\tools\prng.cpp" />
     <ClCompile Include="apsi\Tools\sealcompress.cpp" />

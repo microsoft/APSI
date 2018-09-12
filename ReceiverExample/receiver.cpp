@@ -10,6 +10,7 @@
 #include "apsi/apsi.h"
 #include "apsi/network/channel.h"
 #include "apsi/tools/utils.h"
+#include "apsi/tools/csvreader.h"
 #include "apsi/logging/log.h"
 #include "common_utils.h"
 
@@ -37,7 +38,7 @@ void print_intersection_results(vector<Item>& client_items, int intersection_siz
 void print_transmitted_data(Channel& channel);
 string get_bind_addr(const CLP& cmd);
 string get_conn_addr(const CLP& cmd);
-
+int initialize_query(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels, int label_byte_count);
 
 namespace {
     struct Colors {
@@ -217,7 +218,7 @@ void example_remote(const CLP& cmd)
 
     Log::warning("Only parameter 'recThreads' is used in this mode. All other thread count parameters are ignored.");
 
-    // Connect the network
+    // Connect to the network
     zmqpp::context_t context;
     Channel channel(context);
 
@@ -226,29 +227,27 @@ void example_remote(const CLP& cmd)
     channel.connect(conn_addr);
 
     PSIParams params = build_psi_params(cmd);
-
     Receiver receiver(params, cmd.rec_threads());
-    vector<Item> items(20);
-    auto sender_size = 1 << cmd.sender_size();
 
-    int i;
-    for (i = 0; i < items.size() / 2; i++)
-    {
-        // Items within sender
-        items[i] = i;
-    }
-
-    for (; i < items.size(); i++)
-    {
-        // Items that should not be within sender
-        items[i] = sender_size + i;
-    }
+    vector<Item> items;
+    Matrix<u8> labels;
+    int intersection_size = initialize_query(cmd, items, labels, params.get_label_byte_count());
 
     auto result = receiver.query(items, channel);
 
     vector<int> label_idx;
-    Matrix<u8> labels;
-    print_intersection_results(items, static_cast<int>(items.size() / 2), result, /* compare_labels */ false, label_idx, labels);
+    bool compare_labels = false;
+    if (!cmd.query_file().empty() && cmd.use_labels())
+    {
+        // We can compare labels.
+        compare_labels = true;
+        for (int i = 0; i < intersection_size; i++)
+        {
+            label_idx.emplace_back(i);
+        }
+    }
+
+    print_intersection_results(items, intersection_size, result, compare_labels, label_idx, labels);
     print_transmitted_data(channel);
 }
 
@@ -321,3 +320,51 @@ string get_conn_addr(const CLP& cmd)
     return ss.str();
 }
 
+int initialize_query(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels, int label_byte_count)
+{
+    if (cmd.query_file().empty())
+    {
+        items.resize(20);
+        auto sender_size = 1 << cmd.sender_size();
+
+        int i;
+        for (i = 0; i < items.size() / 2; i++)
+        {
+            // Items within sender
+            items[i] = i;
+        }
+
+        for (; i < items.size(); i++)
+        {
+            // Items that should not be within sender
+            items[i] = sender_size + i;
+        }
+
+        return static_cast<int>(items.size() / 2);
+    }
+    else
+    {
+        // Read items that should exist from file
+        CSVReader reader(cmd.query_file());
+        reader.read(items, labels, label_byte_count);
+
+        u64 read_items = items.size();
+
+        // Now add some items that should _not_ be in the Sender.
+        PRNG prng(sys_random_seed());
+        labels.resize(read_items + 20, label_byte_count);
+
+        for (int i = 0; i < 20; i++)
+        {
+            u64 low_part = 0;
+            Item item = zero_block;
+
+            prng.get(reinterpret_cast<u8*>(&low_part), 7);
+            item[0] = low_part;
+
+            items.push_back(item);
+        }
+
+        return static_cast<int>(read_items);
+    }
+}

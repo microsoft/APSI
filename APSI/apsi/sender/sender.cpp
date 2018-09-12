@@ -126,6 +126,7 @@ namespace apsi
 
                     if (i == 0)
                         stop_watch.set_time_point("symmpoly_done");
+
                     if (params_.get_label_bit_count())
                     {
                         sender_db_->batched_interpolate_polys(context, total_thread_count_, evaluator_, ex_batch_encoder_);
@@ -133,6 +134,7 @@ namespace apsi
                         if (i == 0)
                             stop_watch.set_time_point("interpolation_done");
                     }
+
                     release_thread_context(context.id());
                 });
             }
@@ -143,15 +145,28 @@ namespace apsi
             }
         }
 
+        void Sender::handshake(Channel& chl)
+        {
+            // Receive start of session by Receiver.
+            int receiver_version;
+            chl.receive(receiver_version);
+
+            // Send set size so client can configure itself correctly.
+            chl.send(params_.sender_set_size());
+        }
+
         void Sender::query_session(Channel &chl)
         {
+            handshake(chl);
+            Log::info("Starting session");
+
             // Send the EC point when using OPRF
             if (params_.use_oprf())
             {
+                Log::info("Starting OPRF query pre-processing");
+
                 vector<u8> buff;
                 chl.receive(buff);
-
-                Log::info("Starting session with OPRF");
 
                 PRNG pp(cc_block);
                 digit_t key[NWORDS_ORDER];
@@ -171,7 +186,7 @@ namespace apsi
                 }
 
                 chl.send(buff);
-                Log::info("OPRF pre-processing done");
+                Log::info("OPRF query pre-processing done");
             }
 
             /* Set up and receive keys. */
@@ -198,6 +213,8 @@ namespace apsi
             /* Receive client's query data. */
             int num_of_powers;
             chl.receive(num_of_powers);
+            Log::debug("Received powers: %i", num_of_powers);
+            Log::debug("Current batch count: %i", params_.batch_count());
 
             vector<vector<Ciphertext>> powers(params_.batch_count());
             auto split_size_plus_one = params_.split_size() + 1;
@@ -209,6 +226,7 @@ namespace apsi
                     powers[i].emplace_back(seal_context_, pool_);
 
             }
+
             while (num_of_powers-- > 0)
             {
                 uint64_t power;

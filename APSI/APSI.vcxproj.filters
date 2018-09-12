@@ -141,6 +141,9 @@
     <ClInclude Include="apsi\logging\log.h">
       <Filter>Header Files\Logging</Filter>
     </ClInclude>
+    <ClInclude Include="apsi\tools\csvreader.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp">
@@ -205,6 +208,9 @@
     </ClCompile>
     <ClCompile Include="apsi\logging\log.cpp">
       <Filter>Source Files\Logging</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\tools\csvreader.cpp">
+      <Filter>Source Files\Tools</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

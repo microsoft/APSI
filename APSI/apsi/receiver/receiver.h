@@ -45,6 +45,8 @@ namespace apsi
             */
             std::pair<std::vector<bool>, Matrix<u8>> query(std::vector<Item> &items, apsi::network::Channel& chl);
 
+            void handshake(apsi::network::Channel& channel);
+
             /**
             Preprocesses the PSI items. Returns the powr map of the items, and the indices of them in the hash table.
             */

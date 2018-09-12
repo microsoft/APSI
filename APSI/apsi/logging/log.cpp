@@ -15,6 +15,13 @@ using namespace apsi::logging;
 using namespace log4cplus;
 
 
+#define CheckLogLevel(log_level) \
+    if (instance().getLogLevel() > log_level) \
+    { \
+        return; \
+    }
+
+
 namespace
 {
     bool configured_ = false;
@@ -45,6 +52,8 @@ namespace
 
 void Log::info(const char* format, ...)
 {
+    CheckLogLevel(INFO_LOG_LEVEL);
+
     va_list ap;
     va_start(ap, format);
     string msg = format_msg(format, ap);
@@ -55,6 +64,8 @@ void Log::info(const char* format, ...)
 
 void Log::warning(const char* format, ...)
 {
+    CheckLogLevel(WARN_LOG_LEVEL);
+
     va_list ap;
     va_start(ap, format);
     string msg = format_msg(format, ap);
@@ -65,6 +76,8 @@ void Log::warning(const char* format, ...)
 
 void Log::debug(const char* format, ...)
 {
+    CheckLogLevel(DEBUG_LOG_LEVEL);
+
     va_list ap;
     va_start(ap, format);
     string msg = format_msg(format, ap);
@@ -75,6 +88,8 @@ void Log::debug(const char* format, ...)
 
 void Log::error(const char* format, ...)
 {
+    CheckLogLevel(ERROR_LOG_LEVEL);
+
     va_list ap;
     va_start(ap, format);
     string msg = format_msg(format, ap);

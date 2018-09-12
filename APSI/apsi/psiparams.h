@@ -10,6 +10,8 @@
 
 // APSI
 #include "apsi/apsidefines.h"
+#include "apsi/logging/log.h"
+#include "apsi/tools/utils.h"
 
 // SEAL
 #include "seal/encryptionparams.h"
@@ -32,9 +34,9 @@ namespace apsi
     struct TableParams
     {
         unsigned log_table_size;
-        unsigned sender_bin_size;
         unsigned window_size;
         unsigned split_count;
+        unsigned binning_sec_level;
     };
 
     struct SEALParams
@@ -55,13 +57,15 @@ namespace apsi
         PSIParams(
             unsigned item_bit_count,
             bool use_oprf,
+            u64 sender_set_size,
             TableParams table_params,
             CuckooParams cuckoo_params,
             SEALParams seal_params)
                 : log_table_size_(table_params.log_table_size), 
                   table_size_(1 << log_table_size_),
                   window_size_(table_params.window_size),
-                  sender_bin_size_(table_params.sender_bin_size), 
+                  sender_set_size_(sender_set_size),
+                  binning_sec_level_(table_params.binning_sec_level),
                   split_count_(table_params.split_count),
                   use_oprf_(use_oprf),
                   encryption_params_(seal_params.encryption_params),
@@ -73,6 +77,7 @@ namespace apsi
                   exfield_characteristic_(seal_params.exfield_params.exfield_characteristic), 
                   exfield_degree_(seal_params.exfield_params.exfield_degree)
         {
+            compute_sender_bin_size();
         }
 
         void validate() const
@@ -95,7 +100,7 @@ namespace apsi
             if (item_bit_count_ > (max_item_bit_count - 8))
             {
                 // Not an error, but a warning.
-                std::cout << std::endl << "Item bit count is close to its upper limit. Several bits should be reserved for appropriate Cuckoo hashing." << std::endl;
+                apsi::logging::Log::warning("Item bit count is close to its upper limit. Several bits should be reserved for appropriate Cuckoo hashing.");
             }
         }
 
@@ -175,6 +180,17 @@ namespace apsi
             return sender_bin_size_;
         }
 
+        inline u64 sender_set_size() const
+        {
+            return sender_set_size_;
+        }
+
+        inline void set_sender_set_size(u64 size)
+        {
+            sender_set_size_ = size;
+            compute_sender_bin_size();
+        }
+
         inline int window_size() const
         {
             return window_size_;
@@ -217,6 +233,10 @@ namespace apsi
 
         int sender_bin_size_;
 
+        u64 sender_set_size_;
+
+        int binning_sec_level_;
+
         int split_count_;
 
         bool use_oprf_;
@@ -247,5 +267,18 @@ namespace apsi
         u64 exfield_characteristic_;
 
         unsigned exfield_degree_;
+
+
+        inline void compute_sender_bin_size()
+        {
+            sender_bin_size_ = static_cast<int>(apsi::tools::round_up_to(
+                apsi::tools::get_bin_size(
+                    1ull << log_table_size_,
+                    sender_set_size_ * hash_func_count_,
+                    binning_sec_level_),
+                static_cast<u64>(split_count_)));
+
+            validate();
+        }
     };
 }

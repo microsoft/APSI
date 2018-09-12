@@ -1,4 +1,5 @@
 #pragma once
+#pragma once
 
 // STD
 #include <vector>
@@ -65,6 +66,11 @@ namespace apsi
         template<typename T>
         typename std::enable_if<std::is_pod<T>::value, T>::type
         round_up_to(const T val, const T step) { return ((val + step - 1) / step) * step; }
+
+        /**
+        Get secure bin size
+        */
+        apsi::u64 get_bin_size(apsi::u64 num_bins, apsi::u64 num_balls, apsi::u64 stat_sec_param);
 
         extern apsi::tools::Stopwatch stop_watch, recv_stop_watch;
     }
