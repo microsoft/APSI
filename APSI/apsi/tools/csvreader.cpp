@@ -1,10 +1,20 @@
 // STD
 #include <fstream>
+
+#if _MSC_VER || (__GNUC__ >= 8)
 #include <filesystem>
+#else
+// filesystem appears to be experimental in GCC < 8
+#include <experimental/filesystem>
+#endif
 
 // APSI
 #include "csvreader.h"
 
+
+#if (__GNUC__ < 8)
+using namespace std::experimental;
+#endif
 
 using namespace std;
 using namespace apsi;
