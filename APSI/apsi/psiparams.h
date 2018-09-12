@@ -34,7 +34,6 @@ namespace apsi
     struct TableParams
     {
         unsigned log_table_size;
-        //unsigned sender_bin_size;
         unsigned window_size;
         unsigned split_count;
         unsigned binning_sec_level;
@@ -65,7 +64,6 @@ namespace apsi
                 : log_table_size_(table_params.log_table_size), 
                   table_size_(1 << log_table_size_),
                   window_size_(table_params.window_size),
-                  //sender_bin_size_(table_params.sender_bin_size),
                   sender_set_size_(sender_set_size),
                   binning_sec_level_(table_params.binning_sec_level),
                   split_count_(table_params.split_count),

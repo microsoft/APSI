@@ -102,14 +102,6 @@ const apsi::PSIParams apsi::tools::build_psi_params(const BaseCLP& cmd)
         // Negative log failure probability for simple hashing
         table_params.binning_sec_level = cmd.sec_level();
 
-        // Get secure bin size
-        //table_params.sender_bin_size = round_up_to(
-        //    static_cast<unsigned>(get_bin_size(
-        //        1ull << table_params.log_table_size,
-        //        sender_set_size * cuckoo_params.hash_func_count,
-        //        table_params.binning_sec_level)),
-        //    table_params.split_count);
-
         // Window size parameter
         // Larger means lower depth but bigger R-->S communication
         table_params.window_size = cmd.window_size();
