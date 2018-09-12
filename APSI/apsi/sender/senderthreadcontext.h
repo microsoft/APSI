@@ -22,7 +22,7 @@ namespace apsi
     {
         /**
         Manages the resources used in a single sender thread. This is intended to separate the resources for different
-        threads, in order to avoid multi-threaded contension for resources and to improve performance.
+        threads, in order to avoid multi-threaded contention for resources and to improve performance.
         */
         class SenderThreadContext
         {

@@ -126,6 +126,7 @@ namespace apsi
 
                     if (i == 0)
                         stop_watch.set_time_point("symmpoly_done");
+
                     if (params_.get_label_bit_count())
                     {
                         sender_db_->batched_interpolate_polys(context, total_thread_count_, evaluator_, ex_batch_encoder_);
@@ -133,6 +134,7 @@ namespace apsi
                         if (i == 0)
                             stop_watch.set_time_point("interpolation_done");
                     }
+
                     release_thread_context(context.id());
                 });
             }
