@@ -151,8 +151,8 @@ namespace apsi
             int receiver_version;
             chl.receive(receiver_version);
 
-            // Send set size so client can configure itself correctly.
-            chl.send(params_.sender_set_size());
+            // Send bin size so client can configure itself correctly.
+            chl.send(params_.sender_bin_size());
         }
 
         void Sender::query_session(Channel &chl)

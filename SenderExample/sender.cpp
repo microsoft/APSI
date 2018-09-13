@@ -52,7 +52,13 @@ void example_remote(const CLP& cmd)
     Matrix<u8> labels;
 
     initialize_db(cmd, items, labels);
-    params.set_sender_set_size(items.size());
+    u64 sender_bin_size = compute_sender_bin_size(
+        params.log_table_size(),
+        items.size(),
+        params.hash_func_count(),
+        params.binning_sec_level(),
+        params.split_count());
+    params.set_sender_bin_size(static_cast<int>(sender_bin_size));
 
     Log::info("Building sender");
     Sender sender(params, cmd.threads(), cmd.threads());

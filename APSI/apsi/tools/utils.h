@@ -68,9 +68,9 @@ namespace apsi
         round_up_to(const T val, const T step) { return ((val + step - 1) / step) * step; }
 
         /**
-        Get secure bin size
+        Compute secure Sender bin size
         */
-        apsi::u64 get_bin_size(apsi::u64 num_bins, apsi::u64 num_balls, apsi::u64 stat_sec_param);
+        apsi::u64 compute_sender_bin_size(unsigned log_table_size, apsi::u64 sender_set_size, unsigned hash_func_count, unsigned binning_sec_level, unsigned split_count);
 
         extern apsi::tools::Stopwatch stop_watch, recv_stop_watch;
     }

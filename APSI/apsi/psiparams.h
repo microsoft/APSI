@@ -37,6 +37,7 @@ namespace apsi
         unsigned window_size;
         unsigned split_count;
         unsigned binning_sec_level;
+        unsigned sender_bin_size;
     };
 
     struct SEALParams
@@ -57,14 +58,13 @@ namespace apsi
         PSIParams(
             unsigned item_bit_count,
             bool use_oprf,
-            u64 sender_set_size,
             TableParams table_params,
             CuckooParams cuckoo_params,
             SEALParams seal_params)
                 : log_table_size_(table_params.log_table_size), 
                   table_size_(1 << log_table_size_),
                   window_size_(table_params.window_size),
-                  sender_set_size_(sender_set_size),
+                  sender_bin_size_(table_params.sender_bin_size),
                   binning_sec_level_(table_params.binning_sec_level),
                   split_count_(table_params.split_count),
                   use_oprf_(use_oprf),
@@ -77,7 +77,6 @@ namespace apsi
                   exfield_characteristic_(seal_params.exfield_params.exfield_characteristic), 
                   exfield_degree_(seal_params.exfield_params.exfield_degree)
         {
-            compute_sender_bin_size();
         }
 
         void validate() const
@@ -180,15 +179,15 @@ namespace apsi
             return sender_bin_size_;
         }
 
-        inline u64 sender_set_size() const
+        inline void set_sender_bin_size(int size)
         {
-            return sender_set_size_;
+            sender_bin_size_ = size;
+            validate();
         }
 
-        inline void set_sender_set_size(u64 size)
+        inline int binning_sec_level() const
         {
-            sender_set_size_ = size;
-            compute_sender_bin_size();
+            return binning_sec_level_;
         }
 
         inline int window_size() const
@@ -233,8 +232,6 @@ namespace apsi
 
         int sender_bin_size_;
 
-        u64 sender_set_size_;
-
         int binning_sec_level_;
 
         int split_count_;
@@ -267,18 +264,5 @@ namespace apsi
         u64 exfield_characteristic_;
 
         unsigned exfield_degree_;
-
-
-        inline void compute_sender_bin_size()
-        {
-            sender_bin_size_ = static_cast<int>(apsi::tools::round_up_to(
-                apsi::tools::get_bin_size(
-                    1ull << log_table_size_,
-                    sender_set_size_ * hash_func_count_,
-                    binning_sec_level_),
-                static_cast<u64>(split_count_)));
-
-            validate();
-        }
     };
 }
