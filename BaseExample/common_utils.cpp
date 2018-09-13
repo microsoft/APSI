@@ -105,6 +105,14 @@ const apsi::PSIParams apsi::tools::build_psi_params(const BaseCLP& cmd)
         // Window size parameter
         // Larger means lower depth but bigger R-->S communication
         table_params.window_size = cmd.window_size();
+
+        // Get secure bin size
+        table_params.sender_bin_size = static_cast<int>(compute_sender_bin_size(
+            table_params.log_table_size,
+            sender_set_size,
+            cuckoo_params.hash_func_count,
+            table_params.binning_sec_level,
+            table_params.split_count));
     }
 
     SEALParams seal_params;
@@ -165,7 +173,7 @@ const apsi::PSIParams apsi::tools::build_psi_params(const BaseCLP& cmd)
     /*
     Creating the PSIParams class.
     */
-    PSIParams params(item_bit_length, use_OPRF, sender_set_size, table_params, cuckoo_params, seal_params);
+    PSIParams params(item_bit_length, use_OPRF, table_params, cuckoo_params, seal_params);
     params.set_value_bit_count(label_bit_length);
     params.validate();
 

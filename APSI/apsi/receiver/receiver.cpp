@@ -115,11 +115,11 @@ namespace apsi
             // Start query
             chl.send(receiver_version);
 
-            // Sender will reply with correct set size, which we need to use.
-            u64 sender_set_size;
-            chl.receive(sender_set_size);
-            params_.set_sender_set_size(sender_set_size);
-            Log::debug("Set sender set size to %i", sender_set_size);
+            // Sender will reply with correct bin size, which we need to use.
+            int sender_bin_size;
+            chl.receive(sender_bin_size);
+            params_.set_sender_bin_size(sender_bin_size);
+            Log::debug("Set sender bin size to %i", sender_bin_size);
 
             Log::info("Handshake done");
         }

@@ -52,6 +52,39 @@ namespace
 
         return max<double>(0, (double)-sec);
     }
+
+    u64 get_bin_size(u64 num_bins, u64 num_balls, u64 stat_sec_param)
+    {
+        auto B = max<u64>(1, num_balls / num_bins);
+        double currentProb = get_bin_overflow_prob(num_bins, num_balls, B);
+        u64 step = 1;
+        bool doubling = true;
+
+        while (currentProb < stat_sec_param || step > 1)
+        {
+            if (stat_sec_param > currentProb)
+            {
+                if (doubling)
+                {
+                    step = max<u64>(1, step * 2);
+                }
+                else
+                {
+                    step = max<u64>(1, step / 2);
+                }
+                B += step;
+            }
+            else
+            {
+                doubling = false;
+                step = max<u64>(1, step / 2);
+                B -= step;
+            }
+            currentProb = get_bin_overflow_prob(num_bins, num_balls, B);
+        }
+
+        return B;
+    }
 }
 
 block apsi::tools::sys_random_seed()
@@ -144,35 +177,12 @@ seal::Plaintext apsi::tools::random_plaintext(const seal::SEALContext &context)
     return random;
 }
 
-u64 apsi::tools::get_bin_size(u64 num_bins, u64 num_balls, u64 stat_sec_param)
+u64 apsi::tools::compute_sender_bin_size(unsigned log_table_size, u64 sender_set_size, unsigned hash_func_count, unsigned binning_sec_level, unsigned split_count)
 {
-    auto B = max<u64>(1, num_balls / num_bins);
-    double currentProb = get_bin_overflow_prob(num_bins, num_balls, B);
-    u64 step = 1;
-    bool doubling = true;
-
-    while (currentProb < stat_sec_param || step > 1)
-    {
-        if (stat_sec_param > currentProb)
-        {
-            if (doubling)
-            {
-                step = max<u64>(1, step * 2);
-            }
-            else
-            {
-                step = max<u64>(1, step / 2);
-            }
-            B += step;
-        }
-        else
-        {
-            doubling = false;
-            step = max<u64>(1, step / 2);
-            B -= step;
-        }
-        currentProb = get_bin_overflow_prob(num_bins, num_balls, B);
-    }
-
-    return B;
+    return round_up_to(
+        get_bin_size(
+            1ull << log_table_size,
+            sender_set_size * hash_func_count,
+            binning_sec_level),
+        static_cast<u64>(split_count));
 }
