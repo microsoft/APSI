@@ -451,9 +451,10 @@ namespace apsi
 
         void SenderDB::batched_randomized_symmetric_polys(
             SenderThreadContext &context,
+            int start_block,
+            int end_block,
             shared_ptr<Evaluator> evaluator,
-            shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
-            int thread_count)
+            shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder)
         {
             // Get the symmetric block
             auto symm_block = context.symm_block();
@@ -474,8 +475,6 @@ namespace apsi
             };
 
             MemoryPoolHandle local_pool = context.pool();
-            int start_block = static_cast<int>(context.id() * db_blocks_.size() / thread_count);
-            int end_block = static_cast<int>((context.id() + 1) * db_blocks_.size() / thread_count);
 
             for (int next_block = start_block; next_block < end_block; next_block++)
             {
@@ -513,12 +512,15 @@ namespace apsi
                         block.debug_sym_block_.push_back(batch_vector);
                     }
                 }
+
+                context.inc_randomized_polys();
             }
         }
 
         void SenderDB::batched_interpolate_polys(
             SenderThreadContext &th_context,
-            int thread_count,
+            int start_block,
+            int end_block,
             shared_ptr<Evaluator> evaluator,
             shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder)
         {
@@ -543,13 +545,11 @@ namespace apsi
                 throw std::runtime_error("labels are too large u64 interpolation.");
             }
 
-            int start = static_cast<int>(th_context.id() * db_blocks_.size() / thread_count);
-            int end = static_cast<int>((th_context.id() + 1) * db_blocks_.size() / thread_count);
-
-            for (int bIdx = start; bIdx < end; bIdx++)
+            for (int bIdx = start_block; bIdx < end_block; bIdx++)
             {
                 auto& block = db_blocks_(bIdx);
                 block.batch_interpolate(th_context, seal_context_, evaluator, ex_batch_encoder, cache, params_);
+                th_context.inc_interpolate_polys();
             }
 
         }

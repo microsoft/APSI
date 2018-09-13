@@ -65,7 +65,7 @@ void example_remote(const CLP& cmd)
     Log::info("Building sender");
     Sender sender(params, cmd.threads(), cmd.threads());
 
-    Log::info("Sender loading DB");
+    Log::info("Sender loading DB with %i items", items.size());
     sender.load_db(items, labels);
 
     zmqpp::context_t context;

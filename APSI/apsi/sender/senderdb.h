@@ -220,13 +220,15 @@ namespace apsi
             */
             void batched_randomized_symmetric_polys(
                 SenderThreadContext &th_context,
-                std::shared_ptr<seal::Evaluator> evaluator, 
-                std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
-                int thread_count);
+                int start_block,
+                int end_block,
+                std::shared_ptr<seal::Evaluator> evaluator,
+                std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder);
 
             void batched_interpolate_polys(
                 SenderThreadContext& th_context,
-                int thread_count,
+                int start_block,
+                int end_block,
                 std::shared_ptr<seal::Evaluator> evaluator,
                 std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder
                 );
@@ -234,6 +236,11 @@ namespace apsi
             DBBlock& get_block(int batch, int split)
             {
                 return db_blocks_(batch, split);
+            }
+
+            u64 get_block_count() const
+            {
+                return db_blocks_.size();
             }
 
         private:

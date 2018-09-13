@@ -135,6 +135,12 @@ namespace apsi
             void offline_compute();
 
             /**
+            Report progress of the offline_compute operation.
+            Progress is reported to the Log.
+            */
+            void report_offline_compute_progress(int total_threads);
+
+            /**
             Responds to a query from the receiver. Input is a map of powers of receiver's items, from k to y^k, where k is an
             exponent, y is an item in receiver's cuckoo hashing table.
 

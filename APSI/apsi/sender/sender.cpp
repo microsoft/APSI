@@ -112,6 +112,8 @@ namespace apsi
 
         void Sender::offline_compute()
         {
+            Log::info("Offline compute started");
+
             vector<thread> thread_pool(total_thread_count_);
             for (int i = 0; i < total_thread_count_; i++)
             {
@@ -122,14 +124,24 @@ namespace apsi
 
                     int thread_context_idx = acquire_thread_context();
                     SenderThreadContext &context = thread_contexts_[thread_context_idx];
-                    sender_db_->batched_randomized_symmetric_polys(context, evaluator_, ex_batch_encoder_, total_thread_count_);
+                    int start_block = static_cast<int>(thread_context_idx * sender_db_->get_block_count() / total_thread_count_);
+                    int end_block = static_cast<int>((thread_context_idx + 1) * sender_db_->get_block_count() / total_thread_count_);
+
+                    context.clear_processed_counts();
+                    context.set_total_randomized_polys(end_block - start_block);
+                    if (params_.get_label_bit_count())
+                    {
+                        context.set_total_interpolate_polys(end_block - start_block);
+                    }
+
+                    sender_db_->batched_randomized_symmetric_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
 
                     if (i == 0)
                         stop_watch.set_time_point("symmpoly_done");
 
                     if (params_.get_label_bit_count())
                     {
-                        sender_db_->batched_interpolate_polys(context, total_thread_count_, evaluator_, ex_batch_encoder_);
+                        sender_db_->batched_interpolate_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
 
                         if (i == 0)
                             stop_watch.set_time_point("interpolation_done");
@@ -139,9 +151,43 @@ namespace apsi
                 });
             }
 
+            report_offline_compute_progress(total_thread_count_);
+
             for (int i = 0; i < thread_pool.size(); i++)
             {
                 thread_pool[i].join();
+            }
+
+            Log::info("Offline compute finished.");
+        }
+
+        void Sender::report_offline_compute_progress(int total_threads)
+        {
+            int progress = 0;
+            while (true)
+            {
+                float threads_progress = 0.0f;
+                for (int i = 0; i < total_threads; i++)
+                {
+                    threads_progress += thread_contexts_[i].get_progress();
+                }
+
+                int int_progress = static_cast<int>((threads_progress / total_threads) * 100.0f);
+
+                if (int_progress > progress)
+                {
+                    progress = int_progress;
+                    Log::info("Offline compute progress: %i%%", progress);
+                }
+
+                if (progress >= 99)
+                {
+                    // Exit when near completion.
+                    break;
+                }
+
+                // Check for progress 10 times per second
+                this_thread::sleep_for(100ms);
             }
         }
 
