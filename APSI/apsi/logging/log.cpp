@@ -98,6 +98,62 @@ void Log::error(const char* format, ...)
     instance().log(ERROR_LOG_LEVEL, msg);
 }
 
+void Log::set_log_level(Log::Level level)
+{
+    // Verify level is a known log level
+    LogLevel actual = ALL_LOG_LEVEL;
+    switch (level)
+    {
+    case Level::level_all:
+        actual = ALL_LOG_LEVEL;
+        break;
+    case Level::level_debug:
+        actual = DEBUG_LOG_LEVEL;
+        break;
+    case Level::level_info:
+        actual = INFO_LOG_LEVEL;
+        break;
+    case Level::level_warning:
+        actual = WARN_LOG_LEVEL;
+        break;
+    case Level::level_error:
+        actual = ERROR_LOG_LEVEL;
+        break;
+    default:
+        throw std::invalid_argument("Unknown log level");
+    }
+
+    instance().setLogLevel(actual);
+}
+
+void Log::set_log_level(const string& level)
+{
+    Log::Level actual;
+
+    if (level == "debug")
+    {
+        actual = Log::Level::level_debug;
+    }
+    else if (level == "info")
+    {
+        actual = Log::Level::level_info;
+    }
+    else if (level == "warning")
+    {
+        actual = Log::Level::level_warning;
+    }
+    else if (level == "error")
+    {
+        actual = Log::Level::level_error;
+    }
+    else
+    {
+        throw invalid_argument("Unknown log level");
+    }
+
+    set_log_level(actual);
+}
+
 string Log::format_msg(const char* format, va_list ap)
 {
     string msg;

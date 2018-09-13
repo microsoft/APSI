@@ -89,6 +89,8 @@ int main(int argc, char *argv[])
     if (!cmd.parse_args(argc, argv))
         return -1;
 
+    Log::set_log_level(cmd.log_level());
+
     prepare_console();
 
     if (cmd.mode() == "local")
@@ -290,7 +292,6 @@ void print_intersection_results(vector<Item>& client_items, int intersection_siz
 
     if (correct)
         cout << Colors::Green << "Correct";
-
     else
         cout << Colors::Red << "Incorrect";
 

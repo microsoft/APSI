@@ -23,7 +23,11 @@ namespace apsi
     public:
         BaseCLP(const std::string& description)
             : TCLAP::CmdLine(description)
-        {}
+        {
+            std::vector<std::string> log_levels = { "debug", "info", "warning", "error" };
+            log_level_constraint_ = std::make_unique<TCLAP::ValuesConstraint<std::string>>(log_levels);
+            log_level_arg_ = std::make_unique<TCLAP::ValueArg<std::string>>("", "logLevel", "Level for application logging", false, "info", log_level_constraint_.get(), *this);
+        }
 
         virtual ~BaseCLP() {}
 
@@ -80,6 +84,8 @@ namespace apsi
 
             TCLAP::SwitchArg oprfArg("o", "oprf", "Use OPRF", false);
             add(oprfArg);
+
+            // No need to add log_level_arg_, already added in constructor
 
             // Additional arguments
             add_args();
@@ -144,6 +150,9 @@ namespace apsi
                 oprf_ = oprfArg.getValue();
                 cout_param("oprf", oprf_ ? "true" : "false");
 
+                log_level_ = log_level_arg_->getValue();
+                cout_param("logLevel", log_level_);
+
                 get_args();
             }
             catch (...)
@@ -169,6 +178,7 @@ namespace apsi
         int dbc() const { return dbc_; }
         int exfield_degree() const { return exfield_degree_; }
         bool oprf() const { return oprf_; }
+        const std::string& log_level() const { return log_level_; }
 
     protected:
         template<class T>
@@ -206,5 +216,10 @@ namespace apsi
         int dbc_;
         int exfield_degree_;
         bool oprf_;
+        std::string log_level_;
+
+        // Parameters with constraints
+        std::unique_ptr<TCLAP::ValueArg<std::string>> log_level_arg_;
+        std::unique_ptr<TCLAP::ValuesConstraint<std::string>> log_level_constraint_;
     };
 }
