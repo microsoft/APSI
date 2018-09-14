@@ -149,8 +149,8 @@ namespace apsi
             
             apsi::tools::PRNG prng_;
 
-            int randomized_polys_processed_;
-            int interpolate_polys_processed_;
+            std::atomic<int> randomized_polys_processed_;
+            std::atomic<int> interpolate_polys_processed_;
             int total_randomized_polys_;
             int total_interpolate_polys_;
         };

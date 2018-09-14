@@ -117,57 +117,70 @@ namespace apsi
             vector<thread> thread_pool(total_thread_count_);
             for (int i = 0; i < total_thread_count_; i++)
             {
-                thread_pool[i] = thread([&, i]()
+                thread_pool[i] = thread([&]()
                 {
-                    if (i == 0)
-                        stop_watch.set_time_point("symmpoly_start");
-
-                    int thread_context_idx = acquire_thread_context();
-                    SenderThreadContext &context = thread_contexts_[thread_context_idx];
-                    int start_block = static_cast<int>(thread_context_idx * sender_db_->get_block_count() / total_thread_count_);
-                    int end_block = static_cast<int>((thread_context_idx + 1) * sender_db_->get_block_count() / total_thread_count_);
-
-                    int blocks_to_process = end_block - start_block;
-                    Log::debug("Thread %i processing %i blocks.", i, blocks_to_process);
-
-                    context.clear_processed_counts();
-                    context.set_total_randomized_polys(blocks_to_process);
-                    if (params_.get_label_bit_count())
-                    {
-                        context.set_total_interpolate_polys(blocks_to_process);
-                    }
-
-                    sender_db_->batched_randomized_symmetric_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
-
-                    if (i == 0)
-                        stop_watch.set_time_point("symmpoly_done");
-
-                    if (params_.get_label_bit_count())
-                    {
-                        sender_db_->batched_interpolate_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
-
-                        if (i == 0)
-                            stop_watch.set_time_point("interpolation_done");
-                    }
-
-                    release_thread_context(context.id());
+                    offline_compute_work();
                 });
             }
 
-            report_offline_compute_progress(total_thread_count_);
+            atomic<bool> work_finished = false;
+            thread progress_thread([&]()
+            {
+                report_offline_compute_progress(total_thread_count_, work_finished);
+            });
 
             for (int i = 0; i < thread_pool.size(); i++)
             {
                 thread_pool[i].join();
             }
 
+            // Signal progress thread work is done
+            work_finished = true;
+            progress_thread.join();
+
             Log::info("Offline compute finished.");
         }
 
-        void Sender::report_offline_compute_progress(int total_threads)
+        void Sender::offline_compute_work()
+        {
+            int thread_context_idx = acquire_thread_context();
+            if (thread_context_idx == 0)
+                stop_watch.set_time_point("symmpoly_start");
+
+            SenderThreadContext &context = thread_contexts_[thread_context_idx];
+            int start_block = static_cast<int>(thread_context_idx * sender_db_->get_block_count() / total_thread_count_);
+            int end_block = static_cast<int>((thread_context_idx + 1) * sender_db_->get_block_count() / total_thread_count_);
+
+            int blocks_to_process = end_block - start_block;
+            Log::debug("Thread %i processing %i blocks.", thread_context_idx, blocks_to_process);
+
+            context.clear_processed_counts();
+            context.set_total_randomized_polys(blocks_to_process);
+            if (params_.get_label_bit_count())
+            {
+                context.set_total_interpolate_polys(blocks_to_process);
+            }
+
+            sender_db_->batched_randomized_symmetric_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
+
+            if (thread_context_idx == 0)
+                stop_watch.set_time_point("symmpoly_done");
+
+            if (params_.get_label_bit_count())
+            {
+                sender_db_->batched_interpolate_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
+
+                if (thread_context_idx == 0)
+                    stop_watch.set_time_point("interpolation_done");
+            }
+
+            release_thread_context(context.id());
+        }
+
+        void Sender::report_offline_compute_progress(int total_threads, atomic<bool>& work_finished)
         {
             int progress = 0;
-            while (true)
+            while (!work_finished)
             {
                 float threads_progress = 0.0f;
                 for (int i = 0; i < total_threads; i++)
@@ -181,12 +194,6 @@ namespace apsi
                 {
                     progress = int_progress;
                     Log::info("Offline compute progress: %i%%", progress);
-                }
-
-                if (progress >= 99)
-                {
-                    // Exit when near completion.
-                    break;
                 }
 
                 // Check for progress 10 times per second

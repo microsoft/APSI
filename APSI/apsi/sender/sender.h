@@ -135,10 +135,15 @@ namespace apsi
             void offline_compute();
 
             /**
+            Handles work for offline_compute for a single thread.
+            */
+            void offline_compute_work();
+
+            /**
             Report progress of the offline_compute operation.
             Progress is reported to the Log.
             */
-            void report_offline_compute_progress(int total_threads);
+            void report_offline_compute_progress(int total_threads, std::atomic<bool>& work_finished);
 
             /**
             Responds to a query from the receiver. Input is a map of powers of receiver's items, from k to y^k, where k is an
