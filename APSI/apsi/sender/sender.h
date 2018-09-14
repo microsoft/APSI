@@ -135,6 +135,17 @@ namespace apsi
             void offline_compute();
 
             /**
+            Handles work for offline_compute for a single thread.
+            */
+            void offline_compute_work();
+
+            /**
+            Report progress of the offline_compute operation.
+            Progress is reported to the Log.
+            */
+            void report_offline_compute_progress(int total_threads, std::atomic<bool>& work_finished);
+
+            /**
             Responds to a query from the receiver. Input is a map of powers of receiver's items, from k to y^k, where k is an
             exponent, y is an item in receiver's cuckoo hashing table.
 
@@ -144,6 +155,23 @@ namespace apsi
             */
             void respond(std::vector<std::vector<seal::Ciphertext> > &query,
                 apsi::sender::SenderSessionContext &session_context, apsi::network::Channel &channel);
+
+            /**
+            Method that handles the work of a single thread that computes the response to a query.
+            */
+            void respond_work(
+                int batch_count,
+                int total_threads,
+                int total_blocks,
+                std::promise<void>& batches_done_prom,
+                std::shared_future<void>& batches_done_fut,
+                std::vector<std::vector<seal::Ciphertext>>& powers,
+                apsi::sender::SenderSessionContext &session_context,
+                apsi::sender::WindowingDag& dag,
+                std::vector<apsi::sender::WindowingDag::State>& states,
+                std::atomic<int>& remaining_batches,
+                apsi::network::Channel& channel);
+
 
             /**
             Constructs all powers of receiver's items for the specified batch, based on the powers sent from the receiver. For example, if the

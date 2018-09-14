@@ -112,36 +112,92 @@ namespace apsi
 
         void Sender::offline_compute()
         {
+            Log::info("Offline compute started");
+
             vector<thread> thread_pool(total_thread_count_);
             for (int i = 0; i < total_thread_count_; i++)
             {
-                thread_pool[i] = thread([&, i]()
+                thread_pool[i] = thread([&]()
                 {
-                    if (i == 0)
-                        stop_watch.set_time_point("symmpoly_start");
-
-                    int thread_context_idx = acquire_thread_context();
-                    SenderThreadContext &context = thread_contexts_[thread_context_idx];
-                    sender_db_->batched_randomized_symmetric_polys(context, evaluator_, ex_batch_encoder_, total_thread_count_);
-
-                    if (i == 0)
-                        stop_watch.set_time_point("symmpoly_done");
-
-                    if (params_.get_label_bit_count())
-                    {
-                        sender_db_->batched_interpolate_polys(context, total_thread_count_, evaluator_, ex_batch_encoder_);
-
-                        if (i == 0)
-                            stop_watch.set_time_point("interpolation_done");
-                    }
-
-                    release_thread_context(context.id());
+                    offline_compute_work();
                 });
             }
+
+            atomic<bool> work_finished = false;
+            thread progress_thread([&]()
+            {
+                report_offline_compute_progress(total_thread_count_, work_finished);
+            });
 
             for (int i = 0; i < thread_pool.size(); i++)
             {
                 thread_pool[i].join();
+            }
+
+            // Signal progress thread work is done
+            work_finished = true;
+            progress_thread.join();
+
+            Log::info("Offline compute finished.");
+        }
+
+        void Sender::offline_compute_work()
+        {
+            int thread_context_idx = acquire_thread_context();
+            if (thread_context_idx == 0)
+                stop_watch.set_time_point("symmpoly_start");
+
+            SenderThreadContext &context = thread_contexts_[thread_context_idx];
+            int start_block = static_cast<int>(thread_context_idx * sender_db_->get_block_count() / total_thread_count_);
+            int end_block = static_cast<int>((thread_context_idx + 1) * sender_db_->get_block_count() / total_thread_count_);
+
+            int blocks_to_process = end_block - start_block;
+            Log::debug("Thread %i processing %i blocks.", thread_context_idx, blocks_to_process);
+
+            context.clear_processed_counts();
+            context.set_total_randomized_polys(blocks_to_process);
+            if (params_.get_label_bit_count())
+            {
+                context.set_total_interpolate_polys(blocks_to_process);
+            }
+
+            sender_db_->batched_randomized_symmetric_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
+
+            if (thread_context_idx == 0)
+                stop_watch.set_time_point("symmpoly_done");
+
+            if (params_.get_label_bit_count())
+            {
+                sender_db_->batched_interpolate_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
+
+                if (thread_context_idx == 0)
+                    stop_watch.set_time_point("interpolation_done");
+            }
+
+            release_thread_context(context.id());
+        }
+
+        void Sender::report_offline_compute_progress(int total_threads, atomic<bool>& work_finished)
+        {
+            int progress = 0;
+            while (!work_finished)
+            {
+                float threads_progress = 0.0f;
+                for (int i = 0; i < total_threads; i++)
+                {
+                    threads_progress += thread_contexts_[i].get_progress();
+                }
+
+                int int_progress = static_cast<int>((threads_progress / total_threads) * 100.0f);
+
+                if (int_progress > progress)
+                {
+                    progress = int_progress;
+                    Log::info("Offline compute progress: %i%%", progress);
+                }
+
+                // Check for progress 10 times per second
+                this_thread::sleep_for(100ms);
             }
         }
 
@@ -194,11 +250,6 @@ namespace apsi
             RelinKeys relin;
             receive_pubkey(pub, chl);
             receive_relinkeys(relin, chl);
-
-            if (!params_.use_oprf())
-            {
-                Log::info("Starting session");
-            }
 
             SenderSessionContext session_context(seal_context_, pub, relin);
 
@@ -354,169 +405,19 @@ namespace apsi
             vector<thread> thread_pool(session_thread_count_);
             for (int i = 0; i < thread_pool.size(); i++)
             {
-                thread_pool[i] = thread([&, i]()
+                thread_pool[i] = thread([&]()
                 {
-                    /* Multiple client sessions can enter this function to compete for thread context resources. */
-                    int thread_context_idx = acquire_thread_context();
-                    auto& thread_context = thread_contexts_[thread_context_idx];
-                    thread_context.construct_variables(params_);
-                    auto local_pool = thread_context.pool();
-
-                    Ciphertext tmp(local_pool);
-                    Ciphertext compressedResult(seal_context_, local_pool);
-
-                    u64 batch_start = i * batch_count / thread_pool.size();
-                    auto thread_idx = std::this_thread::get_id();
-
-                    for (u64 batch = batch_start, loop_idx = 0ul; loop_idx < batch_count; ++loop_idx)
-                    {
-                        compute_batch_powers(static_cast<int>(batch), powers[batch], session_context, thread_context, dag, states[batch]);
-                        batch = (batch + 1) % batch_count;
-                    }
-
-                    auto count = remaining_batches--;
-                    if(count == 1)
-                    {
-                        batches_done_prom.set_value();
-                    }
-                    else
-                    {
-                        batches_done_fut.get();
-                    }
-
-                    int start_block = i * total_blocks / total_thread_count_;
-                    int end_block = (i + 1) * total_blocks / total_thread_count_;
-
-                    // constuct two ciphertext to store the result.  One keeps track of the current result, 
-                    // one is used as a temp. Their roles switch each iteration. Saved needing to make a 
-                    // copy in eval->add(...)
-                    array<Ciphertext, 2> runningResults{ thread_context.pool(), thread_context.pool() },
-                        label_results{ thread_context.pool(), thread_context.pool() };
-
-
-                    for (int block_idx = start_block; block_idx < end_block; block_idx++)
-                    {
-                        int batch = block_idx / params_.split_count(),
-                            split = block_idx % params_.split_count();
-                        auto& block = sender_db_->get_block(batch, split);
-
-                        // Get the pointer to the first poly of this batch.
-                        //Plaintext* sender_coeffs(&sender_db_.batch_random_symm_polys()[split * splitStep + batch * split_size_plus_one]);
-
-                        // Iterate over the coeffs multiplying them with the query powers  and summing the results
-                        char currResult = 0, curr_label = 0;
-
-                        // TODO: optimize this to allow low degree poly? need to take into account noise levels.
-
-                        // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
-                        // Observe that the first call to mult is always multiplying coeff[0] by 1....
-                        // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
-                        evaluator_->multiply_plain(powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
-
-                        for (int s = 1; s <= params_.split_size(); s++)
-                        {
-                            // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
-                            evaluator_->multiply_plain(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
-                            evaluator_->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
-                            currResult ^= 1;
-                        }
-
-
-                        if (params_.get_label_bit_count())
-                        {
-                            if (block.batched_label_coeffs_.size() > 1)
-                            {
-                                if (i == 0)
-                                    stop_watch.set_time_point("online interpolate start");
-
-                                // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
-                                // Observe that the first call to mult is always multiplying coeff[0] by 1....
-
-                                // TODO: edge case where all block.batched_label_coeffs_[s] are zero.
-
-                                // label_result = coeff[0] * x^0 = coeff[0];
-                                int s = 0;
-                                while (block.batched_label_coeffs_[s].is_zero()) ++s;
-
-                                // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
-                                evaluator_->multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], label_results[curr_label]);
-
-
-                                while (++s < block.batched_label_coeffs_.size())
-                                {
-                                    // label_result += coeff[s] * x^s;
-                                    if (block.batched_label_coeffs_[s].is_zero() == false)
-                                    {
-                                        // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
-                                        evaluator_->multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], tmp);
-                                        evaluator_->add(tmp, label_results[curr_label], label_results[curr_label ^ 1]);
-                                        curr_label ^= 1;
-                                    }
-                                }
-
-                                if (i == 0)
-                                    stop_watch.set_time_point("online interpolate done");
-                            }
-                            else if (block.batched_label_coeffs_.size())
-                            {
-                                // only reachable if user calls PSIParams.set_use_low_degree_poly(true);
-
-                                // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
-                                // Observe that the first call to mult is always multiplying coeff[0] by 1....
-
-                                // TODO: edge case where block.batched_label_coeffs_[0] is zero. 
-
-                                // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
-                                evaluator_->multiply_plain(powers[batch][0], block.batched_label_coeffs_[0], label_results[curr_label]);
-                            }
-                            else
-                            {
-                                // only reachable if user calls PSIParams.set_use_low_degree_poly(true);
-                                // doesn't matter what we set... this will due.
-                                label_results[curr_label] = powers[batch][0];
-                            }
-
-                            // TODO: We need to randomize the result. This is fine for now.
-                            evaluator_->add(runningResults[currResult], label_results[curr_label], label_results[curr_label ^ 1]);
-                            curr_label ^= 1;
-
-                            evaluator_->transform_from_ntt(label_results[curr_label]);
-                        }
-
-                        // Transform back from ntt form.
-                        evaluator_->transform_from_ntt(runningResults[currResult]);
-
-                        // Send the result over the network if needed.
-                        
-                        // First compress
-                        compressor_->mod_switch(runningResults[currResult], compressedResult);
-
-                        // Send the compressed result
-                        ResultPackage pkg;
-                        pkg.split_idx = split;
-                        pkg.batch_idx = batch;
-
-                        {
-                            stringstream ss;
-                            compressor_->compressed_save(compressedResult, ss);
-                            pkg.data = ss.str();
-                        }
-
-                        if (params_.get_label_bit_count())
-                        {
-                            // Compress label
-                            compressor_->mod_switch(label_results[currResult], compressedResult);
-
-                            stringstream ss;
-                            compressor_->compressed_save(compressedResult, ss);
-                            pkg.label_data = ss.str();
-                        }
-
-                        channel.send(pkg);
-                    }
-
-                    /* After this point, this thread will no longer use the context resource, so it is free to return it. */
-                    release_thread_context(thread_context.id());
+                    respond_work(batch_count,
+                                 static_cast<int>(thread_pool.size()),
+                                 total_blocks,
+                                 batches_done_prom,
+                                 batches_done_fut,
+                                 powers,
+                                 session_context,
+                                 dag,
+                                 states,
+                                 remaining_batches,
+                                 channel);
                 });
             }
 
@@ -528,14 +429,189 @@ namespace apsi
             stop_watch.set_time_point("sender online done");
         }
 
+        void Sender::respond_work(
+            int batch_count,
+            int total_threads,
+            int total_blocks,
+            promise<void>& batches_done_prom,
+            shared_future<void>& batches_done_fut,
+            vector<vector<Ciphertext>>& powers,
+            SenderSessionContext &session_context,
+            WindowingDag& dag,
+            vector<WindowingDag::State>& states,
+            atomic<int>& remaining_batches,
+            Channel& channel)
+        {
+            /* Multiple client sessions can enter this function to compete for thread context resources. */
+            int thread_context_idx = acquire_thread_context();
+            auto& thread_context = thread_contexts_[thread_context_idx];
+            thread_context.construct_variables(params_);
+            auto local_pool = thread_context.pool();
+
+            Ciphertext tmp(local_pool);
+            Ciphertext compressedResult(seal_context_, local_pool);
+
+            u64 batch_start = thread_context_idx * batch_count / total_threads;
+            auto thread_idx = std::this_thread::get_id();
+
+            for (u64 batch = batch_start, loop_idx = 0ul; loop_idx < batch_count; ++loop_idx)
+            {
+                compute_batch_powers(static_cast<int>(batch), powers[batch], session_context, thread_context, dag, states[batch]);
+                batch = (batch + 1) % batch_count;
+            }
+
+            auto count = remaining_batches--;
+            if (count == 1)
+            {
+                batches_done_prom.set_value();
+            }
+            else
+            {
+                batches_done_fut.get();
+            }
+
+            int start_block = thread_context_idx * total_blocks / total_thread_count_;
+            int end_block = (thread_context_idx + 1) * total_blocks / total_thread_count_;
+
+            // constuct two ciphertext to store the result.  One keeps track of the current result, 
+            // one is used as a temp. Their roles switch each iteration. Saved needing to make a 
+            // copy in eval->add(...)
+            array<Ciphertext, 2> runningResults{ thread_context.pool(), thread_context.pool() },
+                label_results{ thread_context.pool(), thread_context.pool() };
+
+
+            for (int block_idx = start_block; block_idx < end_block; block_idx++)
+            {
+                int batch = block_idx / params_.split_count(),
+                    split = block_idx % params_.split_count();
+                auto& block = sender_db_->get_block(batch, split);
+
+                // Get the pointer to the first poly of this batch.
+                //Plaintext* sender_coeffs(&sender_db_.batch_random_symm_polys()[split * splitStep + batch * split_size_plus_one]);
+
+                // Iterate over the coeffs multiplying them with the query powers  and summing the results
+                char currResult = 0, curr_label = 0;
+
+                // TODO: optimize this to allow low degree poly? need to take into account noise levels.
+
+                // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
+                // Observe that the first call to mult is always multiplying coeff[0] by 1....
+                // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
+                evaluator_->multiply_plain(powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
+
+                for (int s = 1; s <= params_.split_size(); s++)
+                {
+                    // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
+                    evaluator_->multiply_plain(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
+                    evaluator_->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
+                    currResult ^= 1;
+                }
+
+
+                if (params_.get_label_bit_count())
+                {
+                    if (block.batched_label_coeffs_.size() > 1)
+                    {
+                        if (thread_context_idx == 0)
+                            stop_watch.set_time_point("online interpolate start");
+
+                        // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
+                        // Observe that the first call to mult is always multiplying coeff[0] by 1....
+
+                        // TODO: edge case where all block.batched_label_coeffs_[s] are zero.
+
+                        // label_result = coeff[0] * x^0 = coeff[0];
+                        int s = 0;
+                        while (block.batched_label_coeffs_[s].is_zero()) ++s;
+
+                        // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
+                        evaluator_->multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], label_results[curr_label]);
+
+
+                        while (++s < block.batched_label_coeffs_.size())
+                        {
+                            // label_result += coeff[s] * x^s;
+                            if (block.batched_label_coeffs_[s].is_zero() == false)
+                            {
+                                // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
+                                evaluator_->multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], tmp);
+                                evaluator_->add(tmp, label_results[curr_label], label_results[curr_label ^ 1]);
+                                curr_label ^= 1;
+                            }
+                        }
+
+                        if (thread_context_idx == 0)
+                            stop_watch.set_time_point("online interpolate done");
+                    }
+                    else if (block.batched_label_coeffs_.size())
+                    {
+                        // only reachable if user calls PSIParams.set_use_low_degree_poly(true);
+
+                        // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
+                        // Observe that the first call to mult is always multiplying coeff[0] by 1....
+
+                        // TODO: edge case where block.batched_label_coeffs_[0] is zero. 
+
+                        // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
+                        evaluator_->multiply_plain(powers[batch][0], block.batched_label_coeffs_[0], label_results[curr_label]);
+                    }
+                    else
+                    {
+                        // only reachable if user calls PSIParams.set_use_low_degree_poly(true);
+                        // doesn't matter what we set... this will due.
+                        label_results[curr_label] = powers[batch][0];
+                    }
+
+                    // TODO: We need to randomize the result. This is fine for now.
+                    evaluator_->add(runningResults[currResult], label_results[curr_label], label_results[curr_label ^ 1]);
+                    curr_label ^= 1;
+
+                    evaluator_->transform_from_ntt(label_results[curr_label]);
+                }
+
+                // Transform back from ntt form.
+                evaluator_->transform_from_ntt(runningResults[currResult]);
+
+                // Send the result over the network if needed.
+
+                // First compress
+                compressor_->mod_switch(runningResults[currResult], compressedResult);
+
+                // Send the compressed result
+                ResultPackage pkg;
+                pkg.split_idx = split;
+                pkg.batch_idx = batch;
+
+                {
+                    stringstream ss;
+                    compressor_->compressed_save(compressedResult, ss);
+                    pkg.data = ss.str();
+                }
+
+                if (params_.get_label_bit_count())
+                {
+                    // Compress label
+                    compressor_->mod_switch(label_results[currResult], compressedResult);
+
+                    stringstream ss;
+                    compressor_->compressed_save(compressedResult, ss);
+                    pkg.label_data = ss.str();
+                }
+
+                channel.send(pkg);
+            }
+
+            /* After this point, this thread will no longer use the context resource, so it is free to return it. */
+            release_thread_context(thread_context.id());
+        }
 
         void Sender::compute_batch_powers(
             int batch,
-            vector<Ciphertext> &batch_powers,
-            SenderSessionContext &session_context,
-            SenderThreadContext &thread_context,
+            vector<Ciphertext>& batch_powers,
+            SenderSessionContext& session_context,
+            SenderThreadContext& thread_context,
             const WindowingDag& dag,
-            WindowingDag::State & state)
+            WindowingDag::State& state)
         {
             auto thrdIdx = std::this_thread::get_id();
 

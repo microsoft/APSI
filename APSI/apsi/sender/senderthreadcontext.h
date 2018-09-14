@@ -79,7 +79,6 @@ namespace apsi
                     }
 
                     symm_block_vec_ = std::make_unique<FFieldArray>(field_matrix);
-                    // symm_block_vec_.resize(params.batch_size() * (params.split_size() + 1), FFieldElt(exfield_));
                     symm_block_ = MatrixView<_ffield_array_elt_t>(symm_block_vec_->data(), params.batch_size(), params.split_size() + 1);
                 }
             }
@@ -94,6 +93,49 @@ namespace apsi
                 return prng_;
             }
 
+            void set_total_randomized_polys(int total)
+            {
+                total_randomized_polys_ = total;
+            }
+
+            void set_total_interpolate_polys(int total)
+            {
+                total_interpolate_polys_ = total;
+            }
+
+            void clear_processed_counts()
+            {
+                randomized_polys_processed_ = 0;
+                interpolate_polys_processed_ = 0;
+            }
+
+            void inc_randomized_polys()
+            {
+                randomized_polys_processed_++;
+            }
+
+            void inc_interpolate_polys()
+            {
+                interpolate_polys_processed_++;
+            }
+
+            /**
+            Get current progress of work in the thread serviced by this context.
+            Progress is reported as a floating number between 0 and 1.
+            */
+            float get_progress() const
+            {
+                float randomized_polys_progress = static_cast<float>(randomized_polys_processed_) / total_randomized_polys_;
+
+                // If we are not using labels, only report randomized polynomials progress
+                if (total_interpolate_polys_ == 0)
+                    return randomized_polys_progress;
+
+                float interpolate_polys_progress = static_cast<float>(interpolate_polys_processed_) / total_interpolate_polys_;
+
+                return (randomized_polys_progress + interpolate_polys_progress) / 2;
+            }
+
         private:
             int id_;
 
@@ -106,6 +148,11 @@ namespace apsi
             MatrixView<_ffield_array_elt_t> symm_block_;
             
             apsi::tools::PRNG prng_;
+
+            std::atomic<int> randomized_polys_processed_;
+            std::atomic<int> interpolate_polys_processed_;
+            int total_randomized_polys_;
+            int total_interpolate_polys_;
         };
     }
 }

@@ -251,23 +251,23 @@ namespace apsi
 
             if (cuckoo->encoding_bit_length() > coeff_bit_count * degree)
             {
-                cout << "Reduced items too long. Only have " <<
-                    coeff_bit_count * degree << " bits." << endl;
+                Log::error("Reduced items too long. Only have %i bits.", coeff_bit_count * degree);
                 throw runtime_error("Reduced items too long.");
             }
             else
             {
-                Log::info("Using %i out of %ix%i bits of exfield element",
+                Log::debug("Using %i out of %ix%i bits of exfield element",
                     cuckoo->encoding_bit_length(),
                     seal::util::get_significant_bit_count(params_.exfield_characteristic()) - 1,
                     degree);
             }
+
             bool insertionSuccess;
             for (int i = 0; i < items.size(); i++)
             {
                 insertionSuccess = cuckoo->insert(items[i]);
                 if (!insertionSuccess)
-                    throw logic_error("cuck hashing failed.");
+                    throw logic_error("Cuckoo hashing failed.");
             }
 
             return cuckoo;
@@ -399,7 +399,7 @@ namespace apsi
             }
 
             auto numThreads = thread_count_;
-            Log::info("Decrypting %i blocks(%ib x %is) with %i threads",
+            Log::debug("Decrypting %i blocks(%ib x %is) with %i threads",
                 block_count,
                 num_of_batches,
                 num_of_splits,
@@ -433,7 +433,7 @@ namespace apsi
                     if (first && t == 0)
                     {
                         first = false;
-                        Log::info("Noise budget: %i bits", decryptor_->invariant_noise_budget(tmp, local_pool));
+                        Log::debug("Noise budget: %i bits", decryptor_->invariant_noise_budget(tmp, local_pool));
                         recv_stop_watch.set_time_point("receiver recv-start");
                     }
 
@@ -490,29 +490,6 @@ namespace apsi
                 thrd.join();
 
             return std::move(ret);
-        }
-
-
-        void Receiver::decrypt(
-            seal::Ciphertext &tmp,
-            std::vector<bool> &rr,
-            seal::Plaintext &p,
-            std::vector<uint64_t> &integer_batch,
-            FFieldArray &batch)
-        {
-            throw std::runtime_error("outdated code");
-            decrypt(tmp, p);
-
-            ex_batch_encoder_->decompose(p, batch);
-            for (int k = 0; k < batch.size(); k++)
-            {
-                rr[k] = batch.is_zero(k);
-            }
-        }
-
-        void Receiver::decrypt(const Ciphertext &cipher, Plaintext &plain)
-        {
-            decryptor_->decrypt(cipher, plain);
         }
     }
 }

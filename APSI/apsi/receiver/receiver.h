@@ -112,19 +112,6 @@ namespace apsi
                 const std::vector<int>& table_to_input_map,
                 std::vector<Item>& items);
 
-            /**
-            Decrypts a SEAL Ciphertext to a Plaintext.
-
-            @param[out] plain The plaintext to hold the decrypted data.
-            */
-            void decrypt(const seal::Ciphertext &cipher, seal::Plaintext &plain);
-
-            void decrypt(
-                seal::Ciphertext &tmp, 
-                std::vector<bool> & rr, 
-                seal::Plaintext &p, 
-                std::vector<std::uint64_t> &integer_batch, 
-                FFieldArray &batch);
 
             std::shared_ptr<FField> ex_field() const
             {
