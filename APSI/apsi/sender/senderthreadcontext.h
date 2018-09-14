@@ -119,10 +119,15 @@ namespace apsi
                 interpolate_polys_processed_++;
             }
 
+            /**
+            Get current progress of work in the thread serviced by this context.
+            Progress is reported as a floating number between 0 and 1.
+            */
             float get_progress() const
             {
                 float randomized_polys_progress = static_cast<float>(randomized_polys_processed_) / total_randomized_polys_;
 
+                // If we are not using labels, only report randomized polynomials progress
                 if (total_interpolate_polys_ == 0)
                     return randomized_polys_progress;
 
