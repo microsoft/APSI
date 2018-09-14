@@ -41,7 +41,7 @@ namespace apsi
             static void set_log_level(const std::string& level);
 
         private:
-            static std::string format_msg(const char* format, va_list ap);
+            static void format_msg(std::string& msg, const char* format, va_list ap);
         };
     }
 }

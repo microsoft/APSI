@@ -25,7 +25,7 @@ using namespace log4cplus;
 { \
     va_list ap; \
     va_start(ap, format); \
-    msg = format_msg(format, ap); \
+    format_msg(msg, format, ap); \
     va_end(ap); \
 }
 
@@ -150,12 +150,8 @@ void Log::set_log_level(const string& level)
     set_log_level(actual);
 }
 
-string Log::format_msg(const char* format, va_list ap)
+void Log::format_msg(std::string& msg, const char* format, va_list ap)
 {
-    string msg;
     msg.resize(1000);
-
     vsnprintf(msg.data(), msg.size(), format, ap);
-
-    return msg;
 }
