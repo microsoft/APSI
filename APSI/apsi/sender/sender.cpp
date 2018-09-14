@@ -127,11 +127,14 @@ namespace apsi
                     int start_block = static_cast<int>(thread_context_idx * sender_db_->get_block_count() / total_thread_count_);
                     int end_block = static_cast<int>((thread_context_idx + 1) * sender_db_->get_block_count() / total_thread_count_);
 
+                    int blocks_to_process = end_block - start_block;
+                    Log::debug("Thread %i processing %i blocks.", i, blocks_to_process);
+
                     context.clear_processed_counts();
-                    context.set_total_randomized_polys(end_block - start_block);
+                    context.set_total_randomized_polys(blocks_to_process);
                     if (params_.get_label_bit_count())
                     {
-                        context.set_total_interpolate_polys(end_block - start_block);
+                        context.set_total_interpolate_polys(blocks_to_process);
                     }
 
                     sender_db_->batched_randomized_symmetric_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
