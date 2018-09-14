@@ -21,6 +21,14 @@ using namespace log4cplus;
         return; \
     }
 
+#define FormatLogMessage(format, msg) \
+{ \
+    va_list ap; \
+    va_start(ap, format); \
+    msg = format_msg(format, ap); \
+    va_end(ap); \
+}
+
 
 namespace
 {
@@ -54,11 +62,8 @@ void Log::info(const char* format, ...)
 {
     CheckLogLevel(INFO_LOG_LEVEL);
 
-    va_list ap;
-    va_start(ap, format);
-    string msg = format_msg(format, ap);
-    va_end(ap);
-
+    string msg;
+    FormatLogMessage(format, msg);
     instance().log(INFO_LOG_LEVEL, msg);
 }
 
@@ -66,11 +71,8 @@ void Log::warning(const char* format, ...)
 {
     CheckLogLevel(WARN_LOG_LEVEL);
 
-    va_list ap;
-    va_start(ap, format);
-    string msg = format_msg(format, ap);
-    va_end(ap);
-
+    string msg;
+    FormatLogMessage(format, msg);
     instance().log(WARN_LOG_LEVEL, msg);
 }
 
@@ -78,11 +80,8 @@ void Log::debug(const char* format, ...)
 {
     CheckLogLevel(DEBUG_LOG_LEVEL);
 
-    va_list ap;
-    va_start(ap, format);
-    string msg = format_msg(format, ap);
-    va_end(ap);
-
+    string msg;
+    FormatLogMessage(format, msg);
     instance().log(DEBUG_LOG_LEVEL, msg);
 }
 
@@ -90,11 +89,8 @@ void Log::error(const char* format, ...)
 {
     CheckLogLevel(ERROR_LOG_LEVEL);
 
-    va_list ap;
-    va_start(ap, format);
-    string msg = format_msg(format, ap);
-    va_end(ap);
-
+    string msg;
+    FormatLogMessage(format, msg);
     instance().log(ERROR_LOG_LEVEL, msg);
 }
 
