@@ -157,6 +157,23 @@ namespace apsi
                 apsi::sender::SenderSessionContext &session_context, apsi::network::Channel &channel);
 
             /**
+            Worker method to compute response in a single thread.
+            */
+            void respond_work(
+                int batch_count,
+                int total_threads,
+                int total_blocks,
+                std::promise<void>& batches_done_prom,
+                std::shared_future<void>& batches_done_fut,
+                std::vector<std::vector<seal::Ciphertext>>& powers,
+                apsi::sender::SenderSessionContext &session_context,
+                apsi::sender::WindowingDag& dag,
+                std::vector<apsi::sender::WindowingDag::State>& states,
+                std::atomic<int>& remaining_batches,
+                apsi::network::Channel& channel);
+
+
+            /**
             Constructs all powers of receiver's items for the specified batch, based on the powers sent from the receiver. For example, if the
             desired highest exponent (determined by PSIParams) is 15, the input exponents are {1, 2, 4, 8}, then this function will compute powers
             from 0 to 15, by multiplying appropriate powers in {1, 2, 4, 8}.
