@@ -241,11 +241,6 @@ namespace apsi
             receive_pubkey(pub, chl);
             receive_relinkeys(relin, chl);
 
-            if (!params_.use_oprf())
-            {
-                Log::info("Starting session");
-            }
-
             SenderSessionContext session_context(seal_context_, pub, relin);
 
             if (params_.debug())
