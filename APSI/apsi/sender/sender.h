@@ -157,7 +157,7 @@ namespace apsi
                 apsi::sender::SenderSessionContext &session_context, apsi::network::Channel &channel);
 
             /**
-            Worker method to compute response in a single thread.
+            Method that handles the work of a single thread that computes the response to a query.
             */
             void respond_work(
                 int batch_count,
