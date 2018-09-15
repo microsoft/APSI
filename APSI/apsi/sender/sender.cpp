@@ -103,7 +103,6 @@ void Sender::initialize()
 void Sender::load_db(const vector<Item> &data, MatrixView<u8> vals)
 {
     sender_db_->set_data(data, vals, total_thread_count_);
-    stop_watch.set_time_point("Sender set-data");
 
     // Compute symmetric polys and batch
     offline_compute();
@@ -111,6 +110,7 @@ void Sender::load_db(const vector<Item> &data, MatrixView<u8> vals)
 
 void Sender::offline_compute()
 {
+    StopwatchScope offline_compute_scope(sender_stop_watch, "offline_compute");
     Log::info("Offline compute started");
 
     vector<thread> thread_pool(total_thread_count_);
@@ -142,9 +142,9 @@ void Sender::offline_compute()
 
 void Sender::offline_compute_work()
 {
+    StopwatchScope worker_scope(sender_stop_watch, "offline_compute_worker");
+
     int thread_context_idx = acquire_thread_context();
-    if (thread_context_idx == 0)
-        stop_watch.set_time_point("symmpoly_start");
 
     SenderThreadContext &context = thread_contexts_[thread_context_idx];
     int start_block = static_cast<int>(thread_context_idx * sender_db_->get_block_count() / total_thread_count_);
@@ -160,17 +160,15 @@ void Sender::offline_compute_work()
         context.set_total_interpolate_polys(blocks_to_process);
     }
 
-    sender_db_->batched_randomized_symmetric_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
-
-    if (thread_context_idx == 0)
-        stop_watch.set_time_point("symmpoly_done");
+    {
+        StopwatchScope symmpoly_scope(sender_stop_watch, "calc_symmpoly");
+        sender_db_->batched_randomized_symmetric_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
+    }
 
     if (params_.get_label_bit_count())
     {
+        StopwatchScope interp_scope(sender_stop_watch, "calc_interpolation");
         sender_db_->batched_interpolate_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
-
-        if (thread_context_idx == 0)
-            stop_watch.set_time_point("interpolation_done");
     }
 
     release_thread_context(context.id());
@@ -375,7 +373,7 @@ void Sender::respond(
     SenderSessionContext &session_context,
     Channel &channel)
 {
-    stop_watch.set_time_point("sender online start");
+    StopwatchScope respond_scope(sender_stop_watch, "sender_respond");
 
     auto batch_count = params_.batch_count();
     int split_size_plus_one = params_.split_size() + 1;
@@ -407,16 +405,16 @@ void Sender::respond(
         thread_pool[i] = thread([&]()
         {
             respond_work(batch_count,
-                            static_cast<int>(thread_pool.size()),
-                            total_blocks,
-                            batches_done_prom,
-                            batches_done_fut,
-                            powers,
-                            session_context,
-                            dag,
-                            states,
-                            remaining_batches,
-                            channel);
+                         static_cast<int>(thread_pool.size()),
+                         total_blocks,
+                         batches_done_prom,
+                         batches_done_fut,
+                         powers,
+                         session_context,
+                         dag,
+                         states,
+                         remaining_batches,
+                         channel);
         });
     }
 
@@ -424,8 +422,6 @@ void Sender::respond(
     {
         thread_pool[i].join();
     }
-
-    stop_watch.set_time_point("sender online done");
 }
 
 void Sender::respond_work(
@@ -441,6 +437,8 @@ void Sender::respond_work(
     atomic<int>& remaining_batches,
     Channel& channel)
 {
+    StopwatchScope respond_work_scope(sender_stop_watch, "respond_worker");
+
     /* Multiple client sessions can enter this function to compete for thread context resources. */
     int thread_context_idx = acquire_thread_context();
     auto& thread_context = thread_contexts_[thread_context_idx];
@@ -472,7 +470,7 @@ void Sender::respond_work(
     int start_block = thread_context_idx * total_blocks / total_thread_count_;
     int end_block = (thread_context_idx + 1) * total_blocks / total_thread_count_;
 
-    // constuct two ciphertext to store the result.  One keeps track of the current result, 
+    // Constuct two ciphertext to store the result.  One keeps track of the current result, 
     // one is used as a temp. Their roles switch each iteration. Saved needing to make a 
     // copy in eval->add(...)
     array<Ciphertext, 2> runningResults{ thread_context.pool(), thread_context.pool() },
@@ -511,8 +509,7 @@ void Sender::respond_work(
         {
             if (block.batched_label_coeffs_.size() > 1)
             {
-                if (thread_context_idx == 0)
-                    stop_watch.set_time_point("online interpolate start");
+                StopwatchScope online_interp_scope(sender_stop_watch, "online_interpolate");
 
                 // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
                 // Observe that the first call to mult is always multiplying coeff[0] by 1....
@@ -538,9 +535,6 @@ void Sender::respond_work(
                         curr_label ^= 1;
                     }
                 }
-
-                if (thread_context_idx == 0)
-                    stop_watch.set_time_point("online interpolate done");
             }
             else if (block.batched_label_coeffs_.size())
             {

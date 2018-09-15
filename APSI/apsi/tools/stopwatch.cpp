@@ -40,3 +40,27 @@ ostream &apsi::tools::operator <<(ostream &out, const Stopwatch &stopwatch)
 
     return out;
 }
+
+void Stopwatch::add_event(const string& name, const time_unit& start)
+{
+    unique_lock<mutex> events_lock(events_mtx_);
+    events_.emplace_back(name, start);
+}
+
+void Stopwatch::add_timespan_event(const string& name, const time_unit& start, const time_unit& end)
+{
+    unique_lock<mutex> timespan_events_lock(timespan_events_mtx_);
+    timespan_events_.emplace_back(name, start, end);
+}
+
+
+StopwatchScope::StopwatchScope(Stopwatch& stopwatch, const std::string& event_name)
+    : stopwatch_(stopwatch), event_name_(event_name), start_(Stopwatch::time_unit::clock::now())
+{
+}
+
+StopwatchScope::~StopwatchScope()
+{
+    Stopwatch::time_unit end = Stopwatch::time_unit::clock::now();
+    stopwatch_.add_timespan_event(event_name_, start_, end);
+}

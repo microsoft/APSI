@@ -14,7 +14,7 @@ using namespace std;
 using namespace apsi;
 using namespace apsi::tools;
 
-Stopwatch apsi::tools::stop_watch;
+Stopwatch apsi::tools::sender_stop_watch;
 Stopwatch apsi::tools::recv_stop_watch;
 
 namespace

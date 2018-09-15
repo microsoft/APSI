@@ -72,6 +72,6 @@ namespace apsi
         */
         apsi::u64 compute_sender_bin_size(unsigned log_table_size, apsi::u64 sender_set_size, unsigned hash_func_count, unsigned binning_sec_level, unsigned split_count);
 
-        extern apsi::tools::Stopwatch stop_watch, recv_stop_watch;
+        extern apsi::tools::Stopwatch sender_stop_watch, recv_stop_watch;
     }
 }

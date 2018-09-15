@@ -108,9 +108,9 @@ void SenderDB::set_data(gsl::span<const Item> data, int thread_count)
 
 void SenderDB::set_data(gsl::span<const Item> data, MatrixView<u8> vals, int thread_count)
 {
+    StopwatchScope set_scope(sender_stop_watch, "set_data");
     clear_db();
     add_data(data, vals, thread_count);
-    stop_watch.set_time_point("Sender add-data");
 }
 
 std::string hexStr(u8* data, u64 size)
