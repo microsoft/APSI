@@ -35,6 +35,7 @@ using namespace seal;
 void example_slow_batching(const CLP& cmd);
 void example_remote(const CLP& cmd);
 void print_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<u8>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<u8>& labels);
+void print_timing_info();
 void print_transmitted_data(Channel& channel);
 string get_bind_addr(const CLP& cmd);
 string get_conn_addr(const CLP& cmd);
@@ -207,10 +208,7 @@ void example_slow_batching(const CLP& cmd)
 
     // Done with everything. Print the results!
     print_intersection_results(c1, intersectionSize, intersection, label_bit_length > 0, cc1.second, labels);
-
-    cout << sender_stop_watch << endl;
-    cout << recv_stop_watch << endl;
-
+    print_timing_info();
     print_transmitted_data(recvChl);
 }
 
@@ -250,6 +248,7 @@ void example_remote(const CLP& cmd)
     }
 
     print_intersection_results(items, intersection_size, result, compare_labels, label_idx, labels);
+    print_timing_info();
     print_transmitted_data(channel);
 }
 
@@ -296,6 +295,50 @@ void print_intersection_results(vector<Item>& client_items, int intersection_siz
         cout << Colors::Red << "Incorrect";
 
     cout << Colors::Reset << endl;
+}
+
+void print_timing_info(Stopwatch& stopwatch, const string& caption)
+{
+    vector<string> timing_report;
+    vector<Stopwatch::TimespanSummary> timings;
+    vector<Stopwatch::Timepoint> timepoints;
+
+    stopwatch.get_events(timepoints);
+    stopwatch.get_timespans(timings);
+
+    if (timepoints.size() == 0 && timings.size() == 0)
+        return;
+
+    Log::info(caption.c_str());
+
+    if (timings.size() > 0)
+    {
+        generate_timespan_report(timing_report, timings);
+
+        Log::info("Timespan event information");
+        for (const auto& timing : timing_report)
+        {
+            Log::info(timing.c_str());
+        }
+    }
+
+
+    if (timepoints.size() > 0)
+    {
+        generate_event_report(timing_report, timepoints);
+
+        Log::info("Single event information");
+        for (const auto& timing : timing_report)
+        {
+            Log::info(timing.c_str());
+        }
+    }
+}
+
+void print_timing_info()
+{
+    print_timing_info(sender_stop_watch, "Timing events for Sender");
+    print_timing_info(recv_stop_watch, "Timing events for Receiver");
 }
 
 void print_transmitted_data(Channel& channel)

@@ -54,6 +54,7 @@ Receiver::Receiver(const PSIParams &params, int thread_count, const MemoryPoolHa
 
 void Receiver::initialize()
 {
+    StopwatchScope init_receiver(recv_stop_watch, "recv_init");
     Log::info("Initializing Receiver");
 
     seal_context_ = SEALContext::Create(params_.encryption_params());
@@ -81,6 +82,7 @@ void Receiver::initialize()
 
 std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Channel& chl)
 {
+    StopwatchScope recv_query(recv_stop_watch, "Receiver::query");
     Log::info("Receiver starting query");
 
     // Perform initial communication with Sender
@@ -90,11 +92,9 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Ch
     auto& ciphertexts = qq.first;
     auto& cuckoo = *qq.second;
 
-
     send(ciphertexts, chl);
 
     auto table_to_input_map = cuckoo_indices(items, cuckoo);
-    recv_stop_watch.set_time_point("receiver pre-process/sent");
 
     /* Receive results in a streaming fashion. */
     auto intersection = stream_decrypt(chl, table_to_input_map, items);
@@ -128,6 +128,7 @@ pair<
     unique_ptr<CuckooInterface> >
     Receiver::preprocess(vector<Item> &items, Channel &channel)
 {
+    StopwatchScope preprocess_scope(recv_stop_watch, "Receiver::preprocess");
     Log::info("Receiver preprocess start");
 
     if (params_.use_oprf())
@@ -210,6 +211,8 @@ pair<
 
 void Receiver::send(const map<uint64_t, vector<Ciphertext> > &query, Channel &channel)
 {
+    StopwatchScope recv_send(recv_stop_watch, "Receiver::send");
+
     /* Send keys. */
     send_pubkey(public_key_, channel);
     send_relinkeys(relin_keys_, channel);
@@ -372,11 +375,10 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
     const std::vector<int> &table_to_input_map,
     std::vector<Item> &items)
 {
-
+    StopwatchScope str_decrypt_scope(recv_stop_watch, "Receiver::stream_decrypt");
     std::pair<std::vector<bool>, Matrix<u8>> ret;
     auto& ret_bools = ret.first;
     auto& ret_labels = ret.second;
-
 
     ret_bools.resize(items.size(), false);
 
@@ -385,108 +387,123 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
         ret_labels.resize(items.size(), params_.get_label_byte_count());
     }
 
-
     int num_of_splits = params_.split_count(),
         num_of_batches = params_.batch_count(),
         block_count = num_of_splits * num_of_batches,
         batch_size = slot_count_;
 
-    std::vector<std::pair<ResultPackage, future<void>>> recvPackages(block_count);
-    for (auto& pkg : recvPackages)
+    std::vector<std::pair<ResultPackage, future<void>>> recv_packages(block_count);
+    for (auto& pkg : recv_packages)
     {
         pkg.second = channel.async_receive(pkg.first);
     }
 
-    auto numThreads = thread_count_;
+    auto num_threads = thread_count_;
     Log::debug("Decrypting %i blocks(%ib x %is) with %i threads",
         block_count,
         num_of_batches,
         num_of_splits,
-        numThreads);
+        num_threads);
 
-    auto routine = [&](int t)
-    {
-        MemoryPoolHandle local_pool(MemoryPoolHandle::New());
-        Plaintext p(local_pool);
-        Ciphertext tmp(seal_context_, local_pool);
-        unique_ptr<FFieldArray> batch = make_unique<FFieldArray>(ex_batch_encoder_->create_array());
-        vector<uint64_t> integer_batch(batch_size);
-
-        bool has_result;
-        std::vector<char> has_label(batch_size);
-
-        bool first = true;
-
-        for (u64 i = t; i < recvPackages.size(); i += numThreads)
-        {
-            auto& pkg = recvPackages[i];
-
-            pkg.second.get();
-            auto base_idx = pkg.first.batch_idx * batch_size;
-
-            // recover the sym poly values 
-            has_result = false;
-            stringstream ss(pkg.first.data);
-            compressor_->compressed_load(ss, tmp);
-
-            if (first && t == 0)
-            {
-                first = false;
-                Log::debug("Noise budget: %i bits", decryptor_->invariant_noise_budget(tmp, local_pool));
-                recv_stop_watch.set_time_point("receiver recv-start");
-            }
-
-            decryptor_->decrypt(tmp, p, local_pool);
-            ex_batch_encoder_->decompose(p, *batch);
-
-            for (int k = 0; k < integer_batch.size(); k++)
-            {
-                auto &is_zero = has_label[k];
-                auto idx = table_to_input_map[base_idx + k];
-
-                is_zero = batch->is_zero(k);
-
-                if (is_zero)
-                {
-                    has_result = true;
-                    ret_bools[idx] = true;
-                }
-            }
-
-            if (has_result && params_.get_label_bit_count())
-            {
-                std::stringstream ss(pkg.first.label_data);
-
-                compressor_->compressed_load(ss, tmp);
-
-                decryptor_->decrypt(tmp, p, local_pool);
-
-                // make sure its the right size. decrypt will shorted when there are zero coeffs at the top.
-                p.resize(static_cast<i32>(ex_batch_encoder_->n()));
-
-                ex_batch_encoder_->decompose(p, *batch);
-
-                for (int k = 0; k < integer_batch.size(); k++)
-                {
-                    if (has_label[k])
-                    {
-                        auto idx = table_to_input_map[base_idx + k];
-                        batch->get(k).decode(ret_labels[idx], params_.get_label_bit_count());
-                    }
-                }
-            }
-        }
-    };
-
-    std::vector<std::thread> thrds(numThreads - 1);
+    std::vector<std::thread> thrds(num_threads);
     for (u64 t = 0; t < thrds.size(); ++t)
     {
-        thrds[t] = std::thread(routine, static_cast<int>(t));
+        thrds[t] = std::thread([&]()
+        {
+            stream_decrypt_worker(
+                static_cast<int>(t),
+                batch_size,
+                thread_count_,
+                recv_packages,
+                table_to_input_map,
+                ret_bools,
+                ret_labels);
+        });
     }
 
-    routine(numThreads - 1);
     for (auto& thrd : thrds)
         thrd.join();
 
     return std::move(ret);
+}
+
+void Receiver::stream_decrypt_worker(
+    int thread_idx,
+    int batch_size,
+    int num_threads,
+    vector<pair<ResultPackage, future<void>>>& recv_packages,
+    const vector<int> &table_to_input_map,
+    vector<bool>& ret_bools,
+    Matrix<u8>& ret_labels)
+{
+    StopwatchScope recv_str_decr_wkr_scope(recv_stop_watch, "Receiver::stream_decrypt_worker");
+    MemoryPoolHandle local_pool(MemoryPoolHandle::New());
+    Plaintext p(local_pool);
+    Ciphertext tmp(seal_context_, local_pool);
+    unique_ptr<FFieldArray> batch = make_unique<FFieldArray>(ex_batch_encoder_->create_array());
+    vector<uint64_t> integer_batch(batch_size);
+
+    bool has_result;
+    std::vector<char> has_label(batch_size);
+
+    bool first = true;
+
+    for (u64 i = thread_idx; i < recv_packages.size(); i += num_threads)
+    {
+        auto& pkg = recv_packages[i];
+
+        pkg.second.get();
+        auto base_idx = pkg.first.batch_idx * batch_size;
+
+        // recover the sym poly values 
+        has_result = false;
+        stringstream ss(pkg.first.data);
+        compressor_->compressed_load(ss, tmp);
+
+        if (first && thread_idx == 0)
+        {
+            first = false;
+            Log::debug("Noise budget: %i bits", decryptor_->invariant_noise_budget(tmp, local_pool));
+        }
+
+        decryptor_->decrypt(tmp, p, local_pool);
+        ex_batch_encoder_->decompose(p, *batch);
+
+        for (int k = 0; k < integer_batch.size(); k++)
+        {
+            auto &is_zero = has_label[k];
+            auto idx = table_to_input_map[base_idx + k];
+
+            is_zero = batch->is_zero(k);
+
+            if (is_zero)
+            {
+                has_result = true;
+                ret_bools[idx] = true;
+            }
+        }
+
+        if (has_result && params_.get_label_bit_count())
+        {
+            std::stringstream ss(pkg.first.label_data);
+
+            compressor_->compressed_load(ss, tmp);
+
+            decryptor_->decrypt(tmp, p, local_pool);
+
+            // make sure its the right size. decrypt will shorted when there are zero coeffs at the top.
+            p.resize(static_cast<i32>(ex_batch_encoder_->n()));
+
+            ex_batch_encoder_->decompose(p, *batch);
+
+            for (int k = 0; k < integer_batch.size(); k++)
+            {
+                if (has_label[k])
+                {
+                    auto idx = table_to_input_map[base_idx + k];
+                    batch->get(k).decode(ret_labels[idx], params_.get_label_bit_count());
+                }
+            }
+        }
+    }
 }
