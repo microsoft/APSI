@@ -54,7 +54,7 @@ Receiver::Receiver(const PSIParams &params, int thread_count, const MemoryPoolHa
 
 void Receiver::initialize()
 {
-    StopwatchScope init_receiver(recv_stop_watch, "recv_init");
+    StopwatchScope init_receiver(recv_stop_watch, "Receiver::initialize");
     Log::info("Initializing Receiver");
 
     seal_context_ = SEALContext::Create(params_.encryption_params());
@@ -99,7 +99,6 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Ch
     /* Receive results in a streaming fashion. */
     auto intersection = stream_decrypt(chl, table_to_input_map, items);
 
-    recv_stop_watch.set_time_point("receiver intersect");
     Log::info("Receiver completed query");
 
     return intersection;

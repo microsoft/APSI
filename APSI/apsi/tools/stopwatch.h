@@ -85,10 +85,6 @@ namespace apsi
             };
 
             const static time_unit start_time;
-            std::list< std::pair<time_unit, std::string> > time_points;
-            const time_unit &set_time_point(const std::string &message);
-
-            friend std::ostream &operator <<(std::ostream &out, const Stopwatch &stopwatch);
 
             /**
             Add a single time event

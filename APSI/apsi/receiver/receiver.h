@@ -112,6 +112,9 @@ namespace apsi
                 const std::vector<int>& table_to_input_map,
                 std::vector<Item>& items);
 
+            /**
+            Work to be done in a single thread for stream_decrypt
+            */
             void stream_decrypt_worker(
                 int thread_idx,
                 int batch_size,

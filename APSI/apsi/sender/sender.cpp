@@ -110,7 +110,7 @@ void Sender::load_db(const vector<Item> &data, MatrixView<u8> vals)
 
 void Sender::offline_compute()
 {
-    StopwatchScope offline_compute_scope(sender_stop_watch, "offline_compute");
+    StopwatchScope offline_compute_scope(sender_stop_watch, "Sender::offline_compute");
     Log::info("Offline compute started");
 
     vector<thread> thread_pool(total_thread_count_);
@@ -142,7 +142,7 @@ void Sender::offline_compute()
 
 void Sender::offline_compute_work()
 {
-    StopwatchScope worker_scope(sender_stop_watch, "offline_compute_worker");
+    StopwatchScope worker_scope(sender_stop_watch, "Sender::offline_compute_work");
 
     int thread_context_idx = acquire_thread_context();
 
@@ -161,13 +161,13 @@ void Sender::offline_compute_work()
     }
 
     {
-        StopwatchScope symmpoly_scope(sender_stop_watch, "calc_symmpoly");
+        StopwatchScope symmpoly_scope(sender_stop_watch, "Sender::offline_compute_work::calc_symmpoly");
         sender_db_->batched_randomized_symmetric_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
     }
 
     if (params_.get_label_bit_count())
     {
-        StopwatchScope interp_scope(sender_stop_watch, "calc_interpolation");
+        StopwatchScope interp_scope(sender_stop_watch, "Sender::offline_compute_work::calc_interpolation");
         sender_db_->batched_interpolate_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
     }
 
@@ -210,12 +210,14 @@ void Sender::handshake(Channel& chl)
 
 void Sender::query_session(Channel &chl)
 {
+    StopwatchScope sndr_query_sess_scope(sender_stop_watch, "Sender::query_session");
     handshake(chl);
     Log::info("Starting session");
 
     // Send the EC point when using OPRF
     if (params_.use_oprf())
     {
+        StopwatchScope sndr_oprf_preproc(sender_stop_watch, "Sender::query_session::OPRF");
         Log::info("Starting OPRF query pre-processing");
 
         vector<u8> buff;
@@ -373,7 +375,7 @@ void Sender::respond(
     SenderSessionContext &session_context,
     Channel &channel)
 {
-    StopwatchScope respond_scope(sender_stop_watch, "sender_respond");
+    StopwatchScope respond_scope(sender_stop_watch, "Sender::respond");
 
     auto batch_count = params_.batch_count();
     int split_size_plus_one = params_.split_size() + 1;
@@ -437,7 +439,7 @@ void Sender::respond_work(
     atomic<int>& remaining_batches,
     Channel& channel)
 {
-    StopwatchScope respond_work_scope(sender_stop_watch, "respond_worker");
+    StopwatchScope respond_work_scope(sender_stop_watch, "Sender::respond_work");
 
     /* Multiple client sessions can enter this function to compete for thread context resources. */
     int thread_context_idx = acquire_thread_context();
@@ -509,7 +511,7 @@ void Sender::respond_work(
         {
             if (block.batched_label_coeffs_.size() > 1)
             {
-                StopwatchScope online_interp_scope(sender_stop_watch, "online_interpolate");
+                StopwatchScope online_interp_scope(sender_stop_watch, "Sender::respond_work::online_interpolate");
 
                 // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
                 // Observe that the first call to mult is always multiplying coeff[0] by 1....
