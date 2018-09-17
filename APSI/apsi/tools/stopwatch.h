@@ -6,6 +6,7 @@
 #include <chrono>
 #include <ostream>
 #include <mutex>
+#include <vector>
 
 // APSI
 #include "apsi/apsidefines.h"
