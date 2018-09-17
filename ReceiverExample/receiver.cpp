@@ -131,7 +131,6 @@ std::string print(gsl::span<u8> s)
 void example_slow_batching(const CLP& cmd)
 {
     print_example_banner("Example: Slow batching");
-    sender_stop_watch.time_points.clear();
 
     // Connect the network
     zmqpp::context_t context;
@@ -196,14 +195,14 @@ void example_slow_batching(const CLP& cmd)
     for (int i = 0; i < (recversActualSize - intersectionSize); ++i)
         c1.emplace_back(i + s1.size());
 
-    sender_stop_watch.set_time_point("Application preparation done");
     sender.load_db(s1, labels);
 
     auto thrd = thread([&]() {
         sender.query_session(sendChl); 
     });
-    recv_stop_watch.set_time_point("receiver start");
+    recv_stop_watch.add_event("receiver start");
     auto intersection = receiver.query(c1, recvChl);
+    recv_stop_watch.add_event("receiver done");
     thrd.join();
 
     // Done with everything. Print the results!

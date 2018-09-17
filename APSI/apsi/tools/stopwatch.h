@@ -89,7 +89,7 @@ namespace apsi
             /**
             Add a single time event
             */
-            void add_event(const std::string& name, const time_unit& start);
+            void add_event(const std::string& name);
 
             /**
             Add a time event with beginning and end

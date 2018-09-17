@@ -15,10 +15,10 @@ using namespace apsi::tools;
 
 const Stopwatch::time_unit Stopwatch::start_time(Stopwatch::time_unit::clock::now());
 
-void Stopwatch::add_event(const string& name, const time_unit& start)
+void Stopwatch::add_event(const string& name)
 {
     unique_lock<mutex> events_lock(events_mtx_);
-    events_.emplace_back(name, start);
+    events_.emplace_back(name, time_unit::clock::now());
 }
 
 void Stopwatch::add_timespan_event(const string& name, const time_unit& start, const time_unit& end)
