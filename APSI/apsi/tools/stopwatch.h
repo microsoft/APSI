@@ -7,6 +7,9 @@
 #include <ostream>
 #include <mutex>
 
+// APSI
+#include "apsi/apsidefines.h"
+
 
 namespace apsi
 {
@@ -22,7 +25,7 @@ namespace apsi
 
         private:
             /**
-            Represents a measurable event
+            Represents a time event
             */
             class StopwatchEvent
             {
@@ -41,7 +44,7 @@ namespace apsi
             };
 
             /**
-            Represents a measurable event with beginning and end
+            Represents a time event with beginning and end
             */
             class StopwatchBeginEndEvent : public StopwatchEvent
             {
@@ -51,11 +54,35 @@ namespace apsi
                     : StopwatchEvent(name, start), end_(end)
                 {}
 
+                const time_unit& end() const { return end_; }
+
             private:
                 time_unit end_;
             };
 
         public:
+            /**
+            Structure used to accumulate data about timespan timing events
+            */
+            struct TimespanSummary
+            {
+                std::string event_name;
+                int event_count;
+                double avg;
+                apsi::u64 sum;
+                apsi::u64 min;
+                apsi::u64 max;
+            };
+
+            /**
+            Structure used to report single events
+            */
+            struct Timepoint
+            {
+                std::string event_name;
+                time_unit time_point;
+            };
+
             const static time_unit start_time;
             std::list< std::pair<time_unit, std::string> > time_points;
             const time_unit &set_time_point(const std::string &message);
@@ -72,6 +99,16 @@ namespace apsi
             */
             void add_timespan_event(const std::string& name, const time_unit& start, const time_unit& end);
 
+            /**
+            Get the timespan timings we have stored at the moment.
+            */
+            void get_timespans(std::vector<TimespanSummary>& timespans);
+
+            /**
+            Get the single event timings we have stored at the moment.
+            */
+            void get_events(std::vector<Timepoint>& events);
+
         private:
             // Single events
             std::list<StopwatchEvent> events_;
@@ -85,7 +122,7 @@ namespace apsi
         /**
         Class used to time a scope.
         
-        Simply create a variable of this type in the scope that you want to measure.
+        Simply declare a variable of this type in the scope that you want to measure.
         */
         class StopwatchScope
         {

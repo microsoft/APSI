@@ -179,3 +179,42 @@ const apsi::PSIParams apsi::tools::build_psi_params(const BaseCLP& cmd)
 
     return params;
 }
+
+void apsi::tools::generate_timespan_report(vector<string>& report, const vector<Stopwatch::TimespanSummary>& timespans)
+{
+    report.clear();
+
+    for (const auto& timespan : timespans)
+    {
+        stringstream ss;
+        ss << "Event '" << timespan.event_name << "': " << timespan.event_count << " instances. ";
+        if (timespan.event_count == 1)
+        {
+            ss << "Duration: " << timespan.sum << "ms.";
+        }
+        else
+        {
+            ss << "Average:  " << timespan.avg << "ms. Minimum: " << timespan.min << "ms. Maximum: " << timespan.max << "ms.";
+        }
+
+        report.push_back(ss.str());
+    }
+}
+
+void apsi::tools::generate_event_report(vector<string>& report, const vector<Stopwatch::Timepoint>& timepoints)
+{
+    report.clear();
+
+    Stopwatch::time_unit last = Stopwatch::start_time;
+
+    for (const auto& timepoint : timepoints)
+    {
+        stringstream ss;
+        i64 since_start = chrono::duration_cast<chrono::milliseconds>(timepoint.time_point - Stopwatch::start_time).count();
+        i64 since_last = chrono::duration_cast<chrono::milliseconds>(timepoint.time_point - last).count();
+
+        ss << "Event '" << timepoint.event_name << "': " << since_start << "ms since start, " << since_last << "ms since last single event.";
+        last = timepoint.time_point;
+        report.push_back(ss.str());
+    }
+}

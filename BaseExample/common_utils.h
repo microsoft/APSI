@@ -2,6 +2,11 @@
 
 // STD
 #include <string>
+#include <vector>
+
+// APSI
+#include "apsi/tools/stopwatch.h"
+
 
 namespace apsi
 {
@@ -24,5 +29,15 @@ namespace apsi
         Get a PSIParams object from a command line.
         */
         const PSIParams build_psi_params(const BaseCLP& cmd);
+
+        /**
+        Generate timing report for timespans
+        */
+        void generate_timespan_report(std::vector<std::string>& report, const std::vector<apsi::tools::Stopwatch::TimespanSummary>& timespans);
+
+        /**
+        Generate timing report for single events
+        */
+        void generate_event_report(std::vector<std::string>& report, const std::vector<apsi::tools::Stopwatch::Timepoint>& timepoints);
     }
 }
