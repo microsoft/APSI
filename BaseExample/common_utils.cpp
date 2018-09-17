@@ -180,40 +180,49 @@ const apsi::PSIParams apsi::tools::build_psi_params(const BaseCLP& cmd)
     return params;
 }
 
-void apsi::tools::generate_timespan_report(vector<string>& report, const vector<Stopwatch::TimespanSummary>& timespans)
+void apsi::tools::generate_timespan_report(vector<string>& report, const vector<Stopwatch::TimespanSummary>& timespans, int max_name_length)
 {
     report.clear();
+
+    int name_col_width = max_name_length + 3;
 
     for (const auto& timespan : timespans)
     {
         stringstream ss;
-        ss << "Event '" << timespan.event_name << "': " << timespan.event_count << " instances. ";
+        stringstream tsname;
+        tsname << "'" << timespan.event_name << "'";
+
+        ss << setw(name_col_width) << left << tsname.str() << ": " << setw(5) << right << timespan.event_count << " instances. ";
         if (timespan.event_count == 1)
         {
-            ss << "Duration: " << timespan.sum << "ms.";
+            ss << "Duration: " << setw(6) << right << timespan.sum << "ms";
         }
         else
         {
-            ss << "Average:  " << timespan.avg << "ms. Minimum: " << timespan.min << "ms. Maximum: " << timespan.max << "ms.";
+            ss << "Average:  " << setw(6) << right << static_cast<int>(timespan.avg) << "ms Minimum: " << setw(6) << right << timespan.min << "ms Maximum: " << setw(6) << right << timespan.max << "ms";
         }
 
         report.push_back(ss.str());
     }
 }
 
-void apsi::tools::generate_event_report(vector<string>& report, const vector<Stopwatch::Timepoint>& timepoints)
+void apsi::tools::generate_event_report(vector<string>& report, const vector<Stopwatch::Timepoint>& timepoints, int max_name_length)
 {
     report.clear();
 
     Stopwatch::time_unit last = Stopwatch::start_time;
+    int name_col_width = max_name_length + 3;
 
     for (const auto& timepoint : timepoints)
     {
         stringstream ss;
+        stringstream evname;
+        evname << "'" << timepoint.event_name << "'";
+
         i64 since_start = chrono::duration_cast<chrono::milliseconds>(timepoint.time_point - Stopwatch::start_time).count();
         i64 since_last = chrono::duration_cast<chrono::milliseconds>(timepoint.time_point - last).count();
 
-        ss << "Event '" << timepoint.event_name << "': " << since_start << "ms since start, " << since_last << "ms since last single event.";
+        ss << setw(name_col_width) << left << evname.str() << ": " << setw(6) << right << since_start << "ms since start, " << setw(6) << right << since_last << "ms since last single event.";
         last = timepoint.time_point;
         report.push_back(ss.str());
     }

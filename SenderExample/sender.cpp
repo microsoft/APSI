@@ -54,7 +54,7 @@ void sigint_handler(int param)
 
     if (timings.size() > 0)
     {
-        generate_timespan_report(timing_report, timings);
+        generate_timespan_report(timing_report, timings, sender_stop_watch.get_max_timespan_event_name_length());
 
         Log::info("Timespan event information");
         for (const auto& timing : timing_report)
@@ -68,7 +68,7 @@ void sigint_handler(int param)
 
     if (timepoints.size() > 0)
     {
-        generate_event_report(timing_report, timepoints);
+        generate_event_report(timing_report, timepoints, sender_stop_watch.get_max_event_name_length());
 
         Log::info("Single event information");
         for (const auto& timing : timing_report)

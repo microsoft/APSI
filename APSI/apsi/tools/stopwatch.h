@@ -84,6 +84,17 @@ namespace apsi
                 time_unit time_point;
             };
 
+            /**
+            Default constructor
+            */
+            Stopwatch()
+                : max_event_name_length_(0),
+                  max_timespan_event_name_length_(0)
+            {}
+
+            /**
+            Used as a reference point for single events
+            */
             const static time_unit start_time;
 
             /**
@@ -106,6 +117,16 @@ namespace apsi
             */
             void get_events(std::vector<Timepoint>& events);
 
+            /**
+            Get the length of the longest single event name
+            */
+            int get_max_event_name_length() const { return max_event_name_length_; }
+
+            /**
+            Get the length of the longest timespan event name
+            */
+            int get_max_timespan_event_name_length() const { return max_timespan_event_name_length_; }
+
         private:
             // Single events
             std::list<StopwatchEvent> events_;
@@ -114,6 +135,10 @@ namespace apsi
             // Events that have a beginning and end
             std::list<StopwatchBeginEndEvent> timespan_events_;
             std::mutex timespan_events_mtx_;
+
+            // Useful for generating reports
+            int max_event_name_length_;
+            int max_timespan_event_name_length_;
         };
 
         /**

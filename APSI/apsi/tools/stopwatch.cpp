@@ -19,12 +19,22 @@ void Stopwatch::add_event(const string& name)
 {
     unique_lock<mutex> events_lock(events_mtx_);
     events_.emplace_back(name, time_unit::clock::now());
+
+    if (name.length() > max_event_name_length_)
+    {
+        max_event_name_length_ = static_cast<int>(name.length());
+    }
 }
 
 void Stopwatch::add_timespan_event(const string& name, const time_unit& start, const time_unit& end)
 {
     unique_lock<mutex> timespan_events_lock(timespan_events_mtx_);
     timespan_events_.emplace_back(name, start, end);
+
+    if (name.length() > max_timespan_event_name_length_)
+    {
+        max_timespan_event_name_length_ = static_cast<int>(name.length());
+    }
 }
 
 

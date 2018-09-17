@@ -312,7 +312,7 @@ void print_timing_info(Stopwatch& stopwatch, const string& caption)
 
     if (timings.size() > 0)
     {
-        generate_timespan_report(timing_report, timings);
+        generate_timespan_report(timing_report, timings, stopwatch.get_max_timespan_event_name_length());
 
         Log::info("Timespan event information");
         for (const auto& timing : timing_report)
@@ -324,7 +324,7 @@ void print_timing_info(Stopwatch& stopwatch, const string& caption)
 
     if (timepoints.size() > 0)
     {
-        generate_event_report(timing_report, timepoints);
+        generate_event_report(timing_report, timepoints, stopwatch.get_max_event_name_length());
 
         Log::info("Single event information");
         for (const auto& timing : timing_report)
