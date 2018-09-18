@@ -22,6 +22,8 @@ namespace apsi
         */
         class Stopwatch
         {
+            friend class StopwatchScope;
+
         public:
             typedef std::chrono::high_resolution_clock::time_point time_unit;
 
@@ -65,11 +67,6 @@ namespace apsi
             void add_event(const std::string& name);
 
             /**
-            Add a time event with beginning and end
-            */
-            void add_timespan_event(const std::string& name, const time_unit& start, const time_unit& end);
-
-            /**
             Get the timespan timings we have stored at the moment.
             */
             void get_timespans(std::vector<TimespanSummary>& timespans);
@@ -101,6 +98,11 @@ namespace apsi
             // Useful for generating reports
             int max_event_name_length_;
             int max_timespan_event_name_length_;
+
+            /**
+            Add a time event with beginning and end
+            */
+            void add_timespan_event(const std::string& name, const time_unit& start, const time_unit& end);
         };
 
         /**
