@@ -1,6 +1,7 @@
 #include "stopwatch_tests.h"
 #include "apsi/tools/stopwatch.h"
 #include <algorithm>
+#include <thread>
 
 
 using namespace std;
@@ -119,32 +120,26 @@ void StopwatchTests::stopwatch_multithreading_test()
     vector<thread> threads(30);
     for (int i = 0; i < threads.size(); i++)
     {
-        threads[i] = thread([&]()
+        threads[i] = thread([&](int idx)
         {
             string thr_name;
-            get_thread_name(i, thr_name);
+            get_thread_name(idx, thr_name);
 
             {
                 StopwatchScope sw1(sw, thr_name);
-
-                int millis = (std::rand() * 20 / RAND_MAX);
-                this_thread::sleep_for(chrono::milliseconds(millis));
+                this_thread::sleep_for(15ms);
             }
 
             {
                 StopwatchScope sw2(sw, thr_name);
-
-                int millis = (std::rand() * 20 / RAND_MAX);
-                this_thread::sleep_for(chrono::milliseconds(millis));
+                this_thread::sleep_for(15ms);
             }
 
             {
                 StopwatchScope sw3(sw, thr_name);
-
-                int millis = (std::rand() * 20 / RAND_MAX);
-                this_thread::sleep_for(chrono::milliseconds(millis));
+                this_thread::sleep_for(15ms);
             }
-        });
+        }, i);
     }
 
     for (auto& thr : threads)
