@@ -15,7 +15,7 @@ const Stopwatch::time_unit Stopwatch::start_time(Stopwatch::time_unit::clock::no
 void Stopwatch::add_event(const string& name)
 {
     unique_lock<mutex> events_lock(events_mtx_);
-    events_.emplace_back(name, time_unit::clock::now());
+    events_.push_back(Timepoint { name, time_unit::clock::now() });
 
     if (name.length() > max_event_name_length_)
     {
@@ -83,8 +83,7 @@ void Stopwatch::get_events(vector<Timepoint>& events)
     events.clear();
     for (const auto& evt : events_)
     {
-        Timepoint timept = { evt.name(), evt.start() };
-        events.push_back(timept);
+        events.push_back(evt);
     }
 }
 

@@ -25,44 +25,6 @@ namespace apsi
         public:
             typedef std::chrono::high_resolution_clock::time_point time_unit;
 
-        private:
-            /**
-            Represents a time event
-            */
-            class StopwatchEvent
-            {
-            public:
-                StopwatchEvent() = delete;
-                StopwatchEvent(const std::string& name, const time_unit& start)
-                    : name_(name), start_(start)
-                {}
-
-                const std::string& name() const { return name_; }
-                const time_unit& start() const { return start_; }
-
-            private:
-                std::string name_;
-                time_unit start_;
-            };
-
-            /**
-            Represents a time event with beginning and end
-            */
-            class StopwatchBeginEndEvent : public StopwatchEvent
-            {
-            public:
-                StopwatchBeginEndEvent() = delete;
-                StopwatchBeginEndEvent(const std::string& name, const time_unit& start, const time_unit& end)
-                    : StopwatchEvent(name, start), end_(end)
-                {}
-
-                const time_unit& end() const { return end_; }
-
-            private:
-                time_unit end_;
-            };
-
-        public:
             /**
             Structure used to accumulate data about timespan timing events
             */
@@ -129,7 +91,7 @@ namespace apsi
 
         private:
             // Single events
-            std::list<StopwatchEvent> events_;
+            std::list<Timepoint> events_;
             std::mutex events_mtx_;
 
             // Events that have a beginning and end
