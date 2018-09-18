@@ -189,10 +189,7 @@ void apsi::tools::generate_timespan_report(vector<string>& report, const vector<
     for (const auto& timespan : timespans)
     {
         stringstream ss;
-        stringstream tsname;
-        tsname << "'" << timespan.event_name << "'";
-
-        ss << setw(name_col_width) << left << tsname.str() << ": " << setw(5) << right << timespan.event_count << " instances. ";
+        ss << setw(max_name_length) << left << timespan.event_name << ": " << setw(5) << right << timespan.event_count << " instances. ";
         if (timespan.event_count == 1)
         {
             ss << "Duration: " << setw(6) << right << timespan.sum << "ms";
@@ -216,13 +213,11 @@ void apsi::tools::generate_event_report(vector<string>& report, const vector<Sto
     for (const auto& timepoint : timepoints)
     {
         stringstream ss;
-        stringstream evname;
-        evname << "'" << timepoint.event_name << "'";
 
         i64 since_start = chrono::duration_cast<chrono::milliseconds>(timepoint.time_point - Stopwatch::start_time).count();
         i64 since_last = chrono::duration_cast<chrono::milliseconds>(timepoint.time_point - last).count();
 
-        ss << setw(name_col_width) << left << evname.str() << ": " << setw(6) << right << since_start << "ms since start, " << setw(6) << right << since_last << "ms since last single event.";
+        ss << setw(max_name_length) << left << timepoint.event_name << ": " << setw(6) << right << since_start << "ms since start, " << setw(6) << right << since_last << "ms since last single event.";
         last = timepoint.time_point;
         report.push_back(ss.str());
     }
