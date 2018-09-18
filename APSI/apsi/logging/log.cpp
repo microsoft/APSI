@@ -36,9 +36,11 @@ namespace
 
     Logger logger_ = Logger::getInstance("APSI");
 
+#ifndef _MSC_VER
 // auto_ptr shows a warning in GCC.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
     
     void configure()
     {
@@ -52,7 +54,9 @@ namespace
         configured_ = true;
     }
 
+#ifndef _MSC_VER
 #pragma GCC diagnostic pop
+#endif
 
     Logger& instance()
     {
