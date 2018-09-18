@@ -106,6 +106,7 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Ch
 
 void Receiver::handshake(Channel& chl)
 {
+    StopwatchScope rcvr_hndshk_scope(recv_stop_watch, "Receiver::handshake");
     Log::info("Initial handshake");
 
     int receiver_version = 1;

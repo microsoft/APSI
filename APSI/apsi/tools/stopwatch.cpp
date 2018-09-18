@@ -1,8 +1,5 @@
 // STD
 #include <cstdint>
-#include <algorithm>
-#include <iomanip>
-#include <map>
 #include <sstream>
 
 // APSI
@@ -29,58 +26,53 @@ void Stopwatch::add_event(const string& name)
 void Stopwatch::add_timespan_event(const string& name, const time_unit& start, const time_unit& end)
 {
     unique_lock<mutex> timespan_events_lock(timespan_events_mtx_);
-    timespan_events_.emplace_back(name, start, end);
+    u64 duration = static_cast<u64>(chrono::duration_cast<chrono::milliseconds>(end - start).count());
+    auto timespan_evt = timespan_events_.find(name);
 
-    if (name.length() > max_timespan_event_name_length_)
+    if (timespan_evt == timespan_events_.end())
     {
-        max_timespan_event_name_length_ = static_cast<int>(name.length());
+        // Insert new
+        TimespanSummary summ = {
+            /* name */ name,
+            /* count */ 1,
+            /* average */ static_cast<double>(duration),
+            /* min */ duration,
+            /* max */ duration
+        };
+
+        timespan_events_.insert_or_assign(name, summ);
+
+        if (name.length() > max_timespan_event_name_length_)
+        {
+            max_timespan_event_name_length_ = static_cast<int>(name.length());
+        }
+    }
+    else
+    {
+        // Update existing
+        timespan_evt->second.event_count++;
+        timespan_evt->second.avg = (timespan_evt->second.avg * (timespan_evt->second.event_count - 1) + duration) / timespan_evt->second.event_count;
+
+        if (timespan_evt->second.min > duration)
+        {
+            timespan_evt->second.min = duration;
+        }
+
+        if (timespan_evt->second.max < duration)
+        {
+            timespan_evt->second.max = duration;
+        }
     }
 }
 
-
 void Stopwatch::get_timespans(vector<TimespanSummary>& timespans)
 {
-    map<string, TimespanSummary> evts;
     unique_lock<mutex> timespan_events_lock(timespan_events_mtx_);
 
-    for (const auto& evt : timespan_events_)
-    {
-        auto evtcalc = evts.find(evt.name());
-        u64 duration = static_cast<u64>(chrono::duration_cast<chrono::milliseconds>(evt.end() - evt.start()).count());
-        if (evtcalc == evts.end())
-        {
-            // Insert new
-            TimespanSummary summ = {/* name */ evt.name(),
-                                    /* count */ 1,
-                                    /* average */ static_cast<double>(duration),
-                                    /* sum */ duration,
-                                    /* min */ duration,
-                                    /* max */ duration };
-            evts.insert_or_assign(evt.name(), summ);
-        }
-        else
-        {
-            // Update existing
-            evtcalc->second.event_count++;
-            evtcalc->second.sum += duration;
-            evtcalc->second.avg = static_cast<double>(evtcalc->second.sum) / evtcalc->second.event_count;
-
-            if (evtcalc->second.min > duration)
-            {
-                evtcalc->second.min = duration;
-            }
-
-            if (evtcalc->second.max < duration)
-            {
-                evtcalc->second.max = duration;
-            }
-        }
-    }
-
     timespans.clear();
-    for (const auto& evtsumm : evts)
+    for (const auto& timespan_evt : timespan_events_)
     {
-        timespans.push_back(evtsumm.second);
+        timespans.push_back(timespan_evt.second);
     }
 }
 

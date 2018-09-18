@@ -210,9 +210,10 @@ void Sender::handshake(Channel& chl)
 
 void Sender::query_session(Channel &chl)
 {
-    StopwatchScope sndr_query_sess_scope(sender_stop_watch, "Sender::query_session");
     handshake(chl);
+
     Log::info("Starting session");
+    StopwatchScope sndr_query_sess_scope(sender_stop_watch, "Sender::query_session");
 
     // Send the EC point when using OPRF
     if (params_.use_oprf())

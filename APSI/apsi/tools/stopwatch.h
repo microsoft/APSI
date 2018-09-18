@@ -7,6 +7,7 @@
 #include <ostream>
 #include <mutex>
 #include <vector>
+#include <map>
 
 // APSI
 #include "apsi/apsidefines.h"
@@ -70,7 +71,6 @@ namespace apsi
                 std::string event_name;
                 int event_count;
                 double avg;
-                apsi::u64 sum;
                 apsi::u64 min;
                 apsi::u64 max;
             };
@@ -133,7 +133,7 @@ namespace apsi
             std::mutex events_mtx_;
 
             // Events that have a beginning and end
-            std::list<StopwatchBeginEndEvent> timespan_events_;
+            std::map<std::string, TimespanSummary> timespan_events_;
             std::mutex timespan_events_mtx_;
 
             // Useful for generating reports

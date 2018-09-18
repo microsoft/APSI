@@ -192,7 +192,7 @@ void apsi::tools::generate_timespan_report(vector<string>& report, const vector<
         ss << setw(max_name_length) << left << timespan.event_name << ": " << setw(5) << right << timespan.event_count << " instances. ";
         if (timespan.event_count == 1)
         {
-            ss << "Duration: " << setw(6) << right << timespan.sum << "ms";
+            ss << "Duration: " << setw(6) << right << static_cast<int>(timespan.avg) << "ms";
         }
         else
         {
