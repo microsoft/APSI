@@ -99,6 +99,25 @@ namespace apsi
 
         const auto& get_value() const { return value_; }
 
+        /**
+        Parse the current item from a string.
+
+        The parser supports only base 10 and base 16 strings.
+        When parsing a base 16 string, do _not_ include a preceding '0x'.
+        */
+        void parse(const std::string& input, int base);
+
+        /**
+        Parse the current item from a string.
+
+        If the string starts with '0x', it will be considered hexadecimal.
+        Otherwise it will be considered base 10.
+        */
+        void parse(const std::string& input);
+
+    private:
         std::array<std::uint64_t, 2> value_;
+
+        u32 muladd(u32 item[4], int mul, int add);
     };
 }

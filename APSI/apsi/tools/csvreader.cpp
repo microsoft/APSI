@@ -1,5 +1,6 @@
 // STD
 #include <fstream>
+#include <cctype>
 
 #if _MSC_VER || (__GNUC__ >= 8)
 #include <filesystem>
@@ -49,7 +50,7 @@ void CSVReader::read(std::istream& stream, std::vector<Item>& items, Matrix<u8>&
         labels.resize(temp_labels.size(), label_byte_count);
         for (u64 i = 0; i < temp_labels.size(); i++)
         {
-            memcpy(labels[i].data(), &temp_labels[i].value_, label_byte_count);
+            memcpy(labels[i].data(), temp_labels[i].data(), label_byte_count);
         }
     }
 }
@@ -69,6 +70,9 @@ void CSVReader::process_line(string line, vector<Item>& items, vector<Item>& lab
     // First is the item
     getline(ss, token, ',');
 
+    // Trim leading whitespace
+    token.erase(token.begin(), std::find_if(token.begin(), token.end(), [](int ch) { return !std::isspace(ch); }));
+
     if (token.empty())
     {
         // Nothing found.
@@ -82,12 +86,18 @@ void CSVReader::process_line(string line, vector<Item>& items, vector<Item>& lab
     items.emplace_back(item);
 
     // Second is the label, if present
+    token.clear();
     getline(ss, token);
 
     if (!token.empty())
     {
         item[0] = std::stoull(token);
         item[1] = 0;
+        labels.emplace_back(item);
+    }
+    else
+    {
+        item = zero_block;
         labels.emplace_back(item);
     }
 }

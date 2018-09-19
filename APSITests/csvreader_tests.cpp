@@ -90,6 +90,89 @@ void CSVReaderTests::read_no_label_test()
     CPPUNIT_ASSERT_EQUAL((u64)0, items[3][1]);
 }
 
+void CSVReaderTests::read_extra_info_test()
+{
+    CSVReader reader;
+    stringstream ss("1,2,3,4,5\n6,7,8,9,10\n11,12,13");
+
+    vector<Item> items;
+    Matrix<u8> labels;
+    reader.read(ss, items, labels, /* label_byte_count */ 8);
+
+    CPPUNIT_ASSERT_EQUAL((size_t)3, items.size());
+    CPPUNIT_ASSERT_EQUAL((u64)3,    labels.rows());
+    CPPUNIT_ASSERT_EQUAL((u64)8,    labels.columns());
+
+    CPPUNIT_ASSERT_EQUAL((u64)1,  items[0][0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0,  items[0][1]);
+    CPPUNIT_ASSERT_EQUAL((u64)6,  items[1][0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0,  items[1][1]);
+    CPPUNIT_ASSERT_EQUAL((u64)11, items[2][0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0,  items[2][1]);
+
+    CPPUNIT_ASSERT_EQUAL((u8)2,  labels[0][0]);
+    CPPUNIT_ASSERT_EQUAL((u8)7,  labels[1][0]);
+    CPPUNIT_ASSERT_EQUAL((u8)12, labels[2][0]);
+
+    for (int r = 0; r < labels.rows(); r++)
+    {
+        // Other than column 0, the rest should be zero
+        for (int c = 1; c < labels.columns(); c++)
+        {
+            CPPUNIT_ASSERT_EQUAL((u8)0, labels[r][c]);
+        }
+    }
+}
+
+void CSVReaderTests::read_missing_info_test()
+{
+    CSVReader reader;
+    stringstream ss("1,2\n3,4\n5\n6,7\n8,9\n10\n11,12\n13");
+
+    vector<Item> items;
+    Matrix<u8> labels;
+    reader.read(ss, items, labels, /* label_byte_count */ 8);
+
+    CPPUNIT_ASSERT_EQUAL((size_t)8, items.size());
+    CPPUNIT_ASSERT_EQUAL((u64)8,    labels.rows());
+    CPPUNIT_ASSERT_EQUAL((u64)8,    labels.columns());
+
+    CPPUNIT_ASSERT_EQUAL((u64)1,  items[0][0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0,  items[0][1]);
+    CPPUNIT_ASSERT_EQUAL((u64)3,  items[1][0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0,  items[1][1]);
+    CPPUNIT_ASSERT_EQUAL((u64)5,  items[2][0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0,  items[2][1]);
+    CPPUNIT_ASSERT_EQUAL((u64)6,  items[3][0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0,  items[3][1]);
+    CPPUNIT_ASSERT_EQUAL((u64)8,  items[4][0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0,  items[4][1]);
+    CPPUNIT_ASSERT_EQUAL((u64)10, items[5][0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0,  items[5][1]);
+    CPPUNIT_ASSERT_EQUAL((u64)11, items[6][0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0,  items[6][1]);
+    CPPUNIT_ASSERT_EQUAL((u64)13, items[7][0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0,  items[7][1]);
+
+    CPPUNIT_ASSERT_EQUAL((u8)2,  labels[0][0]);
+    CPPUNIT_ASSERT_EQUAL((u8)4,  labels[1][0]);
+    CPPUNIT_ASSERT_EQUAL((u8)0,  labels[2][0]);
+    CPPUNIT_ASSERT_EQUAL((u8)7,  labels[3][0]);
+    CPPUNIT_ASSERT_EQUAL((u8)9,  labels[4][0]);
+    CPPUNIT_ASSERT_EQUAL((u8)0,  labels[5][0]);
+    CPPUNIT_ASSERT_EQUAL((u8)12, labels[6][0]);
+    CPPUNIT_ASSERT_EQUAL((u8)0,  labels[7][0]);
+
+    for (int r = 0; r < labels.rows(); r++)
+    {
+        // Other than column 0, the rest should be zero
+        for (int c = 1; c < labels.columns(); c++)
+        {
+            CPPUNIT_ASSERT_EQUAL((u8)0, labels[r][c]);
+        }
+    }
+}
+
 void CSVReaderTests::read_max_bits_test()
 {
     CSVReader reader;
