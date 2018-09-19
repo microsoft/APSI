@@ -1,79 +1,130 @@
-// #include "stdafx.h"
-// #include "CppUnitTest.h"
-// #include "psiparams.h"
-// #include "util/exfield.h"
-// #include "ciphertext.h"
-// #include <vector>
-// #include <map>
-// #include "item.h"
-// #include "cuckoo.h"
 #include "apsi/item.h"
-
 #include "item.h"
+#include "utils.h"
 
-// using namespace Microsoft::VisualStudio::CppUnitTestFramework;
+using namespace std;
 using namespace APSITests;
 using namespace apsi;
-using namespace seal::util;
-using namespace std;
-using namespace seal;
-using namespace cuckoo;
 
-void ItemTests::TestConstruction()
+void ItemTests::parse_test()
 {
-	//Item::set_item_bit_length(4);
-	//Item item(block(17));
+    // 128 bit string
+    string input = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
+    Item item;
 
-	// Assert::AreEqual(item[0], (uint64_t)1);
-	// Assert::AreEqual(item[1], (uint64_t)0);
+    item.parse(input, /* base */ 16);
+
+    CPPUNIT_ASSERT_EQUAL((u64)0xFFFFFFFFFFFFFFFF, item[0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0xFFFFFFFFFFFFFFFF, item[1]);
+
+    // One more nibble is out of range
+    input = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
+
+    ASSERT_THROWS(item.parse(input, /* base */ 16));
+
+    input = "80000000000000000000000000000001";
+    item.parse(input, /* base */ 16);
+
+    CPPUNIT_ASSERT_EQUAL((u64)0x8000000000000000, item[1]);
+    CPPUNIT_ASSERT_EQUAL((u64)0x0000000000000001, item[0]);
+
+    input = "FEDCBA9876543210";
+    item.parse(input, /* base */ 16);
+
+    CPPUNIT_ASSERT_EQUAL((u64)0xFEDCBA9876543210, item[0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0, item[1]);
+
+    input = "abcdef";
+    item.parse(input, /* base */ 16);
+
+    CPPUNIT_ASSERT_EQUAL((u64)0xABCDEF, item[0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0, item[1]);
+
+    input = "fedcba9876543210";
+    item.parse(input, /* base */ 16);
+
+    CPPUNIT_ASSERT_EQUAL((u64)0xFEDCBA9876543210, item[0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0, item[1]);
+
+    input = "12345";
+    item.parse(input, /* base */ 10);
+
+    CPPUNIT_ASSERT_EQUAL((u64)12345, item[0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0, item[1]);
+
+    input = "9223372036854775807";
+    item.parse(input, /* base */ 10);
+
+    CPPUNIT_ASSERT_EQUAL((u64)0x7FFFFFFFFFFFFFFF, item[0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0, item[1]);
+
+    input = "2361200000000000000000";
+    item.parse(input, /* base */ 10);
+
+    CPPUNIT_ASSERT_EQUAL((u64)0x003b89d384580000, item[0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0x80, item[1]);
 }
 
-void ItemTests::TestSplits()
+void ItemTests::parse_empty_test()
 {
-	// Item item;
-	// item[0] = 0x3850683f4a;
-	// item[1] = 0x238bc3df32;
+    string input = "";
+    Item item;
 
-	// Assert::AreEqual(item.item_part(0, 12), (uint64_t)0xf4a);
-	// Assert::AreEqual(item.item_part(3, 12), (uint64_t)0x3);
-	// Assert::AreEqual(item.item_part(5, 12), (uint64_t)0x320);
-	// Assert::AreEqual(item.item_part(7, 12), (uint64_t)0x8bc);
+    item.parse(input);
+
+    CPPUNIT_ASSERT_EQUAL((u64)0, item[0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0, item[1]);
 }
 
-void ItemTests::TestConversion()
+void ItemTests::parse_diff_base_test()
 {
-	// Item::set_reduced_bit_length(128);
-	// Item item;
-	// item[0] = 0x3850683f4a;
-	// item[1] = 0x238bc3df32;
+    Item item;
 
-	// shared_ptr<ExField> field = ExField::Acquire(0x1e01, string("1x^16 + 3e"));
+    // Base 8 not supported
+    ASSERT_THROWS(item.parse("12345", /* base */ 8));
 
-	// ExFieldElement e = item.to_exfield_element(field);
-
-	// ExFieldElement e_manual(field, "23x^8 + 8bcx^7 + 3dfx^6 + 320x^5 + 3x^3 + 850x^2 + 683x^1 + f4a");
-
-	// Assert::IsTrue(e == e_manual);
+    // Base 2 not supported
+    ASSERT_THROWS(item.parse("1010101010", /* base */ 2));
 }
 
-void ItemTests::TestPermutationHashing()
+void ItemTests::parse_non_regular_string_test()
 {
-	// Item item;
-	// item[0] = 0x238bc3df32U;
-	// item[1] = 0xbd23763850683f4aU;
+    Item item;
 
-	// PermutationBasedCuckoo cuckoo(3, 0, 12, 120, 1000);
+    item.parse("12345hello", /* base */ 10);
 
-	// Item new_item = item.itemL(cuckoo, 0);
+    // We should be able to parse until finding someting other than a number
+    CPPUNIT_ASSERT_EQUAL((u64)12345, item[0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0, item[1]);
 
-	// Assert::AreEqual(new_item[0], 0xf4a000000238bc3dU);
-	// Assert::AreEqual(new_item[1], (uint64_t)0x23763850683U);
+    item.parse("   45321   ", /* base */ 10);
 
-	// new_item = item.itemL(cuckoo, 1);
-	// Assert::AreEqual(new_item[0], 0xf4a000000238bc3dU);
-	// Assert::AreEqual(new_item[1], (uint64_t)0x123763850683U);
+    // Whitespace should be ignored
+    CPPUNIT_ASSERT_EQUAL((u64)45321, item[0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0, item[1]);
 
-	// new_item = item.itemL(cuckoo, 2);
-	// Assert::AreEqual(new_item[0], 0xf4a000000238bc3dU);
-	// Assert::AreEqual(new_item[1], (uint64_t)0x223763850683U);
+    item.parse("800000000000000000000001ABCDG", /* base */ 16);
+
+    CPPUNIT_ASSERT_EQUAL((u64)0x1ABCD, item[0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0x800000000000, item[1]);
+}
+
+void ItemTests::parse_auto_detect_hex_test()
+{
+    Item item;
+
+    item.parse("  0xFFF ");
+
+    CPPUNIT_ASSERT_EQUAL((u64)0xFFF, item[0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0, item[1]);
+
+    item.parse("0XABCDEF");
+
+    CPPUNIT_ASSERT_EQUAL((u64)0xABCDEF, item[0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0, item[1]);
+
+    item.parse("   4566789abcdef");
+
+    CPPUNIT_ASSERT_EQUAL((u64)4566789, item[0]);
+    CPPUNIT_ASSERT_EQUAL((u64)0, item[1]);
 }

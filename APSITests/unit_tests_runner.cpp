@@ -17,6 +17,7 @@
 #include "utils_tests.h"
 #include "csvreader_tests.h"
 #include "stopwatch_tests.h"
+#include "item.h"
 
 #ifdef _MSC_VER
 #include "Windows.h"
@@ -122,6 +123,7 @@ int run_unit_tests()
     runner.addTest(UtilsTests::suite());
     runner.addTest(CSVReaderTests::suite());
     runner.addTest(StopwatchTests::suite());
+    runner.addTest(ItemTests::suite());
 
     runner.run(controller);
 

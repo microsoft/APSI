@@ -635,7 +635,7 @@ void DBBlock::batch_interpolate(
             if (has_item(pos))
             {
                 auto& key_item = get_key(pos);
-                temp.encode(gsl::span<u64>{key_item.value_}, params.get_label_bit_count());
+                temp.encode(gsl::span<u64>{key_item.get_value()}, params.get_label_bit_count());
                 x.set(size, temp);
 
                 auto src = get_label(pos);
