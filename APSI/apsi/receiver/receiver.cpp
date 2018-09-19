@@ -408,17 +408,17 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
     std::vector<std::thread> thrds(num_threads);
     for (u64 t = 0; t < thrds.size(); ++t)
     {
-        thrds[t] = std::thread([&]()
+        thrds[t] = std::thread([&](int idx)
         {
             stream_decrypt_worker(
-                static_cast<int>(t),
+                static_cast<int>(idx),
                 batch_size,
                 thread_count_,
                 recv_packages,
                 table_to_input_map,
                 ret_bools,
                 ret_labels);
-        });
+        }, static_cast<int>(t));
     }
 
     for (auto& thrd : thrds)
