@@ -261,7 +261,7 @@ void print_intersection_results(vector<Item>& client_items, int intersection_siz
         {
             if (intersection.first[i] == false)
             {
-                cout << "Miss result for receiver's item at index: " << i << endl;
+                Log::info("Miss result for receiver's item at index: %i", i);
                 correct = false;
             }
             else if (compare_labels)
@@ -269,9 +269,7 @@ void print_intersection_results(vector<Item>& client_items, int intersection_siz
                 auto idx = label_idx[i];
                 if (memcmp(intersection.second[i].data(), labels[idx].data(), labels[idx].size()))
                 {
-                    std::cout << Colors::Red << "incorrect label at index: " << i
-                        << ". actual: " << print(intersection.second[i])
-                        << ", expected: " << print(labels[i]) << std::endl << Colors::Reset;
+                    Log::error("%sincorrect label at index: %i%s", Colors::Red.c_str(), i, Colors::Reset.c_str());
                     correct = false;
                 }
             }
@@ -280,20 +278,16 @@ void print_intersection_results(vector<Item>& client_items, int intersection_siz
         {
             if (intersection.first[i])
             {
-                cout << Colors::Red << "Incorrect result for receiver's item at index: " << i << endl << Colors::Reset;
+                Log::info("%sIncorrect result for receiver's item at index: %i%s", Colors::Red.c_str(), i, Colors::Reset.c_str());
                 correct = false;
             }
         }
     }
 
-    cout << "Intersection results: ";
-
-    if (correct)
-        cout << Colors::Green << "Correct";
-    else
-        cout << Colors::Red << "Incorrect";
-
-    cout << Colors::Reset << endl;
+    Log::info("Intersection results: %s%s%s",
+        correct ? Colors::Green.c_str() : Colors::Red.c_str(),
+        correct ? "Correct" : "Incorrect",
+        Colors::Reset.c_str());
 }
 
 void print_timing_info(Stopwatch& stopwatch, const string& caption)
