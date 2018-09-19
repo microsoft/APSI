@@ -83,7 +83,7 @@ void StopwatchTests::stopwatch_block_test()
 
     {
         StopwatchScope sc1(sw, "one");
-        this_thread::sleep_for(20ms);
+        this_thread::sleep_for(30ms);
     }
 
     {
@@ -93,7 +93,7 @@ void StopwatchTests::stopwatch_block_test()
 
     {
         StopwatchScope sc3(sw, "one");
-        this_thread::sleep_for(10ms);
+        this_thread::sleep_for(20ms);
     }
 
     vector<Stopwatch::TimespanSummary> tsp;
@@ -104,9 +104,28 @@ void StopwatchTests::stopwatch_block_test()
     auto timesp = std::find_if(tsp.begin(), tsp.end(), [](Stopwatch::TimespanSummary& tss) { return tss.event_name == "one"; });
     CPPUNIT_ASSERT(timesp != tsp.end());
     CPPUNIT_ASSERT_EQUAL(2, timesp->event_count);
-    CPPUNIT_ASSERT(timesp->avg >= 15.0);
-    CPPUNIT_ASSERT(timesp->min >= 10 && timesp->min < 15);
-    CPPUNIT_ASSERT(timesp->max >= 20 && timesp->max < 25);
+
+    string msg;
+    {
+        stringstream ss;
+        ss << "Avg should be >= 25.0, it is: " << timesp->avg;
+        msg = ss.str();
+    }
+    CPPUNIT_ASSERT_MESSAGE(msg.c_str(), timesp->avg >= 25.0);
+
+    {
+        stringstream ss;
+        ss << "Min should be >= 20 && < 25, it is: " << timesp->min;
+        msg = ss.str();
+    }
+    CPPUNIT_ASSERT_MESSAGE(msg.c_str(), timesp->min >= 20 && timesp->min < 25);
+
+    {
+        stringstream ss;
+        ss << "Max should be >= 30 && < 35, it is: " << timesp->max;
+        msg = ss.str();
+    }
+    CPPUNIT_ASSERT_MESSAGE(msg.c_str(), timesp->max >= 30 && timesp->max < 35);
 
     timesp = std::find_if(tsp.begin(), tsp.end(), [](Stopwatch::TimespanSummary& tss) { return tss.event_name == "two"; });
     CPPUNIT_ASSERT(timesp != tsp.end());
