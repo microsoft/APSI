@@ -99,6 +99,7 @@
     <ClInclude Include="matrix_tests.h" />
     <ClInclude Include="plaintextarith.h" />
     <ClInclude Include="prng_tests.h" />
+    <ClInclude Include="stopwatch_tests.h" />
     <ClInclude Include="unit_tests_runner.h" />
     <ClInclude Include="utils.h" />
     <ClInclude Include="utils_tests.h" />
@@ -115,6 +116,7 @@
     <ClCompile Include="prng_tests.cpp" />
     <ClCompile Include="receiver.cpp" />
     <ClCompile Include="sender.cpp" />
+    <ClCompile Include="stopwatch_tests.cpp" />
     <ClCompile Include="unit_tests_runner.cpp" />
     <ClCompile Include="utils_tests.cpp" />
   </ItemGroup>

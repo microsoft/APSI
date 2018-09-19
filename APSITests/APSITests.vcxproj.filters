@@ -51,6 +51,9 @@
     <ClInclude Include="csvreader_tests.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="stopwatch_tests.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="receiver.cpp">
@@ -90,6 +93,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="csvreader_tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="stopwatch_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

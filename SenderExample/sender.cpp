@@ -4,6 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <csignal>
 
 // APSI
 #include "clp.h"
@@ -11,6 +12,7 @@
 #include "apsi/network/channel.h"
 #include "apsi/logging/log.h"
 #include "apsi/tools/csvreader.h"
+#include "apsi/tools/utils.h"
 #include "common_utils.h"
 
 
@@ -40,6 +42,42 @@ int main(int argc, char *argv[])
 
     // Example: Remote
     example_remote(cmd);
+}
+
+void sigint_handler(int param)
+{
+    Log::warning("Sender interrupted.");
+
+    vector<string> timing_report;
+    vector<Stopwatch::TimespanSummary> timings;
+    sender_stop_watch.get_timespans(timings);
+
+    if (timings.size() > 0)
+    {
+        generate_timespan_report(timing_report, timings, sender_stop_watch.get_max_timespan_event_name_length());
+
+        Log::info("Timespan event information");
+        for (const auto& timing : timing_report)
+        {
+            Log::info(timing.c_str());
+        }
+    }
+
+    vector<Stopwatch::Timepoint> timepoints;
+    sender_stop_watch.get_events(timepoints);
+
+    if (timepoints.size() > 0)
+    {
+        generate_event_report(timing_report, timepoints, sender_stop_watch.get_max_event_name_length());
+
+        Log::info("Single event information");
+        for (const auto& timing : timing_report)
+        {
+            Log::info(timing.c_str());
+        }
+    }
+
+    exit(0);
 }
 
 void example_remote(const CLP& cmd)
@@ -75,7 +113,9 @@ void example_remote(const CLP& cmd)
     Log::info("Binding to address: %s", bind_addr.c_str());
     channel.bind(bind_addr);
 
-    // Sender will run forever.
+    // Sender will run until interrupted.
+    signal(SIGINT, sigint_handler);
+
     while (true)
     {
         Log::info("Waiting for request.");

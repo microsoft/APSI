@@ -112,6 +112,17 @@ namespace apsi
                 const std::vector<int>& table_to_input_map,
                 std::vector<Item>& items);
 
+            /**
+            Work to be done in a single thread for stream_decrypt
+            */
+            void stream_decrypt_worker(
+                int thread_idx,
+                int batch_size,
+                int num_threads,
+                std::vector<std::pair<apsi::ResultPackage, std::future<void>>>& recv_packages,
+                const std::vector<int> &table_to_input_map,
+                std::vector<bool>& ret_bools,
+                apsi::Matrix<apsi::u8>& ret_labels);
 
             std::shared_ptr<FField> ex_field() const
             {
