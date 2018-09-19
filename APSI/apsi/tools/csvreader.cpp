@@ -82,12 +82,18 @@ void CSVReader::process_line(string line, vector<Item>& items, vector<Item>& lab
     items.emplace_back(item);
 
     // Second is the label, if present
+    token.clear();
     getline(ss, token);
 
     if (!token.empty())
     {
         item[0] = std::stoull(token);
         item[1] = 0;
+        labels.emplace_back(item);
+    }
+    else
+    {
+        item = zero_block;
         labels.emplace_back(item);
     }
 }
