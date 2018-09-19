@@ -80,26 +80,15 @@ void CSVReader::process_line(string line, vector<Item>& items, vector<Item>& lab
     }
 
     Item item;
-    item[0] = std::stoull(token);
-    item[1] = 0;
-
+    item.parse(token);
     items.emplace_back(item);
 
     // Second is the label, if present
     token.clear();
     getline(ss, token);
 
-    if (!token.empty())
-    {
-        item[0] = std::stoull(token);
-        item[1] = 0;
-        labels.emplace_back(item);
-    }
-    else
-    {
-        item = zero_block;
-        labels.emplace_back(item);
-    }
+    item.parse(token);
+    labels.emplace_back(item);
 }
 
 void CSVReader::throw_if_file_not_present() const
