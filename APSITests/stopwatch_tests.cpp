@@ -51,19 +51,20 @@ void StopwatchTests::single_event_multithreading_test()
     vector<thread> threads(20);
     for (int i = 0; i < threads.size(); i++)
     {
-        threads[i] = thread([&]()
+        threads[i] = thread([&](int idx)
         {
             string evt_name;
-            get_thread_name(i, evt_name);
+            get_thread_name(idx, evt_name);
 
-            for (int i = 0; i < 6; i++)
+            for (int j = 0; j < 6; j++)
             {
                 int millis = (std::rand() * 10 / RAND_MAX);
-                this_thread::sleep_for(chrono::milliseconds(millis));
+                chrono::milliseconds ms(millis);
+                this_thread::sleep_for(ms);
 
                 sw.add_event(evt_name);
             }
-        });
+        }, i);
     }
 
     for (auto& thr : threads)
