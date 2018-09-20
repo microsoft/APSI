@@ -214,12 +214,6 @@ namespace apsi
 
         void set_use_low_degree_poly(bool b) { use_low_degree_poly_ = b; }
 
-        bool debug() const { return debug_; }
-
-        void enable_debug() { debug_ = true; }
-
-        void disable_debug() { debug_ = false; }
-
         // Constants
         constexpr static int max_item_bit_count = 128;
 
@@ -243,8 +237,6 @@ namespace apsi
         int value_byte_length_ = 0;
 
         bool use_low_degree_poly_ = false;
-        
-        bool debug_ = false;
 
         seal::EncryptionParameters encryption_params_;
 

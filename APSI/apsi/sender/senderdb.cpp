@@ -488,12 +488,6 @@ void SenderDB::batched_randomized_symmetric_polys(
         block.randomized_symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
         block.batch_random_symm_poly_ = { &batch_random_symm_poly_storage_[indexer(split, batch, 0)] , split_size_plus_one };
 
-        if (params_.debug())
-        {
-            block.debug_sym_block_.clear();
-            block.debug_sym_block_.reserve(split_size_plus_one);
-        }
-
         for (int i = 0; i < split_size_plus_one; i++)
         {
             Plaintext &poly = block.batch_random_symm_poly_[i];
@@ -505,11 +499,6 @@ void SenderDB::batched_randomized_symmetric_polys(
             }
             ex_batch_encoder->compose(batch_vector, poly);
             evaluator->transform_to_ntt(poly, seal_context_->first_parms_id(), local_pool);
-
-            if (params_.debug())
-            {
-                block.debug_sym_block_.push_back(batch_vector);
-            }
         }
 
         context.inc_randomized_polys();

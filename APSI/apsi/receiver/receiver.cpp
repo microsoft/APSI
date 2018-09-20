@@ -217,12 +217,6 @@ void Receiver::send(const map<uint64_t, vector<Ciphertext> > &query, Channel &ch
     send_pubkey(public_key_, channel);
     send_relinkeys(relin_keys_, channel);
 
-    if (params_.debug())
-    {
-        send_prvkey(secret_key_, channel);
-        send_prvkey(secret_key_, channel);
-    }
-
     /* Send query data. */
     channel.send(query.size());
     for (map<uint64_t, vector<Ciphertext> >::const_iterator it = query.begin(); it != query.end(); it++)

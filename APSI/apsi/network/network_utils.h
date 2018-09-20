@@ -15,25 +15,9 @@
 
 namespace apsi
 {
-    void send_plaintext(const seal::Plaintext &plaintext, apsi::network::Channel &channel);
-
-    void receive_plaintext(seal::Plaintext &plaintext, apsi::network::Channel &channel);
-
     void send_ciphertext(const seal::Ciphertext &ciphertext, apsi::network::Channel &channel);
 
     void receive_ciphertext(seal::Ciphertext &ciphertext, apsi::network::Channel &channel);
-
-    void send_ciphertext(const std::vector<seal::Ciphertext> &ciphers, apsi::network::Channel &channel);
-
-    void receive_ciphertext(std::vector<seal::Ciphertext> &ciphers, apsi::network::Channel &channel);
-
-    void send_compressed_ciphertext(const CiphertextCompressor &compressor, const seal::Ciphertext &ciphertext, apsi::network::Channel &channel);
-
-    void receive_compressed_ciphertext(const CiphertextCompressor &compressor, seal::Ciphertext &ciphertext, apsi::network::Channel &channel);
-
-    void send_compressed_ciphertext(const CiphertextCompressor &compressor, const std::vector<seal::Ciphertext> &ciphers, apsi::network::Channel &channel);
-
-    void receive_compressed_ciphertext(const CiphertextCompressor &compressor, std::vector<seal::Ciphertext> &ciphers, apsi::network::Channel &channel);
 
     void send_relinkeys(const seal::RelinKeys &keys, apsi::network::Channel &channel);
 
@@ -42,12 +26,4 @@ namespace apsi
     void send_pubkey(const seal::PublicKey &pubkey, apsi::network::Channel &channel);
 
     void receive_pubkey(seal::PublicKey &pubkey, apsi::network::Channel &channel);
-
-    void send_prvkey(const seal::SecretKey &k, apsi::network::Channel &channel);
-
-    void receive_prvkey(seal::SecretKey &k, apsi::network::Channel &channel);
-
-    void send_item(const apsi::Item &item, apsi::network::Channel &channel);
-
-    void receive_item(apsi::Item &item, apsi::network::Channel &channel);
 }

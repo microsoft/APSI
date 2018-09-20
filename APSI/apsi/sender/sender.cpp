@@ -253,14 +253,6 @@ void Sender::query_session(Channel &chl)
 
     SenderSessionContext session_context(seal_context_, pub, relin);
 
-    if (params_.debug())
-    {
-        seal::SecretKey k;
-        receive_prvkey(k, chl);
-        session_context.set_secret_key(k);
-        session_context.debug_plain_query_ = nullptr;
-    }
-
     /* Receive client's query data. */
     int num_of_powers;
     chl.receive(num_of_powers);
@@ -650,52 +642,9 @@ void Sender::compute_batch_powers(
         idx = (*state.next_node_)++;
     }
 
-    // splin lock until all nodes are compute. We may want to do something smarter here.
+    // Iterate until all nodes are computed. We may want to do something smarter here.
     for (i64 i = 0; i < state.nodes_.size(); ++i)
         while (state.nodes_[i] != WindowingDag::NodeState::Done);
-
-
-    //#define DEBUG_POWERS
-#ifdef DEBUG_POWERS
-    if (params_.debug() && session_context.debug_plain_query_)
-    {
-
-        Plaintext p;
-        if (!session_context.decryptor_)
-            throw std::runtime_error(LOCATION);
-
-
-        auto& query = *session_context.debug_plain_query_;
-        FFieldArray plain_batch(ex_field_, params_.batch_size()), dest(ex_field_, params_.batch_size());
-        for (int i = 0, j = plain_batch.size() * batch; i < plain_batch.size(); ++i, ++j)
-        {
-            auto xj = query.get(j);
-            plain_batch.set(i, xj);
-        }
-
-        auto cur_power = plain_batch;
-        for (int i = 1; i < batch_powers.size(); ++i)
-        {
-            session_context.decryptor_->decrypt(batch_powers[i], p);
-            ex_batch_encoder_->decompose(p, dest);
-
-            if (dest != cur_power)
-            {
-                std::cout << "power = " << i << std::endl;
-
-                for (u64 j = 0; j < cur_power.size(); ++j)
-                {
-                    std::cout << "exp[" << j << "]: " << cur_power.get(j) << "\t act[" << j << "]: " << dest.get(j) << std::endl;
-
-                }
-
-                throw std::runtime_error("bad power");
-            }
-
-            cur_power = cur_power * plain_batch;
-        }
-    }
-#endif
 
     auto end = dag.nodes_.size() + batch_powers.size();
     while (idx < end)
