@@ -22,7 +22,7 @@ namespace apsi
         {
             std::vector<std::string> modes = { "local", "remote" };
             mode_constraint_ = std::make_unique<TCLAP::ValuesConstraint<std::string>>(modes);
-            mode_arg_ = std::make_unique<TCLAP::ValueArg<std::string>>("m", "mode", "Operation mode", false, "local", mode_constraint_.get(), *this);
+            mode_arg_ = std::make_unique<TCLAP::ValueArg<std::string>>("m", "mode", "Operation mode", false, "remote", mode_constraint_.get(), *this);
         }
 
         virtual void add_args()
