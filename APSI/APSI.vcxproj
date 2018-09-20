@@ -151,12 +151,15 @@
     <ClInclude Include="apsi\logging\log.h" />
     <ClInclude Include="apsi\network\channel.h" />
     <ClInclude Include="apsi\Network\network_utils.h" />
+    <ClInclude Include="apsi\network\senderoperation.h" />
+    <ClInclude Include="apsi\network\senderoperationresponse.h" />
     <ClInclude Include="apsi\plaintextarith.h" />
     <ClInclude Include="apsi\psiparams.h" />
     <ClInclude Include="apsi\Receiver\receiver.h" />
     <ClInclude Include="apsi\result_package.h" />
     <ClInclude Include="apsi\Sender\sender.h" />
     <ClInclude Include="apsi\Sender\senderdb.h" />
+    <ClInclude Include="apsi\sender\senderdispatcher.h" />
     <ClInclude Include="apsi\Sender\sendersessioncontext.h" />
     <ClInclude Include="apsi\Sender\senderthreadcontext.h" />
     <ClInclude Include="apsi\tools\aes.h" />
@@ -185,6 +188,7 @@
     <ClCompile Include="apsi\Receiver\receiver.cpp" />
     <ClCompile Include="apsi\Sender\sender.cpp" />
     <ClCompile Include="apsi\Sender\senderdb.cpp" />
+    <ClCompile Include="apsi\sender\senderdispatcher.cpp" />
     <ClCompile Include="apsi\tools\aes.cpp" />
     <ClCompile Include="apsi\tools\csvreader.cpp" />
     <ClCompile Include="apsi\Tools\interpolate.cpp" />

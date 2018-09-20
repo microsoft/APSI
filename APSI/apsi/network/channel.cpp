@@ -294,3 +294,7 @@ void Channel::send_message(message_t& msg)
     if (!sent)
         throw runtime_error("Failed to send message");
 }
+
+void Channel::receive(shared_ptr<SenderOperation>& sender_op)
+{
+}

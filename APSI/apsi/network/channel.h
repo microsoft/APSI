@@ -5,10 +5,18 @@
 #include <future>
 #include <thread>
 #include <mutex>
+#include <map>
 
 // APSI
 #include "apsi/apsidefines.h"
+#include "apsi/network/senderoperation.h"
+#include "apsi/network/senderoperationresponse.h"
 #include "apsi/tools/thread_pool.h"
+
+// SEAL
+#include "seal/publickey.h"
+#include "seal/relinkeys.h"
+#include "seal/ciphertext.h"
 
 // ZeroMQ
 #pragma warning(push, 0)
@@ -190,6 +198,33 @@ namespace apsi
             * Indicates whether the channel is connected to the network.
             */
             bool is_connected() const { return !end_point_.empty(); }
+
+        public:
+            /**
+            * Receive a Sender Operation
+            */
+            void receive(std::shared_ptr<apsi::network::SenderOperation>& sender_op);
+
+            /**
+            * Request parameters from Sender
+            */
+            void get_parameters(apsi::network::SenderResponseGetParameters& response);
+
+            /**
+            * Request item preprocessing from Sender
+            */
+            void preprocess(apsi::network::SenderResponsePreprocess& response, const std::vector<apsi::u8>& buffer);
+
+            /**
+            * Request response to a Query from Sender
+            */
+            void query(
+                apsi::network::SenderResponseQuery& response,
+                const seal::PublicKey& pub_key,
+                const seal::RelinKeys& relin_keys,
+                const std::map<apsi::u64, std::vector<seal::Ciphertext>>& query
+            );
+
 
         private:
             u64 bytes_sent_;
