@@ -295,6 +295,41 @@ void Channel::send_message(message_t& msg)
         throw runtime_error("Failed to send message");
 }
 
-void Channel::receive(shared_ptr<SenderOperation>& sender_op)
+bool Channel::receive(shared_ptr<SenderOperation>& sender_op)
 {
+    message_t msg;
+    if (!socket_.receive(msg, /* dont_block */ true))
+    {
+        // No message yet.
+        return false;
+    }
+
+    // Should have at least type.
+    if (msg.parts() < 1)
+        throw runtime_error("Not enough parts in message");
+
+    // First part is type.
+    const SenderOperationType* typep;
+    msg.get(&typep, /* part */ 0);
+
+    switch (*typep)
+    {
+    case SOP_get_parameters:
+        // We don't need any other data.
+        sender_op = make_shared<SenderOperationGetParameters>();
+        break;
+
+    case SOP_preprocess:
+        sender_op = make_shared<SenderOperationPreprocess>();
+        break;
+
+    case SOP_query:
+        sender_op = make_shared<SenderOperationQuery>();
+        break;
+
+    default:
+        throw runtime_error("Invalid Sender Operation type");
+    }
+
+    return true;
 }

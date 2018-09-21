@@ -6,6 +6,9 @@
 
 // APSI
 #include "apsi/network/senderoperation.h"
+#include "apsi/network/channel.h"
+#include "apsi/sender/sender.h"
+
 
 namespace apsi
 {
@@ -23,9 +26,11 @@ namespace apsi
             void run(const std::atomic<bool>& stop, int port);
 
         private:
-            void DispatchGetParameters(const std::shared_ptr<apsi::network::SenderOperation> sender_op);
-            void DispatchPreprocess(const std::shared_ptr<apsi::network::SenderOperation> sender_op);
-            void DispatchQuery(const std::shared_ptr<apsi::network::SenderOperation> sender_op);
+            std::shared_ptr<apsi::sender::Sender> sender_;
+
+            void dispatch_get_parameters(std::shared_ptr<apsi::network::SenderOperation> sender_op, apsi::network::Channel& channel);
+            void dispatch_preprocess(std::shared_ptr<apsi::network::SenderOperation> sender_op, apsi::network::Channel& channel);
+            void dispatch_query(std::shared_ptr<apsi::network::SenderOperation> sender_op, apsi::network::Channel& channel);
         };
     }
 }

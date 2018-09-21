@@ -36,8 +36,7 @@ Sender::Sender(const PSIParams &params, int total_thread_count,
     pool_(pool),
     total_thread_count_(total_thread_count),
     session_thread_count_(session_thread_count),
-    thread_contexts_(total_thread_count_),
-    stopped_(false)
+    thread_contexts_(total_thread_count_)
 {
     if (session_thread_count_ <= 0 || (session_thread_count_ > total_thread_count_))
     {
@@ -284,11 +283,6 @@ void Sender::query_session(Channel &chl)
     /* Answer the query. */
     respond(powers, session_context, chl);
     Log::info("Finished processing session");
-}
-
-void Sender::stop()
-{
-    stopped_ = true;
 }
 
 void Sender::debug_decrypt(

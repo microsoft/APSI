@@ -9,6 +9,7 @@
 
 // APSI
 #include "apsi/apsidefines.h"
+#include "apsi/psiparams.h"
 #include "apsi/network/senderoperation.h"
 #include "apsi/network/senderoperationresponse.h"
 #include "apsi/tools/thread_pool.h"
@@ -201,29 +202,61 @@ namespace apsi
 
         public:
             /**
-            * Receive a Sender Operation
+            * Receive a Sender Operation.
+            *
+            * This call does not block, if there is no operation pending it will
+            * immediately return false.
             */
-            void receive(std::shared_ptr<apsi::network::SenderOperation>& sender_op);
+            bool receive(std::shared_ptr<apsi::network::SenderOperation>& sender_op);
 
             /**
-            * Request parameters from Sender
+            * Receive Get Parameters response from Sender
             */
-            void get_parameters(apsi::network::SenderResponseGetParameters& response);
+            void receive(apsi::network::SenderResponseGetParameters& response);
 
             /**
-            * Request item preprocessing from Sender
+            * Receive item preprocessing response from Sender
             */
-            void preprocess(apsi::network::SenderResponsePreprocess& response, const std::vector<apsi::u8>& buffer);
+            void receive(apsi::network::SenderResponsePreprocess& response);
 
             /**
-            * Request response to a Query from Sender
+            * Receive Query response from Sender
             */
-            void query(
-                apsi::network::SenderResponseQuery& response,
+            void receive(apsi::network::SenderResponseQuery& response);
+
+            /**
+            Send a request to Get Parameters from Sender
+            */
+            void send_get_parameters();
+
+            /**
+            Send a response to a request to Get Parameters
+            */
+            void send_get_parameters_response(const apsi::PSIParams& params);
+
+            /**
+            Send a request to Preprocess items on Sender
+            */
+            void send_preprocess(const std::vector<apsi::u8>& buffer);
+
+            /**
+            Send a response to a request to Preprocess items
+            */
+            void send_preprocess_response(const std::vector<apsi::u8>& buffer);
+
+            /**
+            Send a request for a Query response to Sender
+            */
+            void send_query(
                 const seal::PublicKey& pub_key,
                 const seal::RelinKeys& relin_keys,
                 const std::map<apsi::u64, std::vector<seal::Ciphertext>>& query
             );
+
+            /**
+            Send a response to a Query request
+            */
+            void send_query_response();
 
 
         private:

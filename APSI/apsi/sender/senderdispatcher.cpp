@@ -36,7 +36,11 @@ void SenderDispatcher::run(const atomic<bool>& stop, int port)
     while (!stop)
     {
         shared_ptr<SenderOperation> sender_op;
-        channel.receive(sender_op);
+        if (!channel.receive(sender_op))
+        {
+            this_thread::sleep_for(100ms);
+            continue;
+        }
 
         if (sender_op == nullptr)
         {
@@ -47,19 +51,42 @@ void SenderDispatcher::run(const atomic<bool>& stop, int port)
         switch (sender_op->type)
         {
         case SOP_get_parameters:
-            DispatchGetParameters(sender_op);
+            dispatch_get_parameters(sender_op, channel);
             break;
 
         case SOP_preprocess:
-            DispatchPreprocess(sender_op);
+            dispatch_preprocess(sender_op, channel);
             break;
 
         case SOP_query:
-            DispatchQuery(sender_op);
+            dispatch_query(sender_op, channel);
             break;
 
         default:
             Log::error("Invalid Sender Operation: %i", sender_op->type);
         }
     }
+}
+
+void SenderDispatcher::dispatch_get_parameters(shared_ptr<SenderOperation> sender_op, Channel& channel)
+{
+    channel.send_get_parameters_response(sender_->get_params());
+}
+
+void SenderDispatcher::dispatch_preprocess(shared_ptr<SenderOperation> sender_op, Channel& channel)
+{
+    auto preprocess_op = reinterpret_cast<SenderOperationPreprocess*>(&sender_op);
+    
+    sender_->preprocess(preprocess_op->buffer);
+    channel.send_preprocess_response(preprocess_op->buffer);
+}
+
+void SenderDispatcher::dispatch_query(shared_ptr<SenderOperation> sender_op, Channel& channel)
+{
+    auto query_op = reinterpret_cast<SenderOperationQuery*>(&sender_op);
+
+    //sender_->query(
+    //    query_op->public_key,
+    //    query_op->relin_keys,
+    //    query_op->query);
 }

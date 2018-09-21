@@ -99,9 +99,20 @@ namespace apsi
             */
             void load_db(const std::vector<Item> &data, MatrixView<u8> vals = {});
 
+            /**
+            Preprocess items from Receiver encoded in given buffer
+            */
+            void preprocess(std::vector<apsi::u8>& buffer);
+
+            /**
+            Receive a query from a Receiver and generate a response
+            */
             void query_session(apsi::network::Channel& channel);
 
-            void stop();
+            /**
+            Return a reference to the PSI parameters used by the Sender
+            */
+            const apsi::PSIParams& get_params() const { return params_; }
 
         private:
             void initialize();
@@ -216,8 +227,6 @@ namespace apsi
             std::mutex thread_context_mtx_;
 
             apsi::tools::PRNG prng_;
-
-            bool stopped_;
 
             void debug_decrypt(
                 SenderSessionContext &session_context,

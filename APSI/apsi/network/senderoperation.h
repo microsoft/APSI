@@ -2,9 +2,16 @@
 
 // STD
 #include <vector>
+#include <map>
 
 // APSI
 #include "apsi/apsidefines.h"
+
+// SEAL
+#include "seal/publickey.h"
+#include "seal/relinkeys.h"
+#include "seal/ciphertext.h"
+
 
 namespace apsi
 {
@@ -20,46 +27,43 @@ namespace apsi
         /**
         Generic Sender Operation
         */
-        struct SenderOperation
+        class SenderOperation
         {
+        public:
             /**
             Operation type
             */
             SenderOperationType type;
-
-            /**
-            Get the size of the data in the structure
-            */
-            virtual apsi::u64 get_size() const = 0;
         };
 
         /**
         Sender Operation: Get Parameters
         */
-        struct SenderOperationGetParameters : SenderOperation
+        class SenderOperationGetParameters : public SenderOperation
         {
-            /**
-            Get the size of the data in the structure
-            */
-            virtual apsi::u64 get_size() const
-            {
-                // The request does not contain any data.
-                return 0;
-            }
         };
 
         /**
         Sender Operation: Preprocess
         */
-        struct SenderOperationPreprocess : SenderOperation
+        class SenderOperationPreprocess : public SenderOperation
         {
+        public:
+            /**
+            Items to preprocess
+            */
+            std::vector<apsi::u8> buffer;
         };
 
         /**
         Sender Operation: Query
         */
-        struct SenderOperationQuery : SenderOperation
+        class SenderOperationQuery : public SenderOperation
         {
+        public:
+            seal::PublicKey public_key;
+            seal::RelinKeys relin_keys;
+            std::map<apsi::u64, std::vector<seal::Ciphertext>> query;
         };
     }
 }
