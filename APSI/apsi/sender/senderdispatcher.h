@@ -20,16 +20,32 @@ namespace apsi
         class SenderDispatcher
         {
         public:
+            SenderDispatcher() = delete;
+            SenderDispatcher(std::shared_ptr<apsi::sender::Sender> sender)
+                : sender_(sender)
+            {}
+
             /**
             Run the dispatcher on the given port.
             */
-            void run(const std::atomic<bool>& stop, int port);
+            void run(const std::atomic<bool>& stop, const int port);
 
         private:
             std::shared_ptr<apsi::sender::Sender> sender_;
 
+            /**
+            Dispatch a Get Parameters request to the Sender.
+            */
             void dispatch_get_parameters(std::shared_ptr<apsi::network::SenderOperation> sender_op, apsi::network::Channel& channel);
+
+            /**
+            Dispatch a Preprocess request to the Sender.
+            */
             void dispatch_preprocess(std::shared_ptr<apsi::network::SenderOperation> sender_op, apsi::network::Channel& channel);
+
+            /**
+            Dispatch a Query request to the Sender.
+            */
             void dispatch_query(std::shared_ptr<apsi::network::SenderOperation> sender_op, apsi::network::Channel& channel);
         };
     }

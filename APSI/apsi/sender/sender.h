@@ -181,7 +181,7 @@ namespace apsi
             /**
             Method that handles the work of a single thread that computes the response to a query.
             */
-            void respond_work(
+            void respond_worker(
                 int batch_count,
                 int total_threads,
                 int total_blocks,

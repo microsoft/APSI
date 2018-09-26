@@ -295,6 +295,12 @@ namespace apsi
             Add buffer to the given message
             */
             void add_buffer(const std::vector<u8>& buff, zmqpp::message_t& msg) const;
+
+            virtual zmqpp::socket_type get_socket_type() const
+            {
+                // Default is pair.
+                return zmqpp::socket_type::pair;
+            }
         };
     }
 }

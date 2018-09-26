@@ -18,7 +18,7 @@ Channel::Channel(const context_t& ctx)
     : bytes_sent_(0),
       bytes_received_(0),
       end_point_(""),
-      socket_(ctx, socket_type::pair),
+      socket_(ctx, get_socket_type()),
       thread_pool_(thread::hardware_concurrency()),
       receive_mutex_(),
       send_mutex_()

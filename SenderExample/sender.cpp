@@ -9,6 +9,7 @@
 // APSI
 #include "clp.h"
 #include "apsi/sender/sender.h"
+#include "apsi/sender/senderdispatcher.h"
 #include "apsi/network/channel.h"
 #include "apsi/logging/log.h"
 #include "apsi/tools/csvreader.h"
@@ -25,8 +26,7 @@ using namespace apsi::network;
 using namespace apsi::logging;
 
 
-void example_remote(const CLP& cmd);
-string get_bind_address(const CLP& cmd);
+void run_sender_dispatcher(const CLP& cmd);
 void initialize_db(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels);
 
 
@@ -40,8 +40,7 @@ int main(int argc, char *argv[])
 
     Log::set_log_level(cmd.log_level());
 
-    // Example: Remote
-    example_remote(cmd);
+    run_sender_dispatcher(cmd);
 }
 
 void sigint_handler(int param)
@@ -80,7 +79,7 @@ void sigint_handler(int param)
     exit(0);
 }
 
-void example_remote(const CLP& cmd)
+void run_sender_dispatcher(const CLP& cmd)
 {
     print_example_banner("Remote Sender");
 
@@ -101,34 +100,19 @@ void example_remote(const CLP& cmd)
     params.set_sender_bin_size(static_cast<int>(sender_bin_size));
 
     Log::info("Building sender");
-    Sender sender(params, cmd.threads(), cmd.threads());
+    shared_ptr<Sender> sender = make_shared<Sender>(params, cmd.threads(), cmd.threads());
 
     Log::info("Sender loading DB with %i items", items.size());
-    sender.load_db(items, labels);
+    sender->load_db(items, labels);
 
-    zmqpp::context_t context;
-    Channel channel(context);
-
-    string bind_addr = get_bind_address(cmd);
-    Log::info("Binding to address: %s", bind_addr.c_str());
-    channel.bind(bind_addr);
-
-    // Sender will run until interrupted.
     signal(SIGINT, sigint_handler);
 
-    while (true)
-    {
-        Log::info("Waiting for request.");
-        sender.query_session(channel);
-    }
-}
+    // Run the dispatcher
+    atomic<bool> stop = false;
+    SenderDispatcher dispatcher(sender);
 
-string get_bind_address(const CLP& cmd)
-{
-    stringstream ss;
-    ss << "tcp://*:" << cmd.net_port();
-
-    return ss.str();
+    // The dispatcher will run until stopped.
+    dispatcher.run(stop, cmd.net_port());
 }
 
 void initialize_db(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels)

@@ -5,7 +5,7 @@
 
 // APSI
 #include "apsi/sender/senderdispatcher.h"
-#include "apsi/network/channel.h"
+#include "apsi/network/senderchannel.h"
 #include "apsi/network/network_utils.h"
 #include "apsi/logging/log.h"
 
@@ -27,10 +27,10 @@ using namespace apsi::network;
 using namespace apsi::logging;
 
 
-void SenderDispatcher::run(const atomic<bool>& stop, int port)
+void SenderDispatcher::run(const atomic<bool>& stop, const int port)
 {
     zmqpp::context_t zmqcontext;
-    Channel channel(zmqcontext);
+    SenderChannel channel(zmqcontext);
 
     stringstream ss;
     ss << "tcp://*:" << port;
@@ -38,39 +38,49 @@ void SenderDispatcher::run(const atomic<bool>& stop, int port)
     Log::info("Sender binding to address: %s", ss.str().c_str());
     channel.bind(ss.str());
 
+    bool logged_waiting = false;
+
     // Run until stopped
     while (!stop)
     {
         shared_ptr<SenderOperation> sender_op;
+
         if (!channel.receive(sender_op))
         {
-            this_thread::sleep_for(100ms);
-            continue;
-        }
+            if (!logged_waiting)
+            {
+                // We want to log 'Waiting' only once, even if we have to wait
+                // for several sleeps. And only once after processing a request as well.
+                logged_waiting = true;
+                Log::info("Waiting for request.");
+            }
 
-        if (sender_op == nullptr)
-        {
-            // Receive timed out.
+            this_thread::sleep_for(50ms);
             continue;
         }
 
         switch (sender_op->type)
         {
         case SOP_get_parameters:
+            Log::info("Received Get Parameters request");
             dispatch_get_parameters(sender_op, channel);
             break;
 
         case SOP_preprocess:
+            Log::info("Received Preprocess request");
             dispatch_preprocess(sender_op, channel);
             break;
 
         case SOP_query:
+            Log::info("Received Query request");
             dispatch_query(sender_op, channel);
             break;
 
         default:
             Log::error("Invalid Sender Operation: %i", sender_op->type);
         }
+
+        logged_waiting = false;
     }
 }
 

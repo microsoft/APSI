@@ -382,17 +382,18 @@ void Sender::respond(
     {
         thread_pool[i] = thread([&]()
         {
-            respond_work(batch_count,
-                         static_cast<int>(thread_pool.size()),
-                         total_blocks,
-                         batches_done_prom,
-                         batches_done_fut,
-                         powers,
-                         session_context,
-                         dag,
-                         states,
-                         remaining_batches,
-                         result);
+            respond_worker(
+                batch_count,
+                static_cast<int>(thread_pool.size()),
+                total_blocks,
+                batches_done_prom,
+                batches_done_fut,
+                powers,
+                session_context,
+                dag,
+                states,
+                remaining_batches,
+                result);
         });
     }
 
@@ -402,7 +403,7 @@ void Sender::respond(
     }
 }
 
-void Sender::respond_work(
+void Sender::respond_worker(
     int batch_count,
     int total_threads,
     int total_blocks,
@@ -415,7 +416,7 @@ void Sender::respond_work(
     atomic<int>& remaining_batches,
     vector<ResultPackage>& result)
 {
-    StopwatchScope respond_work_scope(sender_stop_watch, "Sender::respond_work");
+    StopwatchScope respond_work_scope(sender_stop_watch, "Sender::respond_worker");
 
     /* Multiple client sessions can enter this function to compete for thread context resources. */
     int thread_context_idx = acquire_thread_context();

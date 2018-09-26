@@ -153,6 +153,12 @@
     <ClInclude Include="apsi\network\senderoperationresponse.h">
       <Filter>Header Files\Network</Filter>
     </ClInclude>
+    <ClInclude Include="apsi\network\receiverchannel.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\network\senderchannel.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp">

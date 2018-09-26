@@ -1,0 +1,25 @@
+#pragma once 
+
+// APSI
+#include "apsi/network/channel.h"
+
+namespace apsi
+{
+    namespace network
+    {
+        class SenderChannel : public Channel
+        {
+        public:
+            SenderChannel() = delete;
+            SenderChannel(const zmqpp::context_t& context)
+                : Channel(context)
+            {}
+
+        private:
+            virtual zmqpp::socket_type get_socket_type() const
+            {
+                return zmqpp::socket_type::reply;
+            }
+        };
+    }
+}
