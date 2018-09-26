@@ -12,48 +12,26 @@ namespace apsi
     namespace network
     {
         /**
-        Generic Sender Response
-        */
-        class SenderResponse
-        {
-        public:
-            SenderResponse() = default;
-            virtual ~SenderResponse() = default;
-        };
-
-        /**
         Response for Get Parameters request
         */
-        class SenderResponseGetParameters : public SenderResponse
+        struct SenderResponseGetParameters
         {
-        public:
-            SenderResponseGetParameters() = default;
-            virtual ~SenderResponseGetParameters() = default;
-
             int sender_bin_size;
         };
 
         /**
         Response for Preprocess request
         */
-        class SenderResponsePreprocess : public SenderResponse
+        struct SenderResponsePreprocess
         {
-        public:
-            SenderResponsePreprocess() = default;
-            virtual ~SenderResponsePreprocess() = default;
-
             std::vector<apsi::u8> buffer;
         };
 
         /**
         Response for Query request
         */
-        class SenderResponseQuery : public SenderResponse
+        struct SenderResponseQuery
         {
-        public:
-            SenderResponseQuery() = default;
-            virtual ~SenderResponseQuery() = default;
-
             std::vector<apsi::ResultPackage> result;
         };
     }
