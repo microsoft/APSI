@@ -25,6 +25,12 @@ namespace APSITests
         CPPUNIT_TEST(SendResultPackageAsyncTest);
         CPPUNIT_TEST(ThrowWithoutConnectTest);
         CPPUNIT_TEST(DataCountsTest);
+        CPPUNIT_TEST(SendGetParametersTest);
+        CPPUNIT_TEST(SendPreprocessTest);
+        // CPPUNIT_TEST(SendQueryTest); // Disabled until I can find out how to create a public key and ciphertext
+        CPPUNIT_TEST(SendGetParametersResponseTest);
+        CPPUNIT_TEST(SendPreprocessResponseTest);
+        CPPUNIT_TEST(SendQueryResponseTest);
 
         CPPUNIT_TEST_SUITE_END();
 
@@ -46,6 +52,12 @@ namespace APSITests
         void SendResultPackageAsyncTest();
         void ThrowWithoutConnectTest();
         void DataCountsTest();
+        void SendGetParametersTest();
+        void SendPreprocessTest();
+        void SendQueryTest();
+        void SendGetParametersResponseTest();
+        void SendPreprocessResponseTest();
+        void SendQueryResponseTest();
 
         virtual void setUp();
 

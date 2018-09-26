@@ -207,7 +207,7 @@ namespace apsi
             * This call does not block, if there is no operation pending it will
             * immediately return false.
             */
-            bool receive(std::shared_ptr<apsi::network::SenderOperation>& sender_op);
+            bool receive(std::shared_ptr<apsi::network::SenderOperation>& sender_op, bool wait_for_message = false);
 
             /**
             * Receive Get Parameters response from Sender
@@ -256,7 +256,7 @@ namespace apsi
             /**
             Send a response to a Query request
             */
-            void send_query_response();
+            void send_query_response(const std::vector<apsi::ResultPackage>& result);
 
 
         private:
@@ -274,6 +274,27 @@ namespace apsi
             void throw_if_connected() const;
             void receive_message(zmqpp::message_t& msg);
             void send_message(zmqpp::message_t& msg);
+
+            /**
+            Add message type to message
+            */
+            void add_message_type(const SenderOperationType type, zmqpp::message_t& msg) const;
+
+            /**
+            Get message type from message.
+            Message type is always part 0.
+            */
+            SenderOperationType get_message_type(const zmqpp::message_t& msg) const;
+
+            /**
+            Get buffer from message, located at part_start
+            */
+            void get_buffer(std::vector<u8>& buff, const zmqpp::message_t& msg, int part_start) const;
+
+            /**
+            Add buffer to the given message
+            */
+            void add_buffer(const std::vector<u8>& buff, zmqpp::message_t& msg) const;
         };
     }
 }

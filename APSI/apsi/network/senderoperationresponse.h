@@ -1,7 +1,11 @@
 #pragma once
 
+// STD
+#include <vector>
+
 // APSI
 #include "apsi/apsidefines.h"
+#include "apsi/result_package.h"
 
 namespace apsi
 {
@@ -10,47 +14,47 @@ namespace apsi
         /**
         Generic Sender Response
         */
-        struct SenderResponse
+        class SenderResponse
         {
-            /**
-            Get the size of the data in the structure
-            */
-            virtual apsi::u64 get_size() const = 0;
+        public:
+            SenderResponse() = default;
+            virtual ~SenderResponse() = default;
         };
 
         /**
         Response for Get Parameters request
         */
-        struct SenderResponseGetParameters : SenderResponse
+        class SenderResponseGetParameters : public SenderResponse
         {
-            int sender_bin_size;
+        public:
+            SenderResponseGetParameters() = default;
+            virtual ~SenderResponseGetParameters() = default;
 
-            virtual apsi::u64 get_size() const
-            {
-                return sizeof(int);
-            }
+            int sender_bin_size;
         };
 
         /**
         Response for Preprocess request
         */
-        struct SenderResponsePreprocess : SenderResponse
+        class SenderResponsePreprocess : public SenderResponse
         {
-            virtual apsi::u64 get_size() const
-            {
-                return 0;
-            }
+        public:
+            SenderResponsePreprocess() = default;
+            virtual ~SenderResponsePreprocess() = default;
+
+            std::vector<apsi::u8> buffer;
         };
 
         /**
         Response for Query request
         */
-        struct SenderResponseQuery : SenderResponse
+        class SenderResponseQuery : public SenderResponse
         {
-            virtual apsi::u64 get_size() const
-            {
-                return 0;
-            }
+        public:
+            SenderResponseQuery() = default;
+            virtual ~SenderResponseQuery() = default;
+
+            std::vector<apsi::ResultPackage> result;
         };
     }
 }

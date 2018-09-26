@@ -1,12 +1,14 @@
-#include "channel.h"
 
 // STD
 #include <sstream>
 
 // APSI
 #include "apsi/result_package.h"
+#include "apsi/network/channel.h"
+#include "apsi/network/network_utils.h"
 
 using namespace std;
+using namespace seal;
 using namespace apsi;
 using namespace apsi::network;
 using namespace zmqpp;
@@ -37,29 +39,9 @@ void Channel::receive(vector<u8>& buff)
 
     message_t msg;
     receive_message(msg);
+    get_buffer(buff, msg, /* part_start */ 0);
 
-    // Need to have size
-    if (msg.parts() < 1)
-        throw runtime_error("Should have size at least");
-
-    size_t size = msg.get<size_t>(/* part */ 0);
-
-    // If the vector is not empty, we need the part with the data
-    if (size > 0 && msg.parts() != 2)
-        throw runtime_error("Should have size and data.");
-
-    buff.resize(size);
-
-    if (size > 0)
-    {
-        // Verify the actual data is the size we expect
-        if (msg.size(/* part */ 1) < size)
-            throw runtime_error("Part 1 has less data than expected");
-
-        memcpy(buff.data(), msg.raw_data(/* part */ 1), size);
-    }
-
-    bytes_received_ += size;
+    bytes_received_ += buff.size();
 }
 
 void Channel::send(const vector<u8>& buff)
@@ -68,16 +50,9 @@ void Channel::send(const vector<u8>& buff)
 
     message_t msg;
 
-    // First part is size
-    msg.add(buff.size());
-
-    if (buff.size() > 0)
-    {
-        // Second part is raw data
-        msg.add_raw(buff.data(), buff.size());
-    }
-
+    add_buffer(buff, msg);
     send_message(msg);
+
     bytes_sent_ += buff.size();
 }
 
@@ -295,10 +270,10 @@ void Channel::send_message(message_t& msg)
         throw runtime_error("Failed to send message");
 }
 
-bool Channel::receive(shared_ptr<SenderOperation>& sender_op)
+bool Channel::receive(shared_ptr<SenderOperation>& sender_op, bool wait_for_message)
 {
     message_t msg;
-    if (!socket_.receive(msg, /* dont_block */ true))
+    if (!socket_.receive(msg, !wait_for_message))
     {
         // No message yet.
         return false;
@@ -308,11 +283,9 @@ bool Channel::receive(shared_ptr<SenderOperation>& sender_op)
     if (msg.parts() < 1)
         throw runtime_error("Not enough parts in message");
 
-    // First part is type.
-    const SenderOperationType* typep;
-    msg.get(&typep, /* part */ 0);
+    SenderOperationType type = get_message_type(msg);
 
-    switch (*typep)
+    switch (type)
     {
     case SOP_get_parameters:
         // We don't need any other data.
@@ -320,16 +293,325 @@ bool Channel::receive(shared_ptr<SenderOperation>& sender_op)
         break;
 
     case SOP_preprocess:
-        sender_op = make_shared<SenderOperationPreprocess>();
+        {
+            vector<u8> buffer;
+            get_buffer(buffer, msg, /* part_start */ 1);
+            sender_op = make_shared<SenderOperationPreprocess>(std::move(buffer));
+
+            bytes_received_ += buffer.size();
+        }
         break;
 
     case SOP_query:
-        sender_op = make_shared<SenderOperationQuery>();
+        {
+            PublicKey pub_key;
+            RelinKeys relin_keys;
+            map<u64, vector<Ciphertext>> query;
+
+            string str;
+            msg.get(str, /* part */ 1);
+            get_public_key(pub_key, str);
+            bytes_received_ += str.length();
+
+            msg.get(str, /* part */ 2);
+            get_relin_keys(relin_keys, str);
+            bytes_received_ += str.length();
+
+            auto query_count = msg.get<size_t>(/* part */ 3);
+            bytes_received_ += sizeof(size_t);
+
+            size_t msg_idx = 4;
+
+            for (u64 i = 0; i < query_count; i++)
+            {
+                u64 power = msg.get<u64>(msg_idx++);
+                size_t num_elems = msg.get<size_t>(msg_idx++);
+                vector<Ciphertext> powers;
+
+                for (u64 j = 0; j < num_elems; j++)
+                {
+                    Ciphertext ciphertext;
+                    msg.get(str, msg_idx++);
+                    get_ciphertext(ciphertext, str);
+                    bytes_received_ += str.length();
+                    powers.push_back(ciphertext);
+                }
+
+                query.insert_or_assign(power, powers);
+
+                bytes_received_ += sizeof(u64);
+                bytes_received_ += sizeof(size_t);
+            }
+
+            sender_op = make_shared<SenderOperationQuery>(pub_key, relin_keys, std::move(query));
+        }
         break;
 
     default:
         throw runtime_error("Invalid Sender Operation type");
     }
 
+    bytes_received_ += sizeof(SenderOperationType);
+
     return true;
+}
+
+void Channel::receive(SenderResponseGetParameters& response)
+{
+    message_t msg;
+    socket_.receive(msg);
+
+    // We should have two parts
+    if (msg.parts() != 2)
+        throw runtime_error("Message should have two parts");
+
+    // First part is message type
+    SenderOperationType type = get_message_type(msg);
+
+    if (type != SOP_get_parameters)
+        throw runtime_error("Message should be get parameters type");
+
+    // Second part is the actual parameter: sender bin size
+    response.sender_bin_size = msg.get<int>(/* part */ 1);
+
+    bytes_received_ += sizeof(SenderOperationType);
+    bytes_received_ += sizeof(int);
+}
+
+void Channel::receive(SenderResponsePreprocess& response)
+{
+    message_t msg;
+    socket_.receive(msg);
+
+    // We should have 3 parts
+    if (msg.parts() != 3)
+        throw runtime_error("Message should have three parts");
+
+    SenderOperationType type = get_message_type(msg);
+    if (type != SOP_preprocess)
+        throw runtime_error("Message should be preprocess type");
+
+    // Buffer starts at part 1
+    get_buffer(response.buffer, msg, /* part_start */ 1);
+
+    bytes_received_ += sizeof(SenderOperationType);
+    bytes_received_ += response.buffer.size();
+}
+
+void Channel::receive(SenderResponseQuery& response)
+{
+    message_t msg;
+    socket_.receive(msg);
+
+    // We should have at least 2 parts
+    if (msg.parts() < 2)
+        throw runtime_error("Message should have at least two parts");
+
+    SenderOperationType type = get_message_type(msg);
+    if (type != SOP_query)
+        throw runtime_error("Message should be query type");
+
+    // Number of result packages
+    size_t pkg_count = msg.get<size_t>(/* part */ 1);
+
+    if (msg.parts() < ((pkg_count * 4) + 2))
+        throw runtime_error("Not enough results in message");
+
+    response.result.resize(pkg_count);
+
+    for (u64 i = 0; i < pkg_count; i++)
+    {
+        // Each package has 4 parts, plus the type and package count
+        size_t pkg_idx = (i * 4) + 2;
+
+        ResultPackage pkg;
+        pkg.split_idx  = msg.get<int>(pkg_idx++);
+        pkg.batch_idx  = msg.get<int>(pkg_idx++);
+        pkg.data       = msg.get(pkg_idx++);
+        pkg.label_data = msg.get(pkg_idx++);
+
+        bytes_received_ += sizeof(int) * 2;
+        bytes_received_ += pkg.data.length();
+        bytes_received_ += pkg.label_data.length();
+
+        response.result[i] = pkg;
+    }
+
+    bytes_received_ += sizeof(SenderOperationType);
+    bytes_received_ += sizeof(size_t);
+}
+
+void Channel::send_get_parameters()
+{
+    message_t msg;
+    SenderOperationType type = SOP_get_parameters;
+    add_message_type(type, msg);
+
+    // that's it!
+    socket_.send(msg);
+
+    bytes_sent_ += sizeof(SenderOperationType);
+}
+
+void Channel::send_get_parameters_response(const PSIParams& params)
+{
+    message_t msg;
+    SenderOperationType type = SOP_get_parameters;
+    add_message_type(type, msg);
+
+    // For now only sender bin size
+    msg.add(params.sender_bin_size());
+
+    socket_.send(msg);
+
+    bytes_sent_ += sizeof(SenderOperationType);
+    bytes_sent_ += sizeof(int);
+}
+
+void Channel::send_preprocess(const vector<u8>& buffer)
+{
+    message_t msg;
+    SenderOperationType type = SOP_preprocess;
+
+    add_message_type(type, msg);
+    add_buffer(buffer, msg);
+
+    socket_.send(msg);
+
+    bytes_sent_ += sizeof(SenderOperationType);
+    bytes_sent_ += buffer.size();
+}
+
+void Channel::send_preprocess_response(const std::vector<apsi::u8>& buffer)
+{
+    message_t msg;
+    SenderOperationType type = SOP_preprocess;
+
+    add_message_type(type, msg);
+    add_buffer(buffer, msg);
+
+    socket_.send(msg);
+
+    bytes_sent_ += sizeof(SenderOperationType);
+    bytes_sent_ += buffer.size();
+}
+
+void Channel::send_query(
+    const PublicKey& pub_key,
+    const RelinKeys& relin_keys,
+    const map<u64, vector<Ciphertext>>& query
+)
+{
+    message_t msg;
+    SenderOperationType type = SOP_query;
+    add_message_type(type, msg);
+
+    string str;
+    get_string(str, pub_key);
+    msg.add(str);
+    bytes_sent_ += str.length();
+
+    get_string(str, relin_keys);
+    msg.add(str);
+    bytes_sent_ += str.length();
+
+    msg.add(query.size());
+    bytes_sent_ += sizeof(size_t);
+
+    for (const auto& pair : query)
+    {
+        msg.add(pair.first);
+        msg.add(pair.second.size());
+
+        for (const auto& ciphertext : pair.second)
+        {
+            get_string(str, ciphertext);
+            msg.add(str);
+            bytes_sent_ += str.length();
+        }
+
+        bytes_sent_ += sizeof(u64);
+        bytes_sent_ += sizeof(size_t);
+    }
+
+    socket_.send(msg);
+}
+
+void Channel::send_query_response(const std::vector<apsi::ResultPackage>& result)
+{
+    message_t msg;
+    SenderOperationType type = SOP_query;
+    add_message_type(type, msg);
+
+    msg.add(result.size());
+
+    for (const auto& pkg : result)
+    {
+        msg.add(pkg.split_idx);
+        msg.add(pkg.batch_idx);
+        msg.add(pkg.data);
+        msg.add(pkg.label_data);
+
+        bytes_sent_ += sizeof(int) * 2;
+        bytes_sent_ += pkg.data.length();
+        bytes_sent_ += pkg.label_data.length();
+    }
+
+    bytes_sent_ += sizeof(SenderOperationType);
+    bytes_sent_ += sizeof(size_t);
+
+    socket_.send(msg);
+}
+
+void Channel::get_buffer(vector<u8>& buff, const message_t& msg, int part_start) const
+{
+    // Need to have size
+    if (msg.parts() < (part_start + 1))
+        throw runtime_error("Should have size at least");
+
+    size_t size = msg.get<size_t>(/* part */ part_start);
+
+    // If the vector is not empty, we need the part with the data
+    if (size > 0 && msg.parts() < (part_start + 2))
+        throw runtime_error("Should have size and data.");
+
+    buff.resize(size);
+
+    if (size > 0)
+    {
+        // Verify the actual data is the size we expect
+        if (msg.size(/* part */ part_start + 1) < size)
+            throw runtime_error("Second Part has less data than expected");
+
+        memcpy(buff.data(), msg.raw_data(/* part */ part_start + 1), size);
+    }
+}
+
+void Channel::add_buffer(const vector<u8>& buff, message_t& msg) const
+{
+    // First part is size
+    msg.add(buff.size());
+
+    if (buff.size() > 0)
+    {
+        // Second part is raw data
+        msg.add_raw(buff.data(), buff.size());
+    }
+}
+
+void Channel::add_message_type(const SenderOperationType type, message_t& msg) const
+{
+    // Transform to int to have it have a fixed size
+    msg.add(static_cast<int>(type));
+}
+
+SenderOperationType Channel::get_message_type(const message_t& msg) const
+{
+    // We should have at least type
+    if (msg.parts() < 1)
+        throw invalid_argument("Message should have at least type");
+
+    // First part is message type
+    SenderOperationType type = static_cast<SenderOperationType>(msg.get<int>(/* part */ 0));
+    return type;
 }

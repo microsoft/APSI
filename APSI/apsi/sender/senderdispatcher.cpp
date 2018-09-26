@@ -75,7 +75,7 @@ void SenderDispatcher::dispatch_get_parameters(shared_ptr<SenderOperation> sende
 
 void SenderDispatcher::dispatch_preprocess(shared_ptr<SenderOperation> sender_op, Channel& channel)
 {
-    auto preprocess_op = reinterpret_cast<SenderOperationPreprocess*>(&sender_op);
+    auto preprocess_op = dynamic_pointer_cast<SenderOperationPreprocess>(sender_op);
     
     sender_->preprocess(preprocess_op->buffer);
     channel.send_preprocess_response(preprocess_op->buffer);
@@ -83,7 +83,7 @@ void SenderDispatcher::dispatch_preprocess(shared_ptr<SenderOperation> sender_op
 
 void SenderDispatcher::dispatch_query(shared_ptr<SenderOperation> sender_op, Channel& channel)
 {
-    auto query_op = reinterpret_cast<SenderOperationQuery*>(&sender_op);
+    auto query_op = dynamic_pointer_cast<SenderOperationQuery>(sender_op);
 
     //sender_->query(
     //    query_op->public_key,

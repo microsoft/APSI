@@ -227,22 +227,6 @@ namespace apsi
             std::mutex thread_context_mtx_;
 
             apsi::tools::PRNG prng_;
-
-            void debug_decrypt(
-                SenderSessionContext &session_context,
-                const seal::Ciphertext& c,
-                FFieldArray& dest);
-
-            std::vector<apsi::u64> debug_eval_term(
-                int term, MatrixView<apsi::u64> coeffs, 
-                gsl::span<apsi::u64> x,
-                const seal::SmallModulus& mod,
-                bool print = false);
-
-            bool debug_not_equals(
-                FFieldArray& true_x,
-                const seal::Ciphertext& c,
-                SenderSessionContext& ctx);
         };
     }
 }
