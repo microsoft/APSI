@@ -502,8 +502,6 @@ void ChannelTests::SendQueryTest()
 {
     thread serverth([this]
     {
-        // This will not work until I can figure out an easy way to create valid
-        // pub_key, relin_keys and Ciphertexts.
         PublicKey pub_key;
         RelinKeys relin_keys;
         map<u64, vector<Ciphertext>> query;
@@ -522,6 +520,7 @@ void ChannelTests::SendQueryTest()
     CPPUNIT_ASSERT_EQUAL(SOP_query, sender_op->type);
     auto query_op = dynamic_pointer_cast<SenderOperationQuery>(sender_op);
 
+    // For now we can only verify sizes, as all strings received will be empty.
     CPPUNIT_ASSERT(query_op != nullptr);
     CPPUNIT_ASSERT_EQUAL((size_t)1, query_op->query.size());
     CPPUNIT_ASSERT_EQUAL((size_t)1, query_op->query.at(5).size());

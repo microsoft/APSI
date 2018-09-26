@@ -84,18 +84,18 @@ namespace apsi
         {
         public:
             SenderOperationQuery() = delete;
-            SenderOperationQuery(seal::PublicKey& pub_key, seal::RelinKeys& relin_keys, std::map<apsi::u64, std::vector<seal::Ciphertext>>&& queryp)
+            SenderOperationQuery(const std::string& pub, const std::string& relin, std::map<apsi::u64, std::vector<std::string>>&& queryp)
                 : SenderOperation(SOP_query),
-                  public_key(pub_key),
-                  relin_keys(relin_keys),
+                  public_key(pub),
+                  relin_keys(relin),
                   query(queryp)
             {}
 
             virtual ~SenderOperationQuery() = default;
 
-            seal::PublicKey public_key;
-            seal::RelinKeys relin_keys;
-            std::map<apsi::u64, std::vector<seal::Ciphertext>> query;
+            std::string public_key;
+            std::string relin_keys;
+            std::map<apsi::u64, std::vector<std::string>> query;
         };
     }
 }

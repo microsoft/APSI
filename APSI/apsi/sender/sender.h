@@ -102,7 +102,16 @@ namespace apsi
             /**
             Preprocess items from Receiver encoded in given buffer
             */
-            void preprocess(std::vector<apsi::u8>& buffer);
+            void preprocess(std::vector<apsi::u8>& buff);
+
+            /**
+            Generate a response to a query
+            */
+            void query(
+                const std::string& pub_key,
+                const std::string& relin_keys,
+                const std::map<apsi::u64, std::vector<std::string>> query,
+                std::vector<apsi::ResultPackage>& result);
 
             /**
             Receive a query from a Receiver and generate a response
@@ -160,7 +169,7 @@ namespace apsi
             Responds to a query from the receiver. Input is a map of powers of receiver's items, from k to y^k, where k is an
             exponent, y is an item in receiver's cuckoo hashing table.
 
-            Returns (#splits x #batches) ciphertexts, each of which is a result of the compoute_dot_product function.
+            Returns (#splits x #batches) ciphertexts, each of which is a result of the compute_dot_product function.
 
             @see compute_dot_product for an explanation of the result.
             */

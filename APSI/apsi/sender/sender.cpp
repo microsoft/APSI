@@ -207,6 +207,81 @@ void Sender::handshake(Channel& chl)
     chl.send(params_.sender_bin_size());
 }
 
+void Sender::preprocess(vector<u8>& buff)
+{
+    StopwatchScope preproc_sc(sender_stop_watch, "Sender::preprocess");
+    Log::info("Starting pre-processing");
+
+    PRNG pp(cc_block);
+    digit_t key[NWORDS_ORDER];
+    random_fourq(key, pp);
+    auto iter = buff.data();
+    auto step = (sizeof(digit_t) * NWORDS_ORDER) - 1;
+    digit_t x[NWORDS_ORDER];
+    u64 num = buff.size() / step;
+
+    for (u64 i = 0; i < num; i++)
+    {
+        buffer_to_eccoord(iter, x);
+        Montgomery_multiply_mod_order(x, key, x);
+        eccoord_to_buffer(x, iter);
+
+        iter += step;
+    }
+
+    Log::info("Pre-processing done");
+}
+
+void Sender::query(
+    const string& pub_key_str,
+    const string& relin_keys_str,
+    const map<u64, vector<string>> query,
+    vector<ResultPackage>& result)
+{
+    StopwatchScope query_sc(sender_stop_watch, "Sender::query");
+    Log::info("Start processing query");
+
+    PublicKey pub_key;
+    RelinKeys relin_keys;
+    get_public_key(pub_key, pub_key_str);
+    get_relin_keys(relin_keys, relin_keys_str);
+
+    SenderSessionContext session_context(seal_context_, pub_key, relin_keys);
+
+    /* Receive client's query data. */
+    int num_of_powers = static_cast<int>(query.size());
+    Log::debug("Number of powers: %i", num_of_powers);
+    Log::debug("Current batch count: %i", params_.batch_count());
+
+    vector<vector<Ciphertext>> powers(params_.batch_count());
+    auto split_size_plus_one = params_.split_size() + 1;
+
+    for (u64 i = 0; i < powers.size(); ++i)
+    {
+        powers[i].reserve(split_size_plus_one);
+
+        for (u64 j = 0; j < split_size_plus_one; ++j)
+        {
+            powers[i].emplace_back(seal_context_, pool_);
+        }
+    }
+
+    for (const auto& pair : query)
+    {
+        u64 power = pair.first;
+
+        for (u64 i = 0; i < powers.size(); i++)
+        {
+            get_ciphertext(powers[i][power], pair.second[i]);
+        }
+    }
+
+    /* Answer the query. */
+    //respond(powers, session_context, chl);
+    Log::info("Finished processing session");
+
+}
+
 void Sender::query_session(Channel &chl)
 {
     handshake(chl);
@@ -217,31 +292,11 @@ void Sender::query_session(Channel &chl)
     // Send the EC point when using OPRF
     if (params_.use_oprf())
     {
-        StopwatchScope sndr_oprf_preproc(sender_stop_watch, "Sender::query_session::OPRF");
-        Log::info("Starting OPRF query pre-processing");
-
         vector<u8> buff;
+
         chl.receive(buff);
-
-        PRNG pp(cc_block);
-        digit_t key[NWORDS_ORDER];
-        random_fourq(key, pp);
-        auto iter = buff.data();
-        auto step = (sizeof(digit_t) * NWORDS_ORDER) - 1;
-        digit_t x[NWORDS_ORDER];
-        u64 num = buff.size() / step;
-
-        for (u64 i = 0; i < num; i++)
-        {
-            buffer_to_eccoord(iter, x);
-            Montgomery_multiply_mod_order(x, key, x);
-            eccoord_to_buffer(x, iter);
-
-            iter += step;
-        }
-
+        preprocess(buff);
         chl.send(buff);
-        Log::info("OPRF query pre-processing done");
     }
 
     /* Set up and receive keys. */

@@ -27,7 +27,7 @@ namespace APSITests
         CPPUNIT_TEST(DataCountsTest);
         CPPUNIT_TEST(SendGetParametersTest);
         CPPUNIT_TEST(SendPreprocessTest);
-        // CPPUNIT_TEST(SendQueryTest); // Disabled until I can find out how to create a public key and ciphertext
+        CPPUNIT_TEST(SendQueryTest);
         CPPUNIT_TEST(SendGetParametersResponseTest);
         CPPUNIT_TEST(SendPreprocessResponseTest);
         CPPUNIT_TEST(SendQueryResponseTest);

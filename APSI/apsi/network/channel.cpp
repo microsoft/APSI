@@ -304,18 +304,15 @@ bool Channel::receive(shared_ptr<SenderOperation>& sender_op, bool wait_for_mess
 
     case SOP_query:
         {
-            PublicKey pub_key;
-            RelinKeys relin_keys;
-            map<u64, vector<Ciphertext>> query;
+            string pub_key;
+            string relin_keys;
+            map<u64, vector<string>> query;
 
-            string str;
-            msg.get(str, /* part */ 1);
-            get_public_key(pub_key, str);
-            bytes_received_ += str.length();
+            msg.get(pub_key, /* part */ 1);
+            bytes_received_ += pub_key.length();
 
-            msg.get(str, /* part */ 2);
-            get_relin_keys(relin_keys, str);
-            bytes_received_ += str.length();
+            msg.get(relin_keys, /* part */ 2);
+            bytes_received_ += relin_keys.length();
 
             auto query_count = msg.get<size_t>(/* part */ 3);
             bytes_received_ += sizeof(size_t);
@@ -326,15 +323,12 @@ bool Channel::receive(shared_ptr<SenderOperation>& sender_op, bool wait_for_mess
             {
                 u64 power = msg.get<u64>(msg_idx++);
                 size_t num_elems = msg.get<size_t>(msg_idx++);
-                vector<Ciphertext> powers;
+                vector<string> powers(num_elems);
 
                 for (u64 j = 0; j < num_elems; j++)
                 {
-                    Ciphertext ciphertext;
-                    msg.get(str, msg_idx++);
-                    get_ciphertext(ciphertext, str);
-                    bytes_received_ += str.length();
-                    powers.push_back(ciphertext);
+                    msg.get(powers[j], msg_idx++);
+                    bytes_received_ += powers[j].length();
                 }
 
                 query.insert_or_assign(power, powers);

@@ -84,9 +84,13 @@ void SenderDispatcher::dispatch_preprocess(shared_ptr<SenderOperation> sender_op
 void SenderDispatcher::dispatch_query(shared_ptr<SenderOperation> sender_op, Channel& channel)
 {
     auto query_op = dynamic_pointer_cast<SenderOperationQuery>(sender_op);
+    vector<ResultPackage> result;
 
-    //sender_->query(
-    //    query_op->public_key,
-    //    query_op->relin_keys,
-    //    query_op->query);
+    sender_->query(
+        query_op->public_key,
+        query_op->relin_keys,
+        query_op->query,
+        result);
+
+    channel.send_query_response(result);
 }
