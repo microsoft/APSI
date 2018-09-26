@@ -6,7 +6,12 @@
 // APSI
 #include "apsi/sender/senderdispatcher.h"
 #include "apsi/network/channel.h"
+#include "apsi/network/network_utils.h"
 #include "apsi/logging/log.h"
+
+// SEAL
+#include "seal/publickey.h"
+#include "seal/relinkeys.h"
 
 // ZeroMQ
 #pragma warning(push, 0)
@@ -15,6 +20,7 @@
 
 
 using namespace std;
+using namespace seal;
 using namespace apsi;
 using namespace apsi::sender;
 using namespace apsi::network;
@@ -85,10 +91,15 @@ void SenderDispatcher::dispatch_query(shared_ptr<SenderOperation> sender_op, Cha
 {
     auto query_op = dynamic_pointer_cast<SenderOperationQuery>(sender_op);
     vector<ResultPackage> result;
+    PublicKey pub_key;
+    RelinKeys relin_keys;
+
+    get_public_key(pub_key, query_op->public_key);
+    get_relin_keys(relin_keys, query_op->relin_keys);
 
     sender_->query(
-        query_op->public_key,
-        query_op->relin_keys,
+        pub_key,
+        relin_keys,
         query_op->query,
         result);
 

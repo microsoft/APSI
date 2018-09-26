@@ -233,18 +233,13 @@ void Sender::preprocess(vector<u8>& buff)
 }
 
 void Sender::query(
-    const string& pub_key_str,
-    const string& relin_keys_str,
+    const PublicKey& pub_key,
+    const RelinKeys& relin_keys,
     const map<u64, vector<string>> query,
     vector<ResultPackage>& result)
 {
     StopwatchScope query_sc(sender_stop_watch, "Sender::query");
     Log::info("Start processing query");
-
-    PublicKey pub_key;
-    RelinKeys relin_keys;
-    get_public_key(pub_key, pub_key_str);
-    get_relin_keys(relin_keys, relin_keys_str);
 
     SenderSessionContext session_context(seal_context_, pub_key, relin_keys);
 
@@ -277,7 +272,8 @@ void Sender::query(
     }
 
     /* Answer the query. */
-    //respond(powers, session_context, chl);
+    respond(powers, session_context, result);
+
     Log::info("Finished processing session");
 
 }
@@ -336,7 +332,13 @@ void Sender::query_session(Channel &chl)
     }
 
     /* Answer the query. */
-    respond(powers, session_context, chl);
+    vector<ResultPackage> result;
+    respond(powers, session_context, result);
+    for (const auto& pkg : result)
+    {
+        chl.send(pkg);
+    }
+
     Log::info("Finished processing session");
 }
 
@@ -344,7 +346,7 @@ void Sender::query_session(Channel &chl)
 void Sender::respond(
     vector<vector<Ciphertext>>& powers,
     SenderSessionContext &session_context,
-    Channel &channel)
+    vector<ResultPackage>& result)
 {
     StopwatchScope respond_scope(sender_stop_watch, "Sender::respond");
 
@@ -353,6 +355,8 @@ void Sender::respond(
     int	splitStep = batch_count * split_size_plus_one;
     int total_blocks = params_.split_count() * batch_count;
 
+    // One ResultPackage per block.
+    result.resize(total_blocks);
 
     session_context.encryptor()->encrypt(BigPoly(string("1")), powers[0][0]);
     for (u64 i = 1; i < powers.size(); ++i)
@@ -360,11 +364,12 @@ void Sender::respond(
         powers[i][0] = powers[0][0];
     }
 
-
     auto& plain_mod = params_.encryption_params().plain_modulus();
 
     WindowingDag dag(params_.split_size(), params_.window_size());
-    std::vector<WindowingDag::State> states; states.reserve(batch_count);
+    std::vector<WindowingDag::State> states;
+    states.reserve(batch_count);
+
     for (u64 i = 0; i < batch_count; ++i)
         states.emplace_back(dag);
 
@@ -387,7 +392,7 @@ void Sender::respond(
                          dag,
                          states,
                          remaining_batches,
-                         channel);
+                         result);
         });
     }
 
@@ -408,7 +413,7 @@ void Sender::respond_work(
     WindowingDag& dag,
     vector<WindowingDag::State>& states,
     atomic<int>& remaining_batches,
-    Channel& channel)
+    vector<ResultPackage>& result)
 {
     StopwatchScope respond_work_scope(sender_stop_watch, "Sender::respond_work");
 
@@ -564,7 +569,7 @@ void Sender::respond_work(
             pkg.label_data = ss.str();
         }
 
-        channel.send(pkg);
+        result[block_idx] = pkg;
     }
 
     /* After this point, this thread will no longer use the context resource, so it is free to return it. */

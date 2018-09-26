@@ -108,8 +108,8 @@ namespace apsi
             Generate a response to a query
             */
             void query(
-                const std::string& pub_key,
-                const std::string& relin_keys,
+                const seal::PublicKey& pub_key,
+                const seal::RelinKeys& relin_keys,
                 const std::map<apsi::u64, std::vector<std::string>> query,
                 std::vector<apsi::ResultPackage>& result);
 
@@ -173,8 +173,10 @@ namespace apsi
 
             @see compute_dot_product for an explanation of the result.
             */
-            void respond(std::vector<std::vector<seal::Ciphertext> > &query,
-                apsi::sender::SenderSessionContext &session_context, apsi::network::Channel &channel);
+            void respond(
+                std::vector<std::vector<seal::Ciphertext> > &query,
+                apsi::sender::SenderSessionContext &session_context,
+                std::vector<apsi::ResultPackage>& result);
 
             /**
             Method that handles the work of a single thread that computes the response to a query.
@@ -190,7 +192,7 @@ namespace apsi
                 apsi::sender::WindowingDag& dag,
                 std::vector<apsi::sender::WindowingDag::State>& states,
                 std::atomic<int>& remaining_batches,
-                apsi::network::Channel& channel);
+                std::vector<apsi::ResultPackage>& result);
 
 
             /**
