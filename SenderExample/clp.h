@@ -34,7 +34,7 @@ namespace apsi
 
     private:
         TCLAP::ValueArg<int> net_port_arg_ = TCLAP::ValueArg<int>("", "port", "Network port to bind to", false, 1212, "int");
-        TCLAP::ValueArg<std::string> db_file_arg_ = TCLAP::ValueArg<std::string>("", "db", "Path to the file containing the Sender database", false, "", "string");
+        TCLAP::ValueArg<std::string> db_file_arg_ = TCLAP::ValueArg<std::string>("", "db", "Path to the file containing the Sender database", true, "", "string");
 
         int net_port_;
         std::string db_file_;

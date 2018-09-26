@@ -133,30 +133,9 @@ string get_bind_address(const CLP& cmd)
 
 void initialize_db(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels)
 {
-    auto sender_size = 1 << cmd.sender_size();
     auto label_bit_length  = cmd.use_labels() ? cmd.item_bit_length() : 0;
     auto label_byte_length = (label_bit_length + 7) / 8;
 
-    if (cmd.db_file().empty())
-    {
-        items.resize(sender_size);
-        labels.resize(sender_size, label_byte_length);
-
-        for (int i = 0; i < items.size(); i++)
-        {
-            items[i] = i;
-
-            if (label_bit_length) {
-                memset(labels[i].data(), 0, labels[i].size());
-
-                labels[i][0] = i;
-                labels[i][1] = (i >> 8);
-            }
-        }
-    }
-    else
-    {
-        CSVReader reader(cmd.db_file());
-        reader.read(items, labels, label_byte_length);
-    }
+    CSVReader reader(cmd.db_file());
+    reader.read(items, labels, label_byte_length);
 }
