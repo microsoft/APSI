@@ -209,6 +209,16 @@ namespace apsi
             void add_data(gsl::span<const Item> keys, MatrixView<u8> values, int thread_count);
 
             /**
+            Handles the work of one thread for adding items to sender's database
+            */
+            void add_data_worker(
+                int thread_idx,
+                int thread_count,
+                const apsi::block& seed,
+                gsl::span<const apsi::Item> data,
+                apsi::MatrixView<apsi::u8> values);
+
+            /**
             Adds one item to sender's database.
             */
             void add_data(const Item &item, int thread_count);

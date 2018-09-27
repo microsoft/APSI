@@ -382,7 +382,7 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::decrypt(
         thrds[t] = std::thread([&](int idx)
         {
             decrypt_worker(
-                static_cast<int>(idx),
+                idx,
                 batch_size,
                 thread_count_,
                 result,
