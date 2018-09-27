@@ -6,6 +6,7 @@
 #include <thread>
 #include <mutex>
 #include <map>
+#include <memory>
 
 // APSI
 #include "apsi/apsidefines.h"
@@ -53,7 +54,7 @@ namespace apsi
             /**
             * Destroy an instance of a Channel
             */
-            ~Channel();
+            virtual ~Channel();
 
             /**
             * Receive the contents of the buffer. Will resize the buffer
@@ -259,11 +260,23 @@ namespace apsi
             void send_query_response(const std::vector<apsi::ResultPackage>& result);
 
 
+        protected:
+            /**
+            Get socket type for this channel.
+            */
+            virtual zmqpp::socket_type get_socket_type()
+            {
+                // default is pair
+                return zmqpp::socket_type::pair;
+            }
+
+
         private:
             u64 bytes_sent_;
             u64 bytes_received_;
 
-            zmqpp::socket_t socket_;
+            const zmqpp::context_t& context_;
+            std::unique_ptr<zmqpp::socket_t> socket_;
             std::string end_point_;
 
             apsi::tools::ThreadPool thread_pool_;
@@ -296,12 +309,6 @@ namespace apsi
             */
             void add_buffer(const std::vector<u8>& buff, zmqpp::message_t& msg) const;
 
-            virtual zmqpp::socket_type get_socket_type() const
-            {
-                // Default is pair.
-                return zmqpp::socket_type::pair;
-            }
-
             /**
             Get a part from a message
             */
@@ -322,6 +329,19 @@ namespace apsi
                 set(const T& data, zmqpp::message_t& msg) const
             {
                 msg.add_raw(&data, sizeof(T));
+            }
+
+            /**
+            Get socket
+            */
+            std::unique_ptr<zmqpp::socket_t>& get_socket()
+            {
+                if (nullptr == socket_)
+                {
+                    socket_ = std::make_unique<zmqpp::socket_t>(context_, get_socket_type());
+                }
+
+                return socket_;
             }
         };
     }

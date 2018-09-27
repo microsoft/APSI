@@ -15,8 +15,8 @@ namespace apsi
                 : Channel(context)
             {}
 
-        private:
-            virtual zmqpp::socket_type get_socket_type() const
+        protected:
+            virtual zmqpp::socket_type get_socket_type()
             {
                 return zmqpp::socket_type::reply;
             }

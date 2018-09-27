@@ -8,6 +8,7 @@
 
 // APSI
 #include "apsi/apsi.h"
+#include "apsi/network/senderchannel.h"
 #include "apsi/network/receiverchannel.h"
 #include "apsi/tools/utils.h"
 #include "apsi/tools/csvreader.h"
@@ -134,8 +135,8 @@ void example_slow_batching(const CLP& cmd)
 
     // Connect the network
     zmqpp::context_t context;
-    Channel recvChl(context);
-    Channel sendChl(context);
+    ReceiverChannel recvChl(context);
+    SenderChannel sendChl(context);
 
     string bind_addr = get_bind_addr(cmd);
     string conn_addr = get_conn_addr(cmd);

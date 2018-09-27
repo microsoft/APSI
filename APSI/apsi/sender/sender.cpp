@@ -274,8 +274,7 @@ void Sender::query(
     /* Answer the query. */
     respond(powers, session_context, result);
 
-    Log::info("Finished processing session");
-
+    Log::info("Finished processing query");
 }
 
 void Sender::query_session(Channel &chl)

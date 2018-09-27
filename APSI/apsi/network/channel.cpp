@@ -18,7 +18,7 @@ Channel::Channel(const context_t& ctx)
     : bytes_sent_(0),
       bytes_received_(0),
       end_point_(""),
-      socket_(ctx, get_socket_type()),
+      context_(ctx),
       thread_pool_(thread::hardware_concurrency()),
       receive_mutex_(),
       send_mutex_()
@@ -219,7 +219,7 @@ void Channel::bind(const string& end_point)
     throw_if_connected();
 
     end_point_ = end_point;
-    socket_.bind(end_point);
+    get_socket()->bind(end_point);
 }
 
 void Channel::connect(const string& end_point)
@@ -227,14 +227,14 @@ void Channel::connect(const string& end_point)
     throw_if_connected();
 
     end_point_ = end_point;
-    socket_.connect(end_point);
+    get_socket()->connect(end_point);
 }
 
 void Channel::disconnect()
 {
     throw_if_not_connected();
 
-    socket_.close();
+    get_socket()->close();
     end_point_ = "";
 }
 
@@ -254,7 +254,7 @@ void Channel::receive_message(message_t& msg)
 {
     // Ensure we receive one message at a time.
     unique_lock<mutex> rec_lock(receive_mutex_);
-    bool received = socket_.receive(msg);
+    bool received = get_socket()->receive(msg);
 
     if (!received)
         throw runtime_error("Failed to receive message.");
@@ -264,7 +264,7 @@ void Channel::send_message(message_t& msg)
 {
     // Ensure we send one message at a time.
     unique_lock<mutex> snd_lock(send_mutex_);
-    bool sent = socket_.send(msg);
+    bool sent = get_socket()->send(msg);
 
     if (!sent)
         throw runtime_error("Failed to send message");
@@ -275,7 +275,7 @@ bool Channel::receive(shared_ptr<SenderOperation>& sender_op, bool wait_for_mess
     throw_if_not_connected();
 
     message_t msg;
-    if (!socket_.receive(msg, !wait_for_message))
+    if (!get_socket()->receive(msg, !wait_for_message))
     {
         // No message yet.
         return false;
@@ -357,7 +357,7 @@ void Channel::receive(SenderResponseGetParameters& response)
     throw_if_not_connected();
 
     message_t msg;
-    socket_.receive(msg);
+    get_socket()->receive(msg);
 
     // We should have two parts
     if (msg.parts() != 2)
@@ -381,7 +381,7 @@ void Channel::receive(SenderResponsePreprocess& response)
     throw_if_not_connected();
 
     message_t msg;
-    socket_.receive(msg);
+    get_socket()->receive(msg);
 
     // We should have 3 parts
     if (msg.parts() != 3)
@@ -403,7 +403,7 @@ void Channel::receive(SenderResponseQuery& response)
     throw_if_not_connected();
 
     message_t msg;
-    socket_.receive(msg);
+    get_socket()->receive(msg);
 
     // We should have at least 2 parts
     if (msg.parts() < 2)
@@ -452,7 +452,7 @@ void Channel::send_get_parameters()
     add_message_type(type, msg);
 
     // that's it!
-    socket_.send(msg);
+    get_socket()->send(msg);
 
     bytes_sent_ += sizeof(SenderOperationType);
 }
@@ -468,7 +468,7 @@ void Channel::send_get_parameters_response(const PSIParams& params)
     // For now only sender bin size
     msg.add(params.sender_bin_size());
 
-    socket_.send(msg);
+    get_socket()->send(msg);
 
     bytes_sent_ += sizeof(SenderOperationType);
     bytes_sent_ += sizeof(int);
@@ -484,7 +484,7 @@ void Channel::send_preprocess(const vector<u8>& buffer)
     add_message_type(type, msg);
     add_buffer(buffer, msg);
 
-    socket_.send(msg);
+    get_socket()->send(msg);
 
     bytes_sent_ += sizeof(SenderOperationType);
     bytes_sent_ += buffer.size();
@@ -500,7 +500,7 @@ void Channel::send_preprocess_response(const std::vector<apsi::u8>& buffer)
     add_message_type(type, msg);
     add_buffer(buffer, msg);
 
-    socket_.send(msg);
+    get_socket()->send(msg);
 
     bytes_sent_ += sizeof(SenderOperationType);
     bytes_sent_ += buffer.size();
@@ -546,7 +546,7 @@ void Channel::send_query(
         bytes_sent_ += sizeof(size_t);
     }
 
-    socket_.send(msg);
+    get_socket()->send(msg);
 }
 
 void Channel::send_query_response(const std::vector<apsi::ResultPackage>& result)
@@ -574,7 +574,7 @@ void Channel::send_query_response(const std::vector<apsi::ResultPackage>& result
     bytes_sent_ += sizeof(SenderOperationType);
     bytes_sent_ += sizeof(size_t);
 
-    socket_.send(msg);
+    get_socket()->send(msg);
 }
 
 void Channel::get_buffer(vector<u8>& buff, const message_t& msg, int part_start) const

@@ -2,7 +2,7 @@
 
 #include <memory>
 #include "cppunit/extensions/HelperMacros.h"
-#include "apsi/network/channel.h"
+#include "apsi/apsidefines.h"
 
 
 namespace APSITests

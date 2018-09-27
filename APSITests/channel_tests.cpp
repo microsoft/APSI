@@ -2,6 +2,7 @@
 #include "utils.h"
 #include <limits>
 #include "apsi/result_package.h"
+#include "apsi/network/channel.h"
 #include "seal/publickey.h"
 
 using namespace APSITests;
