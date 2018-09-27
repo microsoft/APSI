@@ -627,6 +627,8 @@ SenderOperationType Channel::get_message_type(const message_t& msg) const
         throw invalid_argument("Message should have at least type");
 
     // First part is message type
-    SenderOperationType type = static_cast<SenderOperationType>(msg.get<int>(/* part */ 0));
+    int msg_type;
+    get(msg_type, msg, /* part */ 0);
+    SenderOperationType type = static_cast<SenderOperationType>(msg_type);
     return type;
 }
