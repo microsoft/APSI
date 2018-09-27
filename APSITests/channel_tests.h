@@ -11,18 +11,6 @@ namespace APSITests
     {
         CPPUNIT_TEST_SUITE(ChannelTests);
 
-        CPPUNIT_TEST(SendIntTest);
-        CPPUNIT_TEST(SendBlockTest);
-        CPPUNIT_TEST(SendIntAsyncTest);
-        CPPUNIT_TEST(SendBlockAsyncTest);
-        CPPUNIT_TEST(SendStringTest);
-        CPPUNIT_TEST(SendStringAsyncTest);
-        CPPUNIT_TEST(SendStringVectorTest);
-        CPPUNIT_TEST(SendStringVectorAsyncTest);
-        CPPUNIT_TEST(SendBufferTest);
-        CPPUNIT_TEST(SendBufferAsyncTest);
-        CPPUNIT_TEST(SendResultPackageTest);
-        CPPUNIT_TEST(SendResultPackageAsyncTest);
         CPPUNIT_TEST(ThrowWithoutConnectTest);
         CPPUNIT_TEST(DataCountsTest);
         CPPUNIT_TEST(SendGetParametersTest);
@@ -38,18 +26,6 @@ namespace APSITests
         ChannelTests() = default;
         ~ChannelTests();
 
-        void SendIntTest();
-        void SendBlockTest();
-        void SendIntAsyncTest();
-        void SendBlockAsyncTest();
-        void SendStringTest();
-        void SendStringAsyncTest();
-        void SendStringVectorTest();
-        void SendStringVectorAsyncTest();
-        void SendBufferTest();
-        void SendBufferAsyncTest();
-        void SendResultPackageTest();
-        void SendResultPackageAsyncTest();
         void ThrowWithoutConnectTest();
         void DataCountsTest();
         void SendGetParametersTest();

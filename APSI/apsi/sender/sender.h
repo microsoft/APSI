@@ -114,19 +114,12 @@ namespace apsi
                 std::vector<apsi::ResultPackage>& result);
 
             /**
-            Receive a query from a Receiver and generate a response
-            */
-            void query_session(apsi::network::Channel& channel);
-
-            /**
             Return a reference to the PSI parameters used by the Sender
             */
             const apsi::PSIParams& get_params() const { return params_; }
 
         private:
             void initialize();
-
-            void handshake(apsi::network::Channel& channel);
 
             int acquire_thread_context();
 

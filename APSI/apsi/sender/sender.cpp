@@ -197,16 +197,6 @@ void Sender::report_offline_compute_progress(int total_threads, atomic<bool>& wo
     }
 }
 
-void Sender::handshake(Channel& chl)
-{
-    // Receive start of session by Receiver.
-    int receiver_version;
-    chl.receive(receiver_version);
-
-    // Send bin size so client can configure itself correctly.
-    chl.send(params_.sender_bin_size());
-}
-
 void Sender::preprocess(vector<u8>& buff)
 {
     StopwatchScope preproc_sc(sender_stop_watch, "Sender::preprocess");
@@ -276,71 +266,6 @@ void Sender::query(
 
     Log::info("Finished processing query");
 }
-
-void Sender::query_session(Channel &chl)
-{
-    handshake(chl);
-
-    Log::info("Starting session");
-    StopwatchScope sndr_query_sess_scope(sender_stop_watch, "Sender::query_session");
-
-    // Send the EC point when using OPRF
-    if (params_.use_oprf())
-    {
-        vector<u8> buff;
-
-        chl.receive(buff);
-        preprocess(buff);
-        chl.send(buff);
-    }
-
-    /* Set up and receive keys. */
-    PublicKey pub;
-    RelinKeys relin;
-    receive_pubkey(pub, chl);
-    receive_relinkeys(relin, chl);
-
-    SenderSessionContext session_context(seal_context_, pub, relin);
-
-    /* Receive client's query data. */
-    int num_of_powers;
-    chl.receive(num_of_powers);
-    Log::debug("Received powers: %i", num_of_powers);
-    Log::debug("Current batch count: %i", params_.batch_count());
-
-    vector<vector<Ciphertext>> powers(params_.batch_count());
-    auto split_size_plus_one = params_.split_size() + 1;
-
-    for (u64 i = 0; i < powers.size(); ++i)
-    {
-        powers[i].reserve(split_size_plus_one);
-        for (u64 j = 0; j < split_size_plus_one; ++j)
-            powers[i].emplace_back(seal_context_, pool_);
-
-    }
-
-    while (num_of_powers-- > 0)
-    {
-        uint64_t power;
-        chl.receive(power);
-
-        for (u64 i = 0; i < powers.size(); ++i)
-        {
-            receive_ciphertext(powers[i][power], chl);
-        }
-    }
-
-    /* Answer the query. */
-    vector<ResultPackage> result;
-    respond(powers, session_context, result);
-    for (const auto& pkg : result)
-    {
-        chl.send(pkg);
-    }
-
-    Log::info("Finished processing session");
-}
-
 
 void Sender::respond(
     vector<vector<Ciphertext>>& powers,

@@ -131,85 +131,87 @@ std::string print(gsl::span<u8> s)
 
 void example_slow_batching(const CLP& cmd)
 {
-    print_example_banner("Example: Slow batching");
+    throw runtime_error("Deprecated.");
 
-    // Connect the network
-    zmqpp::context_t context;
-    ReceiverChannel recvChl(context);
-    SenderChannel sendChl(context);
+    //print_example_banner("Example: Slow batching");
 
-    string bind_addr = get_bind_addr(cmd);
-    string conn_addr = get_conn_addr(cmd);
+    //// Connect the network
+    //zmqpp::context_t context;
+    //ReceiverChannel recvChl(context);
+    //SenderChannel sendChl(context);
 
-    Log::info("Binding Sender to address: %s", bind_addr.c_str());
-    sendChl.bind(bind_addr);
+    //string bind_addr = get_bind_addr(cmd);
+    //string conn_addr = get_conn_addr(cmd);
 
-    Log::info("Connecting receiver to address: %s", conn_addr.c_str());
-    recvChl.connect(conn_addr);
+    //Log::info("Binding Sender to address: %s", bind_addr.c_str());
+    //sendChl.bind(bind_addr);
 
-    // Thread count
-    unsigned numThreads = cmd.threads();
+    //Log::info("Connecting receiver to address: %s", conn_addr.c_str());
+    //recvChl.connect(conn_addr);
 
-    PSIParams params = build_psi_params(cmd);
+    //// Thread count
+    //unsigned numThreads = cmd.threads();
 
-    std::unique_ptr<Receiver> receiver_ptr;
+    //PSIParams params = build_psi_params(cmd);
 
-    int recThreads = cmd.rec_threads();
+    //std::unique_ptr<Receiver> receiver_ptr;
 
-    // Check that number of blocks is not smaller than thread count
-    if(max<int>(numThreads, recThreads) > params.split_count() * params.batch_count())
-    {
-        cout << "WARNING: Using too many threads for block count!" << endl;
-    }
+    //int recThreads = cmd.rec_threads();
 
-    auto f = std::async([&]()
-    {
-        receiver_ptr = make_unique<Receiver>(params, recThreads, MemoryPoolHandle::New());
-    });
-    Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New());
-    f.get();
-    Receiver& receiver = *receiver_ptr;
+    //// Check that number of blocks is not smaller than thread count
+    //if(max<int>(numThreads, recThreads) > params.split_count() * params.batch_count())
+    //{
+    //    cout << "WARNING: Using too many threads for block count!" << endl;
+    //}
 
-    auto label_bit_length = cmd.use_labels() ? cmd.item_bit_length() : 0;
-    auto sendersActualSize = 1 << cmd.sender_size();
-    auto recversActualSize = 50;
-    auto intersectionSize = 25;
+    //auto f = std::async([&]()
+    //{
+    //    receiver_ptr = make_unique<Receiver>(params, recThreads, MemoryPoolHandle::New());
+    //});
+    //Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New());
+    //f.get();
+    //Receiver& receiver = *receiver_ptr;
 
-    auto s1 = vector<Item>(sendersActualSize);
-    Matrix<u8> labels(sendersActualSize, params.get_label_byte_count());
-    for (int i = 0; i < s1.size(); i++)
-    {
-        s1[i] = i;
+    //auto label_bit_length = cmd.use_labels() ? cmd.item_bit_length() : 0;
+    //auto sendersActualSize = 1 << cmd.sender_size();
+    //auto recversActualSize = 50;
+    //auto intersectionSize = 25;
 
-        if (label_bit_length) {
-            memset(labels[i].data(), 0, labels[i].size());
+    //auto s1 = vector<Item>(sendersActualSize);
+    //Matrix<u8> labels(sendersActualSize, params.get_label_byte_count());
+    //for (int i = 0; i < s1.size(); i++)
+    //{
+    //    s1[i] = i;
 
-            labels[i][0] = i;
-            labels[i][1] = (i >> 8);
-        }
-    }
+    //    if (label_bit_length) {
+    //        memset(labels[i].data(), 0, labels[i].size());
 
-    auto cc1 = rand_subset(s1, intersectionSize);
-    auto& c1 = cc1.first;
+    //        labels[i][0] = i;
+    //        labels[i][1] = (i >> 8);
+    //    }
+    //}
 
-    c1.reserve(recversActualSize);
-    for (int i = 0; i < (recversActualSize - intersectionSize); ++i)
-        c1.emplace_back(i + s1.size());
+    //auto cc1 = rand_subset(s1, intersectionSize);
+    //auto& c1 = cc1.first;
 
-    sender.load_db(s1, labels);
+    //c1.reserve(recversActualSize);
+    //for (int i = 0; i < (recversActualSize - intersectionSize); ++i)
+    //    c1.emplace_back(i + s1.size());
 
-    auto thrd = thread([&]() {
-        sender.query_session(sendChl); 
-    });
-    recv_stop_watch.add_event("receiver start");
-    auto intersection = receiver.query(c1, recvChl);
-    recv_stop_watch.add_event("receiver done");
-    thrd.join();
+    //sender.load_db(s1, labels);
 
-    // Done with everything. Print the results!
-    print_intersection_results(c1, intersectionSize, intersection, label_bit_length > 0, cc1.second, labels);
-    print_timing_info();
-    print_transmitted_data(recvChl);
+    //auto thrd = thread([&]() {
+    //    sender.query_session(sendChl); 
+    //});
+    //recv_stop_watch.add_event("receiver start");
+    //auto intersection = receiver.query(c1, recvChl);
+    //recv_stop_watch.add_event("receiver done");
+    //thrd.join();
+
+    //// Done with everything. Print the results!
+    //print_intersection_results(c1, intersectionSize, intersection, label_bit_length > 0, cc1.second, labels);
+    //print_timing_info();
+    //print_transmitted_data(recvChl);
 }
 
 void example_remote(const CLP& cmd)
@@ -228,6 +230,12 @@ void example_remote(const CLP& cmd)
 
     PSIParams params = build_psi_params(cmd);
     Receiver receiver(params, cmd.rec_threads());
+
+    // Check that number of blocks is not smaller than thread count
+    if (cmd.rec_threads() > params.split_count() * params.batch_count())
+    {
+        Log::warning("Using too many threads for block count!");
+    }
 
     vector<Item> items;
     Matrix<u8> labels;

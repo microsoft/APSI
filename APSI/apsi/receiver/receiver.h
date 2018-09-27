@@ -55,8 +55,6 @@ namespace apsi
                 std::unique_ptr<cuckoo::CuckooInterface>
             > preprocess(std::vector<Item> &items, apsi::network::Channel& channel);
 
-            void send(const std::map<std::uint64_t, std::vector<seal::Ciphertext>> &query_data, apsi::network::Channel &channel);
-
             /**
             Hash all items in the input vector into a cuckoo hashing table.
             */

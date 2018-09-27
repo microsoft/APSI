@@ -211,26 +211,6 @@ pair<
     return { move(ciphers), move(cuckoo) };
 }
 
-void Receiver::send(const map<uint64_t, vector<Ciphertext> > &query, Channel &channel)
-{
-    StopwatchScope recv_send(recv_stop_watch, "Receiver::send");
-
-    channel.send_query(public_key_, relin_keys_, query);
-    /* Send keys. */
-    send_pubkey(public_key_, channel);
-    send_relinkeys(relin_keys_, channel);
-
-    /* Send query data. */
-    channel.send(query.size());
-    for (map<uint64_t, vector<Ciphertext> >::const_iterator it = query.begin(); it != query.end(); it++)
-    {
-        channel.send(it->first);
-
-        for(auto& c : it->second)
-            send_ciphertext(c, channel);
-    }
-}
-
 unique_ptr<CuckooInterface> Receiver::cuckoo_hashing(const vector<Item> &items)
 {
     auto receiver_null_item = all_one_block;

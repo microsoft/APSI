@@ -15,18 +15,6 @@
 
 namespace apsi
 {
-    void send_ciphertext(const seal::Ciphertext &ciphertext, apsi::network::Channel &channel);
-
-    void receive_ciphertext(seal::Ciphertext &ciphertext, apsi::network::Channel &channel);
-
-    void send_relinkeys(const seal::RelinKeys &keys, apsi::network::Channel &channel);
-
-    void receive_relinkeys(seal::RelinKeys &keys, apsi::network::Channel &channel);
-
-    void send_pubkey(const seal::PublicKey &pubkey, apsi::network::Channel &channel);
-
-    void receive_pubkey(seal::PublicKey &pubkey, apsi::network::Channel &channel);
-
     /**
     Get string for a public key
     */
