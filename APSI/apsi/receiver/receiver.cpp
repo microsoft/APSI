@@ -117,8 +117,24 @@ void Receiver::handshake(Channel& chl)
     chl.receive(sender_params);
 
     // Now we need to set the correct bin size that we got form the Sender.
-    params_.set_sender_bin_size(sender_params.sender_bin_size);
     Log::debug("Set sender bin size to %i", sender_params.sender_bin_size);
+    params_.set_sender_bin_size(sender_params.sender_bin_size);
+ 
+    if (sender_params.use_oprf)
+    {
+        Log::debug("Sender is using OPRF. Turning on.");
+    }
+    else
+    {
+        Log::debug("Sender is not using OPRF. Turning off.");
+    }
+    params_.set_use_oprf(sender_params.use_oprf);
+
+    Log::debug("Set item bit count to %i", sender_params.item_bit_count);
+    params_.set_item_bit_count(sender_params.item_bit_count);
+
+    Log::debug("Set label bit count to %i", sender_params.label_bit_count);
+    params_.set_value_bit_count(sender_params.label_bit_count);
 
     Log::info("Handshake done");
 }

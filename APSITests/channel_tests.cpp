@@ -239,15 +239,35 @@ void ChannelTests::SendGetParametersResponseTest()
         CuckooParams cuckoo_params { 3, 2, 1 };
         SEALParams seal_params;
 
-        PSIParams params(60, true, table_params, cuckoo_params, seal_params);
+        unsigned item_bit_count = 60;
+        PSIParams params(item_bit_count, true, table_params, cuckoo_params, seal_params);
+        params.set_value_bit_count(item_bit_count);
 
         server_.send_get_parameters_response(params);
+
+        table_params.sender_bin_size = 54321;
+        item_bit_count = 80;
+        PSIParams params2(item_bit_count, false, table_params, cuckoo_params, seal_params);
+        params2.set_value_bit_count(0);
+
+        server_.send_get_parameters_response(params2);
     });
 
     SenderResponseGetParameters get_params_response;
     client_.receive(get_params_response);
 
     CPPUNIT_ASSERT_EQUAL(12345, get_params_response.sender_bin_size);
+    CPPUNIT_ASSERT_EQUAL(true,  get_params_response.use_oprf);
+    CPPUNIT_ASSERT_EQUAL(60,    get_params_response.item_bit_count);
+    CPPUNIT_ASSERT_EQUAL(60,    get_params_response.label_bit_count);
+
+    SenderResponseGetParameters get_params_response2;
+    client_.receive(get_params_response2);
+
+    CPPUNIT_ASSERT_EQUAL(54321, get_params_response2.sender_bin_size);
+    CPPUNIT_ASSERT_EQUAL(false, get_params_response2.use_oprf);
+    CPPUNIT_ASSERT_EQUAL(80,    get_params_response2.item_bit_count);
+    CPPUNIT_ASSERT_EQUAL(0,     get_params_response2.label_bit_count);
 
     serverth.join();
 }

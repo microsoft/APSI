@@ -155,9 +155,9 @@ void Channel::receive(SenderResponseGetParameters& response)
     message_t msg;
     get_socket()->receive(msg);
 
-    // We should have two parts
-    if (msg.parts() != 2)
-        throw runtime_error("Message should have two parts");
+    // We should have five parts
+    if (msg.parts() != 5)
+        throw runtime_error("Message should have five parts");
 
     // First part is message type
     SenderOperationType type = get_message_type(msg);
@@ -165,11 +165,15 @@ void Channel::receive(SenderResponseGetParameters& response)
     if (type != SOP_get_parameters)
         throw runtime_error("Message should be get parameters type");
 
-    // Second part is the actual parameter: sender bin size
-    response.sender_bin_size = msg.get<int>(/* part */ 1);
+    // Parameters start from second part
+    response.sender_bin_size  = msg.get<int>(/* part */ 1);
+    response.use_oprf         = msg.get<bool>(/* part */ 2);
+    response.item_bit_count   = msg.get<int>(/* part */ 3);
+    response.label_bit_count  = msg.get<int>(/* part */ 4);
 
     bytes_received_ += sizeof(SenderOperationType);
-    bytes_received_ += sizeof(int);
+    bytes_received_ += sizeof(int) * 3;
+    bytes_received_ += sizeof(bool);
 }
 
 void Channel::receive(SenderResponsePreprocess& response)
@@ -261,8 +265,11 @@ void Channel::send_get_parameters_response(const PSIParams& params)
     SenderOperationType type = SOP_get_parameters;
     add_message_type(type, msg);
 
-    // For now only sender bin size
+    // Sender parameters
     msg.add(params.sender_bin_size());
+    msg.add(params.use_oprf());
+    msg.add(params.item_bit_count());
+    msg.add(params.get_label_bit_count());
 
     get_socket()->send(msg);
 

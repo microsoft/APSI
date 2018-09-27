@@ -17,6 +17,9 @@ namespace apsi
         struct SenderResponseGetParameters
         {
             int sender_bin_size;
+            bool use_oprf;
+            int item_bit_count;
+            int label_bit_count;
         };
 
         /**

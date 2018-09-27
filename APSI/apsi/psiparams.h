@@ -108,6 +108,11 @@ namespace apsi
             return use_oprf_;
         }
 
+        inline void set_use_oprf(bool use_oprf)
+        {
+            use_oprf_ = use_oprf;
+        }
+
         inline int log_table_size() const
         {
             return log_table_size_;
@@ -136,6 +141,12 @@ namespace apsi
         inline int item_bit_count() const
         {
             return item_bit_count_;
+        }
+
+        inline void set_item_bit_count(int item_bit_count)
+        {
+            item_bit_count_ = item_bit_count;
+            validate();
         }
 
         inline u64 exfield_characteristic() const
