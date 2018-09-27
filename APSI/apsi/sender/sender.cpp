@@ -412,7 +412,7 @@ void Sender::respond_worker(
         {
             if (block.batched_label_coeffs_.size() > 1)
             {
-                StopwatchScope online_interp_scope(sender_stop_watch, "Sender::respond_work::online_interpolate");
+                StopwatchScope online_interp_scope(sender_stop_watch, "Sender::respond_worker::online_interpolate");
 
                 // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
                 // Observe that the first call to mult is always multiplying coeff[0] by 1....
