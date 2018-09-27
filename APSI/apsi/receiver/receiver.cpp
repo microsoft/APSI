@@ -92,12 +92,15 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Ch
     auto& ciphertexts = qq.first;
     auto& cuckoo = *qq.second;
 
-    send(ciphertexts, chl);
+    chl.send_query(public_key_, relin_keys_, ciphertexts);
 
     auto table_to_input_map = cuckoo_indices(items, cuckoo);
 
-    /* Receive results in a streaming fashion. */
-    auto intersection = stream_decrypt(chl, table_to_input_map, items);
+    /* Receive results */
+    SenderResponseQuery query_resp;
+    chl.receive(query_resp);
+
+    auto intersection = decrypt(query_resp.result, table_to_input_map, items);
 
     Log::info("Receiver completed query");
 
@@ -109,16 +112,13 @@ void Receiver::handshake(Channel& chl)
     StopwatchScope rcvr_hndshk_scope(recv_stop_watch, "Receiver::handshake");
     Log::info("Initial handshake");
 
-    int receiver_version = 1;
+    SenderResponseGetParameters sender_params;
+    chl.send_get_parameters();
+    chl.receive(sender_params);
 
-    // Start query
-    chl.send(receiver_version);
-
-    // Sender will reply with correct bin size, which we need to use.
-    int sender_bin_size;
-    chl.receive(sender_bin_size);
-    params_.set_sender_bin_size(sender_bin_size);
-    Log::debug("Set sender bin size to %i", sender_bin_size);
+    // Now we need to set the correct bin size that we got form the Sender.
+    params_.set_sender_bin_size(sender_params.sender_bin_size);
+    Log::debug("Set sender bin size to %i", sender_params.sender_bin_size);
 
     Log::info("Handshake done");
 }
@@ -155,8 +155,7 @@ pair<
         }
 
         // send the data over the network and prep for the response.
-        channel.send(buff);
-        auto f = channel.async_receive(buff);
+        channel.send_preprocess(buff);
 
         // compute 1/b so that we can compute (x^ba)^(1/b) = x^a
         for (u64 i = 0; i < items.size(); ++i)
@@ -165,9 +164,12 @@ pair<
             Montgomery_inversion_mod_order(b[i].data(), inv);
             b[i] = vector<digit_t>(inv, inv + NWORDS_ORDER);
         }
-        f.get();
 
-        iter = buff.data();
+        // Now we can receive response from Sender
+        SenderResponsePreprocess sender_preproc;
+        channel.receive(sender_preproc);
+
+        iter = sender_preproc.buffer.data();
         for (u64 i = 0; i < items.size(); i++)
         {
             buffer_to_eccoord(iter, x);
@@ -213,6 +215,7 @@ void Receiver::send(const map<uint64_t, vector<Ciphertext> > &query, Channel &ch
 {
     StopwatchScope recv_send(recv_stop_watch, "Receiver::send");
 
+    channel.send_query(public_key_, relin_keys_, query);
     /* Send keys. */
     send_pubkey(public_key_, channel);
     send_relinkeys(relin_keys_, channel);
@@ -364,12 +367,12 @@ void Receiver::encrypt(const FFieldArray &input, vector<Ciphertext> &destination
     }
 }
 
-std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
-    Channel &channel,
+std::pair<std::vector<bool>, Matrix<u8>> Receiver::decrypt(
+    const vector<ResultPackage>& result,
     const std::vector<int> &table_to_input_map,
     std::vector<Item> &items)
 {
-    StopwatchScope str_decrypt_scope(recv_stop_watch, "Receiver::stream_decrypt");
+    StopwatchScope decrypt_scope(recv_stop_watch, "Receiver::decrypt");
     std::pair<std::vector<bool>, Matrix<u8>> ret;
     auto& ret_bools = ret.first;
     auto& ret_labels = ret.second;
@@ -386,12 +389,6 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
         block_count = num_of_splits * num_of_batches,
         batch_size = slot_count_;
 
-    std::vector<std::pair<ResultPackage, future<void>>> recv_packages(block_count);
-    for (auto& pkg : recv_packages)
-    {
-        pkg.second = channel.async_receive(pkg.first);
-    }
-
     auto num_threads = thread_count_;
     Log::debug("Decrypting %i blocks(%ib x %is) with %i threads",
         block_count,
@@ -404,11 +401,11 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
     {
         thrds[t] = std::thread([&](int idx)
         {
-            stream_decrypt_worker(
+            decrypt_worker(
                 static_cast<int>(idx),
                 batch_size,
                 thread_count_,
-                recv_packages,
+                result,
                 table_to_input_map,
                 ret_bools,
                 ret_labels);
@@ -421,16 +418,16 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
     return std::move(ret);
 }
 
-void Receiver::stream_decrypt_worker(
+void Receiver::decrypt_worker(
     int thread_idx,
     int batch_size,
     int num_threads,
-    vector<pair<ResultPackage, future<void>>>& recv_packages,
+    const vector<ResultPackage>& result,
     const vector<int> &table_to_input_map,
     vector<bool>& ret_bools,
     Matrix<u8>& ret_labels)
 {
-    StopwatchScope recv_str_decr_wkr_scope(recv_stop_watch, "Receiver::stream_decrypt_worker");
+    StopwatchScope recv_str_decr_wkr_scope(recv_stop_watch, "Receiver::decrypt_worker");
     MemoryPoolHandle local_pool(MemoryPoolHandle::New());
     Plaintext p(local_pool);
     Ciphertext tmp(seal_context_, local_pool);
@@ -442,16 +439,15 @@ void Receiver::stream_decrypt_worker(
 
     bool first = true;
 
-    for (u64 i = thread_idx; i < recv_packages.size(); i += num_threads)
+    for (u64 i = thread_idx; i < result.size(); i += num_threads)
     {
-        auto& pkg = recv_packages[i];
+        auto& pkg = result[i];
 
-        pkg.second.get();
-        auto base_idx = pkg.first.batch_idx * batch_size;
+        auto base_idx = pkg.batch_idx * batch_size;
 
         // recover the sym poly values 
         has_result = false;
-        stringstream ss(pkg.first.data);
+        stringstream ss(pkg.data);
         compressor_->compressed_load(ss, tmp);
 
         if (first && thread_idx == 0)
@@ -479,7 +475,7 @@ void Receiver::stream_decrypt_worker(
 
         if (has_result && params_.get_label_bit_count())
         {
-            std::stringstream ss(pkg.first.label_data);
+            std::stringstream ss(pkg.label_data);
 
             compressor_->compressed_load(ss, tmp);
 

@@ -48,7 +48,7 @@ namespace apsi
             void handshake(apsi::network::Channel& channel);
 
             /**
-            Preprocesses the PSI items. Returns the powr map of the items, and the indices of them in the hash table.
+            Preprocesses the PSI items. Returns the power map of the items, and the indices of them in the hash table.
             */
             std::pair<
                 std::map<std::uint64_t, std::vector<seal::Ciphertext>>,
@@ -107,19 +107,19 @@ namespace apsi
             @result Matrix of size (#splits x table_size_ceiling). Here table_size_ceiling is defined as (#batches x batch_size), which might be
             larger than table_size.
             */
-            std::pair<std::vector<bool>, Matrix<u8> > stream_decrypt(
-                apsi::network::Channel &channel,
+            std::pair<std::vector<bool>, Matrix<u8> > decrypt(
+                const std::vector<apsi::ResultPackage>& result,
                 const std::vector<int>& table_to_input_map,
                 std::vector<Item>& items);
 
             /**
-            Work to be done in a single thread for stream_decrypt
+            Work to be done in a single thread for decrypt
             */
-            void stream_decrypt_worker(
+            void decrypt_worker(
                 int thread_idx,
                 int batch_size,
                 int num_threads,
-                std::vector<std::pair<apsi::ResultPackage, std::future<void>>>& recv_packages,
+                const std::vector<apsi::ResultPackage>& result,
                 const std::vector<int> &table_to_input_map,
                 std::vector<bool>& ret_bools,
                 apsi::Matrix<apsi::u8>& ret_labels);

@@ -8,7 +8,7 @@
 
 // APSI
 #include "apsi/apsi.h"
-#include "apsi/network/channel.h"
+#include "apsi/network/receiverchannel.h"
 #include "apsi/tools/utils.h"
 #include "apsi/tools/csvreader.h"
 #include "apsi/logging/log.h"
@@ -219,7 +219,7 @@ void example_remote(const CLP& cmd)
 
     // Connect to the network
     zmqpp::context_t context;
-    Channel channel(context);
+    ReceiverChannel channel(context);
 
     string conn_addr = get_conn_addr(cmd);
     Log::info("Receiver connecting to address: %s", conn_addr.c_str());
