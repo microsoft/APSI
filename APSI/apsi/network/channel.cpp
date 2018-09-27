@@ -272,6 +272,8 @@ void Channel::send_message(message_t& msg)
 
 bool Channel::receive(shared_ptr<SenderOperation>& sender_op, bool wait_for_message)
 {
+    throw_if_not_connected();
+
     message_t msg;
     if (!socket_.receive(msg, !wait_for_message))
     {
@@ -352,6 +354,8 @@ bool Channel::receive(shared_ptr<SenderOperation>& sender_op, bool wait_for_mess
 
 void Channel::receive(SenderResponseGetParameters& response)
 {
+    throw_if_not_connected();
+
     message_t msg;
     socket_.receive(msg);
 
@@ -374,6 +378,8 @@ void Channel::receive(SenderResponseGetParameters& response)
 
 void Channel::receive(SenderResponsePreprocess& response)
 {
+    throw_if_not_connected();
+
     message_t msg;
     socket_.receive(msg);
 
@@ -394,6 +400,8 @@ void Channel::receive(SenderResponsePreprocess& response)
 
 void Channel::receive(SenderResponseQuery& response)
 {
+    throw_if_not_connected();
+
     message_t msg;
     socket_.receive(msg);
 
@@ -437,6 +445,8 @@ void Channel::receive(SenderResponseQuery& response)
 
 void Channel::send_get_parameters()
 {
+    throw_if_not_connected();
+
     message_t msg;
     SenderOperationType type = SOP_get_parameters;
     add_message_type(type, msg);
@@ -449,6 +459,8 @@ void Channel::send_get_parameters()
 
 void Channel::send_get_parameters_response(const PSIParams& params)
 {
+    throw_if_not_connected();
+
     message_t msg;
     SenderOperationType type = SOP_get_parameters;
     add_message_type(type, msg);
@@ -464,6 +476,8 @@ void Channel::send_get_parameters_response(const PSIParams& params)
 
 void Channel::send_preprocess(const vector<u8>& buffer)
 {
+    throw_if_not_connected();
+
     message_t msg;
     SenderOperationType type = SOP_preprocess;
 
@@ -478,6 +492,8 @@ void Channel::send_preprocess(const vector<u8>& buffer)
 
 void Channel::send_preprocess_response(const std::vector<apsi::u8>& buffer)
 {
+    throw_if_not_connected();
+
     message_t msg;
     SenderOperationType type = SOP_preprocess;
 
@@ -496,6 +512,8 @@ void Channel::send_query(
     const map<u64, vector<Ciphertext>>& query
 )
 {
+    throw_if_not_connected();
+
     message_t msg;
     SenderOperationType type = SOP_query;
     add_message_type(type, msg);
@@ -533,6 +551,8 @@ void Channel::send_query(
 
 void Channel::send_query_response(const std::vector<apsi::ResultPackage>& result)
 {
+    throw_if_not_connected();
+
     message_t msg;
     SenderOperationType type = SOP_query;
     add_message_type(type, msg);
@@ -563,7 +583,8 @@ void Channel::get_buffer(vector<u8>& buff, const message_t& msg, int part_start)
     if (msg.parts() < (part_start + 1))
         throw runtime_error("Should have size at least");
 
-    size_t size = msg.get<size_t>(/* part */ part_start);
+    size_t size;
+    get(size, msg, /* part */ part_start);
 
     // If the vector is not empty, we need the part with the data
     if (size > 0 && msg.parts() < (part_start + 2))

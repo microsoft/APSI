@@ -301,6 +301,18 @@ namespace apsi
                 // Default is pair.
                 return zmqpp::socket_type::pair;
             }
+
+            /**
+            * Get a part from a message
+            */
+            template<typename T>
+            typename std::enable_if<std::is_pod<T>::value, void>::type
+                get(T& data, const zmqpp::message_t& msg, const size_t part) const
+            {
+                const T* presult;
+                msg.get(&presult, /* part */ 0);
+                memcpy(&data, presult, sizeof(T));
+            }
         };
     }
 }
