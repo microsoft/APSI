@@ -605,7 +605,7 @@ void Channel::get_buffer(vector<u8>& buff, const message_t& msg, int part_start)
 void Channel::add_buffer(const vector<u8>& buff, message_t& msg) const
 {
     // First part is size
-    msg.add(buff.size());
+    set(buff.size(), msg);
 
     if (buff.size() > 0)
     {
@@ -617,7 +617,7 @@ void Channel::add_buffer(const vector<u8>& buff, message_t& msg) const
 void Channel::add_message_type(const SenderOperationType type, message_t& msg) const
 {
     // Transform to int to have it have a fixed size
-    msg.add(static_cast<int>(type));
+    set(static_cast<int>(type), msg);
 }
 
 SenderOperationType Channel::get_message_type(const message_t& msg) const

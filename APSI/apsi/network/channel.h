@@ -303,15 +303,25 @@ namespace apsi
             }
 
             /**
-            * Get a part from a message
+            Get a part from a message
             */
             template<typename T>
             typename std::enable_if<std::is_pod<T>::value, void>::type
                 get(T& data, const zmqpp::message_t& msg, const size_t part) const
             {
                 const T* presult;
-                msg.get(&presult, /* part */ 0);
+                msg.get(&presult, part);
                 memcpy(&data, presult, sizeof(T));
+            }
+
+            /**
+            Set a part on a message
+            */
+            template<typename T>
+            typename std::enable_if<std::is_pod<T>::value, void>::type
+                set(const T& data, zmqpp::message_t& msg) const
+            {
+                msg.add_raw(&data, sizeof(T));
             }
         };
     }
