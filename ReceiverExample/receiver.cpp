@@ -232,7 +232,7 @@ void remote_query(const CLP& cmd)
 
     vector<int> label_idx;
     bool compare_labels = false;
-    if (!cmd.query_file().empty() && cmd.use_labels())
+    if (!cmd.query_file().empty() && receiver.get_params().get_label_bit_count() > 0)
     {
         // We can compare labels.
         compare_labels = true;

@@ -89,15 +89,10 @@ void run_sender_dispatcher(const CLP& cmd)
     Matrix<u8> labels;
 
     initialize_db(cmd, items, labels);
-    PSIParams params = build_psi_params(cmd, items.size());
 
-    //u64 sender_bin_size = compute_sender_bin_size(
-    //    params.log_table_size(),
-    //    items.size(),
-    //    params.hash_func_count(),
-    //    params.binning_sec_level(),
-    //    params.split_count());
-    //params.set_sender_bin_size(static_cast<int>(sender_bin_size));
+    int label_bit_length = cmd.use_labels() ? cmd.item_bit_length() : 0;
+    PSIParams params = build_psi_params(cmd, items.size(), cmd.item_bit_length(), label_bit_length, cmd.use_oprf());
+    params.validate();
 
     Log::info("Building sender");
     shared_ptr<Sender> sender = make_shared<Sender>(params, cmd.threads(), cmd.threads());

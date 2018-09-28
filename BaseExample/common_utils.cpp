@@ -65,14 +65,13 @@ void apsi::tools::prepare_console()
 #endif
 }
 
-const apsi::PSIParams apsi::tools::build_psi_params(const BaseCLP& cmd, u64 sender_set_size)
+const apsi::PSIParams apsi::tools::build_psi_params(
+    const BaseCLP& cmd,
+    const apsi::u64 sender_set_size,
+    const int item_bit_length,
+    const int label_bit_length,
+    const bool use_oprf)
 {
-    // Length of items
-    unsigned item_bit_length = cmd.item_bit_length();
-
-    bool useLabels = cmd.use_labels();
-    unsigned label_bit_length = useLabels ? item_bit_length : 0;
-
     // Cuckoo hash parameters
     CuckooParams cuckoo_params;
     {
@@ -168,15 +167,11 @@ const apsi::PSIParams apsi::tools::build_psi_params(const BaseCLP& cmd, u64 send
         seal_params.decomposition_bit_count = cmd.dbc();
     }
 
-    // Use OPRF to eliminate need for noise flooding for sender's security
-    auto use_OPRF = cmd.oprf();
-
     /*
     Creating the PSIParams class.
     */
-    PSIParams params(item_bit_length, use_OPRF, table_params, cuckoo_params, seal_params);
+    PSIParams params(item_bit_length, use_oprf, table_params, cuckoo_params, seal_params);
     params.set_value_bit_count(label_bit_length);
-    params.validate();
 
     return params;
 }

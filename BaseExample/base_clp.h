@@ -49,12 +49,6 @@ namespace apsi
             TCLAP::ValueArg<unsigned> secLvlArg("", "secLevel", "Security level", false, 40, "unsigned");
             add(secLvlArg);
 
-            TCLAP::ValueArg<unsigned> itmBitLengthArg("b", "itemBitLength", "Item bit length", false, 60, "unsigned");
-            add(itmBitLengthArg);
-
-            TCLAP::SwitchArg labelsArg("l", "useLabels", "Use labels", false);
-            add(labelsArg);
-
             TCLAP::ValueArg<int> logTblSzArg("", "logTableSize", "Table Size", false, 10, "int");
             add(logTblSzArg);
 
@@ -79,9 +73,6 @@ namespace apsi
             TCLAP::ValueArg<int> exFldDegreeArg("", "exfieldDegree", "exField degree", false, 8, "int");
             add(exFldDegreeArg);
 
-            TCLAP::SwitchArg oprfArg("o", "oprf", "Use OPRF", false);
-            add(oprfArg);
-
             // No need to add log_level_arg_, already added in constructor
 
             // Additional arguments
@@ -96,12 +87,6 @@ namespace apsi
 
                 sec_level_ = secLvlArg.getValue();
                 cout_param("secLevel", sec_level_);
-
-                item_bit_length_ = itmBitLengthArg.getValue();
-                cout_param("itemBitLength", item_bit_length_);
-
-                use_labels_ = labelsArg.getValue();
-                cout_param("useLabels", use_labels_ ? "true" : "false");
 
                 log_table_size_ = logTblSzArg.getValue();
                 cout_param("logTableSize", log_table_size_);
@@ -141,9 +126,6 @@ namespace apsi
                 exfield_degree_ = exFldDegreeArg.getValue();
                 cout_param("exfieldDegree", exfield_degree_);
 
-                oprf_ = oprfArg.getValue();
-                cout_param("oprf", oprf_ ? "true" : "false");
-
                 log_level_ = log_level_arg_->getValue();
                 cout_param("logLevel", log_level_);
 
@@ -160,8 +142,6 @@ namespace apsi
 
         int threads() const { return threads_; }
         unsigned sec_level() const { return sec_level_; }
-        unsigned item_bit_length() const { return item_bit_length_; }
-        bool use_labels() const { return use_labels_; }
         int log_table_size() const { return log_table_size_; }
         int split_count() const { return split_count_; }
         int window_size() const { return window_size_; }
@@ -170,7 +150,6 @@ namespace apsi
         u64 plain_modulus() const { return plain_modulus_; }
         int dbc() const { return dbc_; }
         int exfield_degree() const { return exfield_degree_; }
-        bool oprf() const { return oprf_; }
         const std::string& log_level() const { return log_level_; }
 
     protected:
@@ -197,8 +176,6 @@ namespace apsi
         // Parameters from command line
         int threads_;
         unsigned sec_level_;
-        unsigned item_bit_length_;
-        bool use_labels_;
         int log_table_size_;
         int split_count_;
         int window_size_;
@@ -207,7 +184,6 @@ namespace apsi
         u64 plain_modulus_;
         int dbc_;
         int exfield_degree_;
-        bool oprf_;
         std::string log_level_;
 
         // Parameters with constraints

@@ -147,6 +147,11 @@ namespace apsi
                 return secret_key_;
             }
 
+            const PSIParams& get_params() const
+            {
+                return params_;
+            }
+
         private:
             void initialize();
 
