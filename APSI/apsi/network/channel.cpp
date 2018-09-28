@@ -86,57 +86,15 @@ bool Channel::receive(shared_ptr<SenderOperation>& sender_op, bool wait_for_mess
     switch (type)
     {
     case SOP_get_parameters:
-        // We don't need any other data.
-        sender_op = make_shared<SenderOperationGetParameters>();
+        sender_op = decode_get_parameters(msg);
         break;
 
     case SOP_preprocess:
-        {
-            vector<u8> buffer;
-            get_buffer(buffer, msg, /* part_start */ 1);
-            sender_op = make_shared<SenderOperationPreprocess>(std::move(buffer));
-
-            bytes_received_ += buffer.size();
-        }
+        sender_op = decode_preprocess(msg);
         break;
 
     case SOP_query:
-        {
-            string pub_key;
-            string relin_keys;
-            map<u64, vector<string>> query;
-
-            msg.get(pub_key, /* part */ 1);
-            bytes_received_ += pub_key.length();
-
-            msg.get(relin_keys, /* part */ 2);
-            bytes_received_ += relin_keys.length();
-
-            auto query_count = msg.get<size_t>(/* part */ 3);
-            bytes_received_ += sizeof(size_t);
-
-            size_t msg_idx = 4;
-
-            for (u64 i = 0; i < query_count; i++)
-            {
-                u64 power = msg.get<u64>(msg_idx++);
-                size_t num_elems = msg.get<size_t>(msg_idx++);
-                vector<string> powers(num_elems);
-
-                for (u64 j = 0; j < num_elems; j++)
-                {
-                    msg.get(powers[j], msg_idx++);
-                    bytes_received_ += powers[j].length();
-                }
-
-                query.insert_or_assign(power, powers);
-
-                bytes_received_ += sizeof(u64);
-                bytes_received_ += sizeof(size_t);
-            }
-
-            sender_op = make_shared<SenderOperationQuery>(pub_key, relin_keys, std::move(query));
-        }
+        sender_op = decode_query(msg);
         break;
 
     default:
@@ -330,13 +288,13 @@ void Channel::send_query(
     msg.add(str);
     bytes_sent_ += str.length();
 
-    msg.add(query.size());
+    add_part(query.size(), msg);
     bytes_sent_ += sizeof(size_t);
 
     for (const auto& pair : query)
     {
-        msg.add(pair.first);
-        msg.add(pair.second.size());
+        add_part(pair.first, msg);
+        add_part(pair.second.size(), msg);
 
         for (const auto& ciphertext : pair.second)
         {
@@ -387,7 +345,7 @@ void Channel::get_buffer(vector<u8>& buff, const message_t& msg, int part_start)
         throw runtime_error("Should have size at least");
 
     size_t size;
-    get(size, msg, /* part */ part_start);
+    get_part(size, msg, /* part */ part_start);
 
     // If the vector is not empty, we need the part with the data
     if (size > 0 && msg.parts() < (part_start + 2))
@@ -408,7 +366,7 @@ void Channel::get_buffer(vector<u8>& buff, const message_t& msg, int part_start)
 void Channel::add_buffer(const vector<u8>& buff, message_t& msg) const
 {
     // First part is size
-    set(buff.size(), msg);
+    add_part(buff.size(), msg);
 
     if (buff.size() > 0)
     {
@@ -420,7 +378,7 @@ void Channel::add_buffer(const vector<u8>& buff, message_t& msg) const
 void Channel::add_message_type(const SenderOperationType type, message_t& msg) const
 {
     // Transform to int to have it have a fixed size
-    set(static_cast<int>(type), msg);
+    add_part(static_cast<int>(type), msg);
 }
 
 SenderOperationType Channel::get_message_type(const message_t& msg) const
@@ -431,7 +389,67 @@ SenderOperationType Channel::get_message_type(const message_t& msg) const
 
     // First part is message type
     int msg_type;
-    get(msg_type, msg, /* part */ 0);
+    get_part(msg_type, msg, /* part */ 0);
     SenderOperationType type = static_cast<SenderOperationType>(msg_type);
     return type;
+}
+
+shared_ptr<SenderOperation> Channel::decode_get_parameters(const message_t& msg)
+{
+    // Nothing in the message to decode.
+    return make_shared<SenderOperationGetParameters>();
+}
+
+shared_ptr<SenderOperation> Channel::decode_preprocess(const message_t& msg)
+{
+    vector<u8> buffer;
+    get_buffer(buffer, msg, /* part_start */ 1);
+
+    bytes_received_ += buffer.size();
+
+    return make_shared<SenderOperationPreprocess>(std::move(buffer));
+}
+
+shared_ptr<SenderOperation> Channel::decode_query(const message_t& msg)
+{
+    string pub_key;
+    string relin_keys;
+    map<u64, vector<string>> query;
+
+    msg.get(pub_key, /* part */ 1);
+    bytes_received_ += pub_key.length();
+
+    msg.get(relin_keys, /* part */ 2);
+    bytes_received_ += relin_keys.length();
+
+    size_t query_count;
+    get_part(query_count, msg, /* part */ 3);
+    bytes_received_ += sizeof(size_t);
+
+    size_t msg_idx = 4;
+
+    for (u64 i = 0; i < query_count; i++)
+    {
+        u64 power;
+        get_part(power, msg, msg_idx++);
+
+        size_t num_elems;
+        get_part(num_elems, msg, msg_idx++);
+
+        vector<string> powers(num_elems);
+
+        for (u64 j = 0; j < num_elems; j++)
+        {
+            msg.get(powers[j], msg_idx++);
+
+            bytes_received_ += powers[j].length();
+        }
+
+        query.insert_or_assign(power, powers);
+
+        bytes_received_ += sizeof(u64);
+        bytes_received_ += sizeof(size_t);
+    }
+
+    return make_shared<SenderOperationQuery>(pub_key, relin_keys, std::move(query));
 }

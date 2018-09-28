@@ -83,7 +83,6 @@ namespace apsi
             */
             bool is_connected() const { return !end_point_.empty(); }
 
-        public:
             /**
             * Receive a Sender Operation.
             *
@@ -165,6 +164,24 @@ namespace apsi
             void throw_if_connected() const;
 
             /**
+            Decode a Get Parameters message
+            */
+            std::shared_ptr<apsi::network::SenderOperation>
+                decode_get_parameters(const zmqpp::message_t& msg);
+
+            /**
+            Decode a Preprocess message
+            */
+            std::shared_ptr<apsi::network::SenderOperation>
+                decode_preprocess(const zmqpp::message_t& msg);
+
+            /**
+            Decode a Query message
+            */
+            std::shared_ptr<apsi::network::SenderOperation>
+                decode_query(const zmqpp::message_t& msg);
+
+            /**
             Add message type to message
             */
             void add_message_type(const SenderOperationType type, zmqpp::message_t& msg) const;
@@ -190,7 +207,7 @@ namespace apsi
             */
             template<typename T>
             typename std::enable_if<std::is_pod<T>::value, void>::type
-                get(T& data, const zmqpp::message_t& msg, const size_t part) const
+                get_part(T& data, const zmqpp::message_t& msg, const size_t part) const
             {
                 const T* presult;
                 msg.get(&presult, part);
@@ -198,11 +215,11 @@ namespace apsi
             }
 
             /**
-            Set a part on a message
+            Add a part to a message
             */
             template<typename T>
             typename std::enable_if<std::is_pod<T>::value, void>::type
-                set(const T& data, zmqpp::message_t& msg) const
+                add_part(const T& data, zmqpp::message_t& msg) const
             {
                 msg.add_raw(&data, sizeof(T));
             }
