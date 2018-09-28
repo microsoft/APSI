@@ -46,9 +46,6 @@ namespace apsi
             TCLAP::ValueArg<int> threadsArg("t", "threads", "Number of threads to use", /* req */ false, /* value */ 1, "int");
             add(threadsArg);
 
-            TCLAP::ValueArg<unsigned> senderSzArg("s", "senderSize", "Size of sender database", false, 20, "unsigned");
-            add(senderSzArg);
-
             TCLAP::ValueArg<unsigned> secLvlArg("", "secLevel", "Security level", false, 40, "unsigned");
             add(secLvlArg);
 
@@ -96,9 +93,6 @@ namespace apsi
 
                 threads_ = threadsArg.getValue();
                 cout_param("threads", threads_);
-
-                sender_size_ = senderSzArg.getValue();
-                cout_param("senderSize", sender_size_);
 
                 sec_level_ = secLvlArg.getValue();
                 cout_param("secLevel", sec_level_);
@@ -165,7 +159,6 @@ namespace apsi
         }
 
         int threads() const { return threads_; }
-        unsigned sender_size() const { return sender_size_; }
         unsigned sec_level() const { return sec_level_; }
         unsigned item_bit_length() const { return item_bit_length_; }
         bool use_labels() const { return use_labels_; }
@@ -203,7 +196,6 @@ namespace apsi
 
         // Parameters from command line
         int threads_;
-        unsigned sender_size_;
         unsigned sec_level_;
         unsigned item_bit_length_;
         bool use_labels_;

@@ -83,21 +83,21 @@ void run_sender_dispatcher(const CLP& cmd)
 {
     print_example_banner("Remote Sender");
 
-    PSIParams params = build_psi_params(cmd);
-
     Log::info("Preparing sender DB");
 
     vector<Item> items;
     Matrix<u8> labels;
 
     initialize_db(cmd, items, labels);
-    u64 sender_bin_size = compute_sender_bin_size(
-        params.log_table_size(),
-        items.size(),
-        params.hash_func_count(),
-        params.binning_sec_level(),
-        params.split_count());
-    params.set_sender_bin_size(static_cast<int>(sender_bin_size));
+    PSIParams params = build_psi_params(cmd, items.size());
+
+    //u64 sender_bin_size = compute_sender_bin_size(
+    //    params.log_table_size(),
+    //    items.size(),
+    //    params.hash_func_count(),
+    //    params.binning_sec_level(),
+    //    params.split_count());
+    //params.set_sender_bin_size(static_cast<int>(sender_bin_size));
 
     Log::info("Building sender");
     shared_ptr<Sender> sender = make_shared<Sender>(params, cmd.threads(), cmd.threads());

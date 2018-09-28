@@ -98,7 +98,10 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Ch
 
     /* Receive results */
     SenderResponseQuery query_resp;
-    chl.receive(query_resp);
+    {
+        StopwatchScope qryw_sc(recv_stop_watch, "Receiver::query::wait_response");
+        chl.receive(query_resp);
+    }
 
     auto intersection = decrypt(query_resp.result, table_to_input_map, items);
 
@@ -114,7 +117,11 @@ void Receiver::handshake(Channel& chl)
 
     SenderResponseGetParameters sender_params;
     chl.send_get_parameters();
-    chl.receive(sender_params);
+
+    {
+        StopwatchScope wait_hnd_sc(recv_stop_watch, "Receiver::handshake::wait_response");
+        chl.receive(sender_params);
+    }
 
     // Now we need to set the correct bin size that we got form the Sender.
     Log::debug("Set sender bin size to %i", sender_params.sender_bin_size);
@@ -183,7 +190,10 @@ pair<
 
         // Now we can receive response from Sender
         SenderResponsePreprocess sender_preproc;
-        channel.receive(sender_preproc);
+        {
+            StopwatchScope rcv_ppwait_sc(recv_stop_watch, "Receiver::preprocess::wait_response");
+            channel.receive(sender_preproc);
+        }
 
         iter = sender_preproc.buffer.data();
         for (u64 i = 0; i < items.size(); i++)

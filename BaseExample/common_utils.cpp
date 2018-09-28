@@ -65,11 +65,8 @@ void apsi::tools::prepare_console()
 #endif
 }
 
-const apsi::PSIParams apsi::tools::build_psi_params(const BaseCLP& cmd)
+const apsi::PSIParams apsi::tools::build_psi_params(const BaseCLP& cmd, u64 sender_set_size)
 {
-    // Larger set size 
-    u64 sender_set_size = 1ull << cmd.sender_size();
-
     // Length of items
     unsigned item_bit_length = cmd.item_bit_length();
 
@@ -107,12 +104,16 @@ const apsi::PSIParams apsi::tools::build_psi_params(const BaseCLP& cmd)
         table_params.window_size = cmd.window_size();
 
         // Get secure bin size
-        table_params.sender_bin_size = static_cast<int>(compute_sender_bin_size(
-            table_params.log_table_size,
-            sender_set_size,
-            cuckoo_params.hash_func_count,
-            table_params.binning_sec_level,
-            table_params.split_count));
+        table_params.sender_bin_size = 0;
+        if (0 != sender_set_size)
+        {
+            table_params.sender_bin_size = static_cast<int>(compute_sender_bin_size(
+                table_params.log_table_size,
+                sender_set_size,
+                cuckoo_params.hash_func_count,
+                table_params.binning_sec_level,
+                table_params.split_count));
+        }
     }
 
     SEALParams seal_params;

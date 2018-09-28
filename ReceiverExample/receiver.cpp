@@ -355,49 +355,26 @@ string get_conn_addr(const CLP& cmd)
 
 int initialize_query(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels, int label_byte_count)
 {
-    if (cmd.query_file().empty())
+    // Read items that should exist from file
+    CSVReader reader(cmd.query_file());
+    reader.read(items, labels, label_byte_count);
+
+    u64 read_items = items.size();
+
+    // Now add some items that should _not_ be in the Sender.
+    PRNG prng(sys_random_seed());
+    labels.resize(read_items + 20, label_byte_count);
+
+    for (int i = 0; i < 20; i++)
     {
-        items.resize(20);
-        auto sender_size = 1 << cmd.sender_size();
+        u64 low_part = 0;
+        Item item = zero_block;
 
-        int i;
-        for (i = 0; i < items.size() / 2; i++)
-        {
-            // Items within sender
-            items[i] = i;
-        }
+        prng.get(reinterpret_cast<u8*>(&low_part), 7);
+        item[0] = low_part;
 
-        for (; i < items.size(); i++)
-        {
-            // Items that should not be within sender
-            items[i] = sender_size + i;
-        }
-
-        return static_cast<int>(items.size() / 2);
+        items.push_back(item);
     }
-    else
-    {
-        // Read items that should exist from file
-        CSVReader reader(cmd.query_file());
-        reader.read(items, labels, label_byte_count);
 
-        u64 read_items = items.size();
-
-        // Now add some items that should _not_ be in the Sender.
-        PRNG prng(sys_random_seed());
-        labels.resize(read_items + 20, label_byte_count);
-
-        for (int i = 0; i < 20; i++)
-        {
-            u64 low_part = 0;
-            Item item = zero_block;
-
-            prng.get(reinterpret_cast<u8*>(&low_part), 7);
-            item[0] = low_part;
-
-            items.push_back(item);
-        }
-
-        return static_cast<int>(read_items);
-    }
+    return static_cast<int>(read_items);
 }
