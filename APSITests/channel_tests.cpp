@@ -268,7 +268,6 @@ void ChannelTests::SendGetParametersResponseTest()
 {
     thread serverth([this]
     {
-        // At the moment the only parameter we care about is sender_bin_size, in table_params
         TableParams table_params { 10, 1, 2, 40, 12345 };
         CuckooParams cuckoo_params { 3, 2, 1 };
         SEALParams seal_params;

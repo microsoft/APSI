@@ -267,12 +267,15 @@ unique_ptr<CuckooInterface> Receiver::cuckoo_hashing(const vector<Item> &items)
             degree);
     }
 
-    bool insertionSuccess;
     for (int i = 0; i < items.size(); i++)
     {
-        insertionSuccess = cuckoo->insert(items[i]);
+        bool insertionSuccess = cuckoo->insert(items[i]);
         if (!insertionSuccess)
-            throw logic_error("Cuckoo hashing failed.");
+        {
+            string msg = "Cuckoo hashing failed";
+            Log::error("%s: current element: %i", msg.c_str(), i);
+            throw logic_error(msg);
+        }
     }
 
     return cuckoo;
