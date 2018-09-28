@@ -10,6 +10,7 @@ using namespace std;
 using namespace seal;
 using namespace apsi;
 using namespace apsi::network;
+using namespace apsi::tools;
 
 namespace
 {
@@ -78,85 +79,118 @@ void ChannelTests::ThrowWithoutConnectTest()
 
 void ChannelTests::DataCountsTest()
 {
-    //Channel svr(ctx_);
-    //Channel clt(ctx_);
+    Channel svr(ctx_);
+    Channel clt(ctx_);
 
-    //svr.bind("tcp://*:5554");
-    //clt.connect("tcp://localhost:5554");
+    svr.bind("tcp://*:5554");
+    clt.connect("tcp://localhost:5554");
 
-    //thread serverth([this, &svr]
-    //{
-    //    vector<u8> data1;
-    //    InitU8Vector(data1, 1000);
+    thread serverth([this, &svr]
+    {
+        this_thread::sleep_for(50ms);
 
-    //    // This should be 1000 bytes
-    //    svr.send(data1);
+        // This should be SenderOperationType size
+        svr.send_get_parameters();
 
-    //    vector<string> data2;
-    //    InitStringVector(data2, 100);
+        vector<u8> data1;
+        InitU8Vector(data1, 1000);
 
-    //    // This should be 190 bytes
-    //    svr.send(data2);
+        // This should be 1000 bytes + SenderOperationType size
+        svr.send_preprocess(data1);
 
-    //    // 4 bytes
-    //    u32 data3 = 10;
-    //    svr.send(data3);
+        PublicKey pubkey;
+        RelinKeys relinkeys;
+        map<u64, vector<Ciphertext>> querydata;
+        vector<Ciphertext> vec1;
+        vector<Ciphertext> vec2;
+        Ciphertext txt;
 
-    //    // 16 bytes
-    //    block data4 = _mm_set_epi64x(1, 1);
-    //    svr.send(data4);
+        vec1.push_back(txt);
+        vec2.push_back(txt);
+        querydata.insert_or_assign(1, vec1);
+        querydata.insert_or_assign(2, vec2);
 
-    //    string data5 = "Hello world!";
-    //    svr.send(data5);
+        // This should be:
+        // SenderOperationType size
+        // 57 for pubkey and 40 for relinkeys
+        // size_t size (number of entries in querydata)
+        // u64 size * 2 (each entry in querydata)
+        // size_t size * 2 (each entry in querydata)
+        // Ciphertexts will generate strings of length 57
+        svr.send_query(pubkey, relinkeys, querydata);
 
-    //    svr.receive(data1);
-    //    svr.receive(data2);
-    //    svr.receive(data3);
-    //    svr.receive(data4);
-    //    svr.receive(data5);
-    //});
+        SenderResponseGetParameters get_params_resp;
+        svr.receive(get_params_resp);
 
-    //vector<u8> data1;
-    //vector<string> data2;
-    //u32 data3;
-    //block data4;
-    //string data5;
+        SenderResponsePreprocess preprocess_resp;
+        svr.receive(preprocess_resp);
 
-    //CPPUNIT_ASSERT_EQUAL((u64)0, clt.get_total_data_received());
-    //CPPUNIT_ASSERT_EQUAL((u64)0, clt.get_total_data_sent());
+        SenderResponseQuery query_resp;
+        svr.receive(query_resp);
+    });
 
-    //clt.receive(data1);
-    //CPPUNIT_ASSERT_EQUAL((u64)1000, clt.get_total_data_received());
+    CPPUNIT_ASSERT_EQUAL((u64)0, clt.get_total_data_received());
+    CPPUNIT_ASSERT_EQUAL((u64)0, clt.get_total_data_sent());
+    CPPUNIT_ASSERT_EQUAL((u64)0, svr.get_total_data_received());
+    CPPUNIT_ASSERT_EQUAL((u64)0, svr.get_total_data_sent());
 
-    //clt.receive(data2);
-    //CPPUNIT_ASSERT_EQUAL((u64)1190, clt.get_total_data_received());
+    // get parameters
+    shared_ptr<SenderOperation> sender_op;
+    clt.receive(sender_op, /* wait_for_message */ true);
+    size_t expected_total = sizeof(SenderOperationType);
+    CPPUNIT_ASSERT_EQUAL(expected_total, clt.get_total_data_received());
 
-    //clt.receive(data3);
-    //CPPUNIT_ASSERT_EQUAL((u64)1194, clt.get_total_data_received());
+    // preprocess
+    clt.receive(sender_op, /* wait_for_message */ true);
+    expected_total += 1000;
+    expected_total += sizeof(SenderOperationType);
+    CPPUNIT_ASSERT_EQUAL(expected_total, clt.get_total_data_received());
 
-    //clt.receive(data4);
-    //CPPUNIT_ASSERT_EQUAL((u64)1210, clt.get_total_data_received());
+    // query
+    clt.receive(sender_op, /* wait_for_message */ true);
+    expected_total += sizeof(SenderOperationType);
+    expected_total += sizeof(size_t) * 3;
+    expected_total += sizeof(u64) * 2;
+    expected_total += (57 + 40); // pubkey + relinkeys
+    expected_total += 57 * 2; // Ciphertexts
+    CPPUNIT_ASSERT_EQUAL(expected_total, clt.get_total_data_received());
 
-    //clt.receive(data5);
-    //CPPUNIT_ASSERT_EQUAL((u64)1222, clt.get_total_data_received());
-    //CPPUNIT_ASSERT_EQUAL((u64)1222, svr.get_total_data_sent());
+    // get parameters response
+    TableParams table_params{ 10, 1, 2, 40, 12345 };
+    CuckooParams cuckoo_params{ 3, 2, 1 };
+    SEALParams seal_params;
+    PSIParams params(60, true, table_params, cuckoo_params, seal_params);
+    clt.send_get_parameters_response(params);
+    expected_total = sizeof(SenderOperationType);
+    expected_total += sizeof(int) * 3;
+    expected_total += sizeof(bool);
+    CPPUNIT_ASSERT_EQUAL(expected_total, clt.get_total_data_sent());
 
-    //clt.send(data1);
-    //CPPUNIT_ASSERT_EQUAL((u64)1000, clt.get_total_data_sent());
+    // Preprocess response
+    vector<u8> preproc;
+    InitU8Vector(preproc, 50);
+    clt.send_preprocess_response(preproc);
+    expected_total += sizeof(SenderOperationType);
+    expected_total += preproc.size();
+    CPPUNIT_ASSERT_EQUAL(expected_total, clt.get_total_data_sent());
 
-    //clt.send(data2);
-    //CPPUNIT_ASSERT_EQUAL((u64)1190, clt.get_total_data_sent());
+    // Query response
+    vector<ResultPackage> result;
+    ResultPackage pkg1 = { 1, 2, "one", "two" };
+    ResultPackage pkg2 = { 100, 200, "three", "four" };
+    ResultPackage pkg3 = { 20, 40, "hello", "world" };
+    result.push_back(pkg1);
+    result.push_back(pkg2);
+    result.push_back(pkg3);
+    clt.send_query_response(result);
 
-    //clt.send(data3);
-    //CPPUNIT_ASSERT_EQUAL((u64)1194, clt.get_total_data_sent());
+    expected_total += sizeof(int) * 6;
+    expected_total += 25; // strings
+    expected_total += sizeof(SenderOperationType);
+    expected_total += sizeof(size_t); // size of vector
+    CPPUNIT_ASSERT_EQUAL(expected_total, clt.get_total_data_sent());
 
-    //clt.send(data4);
-    //CPPUNIT_ASSERT_EQUAL((u64)1210, clt.get_total_data_sent());
-
-    //clt.send(data5);
-    //CPPUNIT_ASSERT_EQUAL((u64)1222, clt.get_total_data_sent());
-
-    //serverth.join();
+    serverth.join();
 }
 
 void ChannelTests::SendGetParametersTest()

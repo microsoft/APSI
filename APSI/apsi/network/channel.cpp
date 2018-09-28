@@ -232,7 +232,8 @@ void Channel::send_get_parameters_response(const PSIParams& params)
     get_socket()->send(msg);
 
     bytes_sent_ += sizeof(SenderOperationType);
-    bytes_sent_ += sizeof(int);
+    bytes_sent_ += sizeof(int) * 3;
+    bytes_sent_ += sizeof(bool);
 }
 
 void Channel::send_preprocess(const vector<u8>& buffer)
@@ -278,6 +279,7 @@ void Channel::send_query(
     message_t msg;
     SenderOperationType type = SOP_query;
     add_message_type(type, msg);
+    bytes_sent_ += sizeof(SenderOperationType);
 
     string str;
     get_string(str, pub_key);
