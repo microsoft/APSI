@@ -13,6 +13,16 @@
 #include "apsi/apsidefines.h"
 
 
+// Macro Magic to generate unique variable names. This is used for the
+// STOPWATCH macro.
+#define PP_CAT_II(p, res) res
+#define PP_CAT_I(a, b) PP_CAT_II(~, a ## b)
+#define PP_CAT(a, b) PP_CAT_I(a, b)
+#define UNIQUE_STOPWATCH_NAME(base) PP_CAT(base, __COUNTER__)
+
+// Measure a block
+#define STOPWATCH(stopwatch, name) StopwatchScope UNIQUE_STOPWATCH_NAME(stopwatchscope) (stopwatch, name);
+
 namespace apsi
 {
     namespace tools

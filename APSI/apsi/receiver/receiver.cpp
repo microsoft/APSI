@@ -54,7 +54,7 @@ Receiver::Receiver(const PSIParams &params, int thread_count, const MemoryPoolHa
 
 void Receiver::initialize()
 {
-    StopwatchScope init_receiver(recv_stop_watch, "Receiver::initialize");
+    STOPWATCH(recv_stop_watch, "Receiver::initialize");
     Log::info("Initializing Receiver");
 
     seal_context_ = SEALContext::Create(params_.encryption_params());
@@ -82,7 +82,7 @@ void Receiver::initialize()
 
 std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Channel& chl)
 {
-    StopwatchScope recv_query(recv_stop_watch, "Receiver::query");
+    STOPWATCH(recv_stop_watch, "Receiver::query");
     Log::info("Receiver starting query");
 
     // Perform initial communication with Sender
@@ -99,7 +99,7 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Ch
     /* Receive results */
     SenderResponseQuery query_resp;
     {
-        StopwatchScope qryw_sc(recv_stop_watch, "Receiver::query::wait_response");
+        STOPWATCH(recv_stop_watch, "Receiver::query::wait_response");
         chl.receive(query_resp);
     }
 
@@ -112,14 +112,14 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Ch
 
 void Receiver::handshake(Channel& chl)
 {
-    StopwatchScope rcvr_hndshk_scope(recv_stop_watch, "Receiver::handshake");
+    STOPWATCH(recv_stop_watch, "Receiver::handshake");
     Log::info("Initial handshake");
 
     SenderResponseGetParameters sender_params;
     chl.send_get_parameters();
 
     {
-        StopwatchScope wait_hnd_sc(recv_stop_watch, "Receiver::handshake::wait_response");
+        STOPWATCH(recv_stop_watch, "Receiver::handshake::wait_response");
         chl.receive(sender_params);
     }
 
@@ -151,7 +151,7 @@ pair<
     unique_ptr<CuckooInterface> >
     Receiver::preprocess(vector<Item> &items, Channel &channel)
 {
-    StopwatchScope preprocess_scope(recv_stop_watch, "Receiver::preprocess");
+    STOPWATCH(recv_stop_watch, "Receiver::preprocess");
     Log::info("Receiver preprocess start");
 
     if (params_.use_oprf())
@@ -191,7 +191,7 @@ pair<
         // Now we can receive response from Sender
         SenderResponsePreprocess sender_preproc;
         {
-            StopwatchScope rcv_ppwait_sc(recv_stop_watch, "Receiver::preprocess::wait_response");
+            STOPWATCH(recv_stop_watch, "Receiver::preprocess::wait_response");
             channel.receive(sender_preproc);
         }
 
@@ -381,7 +381,7 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::decrypt(
     const std::vector<int> &table_to_input_map,
     std::vector<Item> &items)
 {
-    StopwatchScope decrypt_scope(recv_stop_watch, "Receiver::decrypt");
+    STOPWATCH(recv_stop_watch, "Receiver::decrypt");
     std::pair<std::vector<bool>, Matrix<u8>> ret;
     auto& ret_bools = ret.first;
     auto& ret_labels = ret.second;
@@ -436,7 +436,7 @@ void Receiver::decrypt_worker(
     vector<bool>& ret_bools,
     Matrix<u8>& ret_labels)
 {
-    StopwatchScope recv_str_decr_wkr_scope(recv_stop_watch, "Receiver::decrypt_worker");
+    STOPWATCH(recv_stop_watch, "Receiver::decrypt_worker");
     MemoryPoolHandle local_pool(MemoryPoolHandle::New());
     Plaintext p(local_pool);
     Ciphertext tmp(seal_context_, local_pool);

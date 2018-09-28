@@ -109,7 +109,7 @@ void Sender::load_db(const vector<Item> &data, MatrixView<u8> vals)
 
 void Sender::offline_compute()
 {
-    StopwatchScope offline_compute_scope(sender_stop_watch, "Sender::offline_compute");
+    STOPWATCH(sender_stop_watch, "Sender::offline_compute");
     Log::info("Offline compute started");
 
     vector<thread> thread_pool(total_thread_count_);
@@ -141,7 +141,7 @@ void Sender::offline_compute()
 
 void Sender::offline_compute_work()
 {
-    StopwatchScope worker_scope(sender_stop_watch, "Sender::offline_compute_work");
+    STOPWATCH(sender_stop_watch, "Sender::offline_compute_work");
 
     int thread_context_idx = acquire_thread_context();
 
@@ -160,13 +160,13 @@ void Sender::offline_compute_work()
     }
 
     {
-        StopwatchScope symmpoly_scope(sender_stop_watch, "Sender::offline_compute_work::calc_symmpoly");
+        STOPWATCH(sender_stop_watch, "Sender::offline_compute_work::calc_symmpoly");
         sender_db_->batched_randomized_symmetric_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
     }
 
     if (params_.get_label_bit_count())
     {
-        StopwatchScope interp_scope(sender_stop_watch, "Sender::offline_compute_work::calc_interpolation");
+        STOPWATCH(sender_stop_watch, "Sender::offline_compute_work::calc_interpolation");
         sender_db_->batched_interpolate_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
     }
 
@@ -199,7 +199,7 @@ void Sender::report_offline_compute_progress(int total_threads, atomic<bool>& wo
 
 void Sender::preprocess(vector<u8>& buff)
 {
-    StopwatchScope preproc_sc(sender_stop_watch, "Sender::preprocess");
+    STOPWATCH(sender_stop_watch, "Sender::preprocess");
     Log::info("Starting pre-processing");
 
     PRNG pp(cc_block);
@@ -228,7 +228,7 @@ void Sender::query(
     const map<u64, vector<string>> query,
     vector<ResultPackage>& result)
 {
-    StopwatchScope query_sc(sender_stop_watch, "Sender::query");
+    STOPWATCH(sender_stop_watch, "Sender::query");
     Log::info("Start processing query");
 
     SenderSessionContext session_context(seal_context_, pub_key, relin_keys);
@@ -272,7 +272,7 @@ void Sender::respond(
     SenderSessionContext &session_context,
     vector<ResultPackage>& result)
 {
-    StopwatchScope respond_scope(sender_stop_watch, "Sender::respond");
+    STOPWATCH(sender_stop_watch, "Sender::respond");
 
     auto batch_count = params_.batch_count();
     int split_size_plus_one = params_.split_size() + 1;
@@ -340,7 +340,7 @@ void Sender::respond_worker(
     atomic<int>& remaining_batches,
     vector<ResultPackage>& result)
 {
-    StopwatchScope respond_work_scope(sender_stop_watch, "Sender::respond_worker");
+    STOPWATCH(sender_stop_watch, "Sender::respond_worker");
 
     /* Multiple client sessions can enter this function to compete for thread context resources. */
     int thread_context_idx = acquire_thread_context();
@@ -412,7 +412,7 @@ void Sender::respond_worker(
         {
             if (block.batched_label_coeffs_.size() > 1)
             {
-                StopwatchScope online_interp_scope(sender_stop_watch, "Sender::respond_worker::online_interpolate");
+                STOPWATCH(sender_stop_watch, "Sender::respond_worker::online_interpolate");
 
                 // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
                 // Observe that the first call to mult is always multiplying coeff[0] by 1....
