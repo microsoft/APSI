@@ -105,19 +105,20 @@ namespace apsi
             @result Matrix of size (#splits x table_size_ceiling). Here table_size_ceiling is defined as (#batches x batch_size), which might be
             larger than table_size.
             */
-            std::pair<std::vector<bool>, Matrix<u8> > decrypt(
-                const std::vector<apsi::ResultPackage>& result,
+            std::pair<std::vector<bool>, Matrix<u8> > stream_decrypt(
+                apsi::network::Channel& channel,
                 const std::vector<int>& table_to_input_map,
                 std::vector<Item>& items);
 
             /**
-            Work to be done in a single thread for decrypt
+            Work to be done in a single thread for stream_decrypt
             */
-            void decrypt_worker(
+            void stream_decrypt_worker(
                 int thread_idx,
                 int batch_size,
                 int num_threads,
-                const std::vector<apsi::ResultPackage>& result,
+                int block_count,
+                apsi::network::Channel& channel,
                 const std::vector<int> &table_to_input_map,
                 std::vector<bool>& ret_bools,
                 apsi::Matrix<apsi::u8>& ret_labels);

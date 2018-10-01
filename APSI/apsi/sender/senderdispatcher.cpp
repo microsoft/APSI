@@ -107,11 +107,14 @@ void SenderDispatcher::dispatch_query(shared_ptr<SenderOperation> sender_op, Cha
     get_public_key(pub_key, query_op->public_key);
     get_relin_keys(relin_keys, query_op->relin_keys);
 
+    // The query response will tell the Receiver how many ResultPackages to expect
+    size_t package_count = sender_->get_params().batch_count() * sender_->get_params().split_count();
+    channel.send_query_response(sender_op->client_id, package_count);
+
     sender_->query(
         pub_key,
         relin_keys,
         query_op->query,
-        result);
-
-    channel.send_query_response(sender_op->client_id, result);
+        sender_op->client_id,
+        channel);
 }

@@ -226,7 +226,8 @@ void Sender::query(
     const PublicKey& pub_key,
     const RelinKeys& relin_keys,
     const map<u64, vector<string>> query,
-    vector<ResultPackage>& result)
+    const vector<u8>& client_id,
+    Channel& channel)
 {
     STOPWATCH(sender_stop_watch, "Sender::query");
     Log::info("Start processing query");
@@ -262,7 +263,7 @@ void Sender::query(
     }
 
     /* Answer the query. */
-    respond(powers, session_context, result);
+    respond(powers, session_context, client_id, channel);
 
     Log::info("Finished processing query");
 }
@@ -270,7 +271,8 @@ void Sender::query(
 void Sender::respond(
     vector<vector<Ciphertext>>& powers,
     SenderSessionContext &session_context,
-    vector<ResultPackage>& result)
+    const vector<u8>& client_id,
+    Channel& channel)
 {
     STOPWATCH(sender_stop_watch, "Sender::respond");
 
@@ -278,9 +280,6 @@ void Sender::respond(
     int split_size_plus_one = params_.split_size() + 1;
     int	splitStep = batch_count * split_size_plus_one;
     int total_blocks = params_.split_count() * batch_count;
-
-    // One ResultPackage per block.
-    result.resize(total_blocks);
 
     session_context.encryptor()->encrypt(BigPoly(string("1")), powers[0][0]);
     for (u64 i = 1; i < powers.size(); ++i)
@@ -317,7 +316,8 @@ void Sender::respond(
                 dag,
                 states,
                 remaining_batches,
-                result);
+                client_id,
+                channel);
         });
     }
 
@@ -338,7 +338,8 @@ void Sender::respond_worker(
     WindowingDag& dag,
     vector<WindowingDag::State>& states,
     atomic<int>& remaining_batches,
-    vector<ResultPackage>& result)
+    const vector<u8>& client_id,
+    Channel& channel)
 {
     STOPWATCH(sender_stop_watch, "Sender::respond_worker");
 
@@ -494,7 +495,7 @@ void Sender::respond_worker(
             pkg.label_data = ss.str();
         }
 
-        result[block_idx] = pkg;
+        channel.send(client_id, pkg);
     }
 
     /* After this point, this thread will no longer use the context resource, so it is free to return it. */

@@ -35,7 +35,7 @@ namespace apsi
         */
         struct SenderResponseQuery
         {
-            std::vector<apsi::ResultPackage> result;
+            apsi::u64 package_count;
         };
     }
 }

@@ -172,30 +172,7 @@ void Channel::receive(SenderResponseQuery& response)
         throw runtime_error("Message should be query type");
 
     // Number of result packages
-    size_t pkg_count = msg.get<size_t>(/* part */ 1);
-
-    if (msg.parts() < ((pkg_count * 4) + 2))
-        throw runtime_error("Not enough results in message");
-
-    response.result.resize(pkg_count);
-
-    for (u64 i = 0; i < pkg_count; i++)
-    {
-        // Each package has 4 parts, plus the type and package count
-        size_t pkg_idx = (i * 4) + 2;
-
-        ResultPackage pkg;
-        pkg.split_idx  = msg.get<int>(pkg_idx++);
-        pkg.batch_idx  = msg.get<int>(pkg_idx++);
-        pkg.data       = msg.get(pkg_idx++);
-        pkg.label_data = msg.get(pkg_idx++);
-
-        bytes_received_ += sizeof(int) * 2;
-        bytes_received_ += pkg.data.length();
-        bytes_received_ += pkg.label_data.length();
-
-        response.result[i] = pkg;
-    }
+    response.package_count = msg.get<size_t>(/* part */ 1);
 
     bytes_received_ += sizeof(SenderOperationType);
     bytes_received_ += sizeof(size_t);
@@ -337,7 +314,7 @@ void Channel::send_query(
     send_message(msg);
 }
 
-void Channel::send_query_response(const vector<u8>& client_id, const std::vector<apsi::ResultPackage>& result)
+void Channel::send_query_response(const vector<u8>& client_id, const size_t package_count)
 {
     throw_if_not_connected();
 
@@ -346,19 +323,7 @@ void Channel::send_query_response(const vector<u8>& client_id, const std::vector
     add_client_id(msg, client_id);
     add_message_type(type, msg);
 
-    msg.add(result.size());
-
-    for (const auto& pkg : result)
-    {
-        msg.add(pkg.split_idx);
-        msg.add(pkg.batch_idx);
-        msg.add(pkg.data);
-        msg.add(pkg.label_data);
-
-        bytes_sent_ += sizeof(int) * 2;
-        bytes_sent_ += pkg.data.length();
-        bytes_sent_ += pkg.label_data.length();
-    }
+    msg.add(package_count);
 
     bytes_sent_ += sizeof(SenderOperationType);
     bytes_sent_ += sizeof(size_t);

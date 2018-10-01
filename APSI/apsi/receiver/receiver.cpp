@@ -101,9 +101,10 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Ch
     {
         STOPWATCH(recv_stop_watch, "Receiver::query::wait_response");
         chl.receive(query_resp);
+        Log::debug("Sender will send %i result packages", query_resp.package_count);
     }
 
-    auto intersection = decrypt(query_resp.result, table_to_input_map, items);
+    auto intersection = stream_decrypt(chl, table_to_input_map, items);
 
     Log::info("Receiver completed query");
 
@@ -376,12 +377,12 @@ void Receiver::encrypt(const FFieldArray &input, vector<Ciphertext> &destination
     }
 }
 
-std::pair<std::vector<bool>, Matrix<u8>> Receiver::decrypt(
-    const vector<ResultPackage>& result,
+std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
+    Channel& channel,
     const std::vector<int> &table_to_input_map,
     std::vector<Item> &items)
 {
-    STOPWATCH(recv_stop_watch, "Receiver::decrypt");
+    STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt");
     std::pair<std::vector<bool>, Matrix<u8>> ret;
     auto& ret_bools = ret.first;
     auto& ret_labels = ret.second;
@@ -410,11 +411,12 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::decrypt(
     {
         thrds[t] = std::thread([&](int idx)
         {
-            decrypt_worker(
+            stream_decrypt_worker(
                 idx,
                 batch_size,
                 thread_count_,
-                result,
+                block_count,
+                channel,
                 table_to_input_map,
                 ret_bools,
                 ret_labels);
@@ -427,16 +429,17 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::decrypt(
     return std::move(ret);
 }
 
-void Receiver::decrypt_worker(
+void Receiver::stream_decrypt_worker(
     int thread_idx,
     int batch_size,
     int num_threads,
-    const vector<ResultPackage>& result,
+    int block_count,
+    Channel& channel,
     const vector<int> &table_to_input_map,
     vector<bool>& ret_bools,
     Matrix<u8>& ret_labels)
 {
-    STOPWATCH(recv_stop_watch, "Receiver::decrypt_worker");
+    STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt_worker");
     MemoryPoolHandle local_pool(MemoryPoolHandle::New());
     Plaintext p(local_pool);
     Ciphertext tmp(seal_context_, local_pool);
@@ -448,9 +451,10 @@ void Receiver::decrypt_worker(
 
     bool first = true;
 
-    for (u64 i = thread_idx; i < result.size(); i += num_threads)
+    for (u64 i = thread_idx; i < block_count; i += num_threads)
     {
-        auto& pkg = result[i];
+        ResultPackage pkg;
+        channel.receive(pkg);
 
         auto base_idx = pkg.batch_idx * batch_size;
 

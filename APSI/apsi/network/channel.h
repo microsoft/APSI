@@ -114,7 +114,7 @@ namespace apsi
             /**
             Send a response to a Query request
             */
-            void send_query_response(const std::vector<apsi::u8>& client_id, const std::vector<apsi::ResultPackage>& result);
+            void send_query_response(const std::vector<apsi::u8>& client_id, const size_t package_count);
 
             /**
             * Send a ResultPackage structure

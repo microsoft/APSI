@@ -61,7 +61,6 @@ void ChannelTests::ThrowWithoutConnectTest()
     PublicKey pub_key;
     RelinKeys relin_keys;
     map<u64, vector<Ciphertext>> query_data;
-    vector<ResultPackage> result;
 
     // Receives
     ASSERT_THROWS(mychannel.receive(get_params_resp));
@@ -76,7 +75,7 @@ void ChannelTests::ThrowWithoutConnectTest()
     ASSERT_THROWS(mychannel.send_preprocess(buff));
     ASSERT_THROWS(mychannel.send_preprocess_response(empty_client_id, buff));
     ASSERT_THROWS(mychannel.send_query(pub_key, relin_keys, query_data));
-    ASSERT_THROWS(mychannel.send_query_response(empty_client_id, result));
+    ASSERT_THROWS(mychannel.send_query_response(empty_client_id, 10));
 }
 
 void ChannelTests::DataCountsTest()
@@ -129,6 +128,11 @@ void ChannelTests::DataCountsTest()
 
         SenderResponseQuery query_resp;
         clt.receive(query_resp);
+
+        ResultPackage pkg;
+        clt.receive(pkg);
+        clt.receive(pkg);
+        clt.receive(pkg);
     });
 
     CPPUNIT_ASSERT_EQUAL((u64)0, clt.get_total_data_received());
@@ -184,7 +188,10 @@ void ChannelTests::DataCountsTest()
     result.push_back(pkg1);
     result.push_back(pkg2);
     result.push_back(pkg3);
-    svr.send_query_response(sender_op->client_id, result);
+    svr.send_query_response(sender_op->client_id, 3);
+    svr.send(sender_op->client_id, pkg1);
+    svr.send(sender_op->client_id, pkg2);
+    svr.send(sender_op->client_id, pkg3);
 
     expected_total += sizeof(int) * 6;
     expected_total += 25; // strings
@@ -357,7 +364,11 @@ void ChannelTests::SendQueryResponseTest()
         result[2] = ResultPackage { 11, 10, "", "non empty" };
         result[3] = ResultPackage { 15, 20, "data", "" };
 
-        server_.send_query_response(sender_op->client_id, result);
+        server_.send_query_response(sender_op->client_id, 4);
+        server_.send(sender_op->client_id, result[0]);
+        server_.send(sender_op->client_id, result[1]);
+        server_.send(sender_op->client_id, result[2]);
+        server_.send(sender_op->client_id, result[3]);
     });
 
     PublicKey pubkey;
@@ -370,27 +381,36 @@ void ChannelTests::SendQueryResponseTest()
     SenderResponseQuery query_response;
     client_.receive(query_response);
 
-    CPPUNIT_ASSERT_EQUAL((size_t)4, query_response.result.size());
+    CPPUNIT_ASSERT_EQUAL((size_t)4, query_response.package_count);
 
-    CPPUNIT_ASSERT_EQUAL(1, query_response.result[0].split_idx);
-    CPPUNIT_ASSERT_EQUAL(2, query_response.result[0].batch_idx);
-    CPPUNIT_ASSERT(query_response.result[0].data == "hello");
-    CPPUNIT_ASSERT(query_response.result[0].label_data == "world");
+    ResultPackage pkg;
+    client_.receive(pkg);
 
-    CPPUNIT_ASSERT_EQUAL(3, query_response.result[1].split_idx);
-    CPPUNIT_ASSERT_EQUAL(4, query_response.result[1].batch_idx);
-    CPPUNIT_ASSERT(query_response.result[1].data == "one");
-    CPPUNIT_ASSERT(query_response.result[1].label_data == "two");
+    CPPUNIT_ASSERT_EQUAL(1, pkg.split_idx);
+    CPPUNIT_ASSERT_EQUAL(2, pkg.batch_idx);
+    CPPUNIT_ASSERT(pkg.data == "hello");
+    CPPUNIT_ASSERT(pkg.label_data == "world");
 
-    CPPUNIT_ASSERT_EQUAL(11, query_response.result[2].split_idx);
-    CPPUNIT_ASSERT_EQUAL(10, query_response.result[2].batch_idx);
-    CPPUNIT_ASSERT(query_response.result[2].data == "");
-    CPPUNIT_ASSERT(query_response.result[2].label_data == "non empty");
+    client_.receive(pkg);
 
-    CPPUNIT_ASSERT_EQUAL(15, query_response.result[3].split_idx);
-    CPPUNIT_ASSERT_EQUAL(20, query_response.result[3].batch_idx);
-    CPPUNIT_ASSERT(query_response.result[3].data == "data");
-    CPPUNIT_ASSERT(query_response.result[3].label_data == "");
+    CPPUNIT_ASSERT_EQUAL(3, pkg.split_idx);
+    CPPUNIT_ASSERT_EQUAL(4, pkg.batch_idx);
+    CPPUNIT_ASSERT(pkg.data == "one");
+    CPPUNIT_ASSERT(pkg.label_data == "two");
+
+    client_.receive(pkg);
+
+    CPPUNIT_ASSERT_EQUAL(11, pkg.split_idx);
+    CPPUNIT_ASSERT_EQUAL(10, pkg.batch_idx);
+    CPPUNIT_ASSERT(pkg.data == "");
+    CPPUNIT_ASSERT(pkg.label_data == "non empty");
+
+    client_.receive(pkg);
+
+    CPPUNIT_ASSERT_EQUAL(15, pkg.split_idx);
+    CPPUNIT_ASSERT_EQUAL(20, pkg.batch_idx);
+    CPPUNIT_ASSERT(pkg.data == "data");
+    CPPUNIT_ASSERT(pkg.label_data == "");
 
     serverth.join();
 }

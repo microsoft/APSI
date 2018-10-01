@@ -111,7 +111,8 @@ namespace apsi
                 const seal::PublicKey& pub_key,
                 const seal::RelinKeys& relin_keys,
                 const std::map<apsi::u64, std::vector<std::string>> query,
-                std::vector<apsi::ResultPackage>& result);
+                const std::vector<apsi::u8>& client_id,
+                apsi::network::Channel& channel);
 
             /**
             Return a reference to the PSI parameters used by the Sender
@@ -169,7 +170,8 @@ namespace apsi
             void respond(
                 std::vector<std::vector<seal::Ciphertext> > &query,
                 apsi::sender::SenderSessionContext &session_context,
-                std::vector<apsi::ResultPackage>& result);
+                const std::vector<apsi::u8>& client_id,
+                apsi::network::Channel& channel);
 
             /**
             Method that handles the work of a single thread that computes the response to a query.
@@ -185,7 +187,8 @@ namespace apsi
                 apsi::sender::WindowingDag& dag,
                 std::vector<apsi::sender::WindowingDag::State>& states,
                 std::atomic<int>& remaining_batches,
-                std::vector<apsi::ResultPackage>& result);
+                const std::vector<apsi::u8>& client_id,
+                apsi::network::Channel& channel);
 
 
             /**
