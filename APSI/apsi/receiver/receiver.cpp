@@ -454,7 +454,10 @@ void Receiver::stream_decrypt_worker(
     for (u64 i = thread_idx; i < block_count; i += num_threads)
     {
         ResultPackage pkg;
-        channel.receive(pkg);
+        {
+            STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt_worker_wait");
+            channel.receive(pkg);
+        }
 
         auto base_idx = pkg.batch_idx * batch_size;
 
