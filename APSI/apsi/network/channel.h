@@ -114,7 +114,7 @@ namespace apsi
             /**
             Send a response to a request to Get Parameters
             */
-            void send_get_parameters_response(const apsi::PSIParams& params);
+            void send_get_parameters_response(const std::vector<apsi::u8>& client_id, const apsi::PSIParams& params);
 
             /**
             Send a request to Preprocess items on Sender
@@ -124,7 +124,7 @@ namespace apsi
             /**
             Send a response to a request to Preprocess items
             */
-            void send_preprocess_response(const std::vector<apsi::u8>& buffer);
+            void send_preprocess_response(const std::vector<apsi::u8>& client_id, const std::vector<apsi::u8>& buffer);
 
             /**
             Send a request for a Query response to Sender
@@ -138,19 +138,14 @@ namespace apsi
             /**
             Send a response to a Query request
             */
-            void send_query_response(const std::vector<apsi::ResultPackage>& result);
+            void send_query_response(const std::vector<apsi::u8>& client_id, const std::vector<apsi::ResultPackage>& result);
 
 
         protected:
             /**
             Get socket type for this channel.
             */
-            virtual zmqpp::socket_type get_socket_type()
-            {
-                // default is pair
-                return zmqpp::socket_type::pair;
-            }
-
+            virtual zmqpp::socket_type get_socket_type() = 0;
 
         private:
             u64 bytes_sent_;
@@ -190,7 +185,17 @@ namespace apsi
             Get message type from message.
             Message type is always part 0.
             */
-            SenderOperationType get_message_type(const zmqpp::message_t& msg) const;
+            SenderOperationType get_message_type(const zmqpp::message_t& msg, const size_t part = 1) const;
+
+            /**
+            Extract client ID from a message
+            */
+            void extract_client_id(const zmqpp::message_t& msg, std::vector<apsi::u8>& id) const;
+
+            /**
+            Add client ID to message
+            */
+            void add_client_id(zmqpp::message_t& msg, const std::vector<apsi::u8>& id) const;
 
             /**
             Get buffer from message, located at part_start

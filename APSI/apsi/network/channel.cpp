@@ -77,8 +77,8 @@ bool Channel::receive(shared_ptr<SenderOperation>& sender_op, bool wait_for_mess
         return false;
     }
 
-    // Should have at least type.
-    if (msg.parts() < 1)
+    // Should have ID and type.
+    if (msg.parts() < 2)
         throw runtime_error("Not enough parts in message");
 
     SenderOperationType type = get_message_type(msg);
@@ -118,7 +118,7 @@ void Channel::receive(SenderResponseGetParameters& response)
         throw runtime_error("Message should have five parts");
 
     // First part is message type
-    SenderOperationType type = get_message_type(msg);
+    SenderOperationType type = get_message_type(msg, /* part */ 0);
 
     if (type != SOP_get_parameters)
         throw runtime_error("Message should be get parameters type");
@@ -145,7 +145,7 @@ void Channel::receive(SenderResponsePreprocess& response)
     if (msg.parts() != 3)
         throw runtime_error("Message should have three parts");
 
-    SenderOperationType type = get_message_type(msg);
+    SenderOperationType type = get_message_type(msg, /* part */ 0);
     if (type != SOP_preprocess)
         throw runtime_error("Message should be preprocess type");
 
@@ -167,7 +167,7 @@ void Channel::receive(SenderResponseQuery& response)
     if (msg.parts() < 2)
         throw runtime_error("Message should have at least two parts");
 
-    SenderOperationType type = get_message_type(msg);
+    SenderOperationType type = get_message_type(msg, /* part */ 0);
     if (type != SOP_query)
         throw runtime_error("Message should be query type");
 
@@ -215,12 +215,14 @@ void Channel::send_get_parameters()
     bytes_sent_ += sizeof(SenderOperationType);
 }
 
-void Channel::send_get_parameters_response(const PSIParams& params)
+void Channel::send_get_parameters_response(const vector<u8>& client_id, const PSIParams& params)
 {
     throw_if_not_connected();
 
     message_t msg;
+
     SenderOperationType type = SOP_get_parameters;
+    add_client_id(msg, client_id);
     add_message_type(type, msg);
 
     // Sender parameters
@@ -252,13 +254,14 @@ void Channel::send_preprocess(const vector<u8>& buffer)
     bytes_sent_ += buffer.size();
 }
 
-void Channel::send_preprocess_response(const std::vector<apsi::u8>& buffer)
+void Channel::send_preprocess_response(const vector<u8>& client_id, const std::vector<apsi::u8>& buffer)
 {
     throw_if_not_connected();
 
     message_t msg;
     SenderOperationType type = SOP_preprocess;
 
+    add_client_id(msg, client_id);
     add_message_type(type, msg);
     add_buffer(buffer, msg);
 
@@ -312,12 +315,13 @@ void Channel::send_query(
     get_socket()->send(msg);
 }
 
-void Channel::send_query_response(const std::vector<apsi::ResultPackage>& result)
+void Channel::send_query_response(const vector<u8>& client_id, const std::vector<apsi::ResultPackage>& result)
 {
     throw_if_not_connected();
 
     message_t msg;
     SenderOperationType type = SOP_query;
+    add_client_id(msg, client_id);
     add_message_type(type, msg);
 
     msg.add(result.size());
@@ -383,52 +387,74 @@ void Channel::add_message_type(const SenderOperationType type, message_t& msg) c
     add_part(static_cast<int>(type), msg);
 }
 
-SenderOperationType Channel::get_message_type(const message_t& msg) const
+SenderOperationType Channel::get_message_type(const message_t& msg, const size_t part) const
 {
-    // We should have at least type
-    if (msg.parts() < 1)
+    // We should have at least the parts we want to get
+    if (msg.parts() < (part + 1))
         throw invalid_argument("Message should have at least type");
 
-    // First part is message type
+    // Get message type
     int msg_type;
-    get_part(msg_type, msg, /* part */ 0);
+    get_part(msg_type, msg, /* part */ part);
     SenderOperationType type = static_cast<SenderOperationType>(msg_type);
     return type;
 }
 
+void Channel::extract_client_id(const zmqpp::message_t& msg, std::vector<apsi::u8>& id) const
+{
+    // ID should always be part 0
+    size_t id_size = msg.size(/* part */ 0);
+    id.resize(id_size);
+    memcpy(id.data(), msg.raw_data(/* part */ 0), id_size);
+}
+
+void Channel::add_client_id(zmqpp::message_t& msg, const std::vector<apsi::u8>& id) const
+{
+    msg.add_raw(id.data(), id.size());
+}
+
 shared_ptr<SenderOperation> Channel::decode_get_parameters(const message_t& msg)
 {
+    vector<u8> client_id;
+    extract_client_id(msg, client_id);
+
     // Nothing in the message to decode.
-    return make_shared<SenderOperationGetParameters>();
+    return make_shared<SenderOperationGetParameters>(std::move(client_id));
 }
 
 shared_ptr<SenderOperation> Channel::decode_preprocess(const message_t& msg)
 {
+    vector<u8> client_id;
+    extract_client_id(msg, client_id);
+
     vector<u8> buffer;
-    get_buffer(buffer, msg, /* part_start */ 1);
+    get_buffer(buffer, msg, /* part_start */ 2);
 
     bytes_received_ += buffer.size();
 
-    return make_shared<SenderOperationPreprocess>(std::move(buffer));
+    return make_shared<SenderOperationPreprocess>(std::move(client_id), std::move(buffer));
 }
 
 shared_ptr<SenderOperation> Channel::decode_query(const message_t& msg)
 {
+    vector<u8> client_id;
+    extract_client_id(msg, client_id);
+
     string pub_key;
     string relin_keys;
     map<u64, vector<string>> query;
 
-    msg.get(pub_key, /* part */ 1);
+    msg.get(pub_key, /* part */ 2);
     bytes_received_ += pub_key.length();
 
-    msg.get(relin_keys, /* part */ 2);
+    msg.get(relin_keys, /* part */ 3);
     bytes_received_ += relin_keys.length();
 
     size_t query_count;
-    get_part(query_count, msg, /* part */ 3);
+    get_part(query_count, msg, /* part */ 4);
     bytes_received_ += sizeof(size_t);
 
-    size_t msg_idx = 4;
+    size_t msg_idx = 5;
 
     for (u64 i = 0; i < query_count; i++)
     {
@@ -453,5 +479,5 @@ shared_ptr<SenderOperation> Channel::decode_query(const message_t& msg)
         bytes_received_ += sizeof(size_t);
     }
 
-    return make_shared<SenderOperationQuery>(pub_key, relin_keys, std::move(query));
+    return make_shared<SenderOperationQuery>(std::move(client_id), pub_key, relin_keys, std::move(query));
 }

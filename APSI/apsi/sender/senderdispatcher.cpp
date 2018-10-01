@@ -86,7 +86,7 @@ void SenderDispatcher::run(const atomic<bool>& stop, const int port)
 
 void SenderDispatcher::dispatch_get_parameters(shared_ptr<SenderOperation> sender_op, Channel& channel)
 {
-    channel.send_get_parameters_response(sender_->get_params());
+    channel.send_get_parameters_response(sender_op->client_id, sender_->get_params());
 }
 
 void SenderDispatcher::dispatch_preprocess(shared_ptr<SenderOperation> sender_op, Channel& channel)
@@ -94,7 +94,7 @@ void SenderDispatcher::dispatch_preprocess(shared_ptr<SenderOperation> sender_op
     auto preprocess_op = dynamic_pointer_cast<SenderOperationPreprocess>(sender_op);
     
     sender_->preprocess(preprocess_op->buffer);
-    channel.send_preprocess_response(preprocess_op->buffer);
+    channel.send_preprocess_response(sender_op->client_id, preprocess_op->buffer);
 }
 
 void SenderDispatcher::dispatch_query(shared_ptr<SenderOperation> sender_op, Channel& channel)
@@ -113,5 +113,5 @@ void SenderDispatcher::dispatch_query(shared_ptr<SenderOperation> sender_op, Cha
         query_op->query,
         result);
 
-    channel.send_query_response(result);
+    channel.send_query_response(sender_op->client_id, result);
 }

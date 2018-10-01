@@ -32,8 +32,9 @@ namespace apsi
         {
         public:
             SenderOperation() = delete;
-            SenderOperation(SenderOperationType type)
-                : type(type)
+            SenderOperation(SenderOperationType type, std::vector<apsi::u8>&& clt_id)
+                : type(type),
+                  client_id(clt_id)
             {}
 
             virtual ~SenderOperation() = default;
@@ -42,6 +43,11 @@ namespace apsi
             Operation type
             */
             SenderOperationType type;
+
+            /**
+            Client ID
+            */
+            std::vector<apsi::u8> client_id;
         };
 
         /**
@@ -50,8 +56,8 @@ namespace apsi
         class SenderOperationGetParameters : public SenderOperation
         {
         public:
-            SenderOperationGetParameters()
-                : SenderOperation(SOP_get_parameters)
+            SenderOperationGetParameters(std::vector<apsi::u8>&& client_id)
+                : SenderOperation(SOP_get_parameters, std::move(client_id))
             {}
 
             virtual ~SenderOperationGetParameters() = default;
@@ -64,8 +70,8 @@ namespace apsi
         {
         public:
             SenderOperationPreprocess() = delete;
-            SenderOperationPreprocess(std::vector<apsi::u8>&& buff)
-                : SenderOperation(SOP_preprocess),
+            SenderOperationPreprocess(std::vector<apsi::u8>&& client_id, std::vector<apsi::u8>&& buff)
+                : SenderOperation(SOP_preprocess, std::move(client_id)),
                   buffer(buff)
             {}
 
@@ -84,8 +90,8 @@ namespace apsi
         {
         public:
             SenderOperationQuery() = delete;
-            SenderOperationQuery(const std::string& pub, const std::string& relin, std::map<apsi::u64, std::vector<std::string>>&& queryp)
-                : SenderOperation(SOP_query),
+            SenderOperationQuery(std::vector<apsi::u8>&& client_id, const std::string& pub, const std::string& relin, std::map<apsi::u64, std::vector<std::string>>&& queryp)
+                : SenderOperation(SOP_query, std::move(client_id)),
                   public_key(pub),
                   relin_keys(relin),
                   query(queryp)

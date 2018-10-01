@@ -18,7 +18,7 @@ namespace apsi
         protected:
             virtual zmqpp::socket_type get_socket_type()
             {
-                return zmqpp::socket_type::request;
+                return zmqpp::socket_type::dealer;
             }
         };
     }
