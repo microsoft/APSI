@@ -48,14 +48,12 @@ namespace apsi
             void handshake(apsi::network::Channel& channel);
 
             /**
-            Preprocesses the PSI items. Returns the powr map of the items, and the indices of them in the hash table.
+            Preprocesses the PSI items. Returns the power map of the items, and the indices of them in the hash table.
             */
             std::pair<
                 std::map<std::uint64_t, std::vector<seal::Ciphertext>>,
                 std::unique_ptr<cuckoo::CuckooInterface>
             > preprocess(std::vector<Item> &items, apsi::network::Channel& channel);
-
-            void send(const std::map<std::uint64_t, std::vector<seal::Ciphertext>> &query_data, apsi::network::Channel &channel);
 
             /**
             Hash all items in the input vector into a cuckoo hashing table.
@@ -108,7 +106,7 @@ namespace apsi
             larger than table_size.
             */
             std::pair<std::vector<bool>, Matrix<u8> > stream_decrypt(
-                apsi::network::Channel &channel,
+                apsi::network::Channel& channel,
                 const std::vector<int>& table_to_input_map,
                 std::vector<Item>& items);
 
@@ -119,7 +117,8 @@ namespace apsi
                 int thread_idx,
                 int batch_size,
                 int num_threads,
-                std::vector<std::pair<apsi::ResultPackage, std::future<void>>>& recv_packages,
+                int block_count,
+                apsi::network::Channel& channel,
                 const std::vector<int> &table_to_input_map,
                 std::vector<bool>& ret_bools,
                 apsi::Matrix<apsi::u8>& ret_labels);
@@ -147,6 +146,11 @@ namespace apsi
             const seal::SecretKey& secret_key() const
             {
                 return secret_key_;
+            }
+
+            const PSIParams& get_params() const
+            {
+                return params_;
             }
 
         private:

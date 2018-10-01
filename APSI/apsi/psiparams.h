@@ -108,6 +108,11 @@ namespace apsi
             return use_oprf_;
         }
 
+        inline void set_use_oprf(bool use_oprf)
+        {
+            use_oprf_ = use_oprf;
+        }
+
         inline int log_table_size() const
         {
             return log_table_size_;
@@ -136,6 +141,12 @@ namespace apsi
         inline int item_bit_count() const
         {
             return item_bit_count_;
+        }
+
+        inline void set_item_bit_count(int item_bit_count)
+        {
+            item_bit_count_ = item_bit_count;
+            validate();
         }
 
         inline u64 exfield_characteristic() const
@@ -214,12 +225,6 @@ namespace apsi
 
         void set_use_low_degree_poly(bool b) { use_low_degree_poly_ = b; }
 
-        bool debug() const { return debug_; }
-
-        void enable_debug() { debug_ = true; }
-
-        void disable_debug() { debug_ = false; }
-
         // Constants
         constexpr static int max_item_bit_count = 128;
 
@@ -243,8 +248,6 @@ namespace apsi
         int value_byte_length_ = 0;
 
         bool use_low_degree_poly_ = false;
-        
-        bool debug_ = false;
 
         seal::EncryptionParameters encryption_params_;
 

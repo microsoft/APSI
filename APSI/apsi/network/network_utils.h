@@ -15,39 +15,33 @@
 
 namespace apsi
 {
-    void send_plaintext(const seal::Plaintext &plaintext, apsi::network::Channel &channel);
+    /**
+    Get string for a public key
+    */
+    void get_string(std::string& str, const seal::PublicKey& pub_key);
 
-    void receive_plaintext(seal::Plaintext &plaintext, apsi::network::Channel &channel);
+    /**
+    Get string for Relinearization keys
+    */
+    void get_string(std::string& str, const seal::RelinKeys& relin_keys);
 
-    void send_ciphertext(const seal::Ciphertext &ciphertext, apsi::network::Channel &channel);
+    /**
+    Get string for a Ciphertext
+    */
+    void get_string(std::string& str, const seal::Ciphertext& ciphertext);
 
-    void receive_ciphertext(seal::Ciphertext &ciphertext, apsi::network::Channel &channel);
+    /**
+    Get public key from a string
+    */
+    void get_public_key(seal::PublicKey& pub_key, const std::string& str);
 
-    void send_ciphertext(const std::vector<seal::Ciphertext> &ciphers, apsi::network::Channel &channel);
+    /**
+    Get Relinearization keys from a string
+    */
+    void get_relin_keys(seal::RelinKeys& relin_keys, const std::string& str);
 
-    void receive_ciphertext(std::vector<seal::Ciphertext> &ciphers, apsi::network::Channel &channel);
-
-    void send_compressed_ciphertext(const CiphertextCompressor &compressor, const seal::Ciphertext &ciphertext, apsi::network::Channel &channel);
-
-    void receive_compressed_ciphertext(const CiphertextCompressor &compressor, seal::Ciphertext &ciphertext, apsi::network::Channel &channel);
-
-    void send_compressed_ciphertext(const CiphertextCompressor &compressor, const std::vector<seal::Ciphertext> &ciphers, apsi::network::Channel &channel);
-
-    void receive_compressed_ciphertext(const CiphertextCompressor &compressor, std::vector<seal::Ciphertext> &ciphers, apsi::network::Channel &channel);
-
-    void send_relinkeys(const seal::RelinKeys &keys, apsi::network::Channel &channel);
-
-    void receive_relinkeys(seal::RelinKeys &keys, apsi::network::Channel &channel);
-
-    void send_pubkey(const seal::PublicKey &pubkey, apsi::network::Channel &channel);
-
-    void receive_pubkey(seal::PublicKey &pubkey, apsi::network::Channel &channel);
-
-    void send_prvkey(const seal::SecretKey &k, apsi::network::Channel &channel);
-
-    void receive_prvkey(seal::SecretKey &k, apsi::network::Channel &channel);
-
-    void send_item(const apsi::Item &item, apsi::network::Channel &channel);
-
-    void receive_item(apsi::Item &item, apsi::network::Channel &channel);
+    /**
+    Get Ciphertext from a string
+    */
+    void get_ciphertext(seal::Ciphertext& ciphertext, const std::string& str);
 }

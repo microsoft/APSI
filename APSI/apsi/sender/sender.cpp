@@ -36,8 +36,7 @@ Sender::Sender(const PSIParams &params, int total_thread_count,
     pool_(pool),
     total_thread_count_(total_thread_count),
     session_thread_count_(session_thread_count),
-    thread_contexts_(total_thread_count_),
-    stopped_(false)
+    thread_contexts_(total_thread_count_)
 {
     if (session_thread_count_ <= 0 || (session_thread_count_ > total_thread_count_))
     {
@@ -110,7 +109,7 @@ void Sender::load_db(const vector<Item> &data, MatrixView<u8> vals)
 
 void Sender::offline_compute()
 {
-    StopwatchScope offline_compute_scope(sender_stop_watch, "Sender::offline_compute");
+    STOPWATCH(sender_stop_watch, "Sender::offline_compute");
     Log::info("Offline compute started");
 
     vector<thread> thread_pool(total_thread_count_);
@@ -142,7 +141,7 @@ void Sender::offline_compute()
 
 void Sender::offline_compute_work()
 {
-    StopwatchScope worker_scope(sender_stop_watch, "Sender::offline_compute_work");
+    STOPWATCH(sender_stop_watch, "Sender::offline_compute_work");
 
     int thread_context_idx = acquire_thread_context();
 
@@ -161,13 +160,13 @@ void Sender::offline_compute_work()
     }
 
     {
-        StopwatchScope symmpoly_scope(sender_stop_watch, "Sender::offline_compute_work::calc_symmpoly");
+        STOPWATCH(sender_stop_watch, "Sender::offline_compute_work::calc_symmpoly");
         sender_db_->batched_randomized_symmetric_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
     }
 
     if (params_.get_label_bit_count())
     {
-        StopwatchScope interp_scope(sender_stop_watch, "Sender::offline_compute_work::calc_interpolation");
+        STOPWATCH(sender_stop_watch, "Sender::offline_compute_work::calc_interpolation");
         sender_db_->batched_interpolate_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
     }
 
@@ -198,73 +197,46 @@ void Sender::report_offline_compute_progress(int total_threads, atomic<bool>& wo
     }
 }
 
-void Sender::handshake(Channel& chl)
+void Sender::preprocess(vector<u8>& buff)
 {
-    // Receive start of session by Receiver.
-    int receiver_version;
-    chl.receive(receiver_version);
+    STOPWATCH(sender_stop_watch, "Sender::preprocess");
+    Log::info("Starting pre-processing");
 
-    // Send bin size so client can configure itself correctly.
-    chl.send(params_.sender_bin_size());
+    PRNG pp(cc_block);
+    digit_t key[NWORDS_ORDER];
+    random_fourq(key, pp);
+    auto iter = buff.data();
+    auto step = (sizeof(digit_t) * NWORDS_ORDER) - 1;
+    digit_t x[NWORDS_ORDER];
+    u64 num = buff.size() / step;
+
+    for (u64 i = 0; i < num; i++)
+    {
+        buffer_to_eccoord(iter, x);
+        Montgomery_multiply_mod_order(x, key, x);
+        eccoord_to_buffer(x, iter);
+
+        iter += step;
+    }
+
+    Log::info("Pre-processing done");
 }
 
-void Sender::query_session(Channel &chl)
+void Sender::query(
+    const PublicKey& pub_key,
+    const RelinKeys& relin_keys,
+    const map<u64, vector<string>> query,
+    const vector<u8>& client_id,
+    Channel& channel)
 {
-    handshake(chl);
+    STOPWATCH(sender_stop_watch, "Sender::query");
+    Log::info("Start processing query");
 
-    Log::info("Starting session");
-    StopwatchScope sndr_query_sess_scope(sender_stop_watch, "Sender::query_session");
-
-    // Send the EC point when using OPRF
-    if (params_.use_oprf())
-    {
-        StopwatchScope sndr_oprf_preproc(sender_stop_watch, "Sender::query_session::OPRF");
-        Log::info("Starting OPRF query pre-processing");
-
-        vector<u8> buff;
-        chl.receive(buff);
-
-        PRNG pp(cc_block);
-        digit_t key[NWORDS_ORDER];
-        random_fourq(key, pp);
-        auto iter = buff.data();
-        auto step = (sizeof(digit_t) * NWORDS_ORDER) - 1;
-        digit_t x[NWORDS_ORDER];
-        u64 num = buff.size() / step;
-
-        for (u64 i = 0; i < num; i++)
-        {
-            buffer_to_eccoord(iter, x);
-            Montgomery_multiply_mod_order(x, key, x);
-            eccoord_to_buffer(x, iter);
-
-            iter += step;
-        }
-
-        chl.send(buff);
-        Log::info("OPRF query pre-processing done");
-    }
-
-    /* Set up and receive keys. */
-    PublicKey pub;
-    RelinKeys relin;
-    receive_pubkey(pub, chl);
-    receive_relinkeys(relin, chl);
-
-    SenderSessionContext session_context(seal_context_, pub, relin);
-
-    if (params_.debug())
-    {
-        seal::SecretKey k;
-        receive_prvkey(k, chl);
-        session_context.set_secret_key(k);
-        session_context.debug_plain_query_ = nullptr;
-    }
+    SenderSessionContext session_context(seal_context_, pub_key, relin_keys);
 
     /* Receive client's query data. */
-    int num_of_powers;
-    chl.receive(num_of_powers);
-    Log::debug("Received powers: %i", num_of_powers);
+    int num_of_powers = static_cast<int>(query.size());
+    Log::debug("Number of powers: %i", num_of_powers);
     Log::debug("Current batch count: %i", params_.batch_count());
 
     vector<vector<Ciphertext>> powers(params_.batch_count());
@@ -273,116 +245,41 @@ void Sender::query_session(Channel &chl)
     for (u64 i = 0; i < powers.size(); ++i)
     {
         powers[i].reserve(split_size_plus_one);
-        for (u64 j = 0; j < split_size_plus_one; ++j)
-            powers[i].emplace_back(seal_context_, pool_);
 
+        for (u64 j = 0; j < split_size_plus_one; ++j)
+        {
+            powers[i].emplace_back(seal_context_, pool_);
+        }
     }
 
-    while (num_of_powers-- > 0)
+    for (const auto& pair : query)
     {
-        uint64_t power;
-        chl.receive(power);
+        u64 power = pair.first;
 
-        for (u64 i = 0; i < powers.size(); ++i)
+        for (u64 i = 0; i < powers.size(); i++)
         {
-            receive_ciphertext(powers[i][power], chl);
+            get_ciphertext(powers[i][power], pair.second[i]);
         }
     }
 
     /* Answer the query. */
-    respond(powers, session_context, chl);
-    Log::info("Finished processing session");
-}
+    respond(powers, session_context, client_id, channel);
 
-void Sender::stop()
-{
-    stopped_ = true;
-}
-
-void Sender::debug_decrypt(
-    SenderSessionContext &session_context,
-    const Ciphertext& c,
-    FFieldArray& dest)
-{
-    Plaintext p;
-    if (!session_context.decryptor_)
-        throw std::runtime_error("No decryptor available");
-
-    session_context.decryptor_->decrypt(c, p);
-
-    ex_batch_encoder_->decompose(p, dest);
-}
-
-u64 pow(u64 x, u64 p, const seal::SmallModulus& mod)
-{
-    u64 r = 1;
-    while (p--)
-    {
-        r = (r * x) % mod.value();
-    }
-    return x;
-}
-
-std::vector<u64> Sender::debug_eval_term(
-    int term,
-    MatrixView<u64> coeffs,
-    gsl::span<u64> x,
-    const seal::SmallModulus& mod,
-    bool print)
-{
-    if (x.size() != coeffs.rows())
-        throw std::runtime_error("Size of x should be same as coeffs.rows");
-
-    std::vector<u64> r(x.size());
-
-    for (int i = 0; i < x.size(); ++i)
-    {
-        auto xx = pow(x[i], term, mod);
-
-        r[i] = (xx * coeffs(term, i)) % mod.value();
-
-        if (i == 0 && print)
-        {
-            std::cout << xx << " * " << coeffs(term, i) << " -> " << r[i] << " " << term << std::endl;
-        }
-    }
-
-
-    return r;
-}
-
-bool Sender::debug_not_equals(FFieldArray& true_x, const Ciphertext& c, SenderSessionContext& ctx)
-{
-    FFieldArray cc(true_x.field(0), true_x.size());
-    debug_decrypt(ctx, c, cc);
-
-    return true_x == cc;
-}
-
-
-std::vector<u64> add(gsl::span<u64> x, gsl::span<u64> y, const seal::SmallModulus& mod)
-{
-    std::vector<u64> r(x.size());
-    for (int i = 0; i < r.size(); ++i)
-    {
-        r[i] = x[i] + y[i] % mod.value();
-    }
-
-    return r;
+    Log::info("Finished processing query");
 }
 
 void Sender::respond(
     vector<vector<Ciphertext>>& powers,
     SenderSessionContext &session_context,
-    Channel &channel)
+    const vector<u8>& client_id,
+    Channel& channel)
 {
-    StopwatchScope respond_scope(sender_stop_watch, "Sender::respond");
+    STOPWATCH(sender_stop_watch, "Sender::respond");
 
     auto batch_count = params_.batch_count();
     int split_size_plus_one = params_.split_size() + 1;
     int	splitStep = batch_count * split_size_plus_one;
     int total_blocks = params_.split_count() * batch_count;
-
 
     session_context.encryptor()->encrypt(BigPoly(string("1")), powers[0][0]);
     for (u64 i = 1; i < powers.size(); ++i)
@@ -390,11 +287,12 @@ void Sender::respond(
         powers[i][0] = powers[0][0];
     }
 
-
     auto& plain_mod = params_.encryption_params().plain_modulus();
 
     WindowingDag dag(params_.split_size(), params_.window_size());
-    std::vector<WindowingDag::State> states; states.reserve(batch_count);
+    std::vector<WindowingDag::State> states;
+    states.reserve(batch_count);
+
     for (u64 i = 0; i < batch_count; ++i)
         states.emplace_back(dag);
 
@@ -407,17 +305,19 @@ void Sender::respond(
     {
         thread_pool[i] = thread([&]()
         {
-            respond_work(batch_count,
-                         static_cast<int>(thread_pool.size()),
-                         total_blocks,
-                         batches_done_prom,
-                         batches_done_fut,
-                         powers,
-                         session_context,
-                         dag,
-                         states,
-                         remaining_batches,
-                         channel);
+            respond_worker(
+                batch_count,
+                static_cast<int>(thread_pool.size()),
+                total_blocks,
+                batches_done_prom,
+                batches_done_fut,
+                powers,
+                session_context,
+                dag,
+                states,
+                remaining_batches,
+                client_id,
+                channel);
         });
     }
 
@@ -427,7 +327,7 @@ void Sender::respond(
     }
 }
 
-void Sender::respond_work(
+void Sender::respond_worker(
     int batch_count,
     int total_threads,
     int total_blocks,
@@ -438,9 +338,10 @@ void Sender::respond_work(
     WindowingDag& dag,
     vector<WindowingDag::State>& states,
     atomic<int>& remaining_batches,
+    const vector<u8>& client_id,
     Channel& channel)
 {
-    StopwatchScope respond_work_scope(sender_stop_watch, "Sender::respond_work");
+    STOPWATCH(sender_stop_watch, "Sender::respond_worker");
 
     /* Multiple client sessions can enter this function to compete for thread context resources. */
     int thread_context_idx = acquire_thread_context();
@@ -512,7 +413,7 @@ void Sender::respond_work(
         {
             if (block.batched_label_coeffs_.size() > 1)
             {
-                StopwatchScope online_interp_scope(sender_stop_watch, "Sender::respond_work::online_interpolate");
+                STOPWATCH(sender_stop_watch, "Sender::respond_worker::online_interpolate");
 
                 // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
                 // Observe that the first call to mult is always multiplying coeff[0] by 1....
@@ -594,7 +495,7 @@ void Sender::respond_work(
             pkg.label_data = ss.str();
         }
 
-        channel.send(pkg);
+        channel.send(client_id, pkg);
     }
 
     /* After this point, this thread will no longer use the context resource, so it is free to return it. */
@@ -650,52 +551,9 @@ void Sender::compute_batch_powers(
         idx = (*state.next_node_)++;
     }
 
-    // splin lock until all nodes are compute. We may want to do something smarter here.
+    // Iterate until all nodes are computed. We may want to do something smarter here.
     for (i64 i = 0; i < state.nodes_.size(); ++i)
         while (state.nodes_[i] != WindowingDag::NodeState::Done);
-
-
-    //#define DEBUG_POWERS
-#ifdef DEBUG_POWERS
-    if (params_.debug() && session_context.debug_plain_query_)
-    {
-
-        Plaintext p;
-        if (!session_context.decryptor_)
-            throw std::runtime_error(LOCATION);
-
-
-        auto& query = *session_context.debug_plain_query_;
-        FFieldArray plain_batch(ex_field_, params_.batch_size()), dest(ex_field_, params_.batch_size());
-        for (int i = 0, j = plain_batch.size() * batch; i < plain_batch.size(); ++i, ++j)
-        {
-            auto xj = query.get(j);
-            plain_batch.set(i, xj);
-        }
-
-        auto cur_power = plain_batch;
-        for (int i = 1; i < batch_powers.size(); ++i)
-        {
-            session_context.decryptor_->decrypt(batch_powers[i], p);
-            ex_batch_encoder_->decompose(p, dest);
-
-            if (dest != cur_power)
-            {
-                std::cout << "power = " << i << std::endl;
-
-                for (u64 j = 0; j < cur_power.size(); ++j)
-                {
-                    std::cout << "exp[" << j << "]: " << cur_power.get(j) << "\t act[" << j << "]: " << dest.get(j) << std::endl;
-
-                }
-
-                throw std::runtime_error("bad power");
-            }
-
-            cur_power = cur_power * plain_batch;
-        }
-    }
-#endif
 
     auto end = dag.nodes_.size() + batch_powers.size();
     while (idx < end)

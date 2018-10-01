@@ -3,12 +3,20 @@
 // STD
 #include <vector>
 #include <future>
-#include <thread>
+#include <map>
+#include <memory>
 #include <mutex>
 
 // APSI
 #include "apsi/apsidefines.h"
-#include "apsi/tools/thread_pool.h"
+#include "apsi/psiparams.h"
+#include "apsi/network/senderoperation.h"
+#include "apsi/network/senderoperationresponse.h"
+
+// SEAL
+#include "seal/publickey.h"
+#include "seal/relinkeys.h"
+#include "seal/ciphertext.h"
 
 // ZeroMQ
 #pragma warning(push, 0)
@@ -44,122 +52,74 @@ namespace apsi
             /**
             * Destroy an instance of a Channel
             */
-            ~Channel();
+            virtual ~Channel();
 
             /**
-            * Receive the contents of the buffer. Will resize the buffer
-            * if necessary.
+            * Receive a Sender Operation.
+            *
+            * This call does not block, if there is no operation pending it will
+            * immediately return false.
             */
-            void receive(std::vector<apsi::u8>& buff);
+            bool receive(std::shared_ptr<apsi::network::SenderOperation>& sender_op, bool wait_for_message = false);
 
             /**
-            * Receive a string.
+            * Receive Get Parameters response from Sender
             */
-            void receive(std::string& str);
+            void receive(apsi::network::SenderResponseGetParameters& response);
 
             /**
-            * Receive a vector of strings
+            * Receive item preprocessing response from Sender
             */
-            void receive(std::vector<std::string>& data);
+            void receive(apsi::network::SenderResponsePreprocess& response);
 
             /**
-            * Receive a ResultPackage structure
+            * Receive Query response from Sender
+            */
+            void receive(apsi::network::SenderResponseQuery& response);
+
+            /**
+            Receive a ResultPackage structure
             */
             void receive(apsi::ResultPackage& pkg);
 
             /**
-            * Receive a simple POD type.
+            Send a request to Get Parameters from Sender
             */
-            template<typename T>
-            typename std::enable_if<std::is_pod<T>::value, void>::type
-                receive(T& data)
-            {
-                throw_if_not_connected();
-
-                zmqpp::message_t msg;
-                receive_message(msg);
-
-                if (msg.parts() < 1)
-                    throw std::runtime_error("Not enough data");
-
-                const T* pres;
-                msg.get(&pres, /* part */ 0);
-                memcpy(&data, pres, sizeof(T));
-
-                bytes_received_ += sizeof(T);
-            }
+            void send_get_parameters();
 
             /**
-            * Asynchronously receive a buffer.
+            Send a response to a request to Get Parameters
             */
-            std::future<void> async_receive(std::vector<apsi::u8>& buff);
+            void send_get_parameters_response(const std::vector<apsi::u8>& client_id, const apsi::PSIParams& params);
 
             /**
-            * Asynchronously receive a vector of strings.
+            Send a request to Preprocess items on Sender
             */
-            std::future<void> async_receive(std::vector<std::string>& buff);
+            void send_preprocess(const std::vector<apsi::u8>& buffer);
 
             /**
-            * Asynchronously receive a ResultPackage structure
+            * Send a response to a request to Preprocess items
             */
-            std::future<void> async_receive(apsi::ResultPackage& pkg);
+            void send_preprocess_response(const std::vector<apsi::u8>& client_id, const std::vector<apsi::u8>& buffer);
 
             /**
-            * Asynchrounously receive a simple POD type.
+            * Send a request for a Query response to Sender
             */
-            template<typename T>
-            typename std::enable_if<std::is_pod<T>::value, std::future<void>>::type
-                async_receive(T& data)
-            {
-                throw_if_not_connected();
-
-                std::future<void> ret = thread_pool_.enqueue([this, &data]
-                {
-                    receive<T>(data);
-                });
-
-                return ret;
-            }
+            void send_query(
+                const seal::PublicKey& pub_key,
+                const seal::RelinKeys& relin_keys,
+                const std::map<apsi::u64, std::vector<seal::Ciphertext>>& query
+            );
 
             /**
-            * Asynchronously receive a string.
+            Send a response to a Query request
             */
-            std::future<void> async_receive(std::string& str);
-
-            /**
-            * Send the contents of the buffer. A copy of the data is made.
-            */
-            void send(const std::vector<apsi::u8>& buff);
-
-            /**
-            * Send a string.
-            */
-            void send(const std::string& str);
-
-            /**
-            * Send a vector of strings. A copy of the data is made.
-            */
-            void send(const std::vector<std::string>& data);
+            void send_query_response(const std::vector<apsi::u8>& client_id, const size_t package_count);
 
             /**
             * Send a ResultPackage structure
             */
-            void send(const apsi::ResultPackage& pkg);
-
-            /**
-            * Send a simple POD type.
-            */
-            template<typename T>
-            typename std::enable_if<std::is_pod<T>::value, void>::type
-                send(const T& data)
-            {
-                throw_if_not_connected();
-
-                zmqpp::message_t msg;
-                msg.add_raw(&data, sizeof(T));
-                send_message(msg);
-                bytes_sent_ += sizeof(T);
-            }
+            void send(const std::vector<apsi::u8>& client_id, const apsi::ResultPackage& pkg);
 
             /**
             * Bind the channel to the given connection point.
@@ -191,21 +151,112 @@ namespace apsi
             */
             bool is_connected() const { return !end_point_.empty(); }
 
+        protected:
+            /**
+            Get socket type for this channel.
+            */
+            virtual zmqpp::socket_type get_socket_type() = 0;
+
         private:
             u64 bytes_sent_;
             u64 bytes_received_;
 
-            zmqpp::socket_t socket_;
+            const zmqpp::context_t& context_;
+            std::unique_ptr<zmqpp::socket_t> socket_;
             std::string end_point_;
 
-            apsi::tools::ThreadPool thread_pool_;
             std::mutex receive_mutex_;
             std::mutex send_mutex_;
 
             void throw_if_not_connected() const;
             void throw_if_connected() const;
-            void receive_message(zmqpp::message_t& msg);
+
+            bool receive_message(zmqpp::message_t& msg, bool wait_for_message = true);
             void send_message(zmqpp::message_t& msg);
+
+            /**
+            Decode a Get Parameters message
+            */
+            std::shared_ptr<apsi::network::SenderOperation>
+                decode_get_parameters(const zmqpp::message_t& msg);
+
+            /**
+            Decode a Preprocess message
+            */
+            std::shared_ptr<apsi::network::SenderOperation>
+                decode_preprocess(const zmqpp::message_t& msg);
+
+            /**
+            Decode a Query message
+            */
+            std::shared_ptr<apsi::network::SenderOperation>
+                decode_query(const zmqpp::message_t& msg);
+
+            /**
+            Add message type to message
+            */
+            void add_message_type(const SenderOperationType type, zmqpp::message_t& msg) const;
+
+            /**
+            Get message type from message.
+            Message type is always part 0.
+            */
+            SenderOperationType get_message_type(const zmqpp::message_t& msg, const size_t part = 1) const;
+
+            /**
+            Extract client ID from a message
+            */
+            void extract_client_id(const zmqpp::message_t& msg, std::vector<apsi::u8>& id) const;
+
+            /**
+            Add client ID to message
+            */
+            void add_client_id(zmqpp::message_t& msg, const std::vector<apsi::u8>& id) const;
+
+            /**
+            Get buffer from message, located at part_start
+            */
+            void get_buffer(std::vector<u8>& buff, const zmqpp::message_t& msg, int part_start) const;
+
+            /**
+            Add buffer to the given message
+            */
+            void add_buffer(const std::vector<u8>& buff, zmqpp::message_t& msg) const;
+
+            /**
+            Get a part from a message
+            */
+            template<typename T>
+            typename std::enable_if<std::is_pod<T>::value, void>::type
+                get_part(T& data, const zmqpp::message_t& msg, const size_t part) const
+            {
+                const T* presult;
+                msg.get(&presult, part);
+                memcpy(&data, presult, sizeof(T));
+            }
+
+            /**
+            Add a part to a message
+            */
+            template<typename T>
+            typename std::enable_if<std::is_pod<T>::value, void>::type
+                add_part(const T& data, zmqpp::message_t& msg) const
+            {
+                msg.add_raw(&data, sizeof(T));
+            }
+
+            /**
+            Get socket
+            */
+            std::unique_ptr<zmqpp::socket_t>& get_socket()
+            {
+                if (nullptr == socket_)
+                {
+                    socket_ = std::make_unique<zmqpp::socket_t>(context_, get_socket_type());
+                }
+
+                return socket_;
+            }
         };
     }
 }

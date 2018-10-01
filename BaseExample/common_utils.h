@@ -28,7 +28,12 @@ namespace apsi
         /**
         Get a PSIParams object from a command line.
         */
-        const PSIParams build_psi_params(const BaseCLP& cmd);
+        const PSIParams build_psi_params(
+            const BaseCLP& cmd,
+            const apsi::u64 sender_set_size = 0,
+            const int item_bit_length = 0,
+            const int label_bit_length = 0,
+            const bool use_oprf = false);
 
         /**
         Generate timing report for timespans

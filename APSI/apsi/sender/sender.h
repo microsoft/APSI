@@ -99,14 +99,28 @@ namespace apsi
             */
             void load_db(const std::vector<Item> &data, MatrixView<u8> vals = {});
 
-            void query_session(apsi::network::Channel& channel);
+            /**
+            Preprocess items from Receiver encoded in given buffer
+            */
+            void preprocess(std::vector<apsi::u8>& buff);
 
-            void stop();
+            /**
+            Generate a response to a query
+            */
+            void query(
+                const seal::PublicKey& pub_key,
+                const seal::RelinKeys& relin_keys,
+                const std::map<apsi::u64, std::vector<std::string>> query,
+                const std::vector<apsi::u8>& client_id,
+                apsi::network::Channel& channel);
+
+            /**
+            Return a reference to the PSI parameters used by the Sender
+            */
+            const apsi::PSIParams& get_params() const { return params_; }
 
         private:
             void initialize();
-
-            void handshake(apsi::network::Channel& channel);
 
             int acquire_thread_context();
 
@@ -149,17 +163,20 @@ namespace apsi
             Responds to a query from the receiver. Input is a map of powers of receiver's items, from k to y^k, where k is an
             exponent, y is an item in receiver's cuckoo hashing table.
 
-            Returns (#splits x #batches) ciphertexts, each of which is a result of the compoute_dot_product function.
+            Returns (#splits x #batches) ciphertexts, each of which is a result of the compute_dot_product function.
 
             @see compute_dot_product for an explanation of the result.
             */
-            void respond(std::vector<std::vector<seal::Ciphertext> > &query,
-                apsi::sender::SenderSessionContext &session_context, apsi::network::Channel &channel);
+            void respond(
+                std::vector<std::vector<seal::Ciphertext> > &query,
+                apsi::sender::SenderSessionContext &session_context,
+                const std::vector<apsi::u8>& client_id,
+                apsi::network::Channel& channel);
 
             /**
             Method that handles the work of a single thread that computes the response to a query.
             */
-            void respond_work(
+            void respond_worker(
                 int batch_count,
                 int total_threads,
                 int total_blocks,
@@ -170,6 +187,7 @@ namespace apsi
                 apsi::sender::WindowingDag& dag,
                 std::vector<apsi::sender::WindowingDag::State>& states,
                 std::atomic<int>& remaining_batches,
+                const std::vector<apsi::u8>& client_id,
                 apsi::network::Channel& channel);
 
 
@@ -216,24 +234,6 @@ namespace apsi
             std::mutex thread_context_mtx_;
 
             apsi::tools::PRNG prng_;
-
-            bool stopped_;
-
-            void debug_decrypt(
-                SenderSessionContext &session_context,
-                const seal::Ciphertext& c,
-                FFieldArray& dest);
-
-            std::vector<apsi::u64> debug_eval_term(
-                int term, MatrixView<apsi::u64> coeffs, 
-                gsl::span<apsi::u64> x,
-                const seal::SmallModulus& mod,
-                bool print = false);
-
-            bool debug_not_equals(
-                FFieldArray& true_x,
-                const seal::Ciphertext& c,
-                SenderSessionContext& ctx);
         };
     }
 }

@@ -8,7 +8,7 @@
 
 // APSI
 #include "apsi/apsi.h"
-#include "apsi/network/channel.h"
+#include "apsi/network/receiverchannel.h"
 #include "apsi/tools/utils.h"
 #include "apsi/tools/csvreader.h"
 #include "apsi/logging/log.h"
@@ -32,8 +32,7 @@ using namespace seal::util;
 using namespace seal;
 
 
-void example_slow_batching(const CLP& cmd);
-void example_remote(const CLP& cmd);
+void remote_query(const CLP& cmd);
 void print_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<u8>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<u8>& labels);
 void print_timing_info();
 void print_transmitted_data(Channel& channel);
@@ -85,7 +84,7 @@ std::pair<vector<Item>, vector<int>> rand_subset(const vector<Item>& items, int 
 
 int main(int argc, char *argv[])
 {
-    apsi::CLP cmd("Example Implementation of APSI library");
+    apsi::CLP cmd("Example Implementation of APSI Receiver");
 
     if (!cmd.parse_args(argc, argv))
         return -1;
@@ -94,15 +93,7 @@ int main(int argc, char *argv[])
 
     prepare_console();
 
-    if (cmd.mode() == "local")
-    {
-        // Example: Slow batching
-        example_slow_batching(cmd);
-    }
-    else
-    {
-        example_remote(cmd);
-    }
+    remote_query(cmd);
 
 #ifdef _MSC_VER
     if (IsDebuggerPresent())
@@ -128,105 +119,110 @@ std::string print(gsl::span<u8> s)
     return ss.str();
 }
 
-void example_slow_batching(const CLP& cmd)
+//void example_slow_batching(const CLP& cmd)
+//{
+//    print_example_banner("Example: Slow batching");
+//
+//    // Connect the network
+//    zmqpp::context_t context;
+//    ReceiverChannel recvChl(context);
+//    SenderChannel sendChl(context);
+//
+//    string bind_addr = get_bind_addr(cmd);
+//    string conn_addr = get_conn_addr(cmd);
+//
+//    Log::info("Binding Sender to address: %s", bind_addr.c_str());
+//    sendChl.bind(bind_addr);
+//
+//    Log::info("Connecting receiver to address: %s", conn_addr.c_str());
+//    recvChl.connect(conn_addr);
+//
+//    // Thread count
+//    unsigned numThreads = cmd.threads();
+//
+//    PSIParams params = build_psi_params(cmd);
+//
+//    std::unique_ptr<Receiver> receiver_ptr;
+//
+//    int recThreads = cmd.rec_threads();
+//
+//    // Check that number of blocks is not smaller than thread count
+//    if(max<int>(numThreads, recThreads) > params.split_count() * params.batch_count())
+//    {
+//        cout << "WARNING: Using too many threads for block count!" << endl;
+//    }
+//
+//    auto f = std::async([&]()
+//    {
+//        receiver_ptr = make_unique<Receiver>(params, recThreads, MemoryPoolHandle::New());
+//    });
+//    Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New());
+//    f.get();
+//    Receiver& receiver = *receiver_ptr;
+//
+//    auto label_bit_length = cmd.use_labels() ? cmd.item_bit_length() : 0;
+//    auto sendersActualSize = 1 << cmd.sender_size();
+//    auto recversActualSize = 50;
+//    auto intersectionSize = 25;
+//
+//    auto s1 = vector<Item>(sendersActualSize);
+//    Matrix<u8> labels(sendersActualSize, params.get_label_byte_count());
+//    for (int i = 0; i < s1.size(); i++)
+//    {
+//        s1[i] = i;
+//
+//        if (label_bit_length) {
+//            memset(labels[i].data(), 0, labels[i].size());
+//
+//            labels[i][0] = i;
+//            labels[i][1] = (i >> 8);
+//        }
+//    }
+//
+//    auto cc1 = rand_subset(s1, intersectionSize);
+//    auto& c1 = cc1.first;
+//
+//    c1.reserve(recversActualSize);
+//    for (int i = 0; i < (recversActualSize - intersectionSize); ++i)
+//        c1.emplace_back(i + s1.size());
+//
+//    sender.load_db(s1, labels);
+//
+//    auto thrd = thread([&]() {
+//        sender.query_session(sendChl); 
+//    });
+//    recv_stop_watch.add_event("receiver start");
+//    auto intersection = receiver.query(c1, recvChl);
+//    recv_stop_watch.add_event("receiver done");
+//    thrd.join();
+//
+//    // Done with everything. Print the results!
+//    print_intersection_results(c1, intersectionSize, intersection, label_bit_length > 0, cc1.second, labels);
+//    print_timing_info();
+//    print_transmitted_data(recvChl);
+//}
+
+void remote_query(const CLP& cmd)
 {
-    print_example_banner("Example: Slow batching");
-
-    // Connect the network
-    zmqpp::context_t context;
-    Channel recvChl(context);
-    Channel sendChl(context);
-
-    string bind_addr = get_bind_addr(cmd);
-    string conn_addr = get_conn_addr(cmd);
-
-    Log::info("Binding Sender to address: %s", bind_addr.c_str());
-    sendChl.bind(bind_addr);
-
-    Log::info("Connecting receiver to address: %s", conn_addr.c_str());
-    recvChl.connect(conn_addr);
-
-    // Thread count
-    unsigned numThreads = cmd.threads();
-
-    PSIParams params = build_psi_params(cmd);
-
-    std::unique_ptr<Receiver> receiver_ptr;
-
-    int recThreads = cmd.rec_threads();
-
-    // Check that number of blocks is not smaller than thread count
-    if(max<int>(numThreads, recThreads) > params.split_count() * params.batch_count())
-    {
-        cout << "WARNING: Using too many threads for block count!" << endl;
-    }
-
-    auto f = std::async([&]()
-    {
-        receiver_ptr = make_unique<Receiver>(params, recThreads, MemoryPoolHandle::New());
-    });
-    Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New());
-    f.get();
-    Receiver& receiver = *receiver_ptr;
-
-    auto label_bit_length = cmd.use_labels() ? cmd.item_bit_length() : 0;
-    auto sendersActualSize = 1 << cmd.sender_size();
-    auto recversActualSize = 50;
-    auto intersectionSize = 25;
-
-    auto s1 = vector<Item>(sendersActualSize);
-    Matrix<u8> labels(sendersActualSize, params.get_label_byte_count());
-    for (int i = 0; i < s1.size(); i++)
-    {
-        s1[i] = i;
-
-        if (label_bit_length) {
-            memset(labels[i].data(), 0, labels[i].size());
-
-            labels[i][0] = i;
-            labels[i][1] = (i >> 8);
-        }
-    }
-
-    auto cc1 = rand_subset(s1, intersectionSize);
-    auto& c1 = cc1.first;
-
-    c1.reserve(recversActualSize);
-    for (int i = 0; i < (recversActualSize - intersectionSize); ++i)
-        c1.emplace_back(i + s1.size());
-
-    sender.load_db(s1, labels);
-
-    auto thrd = thread([&]() {
-        sender.query_session(sendChl); 
-    });
-    recv_stop_watch.add_event("receiver start");
-    auto intersection = receiver.query(c1, recvChl);
-    recv_stop_watch.add_event("receiver done");
-    thrd.join();
-
-    // Done with everything. Print the results!
-    print_intersection_results(c1, intersectionSize, intersection, label_bit_length > 0, cc1.second, labels);
-    print_timing_info();
-    print_transmitted_data(recvChl);
-}
-
-void example_remote(const CLP& cmd)
-{
-    print_example_banner("Example: Remote connection");
-
-    Log::warning("Only parameter 'recThreads' is used in this mode. All other thread count parameters are ignored.");
+    print_example_banner("Query a remote Sender");
 
     // Connect to the network
     zmqpp::context_t context;
-    Channel channel(context);
+    ReceiverChannel channel(context);
 
     string conn_addr = get_conn_addr(cmd);
     Log::info("Receiver connecting to address: %s", conn_addr.c_str());
     channel.connect(conn_addr);
 
     PSIParams params = build_psi_params(cmd);
-    Receiver receiver(params, cmd.rec_threads());
+    Receiver receiver(params, cmd.threads());
+
+    // Check that number of blocks is not smaller than thread count
+    auto block_count = params.split_count() * params.batch_count();
+    if (cmd.threads() > block_count)
+    {
+        Log::warning("Using too many threads for block count! Block count: %i", block_count);
+    }
 
     vector<Item> items;
     Matrix<u8> labels;
@@ -236,7 +232,7 @@ void example_remote(const CLP& cmd)
 
     vector<int> label_idx;
     bool compare_labels = false;
-    if (!cmd.query_file().empty() && cmd.use_labels())
+    if (!cmd.query_file().empty() && receiver.get_params().get_label_bit_count() > 0)
     {
         // We can compare labels.
         compare_labels = true;
@@ -359,49 +355,26 @@ string get_conn_addr(const CLP& cmd)
 
 int initialize_query(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels, int label_byte_count)
 {
-    if (cmd.query_file().empty())
+    // Read items that should exist from file
+    CSVReader reader(cmd.query_file());
+    reader.read(items, labels, label_byte_count);
+
+    u64 read_items = items.size();
+
+    // Now add some items that should _not_ be in the Sender.
+    PRNG prng(sys_random_seed());
+    labels.resize(read_items + 20, label_byte_count);
+
+    for (int i = 0; i < 20; i++)
     {
-        items.resize(20);
-        auto sender_size = 1 << cmd.sender_size();
+        u64 low_part = 0;
+        Item item = zero_block;
 
-        int i;
-        for (i = 0; i < items.size() / 2; i++)
-        {
-            // Items within sender
-            items[i] = i;
-        }
+        prng.get(reinterpret_cast<u8*>(&low_part), 7);
+        item[0] = low_part;
 
-        for (; i < items.size(); i++)
-        {
-            // Items that should not be within sender
-            items[i] = sender_size + i;
-        }
-
-        return static_cast<int>(items.size() / 2);
+        items.push_back(item);
     }
-    else
-    {
-        // Read items that should exist from file
-        CSVReader reader(cmd.query_file());
-        reader.read(items, labels, label_byte_count);
 
-        u64 read_items = items.size();
-
-        // Now add some items that should _not_ be in the Sender.
-        PRNG prng(sys_random_seed());
-        labels.resize(read_items + 20, label_byte_count);
-
-        for (int i = 0; i < 20; i++)
-        {
-            u64 low_part = 0;
-            Item item = zero_block;
-
-            prng.get(reinterpret_cast<u8*>(&low_part), 7);
-            item[0] = low_part;
-
-            items.push_back(item);
-        }
-
-        return static_cast<int>(read_items);
-    }
+    return static_cast<int>(read_items);
 }

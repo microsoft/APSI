@@ -144,6 +144,21 @@
     <ClInclude Include="apsi\tools\csvreader.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
+    <ClInclude Include="apsi\sender\senderdispatcher.h">
+      <Filter>Header Files\Sender</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\network\senderoperation.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\network\senderoperationresponse.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\network\receiverchannel.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\network\senderchannel.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp">
@@ -211,6 +226,9 @@
     </ClCompile>
     <ClCompile Include="apsi\tools\csvreader.cpp">
       <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\sender\senderdispatcher.cpp">
+      <Filter>Source Files\Sender</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

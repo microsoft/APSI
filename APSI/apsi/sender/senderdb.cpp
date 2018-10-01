@@ -108,7 +108,7 @@ void SenderDB::set_data(gsl::span<const Item> data, int thread_count)
 
 void SenderDB::set_data(gsl::span<const Item> data, MatrixView<u8> vals, int thread_count)
 {
-    StopwatchScope set_scope(sender_stop_watch, "SenderDB::set_data");
+    STOPWATCH(sender_stop_watch, "SenderDB::set_data");
     clear_db();
     add_data(data, vals, thread_count);
 }
@@ -128,6 +128,8 @@ std::string hexStr(u8* data, u64 size)
 
 void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int thread_count)
 {
+    STOPWATCH(sender_stop_watch, "SenderDB::add_data");
+
     if (values.stride() != params_.get_label_byte_count())
         throw std::invalid_argument("unexpacted label length");
 
@@ -135,77 +137,10 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
     for (int t = 0; t < thrds.size(); t++)
     {
         auto seed = prng_.get<block>();
-        thrds[t] = thread([&, t, seed]()
+        thrds[t] = thread([&, t, seed](int idx)
         {
-            PRNG prng(seed, /* buffer_size */ 256);
-            auto start = t * data.size() / thrds.size();
-            auto end = (t + 1) * data.size() / thrds.size();
-
-            vector<u8> buff((sizeof(digit_t) * NWORDS_ORDER) - 1);
-            PRNG pp(cc_block);
-            digit_t key[NWORDS_ORDER];
-            random_fourq(key, pp);
-
-            vector<cuckoo::LocFunc> normal_loc_func(params_.hash_func_count());
-
-            for (int i = 0; i < normal_loc_func.size(); i++)
-            {
-                normal_loc_func[i] = cuckoo::LocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
-            }
-
-            for (size_t i = start; i < end; i++)
-            {
-                // Do we do OPRF for Sender's security?
-                if (params_.use_oprf())
-                {
-                    // Compute EC PRF first for data
-                    PRNG p(data[i], /* buffer_size */ 8);
-                    digit_t a[NWORDS_ORDER];
-                    random_fourq(a, p);
-                    Montgomery_multiply_mod_order(a, key, a);
-                    eccoord_to_buffer(a, buff.data());
-
-                    // Then compress with SHA3
-                    CryptoPP::SHA3_256 sha;
-                    sha.Update(buff.data(), buff.size());
-                    sha.TruncatedFinal(reinterpret_cast<CryptoPP::byte*>(const_cast<Item*>(&data[i])), sizeof(block));
-                }
-
-                std::array<u64, 3> locs;
-                std::array<Item, 3> keys;
-                std::array<bool, 3> skip{ false, false, false };
-
-                // Compute bin locations
-                locs[0] = normal_loc_func[0].location(data[i]);
-                locs[1] = normal_loc_func[1].location(data[i]);
-                locs[2] = normal_loc_func[2].location(data[i]);
-                keys[0] = keys[1] = keys[2] = data[i];
-                skip[1] = locs[0] == locs[1];
-                skip[2] = locs[0] == locs[2] || locs[1] == locs[2];
-
-                // Claim an empty location in each matching bin
-                for (int j = 0; j < params_.hash_func_count(); j++)
-                {
-                    if (skip[j] == false)
-                    {
-
-                        // Lock-free thread-safe bin position search
-                        auto block_pos = aquire_db_position(static_cast<int>(locs[j]), prng);
-                        auto& db_block = *block_pos.first;
-                        auto pos = block_pos.second;
-
-
-                        db_block.get_key(pos) = keys[j];
-
-                        if (params_.get_label_bit_count())
-                        {
-                            auto dest = db_block.get_label(pos);
-                            memcpy(dest, values[i].data(), params_.get_label_byte_count());
-                        }
-                    }
-                }
-            };
-        });
+            add_data_worker(idx, thread_count, seed, data, values);
+        }, t);
     }
 
     for (auto &t : thrds)
@@ -265,6 +200,80 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
             }
         }
 
+    }
+}
+
+void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& seed, gsl::span<const Item> data, MatrixView<u8> values)
+{
+    STOPWATCH(sender_stop_watch, "SenderDB::add_data_worker");
+
+    PRNG prng(seed, /* buffer_size */ 256);
+    u64 start = thread_idx * data.size() / thread_count;
+    u64 end = (thread_idx + 1) * data.size() / thread_count;
+
+    vector<u8> buff((sizeof(digit_t) * NWORDS_ORDER) - 1);
+    PRNG pp(cc_block);
+    digit_t key[NWORDS_ORDER];
+    random_fourq(key, pp);
+
+    vector<cuckoo::LocFunc> normal_loc_func(params_.hash_func_count());
+
+    for (int i = 0; i < normal_loc_func.size(); i++)
+    {
+        normal_loc_func[i] = cuckoo::LocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
+    }
+
+    for (size_t i = start; i < end; i++)
+    {
+        // Do we do OPRF for Sender's security?
+        if (params_.use_oprf())
+        {
+            // Compute EC PRF first for data
+            PRNG p(data[i], /* buffer_size */ 8);
+            digit_t a[NWORDS_ORDER];
+            random_fourq(a, p);
+            Montgomery_multiply_mod_order(a, key, a);
+            eccoord_to_buffer(a, buff.data());
+
+            // Then compress with SHA3
+            CryptoPP::SHA3_256 sha;
+            sha.Update(buff.data(), buff.size());
+            sha.TruncatedFinal(reinterpret_cast<CryptoPP::byte*>(const_cast<Item*>(&data[i])), sizeof(block));
+        }
+
+        std::array<u64, 3> locs;
+        std::array<Item, 3> keys;
+        std::array<bool, 3> skip{ false, false, false };
+
+        // Compute bin locations
+        locs[0] = normal_loc_func[0].location(data[i]);
+        locs[1] = normal_loc_func[1].location(data[i]);
+        locs[2] = normal_loc_func[2].location(data[i]);
+        keys[0] = keys[1] = keys[2] = data[i];
+        skip[1] = locs[0] == locs[1];
+        skip[2] = locs[0] == locs[2] || locs[1] == locs[2];
+
+        // Claim an empty location in each matching bin
+        for (int j = 0; j < params_.hash_func_count(); j++)
+        {
+            if (skip[j] == false)
+            {
+
+                // Lock-free thread-safe bin position search
+                auto block_pos = aquire_db_position(static_cast<int>(locs[j]), prng);
+                auto& db_block = *block_pos.first;
+                auto pos = block_pos.second;
+
+
+                db_block.get_key(pos) = keys[j];
+
+                if (params_.get_label_bit_count())
+                {
+                    auto dest = db_block.get_label(pos);
+                    memcpy(dest, values[i].data(), params_.get_label_byte_count());
+                }
+            }
+        }
     }
 }
 
@@ -488,12 +497,6 @@ void SenderDB::batched_randomized_symmetric_polys(
         block.randomized_symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
         block.batch_random_symm_poly_ = { &batch_random_symm_poly_storage_[indexer(split, batch, 0)] , split_size_plus_one };
 
-        if (params_.debug())
-        {
-            block.debug_sym_block_.clear();
-            block.debug_sym_block_.reserve(split_size_plus_one);
-        }
-
         for (int i = 0; i < split_size_plus_one; i++)
         {
             Plaintext &poly = block.batch_random_symm_poly_[i];
@@ -505,11 +508,6 @@ void SenderDB::batched_randomized_symmetric_polys(
             }
             ex_batch_encoder->compose(batch_vector, poly);
             evaluator->transform_to_ntt(poly, seal_context_->first_parms_id(), local_pool);
-
-            if (params_.debug())
-            {
-                block.debug_sym_block_.push_back(batch_vector);
-            }
         }
 
         context.inc_randomized_polys();

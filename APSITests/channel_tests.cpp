@@ -2,17 +2,22 @@
 #include "utils.h"
 #include <limits>
 #include "apsi/result_package.h"
+#include "apsi/network/receiverchannel.h"
+#include "apsi/network/senderchannel.h"
+#include "seal/publickey.h"
 
 using namespace APSITests;
 using namespace std;
+using namespace seal;
 using namespace apsi;
 using namespace apsi::network;
+using namespace apsi::tools;
 
 namespace
 {
     zmqpp::context_t ctx_;
-    Channel server_(ctx_);
-    Channel client_(ctx_);
+    SenderChannel server_(ctx_);
+    ReceiverChannel client_(ctx_);
 }
 
 ChannelTests::~ChannelTests()
@@ -37,252 +42,465 @@ void ChannelTests::setUp()
     }
 }
 
-void ChannelTests::SendIntTest()
+void ChannelTests::ThrowWithoutConnectTest()
 {
-    int result = 0;
-    thread serverth([this, &result]
-    {
-        int sent;
-        server_.receive(sent);
-        result = sent;
-    });
+    SenderChannel mychannel(ctx_);
+    SenderResponseGetParameters get_params_resp;
+    SenderResponsePreprocess preproc_resp;
+    SenderResponseQuery query_resp;
+    shared_ptr<SenderOperation> sender_op;
 
-    int data = 5;
-    client_.send(data);
+    TableParams table_params{ 10, 1, 2, 40, 12345 };
+    CuckooParams cuckoo_params{ 3, 2, 1 };
+    SEALParams seal_params;
 
-    serverth.join();
+    PSIParams params(60, true, table_params, cuckoo_params, seal_params);
 
-    CPPUNIT_ASSERT_EQUAL(data, result);
+    vector<u8> buff = { 1, 2, 3, 4, 5 };
+
+    PublicKey pub_key;
+    RelinKeys relin_keys;
+    map<u64, vector<Ciphertext>> query_data;
+
+    // Receives
+    ASSERT_THROWS(mychannel.receive(get_params_resp));
+    ASSERT_THROWS(mychannel.receive(preproc_resp));
+    ASSERT_THROWS(mychannel.receive(query_resp));
+    ASSERT_THROWS(mychannel.receive(sender_op));
+
+    // Sends
+    vector<u8> empty_client_id;
+    ASSERT_THROWS(mychannel.send_get_parameters());
+    ASSERT_THROWS(mychannel.send_get_parameters_response(empty_client_id, params));
+    ASSERT_THROWS(mychannel.send_preprocess(buff));
+    ASSERT_THROWS(mychannel.send_preprocess_response(empty_client_id, buff));
+    ASSERT_THROWS(mychannel.send_query(pub_key, relin_keys, query_data));
+    ASSERT_THROWS(mychannel.send_query_response(empty_client_id, 10));
 }
 
-void ChannelTests::SendBlockTest()
+void ChannelTests::DataCountsTest()
 {
-    block blk = _mm_set_epi64x(0, 10);
-    block result = _mm_set_epi64x(0, 0);
+    SenderChannel svr(ctx_);
+    ReceiverChannel clt(ctx_);
 
-    thread serverth([this, &result]
+    svr.bind("tcp://*:5554");
+    clt.connect("tcp://localhost:5554");
+
+    thread clientth([this, &clt]
     {
-        server_.receive(result);
-    });
-
-    block data = _mm_set_epi64x(0, 10);
-    client_.send(data);
-
-    serverth.join();
-
-    CPPUNIT_ASSERT_EQUAL(0, memcmp(&result, &data, sizeof(block)));
-}
-
-void ChannelTests::SendIntAsyncTest()
-{
-    thread serverth([this]
-    {
-        int data = 12345;
         this_thread::sleep_for(50ms);
-        server_.send(data);
+
+        // This should be SenderOperationType size
+        clt.send_get_parameters();
+
+        vector<u8> data1;
+        InitU8Vector(data1, 1000);
+
+        // This should be 1000 bytes + SenderOperationType size
+        clt.send_preprocess(data1);
+
+        PublicKey pubkey;
+        RelinKeys relinkeys;
+        map<u64, vector<Ciphertext>> querydata;
+        vector<Ciphertext> vec1;
+        vector<Ciphertext> vec2;
+        Ciphertext txt;
+
+        vec1.push_back(txt);
+        vec2.push_back(txt);
+        querydata.insert_or_assign(1, vec1);
+        querydata.insert_or_assign(2, vec2);
+
+        // This should be:
+        // SenderOperationType size
+        // 57 for pubkey and 40 for relinkeys
+        // size_t size (number of entries in querydata)
+        // u64 size * 2 (each entry in querydata)
+        // size_t size * 2 (each entry in querydata)
+        // Ciphertexts will generate strings of length 57
+        clt.send_query(pubkey, relinkeys, querydata);
+
+        SenderResponseGetParameters get_params_resp;
+        clt.receive(get_params_resp);
+
+        SenderResponsePreprocess preprocess_resp;
+        clt.receive(preprocess_resp);
+
+        SenderResponseQuery query_resp;
+        clt.receive(query_resp);
+
+        ResultPackage pkg;
+        clt.receive(pkg);
+        clt.receive(pkg);
+        clt.receive(pkg);
     });
 
-    int result = 0;
-    auto fut = client_.async_receive(result);
+    CPPUNIT_ASSERT_EQUAL((u64)0, clt.get_total_data_received());
+    CPPUNIT_ASSERT_EQUAL((u64)0, clt.get_total_data_sent());
+    CPPUNIT_ASSERT_EQUAL((u64)0, svr.get_total_data_received());
+    CPPUNIT_ASSERT_EQUAL((u64)0, svr.get_total_data_sent());
 
-    CPPUNIT_ASSERT_EQUAL(0, result);
+    // get parameters
+    shared_ptr<SenderOperation> sender_op;
+    svr.receive(sender_op, /* wait_for_message */ true);
+    size_t expected_total = sizeof(SenderOperationType);
+    CPPUNIT_ASSERT_EQUAL(expected_total, svr.get_total_data_received());
 
-    fut.get();
-    serverth.join();
+    // preprocess
+    svr.receive(sender_op, /* wait_for_message */ true);
+    expected_total += 1000;
+    expected_total += sizeof(SenderOperationType);
+    CPPUNIT_ASSERT_EQUAL(expected_total, svr.get_total_data_received());
 
-    CPPUNIT_ASSERT_EQUAL(12345, result);
+    // query
+    svr.receive(sender_op, /* wait_for_message */ true);
+    expected_total += sizeof(SenderOperationType);
+    expected_total += sizeof(size_t) * 3;
+    expected_total += sizeof(u64) * 2;
+    expected_total += (57 + 40); // pubkey + relinkeys
+    expected_total += 57 * 2; // Ciphertexts
+    CPPUNIT_ASSERT_EQUAL(expected_total, svr.get_total_data_received());
+
+    // get parameters response
+    TableParams table_params{ 10, 1, 2, 40, 12345 };
+    CuckooParams cuckoo_params{ 3, 2, 1 };
+    SEALParams seal_params;
+    PSIParams params(60, true, table_params, cuckoo_params, seal_params);
+    svr.send_get_parameters_response(sender_op->client_id, params);
+    expected_total = sizeof(SenderOperationType);
+    expected_total += sizeof(int) * 3;
+    expected_total += sizeof(bool);
+    CPPUNIT_ASSERT_EQUAL(expected_total, svr.get_total_data_sent());
+
+    // Preprocess response
+    vector<u8> preproc;
+    InitU8Vector(preproc, 50);
+    svr.send_preprocess_response(sender_op->client_id, preproc);
+    expected_total += sizeof(SenderOperationType);
+    expected_total += preproc.size();
+    CPPUNIT_ASSERT_EQUAL(expected_total, svr.get_total_data_sent());
+
+    // Query response
+    vector<ResultPackage> result;
+    ResultPackage pkg1 = { 1, 2, "one", "two" };
+    ResultPackage pkg2 = { 100, 200, "three", "four" };
+    ResultPackage pkg3 = { 20, 40, "hello", "world" };
+    result.push_back(pkg1);
+    result.push_back(pkg2);
+    result.push_back(pkg3);
+    svr.send_query_response(sender_op->client_id, 3);
+    svr.send(sender_op->client_id, pkg1);
+    svr.send(sender_op->client_id, pkg2);
+    svr.send(sender_op->client_id, pkg3);
+
+    expected_total += sizeof(int) * 6;
+    expected_total += 25; // strings
+    expected_total += sizeof(SenderOperationType);
+    expected_total += sizeof(size_t); // size of vector
+    CPPUNIT_ASSERT_EQUAL(expected_total, svr.get_total_data_sent());
+
+    clientth.join();
 }
 
-void ChannelTests::SendBlockAsyncTest()
+void ChannelTests::SendGetParametersTest()
+{
+    thread clientth([this]
+    {
+        client_.send_get_parameters();
+    });
+
+    shared_ptr<SenderOperation> sender_op;
+    server_.receive(sender_op, /* wait_for_message */ true);
+
+    CPPUNIT_ASSERT(sender_op != nullptr);
+    CPPUNIT_ASSERT_EQUAL(SOP_get_parameters, sender_op->type);
+
+    clientth.join();
+}
+
+void ChannelTests::SendPreprocessTest()
+{
+    thread clientth([this]
+    {
+        vector<u8> buff = { 1, 2, 3, 4, 5 };
+        client_.send_preprocess(buff);
+    });
+
+    shared_ptr<SenderOperation> sender_op;
+    server_.receive(sender_op, /* wait_for_message */ true);
+
+    CPPUNIT_ASSERT_EQUAL(SOP_preprocess, sender_op->type);
+    auto preproc = dynamic_pointer_cast<SenderOperationPreprocess>(sender_op);
+
+    CPPUNIT_ASSERT(preproc != nullptr);
+    CPPUNIT_ASSERT_EQUAL((size_t)5, preproc->buffer.size());
+    CPPUNIT_ASSERT_EQUAL((u8)1, preproc->buffer[0]);
+    CPPUNIT_ASSERT_EQUAL((u8)2, preproc->buffer[1]);
+    CPPUNIT_ASSERT_EQUAL((u8)3, preproc->buffer[2]);
+    CPPUNIT_ASSERT_EQUAL((u8)4, preproc->buffer[3]);
+    CPPUNIT_ASSERT_EQUAL((u8)5, preproc->buffer[4]);
+
+    clientth.join();
+}
+
+void ChannelTests::SendQueryTest()
+{
+    thread clientth([this]
+    {
+        PublicKey pub_key;
+        RelinKeys relin_keys;
+        map<u64, vector<Ciphertext>> query;
+
+        vector<Ciphertext> vec;
+        vec.push_back(Ciphertext());
+
+        query.insert_or_assign(5, vec);
+
+        client_.send_query(pub_key, relin_keys, query);
+    });
+
+    shared_ptr<SenderOperation> sender_op;
+    server_.receive(sender_op, /* wait_for_message */ true);
+
+    CPPUNIT_ASSERT_EQUAL(SOP_query, sender_op->type);
+    auto query_op = dynamic_pointer_cast<SenderOperationQuery>(sender_op);
+
+    // For now we can only verify sizes, as all strings received will be empty.
+    CPPUNIT_ASSERT(query_op != nullptr);
+    CPPUNIT_ASSERT_EQUAL((size_t)1, query_op->query.size());
+    CPPUNIT_ASSERT_EQUAL((size_t)1, query_op->query.at(5).size());
+
+    clientth.join();
+}
+
+void ChannelTests::SendGetParametersResponseTest()
 {
     thread serverth([this]
     {
-        block data = _mm_set_epi64x(12345, 54321);
-        this_thread::sleep_for(50ms);
-        server_.send(data);
+        shared_ptr<SenderOperation> sender_op;
+        server_.receive(sender_op, /* wait_for_message */ true);
+        CPPUNIT_ASSERT_EQUAL(SOP_get_parameters, sender_op->type);
+
+        TableParams table_params { 10, 1, 2, 40, 12345 };
+        CuckooParams cuckoo_params { 3, 2, 1 };
+        SEALParams seal_params;
+
+        unsigned item_bit_count = 60;
+        PSIParams params(item_bit_count, true, table_params, cuckoo_params, seal_params);
+        params.set_value_bit_count(item_bit_count);
+
+        server_.send_get_parameters_response(sender_op->client_id, params);
+
+        table_params.sender_bin_size = 54321;
+        item_bit_count = 80;
+        PSIParams params2(item_bit_count, false, table_params, cuckoo_params, seal_params);
+        params2.set_value_bit_count(0);
+
+        server_.send_get_parameters_response(sender_op->client_id, params2);
     });
 
-    block result = zero_block;
-    auto fut = client_.async_receive(result);
+    client_.send_get_parameters();
 
-    CPPUNIT_ASSERT_EQUAL(0, memcmp(&result, &zero_block, sizeof(block)));
+    SenderResponseGetParameters get_params_response;
+    client_.receive(get_params_response);
 
-    fut.get();
-    block expected = _mm_set_epi64x(12345, 54321);
+    CPPUNIT_ASSERT_EQUAL(12345, get_params_response.sender_bin_size);
+    CPPUNIT_ASSERT_EQUAL(true,  get_params_response.use_oprf);
+    CPPUNIT_ASSERT_EQUAL(60,    get_params_response.item_bit_count);
+    CPPUNIT_ASSERT_EQUAL(60,    get_params_response.label_bit_count);
+
+    SenderResponseGetParameters get_params_response2;
+    client_.receive(get_params_response2);
+
+    CPPUNIT_ASSERT_EQUAL(54321, get_params_response2.sender_bin_size);
+    CPPUNIT_ASSERT_EQUAL(false, get_params_response2.use_oprf);
+    CPPUNIT_ASSERT_EQUAL(80,    get_params_response2.item_bit_count);
+    CPPUNIT_ASSERT_EQUAL(0,     get_params_response2.label_bit_count);
+
     serverth.join();
-
-    CPPUNIT_ASSERT_EQUAL(0, memcmp(&expected, &result, sizeof(block)));
 }
 
-void ChannelTests::SendStringTest()
+void ChannelTests::SendPreprocessResponseTest()
+{
+    thread serverth([this] 
+    {
+        shared_ptr<SenderOperation> sender_op;
+        server_.receive(sender_op, /* wait_for_message */ true);
+        CPPUNIT_ASSERT_EQUAL(SOP_preprocess, sender_op->type);
+
+        vector<u8> buffer = { 10, 9, 8, 7, 6 };
+        server_.send_preprocess_response(sender_op->client_id, buffer);
+    });
+
+    // This buffer will actually be ignored
+    vector<u8> buff = { 1 };
+    client_.send_preprocess(buff);
+
+    SenderResponsePreprocess preprocess_response;
+    client_.receive(preprocess_response);
+
+    CPPUNIT_ASSERT_EQUAL((size_t)5, preprocess_response.buffer.size());
+    CPPUNIT_ASSERT_EQUAL((u8)10, preprocess_response.buffer[0]);
+    CPPUNIT_ASSERT_EQUAL((u8)9,  preprocess_response.buffer[1]);
+    CPPUNIT_ASSERT_EQUAL((u8)8,  preprocess_response.buffer[2]);
+    CPPUNIT_ASSERT_EQUAL((u8)7,  preprocess_response.buffer[3]);
+    CPPUNIT_ASSERT_EQUAL((u8)6,  preprocess_response.buffer[4]);
+
+    serverth.join();
+}
+
+void ChannelTests::SendQueryResponseTest()
 {
     thread serverth([this]
     {
-        string hello = "Hello world";
-        server_.send(hello);
+        shared_ptr<SenderOperation> sender_op;
+        server_.receive(sender_op, /* wait_for_message */ true);
+        CPPUNIT_ASSERT_EQUAL(SOP_query, sender_op->type);
+
+        vector<ResultPackage> result(4);
+
+        result[0] = ResultPackage { 1, 2, "hello", "world" };
+        result[1] = ResultPackage { 3, 4, "one", "two" };
+        result[2] = ResultPackage { 11, 10, "", "non empty" };
+        result[3] = ResultPackage { 15, 20, "data", "" };
+
+        server_.send_query_response(sender_op->client_id, 4);
+        server_.send(sender_op->client_id, result[0]);
+        server_.send(sender_op->client_id, result[1]);
+        server_.send(sender_op->client_id, result[2]);
+        server_.send(sender_op->client_id, result[3]);
     });
 
-    string expected = "Hello world";
-    string received;
-    client_.receive(received);
+    PublicKey pubkey;
+    RelinKeys relinkeys;
+    map<u64, vector<Ciphertext>> querydata;
+
+    // Send empty info, it is ignored
+    client_.send_query(pubkey, relinkeys, querydata);
+
+    SenderResponseQuery query_response;
+    client_.receive(query_response);
+
+    CPPUNIT_ASSERT_EQUAL((size_t)4, query_response.package_count);
+
+    ResultPackage pkg;
+    client_.receive(pkg);
+
+    CPPUNIT_ASSERT_EQUAL(1, pkg.split_idx);
+    CPPUNIT_ASSERT_EQUAL(2, pkg.batch_idx);
+    CPPUNIT_ASSERT(pkg.data == "hello");
+    CPPUNIT_ASSERT(pkg.label_data == "world");
+
+    client_.receive(pkg);
+
+    CPPUNIT_ASSERT_EQUAL(3, pkg.split_idx);
+    CPPUNIT_ASSERT_EQUAL(4, pkg.batch_idx);
+    CPPUNIT_ASSERT(pkg.data == "one");
+    CPPUNIT_ASSERT(pkg.label_data == "two");
+
+    client_.receive(pkg);
+
+    CPPUNIT_ASSERT_EQUAL(11, pkg.split_idx);
+    CPPUNIT_ASSERT_EQUAL(10, pkg.batch_idx);
+    CPPUNIT_ASSERT(pkg.data == "");
+    CPPUNIT_ASSERT(pkg.label_data == "non empty");
+
+    client_.receive(pkg);
+
+    CPPUNIT_ASSERT_EQUAL(15, pkg.split_idx);
+    CPPUNIT_ASSERT_EQUAL(20, pkg.batch_idx);
+    CPPUNIT_ASSERT(pkg.data == "data");
+    CPPUNIT_ASSERT(pkg.label_data == "");
 
     serverth.join();
-
-    CPPUNIT_ASSERT(expected == received);
 }
 
-void ChannelTests::SendStringAsyncTest()
+void ChannelTests::MultipleClientsTest()
 {
-    thread serverth([this]
+    atomic<bool> finished = false;
+
+    thread serverth([this, &finished]
     {
-        string hello = "Hello again";
-        this_thread::sleep_for(50ms);
-        server_.send(hello);
+        zmqpp::context_t context;
+        SenderChannel sender(context);
+
+        sender.bind("tcp://*:5552");
+
+        while (!finished)
+        {
+            shared_ptr<SenderOperation> sender_op;
+            if (!sender.receive(sender_op))
+            {
+                this_thread::sleep_for(50ms);
+                continue;
+            }
+
+            CPPUNIT_ASSERT_EQUAL(SOP_preprocess, sender_op->type);
+
+            // Preprocessing will multiply two numbers and add them to the result
+            auto preproc_op = dynamic_pointer_cast<SenderOperationPreprocess>(sender_op);
+            preproc_op->buffer.resize(3);
+            preproc_op->buffer[2] = preproc_op->buffer[0] * preproc_op->buffer[1];
+
+            sender.send_preprocess_response(preproc_op->client_id, preproc_op->buffer);
+        }
     });
 
-    string received = "";
-    auto fut = client_.async_receive(received);
-
-    CPPUNIT_ASSERT(received == "");
-
-    string expected = "Hello again";
-    fut.get();
-
-    serverth.join();
-
-    CPPUNIT_ASSERT(expected == received);
-}
-
-void ChannelTests::SendStringVectorTest()
-{
-    vector<string> result;
-    vector<string> result2;
-
-    thread serverth([this, &result, &result2]
+    vector<thread> clients(5);
+    for (unsigned i = 0; i < clients.size(); i++)
     {
-        server_.receive(result);
-        server_.receive(result2);
-    });
+        clients[i] = thread([this](unsigned idx)
+        {
+            zmqpp::context_t context;
+            ReceiverChannel recv(context);
 
-    vector<string> sent;
-    InitStringVector(sent, 1000);
+            recv.connect("tcp://localhost:5552");
 
-    vector<string> empty;
+            u8 a = static_cast<u8>(idx) * 2;
+            u8 b = a + 1;
 
-    // Add some data to the result2 vetor. After data is received, it
-    // should become empty.
-    result2.emplace_back("Hello");
-    CPPUNIT_ASSERT_EQUAL((size_t)1, result2.size());
+            for (unsigned i = 0; i < 5; i++)
+            {
+                vector<u8> buffer(2);
+                buffer[0] = a;
+                buffer[1] = b;
 
-    client_.send(sent);
-    client_.send(empty);
+                recv.send_preprocess(buffer);
 
-    serverth.join();
+                SenderResponsePreprocess preproc;
+                recv.receive(preproc);
 
-    CPPUNIT_ASSERT_EQUAL(sent.size(), result.size());
-    for (int i = 0; i < 1000; i++)
-    {
-        CPPUNIT_ASSERT(sent[i] == result[i]);
+                CPPUNIT_ASSERT_EQUAL((size_t)3, preproc.buffer.size());
+                CPPUNIT_ASSERT_EQUAL((u8)(a * b), preproc.buffer[2]);
+            }
+
+        }, i);
     }
 
-    CPPUNIT_ASSERT_EQUAL((size_t)0, result2.size());
-}
-
-void ChannelTests::SendStringVectorAsyncTest()
-{
-    thread serverth([this]
+    for (unsigned i = 0; i < clients.size(); i++)
     {
-        vector<string> sent;
-        InitStringVector(sent, 1000);
-
-        this_thread::sleep_for(50ms);
-        server_.send(sent);
-    });
-
-    vector<string> result;
-    auto fut = client_.async_receive(result);
-
-    // For now result should be empty
-    CPPUNIT_ASSERT_EQUAL((size_t)0, result.size());
-
-    fut.get();
-    serverth.join();
-
-    // Now we should have data.
-    CPPUNIT_ASSERT_EQUAL((size_t)1000, result.size());
-}
-
-void ChannelTests::SendBufferTest()
-{
-    thread serverth([this]
-    {
-        vector<u8> buff;
-        InitU8Vector(buff, 1000);
-
-        server_.send(buff);
-
-        vector<u8> buff2;
-        server_.send(buff2);
-    });
-
-    vector<u8> result;
-    client_.receive(result);
-
-    vector<u8> result2;
-    result2.emplace_back(5);
-    CPPUNIT_ASSERT_EQUAL((size_t)1, result2.size());
-
-    client_.receive(result2);
-
-    serverth.join();
-
-    CPPUNIT_ASSERT_EQUAL((size_t)1000, result.size());
-    for (int i = 0; i < 1000; i++)
-    {
-        CPPUNIT_ASSERT_EQUAL((apsi::u8)(i % 0xFF), result[i]);
+        clients[i].join();
     }
 
-    CPPUNIT_ASSERT_EQUAL((size_t)0, result2.size());
-}
-
-void ChannelTests::SendBufferAsyncTest()
-{
-    thread serverth([this]
-    {
-        vector<u8> buff;
-        InitU8Vector(buff, 1000);
-        this_thread::sleep_for(50ms);
-        server_.send(buff);
-    });
-
-    vector<u8> result;
-    auto fut = client_.async_receive(result);
-
-    // Result should still be empty
-    CPPUNIT_ASSERT_EQUAL((size_t)0, result.size());
-
-    fut.get();
+    finished = true;
     serverth.join();
-
-    // Now we should have data
-    CPPUNIT_ASSERT_EQUAL((size_t)1000, result.size());
-    for (int i = 0; i < 1000; i++)
-    {
-        CPPUNIT_ASSERT_EQUAL((apsi::u8)(i % 0xFF), result[i]);
-    }
 }
 
 void ChannelTests::SendResultPackageTest()
 {
     thread serverth([this]
     {
+        shared_ptr<SenderOperation> sender_op;
+        server_.receive(sender_op, /* wait_for_message */ true);
+        CPPUNIT_ASSERT_EQUAL(SOP_get_parameters, sender_op->type);
+
         ResultPackage pkg;
         pkg.split_idx = 1;
         pkg.batch_idx = 2;
         pkg.data = "This is data";
         pkg.label_data = "Not label data";
 
-        server_.send(pkg);
+        server_.send(sender_op->client_id, pkg);
 
         ResultPackage pkg2;
         pkg2.split_idx = 3;
@@ -290,8 +508,10 @@ void ChannelTests::SendResultPackageTest()
         pkg2.data = "small data";
         pkg2.label_data = "";
 
-        server_.send(pkg2);
+        server_.send(sender_op->client_id, pkg2);
     });
+
+    client_.send_get_parameters();
 
     ResultPackage result;
     client_.receive(result);
@@ -308,149 +528,6 @@ void ChannelTests::SendResultPackageTest()
     CPPUNIT_ASSERT_EQUAL(4, result2.batch_idx);
     CPPUNIT_ASSERT(result2.data == "small data");
     CPPUNIT_ASSERT(result2.label_data.empty());
-
-    serverth.join();
-}
-
-void ChannelTests::SendResultPackageAsyncTest()
-{
-    thread serverth([this]
-    {
-        ResultPackage pkg;
-
-        pkg.split_idx = 5;
-        pkg.batch_idx = 6;
-        pkg.data = "data 1";
-        pkg.label_data = "label 1";
-
-        this_thread::sleep_for(50ms);
-
-        server_.send(pkg);
-    });
-
-    ResultPackage result;
-    result.batch_idx = 0;
-    result.split_idx = 0;
-
-    future<void> fut = client_.async_receive(result);
-
-    // At this point nothing should have been received.
-    CPPUNIT_ASSERT_EQUAL(0, result.split_idx);
-    CPPUNIT_ASSERT_EQUAL(0, result.batch_idx);
-    CPPUNIT_ASSERT(result.data.empty());
-    CPPUNIT_ASSERT(result.data.empty());
-
-    fut.get();
-
-    // Now data should be there.
-    CPPUNIT_ASSERT_EQUAL(5, result.split_idx);
-    CPPUNIT_ASSERT_EQUAL(6, result.batch_idx);
-    CPPUNIT_ASSERT(result.data == "data 1");
-    CPPUNIT_ASSERT(result.label_data == "label 1");
-
-    serverth.join();
-}
-
-void ChannelTests::ThrowWithoutConnectTest()
-{
-    Channel mychannel(ctx_);
-    int result;
-    string str;
-    vector<u8> buff;
-    vector<string> buff2;
-
-    // Receives
-    ASSERT_THROWS(mychannel.receive(result));
-    ASSERT_THROWS(mychannel.receive(str));
-    ASSERT_THROWS(mychannel.receive(buff));
-    ASSERT_THROWS(mychannel.receive(buff2));
-
-    // Sends
-    ASSERT_THROWS(mychannel.send(result));
-    ASSERT_THROWS(mychannel.send(str));
-    ASSERT_THROWS(mychannel.send(buff));
-    ASSERT_THROWS(mychannel.send(buff2));
-}
-
-void ChannelTests::DataCountsTest()
-{
-    Channel svr(ctx_);
-    Channel clt(ctx_);
-
-    svr.bind("tcp://*:5554");
-    clt.connect("tcp://localhost:5554");
-
-    thread serverth([this, &svr]
-    {
-        vector<u8> data1;
-        InitU8Vector(data1, 1000);
-
-        // This should be 1000 bytes
-        svr.send(data1);
-
-        vector<string> data2;
-        InitStringVector(data2, 100);
-
-        // This should be 190 bytes
-        svr.send(data2);
-
-        // 4 bytes
-        u32 data3 = 10;
-        svr.send(data3);
-
-        // 16 bytes
-        block data4 = _mm_set_epi64x(1, 1);
-        svr.send(data4);
-
-        string data5 = "Hello world!";
-        svr.send(data5);
-
-        svr.receive(data1);
-        svr.receive(data2);
-        svr.receive(data3);
-        svr.receive(data4);
-        svr.receive(data5);
-    });
-
-    vector<u8> data1;
-    vector<string> data2;
-    u32 data3;
-    block data4;
-    string data5;
-
-    CPPUNIT_ASSERT_EQUAL((u64)0, clt.get_total_data_received());
-    CPPUNIT_ASSERT_EQUAL((u64)0, clt.get_total_data_sent());
-
-    clt.receive(data1);
-    CPPUNIT_ASSERT_EQUAL((u64)1000, clt.get_total_data_received());
-
-    clt.receive(data2);
-    CPPUNIT_ASSERT_EQUAL((u64)1190, clt.get_total_data_received());
-
-    clt.receive(data3);
-    CPPUNIT_ASSERT_EQUAL((u64)1194, clt.get_total_data_received());
-
-    clt.receive(data4);
-    CPPUNIT_ASSERT_EQUAL((u64)1210, clt.get_total_data_received());
-
-    clt.receive(data5);
-    CPPUNIT_ASSERT_EQUAL((u64)1222, clt.get_total_data_received());
-    CPPUNIT_ASSERT_EQUAL((u64)1222, svr.get_total_data_sent());
-
-    clt.send(data1);
-    CPPUNIT_ASSERT_EQUAL((u64)1000, clt.get_total_data_sent());
-
-    clt.send(data2);
-    CPPUNIT_ASSERT_EQUAL((u64)1190, clt.get_total_data_sent());
-
-    clt.send(data3);
-    CPPUNIT_ASSERT_EQUAL((u64)1194, clt.get_total_data_sent());
-
-    clt.send(data4);
-    CPPUNIT_ASSERT_EQUAL((u64)1210, clt.get_total_data_sent());
-
-    clt.send(data5);
-    CPPUNIT_ASSERT_EQUAL((u64)1222, clt.get_total_data_sent());
 
     serverth.join();
 }

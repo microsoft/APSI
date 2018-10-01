@@ -54,7 +54,7 @@ Receiver::Receiver(const PSIParams &params, int thread_count, const MemoryPoolHa
 
 void Receiver::initialize()
 {
-    StopwatchScope init_receiver(recv_stop_watch, "Receiver::initialize");
+    STOPWATCH(recv_stop_watch, "Receiver::initialize");
     Log::info("Initializing Receiver");
 
     seal_context_ = SEALContext::Create(params_.encryption_params());
@@ -82,7 +82,7 @@ void Receiver::initialize()
 
 std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Channel& chl)
 {
-    StopwatchScope recv_query(recv_stop_watch, "Receiver::query");
+    STOPWATCH(recv_stop_watch, "Receiver::query");
     Log::info("Receiver starting query");
 
     // Perform initial communication with Sender
@@ -92,11 +92,18 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Ch
     auto& ciphertexts = qq.first;
     auto& cuckoo = *qq.second;
 
-    send(ciphertexts, chl);
+    chl.send_query(public_key_, relin_keys_, ciphertexts);
 
     auto table_to_input_map = cuckoo_indices(items, cuckoo);
 
-    /* Receive results in a streaming fashion. */
+    /* Receive results */
+    SenderResponseQuery query_resp;
+    {
+        STOPWATCH(recv_stop_watch, "Receiver::query::wait_response");
+        chl.receive(query_resp);
+        Log::debug("Sender will send %i result packages", query_resp.package_count);
+    }
+
     auto intersection = stream_decrypt(chl, table_to_input_map, items);
 
     Log::info("Receiver completed query");
@@ -106,19 +113,36 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Ch
 
 void Receiver::handshake(Channel& chl)
 {
-    StopwatchScope rcvr_hndshk_scope(recv_stop_watch, "Receiver::handshake");
+    STOPWATCH(recv_stop_watch, "Receiver::handshake");
     Log::info("Initial handshake");
 
-    int receiver_version = 1;
+    SenderResponseGetParameters sender_params;
+    chl.send_get_parameters();
 
-    // Start query
-    chl.send(receiver_version);
+    {
+        STOPWATCH(recv_stop_watch, "Receiver::handshake::wait_response");
+        chl.receive(sender_params);
+    }
 
-    // Sender will reply with correct bin size, which we need to use.
-    int sender_bin_size;
-    chl.receive(sender_bin_size);
-    params_.set_sender_bin_size(sender_bin_size);
-    Log::debug("Set sender bin size to %i", sender_bin_size);
+    // Set parameters we got from Sender.
+    Log::debug("Set item bit count to %i", sender_params.item_bit_count);
+    params_.set_item_bit_count(sender_params.item_bit_count);
+
+    Log::debug("Set label bit count to %i", sender_params.label_bit_count);
+    params_.set_value_bit_count(sender_params.label_bit_count);
+
+    Log::debug("Set sender bin size to %i", sender_params.sender_bin_size);
+    params_.set_sender_bin_size(sender_params.sender_bin_size);
+ 
+    if (sender_params.use_oprf)
+    {
+        Log::debug("Sender is using OPRF. Turning on.");
+    }
+    else
+    {
+        Log::debug("Sender is not using OPRF. Turning off.");
+    }
+    params_.set_use_oprf(sender_params.use_oprf);
 
     Log::info("Handshake done");
 }
@@ -128,7 +152,7 @@ pair<
     unique_ptr<CuckooInterface> >
     Receiver::preprocess(vector<Item> &items, Channel &channel)
 {
-    StopwatchScope preprocess_scope(recv_stop_watch, "Receiver::preprocess");
+    STOPWATCH(recv_stop_watch, "Receiver::preprocess");
     Log::info("Receiver preprocess start");
 
     if (params_.use_oprf())
@@ -155,8 +179,7 @@ pair<
         }
 
         // send the data over the network and prep for the response.
-        channel.send(buff);
-        auto f = channel.async_receive(buff);
+        channel.send_preprocess(buff);
 
         // compute 1/b so that we can compute (x^ba)^(1/b) = x^a
         for (u64 i = 0; i < items.size(); ++i)
@@ -165,9 +188,15 @@ pair<
             Montgomery_inversion_mod_order(b[i].data(), inv);
             b[i] = vector<digit_t>(inv, inv + NWORDS_ORDER);
         }
-        f.get();
 
-        iter = buff.data();
+        // Now we can receive response from Sender
+        SenderResponsePreprocess sender_preproc;
+        {
+            STOPWATCH(recv_stop_watch, "Receiver::preprocess::wait_response");
+            channel.receive(sender_preproc);
+        }
+
+        iter = sender_preproc.buffer.data();
         for (u64 i = 0; i < items.size(); i++)
         {
             buffer_to_eccoord(iter, x);
@@ -209,31 +238,6 @@ pair<
     return { move(ciphers), move(cuckoo) };
 }
 
-void Receiver::send(const map<uint64_t, vector<Ciphertext> > &query, Channel &channel)
-{
-    StopwatchScope recv_send(recv_stop_watch, "Receiver::send");
-
-    /* Send keys. */
-    send_pubkey(public_key_, channel);
-    send_relinkeys(relin_keys_, channel);
-
-    if (params_.debug())
-    {
-        send_prvkey(secret_key_, channel);
-        send_prvkey(secret_key_, channel);
-    }
-
-    /* Send query data. */
-    channel.send(query.size());
-    for (map<uint64_t, vector<Ciphertext> >::const_iterator it = query.begin(); it != query.end(); it++)
-    {
-        channel.send(it->first);
-
-        for(auto& c : it->second)
-            send_ciphertext(c, channel);
-    }
-}
-
 unique_ptr<CuckooInterface> Receiver::cuckoo_hashing(const vector<Item> &items)
 {
     auto receiver_null_item = all_one_block;
@@ -264,12 +268,15 @@ unique_ptr<CuckooInterface> Receiver::cuckoo_hashing(const vector<Item> &items)
             degree);
     }
 
-    bool insertionSuccess;
     for (int i = 0; i < items.size(); i++)
     {
-        insertionSuccess = cuckoo->insert(items[i]);
+        bool insertionSuccess = cuckoo->insert(items[i]);
         if (!insertionSuccess)
-            throw logic_error("Cuckoo hashing failed.");
+        {
+            string msg = "Cuckoo hashing failed";
+            Log::error("%s: current element: %i", msg.c_str(), i);
+            throw logic_error(msg);
+        }
     }
 
     return cuckoo;
@@ -371,11 +378,11 @@ void Receiver::encrypt(const FFieldArray &input, vector<Ciphertext> &destination
 }
 
 std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
-    Channel &channel,
+    Channel& channel,
     const std::vector<int> &table_to_input_map,
     std::vector<Item> &items)
 {
-    StopwatchScope str_decrypt_scope(recv_stop_watch, "Receiver::stream_decrypt");
+    STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt");
     std::pair<std::vector<bool>, Matrix<u8>> ret;
     auto& ret_bools = ret.first;
     auto& ret_labels = ret.second;
@@ -392,12 +399,6 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
         block_count = num_of_splits * num_of_batches,
         batch_size = slot_count_;
 
-    std::vector<std::pair<ResultPackage, future<void>>> recv_packages(block_count);
-    for (auto& pkg : recv_packages)
-    {
-        pkg.second = channel.async_receive(pkg.first);
-    }
-
     auto num_threads = thread_count_;
     Log::debug("Decrypting %i blocks(%ib x %is) with %i threads",
         block_count,
@@ -411,10 +412,11 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
         thrds[t] = std::thread([&](int idx)
         {
             stream_decrypt_worker(
-                static_cast<int>(idx),
+                idx,
                 batch_size,
                 thread_count_,
-                recv_packages,
+                block_count,
+                channel,
                 table_to_input_map,
                 ret_bools,
                 ret_labels);
@@ -431,12 +433,13 @@ void Receiver::stream_decrypt_worker(
     int thread_idx,
     int batch_size,
     int num_threads,
-    vector<pair<ResultPackage, future<void>>>& recv_packages,
+    int block_count,
+    Channel& channel,
     const vector<int> &table_to_input_map,
     vector<bool>& ret_bools,
     Matrix<u8>& ret_labels)
 {
-    StopwatchScope recv_str_decr_wkr_scope(recv_stop_watch, "Receiver::stream_decrypt_worker");
+    STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt_worker");
     MemoryPoolHandle local_pool(MemoryPoolHandle::New());
     Plaintext p(local_pool);
     Ciphertext tmp(seal_context_, local_pool);
@@ -448,16 +451,16 @@ void Receiver::stream_decrypt_worker(
 
     bool first = true;
 
-    for (u64 i = thread_idx; i < recv_packages.size(); i += num_threads)
+    for (u64 i = thread_idx; i < block_count; i += num_threads)
     {
-        auto& pkg = recv_packages[i];
+        ResultPackage pkg;
+        channel.receive(pkg);
 
-        pkg.second.get();
-        auto base_idx = pkg.first.batch_idx * batch_size;
+        auto base_idx = pkg.batch_idx * batch_size;
 
         // recover the sym poly values 
         has_result = false;
-        stringstream ss(pkg.first.data);
+        stringstream ss(pkg.data);
         compressor_->compressed_load(ss, tmp);
 
         if (first && thread_idx == 0)
@@ -485,7 +488,7 @@ void Receiver::stream_decrypt_worker(
 
         if (has_result && params_.get_label_bit_count())
         {
-            std::stringstream ss(pkg.first.label_data);
+            std::stringstream ss(pkg.label_data);
 
             compressor_->compressed_load(ss, tmp);
 
