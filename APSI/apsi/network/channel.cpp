@@ -71,7 +71,7 @@ bool Channel::receive(shared_ptr<SenderOperation>& sender_op, bool wait_for_mess
     throw_if_not_connected();
 
     message_t msg;
-    if (!get_socket()->receive(msg, !wait_for_message))
+    if (!receive_message(msg, wait_for_message))
     {
         // No message yet.
         return false;
@@ -111,7 +111,7 @@ void Channel::receive(SenderResponseGetParameters& response)
     throw_if_not_connected();
 
     message_t msg;
-    get_socket()->receive(msg);
+    receive_message(msg);
 
     // We should have five parts
     if (msg.parts() != 5)
@@ -139,7 +139,7 @@ void Channel::receive(SenderResponsePreprocess& response)
     throw_if_not_connected();
 
     message_t msg;
-    get_socket()->receive(msg);
+    receive_message(msg);
 
     // We should have 3 parts
     if (msg.parts() != 3)
@@ -161,7 +161,7 @@ void Channel::receive(SenderResponseQuery& response)
     throw_if_not_connected();
 
     message_t msg;
-    get_socket()->receive(msg);
+    receive_message(msg);
 
     // We should have at least 2 parts
     if (msg.parts() < 2)
@@ -201,6 +201,28 @@ void Channel::receive(SenderResponseQuery& response)
     bytes_received_ += sizeof(size_t);
 }
 
+void Channel::receive(ResultPackage& pkg)
+{
+    throw_if_not_connected();
+
+    message_t msg;
+    receive_message(msg);
+
+    if (msg.parts() != 4)
+    {
+        stringstream ss;
+        ss << "Should have 4 parts, has " << msg.parts();
+        throw runtime_error(ss.str());
+    }
+
+    pkg.split_idx = msg.get<int>(/* part */ 0);
+    pkg.batch_idx = msg.get<int>(/* part */ 1);
+    pkg.data = msg.get(/* part */ 2);
+    pkg.label_data = msg.get(/* part */ 3);
+
+    bytes_received_ += pkg.size();
+}
+
 void Channel::send_get_parameters()
 {
     throw_if_not_connected();
@@ -210,7 +232,7 @@ void Channel::send_get_parameters()
     add_message_type(type, msg);
 
     // that's it!
-    get_socket()->send(msg);
+    send_message(msg);
 
     bytes_sent_ += sizeof(SenderOperationType);
 }
@@ -231,7 +253,7 @@ void Channel::send_get_parameters_response(const vector<u8>& client_id, const PS
     msg.add(params.item_bit_count());
     msg.add(params.get_label_bit_count());
 
-    get_socket()->send(msg);
+    send_message(msg);
 
     bytes_sent_ += sizeof(SenderOperationType);
     bytes_sent_ += sizeof(int) * 3;
@@ -248,7 +270,7 @@ void Channel::send_preprocess(const vector<u8>& buffer)
     add_message_type(type, msg);
     add_buffer(buffer, msg);
 
-    get_socket()->send(msg);
+    send_message(msg);
 
     bytes_sent_ += sizeof(SenderOperationType);
     bytes_sent_ += buffer.size();
@@ -265,7 +287,7 @@ void Channel::send_preprocess_response(const vector<u8>& client_id, const std::v
     add_message_type(type, msg);
     add_buffer(buffer, msg);
 
-    get_socket()->send(msg);
+    send_message(msg);
 
     bytes_sent_ += sizeof(SenderOperationType);
     bytes_sent_ += buffer.size();
@@ -312,7 +334,7 @@ void Channel::send_query(
         bytes_sent_ += sizeof(size_t);
     }
 
-    get_socket()->send(msg);
+    send_message(msg);
 }
 
 void Channel::send_query_response(const vector<u8>& client_id, const std::vector<apsi::ResultPackage>& result)
@@ -341,7 +363,25 @@ void Channel::send_query_response(const vector<u8>& client_id, const std::vector
     bytes_sent_ += sizeof(SenderOperationType);
     bytes_sent_ += sizeof(size_t);
 
-    get_socket()->send(msg);
+    send_message(msg);
+}
+
+void Channel::send(const vector<u8>& client_id, const ResultPackage& pkg)
+{
+    throw_if_not_connected();
+
+    message_t msg;
+
+    add_client_id(msg, client_id);
+
+    msg.add(pkg.split_idx);
+    msg.add(pkg.batch_idx);
+    msg.add(pkg.data);
+    msg.add(pkg.label_data);
+
+    send_message(msg);
+
+    bytes_sent_ += pkg.size();
 }
 
 void Channel::get_buffer(vector<u8>& buff, const message_t& msg, int part_start) const
@@ -480,4 +520,24 @@ shared_ptr<SenderOperation> Channel::decode_query(const message_t& msg)
     }
 
     return make_shared<SenderOperationQuery>(std::move(client_id), pub_key, relin_keys, std::move(query));
+}
+
+bool Channel::receive_message(message_t& msg, bool wait_for_message)
+{
+    unique_lock<mutex> rec_lock(receive_mutex_);
+    bool received = get_socket()->receive(msg, !wait_for_message);
+
+    if (!received && wait_for_message)
+        throw runtime_error("Failed to receive message");
+
+    return received;
+}
+
+void Channel::send_message(message_t& msg)
+{
+    unique_lock<mutex> snd_lock(send_mutex_);
+    bool sent = get_socket()->send(msg);
+
+    if (!sent)
+        throw runtime_error("Failed to send message");
 }

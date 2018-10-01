@@ -466,6 +466,52 @@ void ChannelTests::MultipleClientsTest()
     serverth.join();
 }
 
+void ChannelTests::SendResultPackageTest()
+{
+    thread serverth([this]
+    {
+        shared_ptr<SenderOperation> sender_op;
+        server_.receive(sender_op, /* wait_for_message */ true);
+        CPPUNIT_ASSERT_EQUAL(SOP_get_parameters, sender_op->type);
+
+        ResultPackage pkg;
+        pkg.split_idx = 1;
+        pkg.batch_idx = 2;
+        pkg.data = "This is data";
+        pkg.label_data = "Not label data";
+
+        server_.send(sender_op->client_id, pkg);
+
+        ResultPackage pkg2;
+        pkg2.split_idx = 3;
+        pkg2.batch_idx = 4;
+        pkg2.data = "small data";
+        pkg2.label_data = "";
+
+        server_.send(sender_op->client_id, pkg2);
+    });
+
+    client_.send_get_parameters();
+
+    ResultPackage result;
+    client_.receive(result);
+
+    CPPUNIT_ASSERT_EQUAL(1, result.split_idx);
+    CPPUNIT_ASSERT_EQUAL(2, result.batch_idx);
+    CPPUNIT_ASSERT(result.data == "This is data");
+    CPPUNIT_ASSERT(result.label_data == "Not label data");
+
+    ResultPackage result2;
+    client_.receive(result2);
+
+    CPPUNIT_ASSERT_EQUAL(3, result2.split_idx);
+    CPPUNIT_ASSERT_EQUAL(4, result2.batch_idx);
+    CPPUNIT_ASSERT(result2.data == "small data");
+    CPPUNIT_ASSERT(result2.label_data.empty());
+
+    serverth.join();
+}
+
 void ChannelTests::InitStringVector(vector<string>& vec, int size)
 {
     vec.resize(size);

@@ -5,6 +5,7 @@
 #include <future>
 #include <map>
 #include <memory>
+#include <mutex>
 
 // APSI
 #include "apsi/apsidefines.h"
@@ -54,6 +55,73 @@ namespace apsi
             virtual ~Channel();
 
             /**
+            * Receive a Sender Operation.
+            *
+            * This call does not block, if there is no operation pending it will
+            * immediately return false.
+            */
+            bool receive(std::shared_ptr<apsi::network::SenderOperation>& sender_op, bool wait_for_message = false);
+
+            /**
+            * Receive Get Parameters response from Sender
+            */
+            void receive(apsi::network::SenderResponseGetParameters& response);
+
+            /**
+            * Receive item preprocessing response from Sender
+            */
+            void receive(apsi::network::SenderResponsePreprocess& response);
+
+            /**
+            * Receive Query response from Sender
+            */
+            void receive(apsi::network::SenderResponseQuery& response);
+
+            /**
+            Receive a ResultPackage structure
+            */
+            void receive(apsi::ResultPackage& pkg);
+
+            /**
+            Send a request to Get Parameters from Sender
+            */
+            void send_get_parameters();
+
+            /**
+            Send a response to a request to Get Parameters
+            */
+            void send_get_parameters_response(const std::vector<apsi::u8>& client_id, const apsi::PSIParams& params);
+
+            /**
+            Send a request to Preprocess items on Sender
+            */
+            void send_preprocess(const std::vector<apsi::u8>& buffer);
+
+            /**
+            * Send a response to a request to Preprocess items
+            */
+            void send_preprocess_response(const std::vector<apsi::u8>& client_id, const std::vector<apsi::u8>& buffer);
+
+            /**
+            * Send a request for a Query response to Sender
+            */
+            void send_query(
+                const seal::PublicKey& pub_key,
+                const seal::RelinKeys& relin_keys,
+                const std::map<apsi::u64, std::vector<seal::Ciphertext>>& query
+            );
+
+            /**
+            Send a response to a Query request
+            */
+            void send_query_response(const std::vector<apsi::u8>& client_id, const std::vector<apsi::ResultPackage>& result);
+
+            /**
+            * Send a ResultPackage structure
+            */
+            void send(const std::vector<apsi::u8>& client_id, const apsi::ResultPackage& pkg);
+
+            /**
             * Bind the channel to the given connection point.
             */
             void bind(const std::string& connection_point);
@@ -83,64 +151,6 @@ namespace apsi
             */
             bool is_connected() const { return !end_point_.empty(); }
 
-            /**
-            * Receive a Sender Operation.
-            *
-            * This call does not block, if there is no operation pending it will
-            * immediately return false.
-            */
-            bool receive(std::shared_ptr<apsi::network::SenderOperation>& sender_op, bool wait_for_message = false);
-
-            /**
-            * Receive Get Parameters response from Sender
-            */
-            void receive(apsi::network::SenderResponseGetParameters& response);
-
-            /**
-            * Receive item preprocessing response from Sender
-            */
-            void receive(apsi::network::SenderResponsePreprocess& response);
-
-            /**
-            * Receive Query response from Sender
-            */
-            void receive(apsi::network::SenderResponseQuery& response);
-
-            /**
-            Send a request to Get Parameters from Sender
-            */
-            void send_get_parameters();
-
-            /**
-            Send a response to a request to Get Parameters
-            */
-            void send_get_parameters_response(const std::vector<apsi::u8>& client_id, const apsi::PSIParams& params);
-
-            /**
-            Send a request to Preprocess items on Sender
-            */
-            void send_preprocess(const std::vector<apsi::u8>& buffer);
-
-            /**
-            Send a response to a request to Preprocess items
-            */
-            void send_preprocess_response(const std::vector<apsi::u8>& client_id, const std::vector<apsi::u8>& buffer);
-
-            /**
-            Send a request for a Query response to Sender
-            */
-            void send_query(
-                const seal::PublicKey& pub_key,
-                const seal::RelinKeys& relin_keys,
-                const std::map<apsi::u64, std::vector<seal::Ciphertext>>& query
-            );
-
-            /**
-            Send a response to a Query request
-            */
-            void send_query_response(const std::vector<apsi::u8>& client_id, const std::vector<apsi::ResultPackage>& result);
-
-
         protected:
             /**
             Get socket type for this channel.
@@ -155,8 +165,14 @@ namespace apsi
             std::unique_ptr<zmqpp::socket_t> socket_;
             std::string end_point_;
 
+            std::mutex receive_mutex_;
+            std::mutex send_mutex_;
+
             void throw_if_not_connected() const;
             void throw_if_connected() const;
+
+            bool receive_message(zmqpp::message_t& msg, bool wait_for_message = true);
+            void send_message(zmqpp::message_t& msg);
 
             /**
             Decode a Get Parameters message

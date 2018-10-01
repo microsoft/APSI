@@ -20,6 +20,7 @@ namespace APSITests
         CPPUNIT_TEST(SendPreprocessResponseTest);
         CPPUNIT_TEST(SendQueryResponseTest);
         CPPUNIT_TEST(MultipleClientsTest);
+        CPPUNIT_TEST(SendResultPackageTest);
 
         CPPUNIT_TEST_SUITE_END();
 
@@ -36,6 +37,7 @@ namespace APSITests
         void SendPreprocessResponseTest();
         void SendQueryResponseTest();
         void MultipleClientsTest();
+        void SendResultPackageTest();
 
         virtual void setUp();
 
