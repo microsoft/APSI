@@ -9,7 +9,7 @@
 #include "apsi/logging/log.h"
 #include "apsi/network/network_utils.h"
 #include "apsi/network/channel.h"
-#include "apsi/tools/ec_utils.h"
+#include "apsi/tools/fourq.h"
 #include "apsi/tools/prng.h"
 #include "apsi/tools/utils.h"
 #include "apsi/result_package.h"
@@ -23,8 +23,6 @@
 // CryptoPP
 #include "cryptopp/sha3.h"
 
-// FourQ
-#include "FourQ_api.h"
 
 using namespace std;
 using namespace seal;
@@ -158,23 +156,25 @@ pair<
     if (params_.use_oprf())
     {
         PRNG prng(zero_block);
-        vector<vector<digit_t>> b;
+        vector<vector<u64>> b;
         b.reserve(items.size());
-        digit_t x[NWORDS_ORDER];
+        FourQCoordinate x;
 
-        auto step = (sizeof(digit_t) * NWORDS_ORDER) - 1;
+        auto step = FourQCoordinate::byte_count();
         vector<u8> buff(items.size() * step);
         auto iter = buff.data();
+
         for (u64 i = 0; i < items.size(); i++)
         {
-            random_fourq(x, prng);
-            b.emplace_back(x, x + NWORDS_ORDER);
+            x.random(prng);
+            b.emplace_back(x.data(), x.data() + FourQCoordinate::word_count());
 
             PRNG pp(items[i], /* buffer_size */ 8);
 
-            random_fourq(x, pp);
-            Montgomery_multiply_mod_order(x, b[i].data(), x);
-            eccoord_to_buffer(x, iter);
+            x.random(pp);
+            x.multiply_mod_order(b[i].data());
+            x.to_buffer(iter);
+
             iter += step;
         }
 
@@ -184,9 +184,9 @@ pair<
         // compute 1/b so that we can compute (x^ba)^(1/b) = x^a
         for (u64 i = 0; i < items.size(); ++i)
         {
-            digit_t inv[NWORDS_ORDER];
-            Montgomery_inversion_mod_order(b[i].data(), inv);
-            b[i] = vector<digit_t>(inv, inv + NWORDS_ORDER);
+            FourQCoordinate inv(b[i].data());
+            inv.inversion_mod_order();
+            b[i] = vector<u64>(inv.data(), inv.data() + FourQCoordinate::word_count());
         }
 
         // Now we can receive response from Sender
@@ -199,9 +199,9 @@ pair<
         iter = sender_preproc.buffer.data();
         for (u64 i = 0; i < items.size(); i++)
         {
-            buffer_to_eccoord(iter, x);
-            Montgomery_multiply_mod_order(x, b[i].data(), x);
-            eccoord_to_buffer(x, iter);
+            x.from_buffer(iter);
+            x.multiply_mod_order(b[i].data());
+            x.to_buffer(iter);
 
             // Compress with SHA3
             CryptoPP::SHA3_256 sha;

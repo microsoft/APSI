@@ -58,8 +58,8 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;c:\progs\libs\cppunit\include;c:\progs\libs\SEAL\include;c:\progs\libs\Cuckoo\include;c:\progs\libs\GSL;c:\progs\libs\flint2\include;c:\progs\libs\cryptoTools\include;c:\progs\libs\boost-1.65.1\include;c:\progs\libs\mpir\include;c:\progs\libs\mpfr\include;c:\Progs\Libs\cryptopp700\include;c:\Progs\Libs\libzmqpp\include;c:\Progs\Libs\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions);_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;c:\progs\libs\cppunit\include;c:\progs\libs\SEAL\include;c:\progs\libs\Cuckoo\include;c:\progs\Libs\FourQlib\include;c:\progs\libs\GSL;c:\progs\libs\flint2\include;c:\progs\libs\cryptoTools\include;c:\progs\libs\boost-1.65.1\include;c:\progs\libs\mpir\include;c:\progs\libs\mpfr\include;c:\Progs\Libs\cryptopp700\include;c:\Progs\Libs\libzmqpp\include;c:\Progs\Libs\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__WINDOWS__;_AVX2_;_AMD64_;_DEBUG;%(PreprocessorDefinitions);_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK</PreprocessorDefinitions>
       <UseFullPaths>true</UseFullPaths>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
@@ -76,8 +76,8 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;c:\progs\libs\cppunit\include;c:\progs\libs\SEAL\include;c:\progs\libs\Cuckoo\include;c:\progs\libs\GSL;c:\progs\libs\flint2\include;c:\progs\libs\cryptoTools\include;c:\progs\libs\boost-1.65.1\include;c:\progs\libs\mpir\include;c:\progs\libs\mpfr\include;c:\Progs\Libs\cryptopp700\include;c:\Progs\Libs\libzmqpp\include;c:\Progs\Libs\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions);_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;c:\progs\libs\cppunit\include;c:\progs\libs\SEAL\include;c:\progs\libs\Cuckoo\include;c:\progs\Libs\FourQlib\include;c:\progs\libs\GSL;c:\progs\libs\flint2\include;c:\progs\libs\cryptoTools\include;c:\progs\libs\boost-1.65.1\include;c:\progs\libs\mpir\include;c:\progs\libs\mpfr\include;c:\Progs\Libs\cryptopp700\include;c:\Progs\Libs\libzmqpp\include;c:\Progs\Libs\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>__WINDOWS__;_AVX2_;_AMD64_;NDEBUG;%(PreprocessorDefinitions);_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK</PreprocessorDefinitions>
       <UseFullPaths>true</UseFullPaths>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
@@ -94,6 +94,7 @@
     <ClInclude Include="bit_copy_test.h" />
     <ClInclude Include="channel_tests.h" />
     <ClInclude Include="csvreader_tests.h" />
+    <ClInclude Include="fourq_tests.h" />
     <ClInclude Include="interpolate_tests.h" />
     <ClInclude Include="item.h" />
     <ClInclude Include="matrix_tests.h" />
@@ -109,6 +110,7 @@
     <ClCompile Include="bit_copy_test.cpp" />
     <ClCompile Include="channel_tests.cpp" />
     <ClCompile Include="csvreader_tests.cpp" />
+    <ClCompile Include="fourq_tests.cpp" />
     <ClCompile Include="interpolate_tests.cpp" />
     <ClCompile Include="item.cpp" />
     <ClCompile Include="matrix_tests.cpp" />

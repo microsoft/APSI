@@ -9,16 +9,14 @@
 #include "apsi/apsidefines.h"
 #include "apsi/logging/log.h"
 #include "apsi/network/network_utils.h"
-#include "apsi/tools/ec_utils.h"
 #include "apsi/tools/utils.h"
 #include "apsi/tools/prng.h"
+#include "apsi/tools/fourq.h"
 #include "apsi/result_package.h"
 
 // SEAL
 #include "seal/util/common.h"
 
-// FourQ
-#include "FourQ_api.h"
 
 using namespace std;
 using namespace seal;
@@ -203,18 +201,17 @@ void Sender::preprocess(vector<u8>& buff)
     Log::info("Starting pre-processing");
 
     PRNG pp(cc_block);
-    digit_t key[NWORDS_ORDER];
-    random_fourq(key, pp);
+    FourQCoordinate key(pp);
     auto iter = buff.data();
-    auto step = (sizeof(digit_t) * NWORDS_ORDER) - 1;
-    digit_t x[NWORDS_ORDER];
+    auto step = FourQCoordinate::byte_count();
+    FourQCoordinate x;
     u64 num = buff.size() / step;
 
     for (u64 i = 0; i < num; i++)
     {
-        buffer_to_eccoord(iter, x);
-        Montgomery_multiply_mod_order(x, key, x);
-        eccoord_to_buffer(x, iter);
+        x.from_buffer(iter);
+        x.multiply_mod_order(key);
+        x.to_buffer(iter);
 
         iter += step;
     }

@@ -18,6 +18,7 @@
 #include "csvreader_tests.h"
 #include "stopwatch_tests.h"
 #include "item.h"
+#include "fourq_tests.h"
 
 #ifdef _MSC_VER
 #include "Windows.h"
@@ -124,6 +125,7 @@ int run_unit_tests()
     runner.addTest(CSVReaderTests::suite());
     runner.addTest(StopwatchTests::suite());
     runner.addTest(ItemTests::suite());
+    runner.addTest(FourQTests::suite());
 
     runner.run(controller);
 
