@@ -7,7 +7,7 @@ SRCS=$(wildcard *.cpp) $(foreach d,$(SRC_DIRS),$(wildcard $d/*.cpp))
 OBJS=$(SRCS:%.cpp=$(OBJ_DIR)/%.o)
 DEPS=$(OBJS:.o=.d)
 INSTALL_DIR=APSI
-BASELIB=libbaseexample.a
+BASELIB=libcommoncode.a
 CXX=g++
 CXXFLAGS=-O0 -g -DHAVE_CONFIG -DUSE_SECURE_SEED -march=native -std=c++17  -maes -msse2 -msse4.1 -mpclmul -DNDEBUG -D_AMD64_ -D_AVX2_ -D_ASM_ -D__LINUX__ -Wno-ignored-attributes
 PREFIX=/usr/local
