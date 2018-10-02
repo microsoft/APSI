@@ -12,7 +12,6 @@
 #include "apsi/apsidefines.h"
 #include "apsi/tools/interpolate.h"
 #include "apsi/ffield/ffield_array.h"
-//#include "apsi/tools/ec_utils.h"
 #include "apsi/tools/prng.h"
 #include "apsi/tools/utils.h"
 #include "apsi/tools/fourq.h"
@@ -21,9 +20,6 @@
 #include "seal/evaluator.h"
 #include "seal/batchencoder.h"
 #include "seal/util/uintcore.h"
-
-// FourQ
-//#include "FourQ_api.h"
 
 // crypto++
 #include "cryptopp/sha3.h"
