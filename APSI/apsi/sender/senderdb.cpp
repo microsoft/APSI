@@ -12,9 +12,10 @@
 #include "apsi/apsidefines.h"
 #include "apsi/tools/interpolate.h"
 #include "apsi/ffield/ffield_array.h"
-#include "apsi/tools/ec_utils.h"
+//#include "apsi/tools/ec_utils.h"
 #include "apsi/tools/prng.h"
 #include "apsi/tools/utils.h"
+#include "apsi/tools/fourq.h"
 
 // SEAL
 #include "seal/evaluator.h"
@@ -22,7 +23,7 @@
 #include "seal/util/uintcore.h"
 
 // FourQ
-#include "FourQ_api.h"
+//#include "FourQ_api.h"
 
 // crypto++
 #include "cryptopp/sha3.h"
@@ -211,10 +212,9 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
     u64 start = thread_idx * data.size() / thread_count;
     u64 end = (thread_idx + 1) * data.size() / thread_count;
 
-    vector<u8> buff((sizeof(digit_t) * NWORDS_ORDER) - 1);
+    vector<u8> buff(FourQCoordinate::byte_count());
     PRNG pp(cc_block);
-    digit_t key[NWORDS_ORDER];
-    random_fourq(key, pp);
+    FourQCoordinate key(pp);
 
     vector<cuckoo::LocFunc> normal_loc_func(params_.hash_func_count());
 
@@ -230,10 +230,9 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
         {
             // Compute EC PRF first for data
             PRNG p(data[i], /* buffer_size */ 8);
-            digit_t a[NWORDS_ORDER];
-            random_fourq(a, p);
-            Montgomery_multiply_mod_order(a, key, a);
-            eccoord_to_buffer(a, buff.data());
+            FourQCoordinate a(p);
+            a.multiply_mod_order(key);
+            a.to_buffer(buff.data());
 
             // Then compress with SHA3
             CryptoPP::SHA3_256 sha;
