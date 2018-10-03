@@ -2,23 +2,11 @@
 #include <cppunit/TextTestRunner.h>
 #include <cppunit/TestResult.h>
 #include <cppunit/TestFailure.h>
+#include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/TestResultCollector.h>
 #include <cppunit/TextOutputter.h>
 #include <iomanip>
 #include <string>
-
-#include "bit_copy_test.h"
-#include "interpolate_tests.h"
-#include "matrix_tests.h"
-#include "plaintextarith.h"
-#include "aes_tests.h"
-#include "prng_tests.h"
-#include "channel_tests.h"
-#include "utils_tests.h"
-#include "csvreader_tests.h"
-#include "stopwatch_tests.h"
-#include "item.h"
-#include "fourq_tests.h"
 
 #ifdef _MSC_VER
 #include "Windows.h"
@@ -113,19 +101,8 @@ int run_unit_tests()
     controller.addListener(&result);
     controller.addListener(&progress);
 
-    runner.addTest(MatrixViewTests::suite());
-    runner.addTest(MatrixTests::suite());
-    runner.addTest(BitCopyTests::suite());
-    runner.addTest(InterpolateTests::suite());
-    runner.addTest(TestPlainArith::suite());
-    runner.addTest(AESTests::suite());
-    runner.addTest(PRNGTests::suite());
-    runner.addTest(ChannelTests::suite());
-    runner.addTest(UtilsTests::suite());
-    runner.addTest(CSVReaderTests::suite());
-    runner.addTest(StopwatchTests::suite());
-    runner.addTest(ItemTests::suite());
-    runner.addTest(FourQTests::suite());
+    CppUnit::Test* suite = CppUnit::TestFactoryRegistry::getRegistry().makeTest();
+    runner.addTest(suite);
 
     runner.run(controller);
 

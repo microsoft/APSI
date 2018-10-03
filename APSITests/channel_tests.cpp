@@ -13,6 +13,8 @@ using namespace apsi;
 using namespace apsi::network;
 using namespace apsi::tools;
 
+CPPUNIT_TEST_SUITE_REGISTRATION(ChannelTests);
+
 namespace
 {
     zmqpp::context_t ctx_;

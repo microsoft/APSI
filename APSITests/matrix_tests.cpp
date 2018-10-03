@@ -6,6 +6,9 @@
 
 using namespace APSITests;
 
+CPPUNIT_TEST_SUITE_REGISTRATION(MatrixViewTests);
+CPPUNIT_TEST_SUITE_REGISTRATION(MatrixTests);
+
 /**
  * This class only exists to expose the resize method.
  */

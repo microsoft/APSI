@@ -6,6 +6,8 @@ using namespace std;
 using namespace APSITests;
 using namespace apsi;
 
+CPPUNIT_TEST_SUITE_REGISTRATION(ItemTests);
+
 void ItemTests::parse_test()
 {
     // 128 bit string
