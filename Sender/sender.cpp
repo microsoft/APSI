@@ -17,6 +17,9 @@
 #include "common_utils.h"
 
 
+// For now version is a constant
+#define SENDER_VERSION "0.1"
+
 
 using namespace std;
 using namespace apsi;
@@ -34,7 +37,7 @@ int main(int argc, char *argv[])
 {
     prepare_console();
 
-    CLP cmd("Example of a Sender implementation");
+    CLP cmd("Example of a Sender implementation", SENDER_VERSION);
     if (!cmd.parse_args(argc, argv))
         return -1;
 

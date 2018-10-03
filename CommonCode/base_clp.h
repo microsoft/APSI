@@ -21,8 +21,8 @@ namespace apsi
     class BaseCLP : public TCLAP::CmdLine
     {
     public:
-        BaseCLP(const std::string& description)
-            : TCLAP::CmdLine(description)
+        BaseCLP(const std::string& description, const std::string& version)
+            : TCLAP::CmdLine(description, /* delim */ ' ', version)
         {
             std::vector<std::string> log_levels = { "debug", "info", "warning", "error" };
             log_level_constraint_ = std::make_unique<TCLAP::ValuesConstraint<std::string>>(log_levels);

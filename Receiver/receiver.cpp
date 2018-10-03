@@ -21,6 +21,10 @@
 #include "clp.h"
 
 
+// For now version is a constant.
+#define RECEIVER_VERSION "0.1"
+
+
 using namespace std;
 using namespace apsi;
 using namespace apsi::tools;
@@ -84,7 +88,7 @@ std::pair<vector<Item>, vector<int>> rand_subset(const vector<Item>& items, int 
 
 int main(int argc, char *argv[])
 {
-    apsi::CLP cmd("Example Implementation of APSI Receiver");
+    apsi::CLP cmd("Example Implementation of APSI Receiver", RECEIVER_VERSION);
 
     if (!cmd.parse_args(argc, argv))
         return -1;

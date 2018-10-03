@@ -111,6 +111,7 @@ void SenderDispatcher::dispatch_query(shared_ptr<SenderOperation> sender_op, Cha
     size_t package_count = sender_->get_params().batch_count() * sender_->get_params().split_count();
     channel.send_query_response(sender_op->client_id, package_count);
 
+    // Query will send result to client in a stream of ResultPackages
     sender_->query(
         pub_key,
         relin_keys,

@@ -10,8 +10,8 @@ namespace apsi
     class CLP : public BaseCLP
     {
     public:
-        CLP(const std::string& desc)
-            : BaseCLP(desc)
+        CLP(const std::string& desc, const std::string& version)
+            : BaseCLP(desc, version)
         {}
 
         virtual void add_args()
