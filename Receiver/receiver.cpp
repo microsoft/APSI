@@ -5,6 +5,7 @@
 #include <fstream>
 #include <vector>
 #include <set>
+#include <stack>
 
 // APSI
 #include "apsi/apsi.h"
@@ -37,7 +38,7 @@ using namespace seal;
 
 
 void remote_query(const CLP& cmd);
-void print_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<u8>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<u8>& labels);
+void print_intersection_results(pair<vector<bool>, Matrix<u8>>& intersection);
 void print_timing_info();
 void print_transmitted_data(Channel& channel);
 string get_conn_addr(const CLP& cmd);
@@ -85,6 +86,18 @@ int main(int argc, char *argv[])
     return 0;
 }
 
+string print_hex(gsl::span<u8> s)
+{
+    stringstream ss;
+    ss << "{ ";
+    for (int i = static_cast<int>(s.size()) - 1; i >= 0; i--)
+    {
+        ss << std::setw(2) << std::setfill('0') << std::hex << int(s[i]) << (i ? ", " : " }");
+    }
+
+    return ss.str();
+}
+
 void remote_query(const CLP& cmd)
 {
     print_example_banner("Query a remote Sender");
@@ -125,48 +138,34 @@ void remote_query(const CLP& cmd)
         }
     }
 
-    print_intersection_results(items, intersection_size, result, compare_labels, label_idx, labels);
+    print_intersection_results(result);
     print_timing_info();
     print_transmitted_data(channel);
 }
 
-void print_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<u8>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<u8>& labels)
+void print_intersection_results(pair<vector<bool>, Matrix<u8>>& intersection)
 {
-    bool correct = true;
-    for (int i = 0; i < client_items.size(); i++)
+    for (int i = 0; i < intersection.first.size(); i++)
     {
-
-        if (i < intersection_size)
+        stringstream msg;
+        msg << "Item at index " << i << " is ";
+        if (intersection.first[i])
         {
-            if (intersection.first[i] == false)
-            {
-                Log::info("Miss result for receiver's item at index: %i", i);
-                correct = false;
-            }
-            else if (compare_labels)
-            {
-                auto idx = label_idx[i];
-                if (memcmp(intersection.second[i].data(), labels[idx].data(), labels[idx].size()))
-                {
-                    Log::error("%sincorrect label at index: %i%s", Colors::Red.c_str(), i, Colors::Reset.c_str());
-                    correct = false;
-                }
-            }
+            msg << Colors::GreenBold << "present" << Colors::Reset;
         }
         else
         {
-            if (intersection.first[i])
-            {
-                Log::info("%sIncorrect result for receiver's item at index: %i%s", Colors::Red.c_str(), i, Colors::Reset.c_str());
-                correct = false;
-            }
+            msg << Colors::Red << "not present" << Colors::Reset;
         }
-    }
+        msg << " in Sender.";
 
-    Log::info("Intersection results: %s%s%s",
-        correct ? Colors::Green.c_str() : Colors::Red.c_str(),
-        correct ? "Correct" : "Incorrect",
-        Colors::Reset.c_str());
+        if (intersection.first[i] && intersection.second.columns() > 0)
+        {
+            msg << " Label: " << print_hex(intersection.second[i]);
+        }
+
+        Log::info("%s", msg.str().c_str());
+    }
 }
 
 void print_timing_info(Stopwatch& stopwatch, const string& caption)
@@ -234,22 +233,5 @@ int initialize_query(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels, in
     CSVReader reader(cmd.query_file());
     reader.read(items, labels, label_byte_count);
 
-    u64 read_items = items.size();
-
-    // Now add some items that should _not_ be in the Sender.
-    PRNG prng(sys_random_seed());
-    labels.resize(read_items + 20, label_byte_count);
-
-    for (int i = 0; i < 20; i++)
-    {
-        u64 low_part = 0;
-        Item item = zero_block;
-
-        prng.get(reinterpret_cast<u8*>(&low_part), 7);
-        item[0] = low_part;
-
-        items.push_back(item);
-    }
-
-    return static_cast<int>(read_items);
+    return static_cast<int>(items.size());
 }
