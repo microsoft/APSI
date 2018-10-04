@@ -1,16 +1,15 @@
-//#include "stdafx.h"
-//#include "CppUnitTest.h"
 
 #include "plaintextarith.h"
 #include "apsi/plaintextarith.h"
 
-//using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 using namespace apsi;
 using namespace std;
 using namespace seal;
 using namespace seal::util;
 
 using namespace APSITests;
+
+CPPUNIT_TEST_SUITE_REGISTRATION(TestPlainArith);
 
 void TestPlainArith::TestMult()
 {

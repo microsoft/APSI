@@ -7,6 +7,8 @@ using namespace APSITests;
 using namespace apsi;
 using namespace apsi::tools;
 
+CPPUNIT_TEST_SUITE_REGISTRATION(BitCopyTests);
+
 namespace
 {
     block to_block(int i)

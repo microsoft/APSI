@@ -11,6 +11,8 @@
 using namespace APSITests;
 using namespace apsi;
 
+CPPUNIT_TEST_SUITE_REGISTRATION(InterpolateTests);
+
 std::string toString(seal::Plaintext &ptxt, int coeff_count = 0) {
     if (coeff_count == 0) {
         coeff_count = ptxt.coeff_count();

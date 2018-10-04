@@ -8,6 +8,9 @@ using namespace std;
 using namespace apsi;
 using namespace apsi::tools;
 
+CPPUNIT_TEST_SUITE_REGISTRATION(UtilsTests);
+
+
 void UtilsTests::conversion_to_digits_test()
 {
     u64 number = 1234;

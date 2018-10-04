@@ -8,6 +8,7 @@ using namespace std;
 using namespace apsi;
 using namespace apsi::tools;
 
+CPPUNIT_TEST_SUITE_REGISTRATION(FourQTests);
 
 void FourQTests::CreationTest()
 {

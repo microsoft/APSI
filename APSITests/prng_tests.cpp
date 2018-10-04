@@ -10,6 +10,9 @@ using namespace APSITests;
 using namespace apsi;
 using namespace apsi::tools;
 
+CPPUNIT_TEST_SUITE_REGISTRATION(PRNGTests);
+
+
 void PRNGTests::constructor_test()
 {
     block seed;

@@ -5,6 +5,7 @@
 #include <fstream>
 #include <vector>
 #include <set>
+#include <stack>
 
 // APSI
 #include "apsi/apsi.h"
@@ -37,10 +38,9 @@ using namespace seal;
 
 
 void remote_query(const CLP& cmd);
-void print_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<u8>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<u8>& labels);
+void print_intersection_results(pair<vector<bool>, Matrix<u8>>& intersection);
 void print_timing_info();
 void print_transmitted_data(Channel& channel);
-string get_bind_addr(const CLP& cmd);
 string get_conn_addr(const CLP& cmd);
 int initialize_query(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels, int label_byte_count);
 
@@ -58,31 +58,6 @@ namespace {
     const std::string Colors::RedBold = "\033[1;31m";
     const std::string Colors::GreenBold = "\033[1;32m";
     const std::string Colors::Reset = "\033[0m";
-}
-
-std::pair<vector<Item>, vector<int>> rand_subset(const vector<Item>& items, int size)
-{
-    PRNG prn(zero_block);
-
-    set<int> ss;
-    while (ss.size() != size)
-    {
-        ss.emplace(static_cast<int>(prn.get<unsigned int>() % items.size()));
-    }
-    auto ssIter = ss.begin();
-
-    vector<Item> ret(size);
-    for (int i = 0; i < size; i++)
-    {
-        ret[i] = items[*ssIter++];
-    }
-    auto iter = ss.begin();
-    vector<int> s(size);
-    for (u64 i = 0; i < size; ++i)
-    {
-        s[i] = *iter++;
-    }
-    return { ret, s };
 }
 
 
@@ -111,100 +86,17 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-std::string print(gsl::span<u8> s)
+string print_hex(gsl::span<u8> s)
 {
-    std::stringstream ss;
-    for (int i = 0; i < s.size(); ++i)
+    stringstream ss;
+    ss << "{ ";
+    for (int i = static_cast<int>(s.size()) - 1; i >= 0; i--)
     {
-        ss << (i ? ", " : "{ ") << std::setw(2) << std::setfill('0') << std::hex << int(s[i]);
+        ss << std::setw(2) << std::setfill('0') << std::hex << int(s[i]) << (i ? ", " : " }");
     }
 
-    ss << " }";
     return ss.str();
 }
-
-//void example_slow_batching(const CLP& cmd)
-//{
-//    print_example_banner("Example: Slow batching");
-//
-//    // Connect the network
-//    zmqpp::context_t context;
-//    ReceiverChannel recvChl(context);
-//    SenderChannel sendChl(context);
-//
-//    string bind_addr = get_bind_addr(cmd);
-//    string conn_addr = get_conn_addr(cmd);
-//
-//    Log::info("Binding Sender to address: %s", bind_addr.c_str());
-//    sendChl.bind(bind_addr);
-//
-//    Log::info("Connecting receiver to address: %s", conn_addr.c_str());
-//    recvChl.connect(conn_addr);
-//
-//    // Thread count
-//    unsigned numThreads = cmd.threads();
-//
-//    PSIParams params = build_psi_params(cmd);
-//
-//    std::unique_ptr<Receiver> receiver_ptr;
-//
-//    int recThreads = cmd.rec_threads();
-//
-//    // Check that number of blocks is not smaller than thread count
-//    if(max<int>(numThreads, recThreads) > params.split_count() * params.batch_count())
-//    {
-//        cout << "WARNING: Using too many threads for block count!" << endl;
-//    }
-//
-//    auto f = std::async([&]()
-//    {
-//        receiver_ptr = make_unique<Receiver>(params, recThreads, MemoryPoolHandle::New());
-//    });
-//    Sender sender(params, numThreads, numThreads, MemoryPoolHandle::New());
-//    f.get();
-//    Receiver& receiver = *receiver_ptr;
-//
-//    auto label_bit_length = cmd.use_labels() ? cmd.item_bit_length() : 0;
-//    auto sendersActualSize = 1 << cmd.sender_size();
-//    auto recversActualSize = 50;
-//    auto intersectionSize = 25;
-//
-//    auto s1 = vector<Item>(sendersActualSize);
-//    Matrix<u8> labels(sendersActualSize, params.get_label_byte_count());
-//    for (int i = 0; i < s1.size(); i++)
-//    {
-//        s1[i] = i;
-//
-//        if (label_bit_length) {
-//            memset(labels[i].data(), 0, labels[i].size());
-//
-//            labels[i][0] = i;
-//            labels[i][1] = (i >> 8);
-//        }
-//    }
-//
-//    auto cc1 = rand_subset(s1, intersectionSize);
-//    auto& c1 = cc1.first;
-//
-//    c1.reserve(recversActualSize);
-//    for (int i = 0; i < (recversActualSize - intersectionSize); ++i)
-//        c1.emplace_back(i + s1.size());
-//
-//    sender.load_db(s1, labels);
-//
-//    auto thrd = thread([&]() {
-//        sender.query_session(sendChl); 
-//    });
-//    recv_stop_watch.add_event("receiver start");
-//    auto intersection = receiver.query(c1, recvChl);
-//    recv_stop_watch.add_event("receiver done");
-//    thrd.join();
-//
-//    // Done with everything. Print the results!
-//    print_intersection_results(c1, intersectionSize, intersection, label_bit_length > 0, cc1.second, labels);
-//    print_timing_info();
-//    print_transmitted_data(recvChl);
-//}
 
 void remote_query(const CLP& cmd)
 {
@@ -246,48 +138,34 @@ void remote_query(const CLP& cmd)
         }
     }
 
-    print_intersection_results(items, intersection_size, result, compare_labels, label_idx, labels);
+    print_intersection_results(result);
     print_timing_info();
     print_transmitted_data(channel);
 }
 
-void print_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<u8>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<u8>& labels)
+void print_intersection_results(pair<vector<bool>, Matrix<u8>>& intersection)
 {
-    bool correct = true;
-    for (int i = 0; i < client_items.size(); i++)
+    for (int i = 0; i < intersection.first.size(); i++)
     {
-
-        if (i < intersection_size)
+        stringstream msg;
+        msg << "Item at index " << i << " is ";
+        if (intersection.first[i])
         {
-            if (intersection.first[i] == false)
-            {
-                Log::info("Miss result for receiver's item at index: %i", i);
-                correct = false;
-            }
-            else if (compare_labels)
-            {
-                auto idx = label_idx[i];
-                if (memcmp(intersection.second[i].data(), labels[idx].data(), labels[idx].size()))
-                {
-                    Log::error("%sincorrect label at index: %i%s", Colors::Red.c_str(), i, Colors::Reset.c_str());
-                    correct = false;
-                }
-            }
+            msg << Colors::GreenBold << "present" << Colors::Reset;
         }
         else
         {
-            if (intersection.first[i])
-            {
-                Log::info("%sIncorrect result for receiver's item at index: %i%s", Colors::Red.c_str(), i, Colors::Reset.c_str());
-                correct = false;
-            }
+            msg << Colors::Red << "not present" << Colors::Reset;
         }
-    }
+        msg << " in Sender.";
 
-    Log::info("Intersection results: %s%s%s",
-        correct ? Colors::Green.c_str() : Colors::Red.c_str(),
-        correct ? "Correct" : "Incorrect",
-        Colors::Reset.c_str());
+        if (intersection.first[i] && intersection.second.columns() > 0)
+        {
+            msg << " Label: " << print_hex(intersection.second[i]);
+        }
+
+        Log::info("%s", msg.str().c_str());
+    }
 }
 
 void print_timing_info(Stopwatch& stopwatch, const string& caption)
@@ -341,14 +219,6 @@ void print_transmitted_data(Channel& channel)
     Log::info("Communication total: %0.3f KB", (channel.get_total_data_received() + channel.get_total_data_sent()) / 1024.0f);
 }
 
-string get_bind_addr(const CLP& cmd)
-{
-    stringstream ss;
-    ss << "tcp://*:" << cmd.net_port();
-
-    return ss.str();
-}
-
 string get_conn_addr(const CLP& cmd)
 {
     stringstream ss;
@@ -363,22 +233,5 @@ int initialize_query(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels, in
     CSVReader reader(cmd.query_file());
     reader.read(items, labels, label_byte_count);
 
-    u64 read_items = items.size();
-
-    // Now add some items that should _not_ be in the Sender.
-    PRNG prng(sys_random_seed());
-    labels.resize(read_items + 20, label_byte_count);
-
-    for (int i = 0; i < 20; i++)
-    {
-        u64 low_part = 0;
-        Item item = zero_block;
-
-        prng.get(reinterpret_cast<u8*>(&low_part), 7);
-        item[0] = low_part;
-
-        items.push_back(item);
-    }
-
-    return static_cast<int>(read_items);
+    return static_cast<int>(items.size());
 }

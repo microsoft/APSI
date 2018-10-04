@@ -11,6 +11,8 @@ using namespace APSITests;
 using namespace apsi;
 using namespace apsi::tools;
 
+CPPUNIT_TEST_SUITE_REGISTRATION(AESTests);
+
 void AESTests::constructor_test()
 {
     AES aes;

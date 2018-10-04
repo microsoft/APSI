@@ -9,6 +9,8 @@ using namespace APSITests;
 using namespace apsi;
 using namespace apsi::tools;
 
+CPPUNIT_TEST_SUITE_REGISTRATION(StopwatchTests);
+
 namespace {
     void get_thread_name(int idx, string& str)
     {
@@ -82,20 +84,27 @@ void StopwatchTests::stopwatch_block_test()
 {
     Stopwatch sw;
 
+    thread th1([&sw]
     {
-        StopwatchScope sc1(sw, "one");
+        StopwatchScope sc(sw, "one");
+        this_thread::sleep_for(60ms);
+    });
+
+    thread th2([&sw]
+    {
+        StopwatchScope sc(sw, "two");
         this_thread::sleep_for(30ms);
-    }
+    });
 
+    thread th3([&sw]
     {
-        StopwatchScope sc2(sw, "two");
-        this_thread::sleep_for(15ms);
-    }
+        StopwatchScope sc(sw, "one");
+        this_thread::sleep_for(40ms);
+    });
 
-    {
-        StopwatchScope sc3(sw, "one");
-        this_thread::sleep_for(20ms);
-    }
+    th1.join();
+    th2.join();
+    th3.join();
 
     vector<Stopwatch::TimespanSummary> tsp;
     sw.get_timespans(tsp);
@@ -109,24 +118,24 @@ void StopwatchTests::stopwatch_block_test()
     string msg;
     {
         stringstream ss;
-        ss << "Avg should be >= 25.0, it is: " << timesp->avg;
+        ss << "Avg should be >= 50.0, it is: " << timesp->avg;
         msg = ss.str();
     }
-    CPPUNIT_ASSERT_MESSAGE(msg.c_str(), timesp->avg >= 25.0);
+    CPPUNIT_ASSERT_MESSAGE(msg.c_str(), timesp->avg >= 50.0);
 
     {
         stringstream ss;
-        ss << "Min should be >= 20 && < 25, it is: " << timesp->min;
+        ss << "Min should be >= 40 && < 60, it is: " << timesp->min;
         msg = ss.str();
     }
-    CPPUNIT_ASSERT_MESSAGE(msg.c_str(), timesp->min >= 20 && timesp->min < 25);
+    CPPUNIT_ASSERT_MESSAGE(msg.c_str(), timesp->min >= 40 && timesp->min < 60);
 
     {
         stringstream ss;
-        ss << "Max should be >= 30 && < 35, it is: " << timesp->max;
+        ss << "Max should be >= 60 && < 80, it is: " << timesp->max;
         msg = ss.str();
     }
-    CPPUNIT_ASSERT_MESSAGE(msg.c_str(), timesp->max >= 30 && timesp->max < 35);
+    CPPUNIT_ASSERT_MESSAGE(msg.c_str(), timesp->max >= 60 && timesp->max < 80);
 
     timesp = std::find_if(tsp.begin(), tsp.end(), [](Stopwatch::TimespanSummary& tss) { return tss.event_name == "two"; });
     CPPUNIT_ASSERT(timesp != tsp.end());
