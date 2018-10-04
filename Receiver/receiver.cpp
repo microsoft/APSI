@@ -86,18 +86,6 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-string print_hex(gsl::span<u8> s)
-{
-    stringstream ss;
-    ss << "{ ";
-    for (int i = static_cast<int>(s.size()) - 1; i >= 0; i--)
-    {
-        ss << std::setw(2) << std::setfill('0') << std::hex << int(s[i]) << (i ? ", " : " }");
-    }
-
-    return ss.str();
-}
-
 void remote_query(const CLP& cmd)
 {
     print_example_banner("Query a remote Sender");
@@ -143,6 +131,18 @@ void remote_query(const CLP& cmd)
     print_transmitted_data(channel);
 }
 
+string print_hex(gsl::span<u8> s)
+{
+    stringstream ss;
+    ss << "{ ";
+    for (int i = static_cast<int>(s.size()) - 1; i >= 0; i--)
+    {
+        ss << std::setw(2) << std::setfill('0') << std::hex << int(s[i]) << (i ? ", " : " }");
+    }
+
+    return ss.str();
+}
+
 void print_intersection_results(pair<vector<bool>, Matrix<u8>>& intersection)
 {
     for (int i = 0; i < intersection.first.size(); i++)
@@ -155,7 +155,7 @@ void print_intersection_results(pair<vector<bool>, Matrix<u8>>& intersection)
         }
         else
         {
-            msg << Colors::Red << "not present" << Colors::Reset;
+            msg << Colors::Red << "missing" << Colors::Reset;
         }
         msg << " in Sender.";
 
@@ -208,7 +208,6 @@ void print_timing_info(Stopwatch& stopwatch, const string& caption)
 
 void print_timing_info()
 {
-    print_timing_info(sender_stop_watch, "Timing events for Sender");
     print_timing_info(recv_stop_watch, "Timing events for Receiver");
 }
 
