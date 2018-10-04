@@ -30,10 +30,10 @@ namespace apsi
         */
         const PSIParams build_psi_params(
             const BaseCLP& cmd,
-            const apsi::u64 sender_set_size = 0,
-            const int item_bit_length = 0,
-            const int label_bit_length = 0,
-            const bool use_oprf = false);
+            const apsi::u64 sender_set_size,
+            const int item_bit_length,
+            const bool use_oprf = false,
+            const bool use_labels = false);
 
         /**
         Generate timing report for timespans

@@ -65,15 +65,31 @@ void apsi::tools::prepare_console()
 #endif
 }
 
-const apsi::PSIParams apsi::tools::build_psi_params(
+const PSIParams apsi::tools::build_psi_params(
     const BaseCLP& cmd,
     const apsi::u64 sender_set_size,
     const int item_bit_length,
-    const int label_bit_length,
-    const bool use_oprf)
+    const bool use_oprf,
+    const bool use_labels)
 {
+    // General PSI parameters
+    PSIParams::PSIConfParams psiconf_params;
+    {
+        // Length of items
+        psiconf_params.item_bit_count = item_bit_length;
+
+        // Size of the Sender's DB
+        psiconf_params.sender_size = sender_set_size;
+
+        // Whether to use an OPRF
+        psiconf_params.use_oprf = use_oprf;
+
+        // Whether to use labels
+        psiconf_params.use_labels = use_labels;
+    }
+
     // Cuckoo hash parameters
-    CuckooParams cuckoo_params;
+    PSIParams::CuckooParams cuckoo_params;
     {
         // Cuckoo hash function count
         cuckoo_params.hash_func_count = 3;
@@ -86,7 +102,7 @@ const apsi::PSIParams apsi::tools::build_psi_params(
     }
 
     // Create TableParams and populate.
-    TableParams table_params;
+    PSIParams::TableParams table_params;
     {
         // Log of size of full hash table
         table_params.log_table_size = cmd.log_table_size();
@@ -101,21 +117,9 @@ const apsi::PSIParams apsi::tools::build_psi_params(
         // Window size parameter
         // Larger means lower depth but bigger R-->S communication
         table_params.window_size = cmd.window_size();
-
-        // Get secure bin size
-        table_params.sender_bin_size = 0;
-        if (0 != sender_set_size)
-        {
-            table_params.sender_bin_size = static_cast<int>(compute_sender_bin_size(
-                table_params.log_table_size,
-                sender_set_size,
-                cuckoo_params.hash_func_count,
-                table_params.binning_sec_level,
-                table_params.split_count));
-        }
     }
 
-    SEALParams seal_params;
+    PSIParams::SEALParams seal_params;
     {
         seal_params.encryption_params.set_poly_modulus_degree(cmd.poly_modulus());
 
@@ -161,18 +165,20 @@ const apsi::PSIParams apsi::tools::build_psi_params(
         seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
         seal_params.encryption_params.set_plain_modulus(cmd.plain_modulus());
 
-        // This must be equal to plain_modulus
-        seal_params.exfield_params.exfield_characteristic = seal_params.encryption_params.plain_modulus().value();
-        seal_params.exfield_params.exfield_degree = cmd.exfield_degree();
         seal_params.decomposition_bit_count = cmd.dbc();
+    }
+
+    PSIParams::ExFieldParams exfield_params;
+    {
+        // This must be equal to plain_modulus
+        exfield_params.characteristic = seal_params.encryption_params.plain_modulus().value();
+        exfield_params.degree = cmd.exfield_degree();
     }
 
     /*
     Creating the PSIParams class.
     */
-    PSIParams params(item_bit_length, use_oprf, table_params, cuckoo_params, seal_params);
-    params.set_value_bit_count(label_bit_length);
-
+    PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
     return params;
 }
 

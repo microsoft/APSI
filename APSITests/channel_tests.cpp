@@ -52,11 +52,12 @@ void ChannelTests::ThrowWithoutConnectTest()
     SenderResponseQuery query_resp;
     shared_ptr<SenderOperation> sender_op;
 
-    TableParams table_params{ 10, 1, 2, 40, 12345 };
-    CuckooParams cuckoo_params{ 3, 2, 1 };
-    SEALParams seal_params;
-
-    PSIParams params(60, true, table_params, cuckoo_params, seal_params);
+    PSIParams::PSIConfParams psiconf_params{ 60, true, true, 12345 };
+    PSIParams::TableParams table_params{ 10, 1, 2, 40 };
+    PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
+    PSIParams::SEALParams seal_params;
+    PSIParams::ExFieldParams exfield_params;
+    PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
 
     vector<u8> buff = { 1, 2, 3, 4, 5 };
 
@@ -164,10 +165,13 @@ void ChannelTests::DataCountsTest()
     CPPUNIT_ASSERT_EQUAL(expected_total, svr.get_total_data_received());
 
     // get parameters response
-    TableParams table_params{ 10, 1, 2, 40, 12345 };
-    CuckooParams cuckoo_params{ 3, 2, 1 };
-    SEALParams seal_params;
-    PSIParams params(60, true, table_params, cuckoo_params, seal_params);
+    PSIParams::PSIConfParams psiconf_params{ 60, true, true, 12345 };
+    PSIParams::TableParams table_params{ 10, 1, 2, 40 };
+    PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
+    PSIParams::SEALParams seal_params;
+    PSIParams::ExFieldParams exfield_params;
+    PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
+
     svr.send_get_parameters_response(sender_op->client_id, params);
     expected_total = sizeof(SenderOperationType);
     expected_total += sizeof(int) * 3;
@@ -283,20 +287,21 @@ void ChannelTests::SendGetParametersResponseTest()
         server_.receive(sender_op, /* wait_for_message */ true);
         CPPUNIT_ASSERT_EQUAL(SOP_get_parameters, sender_op->type);
 
-        TableParams table_params { 10, 1, 2, 40, 12345 };
-        CuckooParams cuckoo_params { 3, 2, 1 };
-        SEALParams seal_params;
+        PSIParams::PSIConfParams psiconf_params{ 60, true, true, 12345 };
+        PSIParams::TableParams table_params { 10, 1, 2, 40 };
+        PSIParams::CuckooParams cuckoo_params { 3, 2, 1 };
+        PSIParams::SEALParams seal_params;
+        PSIParams::ExFieldParams exfield_params;
 
-        unsigned item_bit_count = 60;
-        PSIParams params(item_bit_count, true, table_params, cuckoo_params, seal_params);
-        params.set_value_bit_count(item_bit_count);
+        PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
 
         server_.send_get_parameters_response(sender_op->client_id, params);
 
-        table_params.sender_bin_size = 54321;
-        item_bit_count = 80;
-        PSIParams params2(item_bit_count, false, table_params, cuckoo_params, seal_params);
-        params2.set_value_bit_count(0);
+        psiconf_params.sender_size = 54321;
+        psiconf_params.item_bit_count = 80;
+        psiconf_params.use_oprf = false;
+        psiconf_params.use_labels = false;
+        PSIParams params2(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
 
         server_.send_get_parameters_response(sender_op->client_id, params2);
     });

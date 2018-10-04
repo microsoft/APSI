@@ -35,12 +35,11 @@ using namespace apsi::network;
 using namespace apsi::receiver;
 
 
-Receiver::Receiver(const PSIParams &params, int thread_count, const MemoryPoolHandle &pool) :
-    params_(params),
+Receiver::Receiver(int thread_count, const MemoryPoolHandle &pool) :
     thread_count_(thread_count),
     pool_(pool),
-    ex_field_(FField::Acquire(params.exfield_characteristic(), params.exfield_degree())),
-    slot_count_((params_.encryption_params().poly_modulus_degree() / params_.exfield_degree()))
+    ex_field_(nullptr),
+    slot_count_(0)
 {
     if (thread_count_ <= 0)
     {
@@ -55,7 +54,10 @@ void Receiver::initialize()
     STOPWATCH(recv_stop_watch, "Receiver::initialize");
     Log::info("Initializing Receiver");
 
-    seal_context_ = SEALContext::Create(params_.encryption_params());
+    ex_field_ = FField::Acquire(get_params().exfield_characteristic(), get_params().exfield_degree());
+    slot_count_ = get_params().encryption_params().poly_modulus_degree() / get_params().exfield_degree();
+
+    seal_context_ = SEALContext::Create(get_params().encryption_params());
     KeyGenerator generator(seal_context_);
 
     public_key_ = generator.public_key();
@@ -70,10 +72,10 @@ void Receiver::initialize()
     compressor_ = make_unique<CiphertextCompressor>(seal_context_, 
         dummy_evaluator, pool_);
 
-    relin_keys_ = generator.relin_keys(params_.decomposition_bit_count());
+    relin_keys_ = generator.relin_keys(get_params().decomposition_bit_count());
 
     ex_batch_encoder_ = make_shared<FFieldFastBatchEncoder>(ex_field_->ch(), ex_field_->d(),
-        get_power_of_two(params_.encryption_params().poly_modulus_degree()));
+        get_power_of_two(get_params().encryption_params().poly_modulus_degree()));
 
     Log::info("Receiver initialized");
 }
@@ -123,24 +125,24 @@ void Receiver::handshake(Channel& chl)
     }
 
     // Set parameters we got from Sender.
-    Log::debug("Set item bit count to %i", sender_params.item_bit_count);
-    params_.set_item_bit_count(sender_params.item_bit_count);
+    //Log::debug("Set item bit count to %i", sender_params.item_bit_count);
+    //get_params().set_item_bit_count(sender_params.item_bit_count);
 
-    Log::debug("Set label bit count to %i", sender_params.label_bit_count);
-    params_.set_value_bit_count(sender_params.label_bit_count);
+    //Log::debug("Set label bit count to %i", sender_params.label_bit_count);
+    //get_params().set_value_bit_count(sender_params.label_bit_count);
 
-    Log::debug("Set sender bin size to %i", sender_params.sender_bin_size);
-    params_.set_sender_bin_size(sender_params.sender_bin_size);
+    //Log::debug("Set sender bin size to %i", sender_params.sender_bin_size);
+    //get_params().set_sender_bin_size(sender_params.sender_bin_size);
  
-    if (sender_params.use_oprf)
-    {
-        Log::debug("Sender is using OPRF. Turning on.");
-    }
-    else
-    {
-        Log::debug("Sender is not using OPRF. Turning off.");
-    }
-    params_.set_use_oprf(sender_params.use_oprf);
+    //if (sender_params.use_oprf)
+    //{
+    //    Log::debug("Sender is using OPRF. Turning on.");
+    //}
+    //else
+    //{
+    //    Log::debug("Sender is not using OPRF. Turning off.");
+    //}
+    //get_params().set_use_oprf(sender_params.use_oprf);
 
     Log::info("Handshake done");
 }
@@ -153,7 +155,7 @@ pair<
     STOPWATCH(recv_stop_watch, "Receiver::preprocess");
     Log::info("Receiver preprocess start");
 
-    if (params_.use_oprf())
+    if (get_params().use_oprf())
     {
         PRNG prng(zero_block);
         vector<vector<u64>> b;
@@ -244,11 +246,11 @@ unique_ptr<CuckooInterface> Receiver::cuckoo_hashing(const vector<Item> &items)
 
     unique_ptr<CuckooInterface> cuckoo(
         static_cast<CuckooInterface*>(new Cuckoo(
-            params_.hash_func_count(),
-            params_.hash_func_seed(),
-            params_.log_table_size(),
-            params_.item_bit_count(),
-            params_.max_probe(),
+            get_params().hash_func_count(),
+            get_params().hash_func_seed(),
+            get_params().log_table_size(),
+            get_params().item_bit_count(),
+            get_params().max_probe(),
             receiver_null_item))
     );
 
@@ -264,7 +266,7 @@ unique_ptr<CuckooInterface> Receiver::cuckoo_hashing(const vector<Item> &items)
     {
         Log::debug("Using %i out of %ix%i bits of exfield element",
             cuckoo->encoding_bit_length(),
-            seal::util::get_significant_bit_count(params_.exfield_characteristic()) - 1,
+            seal::util::get_significant_bit_count(get_params().exfield_characteristic()) - 1,
             degree);
     }
 
@@ -321,8 +323,8 @@ void Receiver::exfield_encoding(
 void Receiver::generate_powers(const FFieldArray &exfield_items,
     map<uint64_t, FFieldArray> &result)
 {
-    int split_size = (params_.sender_bin_size() + params_.split_count() - 1) / params_.split_count();
-    int window_size = params_.window_size();
+    int split_size = (get_params().sender_bin_size() + get_params().split_count() - 1) / get_params().split_count();
+    int window_size = get_params().window_size();
     int radix = 1 << window_size;
     int bound = static_cast<int>(floor(log2(split_size) / window_size) + 1);
 
@@ -389,13 +391,13 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
 
     ret_bools.resize(items.size(), false);
 
-    if (params_.get_label_bit_count())
+    if (get_params().get_label_bit_count())
     {
-        ret_labels.resize(items.size(), params_.get_label_byte_count());
+        ret_labels.resize(items.size(), get_params().get_label_byte_count());
     }
 
-    int num_of_splits = params_.split_count(),
-        num_of_batches = params_.batch_count(),
+    int num_of_splits = get_params().split_count(),
+        num_of_batches = get_params().batch_count(),
         block_count = num_of_splits * num_of_batches,
         batch_size = slot_count_;
 
@@ -489,7 +491,7 @@ void Receiver::stream_decrypt_worker(
             }
         }
 
-        if (has_result && params_.get_label_bit_count())
+        if (has_result && get_params().get_label_bit_count())
         {
             std::stringstream ss(pkg.label_data);
 
@@ -507,7 +509,7 @@ void Receiver::stream_decrypt_worker(
                 if (has_label[k])
                 {
                     auto idx = table_to_input_map[base_idx + k];
-                    batch->get(k).decode(ret_labels[idx], params_.get_label_bit_count());
+                    batch->get(k).decode(ret_labels[idx], get_params().get_label_bit_count());
                 }
             }
         }

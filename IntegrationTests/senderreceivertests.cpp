@@ -98,7 +98,7 @@ void SenderReceiverTests::RunTest(size_t senderActualSize, PSIParams& params)
 
     auto f = std::async([&]()
     {
-        receiver_ptr = make_unique<Receiver>(params, numThreads, MemoryPoolHandle::New());
+        receiver_ptr = make_unique<Receiver>(numThreads, MemoryPoolHandle::New());
     });
     shared_ptr<Sender> sender = make_shared<Sender>(params, numThreads, numThreads, MemoryPoolHandle::New());
     f.get();
@@ -148,40 +148,36 @@ void SenderReceiverTests::RunTest(size_t senderActualSize, PSIParams& params)
 
 PSIParams SenderReceiverTests::create_params(size_t sender_set_size, bool use_oprf, bool use_labels)
 {
-    unsigned int item_bit_count = 60;
+    PSIParams::PSIConfParams psiconf_params;
+    psiconf_params.item_bit_count = 60;
+    psiconf_params.sender_size = sender_set_size;
+    psiconf_params.use_labels = use_labels;
+    psiconf_params.use_oprf = use_oprf;
 
-    CuckooParams cuckoo_params;
+    PSIParams::CuckooParams cuckoo_params;
     cuckoo_params.hash_func_count = 3;
     cuckoo_params.hash_func_seed = 0;
     cuckoo_params.max_probe = 100;
 
-    TableParams table_params;
+    PSIParams::TableParams table_params;
     table_params.binning_sec_level = 40;
     table_params.log_table_size = 10;
     table_params.split_count = 128;
     table_params.window_size = 1;
 
-    table_params.sender_bin_size = static_cast<int>(compute_sender_bin_size(
-        table_params.log_table_size,
-        sender_set_size,
-        cuckoo_params.hash_func_count,
-        table_params.binning_sec_level,
-        table_params.split_count));
-
-    SEALParams seal_params;
+    PSIParams::SEALParams seal_params;
+    seal_params.decomposition_bit_count = 30;
     seal_params.encryption_params.set_poly_modulus_degree(4096);
 
     vector<SmallModulus> coeff_modulus = coeff_modulus_128(seal_params.encryption_params.poly_modulus_degree());
     seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
     seal_params.encryption_params.set_plain_modulus(0x13ff);
 
-    seal_params.exfield_params.exfield_characteristic = seal_params.encryption_params.plain_modulus().value();
-    seal_params.exfield_params.exfield_degree = 8;
-    seal_params.decomposition_bit_count = 30;
+    PSIParams::ExFieldParams exfield_params;
+    exfield_params.characteristic = seal_params.encryption_params.plain_modulus().value();
+    exfield_params.degree = 8;
 
-    PSIParams params(item_bit_count, use_oprf, table_params, cuckoo_params, seal_params);
-    params.set_value_bit_count(use_labels ? item_bit_count : 0);
-
+    PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
     return params;
 }
 

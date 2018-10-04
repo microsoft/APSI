@@ -35,7 +35,7 @@ namespace apsi
         class Receiver
         {
         public:
-            Receiver(const PSIParams &params, int thread_count,
+            Receiver(int thread_count,
                 const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::Global());
 
             /**
@@ -150,13 +150,16 @@ namespace apsi
 
             const PSIParams& get_params() const
             {
-                return params_;
+                if (nullptr == params_.get())
+                    throw new std::logic_error("PSIParams have not been initialized");
+
+                return *params_.get();
             }
 
         private:
             void initialize();
 
-            PSIParams params_;
+            std::unique_ptr<PSIParams> params_;
 
             std::shared_ptr<seal::SEALContext> seal_context_;
 
