@@ -109,7 +109,7 @@ namespace apsi
         /********************************************
         Parameters from input: PSIConfParameters
         *********************************************/
-        inline int item_bit_count() const
+        inline unsigned int item_bit_count() const
         {
             return psiconf_params_.item_bit_count;
         }
@@ -122,6 +122,11 @@ namespace apsi
         inline bool use_labels() const
         {
             return psiconf_params_.use_labels;
+        }
+
+        inline apsi::u64 sender_size() const
+        {
+            return psiconf_params_.sender_size;
         }
 
         /********************************************

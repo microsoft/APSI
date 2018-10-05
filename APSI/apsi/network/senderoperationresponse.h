@@ -6,6 +6,7 @@
 // APSI
 #include "apsi/apsidefines.h"
 #include "apsi/result_package.h"
+#include "apsi/psiparams.h"
 
 namespace apsi
 {
@@ -16,10 +17,11 @@ namespace apsi
         */
         struct SenderResponseGetParameters
         {
-            int sender_bin_size;
-            bool use_oprf;
-            int item_bit_count;
-            int label_bit_count;
+            apsi::PSIParams::PSIConfParams psiconf_params;
+            apsi::PSIParams::TableParams   table_params;
+            apsi::PSIParams::CuckooParams  cuckoo_params;
+            apsi::PSIParams::SEALParams    seal_params;
+            apsi::PSIParams::ExFieldParams exfield_params;
         };
 
         /**
