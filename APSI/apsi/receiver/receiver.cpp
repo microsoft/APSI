@@ -130,6 +130,39 @@ void Receiver::handshake(Channel& chl)
         sender_params.seal_params,
         sender_params.exfield_params);
 
+    Log::debug("Received parameters from Sender:");
+    Log::debug(
+        "item bit count: %i, sender size: %i, use OPRF: %s, use labels: %s",
+        sender_params.psiconf_params.item_bit_count,
+        sender_params.psiconf_params.sender_size,
+        sender_params.psiconf_params.use_oprf ? "true" : "false",
+        sender_params.psiconf_params.use_labels ? "true" : "false");
+    Log::debug(
+        "log table size: %i, split count: %i, binning sec level: %i, window size: %i",
+        sender_params.table_params.log_table_size,
+        sender_params.table_params.split_count,
+        sender_params.table_params.binning_sec_level,
+        sender_params.table_params.window_size);
+    Log::debug(
+        "hash func count: %i, hash func seed: %i, max probe: %i",
+        sender_params.cuckoo_params.hash_func_count,
+        sender_params.cuckoo_params.hash_func_seed,
+        sender_params.cuckoo_params.max_probe);
+    Log::debug(
+        "decomposition bit count: %i, poly modulus degree: %i, plain modulus: 0x%llx",
+        sender_params.seal_params.decomposition_bit_count,
+        sender_params.seal_params.encryption_params.poly_modulus_degree(),
+        sender_params.seal_params.encryption_params.plain_modulus().value());
+    Log::debug("coeff modulus: %i elements", sender_params.seal_params.encryption_params.coeff_modulus().size());
+    for (u64 i = 0; i < sender_params.seal_params.encryption_params.coeff_modulus().size(); i++)
+    {
+        Log::debug("Coeff modulus %i: 0x%llx", i, sender_params.seal_params.encryption_params.coeff_modulus()[i].value());
+    }
+    Log::debug(
+        "exfield characteristic: 0x%llx, exfield degree: %i",
+        sender_params.exfield_params.characteristic,
+        sender_params.exfield_params.degree);
+
     // Once we have parameters, initialize Receiver
     initialize();
 
