@@ -113,9 +113,9 @@ void Channel::receive(SenderResponseGetParameters& response)
     message_t msg;
     receive_message(msg);
 
-    // We should have five parts
-    if (msg.parts() != 5)
-        throw runtime_error("Message should have five parts");
+    // We should have at least 18 parts
+    if (msg.parts() < 18)
+        throw runtime_error("Message should have at least 18 parts");
 
     // First part is message type
     SenderOperationType type = get_message_type(msg, /* part */ 0);
@@ -438,6 +438,40 @@ void Channel::add_buffer(const vector<u8>& buff, message_t& msg) const
     {
         // Second part is raw data
         msg.add_raw(buff.data(), buff.size());
+    }
+}
+
+void Channel::get_sm_vector(vector<SmallModulus>& smv, const zmqpp::message_t& msg, size_t& part_idx) const
+{
+    // Need to have size
+    if (msg.parts() < (part_idx + 1))
+        throw runtime_error("Should have size at least");
+
+    size_t size;
+    get_part(size, msg, /* part */ part_idx++);
+
+    if (msg.parts() < (part_idx + size))
+        throw runtime_error("Insufficient parts for SmallModulus vector");
+
+    smv.resize(size);
+    for (u64 sm_idx = 0; sm_idx < size; sm_idx++)
+    {
+        string str = msg.get(part_idx++);
+        get_small_modulus(smv[sm_idx], str);
+    }
+}
+
+void Channel::add_sm_vector(const vector<SmallModulus>& smv, zmqpp::message_t& msg) const
+{
+    // First part is size
+    add_part(smv.size(), msg);
+
+    for (const SmallModulus& sm : smv)
+    {
+        // Add each element as a string
+        string str;
+        get_string(str, sm);
+        msg.add(str);
     }
 }
 

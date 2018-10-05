@@ -1,5 +1,8 @@
-#include "apsi/network/network_utils.h"
+// STD
 #include <sstream>
+
+// APSI
+#include "apsi/network/network_utils.h"
 
 using namespace std;
 using namespace seal;
@@ -28,6 +31,13 @@ namespace apsi
         str = ss.str();
     }
 
+    void get_string(string& str, const SmallModulus& sm)
+    {
+        stringstream ss;
+        sm.save(ss);
+        str = ss.str();
+    }
+
     void get_public_key(seal::PublicKey& pub_key, const std::string& str)
     {
         stringstream ss(str);
@@ -44,5 +54,11 @@ namespace apsi
     {
         stringstream ss(str);
         ciphertext.load(ss);
+    }
+
+    void get_small_modulus(seal::SmallModulus& sm, const std::string& str)
+    {
+        stringstream ss(str);
+        sm.load(ss);
     }
 }

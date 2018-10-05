@@ -31,6 +31,11 @@ namespace apsi
     void get_string(std::string& str, const seal::Ciphertext& ciphertext);
 
     /**
+    Get string for a SmallModulus
+    */
+    void get_string(std::string& str, const seal::SmallModulus& sm);
+
+    /**
     Get public key from a string
     */
     void get_public_key(seal::PublicKey& pub_key, const std::string& str);
@@ -44,4 +49,9 @@ namespace apsi
     Get Ciphertext from a string
     */
     void get_ciphertext(seal::Ciphertext& ciphertext, const std::string& str);
+
+    /**
+    Get SmallModulus from a string
+    */
+    void get_small_modulus(seal::SmallModulus& sm, const std::string& str);
 }
