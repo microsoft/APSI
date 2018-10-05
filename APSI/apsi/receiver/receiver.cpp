@@ -45,8 +45,6 @@ Receiver::Receiver(int thread_count, const MemoryPoolHandle &pool) :
     {
         throw invalid_argument("thread_count must be positive");
     }
-
-    initialize();
 }
 
 void Receiver::initialize()
@@ -124,25 +122,16 @@ void Receiver::handshake(Channel& chl)
         chl.receive(sender_params);
     }
 
-    // Set parameters we got from Sender.
-    //Log::debug("Set item bit count to %i", sender_params.item_bit_count);
-    //get_params().set_item_bit_count(sender_params.item_bit_count);
+    // Set parameters from Sender.
+    params_ = make_unique<PSIParams>(
+        sender_params.psiconf_params,
+        sender_params.table_params,
+        sender_params.cuckoo_params,
+        sender_params.seal_params,
+        sender_params.exfield_params);
 
-    //Log::debug("Set label bit count to %i", sender_params.label_bit_count);
-    //get_params().set_value_bit_count(sender_params.label_bit_count);
-
-    //Log::debug("Set sender bin size to %i", sender_params.sender_bin_size);
-    //get_params().set_sender_bin_size(sender_params.sender_bin_size);
- 
-    //if (sender_params.use_oprf)
-    //{
-    //    Log::debug("Sender is using OPRF. Turning on.");
-    //}
-    //else
-    //{
-    //    Log::debug("Sender is not using OPRF. Turning off.");
-    //}
-    //get_params().set_use_oprf(sender_params.use_oprf);
+    // Once we have parameters, initialize Receiver
+    initialize();
 
     Log::info("Handshake done");
 }

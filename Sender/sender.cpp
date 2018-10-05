@@ -95,7 +95,6 @@ void run_sender_dispatcher(const CLP& cmd)
 
     int label_bit_length = cmd.use_labels() ? cmd.item_bit_length() : 0;
     PSIParams params = build_psi_params(cmd, items.size(), cmd.item_bit_length(), label_bit_length, cmd.use_oprf());
-    params.validate();
 
     Log::info("Building sender");
     shared_ptr<Sender> sender = make_shared<Sender>(params, cmd.threads(), cmd.threads());

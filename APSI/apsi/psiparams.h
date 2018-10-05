@@ -82,30 +82,6 @@ namespace apsi
             validate();
         }
 
-        void validate() const
-        {
-            if (sender_bin_size() % split_count() != 0)
-            {
-                throw std::invalid_argument("Sender bin size must be a multiple of number of splits.");
-            }
-
-            if ((item_bit_count() + 63) / 64 != (item_bit_count() + static_cast<int>(floor(log2(hash_func_count()))) + 1 + 1 + 63) / 64)
-            {
-                throw std::invalid_argument("Invalid for cuckoo: null bit and location index overflow to new uint64_t.");
-            }
-
-            if (item_bit_count() > max_item_bit_count)
-            {
-                throw std::invalid_argument("Item bit count cannot exceed max.");
-            }
-
-            if (item_bit_count() > (max_item_bit_count - 8))
-            {
-                // Not an error, but a warning.
-                apsi::logging::Log::warning("Item bit count is close to its upper limit. Several bits should be reserved for appropriate Cuckoo hashing.");
-            }
-        }
-
         /********************************************
         Parameters from input: PSIConfParameters
         *********************************************/
@@ -261,6 +237,33 @@ namespace apsi
                 cuckoo_params_.hash_func_count,
                 table_params_.binning_sec_level,
                 table_params_.split_count));
+        }
+
+        /**
+        Validate parameters
+        */
+        void validate() const
+        {
+            if (sender_bin_size() % split_count() != 0)
+            {
+                throw std::invalid_argument("Sender bin size must be a multiple of number of splits.");
+            }
+
+            if ((item_bit_count() + 63) / 64 != (item_bit_count() + static_cast<int>(floor(log2(hash_func_count()))) + 1 + 1 + 63) / 64)
+            {
+                throw std::invalid_argument("Invalid for cuckoo: null bit and location index overflow to new uint64_t.");
+            }
+
+            if (item_bit_count() > max_item_bit_count)
+            {
+                throw std::invalid_argument("Item bit count cannot exceed max.");
+            }
+
+            if (item_bit_count() > (max_item_bit_count - 8))
+            {
+                // Not an error, but a warning.
+                apsi::logging::Log::warning("Item bit count is close to its upper limit. Several bits should be reserved for appropriate Cuckoo hashing.");
+            }
         }
     };
 }
