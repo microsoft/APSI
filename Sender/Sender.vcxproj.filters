@@ -21,9 +21,15 @@
     <ClInclude Include="clp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="senderutils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="sender.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="senderutils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

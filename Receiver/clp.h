@@ -12,7 +12,7 @@
 namespace apsi
 {
     /**
-    * Command Line Processor for ReceiverExample
+    * Command Line Processor for Receiver
     */
     class CLP : public BaseCLP
     {
