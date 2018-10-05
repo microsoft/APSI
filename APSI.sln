@@ -25,6 +25,10 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CommonCode", "CommonCode\CommonCode.vcxproj", "{E3FE0731-D244-44C3-8BB9-7165391DD886}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "IntegrationTests", "IntegrationTests\IntegrationTests.vcxproj", "{305E8743-DC5A-4BC1-94E2-7764E7468DB6}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E3FE0731-D244-44C3-8BB9-7165391DD886} = {E3FE0731-D244-44C3-8BB9-7165391DD886}
+		{6E84A852-E68E-4C1D-8266-08CEEAB6ADE6} = {6E84A852-E68E-4C1D-8266-08CEEAB6ADE6}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -125,9 +125,11 @@
   <ItemGroup>
     <ClInclude Include="clp.h" />
     <ClInclude Include="sender.h" />
+    <ClInclude Include="senderutils.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="sender.cpp" />
+    <ClCompile Include="senderutils.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

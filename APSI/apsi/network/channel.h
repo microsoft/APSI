@@ -224,6 +224,17 @@ namespace apsi
             void add_buffer(const std::vector<u8>& buff, zmqpp::message_t& msg) const;
 
             /**
+            Get a vector of SmallModulus from message at the given part index.
+            When method exits the part index will be pointing to the next part in the message, after the vector.
+            */
+            void get_sm_vector(std::vector<seal::SmallModulus>& smv, const zmqpp::message_t& msg, size_t& part_idx) const;
+
+            /**
+            Add a vector of SmallModulus to given message
+            */
+            void add_sm_vector(const std::vector<seal::SmallModulus>& smv, zmqpp::message_t& msg) const;
+
+            /**
             Get a part from a message
             */
             template<typename T>

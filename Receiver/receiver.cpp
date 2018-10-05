@@ -42,7 +42,7 @@ void print_intersection_results(pair<vector<bool>, Matrix<u8>>& intersection);
 void print_timing_info();
 void print_transmitted_data(Channel& channel);
 string get_conn_addr(const CLP& cmd);
-int initialize_query(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels, int label_byte_count);
+int initialize_query(const CLP& cmd, vector<Item>& items);
 
 namespace {
     struct Colors {
@@ -98,33 +98,13 @@ void remote_query(const CLP& cmd)
     Log::info("Receiver connecting to address: %s", conn_addr.c_str());
     channel.connect(conn_addr);
 
-    PSIParams params = build_psi_params(cmd);
-    Receiver receiver(params, cmd.threads());
-
-    // Check that number of blocks is not smaller than thread count
-    auto block_count = params.split_count() * params.batch_count();
-    if (cmd.threads() > block_count)
-    {
-        Log::warning("Using too many threads for block count! Block count: %i", block_count);
-    }
+    Receiver receiver(cmd.threads());
 
     vector<Item> items;
     Matrix<u8> labels;
-    int intersection_size = initialize_query(cmd, items, labels, params.get_label_byte_count());
+    int intersection_size = initialize_query(cmd, items);
 
     auto result = receiver.query(items, channel);
-
-    vector<int> label_idx;
-    bool compare_labels = false;
-    if (!cmd.query_file().empty() && receiver.get_params().get_label_bit_count() > 0)
-    {
-        // We can compare labels.
-        compare_labels = true;
-        for (int i = 0; i < intersection_size; i++)
-        {
-            label_idx.emplace_back(i);
-        }
-    }
 
     print_intersection_results(result);
     print_timing_info();
@@ -226,11 +206,12 @@ string get_conn_addr(const CLP& cmd)
     return ss.str();
 }
 
-int initialize_query(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels, int label_byte_count)
+int initialize_query(const CLP& cmd, vector<Item>& items)
 {
     // Read items that should exist from file
+    Matrix<u8> unused;
     CSVReader reader(cmd.query_file());
-    reader.read(items, labels, label_byte_count);
+    reader.read(items, unused, /* label_byte_count */ 0);
 
     return static_cast<int>(items.size());
 }

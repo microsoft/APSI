@@ -24,248 +24,246 @@
 
 namespace apsi
 {
-    struct CuckooParams
-    {
-        unsigned hash_func_count;
-        unsigned hash_func_seed;
-        unsigned max_probe;
-    };
-
-    struct TableParams
-    {
-        unsigned log_table_size;
-        unsigned window_size;
-        unsigned split_count;
-        unsigned binning_sec_level;
-        unsigned sender_bin_size;
-    };
-
-    struct SEALParams
-    {
-        struct ExFieldParams
-        {
-            u64 exfield_characteristic;
-            unsigned exfield_degree;
-        } exfield_params;
-
-        seal::EncryptionParameters encryption_params{ seal::scheme_type::BFV };
-        unsigned decomposition_bit_count;
-    };
-
     class PSIParams
     {
     public:
-        PSIParams(
-            unsigned item_bit_count,
-            bool use_oprf,
-            TableParams table_params,
-            CuckooParams cuckoo_params,
-            SEALParams seal_params)
-                : log_table_size_(table_params.log_table_size), 
-                  table_size_(1 << log_table_size_),
-                  window_size_(table_params.window_size),
-                  sender_bin_size_(table_params.sender_bin_size),
-                  binning_sec_level_(table_params.binning_sec_level),
-                  split_count_(table_params.split_count),
-                  use_oprf_(use_oprf),
-                  encryption_params_(seal_params.encryption_params),
-                  decomposition_bit_count_(seal_params.decomposition_bit_count),
-                  hash_func_count_(cuckoo_params.hash_func_count), 
-                  hash_func_seed_(cuckoo_params.hash_func_seed), 
-                  max_probe_(cuckoo_params.max_probe),
-                  item_bit_count_(item_bit_count), 
-                  exfield_characteristic_(seal_params.exfield_params.exfield_characteristic), 
-                  exfield_degree_(seal_params.exfield_params.exfield_degree)
+        struct PSIConfParams
         {
+            // Should not exceed 128. Moreover, should reserve several bits because of the requirement of current Cuckoo hashing impl.
+            unsigned item_bit_count;
+            bool use_oprf;
+            bool use_labels;
+            apsi::u64 sender_size;
+        };
+
+        struct CuckooParams
+        {
+            // Should not be too big, both due to the performance consideration and the requirement of current Cuckoo hashing impl.
+            // For example, if item_bit_count = 120, then hash_func_count should be smaller than 2^6 = 64. But typically, 3 is enough.
+            unsigned hash_func_count;
+            unsigned hash_func_seed;
+            unsigned max_probe;
+        };
+
+        struct TableParams
+        {
+            unsigned log_table_size;
+            unsigned window_size;
+            unsigned split_count;
+            unsigned binning_sec_level;
+        };
+
+        struct SEALParams
+        {
+            seal::EncryptionParameters encryption_params{ seal::scheme_type::BFV };
+            unsigned decomposition_bit_count;
+        };
+
+        struct ExFieldParams
+        {
+            u64 characteristic;
+            unsigned degree;
+        };
+
+    public:
+        PSIParams(
+            const PSIConfParams& psi_params,
+            const TableParams& table_params,
+            const CuckooParams& cuckoo_params,
+            const SEALParams& seal_params,
+            const ExFieldParams& exfield_params)
+            : psiconf_params_(psi_params),
+              table_params_(table_params),
+              cuckoo_params_(cuckoo_params),
+              seal_params_(seal_params),
+              exfield_params_(exfield_params)
+        {
+            update_sender_bin_size();
+            validate();
         }
 
-        void validate() const
+        /********************************************
+        Parameters from input: PSIConfParameters
+        *********************************************/
+        inline unsigned int item_bit_count() const
         {
-            if (sender_bin_size_ % split_count_ != 0)
-            {
-                throw std::invalid_argument("Sender bin size must be a multiple of number of splits.");
-            }
-
-            if ((item_bit_count_ + 63) / 64 != (item_bit_count_ + static_cast<int>(floor(log2(hash_func_count_))) + 1 + 1 + 63) / 64)
-            {
-                throw std::invalid_argument("Invalid for cuckoo: null bit and location index overflow to new uint64_t.");
-            }
-
-            if (item_bit_count_ > max_item_bit_count)
-            {
-                throw std::invalid_argument("Item bit count cannot exceed max.");
-            }
-
-            if (item_bit_count_ > (max_item_bit_count - 8))
-            {
-                // Not an error, but a warning.
-                apsi::logging::Log::warning("Item bit count is close to its upper limit. Several bits should be reserved for appropriate Cuckoo hashing.");
-            }
+            return psiconf_params_.item_bit_count;
         }
 
         inline bool use_oprf() const
         {
-            return use_oprf_;
+            return psiconf_params_.use_oprf;
         }
 
-        inline void set_use_oprf(bool use_oprf)
+        inline bool use_labels() const
         {
-            use_oprf_ = use_oprf;
+            return psiconf_params_.use_labels;
         }
 
-        inline int log_table_size() const
+        inline apsi::u64 sender_size() const
         {
-            return log_table_size_;
+            return psiconf_params_.sender_size;
         }
 
-        inline int table_size() const
+        /********************************************
+        Parameters from input: TableParameters
+        *********************************************/
+        inline unsigned int log_table_size() const
         {
-            return table_size_;
+            return table_params_.log_table_size;
         }
 
-        inline int hash_func_count() const
+        inline unsigned int window_size() const
         {
-            return hash_func_count_;
+            return table_params_.window_size;
         }
 
-        inline int hash_func_seed() const
+        inline unsigned int split_count() const
         {
-            return hash_func_seed_;
+            return table_params_.split_count;
         }
 
-        inline int max_probe() const
+        inline unsigned int binning_sec_level() const
         {
-            return max_probe_;
+            return table_params_.binning_sec_level;
         }
 
-        inline int item_bit_count() const
+        /********************************************
+        Parameters from input: CuckooParams
+        *********************************************/
+        inline unsigned int hash_func_count() const
         {
-            return item_bit_count_;
+            return cuckoo_params_.hash_func_count;
         }
 
-        inline void set_item_bit_count(int item_bit_count)
+        inline unsigned int hash_func_seed() const
         {
-            item_bit_count_ = item_bit_count;
-            validate();
+            return cuckoo_params_.hash_func_seed;
         }
 
-        inline u64 exfield_characteristic() const
+        inline unsigned int max_probe() const
         {
-            return exfield_characteristic_;
+            return cuckoo_params_.max_probe;
         }
 
-        inline unsigned exfield_degree() const
+        /********************************************
+        Parameters from input: SEALParams
+        *********************************************/
+        inline const seal::EncryptionParameters& encryption_params() const
         {
-            return exfield_degree_;
+            return seal_params_.encryption_params;
         }
 
-        inline int split_count() const
+        inline unsigned int decomposition_bit_count() const
         {
-            return split_count_;
+            return seal_params_.decomposition_bit_count;
         }
 
-        inline int split_size() const
+        /********************************************
+        Parameters from input: ExFieldParams
+        *********************************************/
+        inline apsi::u64 exfield_characteristic() const
         {
-            return sender_bin_size_ / split_count_;
+            return exfield_params_.characteristic;
         }
 
-        inline int batch_size() const
+        inline unsigned int exfield_degree() const
         {
-            return encryption_params_.poly_modulus_degree() / exfield_degree_;
+            return exfield_params_.degree;
         }
 
-        inline int batch_count() const
-        {
-            int batch = batch_size();
-            return (table_size_ + batch - 1) / batch;
-        }
-
-        inline int decomposition_bit_count() const
-        {
-            return decomposition_bit_count_;
-        }
-
+        /********************************************
+        Calculated parameters
+        *********************************************/
         inline int sender_bin_size() const
         {
             return sender_bin_size_;
         }
 
-        inline void set_sender_bin_size(int size)
+        inline unsigned int table_size() const
         {
-            sender_bin_size_ = size;
-            validate();
+            return 1 << table_params_.log_table_size;
         }
 
-        inline int binning_sec_level() const
+        inline int split_size() const
         {
-            return binning_sec_level_;
+            return sender_bin_size() / split_count();
         }
 
-        inline int window_size() const
+        inline int batch_size() const
         {
-            return window_size_;
+            return encryption_params().poly_modulus_degree() / exfield_degree();
         }
 
-        inline const seal::EncryptionParameters &encryption_params() const
+        inline int batch_count() const
         {
-            return encryption_params_;
+            int batch = batch_size();
+            return (table_size() + batch - 1) / batch;
         }
 
-        inline int get_label_bit_count() const { return value_bit_length_; }
-
-        inline int get_label_byte_count() const { return value_byte_length_; }
-
-        void set_value_bit_count(int bits)
+        inline int get_label_bit_count() const
         {
-            value_bit_length_ = bits;
-            value_byte_length_ = (bits + 7) / 8;
+            if (!psiconf_params_.use_labels)
+                return 0;
+
+            return psiconf_params_.item_bit_count;
         }
 
-        bool use_low_degree_poly() const { return use_low_degree_poly_; }
+        inline int get_label_byte_count() const
+        {
+            if (!psiconf_params_.use_labels)
+                return 0;
 
-        void set_use_low_degree_poly(bool b) { use_low_degree_poly_ = b; }
+            return (psiconf_params_.item_bit_count + 7) / 8;
+        }
 
         // Constants
         constexpr static int max_item_bit_count = 128;
 
     private:
-        int log_table_size_;
-
-        int table_size_;
-
-        int window_size_;
+        PSIConfParams psiconf_params_;
+        TableParams   table_params_;
+        CuckooParams  cuckoo_params_;
+        SEALParams    seal_params_;
+        ExFieldParams exfield_params_;
 
         int sender_bin_size_;
 
-        int binning_sec_level_;
+        void update_sender_bin_size()
+        {
+            sender_bin_size_ = static_cast<int>(apsi::tools::compute_sender_bin_size(
+                table_params_.log_table_size,
+                psiconf_params_.sender_size,
+                cuckoo_params_.hash_func_count,
+                table_params_.binning_sec_level,
+                table_params_.split_count));
+        }
 
-        int split_count_;
+        /**
+        Validate parameters
+        */
+        void validate() const
+        {
+            if (sender_bin_size() % split_count() != 0)
+            {
+                throw std::invalid_argument("Sender bin size must be a multiple of number of splits.");
+            }
 
-        bool use_oprf_;
+            if ((item_bit_count() + 63) / 64 != (item_bit_count() + static_cast<int>(floor(log2(hash_func_count()))) + 1 + 1 + 63) / 64)
+            {
+                throw std::invalid_argument("Invalid for cuckoo: null bit and location index overflow to new uint64_t.");
+            }
 
-        int value_bit_length_ = 0;
-        
-        int value_byte_length_ = 0;
+            if (item_bit_count() > max_item_bit_count)
+            {
+                throw std::invalid_argument("Item bit count cannot exceed max.");
+            }
 
-        bool use_low_degree_poly_ = false;
-
-        seal::EncryptionParameters encryption_params_;
-
-        int decomposition_bit_count_;
-
-        /* Should not be too big, both due to the performance consideration and the requirement of current Cuckoo hashing impl.
-        For example, if item_bit_count = 120, then hash_func_count should be smaller than 2^6 = 64. But typically, 3 is enough. */
-        int hash_func_count_;
-
-        int hash_func_seed_;
-
-        int max_probe_;
-
-        /* Should not exceed 128. Moreover, should reserve several bits because of the requirement of current Cuckoo hashing impl. */
-        int item_bit_count_;
-
-        u64 exfield_characteristic_;
-
-        unsigned exfield_degree_;
+            if (item_bit_count() > (max_item_bit_count - 8))
+            {
+                // Not an error, but a warning.
+                apsi::logging::Log::warning("Item bit count is close to its upper limit. Several bits should be reserved for appropriate Cuckoo hashing.");
+            }
+        }
     };
 }

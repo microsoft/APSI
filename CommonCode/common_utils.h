@@ -10,9 +10,6 @@
 
 namespace apsi
 {
-    class BaseCLP;
-    class PSIParams;
-
     namespace tools
     {
         /**
@@ -24,16 +21,6 @@ namespace apsi
         Prepare console for color output.
         */
         void prepare_console();
-
-        /**
-        Get a PSIParams object from a command line.
-        */
-        const PSIParams build_psi_params(
-            const BaseCLP& cmd,
-            const apsi::u64 sender_set_size = 0,
-            const int item_bit_length = 0,
-            const int label_bit_length = 0,
-            const bool use_oprf = false);
 
         /**
         Generate timing report for timespans

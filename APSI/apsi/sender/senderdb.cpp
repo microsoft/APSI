@@ -161,7 +161,7 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
         {
 
             // Claim an emply location in each matching bin
-            for (int j = 0; j < params_.hash_func_count(); j++)
+            for (unsigned j = 0; j < params_.hash_func_count(); j++)
             {
                 Item key;
                 u64 cuckoo_loc;
@@ -249,7 +249,7 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
         skip[2] = locs[0] == locs[2] || locs[1] == locs[2];
 
         // Claim an empty location in each matching bin
-        for (int j = 0; j < params_.hash_func_count(); j++)
+        for (unsigned j = 0; j < params_.hash_func_count(); j++)
         {
             if (skip[j] == false)
             {
@@ -612,9 +612,6 @@ void DBBlock::batch_interpolate(
     auto mod = seal_context->context_data()->parms().plain_modulus().value();
     MemoryPoolHandle local_pool = th_context.pool();
     Position pos;
-
-    if (params.use_low_degree_poly())
-        throw std::runtime_error("not impl");
 
     for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
     {

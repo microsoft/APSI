@@ -8,13 +8,14 @@
 
 // APSI
 #include "clp.h"
+#include "senderutils.h"
+#include "common_utils.h"
 #include "apsi/sender/sender.h"
 #include "apsi/sender/senderdispatcher.h"
 #include "apsi/network/channel.h"
 #include "apsi/logging/log.h"
 #include "apsi/tools/csvreader.h"
 #include "apsi/tools/utils.h"
-#include "common_utils.h"
 
 
 // For now version is a constant
@@ -93,9 +94,7 @@ void run_sender_dispatcher(const CLP& cmd)
 
     initialize_db(cmd, items, labels);
 
-    int label_bit_length = cmd.use_labels() ? cmd.item_bit_length() : 0;
-    PSIParams params = build_psi_params(cmd, items.size(), cmd.item_bit_length(), label_bit_length, cmd.use_oprf());
-    params.validate();
+    PSIParams params = build_psi_params(cmd, items.size());
 
     Log::info("Building sender");
     shared_ptr<Sender> sender = make_shared<Sender>(params, cmd.threads(), cmd.threads());

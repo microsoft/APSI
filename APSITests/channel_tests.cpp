@@ -5,6 +5,7 @@
 #include "apsi/network/receiverchannel.h"
 #include "apsi/network/senderchannel.h"
 #include "seal/publickey.h"
+#include "seal/defaultparams.h"
 
 using namespace APSITests;
 using namespace std;
@@ -52,11 +53,12 @@ void ChannelTests::ThrowWithoutConnectTest()
     SenderResponseQuery query_resp;
     shared_ptr<SenderOperation> sender_op;
 
-    TableParams table_params{ 10, 1, 2, 40, 12345 };
-    CuckooParams cuckoo_params{ 3, 2, 1 };
-    SEALParams seal_params;
-
-    PSIParams params(60, true, table_params, cuckoo_params, seal_params);
+    PSIParams::PSIConfParams psiconf_params{ 60, true, true, 12345 };
+    PSIParams::TableParams table_params{ 10, 1, 2, 40 };
+    PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
+    PSIParams::SEALParams seal_params;
+    PSIParams::ExFieldParams exfield_params;
+    PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
 
     vector<u8> buff = { 1, 2, 3, 4, 5 };
 
@@ -164,14 +166,25 @@ void ChannelTests::DataCountsTest()
     CPPUNIT_ASSERT_EQUAL(expected_total, svr.get_total_data_received());
 
     // get parameters response
-    TableParams table_params{ 10, 1, 2, 40, 12345 };
-    CuckooParams cuckoo_params{ 3, 2, 1 };
-    SEALParams seal_params;
-    PSIParams params(60, true, table_params, cuckoo_params, seal_params);
+    PSIParams::PSIConfParams psiconf_params{ 60, true, true, 12345 };
+    PSIParams::TableParams table_params{ 10, 1, 2, 40 };
+    PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
+    PSIParams::ExFieldParams exfield_params{ 321, 8 };
+    PSIParams::SEALParams seal_params;
+    seal_params.decomposition_bit_count = 10;
+    vector<SmallModulus> smv = coeff_modulus_128(4096);
+    seal_params.encryption_params.set_poly_modulus_degree(4096);
+    seal_params.encryption_params.set_plain_modulus(5119);
+    seal_params.encryption_params.set_coeff_modulus(smv);
+    PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
+
     svr.send_get_parameters_response(sender_op->client_id, params);
     expected_total = sizeof(SenderOperationType);
-    expected_total += sizeof(int) * 3;
-    expected_total += sizeof(bool);
+    expected_total += sizeof(PSIParams::PSIConfParams);
+    expected_total += sizeof(PSIParams::TableParams);
+    expected_total += sizeof(PSIParams::CuckooParams);
+    expected_total += sizeof(PSIParams::SEALParams);
+    expected_total += sizeof(PSIParams::ExFieldParams);
     CPPUNIT_ASSERT_EQUAL(expected_total, svr.get_total_data_sent());
 
     // Preprocess response
@@ -283,43 +296,79 @@ void ChannelTests::SendGetParametersResponseTest()
         server_.receive(sender_op, /* wait_for_message */ true);
         CPPUNIT_ASSERT_EQUAL(SOP_get_parameters, sender_op->type);
 
-        TableParams table_params { 10, 1, 2, 40, 12345 };
-        CuckooParams cuckoo_params { 3, 2, 1 };
-        SEALParams seal_params;
+        PSIParams::PSIConfParams psiconf_params{ 60, true, true, 12345 };
+        PSIParams::TableParams table_params { 10, 1, 2, 40 };
+        PSIParams::CuckooParams cuckoo_params { 3, 2, 1 };
+        PSIParams::ExFieldParams exfield_params{ 678910, 8 };
+        PSIParams::SEALParams seal_params;
+        seal_params.decomposition_bit_count = 30;
+        seal_params.encryption_params.set_plain_modulus(5119);
+        seal_params.encryption_params.set_poly_modulus_degree(4096);
+        vector<SmallModulus> coeff_modulus = coeff_modulus_128(seal_params.encryption_params.poly_modulus_degree());
+        seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
 
-        unsigned item_bit_count = 60;
-        PSIParams params(item_bit_count, true, table_params, cuckoo_params, seal_params);
-        params.set_value_bit_count(item_bit_count);
+        PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
 
         server_.send_get_parameters_response(sender_op->client_id, params);
 
-        table_params.sender_bin_size = 54321;
-        item_bit_count = 80;
-        PSIParams params2(item_bit_count, false, table_params, cuckoo_params, seal_params);
-        params2.set_value_bit_count(0);
+        psiconf_params.sender_size = 54321;
+        psiconf_params.item_bit_count = 80;
+        psiconf_params.use_oprf = false;
+        psiconf_params.use_labels = false;
+        PSIParams params2(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
 
         server_.send_get_parameters_response(sender_op->client_id, params2);
     });
 
     client_.send_get_parameters();
+    serverth.join();
 
     SenderResponseGetParameters get_params_response;
     client_.receive(get_params_response);
 
-    CPPUNIT_ASSERT_EQUAL(12345, get_params_response.sender_bin_size);
-    CPPUNIT_ASSERT_EQUAL(true,  get_params_response.use_oprf);
-    CPPUNIT_ASSERT_EQUAL(60,    get_params_response.item_bit_count);
-    CPPUNIT_ASSERT_EQUAL(60,    get_params_response.label_bit_count);
+    CPPUNIT_ASSERT_EQUAL((u64)12345,   get_params_response.psiconf_params.sender_size);
+    CPPUNIT_ASSERT_EQUAL(true,         get_params_response.psiconf_params.use_oprf);
+    CPPUNIT_ASSERT_EQUAL(true,         get_params_response.psiconf_params.use_labels);
+    CPPUNIT_ASSERT_EQUAL((unsigned)60, get_params_response.psiconf_params.item_bit_count);
+    CPPUNIT_ASSERT_EQUAL((unsigned)10, get_params_response.table_params.log_table_size);
+    CPPUNIT_ASSERT_EQUAL((unsigned)1,  get_params_response.table_params.window_size);
+    CPPUNIT_ASSERT_EQUAL((unsigned)2,  get_params_response.table_params.split_count);
+    CPPUNIT_ASSERT_EQUAL((unsigned)40, get_params_response.table_params.binning_sec_level);
+    CPPUNIT_ASSERT_EQUAL((unsigned)3,  get_params_response.cuckoo_params.hash_func_count);
+    CPPUNIT_ASSERT_EQUAL((unsigned)2,  get_params_response.cuckoo_params.hash_func_seed);
+    CPPUNIT_ASSERT_EQUAL((unsigned)1,  get_params_response.cuckoo_params.max_probe);
+    CPPUNIT_ASSERT_EQUAL((u64)678910,  get_params_response.exfield_params.characteristic);
+    CPPUNIT_ASSERT_EQUAL((unsigned)8,  get_params_response.exfield_params.degree);
+    CPPUNIT_ASSERT_EQUAL((unsigned)30, get_params_response.seal_params.decomposition_bit_count);
+    CPPUNIT_ASSERT_EQUAL((u64)5119,    get_params_response.seal_params.encryption_params.plain_modulus().value());
+    CPPUNIT_ASSERT_EQUAL(4096,         get_params_response.seal_params.encryption_params.poly_modulus_degree());
+    CPPUNIT_ASSERT_EQUAL((size_t)2,    get_params_response.seal_params.encryption_params.coeff_modulus().size());
+    CPPUNIT_ASSERT_EQUAL((u64)0x007fffffff380001, get_params_response.seal_params.encryption_params.coeff_modulus()[0].value());
+    CPPUNIT_ASSERT_EQUAL((u64)0x003fffffff000001, get_params_response.seal_params.encryption_params.coeff_modulus()[1].value());
+
 
     SenderResponseGetParameters get_params_response2;
     client_.receive(get_params_response2);
 
-    CPPUNIT_ASSERT_EQUAL(54321, get_params_response2.sender_bin_size);
-    CPPUNIT_ASSERT_EQUAL(false, get_params_response2.use_oprf);
-    CPPUNIT_ASSERT_EQUAL(80,    get_params_response2.item_bit_count);
-    CPPUNIT_ASSERT_EQUAL(0,     get_params_response2.label_bit_count);
-
-    serverth.join();
+    CPPUNIT_ASSERT_EQUAL((u64)54321,   get_params_response2.psiconf_params.sender_size);
+    CPPUNIT_ASSERT_EQUAL(false,        get_params_response2.psiconf_params.use_oprf);
+    CPPUNIT_ASSERT_EQUAL(false,        get_params_response2.psiconf_params.use_labels);
+    CPPUNIT_ASSERT_EQUAL((unsigned)80, get_params_response2.psiconf_params.item_bit_count);
+    CPPUNIT_ASSERT_EQUAL((unsigned)10, get_params_response2.table_params.log_table_size);
+    CPPUNIT_ASSERT_EQUAL((unsigned)1,  get_params_response2.table_params.window_size);
+    CPPUNIT_ASSERT_EQUAL((unsigned)2,  get_params_response2.table_params.split_count);
+    CPPUNIT_ASSERT_EQUAL((unsigned)40, get_params_response2.table_params.binning_sec_level);
+    CPPUNIT_ASSERT_EQUAL((unsigned)3,  get_params_response2.cuckoo_params.hash_func_count);
+    CPPUNIT_ASSERT_EQUAL((unsigned)2,  get_params_response2.cuckoo_params.hash_func_seed);
+    CPPUNIT_ASSERT_EQUAL((unsigned)1,  get_params_response2.cuckoo_params.max_probe);
+    CPPUNIT_ASSERT_EQUAL((u64)678910,  get_params_response2.exfield_params.characteristic);
+    CPPUNIT_ASSERT_EQUAL((unsigned)8,  get_params_response2.exfield_params.degree);
+    CPPUNIT_ASSERT_EQUAL((unsigned)30, get_params_response2.seal_params.decomposition_bit_count);
+    CPPUNIT_ASSERT_EQUAL((u64)5119,    get_params_response2.seal_params.encryption_params.plain_modulus().value());
+    CPPUNIT_ASSERT_EQUAL(4096,         get_params_response2.seal_params.encryption_params.poly_modulus_degree());
+    CPPUNIT_ASSERT_EQUAL((size_t)2,    get_params_response2.seal_params.encryption_params.coeff_modulus().size());
+    CPPUNIT_ASSERT_EQUAL((u64)0x007fffffff380001, get_params_response2.seal_params.encryption_params.coeff_modulus()[0].value());
+    CPPUNIT_ASSERT_EQUAL((u64)0x003fffffff000001, get_params_response2.seal_params.encryption_params.coeff_modulus()[1].value());
 }
 
 void ChannelTests::SendPreprocessResponseTest()

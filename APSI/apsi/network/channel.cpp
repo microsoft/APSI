@@ -113,9 +113,9 @@ void Channel::receive(SenderResponseGetParameters& response)
     message_t msg;
     receive_message(msg);
 
-    // We should have five parts
-    if (msg.parts() != 5)
-        throw runtime_error("Message should have five parts");
+    // We should have at least 18 parts
+    if (msg.parts() < 18)
+        throw runtime_error("Message should have at least 18 parts");
 
     // First part is message type
     SenderOperationType type = get_message_type(msg, /* part */ 0);
@@ -124,14 +124,45 @@ void Channel::receive(SenderResponseGetParameters& response)
         throw runtime_error("Message should be get parameters type");
 
     // Parameters start from second part
-    response.sender_bin_size  = msg.get<int>(/* part */ 1);
-    response.use_oprf         = msg.get<bool>(/* part */ 2);
-    response.item_bit_count   = msg.get<int>(/* part */ 3);
-    response.label_bit_count  = msg.get<int>(/* part */ 4);
+    size_t idx = 1;
+
+    // PSIConfParams
+    response.psiconf_params.item_bit_count = msg.get<unsigned int>(idx++);
+    response.psiconf_params.use_oprf       = msg.get<bool>(idx++);
+    response.psiconf_params.use_labels     = msg.get<bool>(idx++);
+    response.psiconf_params.sender_size    = msg.get<u64>(idx++);
+
+    // TableParams
+    response.table_params.log_table_size    = msg.get<unsigned int>(idx++);
+    response.table_params.window_size       = msg.get<unsigned int>(idx++);
+    response.table_params.split_count       = msg.get<unsigned int>(idx++);
+    response.table_params.binning_sec_level = msg.get<unsigned int>(idx++);
+
+    // CuckooParams
+    response.cuckoo_params.hash_func_count = msg.get<unsigned int>(idx++);
+    response.cuckoo_params.hash_func_seed  = msg.get<unsigned int>(idx++);
+    response.cuckoo_params.max_probe       = msg.get<unsigned int>(idx++);
+
+    // SEALParams
+    response.seal_params.encryption_params.set_poly_modulus_degree(msg.get<int>(idx++));
+
+    vector<SmallModulus> coeff_modulus;
+    get_sm_vector(coeff_modulus, msg, idx);
+    response.seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
+
+    response.seal_params.encryption_params.set_plain_modulus(msg.get<u64>(idx++));
+    response.seal_params.decomposition_bit_count = msg.get<unsigned int>(idx++);
+
+    // ExFieldParams
+    response.exfield_params.characteristic = msg.get<u64>(idx++);
+    response.exfield_params.degree         = msg.get<unsigned int>(idx++);
 
     bytes_received_ += sizeof(SenderOperationType);
-    bytes_received_ += sizeof(int) * 3;
-    bytes_received_ += sizeof(bool);
+    bytes_received_ += sizeof(PSIParams::PSIConfParams);
+    bytes_received_ += sizeof(PSIParams::TableParams);
+    bytes_received_ += sizeof(PSIParams::CuckooParams);
+    bytes_received_ += sizeof(PSIParams::SEALParams);
+    bytes_received_ += sizeof(PSIParams::ExFieldParams);
 }
 
 void Channel::receive(SenderResponsePreprocess& response)
@@ -224,17 +255,41 @@ void Channel::send_get_parameters_response(const vector<u8>& client_id, const PS
     add_client_id(msg, client_id);
     add_message_type(type, msg);
 
-    // Sender parameters
-    msg.add(params.sender_bin_size());
-    msg.add(params.use_oprf());
+    // PSIConfParams
     msg.add(params.item_bit_count());
-    msg.add(params.get_label_bit_count());
+    msg.add(params.use_oprf());
+    msg.add(params.use_labels());
+    msg.add(params.sender_size());
+
+    // TableParams
+    msg.add(params.log_table_size());
+    msg.add(params.window_size());
+    msg.add(params.split_count());
+    msg.add(params.binning_sec_level());
+
+    // CuckooParams
+    msg.add(params.hash_func_count());
+    msg.add(params.hash_func_seed());
+    msg.add(params.max_probe());
+
+    // SEALParams
+    msg.add(params.encryption_params().poly_modulus_degree());
+    add_sm_vector(params.encryption_params().coeff_modulus(), msg);
+    msg.add(params.encryption_params().plain_modulus().value());
+    msg.add(params.decomposition_bit_count());
+
+    // ExFieldParams
+    msg.add(params.exfield_characteristic());
+    msg.add(params.exfield_degree());
 
     send_message(msg);
 
     bytes_sent_ += sizeof(SenderOperationType);
-    bytes_sent_ += sizeof(int) * 3;
-    bytes_sent_ += sizeof(bool);
+    bytes_sent_ += sizeof(PSIParams::PSIConfParams);
+    bytes_sent_ += sizeof(PSIParams::TableParams);
+    bytes_sent_ += sizeof(PSIParams::CuckooParams);
+    bytes_sent_ += sizeof(PSIParams::SEALParams);
+    bytes_sent_ += sizeof(PSIParams::ExFieldParams);
 }
 
 void Channel::send_preprocess(const vector<u8>& buffer)
@@ -383,6 +438,40 @@ void Channel::add_buffer(const vector<u8>& buff, message_t& msg) const
     {
         // Second part is raw data
         msg.add_raw(buff.data(), buff.size());
+    }
+}
+
+void Channel::get_sm_vector(vector<SmallModulus>& smv, const zmqpp::message_t& msg, size_t& part_idx) const
+{
+    // Need to have size
+    if (msg.parts() < (part_idx + 1))
+        throw runtime_error("Should have size at least");
+
+    size_t size;
+    get_part(size, msg, /* part */ part_idx++);
+
+    if (msg.parts() < (part_idx + size))
+        throw runtime_error("Insufficient parts for SmallModulus vector");
+
+    smv.resize(size);
+    for (u64 sm_idx = 0; sm_idx < size; sm_idx++)
+    {
+        string str = msg.get(part_idx++);
+        get_small_modulus(smv[sm_idx], str);
+    }
+}
+
+void Channel::add_sm_vector(const vector<SmallModulus>& smv, zmqpp::message_t& msg) const
+{
+    // First part is size
+    add_part(smv.size(), msg);
+
+    for (const SmallModulus& sm : smv)
+    {
+        // Add each element as a string
+        string str;
+        get_string(str, sm);
+        msg.add(str);
     }
 }
 
