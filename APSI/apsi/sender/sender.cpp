@@ -152,7 +152,7 @@ void Sender::offline_compute_work()
 
     context.clear_processed_counts();
     context.set_total_randomized_polys(blocks_to_process);
-    if (params_.get_label_bit_count())
+    if (params_.use_labels())
     {
         context.set_total_interpolate_polys(blocks_to_process);
     }
@@ -162,7 +162,7 @@ void Sender::offline_compute_work()
         sender_db_->batched_randomized_symmetric_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
     }
 
-    if (params_.get_label_bit_count())
+    if (params_.use_labels())
     {
         STOPWATCH(sender_stop_watch, "Sender::offline_compute_work::calc_interpolation");
         sender_db_->batched_interpolate_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
@@ -406,7 +406,7 @@ void Sender::respond_worker(
         }
 
 
-        if (params_.get_label_bit_count())
+        if (params_.use_labels())
         {
             if (block.batched_label_coeffs_.size() > 1)
             {
@@ -482,7 +482,7 @@ void Sender::respond_worker(
             pkg.data = ss.str();
         }
 
-        if (params_.get_label_bit_count())
+        if (params_.use_labels())
         {
             // Compress label
             compressor_->mod_switch(label_results[currResult], compressedResult);

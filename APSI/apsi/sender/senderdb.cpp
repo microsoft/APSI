@@ -262,7 +262,7 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
 
                 db_block.get_key(pos) = keys[j];
 
-                if (params_.get_label_bit_count())
+                if (params_.use_labels())
                 {
                     auto dest = db_block.get_label(pos);
                     memcpy(dest, values[i].data(), params_.get_label_byte_count());

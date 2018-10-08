@@ -413,7 +413,7 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
 
     ret_bools.resize(items.size(), false);
 
-    if (get_params().get_label_bit_count())
+    if (get_params().use_labels())
     {
         ret_labels.resize(items.size(), get_params().get_label_byte_count());
     }
@@ -513,7 +513,7 @@ void Receiver::stream_decrypt_worker(
             }
         }
 
-        if (has_result && get_params().get_label_bit_count())
+        if (has_result && get_params().use_labels())
         {
             std::stringstream ss(pkg.label_data);
 
