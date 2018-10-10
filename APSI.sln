@@ -30,6 +30,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "IntegrationTests", "Integra
 		{6E84A852-E68E-4C1D-8266-08CEEAB6ADE6} = {6E84A852-E68E-4C1D-8266-08CEEAB6ADE6}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "APSINet", "APSINet\APSINet.vcxproj", "{5CB462F2-5A90-4B35-8900-3D0CB08FDDFF}"
+	ProjectSection(ProjectDependencies) = postProject
+		{6E84A852-E68E-4C1D-8266-08CEEAB6ADE6} = {6E84A852-E68E-4C1D-8266-08CEEAB6ADE6}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -60,6 +65,10 @@ Global
 		{305E8743-DC5A-4BC1-94E2-7764E7468DB6}.Debug|x64.Build.0 = Debug|x64
 		{305E8743-DC5A-4BC1-94E2-7764E7468DB6}.Release|x64.ActiveCfg = Release|x64
 		{305E8743-DC5A-4BC1-94E2-7764E7468DB6}.Release|x64.Build.0 = Release|x64
+		{5CB462F2-5A90-4B35-8900-3D0CB08FDDFF}.Debug|x64.ActiveCfg = Debug|x64
+		{5CB462F2-5A90-4B35-8900-3D0CB08FDDFF}.Debug|x64.Build.0 = Debug|x64
+		{5CB462F2-5A90-4B35-8900-3D0CB08FDDFF}.Release|x64.ActiveCfg = Release|x64
+		{5CB462F2-5A90-4B35-8900-3D0CB08FDDFF}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
