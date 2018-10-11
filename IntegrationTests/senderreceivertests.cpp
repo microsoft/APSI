@@ -9,6 +9,11 @@
 #include "apsi/logging/log.h"
 #include "seal/defaultparams.h"
 
+// ZeroMQ
+#pragma warning(push, 0)
+#include "zmqpp/zmqpp.hpp"
+#pragma warning(pop)
+
 
 using namespace APSITests;
 using namespace std;

@@ -2,10 +2,9 @@
 
 // STD
 #include <vector>
-#include <future>
 #include <map>
 #include <memory>
-#include <mutex>
+//#include <mutex>
 
 // APSI
 #include "apsi/apsidefines.h"
@@ -19,10 +18,20 @@
 #include "seal/ciphertext.h"
 
 // ZeroMQ
-#pragma warning(push, 0)
-#include "zmqpp/zmqpp.hpp"
-#pragma warning(pop)
+//#pragma warning(push, 0)
+//#include "zmqpp/zmqpp.hpp"
+//#pragma warning(pop)
 
+namespace zmqpp
+{
+    class context;
+    typedef context context_t;
+    class socket;
+    typedef socket socket_t;
+    enum class socket_type;
+    class message;
+    typedef message message_t;
+}
 
 namespace apsi
 {
@@ -165,8 +174,8 @@ namespace apsi
             std::unique_ptr<zmqpp::socket_t> socket_;
             std::string end_point_;
 
-            std::mutex receive_mutex_;
-            std::mutex send_mutex_;
+            //std::mutex receive_mutex_;
+            //std::mutex send_mutex_;
 
             void throw_if_not_connected() const;
             void throw_if_connected() const;
@@ -239,35 +248,35 @@ namespace apsi
             */
             template<typename T>
             typename std::enable_if<std::is_pod<T>::value, void>::type
-                get_part(T& data, const zmqpp::message_t& msg, const size_t part) const
-            {
-                const T* presult;
-                msg.get(&presult, part);
-                memcpy(&data, presult, sizeof(T));
-            }
+                get_part(T& data, const zmqpp::message_t& msg, const size_t part) const;
+            //{
+            //    const T* presult;
+            //    msg.get(&presult, part);
+            //    memcpy(&data, presult, sizeof(T));
+            //}
 
             /**
             Add a part to a message
             */
             template<typename T>
             typename std::enable_if<std::is_pod<T>::value, void>::type
-                add_part(const T& data, zmqpp::message_t& msg) const
-            {
-                msg.add_raw(&data, sizeof(T));
-            }
+                add_part(const T& data, zmqpp::message_t& msg) const;
+            //{
+            //    msg.add_raw(&data, sizeof(T));
+            //}
 
             /**
             Get socket
             */
-            std::unique_ptr<zmqpp::socket_t>& get_socket()
-            {
-                if (nullptr == socket_)
-                {
-                    socket_ = std::make_unique<zmqpp::socket_t>(context_, get_socket_type());
-                }
+            std::unique_ptr<zmqpp::socket_t>& get_socket();
+            //{
+            //    if (nullptr == socket_)
+            //    {
+            //        socket_ = std::make_unique<zmqpp::socket_t>(context_, get_socket_type());
+            //    }
 
-                return socket_;
-            }
+            //    return socket_;
+            //}
         };
     }
 }

@@ -1,6 +1,7 @@
 // STD
 #include <cstdint>
 #include <sstream>
+#include <mutex>
 
 // APSI
 #include "apsi/tools/stopwatch.h"
@@ -9,6 +10,12 @@ using namespace std;
 using namespace apsi;
 using namespace apsi::tools;
 
+
+namespace
+{
+    mutex events_mtx_;
+    mutex timespan_events_mtx_;
+}
 
 const Stopwatch::time_unit Stopwatch::start_time(Stopwatch::time_unit::clock::now());
 

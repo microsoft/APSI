@@ -1,17 +1,31 @@
 
 // STD
 #include <sstream>
+#include <mutex>
 
 // APSI
 #include "apsi/result_package.h"
 #include "apsi/network/channel.h"
 #include "apsi/network/network_utils.h"
 
+// ZeroMQ
+#pragma warning(push, 0)
+#include "zmqpp/zmqpp.hpp"
+#pragma warning(pop)
+
+
 using namespace std;
 using namespace seal;
 using namespace apsi;
 using namespace apsi::network;
 using namespace zmqpp;
+
+
+namespace
+{
+    mutex receive_mutex_;
+    mutex send_mutex_;
+}
 
 
 Channel::Channel(const context_t& ctx)
@@ -594,4 +608,30 @@ void Channel::send_message(message_t& msg)
 
     if (!sent)
         throw runtime_error("Failed to send message");
+}
+
+template<typename T>
+typename enable_if<is_pod<T>::value, void>::type
+Channel::get_part(T& data, const zmqpp::message_t& msg, const size_t part) const
+{
+    const T* presult;
+    msg.get(&presult, part);
+    memcpy(&data, presult, sizeof(T));
+}
+
+template<typename T>
+typename enable_if<is_pod<T>::value, void>::type
+Channel::add_part(const T& data, zmqpp::message_t& msg) const
+{
+    msg.add_raw(&data, sizeof(T));
+}
+
+unique_ptr<zmqpp::socket_t>& Channel::get_socket()
+{
+    if (nullptr == socket_)
+    {
+        socket_ = std::make_unique<zmqpp::socket_t>(context_, get_socket_type());
+    }
+
+    return socket_;
 }

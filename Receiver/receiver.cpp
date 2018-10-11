@@ -21,6 +21,11 @@
 // Command Line Processor
 #include "clp.h"
 
+// ZeroMQ
+#pragma warning(push, 0)
+#include "zmqpp/zmqpp.hpp"
+#pragma warning(pop)
+
 
 // For now version is a constant.
 #define RECEIVER_VERSION "0.1"
@@ -74,15 +79,15 @@ int main(int argc, char *argv[])
 
     remote_query(cmd);
 
-#ifdef _MSC_VER
-    if (IsDebuggerPresent())
-    {
-        // Wait for ENTER before closing screen.
-        cout << endl << "Press ENTER to exit" << endl;
-        char ignore;
-        cin.get(ignore);
-    }
-#endif
+//#ifdef _MSC_VER
+//    if (IsDebuggerPresent())
+//    {
+//        // Wait for ENTER before closing screen.
+//        cout << endl << "Press ENTER to exit" << endl;
+//        char ignore;
+//        cin.get(ignore);
+//    }
+//#endif
     return 0;
 }
 
