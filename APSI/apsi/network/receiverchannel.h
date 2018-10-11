@@ -13,19 +13,13 @@ namespace apsi
         class ReceiverChannel : public Channel
         {
         public:
-            ReceiverChannel() = delete;
-            ReceiverChannel(const zmqpp::context_t& context);
-            //    : Channel(context)
-            //{}
+            ReceiverChannel() = default;
 
         protected:
             /**
             The only difference from a Sender is the socket type.
             */
             virtual zmqpp::socket_type get_socket_type();
-            //{
-            //    return zmqpp::socket_type::dealer;
-            //}
         };
     }
 }

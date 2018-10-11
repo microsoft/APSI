@@ -4,7 +4,6 @@
 #include <vector>
 #include <map>
 #include <memory>
-//#include <mutex>
 
 // APSI
 #include "apsi/apsidefines.h"
@@ -17,15 +16,14 @@
 #include "seal/relinkeys.h"
 #include "seal/ciphertext.h"
 
-// ZeroMQ
-//#pragma warning(push, 0)
-//#include "zmqpp/zmqpp.hpp"
-//#pragma warning(pop)
+
+namespace std
+{
+    class mutex;
+}
 
 namespace zmqpp
 {
-    class context;
-    typedef context context_t;
     class socket;
     typedef socket socket_t;
     enum class socket_type;
@@ -42,21 +40,16 @@ namespace apsi
         /**
         * Communication channel between Sender and Receiver.
         *
-        * All receives are synchrounous, except the ones prefixed with 'async'.
+        * All receives are synchrounous.
         * All sends are asynchrounous.
         */
         class Channel
         {
         public:
             /**
-            * A channel should always be initialized with a context.
+            * Create an instance of a Channel
             */
-            Channel() = delete;
-
-            /**
-            * Create an instance of a Channel with the given context
-            */
-            Channel(const zmqpp::context_t& context);
+            Channel();
 
             /**
             * Destroy an instance of a Channel
@@ -66,8 +59,8 @@ namespace apsi
             /**
             * Receive a Sender Operation.
             *
-            * This call does not block, if there is no operation pending it will
-            * immediately return false.
+            * This call does not block if wait_for_message is false, if there
+            * is no operation pending it will immediately return false.
             */
             bool receive(std::shared_ptr<apsi::network::SenderOperation>& sender_op, bool wait_for_message = false);
 
@@ -170,12 +163,11 @@ namespace apsi
             u64 bytes_sent_;
             u64 bytes_received_;
 
-            const zmqpp::context_t& context_;
             std::unique_ptr<zmqpp::socket_t> socket_;
             std::string end_point_;
 
-            //std::mutex receive_mutex_;
-            //std::mutex send_mutex_;
+            std::unique_ptr<std::mutex> receive_mutex_;
+            std::unique_ptr<std::mutex> send_mutex_;
 
             void throw_if_not_connected() const;
             void throw_if_connected() const;
@@ -249,11 +241,6 @@ namespace apsi
             template<typename T>
             typename std::enable_if<std::is_pod<T>::value, void>::type
                 get_part(T& data, const zmqpp::message_t& msg, const size_t part) const;
-            //{
-            //    const T* presult;
-            //    msg.get(&presult, part);
-            //    memcpy(&data, presult, sizeof(T));
-            //}
 
             /**
             Add a part to a message
@@ -261,22 +248,11 @@ namespace apsi
             template<typename T>
             typename std::enable_if<std::is_pod<T>::value, void>::type
                 add_part(const T& data, zmqpp::message_t& msg) const;
-            //{
-            //    msg.add_raw(&data, sizeof(T));
-            //}
 
             /**
             Get socket
             */
             std::unique_ptr<zmqpp::socket_t>& get_socket();
-            //{
-            //    if (nullptr == socket_)
-            //    {
-            //        socket_ = std::make_unique<zmqpp::socket_t>(context_, get_socket_type());
-            //    }
-
-            //    return socket_;
-            //}
         };
     }
 }

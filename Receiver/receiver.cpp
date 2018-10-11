@@ -21,11 +21,6 @@
 // Command Line Processor
 #include "clp.h"
 
-// ZeroMQ
-#pragma warning(push, 0)
-#include "zmqpp/zmqpp.hpp"
-#pragma warning(pop)
-
 
 // For now version is a constant.
 #define RECEIVER_VERSION "0.1"
@@ -96,8 +91,7 @@ void remote_query(const CLP& cmd)
     print_example_banner("Query a remote Sender");
 
     // Connect to the network
-    zmqpp::context_t context;
-    ReceiverChannel channel(context);
+    ReceiverChannel channel;
 
     string conn_addr = get_conn_addr(cmd);
     Log::info("Receiver connecting to address: %s", conn_addr.c_str());
