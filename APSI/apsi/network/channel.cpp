@@ -65,6 +65,8 @@ void Channel::disconnect()
 
     get_socket()->close();
     end_point_ = "";
+    socket_ = nullptr;
+    context_ = nullptr;
 }
 
 void Channel::throw_if_not_connected() const
