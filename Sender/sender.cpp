@@ -17,11 +17,6 @@
 #include "apsi/tools/csvreader.h"
 #include "apsi/tools/utils.h"
 
-// ZeroMQ
-#pragma warning(push, 0)
-#include "zmqpp/zmqpp.hpp"
-#pragma warning(pop)
-
 
 // For now version is a constant
 #define SENDER_VERSION "0.1"

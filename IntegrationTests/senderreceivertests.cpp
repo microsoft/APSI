@@ -9,6 +9,10 @@
 #include "apsi/logging/log.h"
 #include "seal/defaultparams.h"
 
+#pragma warning(push, 0)
+#include "zmqpp/zmqpp.hpp"
+#pragma warning(pop)
+
 
 using namespace APSITests;
 using namespace std;
@@ -86,7 +90,8 @@ void SenderReceiverTests::RunTest(size_t senderActualSize, PSIParams& params)
     Log::set_log_level(Log::Level::level_error);
 
     // Connect the network
-    ReceiverChannel recvChl;
+    zmqpp::context_t context;
+    ReceiverChannel recvChl(context);
 
     string conn_addr = "tcp://localhost:5550";
     recvChl.connect(conn_addr);
@@ -137,6 +142,7 @@ void SenderReceiverTests::RunTest(size_t senderActualSize, PSIParams& params)
         dispatcher.run(stop_sender, /* port */ 5550);
     });
 
+    receiver.handshake(recvChl);
     auto intersection = receiver.query(c1, recvChl);
     stop_sender = true;
     thrd.join();

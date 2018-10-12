@@ -22,7 +22,7 @@ using namespace zmqpp;
 
 namespace
 {
-    unique_ptr<context_t> context_;
+    unique_ptr<context_t> global_context_;
 }
 
 
@@ -31,7 +31,18 @@ Channel::Channel()
       bytes_received_(0),
       end_point_(""),
       receive_mutex_(make_unique<mutex>()),
-      send_mutex_(make_unique<mutex>())
+      send_mutex_(make_unique<mutex>()),
+      context_(nullptr)
+{
+}
+
+Channel::Channel(const context_t& context)
+    : bytes_sent_(0),
+      bytes_received_(0),
+      end_point_(""),
+      receive_mutex_(make_unique<mutex>()),
+      send_mutex_(make_unique<mutex>()),
+      context_(&context)
 {
 }
 
@@ -629,14 +640,15 @@ Channel::add_part(const T& data, message_t& msg) const
 
 unique_ptr<socket_t>& Channel::get_socket()
 {
-    if (nullptr == context_)
+    if (nullptr == context_ && nullptr == global_context_)
     {
-        context_ = make_unique<context_t>();
+        global_context_ = make_unique<context_t>();
     }
 
     if (nullptr == socket_)
     {
-        socket_ = make_unique<socket_t>(*context_, get_socket_type());
+        const context_t* ctx = context_ ? context_ : global_context_.get();
+        socket_ = make_unique<socket_t>(*ctx, get_socket_type());
     }
 
     return socket_;

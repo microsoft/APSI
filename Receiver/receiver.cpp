@@ -103,6 +103,7 @@ void remote_query(const CLP& cmd)
     Matrix<u8> labels;
     int intersection_size = initialize_query(cmd, items);
 
+    receiver.handshake(channel);
     auto result = receiver.query(items, channel);
 
     print_intersection_results(result);

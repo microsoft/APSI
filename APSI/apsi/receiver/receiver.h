@@ -45,8 +45,25 @@ namespace apsi
             */
             std::pair<std::vector<bool>, Matrix<u8>> query(std::vector<Item> &items, apsi::network::Channel& chl);
 
+            /**
+            Perform a handshake between the Sender and this Receiver.
+            Sender will send configuration parameters that the Receiver will use to configure itself.
+            A handshake needs to be performed before any query call.
+            */
             void handshake(apsi::network::Channel& channel);
 
+            /**
+            Get current configuration parameters
+            */
+            const PSIParams& get_params() const
+            {
+                if (nullptr == params_.get())
+                    throw new std::logic_error("PSIParams have not been initialized");
+
+                return *params_.get();
+            }
+
+        private:
             /**
             Preprocesses the PSI items. Returns the power map of the items, and the indices of them in the hash table.
             */
@@ -148,15 +165,6 @@ namespace apsi
                 return secret_key_;
             }
 
-            const PSIParams& get_params() const
-            {
-                if (nullptr == params_.get())
-                    throw new std::logic_error("PSIParams have not been initialized");
-
-                return *params_.get();
-            }
-
-        private:
             void initialize();
 
             std::unique_ptr<PSIParams> params_;

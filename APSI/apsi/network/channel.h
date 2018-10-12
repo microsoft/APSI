@@ -29,6 +29,8 @@ namespace zmqpp
     enum class socket_type;
     class message;
     typedef message message_t;
+    class context;
+    typedef context context_t;
 }
 
 namespace apsi
@@ -50,6 +52,11 @@ namespace apsi
             * Create an instance of a Channel
             */
             Channel();
+
+            /**
+            Create an instance of a Channel with the given context
+            */
+            Channel(const zmqpp::context_t& context);
 
             /**
             * Destroy an instance of a Channel
@@ -168,6 +175,8 @@ namespace apsi
 
             std::unique_ptr<std::mutex> receive_mutex_;
             std::unique_ptr<std::mutex> send_mutex_;
+
+            const zmqpp::context_t* context_;
 
             void throw_if_not_connected() const;
             void throw_if_connected() const;

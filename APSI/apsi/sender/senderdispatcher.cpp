@@ -13,6 +13,11 @@
 #include "seal/publickey.h"
 #include "seal/relinkeys.h"
 
+// ZeroMQ
+#pragma warning(push, 0)
+#include "zmqpp/zmqpp.hpp"
+#pragma warning(pop)
+
 
 using namespace std;
 using namespace seal;
@@ -24,7 +29,8 @@ using namespace apsi::logging;
 
 void SenderDispatcher::run(const atomic<bool>& stop, const int port)
 {
-    SenderChannel channel;
+    zmqpp::context_t context;
+    SenderChannel channel(context);
 
     stringstream ss;
     ss << "tcp://*:" << port;
