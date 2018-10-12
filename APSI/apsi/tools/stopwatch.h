@@ -5,7 +5,6 @@
 #include <string>
 #include <chrono>
 #include <ostream>
-//#include <mutex>
 #include <vector>
 #include <map>
 
@@ -99,11 +98,9 @@ namespace apsi
         private:
             // Single events
             std::list<Timepoint> events_;
-//            std::mutex events_mtx_;
 
             // Events that have a beginning and end
             std::map<std::string, TimespanSummary> timespan_events_;
-//            std::mutex timespan_events_mtx_;
 
             // Useful for generating reports
             int max_event_name_length_;
