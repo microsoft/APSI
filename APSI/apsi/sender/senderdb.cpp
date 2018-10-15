@@ -532,11 +532,6 @@ void SenderDB::batched_interpolate_polys(
         throw std::runtime_error("labels are too large for exfield.");
     }
 
-    if (params_.get_label_bit_count() >= 64)
-    {
-        throw std::runtime_error("labels are too large u64 interpolation.");
-    }
-
     for (int bIdx = start_block; bIdx < end_block; bIdx++)
     {
         auto& block = db_blocks_(bIdx);
