@@ -176,6 +176,7 @@ namespace apsi
             std::unique_ptr<std::mutex> receive_mutex_;
             std::unique_ptr<std::mutex> send_mutex_;
 
+            std::unique_ptr<zmqpp::context_t> ch_context_;
             const zmqpp::context_t* context_;
 
             void throw_if_not_connected() const;
