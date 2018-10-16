@@ -1,11 +1,18 @@
 
 // STD
 #include <sstream>
+#include <mutex>
 
 // APSI
 #include "apsi/result_package.h"
 #include "apsi/network/channel.h"
 #include "apsi/network/network_utils.h"
+
+// ZeroMQ
+#pragma warning(push, 0)
+#include "zmqpp/zmqpp.hpp"
+#pragma warning(pop)
+
 
 using namespace std;
 using namespace seal;
@@ -14,11 +21,25 @@ using namespace apsi::network;
 using namespace zmqpp;
 
 
-Channel::Channel(const context_t& ctx)
+Channel::Channel()
     : bytes_sent_(0),
       bytes_received_(0),
       end_point_(""),
-      context_(ctx)
+      receive_mutex_(make_unique<mutex>()),
+      send_mutex_(make_unique<mutex>()),
+      context_(nullptr),
+      ch_context_(make_unique<context_t>())
+{
+}
+
+Channel::Channel(const context_t& context)
+    : bytes_sent_(0),
+      bytes_received_(0),
+      end_point_(""),
+      receive_mutex_(make_unique<mutex>()),
+      send_mutex_(make_unique<mutex>()),
+      context_(&context),
+      ch_context_(nullptr)
 {
 }
 
@@ -51,7 +72,15 @@ void Channel::disconnect()
     throw_if_not_connected();
 
     get_socket()->close();
+    if (nullptr != ch_context_)
+    {
+        ch_context_->terminate();
+    }
+
     end_point_ = "";
+    socket_ = nullptr;
+    context_ = nullptr;
+    ch_context_ = nullptr;
 }
 
 void Channel::throw_if_not_connected() const
@@ -441,7 +470,7 @@ void Channel::add_buffer(const vector<u8>& buff, message_t& msg) const
     }
 }
 
-void Channel::get_sm_vector(vector<SmallModulus>& smv, const zmqpp::message_t& msg, size_t& part_idx) const
+void Channel::get_sm_vector(vector<SmallModulus>& smv, const message_t& msg, size_t& part_idx) const
 {
     // Need to have size
     if (msg.parts() < (part_idx + 1))
@@ -461,7 +490,7 @@ void Channel::get_sm_vector(vector<SmallModulus>& smv, const zmqpp::message_t& m
     }
 }
 
-void Channel::add_sm_vector(const vector<SmallModulus>& smv, zmqpp::message_t& msg) const
+void Channel::add_sm_vector(const vector<SmallModulus>& smv, message_t& msg) const
 {
     // First part is size
     add_part(smv.size(), msg);
@@ -494,7 +523,7 @@ SenderOperationType Channel::get_message_type(const message_t& msg, const size_t
     return type;
 }
 
-void Channel::extract_client_id(const zmqpp::message_t& msg, std::vector<apsi::u8>& id) const
+void Channel::extract_client_id(const message_t& msg, vector<u8>& id) const
 {
     // ID should always be part 0
     size_t id_size = msg.size(/* part */ 0);
@@ -502,7 +531,7 @@ void Channel::extract_client_id(const zmqpp::message_t& msg, std::vector<apsi::u
     memcpy(id.data(), msg.raw_data(/* part */ 0), id_size);
 }
 
-void Channel::add_client_id(zmqpp::message_t& msg, const std::vector<apsi::u8>& id) const
+void Channel::add_client_id(message_t& msg, const vector<u8>& id) const
 {
     msg.add_raw(id.data(), id.size());
 }
@@ -578,7 +607,7 @@ shared_ptr<SenderOperation> Channel::decode_query(const message_t& msg)
 
 bool Channel::receive_message(message_t& msg, bool wait_for_message)
 {
-    unique_lock<mutex> rec_lock(receive_mutex_);
+    unique_lock<mutex> rec_lock(*receive_mutex_);
     bool received = get_socket()->receive(msg, !wait_for_message);
 
     if (!received && wait_for_message)
@@ -589,9 +618,36 @@ bool Channel::receive_message(message_t& msg, bool wait_for_message)
 
 void Channel::send_message(message_t& msg)
 {
-    unique_lock<mutex> snd_lock(send_mutex_);
+    unique_lock<mutex> snd_lock(*send_mutex_);
     bool sent = get_socket()->send(msg);
 
     if (!sent)
         throw runtime_error("Failed to send message");
+}
+
+template<typename T>
+typename enable_if<is_pod<T>::value, void>::type
+Channel::get_part(T& data, const message_t& msg, const size_t part) const
+{
+    const T* presult;
+    msg.get(&presult, part);
+    memcpy(&data, presult, sizeof(T));
+}
+
+template<typename T>
+typename enable_if<is_pod<T>::value, void>::type
+Channel::add_part(const T& data, message_t& msg) const
+{
+    msg.add_raw(&data, sizeof(T));
+}
+
+unique_ptr<socket_t>& Channel::get_socket()
+{
+    if (nullptr == socket_)
+    {
+        const context_t* ctx = context_ ? context_ : ch_context_.get();
+        socket_ = make_unique<socket_t>(*ctx, get_socket_type());
+    }
+
+    return socket_;
 }

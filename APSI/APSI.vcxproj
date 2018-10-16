@@ -186,6 +186,8 @@
     <ClCompile Include="apsi\logging\log.cpp" />
     <ClCompile Include="apsi\network\channel.cpp" />
     <ClCompile Include="apsi\Network\network_utils.cpp" />
+    <ClCompile Include="apsi\network\receiverchannel.cpp" />
+    <ClCompile Include="apsi\network\senderchannel.cpp" />
     <ClCompile Include="apsi\plaintextarith.cpp" />
     <ClCompile Include="apsi\Receiver\receiver.cpp" />
     <ClCompile Include="apsi\Sender\sender.cpp" />

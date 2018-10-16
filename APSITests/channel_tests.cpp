@@ -1,11 +1,17 @@
 #include "channel_tests.h"
 #include "utils.h"
 #include <limits>
+#include <thread>
 #include "apsi/result_package.h"
 #include "apsi/network/receiverchannel.h"
 #include "apsi/network/senderchannel.h"
 #include "seal/publickey.h"
 #include "seal/defaultparams.h"
+
+#pragma warning(push, 0)
+#include "zmqpp/zmqpp.hpp"
+#pragma warning(pop)
+
 
 using namespace APSITests;
 using namespace std;
@@ -47,7 +53,7 @@ void ChannelTests::setUp()
 
 void ChannelTests::ThrowWithoutConnectTest()
 {
-    SenderChannel mychannel(ctx_);
+    SenderChannel mychannel;
     SenderResponseGetParameters get_params_resp;
     SenderResponsePreprocess preproc_resp;
     SenderResponseQuery query_resp;

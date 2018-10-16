@@ -7,6 +7,7 @@
 #include <vector>
 #include <iostream>
 #include <map>
+#include <future>
 
 // GSL
 #include <gsl/span>

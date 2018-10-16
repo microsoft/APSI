@@ -5,9 +5,9 @@
 #include <string>
 #include <chrono>
 #include <ostream>
-#include <mutex>
 #include <vector>
 #include <map>
+#include <memory>
 
 // APSI
 #include "apsi/apsidefines.h"
@@ -22,6 +22,12 @@
 
 // Measure a block
 #define STOPWATCH(stopwatch, name) StopwatchScope UNIQUE_STOPWATCH_NAME(stopwatchscope) (stopwatch, name);
+
+
+namespace std
+{
+    class mutex;
+}
 
 namespace apsi
 {
@@ -61,10 +67,7 @@ namespace apsi
             /**
             Default constructor
             */
-            Stopwatch()
-                : max_event_name_length_(0),
-                  max_timespan_event_name_length_(0)
-            {}
+            Stopwatch();
 
             /**
             Used as a reference point for single events
@@ -99,11 +102,11 @@ namespace apsi
         private:
             // Single events
             std::list<Timepoint> events_;
-            std::mutex events_mtx_;
+            std::shared_ptr<std::mutex> events_mtx_;
 
             // Events that have a beginning and end
             std::map<std::string, TimespanSummary> timespan_events_;
-            std::mutex timespan_events_mtx_;
+            std::shared_ptr<std::mutex> timespan_events_mtx_;
 
             // Useful for generating reports
             int max_event_name_length_;

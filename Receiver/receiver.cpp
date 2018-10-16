@@ -74,15 +74,15 @@ int main(int argc, char *argv[])
 
     remote_query(cmd);
 
-#ifdef _MSC_VER
-    if (IsDebuggerPresent())
-    {
-        // Wait for ENTER before closing screen.
-        cout << endl << "Press ENTER to exit" << endl;
-        char ignore;
-        cin.get(ignore);
-    }
-#endif
+//#ifdef _MSC_VER
+//    if (IsDebuggerPresent())
+//    {
+//        // Wait for ENTER before closing screen.
+//        cout << endl << "Press ENTER to exit" << endl;
+//        char ignore;
+//        cin.get(ignore);
+//    }
+//#endif
     return 0;
 }
 
@@ -91,8 +91,7 @@ void remote_query(const CLP& cmd)
     print_example_banner("Query a remote Sender");
 
     // Connect to the network
-    zmqpp::context_t context;
-    ReceiverChannel channel(context);
+    ReceiverChannel channel;
 
     string conn_addr = get_conn_addr(cmd);
     Log::info("Receiver connecting to address: %s", conn_addr.c_str());
@@ -104,6 +103,7 @@ void remote_query(const CLP& cmd)
     Matrix<u8> labels;
     int intersection_size = initialize_query(cmd, items);
 
+    receiver.handshake(channel);
     auto result = receiver.query(items, channel);
 
     print_intersection_results(result);

@@ -29,8 +29,8 @@ using namespace apsi::logging;
 
 void SenderDispatcher::run(const atomic<bool>& stop, const int port)
 {
-    zmqpp::context_t zmqcontext;
-    SenderChannel channel(zmqcontext);
+    zmqpp::context_t context;
+    SenderChannel channel(context);
 
     stringstream ss;
     ss << "tcp://*:" << port;

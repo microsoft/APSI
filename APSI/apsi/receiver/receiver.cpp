@@ -83,8 +83,12 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Ch
     STOPWATCH(recv_stop_watch, "Receiver::query");
     Log::info("Receiver starting query");
 
-    // Perform initial communication with Sender
-    handshake(chl);
+    if (nullptr == params_)
+    {
+        string msg = "Handshake has not been performed.";
+        Log::error(msg.c_str());
+        throw runtime_error(msg);
+    }
 
     auto qq = preprocess(items, chl);
     auto& ciphertexts = qq.first;

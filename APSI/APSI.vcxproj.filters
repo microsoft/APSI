@@ -230,5 +230,11 @@
     <ClCompile Include="apsi\tools\fourq.cpp">
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
+    <ClCompile Include="apsi\network\receiverchannel.cpp">
+      <Filter>Source Files\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\network\senderchannel.cpp">
+      <Filter>Source Files\Network</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>
