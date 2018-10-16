@@ -9,10 +9,6 @@
 #include "apsi/logging/log.h"
 #include "seal/defaultparams.h"
 
-#pragma warning(push, 0)
-#include "zmqpp/zmqpp.hpp"
-#pragma warning(pop)
-
 
 using namespace APSITests;
 using namespace std;
@@ -90,8 +86,7 @@ void SenderReceiverTests::RunTest(size_t senderActualSize, PSIParams& params)
     Log::set_log_level(Log::Level::level_error);
 
     // Connect the network
-    zmqpp::context_t context;
-    ReceiverChannel recvChl(context);
+    ReceiverChannel recvChl;
 
     string conn_addr = "tcp://localhost:5550";
     recvChl.connect(conn_addr);

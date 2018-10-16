@@ -13,11 +13,6 @@
 #include "seal/publickey.h"
 #include "seal/relinkeys.h"
 
-// ZeroMQ
-#pragma warning(push, 0)
-#include "zmqpp/zmqpp.hpp"
-#pragma warning(pop)
-
 
 using namespace std;
 using namespace seal;
@@ -29,8 +24,7 @@ using namespace apsi::logging;
 
 void SenderDispatcher::run(const atomic<bool>& stop, const int port)
 {
-    zmqpp::context_t context;
-    SenderChannel channel(context);
+    SenderChannel channel;
 
     stringstream ss;
     ss << "tcp://*:" << port;
@@ -86,6 +80,7 @@ void SenderDispatcher::run(const atomic<bool>& stop, const int port)
 
 void SenderDispatcher::dispatch_get_parameters(shared_ptr<SenderOperation> sender_op, Channel& channel)
 {
+    // No need to cast to SenderOperationGetParameters, we just need the client_id.
     channel.send_get_parameters_response(sender_op->client_id, sender_->get_params());
 }
 
@@ -100,7 +95,6 @@ void SenderDispatcher::dispatch_preprocess(shared_ptr<SenderOperation> sender_op
 void SenderDispatcher::dispatch_query(shared_ptr<SenderOperation> sender_op, Channel& channel)
 {
     auto query_op = dynamic_pointer_cast<SenderOperationQuery>(sender_op);
-    vector<ResultPackage> result;
     PublicKey pub_key;
     RelinKeys relin_keys;
 

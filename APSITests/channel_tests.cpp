@@ -8,10 +8,6 @@
 #include "seal/publickey.h"
 #include "seal/defaultparams.h"
 
-#pragma warning(push, 0)
-#include "zmqpp/zmqpp.hpp"
-#pragma warning(pop)
-
 
 using namespace APSITests;
 using namespace std;
@@ -24,9 +20,8 @@ CPPUNIT_TEST_SUITE_REGISTRATION(ChannelTests);
 
 namespace
 {
-    zmqpp::context_t ctx_;
-    SenderChannel server_(ctx_);
-    ReceiverChannel client_(ctx_);
+    SenderChannel server_;
+    ReceiverChannel client_;
 }
 
 ChannelTests::~ChannelTests()
@@ -90,8 +85,8 @@ void ChannelTests::ThrowWithoutConnectTest()
 
 void ChannelTests::DataCountsTest()
 {
-    SenderChannel svr(ctx_);
-    ReceiverChannel clt(ctx_);
+    SenderChannel svr;
+    ReceiverChannel clt;
 
     svr.bind("tcp://*:5554");
     clt.connect("tcp://localhost:5554");
@@ -478,8 +473,7 @@ void ChannelTests::MultipleClientsTest()
 
     thread serverth([this, &finished]
     {
-        zmqpp::context_t context;
-        SenderChannel sender(context);
+        SenderChannel sender;
 
         sender.bind("tcp://*:5552");
 
@@ -508,8 +502,7 @@ void ChannelTests::MultipleClientsTest()
     {
         clients[i] = thread([this](unsigned idx)
         {
-            zmqpp::context_t context;
-            ReceiverChannel recv(context);
+            ReceiverChannel recv;
 
             recv.connect("tcp://localhost:5552");
 
