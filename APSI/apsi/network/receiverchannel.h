@@ -14,7 +14,6 @@ namespace apsi
         {
         public:
             ReceiverChannel() = default;
-            ReceiverChannel(const zmqpp::context_t& context);
 
         protected:
             /**
