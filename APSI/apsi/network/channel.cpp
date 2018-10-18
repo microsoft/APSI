@@ -27,19 +27,7 @@ Channel::Channel()
       end_point_(""),
       receive_mutex_(make_unique<mutex>()),
       send_mutex_(make_unique<mutex>()),
-      context_(nullptr),
-      ch_context_(make_unique<context_t>())
-{
-}
-
-Channel::Channel(const context_t& context)
-    : bytes_sent_(0),
-      bytes_received_(0),
-      end_point_(""),
-      receive_mutex_(make_unique<mutex>()),
-      send_mutex_(make_unique<mutex>()),
-      context_(&context),
-      ch_context_(nullptr)
+      context_(make_unique<context_t>())
 {
 }
 
@@ -72,15 +60,14 @@ void Channel::disconnect()
     throw_if_not_connected();
 
     get_socket()->close();
-    if (nullptr != ch_context_)
+    if (nullptr != context_)
     {
-        ch_context_->terminate();
+        context_->terminate();
     }
 
     end_point_ = "";
     socket_ = nullptr;
     context_ = nullptr;
-    ch_context_ = nullptr;
 }
 
 void Channel::throw_if_not_connected() const
@@ -645,8 +632,7 @@ unique_ptr<socket_t>& Channel::get_socket()
 {
     if (nullptr == socket_)
     {
-        const context_t* ctx = context_ ? context_ : ch_context_.get();
-        socket_ = make_unique<socket_t>(*ctx, get_socket_type());
+        socket_ = make_unique<socket_t>(*context_.get(), get_socket_type());
     }
 
     return socket_;

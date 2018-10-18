@@ -54,11 +54,6 @@ namespace apsi
             Channel();
 
             /**
-            Create an instance of a Channel with the given context
-            */
-            Channel(const zmqpp::context_t& context);
-
-            /**
             * Destroy an instance of a Channel
             */
             virtual ~Channel();
@@ -176,8 +171,7 @@ namespace apsi
             std::unique_ptr<std::mutex> receive_mutex_;
             std::unique_ptr<std::mutex> send_mutex_;
 
-            std::unique_ptr<zmqpp::context_t> ch_context_;
-            const zmqpp::context_t* context_;
+            std::unique_ptr<zmqpp::context_t> context_;
 
             void throw_if_not_connected() const;
             void throw_if_connected() const;
