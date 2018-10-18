@@ -160,7 +160,7 @@ void Channel::receive(SenderResponseGetParameters& response)
     response.cuckoo_params.max_probe       = msg.get<unsigned int>(idx++);
 
     // SEALParams
-    response.seal_params.encryption_params.set_poly_modulus_degree(msg.get<int>(idx++));
+    response.seal_params.encryption_params.set_poly_modulus_degree(msg.get<size_t>(idx++));
 
     vector<SmallModulus> coeff_modulus;
     get_sm_vector(coeff_modulus, msg, idx);

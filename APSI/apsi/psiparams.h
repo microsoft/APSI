@@ -192,7 +192,7 @@ namespace apsi
 
         inline int batch_size() const
         {
-            return encryption_params().poly_modulus_degree() / exfield_degree();
+            return static_cast<int>(encryption_params().poly_modulus_degree() / exfield_degree());
         }
 
         inline int batch_count() const

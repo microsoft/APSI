@@ -502,7 +502,7 @@ void SenderDB::batched_randomized_symmetric_polys(
                 fq_nmod_set(batch_vector.data() + k, &symm_block(k, i), batch_vector.field(k)->ctx());
             }
             ex_batch_encoder->compose(batch_vector, poly);
-            evaluator->transform_to_ntt(poly, seal_context_->first_parms_id(), local_pool);
+            evaluator->transform_to_ntt_inplace(poly, seal_context_->first_parms_id(), local_pool);
         }
 
         context.inc_randomized_polys();
@@ -688,10 +688,10 @@ void DBBlock::batch_interpolate(
 
         auto capacity = static_cast<Plaintext::size_type>(params.encryption_params().coeff_modulus().size() *
             params.encryption_params().poly_modulus_degree());
-        batched_coeff.reserve(capacity, local_pool);
+        batched_coeff.reserve(capacity);
 
         ex_batch_encoder->compose(temp_array, batched_coeff);
-        evaluator->transform_to_ntt(batched_coeff, seal_context->first_parms_id());
+        evaluator->transform_to_ntt_inplace(batched_coeff, seal_context->first_parms_id());
     }
 }
 

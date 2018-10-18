@@ -8,7 +8,6 @@
 #include "seal/ciphertext.h"
 #include "seal/context.h"
 #include "seal/evaluator.h"
-#include "seal/memorypoolhandle.h"
 
 namespace apsi
 {

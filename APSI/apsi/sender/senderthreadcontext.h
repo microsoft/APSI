@@ -12,9 +12,6 @@
 #include "apsi/tools/matrixview.h"
 #include "apsi/tools/prng.h"
 
-// SEAL
-#include "seal/memorypoolhandle.h"
-
 
 namespace apsi
 {

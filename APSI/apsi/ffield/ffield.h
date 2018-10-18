@@ -64,7 +64,7 @@ namespace apsi
     inline void bigpoly_to_nmod_poly(const seal::BigPoly &in, nmod_poly_t out)
     {
         nmod_poly_zero(out);
-        unsigned coeff_count = in.coeff_count();
+        size_t coeff_count = in.coeff_count();
         auto *poly_ptr = in.data();
         for(unsigned i = 0; i < coeff_count; i++, poly_ptr++)
         {
@@ -99,7 +99,7 @@ namespace apsi
 
     inline void biguint_to_fmpz(const seal::BigUInt &in, fmpz_t out)
     {
-        unsigned word_count = in.uint64_count();
+        size_t word_count = in.uint64_count();
         if(word_count == 0)
         {
             fmpz_zero(out);

@@ -460,11 +460,11 @@ void Sender::respond_worker(
             evaluator_->add(runningResults[currResult], label_results[curr_label], label_results[curr_label ^ 1]);
             curr_label ^= 1;
 
-            evaluator_->transform_from_ntt(label_results[curr_label]);
+            evaluator_->transform_from_ntt_inplace(label_results[curr_label]);
         }
 
         // Transform back from ntt form.
-        evaluator_->transform_from_ntt(runningResults[currResult]);
+        evaluator_->transform_from_ntt_inplace(runningResults[currResult]);
 
         // Send the result over the network if needed.
 
@@ -537,7 +537,7 @@ void Sender::compute_batch_powers(
             while (state.nodes_[node.inputs_[i]] != WindowingDag::NodeState::Done);
 
         evaluator_->multiply(batch_powers[node.inputs_[0]], batch_powers[node.inputs_[1]], batch_powers[node.output_], local_pool);
-        evaluator_->relinearize(batch_powers[node.output_], session_context.relin_keys_, local_pool);
+        evaluator_->relinearize_inplace(batch_powers[node.output_], session_context.relin_keys_, local_pool);
 
         // a simple write should be sufficient but lets be safe
         exp = WindowingDag::NodeState::Pending;
@@ -557,7 +557,7 @@ void Sender::compute_batch_powers(
     {
         auto i = idx - dag.nodes_.size();
 
-        evaluator_->transform_to_ntt(batch_powers[i]);
+        evaluator_->transform_to_ntt_inplace(batch_powers[i]);
         idx = (*state.next_node_)++;
     }
 }

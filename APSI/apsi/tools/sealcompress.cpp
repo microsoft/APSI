@@ -19,14 +19,14 @@ void CiphertextCompressor::mod_switch(Ciphertext &encrypted) const
     }
     while(encrypted.parms_id() != seal_context_->last_parms_id())
     {
-        evaluator_->mod_switch_to_next(encrypted, pool_);
+        evaluator_->mod_switch_to_next_inplace(encrypted, pool_);
     }
 }
 
 void CiphertextCompressor::compressed_save(const seal::Ciphertext &encrypted, 
     std::ostream &stream) const
 {
-    int encrypted_size = encrypted.size();
+    size_t encrypted_size = encrypted.size();
     if(encrypted_size > 2)
     {
         throw invalid_argument("can only compress fully relinearized ciphertexts");
@@ -48,7 +48,7 @@ void CiphertextCompressor::compressed_save(const seal::Ciphertext &encrypted,
     auto& context_data = *seal_context_->context_data(seal_context_->last_parms_id());
     auto &parms = context_data.parms();
     
-    int coeff_count = parms.poly_modulus_degree();
+    size_t coeff_count = parms.poly_modulus_degree();
     int compr_coeff_bit_count = parms.plain_modulus().bit_count() + 
         get_significant_bit_count(coeff_count);
     int compr_coeff_byte_count = divide_round_up(compr_coeff_bit_count, bits_per_byte);
@@ -64,15 +64,15 @@ void CiphertextCompressor::compressed_save(const seal::Ciphertext &encrypted,
         sizeof(parms_id_type));
 
     // Create compressed polynomials
-    int compr_data_byte_count = compr_coeff_byte_count * encrypted_size * coeff_count;
-    int compr_data_uint64_count = divide_round_up(compr_data_byte_count, bytes_per_uint64);
+    size_t compr_data_byte_count = compr_coeff_byte_count * encrypted_size * coeff_count;
+    size_t compr_data_uint64_count = divide_round_up(compr_data_byte_count, static_cast<size_t>(bytes_per_uint64));
     auto compr_poly(allocate_zero_uint(compr_data_uint64_count, pool_));
 
     char *compr_poly_writer_head = reinterpret_cast<char*>(compr_poly.get());
     const uint64_t *encrypted_coeff_ptr = encrypted.data(); 
-    int encrypted_uint64_count = encrypted_size * encrypted.poly_modulus_degree();
+    size_t encrypted_uint64_count = encrypted_size * encrypted.poly_modulus_degree();
     int bit_shift = bits_per_uint64 - coeff_mod_bit_count;
-    for(int i = 0; i < encrypted_uint64_count; i++, encrypted_coeff_ptr++)
+    for(size_t i = 0; i < encrypted_uint64_count; i++, encrypted_coeff_ptr++)
     {
         uint64_t shifted_coeff = *encrypted_coeff_ptr << bit_shift;
         memcpy(compr_poly_writer_head, 
@@ -88,7 +88,7 @@ void CiphertextCompressor::compressed_save(const seal::Ciphertext &encrypted,
 void CiphertextCompressor::compressed_load(std::istream &stream, 
     seal::Ciphertext &destination) const
 {
-    int encrypted_size = destination.size();
+    size_t encrypted_size = destination.size();
 
     // Resize destination if necessary. If destination is a newly created Ciphertext,
     // its size will be zero.
@@ -118,7 +118,7 @@ void CiphertextCompressor::compressed_load(std::istream &stream,
     auto& context_data = *seal_context_->context_data(seal_context_->last_parms_id());
     auto &parms = context_data.parms();
 
-    int coeff_count = parms.poly_modulus_degree();
+    size_t coeff_count = parms.poly_modulus_degree();
     int compr_coeff_bit_count = parms.plain_modulus().bit_count() + 
         get_significant_bit_count(coeff_count);
     int compr_coeff_byte_count = divide_round_up(compr_coeff_bit_count, bits_per_byte);
@@ -141,8 +141,8 @@ void CiphertextCompressor::compressed_load(std::istream &stream,
 
 
     // Create compressed polynomials
-    int compr_data_byte_count = compr_coeff_byte_count * encrypted_size * coeff_count;
-    int compr_data_uint64_count = divide_round_up(compr_data_byte_count, bytes_per_uint64);
+    size_t compr_data_byte_count = compr_coeff_byte_count * encrypted_size * coeff_count;
+    size_t compr_data_uint64_count = divide_round_up(compr_data_byte_count, static_cast<size_t>(bytes_per_uint64));
     auto compr_poly(allocate_zero_uint(compr_data_uint64_count, pool_));
 
     // Read data
@@ -151,9 +151,9 @@ void CiphertextCompressor::compressed_load(std::istream &stream,
     // Finally parse and write to destination
     const char *compr_poly_reader_head = reinterpret_cast<const char*>(compr_poly.get());
     uint64_t *destination_coeff_ptr = destination.data(); 
-    int encrypted_uint64_count = encrypted_size * destination.poly_modulus_degree();
+    size_t encrypted_uint64_count = encrypted_size * destination.poly_modulus_degree();
     int bit_shift = bits_per_uint64 - coeff_mod_bit_count;
-    for(int i = 0; i < encrypted_uint64_count; i++, destination_coeff_ptr++)
+    for(size_t i = 0; i < encrypted_uint64_count; i++, destination_coeff_ptr++)
     {
         uint64_t shifted_coeff = 0;
         memcpy(reinterpret_cast<char*>(&shifted_coeff), compr_poly_reader_head, 

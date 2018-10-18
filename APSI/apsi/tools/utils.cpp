@@ -161,7 +161,7 @@ std::vector<std::string> apsi::tools::split(const std::string &s, const char del
 seal::Plaintext apsi::tools::random_plaintext(const seal::SEALContext &context)
 {
     u64 plain_mod = context.context_data()->parms().plain_modulus().value();
-    int coeff_count = context.context_data()->parms().poly_modulus_degree();
+    size_t coeff_count = context.context_data()->parms().poly_modulus_degree();
     seal::Plaintext random(coeff_count);
     u64* random_ptr = random.data();
 

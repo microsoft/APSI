@@ -26,7 +26,6 @@
 #include "apsi/network/channel.h"
 
 // SEAL
-#include "seal/memorypoolhandle.h"
 #include "seal/encryptionparams.h"
 #include "seal/ciphertext.h"
 #include "seal/context.h"
