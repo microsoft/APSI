@@ -118,11 +118,11 @@ void ChannelTests::DataCountsTest()
 
         // This should be:
         // SenderOperationType size
-        // 57 for pubkey and 40 for relinkeys
+        // 73 for pubkey and 44 for relinkeys
         // size_t size (number of entries in querydata)
         // u64 size * 2 (each entry in querydata)
         // size_t size * 2 (each entry in querydata)
-        // Ciphertexts will generate strings of length 57
+        // Ciphertexts will generate strings of length 73
         clt.send_query(pubkey, relinkeys, querydata);
 
         SenderResponseGetParameters get_params_resp;
@@ -162,8 +162,8 @@ void ChannelTests::DataCountsTest()
     expected_total += sizeof(SenderOperationType);
     expected_total += sizeof(size_t) * 3;
     expected_total += sizeof(u64) * 2;
-    expected_total += (57 + 40); // pubkey + relinkeys
-    expected_total += 57 * 2; // Ciphertexts
+    expected_total += (73 + 44); // pubkey + relinkeys
+    expected_total += 73 * 2; // Ciphertexts
     CPPUNIT_ASSERT_EQUAL(expected_total, svr.get_total_data_received());
 
     // get parameters response
@@ -342,7 +342,7 @@ void ChannelTests::SendGetParametersResponseTest()
     CPPUNIT_ASSERT_EQUAL((unsigned)8,  get_params_response.exfield_params.degree);
     CPPUNIT_ASSERT_EQUAL((unsigned)30, get_params_response.seal_params.decomposition_bit_count);
     CPPUNIT_ASSERT_EQUAL((u64)5119,    get_params_response.seal_params.encryption_params.plain_modulus().value());
-    CPPUNIT_ASSERT_EQUAL(4096,         get_params_response.seal_params.encryption_params.poly_modulus_degree());
+    CPPUNIT_ASSERT_EQUAL((size_t)4096, get_params_response.seal_params.encryption_params.poly_modulus_degree());
     CPPUNIT_ASSERT_EQUAL((size_t)2,    get_params_response.seal_params.encryption_params.coeff_modulus().size());
     CPPUNIT_ASSERT_EQUAL((u64)0x007fffffff380001, get_params_response.seal_params.encryption_params.coeff_modulus()[0].value());
     CPPUNIT_ASSERT_EQUAL((u64)0x003fffffff000001, get_params_response.seal_params.encryption_params.coeff_modulus()[1].value());
@@ -366,7 +366,7 @@ void ChannelTests::SendGetParametersResponseTest()
     CPPUNIT_ASSERT_EQUAL((unsigned)8,  get_params_response2.exfield_params.degree);
     CPPUNIT_ASSERT_EQUAL((unsigned)30, get_params_response2.seal_params.decomposition_bit_count);
     CPPUNIT_ASSERT_EQUAL((u64)5119,    get_params_response2.seal_params.encryption_params.plain_modulus().value());
-    CPPUNIT_ASSERT_EQUAL(4096,         get_params_response2.seal_params.encryption_params.poly_modulus_degree());
+    CPPUNIT_ASSERT_EQUAL((size_t)4096, get_params_response2.seal_params.encryption_params.poly_modulus_degree());
     CPPUNIT_ASSERT_EQUAL((size_t)2,    get_params_response2.seal_params.encryption_params.coeff_modulus().size());
     CPPUNIT_ASSERT_EQUAL((u64)0x007fffffff380001, get_params_response2.seal_params.encryption_params.coeff_modulus()[0].value());
     CPPUNIT_ASSERT_EQUAL((u64)0x003fffffff000001, get_params_response2.seal_params.encryption_params.coeff_modulus()[1].value());

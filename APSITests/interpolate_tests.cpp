@@ -13,14 +13,14 @@ using namespace apsi;
 
 CPPUNIT_TEST_SUITE_REGISTRATION(InterpolateTests);
 
-std::string toString(seal::Plaintext &ptxt, int coeff_count = 0) {
+std::string toString(seal::Plaintext &ptxt, size_t coeff_count = 0) {
     if (coeff_count == 0) {
         coeff_count = ptxt.coeff_count();
     }
 
     std::stringstream ss;
     ss << "(";
-    for (int j = 0; j < coeff_count; j++) {
+    for (size_t j = 0; j < coeff_count; j++) {
         ss << ptxt.data()[j];
 
         if (j != coeff_count - 1)

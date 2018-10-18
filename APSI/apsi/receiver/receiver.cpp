@@ -53,7 +53,7 @@ void Receiver::initialize()
     Log::info("Initializing Receiver");
 
     ex_field_ = FField::Acquire(get_params().exfield_characteristic(), get_params().exfield_degree());
-    slot_count_ = get_params().encryption_params().poly_modulus_degree() / get_params().exfield_degree();
+    slot_count_ = static_cast<int>(get_params().encryption_params().poly_modulus_degree() / get_params().exfield_degree());
 
     seal_context_ = SEALContext::Create(get_params().encryption_params());
     KeyGenerator generator(seal_context_);
