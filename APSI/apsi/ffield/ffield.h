@@ -121,7 +121,6 @@ namespace apsi
         friend class FFieldElt;
         friend class FFieldArray;
         friend class FFieldPoly;
-        friend class FFieldNTT;
         friend class FFieldFastBatchEncoder;
 
     public:
