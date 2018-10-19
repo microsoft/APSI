@@ -19,7 +19,6 @@ namespace apsi
 {
     class FFieldPoly
     {
-        friend class FFieldBatchEncoder;
         friend class FFieldFastBatchEncoder;
 
     public:
