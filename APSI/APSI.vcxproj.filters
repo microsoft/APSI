@@ -96,9 +96,6 @@
     <ClInclude Include="apsi\ffield\ffield_elt.h">
       <Filter>Header Files\FField</Filter>
     </ClInclude>
-    <ClInclude Include="apsi\ffield\ffield_poly.h">
-      <Filter>Header Files\FField</Filter>
-    </ClInclude>
     <ClInclude Include="apsi\Tools\interpolate.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>

@@ -1,6 +1,13 @@
-#include "apsi/ffield/ffield_fast_batch_encoder.h"
-#include "seal/util/common.h"
+// STD
 #include <iostream>
+
+// APSI
+#include "apsi/ffield/ffield_fast_batch_encoder.h"
+#include "apsi/ffield/ffield_array.h"
+
+// SEAL
+#include "seal/util/common.h"
+
 
 using namespace std;
 using namespace seal;

@@ -16,7 +16,6 @@ namespace apsi
 {
     class FFieldArray
     {
-        friend class FFieldPoly;
         friend class FFieldFastBatchEncoder;
 
     public:
