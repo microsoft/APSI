@@ -12,7 +12,6 @@
 
 // APSI
 #include "apsi/ffield/ffield_array.h"
-#include "apsi/ffield/ffield_poly.h"
 
 
 namespace apsi

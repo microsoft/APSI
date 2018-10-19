@@ -96,12 +96,6 @@
     <ClInclude Include="apsi\ffield\ffield_elt.h">
       <Filter>Header Files\FField</Filter>
     </ClInclude>
-    <ClInclude Include="apsi\ffield\ffield_ntt.h">
-      <Filter>Header Files\FField</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\ffield\ffield_poly.h">
-      <Filter>Header Files\FField</Filter>
-    </ClInclude>
     <ClInclude Include="apsi\Tools\interpolate.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
@@ -110,9 +104,6 @@
     </ClInclude>
     <ClInclude Include="apsi\tools\prng.h">
       <Filter>Header Files\Tools</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\ffield\ffield_batch_encoder.h">
-      <Filter>Header Files\FField</Filter>
     </ClInclude>
     <ClInclude Include="apsi\ffield\ffield_fast_batch_encoder.h">
       <Filter>Header Files\FField</Filter>
@@ -191,17 +182,11 @@
     <ClCompile Include="apsi\ffield\ffield_elt.cpp">
       <Filter>Source Files\FField</Filter>
     </ClCompile>
-    <ClCompile Include="apsi\ffield\ffield_ntt.cpp">
-      <Filter>Source Files\FField</Filter>
-    </ClCompile>
     <ClCompile Include="apsi\Tools\interpolate.cpp">
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
     <ClCompile Include="apsi\Tools\sealcompress.cpp">
       <Filter>Source Files\Tools</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\ffield\ffield_batch_encoder.cpp">
-      <Filter>Source Files\FField</Filter>
     </ClCompile>
     <ClCompile Include="apsi\ffield\ffield_fast_batch_encoder.cpp">
       <Filter>Source Files\FField</Filter>

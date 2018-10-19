@@ -7,7 +7,7 @@
 // APSI 
 #include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_elt.h"
-#include "apsi/ffield/ffield_poly.h"
+#include "apsi/ffield/ffield_array.h"
 
 // SEAL
 #include "seal/plaintext.h"

@@ -16,10 +16,7 @@ namespace apsi
 {
     class FFieldArray
     {
-        friend class FFieldPoly;
-        friend class FFieldBatchEncoder;
         friend class FFieldFastBatchEncoder;
-        friend class FFieldNTT;
 
     public:
         FFieldArray(std::shared_ptr<FField> field, std::size_t size) : 
