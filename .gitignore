@@ -16,3 +16,5 @@ x64/*
 *.json
 Receiver/receiver
 Sender/sender
+doc/html
+doc/latex
