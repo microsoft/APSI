@@ -220,7 +220,7 @@ namespace apsi
 
         unsigned d_;
         _ch_t ch_;
-        bool frob_populated_;
+        bool frob_populated_ = false;
         _ffield_array_t frob_table_backing_;
         MatrixView<_ffield_array_elt_t> frob_table_;
         _ffield_ctx_t ctx_;
