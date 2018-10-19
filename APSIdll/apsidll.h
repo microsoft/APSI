@@ -36,6 +36,7 @@ APSIDLL bool APSICALL ReceiverIsConnected();
 /**
 Perform a Query for the given items.
 
-The result and labels are returned in the given arrays.
+The 'result' array consist of booleans encoded as integers. Any value other than 0
+is considered 'true', 0 is considered as 'false'.
 */
 APSIDLL bool APSICALL ReceiverQuery(int length, u64* items, int* result, u64* labels);
