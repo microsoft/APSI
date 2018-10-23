@@ -156,6 +156,7 @@
     <ClInclude Include="apsi\psiparams.h" />
     <ClInclude Include="apsi\Receiver\receiver.h" />
     <ClInclude Include="apsi\result_package.h" />
+    <ClInclude Include="apsi\sender\dbblock.h" />
     <ClInclude Include="apsi\Sender\sender.h" />
     <ClInclude Include="apsi\Sender\senderdb.h" />
     <ClInclude Include="apsi\sender\senderdispatcher.h" />
@@ -185,6 +186,7 @@
     <ClCompile Include="apsi\network\senderchannel.cpp" />
     <ClCompile Include="apsi\plaintextarith.cpp" />
     <ClCompile Include="apsi\Receiver\receiver.cpp" />
+    <ClCompile Include="apsi\sender\dbblock.cpp" />
     <ClCompile Include="apsi\Sender\sender.cpp" />
     <ClCompile Include="apsi\Sender\senderdb.cpp" />
     <ClCompile Include="apsi\sender\senderdispatcher.cpp" />
