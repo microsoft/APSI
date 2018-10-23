@@ -3,7 +3,6 @@
 #include "apsi/tools/prng.h"
 #include "apsi/tools/interpolate.h"
 #include "apsi/logging/log.h"
-#include "apsi/ffield/ffield_fast_batch_encoder.h"
 
 
 using namespace std;
