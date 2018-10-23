@@ -150,6 +150,9 @@
     <ClInclude Include="apsi\tools\fourq.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
+    <ClInclude Include="apsi\sender\dbblock.h">
+      <Filter>Header Files\Sender</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp">
@@ -220,6 +223,9 @@
     </ClCompile>
     <ClCompile Include="apsi\network\senderchannel.cpp">
       <Filter>Source Files\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\sender\dbblock.cpp">
+      <Filter>Source Files\Sender</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

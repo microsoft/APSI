@@ -1,25 +1,16 @@
 // STD
-#include <fstream>
-#include <algorithm>
 #include <memory>
 #include <thread>
-#include <unordered_map>
-#include <unordered_set>
-#include <iomanip>
 
 // APSI
 #include "apsi/sender/senderdb.h"
 #include "apsi/apsidefines.h"
-#include "apsi/tools/interpolate.h"
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/tools/prng.h"
-#include "apsi/tools/utils.h"
 #include "apsi/tools/fourq.h"
 
 // SEAL
 #include "seal/evaluator.h"
-#include "seal/batchencoder.h"
-#include "seal/util/uintcore.h"
 
 // crypto++
 #include "cryptopp/sha3.h"
@@ -108,19 +99,6 @@ void SenderDB::set_data(gsl::span<const Item> data, MatrixView<u8> vals, int thr
     STOPWATCH(sender_stop_watch, "SenderDB::set_data");
     clear_db();
     add_data(data, vals, thread_count);
-}
-
-std::string hexStr(u8* data, u64 size)
-{
-    std::stringstream ss;
-
-    ss << '{';
-    for (u64 i = 0; i < size; ++i)
-    {
-        ss << ' ' << std::setw(2) << std::hex << std::setfill('0') << int(data[i]);
-    }
-    ss << '}';
-    return ss.str();
 }
 
 void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int thread_count)
@@ -287,7 +265,7 @@ std::pair<DBBlock*, DBBlock::Position>
     for (int i = 0; i < db_blocks_.stride(); ++i)
     {
         auto pos = db_blocks_(batch_idx, s_idx).try_aquire_position(batch_offset, prng);
-        if (pos)
+        if (pos.is_initialized())
         {
             return { &db_blocks_(batch_idx, s_idx) , pos };
         }
@@ -299,157 +277,9 @@ std::pair<DBBlock*, DBBlock::Position>
     throw runtime_error("simple hashing failed due to bin overflow");
 }
 
-DBBlock::Position DBBlock::try_aquire_position(int bin_idx, PRNG& prng)
-{
-    if (bin_idx >= items_per_batch_)
-    {
-        throw runtime_error("bin_idx should be smaller than items_per_batch");
-    }
-
-    int idx = 0;
-    auto start = bin_idx * items_per_split_;
-    auto end = (bin_idx + 1) * items_per_split_;
-
-    // For 100 tries, guess a bin location can try to insert item there
-    for (int i = 0; i < 100; i++)
-    {
-        idx = prng.get<apsi::u32>() % items_per_split_;
-
-        bool exp = false;
-        if (has_item_[start + idx].compare_exchange_strong(exp, true))
-        {
-            return { bin_idx, idx };
-        }
-    }
-
-    // If still failed, try to do linear scan
-    for (int i = 0; i < items_per_split_; ++i)
-    {
-        bool exp = false;
-        if (has_item_[start + idx].compare_exchange_strong(exp, true))
-        {
-            // Great, found an empty location and have marked it as mine
-            return { bin_idx, idx };
-        }
-
-        idx = (idx + 1) % items_per_split_;
-    }
-
-    return {};
-}
-
-
-void DBBlock::check(const Position & pos)
-{
-    if (!pos ||
-        pos.batch_offset >= items_per_batch_ ||
-        pos.split_offset >= items_per_split_)
-    {
-        std::cout
-            << !pos << "\n"
-            << pos.batch_offset << " >= " << items_per_batch_ << "\n"
-            << pos.split_offset << " >= " << items_per_split_ << std::endl;
-        throw std::runtime_error("bad index");
-    }
-}
-
 void SenderDB::add_data(const Item &item, int thread_count)
 {
     add_data(vector<Item>(1, item), thread_count);
-}
-
-void DBBlock::symmetric_polys(
-    SenderThreadContext &th_context,
-    MatrixView<_ffield_array_elt_t> symm_block,
-    int encoding_bit_length,
-    const FFieldArray &neg_null_element)
-{
-    int split_size = items_per_split_;
-    int split_size_plus_one = split_size + 1;
-    int batch_size = items_per_batch_;
-    auto num_rows = batch_size;
-    auto &field_vec = th_context.exfield();
-
-    Position pos;
-    for (pos.batch_offset = 0; pos.batch_offset < num_rows; pos.batch_offset++)
-    {
-        FFieldElt temp11(field_vec[pos.batch_offset]);
-        FFieldElt temp2(field_vec[pos.batch_offset]);
-        FFieldElt *temp1;
-        FFieldElt curr_neg_null_element(neg_null_element.get(pos.batch_offset));
-        auto &ctx = field_vec[pos.batch_offset]->ctx();
-        fq_nmod_one(&symm_block(pos.batch_offset, split_size), field_vec[pos.batch_offset]->ctx());
-
-        for (pos.split_offset = split_size - 1; pos.split_offset >= 0; pos.split_offset--)
-        {
-            if (!has_item(pos))
-            {
-                temp1 = &curr_neg_null_element;
-            }
-            else
-            {
-                get_key(pos).to_exfield_element(temp11, encoding_bit_length);
-
-                temp1 = &temp11;
-                temp1->neg();
-            }
-
-            auto symm_block_ptr = &symm_block(pos.batch_offset, pos.split_offset + 1);
-
-            fq_nmod_mul(
-                symm_block_ptr - 1,
-                symm_block_ptr,
-                temp1->data(), ctx);
-
-            for (int k = pos.split_offset + 1; k < split_size; k++, symm_block_ptr++)
-            {
-                fq_nmod_mul(temp2.data(), temp1->data(), symm_block_ptr + 1, ctx);
-                fq_nmod_add(
-                    symm_block_ptr,
-                    symm_block_ptr,
-                    temp2.data(), ctx);
-            }
-        }
-    }
-}
-
-void DBBlock::randomized_symmetric_polys(
-    SenderThreadContext &th_context,
-    MatrixView<_ffield_array_elt_t> symm_block,
-    int encoding_bit_length,
-    FFieldArray &neg_null_element)
-{
-    int split_size_plus_one = items_per_split_ + 1;
-    int batch_size = items_per_batch_;
-    symmetric_polys(th_context, symm_block, encoding_bit_length, neg_null_element);
-
-    auto num_rows = items_per_batch_;
-    PRNG &prng = th_context.prng();
-
-    FFieldArray r(th_context.exfield());
-    r.set_random_nonzero(prng);
-
-    auto symm_block_ptr = symm_block.data();
-    for (int i = 0; i < num_rows; i++)
-    {
-        auto &field_ctx = th_context.exfield()[i]->ctx();
-        for (int j = 0; j < split_size_plus_one; j++, symm_block_ptr++)
-        {
-            fq_nmod_mul(symm_block_ptr, symm_block_ptr, r.data() + i, field_ctx);
-        }
-    }
-}
-
-void DBBlock::clear()
-{
-    auto ss = key_data_.size();
-    has_item_ = make_unique<atomic_bool[]>(ss);
-
-    // Make sure all entries are false
-    for (int i = 0; i < ss; i++)
-    {
-        has_item_[i] = false;
-    }
 }
 
 void SenderDB::batched_randomized_symmetric_polys(
@@ -463,18 +293,17 @@ void SenderDB::batched_randomized_symmetric_polys(
     auto symm_block = context.symm_block();
 
     int table_size = params_.table_size(),
-        split_size = params_.split_size(),
         batch_size = params_.batch_size(),
-        split_size_plus_one = split_size + 1;
+        split_size_plus_one = params_.split_size() + 1;
 
     FFieldArray batch_vector(context.exfield());
     vector<uint64_t> integer_batch_vector(batch_size);
 
     // Data in batch-split table is stored in "batch-major order"
     auto indexer = [splitStep = params_.batch_count() * split_size_plus_one,
-        batchStep = split_size_plus_one](int splitIdx, int batchIdx, int i)
+        batchStep = split_size_plus_one](int splitIdx, int batchIdx)
     {
-        return splitIdx * splitStep + batchIdx * batchStep + i;
+        return splitIdx * splitStep + batchIdx * batchStep;
     };
 
     MemoryPoolHandle local_pool = context.pool();
@@ -484,13 +313,12 @@ void SenderDB::batched_randomized_symmetric_polys(
         int split = next_block / params_.batch_count();
         int batch = next_block % params_.batch_count();
 
-        int split_start = split * split_size,
-            batch_start = batch * batch_size,
+        int batch_start = batch * batch_size,
             batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
 
         auto &block = db_blocks_.data()[next_block];
         block.randomized_symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
-        block.batch_random_symm_poly_ = { &batch_random_symm_poly_storage_[indexer(split, batch, 0)] , split_size_plus_one };
+        block.batch_random_symm_poly_ = { &batch_random_symm_poly_storage_[indexer(split, batch)] , split_size_plus_one };
 
         for (int i = 0; i < split_size_plus_one; i++)
         {
@@ -539,211 +367,4 @@ void SenderDB::batched_interpolate_polys(
         th_context.inc_interpolate_polys();
     }
 
-}
-
-
-DBInterpolationCache::DBInterpolationCache(
-    std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
-    int items_per_batch_,
-    int items_per_split_,
-    int value_byte_length_)
-{
-    coeff_temp.reserve(items_per_batch_);
-    x_temp.reserve(items_per_batch_);
-    y_temp.reserve(items_per_batch_);
-
-    for (u64 i = 0; i < items_per_batch_; ++i)
-    {
-        coeff_temp.emplace_back(ex_batch_encoder->field(i), items_per_split_);
-        x_temp.emplace_back(ex_batch_encoder->field(i), items_per_split_);
-        y_temp.emplace_back(ex_batch_encoder->field(i), items_per_split_);
-    }
-
-    temp_vec.resize((value_byte_length_ + sizeof(u64)) / sizeof(u64), 0);
-    key_set.reserve(items_per_split_);
-}
-
-
-void test_interp_poly(FFieldArray& x, FFieldArray& y,
-    FFieldArray& poly,
-    int size,
-    int bit_count)
-{
-    for (u64 i = 0; i < x.size(); ++i)
-    {
-        auto sum = poly.get(0);
-        auto xx = x.get(i);
-        for (u64 j = 1; j < poly.size(); ++j)
-        {
-            sum += xx * poly.get(j);
-            xx = xx * x.get(i);
-        }
-
-        if (sum != y.get(i))
-        {
-            throw std::runtime_error("bad interpolation");
-        }
-
-        if (i < size)
-        {
-            std::vector<u8> buff((bit_count + 7) / 8);
-            x.get(i).decode(gsl::span<u8>{buff}, bit_count);
-            std::cout << "x=" << hexStr(buff.data(), buff.size()) << " -> ";
-
-            sum.decode(gsl::span<u8>{buff}, bit_count);
-            std::cout << hexStr(buff.data(), buff.size()) << std::endl;
-        }
-    }
-}
-
-void DBBlock::batch_interpolate(
-    SenderThreadContext &th_context,
-    shared_ptr<SEALContext> seal_context,
-    shared_ptr<Evaluator> evaluator,
-    shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
-    DBInterpolationCache& cache,
-    const PSIParams& params)
-{
-    auto mod = seal_context->context_data()->parms().plain_modulus().value();
-    MemoryPoolHandle local_pool = th_context.pool();
-    Position pos;
-
-    for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
-    {
-        FFieldElt temp(ex_batch_encoder->field(pos.batch_offset));
-        FFieldArray& x = cache.x_temp[pos.batch_offset];
-        FFieldArray& y = cache.y_temp[pos.batch_offset];
-
-        int size = 0;
-        for (pos.split_offset = 0; pos.split_offset < items_per_split_; ++pos.split_offset)
-        {
-            if (has_item(pos))
-            {
-                auto& key_item = get_key(pos);
-                temp.encode(gsl::span<u64>{key_item.get_value()}, params.get_label_bit_count());
-                x.set(size, temp);
-
-                auto src = get_label(pos);
-                temp.encode(gsl::span<u8>{src, value_byte_length_}, params.get_label_bit_count());
-                y.set(size, temp);
-
-                ++size;
-            }
-        }
-
-        // pad the points to have max degree (split_size)
-        // with (x,x) points where x is unique.
-        cache.key_set.clear();
-
-        for (int i = 0; i < size; ++i)
-        {
-            auto r = cache.key_set.emplace(x.get_coeff_of(i, 0));
-        }
-
-        cache.temp_vec[0] = 0;
-        while (size != items_per_split_)
-        {
-            if (cache.temp_vec[0] >= mod)
-            {
-                std::cout << cache.temp_vec[0] << " >= " << mod;
-                throw std::runtime_error("");
-            }
-
-            if (cache.key_set.find(cache.temp_vec[0]) == cache.key_set.end())
-            {
-                temp.encode(gsl::span<u64>{cache.temp_vec}, params.get_label_bit_count());
-
-                x.set(size, temp);
-                y.set(size, temp);
-                ++size;
-            }
-
-            ++cache.temp_vec[0];
-        }
-
-
-        ffield_newton_interpolate_poly(
-            x, y,
-            // We don't use the cache for divided differences.
-            // cache.div_diff_temp[pos.batch_offset],
-            cache.coeff_temp[pos.batch_offset]);
-    }
-
-    batched_label_coeffs_.resize(items_per_split_);
-
-    // We assume there are all the same
-    unsigned degree = th_context.exfield()[0]->d();
-    FFieldArray temp_array(ex_batch_encoder->create_array());
-    for (int s = 0; s < items_per_split_; s++)
-    {
-        Plaintext &batched_coeff = batched_label_coeffs_[s];
-
-        // transpose the coeffs into temp_array
-        for (int b = 0; b < items_per_batch_; b++)
-        {
-            for (unsigned c = 0; c < degree; ++c)
-                temp_array.set_coeff_of(b, c, cache.coeff_temp[b].get_coeff_of(s, c));
-        }
-
-
-        auto capacity = static_cast<Plaintext::size_type>(params.encryption_params().coeff_modulus().size() *
-            params.encryption_params().poly_modulus_degree());
-        batched_coeff.reserve(capacity);
-
-        ex_batch_encoder->compose(temp_array, batched_coeff);
-        evaluator->transform_to_ntt_inplace(batched_coeff, seal_context->first_parms_id());
-    }
-}
-
-std::vector<u64> add_(gsl::span<u64> x, gsl::span<u64> y, const seal::SmallModulus& mod)
-{
-    std::vector<u64> r(x.size());
-    for (int i = 0; i < r.size(); ++i)
-    {
-        r[i] = x[i] + y[i] % mod.value();
-    }
-
-    return r;
-}
-
-u64 pow_(u64 x, u64 p, const seal::SmallModulus& mod)
-{
-    u64 r = 1;
-    while (p--)
-    {
-        r = (r * x) % mod.value();
-    }
-    return x;
-}
-
-std::vector<apsi::u64> debug_eval_term(
-    int term,
-    MatrixView<u64> coeffs,
-    gsl::span<u64> x,
-    const seal::SmallModulus& mod)
-{
-    if (x.size() != coeffs.rows())
-        throw std::runtime_error("Size of x should be the same as coeffs.rows");
-
-    std::vector<u64> r(x.size());
-
-    for (int i = 0; i < x.size(); ++i)
-    {
-        auto xx = pow_(x[i], term, mod);
-
-        r[i] = (xx * coeffs(term, i)) % mod.value();
-    }
-
-
-    return r;
-}
-
-void print_poly(int b, MatrixView<u64> polys)
-{
-    std::cout << "P" << b << "(x) = ";
-    for (u64 i = polys.stride(); i != -1; --i)
-    {
-        std::cout << polys(b, i) << " * x^" << i << " " << (i ? " + " : "");
-    }
-    std::cout << std::endl;
 }
