@@ -420,7 +420,6 @@ void DBBlock::randomized_symmetric_polys(
     FFieldArray &neg_null_element)
 {
     int split_size_plus_one = items_per_split_ + 1;
-    int batch_size = items_per_batch_;
     symmetric_polys(th_context, symm_block, encoding_bit_length, neg_null_element);
 
     auto num_rows = items_per_batch_;
@@ -463,18 +462,17 @@ void SenderDB::batched_randomized_symmetric_polys(
     auto symm_block = context.symm_block();
 
     int table_size = params_.table_size(),
-        split_size = params_.split_size(),
         batch_size = params_.batch_size(),
-        split_size_plus_one = split_size + 1;
+        split_size_plus_one = params_.split_size() + 1;
 
     FFieldArray batch_vector(context.exfield());
     vector<uint64_t> integer_batch_vector(batch_size);
 
     // Data in batch-split table is stored in "batch-major order"
     auto indexer = [splitStep = params_.batch_count() * split_size_plus_one,
-        batchStep = split_size_plus_one](int splitIdx, int batchIdx, int i)
+        batchStep = split_size_plus_one](int splitIdx, int batchIdx)
     {
-        return splitIdx * splitStep + batchIdx * batchStep + i;
+        return splitIdx * splitStep + batchIdx * batchStep;
     };
 
     MemoryPoolHandle local_pool = context.pool();
@@ -484,13 +482,12 @@ void SenderDB::batched_randomized_symmetric_polys(
         int split = next_block / params_.batch_count();
         int batch = next_block % params_.batch_count();
 
-        int split_start = split * split_size,
-            batch_start = batch * batch_size,
+        int batch_start = batch * batch_size,
             batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
 
         auto &block = db_blocks_.data()[next_block];
         block.randomized_symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
-        block.batch_random_symm_poly_ = { &batch_random_symm_poly_storage_[indexer(split, batch, 0)] , split_size_plus_one };
+        block.batch_random_symm_poly_ = { &batch_random_symm_poly_storage_[indexer(split, batch)] , split_size_plus_one };
 
         for (int i = 0; i < split_size_plus_one; i++)
         {
