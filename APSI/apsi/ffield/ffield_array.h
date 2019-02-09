@@ -123,7 +123,7 @@ namespace apsi
             fq_nmod_set(array_ + dest_index, in.array_ + src_index, fields_[dest_index]->ctx_);
         }
 
-        inline void set(std::size_t index, const seal::BigPoly &in)
+        inline void set(std::size_t index, const BigPoly &in)
         {
 #ifndef NDEBUG
             if(index > size_)
@@ -140,7 +140,7 @@ namespace apsi
 
         inline void set(std::size_t index, std::string in)
         {
-            set(index, seal::BigPoly(in));
+            set(index, BigPoly(in));
         }
 
         inline _ffield_elt_coeff_t get_coeff_of(std::size_t array_index, std::size_t elt_index) const

@@ -153,6 +153,21 @@
     <ClInclude Include="apsi\sender\dbblock.h">
       <Filter>Header Files\Sender</Filter>
     </ClInclude>
+    <ClInclude Include="apsi\tools\bigpoly.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\polymodulus.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\bigpolyarray.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\polyfftmultsmallmod.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\nussbaumer.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp">
@@ -226,6 +241,21 @@
     </ClCompile>
     <ClCompile Include="apsi\sender\dbblock.cpp">
       <Filter>Source Files\Sender</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\tools\bigpoly.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\tools\polymodulus.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\tools\bigpolyarray.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\tools\polyfftmultsmallmod.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\tools\nussbaumer.cpp">
+      <Filter>Source Files\Tools</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

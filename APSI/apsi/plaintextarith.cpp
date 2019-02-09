@@ -1,7 +1,12 @@
+// APSI
 #include "apsi/plaintextarith.h"
+#include "apsi/tools/bigpoly.h"
+#include "apsi/tools/polymodulus.h"
+#include "apsi/tools/polyfftmultsmallmod.h"
+
+// SEAL
 #include "seal/util/mempool.h"
 #include "seal/util/polycore.h"
-#include "seal/util/polyfftmultsmallmod.h"
 #include "seal/util/polyarithsmallmod.h"
 
 using namespace seal;
@@ -33,7 +38,7 @@ namespace apsi
     }
 
     void multiply(const seal::Plaintext &plaintext1, const seal::Plaintext &plaintext2,
-        const seal::util::PolyModulus &poly_mod, const seal::SmallModulus &coeff_mod, seal::Plaintext &result, MemoryPoolHandle pool)
+        const PolyModulus &poly_mod, const seal::SmallModulus &coeff_mod, seal::Plaintext &result, MemoryPoolHandle pool)
     {
         size_t coeff_count = poly_mod.coeff_count();
         int coeff_bit_count = coeff_mod.bit_count();
@@ -51,7 +56,7 @@ namespace apsi
     }
 
     void add(const seal::Plaintext &plaintext1, const seal::Plaintext &plaintext2,
-        const seal::util::PolyModulus &poly_mod, const seal::SmallModulus &coeff_mod, seal::Plaintext &result, seal::MemoryPoolHandle pool)
+        const PolyModulus &poly_mod, const seal::SmallModulus &coeff_mod, seal::Plaintext &result, seal::MemoryPoolHandle pool)
     {
         // Verify parameters.
         size_t coeff_count = poly_mod.coeff_count();
@@ -70,7 +75,7 @@ namespace apsi
     }
 
     void sub(const seal::Plaintext &plaintext1, const seal::Plaintext &plaintext2,
-        const seal::util::PolyModulus &poly_mod, const seal::SmallModulus &coeff_mod, seal::Plaintext &result, seal::MemoryPoolHandle pool)
+        const PolyModulus &poly_mod, const seal::SmallModulus &coeff_mod, seal::Plaintext &result, seal::MemoryPoolHandle pool)
     {
         // Verify parameters.
         size_t coeff_count = poly_mod.coeff_count();

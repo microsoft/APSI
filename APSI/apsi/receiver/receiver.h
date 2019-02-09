@@ -12,6 +12,7 @@
 #include "apsi/tools/sealcompress.h"
 #include "apsi/tools/matrix.h"
 #include "apsi/network/channel.h"
+#include "apsi/tools/bigpolyarray.h"
 
 // Cuckoo
 #include "cuckoo/cuckoo.h"
@@ -19,7 +20,6 @@
 // SEAL
 #include "seal/context.h"
 #include "seal/biguint.h"
-#include "seal/bigpolyarray.h"
 #include "seal/encryptor.h"
 #include "seal/decryptor.h"
 #include "seal/publickey.h"

@@ -16,11 +16,9 @@
 #include "fq_nmod_poly.h"
 #pragma warning(pop)
 
-// SEAL
-#include "seal/bigpoly.h"
-
 // APSI
 #include "apsi/tools/matrixview.h"
+#include "apsi/tools/bigpoly.h"
 
 
 // Require mp_limb_t equal to std::uint64
@@ -48,7 +46,7 @@ namespace apsi
     // Symbol to use in internal representation of field elements
     const char field_elt_var[]{ 'Y' };
 
-    inline void nmod_poly_to_bigpoly(const nmod_poly_t in, seal::BigPoly &out)
+    inline void nmod_poly_to_bigpoly(const nmod_poly_t in, BigPoly &out)
     {
         out.set_zero();
         auto coeff_count = in->length;
@@ -61,7 +59,7 @@ namespace apsi
         }
     }
 
-    inline void bigpoly_to_nmod_poly(const seal::BigPoly &in, nmod_poly_t out)
+    inline void bigpoly_to_nmod_poly(const BigPoly &in, nmod_poly_t out)
     {
         nmod_poly_zero(out);
         size_t coeff_count = in.coeff_count();
@@ -147,7 +145,7 @@ namespace apsi
             return std::shared_ptr<FField>{ new FField(ch, field_poly) };
         }
 
-        static std::shared_ptr<FField> Acquire(std::uint64_t ch, const seal::BigPoly &field_poly)
+        static std::shared_ptr<FField> Acquire(std::uint64_t ch, const BigPoly &field_poly)
         {
             return std::shared_ptr<FField>{ new FField(ch, field_poly) };
         }
@@ -162,9 +160,9 @@ namespace apsi
             return ch_;
         }
 
-        inline seal::BigPoly field_poly() const
+        inline BigPoly field_poly() const
         {
-            seal::BigPoly result;
+            BigPoly result;
 
             // Set the bigpoly
             nmod_poly_to_bigpoly(ctx_->modulus, result);
@@ -210,7 +208,7 @@ namespace apsi
     private:
         explicit FField(std::uint64_t ch, unsigned d); 
         explicit FField(std::uint64_t ch, const _ffield_modulus_t modulus); 
-        FField(std::uint64_t ch, seal::BigPoly modulus); 
+        FField(std::uint64_t ch, BigPoly modulus); 
         FField(std::uint64_t ch, std::string modulus);
         
         void populate_frob_table();

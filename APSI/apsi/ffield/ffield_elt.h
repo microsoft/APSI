@@ -44,7 +44,7 @@ namespace apsi
             fq_nmod_init2(elt_, field_->ctx_);
         }
 
-        FFieldElt(std::shared_ptr<FField> field, const seal::BigPoly &in) :
+        FFieldElt(std::shared_ptr<FField> field, const BigPoly &in) :
             field_(std::move(field))
         {
             // Allocate enough space to be an element of the field
@@ -129,7 +129,7 @@ namespace apsi
             return field_;
         }
 
-        inline void set(const seal::BigPoly &in)
+        inline void set(const BigPoly &in)
         {
             if (static_cast<unsigned>(in.coeff_count()) > field_->d_)
             {
@@ -140,19 +140,19 @@ namespace apsi
 
         inline void set(std::string in)
         {
-            set(seal::BigPoly(in));
+            set(BigPoly(in));
         }
 
-        inline seal::BigPoly to_bigpoly() const
+        inline BigPoly to_bigpoly() const
         {
-            seal::BigPoly result;
+            BigPoly result;
             nmod_poly_to_bigpoly(elt_, result);
             return result;
         }
 
         inline std::string to_string() const
         {
-            seal::BigPoly result;
+            BigPoly result;
             nmod_poly_to_bigpoly(elt_, result);
             return result.to_string();
         }
@@ -365,7 +365,7 @@ namespace apsi
             set(in);
         }
 
-        inline void operator =(const seal::BigPoly &in)
+        inline void operator =(const BigPoly &in)
         {
             set(in);
         }
