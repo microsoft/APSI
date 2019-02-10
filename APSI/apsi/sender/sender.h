@@ -119,6 +119,14 @@ namespace apsi
             */
             const apsi::PSIParams& get_params() const { return params_; }
 
+            /**
+            Return the SEALContext
+            */
+            std::shared_ptr<seal::SEALContext> get_seal_context()
+            {
+                return seal_context_;
+            }
+
         private:
             void initialize();
 

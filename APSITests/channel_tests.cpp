@@ -7,6 +7,7 @@
 #include "apsi/network/senderchannel.h"
 #include "seal/publickey.h"
 #include "seal/defaultparams.h"
+#include "seal/keygenerator.h"
 
 
 using namespace APSITests;
@@ -104,8 +105,15 @@ void ChannelTests::DataCountsTest()
         // This should be 1000 bytes + SenderOperationType size
         clt.send_preprocess(data1);
 
-        PublicKey pubkey;
-        RelinKeys relinkeys;
+        EncryptionParameters enc_params(scheme_type::BFV);
+        enc_params.set_plain_modulus(64ul);
+        enc_params.set_poly_modulus_degree(1024);
+        enc_params.set_coeff_modulus(coeff_modulus_128(1024));
+        shared_ptr<SEALContext> context = SEALContext::Create(enc_params);
+        KeyGenerator key_gen(context);
+
+        PublicKey pubkey = key_gen.public_key();
+        RelinKeys relinkeys = key_gen.relin_keys(10);
         map<u64, vector<Ciphertext>> querydata;
         vector<Ciphertext> vec1;
         vector<Ciphertext> vec2;
@@ -162,7 +170,7 @@ void ChannelTests::DataCountsTest()
     expected_total += sizeof(SenderOperationType);
     expected_total += sizeof(size_t) * 3;
     expected_total += sizeof(u64) * 2;
-    expected_total += (73 + 44); // pubkey + relinkeys
+    expected_total += 65734; // pubkey + relinkeys
     expected_total += 73 * 2; // Ciphertexts
     CPPUNIT_ASSERT_EQUAL(expected_total, svr.get_total_data_received());
 
@@ -263,8 +271,16 @@ void ChannelTests::SendQueryTest()
 {
     thread clientth([this]
     {
-        PublicKey pub_key;
-        RelinKeys relin_keys;
+        EncryptionParameters enc_params(scheme_type::BFV);
+        enc_params.set_plain_modulus(64ul);
+        enc_params.set_poly_modulus_degree(1024);
+        enc_params.set_coeff_modulus(coeff_modulus_128(1024));
+        shared_ptr<SEALContext> context = SEALContext::Create(enc_params);
+        KeyGenerator key_gen(context);
+
+        PublicKey pub_key = key_gen.public_key();
+        RelinKeys relin_keys = key_gen.relin_keys(10);
+
         map<u64, vector<Ciphertext>> query;
 
         vector<Ciphertext> vec;
@@ -423,8 +439,16 @@ void ChannelTests::SendQueryResponseTest()
         server_.send(sender_op->client_id, result[3]);
     });
 
-    PublicKey pubkey;
-    RelinKeys relinkeys;
+    EncryptionParameters enc_params(scheme_type::BFV);
+    enc_params.set_plain_modulus(64ul);
+    enc_params.set_poly_modulus_degree(1024);
+    enc_params.set_coeff_modulus(coeff_modulus_128(1024));
+    shared_ptr<SEALContext> context = SEALContext::Create(enc_params);
+    KeyGenerator key_gen(context);
+
+    PublicKey pubkey = key_gen.public_key();
+    RelinKeys relinkeys = key_gen.relin_keys(10);
+
     map<u64, vector<Ciphertext>> querydata;
 
     // Send empty info, it is ignored

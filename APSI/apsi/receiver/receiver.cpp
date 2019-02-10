@@ -497,10 +497,10 @@ void Receiver::stream_decrypt_worker(
         if (first && thread_idx == 0)
         {
             first = false;
-            Log::debug("Noise budget: %i bits", decryptor_->invariant_noise_budget(tmp, local_pool));
+            Log::debug("Noise budget: %i bits", decryptor_->invariant_noise_budget(tmp));
         }
 
-        decryptor_->decrypt(tmp, p, local_pool);
+        decryptor_->decrypt(tmp, p);
         ex_batch_encoder_->decompose(p, *batch);
 
         for (int k = 0; k < integer_batch.size(); k++)
@@ -523,7 +523,7 @@ void Receiver::stream_decrypt_worker(
 
             compressor_->compressed_load(ss, tmp);
 
-            decryptor_->decrypt(tmp, p, local_pool);
+            decryptor_->decrypt(tmp, p);
 
             // make sure its the right size. decrypt will shorted when there are zero coeffs at the top.
             p.resize(static_cast<i32>(ex_batch_encoder_->n()));

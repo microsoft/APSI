@@ -255,7 +255,7 @@ void Sender::query(
 
         for (u64 i = 0; i < powers.size(); i++)
         {
-            get_ciphertext(powers[i][power], pair.second[i]);
+            get_ciphertext(seal_context_, powers[i][power], pair.second[i]);
         }
     }
 
@@ -278,7 +278,7 @@ void Sender::respond(
     int	splitStep = batch_count * split_size_plus_one;
     int total_blocks = params_.split_count() * batch_count;
 
-    session_context.encryptor()->encrypt(BigPoly(string("1")), powers[0][0]);
+    session_context.encryptor()->encrypt(Plaintext("1"), powers[0][0]);
     for (u64 i = 1; i < powers.size(); ++i)
     {
         powers[i][0] = powers[0][0];

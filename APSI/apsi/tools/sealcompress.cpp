@@ -125,7 +125,7 @@ void CiphertextCompressor::compressed_load(std::istream &stream,
     int coeff_mod_bit_count = parms.coeff_modulus()[0].bit_count();
     if(compr_coeff_bit_count >= coeff_mod_bit_count)
     {
-        destination.load(stream);
+        destination.load(seal_context_, stream);
         return;
     }
 

@@ -38,22 +38,22 @@ namespace apsi
         str = ss.str();
     }
 
-    void get_public_key(seal::PublicKey& pub_key, const std::string& str)
+    void get_public_key(std::shared_ptr<seal::SEALContext> context, seal::PublicKey& pub_key, const std::string& str)
     {
         stringstream ss(str);
-        pub_key.load(ss);
+        pub_key.load(context, ss);
     }
 
-    void get_relin_keys(seal::RelinKeys& relin_keys, const std::string& str)
+    void get_relin_keys(std::shared_ptr<seal::SEALContext> context, seal::RelinKeys& relin_keys, const std::string& str)
     {
         stringstream ss(str);
-        relin_keys.load(ss);
+        relin_keys.load(context, ss);
     }
 
-    void get_ciphertext(seal::Ciphertext& ciphertext, const std::string& str)
+    void get_ciphertext(std::shared_ptr<seal::SEALContext> context, seal::Ciphertext& ciphertext, const std::string& str)
     {
         stringstream ss(str);
-        ciphertext.load(ss);
+        ciphertext.load(context, ss);
     }
 
     void get_small_modulus(seal::SmallModulus& sm, const std::string& str)
