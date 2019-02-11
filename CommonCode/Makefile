@@ -2,7 +2,7 @@
 SRC_DIRS=
 BIN_DIR=../bin
 OBJ_DIR=obj
-INCLUDE_DIRS=. ../APSI ../../SEAL-dev/SEAL /usr/include/flint ../../Cuckoo/Cuckoo ../../FourQlib/FourQ_64bit_and_portable
+INCLUDE_DIRS=. ../APSI ../../SEAL/native/src /usr/include/flint ../../Cuckoo/Cuckoo ../../FourQlib/FourQ_64bit_and_portable
 SRCS=$(wildcard *.cpp) $(foreach d,$(SRC_DIRS),$(wildcard $d/*.cpp))
 OBJS=$(SRCS:%.cpp=$(OBJ_DIR)/%.o)
 DEPS=$(OBJS:.o=.d)

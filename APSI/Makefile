@@ -2,7 +2,7 @@
 SRC_DIRS=apsi apsi/network apsi/receiver apsi/sender apsi/tools apsi/ffield apsi/logging
 BIN_DIR=../bin
 OBJ_DIR=obj
-INCLUDE_DIRS=. ../../SEAL-dev/SEAL /usr/include/flint ../../Cuckoo/Cuckoo ../../FourQlib/FourQ_64bit_and_portable
+INCLUDE_DIRS=. ../../SEAL/native/src /usr/include/flint ../../Cuckoo/Cuckoo ../../FourQlib/FourQ_64bit_and_portable
 SRCS=$(wildcard *.cpp) $(foreach d,$(SRC_DIRS),$(wildcard $d/*.cpp))
 OBJS=$(SRCS:%.cpp=$(OBJ_DIR)/%.o)
 DEPS=$(OBJS:.o=.d)
@@ -12,7 +12,7 @@ CXX=g++
 CXXFLAGS=-O0 -g -DHAVE_CONFIG -DUSE_SECURE_SEED -march=native -std=c++17  -maes -msse2 -msse4.1 -mpclmul -DNDEBUG -D_AMD64_ -D_AVX2_ -D_ASM_ -D__LINUX__ -Wno-ignored-attributes
 PREFIX=/usr/local
 LDFLAGS=-lseal -lcuckoo -lpthread -lflint -lgmp -lFourQ
-LIBRARY_PATHS=../../SEAL-dev/bin /usr/lib ../../FourQlib/FourQ_64bit_and_portable
+LIBRARY_PATHS=../../SEAL/native/lib /usr/lib ../../FourQlib/FourQ_64bit_and_portable
 
 .PHONY : all clean install uninstall
 

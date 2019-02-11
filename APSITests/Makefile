@@ -2,7 +2,7 @@
 SRC_DIRS=
 BIN_DIR=../bin
 OBJ_DIR=obj
-INCLUDE_DIRS=. ../APSI ../../SEAL-dev/SEAL /usr/include/flint ../../Cuckoo/Cuckoo ../../FourQlib/FourQ_64bit_and_portable
+INCLUDE_DIRS=. ../APSI ../../SEAL/native/src /usr/include/flint ../../Cuckoo/Cuckoo ../../FourQlib/FourQ_64bit_and_portable
 SRCS=$(wildcard *.cpp) $(foreach d,$(SRC_DIRS),$(wildcard $d/*.cpp))
 OBJS=$(SRCS:%.cpp=$(OBJ_DIR)/%.o)
 DEPS=$(OBJS:.o=.d)
@@ -10,7 +10,7 @@ APSITESTEXE=unit_tests
 CXX=g++
 CXXFLAGS=-O0 -g -DHAVE_CONFIG -march=native -std=c++17  -maes -msse2 -msse4.1 -mpclmul -DNDEBUG -D_AMD64_ -D_AVX2_ -D_ASM_ -D__LINUX__ -Wno-ignored-attributes
 LDFLAGS=-lapsi -lseal -lflint -lpthread -lcppunit -lcryptopp -lzmqpp -lzmq -llog4cplus -lstdc++fs -lFourQ
-LIBRARY_PATHS=-L../bin -L../../SEAL-dev/lib -L../../FourQlib/FourQ_64bit_and_portable
+LIBRARY_PATHS=-L../bin -L../../SEAL/native/lib -L../../FourQlib/FourQ_64bit_and_portable
 
 .PHONY : all clean
 
