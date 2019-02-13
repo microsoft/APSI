@@ -28,8 +28,19 @@ message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 # Import Microsoft SEAL
 find_package(SEAL 3.2.0 EXACT REQUIRED)
 
-# Link Microsoft SEAL
-target_link_libraries(apsi SEAL::seal)
+# Import Cuckoo library
+find_package(Cuckoo 1.0 REQUIRED)
+
+# Import FLINT library
+find_library(FLINT flint)
+if (NOT FLINT)
+    message(FATAL_ERROR "Could not find FLINT library")
+else()
+    message(STATUS "Found FLINT: ${FLINT}")
+endif()
+
+# Link required libraries
+target_link_libraries(apsi SEAL::seal Cuckoo::cuckoo ${FLINT})
 
 # Add source files to library
 add_subdirectory(apsi)
