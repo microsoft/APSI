@@ -2,8 +2,11 @@
 obj/*
 */bin/*
 bin/*
+*/lib/*
 */.build/*
 *.o
+*.so
+*.a
 */~*
 *~
 *.out
