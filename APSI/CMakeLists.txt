@@ -34,7 +34,7 @@ find_package(Cuckoo 1.0 REQUIRED)
 # Import FLINT library
 find_path(FLINT_DIR NAMES flint/fmpz.h)
 find_library(FLINT flint)
-if (NOT FLINT)
+if (NOT FLINT OR NOT FLINT_DIR)
     message(FATAL_ERROR "Could not find FLINT library")
 else()
     message(STATUS "Flint directory: ${FLINT_DIR}")
@@ -44,11 +44,33 @@ endif()
 # FourQ
 find_path(FOURQ_DIR NAMES FourQ/FourQ.h)
 find_library(FOURQ FourQ)
-if (NOT FOURQ)
+if (NOT FOURQ OR NOT FOURQ_DIR)
     message(FATAL_ERROR "Could not find FourQ library")
 else()
     message(STATUS "FourQ directory: ${FOURQ_DIR}")
     message(STATUS "Found FourQ: ${FOURQ}")
+endif()
+
+# Log4cplus
+find_path(LOG4CPLUS_DIR log4cplus/logger.h)
+find_library(LOG4CPLUS log4cplus)
+if (NOT LOG4CPLUS_DIR OR NOT LOG4CPLUS)
+    message(FATAL_ERROR "Could not find log4cplus library")
+else()
+    message(STATUS "log4cplus directory: ${LOG4CPLUS_DIR}")
+    message(STATUS "Found log4cplus: ${LOG4CPLUS}")
+endif()
+
+# ZeroMQ
+find_path(ZMQ_DIR zmqpp/zmqpp.hpp)
+find_library(ZMQ zmq)
+find_library(ZMQPP zmqpp)
+if (NOT ZMQ OR NOT ZMQPP OR NOT ZMQ_DIR)
+    message(FATAL_ERROR "Could not find zmq or zmqpp libraries")
+else()
+    message(STATUS "zmqpp directory:  ${ZMQ_DIR}")
+    message(STATUS "Found zmq: ${ZMQ}")
+    message(STATUS "Found zmqpp: ${ZMQPP}")
 endif()
 
 # Set flags
@@ -71,9 +93,11 @@ add_definitions(-D__LINUX__)
 # Includes
 include_directories(${FLINT_DIR}/flint)
 include_directories(${FOURQ_DIR}/FourQ)
+include_directories(${LOG4CPLUS_DIR})
+#include_directories(${ZMQ_DIR})
 
 # Link required libraries
-target_link_libraries(apsi SEAL::seal Cuckoo::cuckoo ${FLINT} ${FOURQ})
+target_link_libraries(apsi SEAL::seal Cuckoo::cuckoo ${FLINT} ${FOURQ} ${ZMQ} ${ZMQPP})
 
 # Add source files to library
 add_subdirectory(apsi)
