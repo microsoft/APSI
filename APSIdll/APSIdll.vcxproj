@@ -24,6 +24,7 @@
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>APSIdll</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
+    <ProjectName>APSINative</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -92,7 +93,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;NDEBUG;APSIDLL_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;c:\Progs\Libs\SEAL\include;c:\Progs\Libs\mpir\include;c:\Progs\Libs\mpfr\include;c:\Progs\Libs\flint2\include;c:\Progs\Libs\GSL;c:\Progs\Libs\Cuckoo\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;$(APSILIBS)\SEAL\include;$(APSILIBS)\mpir\include;$(APSILIBS)\mpfr\include;$(APSILIBS)\flint2\include;$(APSILIBS)\GSL;$(APSILIBS)\Cuckoo\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
@@ -101,7 +102,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>SEAL.lib;Cuckoo.lib;APSI.lib;FourQ.lib;dll_flint.lib;cryptlib.lib;mpfr.lib;mpir.lib;zmqpp.lib;libzmq.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\;$(ProjectDir)..\$(Platform)\$(Configuration)\;c:\Progs\Libs\SEAL\lib\$(IntDir);c:\Progs\Libs\mpfr\lib\$(IntDir);c:\Progs\Libs\mpir\lib\$(IntDir);c:\Progs\Libs\FourQlib\lib\$(IntDir);c:\Progs\Libs\boost-1.65.1\lib;c:\Progs\Libs\flint2\lib\$(IntDir);c:\Progs\Libs\Cuckoo\lib\$(IntDir);c:\Progs\Libs\cryptopp700\lib\$(IntDir);c:\Progs\Libs\libzmqpp\lib\$(IntDir);c:\Progs\Libs\libzmq\dll\$(IntDir);</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\;$(ProjectDir)..\$(Platform)\$(Configuration)\;$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\mpfr\lib\$(IntDir);$(APSILIBS)\mpir\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\boost-1.65.1\lib;$(APSILIBS)\flint2\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\cryptopp700\lib\$(IntDir);$(APSILIBS)\libzmqpp\lib\$(IntDir);$(APSILIBS)\libzmq\dll\$(IntDir)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -126,14 +127,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NOMINMAX;_DEBUG;APSIDLL_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;c:\Progs\Libs\SEAL\include;c:\Progs\Libs\mpir\include;c:\Progs\Libs\mpfr\include;c:\Progs\Libs\flint2\include;c:\Progs\Libs\GSL;c:\Progs\Libs\Cuckoo\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;$(APSILIBS)\SEAL\include;$(APSILIBS)\mpir\include;$(APSILIBS)\mpfr\include;$(APSILIBS)\flint2\include;$(APSILIBS)\GSL;$(APSILIBS)\Cuckoo\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>SEAL.lib;Cuckoo.lib;APSI.lib;FourQ.lib;dll_flint.lib;cryptlib.lib;mpfr.lib;mpir.lib;zmqpp.lib;libzmq.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\;$(ProjectDir)..\$(Platform)\$(Configuration)\;c:\Progs\Libs\SEAL\lib\$(IntDir);c:\Progs\Libs\mpfr\lib\$(IntDir);c:\Progs\Libs\mpir\lib\$(IntDir);c:\Progs\Libs\FourQlib\lib\$(IntDir);c:\Progs\Libs\boost-1.65.1\lib;c:\Progs\Libs\flint2\lib\$(IntDir);c:\Progs\Libs\Cuckoo\lib\$(IntDir);c:\Progs\Libs\cryptopp700\lib\$(IntDir);c:\Progs\Libs\libzmqpp\lib\$(IntDir);c:\Progs\Libs\libzmq\dll\$(IntDir);</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\;$(ProjectDir)..\$(Platform)\$(Configuration)\;$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\mpfr\lib\$(IntDir);$(APSILIBS)\mpir\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\boost-1.65.1\lib;$(APSILIBS)\flint2\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\cryptopp700\lib\$(IntDir);$(APSILIBS)\libzmqpp\lib\$(IntDir);$(APSILIBS)\libzmq\dll\$(IntDir)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -155,12 +156,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="apsidll.h" />
+    <ClInclude Include="apsinative.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="APSIdll.cpp" />
+    <ClCompile Include="apsinative.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>

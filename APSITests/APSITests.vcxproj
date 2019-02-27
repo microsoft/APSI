@@ -58,14 +58,14 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;c:\progs\libs\cppunit\include;c:\progs\libs\SEAL\include;c:\progs\libs\Cuckoo\include;c:\progs\Libs\FourQlib\include;c:\progs\libs\GSL;c:\progs\libs\flint2\include;c:\progs\libs\cryptoTools\include;c:\progs\libs\boost-1.65.1\include;c:\progs\libs\mpir\include;c:\progs\libs\mpfr\include;c:\Progs\Libs\cryptopp700\include;c:\Progs\Libs\libzmqpp\include;c:\Progs\Libs\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;$(APSILIBS)\cppunit\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\Cuckoo\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\flint2\include;$(APSILIBS)\cryptoTools\include;$(APSILIBS)\boost-1.65.1\include;$(APSILIBS)\mpir\include;$(APSILIBS)\mpfr\include;$(APSILIBS)\cryptopp700\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>__WINDOWS__;_AVX2_;_AMD64_;_DEBUG;%(PreprocessorDefinitions);_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK</PreprocessorDefinitions>
       <UseFullPaths>true</UseFullPaths>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(IntDir);c:\progs\libs\SEAL\lib\$(IntDir);c:\progs\libs\Cuckoo\lib\$(IntDir);c:\progs\libs\cppunit\lib;c:\progs\Libs\flint2\lib\$(IntDir);c:\progs\libs\mpir\lib\$(IntDir);c:\progs\libs\mpfr\lib\$(IntDir);c:\Progs\Libs\cryptopp700\lib\$(IntDir);c:\Progs\Libs\libzmqpp\lib\$(IntDir);c:\Progs\Libs\libzmq\dll\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(IntDir);$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\cppunit\lib;$(APSILIBS)\flint2\lib\$(IntDir);$(APSILIBS)\mpir\lib\$(IntDir);$(APSILIBS)\mpfr\lib\$(IntDir);$(APSILIBS)\cryptopp700\lib\$(IntDir);$(APSILIBS)\libzmqpp\lib\$(IntDir);$(APSILIBS)\libzmq\dll\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>APSI.lib;SEAL.lib;Cuckoo.lib;dll_flint.lib;mpir.lib;mpfr.lib;cryptlib.lib;zmqpp.lib;libzmq.lib;cppunitd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -76,7 +76,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;c:\progs\libs\cppunit\include;c:\progs\libs\SEAL\include;c:\progs\libs\Cuckoo\include;c:\progs\Libs\FourQlib\include;c:\progs\libs\GSL;c:\progs\libs\flint2\include;c:\progs\libs\cryptoTools\include;c:\progs\libs\boost-1.65.1\include;c:\progs\libs\mpir\include;c:\progs\libs\mpfr\include;c:\Progs\Libs\cryptopp700\include;c:\Progs\Libs\libzmqpp\include;c:\Progs\Libs\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;$(APSILIBS)\cppunit\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\Cuckoo\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\flint2\include;$(APSILIBS)\cryptoTools\include;$(APSILIBS)\boost-1.65.1\include;$(APSILIBS)\mpir\include;$(APSILIBS)\mpfr\include;$(APSILIBS)\cryptopp700\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>__WINDOWS__;_AVX2_;_AMD64_;NDEBUG;%(PreprocessorDefinitions);_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK</PreprocessorDefinitions>
       <UseFullPaths>true</UseFullPaths>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -85,7 +85,7 @@
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(IntDir);c:\progs\libs\SEAL\lib\$(IntDir);c:\progs\libs\Cuckoo\lib\$(IntDir);c:\progs\libs\cppunit\lib;c:\progs\Libs\flint2\lib\$(IntDir);c:\progs\libs\mpir\lib\$(IntDir);c:\progs\libs\mpfr\lib\$(IntDir);c:\Progs\Libs\cryptopp700\lib\$(IntDir);c:\Progs\Libs\libzmqpp\lib\$(IntDir);c:\Progs\Libs\libzmq\dll\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(IntDir);$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\cppunit\lib;$(APSILIBS)\flint2\lib\$(IntDir);$(APSILIBS)\mpir\lib\$(IntDir);$(APSILIBS)\mpfr\lib\$(IntDir);$(APSILIBS)\cryptopp700\lib\$(IntDir);$(APSILIBS)\libzmqpp\lib\$(IntDir);$(APSILIBS)\libzmq\dll\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>APSI.lib;SEAL.lib;Cuckoo.lib;dll_flint.lib;mpir.lib;mpfr.lib;cryptlib.lib;zmqpp.lib;libzmq.lib;cppunit.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>

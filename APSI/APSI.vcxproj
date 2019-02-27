@@ -89,7 +89,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);c:\progs\Libs\SEAL\include;c:\progs\Libs\Cuckoo\include;c:\progs\Libs\flint2\include;c:\progs\Libs\FourQlib\include;c:\progs\Libs\GSL;c:\progs\Libs\mpfr\include;c:\progs\Libs\mpir\include;c:\progs\Libs\pthreads4w-3.0.0\include;c:\progs\Libs\cryptopp700\include;c:\progs\Libs\libzmqpp\include;c:\progs\Libs\libzmq\include;c:\Progs\Libs\log4cplus\include;c:\Progs\Libs\boost-1.65.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(APSILIBS)\SEAL\include;$(APSILIBS)\Cuckoo\include;$(APSILIBS)\flint2\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\mpfr\include;$(APSILIBS)\mpir\include;$(APSILIBS)\pthreads4w-3.0.0\include;$(APSILIBS)\cryptopp700\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\log4cplus\include;$(APSILIBS)\boost-1.65.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;NOMINMAX;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ShowIncludes>false</ShowIncludes>
@@ -98,7 +98,7 @@
       <AdditionalDependencies>SEAL.lib;cuckoo.lib;FourQ.lib;log4cplusSD.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\x64\$(Configuration)\;c:\Progs\Libs\SEAL\lib\$(IntDir);c:\Progs\Libs\Cuckoo\lib\$(IntDir);c:\Progs\Libs\FourQlib\lib\$(IntDir);c:\Progs\Libs\cryptopp700\lib\$(IntDir);c:\Progs\Libs\log4cplus\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\x64\$(Configuration)\;$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\cryptopp700\lib\$(IntDir);$(APSILIBS)\log4cplus\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -121,7 +121,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);c:\progs\Libs\SEAL\include;c:\progs\Libs\Cuckoo\include;c:\progs\Libs\flint2\include;c:\progs\Libs\FourQlib\include;c:\progs\Libs\GSL;c:\progs\Libs\mpfr\include;c:\progs\Libs\mpir\include;c:\progs\Libs\pthreads4w-3.0.0\include;c:\progs\Libs\cryptopp700\include;c:\progs\Libs\libzmqpp\include;c:\progs\Libs\libzmq\include;c:\Progs\Libs\log4cplus\include;c:\Progs\Libs\boost-1.65.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(APSILIBS)\SEAL\include;$(APSILIBS)\Cuckoo\include;$(APSILIBS)\flint2\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\mpfr\include;$(APSILIBS)\mpir\include;$(APSILIBS)\pthreads4w-3.0.0\include;$(APSILIBS)\cryptopp700\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\log4cplus\include;$(APSILIBS)\boost-1.65.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;NOMINMAX;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ShowIncludes>false</ShowIncludes>
@@ -134,7 +134,7 @@
       <AdditionalDependencies>SEAL.lib;cuckoo.lib;FourQ.lib;log4cplusS.lib</AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\x64\$(Configuration)\;c:\Progs\Libs\SEAL\lib\$(IntDir);c:\Progs\Libs\Cuckoo\lib\$(IntDir);c:\Progs\Libs\FourQlib\lib\$(IntDir);c:\Progs\Libs\cryptopp700\lib\$(IntDir);c:\Progs\Libs\log4cplus\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\x64\$(Configuration)\;$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\cryptopp700\lib\$(IntDir);$(APSILIBS)\log4cplus\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>

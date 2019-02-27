@@ -82,12 +82,12 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\APSI;$(ProjectDir)..\CommonCode;c:\Progs\Libs\SEAL\include;c:\Progs\Libs\flint2\include;c:\Progs\Libs\GSL;c:\Progs\Libs\Cuckoo\include;c:\Progs\Libs\mpfr\include;c:\Progs\Libs\mpir\include;c:\Progs\Libs\boost-1.65.1\include;c:\Progs\Libs\cryptopp700\include;c:\Progs\Libs\tclap-1.2.2\include;c:\Progs\Libs\libzmqpp\include;c:\Progs\Libs\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\APSI;$(ProjectDir)..\CommonCode;$(APSILIBS)\SEAL\include;$(APSILIBS)\flint2\include;$(APSILIBS)\GSL;$(APSILIBS)\Cuckoo\include;$(APSILIBS)\mpfr\include;$(APSILIBS)\mpir\include;$(APSILIBS)\boost-1.65.1\include;$(APSILIBS)\cryptopp700\include;$(APSILIBS)\tclap-1.2.2\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>USE_SECURE_SEED;_DISABLE_EXTENDED_ALIGNED_STORAGE;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\;$(ProjectDir)..\$(Platform)\$(Configuration)\;c:\Progs\Libs\SEAL\lib\$(IntDir);c:\Progs\Libs\mpfr\lib\$(IntDir);c:\Progs\Libs\mpir\lib\$(IntDir);c:\Progs\Libs\FourQlib\lib\$(IntDir);c:\Progs\Libs\boost-1.65.1\lib;c:\Progs\Libs\flint2\lib\$(IntDir);c:\Progs\Libs\Cuckoo\lib\$(IntDir);c:\Progs\Libs\cryptopp700\lib\$(IntDir);c:\Progs\Libs\libzmqpp\lib\$(IntDir);c:\Progs\Libs\libzmq\dll\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\;$(ProjectDir)..\$(Platform)\$(Configuration)\;$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\mpfr\lib\$(IntDir);$(APSILIBS)\mpir\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\boost-1.65.1\lib;$(APSILIBS)\flint2\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\cryptopp700\lib\$(IntDir);$(APSILIBS)\libzmqpp\lib\$(IntDir);$(APSILIBS)\libzmq\dll\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>mpfr.lib;mpir.lib;dll_flint.lib;SEAL.lib;Cuckoo.lib;APSI.lib;FourQ.lib;cryptlib.lib;zmqpp.lib;libzmq.lib;CommonCode.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -111,14 +111,14 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\APSI;$(ProjectDir)..\CommonCode;c:\Progs\Libs\SEAL\include;c:\Progs\Libs\flint2\include;c:\Progs\Libs\GSL;c:\Progs\Libs\Cuckoo\include;c:\Progs\Libs\mpfr\include;c:\Progs\Libs\mpir\include;c:\Progs\Libs\boost-1.65.1\include;c:\Progs\Libs\cryptopp700\include;c:\Progs\Libs\tclap-1.2.2\include;c:\Progs\Libs\libzmqpp\include;c:\Progs\Libs\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\APSI;$(ProjectDir)..\CommonCode;$(APSILIBS)\SEAL\include;$(APSILIBS)\flint2\include;$(APSILIBS)\GSL;$(APSILIBS)\Cuckoo\include;$(APSILIBS)\mpfr\include;$(APSILIBS)\mpir\include;$(APSILIBS)\boost-1.65.1\include;$(APSILIBS)\cryptopp700\include;$(APSILIBS)\tclap-1.2.2\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PreprocessorDefinitions>USE_SECURE_SEED;_DISABLE_EXTENDED_ALIGNED_STORAGE;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\;$(ProjectDir)..\$(Platform)\$(Configuration)\;c:\Progs\Libs\SEAL\lib\$(IntDir);c:\Progs\Libs\mpfr\lib\$(IntDir);c:\Progs\Libs\mpir\lib\$(IntDir);c:\Progs\Libs\FourQlib\lib\$(IntDir);c:\Progs\Libs\boost-1.65.1\lib;c:\Progs\Libs\flint2\lib\$(IntDir);c:\Progs\Libs\Cuckoo\lib\$(IntDir);c:\Progs\Libs\cryptopp700\lib\$(IntDir);c:\Progs\Libs\libzmqpp\lib\$(IntDir);c:\Progs\Libs\libzmq\dll\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(Platform)\$(Configuration)\;$(ProjectDir)..\$(Platform)\$(Configuration)\;$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\mpfr\lib\$(IntDir);$(APSILIBS)\mpir\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\boost-1.65.1\lib;$(APSILIBS)\flint2\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\cryptopp700\lib\$(IntDir);$(APSILIBS)\libzmqpp\lib\$(IntDir);$(APSILIBS)\libzmq\dll\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>mpfr.lib;mpir.lib;dll_flint.lib;SEAL.lib;Cuckoo.lib;APSI.lib;FourQ.lib;cryptlib.lib;zmqpp.lib;libzmq.lib;CommonCode.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>

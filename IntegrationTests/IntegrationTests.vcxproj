@@ -94,13 +94,13 @@
       </PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderOutputFile />
-      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;c:\progs\Libs\cppunit\include;c:\progs\Libs\SEAL\include;c:\progs\Libs\libzmq\include;c:\progs\Libs\libzmqpp\include;c:\progs\Libs\flint2\include;c:\progs\Libs\mpir\include;c:\progs\libs\mpfr\include;c:\progs\Libs\GSL;c:\progs\Libs\Cuckoo\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;$(APSILIBS)\cppunit\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\flint2\include;$(APSILIBS)\mpir\include;$(APSILIBS)\mpfr\include;$(APSILIBS)\GSL;$(APSILIBS)\Cuckoo\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>APSI.lib;SEAL.lib;Cuckoo.lib;dll_flint.lib;mpir.lib;mpfr.lib;cryptlib.lib;zmqpp.lib;libzmq.lib;cppunitd.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(IntDir);c:\progs\libs\SEAL\lib\$(IntDir);c:\progs\libs\Cuckoo\lib\$(IntDir);c:\progs\libs\cppunit\lib;c:\progs\Libs\flint2\lib\$(IntDir);c:\progs\libs\mpir\lib\$(IntDir);c:\progs\libs\mpfr\lib\$(IntDir);c:\Progs\Libs\cryptopp700\lib\$(IntDir);c:\Progs\Libs\libzmqpp\lib\$(IntDir);c:\Progs\Libs\libzmq\dll\$(IntDir);</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(IntDir);$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\cppunit\lib;$(APSILIBS)\flint2\lib\$(IntDir);$(APSILIBS)\mpir\lib\$(IntDir);$(APSILIBS)\mpfr\lib\$(IntDir);$(APSILIBS)\cryptopp700\lib\$(IntDir);$(APSILIBS)\libzmqpp\lib\$(IntDir);$(APSILIBS)\libzmq\dll\$(IntDir)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -151,7 +151,7 @@
       </PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderOutputFile />
-      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;c:\progs\Libs\cppunit\include;c:\progs\Libs\SEAL\include;c:\progs\Libs\libzmq\include;c:\progs\Libs\libzmqpp\include;c:\progs\Libs\flint2\include;c:\progs\Libs\mpir\include;c:\progs\libs\mpfr\include;c:\progs\Libs\GSL;c:\progs\Libs\Cuckoo\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;$(APSILIBS)\cppunit\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\flint2\include;$(APSILIBS)\mpir\include;$(APSILIBS)\mpfr\include;$(APSILIBS)\GSL;$(APSILIBS)\Cuckoo\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -159,7 +159,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>APSI.lib;SEAL.lib;Cuckoo.lib;dll_flint.lib;mpir.lib;mpfr.lib;cryptlib.lib;zmqpp.lib;libzmq.lib;cppunit.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(IntDir);c:\progs\libs\SEAL\lib\$(IntDir);c:\progs\libs\Cuckoo\lib\$(IntDir);c:\progs\libs\cppunit\lib;c:\progs\Libs\flint2\lib\$(IntDir);c:\progs\libs\mpir\lib\$(IntDir);c:\progs\libs\mpfr\lib\$(IntDir);c:\Progs\Libs\cryptopp700\lib\$(IntDir);c:\Progs\Libs\libzmqpp\lib\$(IntDir);c:\Progs\Libs\libzmq\dll\$(IntDir);</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(IntDir);$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\cppunit\lib;$(APSILIBS)\flint2\lib\$(IntDir);$(APSILIBS)\mpir\lib\$(IntDir);$(APSILIBS)\mpfr\lib\$(IntDir);$(APSILIBS)\cryptopp700\lib\$(IntDir);$(APSILIBS)\libzmqpp\lib\$(IntDir);$(APSILIBS)\libzmq\dll\$(IntDir)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
