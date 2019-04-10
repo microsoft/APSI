@@ -25,6 +25,21 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
+# In Debug mode enable also APSI_DEBUG by default
+if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+    set(APSI_DEBUG_DEFAULT ON)
+else()
+    set(APSI_DEBUG_DEFAULT OFF)
+endif()
+
+# Required files and directories
+set(APSI_INCLUDES_INSTALL_DIR include)
+set(APSI_CONFIG_IN_FILENAME ${APSI_SOURCE_DIR}/cmake/APSIConfig.cmake.in)
+set(APSI_CONFIG_FILENAME ${APSI_SOURCE_DIR}/cmake/APSIConfig.cmake)
+set(APSI_TARGETS_FILENAME ${APSI_SOURCE_DIR}/cmake/APSITargets.cmake)
+set(APSI_CONFIG_VERSION_FILENAME ${APSI_SOURCE_DIR}/cmake/APSIConfigVersion.cmake)
+set(APSI_CONFIG_INSTALL_DIR lib/cmake/APSI)
+
 # Import Microsoft SEAL
 find_package(SEAL 3.2.0 EXACT REQUIRED)
 
