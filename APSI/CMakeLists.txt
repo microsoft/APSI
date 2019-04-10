@@ -109,7 +109,6 @@ add_definitions(-D__LINUX__)
 include_directories(${FLINT_DIR}/flint)
 include_directories(${FOURQ_DIR}/FourQ)
 include_directories(${LOG4CPLUS_DIR})
-#include_directories(${ZMQ_DIR})
 
 # Link required libraries
 target_link_libraries(apsi SEAL::seal Cuckoo::cuckoo ${FLINT} ${FOURQ} ${ZMQ} ${ZMQPP})
@@ -121,6 +120,35 @@ add_subdirectory(apsi)
 target_include_directories(apsi
 	PRIVATE $<BUILD_INTERFACE:${APSI_SOURCE_DIR}>)
 
-# Install the library
-#install(TARGETS apsi LIBRARY DESTINATION lib)
+# Associate APSI to export apsi_export
+install(TARGETS apsi EXPORT apsi_export
+    ARCHIVE DESTINATION lib
+    INCLUDES DESTINATION ${APSI_INCLUDES_INSTALL_DIR})
 
+# Export the targets
+export(EXPORT apsi_export
+    FILE ${APSI_TARGETS_FILENAME}
+    NAMESPACE APSI::)
+
+# Create the CMake config file
+configure_file(${APSI_CONFIG_IN_FILENAME} ${APSI_CONFIG_FILENAME} @ONLY)
+
+# Install the export
+install(
+    EXPORT apsi_export
+    FILE APSITargets.cmake
+    NAMESPACE APSI::
+    DESTINATION ${APSI_CONFIG_INSTALL_DIR})
+
+# Version file; we require exact version match for downstream
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(${APSI_CONFIG_VERSION_FILENAME}
+    VERSION ${APSI_VERSION}
+    COMPATIBILITY ExactVersion)
+
+# Install other files 
+install(
+    FILES
+        ${APSI_CONFIG_FILENAME}
+        ${APSI_CONFIG_VERSION_FILENAME}
+    DESTINATION ${APSI_CONFIG_INSTALL_DIR})

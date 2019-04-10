@@ -10,7 +10,7 @@ if (DEFINED MSVC)
 endif()
 
 # Executable will be in ../bin
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../bin)
 
 # Create executable but add no source files yet
 add_executable(sender "")
@@ -28,13 +28,93 @@ message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 # Import APSI
 find_package(APSI 1.0.0 EXACT REQUIRED)
 
+# Import SEAL
+find_package(SEAL 3.2.0 REQUIRED)
+
+# Import Cuckoo
+find_package(Cuckoo 1.0 REQUIRED)
+
+# Import FLINT library
+find_path(FLINT_DIR NAMES flint/fmpz.h)
+find_library(FLINT flint)
+if (NOT FLINT OR NOT FLINT_DIR)
+    message(FATAL_ERROR "Could not find FLINT library")
+else()
+    message(STATUS "Flint directory: ${FLINT_DIR}")
+    message(STATUS "Found FLINT: ${FLINT}")
+endif()
+
+# FourQ
+#find_path(FOURQ_DIR NAMES FourQ/FourQ.h)
+#find_library(FOURQ FourQ)
+#if (NOT FOURQ OR NOT FOURQ_DIR)
+#    message(FATAL_ERROR "Could not find FourQ library")
+#else()
+#    message(STATUS "FourQ directory: ${FOURQ_DIR}")
+#    message(STATUS "Found FourQ: ${FOURQ}")
+#endif()
+
+# Log4cplus
+find_path(LOG4CPLUS_DIR log4cplus/logger.h)
+find_library(LOG4CPLUS log4cplus)
+if (NOT LOG4CPLUS_DIR OR NOT LOG4CPLUS)
+    message(FATAL_ERROR "Could not find log4cplus library")
+else()
+    message(STATUS "log4cplus directory: ${LOG4CPLUS_DIR}")
+    message(STATUS "Found log4cplus: ${LOG4CPLUS}")
+endif()
+
+# ZeroMQ
+find_path(ZMQ_DIR zmqpp/zmqpp.hpp)
+find_library(ZMQ zmq)
+find_library(ZMQPP zmqpp)
+if (NOT ZMQ OR NOT ZMQPP OR NOT ZMQ_DIR)
+    message(FATAL_ERROR "Could not find zmq or zmqpp libraries")
+else()
+    message(STATUS "zmqpp directory:  ${ZMQ_DIR}")
+    message(STATUS "Found zmq: ${ZMQ}")
+    message(STATUS "Found zmqpp: ${ZMQPP}")
+endif()
+
+# GMP
+find_library(GMP gmp)
+if (NOT GMP)
+    message(FATAL_ERROR "Could not find gmp library")
+else()
+    message(STATUS "Found gmp: ${GMP}")
+endif()
+
+# CryptoPP
+find_library(CRYPTOPP cryptopp)
+if (NOT CRYPTOPP)
+    message(FATAL_ERROR "Could not find cryptopp library")
+else()
+    message(STATUS "Found cryptopp: ${CRYPTOPP}")
+endif()
+
+# Common Code
+find_library(COMMON_CODE common_code HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../lib)
+if (NOT COMMON_CODE)
+    message(FATAL_ERROR "Could not find common_code library")
+else()
+    message(STATUS "Found common_code: ${COMMON_CODE}")
+endif()
+
+
 # Set flags
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -maes")
+
+target_include_directories(sender PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../APSI>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../CommonCode>
+    ${FLINT_DIR}/flint
+#    ${FOURQ_DIR}/FourQ
+    ${LOG4CPLUS_DIR}
+)
 
 # C++17
-target_compile_features(apsi PUBLIC cxx_std_17)
+target_compile_features(sender PUBLIC cxx_std_17)
 
 # Defines
 #add_definitions(-DHAVE_CONFIG)
@@ -46,8 +126,18 @@ target_compile_features(apsi PUBLIC cxx_std_17)
 #add_definitions(-D__LINUX__)
 
 # Link required libraries
-target_link_libraries(sender APSI::apsi)
+target_link_libraries(sender
+    APSI::apsi
+    ${FLINT}
+#    ${FOURQ}
+    ${ZMQ}
+    ${ZMQPP}
+    ${GMP}
+    ${LOG4CPLUS}
+    ${CRYPTOPP}
+    ${COMMON_CODE}
+    stdc++fs
+)
 
 # Add source files to executable
 add_subdirectory(src)
-

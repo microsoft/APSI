@@ -6,3 +6,9 @@ target_sources(apsi
 		${CMAKE_CURRENT_LIST_DIR}/receiver.cpp
 )
 
+install(
+    FILES
+        ${CMAKE_CURRENT_LIST_DIR}/receiver.h
+    DESTINATION
+        ${APSI_INCLUDES_INSTALL_DIR}/apsi
+)

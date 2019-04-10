@@ -6,3 +6,9 @@ target_sources(apsi
 		${CMAKE_CURRENT_LIST_DIR}/log.cpp
 )
 
+install(
+    FILES
+        ${CMAKE_CURRENT_LIST_DIR}/log.h
+    DESTINATION
+        ${APSI_INCLUDES_INSTALL_DIR}/apsi
+)
