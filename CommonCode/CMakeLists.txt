@@ -25,11 +25,6 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
-# Set flags
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -maes")
-
 # Add APSI
 find_package(APSI 1.0.0 EXACT REQUIRED)
 
@@ -42,26 +37,9 @@ find_package(Cuckoo 1.0 REQUIRED)
 # C++17
 target_compile_features(common_code PUBLIC cxx_std_17)
 
-# Defines
-#add_definitions(-DHAVE_CONFIG)
-#add_definitions(-DUSE_SECURE_SEED)
-#add_definitions(-DNDEBUG)
-#add_definitions(-D_AMD64_)
-#add_definitions(-D_AVX2_)
-#add_definitions(-D_ASM_)
-#add_definitions(-D__LINUX__)
-
 target_include_directories(common_code PRIVATE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../APSI>
 )
 
 # Link required libraries
 target_link_libraries(common_code APSI::apsi SEAL::seal Cuckoo::cuckoo)
-
-# Add source files to library
-#add_subdirectory(apsi)
-
-# Add local include directories for build
-#target_include_directories(apsi
-#	PRIVATE $<BUILD_INTERFACE:${APSI_SOURCE_DIR}>)
-

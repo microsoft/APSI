@@ -44,16 +44,6 @@ else()
     message(STATUS "Found FLINT: ${FLINT}")
 endif()
 
-# FourQ
-#find_path(FOURQ_DIR NAMES FourQ/FourQ.h)
-#find_library(FOURQ FourQ)
-#if (NOT FOURQ OR NOT FOURQ_DIR)
-#    message(FATAL_ERROR "Could not find FourQ library")
-#else()
-#    message(STATUS "FourQ directory: ${FOURQ_DIR}")
-#    message(STATUS "Found FourQ: ${FOURQ}")
-#endif()
-
 # Log4cplus
 find_path(LOG4CPLUS_DIR log4cplus/logger.h)
 find_library(LOG4CPLUS log4cplus)
@@ -100,36 +90,25 @@ else()
     message(STATUS "Found common_code: ${COMMON_CODE}")
 endif()
 
-
 # Set flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 
+# Includes
 target_include_directories(sender PRIVATE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../APSI>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../CommonCode>
     ${FLINT_DIR}/flint
-#    ${FOURQ_DIR}/FourQ
     ${LOG4CPLUS_DIR}
 )
 
 # C++17
 target_compile_features(sender PUBLIC cxx_std_17)
 
-# Defines
-#add_definitions(-DHAVE_CONFIG)
-#add_definitions(-DUSE_SECURE_SEED)
-#add_definitions(-DNDEBUG)
-#add_definitions(-D_AMD64_)
-#add_definitions(-D_AVX2_)
-#add_definitions(-D_ASM_)
-#add_definitions(-D__LINUX__)
-
 # Link required libraries
 target_link_libraries(sender
     APSI::apsi
     ${FLINT}
-#    ${FOURQ}
     ${ZMQ}
     ${ZMQPP}
     ${GMP}
