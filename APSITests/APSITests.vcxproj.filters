@@ -15,93 +15,93 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="bit_copy_test.h">
+    <ClInclude Include="src\bit_copy_test.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="interpolate_tests.h">
+    <ClInclude Include="src\interpolate_tests.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="item.h">
+    <ClInclude Include="src\item.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="matrix_tests.h">
+    <ClInclude Include="src\matrix_tests.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="plaintextarith.h">
+    <ClInclude Include="src\plaintextarith.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="unit_tests_runner.h">
+    <ClInclude Include="src\unit_tests_runner.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="aes_tests.h">
+    <ClInclude Include="src\aes_tests.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="prng_tests.h">
+    <ClInclude Include="src\prng_tests.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="utils.h">
+    <ClInclude Include="src\utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="channel_tests.h">
+    <ClInclude Include="src\channel_tests.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="utils_tests.h">
+    <ClInclude Include="src\utils_tests.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="csvreader_tests.h">
+    <ClInclude Include="src\csvreader_tests.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="stopwatch_tests.h">
+    <ClInclude Include="src\stopwatch_tests.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="fourq_tests.h">
+    <ClInclude Include="src\fourq_tests.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="receiver.cpp">
+    <ClCompile Include="src\receiver.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="sender.cpp">
+    <ClCompile Include="src\sender.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="item.cpp">
+    <ClCompile Include="src\item.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="plaintextarith.cpp">
+    <ClCompile Include="src\plaintextarith.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="bit_copy_test.cpp">
+    <ClCompile Include="src\bit_copy_test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="interpolate_tests.cpp">
+    <ClCompile Include="src\interpolate_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="matrix_tests.cpp">
+    <ClCompile Include="src\matrix_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="unit_tests_runner.cpp">
+    <ClCompile Include="src\unit_tests_runner.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="aes_tests.cpp">
+    <ClCompile Include="src\aes_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="prng_tests.cpp">
+    <ClCompile Include="src\prng_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="channel_tests.cpp">
+    <ClCompile Include="src\channel_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="utils_tests.cpp">
+    <ClCompile Include="src\utils_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="csvreader_tests.cpp">
+    <ClCompile Include="src\csvreader_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="stopwatch_tests.cpp">
+    <ClCompile Include="src\stopwatch_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="fourq_tests.cpp">
+    <ClCompile Include="src\fourq_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

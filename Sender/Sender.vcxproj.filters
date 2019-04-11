@@ -15,21 +15,21 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="sender.h">
+    <ClInclude Include="src\sender.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="clp.h">
+    <ClInclude Include="src\clp.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="senderutils.h">
+    <ClInclude Include="src\senderutils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="sender.cpp">
+    <ClCompile Include="src\sender.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="senderutils.cpp">
+    <ClCompile Include="src\senderutils.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
