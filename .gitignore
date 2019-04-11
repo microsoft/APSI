@@ -2,7 +2,11 @@
 obj/*
 */bin/*
 bin/*
+*/lib/*
+*/.build/*
 *.o
+*.so
+*.a
 */~*
 *~
 *.out
@@ -14,7 +18,9 @@ x64/*
 *.user
 *.vs
 *.json
-Receiver/receiver
-Sender/sender
+.vscode/*
+APSI/cmake/APSIConfig.cmake
+APSI/cmake/APSIConfigVersion.cmake
+APSI/cmake/APSITargets.cmake
 doc/html
 doc/latex

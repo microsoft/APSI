@@ -123,10 +123,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="receiver.cpp" />
+    <ClCompile Include="src\receiver.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="clp.h" />
+    <ClInclude Include="src\clp.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -163,11 +163,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="IntegrationTests.cpp" />
-    <ClCompile Include="senderreceivertests.cpp" />
+    <ClCompile Include="src\IntegrationTests.cpp" />
+    <ClCompile Include="src\senderreceivertests.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="senderreceivertests.h" />
+    <ClInclude Include="src\senderreceivertests.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

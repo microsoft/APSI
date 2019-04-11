@@ -90,37 +90,37 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="aes_tests.h" />
-    <ClInclude Include="bit_copy_test.h" />
-    <ClInclude Include="channel_tests.h" />
-    <ClInclude Include="csvreader_tests.h" />
-    <ClInclude Include="fourq_tests.h" />
-    <ClInclude Include="interpolate_tests.h" />
-    <ClInclude Include="item.h" />
-    <ClInclude Include="matrix_tests.h" />
-    <ClInclude Include="plaintextarith.h" />
-    <ClInclude Include="prng_tests.h" />
-    <ClInclude Include="stopwatch_tests.h" />
-    <ClInclude Include="unit_tests_runner.h" />
-    <ClInclude Include="utils.h" />
-    <ClInclude Include="utils_tests.h" />
+    <ClInclude Include="src\aes_tests.h" />
+    <ClInclude Include="src\bit_copy_test.h" />
+    <ClInclude Include="src\channel_tests.h" />
+    <ClInclude Include="src\csvreader_tests.h" />
+    <ClInclude Include="src\fourq_tests.h" />
+    <ClInclude Include="src\interpolate_tests.h" />
+    <ClInclude Include="src\item.h" />
+    <ClInclude Include="src\matrix_tests.h" />
+    <ClInclude Include="src\plaintextarith.h" />
+    <ClInclude Include="src\prng_tests.h" />
+    <ClInclude Include="src\stopwatch_tests.h" />
+    <ClInclude Include="src\unit_tests_runner.h" />
+    <ClInclude Include="src\utils.h" />
+    <ClInclude Include="src\utils_tests.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="aes_tests.cpp" />
-    <ClCompile Include="bit_copy_test.cpp" />
-    <ClCompile Include="channel_tests.cpp" />
-    <ClCompile Include="csvreader_tests.cpp" />
-    <ClCompile Include="fourq_tests.cpp" />
-    <ClCompile Include="interpolate_tests.cpp" />
-    <ClCompile Include="item.cpp" />
-    <ClCompile Include="matrix_tests.cpp" />
-    <ClCompile Include="plaintextarith.cpp" />
-    <ClCompile Include="prng_tests.cpp" />
-    <ClCompile Include="receiver.cpp" />
-    <ClCompile Include="sender.cpp" />
-    <ClCompile Include="stopwatch_tests.cpp" />
-    <ClCompile Include="unit_tests_runner.cpp" />
-    <ClCompile Include="utils_tests.cpp" />
+    <ClCompile Include="src\aes_tests.cpp" />
+    <ClCompile Include="src\bit_copy_test.cpp" />
+    <ClCompile Include="src\channel_tests.cpp" />
+    <ClCompile Include="src\csvreader_tests.cpp" />
+    <ClCompile Include="src\fourq_tests.cpp" />
+    <ClCompile Include="src\interpolate_tests.cpp" />
+    <ClCompile Include="src\item.cpp" />
+    <ClCompile Include="src\matrix_tests.cpp" />
+    <ClCompile Include="src\plaintextarith.cpp" />
+    <ClCompile Include="src\prng_tests.cpp" />
+    <ClCompile Include="src\receiver.cpp" />
+    <ClCompile Include="src\sender.cpp" />
+    <ClCompile Include="src\stopwatch_tests.cpp" />
+    <ClCompile Include="src\unit_tests_runner.cpp" />
+    <ClCompile Include="src\utils_tests.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

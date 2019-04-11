@@ -123,13 +123,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="clp.h" />
-    <ClInclude Include="sender.h" />
-    <ClInclude Include="senderutils.h" />
+    <ClInclude Include="src\clp.h" />
+    <ClInclude Include="src\sender.h" />
+    <ClInclude Include="src\senderutils.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="sender.cpp" />
-    <ClCompile Include="senderutils.cpp" />
+    <ClCompile Include="src\sender.cpp" />
+    <ClCompile Include="src\senderutils.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

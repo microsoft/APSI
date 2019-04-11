@@ -55,7 +55,7 @@ void InterpolateTests::u64_interpolate_test()
 {
     seal::EncryptionParameters parms(seal::scheme_type::BFV);
     parms.set_poly_modulus_degree(64);
-    parms.set_coeff_modulus(seal::coeff_modulus_128(1024));
+    parms.set_coeff_modulus(seal::DefaultParams::coeff_modulus_128(1024));
     parms.set_plain_modulus(11);
 
     auto context = seal::SEALContext::Create(parms);

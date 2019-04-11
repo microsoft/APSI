@@ -15,15 +15,15 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="IntegrationTests.cpp">
+    <ClCompile Include="src\IntegrationTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="senderreceivertests.cpp">
+    <ClCompile Include="src\senderreceivertests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="senderreceivertests.h">
+    <ClInclude Include="src\senderreceivertests.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

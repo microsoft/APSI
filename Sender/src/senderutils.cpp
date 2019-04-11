@@ -77,7 +77,7 @@ const PSIParams apsi::tools::build_psi_params(
 
         if (coeff_mod_bit_vector.size() == 0)
         {
-            coeff_modulus = coeff_modulus_128(seal_params.encryption_params.poly_modulus_degree());
+            coeff_modulus = DefaultParams::coeff_modulus_128(seal_params.encryption_params.poly_modulus_degree());
         }
         else
         {
@@ -87,22 +87,22 @@ const PSIParams apsi::tools::build_psi_params(
                 switch (bit_size)
                 {
                 case 30:
-                    coeff_modulus.emplace_back(small_mods_30bit(static_cast<int>(mods_added[bit_size])));
+                    coeff_modulus.emplace_back(DefaultParams::small_mods_30bit(static_cast<int>(mods_added[bit_size])));
                     mods_added[bit_size]++;
                     break;
 
                 case 40:
-                    coeff_modulus.emplace_back(small_mods_40bit(static_cast<int>(mods_added[bit_size])));
+                    coeff_modulus.emplace_back(DefaultParams::small_mods_40bit(static_cast<int>(mods_added[bit_size])));
                     mods_added[bit_size]++;
                     break;
 
                 case 50:
-                    coeff_modulus.emplace_back(small_mods_50bit(static_cast<int>(mods_added[bit_size])));
+                    coeff_modulus.emplace_back(DefaultParams::small_mods_50bit(static_cast<int>(mods_added[bit_size])));
                     mods_added[bit_size]++;
                     break;
 
                 case 60:
-                    coeff_modulus.emplace_back(small_mods_60bit(static_cast<int>(mods_added[bit_size])));
+                    coeff_modulus.emplace_back(DefaultParams::small_mods_60bit(static_cast<int>(mods_added[bit_size])));
                     mods_added[bit_size]++;
                     break;
 
