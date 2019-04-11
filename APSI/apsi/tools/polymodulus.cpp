@@ -5,6 +5,7 @@
 #include "apsi/tools/polymodulus.h"
 
 using namespace std;
+using namespace seal::util;
 
 namespace apsi
 {
