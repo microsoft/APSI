@@ -15,46 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\bit_copy_test.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\interpolate_tests.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\item.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\matrix_tests.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\plaintextarith.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\unit_tests_runner.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\aes_tests.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\prng_tests.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\utils.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\channel_tests.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\utils_tests.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\csvreader_tests.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\stopwatch_tests.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\fourq_tests.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -104,5 +65,8 @@
     <ClCompile Include="src\fourq_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
 </Project>
