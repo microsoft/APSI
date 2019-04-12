@@ -82,12 +82,14 @@ else()
     message(STATUS "Found cryptopp: ${CRYPTOPP}")
 endif()
 
-# CPPUnit
-find_library(CPPUNIT cppunit)
-if (NOT CPPUNIT)
-    message(FATAL_ERROR "Could not find cppunit library")
+# Google Test
+find_path(GTEST_DIR gtest/gtest.h)
+find_library(GTEST gtest)
+if (NOT GTEST OR NOT GTEST_DIR)
+    message(FATAL_ERROR "Could not find Google Test library")
 else()
-    message(STATUS "Found cppunit: ${CPUNIT}")
+    message(STATUS "Google Test directory: ${GTEST_DIR}")
+    message(STATUS "Found Google Test: ${GTEST}")
 endif()
 
 # Set flags
@@ -113,7 +115,7 @@ target_link_libraries(int_tests
     ${GMP}
     ${LOG4CPLUS}
     ${CRYPTOPP}
-    ${CPPUNIT}
+    ${GTEST}
 )
 
 # Add source files to executable

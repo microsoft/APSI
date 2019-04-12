@@ -1,13 +1,10 @@
-#include "bit_copy_test.h"
+#include "gtest/gtest.h"
 #include "apsi/ffield/ffield_elt.h"
 #include <vector>
 
 using namespace std;
-using namespace APSITests;
 using namespace apsi;
 using namespace apsi::tools;
-
-CPPUNIT_TEST_SUITE_REGISTRATION(BitCopyTests);
 
 namespace
 {
@@ -32,49 +29,52 @@ namespace
     }
 }
 
-void BitCopyTests::bit_copy_test()
+namespace APSITests
 {
-    int trials = 1000;
-    int size = 10;
+	TEST(BitCopyTests, bit_copy_test)
+	{
+		int trials = 1000;
+		int size = 10;
 
-    std::vector<u8> src(size), dest(size);
-    for (int t = 6; t < trials; ++t)
-    {
-        PRNG prng(to_block(t));
+		std::vector<u8> src(size), dest(size);
+		for (int t = 6; t < trials; ++t)
+		{
+			PRNG prng(to_block(t));
 
-        auto srcOffset = prng.get<u32>() % (size * 4);
-        auto destOffset = prng.get<u32>() % (size * 4);
-        auto bitLength = prng.get<u32>() % (size * 4 - 1) + 1;
+			auto srcOffset = prng.get<u32>() % (size * 4);
+			auto destOffset = prng.get<u32>() % (size * 4);
+			auto bitLength = prng.get<u32>() % (size * 4 - 1) + 1;
 
-        char srcVal = (t & 1) * ~0;
-        char destVal = ~srcVal;
+			char srcVal = (t & 1) * ~0;
+			char destVal = ~srcVal;
 
-        memset(src.data(), srcVal, src.size());
-        memset(dest.data(), destVal, dest.size());
+			memset(src.data(), srcVal, src.size());
+			memset(dest.data(), destVal, dest.size());
 
-        apsi::details::copy_with_bit_offset(src, srcOffset, destOffset, bitLength, dest);
+			apsi::details::copy_with_bit_offset(src, srcOffset, destOffset, bitLength, dest);
 
-        u32 src_idx = srcOffset;
-        u32 dst_idx = 0;
+			u32 src_idx = srcOffset;
+			u32 dst_idx = 0;
 
-        for (unsigned i = 0; i < destOffset; ++i)
-        {
-            CPPUNIT_ASSERT_EQUAL((u8)(destVal & 1), get_bit(dest, dst_idx));
-            dst_idx++;
-        }
+			for (unsigned i = 0; i < destOffset; ++i)
+			{
+				ASSERT_EQ((u8)(destVal & 1), get_bit(dest, dst_idx));
+				dst_idx++;
+			}
 
-        for (unsigned i = 0; i < bitLength; ++i)
-        {
-            CPPUNIT_ASSERT_EQUAL(get_bit(src, src_idx), get_bit(dest, dst_idx));
-            src_idx++;
-            dst_idx++;
-        }
+			for (unsigned i = 0; i < bitLength; ++i)
+			{
+				ASSERT_EQ(get_bit(src, src_idx), get_bit(dest, dst_idx));
+				src_idx++;
+				dst_idx++;
+			}
 
-        auto rem = size * 8 - destOffset - bitLength;
-        for (unsigned i = 0; i < rem; ++i)
-        {
-            CPPUNIT_ASSERT_EQUAL((u8)(destVal & 1), get_bit(dest, dst_idx));
-            dst_idx++;
-        }
-    }
+			auto rem = size * 8 - destOffset - bitLength;
+			for (unsigned i = 0; i < rem; ++i)
+			{
+				ASSERT_EQ((u8)(destVal & 1), get_bit(dest, dst_idx));
+				dst_idx++;
+			}
+		}
+	}
 }

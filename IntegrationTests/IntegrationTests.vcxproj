@@ -94,13 +94,13 @@
       </PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderOutputFile />
-      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;$(APSILIBS)\cppunit\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\flint2\include;$(APSILIBS)\mpir\include;$(APSILIBS)\mpfr\include;$(APSILIBS)\GSL;$(APSILIBS)\Cuckoo\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;$(APSILIBS)\SEAL\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\flint2\include;$(APSILIBS)\mpir\include;$(APSILIBS)\mpfr\include;$(APSILIBS)\GSL;$(APSILIBS)\Cuckoo\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>APSI.lib;SEAL.lib;Cuckoo.lib;dll_flint.lib;mpir.lib;mpfr.lib;cryptlib.lib;zmqpp.lib;libzmq.lib;cppunitd.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(IntDir);$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\cppunit\lib;$(APSILIBS)\flint2\lib\$(IntDir);$(APSILIBS)\mpir\lib\$(IntDir);$(APSILIBS)\mpfr\lib\$(IntDir);$(APSILIBS)\cryptopp700\lib\$(IntDir);$(APSILIBS)\libzmqpp\lib\$(IntDir);$(APSILIBS)\libzmq\dll\$(IntDir)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>APSI.lib;SEAL.lib;Cuckoo.lib;dll_flint.lib;mpir.lib;mpfr.lib;cryptlib.lib;zmqpp.lib;libzmq.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(IntDir);$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\flint2\lib\$(IntDir);$(APSILIBS)\mpir\lib\$(IntDir);$(APSILIBS)\mpfr\lib\$(IntDir);$(APSILIBS)\cryptopp700\lib\$(IntDir);$(APSILIBS)\libzmqpp\lib\$(IntDir);$(APSILIBS)\libzmq\dll\$(IntDir)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -151,15 +151,15 @@
       </PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderOutputFile />
-      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;$(APSILIBS)\cppunit\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\flint2\include;$(APSILIBS)\mpir\include;$(APSILIBS)\mpfr\include;$(APSILIBS)\GSL;$(APSILIBS)\Cuckoo\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\APSI;$(APSILIBS)\SEAL\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\flint2\include;$(APSILIBS)\mpir\include;$(APSILIBS)\mpfr\include;$(APSILIBS)\GSL;$(APSILIBS)\Cuckoo\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>APSI.lib;SEAL.lib;Cuckoo.lib;dll_flint.lib;mpir.lib;mpfr.lib;cryptlib.lib;zmqpp.lib;libzmq.lib;cppunit.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(IntDir);$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\cppunit\lib;$(APSILIBS)\flint2\lib\$(IntDir);$(APSILIBS)\mpir\lib\$(IntDir);$(APSILIBS)\mpfr\lib\$(IntDir);$(APSILIBS)\cryptopp700\lib\$(IntDir);$(APSILIBS)\libzmqpp\lib\$(IntDir);$(APSILIBS)\libzmq\dll\$(IntDir)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>APSI.lib;SEAL.lib;Cuckoo.lib;dll_flint.lib;mpir.lib;mpfr.lib;cryptlib.lib;zmqpp.lib;libzmq.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(IntDir);$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\flint2\lib\$(IntDir);$(APSILIBS)\mpir\lib\$(IntDir);$(APSILIBS)\mpfr\lib\$(IntDir);$(APSILIBS)\cryptopp700\lib\$(IntDir);$(APSILIBS)\libzmqpp\lib\$(IntDir);$(APSILIBS)\libzmq\dll\$(IntDir)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -167,9 +167,16 @@
     <ClCompile Include="src\senderreceivertests.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\senderreceivertests.h" />
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
+    <Import Project="..\packages\Microsoft.googletest.v140.windesktop.msvcstl.static.rt-dyn.1.8.1\build\native\Microsoft.googletest.v140.windesktop.msvcstl.static.rt-dyn.targets" Condition="Exists('..\packages\Microsoft.googletest.v140.windesktop.msvcstl.static.rt-dyn.1.8.1\build\native\Microsoft.googletest.v140.windesktop.msvcstl.static.rt-dyn.targets')" />
   </ImportGroup>
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\Microsoft.googletest.v140.windesktop.msvcstl.static.rt-dyn.1.8.1\build\native\Microsoft.googletest.v140.windesktop.msvcstl.static.rt-dyn.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Microsoft.googletest.v140.windesktop.msvcstl.static.rt-dyn.1.8.1\build\native\Microsoft.googletest.v140.windesktop.msvcstl.static.rt-dyn.targets'))" />
+  </Target>
 </Project>

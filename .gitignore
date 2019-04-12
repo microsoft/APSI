@@ -19,6 +19,7 @@ x64/*
 *.vs
 *.json
 .vscode/*
+packages/*
 APSI/cmake/APSIConfig.cmake
 APSI/cmake/APSIConfigVersion.cmake
 APSI/cmake/APSITargets.cmake
