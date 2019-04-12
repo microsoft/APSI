@@ -19,5 +19,5 @@ Fast asymmetric PSI library
     * [libzmqpp](https://github.com/zeromq/zmqpp) - ZeroMQ C++ wrapper
 
 ### Additional requirements
-* [CppUnit](https://www.freedesktop.org/wiki/Software/cppunit/) - For unit tests and integration tests projects
+* [Google Test](https://github.com/google/googletest) - For unit tests and integration tests projects
 * [TCLAP](https://sourceforge.net/projects/tclap/) - Command line parser for stand alone executables (Receiver / Sender)
