@@ -60,9 +60,6 @@
     <ClInclude Include="apsi\Network\network_utils.h">
       <Filter>Header Files\Network</Filter>
     </ClInclude>
-    <ClInclude Include="apsi\plaintextarith.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="apsi\psiparams.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -156,18 +153,6 @@
     <ClInclude Include="apsi\tools\bigpoly.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
-    <ClInclude Include="apsi\tools\polymodulus.h">
-      <Filter>Header Files\Tools</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\tools\bigpolyarray.h">
-      <Filter>Header Files\Tools</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\tools\polyfftmultsmallmod.h">
-      <Filter>Header Files\Tools</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\tools\nussbaumer.h">
-      <Filter>Header Files\Tools</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp">
@@ -178,9 +163,6 @@
     </ClCompile>
     <ClCompile Include="apsi\Network\network_utils.cpp">
       <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\plaintextarith.cpp">
-      <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="apsi\Receiver\receiver.cpp">
       <Filter>Source Files\Receiver</Filter>
@@ -243,18 +225,6 @@
       <Filter>Source Files\Sender</Filter>
     </ClCompile>
     <ClCompile Include="apsi\tools\bigpoly.cpp">
-      <Filter>Source Files\Tools</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\tools\polymodulus.cpp">
-      <Filter>Source Files\Tools</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\tools\bigpolyarray.cpp">
-      <Filter>Source Files\Tools</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\tools\polyfftmultsmallmod.cpp">
-      <Filter>Source Files\Tools</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\tools\nussbaumer.cpp">
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
   </ItemGroup>

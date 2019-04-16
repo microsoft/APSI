@@ -29,9 +29,6 @@
     <ClCompile Include="src\item.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\plaintextarith.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\bit_copy_test.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
