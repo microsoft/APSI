@@ -12,7 +12,6 @@
 #include "apsi/tools/sealcompress.h"
 #include "apsi/tools/matrix.h"
 #include "apsi/network/channel.h"
-#include "apsi/tools/bigpolyarray.h"
 
 // Cuckoo
 #include "cuckoo/cuckoo.h"

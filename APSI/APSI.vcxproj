@@ -163,7 +163,6 @@
     <ClInclude Include="apsi\Sender\senderthreadcontext.h" />
     <ClInclude Include="apsi\tools\aes.h" />
     <ClInclude Include="apsi\tools\bigpoly.h" />
-    <ClInclude Include="apsi\tools\bigpolyarray.h" />
     <ClInclude Include="apsi\tools\csvreader.h" />
     <ClInclude Include="apsi\tools\fourq.h" />
     <ClInclude Include="apsi\Tools\interpolate.h" />
@@ -192,7 +191,6 @@
     <ClCompile Include="apsi\sender\senderdispatcher.cpp" />
     <ClCompile Include="apsi\tools\aes.cpp" />
     <ClCompile Include="apsi\tools\bigpoly.cpp" />
-    <ClCompile Include="apsi\tools\bigpolyarray.cpp" />
     <ClCompile Include="apsi\tools\csvreader.cpp" />
     <ClCompile Include="apsi\tools\fourq.cpp" />
     <ClCompile Include="apsi\Tools\interpolate.cpp" />
