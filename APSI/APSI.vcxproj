@@ -152,7 +152,6 @@
     <ClInclude Include="apsi\network\senderchannel.h" />
     <ClInclude Include="apsi\network\senderoperation.h" />
     <ClInclude Include="apsi\network\senderoperationresponse.h" />
-    <ClInclude Include="apsi\plaintextarith.h" />
     <ClInclude Include="apsi\psiparams.h" />
     <ClInclude Include="apsi\Receiver\receiver.h" />
     <ClInclude Include="apsi\result_package.h" />
@@ -169,9 +168,6 @@
     <ClInclude Include="apsi\tools\fourq.h" />
     <ClInclude Include="apsi\Tools\interpolate.h" />
     <ClInclude Include="apsi\tools\matrix.h" />
-    <ClInclude Include="apsi\tools\nussbaumer.h" />
-    <ClInclude Include="apsi\tools\polyfftmultsmallmod.h" />
-    <ClInclude Include="apsi\tools\polymodulus.h" />
     <ClInclude Include="apsi\tools\prng.h" />
     <ClInclude Include="apsi\Tools\sealcompress.h" />
     <ClInclude Include="apsi\Tools\stopwatch.h" />
@@ -189,7 +185,6 @@
     <ClCompile Include="apsi\Network\network_utils.cpp" />
     <ClCompile Include="apsi\network\receiverchannel.cpp" />
     <ClCompile Include="apsi\network\senderchannel.cpp" />
-    <ClCompile Include="apsi\plaintextarith.cpp" />
     <ClCompile Include="apsi\Receiver\receiver.cpp" />
     <ClCompile Include="apsi\sender\dbblock.cpp" />
     <ClCompile Include="apsi\Sender\sender.cpp" />
@@ -201,9 +196,6 @@
     <ClCompile Include="apsi\tools\csvreader.cpp" />
     <ClCompile Include="apsi\tools\fourq.cpp" />
     <ClCompile Include="apsi\Tools\interpolate.cpp" />
-    <ClCompile Include="apsi\tools\nussbaumer.cpp" />
-    <ClCompile Include="apsi\tools\polyfftmultsmallmod.cpp" />
-    <ClCompile Include="apsi\tools\polymodulus.cpp" />
     <ClCompile Include="apsi\tools\prng.cpp" />
     <ClCompile Include="apsi\Tools\sealcompress.cpp" />
     <ClCompile Include="apsi\Tools\stopwatch.cpp" />
