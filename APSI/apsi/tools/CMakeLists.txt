@@ -9,9 +9,6 @@ target_sources(apsi
 		${CMAKE_CURRENT_LIST_DIR}/csvreader.cpp
 		${CMAKE_CURRENT_LIST_DIR}/fourq.cpp
 		${CMAKE_CURRENT_LIST_DIR}/interpolate.cpp
-		${CMAKE_CURRENT_LIST_DIR}/nussbaumer.cpp
-		${CMAKE_CURRENT_LIST_DIR}/polyfftmultsmallmod.cpp
-		${CMAKE_CURRENT_LIST_DIR}/polymodulus.cpp
 		${CMAKE_CURRENT_LIST_DIR}/prng.cpp
 		${CMAKE_CURRENT_LIST_DIR}/sealcompress.cpp
 		${CMAKE_CURRENT_LIST_DIR}/stopwatch.cpp
@@ -28,9 +25,6 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/interpolate.h
         ${CMAKE_CURRENT_LIST_DIR}/matrix.h
         ${CMAKE_CURRENT_LIST_DIR}/matrixview.h
-        ${CMAKE_CURRENT_LIST_DIR}/nussbaumer.h
-        ${CMAKE_CURRENT_LIST_DIR}/polyfftmultsmallmod.h
-        ${CMAKE_CURRENT_LIST_DIR}/polymodulus.h
         ${CMAKE_CURRENT_LIST_DIR}/prng.h
         ${CMAKE_CURRENT_LIST_DIR}/sealcompress.h
         ${CMAKE_CURRENT_LIST_DIR}/stopwatch.h

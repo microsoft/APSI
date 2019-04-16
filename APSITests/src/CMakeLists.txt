@@ -11,7 +11,6 @@ target_sources(unit_tests
 		${CMAKE_CURRENT_LIST_DIR}/interpolate_tests.cpp
 		${CMAKE_CURRENT_LIST_DIR}/item.cpp
 		${CMAKE_CURRENT_LIST_DIR}/matrix_tests.cpp
-		${CMAKE_CURRENT_LIST_DIR}/plaintextarith.cpp
 		${CMAKE_CURRENT_LIST_DIR}/prng_tests.cpp
 		${CMAKE_CURRENT_LIST_DIR}/receiver.cpp
 		${CMAKE_CURRENT_LIST_DIR}/sender.cpp
