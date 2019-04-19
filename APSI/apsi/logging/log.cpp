@@ -8,6 +8,7 @@
 #include "log4cplus/logger.h"
 #include "log4cplus/consoleappender.h"
 #include "log4cplus/fileappender.h"
+#include "log4cplus/nullappender.h"
 
 
 using namespace std;
@@ -39,6 +40,7 @@ namespace
     bool configured_ = false;
     Logger logger_ = Logger::getInstance("APSI");
 	string log_file_;
+	bool disable_console_ = false;
 	char msgBuffer_[MSG_BUFFER_LEN];
 
 #ifndef _MSC_VER
@@ -52,15 +54,25 @@ namespace
         if (configured_)
             throw runtime_error("Logger is already configured.");
 
-        SharedAppenderPtr appender(new ConsoleAppender);
-        appender->setLayout(auto_ptr<Layout>(new PatternLayout("%-5p %D{%H:%M:%S:%Q}: %m%n")));
-        logger_.addAppender(appender);
+		if (!disable_console_)
+		{
+			SharedAppenderPtr appender(new ConsoleAppender);
+			appender->setLayout(auto_ptr<Layout>(new PatternLayout("%-5p %D{%H:%M:%S:%Q}: %m%n")));
+			logger_.addAppender(appender);
+		}
 
 		if (!log_file_.empty())
 		{
-			SharedAppenderPtr fileAppender(new RollingFileAppender(log_file_));
-			fileAppender->setLayout(auto_ptr<Layout>(new PatternLayout("%-5p %D{%H:%M:%S:%Q}: %m%n")));
-			logger_.addAppender(fileAppender);
+			SharedAppenderPtr appender(new RollingFileAppender(log_file_));
+			appender->setLayout(auto_ptr<Layout>(new PatternLayout("%-5p %D{%H:%M:%S:%Q}: %m%n")));
+			logger_.addAppender(appender);
+		}
+
+		if (disable_console_ && log_file_.empty())
+		{
+			// Log4CPlus needs at least one appender. Use the null appender if the user doesn't want any output.
+			SharedAppenderPtr appender(new NullAppender());
+			logger_.addAppender(appender);
 		}
 
         configured_ = true;
@@ -135,6 +147,11 @@ void Log::set_log_level(Log::Level level)
 void Log::set_log_file(const string& file)
 {
 	log_file_ = file;
+}
+
+void Log::set_console_disabled(bool disable_console)
+{
+	disable_console_ = disable_console;
 }
 
 void Log::set_log_level(const string& level)

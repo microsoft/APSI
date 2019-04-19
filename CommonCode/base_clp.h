@@ -49,6 +49,9 @@ namespace apsi
 			TCLAP::ValueArg<std::string> logFileArg("", "logFile", "File where logs will be written to", /* req */ false, /* value */ "", /* type desc */ "file path");
 			add(logFileArg);
 
+			TCLAP::SwitchArg disableConsoleLogArg("", "noConsole", "Disable Console output", false);
+			add(disableConsoleLogArg);
+
             // No need to add log_level_arg_, already added in constructor
 
             // Additional arguments
@@ -63,6 +66,9 @@ namespace apsi
 
                 log_level_ = log_level_arg_->getValue();
                 cout_param("logLevel", log_level_);
+
+				disable_console_ = disableConsoleLogArg.getValue();
+				cout_param("noConsole", disable_console_);
 
                 get_args();
 
@@ -81,6 +87,7 @@ namespace apsi
         int threads() const { return threads_; }
         const std::string& log_level() const { return log_level_; }
 		const std::string& log_file() const { return log_file_; }
+		bool disable_console() const { return disable_console_; }
 
     protected:
         template<class T>
@@ -107,6 +114,7 @@ namespace apsi
         int threads_;
         std::string log_level_;
 		std::string log_file_;
+		bool disable_console_;
 
         // Parameters with constraints
         std::unique_ptr<TCLAP::ValueArg<std::string>> log_level_arg_;

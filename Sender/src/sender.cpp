@@ -43,6 +43,7 @@ int main(int argc, char *argv[])
         return -1;
 
 	Log::set_log_file(cmd.log_file());
+	Log::set_console_disabled(cmd.disable_console());
 	Log::set_log_level(cmd.log_level());
 
     run_sender_dispatcher(cmd);
