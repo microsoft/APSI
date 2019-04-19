@@ -68,7 +68,8 @@ int main(int argc, char *argv[])
     if (!cmd.parse_args(argc, argv))
         return -1;
 
-    Log::set_log_level(cmd.log_level());
+	Log::set_log_file(cmd.log_file());
+	Log::set_log_level(cmd.log_level());
 
     prepare_console();
 

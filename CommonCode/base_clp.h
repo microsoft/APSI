@@ -43,8 +43,11 @@ namespace apsi
 
         bool parse_args(int argc, char** argv)
         {
-            TCLAP::ValueArg<int> threadsArg("t", "threads", "Number of threads to use", /* req */ false, /* value */ 1, "int");
+            TCLAP::ValueArg<int> threadsArg("t", "threads", "Number of threads to use", /* req */ false, /* value */ 1, /* type desc */ "int");
             add(threadsArg);
+
+			TCLAP::ValueArg<std::string> logFileArg("", "logFile", "File where logs will be written to", /* req */ false, /* value */ "", /* type desc */ "file path");
+			add(logFileArg);
 
             // No need to add log_level_arg_, already added in constructor
 
@@ -62,7 +65,10 @@ namespace apsi
                 cout_param("logLevel", log_level_);
 
                 get_args();
-            }
+
+				log_file_ = logFileArg.getValue();
+				cout_param("logFile", log_file_);
+			}
             catch (...)
             {
                 std::cout << "Error parsing parameters.";
@@ -74,6 +80,7 @@ namespace apsi
 
         int threads() const { return threads_; }
         const std::string& log_level() const { return log_level_; }
+		const std::string& log_file() const { return log_file_; }
 
     protected:
         template<class T>
@@ -99,6 +106,7 @@ namespace apsi
         // Parameters from command line
         int threads_;
         std::string log_level_;
+		std::string log_file_;
 
         // Parameters with constraints
         std::unique_ptr<TCLAP::ValueArg<std::string>> log_level_arg_;
