@@ -7,6 +7,8 @@
 // Logging
 #include "log4cplus/logger.h"
 #include "log4cplus/consoleappender.h"
+#include "log4cplus/fileappender.h"
+#include "log4cplus/nullappender.h"
 
 
 using namespace std;
@@ -31,12 +33,15 @@ using namespace log4cplus;
     instance().log(log_level, msg); \
 }
 
+#define MSG_BUFFER_LEN 512
 
 namespace
 {
     bool configured_ = false;
-
     Logger logger_ = Logger::getInstance("APSI");
+	string log_file_;
+	bool disable_console_ = false;
+	char msgBuffer_[MSG_BUFFER_LEN];
 
 #ifndef _MSC_VER
 // auto_ptr shows a warning in GCC.
@@ -49,9 +54,26 @@ namespace
         if (configured_)
             throw runtime_error("Logger is already configured.");
 
-        SharedAppenderPtr appender(new ConsoleAppender);
-        appender->setLayout(auto_ptr<Layout>(new PatternLayout("%-5p %D{%H:%M:%S:%Q}: %m%n")));
-        logger_.addAppender(appender);
+		if (!disable_console_)
+		{
+			SharedAppenderPtr appender(new ConsoleAppender);
+			appender->setLayout(auto_ptr<Layout>(new PatternLayout("%-5p %D{%H:%M:%S:%Q}: %m%n")));
+			logger_.addAppender(appender);
+		}
+
+		if (!log_file_.empty())
+		{
+			SharedAppenderPtr appender(new RollingFileAppender(log_file_));
+			appender->setLayout(auto_ptr<Layout>(new PatternLayout("%-5p %D{%H:%M:%S:%Q}: %m%n")));
+			logger_.addAppender(appender);
+		}
+
+		if (disable_console_ && log_file_.empty())
+		{
+			// Log4CPlus needs at least one appender. Use the null appender if the user doesn't want any output.
+			SharedAppenderPtr appender(new NullAppender());
+			logger_.addAppender(appender);
+		}
 
         configured_ = true;
     }
@@ -122,6 +144,16 @@ void Log::set_log_level(Log::Level level)
     instance().setLogLevel(actual);
 }
 
+void Log::set_log_file(const string& file)
+{
+	log_file_ = file;
+}
+
+void Log::set_console_disabled(bool disable_console)
+{
+	disable_console_ = disable_console;
+}
+
 void Log::set_log_level(const string& level)
 {
     Log::Level actual;
@@ -152,6 +184,6 @@ void Log::set_log_level(const string& level)
 
 void Log::format_msg(std::string& msg, const char* format, va_list ap)
 {
-    msg.resize(1000);
-    vsnprintf(msg.data(), msg.size(), format, ap);
+    int length = vsnprintf(msgBuffer_, MSG_BUFFER_LEN, format, ap);
+	msg = string(msgBuffer_, length);
 }
