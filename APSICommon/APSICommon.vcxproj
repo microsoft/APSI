@@ -1,0 +1,205 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{6E84A852-E68E-4C1D-8266-08CEEAB6ADE6}</ProjectGuid>
+    <RootNamespace>APSI</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
+    <ProjectName>APSICommon</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v141</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <TargetExt>.lib</TargetExt>
+    <OutDir>$(ProjectDir)../bin/$(Platform)\$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <TargetExt>.lib</TargetExt>
+    <OutDir>$(ProjectDir)../bin/$(Platform)\$(Configuration)\</OutDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(APSILIBS)\SEAL\include;$(APSILIBS)\Cuckoo\include;$(APSILIBS)\flint2\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\mpfr\include;$(APSILIBS)\mpir\include;$(APSILIBS)\pthreads4w-3.0.0\include;$(APSILIBS)\cryptopp700\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\log4cplus\include;$(APSILIBS)\boost-1.65.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;NOMINMAX;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <ShowIncludes>false</ShowIncludes>
+    </ClCompile>
+    <Lib>
+      <AdditionalDependencies>SEAL.lib;cuckoo.lib;FourQ.lib;log4cplusSD.lib</AdditionalDependencies>
+    </Lib>
+    <Lib>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\x64\$(Configuration)\;$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\cryptopp700\lib\$(IntDir);$(APSILIBS)\log4cplus\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+    </ClCompile>
+    <Link>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(APSILIBS)\SEAL\include;$(APSILIBS)\Cuckoo\include;$(APSILIBS)\flint2\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\mpfr\include;$(APSILIBS)\mpir\include;$(APSILIBS)\pthreads4w-3.0.0\include;$(APSILIBS)\cryptopp700\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\log4cplus\include;$(APSILIBS)\boost-1.65.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;NOMINMAX;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <ShowIncludes>false</ShowIncludes>
+    </ClCompile>
+    <Link>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+    </Link>
+    <Lib>
+      <AdditionalDependencies>SEAL.lib;cuckoo.lib;FourQ.lib;log4cplusS.lib</AdditionalDependencies>
+    </Lib>
+    <Lib>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\x64\$(Configuration)\;$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\cryptopp700\lib\$(IntDir);$(APSILIBS)\log4cplus\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Lib>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="apsi\apsi.h" />
+    <ClInclude Include="apsi\apsidefines.h" />
+    <ClInclude Include="apsi\ffield\ffield.h" />
+    <ClInclude Include="apsi\ffield\ffield_array.h" />
+    <ClInclude Include="apsi\ffield\ffield_elt.h" />
+    <ClInclude Include="apsi\ffield\ffield_fast_batch_encoder.h" />
+    <ClInclude Include="apsi\item.h" />
+    <ClInclude Include="apsi\logging\log.h" />
+    <ClInclude Include="apsi\network\channel.h" />
+    <ClInclude Include="apsi\Network\network_utils.h" />
+    <ClInclude Include="apsi\network\receiverchannel.h" />
+    <ClInclude Include="apsi\network\senderchannel.h" />
+    <ClInclude Include="apsi\network\senderoperation.h" />
+    <ClInclude Include="apsi\network\senderoperationresponse.h" />
+    <ClInclude Include="apsi\psiparams.h" />
+    <ClInclude Include="apsi\Receiver\receiver.h" />
+    <ClInclude Include="apsi\result_package.h" />
+    <ClInclude Include="apsi\sender\dbblock.h" />
+    <ClInclude Include="apsi\Sender\sender.h" />
+    <ClInclude Include="apsi\Sender\senderdb.h" />
+    <ClInclude Include="apsi\sender\senderdispatcher.h" />
+    <ClInclude Include="apsi\Sender\sendersessioncontext.h" />
+    <ClInclude Include="apsi\Sender\senderthreadcontext.h" />
+    <ClInclude Include="apsi\tools\aes.h" />
+    <ClInclude Include="apsi\tools\bigpoly.h" />
+    <ClInclude Include="apsi\tools\csvreader.h" />
+    <ClInclude Include="apsi\tools\fourq.h" />
+    <ClInclude Include="apsi\Tools\interpolate.h" />
+    <ClInclude Include="apsi\tools\matrix.h" />
+    <ClInclude Include="apsi\tools\prng.h" />
+    <ClInclude Include="apsi\Tools\sealcompress.h" />
+    <ClInclude Include="apsi\Tools\stopwatch.h" />
+    <ClInclude Include="apsi\Tools\thread_pool.h" />
+    <ClInclude Include="apsi\tools\utils.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="apsi\apsidefines.cpp" />
+    <ClCompile Include="apsi\ffield\ffield.cpp" />
+    <ClCompile Include="apsi\ffield\ffield_elt.cpp" />
+    <ClCompile Include="apsi\ffield\ffield_fast_batch_encoder.cpp" />
+    <ClCompile Include="apsi\item.cpp" />
+    <ClCompile Include="apsi\logging\log.cpp" />
+    <ClCompile Include="apsi\network\channel.cpp" />
+    <ClCompile Include="apsi\Network\network_utils.cpp" />
+    <ClCompile Include="apsi\network\receiverchannel.cpp" />
+    <ClCompile Include="apsi\network\senderchannel.cpp" />
+    <ClCompile Include="apsi\Receiver\receiver.cpp" />
+    <ClCompile Include="apsi\sender\dbblock.cpp" />
+    <ClCompile Include="apsi\Sender\sender.cpp" />
+    <ClCompile Include="apsi\Sender\senderdb.cpp" />
+    <ClCompile Include="apsi\sender\senderdispatcher.cpp" />
+    <ClCompile Include="apsi\tools\aes.cpp" />
+    <ClCompile Include="apsi\tools\bigpoly.cpp" />
+    <ClCompile Include="apsi\tools\csvreader.cpp" />
+    <ClCompile Include="apsi\tools\fourq.cpp" />
+    <ClCompile Include="apsi\Tools\interpolate.cpp" />
+    <ClCompile Include="apsi\tools\prng.cpp" />
+    <ClCompile Include="apsi\Tools\sealcompress.cpp" />
+    <ClCompile Include="apsi\Tools\stopwatch.cpp" />
+    <ClCompile Include="apsi\tools\utils.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
