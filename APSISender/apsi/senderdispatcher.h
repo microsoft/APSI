@@ -7,7 +7,7 @@
 // APSI
 #include "apsi/network/senderoperation.h"
 #include "apsi/network/channel.h"
-#include "apsi/sender/sender.h"
+#include "apsi/sender.h"
 
 
 namespace apsi

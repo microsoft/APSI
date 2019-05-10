@@ -4,7 +4,7 @@
 #include <memory>
 
 // APSI
-#include "apsi/sender/senderdispatcher.h"
+#include "apsi/senderdispatcher.h"
 #include "apsi/network/senderchannel.h"
 #include "apsi/network/network_utils.h"
 #include "apsi/logging/log.h"

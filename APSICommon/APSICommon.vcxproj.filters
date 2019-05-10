@@ -13,18 +13,6 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Header Files\Receiver">
-      <UniqueIdentifier>{697b477a-1b7c-4938-b7ae-210a0d923639}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\Sender">
-      <UniqueIdentifier>{60858af7-f52f-4e2a-9c74-1ff8bfe40139}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Sender">
-      <UniqueIdentifier>{06290153-ce5f-47b0-b510-00bc5ed85904}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\Receiver">
-      <UniqueIdentifier>{e42be588-5cca-4442-b14a-226e5429bcac}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\Network">
       <UniqueIdentifier>{1d7550ee-b676-45fd-92a7-e3960c3f4180}</UniqueIdentifier>
     </Filter>
@@ -62,21 +50,6 @@
     </ClInclude>
     <ClInclude Include="apsi\psiparams.h">
       <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\Receiver\receiver.h">
-      <Filter>Header Files\Receiver</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\Sender\sender.h">
-      <Filter>Header Files\Sender</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\Sender\senderdb.h">
-      <Filter>Header Files\Sender</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\Sender\sendersessioncontext.h">
-      <Filter>Header Files\Sender</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\Sender\senderthreadcontext.h">
-      <Filter>Header Files\Sender</Filter>
     </ClInclude>
     <ClInclude Include="apsi\Tools\stopwatch.h">
       <Filter>Header Files\Tools</Filter>
@@ -129,9 +102,6 @@
     <ClInclude Include="apsi\tools\csvreader.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
-    <ClInclude Include="apsi\sender\senderdispatcher.h">
-      <Filter>Header Files\Sender</Filter>
-    </ClInclude>
     <ClInclude Include="apsi\network\senderoperation.h">
       <Filter>Header Files\Network</Filter>
     </ClInclude>
@@ -147,9 +117,6 @@
     <ClInclude Include="apsi\tools\fourq.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
-    <ClInclude Include="apsi\sender\dbblock.h">
-      <Filter>Header Files\Sender</Filter>
-    </ClInclude>
     <ClInclude Include="apsi\tools\bigpoly.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
@@ -163,15 +130,6 @@
     </ClCompile>
     <ClCompile Include="apsi\Network\network_utils.cpp">
       <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\Receiver\receiver.cpp">
-      <Filter>Source Files\Receiver</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\Sender\sender.cpp">
-      <Filter>Source Files\Sender</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\Sender\senderdb.cpp">
-      <Filter>Source Files\Sender</Filter>
     </ClCompile>
     <ClCompile Include="apsi\Tools\stopwatch.cpp">
       <Filter>Source Files\Tools</Filter>
@@ -209,9 +167,6 @@
     <ClCompile Include="apsi\tools\csvreader.cpp">
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
-    <ClCompile Include="apsi\sender\senderdispatcher.cpp">
-      <Filter>Source Files\Sender</Filter>
-    </ClCompile>
     <ClCompile Include="apsi\tools\fourq.cpp">
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
@@ -220,9 +175,6 @@
     </ClCompile>
     <ClCompile Include="apsi\network\senderchannel.cpp">
       <Filter>Source Files\Network</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\sender\dbblock.cpp">
-      <Filter>Source Files\Sender</Filter>
     </ClCompile>
     <ClCompile Include="apsi\tools\bigpoly.cpp">
       <Filter>Source Files\Tools</Filter>

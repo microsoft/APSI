@@ -71,11 +71,11 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetExt>.lib</TargetExt>
-    <OutDir>$(ProjectDir)../bin/$(Platform)\$(Configuration)\</OutDir>
+    <OutDir>$(ProjectDir)../lib/$(Platform)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TargetExt>.lib</TargetExt>
-    <OutDir>$(ProjectDir)../bin/$(Platform)\$(Configuration)\</OutDir>
+    <OutDir>$(ProjectDir)../lib/$(Platform)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -153,14 +153,7 @@
     <ClInclude Include="apsi\network\senderoperation.h" />
     <ClInclude Include="apsi\network\senderoperationresponse.h" />
     <ClInclude Include="apsi\psiparams.h" />
-    <ClInclude Include="apsi\Receiver\receiver.h" />
     <ClInclude Include="apsi\result_package.h" />
-    <ClInclude Include="apsi\sender\dbblock.h" />
-    <ClInclude Include="apsi\Sender\sender.h" />
-    <ClInclude Include="apsi\Sender\senderdb.h" />
-    <ClInclude Include="apsi\sender\senderdispatcher.h" />
-    <ClInclude Include="apsi\Sender\sendersessioncontext.h" />
-    <ClInclude Include="apsi\Sender\senderthreadcontext.h" />
     <ClInclude Include="apsi\tools\aes.h" />
     <ClInclude Include="apsi\tools\bigpoly.h" />
     <ClInclude Include="apsi\tools\csvreader.h" />
@@ -184,11 +177,6 @@
     <ClCompile Include="apsi\Network\network_utils.cpp" />
     <ClCompile Include="apsi\network\receiverchannel.cpp" />
     <ClCompile Include="apsi\network\senderchannel.cpp" />
-    <ClCompile Include="apsi\Receiver\receiver.cpp" />
-    <ClCompile Include="apsi\sender\dbblock.cpp" />
-    <ClCompile Include="apsi\Sender\sender.cpp" />
-    <ClCompile Include="apsi\Sender\senderdb.cpp" />
-    <ClCompile Include="apsi\sender\senderdispatcher.cpp" />
     <ClCompile Include="apsi\tools\aes.cpp" />
     <ClCompile Include="apsi\tools\bigpoly.cpp" />
     <ClCompile Include="apsi\tools\csvreader.cpp" />

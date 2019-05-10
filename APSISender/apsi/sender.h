@@ -15,9 +15,9 @@
 // APSI
 #include "apsi/item.h"
 #include "apsi/psiparams.h"
-#include "apsi/sender/senderdb.h"
-#include "apsi/sender/sendersessioncontext.h"
-#include "apsi/sender/senderthreadcontext.h"
+#include "apsi/senderdb.h"
+#include "apsi/sendersessioncontext.h"
+#include "apsi/senderthreadcontext.h"
 #include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_fast_batch_encoder.h"
 #include "apsi/tools/sealcompress.h"

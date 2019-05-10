@@ -3,8 +3,7 @@
 #include <map>
 
 // APSI
-#include "apsi/sender/sender.h"
-#include "apsi/receiver/receiver.h"
+#include "apsi/receiver.h"
 #include "apsi/apsidefines.h"
 #include "apsi/logging/log.h"
 #include "apsi/network/network_utils.h"

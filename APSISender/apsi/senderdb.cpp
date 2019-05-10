@@ -3,7 +3,7 @@
 #include <thread>
 
 // APSI
-#include "apsi/sender/senderdb.h"
+#include "apsi/senderdb.h"
 #include "apsi/apsidefines.h"
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/tools/prng.h"

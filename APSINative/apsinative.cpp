@@ -12,7 +12,7 @@
 
 // APSI
 #include "apsi/item.h"
-#include "apsi/receiver/receiver.h"
+#include "apsi/receiver.h"
 #include "apsi/network/receiverchannel.h"
 
 

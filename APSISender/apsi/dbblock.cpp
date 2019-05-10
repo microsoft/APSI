@@ -1,5 +1,5 @@
 // APSI
-#include "apsi/sender/dbblock.h"
+#include "apsi/dbblock.h"
 #include "apsi/tools/prng.h"
 #include "apsi/tools/interpolate.h"
 #include "apsi/logging/log.h"

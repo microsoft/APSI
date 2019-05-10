@@ -5,7 +5,7 @@
 #include <array>
 
 // APSI
-#include "apsi/sender/sender.h"
+#include "apsi/sender.h"
 #include "apsi/apsidefines.h"
 #include "apsi/logging/log.h"
 #include "apsi/network/network_utils.h"

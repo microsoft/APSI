@@ -8,7 +8,7 @@
 // APSI
 #include "apsi/apsidefines.h"
 #include "apsi/item.h"
-#include "apsi/sender/senderthreadcontext.h"
+#include "apsi/senderthreadcontext.h"
 #include "apsi/ffield/ffield_fast_batch_encoder.h"
 
 // SEAL
