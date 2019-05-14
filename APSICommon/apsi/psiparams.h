@@ -12,7 +12,6 @@
 #include "apsi/apsidefines.h"
 #include "apsi/logging/log.h"
 #include "apsi/tools/utils.h"
-#include "apsi/tools/bigpoly.h"
 
 // SEAL
 #include "seal/encryptionparams.h"

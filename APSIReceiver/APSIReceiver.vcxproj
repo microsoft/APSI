@@ -19,9 +19,11 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="apsi\network\receiverchannel.cpp" />
     <ClCompile Include="apsi\receiver.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="apsi\network\receiverchannel.h" />
     <ClInclude Include="apsi\receiver.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

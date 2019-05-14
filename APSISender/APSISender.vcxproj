@@ -20,12 +20,14 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\dbblock.cpp" />
+    <ClCompile Include="apsi\network\senderchannel.cpp" />
     <ClCompile Include="apsi\sender.cpp" />
     <ClCompile Include="apsi\senderdb.cpp" />
     <ClCompile Include="apsi\senderdispatcher.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="apsi\dbblock.h" />
+    <ClInclude Include="apsi\network\senderchannel.h" />
     <ClInclude Include="apsi\sender.h" />
     <ClInclude Include="apsi\senderdb.h" />
     <ClInclude Include="apsi\senderdispatcher.h" />
