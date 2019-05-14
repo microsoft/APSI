@@ -29,5 +29,5 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/thread_pool.h
         ${CMAKE_CURRENT_LIST_DIR}/utils.h
     DESTINATION
-        ${APSI_INCLUDES_INSTALL_DIR}/apsi
+        ${APSICOMMON_INCLUDES_INSTALL_DIR}/apsi/tools
 )

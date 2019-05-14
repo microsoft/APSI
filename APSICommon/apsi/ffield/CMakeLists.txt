@@ -15,5 +15,5 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/ffield_fast_batch_encoder.h
         ${CMAKE_CURRENT_LIST_DIR}/ffield.h
     DESTINATION
-        ${APSI_INCLUDES_INSTALL_DIR}/apsi
+        ${APSICOMMON_INCLUDES_INSTALL_DIR}/apsi/ffield
 )

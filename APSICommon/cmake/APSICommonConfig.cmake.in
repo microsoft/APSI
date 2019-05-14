@@ -1,4 +1,4 @@
-# Exports target APIS::api
+# Exports target APSICommon::apsi_common
 #
 # Creates variables:
 #   APSI_BUILD_TYPE : The build configuration used

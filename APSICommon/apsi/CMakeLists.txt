@@ -20,5 +20,5 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/psiparams.h
         ${CMAKE_CURRENT_LIST_DIR}/result_package.h
     DESTINATION
-        ${APSI_INCLUDES_INSTALL_DIR}/apsi
+        ${APSICOMMON_INCLUDES_INSTALL_DIR}/apsi
 )

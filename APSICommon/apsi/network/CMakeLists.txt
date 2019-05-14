@@ -14,5 +14,5 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/senderoperation.h
         ${CMAKE_CURRENT_LIST_DIR}/senderoperationresponse.h
     DESTINATION
-        ${APSI_INCLUDES_INSTALL_DIR}/apsi
+        ${APSICOMMON_INCLUDES_INSTALL_DIR}/apsi/network
 )

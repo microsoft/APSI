@@ -10,5 +10,5 @@ install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/log.h
     DESTINATION
-        ${APSI_INCLUDES_INSTALL_DIR}/apsi
+        ${APSICOMMON_INCLUDES_INSTALL_DIR}/apsi/logging
 )
