@@ -3,14 +3,12 @@
 
 target_sources(apsi_receiver
 	PRIVATE
-		${CMAKE_CURRENT_LIST_DIR}/receiver.cpp
+		${CMAKE_CURRENT_LIST_DIR}/receiverchannel.cpp
 )
-
-add_subdirectory(network)
 
 install(
     FILES
-        ${CMAKE_CURRENT_LIST_DIR}/receiver.h
+        ${CMAKE_CURRENT_LIST_DIR}/receiverchannel.h
     DESTINATION
-        ${APSIRECEIVER_INCLUDES_INSTALL_DIR}/apsi
+        ${APSIRECEIVER_INCLUDES_INSTALL_DIR}/apsi/network
 )

@@ -23,5 +23,8 @@ packages/*
 APSICommon/cmake/APSICommonConfig.cmake
 APSICommon/cmake/APSICommonConfigVersion.cmake
 APSICommon/cmake/APSICommonTargets.cmake
+APSIReceiver/cmake/APSIReceiverConfig.cmake
+APSIReceiver/cmake/APSIReceiverConfigVersion.cmake
+APSIReceiver/cmake/APSIReceiverTargets.cmake
 doc/html
 doc/latex

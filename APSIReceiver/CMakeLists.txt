@@ -3,7 +3,7 @@
 
 cmake_minimum_required(VERSION 3.10)
 
-project(APSICOMMON VERSION 1.0.0 LANGUAGES CXX C)
+project(APSIReceiver VERSION 1.0.0 LANGUAGES CXX C)
 
 if (DEFINED MSVC)
     message(FATAL_ERROR "Please build APSI using the attached Visual Studio solution/project file")
@@ -13,7 +13,7 @@ endif()
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../lib)
 
 # Create library but add no source files yet
-add_library(apsi_common STATIC "")
+add_library(apsi_receiver STATIC "")
 
 # Build in release mode by default
 set(APSI_DEFAULT_BUILD_TYPE "Release")
@@ -33,12 +33,15 @@ else()
 endif()
 
 # Required files and directories
-set(APSICOMMON_INCLUDES_INSTALL_DIR include)
-set(APSICOMMON_CONFIG_IN_FILENAME ${APSICOMMON_SOURCE_DIR}/cmake/APSICommonConfig.cmake.in)
-set(APSICOMMON_CONFIG_FILENAME ${APSICOMMON_SOURCE_DIR}/cmake/APSICommonConfig.cmake)
-set(APSICOMMON_TARGETS_FILENAME ${APSICOMMON_SOURCE_DIR}/cmake/APSICommonTargets.cmake)
-set(APSICOMMON_CONFIG_VERSION_FILENAME ${APSICOMMON_SOURCE_DIR}/cmake/APSICommonConfigVersion.cmake)
-set(APSICOMMON_CONFIG_INSTALL_DIR lib/cmake/APSICommon)
+set(APSIRECEIVER_INCLUDES_INSTALL_DIR include)
+set(APSIRECEIVER_CONFIG_IN_FILENAME ${APSIReceiver_SOURCE_DIR}/cmake/APSIReceiverConfig.cmake.in)
+set(APSIRECEIVER_CONFIG_FILENAME ${APSIReceiver_SOURCE_DIR}/cmake/APSIReceiverConfig.cmake)
+set(APSIRECEIVER_TARGETS_FILENAME ${APSIReceiver_SOURCE_DIR}/cmake/APSIReceiverTargets.cmake)
+set(APSIRECEIVER_CONFIG_VERSION_FILENAME ${APSIReceiver_SOURCE_DIR}/cmake/APSIReceiverConfigVersion.cmake)
+set(APSIRECEIVER_CONFIG_INSTALL_DIR lib/cmake/APSIReceiver)
+
+# Import APSICommon
+find_package(APSICommon 1.0.0 EXACT REQUIRED)
 
 # Import Microsoft SEAL
 find_package(SEAL 3.2.0 EXACT REQUIRED)
@@ -66,35 +69,13 @@ else()
     message(STATUS "Found FourQ: ${FOURQ}")
 endif()
 
-# Log4cplus
-find_path(LOG4CPLUS_DIR log4cplus/logger.h)
-find_library(LOG4CPLUS log4cplus)
-if (NOT LOG4CPLUS_DIR OR NOT LOG4CPLUS)
-    message(FATAL_ERROR "Could not find log4cplus library")
-else()
-    message(STATUS "log4cplus directory: ${LOG4CPLUS_DIR}")
-    message(STATUS "Found log4cplus: ${LOG4CPLUS}")
-endif()
-
-# ZeroMQ
-find_path(ZMQ_DIR zmqpp/zmqpp.hpp)
-find_library(ZMQ zmq)
-find_library(ZMQPP zmqpp)
-if (NOT ZMQ OR NOT ZMQPP OR NOT ZMQ_DIR)
-    message(FATAL_ERROR "Could not find zmq or zmqpp libraries")
-else()
-    message(STATUS "zmqpp directory:  ${ZMQ_DIR}")
-    message(STATUS "Found zmq: ${ZMQ}")
-    message(STATUS "Found zmqpp: ${ZMQPP}")
-endif()
-
 # Set flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -maes")
 
 # C++17
-target_compile_features(apsi_common PUBLIC cxx_std_17)
+target_compile_features(apsi_receiver PUBLIC cxx_std_17)
 
 # Defines
 add_definitions(-DHAVE_CONFIG)
@@ -108,47 +89,46 @@ add_definitions(-D__LINUX__)
 # Includes
 include_directories(${FLINT_DIR}/flint)
 include_directories(${FOURQ_DIR}/FourQ)
-include_directories(${LOG4CPLUS_DIR})
 
 # Link required libraries
-target_link_libraries(apsi_common SEAL::seal Cuckoo::cuckoo ${FLINT} ${FOURQ} ${ZMQ} ${ZMQPP})
+target_link_libraries(apsi_receiver APSICommon::apsi_common SEAL::seal Cuckoo::cuckoo ${FLINT} ${FOURQ})
 
 # Add source files to library
 add_subdirectory(apsi)
 
 # Add local include directories for build
-target_include_directories(apsi_common
-	PRIVATE $<BUILD_INTERFACE:${APSICOMMON_SOURCE_DIR}>)
+target_include_directories(apsi_receiver
+	PRIVATE $<BUILD_INTERFACE:${APSIReceiver_SOURCE_DIR}>)
 
-# Associate APSI to export apsi_export
-install(TARGETS apsi_common EXPORT apsi_common_export
+# Associate APSI to export apsi_receiver_export
+install(TARGETS apsi_receiver EXPORT apsi_receiver_export
     ARCHIVE DESTINATION lib
-    INCLUDES DESTINATION ${APSICOMMON_INCLUDES_INSTALL_DIR})
+    INCLUDES DESTINATION ${APSIRECEIVER_INCLUDES_INSTALL_DIR})
 
 # Export the targets
-export(EXPORT apsi_common_export
-    FILE ${APSICOMMON_TARGETS_FILENAME}
-    NAMESPACE APSICommon::)
+export(EXPORT apsi_receiver_export
+    FILE ${APSIRECEIVER_TARGETS_FILENAME}
+    NAMESPACE APSIReceiver::)
 
 # Create the CMake config file
-configure_file(${APSICOMMON_CONFIG_IN_FILENAME} ${APSICOMMON_CONFIG_FILENAME} @ONLY)
+configure_file(${APSIRECEIVER_CONFIG_IN_FILENAME} ${APSIRECEIVER_CONFIG_FILENAME} @ONLY)
 
 # Install the export
 install(
-    EXPORT apsi_common_export
-    FILE APSICommonTargets.cmake
-    NAMESPACE APSICommon::
-    DESTINATION ${APSICOMMON_CONFIG_INSTALL_DIR})
+    EXPORT apsi_receiver_export
+    FILE APSIReceiverTargets.cmake
+    NAMESPACE APSIReceiver::
+    DESTINATION ${APSIRECEIVER_CONFIG_INSTALL_DIR})
 
 # Version file; we require exact version match for downstream
 include(CMakePackageConfigHelpers)
-write_basic_package_version_file(${APSICOMMON_CONFIG_VERSION_FILENAME}
-    VERSION ${APSICOMMON_VERSION}
+write_basic_package_version_file(${APSIRECEIVER_CONFIG_VERSION_FILENAME}
+    VERSION ${APSIRECEIVER_VERSION}
     COMPATIBILITY ExactVersion)
 
 # Install other files 
 install(
     FILES
-        ${APSICOMMON_CONFIG_FILENAME}
-        ${APSICOMMON_CONFIG_VERSION_FILENAME}
-    DESTINATION ${APSICOMMON_CONFIG_INSTALL_DIR})
+        ${APSIRECEIVER_CONFIG_FILENAME}
+        ${APSIRECEIVER_CONFIG_VERSION_FILENAME}
+    DESTINATION ${APSIRECEIVER_CONFIG_INSTALL_DIR})
