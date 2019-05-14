@@ -3,7 +3,7 @@
 
 cmake_minimum_required(VERSION 3.10)
 
-project(APSI VERSION 1.0.0 LANGUAGES CXX C)
+project(APSICOMMON VERSION 1.0.0 LANGUAGES CXX C)
 
 if (DEFINED MSVC)
     message(FATAL_ERROR "Please build APSI using the attached Visual Studio solution/project file")
@@ -13,7 +13,7 @@ endif()
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../lib)
 
 # Create library but add no source files yet
-add_library(apsi STATIC "")
+add_library(apsi_common STATIC "")
 
 # Build in release mode by default
 set(APSI_DEFAULT_BUILD_TYPE "Release")
@@ -33,12 +33,12 @@ else()
 endif()
 
 # Required files and directories
-set(APSI_INCLUDES_INSTALL_DIR include)
-set(APSI_CONFIG_IN_FILENAME ${APSI_SOURCE_DIR}/cmake/APSIConfig.cmake.in)
-set(APSI_CONFIG_FILENAME ${APSI_SOURCE_DIR}/cmake/APSIConfig.cmake)
-set(APSI_TARGETS_FILENAME ${APSI_SOURCE_DIR}/cmake/APSITargets.cmake)
-set(APSI_CONFIG_VERSION_FILENAME ${APSI_SOURCE_DIR}/cmake/APSIConfigVersion.cmake)
-set(APSI_CONFIG_INSTALL_DIR lib/cmake/APSI)
+set(APSICOMMON_INCLUDES_INSTALL_DIR include)
+set(APSICOMMON_CONFIG_IN_FILENAME ${APSICOMMON_SOURCE_DIR}/cmake/APSICommonConfig.cmake.in)
+set(APSICOMMON_CONFIG_FILENAME ${APSICOMMON_SOURCE_DIR}/cmake/APSICommonConfig.cmake)
+set(APSICOMMON_TARGETS_FILENAME ${APSICOMMON_SOURCE_DIR}/cmake/APSICommonTargets.cmake)
+set(APSICOMMON_CONFIG_VERSION_FILENAME ${APSICOMMON_SOURCE_DIR}/cmake/APSICommonConfigVersion.cmake)
+set(APSICOMMON_CONFIG_INSTALL_DIR lib/cmake/APSI)
 
 # Import Microsoft SEAL
 find_package(SEAL 3.2.0 EXACT REQUIRED)
@@ -94,7 +94,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -maes")
 
 # C++17
-target_compile_features(apsi PUBLIC cxx_std_17)
+target_compile_features(apsi_common PUBLIC cxx_std_17)
 
 # Defines
 add_definitions(-DHAVE_CONFIG)
@@ -111,44 +111,44 @@ include_directories(${FOURQ_DIR}/FourQ)
 include_directories(${LOG4CPLUS_DIR})
 
 # Link required libraries
-target_link_libraries(apsi SEAL::seal Cuckoo::cuckoo ${FLINT} ${FOURQ} ${ZMQ} ${ZMQPP})
+target_link_libraries(apsi_common SEAL::seal Cuckoo::cuckoo ${FLINT} ${FOURQ} ${ZMQ} ${ZMQPP})
 
 # Add source files to library
 add_subdirectory(apsi)
 
 # Add local include directories for build
-target_include_directories(apsi
-	PRIVATE $<BUILD_INTERFACE:${APSI_SOURCE_DIR}>)
+target_include_directories(apsi_common
+	PRIVATE $<BUILD_INTERFACE:${APSICOMMON_SOURCE_DIR}>)
 
 # Associate APSI to export apsi_export
-install(TARGETS apsi EXPORT apsi_export
+install(TARGETS apsi_common EXPORT apsi_common_export
     ARCHIVE DESTINATION lib
-    INCLUDES DESTINATION ${APSI_INCLUDES_INSTALL_DIR})
+    INCLUDES DESTINATION ${APSICOMMON_INCLUDES_INSTALL_DIR})
 
 # Export the targets
-export(EXPORT apsi_export
-    FILE ${APSI_TARGETS_FILENAME}
-    NAMESPACE APSI::)
+export(EXPORT apsi_common_export
+    FILE ${APSICOMMON_TARGETS_FILENAME}
+    NAMESPACE APSICommon::)
 
 # Create the CMake config file
-configure_file(${APSI_CONFIG_IN_FILENAME} ${APSI_CONFIG_FILENAME} @ONLY)
+configure_file(${APSICOMMON_CONFIG_IN_FILENAME} ${APSICOMMON_CONFIG_FILENAME} @ONLY)
 
 # Install the export
 install(
-    EXPORT apsi_export
+    EXPORT apsi_common_export
     FILE APSITargets.cmake
-    NAMESPACE APSI::
-    DESTINATION ${APSI_CONFIG_INSTALL_DIR})
+    NAMESPACE APSICommon::
+    DESTINATION ${APSICOMMON_CONFIG_INSTALL_DIR})
 
 # Version file; we require exact version match for downstream
 include(CMakePackageConfigHelpers)
-write_basic_package_version_file(${APSI_CONFIG_VERSION_FILENAME}
-    VERSION ${APSI_VERSION}
+write_basic_package_version_file(${APSICOMMON_CONFIG_VERSION_FILENAME}
+    VERSION ${APSICOMMON_VERSION}
     COMPATIBILITY ExactVersion)
 
 # Install other files 
 install(
     FILES
-        ${APSI_CONFIG_FILENAME}
-        ${APSI_CONFIG_VERSION_FILENAME}
-    DESTINATION ${APSI_CONFIG_INSTALL_DIR})
+        ${APSICOMMON_CONFIG_FILENAME}
+        ${APSICOMMON_CONFIG_VERSION_FILENAME}
+    DESTINATION ${APSICOMMON_CONFIG_INSTALL_DIR})
