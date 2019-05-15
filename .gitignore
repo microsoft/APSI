@@ -23,6 +23,9 @@ packages/*
 APSICommon/cmake/APSICommonConfig.cmake
 APSICommon/cmake/APSICommonConfigVersion.cmake
 APSICommon/cmake/APSICommonTargets.cmake
+APSISender/cmake/APSISenderConfig.cmake
+APSISender/cmake/APSISenderConfigVersion.cmake
+APSISender/cmake/APSISenderTargets.cmake
 APSIReceiver/cmake/APSIReceiverConfig.cmake
 APSIReceiver/cmake/APSIReceiverConfigVersion.cmake
 APSIReceiver/cmake/APSIReceiverTargets.cmake
