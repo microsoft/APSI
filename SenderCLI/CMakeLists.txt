@@ -25,8 +25,11 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
-# Import APSI
-find_package(APSI 1.0.0 EXACT REQUIRED)
+# Import APSICommon
+find_package(APSICommon 1.0.0 EXACT REQUIRED)
+
+# Import APSISender
+find_package(APSISender 1.0.0 EXACT REQUIRED)
 
 # Import SEAL
 find_package(SEAL 3.2.0 REQUIRED)
@@ -36,12 +39,10 @@ find_package(Cuckoo 1.0 REQUIRED)
 
 # Import FLINT library
 find_path(FLINT_DIR NAMES flint/fmpz.h)
-find_library(FLINT flint)
-if (NOT FLINT OR NOT FLINT_DIR)
+if (NOT FLINT_DIR)
     message(FATAL_ERROR "Could not find FLINT library")
 else()
     message(STATUS "Flint directory: ${FLINT_DIR}")
-    message(STATUS "Found FLINT: ${FLINT}")
 endif()
 
 # Log4cplus
@@ -52,26 +53,6 @@ if (NOT LOG4CPLUS_DIR OR NOT LOG4CPLUS)
 else()
     message(STATUS "log4cplus directory: ${LOG4CPLUS_DIR}")
     message(STATUS "Found log4cplus: ${LOG4CPLUS}")
-endif()
-
-# ZeroMQ
-find_path(ZMQ_DIR zmqpp/zmqpp.hpp)
-find_library(ZMQ zmq)
-find_library(ZMQPP zmqpp)
-if (NOT ZMQ OR NOT ZMQPP OR NOT ZMQ_DIR)
-    message(FATAL_ERROR "Could not find zmq or zmqpp libraries")
-else()
-    message(STATUS "zmqpp directory:  ${ZMQ_DIR}")
-    message(STATUS "Found zmq: ${ZMQ}")
-    message(STATUS "Found zmqpp: ${ZMQPP}")
-endif()
-
-# GMP
-find_library(GMP gmp)
-if (NOT GMP)
-    message(FATAL_ERROR "Could not find gmp library")
-else()
-    message(STATUS "Found gmp: ${GMP}")
 endif()
 
 # CryptoPP
@@ -96,8 +77,9 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 
 # Includes
 target_include_directories(sender PRIVATE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../APSI>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../CommonCode>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../APSICommon>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../APSISender>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../CommonCodeCLI>
     ${FLINT_DIR}/flint
     ${LOG4CPLUS_DIR}
 )
@@ -107,11 +89,8 @@ target_compile_features(sender PUBLIC cxx_std_17)
 
 # Link required libraries
 target_link_libraries(sender
-    APSI::apsi
-    ${FLINT}
-    ${ZMQ}
-    ${ZMQPP}
-    ${GMP}
+    APSICommon::apsi_common
+    APSISender::apsi_sender
     ${LOG4CPLUS}
     ${CRYPTOPP}
     ${COMMON_CODE}
