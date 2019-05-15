@@ -88,6 +88,14 @@ else()
     message(STATUS "Found zmqpp: ${ZMQPP}")
 endif()
 
+# GMP
+find_library(GMP gmp)
+if (NOT GMP)
+    message(FATAL_ERROR "Could not find gmp library")
+else()
+    message(STATUS "Found gmp: ${GMP}")
+endif()
+
 # Set flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
@@ -111,7 +119,7 @@ include_directories(${FOURQ_DIR}/FourQ)
 include_directories(${LOG4CPLUS_DIR})
 
 # Link required libraries
-target_link_libraries(apsi_common SEAL::seal Cuckoo::cuckoo ${FLINT} ${FOURQ} ${ZMQ} ${ZMQPP})
+target_link_libraries(apsi_common SEAL::seal Cuckoo::cuckoo ${FLINT} ${FOURQ} ${ZMQ} ${ZMQPP} ${GMP})
 
 # Add source files to library
 add_subdirectory(apsi)
@@ -143,7 +151,7 @@ install(
 # Version file; we require exact version match for downstream
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(${APSICOMMON_CONFIG_VERSION_FILENAME}
-    VERSION ${APSICOMMON_VERSION}
+    VERSION ${APSICommon_VERSION}
     COMPATIBILITY ExactVersion)
 
 # Install other files 

@@ -8,6 +8,6 @@ set(APSI_BUILD_TYPE @CMAKE_BUILD_TYPE@)
 set(APSI_DEBUG @APSI_DEBUG@)
 
 include(${CMAKE_CURRENT_LIST_DIR}/APSICommonTargets.cmake)
-message(STATUS "APSICommon detected (version ${APSICOMMON_VERSION})")
+message(STATUS "APSICommon detected (version ${APSICommon_VERSION})")
 message(STATUS "APSICommon build type: ${APSI_BUILD_TYPE}")
 message(STATUS "APSICommon debug mode: ${APSI_DEBUG}")

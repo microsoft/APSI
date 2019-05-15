@@ -26,7 +26,7 @@ endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
 # Add APSI
-find_package(APSI 1.0.0 EXACT REQUIRED)
+find_package(APSICommon 1.0.0 EXACT REQUIRED)
 
 # Add SEAL
 find_package(SEAL 3.2.0 REQUIRED)
@@ -42,4 +42,4 @@ target_include_directories(common_code PRIVATE
 )
 
 # Link required libraries
-target_link_libraries(common_code APSI::apsi SEAL::seal Cuckoo::cuckoo)
+target_link_libraries(common_code APSICommon::apsi_common SEAL::seal Cuckoo::cuckoo)

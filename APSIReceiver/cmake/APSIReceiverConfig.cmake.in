@@ -8,6 +8,6 @@ set(APSI_BUILD_TYPE @CMAKE_BUILD_TYPE@)
 set(APSI_DEBUG @APSI_DEBUG@)
 
 include(${CMAKE_CURRENT_LIST_DIR}/APSIReceiverTargets.cmake)
-message(STATUS "APSIReceiver detected (version ${APSIRECEIVER_VERSION})")
+message(STATUS "APSIReceiver detected (version ${APSIReceiver_VERSION})")
 message(STATUS "APSIReceiver build type: ${APSI_BUILD_TYPE}")
 message(STATUS "APSIReceiver debug mode: ${APSI_DEBUG}")

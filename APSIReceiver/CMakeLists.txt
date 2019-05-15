@@ -123,7 +123,7 @@ install(
 # Version file; we require exact version match for downstream
 include(CMakePackageConfigHelpers)
 write_basic_package_version_file(${APSIRECEIVER_CONFIG_VERSION_FILENAME}
-    VERSION ${APSIRECEIVER_VERSION}
+    VERSION ${APSIReceiver_VERSION}
     COMPATIBILITY ExactVersion)
 
 # Install other files 
