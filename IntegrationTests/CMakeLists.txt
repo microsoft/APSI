@@ -82,7 +82,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 
 # Includes
 target_include_directories(int_tests PRIVATE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../APSI>
     ${FLINT_DIR}/flint
     ${LOG4CPLUS_DIR}
 )

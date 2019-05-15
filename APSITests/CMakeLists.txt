@@ -90,7 +90,6 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 
 # Includes
 target_include_directories(unit_tests PRIVATE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../APSICommon>
     ${FLINT_DIR}/flint
     ${FOURQ_DIR}/FourQ
     ${LOG4CPLUS_DIR}
