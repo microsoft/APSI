@@ -1,0 +1,13 @@
+# Exports target APSIReceiver::apsi_receiver
+#
+# Creates variables:
+#   APSI_BUILD_TYPE : The build configuration used
+#   APSI_DEBUG : Set to non-zero value if APSI is compiled with extra debugging code
+
+set(APSI_BUILD_TYPE @CMAKE_BUILD_TYPE@)
+set(APSI_DEBUG @APSI_DEBUG@)
+
+include(${CMAKE_CURRENT_LIST_DIR}/APSIReceiverTargets.cmake)
+message(STATUS "APSIReceiver detected (version ${APSIReceiver_VERSION})")
+message(STATUS "APSIReceiver build type: ${APSI_BUILD_TYPE}")
+message(STATUS "APSIReceiver debug mode: ${APSI_DEBUG}")

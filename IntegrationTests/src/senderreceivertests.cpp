@@ -1,9 +1,9 @@
 #include "gtest/gtest.h"
 #include <random>
 #include <memory>
-#include "apsi/sender/sender.h"
-#include "apsi/sender/senderdispatcher.h"
-#include "apsi/receiver/receiver.h"
+#include "apsi/sender.h"
+#include "apsi/senderdispatcher.h"
+#include "apsi/receiver.h"
 #include "apsi/network/receiverchannel.h"
 #include "apsi/tools/utils.h"
 #include "apsi/logging/log.h"

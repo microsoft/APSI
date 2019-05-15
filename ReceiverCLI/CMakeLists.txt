@@ -3,22 +3,22 @@
 
 cmake_minimum_required(VERSION 3.10)
 
-project(unit_tests VERSION 1.0.0 LANGUAGES CXX C)
+project(receiver VERSION 1.0.0 LANGUAGES CXX C)
 
 if (DEFINED MSVC)
-    message(FATAL_ERROR "Please build Unit Tests using the attached Visual Studio solution/project file")
+    message(FATAL_ERROR "Please build Receiver using the attached Visual Studio solution/project file")
 endif()
 
 # Executable will be in ../bin
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../bin)
 
 # Create executable but add no source files yet
-add_executable(unit_tests "")
+add_executable(receiver "")
 
 # Build in release mode by default
-set(UNIT_TESTS_DEFAULT_BUILD_TYPE "Release")
+set(RECEIVER_DEFAULT_BUILD_TYPE "Release")
 if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE ${UNIT_TESTS_DEFAULT_BUILD_TYPE} CACHE
+    set(CMAKE_BUILD_TYPE ${RECEIVER_DEFAULT_BUILD_TYPE} CACHE
         STRING "Build type" FORCE)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
         "Release" "Debug" "MinSizeRel" "RelWithDebInfo")
@@ -27,9 +27,6 @@ message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
 # Import APSICommon
 find_package(APSICommon 1.0.0 EXACT REQUIRED)
-
-# Import APSISender
-find_package(APSISender 1.0.0 EXACT REQUIRED)
 
 # Import APSIReceiver
 find_package(APSIReceiver 1.0.0 EXACT REQUIRED)
@@ -40,20 +37,12 @@ find_package(SEAL 3.2.0 REQUIRED)
 # Import Cuckoo
 find_package(Cuckoo 1.0 REQUIRED)
 
-# FLINT library
+# Import FLINT library
 find_path(FLINT_DIR NAMES flint/fmpz.h)
 if (NOT FLINT_DIR)
     message(FATAL_ERROR "Could not find FLINT library")
 else()
     message(STATUS "Flint directory: ${FLINT_DIR}")
-endif()
-
-# FourQ
-find_path(FOURQ_DIR NAMES FourQ/FourQ.h)
-if (NOT FOURQ_DIR)
-    message(FATAL_ERROR "Could not find FourQ library")
-else()
-    message(STATUS "FourQ directory: ${FOURQ_DIR}")
 endif()
 
 # Log4cplus
@@ -74,14 +63,12 @@ else()
     message(STATUS "Found cryptopp: ${CRYPTOPP}")
 endif()
 
-# Google Test
-find_path(GTEST_DIR gtest/gtest.h)
-find_library(GTEST gtest)
-if (NOT GTEST OR NOT GTEST_DIR)
-    message(FATAL_ERROR "Could not find Google Test library")
+# Common Code
+find_library(COMMON_CODE common_code HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../lib)
+if (NOT COMMON_CODE)
+    message(FATAL_ERROR "Could not find common_code library")
 else()
-    message(STATUS "Google Test directory: ${GTEST_DIR}")
-    message(STATUS "Found Google Test: ${GTEST}")
+    message(STATUS "Found common_code: ${COMMON_CODE}")
 endif()
 
 # Set flags
@@ -89,31 +76,28 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 
 # Includes
-target_include_directories(unit_tests PRIVATE
+target_include_directories(receiver PRIVATE
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../APSICommon>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../APSIReceiver>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../CommonCodeCLI>
     ${FLINT_DIR}/flint
-    ${FOURQ_DIR}/FourQ
     ${LOG4CPLUS_DIR}
 )
 
 # C++17
-target_compile_features(unit_tests PUBLIC cxx_std_17)
-
-# Defines
-add_definitions(-D_AMD64_)
-add_definitions(-D_AVX2_)
-add_definitions(-D_ASM_)
-add_definitions(-D__LINUX__)
-
-# Link required libraries
-target_link_libraries(unit_tests
-    APSICommon::apsi_common
-    APSISender::apsi_sender
-    APSIReceiver::apsi_receiver
-    ${GTEST}
-    stdc++fs
-    ${LOG4CPLUS}
-    ${CRYPTOPP}
-)
+target_compile_features(receiver PUBLIC cxx_std_17)
 
 # Add source files to executable
 add_subdirectory(src)
+
+# Link required libraries
+target_link_libraries(receiver
+    APSICommon::apsi_common
+    APSIReceiver::apsi_receiver
+    SEAL::seal
+    Cuckoo::cuckoo
+    stdc++fs
+    ${COMMON_CODE}
+    ${LOG4CPLUS}
+    ${CRYPTOPP}
+)

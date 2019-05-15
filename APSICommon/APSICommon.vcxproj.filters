@@ -1,0 +1,171 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Header Files\Network">
+      <UniqueIdentifier>{1d7550ee-b676-45fd-92a7-e3960c3f4180}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Network">
+      <UniqueIdentifier>{bc1b2fb6-fe51-4c78-aaa8-d0ce85877950}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Tools">
+      <UniqueIdentifier>{3724c067-3d6b-42ac-b9ab-cbf3c5c3fc09}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Tools">
+      <UniqueIdentifier>{3071dd66-85f2-4ab2-a9d1-1b986e2921e9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\FField">
+      <UniqueIdentifier>{ac40a90d-a74a-497e-bf3e-fa0c9f9ef422}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\FField">
+      <UniqueIdentifier>{2410c2d4-ab26-45d4-8505-d7f3cf1b99c0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Logging">
+      <UniqueIdentifier>{a816c5eb-9d2c-4624-8b09-68f8b09b1512}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Logging">
+      <UniqueIdentifier>{9865b702-dfe7-405d-830a-1a09e38d309f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="apsi\apsi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\item.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\Network\network_utils.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\psiparams.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\Tools\stopwatch.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\apsidefines.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\ffield\ffield.h">
+      <Filter>Header Files\FField</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\ffield\ffield_array.h">
+      <Filter>Header Files\FField</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\ffield\ffield_elt.h">
+      <Filter>Header Files\FField</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\Tools\interpolate.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\Tools\sealcompress.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\prng.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\ffield\ffield_fast_batch_encoder.h">
+      <Filter>Header Files\FField</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\aes.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\network\channel.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\matrix.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\result_package.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\utils.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\Tools\thread_pool.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\logging\log.h">
+      <Filter>Header Files\Logging</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\csvreader.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\fourq.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\bigpoly.h">
+      <Filter>Header Files\Tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\network\senderoperation.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\network\senderoperationresponse.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="apsi\apsidefines.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\item.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\Network\network_utils.cpp">
+      <Filter>Source Files\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\Tools\stopwatch.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\ffield\ffield.cpp">
+      <Filter>Source Files\FField</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\ffield\ffield_elt.cpp">
+      <Filter>Source Files\FField</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\Tools\interpolate.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\Tools\sealcompress.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\ffield\ffield_fast_batch_encoder.cpp">
+      <Filter>Source Files\FField</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\tools\prng.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\tools\aes.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\network\channel.cpp">
+      <Filter>Source Files\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\tools\utils.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\logging\log.cpp">
+      <Filter>Source Files\Logging</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\tools\csvreader.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\tools\fourq.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\tools\bigpoly.cpp">
+      <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

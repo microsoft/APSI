@@ -20,8 +20,14 @@ x64/*
 *.json
 .vscode/*
 packages/*
-APSI/cmake/APSIConfig.cmake
-APSI/cmake/APSIConfigVersion.cmake
-APSI/cmake/APSITargets.cmake
+APSICommon/cmake/APSICommonConfig.cmake
+APSICommon/cmake/APSICommonConfigVersion.cmake
+APSICommon/cmake/APSICommonTargets.cmake
+APSISender/cmake/APSISenderConfig.cmake
+APSISender/cmake/APSISenderConfigVersion.cmake
+APSISender/cmake/APSISenderTargets.cmake
+APSIReceiver/cmake/APSIReceiverConfig.cmake
+APSIReceiver/cmake/APSIReceiverConfigVersion.cmake
+APSIReceiver/cmake/APSIReceiverTargets.cmake
 doc/html
 doc/latex
