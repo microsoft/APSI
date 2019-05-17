@@ -161,10 +161,10 @@ namespace apsi
             */
             virtual zmqpp::socket_type get_socket_type() = 0;
 
-			/**
-			Add any needed options for the socket. Called just after socket creation.
-			*/
-			virtual void set_socket_options(zmqpp::socket_t* socket) = 0;
+            /**
+            Add any needed options for the socket. Called just after socket creation.
+            */
+            virtual void set_socket_options(zmqpp::socket_t* socket) = 0;
 
         private:
             u64 bytes_sent_;

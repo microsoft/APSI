@@ -21,11 +21,11 @@ namespace apsi
             */
             virtual zmqpp::socket_type get_socket_type();
 
-			/**
-			The Sender needs to set a couple of socket options to ensure
-			messages are not dropped.
-			*/
-			virtual void set_socket_options(zmqpp::socket_t* socket);
+            /**
+            The Sender needs to set a couple of socket options to ensure
+            messages are not dropped.
+            */
+            virtual void set_socket_options(zmqpp::socket_t* socket);
         };
     }
 }
