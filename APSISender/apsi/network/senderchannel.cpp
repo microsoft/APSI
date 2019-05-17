@@ -13,5 +13,5 @@ using namespace apsi::network;
 
 zmqpp::socket_type SenderChannel::get_socket_type()
 {
-    return zmqpp::socket_type::router;
+	return zmqpp::socket_type::router;
 }

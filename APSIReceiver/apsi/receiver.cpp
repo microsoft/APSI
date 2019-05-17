@@ -477,6 +477,7 @@ void Receiver::stream_decrypt_worker(
     std::vector<char> has_label(batch_size);
 
     bool first = true;
+	u64 processed_count = 0;
 
     for (u64 i = thread_idx; i < block_count; i += num_threads)
     {
@@ -538,5 +539,9 @@ void Receiver::stream_decrypt_worker(
                 }
             }
         }
+
+		processed_count++;
     }
+
+	Log::debug("Thread %d processed %d blocks.", thread_idx, processed_count);
 }

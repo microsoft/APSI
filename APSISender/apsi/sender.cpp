@@ -377,6 +377,7 @@ void Sender::respond_worker(
     array<Ciphertext, 2> runningResults{ thread_context.pool(), thread_context.pool() },
         label_results{ thread_context.pool(), thread_context.pool() };
 
+	u64 processed_blocks = 0;
 
     for (int block_idx = start_block; block_idx < end_block; block_idx++)
     {
@@ -493,7 +494,10 @@ void Sender::respond_worker(
         }
 
         channel.send(client_id, pkg);
+		processed_blocks++;
     }
+
+	Log::debug("Thread %d sent %d blocks", thread_context.id(), processed_blocks);
 
     /* After this point, this thread will no longer use the context resource, so it is free to return it. */
     release_thread_context(thread_context.id());
