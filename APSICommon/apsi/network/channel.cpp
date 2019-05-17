@@ -633,6 +633,7 @@ unique_ptr<socket_t>& Channel::get_socket()
     if (nullptr == socket_)
     {
         socket_ = make_unique<socket_t>(*context_.get(), get_socket_type());
+        set_socket_options(socket_.get());
     }
 
     return socket_;
