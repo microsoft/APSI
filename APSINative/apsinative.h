@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license.using System;
+
 #pragma once
 
 ///////////////////////////////////////////////////////////////////////////
@@ -5,9 +8,6 @@
 // This API is provided as a simple interface for the APSI library
 // that can be PInvoked by .Net code.
 // 
-// In this way we avoid having to create a .Net assembly, with all the
-// restrictions that it implies.
-//
 ///////////////////////////////////////////////////////////////////////////
 
 #define APSIEXPORT extern "C" __declspec(dllexport)
