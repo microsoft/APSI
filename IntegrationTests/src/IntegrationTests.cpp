@@ -1,4 +1,7 @@
-﻿#include "gtest/gtest.h"
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license.using System;
+
+#include "gtest/gtest.h"
 
 /**
 Main entry point for Google Test unit tests.

@@ -1,4 +1,7 @@
-﻿// APSINative.cpp : Defines the exported functions for the library.
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license.using System;
+
+// APSINative.cpp : Defines the exported functions for the library.
 //
 
 // STD
