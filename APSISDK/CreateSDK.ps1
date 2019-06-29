@@ -17,6 +17,7 @@ Copy-Item -Recurse -Path $APSIDirectory\APSINative    $ScriptDirectory\SDK
 Copy-Item -Recurse -Path $APSIDirectory\APSIReceiver  $ScriptDirectory\SDK
 Copy-Item -Recurse -Path $APSIDirectory\Cuckoo        $ScriptDirectory\SDK
 Copy-Item          -Path $ScriptDirectory\APSISDK.sln $ScriptDirectory\SDK
+Copy-Item          -Path $ScriptDirectory\README.md   $ScriptDirectory\SDK
 
 remove-dir-if-present $ScriptDirectory\SDK\APSIClient\bin
 remove-dir-if-present $ScriptDirectory\SDK\APSIClient\obj
