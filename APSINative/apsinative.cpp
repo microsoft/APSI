@@ -66,7 +66,7 @@ APSIEXPORT bool APSICALL ReceiverIsConnected()
     return rec_channel_->is_connected();
 }
 
-APSIEXPORT bool APSICALL ReceiverQuery(int length, u64* items, int* result, u64* labels)
+APSIEXPORT bool APSICALL ReceiverQuery(int length, u64apsi* items, int* result, u64apsi* labels)
 {
     if (nullptr == items)
         return false;

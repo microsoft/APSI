@@ -53,6 +53,7 @@ endif()
 
 # Create library but add no source files yet
 add_library(cuckoo STATIC "")
+set_property(TARGET cuckoo PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Add source files to library and header files to install
 add_subdirectory(cuckoo)
