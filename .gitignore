@@ -35,3 +35,8 @@ Cuckoo/cmake/CuckooConfigVersion.cmake
 Cuckoo/cmake/CuckooTargets.cmake
 doc/html
 doc/latex
+**/CMakeCache.txt
+**/CMakeFiles/
+**/Makefile
+**/cmake_install.cmake
+**/install_manifest.txt
