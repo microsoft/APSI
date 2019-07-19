@@ -12,7 +12,7 @@ variables:
   solution: '**/*.sln'
   buildPlatform: 'x64'
   buildConfiguration: 'Release'
-  APSILIBS: '$(buildSourcesDirectory)\APSI\tools\Libs'
+  APSILIBS: '$(Build.SourcesDirectory)\tools\Libs'
 
 steps:
 - task: PowerShell@2
