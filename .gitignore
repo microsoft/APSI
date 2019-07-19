@@ -29,5 +29,9 @@ APSISender/cmake/APSISenderTargets.cmake
 APSIReceiver/cmake/APSIReceiverConfig.cmake
 APSIReceiver/cmake/APSIReceiverConfigVersion.cmake
 APSIReceiver/cmake/APSIReceiverTargets.cmake
+Cuckoo/cuckoo/config.h
+Cuckoo/cmake/CuckooConfig.cmake
+Cuckoo/cmake/CuckooConfigVersion.cmake
+Cuckoo/cmake/CuckooTargets.cmake
 doc/html
 doc/latex

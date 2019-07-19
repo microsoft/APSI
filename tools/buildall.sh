@@ -32,6 +32,11 @@ cd $scriptdir
 scriptdir=`pwd`
 apsidir=`dirname "$scriptdir"`
 
+# Cuckoo
+print_banner "Building Cuckoo"
+cd $apsidir/Cuckoo
+build_with_install
+
 # APSICommon
 print_banner "Building APSICommon"
 cd $apsidir/APSICommon
@@ -46,6 +51,10 @@ build_with_install
 print_banner "Building APSIReceiver"
 cd $apsidir/APSIReceiver
 build_with_install
+
+print_banner "Building APSINative"
+cd $apsidir/APSINative
+build_without_install
 
 # Unit tests
 print_banner "Building APSITest"

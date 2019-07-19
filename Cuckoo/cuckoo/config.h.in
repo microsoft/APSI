@@ -1,0 +1,2 @@
+#define CUCKOO_VERSION "@Cuckoo_VERSION@"
+#cmakedefine CUCKOO_DEBUG

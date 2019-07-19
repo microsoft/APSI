@@ -14,6 +14,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../lib)
 
 # Create library but add no source files yet
 add_library(apsi_common STATIC "")
+set_property(TARGET apsi_common PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Build in release mode by default
 set(APSI_DEFAULT_BUILD_TYPE "Release")

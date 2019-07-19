@@ -1,3 +1,6 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license.using System;
+
 #pragma once
 
 ///////////////////////////////////////////////////////////////////////////
@@ -5,15 +8,20 @@
 // This API is provided as a simple interface for the APSI library
 // that can be PInvoked by .Net code.
 // 
-// In this way we avoid having to create a .Net assembly, with all the
-// restrictions that it implies.
-//
 ///////////////////////////////////////////////////////////////////////////
 
+#ifdef _MSC_VER
 #define APSIEXPORT extern "C" __declspec(dllexport)
 #define APSICALL __cdecl
+#else
+#define APSIEXPORT
+#define APSICALL
 
-typedef unsigned long long u64;
+#define TRUE 1
+#define FALSE 0
+#endif
+
+typedef unsigned long long u64apsi;
 
 /**
 Connect a Receiver to the given address and port.
@@ -39,4 +47,4 @@ Perform a Query for the given items.
 The 'result' array consist of booleans encoded as integers. Any value other than 0
 is considered 'true', 0 is considered as 'false'.
 */
-APSIEXPORT bool APSICALL ReceiverQuery(int length, u64* items, int* result, u64* labels);
+APSIEXPORT bool APSICALL ReceiverQuery(int length, u64apsi* items, int* result, u64apsi* labels);

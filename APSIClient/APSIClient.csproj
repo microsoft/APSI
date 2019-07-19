@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <DocumentationFile>$(TargetDir)/APSIClient.xml</DocumentationFile>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <APSINativeBinaryFiles Condition="'$(OS)' == 'Windows_NT'" Include="$(ProjectDir)../bin/x64/$(Configuration)/apsinative.*" />
+    <APSINativeBinaryFiles Condition="'$(OS)' == 'Unix'" Include="$(ProjectDir)../lib/libapsinative.*" />
+  </ItemGroup>
+
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Copy SourceFiles="@(APSINativeBinaryFiles)" DestinationFolder="$(TargetDir)" />
+  </Target>
+
+</Project>
