@@ -9,7 +9,7 @@ pool:
   vmImage: 'windows-latest'
 
 variables:
-  solution: '**/*.sln'
+  solution: 'APSI.sln'
   buildPlatform: 'x64'
   buildConfiguration: 'Release'
   APSILIBS: '$(Build.SourcesDirectory)\tools\Libs'
