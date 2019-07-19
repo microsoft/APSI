@@ -1,0 +1,13 @@
+[submodule "thirdparty/FourQlib"]
+	path = thirdparty/FourQlib
+	url = https://github.com/kiromaru/FourQlib.git
+[submodule "thirdparty/Cuckoo"]
+	path = thirdparty/Cuckoo
+	url = kilai@vs-ssh.visualstudio.com:v3/kilai/Cuckoo/Cuckoo
+[submodule "thirdparty/SEAL"]
+	path = thirdparty/SEAL
+	url = https://github.com/microsoft/SEAL.git
+	branch = 3.2.0
+[submodule "thirdparty/GSL"]
+	path = thirdparty/GSL
+	url = https://github.com/microsoft/GSL.git
