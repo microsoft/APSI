@@ -85,3 +85,4 @@ steps:
     uploadUrl: 'https://airbuildscan.azurewebsites.net/api/Upload'
     areaPathParent: '/'
     areaPathChild: 'PrivateAI'
+  enabled: false
