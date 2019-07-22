@@ -40,37 +40,22 @@ set(APSISENDER_TARGETS_FILENAME ${APSISender_SOURCE_DIR}/cmake/APSISenderTargets
 set(APSISENDER_CONFIG_VERSION_FILENAME ${APSISender_SOURCE_DIR}/cmake/APSISenderConfigVersion.cmake)
 set(APSISENDER_CONFIG_INSTALL_DIR lib/cmake/APSISender)
 
+# For extra modules
+list(APPEND CMAKE_MODULE_PATH ${APSISender_SOURCE_DIR}/../cmake)
+
 # Import APSICommon
 find_package(APSICommon 1.0.0 EXACT REQUIRED)
 
 # Import Microsoft SEAL
 find_package(SEAL 3.2.0 EXACT REQUIRED)
 
-# Import Cuckoo library
-find_package(Cuckoo 1.0 REQUIRED)
+# Import Cuckoo
+find_package(Cuckoo 1.1.0 EXACT REQUIRED)
 
-# Import FLINT library
-find_path(FLINT_DIR NAMES flint/fmpz.h)
-find_library(FLINT flint)
-if (NOT FLINT OR NOT FLINT_DIR)
-    message(FATAL_ERROR "Could not find FLINT library")
-else()
-    message(STATUS "Flint directory: ${FLINT_DIR}")
-    message(STATUS "Found FLINT: ${FLINT}")
-endif()
-
-# FourQ
-find_path(FOURQ_DIR NAMES FourQ/FourQ.h)
-find_library(FOURQ FourQ)
-if (NOT FOURQ OR NOT FOURQ_DIR)
-    message(FATAL_ERROR "Could not find FourQ library")
-else()
-    message(STATUS "FourQ directory: ${FOURQ_DIR}")
-    message(STATUS "Found FourQ: ${FOURQ}")
-endif()
+# Import FourQ
+find_package(FourQ MODULE REQUIRED)
 
 # Set flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -maes")
 
@@ -86,12 +71,8 @@ add_definitions(-D_AVX2_)
 add_definitions(-D_ASM_)
 add_definitions(-D__LINUX__)
 
-# Includes
-include_directories(${FLINT_DIR}/flint)
-include_directories(${FOURQ_DIR}/FourQ)
-
 # Link required libraries
-target_link_libraries(apsi_sender APSICommon::apsi_common SEAL::seal Cuckoo::cuckoo ${FLINT} ${FOURQ})
+target_link_libraries(apsi_sender APSICommon::apsi_common)
 
 # Add source files to library
 add_subdirectory(apsi)

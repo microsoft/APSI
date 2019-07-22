@@ -71,24 +71,27 @@ namespace apsi
             */
             std::pair<
                 std::map<std::uint64_t, std::vector<seal::Ciphertext>>,
-                std::unique_ptr<cuckoo::CuckooInterface>
+                std::unique_ptr<cuckoo::CuckooTable>
             > preprocess(std::vector<Item> &items, apsi::network::Channel& channel);
 
             /**
             Hash all items in the input vector into a cuckoo hashing table.
             */
-            std::unique_ptr<cuckoo::CuckooInterface> cuckoo_hashing(const std::vector<Item> &items);
+            std::unique_ptr<cuckoo::CuckooTable> cuckoo_hashing(
+                const std::vector<Item> &items);
 
             /**
             Returns a map: table index -> input index.
             */
-            std::vector<int> cuckoo_indices(const std::vector<Item> &items, cuckoo::CuckooInterface &cuckoo);
+            std::vector<int> cuckoo_indices(
+                const std::vector<Item> &items,
+                cuckoo::CuckooTable &cuckoo);
 
             /**
             Encodes items in the cuckoo hashing table into ExField elements.
             */
             void exfield_encoding(
-                cuckoo::CuckooInterface &cuckoo,
+                cuckoo::CuckooTable &cuckoo,
                 FFieldArray& ret);
 
             /**

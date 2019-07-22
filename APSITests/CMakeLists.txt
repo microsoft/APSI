@@ -12,6 +12,9 @@ endif()
 # Executable will be in ../bin
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../bin)
 
+# For extra modules
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/../cmake)
+
 # Create executable but add no source files yet
 add_executable(unit_tests "")
 
@@ -38,62 +41,38 @@ find_package(APSIReceiver 1.0.0 EXACT REQUIRED)
 find_package(SEAL 3.2.0 REQUIRED)
 
 # Import Cuckoo
-find_package(Cuckoo 1.0 REQUIRED)
+find_package(Cuckoo 1.1.0 REQUIRED)
 
-# FLINT library
-find_path(FLINT_DIR NAMES flint/fmpz.h)
-if (NOT FLINT_DIR)
-    message(FATAL_ERROR "Could not find FLINT library")
-else()
-    message(STATUS "Flint directory: ${FLINT_DIR}")
-endif()
+# Import Flint
+find_package(Flint MODULE REQUIRED)
 
-# FourQ
-find_path(FOURQ_DIR NAMES FourQ/FourQ.h)
-if (NOT FOURQ_DIR)
-    message(FATAL_ERROR "Could not find FourQ library")
-else()
-    message(STATUS "FourQ directory: ${FOURQ_DIR}")
-endif()
+# Import ZeroMQ
+find_package(ZeroMQ MODULE REQUIRED)
 
-# Log4cplus
-find_path(LOG4CPLUS_DIR log4cplus/logger.h)
-find_library(LOG4CPLUS log4cplus)
-if (NOT LOG4CPLUS_DIR OR NOT LOG4CPLUS)
-    message(FATAL_ERROR "Could not find log4cplus library")
-else()
-    message(STATUS "log4cplus directory: ${LOG4CPLUS_DIR}")
-    message(STATUS "Found log4cplus: ${LOG4CPLUS}")
-endif()
+# Import ZeroMQpp
+find_package(ZeroMQpp MODULE REQUIRED)
 
-# CryptoPP
-find_library(CRYPTOPP cryptopp)
-if (NOT CRYPTOPP)
-    message(FATAL_ERROR "Could not find cryptopp library")
-else()
-    message(STATUS "Found cryptopp: ${CRYPTOPP}")
-endif()
+# Import FourQ
+find_package(FourQ MODULE REQUIRED)
 
-# Google Test
-find_path(GTEST_DIR gtest/gtest.h)
-find_library(GTEST gtest)
-if (NOT GTEST OR NOT GTEST_DIR)
-    message(FATAL_ERROR "Could not find Google Test library")
-else()
-    message(STATUS "Google Test directory: ${GTEST_DIR}")
-    message(STATUS "Found Google Test: ${GTEST}")
+# Import Log4cplus
+find_package(Log4cplus MODULE REQUIRED)
+
+# Only build GTest
+option(BUILD_GMOCK OFF)
+option(INSTALL_GTEST OFF)
+mark_as_advanced(BUILD_GMOCK INSTALL_GTEST)
+
+# Add GTest
+set(GTEST_DIR "thirdparty/googletest")
+if(NOT EXISTS ${GTEST_DIR}/CMakeLists.txt)
+    message(FATAL_ERROR "Could not find `${GTEST_DIR}/CMakeLists.txt`. Run `git submodule update --init` and retry.")
 endif()
+add_subdirectory(${GTEST_DIR})
 
 # Set flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-
-# Includes
-target_include_directories(unit_tests PRIVATE
-    ${FLINT_DIR}/flint
-    ${FOURQ_DIR}/FourQ
-    ${LOG4CPLUS_DIR}
-)
 
 # C++17
 target_compile_features(unit_tests PUBLIC cxx_std_17)
@@ -109,10 +88,8 @@ target_link_libraries(unit_tests
     APSICommon::apsi_common
     APSISender::apsi_sender
     APSIReceiver::apsi_receiver
-    ${GTEST}
+    gtest
     stdc++fs
-    ${LOG4CPLUS}
-    ${CRYPTOPP}
 )
 
 # Add source files to executable

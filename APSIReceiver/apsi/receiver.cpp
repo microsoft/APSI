@@ -15,16 +15,13 @@
 #include "apsi/tools/prng.h"
 #include "apsi/tools/utils.h"
 #include "apsi/result_package.h"
+#include "apsi/tools/blake2/blake2.h"
 
 // SEAL
 #include "seal/util/common.h"
 #include "seal/util/uintcore.h"
 #include "seal/encryptionparams.h"
 #include "seal/keygenerator.h"
-
-// CryptoPP
-#include "cryptopp/sha3.h"
-
 
 using namespace std;
 using namespace seal;
@@ -177,7 +174,7 @@ void Receiver::handshake(Channel& chl)
 
 pair<
     map<uint64_t, vector<Ciphertext> >,
-    unique_ptr<CuckooInterface> >
+    unique_ptr<CuckooTable> >
     Receiver::preprocess(vector<Item> &items, Channel &channel)
 {
     STOPWATCH(recv_stop_watch, "Receiver::preprocess");
@@ -233,16 +230,18 @@ pair<
             x.multiply_mod_order(b[i].data());
             x.to_buffer(iter);
 
-            // Compress with SHA3
-            CryptoPP::SHA3_256 sha;
-            sha.Update(iter, step);
-            sha.TruncatedFinal(reinterpret_cast<CryptoPP::byte*>(&items[i]), sizeof(block));
+            // Compress with BLAKE2b
+            blake2(
+                reinterpret_cast<uint8_t*>(&items[i]),
+                sizeof(block),
+                reinterpret_cast<const uint8_t*>(iter), step,
+                nullptr, 0);
 
             iter += step;
         }
     }
 
-    unique_ptr<CuckooInterface> cuckoo = cuckoo_hashing(items);
+    unique_ptr<CuckooTable> cuckoo = cuckoo_hashing(items);
 
     unique_ptr<FFieldArray> exfield_items;
     unsigned padded_cuckoo_capacity = static_cast<unsigned>(((cuckoo->table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
@@ -268,24 +267,22 @@ pair<
     return { move(ciphers), move(cuckoo) };
 }
 
-unique_ptr<CuckooInterface> Receiver::cuckoo_hashing(const vector<Item> &items)
+unique_ptr<CuckooTable> Receiver::cuckoo_hashing(const vector<Item> &items)
 {
     auto receiver_null_item = all_one_block;
 
-    unique_ptr<CuckooInterface> cuckoo(
-        static_cast<CuckooInterface*>(new Cuckoo(
-            get_params().hash_func_count(),
-            get_params().hash_func_seed(),
-            get_params().log_table_size(),
-            get_params().item_bit_count(),
-            get_params().max_probe(),
-            receiver_null_item))
-    );
+    unique_ptr<CuckooTable> cuckoo = make_unique<CuckooTable>(
+        get_params().log_table_size(),
+        0, // stash size
+        get_params().hash_func_count(),
+        cuckoo::make_block(get_params().hash_func_seed(), 0),
+        get_params().max_probe(),
+        receiver_null_item);
 
     auto coeff_bit_count = seal::util::get_significant_bit_count(ex_field_->ch()) - 1;
     auto degree = ex_field_ ? ex_field_->d() : 1;
 
-    if (cuckoo->encoding_bit_length() > coeff_bit_count * degree)
+    if (get_params().item_bit_count() > coeff_bit_count * degree)
     {
         Log::error("Reduced items too long. Only have %i bits.", coeff_bit_count * degree);
         throw runtime_error("Reduced items too long.");
@@ -293,7 +290,7 @@ unique_ptr<CuckooInterface> Receiver::cuckoo_hashing(const vector<Item> &items)
     else
     {
         Log::debug("Using %i out of %ix%i bits of exfield element",
-            cuckoo->encoding_bit_length(),
+            get_params().item_bit_count(),
             seal::util::get_significant_bit_count(get_params().exfield_characteristic()) - 1,
             degree);
     }
@@ -313,38 +310,40 @@ unique_ptr<CuckooInterface> Receiver::cuckoo_hashing(const vector<Item> &items)
 }
 
 
-vector<int> Receiver::cuckoo_indices(const vector<Item> &items, cuckoo::CuckooInterface &cuckoo)
+vector<int> Receiver::cuckoo_indices(
+    const vector<Item> &items,
+    cuckoo::CuckooTable &cuckoo)
 {
-    vector<int> indice(cuckoo.table_size(), -1);
-    auto& encodings = cuckoo.get_encodings();
+    vector<int> index(cuckoo.table_size(), -1);
+    auto& table = cuckoo.table();
 
     for (int i = 0; i < items.size(); i++)
     {
-        auto q = cuckoo.query_item(items[i]);
-        indice[q.table_index()] = i;
+        auto q = cuckoo.query(items[i]);
+        index[q.location()] = i;
 
-        if (not_equal(items[i], encodings[q.table_index()]))
-            throw runtime_error("items[i] different from encodings[q.table_index()]");
+        if (not_equal(items[i], table[q.location()]))
+            throw runtime_error("items[i] different from encodings[q.location()]");
     }
-    return indice;
+    return index;
 }
 
 void Receiver::exfield_encoding(
-    CuckooInterface &cuckoo,
+    CuckooTable &cuckoo,
     FFieldArray &ret)
 {
-    int encoding_bit_length = static_cast<int>(cuckoo.encoding_bit_length());
-    auto encoding_u64_len = round_up_to(encoding_bit_length, 64) / 64;
+    int item_bit_count = get_params().item_bit_count();
+    auto encoding_u64_len = round_up_to(item_bit_count, 64) / 64;
 
-    auto& encodings = cuckoo.get_encodings();
+    auto& encodings = cuckoo.table();
 
     for (int i = 0; i < cuckoo.table_size(); i++)
     {
-        ret.set(i, Item(encodings[i]).to_exfield_element(ret.field(i), encoding_bit_length));
+        ret.set(i, Item(encodings[i]).to_exfield_element(ret.field(i), item_bit_count));
     }
     for (size_t i = cuckoo.table_size(); i < ret.size(); i++)
     {
-        ret.set(i, Item(cuckoo.null_value()).to_exfield_element(ret.field(i), encoding_bit_length));
+        ret.set(i, Item(cuckoo.empty_item()).to_exfield_element(ret.field(i), item_bit_count));
     }
 }
 

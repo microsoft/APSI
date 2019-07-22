@@ -25,6 +25,9 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
+# For extra modules
+list(APPEND CMAKE_MODULE_PATH ${APSISender_SOURCE_DIR}/../cmake)
+
 # Import APSICommon
 find_package(APSICommon 1.0.0 EXACT REQUIRED)
 
@@ -32,57 +35,17 @@ find_package(APSICommon 1.0.0 EXACT REQUIRED)
 find_package(APSISender 1.0.0 EXACT REQUIRED)
 
 # Import SEAL
-find_package(SEAL 3.2.0 REQUIRED)
+find_package(SEAL 3.2.0 EXACT REQUIRED)
 
 # Import Cuckoo
-find_package(Cuckoo 1.0 REQUIRED)
+find_package(Cuckoo 1.1.0 EXACT REQUIRED)
 
-# Import FLINT library
-find_path(FLINT_DIR NAMES flint/fmpz.h)
-if (NOT FLINT_DIR)
-    message(FATAL_ERROR "Could not find FLINT library")
-else()
-    message(STATUS "Flint directory: ${FLINT_DIR}")
-endif()
-
-# Log4cplus
-find_path(LOG4CPLUS_DIR log4cplus/logger.h)
-find_library(LOG4CPLUS log4cplus)
-if (NOT LOG4CPLUS_DIR OR NOT LOG4CPLUS)
-    message(FATAL_ERROR "Could not find log4cplus library")
-else()
-    message(STATUS "log4cplus directory: ${LOG4CPLUS_DIR}")
-    message(STATUS "Found log4cplus: ${LOG4CPLUS}")
-endif()
-
-# CryptoPP
-find_library(CRYPTOPP cryptopp)
-if (NOT CRYPTOPP)
-    message(FATAL_ERROR "Could not find cryptopp library")
-else()
-    message(STATUS "Found cryptopp: ${CRYPTOPP}")
-endif()
-
-# Common Code
-find_library(COMMON_CODE common_code HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../lib)
-if (NOT COMMON_CODE)
-    message(FATAL_ERROR "Could not find common_code library")
-else()
-    message(STATUS "Found common_code: ${COMMON_CODE}")
-endif()
+# Import TCLAP
+find_package(TCLAP MODULE REQUIRED)
 
 # Set flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-
-# Includes
-target_include_directories(sender PRIVATE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../APSICommon>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../APSISender>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../CommonCodeCLI>
-    ${FLINT_DIR}/flint
-    ${LOG4CPLUS_DIR}
-)
 
 # C++17
 target_compile_features(sender PUBLIC cxx_std_17)
@@ -91,9 +54,6 @@ target_compile_features(sender PUBLIC cxx_std_17)
 target_link_libraries(sender
     APSICommon::apsi_common
     APSISender::apsi_sender
-    ${LOG4CPLUS}
-    ${CRYPTOPP}
-    ${COMMON_CODE}
     stdc++fs
 )
 

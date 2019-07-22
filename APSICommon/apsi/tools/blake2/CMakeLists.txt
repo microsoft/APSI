@@ -11,7 +11,7 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/blake2b-load-sse2.h
         ${CMAKE_CURRENT_LIST_DIR}/blake2b-load-sse41.h
         ${CMAKE_CURRENT_LIST_DIR}/blake2b-round.h
-        ${CMAKE_CURRENT_LIST_DIR}/blake2b-config.h
+        ${CMAKE_CURRENT_LIST_DIR}/blake2-config.h
         ${CMAKE_CURRENT_LIST_DIR}/blake2.h
         ${CMAKE_CURRENT_LIST_DIR}/blake2-impl.h
     DESTINATION

@@ -42,7 +42,7 @@ set(APSICOMMON_CONFIG_VERSION_FILENAME ${APSICommon_SOURCE_DIR}/cmake/APSICommon
 set(APSICOMMON_CONFIG_INSTALL_DIR lib/cmake/APSICommon)
 
 # For extra modules
-list(APPEND CMAKE_MODULE_PATH ${APSICommon_SOURCE_DIR}/cmake)
+list(APPEND CMAKE_MODULE_PATH ${APSICommon_SOURCE_DIR}/../cmake)
 
 # Import Microsoft SEAL
 find_package(SEAL 3.2.0 EXACT REQUIRED)
@@ -62,8 +62,11 @@ find_package(ZeroMQ MODULE REQUIRED)
 # Import ZeroMQpp
 find_package(ZeroMQpp MODULE REQUIRED)
 
-# FourQ
+# Import FourQ
 find_package(FourQ MODULE REQUIRED)
+
+# Import Log4cplus 
+find_package(Log4cplus MODULE REQUIRED)
 
 # Set flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
@@ -82,12 +85,15 @@ add_definitions(-D_ASM_)
 add_definitions(-D__LINUX__)
 
 # Link required libraries
-target_link_libraries(apsi_common
+target_link_libraries(apsi_common PUBLIC
     SEAL::seal
     Cuckoo::cuckoo
+    msgsl
     Flint
+    ZeroMQ
+    ZeroMQpp
     FourQ
-    ZeroMQpp)
+    Log4cplus)
 
 # Add source files to library
 add_subdirectory(apsi)
@@ -100,6 +106,9 @@ target_include_directories(apsi_common
 install(TARGETS apsi_common EXPORT apsi_common_export
     ARCHIVE DESTINATION lib
     INCLUDES DESTINATION ${APSICOMMON_INCLUDES_INSTALL_DIR})
+
+# Associate Microsoft GSL to apsi_common_export
+install(TARGETS msgsl EXPORT apsi_common_export)
 
 # Export the targets
 export(EXPORT apsi_common_export

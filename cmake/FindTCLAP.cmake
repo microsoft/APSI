@@ -1,9 +1,12 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT license.
+
 # Simple attempt to locate TCLAP
 set(CURRENT_TCLAP_INCLUDE_DIR ${TCLAP_INCLUDE_DIR})
 unset(TCLAP_INCLUDE_DIR CACHE)
 find_path(TCLAP_INCLUDE_DIR
     NAMES tclap/CmdLine.h
-    HINTS ${CMAKE_INCLUDE_PATH} ${CURRENT_TCLAP_INCLUDE_DIR})
+    HINTS ${CURRENT_TCLAP_INCLUDE_DIR} ${CMAKE_INCLUDE_PATH})
 
 find_package(PackageHandleStandardArgs)
 find_package_handle_standard_args(TCLAP
