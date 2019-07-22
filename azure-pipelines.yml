@@ -37,6 +37,7 @@ steps:
     configuration: '$(buildConfiguration)'
 
 - task: ComponentGovernanceComponentDetection@0
+  displayName: 'Component Detection'
   inputs:
     scanType: 'Register'
     verbosity: 'Verbose'
