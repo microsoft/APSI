@@ -11,14 +11,11 @@
 // APSI
 #include "apsi/item.h"
 #include "apsi/apsidefines.h"
+#include "apsi/tools/blake2/blake2.h"
 
 // SEAL
 #include "seal/util/uintcore.h"
 #include "seal/util/common.h"
-
-// crypto++
-#include "cryptopp/sha3.h"
-
 
 using namespace std;
 using namespace seal;
@@ -67,10 +64,11 @@ Item &Item::operator =(const string &str)
 {
     if (str.size() > sizeof(value_))
     {
-        // Use SHA3 as random oracle
-        CryptoPP::SHA3_256 sha3;
-        sha3.Update(reinterpret_cast<const CryptoPP::byte*>(str.data()), str.size());
-        sha3.TruncatedFinal(reinterpret_cast<CryptoPP::byte*>(&value_), sizeof(value_));
+        // Use BLAKE2b as random oracle
+        blake2(
+            reinterpret_cast<uint8_t*>(&value_), sizeof(value_),
+            reinterpret_cast<const uint8_t*>(str.data()), str.size(),
+            nullptr, 0);
     }
     else
     {

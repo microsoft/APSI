@@ -1,0 +1,27 @@
+# Simple attempt to locate Log4cplus
+set(CURRENT_LOG4CPLUS_INCLUDE_DIR ${LOG4CPLUS_INCLUDE_DIR})
+set(CURRENT_LOG4CPLUS_LIBRARY_PATH ${LOG4CPLUS_LIBRARY_PATH})
+
+unset(LOG4CPLUS_INCLUDE_DIR CACHE)
+find_path(LOG4CPLUS_INCLUDE_DIR
+    NAMES log4cplus/logger.h
+    HINTS ${CMAKE_INCLUDE_PATH} ${CURRENT_LOG4CPLUS_INCLUDE_DIR})
+
+unset(LOG4CPLUS_LIBRARY_PATH CACHE)
+find_library(LOG4CPLUS_LIBRARY_PATH
+    NAMES log4cplus
+    HINTS ${CMAKE_LIBRARY_PATH} ${CURRENT_LOG4CPLUS_LIBRARY_PATH})
+
+# Determine whether found based on LOG4CPLUS_INCLUDE_DIR
+find_package(PackageHandleStandardArgs)
+find_package_handle_standard_args(Log4cplus
+    REQUIRED_VARS LOG4CPLUS_INCLUDE_DIR LOG4CPLUS_LIBRARY_PATH)
+
+if(Log4cplus_FOUND)
+    # Create interface target for Log4cplus
+    add_library(Log4clus UNKNOWN IMPORTED)
+
+    set_target_properties(Log4cplus PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES ${LOG4CPLUS_INCLUDE_DIR}
+        IMPORTED_LOCATION ${LOG4CPLUS_LIBRARY_PATH})
+endif()

@@ -13,10 +13,10 @@
 
 // FLINT
 #pragma warning(push, 0)
-#include "fmpz.h"
-#include "fq_nmod.h"
-#include "fq_nmod_vec.h"
-#include "fq_nmod_poly.h"
+#include "flint/fmpz.h"
+#include "flint/fq_nmod.h"
+#include "flint/fq_nmod_vec.h"
+#include "flint/fq_nmod_poly.h"
 #pragma warning(pop)
 
 // APSI

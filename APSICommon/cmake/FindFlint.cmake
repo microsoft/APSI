@@ -1,0 +1,30 @@
+# Simple attempt to locate Flint
+set(CURRENT_FLINT_INCLUDE_DIR ${FLINT_INCLUDE_DIR})
+set(CURRENT_FLINT_LIBRARY_DIR ${FLINT_LIBRARY_DIR})
+set(CURRENT_FLINT_LIBRARY_PATH ${FLINT_LIBRARY_PATH})
+
+unset(FLINT_INCLUDE_DIR CACHE)
+find_path(FLINT_INCLUDE_DIR
+    NAMES flint/flint.h flint/fmpq.h flint/fmpz.h
+    HINTS ${CMAKE_INCLUDE_PATH} ${CURRENT_FLINT_INCLUDE_DIR})
+
+unset(FLINT_LIBRARY_DIR CACHE)
+unset(FLINT_LIBRARY_PATH CACHE)
+find_library(FLINT_LIBRARY_PATH
+    NAMES flint
+_   HINTS ${CMAKE_LIBRARY_PATH} ${CURRENT_FLINT_LIBRARY_DIR})
+if(FLINT_LIBRARY_PATH)
+    get_filename_component(FLINT_LIBRARY_DIR ${FLINT_LIBRARY_PATH} DIRECTORY CACHE)
+endif()
+
+find_package(PackageHandleStandardArgs)
+find_package_handle_standard_args(Flint
+    REQUIRED_VARS FLINT_INCLUDE_DIR FLINT_LIBRARY_DIR FLINT_LIBRARY_PATH)
+
+if(Flint_FOUND)
+    # Create imported target for Flint
+    add_library(Flint UNKNOWN IMPORTED)
+    set_target_properties(Flint PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES ${FLINT_INCLUDE_DIR}
+        IMPORTED_LOCATION ${FLINT_LIBRARY_PATH})
+endif()
