@@ -25,16 +25,46 @@ steps:
   inputs:
     restoreSolution: '$(solution)'
 
+- task: CredScan@2
+  displayName: 'Run CredScan'
+  inputs:
+    outputFormat: sarif
+    debugMode: false
+
 - task: VSBuild@1
   inputs:
     solution: '$(solution)'
     platform: '$(buildPlatform)'
     configuration: '$(buildConfiguration)'
 
+- task: RoslynAnalyzers@2
+  displayName: 'Run Roslyn Analyzers'
+
 - task: VSTest@2
   inputs:
     platform: '$(buildPlatform)'
     configuration: '$(buildConfiguration)'
+
+- task: PublishSymbols@2
+  displayName: 'Publish symbols path'
+  inputs:
+    SearchPattern: '**\bin\**\*.pdb'
+    PublishSymbols: false
+  continueOnError: true
+
+- task: CopyFiles@2
+  displayName: 'Copy Files to: $(build.artifactstagingdirectory)'
+  inputs:
+    SourceFolder: '$(build.sourcesdirectory)'
+    Contents: '**\$(BuildConfiguration)\**\?(*.exe|*.dll|*.lib)'
+    TargetFolder: '$(build.artifactstagingdirectory)'
+
+- task: BinSkim@3
+  displayName: 'Run BinSkim '
+  inputs:
+    InputType: Basic
+    AnalyzeTarget: '$(Build.ArtifactStagingDirectory)\native\bin\x64\Release\*.exe'
+    AnalyzeSymPath: '**\bin\**\*.pdb'
 
 - task: ComponentGovernanceComponentDetection@0
   displayName: 'Component Detection'
