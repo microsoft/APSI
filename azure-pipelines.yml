@@ -63,7 +63,7 @@ steps:
   displayName: 'Run BinSkim '
   inputs:
     InputType: Basic
-    AnalyzeTarget: '$(Build.ArtifactStagingDirectory)\native\bin\x64\Release\*.exe'
+    AnalyzeTarget: '$(Build.ArtifactStagingDirectory)\bin\x64\Release\*.exe'
     AnalyzeSymPath: '**\bin\**\*.pdb'
 
 - task: ComponentGovernanceComponentDetection@0
