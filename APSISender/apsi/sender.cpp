@@ -112,6 +112,11 @@ void Sender::offline_compute()
     STOPWATCH(sender_stop_watch, "Sender::offline_compute");
     Log::info("Offline compute started");
 
+    for (auto& ctx : thread_contexts_)
+    {
+        ctx.clear_processed_counts();
+    }
+
     vector<thread> thread_pool(total_thread_count_);
     for (int i = 0; i < total_thread_count_; i++)
     {
@@ -152,7 +157,6 @@ void Sender::offline_compute_work()
     int blocks_to_process = end_block - start_block;
     Log::debug("Thread %i processing %i blocks.", thread_context_idx, blocks_to_process);
 
-    context.clear_processed_counts();
     context.set_total_randomized_polys(blocks_to_process);
     if (params_.use_labels())
     {

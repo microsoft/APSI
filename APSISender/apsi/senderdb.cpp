@@ -95,6 +95,17 @@ SenderDB::SenderDB(const PSIParams &params,
 
 void SenderDB::clear_db()
 {
+    if (batch_random_symm_poly_storage_[0].is_ntt_form())
+    {
+        // Clear all storage
+        for (auto& plain : batch_random_symm_poly_storage_)
+        {
+            plain.release();
+            plain.reserve(static_cast<int>(params_.encryption_params().coeff_modulus().size() *
+                params_.encryption_params().poly_modulus_degree()));
+        }
+    }
+
     for (auto& block : db_blocks_)
         block.clear();
 }
