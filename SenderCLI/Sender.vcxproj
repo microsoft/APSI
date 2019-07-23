@@ -50,6 +50,7 @@
     <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
+    <SpectreMitigation>Spectre</SpectreMitigation>
   </PropertyGroup>
   <PropertyGroup>
     <OutDir>$(ProjectDir)../bin/$(Platform)\$(Configuration)\</OutDir>
