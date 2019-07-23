@@ -25,6 +25,9 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
+# For extra modules
+list(APPEND CMAKE_MODULE_PATH ${receiver_SOURCE_DIR}/../cmake)
+
 # Import APSICommon
 find_package(APSICommon 1.0.0 EXACT REQUIRED)
 
@@ -32,44 +35,43 @@ find_package(APSICommon 1.0.0 EXACT REQUIRED)
 find_package(APSIReceiver 1.0.0 EXACT REQUIRED)
 
 # Import SEAL
-find_package(SEAL 3.2.0 REQUIRED)
+find_package(SEAL 3.2.0 EXACT REQUIRED)
 
 # Import Cuckoo
-find_package(Cuckoo 1.0 REQUIRED)
+find_package(Cuckoo 1.1.0 EXACT REQUIRED)
 
-# Import FLINT library
-find_path(FLINT_DIR NAMES flint/fmpz.h)
-if (NOT FLINT_DIR)
-    message(FATAL_ERROR "Could not find FLINT library")
-else()
-    message(STATUS "Flint directory: ${FLINT_DIR}")
-endif()
+# Import GMP
+find_package(GMP MODULE REQUIRED)
 
-# Log4cplus
-find_path(LOG4CPLUS_DIR log4cplus/logger.h)
-find_library(LOG4CPLUS log4cplus)
-if (NOT LOG4CPLUS_DIR OR NOT LOG4CPLUS)
-    message(FATAL_ERROR "Could not find log4cplus library")
-else()
-    message(STATUS "log4cplus directory: ${LOG4CPLUS_DIR}")
-    message(STATUS "Found log4cplus: ${LOG4CPLUS}")
-endif()
+# Import Flint
+find_package(Flint MODULE REQUIRED)
 
-# CryptoPP
-find_library(CRYPTOPP cryptopp)
-if (NOT CRYPTOPP)
-    message(FATAL_ERROR "Could not find cryptopp library")
-else()
-    message(STATUS "Found cryptopp: ${CRYPTOPP}")
-endif()
+# Import ZeroMQ
+find_package(ZeroMQ MODULE REQUIRED)
 
-# Common Code
-find_library(COMMON_CODE common_code HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../lib)
-if (NOT COMMON_CODE)
-    message(FATAL_ERROR "Could not find common_code library")
-else()
-    message(STATUS "Found common_code: ${COMMON_CODE}")
-endif()
+# Import ZeroMQpp
+find_package(ZeroMQpp MODULE REQUIRED)
+
+# Import FourQ
+find_package(FourQ MODULE REQUIRED)
+
+# Import Log4cplus 
+find_package(Log4cplus MODULE REQUIRED)
+
+# Import TCLAP
+find_package(TCLAP MODULE REQUIRED)
+
+# Add common_code
+find_path(COMMON_CODE_INCLUDE_DIR
+    NAMES base_clp.h common_utils.h
+    HINTS ${receiver_SOURCE_DIR}/../CommonCodeCLI)
+find_library(COMMON_CODE_LIBRARY_PATH
+    NAMES common_code
+    HINTS ${receiver_SOURCE_DIR}/../lib)
+add_library(common_code UNKNOWN IMPORTED)
+set_target_properties(common_code PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES ${COMMON_CODE_INCLUDE_DIR}
+    IMPORTED_LOCATION ${COMMON_CODE_LIBRARY_PATH}) 
 
 # Set flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
@@ -94,10 +96,6 @@ add_subdirectory(src)
 target_link_libraries(receiver
     APSICommon::apsi_common
     APSIReceiver::apsi_receiver
-    SEAL::seal
-    Cuckoo::cuckoo
     stdc++fs
-    ${COMMON_CODE}
-    ${LOG4CPLUS}
-    ${CRYPTOPP}
+    common_code
 )

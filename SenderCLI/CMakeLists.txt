@@ -26,7 +26,7 @@ endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
 # For extra modules
-list(APPEND CMAKE_MODULE_PATH ${APSISender_SOURCE_DIR}/../cmake)
+list(APPEND CMAKE_MODULE_PATH ${sender_SOURCE_DIR}/../cmake)
 
 # Import APSICommon
 find_package(APSICommon 1.0.0 EXACT REQUIRED)
@@ -40,8 +40,38 @@ find_package(SEAL 3.2.0 EXACT REQUIRED)
 # Import Cuckoo
 find_package(Cuckoo 1.1.0 EXACT REQUIRED)
 
+# Import GMP
+find_package(GMP MODULE REQUIRED)
+
+# Import Flint
+find_package(Flint MODULE REQUIRED)
+
+# Import ZeroMQ
+find_package(ZeroMQ MODULE REQUIRED)
+
+# Import ZeroMQpp
+find_package(ZeroMQpp MODULE REQUIRED)
+
+# Import FourQ
+find_package(FourQ MODULE REQUIRED)
+
+# Import Log4cplus 
+find_package(Log4cplus MODULE REQUIRED)
+
 # Import TCLAP
 find_package(TCLAP MODULE REQUIRED)
+
+# Add common_code
+find_path(COMMON_CODE_INCLUDE_DIR
+    NAMES base_clp.h common_utils.h
+    HINTS ${sender_SOURCE_DIR}/../CommonCodeCLI)
+find_library(COMMON_CODE_LIBRARY_PATH
+    NAMES common_code
+    HINTS ${sender_SOURCE_DIR}/../lib)
+add_library(common_code UNKNOWN IMPORTED)
+set_target_properties(common_code PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES ${COMMON_CODE_INCLUDE_DIR}
+    IMPORTED_LOCATION ${COMMON_CODE_LIBRARY_PATH}) 
 
 # Set flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
@@ -55,6 +85,7 @@ target_link_libraries(sender
     APSICommon::apsi_common
     APSISender::apsi_sender
     stdc++fs
+    common_code
 )
 
 # Add source files to executable

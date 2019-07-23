@@ -25,21 +25,23 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
-# Add APSI
+# For extra modules
+list(APPEND CMAKE_MODULE_PATH ${common_code_SOURCE_DIR}/../cmake)
+
+# Import APSI
 find_package(APSICommon 1.0.0 EXACT REQUIRED)
 
-# Add SEAL
-find_package(SEAL 3.2.0 REQUIRED)
+# Import SEAL
+find_package(SEAL 3.2.0 EXACT REQUIRED)
 
-# Add Cuckoo
-find_package(Cuckoo 1.0 REQUIRED)
+# Import Cuckoo
+find_package(Cuckoo 1.1.0 EXACT REQUIRED)
+
+# Import TCLAP
+find_package(TCLAP MODULE REQUIRED)
 
 # C++17
 target_compile_features(common_code PUBLIC cxx_std_17)
 
-target_include_directories(common_code PRIVATE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../APSI>
-)
-
 # Link required libraries
-target_link_libraries(common_code APSICommon::apsi_common SEAL::seal Cuckoo::cuckoo)
+target_link_libraries(common_code APSICommon::apsi_common TCLAP)

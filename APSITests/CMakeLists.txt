@@ -12,9 +12,6 @@ endif()
 # Executable will be in ../bin
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../bin)
 
-# For extra modules
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/../cmake)
-
 # Create executable but add no source files yet
 add_executable(unit_tests "")
 
@@ -27,6 +24,9 @@ if (NOT CMAKE_BUILD_TYPE)
         "Release" "Debug" "MinSizeRel" "RelWithDebInfo")
 endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
+
+# For extra modules
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/../cmake)
 
 # Import APSICommon
 find_package(APSICommon 1.0.0 EXACT REQUIRED)
@@ -57,6 +57,9 @@ find_package(FourQ MODULE REQUIRED)
 
 # Import Log4cplus
 find_package(Log4cplus MODULE REQUIRED)
+
+# Import Boost
+find_package(Boost 1.67 REQUIRED)
 
 # Only build GTest
 option(BUILD_GMOCK OFF)
