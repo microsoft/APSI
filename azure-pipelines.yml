@@ -16,6 +16,7 @@ variables:
 
 steps:
 - task: PowerShell@2
+  displayName: 'Download 3rd party libraries'
   inputs:
     filePath: 'tools\DownloadLibs.ps1'
 
