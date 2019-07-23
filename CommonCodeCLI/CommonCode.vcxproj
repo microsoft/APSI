@@ -154,6 +154,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir)\..\APSICommon;$(ProjectDir)..\Cuckoo;$(APSILIBS)\tclap-1.2.2\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\boost-1.65.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <WholeProgramOptimization>false</WholeProgramOptimization>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

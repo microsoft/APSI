@@ -100,6 +100,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir)..\APSICommon;$(ProjectDir)..\Cuckoo;$(ProjectDir)..\APSIReceiver;$(APSILIBS)\SEAL\include;$(APSILIBS)\mpir\include;$(APSILIBS)\mpfr\include;$(APSILIBS)\flint2\include;$(APSILIBS)\GSL;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <WholeProgramOptimization>false</WholeProgramOptimization>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
