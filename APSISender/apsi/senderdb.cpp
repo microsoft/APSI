@@ -129,7 +129,7 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
     {
 
         vector<cuckoo::LocFunc> normal_loc_func;
-        for (int i = 0; i < normal_loc_func.size(); i++)
+        for (int i = 0; i < params_.hash_func_count(); i++)
         {
             normal_loc_func.emplace_back(cuckoo::LocFunc(
                 params_.log_table_size(),
@@ -176,7 +176,6 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
                     throw std::runtime_error("");
             }
         }
-
     }
 }
 
@@ -193,11 +192,11 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
     FourQCoordinate key(pp);
 
     vector<cuckoo::LocFunc> normal_loc_func;
-    for (int i = 0; i < normal_loc_func.size(); i++)
+    for (int i = 0; i < params_.hash_func_count(); i++)
     {
-        normal_loc_func.emplace_back(cuckoo::LocFunc(
+        normal_loc_func.emplace_back(
             params_.log_table_size(),
-            cuckoo::make_block(params_.hash_func_seed() + i, 0)));
+            cuckoo::make_block(params_.hash_func_seed() + i, 0));
     }
 
     for (size_t i = start; i < end; i++)

@@ -73,10 +73,6 @@ set_target_properties(common_code PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES ${COMMON_CODE_INCLUDE_DIR}
     IMPORTED_LOCATION ${COMMON_CODE_LIBRARY_PATH}) 
 
-# Set flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-
 # Includes
 target_include_directories(receiver PRIVATE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../APSICommon>
