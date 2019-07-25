@@ -18,7 +18,7 @@ set_property(TARGET apsi_common PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Build in release mode by default
 set(APSI_DEFAULT_BUILD_TYPE "Release")
-if (NOT CMAKE_BUILD_TYPE)
+if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE ${APSI_DEFAULT_BUILD_TYPE} CACHE
         STRING "Build type" FORCE)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
@@ -32,6 +32,7 @@ if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
 else()
     set(APSI_DEBUG_DEFAULT OFF)
 endif()
+set(APSI_DEBUG ${APSI_DEBUG_DEFAULT})
 
 # Required files and directories
 set(APSICOMMON_INCLUDES_INSTALL_DIR include)

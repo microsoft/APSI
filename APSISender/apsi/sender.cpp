@@ -441,7 +441,8 @@ void Sender::respond_worker(
                     }
                 }
             }
-            else if (block.batched_label_coeffs_.size())
+            else if (block.batched_label_coeffs_.size() &&
+                !block.batched_label_coeffs_[0].is_zero())
             {
                 // only reachable if user calls PSIParams.set_use_low_degree_poly(true);
 

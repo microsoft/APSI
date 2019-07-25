@@ -31,6 +31,7 @@ if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
 else()
     set(APSI_DEBUG_DEFAULT OFF)
 endif()
+set(APSI_DEBUG ${APSI_DEBUG_DEFAULT})
 
 # Required files and directories
 set(APSISENDER_INCLUDES_INSTALL_DIR include)
