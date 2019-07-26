@@ -42,7 +42,8 @@ Item::Item(uint64_t item)
 
 Item::Item(const cuckoo::block & item)
 {
-    value_ = *(array<u64, 2>*)&item;
+    value_[0] = item.u64[0];
+    value_[1] = item.u64[1];
 }
 
 Item &Item::operator =(uint64_t assign)
@@ -55,7 +56,8 @@ Item &Item::operator =(uint64_t assign)
 
 Item &Item::operator =(const cuckoo::block& assign)
 {
-    value_ = *(array<u64,2>*)&assign;
+    value_[0] = assign.u64[0];
+    value_[1] = assign.u64[1];
 
     return *this;
 }
@@ -74,7 +76,7 @@ Item &Item::operator =(const string &str)
     {
         value_[0] = 0;
         value_[1] = 0;
-        memcpy((void*)str.data(), value_.data(), str.size());
+        memcpy(value_.data(), str.data(), str.size());
     }
 
     return *this;
@@ -128,8 +130,7 @@ void Item::to_exfield_element(FFieldElt &ring_item, int bit_length)
     // How many coefficients do we need in the ExFieldElement
     int split_index_bound = (bit_length + split_length - 1) / split_length;
 
-    int j = 0;
-    for (; static_cast<unsigned>(j) < exfield->d() && j < split_index_bound; j++)
+    for (int j = 0; static_cast<unsigned>(j) < exfield->d() && j < split_index_bound; j++)
     {
         auto coeff = item_part(value_, j, split_length);
         ring_item.set_coeff(j, coeff);

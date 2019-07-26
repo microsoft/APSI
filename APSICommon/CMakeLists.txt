@@ -69,7 +69,7 @@ find_package(ZeroMQpp MODULE REQUIRED)
 # Import FourQ
 find_package(FourQ MODULE REQUIRED)
 
-# Import Log4cplus 
+# Import Log4cplus
 find_package(Log4cplus MODULE REQUIRED)
 
 # Import Boost

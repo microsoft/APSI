@@ -244,7 +244,8 @@ pair<
     unique_ptr<CuckooTable> cuckoo = cuckoo_hashing(items);
 
     unique_ptr<FFieldArray> exfield_items;
-    unsigned padded_cuckoo_capacity = static_cast<unsigned>(((cuckoo->table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
+    unsigned padded_cuckoo_capacity = static_cast<unsigned>(
+        ((cuckoo->table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
 
     vector<shared_ptr<FField> > field_vec;
     field_vec.reserve(padded_cuckoo_capacity);
@@ -271,13 +272,13 @@ unique_ptr<CuckooTable> Receiver::cuckoo_hashing(const vector<Item> &items)
 {
     auto receiver_null_item = all_one_block;
 
-    unique_ptr<CuckooTable> cuckoo = make_unique<CuckooTable>(
+    unique_ptr<CuckooTable> cuckoo{ make_unique<CuckooTable>(
         get_params().log_table_size(),
         0, // stash size
         get_params().hash_func_count(),
-        cuckoo::make_block(get_params().hash_func_seed(), 0),
+        make_block(get_params().hash_func_seed(), 0),
         get_params().max_probe(),
-        receiver_null_item);
+        receiver_null_item) };
 
     auto coeff_bit_count = seal::util::get_significant_bit_count(ex_field_->ch()) - 1;
     auto degree = ex_field_ ? ex_field_->d() : 1;
@@ -314,18 +315,18 @@ vector<int> Receiver::cuckoo_indices(
     const vector<Item> &items,
     cuckoo::CuckooTable &cuckoo)
 {
-    vector<int> index(cuckoo.table_size(), -1);
+    vector<int> indices(cuckoo.table_size(), -1);
     auto& table = cuckoo.table();
 
     for (int i = 0; i < items.size(); i++)
     {
         auto q = cuckoo.query(items[i]);
-        index[q.location()] = i;
+        indices[q.location()] = i;
 
         if (not_equal(items[i], table[q.location()]))
             throw runtime_error("items[i] different from encodings[q.location()]");
     }
-    return index;
+    return indices;
 }
 
 void Receiver::exfield_encoding(
@@ -337,13 +338,15 @@ void Receiver::exfield_encoding(
 
     auto& encodings = cuckoo.table();
 
-    for (int i = 0; i < cuckoo.table_size(); i++)
+    for (size_t i = 0; i < cuckoo.table_size(); i++)
     {
         ret.set(i, Item(encodings[i]).to_exfield_element(ret.field(i), item_bit_count));
     }
+    auto empty_field_item = Item(cuckoo.empty_item())
+        .to_exfield_element(ret.field(i), item_bit_count); 
     for (size_t i = cuckoo.table_size(); i < ret.size(); i++)
     {
-        ret.set(i, Item(cuckoo.empty_item()).to_exfield_element(ret.field(i), item_bit_count));
+        ret.set(i, empty_field_item);
     }
 }
 
