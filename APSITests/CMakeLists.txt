@@ -61,6 +61,9 @@ find_package(Log4cplus MODULE REQUIRED)
 # Import Boost
 find_package(Boost 1.67 REQUIRED)
 
+# Import GMP
+find_package(GMP REQUIRED)
+
 # Only build GTest
 option(BUILD_GMOCK OFF)
 option(INSTALL_GTEST OFF)

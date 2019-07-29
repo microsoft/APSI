@@ -40,7 +40,7 @@ namespace apsi
         Item(std::uint64_t item);
 
 
-        Item(const cuckoo::block& item);
+        Item(const cuckoo::item_type& item);
         
 
 
@@ -62,16 +62,16 @@ namespace apsi
 
         Item& operator =(const Item &assign);
 
-        Item& operator =(const cuckoo::block &assign);
+        Item& operator =(const cuckoo::item_type &assign);
 
         bool operator ==(const Item &other) const
         {
             return value_ == other.value_;
         }
 
-        operator cuckoo::block &() const
+        operator cuckoo::item_type &() const
         {
-            return *(cuckoo::block*)value_.data();
+            return *(cuckoo::item_type*)value_.data();
         }
 
         std::uint64_t& operator[](size_t i)

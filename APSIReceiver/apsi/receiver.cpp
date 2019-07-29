@@ -276,7 +276,7 @@ unique_ptr<CuckooTable> Receiver::cuckoo_hashing(const vector<Item> &items)
         get_params().log_table_size(),
         0, // stash size
         get_params().hash_func_count(),
-        make_block(get_params().hash_func_seed(), 0),
+        make_item(get_params().hash_func_seed(), 0),
         get_params().max_probe(),
         receiver_null_item) };
 
@@ -342,10 +342,10 @@ void Receiver::exfield_encoding(
     {
         ret.set(i, Item(encodings[i]).to_exfield_element(ret.field(i), item_bit_count));
     }
-    auto empty_field_item = Item(cuckoo.empty_item())
-        .to_exfield_element(ret.field(i), item_bit_count); 
     for (size_t i = cuckoo.table_size(); i < ret.size(); i++)
     {
+        auto empty_field_item = Item(cuckoo.empty_item())
+            .to_exfield_element(ret.field(i), item_bit_count); 
         ret.set(i, empty_field_item);
     }
 }

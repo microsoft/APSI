@@ -40,26 +40,22 @@ Item::Item(uint64_t item)
     operator=(item);
 }
 
-Item::Item(const cuckoo::block & item)
-{
-    value_[0] = item.u64[0];
-    value_[1] = item.u64[1];
-}
-
 Item &Item::operator =(uint64_t assign)
 {
     value_[0] = assign;
     value_[1] = 0;
-
     return *this;
 }
 
-Item &Item::operator =(const cuckoo::block& assign)
+Item &Item::operator =(const cuckoo::item_type& assign)
 {
-    value_[0] = assign.u64[0];
-    value_[1] = assign.u64[1];
-
+    value_ = cuckoo::item_to_uint64_array(assign);
     return *this;
+}
+
+Item::Item(const cuckoo::item_type & item)
+{
+    operator =(item);
 }
 
 Item &Item::operator =(const string &str)
