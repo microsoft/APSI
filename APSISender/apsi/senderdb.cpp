@@ -147,7 +147,8 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
                 u64 cuckoo_loc;
 
                 // Compute bin locations
-                cuckoo_loc = normal_loc_func[j](data[i]);
+                auto cuckoo_item = cuckoo::make_item(data[i].get_value());
+                cuckoo_loc = normal_loc_func[j](cuckoo_item);
                 key = data[i];
 
                 // Lock-free thread-safe bin position search
@@ -223,9 +224,10 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
         std::array<bool, 3> skip{ false, false, false };
 
         // Compute bin locations
-        locs[0] = normal_loc_func[0](data[i]);
-        locs[1] = normal_loc_func[1](data[i]);
-        locs[2] = normal_loc_func[2](data[i]);
+        auto cuckoo_item = cuckoo::make_item(data[i].get_value());
+        locs[0] = normal_loc_func[0](cuckoo_item);
+        locs[1] = normal_loc_func[1](cuckoo_item);
+        locs[2] = normal_loc_func[2](cuckoo_item);
         keys[0] = keys[1] = keys[2] = data[i];
         skip[1] = locs[0] == locs[1];
         skip[2] = locs[0] == locs[2] || locs[1] == locs[2];

@@ -298,7 +298,8 @@ unique_ptr<CuckooTable> Receiver::cuckoo_hashing(const vector<Item> &items)
 
     for (int i = 0; i < items.size(); i++)
     {
-        bool insertionSuccess = cuckoo->insert(items[i]);
+        auto cuckoo_item = make_item(items[i].get_value());
+        bool insertionSuccess = cuckoo->insert(cuckoo_item);
         if (!insertionSuccess)
         {
             string msg = "Cuckoo hashing failed";
@@ -320,10 +321,11 @@ vector<int> Receiver::cuckoo_indices(
 
     for (int i = 0; i < items.size(); i++)
     {
-        auto q = cuckoo.query(items[i]);
+        auto cuckoo_item = make_item(items[i].get_value());
+        auto q = cuckoo.query(cuckoo_item);
         indices[q.location()] = i;
 
-        if (not_equal(items[i], table[q.location()]))
+        if (not_equal(cuckoo_item, table[q.location()]))
             throw runtime_error("items[i] different from encodings[q.location()]");
     }
     return indices;
