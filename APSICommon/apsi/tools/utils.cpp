@@ -60,7 +60,7 @@ namespace
         u64 step = 1;
         bool doubling = true;
 
-        while (currentProb < stat_sec_param || step > 1)
+        while (currentProb < static_cast<double>(stat_sec_param) || step > 1)
         {
             if (stat_sec_param > currentProb)
             {
@@ -166,7 +166,7 @@ seal::Plaintext apsi::tools::random_plaintext(const seal::SEALContext &context)
     u64* random_ptr = random.data();
 
     random_device rd;
-    for (int i = 0; i < coeff_count - 1; i++)
+    for (size_t i = 0; i < coeff_count - 1; i++)
     {
         random_ptr[i] = static_cast<u64>(rd());
         random_ptr[i] <<= 32;

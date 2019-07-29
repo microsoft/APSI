@@ -336,8 +336,6 @@ void Receiver::exfield_encoding(
     FFieldArray &ret)
 {
     int item_bit_count = get_params().item_bit_count();
-    auto encoding_u64_len = round_up_to(item_bit_count, 64) / 64;
-
     auto& encodings = cuckoo.table();
 
     for (size_t i = 0; i < cuckoo.table_size(); i++)

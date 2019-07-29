@@ -51,7 +51,7 @@ namespace apsi
             */
             constexpr static unsigned int byte_count()
             {
-                return sizeof(f2elm_t) - 1;
+                return sizeof(f2elm_t);
             }
 
             /**

@@ -239,7 +239,7 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
             {
 
                 // Lock-free thread-safe bin position search
-                auto block_pos = aquire_db_position(static_cast<int>(locs[j]), prng);
+                auto block_pos = acquire_db_position(locs[j], prng);
                 auto& db_block = *block_pos.first;
                 auto pos = block_pos.second;
 
@@ -262,7 +262,7 @@ void SenderDB::add_data(gsl::span<const Item> data, int thread_count)
 }
 
 std::pair<DBBlock*, DBBlock::Position>
-    SenderDB::aquire_db_position(int cuckoo_loc, PRNG &prng)
+    SenderDB::acquire_db_position(size_t cuckoo_loc, PRNG &prng)
 {
     auto batch_idx = cuckoo_loc / params_.batch_size();
     auto batch_offset = cuckoo_loc % params_.batch_size();
