@@ -232,8 +232,8 @@ pair<
 
             // Compress with BLAKE2b
             blake2(
-                reinterpret_cast<uint8_t*>(&items[i]),
-                sizeof(block),
+                reinterpret_cast<uint8_t*>(items[i].data()),
+                sizeof(items[i].get_value()),
                 reinterpret_cast<const uint8_t*>(iter), step,
                 nullptr, 0);
 

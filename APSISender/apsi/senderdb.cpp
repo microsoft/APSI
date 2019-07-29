@@ -213,7 +213,7 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
 
             // Then compress with BLAKE2b
             blake2(
-                reinterpret_cast<uint8_t*>(const_cast<Item*>(&data[i])),
+                reinterpret_cast<uint8_t*>(const_cast<uint64_t*>(data[i].data())),
                 sizeof(block),
                 reinterpret_cast<const uint8_t*>(buff.data()), buff.size(),
                 nullptr, 0);
