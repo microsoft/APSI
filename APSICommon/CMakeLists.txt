@@ -109,7 +109,7 @@ add_subdirectory(apsi)
 
 # Add local include directories for build
 target_include_directories(apsi_common
-	PRIVATE $<BUILD_INTERFACE:${APSICommon_SOURCE_DIR}>)
+	PUBLIC $<BUILD_INTERFACE:${APSICommon_SOURCE_DIR}>)
 
 # Associate APSI to export apsi_export
 install(TARGETS apsi_common EXPORT apsi_common_export

@@ -26,16 +26,22 @@ endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
 # For extra modules
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/../cmake)
+list(APPEND CMAKE_MODULE_PATH ${unit_tests_SOURCE_DIR}/../cmake)
 
 # Import APSICommon
-find_package(APSICommon 1.0.0 EXACT REQUIRED)
+if(NOT TARGET apsi_common)
+    find_package(APSICommon 1.0.0 EXACT REQUIRED)
+endif()
 
 # Import APSISender
-find_package(APSISender 1.0.0 EXACT REQUIRED)
+if(NOT TARGET apsi_sender)
+    find_package(APSISender 1.0.0 EXACT REQUIRED)
+endif()
 
 # Import APSIReceiver
-find_package(APSIReceiver 1.0.0 EXACT REQUIRED)
+if(NOT TARGET apsi_receiver)
+    find_package(APSIReceiver 1.0.0 EXACT REQUIRED)
+endif()
 
 # Import SEAL
 find_package(SEAL 3.2.0 REQUIRED)
@@ -91,9 +97,9 @@ add_definitions(-D__LINUX__)
 
 # Link required libraries
 target_link_libraries(unit_tests
-    APSICommon::apsi_common
-    APSISender::apsi_sender
-    APSIReceiver::apsi_receiver
+    apsi_common
+    apsi_sender
+    apsi_receiver
     gtest
     stdc++fs
 )

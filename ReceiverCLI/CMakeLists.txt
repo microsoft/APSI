@@ -10,7 +10,7 @@ if (DEFINED MSVC)
 endif()
 
 # Executable will be in ../bin
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${receiver_SOURCE_DIR}/../bin)
 
 # Create executable but add no source files yet
 add_executable(receiver "")
@@ -29,10 +29,14 @@ message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 list(APPEND CMAKE_MODULE_PATH ${receiver_SOURCE_DIR}/../cmake)
 
 # Import APSICommon
-find_package(APSICommon 1.0.0 EXACT REQUIRED)
+if(NOT TARGET apsi_common)
+    find_package(APSICommon 1.0.0 EXACT REQUIRED)
+endif()
 
 # Import APSIReceiver
-find_package(APSIReceiver 1.0.0 EXACT REQUIRED)
+if(NOT TARGET apsi_receiver)
+    find_package(APSIReceiver 1.0.0 EXACT REQUIRED)
+endif()
 
 # Import SEAL
 find_package(SEAL 3.2.0 EXACT REQUIRED)
@@ -62,16 +66,18 @@ find_package(Log4cplus MODULE REQUIRED)
 find_package(TCLAP MODULE REQUIRED)
 
 # Add common_code
-find_path(COMMON_CODE_INCLUDE_DIR
-    NAMES base_clp.h common_utils.h
-    HINTS ${receiver_SOURCE_DIR}/../CommonCodeCLI)
-find_library(COMMON_CODE_LIBRARY_PATH
-    NAMES common_code
-    HINTS ${receiver_SOURCE_DIR}/../lib)
-add_library(common_code UNKNOWN IMPORTED)
-set_target_properties(common_code PROPERTIES
-    INTERFACE_INCLUDE_DIRECTORIES ${COMMON_CODE_INCLUDE_DIR}
-    IMPORTED_LOCATION ${COMMON_CODE_LIBRARY_PATH}) 
+if(NOT TARGET common_code)
+    find_path(COMMON_CODE_INCLUDE_DIR
+        NAMES base_clp.h common_utils.h
+        HINTS ${receiver_SOURCE_DIR}/../CommonCodeCLI)
+    find_library(COMMON_CODE_LIBRARY_PATH
+        NAMES common_code
+        HINTS ${receiver_SOURCE_DIR}/../lib)
+    add_library(common_code UNKNOWN IMPORTED)
+    set_target_properties(common_code PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES ${COMMON_CODE_INCLUDE_DIR}
+        IMPORTED_LOCATION ${COMMON_CODE_LIBRARY_PATH}) 
+endif()
 
 # Includes
 target_include_directories(receiver PRIVATE
@@ -90,8 +96,8 @@ add_subdirectory(src)
 
 # Link required libraries
 target_link_libraries(receiver
-    APSICommon::apsi_common
-    APSIReceiver::apsi_receiver
+    apsi_common
+    apsi_receiver
     stdc++fs
     common_code
 )

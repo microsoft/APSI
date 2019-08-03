@@ -26,8 +26,19 @@ set(APSI_DEBUG ${APSI_DEBUG_DEFAULT})
 message(STATUS "APSI debug mode: ${APSI_DEBUG}")
 
 # For finding local configuration files without installing
-set(CMAKE_PREFIX_PATH ${CMAKE_SOURCE_DIR}/APSICommon ${CMAKE_SOURCE_DIR}/APSISender ${CMAKE_SOURCE_DIR}/APSIReceiver)
+list(APPEND CMAKE_MODULE_PATH
+    ${CMAKE_SOURCE_DIR}/APSICommon/cmake
+    ${CMAKE_SOURCE_DIR}/APSISender/cmake
+    ${CMAKE_SOURCE_DIR}/APSIReceiver/cmake)
 
 add_subdirectory(APSICommon)
 add_subdirectory(APSISender)
 add_subdirectory(APSIReceiver)
+
+if(BUILD_TESTS)
+    add_subdirectory(APSITests)
+endif()
+
+add_subdirectory(CommonCodeCLI)
+add_subdirectory(SenderCLI)
+add_subdirectory(ReceiverCLI)

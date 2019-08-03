@@ -46,7 +46,9 @@ set(APSIRECEIVER_CONFIG_INSTALL_DIR lib/cmake/APSIReceiver)
 list(APPEND CMAKE_MODULE_PATH ${APSIReceiver_SOURCE_DIR}/../cmake)
 
 # Import APSICommon
-find_package(APSICommon 1.0.0 EXACT REQUIRED)
+if(NOT TARGET apsi_common)
+    find_package(APSICommon 1.0.0 EXACT REQUIRED)
+endif()
 
 # Import Microsoft SEAL
 find_package(SEAL 3.2.0 EXACT REQUIRED)
@@ -74,14 +76,14 @@ add_definitions(-D_ASM_)
 add_definitions(-D__LINUX__)
 
 # Link required libraries
-target_link_libraries(apsi_receiver APSICommon::apsi_common)
+target_link_libraries(apsi_receiver apsi_common)
 
 # Add source files to library
 add_subdirectory(apsi)
 
 # Add local include directories for build
 target_include_directories(apsi_receiver
-	PRIVATE $<BUILD_INTERFACE:${APSIReceiver_SOURCE_DIR}>)
+	PUBLIC $<BUILD_INTERFACE:${APSIReceiver_SOURCE_DIR}>)
 
 # Associate APSI to export apsi_receiver_export
 install(TARGETS apsi_receiver EXPORT apsi_receiver_export

@@ -29,7 +29,9 @@ message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 list(APPEND CMAKE_MODULE_PATH ${common_code_SOURCE_DIR}/../cmake)
 
 # Import APSI
-find_package(APSICommon 1.0.0 EXACT REQUIRED)
+if(NOT TARGET apsi_common)
+    find_package(APSICommon 1.0.0 EXACT REQUIRED)
+endif()
 
 # Import SEAL
 find_package(SEAL 3.2.0 EXACT REQUIRED)
@@ -43,5 +45,9 @@ find_package(TCLAP MODULE REQUIRED)
 # C++17
 target_compile_features(common_code PUBLIC cxx_std_17)
 
+# Add local include directories for build
+target_include_directories(common_code
+	PUBLIC $<BUILD_INTERFACE:${common_code_SOURCE_DIR}>)
+
 # Link required libraries
-target_link_libraries(common_code APSICommon::apsi_common TCLAP)
+target_link_libraries(common_code apsi_common TCLAP)
