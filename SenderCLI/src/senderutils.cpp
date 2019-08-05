@@ -38,6 +38,8 @@ const PSIParams apsi::tools::build_psi_params(
 
         // Whether to use labels
         psiconf_params.use_labels = cmd.use_labels();
+
+		psiconf_params.num_chunks = cmd.num_chunks();
     }
 
     // Cuckoo hash parameters
