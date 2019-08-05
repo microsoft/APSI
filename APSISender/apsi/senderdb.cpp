@@ -24,6 +24,7 @@ using namespace seal::util;
 using namespace apsi;
 using namespace apsi::tools;
 using namespace apsi::sender;
+using namespace apsi::logging;
 
 
 SenderDB::SenderDB(const PSIParams &params, 
@@ -68,6 +69,15 @@ SenderDB::SenderDB(const PSIParams &params,
 
     int batch_size = params_.batch_size();
     int split_size = params_.split_size();
+
+	// debugging 
+	int num_ctxts = params_.batch_count() * params_.sender_bin_size(); 
+	Log::info("sender size = %i", params_.sender_size());
+	Log::info("table size = %i", params_.table_size());
+	Log::info("sender bin size = %i", params_.sender_bin_size());
+	Log::info("split size = %i", split_size); 
+	Log::info("number of ciphertexts in senderdb = %i", num_ctxts);
+
     int byte_length = static_cast<int>(round_up_to(params_.get_label_bit_count(), 8) / 8);
     int nb = params_.batch_count();
     int ns = params_.split_count();
@@ -200,6 +210,14 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
         normal_loc_func[i] = cuckoo::LocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
     }
 
+	map<int, int> bin_counting_map;
+	for (int i = 0; i < params_.table_size(); i++) {
+		bin_counting_map[i] = 0;
+	}
+	int maxload = 0; 
+	
+
+
     for (size_t i = start; i < end; i++)
     {
         // Do we do OPRF for Sender's security?
@@ -228,10 +246,19 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
         keys[0] = keys[1] = keys[2] = data[i];
         skip[1] = locs[0] == locs[1];
         skip[2] = locs[0] == locs[2] || locs[1] == locs[2];
+		// printing some info: 
+		// in particular, printing stuff....
+
+
 
         // Claim an empty location in each matching bin
         for (unsigned j = 0; j < params_.hash_func_count(); j++)
         {
+			// debugging
+			bin_counting_map[locs[j]] ++;
+			if (bin_counting_map[locs[j]] > maxload) {
+				maxload = bin_counting_map[locs[j]]; 
+			}
             if (skip[j] == false)
             {
 
@@ -251,6 +278,9 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
             }
         }
     }
+	// debugging: print the bin load 
+	Log::info("max load for thread %i = %i", thread_idx, maxload);
+
 }
 
 void SenderDB::add_data(gsl::span<const Item> data, int thread_count)
