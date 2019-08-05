@@ -24,6 +24,8 @@
 // Cuckoo
 #include "cuckoo/cuckoo.h"
 
+using namespace apsi::logging;
+
 namespace apsi
 {
     class PSIParams
@@ -36,6 +38,9 @@ namespace apsi
             bool use_oprf;
             bool use_labels;
             apsi::u64 sender_size;
+
+			// number of chunks to split each item into 
+			unsigned num_chunks;
         };
 
         struct CuckooParams
@@ -106,6 +111,12 @@ namespace apsi
         {
             return psiconf_params_.sender_size;
         }
+
+		inline unsigned int num_chunks() const
+		{
+			return psiconf_params_.num_chunks;
+		}
+
 
         /********************************************
         Parameters from input: TableParameters
@@ -219,6 +230,15 @@ namespace apsi
             return (psiconf_params_.item_bit_count + 7) / 8;
         }
 
+		// hao: computes the log of the false positive rate (only meaningful with numChunks > 1)
+		// assuming one query.
+		double log_fp_rate() {
+			int numChunks = psiconf_params_.num_chunks; 
+			return  numChunks * (log2(sender_size()) - log2(table_size())) - item_bit_count(); 
+		}
+
+		
+
         // Constants
         constexpr static int max_item_bit_count = 128;
 
@@ -260,6 +280,10 @@ namespace apsi
             {
                 throw std::invalid_argument("Item bit count cannot exceed max.");
             }
+
+			if (item_bit_count() > (uint64_t) (num_chunks()) * ((uint64_t) exfield_degree()) * log2(seal_params_.encryption_params.plain_modulus().value())) {
+				throw std::invalid_argument("item bit count is too large to fit in slots. ");
+			}
 
             if (item_bit_count() > (max_item_bit_count - 8))
             {

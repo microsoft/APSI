@@ -33,6 +33,7 @@ namespace apsi
             add(exfld_degree_arg_);
             add(db_file_arg_);
             add(net_port_arg_);
+			add(num_chunks_arg_); 
         }
 
         virtual void get_args()
@@ -92,6 +93,11 @@ namespace apsi
 
             net_port_ = net_port_arg_.getValue();
             cout_param("port", net_port_);
+
+			num_chunks_ = num_chunks_arg_.getValue();
+			cout_param("numChunks", num_chunks_);
+
+
         }
 
         bool use_labels() const { return use_labels_; }
@@ -108,6 +114,9 @@ namespace apsi
         int exfield_degree() const { return exfield_degree_; }
         int net_port() const { return net_port_; }
         const std::string& db_file() const { return db_file_; }
+		int num_chunks() const {
+			return num_chunks_;
+		}
 
     private:
         TCLAP::SwitchArg             labels_arg_          = TCLAP::SwitchArg("l", "useLabels", "Use labels", false);
@@ -124,6 +133,8 @@ namespace apsi
         TCLAP::ValueArg<apsi::u64>   plain_mod_arg_       = TCLAP::ValueArg<apsi::u64>("", "plainModulus", "Plain Modulus", false, 0x13ff, "u64");
         TCLAP::ValueArg<int>         dbc_arg_             = TCLAP::ValueArg<int>("", "dbc", "Decomposition Bit Count", false, 30, "int");
         TCLAP::ValueArg<int>         exfld_degree_arg_    = TCLAP::ValueArg<int>("", "exfieldDegree", "exField degree", false, 8, "int");
+		TCLAP::ValueArg<int>         num_chunks_arg_ = TCLAP::ValueArg<int>("", "numChunks", "number of chunks per item", false, 1, "int");
+
 
         bool use_labels_;
         bool oprf_;
@@ -139,5 +150,6 @@ namespace apsi
         int exfield_degree_;
         int net_port_;
         std::string db_file_;
+		int num_chunks_;
     };
 }
