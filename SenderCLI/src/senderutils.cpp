@@ -40,6 +40,8 @@ const PSIParams apsi::tools::build_psi_params(
         psiconf_params.use_labels = cmd.use_labels();
 
 		psiconf_params.num_chunks = cmd.num_chunks();
+
+		psiconf_params.sender_bin_size = cmd.sender_bin_size();
     }
 
     // Cuckoo hash parameters
@@ -133,5 +135,6 @@ const PSIParams apsi::tools::build_psi_params(
     Creating the PSIParams class.
     */
     PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
-    return params;
+	
+	return params;
 }

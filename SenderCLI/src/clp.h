@@ -34,6 +34,7 @@ namespace apsi
             add(db_file_arg_);
             add(net_port_arg_);
 			add(num_chunks_arg_); 
+			add(sender_bin_size_arg_);
         }
 
         virtual void get_args()
@@ -97,6 +98,8 @@ namespace apsi
 			num_chunks_ = num_chunks_arg_.getValue();
 			cout_param("numChunks", num_chunks_);
 
+			sender_bin_size_ = sender_bin_size_arg_.getValue();
+			cout_param("senderBinSize", sender_bin_size_);
 
         }
 
@@ -116,6 +119,10 @@ namespace apsi
         const std::string& db_file() const { return db_file_; }
 		int num_chunks() const {
 			return num_chunks_;
+		}	
+
+		int sender_bin_size() const {
+			return sender_bin_size_;
 		}
 
     private:
@@ -134,6 +141,7 @@ namespace apsi
         TCLAP::ValueArg<int>         dbc_arg_             = TCLAP::ValueArg<int>("", "dbc", "Decomposition Bit Count", false, 30, "int");
         TCLAP::ValueArg<int>         exfld_degree_arg_    = TCLAP::ValueArg<int>("", "exfieldDegree", "exField degree", false, 8, "int");
 		TCLAP::ValueArg<int>         num_chunks_arg_ = TCLAP::ValueArg<int>("", "numChunks", "number of chunks per item", false, 1, "int");
+		TCLAP::ValueArg<int>         sender_bin_size_arg_ = TCLAP::ValueArg<int>("", "senderBinSize", "(manually set) sender bin size", false, 0, "int");
 
 
         bool use_labels_;
@@ -151,5 +159,6 @@ namespace apsi
         int net_port_;
         std::string db_file_;
 		int num_chunks_;
+		int sender_bin_size_;
     };
 }

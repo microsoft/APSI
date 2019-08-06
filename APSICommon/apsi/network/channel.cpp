@@ -278,6 +278,8 @@ void Channel::send_get_parameters_response(const vector<u8>& client_id, const PS
     msg.add(params.use_oprf());
     msg.add(params.use_labels());
     msg.add(params.sender_size());
+	msg.add(params.sender_bin_size());
+
 
     // TableParams
     msg.add(params.log_table_size());
