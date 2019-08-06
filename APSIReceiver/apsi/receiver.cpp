@@ -125,6 +125,8 @@ void Receiver::handshake(Channel& chl)
         chl.receive(sender_params);
     }
 
+	Log::info("received sender bin size %i from sender: ", sender_params.psiconf_params.sender_bin_size); 
+
     // Set parameters from Sender.
     params_ = make_unique<PSIParams>(
         sender_params.psiconf_params,

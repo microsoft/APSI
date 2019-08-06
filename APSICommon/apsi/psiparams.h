@@ -41,6 +41,8 @@ namespace apsi
 
 			// number of chunks to split each item into 
 			unsigned num_chunks;
+
+			unsigned sender_bin_size; 
         };
 
         struct CuckooParams
@@ -85,7 +87,14 @@ namespace apsi
               seal_params_(seal_params),
               exfield_params_(exfield_params)
         {
-            update_sender_bin_size();
+			sender_bin_size_ = psiconf_params_.sender_bin_size;
+			if (sender_bin_size_ == 0) { // if bin size is unset.
+				Log::info("updating sender bin size..."); 
+				update_sender_bin_size();
+			}
+			else {
+				Log::info("taking sender bin size = %i from command line...", sender_bin_size_); 
+			}
             validate();
         }
 
@@ -188,7 +197,7 @@ namespace apsi
         /********************************************
         Calculated parameters
         *********************************************/
-        inline int sender_bin_size() const
+        inline unsigned int sender_bin_size() const
         {
             return sender_bin_size_;
         }
