@@ -149,6 +149,8 @@ void Channel::receive(SenderResponseGetParameters& response)
     response.psiconf_params.use_oprf       = msg.get<bool>(idx++);
     response.psiconf_params.use_labels     = msg.get<bool>(idx++);
     response.psiconf_params.sender_size    = msg.get<u64>(idx++);
+	response.psiconf_params.num_chunks = msg.get<unsigned int>(idx++);
+	response.psiconf_params.sender_bin_size = msg.get<unsigned int>(idx++);
 
     // TableParams
     response.table_params.log_table_size    = msg.get<unsigned int>(idx++);
@@ -278,6 +280,7 @@ void Channel::send_get_parameters_response(const vector<u8>& client_id, const PS
     msg.add(params.use_oprf());
     msg.add(params.use_labels());
     msg.add(params.sender_size());
+	msg.add(params.num_chunks());
 	msg.add(params.sender_bin_size());
 
 
