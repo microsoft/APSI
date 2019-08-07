@@ -73,7 +73,7 @@ find_package(FourQ MODULE REQUIRED)
 find_package(Log4cplus MODULE REQUIRED)
 
 # Import Boost
-find_package(Boost 1.67 REQUIRED)
+find_package(Boost 1.66 REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 
 # Set flags

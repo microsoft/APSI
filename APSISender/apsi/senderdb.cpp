@@ -247,7 +247,7 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
         auto cuckoo_item = cuckoo::make_item(data[i].get_value());
 		// Set keys and skip
 		for (int j = 0; j < params_.hash_func_count(); j++) {
-			locs[j] = normal_loc_func[j].location(cuckoo_item);
+			locs[j] = normal_loc_func[j](cuckoo_item);
 			//locs[1] = normal_loc_func[1].location(data[i]);
 			//locs[2] = normal_loc_func[2].location(data[i]);
 			keys[j] = data[i]; 
