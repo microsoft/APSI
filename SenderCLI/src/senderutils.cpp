@@ -48,7 +48,7 @@ const PSIParams apsi::tools::build_psi_params(
     PSIParams::CuckooParams cuckoo_params;
     {
         // Cuckoo hash function count
-        cuckoo_params.hash_func_count = 3;
+        cuckoo_params.hash_func_count = cmd.hash_func_count();
 
         // Set the hash function seed
         cuckoo_params.hash_func_seed = 0;

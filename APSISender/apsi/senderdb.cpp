@@ -236,19 +236,34 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
                 reinterpret_cast<const uint8_t*>(buff.data()), buff.size(),
                 nullptr, 0);
         }
+        std::vector<u64> locs(params_.hash_func_count());
+		std::vector<Item> keys(params_.hash_func_count());
+		std::vector<bool> skip(params_.hash_func_count());
 
-        std::array<u64, 3> locs;
-        std::array<Item, 3> keys;
-        std::array<bool, 3> skip{ false, false, false };
+		// std::array<Item, params_.hash_func_count()> keys;
+        //std::array<bool, params_.hash_func_count()> skip{ false, false, false };
 
         // Compute bin locations
         auto cuckoo_item = cuckoo::make_item(data[i].get_value());
-        locs[0] = normal_loc_func[0](cuckoo_item);
-        locs[1] = normal_loc_func[1](cuckoo_item);
-        locs[2] = normal_loc_func[2](cuckoo_item);
-        keys[0] = keys[1] = keys[2] = data[i];
-        skip[1] = locs[0] == locs[1];
-        skip[2] = locs[0] == locs[2] || locs[1] == locs[2];
+		// Set keys and skip
+		for (int j = 0; j < params_.hash_func_count(); j++) {
+			locs[j] = normal_loc_func[j].location(cuckoo_item);
+			//locs[1] = normal_loc_func[1].location(data[i]);
+			//locs[2] = normal_loc_func[2].location(data[i]);
+			keys[j] = data[i]; 
+			skip[j] = false;
+			if (j > 0) { // check if same. 
+				for (int k = 0; k < j; k++) {
+					if (locs[j] == locs[k]) {
+						skip[j] = true; 
+						break; 
+					}
+				}
+			}
+		}
+        // keys[0] = keys[1] = keys[2] = data[i];
+        //skip[1] = locs[0] == locs[1];
+        //skip[2] = locs[0] == locs[2] || locs[1] == locs[2];
 		// printing some info: 
 		// in particular, printing stuff....
 

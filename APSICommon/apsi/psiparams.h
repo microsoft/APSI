@@ -297,7 +297,7 @@ namespace apsi
             }
 
 			if (item_bit_count() > (uint64_t) (num_chunks()) * ((uint64_t) exfield_degree()) * log2(seal_params_.encryption_params.plain_modulus().value())) {
-				throw std::invalid_argument("item bit count is too large to fit in slots. ");
+				apsi::logging::Log::warning("item bit count (%i) is too large to fit in slots (%i). ", item_bit_count(), (uint64_t)(num_chunks()) * ((uint64_t)exfield_degree()) * log2(seal_params_.encryption_params.plain_modulus().value()));
 			}
 
             if (item_bit_count() > (max_item_bit_count - 8))

@@ -35,6 +35,8 @@ namespace apsi
             add(net_port_arg_);
 			add(num_chunks_arg_); 
 			add(sender_bin_size_arg_);
+
+			add(hash_func_count_arg_); 
         }
 
         virtual void get_args()
@@ -101,6 +103,10 @@ namespace apsi
 			sender_bin_size_ = sender_bin_size_arg_.getValue();
 			cout_param("senderBinSize", sender_bin_size_);
 
+
+			hash_func_count_ = hash_func_count_arg_.getValue();
+			cout_param("numHashes", hash_func_count_);
+
         }
 
         bool use_labels() const { return use_labels_; }
@@ -125,6 +131,10 @@ namespace apsi
 			return sender_bin_size_;
 		}
 
+		int hash_func_count() const {
+			return hash_func_count_;
+		}
+
     private:
         TCLAP::SwitchArg             labels_arg_          = TCLAP::SwitchArg("l", "useLabels", "Use labels", false);
         TCLAP::SwitchArg             oprf_arg_            = TCLAP::SwitchArg("o", "oprf", "Use OPRF", false);
@@ -142,6 +152,7 @@ namespace apsi
         TCLAP::ValueArg<int>         exfld_degree_arg_    = TCLAP::ValueArg<int>("", "exfieldDegree", "exField degree", false, 8, "int");
 		TCLAP::ValueArg<int>         num_chunks_arg_ = TCLAP::ValueArg<int>("", "numChunks", "number of chunks per item", false, 1, "int");
 		TCLAP::ValueArg<int>         sender_bin_size_arg_ = TCLAP::ValueArg<int>("", "senderBinSize", "(manually set) sender bin size", false, 0, "int");
+		TCLAP::ValueArg<int>         hash_func_count_arg_ = TCLAP::ValueArg<int>("", "numHashes", "number of hash functions in cuckoo hashing", false, 3, "int");
 
 
         bool use_labels_;
@@ -160,5 +171,6 @@ namespace apsi
         std::string db_file_;
 		int num_chunks_;
 		int sender_bin_size_;
+		int hash_func_count_;
     };
 }
