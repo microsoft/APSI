@@ -64,7 +64,7 @@
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
     <SpectreMitigation>Spectre</SpectreMitigation>
   </PropertyGroup>
@@ -106,13 +106,13 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\Cuckoo;$(ProjectDir)..\APSICommon;$(APSILIBS)\SEAL\include;$(APSILIBS)\flint2\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\mpfr\include;$(APSILIBS)\mpir\include;$(APSILIBS)\pthreads4w-3.0.0\include;$(APSILIBS)\cryptopp700\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\log4cplus\include;$(APSILIBS)\boost-1.65.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(APSILIBS)\Cuckoo\include;$(ProjectDir)..\APSICommon;$(APSILIBS)\SEAL\include;$(APSILIBS)\flint2\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\mpfr\include;$(APSILIBS)\mpir\include;$(APSILIBS)\pthreads4w-3.0.0\include;$(APSILIBS)\cryptopp700\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\log4cplus\include;$(APSILIBS)\boost-1.65.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;NOMINMAX;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ShowIncludes>false</ShowIncludes>
     </ClCompile>
     <Lib>
-      <AdditionalDependencies>APSICommon.lib;SEAL.lib;cuckoo.lib;FourQ.lib;log4cplusSD.lib</AdditionalDependencies>
+      <AdditionalDependencies>APSICommon.lib;SEAL.lib;FourQ.lib;log4cplusSD.lib</AdditionalDependencies>
     </Lib>
     <Lib>
       <AdditionalLibraryDirectories>$(ProjectDir)..\lib\$(IntDir);$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\cryptopp700\lib\$(IntDir);$(APSILIBS)\log4cplus\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -138,7 +138,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\Cuckoo;$(ProjectDir)..\APSICommon;$(APSILIBS)\SEAL\include;$(APSILIBS)\flint2\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\mpfr\include;$(APSILIBS)\mpir\include;$(APSILIBS)\pthreads4w-3.0.0\include;$(APSILIBS)\cryptopp700\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\log4cplus\include;$(APSILIBS)\boost-1.65.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(APSILIBS)\Cuckoo\include;$(ProjectDir)..\APSICommon;$(APSILIBS)\SEAL\include;$(APSILIBS)\flint2\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\mpfr\include;$(APSILIBS)\mpir\include;$(APSILIBS)\pthreads4w-3.0.0\include;$(APSILIBS)\cryptopp700\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\log4cplus\include;$(APSILIBS)\boost-1.65.1\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;NOMINMAX;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ShowIncludes>false</ShowIncludes>
@@ -150,7 +150,7 @@
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <Lib>
-      <AdditionalDependencies>APSICommon.lib;SEAL.lib;cuckoo.lib;FourQ.lib;log4cplusS.lib</AdditionalDependencies>
+      <AdditionalDependencies>APSICommon.lib;SEAL.lib;FourQ.lib;log4cplusS.lib</AdditionalDependencies>
     </Lib>
     <Lib>
       <AdditionalLibraryDirectories>$(ProjectDir)..\lib\$(IntDir);$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\cryptopp700\lib\$(IntDir);$(APSILIBS)\log4cplus\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>

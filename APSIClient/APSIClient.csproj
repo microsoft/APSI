@@ -1,12 +1,12 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
-  <PropertyGroup>
-    <DocumentationFile>$(TargetDir)/APSIClient.xml</DocumentationFile>
-  </PropertyGroup>
+  <!--<PropertyGroup>
+    <DocumentationFile>$(ProjectDir)\APSIClient.xml</DocumentationFile>
+  </PropertyGroup>-->
   
   <ItemGroup>
     <APSINativeBinaryFiles Condition="'$(OS)' == 'Windows_NT'" Include="$(ProjectDir)../bin/x64/$(Configuration)/apsinative.*" />
