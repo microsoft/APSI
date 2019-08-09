@@ -53,7 +53,7 @@
     <ConfigurationType>DynamicLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v142</PlatformToolset>
-    <WholeProgramOptimization>false</WholeProgramOptimization>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
     <OutDir>$(ProjectDir)../bin/$(Platform)\$(Configuration)\</OutDir>
     <SpectreMitigation>Spectre</SpectreMitigation>
