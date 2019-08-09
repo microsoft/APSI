@@ -11,14 +11,11 @@
 // APSI
 #include "apsi/item.h"
 #include "apsi/apsidefines.h"
+#include "apsi/tools/blake2/blake2.h"
 
 // SEAL
 #include "seal/util/uintcore.h"
 #include "seal/util/common.h"
-
-// crypto++
-#include "cryptopp/sha3.h"
-
 
 using namespace std;
 using namespace seal;
@@ -43,40 +40,39 @@ Item::Item(uint64_t item)
     operator=(item);
 }
 
-Item::Item(const cuckoo::block & item)
-{
-    value_ = *(array<u64, 2>*)&item;
-}
-
 Item &Item::operator =(uint64_t assign)
 {
     value_[0] = assign;
     value_[1] = 0;
-
     return *this;
 }
 
-Item &Item::operator =(const cuckoo::block& assign)
+Item &Item::operator =(const cuckoo::item_type& assign)
 {
-    value_ = *(array<u64,2>*)&assign;
-
+    value_ = cuckoo::item_to_uint64_array(assign);
     return *this;
+}
+
+Item::Item(const cuckoo::item_type & item)
+{
+    operator =(item);
 }
 
 Item &Item::operator =(const string &str)
 {
     if (str.size() > sizeof(value_))
     {
-        // Use SHA3 as random oracle
-        CryptoPP::SHA3_256 sha3;
-        sha3.Update(reinterpret_cast<const CryptoPP::byte*>(str.data()), str.size());
-        sha3.TruncatedFinal(reinterpret_cast<CryptoPP::byte*>(&value_), sizeof(value_));
+        // Use BLAKE2b as random oracle
+        blake2(
+            reinterpret_cast<uint8_t*>(&value_), sizeof(value_),
+            reinterpret_cast<const uint8_t*>(str.data()), str.size(),
+            nullptr, 0);
     }
     else
     {
         value_[0] = 0;
         value_[1] = 0;
-        memcpy((void*)str.data(), value_.data(), str.size());
+        memcpy(value_.data(), str.data(), str.size());
     }
 
     return *this;
@@ -130,8 +126,7 @@ void Item::to_exfield_element(FFieldElt &ring_item, int bit_length)
     // How many coefficients do we need in the ExFieldElement
     int split_index_bound = (bit_length + split_length - 1) / split_length;
 
-    int j = 0;
-    for (; static_cast<unsigned>(j) < exfield->d() && j < split_index_bound; j++)
+    for (int j = 0; static_cast<unsigned>(j) < exfield->d() && j < split_index_bound; j++)
     {
         auto coeff = item_part(value_, j, split_length);
         ring_item.set_coeff(j, coeff);

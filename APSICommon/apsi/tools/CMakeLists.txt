@@ -14,6 +14,8 @@ target_sources(apsi_common
 		${CMAKE_CURRENT_LIST_DIR}/utils.cpp
 )
 
+add_subdirectory(blake2)
+
 install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/aes.h

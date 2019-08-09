@@ -105,7 +105,7 @@ void apsi::u64_newton_interpolate_poly(
     vector<vector<uint64_t>> divided_differences(size);
     uint64_t numerator;
     uint64_t denominator;
-    uint64_t inverse;
+    uint64_t inverse = 0;
 
     for (int i = 0; i < size; i++) {
         divided_differences[i].resize(size - i);

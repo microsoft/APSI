@@ -11,12 +11,10 @@
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/tools/prng.h"
 #include "apsi/tools/fourq.h"
+#include "apsi/tools/blake2/blake2.h"
 
 // SEAL
 #include "seal/evaluator.h"
-
-// crypto++
-#include "cryptopp/sha3.h"
 
 using namespace std;
 using namespace seal;
@@ -140,11 +138,12 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
     if (validate)
     {
 
-        vector<cuckoo::LocFunc> normal_loc_func(params_.hash_func_count());
-
-        for (int i = 0; i < normal_loc_func.size(); i++)
+        vector<cuckoo::LocFunc> normal_loc_func;
+        for (int i = 0; i < params_.hash_func_count(); i++)
         {
-            normal_loc_func[i] = cuckoo::LocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
+            normal_loc_func.emplace_back(cuckoo::LocFunc(
+                params_.log_table_size(),
+                cuckoo::make_item(params_.hash_func_seed() + i, 0)));
         }
 
 
@@ -158,7 +157,8 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
                 u64 cuckoo_loc;
 
                 // Compute bin locations
-                cuckoo_loc = normal_loc_func[j].location(data[i]);
+                auto cuckoo_item = cuckoo::make_item(data[i].get_value());
+                cuckoo_loc = normal_loc_func[j](cuckoo_item);
                 key = data[i];
 
                 // Lock-free thread-safe bin position search
@@ -187,7 +187,6 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
                     throw std::runtime_error("");
             }
         }
-
     }
 }
 
@@ -203,11 +202,12 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
     PRNG pp(cc_block);
     FourQCoordinate key(pp);
 
-    vector<cuckoo::LocFunc> normal_loc_func(params_.hash_func_count());
-
-    for (int i = 0; i < normal_loc_func.size(); i++)
+    vector<cuckoo::LocFunc> normal_loc_func;
+    for (int i = 0; i < params_.hash_func_count(); i++)
     {
-        normal_loc_func[i] = cuckoo::LocFunc(params_.log_table_size(), params_.hash_func_seed() + i);
+        normal_loc_func.emplace_back(
+            params_.log_table_size(),
+            cuckoo::make_item(params_.hash_func_seed() + i, 0));
     }
 
 	map<int, int> bin_counting_map;
@@ -229,10 +229,12 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
             a.multiply_mod_order(key);
             a.to_buffer(buff.data());
 
-            // Then compress with SHA3
-            CryptoPP::SHA3_256 sha;
-            sha.Update(buff.data(), buff.size());
-            sha.TruncatedFinal(reinterpret_cast<CryptoPP::byte*>(const_cast<Item*>(&data[i])), sizeof(block));
+            // Then compress with BLAKE2b
+            blake2(
+                reinterpret_cast<uint8_t*>(const_cast<uint64_t*>(data[i].data())),
+                sizeof(block),
+                reinterpret_cast<const uint8_t*>(buff.data()), buff.size(),
+                nullptr, 0);
         }
         std::vector<u64> locs(params_.hash_func_count());
 		std::vector<Item> keys(params_.hash_func_count());
@@ -243,8 +245,10 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
 
         // Compute bin locations
 		// Set keys and skip
+        auto cuckoo_item = cuckoo::make_item(data[i].get_value());
+		// Set keys and skip
 		for (int j = 0; j < params_.hash_func_count(); j++) {
-			locs[j] = normal_loc_func[j].location(data[i]);
+			locs[j] = normal_loc_func[j](cuckoo_item);
 			//locs[1] = normal_loc_func[1].location(data[i]);
 			//locs[2] = normal_loc_func[2].location(data[i]);
 			keys[j] = data[i]; 
@@ -278,7 +282,7 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
             {
 
                 // Lock-free thread-safe bin position search
-                auto block_pos = aquire_db_position(static_cast<int>(locs[j]), prng);
+                auto block_pos = acquire_db_position(locs[j], prng);
                 auto& db_block = *block_pos.first;
                 auto pos = block_pos.second;
 
@@ -304,7 +308,7 @@ void SenderDB::add_data(gsl::span<const Item> data, int thread_count)
 }
 
 std::pair<DBBlock*, DBBlock::Position>
-    SenderDB::aquire_db_position(int cuckoo_loc, PRNG &prng)
+    SenderDB::acquire_db_position(size_t cuckoo_loc, PRNG &prng)
 {
     auto batch_idx = cuckoo_loc / params_.batch_size();
     auto batch_offset = cuckoo_loc % params_.batch_size();

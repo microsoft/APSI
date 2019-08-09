@@ -430,14 +430,14 @@ void Channel::send(const vector<u8>& client_id, const ResultPackage& pkg)
 void Channel::get_buffer(vector<u8>& buff, const message_t& msg, int part_start) const
 {
     // Need to have size
-    if (msg.parts() < (part_start + 1))
+    if (msg.parts() < static_cast<size_t>(part_start + 1))
         throw runtime_error("Should have size at least");
 
     size_t size;
     get_part(size, msg, /* part */ part_start);
 
     // If the vector is not empty, we need the part with the data
-    if (size > 0 && msg.parts() < (part_start + 2))
+    if (size > 0 && msg.parts() < static_cast<size_t>(part_start + 2))
         throw runtime_error("Should have size and data.");
 
     buff.resize(size);

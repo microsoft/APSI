@@ -147,7 +147,7 @@ namespace apsi
             Thread safe function to insert an item into the bin 
             index by cockooIndex. The PRNG and be any PRNG.  
             */
-            std::pair<DBBlock*, DBBlock::Position> aquire_db_position(int cockooIndex, apsi::tools::PRNG& prng);
+            std::pair<DBBlock*, DBBlock::Position> acquire_db_position(std::size_t cockooIndex, apsi::tools::PRNG& prng);
 
             apsi::tools::PRNG prng_;
         };

@@ -10,7 +10,7 @@ if (DEFINED MSVC)
 endif()
 
 # Executable will be in ../bin
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${sender_SOURCE_DIR}/../bin)
 
 # Create executable but add no source files yet
 add_executable(sender "")
@@ -25,76 +25,73 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
+# For extra modules
+list(APPEND CMAKE_MODULE_PATH ${sender_SOURCE_DIR}/../cmake)
+
 # Import APSICommon
-find_package(APSICommon 1.0.0 EXACT REQUIRED)
+if(NOT TARGET apsi_common)
+    find_package(APSICommon 1.0.0 EXACT REQUIRED)
+endif()
 
 # Import APSISender
-find_package(APSISender 1.0.0 EXACT REQUIRED)
+if(NOT TARGET apsi_sender)
+    find_package(APSISender 1.0.0 EXACT REQUIRED)
+endif()
 
 # Import SEAL
-find_package(SEAL 3.2.0 REQUIRED)
+find_package(SEAL 3.2.0 EXACT REQUIRED)
 
 # Import Cuckoo
-find_package(Cuckoo 1.0 REQUIRED)
+find_package(Cuckoo 1.1.0 EXACT REQUIRED)
 
-# Import FLINT library
-find_path(FLINT_DIR NAMES flint/fmpz.h)
-if (NOT FLINT_DIR)
-    message(FATAL_ERROR "Could not find FLINT library")
-else()
-    message(STATUS "Flint directory: ${FLINT_DIR}")
+# Import GMP
+find_package(GMP MODULE REQUIRED)
+
+# Import Flint
+find_package(Flint MODULE REQUIRED)
+
+# Import ZeroMQ
+find_package(ZeroMQ MODULE REQUIRED)
+
+# Import ZeroMQpp
+find_package(ZeroMQpp MODULE REQUIRED)
+
+# Import FourQ
+find_package(FourQ MODULE REQUIRED)
+
+# Import Log4cplus 
+find_package(Log4cplus MODULE REQUIRED)
+
+# Import TCLAP
+find_package(TCLAP MODULE REQUIRED)
+
+# Add common_code
+if(NOT TARGET common_code)
+    find_path(COMMON_CODE_INCLUDE_DIR
+        NAMES base_clp.h common_utils.h
+        HINTS ${sender_SOURCE_DIR}/../CommonCodeCLI)
+    find_library(COMMON_CODE_LIBRARY_PATH
+        NAMES common_code
+        HINTS ${sender_SOURCE_DIR}/../lib)
+    add_library(common_code UNKNOWN IMPORTED)
+    set_target_properties(common_code PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES ${COMMON_CODE_INCLUDE_DIR}
+        IMPORTED_LOCATION ${COMMON_CODE_LIBRARY_PATH}) 
 endif()
-
-# Log4cplus
-find_path(LOG4CPLUS_DIR log4cplus/logger.h)
-find_library(LOG4CPLUS log4cplus)
-if (NOT LOG4CPLUS_DIR OR NOT LOG4CPLUS)
-    message(FATAL_ERROR "Could not find log4cplus library")
-else()
-    message(STATUS "log4cplus directory: ${LOG4CPLUS_DIR}")
-    message(STATUS "Found log4cplus: ${LOG4CPLUS}")
-endif()
-
-# CryptoPP
-find_library(CRYPTOPP cryptopp)
-if (NOT CRYPTOPP)
-    message(FATAL_ERROR "Could not find cryptopp library")
-else()
-    message(STATUS "Found cryptopp: ${CRYPTOPP}")
-endif()
-
-# Common Code
-find_library(COMMON_CODE common_code HINTS ${CMAKE_CURRENT_SOURCE_DIR}/../lib)
-if (NOT COMMON_CODE)
-    message(FATAL_ERROR "Could not find common_code library")
-else()
-    message(STATUS "Found common_code: ${COMMON_CODE}")
-endif()
-
-# Set flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-
-# Includes
-target_include_directories(sender PRIVATE
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../APSICommon>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../APSISender>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../CommonCodeCLI>
-    ${FLINT_DIR}/flint
-    ${LOG4CPLUS_DIR}
-)
 
 # C++17
 target_compile_features(sender PUBLIC cxx_std_17)
 
+# Require -maes flag
+target_compile_options(sender PRIVATE
+    "-march=native")
+
 # Link required libraries
 target_link_libraries(sender
-    APSICommon::apsi_common
-    APSISender::apsi_sender
-    ${LOG4CPLUS}
-    ${CRYPTOPP}
-    ${COMMON_CODE}
+    apsi_common
+    apsi_sender
     stdc++fs
+    common_code
 )
 
 # Add source files to executable
