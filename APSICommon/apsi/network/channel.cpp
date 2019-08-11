@@ -365,13 +365,17 @@ void Channel::send_query(
     get_string(str, pub_key);
     msg.add(str);
     bytes_sent_ += str.length();
+    Log::info("public key length = %i bytes ", str.length()); 
 
     get_string(str, relin_keys);
     msg.add(str);
     bytes_sent_ += str.length();
+    Log::info("relin key length = %i bytes ", str.length()); 
 
     add_part(query.size(), msg);
     bytes_sent_ += sizeof(size_t);
+
+    u64 sofar = bytes_sent_;
 
     for (const auto& pair : query)
     {
@@ -380,7 +384,7 @@ void Channel::send_query(
 
         for (const auto& ciphertext : pair.second)
         {
-            get_string(str, ciphertext);
+            (str, ciphertext);
             msg.add(str);
             bytes_sent_ += str.length();
         }
@@ -388,6 +392,8 @@ void Channel::send_query(
         bytes_sent_ += sizeof(u64);
         bytes_sent_ += sizeof(size_t);
     }
+    Log::info("ciphertext lengths = %i bytes ", bytes_sent_-sofar); 
+
 
     send_message(msg);
 }

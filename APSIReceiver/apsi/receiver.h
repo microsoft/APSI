@@ -198,6 +198,9 @@ namespace apsi
 
             // Objects for compressed ciphertexts
             std::unique_ptr<CiphertextCompressor> compressor_;
+
+            typedef pair<pair<uint64_t, uint64_t> >, Ciphertext> SeededCiphertext; 
+
         };
     }
 }

@@ -34,6 +34,7 @@ using namespace apsi::network;
 using namespace apsi::receiver;
 
 
+
 Receiver::Receiver(int thread_count, const MemoryPoolHandle &pool) :
     thread_count_(thread_count),
     pool_(pool),
@@ -384,11 +385,15 @@ void Receiver::generate_powers(const FFieldArray &exfield_items,
 
 void Receiver::encrypt(map<uint64_t, FFieldArray> &input, map<uint64_t, vector<Ciphertext>> &destination)
 {
+    // debugging
+    int count = 0; 
     destination.clear();
     for (auto it = input.begin(); it != input.end(); it++)
     {
         encrypt(it->second, destination[it->first]);
+        count += (it->second.size() + slot_count_ - 1) / slot_count_; 
     }
+    Log::info("receiver sending %i ciphertexts", count); 
 }
 
 void Receiver::encrypt(const FFieldArray &input, vector<Ciphertext> &destination)
@@ -407,7 +412,9 @@ void Receiver::encrypt(const FFieldArray &input, vector<Ciphertext> &destination
         }
         ex_batch_encoder_->compose(batch, plain);
         destination.emplace_back(seal_context_, pool_);
-        encryptor_->encrypt(plain, destination.back(), pool_);
+        encryptor_->encrypt_sk(plain, destination.back(), secret_key_, pool_);
+        // debug 
+        Log::info("noise budget = %i", decryptor_->invariant_noise_budget(destination.back())); 
     }
 }
 
