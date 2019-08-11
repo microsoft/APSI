@@ -351,7 +351,7 @@ void Channel::send_preprocess_response(const vector<u8>& client_id, const std::v
 void Channel::send_query(
     const PublicKey& pub_key,
     const RelinKeys& relin_keys,
-    const map<u64, vector<Ciphertext>>& query
+    const map<u64, vector<SeededCiphertext>>& query
 )
 {
     throw_if_not_connected();
@@ -382,14 +382,18 @@ void Channel::send_query(
         add_part(pair.first, msg);
         add_part(pair.second.size(), msg);
 
-        for (const auto& ciphertext : pair.second)
+        for (const auto& seededctxt : pair.second)
         {
-            (str, ciphertext);
+            add_part(seededctxt.first.first, msg); 
+            add_part(seededctxt.first.second, msg); 
+            get_string(str, seededctxt.second);
             msg.add(str);
             bytes_sent_ += str.length();
         }
 
         bytes_sent_ += sizeof(u64);
+        bytes_sent_ += sizeof(u64); // seed1
+        bytes_sent_ += sizeof(u64); // seed2
         bytes_sent_ += sizeof(size_t);
     }
     Log::info("ciphertext lengths = %i bytes ", bytes_sent_-sofar); 

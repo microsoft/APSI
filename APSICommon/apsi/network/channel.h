@@ -19,6 +19,8 @@
 #include "seal/relinkeys.h"
 #include "seal/ciphertext.h"
 
+typedef std::pair<std::pair<std::uint64_t, std::uint64_t>, seal::Ciphertext> SeededCiphertext; 
+
 
 namespace std
 {
@@ -115,7 +117,7 @@ namespace apsi
             void send_query(
                 const seal::PublicKey& pub_key,
                 const seal::RelinKeys& relin_keys,
-                const std::map<apsi::u64, std::vector<seal::Ciphertext>>& query
+                const std::map<apsi::u64, std::vector<SeededCiphertext>>& query
             );
 
             /**
