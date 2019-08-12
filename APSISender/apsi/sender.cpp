@@ -254,6 +254,9 @@ void Sender::query(
 
     Plaintext dummyPtxt("0"); 
     SecretKey dummySk;  // todo: initialize this.
+    dummySk.data().resize(powers[0][0].coeff_mod_count() * powers[0][0].poly_modulus_degree());
+    dummySk.data().set_zero();
+    dummySk.parms_id() = powers[0][0].parms_id();
 
 
     for (const auto& pair : query)
@@ -269,8 +272,8 @@ void Sender::query(
             // Then, make the correction. 
             Ciphertext temp; 
             session_context.encryptor()->encrypt_sk(Plaintext("0"), temp, dummySk, seed);
-            // todo: correct this. 
-            
+            // todo: correcting the first coefficient, which is  -(a*s+e + Delta*m)
+            seal::util::set_poly_poly(temp.data(0), temp.poly_modulus_degree(), temp.coeff_mod_count(), powers[i][power].data(0));      
         }
     }
 
