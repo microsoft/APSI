@@ -268,12 +268,13 @@ void Sender::query(
             // todo: need to change this part to process seeded ciphertext.
             // do we do the logic here? 
             seed128 seed = pair.second[i].first;  // first, locate the seed
+            cout << "sender seed: " << seed.first << ", " << seed.second << endl;
             get_ciphertext(seal_context_, powers[i][power], pair.second[i].second);
             // Then, make the correction. 
             Ciphertext temp; 
             session_context.encryptor()->encrypt_sk(Plaintext("0"), temp, dummySk, seed);
             // todo: correcting the first coefficient, which is  -(a*s+e + Delta*m)
-            seal::util::set_poly_poly(temp.data(0), temp.poly_modulus_degree(), temp.coeff_mod_count(), powers[i][power].data(0));      
+            seal::util::set_poly_poly(temp.data(1), temp.poly_modulus_degree(), temp.coeff_mod_count(), powers[i][power].data(1));      
         }
     }
 

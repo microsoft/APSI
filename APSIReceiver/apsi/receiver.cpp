@@ -415,10 +415,15 @@ void Receiver::encrypt(const FFieldArray &input, vector<SeededCiphertext> &desti
         uint64_t seed_lw = 1; 
         uint64_t seed_hw = 1;
         pair<uint64_t, uint64_t> seeds = {seed_lw, seed_hw}; 
-        destination.push_back({seeds,   Ciphertext(seal_context_, pool_)});
+        destination.push_back({seeds,  Ciphertext(seal_context_, pool_)});
         encryptor_->encrypt_sk(plain, destination.back().second, secret_key_, seeds,  pool_);
         // debug 
+        // note: this is not doing the setting to zero yet. s
         Log::info("noise budget = %i", decryptor_->invariant_noise_budget(destination.back().second)); 
+        seal::util::set_zero_poly(destination.back().second.poly_modulus_degree(), destination.back().second.coeff_mod_count(), destination.back().second.data(1));
+        Log::info("cipher after setting to zero : ");
+        for (int i = 0; i< 10; i++)
+            Log::info("(%i, %i)", i, destination.back().second.data(1)[i]); 
     }
 }
 
