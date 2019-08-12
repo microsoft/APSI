@@ -5,6 +5,7 @@
 
 // STD
 #include <cstdint>
+#include <utility> 
 
 // Intrinsics
 #include <wmmintrin.h>
@@ -30,6 +31,8 @@ namespace apsi
     typedef std::int32_t i32;
     typedef std::uint8_t u8;
     typedef std::int8_t i8;
+    typedef std::pair<u64, u64> seed128; 
+
 
     extern const block zero_block;
     extern const block one_block;

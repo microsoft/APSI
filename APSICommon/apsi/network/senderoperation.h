@@ -93,7 +93,7 @@ namespace apsi
         {
         public:
             SenderOperationQuery() = delete;
-            SenderOperationQuery(std::vector<apsi::u8>&& client_id, const std::string& pub, const std::string& relin, std::map<apsi::u64, std::vector<std::string>>&& queryp)
+            SenderOperationQuery(std::vector<apsi::u8>&& client_id, const std::string& pub, const std::string& relin, std::map<apsi::u64, std::vector<std::pair<seed128, std::string> > >&& queryp)
                 : SenderOperation(SOP_query, std::move(client_id)),
                   public_key(pub),
                   relin_keys(relin),
@@ -104,7 +104,7 @@ namespace apsi
 
             std::string public_key;
             std::string relin_keys;
-            std::map<apsi::u64, std::vector<std::string>> query;
+            std::map<apsi::u64, std::vector<std::pair<seed128, std::string>>> query;
         };
     }
 }

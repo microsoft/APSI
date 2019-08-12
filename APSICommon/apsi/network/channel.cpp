@@ -16,6 +16,7 @@
 #pragma warning(pop)
 
 
+
 using namespace std;
 using namespace seal;
 using namespace apsi;
@@ -206,6 +207,7 @@ void Channel::receive(SenderResponsePreprocess& response)
     bytes_received_ += sizeof(SenderOperationType);
     bytes_received_ += response.buffer.size();
 }
+
 
 void Channel::receive(SenderResponseQuery& response)
 {
@@ -569,7 +571,7 @@ shared_ptr<SenderOperation> Channel::decode_query(const message_t& msg)
 
     string pub_key;
     string relin_keys;
-    map<u64, vector<string>> query;
+    map<u64, vector<pair<seed128, string>>> query;
 
     msg.get(pub_key, /* part */ 2);
     bytes_received_ += pub_key.length();
@@ -591,13 +593,20 @@ shared_ptr<SenderOperation> Channel::decode_query(const message_t& msg)
         size_t num_elems;
         get_part(num_elems, msg, msg_idx++);
 
-        vector<string> powers(num_elems);
+        vector<pair<seed128, string>> powers(num_elems);
 
         for (u64 j = 0; j < num_elems; j++)
         {
-            msg.get(powers[j], msg_idx++);
+            seed128 seed; 
+            get_part(powers[j].first.first, msg, msg_idx++);
+            get_part(powers[j].first.second, msg, msg_idx++);
+            msg.get(powers[j].second, msg_idx++);
 
-            bytes_received_ += powers[j].length();
+            bytes_received_ += powers[j].second.length();
+            bytes_received_ += sizeof(u64) *2;
+
+
+        
         }
 
         query.insert_or_assign(power, powers);
