@@ -37,6 +37,12 @@
     <Filter Include="Source Files\Logging">
       <UniqueIdentifier>{9865b702-dfe7-405d-830a-1a09e38d309f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Tools\blake2">
+      <UniqueIdentifier>{c61f079e-6a99-484a-a216-8e7329a4fb9b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Tools\blake2">
+      <UniqueIdentifier>{7572cfd6-8f59-42fe-8c60-d41b20fcf644}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="apsi\apsi.h">
@@ -114,6 +120,24 @@
     <ClInclude Include="apsi\network\senderoperationresponse.h">
       <Filter>Header Files\Network</Filter>
     </ClInclude>
+    <ClInclude Include="apsi\tools\blake2\blake2.h">
+      <Filter>Header Files\Tools\blake2</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\blake2\blake2b-load-sse2.h">
+      <Filter>Header Files\Tools\blake2</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\blake2\blake2b-load-sse41.h">
+      <Filter>Header Files\Tools\blake2</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\blake2\blake2b-round.h">
+      <Filter>Header Files\Tools\blake2</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\blake2\blake2-config.h">
+      <Filter>Header Files\Tools\blake2</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\blake2\blake2-impl.h">
+      <Filter>Header Files\Tools\blake2</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp">
@@ -166,6 +190,9 @@
     </ClCompile>
     <ClCompile Include="apsi\tools\bigpoly.cpp">
       <Filter>Source Files\Tools</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\tools\blake2\blake2b.c">
+      <Filter>Source Files\Tools\blake2</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
