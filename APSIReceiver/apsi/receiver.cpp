@@ -34,6 +34,7 @@ using namespace apsi::network;
 using namespace apsi::receiver;
 
 
+
 Receiver::Receiver(int thread_count, const MemoryPoolHandle &pool) :
     thread_count_(thread_count),
     pool_(pool),
@@ -175,7 +176,7 @@ void Receiver::handshake(Channel& chl)
 }
 
 pair<
-    map<uint64_t, vector<Ciphertext> >,
+    map<uint64_t, vector<SeededCiphertext> >,
     unique_ptr<CuckooTable> >
     Receiver::preprocess(vector<Item> &items, Channel &channel)
 {
@@ -262,7 +263,7 @@ pair<
     map<uint64_t, FFieldArray> powers;
     generate_powers(*exfield_items, powers);
 
-    map<uint64_t, vector<Ciphertext> > ciphers;
+    map<uint64_t, vector<SeededCiphertext> > ciphers;
     encrypt(powers, ciphers);
 
     Log::info("Receiver preprocess end");
@@ -382,16 +383,20 @@ void Receiver::generate_powers(const FFieldArray &exfield_items,
     }
 }
 
-void Receiver::encrypt(map<uint64_t, FFieldArray> &input, map<uint64_t, vector<Ciphertext>> &destination)
+void Receiver::encrypt(map<uint64_t, FFieldArray> &input, map<uint64_t, vector<SeededCiphertext>> &destination)
 {
+    // debugging
+    int count = 0; 
     destination.clear();
     for (auto it = input.begin(); it != input.end(); it++)
     {
         encrypt(it->second, destination[it->first]);
+        count += (it->second.size() + slot_count_ - 1) / slot_count_; 
     }
+    Log::info("receiver sending %i ciphertexts", count); 
 }
 
-void Receiver::encrypt(const FFieldArray &input, vector<Ciphertext> &destination)
+void Receiver::encrypt(const FFieldArray &input, vector<SeededCiphertext> &destination)
 {
     int batch_size = slot_count_, num_of_batches = static_cast<int>((input.size() + batch_size - 1) / batch_size);
     vector<uint64_t> integer_batch(batch_size, 0);
@@ -399,6 +404,7 @@ void Receiver::encrypt(const FFieldArray &input, vector<Ciphertext> &destination
     destination.reserve(num_of_batches);
     Plaintext plain(pool_);
     FFieldArray batch(ex_batch_encoder_->create_array());
+    random_device rd;
     for (int i = 0; i < num_of_batches; i++)
     {
         for (int j = 0; j < batch_size; j++)
@@ -406,8 +412,18 @@ void Receiver::encrypt(const FFieldArray &input, vector<Ciphertext> &destination
             batch.set(j, i * batch_size + j, input);
         }
         ex_batch_encoder_->compose(batch, plain);
-        destination.emplace_back(seal_context_, pool_);
-        encryptor_->encrypt(plain, destination.back(), pool_);
+        uint64_t seed_lw = 1; 
+        uint64_t seed_hw = 1;
+        pair<uint64_t, uint64_t> seeds = {seed_lw, seed_hw}; 
+        destination.push_back({seeds,  Ciphertext(seal_context_, pool_)});
+        encryptor_->encrypt_sk(plain, destination.back().second, secret_key_, seeds,  pool_);
+        // debug 
+        // note: this is not doing the setting to zero yet. s
+        Log::info("noise budget = %i", decryptor_->invariant_noise_budget(destination.back().second)); 
+        seal::util::set_zero_poly(destination.back().second.poly_modulus_degree(), destination.back().second.coeff_mod_count(), destination.back().second.data(1));
+        Log::info("cipher after setting to zero : ");
+        for (int i = 0; i< 10; i++)
+            Log::info("(%i, %i)", i, destination.back().second.data(1)[i]); 
     }
 }
 

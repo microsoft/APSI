@@ -16,6 +16,7 @@
 #pragma warning(pop)
 
 
+
 using namespace std;
 using namespace seal;
 using namespace apsi;
@@ -207,6 +208,7 @@ void Channel::receive(SenderResponsePreprocess& response)
     bytes_received_ += response.buffer.size();
 }
 
+
 void Channel::receive(SenderResponseQuery& response)
 {
     throw_if_not_connected();
@@ -351,7 +353,7 @@ void Channel::send_preprocess_response(const vector<u8>& client_id, const std::v
 void Channel::send_query(
     const PublicKey& pub_key,
     const RelinKeys& relin_keys,
-    const map<u64, vector<Ciphertext>>& query
+    const map<u64, vector<SeededCiphertext>>& query
 )
 {
     throw_if_not_connected();
@@ -365,29 +367,39 @@ void Channel::send_query(
     get_string(str, pub_key);
     msg.add(str);
     bytes_sent_ += str.length();
+    Log::info("public key length = %i bytes ", str.length()); 
 
     get_string(str, relin_keys);
     msg.add(str);
     bytes_sent_ += str.length();
+    Log::info("relin key length = %i bytes ", str.length()); 
 
     add_part(query.size(), msg);
     bytes_sent_ += sizeof(size_t);
+
+    u64 sofar = bytes_sent_;
 
     for (const auto& pair : query)
     {
         add_part(pair.first, msg);
         add_part(pair.second.size(), msg);
 
-        for (const auto& ciphertext : pair.second)
+        for (const auto& seededctxt : pair.second)
         {
-            get_string(str, ciphertext);
+            add_part(seededctxt.first.first, msg); 
+            add_part(seededctxt.first.second, msg); 
+            get_string(str, seededctxt.second);
             msg.add(str);
             bytes_sent_ += str.length();
         }
 
         bytes_sent_ += sizeof(u64);
+        bytes_sent_ += sizeof(u64); // seed1
+        bytes_sent_ += sizeof(u64); // seed2
         bytes_sent_ += sizeof(size_t);
     }
+    Log::info("ciphertext lengths = %i bytes ", bytes_sent_-sofar); 
+
 
     send_message(msg);
 }
@@ -559,7 +571,7 @@ shared_ptr<SenderOperation> Channel::decode_query(const message_t& msg)
 
     string pub_key;
     string relin_keys;
-    map<u64, vector<string>> query;
+    map<u64, vector<pair<seed128, string>>> query;
 
     msg.get(pub_key, /* part */ 2);
     bytes_received_ += pub_key.length();
@@ -581,13 +593,20 @@ shared_ptr<SenderOperation> Channel::decode_query(const message_t& msg)
         size_t num_elems;
         get_part(num_elems, msg, msg_idx++);
 
-        vector<string> powers(num_elems);
+        vector<pair<seed128, string>> powers(num_elems);
 
         for (u64 j = 0; j < num_elems; j++)
         {
-            msg.get(powers[j], msg_idx++);
+            seed128 seed; 
+            get_part(powers[j].first.first, msg, msg_idx++);
+            get_part(powers[j].first.second, msg, msg_idx++);
+            msg.get(powers[j].second, msg_idx++);
 
-            bytes_received_ += powers[j].length();
+            bytes_received_ += powers[j].second.length();
+            bytes_received_ += sizeof(u64) *2;
+
+
+        
         }
 
         query.insert_or_assign(power, powers);

@@ -225,7 +225,7 @@ void Sender::preprocess(vector<u8>& buff)
 void Sender::query(
     const PublicKey& pub_key,
     const RelinKeys& relin_keys,
-    const map<u64, vector<string>> query,
+    const map<u64, vector<pair<seed128, string>>> query,
     const vector<u8>& client_id,
     Channel& channel)
 {
@@ -252,13 +252,29 @@ void Sender::query(
         }
     }
 
+    Plaintext dummyPtxt("0"); 
+    SecretKey dummySk;  // todo: initialize this.
+    dummySk.data().resize(powers[0][0].coeff_mod_count() * powers[0][0].poly_modulus_degree());
+    dummySk.data().set_zero();
+    dummySk.parms_id() = powers[0][0].parms_id();
+
+
     for (const auto& pair : query)
     {
         u64 power = pair.first;
 
         for (u64 i = 0; i < powers.size(); i++)
         {
-            get_ciphertext(seal_context_, powers[i][power], pair.second[i]);
+            // todo: need to change this part to process seeded ciphertext.
+            // do we do the logic here? 
+            seed128 seed = pair.second[i].first;  // first, locate the seed
+            cout << "sender seed: " << seed.first << ", " << seed.second << endl;
+            get_ciphertext(seal_context_, powers[i][power], pair.second[i].second);
+            // Then, make the correction. 
+            Ciphertext temp; 
+            session_context.encryptor()->encrypt_sk(Plaintext("0"), temp, dummySk, seed);
+            // todo: correcting the first coefficient, which is  -(a*s+e + Delta*m)
+            seal::util::set_poly_poly(temp.data(1), temp.poly_modulus_degree(), temp.coeff_mod_count(), powers[i][power].data(1));      
         }
     }
 

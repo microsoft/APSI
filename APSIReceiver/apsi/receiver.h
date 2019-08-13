@@ -6,7 +6,7 @@
 // STD
 #include <map>
 #include <memory>
-
+#include <utility> 
 // APSI
 #include "apsi/item.h"
 #include "apsi/psiparams.h"
@@ -28,6 +28,9 @@
 #include "seal/secretkey.h"
 #include "seal/relinkeys.h"
 #include "seal/batchencoder.h"
+
+
+typedef std::pair<std::pair<std::uint64_t, std::uint64_t>, seal::Ciphertext> SeededCiphertext; 
 
 
 namespace apsi
@@ -70,7 +73,7 @@ namespace apsi
             Preprocesses the PSI items. Returns the power map of the items, and the indices of them in the hash table.
             */
             std::pair<
-                std::map<std::uint64_t, std::vector<seal::Ciphertext>>,
+                std::map<std::uint64_t, std::vector<SeededCiphertext>>,
                 std::unique_ptr<cuckoo::CuckooTable>
             > preprocess(std::vector<Item> &items, apsi::network::Channel& channel);
 
@@ -108,14 +111,14 @@ namespace apsi
             ciphertexts in a vector depends on the slot count in generalized batching. For example, if an input vector has size 1024, the slot count
             is 256, then there are 1024/256 = 4 ciphertext in the Ciphertext vector.
             */
-            void encrypt(std::map<std::uint64_t, FFieldArray> &input, std::map<std::uint64_t, std::vector<seal::Ciphertext>> &destination);
+            void encrypt(std::map<std::uint64_t, FFieldArray> &input, std::map<std::uint64_t, std::vector<SeededCiphertext>> &destination);
 
             /**
             Encrypts a vector of elements to a corresponding vector of SEAL Ciphertext, using generalized batching. The number of
             ciphertexts in the vector depends on the slot count in generalized batching. For example, if an input vector has size 1024,
             the slot count is 256, then there are 1024/256 = 4 ciphertext in the Ciphertext vector.
             */
-            void encrypt(const FFieldArray &input, std::vector<seal::Ciphertext> &destination);
+            void encrypt(const FFieldArray &input, std::vector<SeededCiphertext> &destination);
 
             /**
             Stream decryption of ciphers from the sender. Ciphertext will be acquired from the sender in a streaming fashion one by one in
@@ -198,6 +201,8 @@ namespace apsi
 
             // Objects for compressed ciphertexts
             std::unique_ptr<CiphertextCompressor> compressor_;
+
+
         };
     }
 }
