@@ -4,6 +4,7 @@ obj/*
 bin/*
 */lib/*
 */.build/*
+*/out/*
 *.o
 *.so
 *.a
