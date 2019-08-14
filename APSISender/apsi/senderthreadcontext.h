@@ -7,14 +7,18 @@
 #include <memory>
 #include <stdexcept>
 #include <vector>
+#include <utility>
 
 // APSI
 #include "apsi/psiparams.h"
+#include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_elt.h"
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/tools/matrixview.h"
 #include "apsi/tools/prng.h"
 
+// SEAL
+#include <seal/memorymanager.h>
 
 namespace apsi
 {
@@ -47,14 +51,14 @@ namespace apsi
                 pool_ = pool;
             }
 
-            inline std::vector<std::shared_ptr<FField> > &exfield()
+            inline FField field()
             {
-                return exfield_;
+                return *field_;
             }
 
-            inline void set_exfield(std::vector<std::shared_ptr<FField> > exfield)
+            inline void set_field(FField field)
             {
-                exfield_ = std::move(exfield);
+                field_ = std::make_unique<FField>(field);
             }
 
             void set_prng(apsi::block block)
@@ -71,19 +75,22 @@ namespace apsi
                 }
                 if (!symm_block_vec_)
                 {
-                    // Append field vectors after each other to form the matrix
-                    std::vector<std::shared_ptr<FField> > field_matrix;
-                    for(int i = 0; i < params.split_size() + 1; i++)
-                    {
-                        field_matrix.insert(field_matrix.end(), exfield_.begin(), exfield_.end()); 
-                    }
+                    // Number of field elements needed
+                    std::size_t total_size = params.batch_size() * (params.split_size() + 1);
 
-                    symm_block_vec_ = std::make_unique<FFieldArray>(field_matrix);
-                    symm_block_ = MatrixView<_ffield_array_elt_t>(symm_block_vec_->data(), params.batch_size(), params.split_size() + 1);
+                    // Set up backing array
+                    symm_block_vec_ = std::make_unique<FFieldArray>(total_size, *field_);
+
+                    // Create matrix view
+                    symm_block_ = MatrixView<_ffield_elt_coeff_t>(
+                        symm_block_vec_->data(),
+                        params.batch_size(), 
+                        params.split_size() + 1,
+                        field_->d());
                 }
             }
 
-            inline MatrixView<_ffield_array_elt_t> symm_block()
+            inline MatrixView<_ffield_elt_coeff_t> symm_block()
             {
                 return symm_block_;
             }
@@ -141,11 +148,11 @@ namespace apsi
 
             seal::MemoryPoolHandle pool_;
 
-            std::vector<std::shared_ptr<FField> > exfield_;
+            std::unique_ptr<FField> field_ = nullptr;
 
-            std::unique_ptr<FFieldArray> symm_block_vec_;
+            std::unique_ptr<FFieldArray> symm_block_vec_ = nullptr;
 
-            MatrixView<_ffield_array_elt_t> symm_block_;
+            MatrixView<_ffield_elt_coeff_t> symm_block_;
             
             apsi::tools::PRNG prng_;
 

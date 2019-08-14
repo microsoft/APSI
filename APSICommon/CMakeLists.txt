@@ -54,12 +54,6 @@ find_package(Cuckoo 1.1.0 EXACT REQUIRED)
 # Import Microsoft GSL
 find_package(msgsl MODULE REQUIRED)
 
-# Import GMP
-find_package(GMP REQUIRED)
-
-# Import Flint
-find_package(Flint MODULE REQUIRED)
-
 # Import ZeroMQ
 find_package(ZeroMQ MODULE REQUIRED)
 
@@ -71,10 +65,6 @@ find_package(FourQ MODULE REQUIRED)
 
 # Import Log4cplus
 find_package(Log4cplus MODULE REQUIRED)
-
-# Import Boost
-find_package(Boost 1.66 REQUIRED)
-include_directories(${Boost_INCLUDE_DIRS})
 
 # Set flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
@@ -97,8 +87,6 @@ target_link_libraries(apsi_common PUBLIC
     SEAL::seal
     msgsl
     Cuckoo::cuckoo
-    GMP
-    Flint
     ZeroMQ
     ZeroMQpp
     FourQ

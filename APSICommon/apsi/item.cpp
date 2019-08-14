@@ -85,7 +85,7 @@ Item &Item::operator =(const Item &assign)
     return *this;
 }
 
-FFieldElt Item::to_exfield_element(const shared_ptr<FField> &exfield, int bit_length)
+FFieldElt Item::to_exfield_element(FField exfield, int bit_length)
 {
     FFieldElt ring_item(exfield);
     to_exfield_element(ring_item, bit_length);
@@ -111,7 +111,7 @@ uint64_t item_part(const std::array<apsi::u64, 2>& value_, uint32_t i, uint32_t 
     }
     else
     {
-        return ((value_[i1] >> j1) & mask) | ((value_[i2] << (64 - j1)) & mask);
+        return ((value_[i1] >> j1) & mask) | ((value_[i2] << (64 - j2)) & mask);
     }
 }
 
@@ -121,12 +121,12 @@ void Item::to_exfield_element(FFieldElt &ring_item, int bit_length)
     auto exfield = ring_item.field();
 
     // Should minus 1 to avoid wrapping around p
-    int split_length = get_significant_bit_count(exfield->ch()) - 1;
+    int split_length = exfield.ch().bit_count() - 1;
 
     // How many coefficients do we need in the ExFieldElement
     int split_index_bound = (bit_length + split_length - 1) / split_length;
 
-    for (int j = 0; static_cast<unsigned>(j) < exfield->d() && j < split_index_bound; j++)
+    for (int j = 0; static_cast<unsigned>(j) < exfield.d() && j < split_index_bound; j++)
     {
         auto coeff = item_part(value_, j, split_length);
         ring_item.set_coeff(j, coeff);

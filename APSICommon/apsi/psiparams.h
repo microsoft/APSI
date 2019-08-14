@@ -17,9 +17,8 @@
 #include "apsi/tools/utils.h"
 
 // SEAL
-#include "seal/encryptionparams.h"
-#include "seal/biguint.h"
-#include "seal/smallmodulus.h"
+#include <seal/encryptionparams.h>
+#include <seal/biguint.h>
 
 // Cuckoo
 #include "cuckoo/cuckoo.h"
@@ -184,7 +183,7 @@ namespace apsi
         /********************************************
         Parameters from input: ExFieldParams
         *********************************************/
-        inline apsi::u64 exfield_characteristic() const
+        inline u64 exfield_characteristic() const
         {
             return exfield_params_.characteristic;
         }

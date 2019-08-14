@@ -47,7 +47,7 @@ void CSVReader::read(std::istream& stream, std::vector<Item>& items, Matrix<u8>&
     // Transfer temp_labels to real labels, if needed
     if (label_byte_count > 0 && temp_labels.size() > 0)
     {
-        labels.resize(temp_labels.size(), label_byte_count);
+        labels.resize(temp_labels.size(), label_byte_count, 1);
         for (u64 i = 0; i < temp_labels.size(); i++)
         {
             memcpy(labels[i].data(), temp_labels[i].data(), label_byte_count);

@@ -6,7 +6,8 @@
 // STD
 #include <map>
 #include <memory>
-#include <utility> 
+#include <utility>
+
 // APSI
 #include "apsi/item.h"
 #include "apsi/psiparams.h"
@@ -146,9 +147,9 @@ namespace apsi
                 std::vector<bool>& ret_bools,
                 apsi::Matrix<apsi::u8>& ret_labels);
 
-            std::shared_ptr<FField> ex_field() const
+            std::shared_ptr<FField> field() const
             {
-                return ex_field_;
+                return field_;
             }
 
             std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder() const
@@ -181,7 +182,7 @@ namespace apsi
 
             seal::MemoryPoolHandle pool_;
 
-            std::shared_ptr<FField> ex_field_;
+            std::shared_ptr<FField> field_;
 
             seal::PublicKey public_key_;
 

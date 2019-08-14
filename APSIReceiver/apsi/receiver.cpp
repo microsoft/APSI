@@ -4,6 +4,7 @@
 // STD
 #include <sstream>
 #include <map>
+#include <iostream>
 
 // APSI
 #include "apsi/receiver.h"
@@ -38,7 +39,7 @@ using namespace apsi::receiver;
 Receiver::Receiver(int thread_count, const MemoryPoolHandle &pool) :
     thread_count_(thread_count),
     pool_(pool),
-    ex_field_(nullptr),
+    field_(nullptr),
     slot_count_(0)
 {
     if (thread_count_ <= 0)
@@ -52,8 +53,12 @@ void Receiver::initialize()
     STOPWATCH(recv_stop_watch, "Receiver::initialize");
     Log::info("Initializing Receiver");
 
-    ex_field_ = FField::Acquire(get_params().exfield_characteristic(), get_params().exfield_degree());
-    slot_count_ = static_cast<int>(get_params().encryption_params().poly_modulus_degree() / get_params().exfield_degree());
+    field_ = make_unique<FField>(
+        SmallModulus(get_params().exfield_characteristic()),
+        get_params().exfield_degree());
+
+    //slot_count_ = static_cast<int>(get_params().encryption_params().poly_modulus_degree() / get_params().exfield_degree());
+    slot_count_ = get_params().batch_size();
 
     seal_context_ = SEALContext::Create(get_params().encryption_params());
     KeyGenerator generator(seal_context_);
@@ -94,8 +99,7 @@ void Receiver::initialize()
     // relin_keys_ = generator.relin_keys(get_params().decomposition_bit_count());
     Log::info("Receiver initialized with relin keys seeds %i and %i", relin_keys_seeds_.first, relin_keys_seeds_.second); 
 
-    ex_batch_encoder_ = make_shared<FFieldFastBatchEncoder>(ex_field_->ch(), ex_field_->d(),
-        get_power_of_two(get_params().encryption_params().poly_modulus_degree()));
+    ex_batch_encoder_ = make_shared<FFieldFastBatchEncoder>(seal_context_, *field_);
 
     Log::info("Receiver initialized");
 }
@@ -272,14 +276,7 @@ pair<
     unsigned padded_cuckoo_capacity = static_cast<unsigned>(
         ((cuckoo->table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
 
-    vector<shared_ptr<FField> > field_vec;
-    field_vec.reserve(padded_cuckoo_capacity);
-    for (unsigned i = 0; i < padded_cuckoo_capacity; i++)
-    {
-        field_vec.emplace_back(ex_batch_encoder_->field(i % slot_count_));
-    }
-
-    exfield_items = make_unique<FFieldArray>(field_vec);
+    exfield_items = make_unique<FFieldArray>(padded_cuckoo_capacity, *field_);
     exfield_encoding(*cuckoo, *exfield_items);
 
     map<uint64_t, FFieldArray> powers;
@@ -305,8 +302,8 @@ unique_ptr<CuckooTable> Receiver::cuckoo_hashing(const vector<Item> &items)
         get_params().max_probe(),
         receiver_null_item) };
 
-    auto coeff_bit_count = seal::util::get_significant_bit_count(ex_field_->ch()) - 1;
-    auto degree = ex_field_ ? ex_field_->d() : 1;
+    auto coeff_bit_count = field_->ch().bit_count() - 1;
+    auto degree = field_ ? field_->d() : 1;
 
     if (get_params().item_bit_count() > coeff_bit_count * degree)
     {
@@ -317,7 +314,7 @@ unique_ptr<CuckooTable> Receiver::cuckoo_hashing(const vector<Item> &items)
     {
         Log::debug("Using %i out of %ix%i bits of exfield element",
             get_params().item_bit_count(),
-            seal::util::get_significant_bit_count(get_params().exfield_characteristic()) - 1,
+            coeff_bit_count - 1,
             degree);
     }
 
@@ -341,7 +338,11 @@ vector<int> Receiver::cuckoo_indices(
     const vector<Item> &items,
     cuckoo::CuckooTable &cuckoo)
 {
-    vector<int> indices(cuckoo.table_size(), -1);
+    // This is the true size of the table; a multiple of slot_count_
+    unsigned padded_cuckoo_capacity = static_cast<unsigned>(
+        ((cuckoo.table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
+
+    vector<int> indices(padded_cuckoo_capacity, -1);
     auto& table = cuckoo.table();
 
     for (int i = 0; i < items.size(); i++)
@@ -365,12 +366,13 @@ void Receiver::exfield_encoding(
 
     for (size_t i = 0; i < cuckoo.table_size(); i++)
     {
-        ret.set(i, Item(encodings[i]).to_exfield_element(ret.field(i), item_bit_count));
+        ret.set(i, Item(encodings[i]).to_exfield_element(ret.field(), item_bit_count));
     }
+
+    auto empty_field_item = Item(cuckoo.empty_item())
+        .to_exfield_element(ret.field(), item_bit_count); 
     for (size_t i = cuckoo.table_size(); i < ret.size(); i++)
     {
-        auto empty_field_item = Item(cuckoo.empty_item())
-            .to_exfield_element(ret.field(i), item_bit_count); 
         ret.set(i, empty_field_item);
     }
 }
@@ -516,7 +518,6 @@ void Receiver::stream_decrypt_worker(
     Plaintext p(local_pool);
     Ciphertext tmp(seal_context_, local_pool);
     unique_ptr<FFieldArray> batch = make_unique<FFieldArray>(ex_batch_encoder_->create_array());
-    vector<uint64_t> integer_batch(batch_size);
 
     bool has_result;
     std::vector<char> has_label(batch_size);
@@ -547,18 +548,28 @@ void Receiver::stream_decrypt_worker(
 
         decryptor_->decrypt(tmp, p);
         ex_batch_encoder_->decompose(p, *batch);
+        //cout << "Batch = " << pkg.batch_idx << "; Returned array size: " << batch->size() << " / batch_size = " << batch_size << "; degree = " << batch->field().d() << endl;
 
-        for (int k = 0; k < integer_batch.size(); k++)
+        for (int k = 0; k < batch_size; k++)
         {
-            auto &is_zero = has_label[k];
             auto idx = table_to_input_map[base_idx + k];
-
-            is_zero = batch->is_zero(k);
-
-            if (is_zero)
+            if (idx >= 0)
             {
-                has_result = true;
-                ret_bools[idx] = true;
+                auto &is_zero = has_label[k];
+
+                is_zero = batch->is_zero(k);
+                //cout << "Item at slot " << k << ": ";
+                //for (size_t a = 0; a < batch->field().d(); a++)
+                //{
+                    //cout << batch->get_coeff_of(k, a) << " ";
+                //}
+                //cout << endl;
+
+                if (is_zero)
+                {
+                    has_result = true;
+                    ret_bools[idx] = true;
+                }
             }
         }
 
@@ -575,7 +586,7 @@ void Receiver::stream_decrypt_worker(
 
             ex_batch_encoder_->decompose(p, *batch);
 
-            for (int k = 0; k < integer_batch.size(); k++)
+            for (int k = 0; k < batch_size; k++)
             {
                 if (has_label[k])
                 {

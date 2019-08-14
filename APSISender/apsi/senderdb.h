@@ -40,7 +40,7 @@ namespace apsi
         public:
             SenderDB(const PSIParams &params, 
                 std::shared_ptr<seal::SEALContext> &seal_context,
-                std::vector<std::shared_ptr<FField> > &ex_field);
+                FField field);
 
             /**
             Clears sender's database and set all entries to sender's null item.
@@ -85,19 +85,18 @@ namespace apsi
                 int start_block,
                 int end_block,
                 std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder);
+                std::shared_ptr<FFieldFastBatchEncoder> batch_encoder);
 
             void batched_interpolate_polys(
                 SenderThreadContext& th_context,
                 int start_block,
                 int end_block,
                 std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder
-                );
+                std::shared_ptr<FFieldFastBatchEncoder> batch_encoder);
 
             DBBlock& get_block(int batch, int split)
             {
-                return db_blocks_(batch, split);
+                return *db_blocks_(batch, split);
             }
 
             u64 get_block_count() const
@@ -108,9 +107,9 @@ namespace apsi
         private:
             PSIParams params_;
             std::shared_ptr<seal::SEALContext> seal_context_;
-            std::vector<std::shared_ptr<FField> > ex_field_;
-            FFieldArray null_element_;
-            FFieldArray neg_null_element_;
+            FField field_;
+            FFieldElt null_element_;
+            FFieldElt neg_null_element_;
             int encoding_bit_length_;
 
             /* 
