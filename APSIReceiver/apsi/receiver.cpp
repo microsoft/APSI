@@ -73,6 +73,23 @@ void Receiver::initialize()
 
     relin_keys_seeds_ = {1,1}; 
     relin_keys_ = generator.relin_keys_with_seeds(get_params().decomposition_bit_count(), relin_keys_seeds_); 
+    for (auto &a : relin_keys_.data())
+    {
+        if (a.size())
+        {
+            for (auto &b : a)
+            {
+                for (std::size_t i = 1; i < b.size(); i += 2)
+                {
+                    // Set seed-generated polynomial to zero
+                    util::set_zero_poly(
+                        b.poly_modulus_degree(), b.coeff_mod_count(), b.data(i));
+                }
+            }
+        }
+    }
+
+    
     // relin_keys_ = generator.relin_keys(get_params().decomposition_bit_count());
     // relin_keys_ = generator.relin_keys(get_params().decomposition_bit_count());
     Log::info("Receiver initialized with relin keys seeds %i and %i", relin_keys_seeds_.first, relin_keys_seeds_.second); 
@@ -99,7 +116,7 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Ch
     auto& ciphertexts = qq.first;
     auto& cuckoo = *qq.second;
 
-    chl.send_query(public_key_, relin_keys_, ciphertexts);
+    chl.send_query(public_key_, relin_keys_, ciphertexts, relin_keys_seeds_);
 
     auto table_to_input_map = cuckoo_indices(items, cuckoo);
 

@@ -352,9 +352,8 @@ void Channel::send_preprocess_response(const vector<u8>& client_id, const std::v
 
 void Channel::send_query(
     const PublicKey& pub_key,
-    const RelinKeys& relin_keys,
-    const map<u64, vector<SeededCiphertext>>& query
-)
+    const RelinKeys& relin_keys, 
+    const map<u64, vector<SeededCiphertext>>& query, const seed128 relin_key_seeds)
 {
     throw_if_not_connected();
 
@@ -400,6 +399,12 @@ void Channel::send_query(
     }
     Log::info("ciphertext lengths = %i bytes ", bytes_sent_-sofar); 
 
+    // finally, send relin keys seeds.      
+    add_part(relin_key_seeds.first, msg); 
+    add_part(relin_key_seeds.second, msg); 
+    bytes_sent_ += sizeof(u64);
+    bytes_sent_ += sizeof(u64); 
+            
 
     send_message(msg);
 }
@@ -615,7 +620,13 @@ shared_ptr<SenderOperation> Channel::decode_query(const message_t& msg)
         bytes_received_ += sizeof(size_t);
     }
 
-    return make_shared<SenderOperationQuery>(std::move(client_id), pub_key, relin_keys, std::move(query));
+    // relin key seed
+    seed128 relin_keys_seeds; 
+    get_part(relin_keys_seeds.first, msg, msg_idx++);
+    get_part(relin_keys_seeds.second, msg, msg_idx++);
+            
+
+    return make_shared<SenderOperationQuery>(std::move(client_id), pub_key, relin_keys, std::move(query), relin_keys_seeds);
 }
 
 bool Channel::receive_message(message_t& msg, bool wait_for_message)
