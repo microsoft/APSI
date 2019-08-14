@@ -21,6 +21,8 @@
 #endif
 #endif
 
+#include "seal/ciphertext.h"
+
 namespace apsi
 {
     typedef __m128i block;
@@ -32,6 +34,8 @@ namespace apsi
     typedef std::uint8_t u8;
     typedef std::int8_t i8;
     typedef std::pair<u64, u64> seed128; 
+    typedef std::pair<seed128, seal::Ciphertext> SeededCiphertext; 
+
 
 
     extern const block zero_block;

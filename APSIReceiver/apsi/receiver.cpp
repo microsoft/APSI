@@ -70,7 +70,12 @@ void Receiver::initialize()
     compressor_ = make_unique<CiphertextCompressor>(seal_context_, 
         dummy_evaluator, pool_);
 
-    relin_keys_ = generator.relin_keys(get_params().decomposition_bit_count());
+
+    relin_keys_seeds_ = {1,1}; 
+    relin_keys_ = generator.relin_keys_with_seeds(get_params().decomposition_bit_count(), relin_keys_seeds_); 
+    // relin_keys_ = generator.relin_keys(get_params().decomposition_bit_count());
+    // relin_keys_ = generator.relin_keys(get_params().decomposition_bit_count());
+    Log::info("Receiver initialized with relin keys seeds %i and %i", relin_keys_seeds_.first, relin_keys_seeds_.second); 
 
     ex_batch_encoder_ = make_shared<FFieldFastBatchEncoder>(ex_field_->ch(), ex_field_->d(),
         get_power_of_two(get_params().encryption_params().poly_modulus_degree()));

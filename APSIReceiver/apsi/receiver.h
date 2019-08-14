@@ -30,8 +30,6 @@
 #include "seal/batchencoder.h"
 
 
-typedef std::pair<std::pair<std::uint64_t, std::uint64_t>, seal::Ciphertext> SeededCiphertext; 
-
 
 namespace apsi
 {
@@ -201,6 +199,10 @@ namespace apsi
 
             // Objects for compressed ciphertexts
             std::unique_ptr<CiphertextCompressor> compressor_;
+
+
+            // seed for generating (the a part) of the relin keys. 
+            seed128 relin_keys_seeds_; 
 
 
         };
