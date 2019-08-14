@@ -8,13 +8,12 @@
 // APSI
 #include "apsi/senderdb.h"
 #include "apsi/apsidefines.h"
-#include "apsi/ffield/ffield_array.h"
 #include "apsi/tools/prng.h"
 #include "apsi/tools/fourq.h"
 #include "apsi/tools/blake2/blake2.h"
 
 // SEAL
-#include "seal/evaluator.h"
+#include <seal/evaluator.h>
 
 using namespace std;
 using namespace seal;
@@ -24,15 +23,14 @@ using namespace apsi::tools;
 using namespace apsi::sender;
 using namespace apsi::logging;
 
-
 SenderDB::SenderDB(const PSIParams &params, 
     shared_ptr<SEALContext> &seal_context, 
-    vector<shared_ptr<FField> > &ex_field) :
+    FField field) :
     params_(params),
     seal_context_(seal_context),
-    ex_field_(ex_field),
-    null_element_(ex_field_),
-    neg_null_element_(ex_field_),
+    field_(field),
+    null_element_(field_),
+    neg_null_element_(field_),
     next_locs_(params.table_size(), 0),
     batch_random_symm_poly_storage_(params.split_count() * params.batch_count() * (params.split_size() + 1))
 {
@@ -59,22 +57,19 @@ SenderDB::SenderDB(const PSIParams &params,
     encoding_bit_length_ = params.item_bit_count();
 
     // Create the null ExFieldElement (note: encoding truncation affects high bits)
-    for(auto i = 0; i < ex_field_.size(); i++)
-    {
-        null_element_.set(i, sender_null_item_.to_exfield_element(ex_field_[i], encoding_bit_length_));
-    }
+    null_element_ = sender_null_item_.to_exfield_element(field_, encoding_bit_length_);
     neg_null_element_ = -null_element_;
 
     int batch_size = params_.batch_size();
     int split_size = params_.split_size();
 
-	// debugging 
-	int num_ctxts = params_.batch_count() * params_.sender_bin_size(); 
-	Log::info("sender size = %i", params_.sender_size());
-	Log::info("table size = %i", params_.table_size());
-	Log::info("sender bin size = %i", params_.sender_bin_size());
-	Log::info("split size = %i", split_size); 
-	Log::info("number of ciphertexts in senderdb = %i", num_ctxts);
+    // debugging 
+    int num_ctxts = params_.batch_count() * params_.sender_bin_size(); 
+    Log::info("sender size = %i", params_.sender_size());
+    Log::info("table size = %i", params_.table_size());
+    Log::info("sender bin size = %i", params_.sender_bin_size());
+    Log::info("split size = %i", split_size); 
+    Log::info("number of ciphertexts in senderdb = %i", num_ctxts);
 
     int byte_length = static_cast<int>(round_up_to(params_.get_label_bit_count(), 8) / 8);
     int nb = params_.batch_count();
@@ -85,7 +80,7 @@ SenderDB::SenderDB(const PSIParams &params,
     {
         for (int s_idx = 0; s_idx < ns; s_idx++)
         {
-            db_blocks_(b_idx, s_idx).init(
+            db_blocks_(b_idx, s_idx)->init(
                 b_idx, s_idx,
                 byte_length,
                 batch_size,
@@ -169,7 +164,7 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
                 auto count = 0;
                 for (u64 j = 0; j < db_blocks_.columns(); ++j)
                 {
-                    auto& blk = db_blocks_(batch_idx, j);
+                    auto &blk = *db_blocks_(batch_idx, j);
                     ;
                     for (pos.split_offset = 0;
                         pos.split_offset < blk.items_per_split_;
@@ -210,12 +205,12 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
             cuckoo::make_item(params_.hash_func_seed() + i, 0));
     }
 
-	map<int, int> bin_counting_map;
-	for (int i = 0; i < params_.table_size(); i++) {
-		bin_counting_map[i] = 0;
-	}
-	int maxload = 0; 
-	
+    map<int, int> bin_counting_map;
+    for (int i = 0; i < params_.table_size(); i++) {
+        bin_counting_map[i] = 0;
+    }
+    int maxload = 0; 
+    
 
 
     for (size_t i = start; i < end; i++)
@@ -237,47 +232,47 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
                 nullptr, 0);
         }
         std::vector<u64> locs(params_.hash_func_count());
-		std::vector<Item> keys(params_.hash_func_count());
-		std::vector<bool> skip(params_.hash_func_count());
+        std::vector<Item> keys(params_.hash_func_count());
+        std::vector<bool> skip(params_.hash_func_count());
 
-		// std::array<Item, params_.hash_func_count()> keys;
+        // std::array<Item, params_.hash_func_count()> keys;
         //std::array<bool, params_.hash_func_count()> skip{ false, false, false };
 
         // Compute bin locations
 		// Set keys and skip
         auto cuckoo_item = cuckoo::make_item(data[i].get_value());
-		// Set keys and skip
-		for (int j = 0; j < params_.hash_func_count(); j++) {
-			locs[j] = normal_loc_func[j](cuckoo_item);
-			//locs[1] = normal_loc_func[1].location(data[i]);
-			//locs[2] = normal_loc_func[2].location(data[i]);
-			keys[j] = data[i]; 
-			skip[j] = false;
-			if (j > 0) { // check if same. 
-				for (int k = 0; k < j; k++) {
-					if (locs[j] == locs[k]) {
-						skip[j] = true; 
-						break; 
-					}
-				}
-			}
-		}
+        // Set keys and skip
+        for (int j = 0; j < params_.hash_func_count(); j++) {
+            locs[j] = normal_loc_func[j](cuckoo_item);
+            //locs[1] = normal_loc_func[1].location(data[i]);
+            //locs[2] = normal_loc_func[2].location(data[i]);
+            keys[j] = data[i]; 
+            skip[j] = false;
+            if (j > 0) { // check if same. 
+                for (int k = 0; k < j; k++) {
+                    if (locs[j] == locs[k]) {
+                        skip[j] = true; 
+                        break; 
+                    }
+                }
+            }
+        }
         // keys[0] = keys[1] = keys[2] = data[i];
         //skip[1] = locs[0] == locs[1];
         //skip[2] = locs[0] == locs[2] || locs[1] == locs[2];
-		// printing some info: 
-		// in particular, printing stuff....
+        // printing some info: 
+        // in particular, printing stuff....
 
 
 
         // Claim an empty location in each matching bin
         for (unsigned j = 0; j < params_.hash_func_count(); j++)
         {
-			// debugging
-			bin_counting_map[locs[j]] ++;
-			if (bin_counting_map[locs[j]] > maxload) {
-				maxload = bin_counting_map[locs[j]]; 
-			}
+            // debugging
+            bin_counting_map[locs[j]] ++;
+            if (bin_counting_map[locs[j]] > maxload) {
+                maxload = bin_counting_map[locs[j]]; 
+            }
             if (skip[j] == false)
             {
 
@@ -297,8 +292,8 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
             }
         }
     }
-	// debugging: print the bin load 
-	Log::info("max load for thread %i = %i", thread_idx, maxload);
+    // debugging: print the bin load 
+    Log::info("max load for thread %i = %i", thread_idx, maxload);
 
 }
 
@@ -316,10 +311,10 @@ std::pair<DBBlock*, DBBlock::Position>
     auto s_idx = prng.get<u32>() % db_blocks_.stride();
     for (int i = 0; i < db_blocks_.stride(); ++i)
     {
-        auto pos = db_blocks_(batch_idx, s_idx).try_aquire_position(batch_offset, prng);
+        auto pos = db_blocks_(batch_idx, s_idx)->try_aquire_position(batch_offset, prng);
         if (pos.is_initialized())
         {
-            return { &db_blocks_(batch_idx, s_idx) , pos };
+            return { db_blocks_(batch_idx, s_idx) , pos };
         }
 
         s_idx = (s_idx + 1) % db_blocks_.stride();
@@ -348,7 +343,7 @@ void SenderDB::batched_randomized_symmetric_polys(
         batch_size = params_.batch_size(),
         split_size_plus_one = params_.split_size() + 1;
 
-    FFieldArray batch_vector(context.exfield());
+    FFieldArray batch_vector(batch_size, context.field());
     vector<uint64_t> integer_batch_vector(batch_size);
 
     // Data in batch-split table is stored in "batch-major order"
@@ -366,7 +361,8 @@ void SenderDB::batched_randomized_symmetric_polys(
         int batch = next_block % params_.batch_count();
 
         int batch_start = batch * batch_size,
-            batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
+            batch_end = batch_start + batch_size;
+            //batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
 
         auto &block = db_blocks_.data()[next_block];
         block.randomized_symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
@@ -379,7 +375,8 @@ void SenderDB::batched_randomized_symmetric_polys(
             // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
             for (int k = 0; batch_start + k < batch_end; k++)
             {
-                fq_nmod_set(batch_vector.data() + k, &symm_block(k, i), batch_vector.field(k)->ctx());
+                copy_n(symm_block(k, i), batch_vector.field().d(), batch_vector.data(k));
+                //fq_nmod_set(batch_vector.data() + k, &symm_block(k, i), batch_vector.field(k)->ctx());
             }
             ex_batch_encoder->compose(batch_vector, poly);
             evaluator->transform_to_ntt_inplace(poly, seal_context_->first_parms_id(), local_pool);
@@ -414,9 +411,8 @@ void SenderDB::batched_interpolate_polys(
 
     for (int bIdx = start_block; bIdx < end_block; bIdx++)
     {
-        auto& block = db_blocks_(bIdx);
+        auto &block = *db_blocks_(bIdx);
         block.batch_interpolate(th_context, seal_context_, evaluator, ex_batch_encoder, cache, params_);
         th_context.inc_interpolate_polys();
     }
-
 }

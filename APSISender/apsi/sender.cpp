@@ -18,7 +18,8 @@
 #include "apsi/result_package.h"
 
 // SEAL
-#include "seal/util/common.h"
+#include <seal/util/common.h>
+#include <seal/smallmodulus.h>
 
 
 using namespace std;
@@ -30,11 +31,11 @@ using namespace apsi::tools;
 using namespace apsi::network;
 using namespace apsi::sender;
 
-
 Sender::Sender(const PSIParams &params, int total_thread_count, 
         int session_thread_count, const MemoryPoolHandle &pool) :
     params_(params),
     pool_(pool),
+    field_(SmallModulus(params_.exfield_characteristic()), params_.exfield_degree()),
     total_thread_count_(total_thread_count),
     session_thread_count_(session_thread_count),
     thread_contexts_(total_thread_count_)
@@ -52,16 +53,14 @@ void Sender::initialize()
 
     // Construct shared Evaluator and BatchEncoder
     evaluator_ = make_shared<Evaluator>(seal_context_);
-    vector<shared_ptr<FField> > field_vec;
+    FField field(
+        SmallModulus(params_.exfield_characteristic()),
+        params_.exfield_degree());
     ex_batch_encoder_ = make_shared<FFieldFastBatchEncoder>(
-        params_.exfield_characteristic(),
-        params_.exfield_degree(),
-        get_power_of_two(params_.encryption_params().poly_modulus_degree())
-    );
-    field_vec = ex_batch_encoder_->fields();
+        seal_context_, field);
 
     // Create SenderDB
-    sender_db_ = make_unique<SenderDB>(params_, seal_context_, field_vec);
+    sender_db_ = make_unique<SenderDB>(params_, seal_context_, field);
 
     compressor_ = make_shared<CiphertextCompressor>(seal_context_, evaluator_);
 
@@ -85,7 +84,7 @@ void Sender::initialize()
             thread_contexts_[i].set_id(i);
             thread_contexts_[i].set_prng(seed);
             thread_contexts_[i].set_pool(local_pool);
-            thread_contexts_[i].set_exfield(field_vec);
+            thread_contexts_[i].set_field(field);
 
             // Allocate memory for repeated use from the given memory pool.
             thread_contexts_[i].construct_variables(params_);
@@ -415,6 +414,7 @@ void Sender::respond_worker(
         // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
         // Observe that the first call to mult is always multiplying coeff[0] by 1....
         // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
+
         evaluator_->multiply_plain(powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
 
         for (int s = 1; s <= params_.split_size(); s++)

@@ -44,12 +44,6 @@ find_package(SEAL 3.2.0 EXACT REQUIRED)
 # Import Cuckoo
 find_package(Cuckoo 1.1.0 EXACT REQUIRED)
 
-# Import GMP
-find_package(GMP MODULE REQUIRED)
-
-# Import Flint
-find_package(Flint MODULE REQUIRED)
-
 # Import ZeroMQ
 find_package(ZeroMQ MODULE REQUIRED)
 

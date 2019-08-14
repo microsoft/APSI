@@ -104,9 +104,9 @@ namespace apsi
             */
             void symmetric_polys(
                 SenderThreadContext &th_context,
-                MatrixView<_ffield_array_elt_t> symm_block,
+                MatrixView<_ffield_elt_coeff_t> symm_block,
                 int encoding_bit_length,
-                const FFieldArray &neg_null_element);
+                const FFieldElt &neg_null_element);
 
             /**
             Computes the randomized symmetric polynomials for the specified split and the specified batch in sender's database. Basically, it
@@ -117,9 +117,9 @@ namespace apsi
             */
             void randomized_symmetric_polys(
                 SenderThreadContext &th_context,
-                MatrixView<_ffield_array_elt_t> symm_block,
+                MatrixView<_ffield_elt_coeff_t> symm_block,
                 int encoding_bit_length,
-                FFieldArray &neg_null_element);
+                const FFieldElt &neg_null_element);
 
             Position try_aquire_position(int cuckoo_loc, apsi::tools::PRNG& prng);
 

@@ -5,6 +5,7 @@
 
 // STD
 #include <memory>
+#include <algorithm>
 #include <vector>
 
 // APSI
@@ -22,59 +23,15 @@ namespace apsi
         friend class FFieldFastBatchEncoder;
 
     public:
-        FFieldArray(std::shared_ptr<FField> field, std::size_t size) : 
+        FFieldArray(std::size_t size, FField field) : 
             size_(size),
-            fields_(size_, field)
+            field_(field)
         {
             // Initialize array
-            array_ = new _ffield_array_elt_t[size_];
-            for(std::size_t i = 0; i < size_; i++)
-            {
-                fq_nmod_init2(array_ + i, field->ctx_);
-            }
-        } 
-
-        FFieldArray(gsl::span<const std::shared_ptr<FField> > fields) : 
-            size_(fields.size())
-        {
-            // Initialize fields
-            fields_.reserve(size_);
-            for(std::size_t i = 0; i < size_; i++)
-            {
-                fields_.emplace_back(fields[i]);
-            }
-
-            // Initialize array
-            array_ = new _ffield_array_elt_t[size_];
-            for(std::size_t i = 0; i < size_; i++)
-            {
-                fq_nmod_init2(array_ + i, fields_[i]->ctx_);
-            }
-        } 
-
-        FFieldArray(const std::vector<std::shared_ptr<FField> > &fields) : 
-            FFieldArray(gsl::span<const std::shared_ptr<FField> >(fields.data(), fields.size()))
-        {
+            array_.resize(field_.d_ * size_, 0);
         }
 
-        ~FFieldArray()
-        {
-            for(std::size_t i = 0; i < size_; i++)
-            {
-                fq_nmod_clear(array_ + i, fields_[i]->ctx_);
-            }
-
-            delete[] array_;
-            array_ = nullptr;
-
-            fields_.clear();
-        }
-
-        FFieldArray(const FFieldArray &copy) :
-            FFieldArray(gsl::span<const std::shared_ptr<FField> >(copy.fields_.data(), copy.size_))
-        {
-            set(copy);
-        }
+        FFieldArray(const FFieldArray &copy) = default;
 
         inline std::size_t size() const
         {
@@ -84,409 +41,345 @@ namespace apsi
         inline FFieldElt get(std::size_t index) const
         {
 #ifndef NDEBUG
-            if(index > size_)
+            if (index >= size_)
             {
                 throw std::out_of_range("index");
             }
 #endif
-            return FFieldElt(fields_[index], array_ + index);
+            return { field_, data(index) };
+        }
+
+        inline _ffield_elt_coeff_t get_coeff_of(std::size_t index, std::size_t coeff) const
+        {
+#ifndef NDEBUG
+            if (index >= size_)
+            {
+                throw std::out_of_range("index");
+            }
+            if (coeff >= field_.d_)
+            {
+                throw std::out_of_range("coeff");
+            }
+#endif
+            return *(data(index) + coeff);
         }
 
         inline void set(std::size_t index, const FFieldElt &in)
         {
 #ifndef NDEBUG
-            if(index > size_)
+            if (index >= size_)
             {
                 throw std::out_of_range("index");
             }
-            if(fields_[index] != in.field_)
+            if (field_ != in.field_)
             {
                 throw std::invalid_argument("field mismatch");
             }
 #endif
-            fq_nmod_set(array_ + index, in.elt_, fields_[index]->ctx_);
+            std::copy_n(in.data(), field_.d_, data(index));
         }
 
         inline void set(std::size_t dest_index, std::size_t src_index, const FFieldArray &in)
         {
 #ifndef NDEBUG
-            if(dest_index > size_)
+            if (dest_index >= size_)
             {
                 throw std::out_of_range("dest_index");
             }
-            if(src_index > in.size_)
+            if (src_index > in.size_)
             {
                 throw std::out_of_range("src_index");
             }
-            if(fields_[dest_index] != in.fields_[src_index])
+            if (field_ != in.field_)
             {
                 throw std::invalid_argument("field mismatch");
             }
 #endif
-            fq_nmod_set(array_ + dest_index, in.array_ + src_index, fields_[dest_index]->ctx_);
+            std::copy(in.data(src_index), in.data(src_index + 1), data(dest_index));
         }
 
-        inline void set(std::size_t index, const BigPoly &in)
+        inline void set_coeff_of(
+            std::size_t index, std::size_t coeff, _ffield_elt_coeff_t value)
         {
 #ifndef NDEBUG
-            if(index > size_)
+            if (index >= size_)
             {
                 throw std::out_of_range("index");
             }
-            if(static_cast<unsigned>(in.coeff_count()) > fields_[index]->d_)
+            if (coeff >= field_.d_)
             {
-                throw std::invalid_argument("input too large");
+                throw std::out_of_range("coeff");
             }
 #endif
-            bigpoly_to_nmod_poly(in, array_ + index);
-        }
-
-        inline void set(std::size_t index, std::string in)
-        {
-            set(index, BigPoly(in));
-        }
-
-        inline _ffield_elt_coeff_t get_coeff_of(std::size_t array_index, std::size_t elt_index) const
-        {
-            return nmod_poly_get_coeff_ui(array_ + array_index, elt_index);
-        }
-
-        inline void set_coeff_of(std::size_t array_index, std::size_t elt_index, _ffield_elt_coeff_t in) 
-        {
-#ifndef NDEBUG
-            if(array_index > size_)
-            {
-                throw std::out_of_range("array_index");
-            }
-            if(elt_index >= fields_[array_index]->d_)
-            {
-                throw std::out_of_range("elt_index");
-            }
-#endif
-            nmod_poly_set_coeff_ui(array_ + array_index, elt_index, in);
-        }
-
-        inline void set_zero()
-        {
-            for(std::size_t i = 0; i < size_; i++)
-            {
-                fq_nmod_zero(array_ + i, fields_[i]->ctx_);
-            }
+            *(data(index) + coeff) = value;
         }
 
         inline void set_zero(std::size_t index)
         {
 #ifndef NDEBUG
-            if(index > size_)
+            if (index >= size_)
             {
                 throw std::out_of_range("index");
             }
 #endif
-            fq_nmod_zero(array_ + index, fields_[index]->ctx_);
+            std::fill_n(data(index), field_.d_, 0);
         }
 
         inline void set_random(apsi::tools::PRNG &prng)
         {
-            for(std::size_t index = 0; index < size_; index++)
+            auto max_int = std::numeric_limits<_ffield_elt_coeff_t>::max(); 
+            _ffield_elt_coeff_t max_value = max_int - max_int % field_.ch_.value();
+            for (std::size_t i = 0; i < array_.size(); i++)
             {
-                auto field_degree = fields_[index]->d_;
-                for(unsigned i = 0; i < field_degree; i++)
+                // Rejection sampling
+                _ffield_elt_coeff_t temp_value;
+                do
                 {
-                    nmod_poly_set_coeff_ui(array_ + index, i, prng.get<mp_limb_t>()); 
-                }
+                    temp_value = prng.get<_ffield_elt_coeff_t>();
+                } while(temp_value > max_value);
+                array_[i] = temp_value % field_.ch_.value();
             }
         }
 
         inline void set_random_nonzero(apsi::tools::PRNG &prng)
         {
-            for(std::size_t index = 0; index < size_; index++)
+            auto max_int = std::numeric_limits<_ffield_elt_coeff_t>::max(); 
+            _ffield_elt_coeff_t max_value = max_int - max_int % field_.ch_.value();
+            for (std::size_t i = 0; i < array_.size(); i++)
             {
-                auto field_degree = fields_[index]->d_;
+                // Rejection sampling
+                _ffield_elt_coeff_t temp_value;
                 do
                 {
-                    for(unsigned i = 0; i < field_degree; i++)
-                    {
-                        nmod_poly_set_coeff_ui(array_ + index, i, prng.get<mp_limb_t>()); 
-                    }
-                } while(fq_nmod_is_zero(array_ + index, fields_[index]->ctx_));
+                    temp_value = prng.get<_ffield_elt_coeff_t>();
+                } while(temp_value > max_value || !temp_value);
+                array_[i] = temp_value % field_.ch_.value();
             }
         }
 
         inline bool is_zero() const
         {
-            for(std::size_t i = 0; i < size_; i++)
-            {
-                if(fq_nmod_is_zero(array_ + i, fields_[i]->ctx_))
-                {
-                    return false;
-                }
-            }
-            return true;
+            return std::all_of(array_.cbegin(), array_.cend(),
+                [](auto a) { return !a; });
         }
 
         inline bool is_zero(std::size_t index) const
         {
-            return nmod_poly_is_zero(array_ + index);
+            return std::all_of(data(index), data(index + 1),
+                [](auto a) { return !a; });
         }
 
         inline void set(const FFieldArray &in) 
         {
 #ifndef NDEBUG
-            if(in.size_ != size_)
+            if (in.size_ != size_)
             {
                 throw std::out_of_range("size mismatch");
             }
-            for(std::size_t i = 0; i < size_; i++)
+            if (field_ != in.field_)
             {
-                if(fields_[i] != in.fields_[i])
-                {
-                    throw std::invalid_argument("field mismatch");
-                }
+                throw std::invalid_argument("field mismatch");
             }
 #endif
-            for(std::size_t i = 0; i < size_; i++)
-            {
-                fq_nmod_set(array_ + i, in.array_ + i, fields_[i]->ctx_);
-            }
+            std::copy(in.array_.cbegin(), in.array_.cend(), array_.begin());
         }
 
         inline bool equals(const FFieldArray &in) const
         {
 #ifndef NDEBUG
-            if(in.size_ != size_)
+            if (in.size_ != size_)
             {
                 throw std::out_of_range("size mismatch");
             }
-            for(std::size_t i = 0; i < size_; i++)
+            if (field_ != in.field_)
             {
-                if(fields_[i] != in.fields_[i])
-                {
-                    throw std::invalid_argument("field mismatch");
-                }
+                throw std::invalid_argument("field mismatch");
             }
 #endif
-            for(std::size_t i = 0; i < size_; i++)
-            {
-                if(!fq_nmod_equal(array_ + i, in.array_ + i, fields_[i]->ctx_))
-                {
-                    return false;
-                }
-            }
-            return true;
+            return std::equal(array_.cbegin(), array_.cend(), in.array_.cbegin());
         }
 
-        inline std::shared_ptr<FField> field(std::size_t index) const
+        inline FField field() const
         {
-            return fields_[index];
-        }
-
-        inline const std::vector<std::shared_ptr<FField> > &fields() const
-        {
-            return fields_;
+            return field_;
         }
 
         inline void add(FFieldArray &out, const FFieldArray &in) const
         {
 #ifndef NDEBUG
-            if(in.size_ != size_ || out.size_ != size_)
+            if (in.size_ != size_ || out.size_ != size_)
             {
                 throw std::out_of_range("size mismatch");
             }
-            for(std::size_t i = 0; i < size_; i++)
+            if (field_ != in.field_ || field_ != out.field_)
             {
-                if(fields_[i] != in.fields_[i] || fields_[i] != out.fields_[i])
-                {
-                    throw std::invalid_argument("field mismatch");
-                }
+                throw std::invalid_argument("field mismatch");
             }
 #endif
-            for(std::size_t i = 0; i < size_; i++)
-            {
-                fq_nmod_add(out.array_ + i, array_ + i, in.array_ + i, fields_[i]->ctx_);
-            }
+            const seal::SmallModulus &ch = field_.ch_;
+            std::transform(array_.cbegin(), array_.cend(), in.array_.cbegin(), out.array_.begin(),
+                [&ch](auto a, auto b) { return seal::util::add_uint_uint_mod(a, b, ch); });
         }
 
         inline void sub(FFieldArray &out, const FFieldArray &in) const
         {
 #ifndef NDEBUG
-            if(in.size_ != size_ || out.size_ != size_)
+            if (in.size_ != size_ || out.size_ != size_)
             {
                 throw std::out_of_range("size mismatch");
             }
-            for(std::size_t i = 0; i < size_; i++)
+            if (field_ != in.field_ || field_ != out.field_)
             {
-                if(fields_[i] != in.fields_[i] || fields_[i] != out.fields_[i])
-                {
-                    throw std::invalid_argument("field mismatch");
-                }
+                throw std::invalid_argument("field mismatch");
             }
 #endif
-            for(std::size_t i = 0; i < size_; i++)
-            {
-                fq_nmod_sub(out.array_ + i, array_ + i, in.array_ + i, fields_[i]->ctx_);
-            }
+            const seal::SmallModulus &ch = field_.ch_;
+            std::transform(array_.cbegin(), array_.cend(), in.array_.cbegin(), out.array_.begin(),
+                [&ch](auto a, auto b) { return seal::util::sub_uint_uint_mod(a, b, ch); });
         }
 
         inline void mul(FFieldArray &out, const FFieldArray &in) const
         {
 #ifndef NDEBUG
-            if(in.size_ != size_ || out.size_ != size_)
+            if (in.size_ != size_ || out.size_ != size_)
             {
                 throw std::out_of_range("size mismatch");
             }
-            for(std::size_t i = 0; i < size_; i++)
+            if (field_ != in.field_ || field_ != out.field_)
             {
-                if(fields_[i] != in.fields_[i] || fields_[i] != out.fields_[i])
-                {
-                    throw std::invalid_argument("field mismatch");
-                }
+                throw std::invalid_argument("field mismatch");
             }
 #endif
-            for(std::size_t i = 0; i < size_; i++)
-            {
-                fq_nmod_mul(out.array_ + i, array_ + i, in.array_ + i, fields_[i]->ctx_);
-            }
+            const seal::SmallModulus &ch = field_.ch_;
+            std::transform(array_.cbegin(), array_.cend(), in.array_.cbegin(), out.array_.begin(),
+                [&ch](auto a, auto b) { return seal::util::multiply_uint_uint_mod(a, b, ch); });
         }
 
         inline void div(FFieldArray &out, const FFieldArray &in) const
         {
 #ifndef NDEBUG
-            if(in.size_ != size_ || out.size_ != size_)
+            if (in.size_ != size_ || out.size_ != size_)
             {
                 throw std::out_of_range("size mismatch");
             }
-            for(std::size_t i = 0; i < size_; i++)
+            if (field_ != in.field_ || field_ != out.field_)
             {
-                if(fields_[i] != in.fields_[i] || fields_[i] != out.fields_[i])
-                {
-                    throw std::invalid_argument("field mismatch");
-                }
+                throw std::invalid_argument("field mismatch");
             }
 #endif
-            for(std::size_t i = 0; i < size_; i++)
-            {
-                fq_nmod_div(out.array_ + i, array_ + i, in.array_ + i, fields_[i]->ctx_);
-            }
+            const seal::SmallModulus &ch = field_.ch_;
+            std::transform(array_.cbegin(), array_.cend(), in.array_.cbegin(), out.array_.begin(),
+                [&ch](auto a, auto b) {
+                    _ffield_elt_coeff_t inv;
+                    if (!seal::util::try_invert_uint_mod(b, ch, inv)) {
+                        throw std::logic_error("division by zero");
+                    }
+                    return seal::util::multiply_uint_uint_mod(a, inv, ch);
+                });
         }
 
         inline void inv(FFieldArray &out) const
         {
 #ifndef NDEBUG
-            if(out.size_ != size_)
+            if (out.size_ != size_)
             {
                 throw std::out_of_range("size mismatch");
             }
-            for(std::size_t i = 0; i < size_; i++)
+            if (field_ != out.field_)
             {
-                if(fields_[i] != out.fields_[i])
-                {
-                    throw std::invalid_argument("field mismatch");
-                }
+                throw std::invalid_argument("field mismatch");
             }
 #endif
-            for(std::size_t i = 0; i < size_; i++)
-            {
-                fq_nmod_inv(out.array_ + i, array_ + i, fields_[i]->ctx_);
-            }
+            const seal::SmallModulus &ch = field_.ch_;
+            std::transform(array_.cbegin(), array_.cend(), out.array_.begin(), [&ch](auto a) {
+                    _ffield_elt_coeff_t inv;
+                    if (!seal::util::try_invert_uint_mod(a, ch, inv)) {
+                        throw std::logic_error("division by zero");
+                    }
+                    return inv;
+                });
         }
 
         inline void inv()
         {
-            for(std::size_t i = 0; i < size_; i++)
-            {
-                fq_nmod_inv(array_ + i, array_ + i, fields_[i]->ctx_);
-            }
+            inv(*this);
         }
 
         inline void neg(FFieldArray &out) const
         {
 #ifndef NDEBUG
-            if(out.size_ != size_)
+            if (out.size_ != size_)
             {
                 throw std::out_of_range("size mismatch");
             }
-            for(std::size_t i = 0; i < size_; i++)
+            if (field_ != out.field_)
             {
-                if(fields_[i] != out.fields_[i])
-                {
-                    throw std::invalid_argument("field mismatch");
-                }
+                throw std::invalid_argument("field mismatch");
             }
 #endif
-            for(std::size_t i = 0; i < size_; i++)
-            {
-                fq_nmod_neg(out.array_ + i, array_ + i, fields_[i]->ctx_);
-            }
+            const seal::SmallModulus &ch = field_.ch_;
+            std::transform(array_.cbegin(), array_.cend(), out.array_.begin(),
+                [&ch](auto a) { return seal::util::negate_uint_mod(a, ch); });
         }
         
         inline void neg()
         {
-            for(std::size_t i = 0; i < size_; i++)
-            {
-                fq_nmod_neg(array_ + i, array_ + i, fields_[i]->ctx_);
-            }
+            neg(*this);
         }
 
         inline void sq(FFieldArray &out) const
         {
 #ifndef NDEBUG
-            if(out.size_ != size_)
+            if (out.size_ != size_)
             {
                 throw std::out_of_range("size mismatch");
             }
-            for(std::size_t i = 0; i < size_; i++)
+            if (field_ != out.field_)
             {
-                if(fields_[i] != out.fields_[i])
-                {
-                    throw std::invalid_argument("field mismatch");
-                }
+                throw std::invalid_argument("field mismatch");
             }
 #endif
-            for(std::size_t i = 0; i < size_; i++)
-            {
-                fq_nmod_sqr(out.array_ + i, array_ + i, fields_[i]->ctx_);
-            }
+            const seal::SmallModulus &ch = field_.ch_;
+            std::transform(array_.cbegin(), array_.cend(), out.array_.begin(),
+                [&ch](auto a) { return seal::util::multiply_uint_uint_mod(a, a, ch); });
         }
 
         inline void sq() 
         {
-            for(std::size_t i = 0; i < size_; i++)
-            {
-                fq_nmod_sqr(array_ + i, array_ + i, fields_[i]->ctx_);
-            }
+            sq(*this);
         }
 
         inline FFieldArray operator +(const FFieldArray &in) const
         {
-            FFieldArray result(fields_);
+            FFieldArray result(size_, field_);
             add(result, in);
             return result;
         }
 
         inline FFieldArray operator -(const FFieldArray &in) const
         {
-            FFieldArray result(fields_);
+            FFieldArray result(size_, field_);
             sub(result, in);
             return result;
         }
 
         inline FFieldArray operator *(const FFieldArray &in) const
         {
-            FFieldArray result(fields_);
+            FFieldArray result(size_, field_);
             mul(result, in);
             return result;
         }
 
         inline FFieldArray operator /(const FFieldArray &in) const
         {
-            FFieldArray result(fields_);
+            FFieldArray result(size_, field_);
             div(result, in);
             return result;
         }
 
         inline FFieldArray operator -() const
         {
-            FFieldArray result(fields_);
+            FFieldArray result(size_, field_);
             neg(result);
             return result;
         }
@@ -526,19 +419,29 @@ namespace apsi
             return !operator ==(compare);
         }
 
-        inline _ffield_array_elt_t *data()
+        inline _ffield_elt_coeff_t *data()
         {
-            return array_;
+            return array_.data();
         }
 
-        inline const _ffield_array_elt_t *data() const
+        inline const _ffield_elt_coeff_t *data() const
         {
-            return array_;
+            return array_.data();
+        }
+
+        inline _ffield_elt_coeff_t *data(std::size_t index)
+        {
+            return array_.data() + index * field_.d_;
+        }
+
+        inline const _ffield_elt_coeff_t *data(std::size_t index) const
+        {
+            return array_.data() + index * field_.d_;
         }
 
     private:
         std::size_t size_;
-        std::vector<std::shared_ptr<FField> > fields_;
-        _ffield_array_t array_;
+        FField field_;
+        std::vector<_ffield_elt_coeff_t> array_;
     };
 }

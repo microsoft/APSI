@@ -223,7 +223,7 @@ namespace apsi
 
             seal::MemoryPoolHandle pool_;
 
-            std::vector<std::shared_ptr<FField> > ex_field_;
+            FField field_;
 
             std::shared_ptr<seal::SEALContext> seal_context_;
 

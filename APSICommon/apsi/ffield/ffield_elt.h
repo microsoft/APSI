@@ -3,6 +3,10 @@
 
 #pragma once
 
+// STD
+#include <limits>
+#include <algorithm>
+
 // APSI
 #include "apsi/ffield/ffield.h"
 #include "apsi/tools/prng.h"
@@ -10,13 +14,18 @@
 // GSL
 #include <gsl/span>
 
+// SEAL
+#include <seal/smallmodulus.h>
+#include <seal/util/uintarithsmallmod.h>
+#include <seal/util/numth.h>
+
 namespace apsi
 {
     namespace details
     {
         // Copies bitLength bits from src starting at the bit index by bitOffset.
         // Bits are written to dest starting at the first bit. All other bits in 
-        // dest are unchanged, e.g. the bit indexed by  [bitLength, bitLength + 1, ...]
+        // dest are unchanged, e.g. the bit indexed by [bitLength, bitLength + 1, ...]
         void copy_with_bit_offset(
             gsl::span<const apsi::u8> src,
             std::int32_t bitOffset,
@@ -40,72 +49,59 @@ namespace apsi
         friend class FFieldFastBatchEncoder;
 
     public:
-        FFieldElt(std::shared_ptr<FField> field) :
-            field_(std::move(field))
+        FFieldElt(FField field, const _ffield_elt_t &elt) : field_(field), elt_(elt)
         {
-            // Allocate enough space to be an element of the field
-            fq_nmod_init2(elt_, field_->ctx_);
         }
 
-        FFieldElt(std::shared_ptr<FField> field, const BigPoly &in) :
-            field_(std::move(field))
+        FFieldElt(FField field) : field_(std::move(field))
         {
-            // Allocate enough space to be an element of the field
-            fq_nmod_init2(elt_, field_->ctx_);
-            set(in);
+            elt_.resize(field_.d_);
         }
 
-        FFieldElt(std::shared_ptr<FField> field, std::string in) :
-            field_(std::move(field))
+        FFieldElt(FField field, const _ffield_elt_coeff_t *value) : field_(field)
         {
-            // Allocate enough space to be an element of the field
-            fq_nmod_init2(elt_, field_->ctx_);
-            set(in);
-        }
-
-        ~FFieldElt()
-        {
-            fq_nmod_clear(elt_, field_->ctx_);
-        }
-
-        FFieldElt(const FFieldElt &copy) :
-            FFieldElt(copy.field_)
-        {
-            set(copy);
+            std::copy_n(value, field_.d_, std::back_inserter(elt_));
         }
 
         inline _ffield_elt_coeff_t get_coeff(std::size_t index) const
         {
             // This function returns 0 when index is beyond the size of the poly,
             // which is critical for correct operation.
-            return nmod_poly_get_coeff_ui(elt_, index);
+            return (index >= field_.d_) ? 0 : elt_[index];
         }
 
         inline void set_coeff(std::size_t index, _ffield_elt_coeff_t in)
         {
-            if (index >= field_->d_)
+            if (index >= field_.d_)
             {
                 throw std::out_of_range("index");
             }
-            nmod_poly_set_coeff_ui(elt_, index, in);
+            elt_[index] = in;
         }
 
         inline void set_zero()
         {
-            fq_nmod_zero(elt_, field_->ctx_);
+            std::fill(elt_.begin(), elt_.end(), 0);
         }
 
         inline void set_one()
         {
-            fq_nmod_one(elt_, field_->ctx_);
+            std::fill(elt_.begin(), elt_.end(), 1);
         }
 
         inline void set_random(apsi::tools::PRNG &prng)
         {
-            auto field_degree = field_->d_;
-            for (unsigned i = 0; i < field_degree; i++)
+            auto max_int = std::numeric_limits<_ffield_elt_coeff_t>::max(); 
+            _ffield_elt_coeff_t max_value = max_int - max_int % field_.ch_.value();
+            for (std::size_t i = 0; i < field_.d_; i++)
             {
-                nmod_poly_set_coeff_ui(elt_, i, prng.get<mp_limb_t>());
+                // Rejection sampling
+                _ffield_elt_coeff_t temp_value;
+                do
+                {
+                    temp_value = prng.get<_ffield_elt_coeff_t>();
+                } while(temp_value > max_value);
+                elt_[i] = temp_value % field_.ch_.value();
             }
         }
 
@@ -119,70 +115,63 @@ namespace apsi
 
         inline bool is_zero() const
         {
-            return fq_nmod_is_zero(elt_, field_->ctx_);
+            return std::all_of(elt_.cbegin(), elt_.cend(), [](auto val) { return !val; });
         }
 
         inline bool is_one() const
         {
-            return fq_nmod_is_one(elt_, field_->ctx_);
+            return std::all_of(elt_.cbegin(), elt_.cend(), [](auto val) { return val == 1; });
         }
 
-        inline std::shared_ptr<FField> field() const
+        inline FField field() const
         {
             return field_;
         }
 
-        inline void set(const BigPoly &in)
-        {
-            if (static_cast<unsigned>(in.coeff_count()) > field_->d_)
-            {
-                throw std::invalid_argument("input too large");
-            }
-            bigpoly_to_nmod_poly(in, elt_);
-        }
-
-        inline void set(std::string in)
-        {
-            set(BigPoly(in));
-        }
-
-        inline BigPoly to_bigpoly() const
-        {
-            BigPoly result;
-            nmod_poly_to_bigpoly(elt_, result);
-            return result;
-        }
-
-        inline std::string to_string() const
-        {
-            BigPoly result;
-            nmod_poly_to_bigpoly(elt_, result);
-            return result.to_string();
-        }
-
         inline void add(FFieldElt &out, const FFieldElt &in) const
         {
-            fq_nmod_add(out.elt_, elt_, in.elt_, field_->ctx_);
+            const seal::SmallModulus &ch = field_.ch_;
+            std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(),
+                [&ch](auto a, auto b) { return seal::util::add_uint_uint_mod(a, b, ch); });
         }
 
         inline void sub(FFieldElt &out, const FFieldElt &in) const
         {
-            fq_nmod_sub(out.elt_, elt_, in.elt_, field_->ctx_);
+            const seal::SmallModulus &ch = field_.ch_;
+            std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(),
+                [&ch](auto a, auto b) { return seal::util::sub_uint_uint_mod(a, b, ch); });
         }
 
         inline void mul(FFieldElt &out, const FFieldElt &in) const
         {
-            fq_nmod_mul(out.elt_, elt_, in.elt_, field_->ctx_);
+            const seal::SmallModulus &ch = field_.ch_;
+            std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(),
+                [&ch](auto a, auto b) { return seal::util::multiply_uint_uint_mod(a, b, ch); });
         }
 
         inline void div(FFieldElt &out, const FFieldElt &in) const
         {
-            fq_nmod_div(out.elt_, elt_, in.elt_, field_->ctx_);
+            const seal::SmallModulus &ch = field_.ch_;
+            std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(),
+                [&ch](auto a, auto b) {
+                    _ffield_elt_coeff_t inv;
+                    if (!seal::util::try_invert_uint_mod(b, ch, inv)) {
+                        throw std::logic_error("division by zero");
+                    }
+                    return seal::util::multiply_uint_uint_mod(a, inv, ch);
+                });
         }
 
         inline void inv(FFieldElt &out) const
         {
-            fq_nmod_inv(out.elt_, elt_, field_->ctx_);
+            const seal::SmallModulus &ch = field_.ch_;
+            std::transform(elt_.cbegin(), elt_.cend(), out.elt_.begin(), [&ch](auto a) {
+                    _ffield_elt_coeff_t inv;
+                    if (!seal::util::try_invert_uint_mod(a, ch, inv)) {
+                        throw std::logic_error("division by zero");
+                    }
+                    return inv;
+                });
         }
 
         inline void inv()
@@ -192,7 +181,9 @@ namespace apsi
 
         inline void neg(FFieldElt &out) const
         {
-            fq_nmod_neg(out.elt_, elt_, field_->ctx_);
+            const seal::SmallModulus &ch = field_.ch_;
+            std::transform(elt_.cbegin(), elt_.cend(), out.elt_.begin(),
+                [&ch](auto a) { return seal::util::negate_uint_mod(a, ch); });
         }
 
         inline void neg()
@@ -200,64 +191,24 @@ namespace apsi
             neg(*this);
         }
 
-        inline void pow(FFieldElt &out, const _bigint_t e) const
-        {
-            fq_nmod_pow(out.elt_, elt_, e, field_->ctx_);
-        }
-
         inline void pow(FFieldElt &out, std::uint64_t e) const
         {
-            fq_nmod_pow_ui(out.elt_, elt_, e, field_->ctx_);
-        }
-
-        inline void pow(FFieldElt &out, const seal::BigUInt &e) const
-        {
-            _bigint_t flint_e;
-            fmpz_init(flint_e);
-            biguint_to_fmpz(e, flint_e);
-            pow(out, flint_e);
-        }
-
-        inline void pow(FFieldElt &out, std::string e) const
-        {
-            pow(out, seal::BigUInt(e));
-        }
-
-        inline FFieldElt frob(unsigned e = 1) const
-        {
-            FFieldElt result(field_);
-
-            if(field_->frob_populated_)
-            {
-                // Fast lookup approach
-                if (e == 0)
-                {
-                    fq_nmod_set(result.elt_, elt_, field_->ctx_);
-                    return result;
-                }
-                FFieldElt temp(field_);
-                for (unsigned i = 0; i < elt_->length; i++)
-                {
-                    fq_nmod_mul_ui(temp.elt_, &field_->frob_table_(e, i), elt_->coeffs[i], field_->ctx_);
-                    result += temp;
-                }
-            }
-            else
-            {
-                // Slow Frobenius
-                fq_nmod_frobenius(result.elt_, elt_, e, field_->ctx_);
-            }
-            return result;
+            const seal::SmallModulus &ch = field_.ch_;
+            std::transform(elt_.cbegin(), elt_.cend(), out.elt_.begin(),
+                [ch, e](auto a) { return seal::util::exponentiate_uint_mod(a, e, ch); });
         }
 
         inline void set(const FFieldElt &in)
         {
-            fq_nmod_set(elt_, in.elt_, field_->ctx_);
+            if (field_ != in.field_) {
+                throw std::logic_error("incompatible fields");
+            }
+            std::copy(in.elt_.cbegin(), in.elt_.cend(), elt_.begin());
         }
 
         inline bool equals(const FFieldElt &in) const
         {
-            return fq_nmod_equal(elt_, in.elt_, field_->ctx_);
+            return std::equal(elt_.cbegin(), elt_.cend(), in.elt_.cbegin());
         }
 
         inline FFieldElt operator +(const FFieldElt &in) const
@@ -295,28 +246,7 @@ namespace apsi
             return result;
         }
 
-        inline FFieldElt operator ^(const _bigint_t &e) const
-        {
-            FFieldElt result(field_);
-            pow(result, e);
-            return result;
-        }
-
         inline FFieldElt operator ^(std::uint64_t e) const
-        {
-            FFieldElt result(field_);
-            pow(result, e);
-            return result;
-        }
-
-        inline FFieldElt operator ^(const seal::BigUInt &e) const
-        {
-            FFieldElt result(field_);
-            pow(result, e);
-            return result;
-        }
-
-        inline FFieldElt operator ^(std::string e) const
         {
             FFieldElt result(field_);
             pow(result, e);
@@ -343,37 +273,12 @@ namespace apsi
             div(*this, in);
         }
 
-        inline void operator ^=(const _bigint_t &e)
-        {
-            pow(*this, e);
-        }
-
         inline void operator ^=(std::uint64_t e)
         {
             pow(*this, e);
         }
 
-        inline void operator ^=(const seal::BigUInt &e)
-        {
-            pow(*this, e);
-        }
-
-        inline void operator ^=(std::string e)
-        {
-            pow(*this, e);
-        }
-
         inline void operator =(const FFieldElt &in)
-        {
-            set(in);
-        }
-
-        inline void operator =(const BigPoly &in)
-        {
-            set(in);
-        }
-
-        inline void operator =(std::string in)
         {
             set(in);
         }
@@ -388,42 +293,40 @@ namespace apsi
             return !operator ==(compare);
         }
 
-        inline _ffield_elt_ptr_t data()
+        inline _ffield_elt_coeff_t *data()
         {
-            return &elt_[0];
+            return elt_.data();
         }
 
-        inline _ffield_elt_const_ptr_t data() const
+        inline const _ffield_elt_coeff_t *data() const
         {
-            return &elt_[0];
+            return elt_.data();
         }
 
         template<typename T>
         typename std::enable_if<std::is_pod<T>::value>::type
-            encode(gsl::span<T> value, unsigned bit_length)
+            encode(gsl::span<T> value, int bit_length)
         {
             gsl::span<const apsi::u8> v2(reinterpret_cast<apsi::u8*>(value.data()), value.size() * sizeof(T));
 
             // Should minus 1 to avoid wrapping around p
-            unsigned split_length = seal::util::get_significant_bit_count(field_->ch()) - 1;
+            int split_length = field_.ch_.bit_count() - 1;
 
-            // How many coefficients do we need in the ExFieldElement
-            unsigned split_index_bound = (bit_length + split_length - 1) / split_length;
+            // How many coefficients do we need
+            int split_index_bound = (bit_length + split_length - 1) / split_length;
 
             static_assert(std::is_pod<_ffield_elt_coeff_t>::value, "must be pod type");
-            _ffield_elt_coeff_t temp = 0;
-            gsl::span<apsi::u8> temp_span(reinterpret_cast<apsi::u8*>(&temp), sizeof(_ffield_elt_coeff_t));
 
-            if (field_->d_ < split_index_bound)
+            if (field_.d_ < static_cast<std::uint64_t>(split_index_bound)) {
                 throw std::invalid_argument("bit_length too large for extension field");
+            }
 
             auto offset = 0;
-            for (unsigned j = 0; j < split_index_bound; j++)
+            for (int j = 0; j < split_index_bound; j++)
             {
                 auto size = std::min<int>(split_length, bit_length);
-                temp = 0;
-                details::copy_with_bit_offset(v2, offset, size, temp_span);
-                nmod_poly_set_coeff_ui(elt_, j, temp);
+                details::copy_with_bit_offset(v2, offset, size,
+                    { reinterpret_cast<apsi::u8*>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) });
 
                 offset += split_length;
                 bit_length -= split_length;
@@ -432,32 +335,30 @@ namespace apsi
 
         template<typename T>
         typename std::enable_if<std::is_pod<T>::value>::type
-            decode(gsl::span<T> value, unsigned bit_length)
+            decode(gsl::span<T> value, int bit_length)
         {
             gsl::span<apsi::u8> v2(reinterpret_cast<apsi::u8*>(value.data()), value.size() * sizeof(T));
 
             // Should minus 1 to avoid wrapping around p
-            unsigned split_length = seal::util::get_significant_bit_count(field_->ch()) - 1;
+            int split_length = field_.ch_.bit_count() - 1;
 
             // How many coefficients do we need in the FFieldElt
-            unsigned split_index_bound = (bit_length + split_length - 1) / split_length;
+            int split_index_bound = (bit_length + split_length - 1) / split_length;
 #ifndef NDEBUG
-            if (split_index_bound > field_->d_)
+            if (static_cast<std::uint64_t>(split_index_bound) > field_.d_)
             {
                 throw std::invalid_argument("too many bits required");
             }
 #endif
             static_assert(std::is_pod<_ffield_elt_coeff_t>::value, "must be pod type");
-            _ffield_elt_coeff_t temp = 0;
-            auto offset = 0;
-            gsl::span<const apsi::u8> temp_span(reinterpret_cast<apsi::u8*>(&temp), sizeof(_ffield_elt_coeff_t));
 
-            for (unsigned j = 0; j < split_index_bound; j++)
+            auto offset = 0;
+            for (int j = 0; j < split_index_bound; j++)
             {
                 auto size = std::min<int>(split_length, bit_length);
-
-                temp = nmod_poly_get_coeff_ui(elt_, j);
-                details::copy_with_bit_offset(temp_span, 0, offset, size, v2);
+                details::copy_with_bit_offset(
+                    { reinterpret_cast<apsi::u8*>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) },
+                    0, offset, size, v2);
 
                 offset += split_length;
                 bit_length -= split_length;
@@ -465,21 +366,17 @@ namespace apsi
         }
 
     private:
-        FFieldElt(std::shared_ptr<FField> field, const _ffield_elt_ptr_t in) :
-            field_(std::move(field))
-        {
-            // Allocate enough space to be an element of the field
-            fq_nmod_init2(elt_, field_->ctx_);
-            fq_nmod_set(elt_, in, field_->ctx_);
-        }
-
-        std::shared_ptr<FField> field_;
+        FField field_;
         _ffield_elt_t elt_;
     };
 
     // Easy printing
     inline std::ostream &operator <<(std::ostream &os, const FFieldElt &in)
     {
-        return os << in.to_string();
+        for (std::size_t i = 0; i < in.field().d() - 1; i++) {
+            os << in.data()[i] << " ";
+        }
+        os << in.data()[in.field().d()];
+        return os;
     }
 }

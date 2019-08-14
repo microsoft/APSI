@@ -18,10 +18,11 @@ namespace apsi
     public:
         MatrixView() = default;
 
-        MatrixView(T* elems, u64 rows, u64 cols) :
-            data_(gsl::span<T>(elems, rows * cols)),
+        MatrixView(T* elems, u64 rows, u64 cols, std::size_t elt_size = 1) :
+            data_(gsl::span<T>(elems, rows * cols * elt_size)),
             rows_(rows),
-            cols_(cols)
+            cols_(cols),
+            elt_size_(elt_size)
         {
         }
 
@@ -32,7 +33,9 @@ namespace apsi
         constexpr gsl::span<T> operator[] (u64 row)
         {
             Expects(row < rows_);
-            return data_.subspan(/* offset */ row * stride(), /* count */ stride());
+            return data_.subspan(
+                /* offset */ row * stride(),
+                /* count */ stride());
         }
 
         /**
@@ -43,6 +46,7 @@ namespace apsi
             rows_ = other.rows_;
             cols_ = other.cols_;
             data_ = other.data_;
+            elt_size_ = other.elt_size_;
 
             return *this;
         }
@@ -50,27 +54,27 @@ namespace apsi
         /**
          * Allows accessing elements through a single index
          */
-        T& operator()(u64 index)
+        T *operator()(u64 index)
         {
             Expects(index < (rows_ * cols_));
-            return data_[index];
+            return data_.data() + index * elt_size_;
         }
 
         /**
          * Allows accesing elements like so: matrix(row, col)
          */
-        T& operator()(u64 row, u64 col) const
+        T *operator()(u64 row, u64 col) const
         {
             Expects(row < rows_);
             Expects(col < cols_);
-            u64 index = row * stride() + col;
-            return data_[index];
+            u64 raw_index = row * stride() + col * elt_size_;
+            return data_.data() + raw_index;
         }
 
         /**
          * Get the stride
          */
-        u64 stride() const { return cols_; }
+        u64 stride() const { return cols_ * elt_size_; }
 
         /**
          * Get the rows
@@ -106,16 +110,18 @@ namespace apsi
         /**
          * Re-initialize the view.
          */
-        void resize(T* data, u64 rows, u64 cols)
+        void resize(T* data, u64 rows, u64 cols, std::size_t elt_size)
         {
             rows_ = rows;
             cols_ = cols;
-            data_ = gsl::span<T>(data, rows * cols);
+            elt_size_ = elt_size;
+            data_ = gsl::span<T>(data, rows * cols * elt_size_);
         }
 
     private:
         gsl::span<T> data_;
         u64 rows_ = 0;
         u64 cols_ = 0;
+        std::size_t elt_size_;
     };
 }
