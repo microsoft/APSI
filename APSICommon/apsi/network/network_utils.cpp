@@ -90,6 +90,7 @@ namespace apsi
         //KeyGenerator keygen(compression_context, sk);
         //auto exp_relin_keys = keygen.relin_keys(
         //    decomposition_bit_count); 
+	
 
         // Finally we need to combine exp_relin_keys and relin_keys
         for (std::size_t i = 0; i < relin_keys.data().size(); i++)
@@ -101,6 +102,9 @@ namespace apsi
                     // auto &exp_key_ct = exp_relin_keys.data()[i][j];
                     // uniform coefficients
                    // uint64_t *eval_keys_second = relin_keys.data()[i][j].data(2 * i + 1);
+				    //Log::info("cipher after setting to zero : ");
+					//for (int i = 0; i< 10; i++)
+		            //    Log::info("(%i, %i)", i, destination.back().second.data(1)[i]);
 
                     
 

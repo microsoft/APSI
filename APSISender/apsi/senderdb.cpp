@@ -73,7 +73,7 @@ SenderDB::SenderDB(const PSIParams &params,
     Log::info("sender bin size = %i", params_.sender_bin_size());
     Log::info("split size = %i", split_size); 
     Log::info("number of ciphertexts in senderdb = %i", num_ctxts);
-
+	Log::info("number of hash functions = %i", params_.hash_func_count());
     int byte_length = static_cast<int>(round_up_to(params_.get_label_bit_count(), 8) / 8);
     int nb = params_.batch_count();
     int ns = params_.split_count();

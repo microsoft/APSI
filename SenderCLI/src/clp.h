@@ -137,7 +137,7 @@ namespace apsi
 
     private:
         TCLAP::SwitchArg             labels_arg_          = TCLAP::SwitchArg("l", "useLabels", "Use labels", false);
-        TCLAP::SwitchArg             oprf_arg_            = TCLAP::SwitchArg("o", "oprf", "Use OPRF", false);
+        TCLAP::SwitchArg             oprf_arg_            = TCLAP::SwitchArg("o", "oprf", "Use OPRF", true);
         TCLAP::ValueArg<unsigned>    item_bit_length_arg_ = TCLAP::ValueArg<unsigned>("b", "itemBitLength", "Item bit length", false, 60, "unsigned");
         TCLAP::ValueArg<int>         net_port_arg_        = TCLAP::ValueArg<int>("", "port", "Network port to bind to", false, 1212, "int");
         TCLAP::ValueArg<std::string> db_file_arg_         = TCLAP::ValueArg<std::string>("", "db", "Path to the file containing the Sender database", true, "", "string");
@@ -152,7 +152,7 @@ namespace apsi
         TCLAP::ValueArg<int>         exfld_degree_arg_    = TCLAP::ValueArg<int>("", "exfieldDegree", "exField degree", false, 8, "int");
 		TCLAP::ValueArg<int>         num_chunks_arg_ = TCLAP::ValueArg<int>("", "numChunks", "number of chunks per item", false, 1, "int");
 		TCLAP::ValueArg<int>         sender_bin_size_arg_ = TCLAP::ValueArg<int>("", "senderBinSize", "(manually set) sender bin size", false, 0, "int");
-		TCLAP::ValueArg<int>         hash_func_count_arg_ = TCLAP::ValueArg<int>("", "numHashes", "number of hash functions in cuckoo hashing", false, 3, "int");
+		TCLAP::ValueArg<int>         hash_func_count_arg_ = TCLAP::ValueArg<int>("", "numHashes", "number of hash functions in cuckoo hashing", false, 2, "int");
 
 
         bool use_labels_;

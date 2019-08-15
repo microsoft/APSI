@@ -449,9 +449,9 @@ void Receiver::encrypt(const FFieldArray &input, vector<SeededCiphertext> &desti
         // note: this is not doing the setting to zero yet. s
         Log::info("noise budget = %i", decryptor_->invariant_noise_budget(destination.back().second)); 
         seal::util::set_zero_poly(destination.back().second.poly_modulus_degree(), destination.back().second.coeff_mod_count(), destination.back().second.data(1));
-        Log::info("cipher after setting to zero : ");
-        for (int i = 0; i< 10; i++)
-            Log::info("(%i, %i)", i, destination.back().second.data(1)[i]); 
+        //Log::info("cipher after setting to zero : ");
+        //for (int i = 0; i< 10; i++)
+        //    Log::info("(%i, %i)", i, destination.back().second.data(1)[i]); 
     }
 }
 
