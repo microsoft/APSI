@@ -116,8 +116,9 @@ namespace apsi
             */
             void send_query(
                 const seal::PublicKey& pub_key,
-                const seal::RelinKeys& relin_keys,
-                const std::map<apsi::u64, std::vector<SeededCiphertext>>& query
+                const seal::RelinKeys& relin_keys, 
+                const std::map<apsi::u64, std::vector<SeededCiphertext>>& query,
+                const seed128 relin_key_seeds
             );
 
             /**
