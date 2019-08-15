@@ -108,6 +108,9 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Ch
 {
     STOPWATCH(recv_stop_watch, "Receiver::query");
     Log::info("Receiver starting query");
+	if (items.size() > 10) {
+		throw runtime_error("more than 10 queries is not supported"); 
+	}
 
     if (nullptr == params_)
     {
@@ -211,6 +214,7 @@ pair<
 
     if (get_params().use_oprf())
     {
+		Log::info("receiver preprocessing uses oprf"); 
         PRNG prng(zero_block);
         vector<vector<u64>> b;
         b.reserve(items.size());

@@ -238,11 +238,10 @@ namespace apsi
             return (psiconf_params_.item_bit_count + 7) / 8;
         }
 
-		// hao: computes the log of the false positive rate (only meaningful with numChunks > 1)
 		// assuming one query.
 		double log_fp_rate() {
-			int numChunks = psiconf_params_.num_chunks; 
-			return  numChunks * (log2(sender_size()) - log2(table_size())) - item_bit_count(); 
+			// int numChunks = psiconf_params_.num_chunks; 
+			return  ((double)exfield_degree())* (log2(split_size()) - log2(table_size())) + log2(sender_size()) - item_bit_count();
 		}
 
 		

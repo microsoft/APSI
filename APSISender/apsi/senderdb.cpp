@@ -65,6 +65,9 @@ SenderDB::SenderDB(const PSIParams &params,
 
     // debugging 
     int num_ctxts = params_.batch_count() * params_.sender_bin_size(); 
+	if (params_.sender_size() > pow(2, 16)) {
+		throw runtime_error("sender size must be bounded by 65536."); 
+	}
     Log::info("sender size = %i", params_.sender_size());
     Log::info("table size = %i", params_.table_size());
     Log::info("sender bin size = %i", params_.sender_bin_size());
