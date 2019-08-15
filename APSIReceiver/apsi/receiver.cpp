@@ -456,6 +456,8 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
     const std::vector<int> &table_to_input_map,
     std::vector<Item> &items)
 {
+
+
     STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt");
     std::pair<std::vector<bool>, Matrix<u8>> ret;
     auto& ret_bools = ret.first;
@@ -472,6 +474,10 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
         num_of_batches = get_params().batch_count(),
         block_count = num_of_splits * num_of_batches,
         batch_size = slot_count_;
+
+
+	Log::info("Receiver batch size = %i", batch_size);
+
 
     auto num_threads = thread_count_;
     Log::debug("Decrypting %i blocks(%ib x %is) with %i threads",
@@ -548,7 +554,8 @@ void Receiver::stream_decrypt_worker(
 
         decryptor_->decrypt(tmp, p);
         ex_batch_encoder_->decompose(p, *batch);
-        //cout << "Batch = " << pkg.batch_idx << "; Returned array size: " << batch->size() << " / batch_size = " << batch_size << "; degree = " << batch->field().d() << endl;
+
+        // cout << "Batch = " << pkg.batch_idx << "; Returned array size: " << batch->size() << " / batch_size = " << batch_size << "; degree = " << batch->field().d() << endl;
 
         for (int k = 0; k < batch_size; k++)
         {

@@ -1,6 +1,7 @@
 // STD
 #include <fstream>
 #include <cctype>
+#include <sstream>
 
 #if _MSC_VER || (__GNUC__ >= 8)
 #include <filesystem>
