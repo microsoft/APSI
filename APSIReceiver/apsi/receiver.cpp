@@ -553,7 +553,7 @@ void Receiver::stream_decrypt_worker(
         if (first && thread_idx == 0)
         {
             first = false;
-            Log::debug("Noise budget: %i bits", decryptor_->invariant_noise_budget(tmp));
+            Log::info("Noise budget: %i bits", decryptor_->invariant_noise_budget(tmp));
         }
 
         decryptor_->decrypt(tmp, p);
