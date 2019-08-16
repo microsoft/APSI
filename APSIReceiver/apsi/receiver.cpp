@@ -76,8 +76,9 @@ void Receiver::initialize()
         dummy_evaluator, pool_);
 
 
-    relin_keys_seeds_ = {1,1}; 
-    relin_keys_ = generator.relin_keys_with_seeds(get_params().decomposition_bit_count(), relin_keys_seeds_); 
+	auto key_material = generator.relin_keys_seeds_out(get_params().decomposition_bit_count()); 
+	relin_keys_seeds_ = key_material.first;
+	relin_keys_ = key_material.second;
     for (auto &a : relin_keys_.data())
     {
         if (a.size())
