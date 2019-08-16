@@ -102,10 +102,7 @@ namespace apsi
                     // auto &exp_key_ct = exp_relin_keys.data()[i][j];
                     // uniform coefficients
                    // uint64_t *eval_keys_second = relin_keys.data()[i][j].data(2 * i + 1);
-				    //Log::info("cipher after setting to zero : ");
-					//for (int i = 0; i< 10; i++)
-		            //    Log::info("(%i, %i)", i, destination.back().second.data(1)[i]);
-
+				    
                     
 
                     // set_poly_coeffs_uniform(context_data, eval_keys_second, random_a);
@@ -113,8 +110,13 @@ namespace apsi
                     size_t coeff_count = complete_key_ct.poly_modulus_degree(); 
                     size_t coeff_mod_count = complete_key_ct.coeff_mod_count(); 
                     for(std::size_t k = 1; k < complete_key_ct.size(); k += 2)
-                    {
+                    {	
+						Log::info("checking if relin keys are zero: k= %i", k);
                         uint64_t *poly = complete_key_ct.data(k);
+						for (size_t ind = 0; ind < 10; ind++) {
+							Log::info("(%i, %i)", poly[ind]);
+						}
+
                         for (size_t jj = 0; jj < coeff_mod_count; jj++)
                         {   
                             // FIXME
