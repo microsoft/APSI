@@ -668,6 +668,7 @@ void WindowingDag::compute_dag()
         splits(max_power_ + 1),
         items_per(max_power_, 0);
 
+	Log::info("max power = %i", max_power_);
     for (int i = 1; i <= max_power_; i++)
     {
         int i1 = static_cast<int>(optimal_split(i, 1 << window_));
@@ -684,6 +685,7 @@ void WindowingDag::compute_dag()
             depth[i] = depth[i1] + depth[i2];
             ++items_per[depth[i]];
         }
+		Log::info("i = %i, depth[i] = %i", i, depth[i]); 
     }
 
     for (int i = 3; i < max_power_ && items_per[i]; ++i)
