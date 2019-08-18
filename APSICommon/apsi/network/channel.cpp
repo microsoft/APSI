@@ -351,7 +351,7 @@ void Channel::send_preprocess_response(const vector<u8>& client_id, const std::v
 }
 
 void Channel::send_query(
-    const PublicKey& pub_key,
+    // const PublicKey& pub_key,
     const RelinKeys& relin_keys, 
     const map<u64, vector<SeededCiphertext>>& query, const seed128 relin_key_seeds)
 {
