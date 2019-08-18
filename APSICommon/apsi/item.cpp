@@ -121,6 +121,7 @@ void Item::to_exfield_element(FFieldElt &ring_item, int bit_length)
     auto exfield = ring_item.field();
 
     // Should minus 1 to avoid wrapping around p
+	// Hao: why? 
     int split_length = exfield.ch().bit_count() - 1;
 
     // How many coefficients do we need in the ExFieldElement

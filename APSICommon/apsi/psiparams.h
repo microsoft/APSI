@@ -240,9 +240,9 @@ namespace apsi
 
 		// assuming one query.
 		double log_fp_rate() {
-			// int numChunks = psiconf_params_.num_chunks; 
-			Log::info("item bit count = %i", item_bit_count());
-			return ((double)exfield_degree())* (log2(split_size())) + log2(sender_size()) + log2(hash_func_count())- item_bit_count();
+			int bitcount = item_bit_count(); 
+			if (psiconf_params_.use_oprf) { bitcount = 128; } // currently hardcoded.
+			return ((double)exfield_degree())* (log2(split_size())) + log2(split_count())- bitcount;
 		}
 
 		

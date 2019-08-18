@@ -55,6 +55,9 @@ SenderDB::SenderDB(const PSIParams &params,
 
     // What is the actual length of strings stored in the hash table
     encoding_bit_length_ = params.item_bit_count();
+	if (params_.use_oprf()) {
+		encoding_bit_length_ = 120; 
+	}
 
     // Create the null ExFieldElement (note: encoding truncation affects high bits)
     null_element_ = sender_null_item_.to_exfield_element(field_, encoding_bit_length_);
@@ -260,14 +263,7 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
                 }
             }
         }
-        // keys[0] = keys[1] = keys[2] = data[i];
-        //skip[1] = locs[0] == locs[1];
-        //skip[2] = locs[0] == locs[2] || locs[1] == locs[2];
-        // printing some info: 
-        // in particular, printing stuff....
-
-
-
+        
         // Claim an empty location in each matching bin
         for (unsigned j = 0; j < params_.hash_func_count(); j++)
         {

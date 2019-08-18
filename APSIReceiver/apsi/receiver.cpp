@@ -275,6 +275,7 @@ pair<
         }
     }
 
+	// find the item length 
     unique_ptr<CuckooTable> cuckoo = cuckoo_hashing(items);
 
     unique_ptr<FFieldArray> exfield_items;
@@ -367,7 +368,14 @@ void Receiver::exfield_encoding(
     FFieldArray &ret)
 {
     int item_bit_count = get_params().item_bit_count();
-    auto& encodings = cuckoo.table();
+	if (get_params().use_oprf()) {
+		item_bit_count = 120; // hardcoded.
+	}
+	Log::info("item bit count before decoding: %i", item_bit_count); 
+	// oprf? depends 
+	auto& encodings = cuckoo.table();
+
+	Log::info("bit count of ptxt modulus = %i", ret.field().ch().bit_count());
 
     for (size_t i = 0; i < cuckoo.table_size(); i++)
     {
