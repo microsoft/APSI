@@ -363,10 +363,10 @@ void Channel::send_query(
     bytes_sent_ += sizeof(SenderOperationType);
 
     string str;
-    get_string(str, pub_key);
-    msg.add(str);
-    bytes_sent_ += str.length();
-    Log::info("public key length = %i bytes ", str.length()); 
+    //get_string(str, pub_key);
+    //msg.add(str);
+    //bytes_sent_ += str.length();
+    //Log::info("public key length = %i bytes ", str.length()); 
 
     get_string(str, relin_keys);
     msg.add(str);
@@ -574,21 +574,24 @@ shared_ptr<SenderOperation> Channel::decode_query(const message_t& msg)
     vector<u8> client_id;
     extract_client_id(msg, client_id);
 
-    string pub_key;
+    // string pub_key;
     string relin_keys;
     map<u64, vector<pair<seed128, string>>> query;
 
-    msg.get(pub_key, /* part */ 2);
-    bytes_received_ += pub_key.length();
+	size_t msg_idx = 2;
 
-    msg.get(relin_keys, /* part */ 3);
+
+    //msg.get(pub_key, /* part */ msg_idx++);
+    // bytes_received_ += pub_key.length();
+
+    msg.get(relin_keys, /* part */  msg_idx++);
     bytes_received_ += relin_keys.length();
 
     size_t query_count;
-    get_part(query_count, msg, /* part */ 4);
+    get_part(query_count, msg, /* part */  msg_idx++);
     bytes_received_ += sizeof(size_t);
 
-    size_t msg_idx = 5;
+    // size_t msg_idx = 5;
 
     for (u64 i = 0; i < query_count; i++)
     {
@@ -626,7 +629,7 @@ shared_ptr<SenderOperation> Channel::decode_query(const message_t& msg)
     get_part(relin_keys_seeds.second, msg, msg_idx++);
             
 
-    return make_shared<SenderOperationQuery>(std::move(client_id), pub_key, relin_keys, std::move(query), relin_keys_seeds);
+    return make_shared<SenderOperationQuery>(std::move(client_id), /*pub_key, */ relin_keys, std::move(query), relin_keys_seeds);
 }
 
 bool Channel::receive_message(message_t& msg, bool wait_for_message)

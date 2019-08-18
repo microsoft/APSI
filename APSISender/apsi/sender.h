@@ -111,7 +111,7 @@ namespace apsi
             Generate a response to a query
             */
             void query(
-                const seal::PublicKey& pub_key,
+                // const seal::PublicKey& pub_key,
                 const seal::RelinKeys& relin_keys,
                 const std::map<apsi::u64, std::vector<std::pair<seed128, std::string>> >query,
                 const std::vector<apsi::u8>& client_id,

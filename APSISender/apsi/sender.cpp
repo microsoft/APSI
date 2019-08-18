@@ -222,7 +222,7 @@ void Sender::preprocess(vector<u8>& buff)
 }
 
 void Sender::query(
-    const PublicKey& pub_key,
+    // const PublicKey& pub_key,
     const RelinKeys& relin_keys,
     const map<u64, vector<pair<seed128, string>>> query,
     const vector<u8>& client_id,
@@ -231,7 +231,7 @@ void Sender::query(
     STOPWATCH(sender_stop_watch, "Sender::query");
     Log::info("Start processing query");
 
-    SenderSessionContext session_context(seal_context_, pub_key, relin_keys);
+    SenderSessionContext session_context(seal_context_, /*pub_key, */ relin_keys);
 
     /* Receive client's query data. */
     int num_of_powers = static_cast<int>(query.size());
@@ -296,6 +296,7 @@ void Sender::respond(
     int	splitStep = batch_count * split_size_plus_one;
     int total_blocks = params_.split_count() * batch_count;
 
+	// like a dummy encryption of 1. 
     session_context.encryptor()->encrypt(Plaintext("1"), powers[0][0]);
     for (u64 i = 1; i < powers.size(); ++i)
     {
