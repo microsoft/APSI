@@ -37,6 +37,7 @@ namespace apsi
             bool use_oprf;
             bool use_labels;
             apsi::u64 sender_size;
+			unsigned item_bit_length_used_after_oprf; // how many bits we take after oprf.
 
 			// number of chunks to split each item into 
 			unsigned num_chunks;
@@ -104,6 +105,12 @@ namespace apsi
         {
             return psiconf_params_.item_bit_count;
         }
+
+		inline unsigned int item_bit_length_used_after_oprf() const
+		{
+			return psiconf_params_.item_bit_length_used_after_oprf;
+		}
+
 
         inline bool use_oprf() const
         {
@@ -241,7 +248,7 @@ namespace apsi
 		// assuming one query.
 		double log_fp_rate() {
 			int bitcount = item_bit_count(); 
-			if (psiconf_params_.use_oprf) { bitcount = 128; } // currently hardcoded.
+			if (psiconf_params_.use_oprf) { bitcount = item_bit_length_used_after_oprf(); } // currently hardcoded.
 			return ((double)exfield_degree())* (log2(split_size())) + log2(split_count())- bitcount;
 		}
 
@@ -295,8 +302,14 @@ namespace apsi
                 throw std::invalid_argument("Item bit count cannot exceed max.");
             }
 
-			if (item_bit_count() > (uint64_t) (num_chunks()) * ((uint64_t) exfield_degree()) * log2(seal_params_.encryption_params.plain_modulus().value())) {
-				apsi::logging::Log::warning("item bit count (%i) is too large to fit in slots (%i). ", item_bit_count(), (uint64_t)(num_chunks()) * ((uint64_t)exfield_degree()) * log2(seal_params_.encryption_params.plain_modulus().value()));
+
+			int bitcount = item_bit_count(); 
+			if (use_oprf()) {
+				bitcount = item_bit_length_used_after_oprf();
+			}
+			int supported_bitcount = ((uint64_t)exfield_degree())* (seal_params_.encryption_params.plain_modulus().bit_count() - 1); 
+			if (bitcount > supported_bitcount){
+				apsi::logging::Log::warning("item bit count (%i) is too large to fit in slots (%i bits). ", bitcount, supported_bitcount);
 			}
 
             if (item_bit_count() > (max_item_bit_count - 8))

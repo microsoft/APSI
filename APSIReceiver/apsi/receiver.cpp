@@ -369,7 +369,7 @@ void Receiver::exfield_encoding(
 {
     int item_bit_count = get_params().item_bit_count();
 	if (get_params().use_oprf()) {
-		item_bit_count = 120; // hardcoded.
+		item_bit_count = get_params().item_bit_length_used_after_oprf();
 	}
 	Log::info("item bit count before decoding: %i", item_bit_count); 
 	// oprf? depends 

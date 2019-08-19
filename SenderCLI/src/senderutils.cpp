@@ -42,6 +42,10 @@ const PSIParams apsi::tools::build_psi_params(
 		psiconf_params.num_chunks = cmd.num_chunks();
 
 		psiconf_params.sender_bin_size = cmd.sender_bin_size();
+
+		psiconf_params.item_bit_length_used_after_oprf = cmd.item_bit_length_used_after_oprf();
+
+		Log::info("item bit length aftre oprf when initializing = %i", psiconf_params.item_bit_length_used_after_oprf); 
     }
 
     // Cuckoo hash parameters

@@ -267,7 +267,7 @@ void Sender::query(
             // todo: need to change this part to process seeded ciphertext.
             // do we do the logic here? 
             seed128 seed = pair.second[i].first;  // first, locate the seed
-            cout << "sender seed: " << seed.first << ", " << seed.second << endl;
+            // cout << "sender seed: " << seed.first << ", " << seed.second << endl;
             get_ciphertext(seal_context_, powers[i][power], pair.second[i].second);
             // Then, make the correction. 
             Ciphertext temp; 
@@ -669,7 +669,7 @@ void WindowingDag::compute_dag()
         splits(max_power_ + 1),
         items_per(max_power_, 0);
 
-	Log::info("max power = %i", max_power_);
+	Log::debug("max power = %i", max_power_);
     for (int i = 1; i <= max_power_; i++)
     {
         int i1 = static_cast<int>(optimal_split(i, 1 << window_));
@@ -686,7 +686,7 @@ void WindowingDag::compute_dag()
             depth[i] = depth[i1] + depth[i2];
             ++items_per[depth[i]];
         }
-		Log::info("i = %i, depth[i] = %i", i, depth[i]); 
+		Log::debug("i = %i, depth[i] = %i", i, depth[i]); 
     }
 
     for (int i = 3; i < max_power_ && items_per[i]; ++i)

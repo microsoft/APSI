@@ -111,10 +111,10 @@ namespace apsi
                     size_t coeff_mod_count = complete_key_ct.coeff_mod_count(); 
                     for(std::size_t k = 1; k < complete_key_ct.size(); k += 2)
                     {	
-						Log::info("checking if relin keys are zero: k = %i", k);
+						Log::debug("checking if relin keys are zero: k = %i", k);
                         uint64_t *poly = complete_key_ct.data(k);
 						for (size_t ind = 0; ind < 10; ind++) {
-							Log::info("(%i, %i)", ind, poly[ind]);
+							Log::debug("(%i, %i)", ind, poly[ind]);
 						}
 
                         for (size_t jj = 0; jj < coeff_mod_count; jj++)

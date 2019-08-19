@@ -35,7 +35,7 @@ namespace apsi
             add(net_port_arg_);
 			add(num_chunks_arg_); 
 			add(sender_bin_size_arg_);
-
+			add(item_bit_length_used_after_oprf_arg_); 
 			add(hash_func_count_arg_); 
         }
 
@@ -49,6 +49,10 @@ namespace apsi
 
             item_bit_length_ = item_bit_length_arg_.getValue();
             cout_param("itemBitLength", item_bit_length_);
+
+			item_bit_length_used_after_oprf_ = item_bit_length_used_after_oprf_arg_.getValue();
+			cout_param("itemBitLengthUsedAfterOPRF", item_bit_length_used_after_oprf_);
+
 
             sec_level_ = sec_lvl_arg_.getValue();
             cout_param("secLevel", sec_level_);
@@ -135,6 +139,10 @@ namespace apsi
 			return hash_func_count_;
 		}
 
+		unsigned item_bit_length_used_after_oprf() const {
+			return item_bit_length_used_after_oprf_;
+		}
+
     private:
         TCLAP::SwitchArg             labels_arg_          = TCLAP::SwitchArg("l", "useLabels", "Use labels", false);
         TCLAP::SwitchArg             oprf_arg_            = TCLAP::SwitchArg("o", "oprf", "Use OPRF", true);
@@ -149,10 +157,11 @@ namespace apsi
         TCLAP::MultiArg<apsi::u64>   coeff_mod_arg_       = TCLAP::MultiArg<apsi::u64>("", "coeffModulus", "Coefficient Modulus", false, "u64");
         TCLAP::ValueArg<apsi::u64>   plain_mod_arg_       = TCLAP::ValueArg<apsi::u64>("", "plainModulus", "Plain Modulus", false, 40961, "u64");
         TCLAP::ValueArg<int>         dbc_arg_             = TCLAP::ValueArg<int>("", "dbc", "Decomposition Bit Count", false, 30, "int");
-        TCLAP::ValueArg<int>         exfld_degree_arg_    = TCLAP::ValueArg<int>("", "exfieldDegree", "exField degree", false, 8, "int");
+        TCLAP::ValueArg<int>         exfld_degree_arg_    = TCLAP::ValueArg<int>("e", "exfieldDegree", "exField degree", false, 8, "int");
 		TCLAP::ValueArg<int>         num_chunks_arg_ = TCLAP::ValueArg<int>("", "numChunks", "number of chunks per item", false, 1, "int");
 		TCLAP::ValueArg<int>         sender_bin_size_arg_ = TCLAP::ValueArg<int>("", "senderBinSize", "(manually set) sender bin size", false, 0, "int");
 		TCLAP::ValueArg<int>         hash_func_count_arg_ = TCLAP::ValueArg<int>("", "numHashes", "number of hash functions in cuckoo hashing", false, 2, "int");
+		TCLAP::ValueArg<unsigned>    item_bit_length_used_after_oprf_arg_ = TCLAP::ValueArg<unsigned>("i", "itemBitLengthUsedAfterOPRF", "Item bit length used after oprf", false, 120, "unsigned");
 
 
         bool use_labels_;
@@ -172,5 +181,6 @@ namespace apsi
 		int num_chunks_;
 		int sender_bin_size_;
 		int hash_func_count_;
+		unsigned item_bit_length_used_after_oprf_;
     };
 }

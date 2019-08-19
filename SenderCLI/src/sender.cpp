@@ -103,6 +103,8 @@ void run_sender_dispatcher(const CLP& cmd)
 
 	Log::info("FPrate = %f", params.log_fp_rate());
 
+	
+
     Log::info("Building sender");
     shared_ptr<Sender> sender = make_shared<Sender>(params, cmd.threads(), cmd.threads());
 

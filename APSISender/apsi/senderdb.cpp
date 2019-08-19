@@ -56,7 +56,8 @@ SenderDB::SenderDB(const PSIParams &params,
     // What is the actual length of strings stored in the hash table
     encoding_bit_length_ = params.item_bit_count();
 	if (params_.use_oprf()) {
-		encoding_bit_length_ = 120; 
+		encoding_bit_length_ = params.item_bit_length_used_after_oprf();
+		Log::info("encoding bit length = %i", encoding_bit_length_); 
 	}
 
     // Create the null ExFieldElement (note: encoding truncation affects high bits)
