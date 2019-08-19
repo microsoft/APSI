@@ -21,7 +21,7 @@ namespace
 {
     double get_bin_overflow_prob(u64 num_bins, u64 num_balls, u64 bin_size, double epsilon = 0.0001)
     {
-		cout << "bin size = " << bin_size;
+		// cout << "bin size = " << bin_size;
         if (num_balls <= bin_size)
         {
             return numeric_limits<double>::max();
@@ -56,7 +56,7 @@ namespace
             sec = sec2;
 			i++;
         }
-		cout << "sec = " << sec << endl;
+		// cout << "sec = " << sec << endl;
 
         return max<double>(0, (double)-sec);
     }

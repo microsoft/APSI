@@ -156,7 +156,6 @@ void Receiver::handshake(Channel& chl)
         chl.receive(sender_params);
     }
 
-	Log::info("received sender bin size %i from sender: ", sender_params.psiconf_params.sender_bin_size); 
 
     // Set parameters from Sender.
     params_ = make_unique<PSIParams>(
@@ -453,10 +452,10 @@ void Receiver::encrypt(const FFieldArray &input, vector<SeededCiphertext> &desti
         destination.push_back({seeds_placeholder,  Ciphertext(seal_context_, pool_)});
         seed128 seeds = encryptor_->encrypt_sk_seeds_out(plain, destination.back().second, secret_key_,  pool_);
 		destination.back().first = seeds;
-		Log::info("Seeds = %i, %i", seeds.first, seeds.second);
+		Log::debug("Seeds = %i, %i", seeds.first, seeds.second);
 		// debug 
         // note: this is not doing the setting to zero yet. s
-        Log::info("Fresh encryption noise budget = %i", decryptor_->invariant_noise_budget(destination.back().second)); 
+        Log::debug("Fresh encryption noise budget = %i", decryptor_->invariant_noise_budget(destination.back().second)); 
         seal::util::set_zero_poly(destination.back().second.poly_modulus_degree(), destination.back().second.coeff_mod_count(), destination.back().second.data(1));
         //Log::info("cipher after setting to zero : ");
         //for (int i = 0; i< 10; i++)
