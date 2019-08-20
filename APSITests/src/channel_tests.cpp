@@ -96,7 +96,8 @@ namespace APSITests
 
 		PublicKey pub_key;
 		RelinKeys relin_keys;
-		map<u64, vector<Ciphertext>> query_data;
+		map<u64, vector<SeededCiphertext>> query_data;
+        seed128 relin_keys_seeds;
 
 		// Receives
 		ASSERT_ANY_THROW(mychannel.receive(get_params_resp));
@@ -110,7 +111,7 @@ namespace APSITests
 		ASSERT_ANY_THROW(mychannel.send_get_parameters_response(empty_client_id, params));
 		ASSERT_ANY_THROW(mychannel.send_preprocess(buff));
 		ASSERT_ANY_THROW(mychannel.send_preprocess_response(empty_client_id, buff));
-		ASSERT_ANY_THROW(mychannel.send_query(pub_key, relin_keys, query_data));
+		ASSERT_ANY_THROW(mychannel.send_query(relin_keys, query_data, relin_keys_seeds));
 		ASSERT_ANY_THROW(mychannel.send_query_response(empty_client_id, 10));
 	}
 
@@ -144,10 +145,11 @@ namespace APSITests
 
 				PublicKey pubkey = key_gen.public_key();
 				RelinKeys relinkeys = key_gen.relin_keys(10);
-				map<u64, vector<Ciphertext>> querydata;
-				vector<Ciphertext> vec1;
-				vector<Ciphertext> vec2;
-				Ciphertext txt;
+				map<u64, vector<SeededCiphertext>> querydata;
+                seed128 relin_keys_seed;
+				vector<SeededCiphertext> vec1;
+				vector<SeededCiphertext> vec2;
+				SeededCiphertext txt;
 
 				vec1.push_back(txt);
 				vec2.push_back(txt);
@@ -161,7 +163,7 @@ namespace APSITests
 				// u64 size * 2 (each entry in querydata)
 				// size_t size * 2 (each entry in querydata)
 				// Ciphertexts will generate strings of length 73
-				clt.send_query(pubkey, relinkeys, querydata);
+				clt.send_query(relinkeys, querydata, relin_keys_seed);
 
 				SenderResponseGetParameters get_params_resp;
 				clt.receive(get_params_resp);
@@ -200,7 +202,7 @@ namespace APSITests
 		expected_total += sizeof(SenderOperationType);
 		expected_total += sizeof(size_t) * 3;
 		expected_total += sizeof(u64) * 2;
-		expected_total += 65734; // pubkey + relinkeys
+		expected_total += 49309; // pubkey + relinkeys
 		expected_total += 73 * 2; // Ciphertexts
 		ASSERT_EQ(expected_total, svr.get_total_data_received());
 
@@ -311,14 +313,15 @@ namespace APSITests
 				PublicKey pub_key = key_gen.public_key();
 				RelinKeys relin_keys = key_gen.relin_keys(10);
 
-				map<u64, vector<Ciphertext>> query;
+				map<u64, vector<SeededCiphertext>> query;
+                seed128 relin_keys_seed;
 
-				vector<Ciphertext> vec;
-				vec.push_back(Ciphertext());
+				vector<SeededCiphertext> vec;
+				vec.push_back(SeededCiphertext());
 
 				query.insert_or_assign(5, vec);
 
-				client_.send_query(pub_key, relin_keys, query);
+				client_.send_query(relin_keys, query, relin_keys_seed);
 			});
 
 		shared_ptr<SenderOperation> sender_op;
@@ -479,10 +482,11 @@ namespace APSITests
 		PublicKey pubkey = key_gen.public_key();
 		RelinKeys relinkeys = key_gen.relin_keys(10);
 
-		map<u64, vector<Ciphertext>> querydata;
+		map<u64, vector<SeededCiphertext>> querydata;
+        seed128 relin_keys_seed;
 
 		// Send empty info, it is ignored
-		client_.send_query(relinkeys, querydata);
+		client_.send_query(relinkeys, querydata, relin_keys_seed);
 
 		SenderResponseQuery query_response;
 		client_.receive(query_response);

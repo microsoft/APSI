@@ -23,7 +23,7 @@ namespace APSITests
 
 		void resize_test(T* data, apsi::u64 rows, apsi::u64 cols)
 		{
-			this->resize(data, rows, cols);
+			this->resize(data, rows, cols, /* elt_size */ 1);
 		}
 	};
 
@@ -50,13 +50,13 @@ namespace APSITests
 		int array[10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
 		apsi::MatrixView mv(array, 2, 5);
 
-		ASSERT_EQ(6, mv(1, 0));
-		ASSERT_EQ(8, mv(1, 2));
+		ASSERT_EQ(6, *mv(1, 0));
+		ASSERT_EQ(8, *mv(1, 2));
 
 		apsi::MatrixView mv2(array, 5, 2);
 
-		ASSERT_EQ(5, mv2(2, 0));
-		ASSERT_EQ(10, mv2(4, 1));
+		ASSERT_EQ(5, *mv2(2, 0));
+		ASSERT_EQ(10, *mv2(4, 1));
 	}
 
 	TEST(MatrixViewTests, OperatorAssignTest)
@@ -71,7 +71,7 @@ namespace APSITests
 		mv2 = mv;
 		ASSERT_EQ((apsi::u64)3, mv2.rows());
 		ASSERT_EQ((apsi::u64)3, mv2.columns());
-		ASSERT_EQ(3, mv2(2, 0));
+		ASSERT_EQ(3, *mv2(2, 0));
 	}
 
 	TEST(MatrixViewTests, OperatorBracketTest)
@@ -93,15 +93,15 @@ namespace APSITests
 		std::string str = "Hello world!";
 		apsi::MatrixView<char> mv(str.data(), 6, 2);
 
-		ASSERT_EQ('H', mv(0, 0));
-		ASSERT_EQ('!', mv(5, 1));
-		ASSERT_EQ('l', mv(1, 0));
+		ASSERT_EQ('H', *mv(0, 0));
+		ASSERT_EQ('!', *mv(5, 1));
+		ASSERT_EQ('l', *mv(1, 0));
 
 		// We can also use a single index to iterate
-		ASSERT_EQ('H', mv(0));
-		ASSERT_EQ('!', mv(11));
-		ASSERT_EQ('l', mv(2));
-		ASSERT_EQ('l', mv(3));
+		ASSERT_EQ('H', *mv(0));
+		ASSERT_EQ('!', *mv(11));
+		ASSERT_EQ('l', *mv(2));
+		ASSERT_EQ('l', *mv(3));
 	}
 
 	TEST(MatrixViewTests, SizeTest)
@@ -120,19 +120,19 @@ namespace APSITests
 						  11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
 		MatrixViewTester<int> mv(array, 5, 4);
 
-		ASSERT_EQ(1, mv(0, 0));
-		ASSERT_EQ(5, mv(1, 0));
-		ASSERT_EQ(9, mv(2, 0));
-		ASSERT_EQ(13, mv(3, 0));
-		ASSERT_EQ(20, mv(4, 3));
+		ASSERT_EQ(1, *mv(0, 0));
+		ASSERT_EQ(5, *mv(1, 0));
+		ASSERT_EQ(9, *mv(2, 0));
+		ASSERT_EQ(13, *mv(3, 0));
+		ASSERT_EQ(20, *mv(4, 3));
 
 		mv.resize_test(array, 4, 5);
 
-		ASSERT_EQ(1, mv(0, 0));
-		ASSERT_EQ(5, mv(0, 4));
-		ASSERT_EQ(9, mv(1, 3));
-		ASSERT_EQ(13, mv(2, 2));
-		ASSERT_EQ(20, mv(3, 4));
+		ASSERT_EQ(1, *mv(0, 0));
+		ASSERT_EQ(5, *mv(0, 4));
+		ASSERT_EQ(9, *mv(1, 3));
+		ASSERT_EQ(13, *mv(2, 2));
+		ASSERT_EQ(20, *mv(3, 4));
 	}
 
 	TEST(MatrixViewTests, IteratorTest)
@@ -179,14 +179,14 @@ namespace APSITests
 		ASSERT_EQ((apsi::u64)100, m.capacity_test());
 
 		// Data should still be there, but in their new positions
-		ASSERT_EQ(25, m(2, 4));
-		ASSERT_EQ(10, m(0, 9));
-		ASSERT_EQ(20, m(1, 9));
+		ASSERT_EQ(25, *m(2, 4));
+		ASSERT_EQ(10, *m(0, 9));
+		ASSERT_EQ(20, *m(1, 9));
 
 		// If we reduce the size the actual capacity should still be the same as before
 		m.resize(2, 2);
 
-		ASSERT_EQ(4, m(1, 1));
+		ASSERT_EQ(4, *m(1, 1));
 		ASSERT_EQ((apsi::u64)100, m.capacity_test());
 	}
 }

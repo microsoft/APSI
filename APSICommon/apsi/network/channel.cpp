@@ -354,7 +354,6 @@ void Channel::send_preprocess_response(const vector<u8>& client_id, const std::v
 }
 
 void Channel::send_query(
-    // const PublicKey& pub_key,
     const RelinKeys& relin_keys, 
     const map<u64, vector<SeededCiphertext>>& query, const seed128 relin_key_seeds)
 {
@@ -450,14 +449,14 @@ void Channel::send(const vector<u8>& client_id, const ResultPackage& pkg)
 void Channel::get_buffer(vector<u8>& buff, const message_t& msg, int part_start) const
 {
     // Need to have size
-    if (msg.parts() < static_cast<size_t>(part_start + 1))
+    if (msg.parts() < static_cast<size_t>(part_start) + 1)
         throw runtime_error("Should have size at least");
 
     size_t size;
     get_part(size, msg, /* part */ part_start);
 
     // If the vector is not empty, we need the part with the data
-    if (size > 0 && msg.parts() < static_cast<size_t>(part_start + 2))
+    if (size > 0 && msg.parts() < static_cast<size_t>(part_start) + 2)
         throw runtime_error("Should have size and data.");
 
     buff.resize(size);
@@ -465,10 +464,10 @@ void Channel::get_buffer(vector<u8>& buff, const message_t& msg, int part_start)
     if (size > 0)
     {
         // Verify the actual data is the size we expect
-        if (msg.size(/* part */ part_start + 1) < size)
+        if (msg.size(/* part */ static_cast<size_t>(part_start) + 1) < size)
             throw runtime_error("Second Part has less data than expected");
 
-        memcpy(buff.data(), msg.raw_data(/* part */ part_start + 1), size);
+        memcpy(buff.data(), msg.raw_data(/* part */ static_cast<size_t>(part_start) + 1), size);
     }
 }
 

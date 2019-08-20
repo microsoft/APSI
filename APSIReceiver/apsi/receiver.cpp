@@ -124,7 +124,7 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Ch
     auto& ciphertexts = qq.first;
     auto& cuckoo = *qq.second;
 
-    chl.send_query(/*public_key_, */relin_keys_, ciphertexts, relin_keys_seeds_);
+    chl.send_query(relin_keys_, ciphertexts, relin_keys_seeds_);
 
     auto table_to_input_map = cuckoo_indices(items, cuckoo);
 
