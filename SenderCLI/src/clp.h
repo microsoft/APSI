@@ -158,10 +158,11 @@ namespace apsi
         TCLAP::ValueArg<apsi::u64>   plain_mod_arg_       = TCLAP::ValueArg<apsi::u64>("", "plainModulus", "Plain Modulus", false, 40961, "u64");
         TCLAP::ValueArg<int>         dbc_arg_             = TCLAP::ValueArg<int>("", "dbc", "Decomposition Bit Count", false, 30, "int");
         TCLAP::ValueArg<int>         exfld_degree_arg_    = TCLAP::ValueArg<int>("e", "exfieldDegree", "exField degree", false, 8, "int");
-		TCLAP::ValueArg<int>         num_chunks_arg_ = TCLAP::ValueArg<int>("", "numChunks", "number of chunks per item", false, 1, "int");
-		TCLAP::ValueArg<int>         sender_bin_size_arg_ = TCLAP::ValueArg<int>("", "senderBinSize", "(manually set) sender bin size", false, 0, "int");
-		TCLAP::ValueArg<int>         hash_func_count_arg_ = TCLAP::ValueArg<int>("", "numHashes", "number of hash functions in cuckoo hashing", false, 2, "int");
-		TCLAP::ValueArg<unsigned>    item_bit_length_used_after_oprf_arg_ = TCLAP::ValueArg<unsigned>("i", "itemBitLengthUsedAfterOPRF", "Item bit length used after oprf", false, 120, "unsigned");
+        TCLAP::ValueArg<int>         num_chunks_arg_      = TCLAP::ValueArg<int>("", "numChunks", "number of chunks per item", false, 1, "int");
+        TCLAP::ValueArg<int>         sender_bin_size_arg_ = TCLAP::ValueArg<int>("", "senderBinSize", "(manually set) sender bin size", false, 0, "int");
+        TCLAP::ValueArg<int>         hash_func_count_arg_ = TCLAP::ValueArg<int>("", "numHashes", "number of hash functions in cuckoo hashing", false, 2, "int");
+        TCLAP::ValueArg<unsigned>    item_bit_length_used_after_oprf_arg_
+                                                          = TCLAP::ValueArg<unsigned>("i", "itemBitLengthUsedAfterOPRF", "Item bit length used after oprf", false, 120, "unsigned");
 
 
         bool use_labels_;

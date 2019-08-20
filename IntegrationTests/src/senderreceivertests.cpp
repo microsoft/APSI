@@ -101,8 +101,8 @@ namespace
 		Receiver& receiver = *receiver_ptr;
 
 		auto label_bit_length = params.get_label_bit_count();
-		auto recversActualSize = 50;
-		auto intersectionSize = 25;
+		auto recversActualSize = 10;
+		auto intersectionSize = 5;
 
 		auto s1 = vector<Item>(senderActualSize);
 		Matrix<u8> labels(senderActualSize, params.get_label_byte_count());
@@ -150,9 +150,12 @@ namespace
 		psiconf_params.sender_size = sender_set_size;
 		psiconf_params.use_labels = use_labels;
 		psiconf_params.use_oprf = use_oprf;
+        psiconf_params.sender_bin_size = 0; // Size will be calculated
+        psiconf_params.num_chunks = 1;
+        psiconf_params.item_bit_length_used_after_oprf = 120;
 
 		PSIParams::CuckooParams cuckoo_params;
-		cuckoo_params.hash_func_count = 3;
+		cuckoo_params.hash_func_count = 2;
 		cuckoo_params.hash_func_seed = 0;
 		cuckoo_params.max_probe = 100;
 
@@ -168,7 +171,7 @@ namespace
 
 		vector<SmallModulus> coeff_modulus = DefaultParams::coeff_modulus_128(seal_params.encryption_params.poly_modulus_degree());
 		seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
-		seal_params.encryption_params.set_plain_modulus(0x13ff);
+		seal_params.encryption_params.set_plain_modulus(40961);
 
 		PSIParams::ExFieldParams exfield_params;
 		exfield_params.characteristic = seal_params.encryption_params.plain_modulus().value();

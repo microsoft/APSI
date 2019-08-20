@@ -422,12 +422,12 @@ void Receiver::generate_powers(const FFieldArray &exfield_items,
 void Receiver::encrypt(map<uint64_t, FFieldArray> &input, map<uint64_t, vector<SeededCiphertext>> &destination)
 {
     // debugging
-    int count = 0; 
+    size_t count = 0; 
     destination.clear();
     for (auto it = input.begin(); it != input.end(); it++)
     {
         encrypt(it->second, destination[it->first]);
-        count += (it->second.size() + slot_count_ - 1) / slot_count_; 
+        count += (it->second.size() + static_cast<size_t>(slot_count_) - 1) / static_cast<size_t>(slot_count_); 
     }
     Log::info("receiver sending %i ciphertexts", count); 
 }
@@ -445,7 +445,9 @@ void Receiver::encrypt(const FFieldArray &input, vector<SeededCiphertext> &desti
     {
         for (int j = 0; j < batch_size; j++)
         {
-            batch.set(j, i * batch_size + j, input);
+            size_t sti = static_cast<size_t>(i);
+            size_t stj = static_cast<size_t>(j);
+            batch.set(stj, sti * batch_size + stj, input);
         }
         ex_batch_encoder_->compose(batch, plain);
 		seed128 seeds_placeholder;

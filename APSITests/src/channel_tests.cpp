@@ -482,7 +482,7 @@ namespace APSITests
 		map<u64, vector<Ciphertext>> querydata;
 
 		// Send empty info, it is ignored
-		client_.send_query(pubkey, relinkeys, querydata);
+		client_.send_query(relinkeys, querydata);
 
 		SenderResponseQuery query_response;
 		client_.receive(query_response);
