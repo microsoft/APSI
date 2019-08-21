@@ -245,14 +245,19 @@ namespace apsi
             return (psiconf_params_.item_bit_count + 7) / 8;
         }
 
-		// assuming one query.
-		double log_fp_rate() {
-			int bitcount = item_bit_count(); 
-			if (psiconf_params_.use_oprf) { bitcount = item_bit_length_used_after_oprf(); } // currently hardcoded.
-			return ((double)exfield_degree())* (log2(split_size())) + log2(split_count())- bitcount;
-		}
+        // assuming one query.
+        double log_fp_rate() {
+            int bitcount = item_bit_count(); 
+            if (psiconf_params_.use_oprf) { bitcount = item_bit_length_used_after_oprf(); } // currently hardcoded.
+            return ((double)exfield_degree())* (log2(split_size())) + log2(split_count())- bitcount;
+        }
 
-		
+        // Allow access to param structures
+        const PSIConfParams& get_psiconf_params() const { return psiconf_params_; }
+        const TableParams& get_table_params() const     { return table_params_; }
+        const CuckooParams& get_cuckoo_params() const   { return cuckoo_params_; }
+        const SEALParams& get_seal_params() const       { return seal_params_; }
+        const ExFieldParams& get_exfield_params() const { return exfield_params_; }
 
         // Constants
         constexpr static int max_item_bit_count = 128;

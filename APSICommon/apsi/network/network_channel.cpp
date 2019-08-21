@@ -121,6 +121,11 @@ bool NetworkChannel::receive(shared_ptr<SenderOperation>& sender_op, bool wait_f
     return true;
 }
 
+bool NetworkChannel::receive(shared_ptr<SenderOperation>& sender_op)
+{
+    return receive(sender_op, /* wait_for_message */ false);
+}
+
 void NetworkChannel::receive(SenderResponseGetParameters& response)
 {
     throw_if_not_connected();
@@ -361,10 +366,6 @@ void NetworkChannel::send_query(
     bytes_sent_ += sizeof(SenderOperationType);
 
     string str;
-    //get_string(str, pub_key);
-    //msg.add(str);
-    //bytes_sent_ += str.length();
-    //Log::info("public key length = %i bytes ", str.length()); 
 
     get_string(str, relin_keys);
     msg.add(str);
@@ -578,18 +579,12 @@ shared_ptr<SenderOperation> NetworkChannel::decode_query(const message_t& msg)
 
     size_t msg_idx = 2;
 
-
-    //msg.get(pub_key, /* part */ msg_idx++);
-    // bytes_received_ += pub_key.length();
-
     msg.get(relin_keys, /* part */  msg_idx++);
     bytes_received_ += relin_keys.length();
 
     size_t query_count;
     get_part(query_count, msg, /* part */  msg_idx++);
     bytes_received_ += sizeof(size_t);
-
-    // size_t msg_idx = 5;
 
     for (u64 i = 0; i < query_count; i++)
     {
@@ -627,7 +622,7 @@ shared_ptr<SenderOperation> NetworkChannel::decode_query(const message_t& msg)
     get_part(relin_keys_seeds.second, msg, msg_idx++);
 
 
-    return make_shared<SenderOperationQuery>(std::move(client_id), /*pub_key, */ relin_keys, std::move(query), relin_keys_seeds);
+    return make_shared<SenderOperationQuery>(std::move(client_id), relin_keys, std::move(query), relin_keys_seeds);
 }
 
 bool NetworkChannel::receive_message(message_t& msg, bool wait_for_message)

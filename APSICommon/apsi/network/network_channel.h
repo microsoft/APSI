@@ -28,7 +28,7 @@ namespace apsi
         /**
         * Communication channel between Sender and Receiver through a Network channel.
         *
-        * All receives are synchrounous.
+        * All receives are synchrounous, except for receiving a SenderOperation.
         * All sends are asynchrounous.
         */
         class NetworkChannel : public Channel
@@ -66,11 +66,16 @@ namespace apsi
 
             /**
             * Receive a Sender Operation.
+            */
+            virtual bool receive(std::shared_ptr<apsi::network::SenderOperation>& sender_op);
+
+            /**
+            * Receive a Sender Operation.
             *
             * This call does not block if wait_for_message is false, if there
             * is no operation pending it will immediately return false.
             */
-            virtual bool receive(std::shared_ptr<apsi::network::SenderOperation>& sender_op, bool wait_for_message = false);
+            bool receive(std::shared_ptr<apsi::network::SenderOperation>& sender_op, bool wait_for_message);
 
             /**
             * Receive Get Parameters response from Sender

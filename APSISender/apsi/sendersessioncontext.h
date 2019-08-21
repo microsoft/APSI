@@ -27,10 +27,9 @@ namespace apsi
         friend class Sender;
 
         public:
-            SenderSessionContext(std::shared_ptr<seal::SEALContext> context, // const seal::PublicKey &pub_key, 
+            SenderSessionContext(std::shared_ptr<seal::SEALContext> context,
                 const seal::RelinKeys &relin_keys) : 
                 seal_context_(std::move(context)), 
-                // public_key_(pub_key), 
                 relin_keys_(relin_keys)
             {
 				seal::PublicKey dummyPk;  // todo: initialize this.

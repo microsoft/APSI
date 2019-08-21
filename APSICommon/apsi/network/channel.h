@@ -10,14 +10,9 @@
 
 // APSI
 #include "apsi/apsidefines.h"
-//#include "apsi/psiparams.h"
 #include "apsi/network/senderoperation.h"
 #include "apsi/network/senderoperationresponse.h"
 
-// SEAL
-//#include "seal/publickey.h"
-//#include "seal/relinkeys.h"
-//#include "seal/ciphertext.h"
 
 namespace apsi
 {
@@ -49,11 +44,8 @@ namespace apsi
 
             /**
             * Receive a Sender Operation.
-            *
-            * This call does not block if wait_for_message is false, if there
-            * is no operation pending it will immediately return false.
             */
-            virtual bool receive(std::shared_ptr<apsi::network::SenderOperation>& sender_op, bool wait_for_message = false) = 0;
+            virtual bool receive(std::shared_ptr<apsi::network::SenderOperation>& sender_op) = 0;
 
             /**
             * Receive Get Parameters response from Sender

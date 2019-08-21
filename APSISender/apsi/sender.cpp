@@ -222,7 +222,6 @@ void Sender::preprocess(vector<u8>& buff)
 }
 
 void Sender::query(
-    // const PublicKey& pub_key,
     const RelinKeys& relin_keys,
     const map<u64, vector<pair<seed128, string>>> query,
     const vector<u8>& client_id,
@@ -231,7 +230,7 @@ void Sender::query(
     STOPWATCH(sender_stop_watch, "Sender::query");
     Log::info("Start processing query");
 
-    SenderSessionContext session_context(seal_context_, /*pub_key, */ relin_keys);
+    SenderSessionContext session_context(seal_context_, relin_keys);
 
     /* Receive client's query data. */
     int num_of_powers = static_cast<int>(query.size());
