@@ -33,6 +33,103 @@ namespace apsi
         */
         class NetworkChannel : public Channel
         {
+        public:
+            /**
+            * Create an instance of a NetworkChannel
+            */
+            NetworkChannel();
+
+            /**
+            * Destroy an instance of a Channel
+            */
+            virtual ~NetworkChannel();
+
+            /**
+            * Bind the channel to the given connection point.
+            */
+            void bind(const std::string& connection_point);
+
+            /**
+            * Connect the channel to the given connection point
+            */
+            void connect(const std::string& connection_point);
+
+            /**
+            * Disconnect from the connection point
+            */
+            void disconnect();
+
+            /**
+            * Indicates whether the channel is connected to the network.
+            */
+            bool is_connected() const { return !end_point_.empty(); }
+
+            /**
+            * Receive a Sender Operation.
+            *
+            * This call does not block if wait_for_message is false, if there
+            * is no operation pending it will immediately return false.
+            */
+            virtual bool receive(std::shared_ptr<apsi::network::SenderOperation>& sender_op, bool wait_for_message = false);
+
+            /**
+            * Receive Get Parameters response from Sender
+            */
+            virtual void receive(apsi::network::SenderResponseGetParameters& response);
+
+            /**
+            * Receive item preprocessing response from Sender
+            */
+            virtual void receive(apsi::network::SenderResponsePreprocess& response);
+
+            /**
+            * Receive Query response from Sender
+            */
+            virtual void receive(apsi::network::SenderResponseQuery& response);
+
+            /**
+            Receive a ResultPackage structure
+            */
+            virtual void receive(apsi::ResultPackage& pkg);
+
+            /**
+            Send a request to Get Parameters from Sender
+            */
+            virtual void send_get_parameters();
+
+            /**
+            Send a response to a request to Get Parameters
+            */
+            virtual void send_get_parameters_response(const std::vector<apsi::u8>& client_id, const apsi::PSIParams& params);
+
+            /**
+            Send a request to Preprocess items on Sender
+            */
+            virtual void send_preprocess(const std::vector<apsi::u8>& buffer);
+
+            /**
+            * Send a response to a request to Preprocess items
+            */
+            virtual void send_preprocess_response(const std::vector<apsi::u8>& client_id, const std::vector<apsi::u8>& buffer);
+
+            /**
+            * Send a request for a Query response to Sender
+            */
+            virtual void send_query(
+                const seal::RelinKeys& relin_keys,
+                const std::map<apsi::u64, std::vector<SeededCiphertext>>& query,
+                const seed128 relin_key_seeds
+            );
+
+            /**
+            Send a response to a Query request
+            */
+            virtual void send_query_response(const std::vector<apsi::u8>& client_id, const size_t package_count);
+
+            /**
+            * Send a ResultPackage structure
+            */
+            virtual void send(const std::vector<apsi::u8>& client_id, const apsi::ResultPackage& pkg);
 
         protected:
             /**
@@ -46,9 +143,6 @@ namespace apsi
             virtual void set_socket_options(zmqpp::socket_t* socket) = 0;
 
         private:
-            u64 bytes_sent_;
-            u64 bytes_received_;
-
             std::unique_ptr<zmqpp::socket_t> socket_;
             std::string end_point_;
 
