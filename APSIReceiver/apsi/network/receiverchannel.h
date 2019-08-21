@@ -4,7 +4,7 @@
 #pragma once 
 
 // APSI
-#include "apsi/network/channel.h"
+#include "apsi/network/network_channel.h"
 
 namespace apsi
 {
@@ -13,7 +13,7 @@ namespace apsi
         /**
         Represents a network channel for a Receiver.
         */
-        class ReceiverChannel : public Channel
+        class ReceiverChannel : public NetworkChannel
         {
         public:
             ReceiverChannel() = default;
