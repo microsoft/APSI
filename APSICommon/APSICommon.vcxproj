@@ -154,9 +154,11 @@
     <ClInclude Include="apsi\item.h" />
     <ClInclude Include="apsi\logging\log.h" />
     <ClInclude Include="apsi\network\channel.h" />
+    <ClInclude Include="apsi\network\network_channel.h" />
     <ClInclude Include="apsi\Network\network_utils.h" />
     <ClInclude Include="apsi\network\senderoperation.h" />
     <ClInclude Include="apsi\network\senderoperationresponse.h" />
+    <ClInclude Include="apsi\network\stream_channel.h" />
     <ClInclude Include="apsi\psiparams.h" />
     <ClInclude Include="apsi\result_package.h" />
     <ClInclude Include="apsi\tools\aes.h" />
@@ -185,7 +187,9 @@
     <ClCompile Include="apsi\item.cpp" />
     <ClCompile Include="apsi\logging\log.cpp" />
     <ClCompile Include="apsi\network\channel.cpp" />
+    <ClCompile Include="apsi\network\network_channel.cpp" />
     <ClCompile Include="apsi\Network\network_utils.cpp" />
+    <ClCompile Include="apsi\network\stream_channel.cpp" />
     <ClCompile Include="apsi\tools\aes.cpp" />
     <ClCompile Include="apsi\tools\bigpoly.cpp" />
     <ClCompile Include="apsi\tools\blake2\blake2b.c" />

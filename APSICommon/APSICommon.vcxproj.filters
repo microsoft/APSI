@@ -138,6 +138,12 @@
     <ClInclude Include="apsi\tools\blake2\blake2-impl.h">
       <Filter>Header Files\Tools\blake2</Filter>
     </ClInclude>
+    <ClInclude Include="apsi\network\network_channel.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\network\stream_channel.h">
+      <Filter>Header Files\Network</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp">
@@ -193,6 +199,12 @@
     </ClCompile>
     <ClCompile Include="apsi\tools\blake2\blake2b.c">
       <Filter>Source Files\Tools\blake2</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\network\network_channel.cpp">
+      <Filter>Source Files\Network</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\network\stream_channel.cpp">
+      <Filter>Source Files\Network</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
