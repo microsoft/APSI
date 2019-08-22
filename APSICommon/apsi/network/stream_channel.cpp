@@ -1,6 +1,9 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.using System;
 
+// STD
+#include <mutex>
+
 // APSI
 #include "stream_channel.h"
 #include "network_utils.h"
@@ -13,7 +16,9 @@ using namespace seal;
 
 StreamChannel::StreamChannel(istream& istream, ostream& ostream)
     : istream_(istream),
-      ostream_(ostream)
+      ostream_(ostream),
+      receive_mutex_(make_unique<mutex>()),
+      send_mutex_(make_unique<mutex>())
 {
 }
 
@@ -243,6 +248,8 @@ void StreamChannel::send_query_response(const vector<u8>& client_id, const size_
 
 void StreamChannel::receive(apsi::ResultPackage& pkg)
 {
+    unique_lock<mutex> rec_lock(*receive_mutex_);
+
     istream_.read(reinterpret_cast<char*>(&pkg.batch_idx), sizeof(int));
     istream_.read(reinterpret_cast<char*>(&pkg.split_idx), sizeof(int));
     
@@ -254,6 +261,8 @@ void StreamChannel::receive(apsi::ResultPackage& pkg)
 
 void StreamChannel::send(const vector<u8>& client_id, const ResultPackage& pkg)
 {
+    unique_lock<mutex> snd_lock(*send_mutex_);
+
     // client_id is ignored
     ostream_.write(reinterpret_cast<const char*>(&pkg.batch_idx), sizeof(int));
     ostream_.write(reinterpret_cast<const char*>(&pkg.split_idx), sizeof(int));
@@ -353,7 +362,7 @@ shared_ptr<SenderOperation> StreamChannel::decode_query()
             string cipher;
             read_string(cipher);
 
-            power_entry.emplace_back(make_pair(seed, cipher));
+            power_entry[vecidx] = make_pair(seed, cipher);
         }
 
         query[power] = power_entry;

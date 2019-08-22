@@ -10,6 +10,11 @@
 // APSI
 #include "apsi/network/channel.h"
 
+namespace std
+{
+    class mutex;
+}
+
 namespace apsi
 {
     namespace network
@@ -103,6 +108,9 @@ namespace apsi
             std::ostream& ostream_;
 
         private:
+            std::unique_ptr<std::mutex> receive_mutex_;
+            std::unique_ptr<std::mutex> send_mutex_;
+
             /**
             Write operation type
             */
