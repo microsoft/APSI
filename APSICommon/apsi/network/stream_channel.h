@@ -22,6 +22,8 @@ namespace apsi
         class StreamChannel : public Channel
         {
         public:
+            StreamChannel() = delete;
+
             /**
             * Create an instance of StreamChannel using the given streams
             */
