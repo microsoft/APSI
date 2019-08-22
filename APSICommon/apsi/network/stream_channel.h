@@ -103,8 +103,43 @@ namespace apsi
             std::ostream& ostream_;
 
         private:
+            /**
+            Write operation type
+            */
             void write_operation_type(const SenderOperationType type);
+
+            /**
+            Read operation type
+            */
             SenderOperationType read_operation_type();
+
+            /**
+            Write a string
+            */
+            void write_string(const std::string& str);
+
+            /**
+            Read a string
+            */
+            void read_string(std::string& str);
+
+            /**
+            Decode a Get Parameters message
+            */
+            std::shared_ptr<apsi::network::SenderOperation>
+                decode_get_parameters();
+
+            /**
+            Decode a Preprocess message
+            */
+            std::shared_ptr<apsi::network::SenderOperation>
+                decode_preprocess();
+
+            /**
+            Decode a Query message
+            */
+            std::shared_ptr<apsi::network::SenderOperation>
+                decode_query();
         };
     }
 }

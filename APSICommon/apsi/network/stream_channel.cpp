@@ -23,7 +23,30 @@ StreamChannel::~StreamChannel()
 
 bool StreamChannel::receive(shared_ptr<SenderOperation>& sender_op)
 {
-    throw logic_error("For now, this method makes no sense for StreamChannel. It might in the future though so leaving it here.");
+    // Get the type
+    SenderOperationType type = read_operation_type();
+
+    switch (type)
+    {
+    case SOP_get_parameters:
+        sender_op = decode_get_parameters();
+        break;
+
+    case SOP_preprocess:
+        sender_op = decode_preprocess();
+        break;
+
+    case SOP_query:
+        sender_op = decode_query();
+        break;
+
+    default:
+        throw runtime_error("Invalid SenderOperationType");
+    }
+
+    bytes_received_ += sizeof(SenderOperationType);
+
+    return true;
 }
 
 void StreamChannel::receive(SenderResponseGetParameters& response)
@@ -59,7 +82,8 @@ void StreamChannel::receive(SenderResponseGetParameters& response)
 
 void StreamChannel::send_get_parameters()
 {
-    throw logic_error("For now, this method makes no sense for StreamChannel. It might in the future though so leaving it here.");
+    // We only need the type.
+    write_operation_type(SOP_get_parameters);
 }
 
 void StreamChannel::send_get_parameters_response(const vector<u8>& client_id, const PSIParams& params)
@@ -170,8 +194,7 @@ void StreamChannel::send_query(
 
     string str;
     get_string(str, relin_keys);
-    ostream_.write(str.data(), str.length());
-    bytes_sent_ += str.length();
+    write_string(str);
 
     size_t size = query.size();
     ostream_.write(reinterpret_cast<const char*>(&size), sizeof(size_t));
@@ -196,10 +219,8 @@ void StreamChannel::send_query(
             ostream_.write(reinterpret_cast<const char*>(&seed), sizeof(u64));
             bytes_sent_ += (sizeof(u64) * 2);
 
-            u64 startpos = ostream_.tellp();
-            seededcipher.second.save(ostream_);
-            u64 endpos = ostream_.tellp();
-            bytes_sent_ += endpos - startpos;
+            get_string(str, seededcipher.second);
+            write_string(str);
         }
     }
 
@@ -215,8 +236,33 @@ void StreamChannel::send_query_response(const vector<u8>& client_id, const size_
 {
     // client_id is ignored
     write_operation_type(SOP_query);
+
+    ostream_.write(reinterpret_cast<const char*>(&package_count), sizeof(size_t));
+    bytes_sent_ += sizeof(size_t);
 }
 
+void StreamChannel::receive(apsi::ResultPackage& pkg)
+{
+    istream_.read(reinterpret_cast<char*>(&pkg.batch_idx), sizeof(int));
+    istream_.read(reinterpret_cast<char*>(&pkg.split_idx), sizeof(int));
+    
+    read_string(pkg.data);
+    read_string(pkg.label_data);
+
+    bytes_received_ += (sizeof(int) * 2);
+}
+
+void StreamChannel::send(const vector<u8>& client_id, const ResultPackage& pkg)
+{
+    // client_id is ignored
+    ostream_.write(reinterpret_cast<const char*>(&pkg.batch_idx), sizeof(int));
+    ostream_.write(reinterpret_cast<const char*>(&pkg.split_idx), sizeof(int));
+
+    write_string(pkg.data);
+    write_string(pkg.label_data);
+
+    bytes_sent_ += (sizeof(int) * 2);
+}
 
 void StreamChannel::write_operation_type(const SenderOperationType type)
 {
@@ -231,4 +277,92 @@ SenderOperationType StreamChannel::read_operation_type()
     bytes_received_ += sizeof(SenderOperationType);
 
     return type;
+}
+
+
+void StreamChannel::write_string(const std::string& str)
+{
+    size_t size = str.length();
+    ostream_.write(reinterpret_cast<const char*>(&size), sizeof(size_t));
+    ostream_.write(str.data(), size);
+
+    bytes_sent_ += sizeof(size_t);
+    bytes_sent_ += size;
+}
+
+void StreamChannel::read_string(std::string& str)
+{
+    size_t size;
+    istream_.read(reinterpret_cast<char*>(&size), sizeof(size_t));
+
+    str.resize(size);
+    istream_.read(str.data(), size);
+
+    bytes_received_ += sizeof(size_t);
+    bytes_received_ += size;
+}
+
+shared_ptr<SenderOperation> StreamChannel::decode_get_parameters()
+{
+    // Nothing to decode
+    return make_shared<SenderOperationGetParameters>();
+}
+
+shared_ptr<SenderOperation> StreamChannel::decode_preprocess()
+{
+    vector<u8> buffer;
+    size_t size;
+    istream_.read(reinterpret_cast<char*>(&size), sizeof(size_t));
+    
+    buffer.resize(size);
+    istream_.read(reinterpret_cast<char*>(buffer.data()), size);
+
+    return make_shared<SenderOperationPreprocess>(move(buffer));
+}
+
+shared_ptr<SenderOperation> StreamChannel::decode_query()
+{
+    string relin_keys;
+    read_string(relin_keys);
+
+    size_t qsize;
+    istream_.read(reinterpret_cast<char*>(&qsize), sizeof(size_t));
+    bytes_received_ += sizeof(size_t);
+
+    map<u64, vector<pair<seed128, string>>> query;
+
+    for (size_t qidx = 0; qidx < qsize; qidx++)
+    {
+        u64 power;
+        size_t vecsize;
+
+        istream_.read(reinterpret_cast<char*>(&power), sizeof(u64));
+        istream_.read(reinterpret_cast<char*>(&vecsize), sizeof(size_t));
+        bytes_received_ += sizeof(u64);
+        bytes_received_ += sizeof(size_t);
+
+        vector<pair<seed128, string>> power_entry(vecsize);
+
+        for (size_t vecidx = 0; vecidx < vecsize; vecidx++)
+        {
+            seed128 seed;
+            istream_.read(reinterpret_cast<char*>(&seed.first), sizeof(u64));
+            istream_.read(reinterpret_cast<char*>(&seed.second), sizeof(u64));
+            bytes_received_ += (sizeof(u64) * 2);
+
+            string cipher;
+            read_string(cipher);
+
+            power_entry.emplace_back(make_pair(seed, cipher));
+        }
+
+        query[power] = power_entry;
+    }
+
+    seed128 relin_seeds;
+    istream_.read(reinterpret_cast<char*>(&relin_seeds.first), sizeof(u64));
+    istream_.read(reinterpret_cast<char*>(&relin_seeds.second), sizeof(u64));
+    bytes_received_ += (sizeof(u64) * 2);
+
+    return make_shared<SenderOperationQuery>(relin_keys, move(query), relin_seeds);
 }

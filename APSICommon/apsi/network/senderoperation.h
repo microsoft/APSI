@@ -35,6 +35,9 @@ namespace apsi
         {
         public:
             SenderOperation() = delete;
+            SenderOperation(SenderOperationType type)
+                : type(type)
+            {}
             SenderOperation(SenderOperationType type, std::vector<apsi::u8>&& clt_id)
                 : type(type),
                   client_id(clt_id)
@@ -59,6 +62,9 @@ namespace apsi
         class SenderOperationGetParameters : public SenderOperation
         {
         public:
+            SenderOperationGetParameters()
+                : SenderOperation(SOP_get_parameters)
+            {}
             SenderOperationGetParameters(std::vector<apsi::u8>&& client_id)
                 : SenderOperation(SOP_get_parameters, std::move(client_id))
             {}
@@ -73,6 +79,10 @@ namespace apsi
         {
         public:
             SenderOperationPreprocess() = delete;
+            SenderOperationPreprocess(std::vector<apsi::u8>&& buff)
+                : SenderOperation(SOP_preprocess),
+                  buffer(buff)
+            {}
             SenderOperationPreprocess(std::vector<apsi::u8>&& client_id, std::vector<apsi::u8>&& buff)
                 : SenderOperation(SOP_preprocess, std::move(client_id)),
                   buffer(buff)
@@ -93,9 +103,13 @@ namespace apsi
         {
         public:
             SenderOperationQuery() = delete;
-            SenderOperationQuery(std::vector<apsi::u8>&& client_id, /*const std::string& pub, */const std::string& relin, std::map<apsi::u64, std::vector<std::pair<seed128, std::string> > >&& queryp, seed128 relin_seeds)
+            SenderOperationQuery(const std::string& relin, std::map<apsi::u64, std::vector<std::pair<seed128, std::string> > >&& queryp, seed128 relin_seeds)
+                : SenderOperation(SOP_query),
+                  query(queryp),
+                  relin_keys_seeds(relin_seeds)
+            {}
+            SenderOperationQuery(std::vector<apsi::u8>&& client_id, const std::string& relin, std::map<apsi::u64, std::vector<std::pair<seed128, std::string> > >&& queryp, seed128 relin_seeds)
                 : SenderOperation(SOP_query, std::move(client_id)),
-                  // public_key(pub),
                   relin_keys(relin),
                   query(queryp),
                   relin_keys_seeds(relin_seeds)
