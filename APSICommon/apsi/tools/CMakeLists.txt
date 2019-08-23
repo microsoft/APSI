@@ -6,6 +6,7 @@ target_sources(apsi_common
 		${CMAKE_CURRENT_LIST_DIR}/aes.cpp
 		${CMAKE_CURRENT_LIST_DIR}/bigpoly.cpp
 		${CMAKE_CURRENT_LIST_DIR}/csvreader.cpp
+		${CMAKE_CURRENT_LIST_DIR}/defaultparams.cpp
 		${CMAKE_CURRENT_LIST_DIR}/fourq.cpp
 		${CMAKE_CURRENT_LIST_DIR}/interpolate.cpp
 		${CMAKE_CURRENT_LIST_DIR}/prng.cpp
@@ -21,6 +22,7 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/aes.h
         ${CMAKE_CURRENT_LIST_DIR}/bigpoly.h
         ${CMAKE_CURRENT_LIST_DIR}/csvreader.h
+		${CMAKE_CURRENT_LIST_DIR}/defaultparams.h
         ${CMAKE_CURRENT_LIST_DIR}/fourq.h
         ${CMAKE_CURRENT_LIST_DIR}/interpolate.h
         ${CMAKE_CURRENT_LIST_DIR}/matrix.h
