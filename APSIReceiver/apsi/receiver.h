@@ -44,16 +44,42 @@ namespace apsi
                 const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::Global());
 
             /**
-            Sends a query to the remote sender, and get the intersection result. The query is a vector of items, and the result
+            Get the query that should be sent to a remote sender, and get the intersection result. The query is a vector of items, and the result
             is a same-size vector of bool values. If an item is in the intersection, the corresponding bool value is true on the
             same position in the result vector .
             */
-            std::pair<std::vector<bool>, Matrix<u8>> query(std::vector<Item> &items, apsi::network::Channel& chl);
+            std::map<std::uint64_t, std::vector<apsi::SeededCiphertext>>& query(std::vector<Item> &items);
+
+            /**
+            Decrypt the result of a query to a remote sender and get the intersection result. The query is a vector of items, and the result
+            is a same-size vector of bool values. If an item is in the intersection, the corresponding bool value is true on the
+            same position in the result vector
+            */
+            std::pair<std::vector<bool>, Matrix<u8>> decrypt_result(std::vector<Item>& items, apsi::network::Channel& chl);
+
+            /**
+            Perform a full query.
+            The query is a vector of items, and the result is a same-size vector of bool values. If an item is in the intersection, the
+            corresponding bool value is true on the same position in the result vector.
+            */
+            std::pair<std::vector<bool>, Matrix<u8>> query(std::vector<Item>& items, apsi::network::Channel& chl);
+
+            /**
+            Obfuscates the items and initializes the given vector with the buffer that must be sent to the Sender for OPRF
+            processing.
+            */
+            void obfuscate_items(std::vector<Item>& items, std::vector<u8>& items_buffer);
+
+            /**
+            Process obfuscated items received from Sender.
+            Remove the Receiver obfuscation so only the Sender obfuscation remains.
+            */
+            void deobfuscate_items(std::vector<Item>& items, std::vector<u8>& items_buffer);
 
             /**
             Perform a handshake between the Sender and this Receiver.
             Sender will send configuration parameters that the Receiver will use to configure itself.
-            A handshake needs to be performed before any query call.
+            A handshake needs to be performed before any full query call. Otherwise, default parameters will be used.
             */
             void handshake(apsi::network::Channel& channel);
 
@@ -70,6 +96,14 @@ namespace apsi
                 return *params_.get();
             }
 
+            /**
+            Get the relinearization keys
+            */
+            const seal::RelinKeys& relin_keys() const
+            {
+                return relin_keys_;
+            }
+
         private:
             /**
             Preprocesses the PSI items. Returns the power map of the items, and the indices of them in the hash table.
@@ -77,7 +111,7 @@ namespace apsi
             std::pair<
                 std::map<std::uint64_t, std::vector<SeededCiphertext>>,
                 std::unique_ptr<cuckoo::CuckooTable>
-            > preprocess(std::vector<Item> &items, apsi::network::Channel& channel);
+            > preprocess(std::vector<Item> &items);
 
             /**
             Hash all items in the input vector into a cuckoo hashing table.
@@ -165,11 +199,6 @@ namespace apsi
                 return public_key_;
             }
 
-            const seal::RelinKeys &relin_keys() const
-            {
-                return relin_keys_;
-            }
-
             const seal::SecretKey& secret_key() const
             {
                 return secret_key_;
@@ -204,11 +233,17 @@ namespace apsi
             // Objects for compressed ciphertexts
             std::unique_ptr<CiphertextCompressor> compressor_;
 
+            // Preprocess result
+            std::pair<
+                std::map<std::uint64_t, std::vector<apsi::SeededCiphertext>>,
+                std::unique_ptr<cuckoo::CuckooTable>
+            > preprocess_result_;
+
+            // For OPRF deobfuscation
+            std::vector<std::vector<apsi::u64>> mult_factor_;
 
             // seed for generating (the a part) of the relin keys. 
             seed128 relin_keys_seeds_; 
-
-
         };
     }
 }

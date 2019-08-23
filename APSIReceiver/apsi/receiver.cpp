@@ -105,26 +105,32 @@ void Receiver::initialize()
     Log::info("Receiver initialized");
 }
 
-std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Channel& chl)
+map<uint64_t, vector<SeededCiphertext>>& Receiver::query(vector<Item>& items)
 {
     STOPWATCH(recv_stop_watch, "Receiver::query");
     Log::info("Receiver starting query");
-	if (items.size() > 10) {
-		throw runtime_error("more than 10 queries is not supported"); 
-	}
+    if (items.size() > 10) {
+        throw runtime_error("more than 10 queries is not supported");
+    }
 
     if (nullptr == params_)
     {
         // Default values
         params_ = make_unique<PSIParams>(default_psi_params(default_sender_set_size));
+
+        // Once we have parameters, initialize receiver
+        initialize();
     }
 
-    auto qq = preprocess(items, chl);
-    auto& ciphertexts = qq.first;
-    auto& cuckoo = *qq.second;
+    preprocess_result_ = preprocess(items);
+    auto& ciphertexts = preprocess_result_.first;
 
-    chl.send_query(relin_keys_, ciphertexts, relin_keys_seeds_);
+    return ciphertexts;
+}
 
+pair<vector<bool>, Matrix<u8>> Receiver::decrypt_result(vector<Item>& items, Channel& chl)
+{
+    auto& cuckoo = *preprocess_result_.second;
     auto table_to_input_map = cuckoo_indices(items, cuckoo);
 
     /* Receive results */
@@ -140,6 +146,102 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Ch
     Log::info("Receiver completed query");
 
     return intersection;
+}
+
+pair<vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Channel& chl)
+{
+    STOPWATCH(recv_stop_watch, "Receiver::query_full");
+    Log::info("Receiver starting full query");
+
+    // OPRF
+    if (get_params().use_oprf())
+    {
+        STOPWATCH(recv_stop_watch, "Receiver::OPRF");
+        Log::info("OPRF processing");
+
+        vector<u8> items_buffer;
+        obfuscate_items(items, items_buffer);
+
+        // Send obfuscated buffer to Sender
+        chl.send_preprocess(items_buffer);
+
+        // Get response and remove our obfuscation
+        SenderResponsePreprocess preprocess_resp;
+        chl.receive(preprocess_resp);
+
+        deobfuscate_items(items, preprocess_resp.buffer);
+    }
+    
+    // Then get encrypted query
+    auto& encrypted_query = query(items);
+
+    // Send encrypted query
+    chl.send_query(relin_keys_, encrypted_query, relin_keys_seeds_);
+
+    // Decrypt result
+    return decrypt_result(items, chl);
+}
+
+void Receiver::obfuscate_items(std::vector<Item>& items, std::vector<u8>& items_buffer)
+{
+    Log::info("Obfuscating items");
+
+    PRNG prng(zero_block);
+    FourQCoordinate x;
+
+    mult_factor_.clear();
+    mult_factor_.reserve(items.size());
+
+    auto step = FourQCoordinate::byte_count();
+    items_buffer.resize(items.size() * step);
+    auto iter = items_buffer.data();
+
+    for (u64 i = 0; i < items.size(); i++)
+    {
+        x.random(prng);
+        mult_factor_.emplace_back(x.data(), x.data() + FourQCoordinate::word_count());
+
+        PRNG pp(items[i], /* buffer_size */ 8);
+
+        x.random(pp);
+        x.multiply_mod_order(mult_factor_[i].data());
+        x.to_buffer(iter);
+
+        iter += step;
+    }
+
+    // compute 1/b so that we can compute (x^ba)^(1/b) = x^a
+    for (u64 i = 0; i < items.size(); ++i)
+    {
+        FourQCoordinate inv(mult_factor_[i].data());
+        inv.inversion_mod_order();
+        mult_factor_[i] = vector<u64>(inv.data(), inv.data() + FourQCoordinate::word_count());
+    }
+}
+
+void Receiver::deobfuscate_items(std::vector<Item>& items, std::vector<u8>& items_buffer)
+{
+    Log::info("Deobfuscating items");
+
+    auto step = FourQCoordinate::byte_count();
+    auto iter = items_buffer.data();
+    FourQCoordinate x;
+
+    for (u64 i = 0; i < items.size(); i++)
+    {
+        x.from_buffer(iter);
+        x.multiply_mod_order(mult_factor_[i].data());
+        x.to_buffer(iter);
+
+        // Compress with BLAKE2b
+        blake2(
+            reinterpret_cast<uint8_t*>(items[i].data()),
+            sizeof(items[i].get_value()),
+            reinterpret_cast<const uint8_t*>(iter), step,
+            nullptr, 0);
+
+        iter += step;
+    }
 }
 
 void Receiver::handshake(Channel& chl)
@@ -206,72 +308,10 @@ void Receiver::handshake(Channel& chl)
 pair<
     map<uint64_t, vector<SeededCiphertext> >,
     unique_ptr<CuckooTable> >
-    Receiver::preprocess(vector<Item> &items, Channel &channel)
+    Receiver::preprocess(vector<Item> &items)
 {
     STOPWATCH(recv_stop_watch, "Receiver::preprocess");
     Log::info("Receiver preprocess start");
-
-    if (get_params().use_oprf())
-    {
-		Log::info("receiver preprocessing uses oprf"); 
-        PRNG prng(zero_block);
-        vector<vector<u64>> b;
-        b.reserve(items.size());
-        FourQCoordinate x;
-
-        auto step = FourQCoordinate::byte_count();
-        vector<u8> buff(items.size() * step);
-        auto iter = buff.data();
-
-        for (u64 i = 0; i < items.size(); i++)
-        {
-            x.random(prng);
-            b.emplace_back(x.data(), x.data() + FourQCoordinate::word_count());
-
-            PRNG pp(items[i], /* buffer_size */ 8);
-
-            x.random(pp);
-            x.multiply_mod_order(b[i].data());
-            x.to_buffer(iter);
-
-            iter += step;
-        }
-
-        // send the data over the network and prep for the response.
-        channel.send_preprocess(buff);
-
-        // compute 1/b so that we can compute (x^ba)^(1/b) = x^a
-        for (u64 i = 0; i < items.size(); ++i)
-        {
-            FourQCoordinate inv(b[i].data());
-            inv.inversion_mod_order();
-            b[i] = vector<u64>(inv.data(), inv.data() + FourQCoordinate::word_count());
-        }
-
-        // Now we can receive response from Sender
-        SenderResponsePreprocess sender_preproc;
-        {
-            STOPWATCH(recv_stop_watch, "Receiver::preprocess::wait_response");
-            channel.receive(sender_preproc);
-        }
-
-        iter = sender_preproc.buffer.data();
-        for (u64 i = 0; i < items.size(); i++)
-        {
-            x.from_buffer(iter);
-            x.multiply_mod_order(b[i].data());
-            x.to_buffer(iter);
-
-            // Compress with BLAKE2b
-            blake2(
-                reinterpret_cast<uint8_t*>(items[i].data()),
-                sizeof(items[i].get_value()),
-                reinterpret_cast<const uint8_t*>(iter), step,
-                nullptr, 0);
-
-            iter += step;
-        }
-    }
 
 	// find the item length 
     unique_ptr<CuckooTable> cuckoo = cuckoo_hashing(items);
