@@ -42,4 +42,6 @@ namespace apsi
     extern const block one_block;
     extern const block all_one_block;
     extern const block cc_block;
+
+    extern const apsi::u64 default_sender_set_size;
 }

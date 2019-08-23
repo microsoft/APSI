@@ -2,7 +2,6 @@
 // Licensed under the MIT license.using System;
 
 #pragma once
-#pragma once
 
 // STD
 #include <vector>

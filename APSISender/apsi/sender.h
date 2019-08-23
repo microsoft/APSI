@@ -88,6 +88,10 @@ namespace apsi
                 int session_thread_count,
                 const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::Global());
 
+            Sender(int total_thread_count,
+                   int session_thread_count,
+                   const seal::MemoryPoolHandle& pool = seal::MemoryPoolHandle::Global());
+
             /**
             Clears data in sender's database.
             */

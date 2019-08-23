@@ -11,4 +11,6 @@ namespace apsi
     const block one_block     = _mm_set_epi64x(0, 1);
     const block all_one_block = _mm_set_epi64x(0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF);
     const block cc_block      = _mm_set_epi64x(0xCCCCCCCCCCCCCCCC, 0xCCCCCCCCCCCCCCCC);
+
+    const u64 default_sender_set_size = 65536;
 }

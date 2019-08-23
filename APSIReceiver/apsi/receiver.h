@@ -15,6 +15,7 @@
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/tools/sealcompress.h"
 #include "apsi/tools/matrix.h"
+#include "apsi/tools/defaultparams.h"
 #include "apsi/network/channel.h"
 
 // Cuckoo
@@ -62,7 +63,9 @@ namespace apsi
             const PSIParams& get_params() const
             {
                 if (nullptr == params_.get())
+                {
                     throw new std::logic_error("PSIParams have not been initialized");
+                }
 
                 return *params_.get();
             }

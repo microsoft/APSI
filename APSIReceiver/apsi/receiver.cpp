@@ -115,9 +115,8 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Ch
 
     if (nullptr == params_)
     {
-        string msg = "Handshake has not been performed.";
-        Log::error(msg.c_str());
-        throw runtime_error(msg);
+        // Default values
+        params_ = make_unique<PSIParams>(default_psi_params(default_sender_set_size));
     }
 
     auto qq = preprocess(items, chl);
