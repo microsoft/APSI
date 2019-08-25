@@ -141,7 +141,7 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
     {
 
         vector<cuckoo::LocFunc> normal_loc_func;
-        for (int i = 0; i < params_.hash_func_count(); i++)
+        for (unsigned i = 0; i < params_.hash_func_count(); i++)
         {
             normal_loc_func.emplace_back(cuckoo::LocFunc(
                 params_.log_table_size(),
@@ -205,18 +205,18 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
     FourQCoordinate key(pp);
 
     vector<cuckoo::LocFunc> normal_loc_func;
-    for (int i = 0; i < params_.hash_func_count(); i++)
+    for (unsigned i = 0; i < params_.hash_func_count(); i++)
     {
         normal_loc_func.emplace_back(
             params_.log_table_size(),
             cuckoo::make_item(params_.hash_func_seed() + i, 0));
     }
 
-    map<int, int> bin_counting_map;
-    for (int i = 0; i < params_.table_size(); i++) {
+    map<u64, u64> bin_counting_map;
+    for (unsigned i = 0; i < params_.table_size(); i++) {
         bin_counting_map[i] = 0;
     }
-    int maxload = 0; 
+    u64 maxload = 0; 
     
 
 
@@ -249,14 +249,14 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
 		// Set keys and skip
         auto cuckoo_item = cuckoo::make_item(data[i].get_value());
         // Set keys and skip
-        for (int j = 0; j < params_.hash_func_count(); j++) {
+        for (unsigned j = 0; j < params_.hash_func_count(); j++) {
             locs[j] = normal_loc_func[j](cuckoo_item);
             //locs[1] = normal_loc_func[1].location(data[i]);
             //locs[2] = normal_loc_func[2].location(data[i]);
             keys[j] = data[i]; 
             skip[j] = false;
             if (j > 0) { // check if same. 
-                for (int k = 0; k < j; k++) {
+                for (unsigned k = 0; k < j; k++) {
                     if (locs[j] == locs[k]) {
                         skip[j] = true; 
                         break; 
@@ -273,6 +273,7 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
             if (bin_counting_map[locs[j]] > maxload) {
                 maxload = bin_counting_map[locs[j]]; 
             }
+
             if (skip[j] == false)
             {
 
@@ -311,7 +312,7 @@ std::pair<DBBlock*, DBBlock::Position>
     auto s_idx = prng.get<u32>() % db_blocks_.stride();
     for (int i = 0; i < db_blocks_.stride(); ++i)
     {
-        auto pos = db_blocks_(batch_idx, s_idx)->try_aquire_position(batch_offset, prng);
+        auto pos = db_blocks_(batch_idx, s_idx)->try_aquire_position(static_cast<int>(batch_offset), prng);
         if (pos.is_initialized())
         {
             return { db_blocks_(batch_idx, s_idx) , pos };
