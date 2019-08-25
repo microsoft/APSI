@@ -75,12 +75,9 @@ void Receiver::initialize()
     compressor_ = make_unique<CiphertextCompressor>(seal_context_, 
         dummy_evaluator, pool_);
 
-    //auto key_material = generator.relin_keys_seeds_out(get_params().decomposition_bit_count()); 
-    //relin_keys_seeds_ = key_material.first;
-    //relin_keys_ = key_material.second;
-
-    relin_keys_seeds_ = { 1,1 };
-    relin_keys_ = generator.relin_keys_with_seeds(get_params().decomposition_bit_count(), relin_keys_seeds_);
+    auto key_material = generator.relin_keys_seeds_out(get_params().decomposition_bit_count()); 
+    relin_keys_seeds_ = key_material.first;
+    relin_keys_ = key_material.second;
 
     for (auto &a : relin_keys_.data())
     {
@@ -495,9 +492,7 @@ void Receiver::encrypt(const FFieldArray &input, vector<SeededCiphertext> &desti
         seed128 seeds_placeholder;
         destination.push_back({seeds_placeholder,  Ciphertext(seal_context_, pool_)});
 
-        //seed128 seeds = encryptor_->encrypt_sk_seeds_out(plain, destination.back().second, secret_key_,  pool_);
-        seed128 seeds = { 1, 1 };
-        encryptor_->encrypt_sk(plain, destination.back().second, secret_key_, seeds, pool_);
+        seed128 seeds = encryptor_->encrypt_sk_seeds_out(plain, destination.back().second, secret_key_,  pool_);
 
         destination.back().first = seeds;
         Log::debug("Seeds = %i, %i", seeds.first, seeds.second);
