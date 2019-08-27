@@ -30,7 +30,7 @@ const PSIParams apsi::tools::default_psi_params(
         psiconf_params.sender_size = sender_set_size;
 
         // Whether to use an OPRF
-        psiconf_params.use_oprf = false;
+        psiconf_params.use_oprf = true;
 
         // Whether to use labels
         psiconf_params.use_labels = false;
@@ -80,7 +80,6 @@ const PSIParams apsi::tools::default_psi_params(
         vector<SmallModulus> coeff_modulus;
         coeff_modulus = DefaultParams::coeff_modulus_128(seal_params.encryption_params.poly_modulus_degree());
         seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
-        //seal_params.encryption_params.set_plain_modulus(0x13ff);
         seal_params.encryption_params.set_plain_modulus(40961);
         seal_params.decomposition_bit_count = 30;
     }

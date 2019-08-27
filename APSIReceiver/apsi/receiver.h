@@ -104,6 +104,14 @@ namespace apsi
                 return relin_keys_;
             }
 
+            /**
+            Get the relinearization keys seeds
+            */
+            const apsi::seed128 relin_keys_seeds() const
+            {
+                return relin_keys_seeds_;
+            }
+
         private:
             /**
             Preprocesses the PSI items. Returns the power map of the items, and the indices of them in the hash table.

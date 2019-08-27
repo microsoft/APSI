@@ -377,7 +377,6 @@ unique_ptr<CuckooTable> Receiver::cuckoo_hashing(const vector<Item> &items)
     return cuckoo;
 }
 
-
 vector<int> Receiver::cuckoo_indices(
     const vector<Item> &items,
     cuckoo::CuckooTable &cuckoo)
@@ -468,7 +467,7 @@ void Receiver::encrypt(map<uint64_t, FFieldArray> &input, map<uint64_t, vector<S
         encrypt(it->second, destination[it->first]);
         count += (it->second.size() + static_cast<size_t>(slot_count_) - 1) / static_cast<size_t>(slot_count_); 
     }
-    Log::info("receiver sending %i ciphertexts", count); 
+    Log::debug("Receiver sending %i ciphertexts", count); 
 }
 
 void Receiver::encrypt(const FFieldArray &input, vector<SeededCiphertext> &destination)
@@ -497,7 +496,7 @@ void Receiver::encrypt(const FFieldArray &input, vector<SeededCiphertext> &desti
         destination.back().first = seeds;
         Log::debug("Seeds = %i, %i", seeds.first, seeds.second);
         // debug 
-        // note: this is not doing the setting to zero yet. s
+        // note: this is not doing the setting to zero yet.
         Log::debug("Fresh encryption noise budget = %i", decryptor_->invariant_noise_budget(destination.back().second)); 
         seal::util::set_zero_poly(destination.back().second.poly_modulus_degree(), destination.back().second.coeff_mod_count(), destination.back().second.data(1));
         //Log::info("cipher after setting to zero : ");
