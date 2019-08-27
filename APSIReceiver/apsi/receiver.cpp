@@ -109,9 +109,6 @@ map<uint64_t, vector<SeededCiphertext>>& Receiver::query(vector<Item>& items)
 {
     STOPWATCH(recv_stop_watch, "Receiver::query");
     Log::info("Receiver starting query");
-    if (items.size() > 10) {
-        throw runtime_error("more than 10 queries is not supported");
-    }
 
     if (nullptr == params_)
     {

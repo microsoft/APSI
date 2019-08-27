@@ -69,15 +69,12 @@ SenderDB::SenderDB(const PSIParams &params,
 
     // debugging 
     int num_ctxts = params_.batch_count() * params_.sender_bin_size(); 
-	if (params_.sender_size() > pow(2, 16)) {
-		throw runtime_error("sender size must be bounded by 65536."); 
-	}
-    Log::info("sender size = %i", params_.sender_size());
-    Log::info("table size = %i", params_.table_size());
-    Log::info("sender bin size = %i", params_.sender_bin_size());
-    Log::info("split size = %i", split_size); 
-    Log::info("number of ciphertexts in senderdb = %i", num_ctxts);
-	Log::info("number of hash functions = %i", params_.hash_func_count());
+    Log::debug("sender size = %i", params_.sender_size());
+    Log::debug("table size = %i", params_.table_size());
+    Log::debug("sender bin size = %i", params_.sender_bin_size());
+    Log::debug("split size = %i", split_size); 
+    Log::debug("number of ciphertexts in senderdb = %i", num_ctxts);
+	Log::debug("number of hash functions = %i", params_.hash_func_count());
     int byte_length = static_cast<int>(round_up_to(params_.get_label_bit_count(), 8) / 8);
     int nb = params_.batch_count();
     int ns = params_.split_count();
