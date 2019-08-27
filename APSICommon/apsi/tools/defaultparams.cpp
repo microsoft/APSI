@@ -26,6 +26,9 @@ const PSIParams apsi::tools::default_psi_params(
         // Length of items
         psiconf_params.item_bit_count = 60;
 
+        // Item bit length used after OPRF
+        psiconf_params.item_bit_length_used_after_oprf = 120;
+
         // Size of the Sender's DB
         psiconf_params.sender_size = sender_set_size;
 
@@ -35,6 +38,10 @@ const PSIParams apsi::tools::default_psi_params(
         // Whether to use labels
         psiconf_params.use_labels = false;
 
+        // Number of chunks per item
+        psiconf_params.num_chunks = 1;
+
+        // Sender bin size of 0 means it will be computed
         psiconf_params.sender_bin_size = 0; 
 
         Log::info("sender bin size default value = %i", psiconf_params.sender_bin_size);
@@ -63,7 +70,7 @@ const PSIParams apsi::tools::default_psi_params(
 
         // Number of splits to use
         // Larger means lower depth but bigger S-->R communication
-        table_params.split_count =  27;
+        table_params.split_count =  128;
 
         // Negative log failure probability for simple hashing
         table_params.binning_sec_level = 40;
