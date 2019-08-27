@@ -10,7 +10,7 @@ if (DEFINED MSVC)
 endif()
 
 # Executable will be in ../bin
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/../bin)
 
 # Create executable but add no source files yet
 add_executable(unit_tests "")
@@ -44,13 +44,10 @@ if(NOT TARGET apsi_receiver)
 endif()
 
 # Import SEAL
-find_package(SEAL 3.2.0 REQUIRED)
+find_package(SEAL 3.2.1 REQUIRED)
 
 # Import Cuckoo
 find_package(Cuckoo 1.1.0 REQUIRED)
-
-# Import Flint
-find_package(Flint MODULE REQUIRED)
 
 # Import ZeroMQ
 find_package(ZeroMQ MODULE REQUIRED)
@@ -64,19 +61,13 @@ find_package(FourQ MODULE REQUIRED)
 # Import Log4cplus
 find_package(Log4cplus MODULE REQUIRED)
 
-# Import Boost
-find_package(Boost 1.67 REQUIRED)
-
-# Import GMP
-find_package(GMP REQUIRED)
-
 # Only build GTest
 option(BUILD_GMOCK OFF)
 option(INSTALL_GTEST OFF)
 mark_as_advanced(BUILD_GMOCK INSTALL_GTEST)
 
 # Add GTest
-set(GTEST_DIR "thirdparty/googletest")
+set(GTEST_DIR "${CMAKE_CURRENT_LIST_DIR}/thirdparty/googletest")
 if(NOT EXISTS ${GTEST_DIR}/CMakeLists.txt)
     message(FATAL_ERROR "Could not find `${GTEST_DIR}/CMakeLists.txt`. Run `git submodule update --init` and retry.")
 endif()

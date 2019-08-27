@@ -25,6 +25,9 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
+# For extra modules
+list(APPEND CMAKE_MODULE_PATH ${int_tests_SOURCE_DIR}/../cmake)
+
 # Import APSICommon
 find_package(APSICommon 1.0.0 EXACT REQUIRED)
 
@@ -35,36 +38,13 @@ find_package(APSISender 1.0.0 EXACT REQUIRED)
 find_package(APSIReceiver 1.0.0 EXACT REQUIRED)
 
 # Import SEAL
-find_package(SEAL 3.2.0 REQUIRED)
+find_package(SEAL 3.2.1 REQUIRED)
 
 # Import Cuckoo
-find_package(Cuckoo 1.0 REQUIRED)
+find_package(Cuckoo 1.1.0 REQUIRED)
 
-# Import FLINT library
-find_path(FLINT_DIR NAMES flint/fmpz.h)
-if (NOT FLINT_DIR)
-    message(FATAL_ERROR "Could not find FLINT library")
-else()
-    message(STATUS "Flint directory: ${FLINT_DIR}")
-endif()
-
-# Log4cplus
-find_path(LOG4CPLUS_DIR log4cplus/logger.h)
-find_library(LOG4CPLUS log4cplus)
-if (NOT LOG4CPLUS_DIR OR NOT LOG4CPLUS)
-    message(FATAL_ERROR "Could not find log4cplus library")
-else()
-    message(STATUS "log4cplus directory: ${LOG4CPLUS_DIR}")
-    message(STATUS "Found log4cplus: ${LOG4CPLUS}")
-endif()
-
-# CryptoPP
-find_library(CRYPTOPP cryptopp)
-if (NOT CRYPTOPP)
-    message(FATAL_ERROR "Could not find cryptopp library")
-else()
-    message(STATUS "Found cryptopp: ${CRYPTOPP}")
-endif()
+# Import Log4cplus
+find_package(Log4cplus MODULE REQUIRED)
 
 # Google Test
 find_path(GTEST_DIR gtest/gtest.h)
@@ -81,10 +61,10 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 
 # Includes
-target_include_directories(int_tests PRIVATE
-    ${FLINT_DIR}/flint
-    ${LOG4CPLUS_DIR}
-)
+#target_include_directories(int_tests PRIVATE
+#    ${FLINT_DIR}/flint
+#    ${LOG4CPLUS_DIR}
+#)
 
 # C++17
 target_compile_features(int_tests PUBLIC cxx_std_17)
@@ -94,8 +74,6 @@ target_link_libraries(int_tests
     APSICommon::apsi_common
     APSISender::apsi_sender
     APSIReceiver::apsi_receiver
-    ${LOG4CPLUS}
-    ${CRYPTOPP}
     ${GTEST}
 )
 

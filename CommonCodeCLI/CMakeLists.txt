@@ -10,7 +10,7 @@ if (DEFINED MSVC)
 endif()
 
 # Library will be in ../lib
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/../lib)
 
 # Create library
 add_library(common_code STATIC common_utils.cpp)

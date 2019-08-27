@@ -10,7 +10,7 @@ if (DEFINED MSVC)
 endif()
 
 # Library will be in ../lib
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/../lib)
 
 # Create library but add no source files yet
 add_library(apsi_sender STATIC "")
