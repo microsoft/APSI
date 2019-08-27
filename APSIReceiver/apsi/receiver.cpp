@@ -401,6 +401,8 @@ vector<int> Receiver::cuckoo_indices(
     {
         auto cuckoo_item = make_item(items[i].get_value());
         auto q = cuckoo.query(cuckoo_item);
+
+        Log::debug("cuckoo_indices: Setting indices at location: %i to: %i", q.location(), i);
         indices[q.location()] = i;
 
         if (not_equal(cuckoo_item, table[q.location()]))
@@ -588,14 +590,14 @@ void Receiver::stream_decrypt_worker(
     Ciphertext tmp(seal_context_, local_pool);
     unique_ptr<FFieldArray> batch = make_unique<FFieldArray>(ex_batch_encoder_->create_array());
 
-    bool has_result;
-    std::vector<char> has_label(batch_size);
-
     bool first = true;
     u64 processed_count = 0;
 
     for (u64 i = thread_idx; i < block_count; i += num_threads)
     {
+        bool has_result = false;
+        std::vector<char> has_label(batch_size);
+
         ResultPackage pkg;
         {
             STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt_worker_wait");
@@ -603,6 +605,7 @@ void Receiver::stream_decrypt_worker(
         }
 
         auto base_idx = pkg.batch_idx * batch_size;
+        Log::debug("Thread idx: %i, pkg.batch_idx: %i", thread_idx, pkg.batch_idx);
 
         // recover the sym poly values 
         has_result = false;
@@ -637,6 +640,7 @@ void Receiver::stream_decrypt_worker(
 
                 if (is_zero)
                 {
+                    Log::debug("Found zero at thread_idx: %i, base_idx: %i, k: %i, idx: %i", thread_idx, base_idx, k, idx);
                     has_result = true;
                     ret_bools[idx] = true;
                 }
@@ -661,6 +665,7 @@ void Receiver::stream_decrypt_worker(
                 if (has_label[k])
                 {
                     auto idx = table_to_input_map[base_idx + k];
+                    Log::debug("Found label at thread_idx: %i, base_idx: %i, k: %i, idx: %i", thread_idx, base_idx, k, idx);
                     batch->get(k).decode(ret_labels[idx], get_params().get_label_bit_count());
                 }
             }

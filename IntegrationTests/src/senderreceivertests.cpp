@@ -101,8 +101,8 @@ namespace
         Receiver& receiver = *receiver_ptr;
 
         auto label_bit_length = params.get_label_bit_count();
-        auto recversActualSize = 10;
-        auto intersectionSize = 5;
+        auto recversActualSize = 20;
+        auto intersectionSize = 10;
 
         auto s1 = vector<Item>(senderActualSize);
         Matrix<u8> labels(senderActualSize, params.get_label_byte_count());
@@ -145,6 +145,8 @@ namespace
 
     PSIParams create_params(size_t sender_set_size, bool use_oprf, bool use_labels)
     {
+        Log::set_log_level(Log::Level::level_error);
+
         PSIParams::PSIConfParams psiconf_params;
         psiconf_params.item_bit_count = 60;
         psiconf_params.sender_size = sender_set_size;
