@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 #pragma once
 
@@ -15,7 +15,6 @@
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/tools/sealcompress.h"
 #include "apsi/tools/matrix.h"
-#include "apsi/tools/defaultparams.h"
 #include "apsi/network/channel.h"
 
 // Cuckoo
@@ -42,6 +41,10 @@ namespace apsi
         public:
             Receiver(int thread_count,
                 const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::Global());
+
+            Receiver(const PSIParams& params,
+                int thread_count,
+                const seal::MemoryPoolHandle& pool = seal::MemoryPoolHandle::Global());
 
             /************************************************************************************************************************************
             Perform a full query.

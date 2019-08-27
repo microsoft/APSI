@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 #pragma once
 
@@ -87,10 +87,6 @@ namespace apsi
                 int total_thread_count,
                 int session_thread_count,
                 const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::Global());
-
-            Sender(int total_thread_count,
-                   int session_thread_count,
-                   const seal::MemoryPoolHandle& pool = seal::MemoryPoolHandle::Global());
 
             /**
             Clears data in sender's database.

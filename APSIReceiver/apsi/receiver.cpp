@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 // STD
 #include <sstream>
@@ -48,6 +48,25 @@ Receiver::Receiver(int thread_count, const MemoryPoolHandle &pool) :
     }
 }
 
+Receiver::Receiver(const PSIParams& params,
+    int thread_count,
+    const MemoryPoolHandle& pool)
+    : params_(make_unique<PSIParams>(params)),
+      thread_count_(thread_count),
+      pool_(pool),
+      field_(nullptr),
+      slot_count_(0)
+{
+    if (thread_count_ <= 0)
+    {
+        throw invalid_argument("thread_count must be positive");
+    }
+
+    // We have params, so initialize
+    initialize();
+}
+
+
 void Receiver::initialize()
 {
     STOPWATCH(recv_stop_watch, "Receiver::initialize");
@@ -95,9 +114,6 @@ void Receiver::initialize()
         }
     }
 
-    
-    // relin_keys_ = generator.relin_keys(get_params().decomposition_bit_count());
-    // relin_keys_ = generator.relin_keys(get_params().decomposition_bit_count());
     Log::info("Receiver initialized with relin keys seeds %i and %i", relin_keys_seeds_.first, relin_keys_seeds_.second); 
 
     ex_batch_encoder_ = make_shared<FFieldFastBatchEncoder>(seal_context_, *field_);
@@ -112,11 +128,7 @@ map<uint64_t, vector<SeededCiphertext>>& Receiver::query(vector<Item>& items)
 
     if (nullptr == params_)
     {
-        // Default values
-        params_ = make_unique<PSIParams>(default_psi_params(default_sender_set_size));
-
-        // Once we have parameters, initialize receiver
-        initialize();
+        throw runtime_error("No parameters have been configured.");
     }
 
     preprocess_result_ = preprocess(items);

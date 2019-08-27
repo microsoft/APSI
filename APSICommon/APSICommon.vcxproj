@@ -170,7 +170,6 @@
     <ClInclude Include="apsi\tools\blake2\blake2b-load-sse41.h" />
     <ClInclude Include="apsi\tools\blake2\blake2b-round.h" />
     <ClInclude Include="apsi\tools\csvreader.h" />
-    <ClInclude Include="apsi\tools\defaultparams.h" />
     <ClInclude Include="apsi\tools\fourq.h" />
     <ClInclude Include="apsi\Tools\interpolate.h" />
     <ClInclude Include="apsi\tools\matrix.h" />
@@ -195,7 +194,6 @@
     <ClCompile Include="apsi\tools\bigpoly.cpp" />
     <ClCompile Include="apsi\tools\blake2\blake2b.c" />
     <ClCompile Include="apsi\tools\csvreader.cpp" />
-    <ClCompile Include="apsi\tools\defaultparams.cpp" />
     <ClCompile Include="apsi\tools\fourq.cpp" />
     <ClCompile Include="apsi\Tools\interpolate.cpp" />
     <ClCompile Include="apsi\tools\prng.cpp" />

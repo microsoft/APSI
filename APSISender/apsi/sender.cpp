@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 // STD
 #include <thread>
@@ -16,7 +16,6 @@
 #include "apsi/tools/prng.h"
 #include "apsi/tools/fourq.h"
 #include "apsi/result_package.h"
-#include "apsi/tools/defaultparams.h"
 
 // SEAL
 #include <seal/util/common.h>
@@ -46,13 +45,6 @@ Sender::Sender(const PSIParams &params, int total_thread_count,
         throw invalid_argument("invalid thread count");
     }
     initialize();
-}
-
-Sender::Sender(int total_thread_count,
-               int session_thread_count,
-               const MemoryPoolHandle& pool) :
-    Sender(default_psi_params(default_sender_set_size), total_thread_count, session_thread_count, pool)
-{
 }
 
 void Sender::initialize()
