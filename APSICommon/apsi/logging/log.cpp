@@ -42,9 +42,9 @@ namespace
 {
     bool configured_ = false;
     Logger logger_ = Logger::getInstance("APSI");
-	string log_file_;
-	bool disable_console_ = false;
-	char msgBuffer_[MSG_BUFFER_LEN];
+    string log_file_;
+    bool disable_console_ = false;
+    char msgBuffer_[MSG_BUFFER_LEN];
 
 #ifndef _MSC_VER
 // auto_ptr shows a warning in GCC.
@@ -57,26 +57,26 @@ namespace
         if (configured_)
             throw runtime_error("Logger is already configured.");
 
-		if (!disable_console_)
-		{
-			SharedAppenderPtr appender(new ConsoleAppender);
-			appender->setLayout(auto_ptr<Layout>(new PatternLayout("%-5p %D{%H:%M:%S:%Q}: %m%n")));
-			logger_.addAppender(appender);
-		}
+        if (!disable_console_)
+        {
+            SharedAppenderPtr appender(new ConsoleAppender);
+            appender->setLayout(auto_ptr<Layout>(new PatternLayout("%-5p %D{%H:%M:%S:%Q}: %m%n")));
+            logger_.addAppender(appender);
+        }
 
-		if (!log_file_.empty())
-		{
-			SharedAppenderPtr appender(new RollingFileAppender(log_file_));
-			appender->setLayout(auto_ptr<Layout>(new PatternLayout("%-5p %D{%H:%M:%S:%Q}: %m%n")));
-			logger_.addAppender(appender);
-		}
+        if (!log_file_.empty())
+        {
+            SharedAppenderPtr appender(new RollingFileAppender(log_file_));
+            appender->setLayout(auto_ptr<Layout>(new PatternLayout("%-5p %D{%H:%M:%S:%Q}: %m%n")));
+            logger_.addAppender(appender);
+        }
 
-		if (disable_console_ && log_file_.empty())
-		{
-			// Log4CPlus needs at least one appender. Use the null appender if the user doesn't want any output.
-			SharedAppenderPtr appender(new NullAppender());
-			logger_.addAppender(appender);
-		}
+        if (disable_console_ && log_file_.empty())
+        {
+            // Log4CPlus needs at least one appender. Use the null appender if the user doesn't want any output.
+            SharedAppenderPtr appender(new NullAppender());
+            logger_.addAppender(appender);
+        }
 
         configured_ = true;
     }
@@ -149,12 +149,12 @@ void Log::set_log_level(Log::Level level)
 
 void Log::set_log_file(const string& file)
 {
-	log_file_ = file;
+    log_file_ = file;
 }
 
 void Log::set_console_disabled(bool disable_console)
 {
-	disable_console_ = disable_console;
+    disable_console_ = disable_console;
 }
 
 void Log::set_log_level(const string& level)
@@ -188,5 +188,5 @@ void Log::set_log_level(const string& level)
 void Log::format_msg(std::string& msg, const char* format, va_list ap)
 {
     int length = vsnprintf(msgBuffer_, MSG_BUFFER_LEN, format, ap);
-	msg = string(msgBuffer_, length);
+    msg = string(msgBuffer_, length);
 }

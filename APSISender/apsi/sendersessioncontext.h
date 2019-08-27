@@ -32,18 +32,18 @@ namespace apsi
                 seal_context_(std::move(context)), 
                 relin_keys_(relin_keys)
             {
-				seal::PublicKey dummyPk;  // todo: initialize this.
-				auto parms = seal_context_->context_data()->parms();
-				size_t coeff_count = seal_context_->context_data()->parms().poly_modulus_degree();
-				size_t coeff_mod_count = seal_context_->context_data()->parms().coeff_modulus().size();
-				dummyPk.data().resize(seal_context_, parms.parms_id(), 2);
-				
-				// set it all to zero.
-				seal::util::set_zero_poly(coeff_count << 1, coeff_mod_count, dummyPk.data().data()); 
+                seal::PublicKey dummyPk;  // todo: initialize this.
+                auto parms = seal_context_->context_data()->parms();
+                size_t coeff_count = seal_context_->context_data()->parms().poly_modulus_degree();
+                size_t coeff_mod_count = seal_context_->context_data()->parms().coeff_modulus().size();
+                dummyPk.data().resize(seal_context_, parms.parms_id(), 2);
+                
+                // set it all to zero.
+                seal::util::set_zero_poly(coeff_count << 1, coeff_mod_count, dummyPk.data().data()); 
 
-				dummyPk.parms_id() = seal_context_->context_data()->parms().parms_id();
-				public_key_ = dummyPk;
-				encryptor_ = std::make_shared<seal::Encryptor>(seal_context_, public_key_);
+                dummyPk.parms_id() = seal_context_->context_data()->parms().parms_id();
+                public_key_ = dummyPk;
+                encryptor_ = std::make_shared<seal::Encryptor>(seal_context_, public_key_);
             }
 
             SenderSessionContext(std::shared_ptr<seal::SEALContext> context) : 

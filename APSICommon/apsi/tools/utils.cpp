@@ -21,7 +21,7 @@ namespace
 {
     double get_bin_overflow_prob(u64 num_bins, u64 num_balls, u64 bin_size, double epsilon = 0.0001)
     {
-		// cout << "bin size = " << bin_size;
+        // cout << "bin size = " << bin_size;
         if (num_balls <= bin_size)
         {
             return numeric_limits<double>::max();
@@ -33,30 +33,30 @@ namespace
             throw runtime_error(msg);
         }
 
-		typedef long double T; // typedef boost::multiprecision::number<boost::multiprecision::backends::cpp_bin_float<16> > T;
+        typedef long double T; // typedef boost::multiprecision::number<boost::multiprecision::backends::cpp_bin_float<16> > T;
         T sum = 0.0;
         T sec = 0.0;
         T diff = 1;
         // u64 i = bin_size + 1;
-		u64 i = 0;
-		T back = pow((1 - T(1.0) / num_bins), num_balls); 
+        u64 i = 0;
+        T back = pow((1 - T(1.0) / num_bins), num_balls); 
 
         while (/* diff > T(epsilon) && /*num_balls >= i */  i <= bin_size)
         {
-			// a(i) = a(i-1) * stuff. 
-			sum += back;
-			back *= T(num_balls - i) / (T(i + 1) * T(num_bins - 1)); 
-			//sum += num_bins * boost::math::binomial_coefficient<T>(static_cast<int>(num_balls), static_cast<int>(i))
+            // a(i) = a(i-1) * stuff. 
+            sum += back;
+            back *= T(num_balls - i) / (T(i + 1) * T(num_bins - 1)); 
+            //sum += num_bins * boost::math::binomial_coefficient<T>(static_cast<int>(num_balls), static_cast<int>(i))
             //    * boost::multiprecision::pow(T(1.0) / num_bins, i) * boost::multiprecision::pow(1 - T(1.0) / num_bins, num_balls - i);
-			// cout << "i = " << i << "sum = " << sum << endl;
-			T sec2 = log2(T(num_bins)* (1 - sum)); 
+            // cout << "i = " << i << "sum = " << sum << endl;
+            T sec2 = log2(T(num_bins)* (1 - sum)); 
             //T sec2 = boost::multiprecision::logb(sum);
-			// diff = abs(sec - sec2); 
-			//diff = boost::multiprecision::abs(sec - sec2);
+            // diff = abs(sec - sec2); 
+            //diff = boost::multiprecision::abs(sec - sec2);
             sec = sec2;
-			i++;
+            i++;
         }
-		// cout << "sec = " << sec << endl;
+        // cout << "sec = " << sec << endl;
 
         return max<double>(0, (double)-sec);
     }

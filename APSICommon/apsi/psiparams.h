@@ -37,12 +37,12 @@ namespace apsi
             bool use_oprf;
             bool use_labels;
             apsi::u64 sender_size;
-			unsigned item_bit_length_used_after_oprf; // how many bits we take after oprf.
+            unsigned item_bit_length_used_after_oprf; // how many bits we take after oprf.
 
-			// number of chunks to split each item into 
-			unsigned num_chunks;
+            // number of chunks to split each item into 
+            unsigned num_chunks;
 
-			unsigned sender_bin_size; 
+            unsigned sender_bin_size; 
         };
 
         struct CuckooParams
@@ -87,14 +87,14 @@ namespace apsi
               seal_params_(seal_params),
               exfield_params_(exfield_params)
         {
-			sender_bin_size_ = psiconf_params_.sender_bin_size;
-			if (sender_bin_size_ == 0) { // if bin size is unset.
-				Log::info("updating sender bin size..."); 
-				update_sender_bin_size();
-			}
-			else {
-				Log::info("taking sender bin size = %i from command line...", sender_bin_size_); 
-			}
+            sender_bin_size_ = psiconf_params_.sender_bin_size;
+            if (sender_bin_size_ == 0) { // if bin size is unset.
+                Log::info("updating sender bin size..."); 
+                update_sender_bin_size();
+            }
+            else {
+                Log::info("taking sender bin size = %i from command line...", sender_bin_size_); 
+            }
             validate();
         }
 
@@ -106,11 +106,10 @@ namespace apsi
             return psiconf_params_.item_bit_count;
         }
 
-		inline unsigned int item_bit_length_used_after_oprf() const
-		{
-			return psiconf_params_.item_bit_length_used_after_oprf;
-		}
-
+        inline unsigned int item_bit_length_used_after_oprf() const
+        {
+            return psiconf_params_.item_bit_length_used_after_oprf;
+        }
 
         inline bool use_oprf() const
         {
@@ -127,10 +126,10 @@ namespace apsi
             return psiconf_params_.sender_size;
         }
 
-		inline unsigned int num_chunks() const
-		{
-			return psiconf_params_.num_chunks;
-		}
+        inline unsigned int num_chunks() const
+        {
+            return psiconf_params_.num_chunks;
+        }
 
 
         /********************************************
@@ -273,18 +272,18 @@ namespace apsi
 
         void update_sender_bin_size()
         {
-			Log::info("running balls in bins analysis with 2^%i bins and %i balls, with stat sec level = %i", table_params_.log_table_size,
-				psiconf_params_.sender_size *
-				cuckoo_params_.hash_func_count,
-				table_params_.binning_sec_level
-				);
+            Log::info("running balls in bins analysis with 2^%i bins and %i balls, with stat sec level = %i", table_params_.log_table_size,
+                psiconf_params_.sender_size *
+                cuckoo_params_.hash_func_count,
+                table_params_.binning_sec_level
+                );
             sender_bin_size_ = static_cast<int>(apsi::tools::compute_sender_bin_size(
                 table_params_.log_table_size,
                 psiconf_params_.sender_size,
                 cuckoo_params_.hash_func_count,
                 table_params_.binning_sec_level,
                 table_params_.split_count));
-			Log::info("final sender bin size = %i.", sender_bin_size_); 
+            Log::info("final sender bin size = %i.", sender_bin_size_); 
         }
 
         /**
@@ -308,14 +307,14 @@ namespace apsi
             }
 
 
-			int bitcount = item_bit_count(); 
-			if (use_oprf()) {
-				bitcount = item_bit_length_used_after_oprf();
-			}
-			int supported_bitcount = ((uint64_t)exfield_degree())* (seal_params_.encryption_params.plain_modulus().bit_count() - 1); 
-			if (bitcount > supported_bitcount){
-				apsi::logging::Log::warning("item bit count (%i) is too large to fit in slots (%i bits). ", bitcount, supported_bitcount);
-			}
+            int bitcount = item_bit_count(); 
+            if (use_oprf()) {
+                bitcount = item_bit_length_used_after_oprf();
+            }
+            int supported_bitcount = ((uint64_t)exfield_degree())* (seal_params_.encryption_params.plain_modulus().bit_count() - 1); 
+            if (bitcount > supported_bitcount){
+                apsi::logging::Log::warning("item bit count (%i) is too large to fit in slots (%i bits). ", bitcount, supported_bitcount);
+            }
 
             if (item_bit_count() > (max_item_bit_count - 8))
             {

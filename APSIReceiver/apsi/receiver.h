@@ -43,6 +43,18 @@ namespace apsi
             Receiver(int thread_count,
                 const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::Global());
 
+            /************************************************************************************************************************************
+            Perform a full query.
+            The query is a vector of items, and the result is a same-size vector of bool values. If an item is in the intersection, the
+            corresponding bool value is true on the same position in the result vector.
+            *************************************************************************************************************************************/
+            std::pair<std::vector<bool>, Matrix<u8>> query(std::vector<Item>& items, apsi::network::Channel& chl);
+
+
+            /************************************************************************************************************************************
+            The following methods are the individual parts that when put together form a full Query to a Sender.
+            *************************************************************************************************************************************/
+
             /**
             Get the query that should be sent to a remote sender, and get the intersection result. The query is a vector of items, and the result
             is a same-size vector of bool values. If an item is in the intersection, the corresponding bool value is true on the
@@ -56,13 +68,6 @@ namespace apsi
             same position in the result vector
             */
             std::pair<std::vector<bool>, Matrix<u8>> decrypt_result(std::vector<Item>& items, apsi::network::Channel& chl);
-
-            /**
-            Perform a full query.
-            The query is a vector of items, and the result is a same-size vector of bool values. If an item is in the intersection, the
-            corresponding bool value is true on the same position in the result vector.
-            */
-            std::pair<std::vector<bool>, Matrix<u8>> query(std::vector<Item>& items, apsi::network::Channel& chl);
 
             /**
             Obfuscates the items and initializes the given vector with the buffer that must be sent to the Sender for OPRF
