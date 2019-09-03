@@ -95,6 +95,7 @@ void CSVReader::process_line(string line, vector<Item>& items, vector<Item>& lab
 void CSVReader::throw_if_file_not_present() const
 {
     filesystem::path pth(file_name_);
+	cout << "File name = " << file_name_ << endl;
     if (!filesystem::exists(pth))
         throw new invalid_argument("File name does not exist");
 }

@@ -78,6 +78,9 @@ SenderDB::SenderDB(const PSIParams &params,
     int byte_length = static_cast<int>(round_up_to(params_.get_label_bit_count(), 8) / 8);
     int nb = params_.batch_count();
     int ns = params_.split_count();
+
+
+	// important: here it resizes the db blocks.
     db_blocks_.resize(nb, ns);
 
     for (int b_idx = 0; b_idx < nb; b_idx++)
@@ -130,12 +133,15 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
         throw std::invalid_argument("unexpacted label length");
 
     vector<thread> thrds(thread_count);
+
+
+	vector<vector<int>> thread_loads(thread_count);
     for (int t = 0; t < thrds.size(); t++)
     {
         auto seed = prng_.get<block>();
         thrds[t] = thread([&, t, seed](int idx)
         {
-            add_data_worker(idx, thread_count, seed, data, values);
+            add_data_worker(idx, thread_count, seed, data, values, thread_loads[t]);
         }, t);
     }
 
@@ -143,6 +149,18 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
     {
         t.join();
     }
+
+	// aggregate and find the max.
+	int maxload = 0;
+	for (int i = 0; i < params_.table_size(); i++) {
+		for (int t = 1; t < thread_count; t++) {
+			thread_loads[0][i] += thread_loads[t][i]; 
+		}
+		maxload = max(maxload, thread_loads[0][i]);
+	}
+	Log::info("max load =  %i", maxload); 
+
+	
 
     bool validate = false;
     if (validate)
@@ -200,8 +218,9 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
     }
 }
 
-void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& seed, gsl::span<const Item> data, MatrixView<u8> values)
+void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& seed, gsl::span<const Item> data, MatrixView<u8> values, vector<int> &loads)
 {
+
     STOPWATCH(sender_stop_watch, "SenderDB::add_data_worker");
 
     PRNG prng(seed, /* buffer_size */ 256);
@@ -220,10 +239,8 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
             cuckoo::make_item(params_.hash_func_seed() + i, 0));
     }
 
-    map<u64, u64> bin_counting_map;
-    for (unsigned i = 0; i < params_.table_size(); i++) {
-        bin_counting_map[i] = 0;
-    }
+    //map<u64, u64> bin_counting_map;
+	loads.resize(params_.table_size(), 0);
     u64 maxload = 0; 
     
 
@@ -277,16 +294,23 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
         for (unsigned j = 0; j < params_.hash_func_count(); j++)
         {
             // debugging
-            bin_counting_map[locs[j]] ++;
-            if (bin_counting_map[locs[j]] > maxload) {
-                maxload = bin_counting_map[locs[j]]; 
+            loads[locs[j]] ++;
+            if (loads[locs[j]] > maxload) {
+                maxload = loads[locs[j]]; 
             }
 
             if (skip[j] == false)
             {
 
                 // Lock-free thread-safe bin position search
-                auto block_pos = acquire_db_position(locs[j], prng);
+				std::pair<DBBlock*, DBBlock::Position> block_pos;
+				if (params_.use_oprf()) {
+					// Log::info("find db position with oprf");
+					block_pos = acquire_db_position_after_oprf(locs[j]);
+				}
+				else {
+					block_pos = acquire_db_position(locs[j], prng);
+				}
                 auto& db_block = *block_pos.first;
                 auto pos = block_pos.second;
 
@@ -332,6 +356,31 @@ std::pair<DBBlock*, DBBlock::Position>
     // Throw an error because bin overflowed
     throw runtime_error("simple hashing failed due to bin overflow");
 }
+
+std::pair<DBBlock*, DBBlock::Position>
+SenderDB::acquire_db_position_after_oprf(size_t cuckoo_loc)
+{
+	auto batch_idx = cuckoo_loc / params_.batch_size();
+	auto batch_offset = cuckoo_loc % params_.batch_size();
+
+	auto s_idx = 0;
+	// auto s_idx = prng.get<u32>() % db_blocks_.stride();
+	for (int i = 0; i < db_blocks_.stride(); ++i)
+	{
+		auto pos = db_blocks_(batch_idx, s_idx)->try_aquire_position_after_oprf(static_cast<int>(batch_offset));
+		if (pos.is_initialized())
+		{
+			return { db_blocks_(batch_idx, s_idx) , pos };
+		}
+		s_idx++;
+		//s_idx = (s_idx + 1) % db_blocks_.stride();
+	}
+
+	// Throw an error because bin overflowed
+	throw runtime_error("simple hashing failed due to bin overflow");
+}
+
+
 
 void SenderDB::add_data(const Item &item, int thread_count)
 {

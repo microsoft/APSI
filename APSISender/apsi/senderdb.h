@@ -68,7 +68,7 @@ namespace apsi
                 int thread_count,
                 const apsi::block& seed,
                 gsl::span<const apsi::Item> data,
-                apsi::MatrixView<apsi::u8> values);
+                apsi::MatrixView<apsi::u8> values, std::vector<int> &loads);
 
             /**
             Adds one item to sender's database.
@@ -147,6 +147,8 @@ namespace apsi
             index by cockooIndex. The PRNG and be any PRNG.  
             */
             std::pair<DBBlock*, DBBlock::Position> acquire_db_position(std::size_t cockooIndex, apsi::tools::PRNG& prng);
+
+			std::pair<DBBlock*, DBBlock::Position> acquire_db_position_after_oprf(size_t cuckoo_loc);
 
             apsi::tools::PRNG prng_;
         };
