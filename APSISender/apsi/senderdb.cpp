@@ -160,7 +160,13 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
 	}
 	Log::info("max load =  %i", maxload); 
 
-	
+	// making sure maxload is a multiple of split_size
+	unsigned new_split_count = (maxload + params_.split_size() - 1) / params_.split_size();
+	maxload = new_split_count * params_.split_size();	
+	params_.set_sender_bin_size(maxload);
+	params_.set_split_count(new_split_count);
+
+	Log::info("New max load, new split count = %i, %i", params_.sender_bin_size(), params_.split_count());
 
     bool validate = false;
     if (validate)

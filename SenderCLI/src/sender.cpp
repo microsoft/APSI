@@ -111,6 +111,8 @@ void run_sender_dispatcher(const CLP& cmd)
     Log::info("Sender loading DB with %i items", items.size());
     sender->load_db(items, labels);
 
+	// make sure sender params gets updated
+
     signal(SIGINT, sigint_handler);
 
     // Run the dispatcher

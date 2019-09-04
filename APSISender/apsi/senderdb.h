@@ -104,6 +104,9 @@ namespace apsi
                 return db_blocks_.size();
             }
 
+			const apsi::PSIParams& get_params() const { return params_; }
+
+
         private:
             PSIParams params_;
             std::shared_ptr<seal::SEALContext> seal_context_;

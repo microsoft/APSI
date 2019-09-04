@@ -103,6 +103,9 @@ void Sender::load_db(const vector<Item> &data, MatrixView<u8> vals)
 {
     sender_db_->set_data(data, vals, total_thread_count_);
 
+	params_.set_split_count(sender_db_->get_params().split_count());
+	params_.set_sender_bin_size(sender_db_->get_params().sender_bin_size());
+
     // Compute symmetric polys and batch
     offline_compute();
 }

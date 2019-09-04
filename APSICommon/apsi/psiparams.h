@@ -251,6 +251,17 @@ namespace apsi
             return ((double)exfield_degree())* (log2(split_size())) + log2(split_count())- bitcount;
         }
 
+		void set_sender_bin_size(unsigned size) {
+			Log::info("manually setting sender bin size to be %i", size);
+			sender_bin_size_ = size;
+		}
+
+
+		void set_split_count(unsigned count) {
+			Log::info("manually setting split count to be %i", count);
+			table_params_.split_count = count;
+		}
+
         // Allow access to param structures
         const PSIConfParams& get_psiconf_params() const { return psiconf_params_; }
         const TableParams& get_table_params() const     { return table_params_; }
@@ -260,6 +271,7 @@ namespace apsi
 
         // Constants
         constexpr static int max_item_bit_count = 128;
+
 
     private:
         PSIConfParams psiconf_params_;
@@ -285,6 +297,7 @@ namespace apsi
                 table_params_.split_count));
             Log::info("final sender bin size = %i.", sender_bin_size_); 
         }
+
 
         /**
         Validate parameters
