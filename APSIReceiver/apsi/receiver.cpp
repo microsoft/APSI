@@ -139,8 +139,17 @@ map<uint64_t, vector<SeededCiphertext>>& Receiver::query(vector<Item>& items)
 
 pair<vector<bool>, Matrix<u8>> Receiver::decrypt_result(vector<Item>& items, Channel& chl)
 {
-    auto& cuckoo = *preprocess_result_.second;
-    auto table_to_input_map = cuckoo_indices(items, cuckoo);
+	auto& cuckoo = *preprocess_result_.second;
+	unsigned padded_table_size = static_cast<unsigned>(
+		((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
+
+	vector<int> table_to_input_map(padded_table_size, 0);
+	if (items.size() > 1) {
+		table_to_input_map = cuckoo_indices(items, cuckoo);
+	} else{
+		Log::info("receiver single query table to input map...");
+		// everything initialized with 0 so we are fine.
+	}
 
     /* Receive results */
     SenderResponseQuery query_resp;
@@ -323,15 +332,36 @@ pair<
     Log::info("Receiver preprocess start");
 
 	// find the item length 
-    unique_ptr<CuckooTable> cuckoo = cuckoo_hashing(items);
+	
 
-    unique_ptr<FFieldArray> exfield_items;
-    unsigned padded_cuckoo_capacity = static_cast<unsigned>(
-        ((cuckoo->table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
+	unique_ptr<CuckooTable> cuckoo;
+	//if (items.size() > 1) {
 
-    exfield_items = make_unique<FFieldArray>(padded_cuckoo_capacity, *field_);
-    exfield_encoding(*cuckoo, *exfield_items);
 
+	unique_ptr<FFieldArray> exfield_items;
+	unsigned padded_cuckoo_capacity = static_cast<unsigned>(
+		((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
+
+	exfield_items = make_unique<FFieldArray>(padded_cuckoo_capacity, *field_);
+
+	int item_bit_count = get_params().item_bit_count();
+	if (get_params().use_oprf()) {
+		item_bit_count = get_params().item_bit_length_used_after_oprf();
+	}
+
+	if (items.size() > 1) {
+		cuckoo = cuckoo_hashing(items);
+		exfield_encoding(*cuckoo, *exfield_items);
+	} 
+	else { //perform repeated encoding. 
+		Log::info("Using repeated encoding for single query....");
+		for (size_t i = 0; i < get_params().table_size(); i++)
+		{
+			exfield_items->set(i, items[0].to_exfield_element(*field_, item_bit_count));
+		}
+	}
+    
+    
     map<uint64_t, FFieldArray> powers;
     generate_powers(*exfield_items, powers);
 
