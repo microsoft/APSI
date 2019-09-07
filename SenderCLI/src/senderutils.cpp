@@ -69,7 +69,9 @@ const PSIParams apsi::tools::build_psi_params(
 
         // Number of splits to use
         // Larger means lower depth but bigger S-->R communication
-        table_params.split_count = cmd.split_count();
+		table_params.split_size = cmd.split_size();
+
+		table_params.split_count = cmd.split_count();
 
         // Negative log failure probability for simple hashing
         table_params.binning_sec_level = cmd.sec_level();

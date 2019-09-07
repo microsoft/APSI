@@ -25,6 +25,7 @@ namespace apsi
             add(sec_lvl_arg_);
             add(log_tbl_sz_arg_);
             add(split_cnt_arg_);
+			add(split_sz_arg_);
             add(wnd_sz_arg_);
             add(poly_mod_arg_);
             add(coeff_mod_arg_);
@@ -62,6 +63,10 @@ namespace apsi
 
             split_count_ = split_cnt_arg_.getValue();
             cout_param("splitCount", split_count_);
+
+			split_size_ = split_sz_arg_.getValue();
+			cout_param("splitSize", split_size_);
+
 
             window_size_ = wnd_sz_arg_.getValue();
             cout_param("windowSize", window_size_);
@@ -119,6 +124,8 @@ namespace apsi
         unsigned sec_level() const { return sec_level_; }
         int log_table_size() const { return log_table_size_; }
         int split_count() const { return split_count_; }
+		int split_size() const { return split_size_; }
+
         int window_size() const { return window_size_; }
         int poly_modulus() const { return poly_modulus_; }
         const std::vector<u64>& coeff_modulus() const { return coeff_modulus_; }
@@ -151,7 +158,8 @@ namespace apsi
         TCLAP::ValueArg<std::string> db_file_arg_         = TCLAP::ValueArg<std::string>("", "db", "Path to the file containing the Sender database", true, "", "string");
         TCLAP::ValueArg<unsigned>    sec_lvl_arg_         = TCLAP::ValueArg<unsigned>("", "secLevel", "Security level", false, 40, "unsigned");
         TCLAP::ValueArg<int>         log_tbl_sz_arg_      = TCLAP::ValueArg<int>("", "logTableSize", "Table Size", false, 9, "int");
-        TCLAP::ValueArg<int>         split_cnt_arg_       = TCLAP::ValueArg<int>("", "splitCount", "Split count", false, 128, "int");
+        TCLAP::ValueArg<int>         split_cnt_arg_       = TCLAP::ValueArg<int>("", "splitCount", "Split count", false, 1, "int");
+		TCLAP::ValueArg<int>         split_sz_arg_ = TCLAP::ValueArg<int>("", "splitSize", "Split size", false, 15, "int");
         TCLAP::ValueArg<int>         wnd_sz_arg_          = TCLAP::ValueArg<int>("w", "windowSize", "Window size", false, 1, "int");
         TCLAP::ValueArg<int>         poly_mod_arg_        = TCLAP::ValueArg<int>("", "polyModulus", "Poly Modulus degree", false, 4096, "int");
         TCLAP::MultiArg<apsi::u64>   coeff_mod_arg_       = TCLAP::MultiArg<apsi::u64>("", "coeffModulus", "Coefficient Modulus", false, "u64");
@@ -171,6 +179,7 @@ namespace apsi
         unsigned sec_level_;
         int log_table_size_;
         int split_count_;
+		int split_size_;
         int window_size_;
         int poly_modulus_;
         std::vector<u64> coeff_modulus_;

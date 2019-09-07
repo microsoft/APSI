@@ -60,6 +60,13 @@ namespace apsi
             void add_data(gsl::span<const Item> keys, int thread_count);
             void add_data(gsl::span<const Item> keys, MatrixView<u8> values, int thread_count);
 
+
+
+			// no hash version of add data
+			// specific for one query
+			void add_data_no_hash(gsl::span<const Item> data, MatrixView<u8> values);
+
+
             /**
             Handles the work of one thread for adding items to sender's database
             */

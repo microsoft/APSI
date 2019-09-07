@@ -59,6 +59,7 @@ namespace apsi
             unsigned log_table_size;
             unsigned window_size;
             unsigned split_count;
+			unsigned split_size;
             unsigned binning_sec_level;
         };
 
@@ -150,6 +151,11 @@ namespace apsi
             return table_params_.split_count;
         }
 
+		inline unsigned int split_size() const
+		{
+			return table_params_.split_size;
+		}
+
         inline unsigned int binning_sec_level() const
         {
             return table_params_.binning_sec_level;
@@ -210,11 +216,6 @@ namespace apsi
         inline unsigned int table_size() const
         {
             return 1 << table_params_.log_table_size;
-        }
-
-        inline int split_size() const
-        {
-            return sender_bin_size() / split_count();
         }
 
         inline int batch_size() const

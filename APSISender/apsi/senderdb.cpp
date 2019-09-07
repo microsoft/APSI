@@ -122,7 +122,16 @@ void SenderDB::set_data(gsl::span<const Item> data, MatrixView<u8> vals, int thr
 {
     STOPWATCH(sender_stop_watch, "SenderDB::set_data");
     clear_db();
-    add_data(data, vals, thread_count);
+
+
+	bool onequery = true;
+	if (onequery) {
+		Log::info("add data with no hashing....");
+		add_data_no_hash(data, vals); 
+	}
+	else {
+		add_data(data, vals, thread_count);
+	}
 }
 
 void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int thread_count)
@@ -222,6 +231,119 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
             }
         }
     }
+}
+
+
+void SenderDB::add_data_no_hash(gsl::span<const Item> data, MatrixView<u8> values)
+{
+
+	STOPWATCH(sender_stop_watch, "SenderDB::add_data_");
+
+	u64 start = 0;
+	u64 end = data.size();
+
+	vector<u8> buff(FourQCoordinate::byte_count());
+	PRNG pp(cc_block);
+	FourQCoordinate key(pp);
+
+	/*vector<cuckoo::LocFunc> normal_loc_func;
+	for (unsigned i = 0; i < params_.hash_func_count(); i++)
+	{
+		normal_loc_func.emplace_back(
+			params_.log_table_size(),
+			cuckoo::make_item(params_.hash_func_seed() + i, 0));
+	}*/
+
+	vector<int> loads(params_.table_size(), 0);
+	u64 maxload = 0;
+
+
+
+	for (size_t i = start; i < end; i++)
+	{
+		// Do we do OPRF for Sender's security?
+		if (params_.use_oprf())
+		{
+			// Compute EC PRF first for data
+			PRNG p(data[i], /* buffer_size */ 8);
+			FourQCoordinate a(p);
+			a.multiply_mod_order(key);
+			a.to_buffer(buff.data());
+
+			// Then compress with BLAKE2b
+			blake2(
+				reinterpret_cast<uint8_t*>(const_cast<uint64_t*>(data[i].data())),
+				sizeof(block),
+				reinterpret_cast<const uint8_t*>(buff.data()), buff.size(),
+				nullptr, 0);
+		}
+		//std::vector<u64> locs(params_.hash_func_count());
+		//std::vector<Item> keys(params_.hash_func_count());
+		//std::vector<bool> skip(params_.hash_func_count());
+
+		// std::array<Item, params_.hash_func_count()> keys;
+		//std::array<bool, params_.hash_func_count()> skip{ false, false, false };
+
+		// Compute bin locations
+		// Set keys and skip
+		//auto cuckoo_item = cuckoo::make_item(data[i].get_value());
+		// Set keys and skip
+		//for (unsigned j = 0; j < params_.hash_func_count(); j++) {
+		//	locs[j] = normal_loc_func[j](cuckoo_item);
+		//	//locs[1] = normal_loc_func[1].location(data[i]);
+		//	//locs[2] = normal_loc_func[2].location(data[i]);
+		//	keys[j] = data[i];
+		//	skip[j] = false;
+		//	if (j > 0) { // check if same. 
+		//		for (unsigned k = 0; k < j; k++) {
+		//			if (locs[j] == locs[k]) {
+		//				skip[j] = true;
+		//				break;
+		//			}
+		//		}
+		//	}
+		//}
+
+		// Claim an empty location in each matching bin
+		//for (unsigned j = 0; j < params_.hash_func_count(); j++)
+		//{
+			// debugging
+
+		u64 loc = i % get_params().table_size();
+
+		loads[loc] ++;
+		if (loads[loc] > maxload) {
+			maxload = loads[loc];
+		}
+
+			// Lock-free thread-safe bin position search
+		std::pair<DBBlock*, DBBlock::Position> block_pos;
+		//if (params_.use_oprf()) {
+		// Log::info("find db position with oprf");
+		block_pos = acquire_db_position_after_oprf(loc);
+		
+		auto& db_block = *block_pos.first;
+		auto pos = block_pos.second;
+
+
+		db_block.get_key(pos) = data[i];
+
+		if (params_.use_labels())
+		{
+			auto dest = db_block.get_label(pos);
+			memcpy(dest, values[i].data(), params_.get_label_byte_count());
+		}
+	}
+	// debugging: print the bin load 
+	Log::info("max load = %i", maxload);
+
+	unsigned new_split_count = (maxload + params_.split_size() - 1) / params_.split_size();
+	maxload = new_split_count * params_.split_size();
+	params_.set_sender_bin_size(maxload);
+	params_.set_split_count(new_split_count);
+
+	Log::info("New max load, new split count = %i, %i", params_.sender_bin_size(), params_.split_count());
+
 }
 
 void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& seed, gsl::span<const Item> data, MatrixView<u8> values, vector<int> &loads)

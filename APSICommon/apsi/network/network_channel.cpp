@@ -160,6 +160,7 @@ void NetworkChannel::receive(SenderResponseGetParameters& response)
     response.table_params.log_table_size = msg.get<unsigned int>(idx++);
     response.table_params.window_size = msg.get<unsigned int>(idx++);
     response.table_params.split_count = msg.get<unsigned int>(idx++);
+	response.table_params.split_size = msg.get<unsigned int>(idx++);
     response.table_params.binning_sec_level = msg.get<unsigned int>(idx++);
 
     // CuckooParams
@@ -294,6 +295,7 @@ void NetworkChannel::send_get_parameters_response(const vector<u8>& client_id, c
     msg.add(params.log_table_size());
     msg.add(params.window_size());
     msg.add(params.split_count());
+	msg.add(params.split_size());
     msg.add(params.binning_sec_level());
 
     // CuckooParams
