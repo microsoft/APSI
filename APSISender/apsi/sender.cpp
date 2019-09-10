@@ -313,10 +313,8 @@ void Sender::respond(
 
     auto& plain_mod = params_.encryption_params().plain_modulus();
 
-	int max_degree_supported = 4; 
+	int max_degree_supported = 4;  // Fixme
 
-	// int given_powers = powers[0].size(); // or powers.size()? 
-	Log::info("How many powers are given? %i", num_of_powers);
 
     WindowingDag dag(params_.split_size(), params_.window_size(), max_degree_supported, num_of_powers);
     std::vector<WindowingDag::State> states;
@@ -648,7 +646,7 @@ uint64_t WindowingDag::optimal_split(uint64_t x, int base, vector<int> &degrees)
 			opt_deg = degrees[i1] + degrees[x - i1];
 		}
 		else if (degrees[i1] + degrees[x - i1] == opt_deg 
-			&& abs((int)(2*i1 - x)) < abs((int)(2*opt_split - x))){
+			&& abs(degrees[i1] - degrees[x-i1]) < abs(degrees[opt_split] - degrees[x- opt_split])){
 			opt_split = i1;
 		}
 	}
@@ -703,6 +701,7 @@ void WindowingDag::compute_dag()
 	Log::debug("Computing windowing dag: max power = %i", max_power_);
 
 	// initialize the degree array.
+	// given digits...
 	int base = (1 << window_);
 	for (int i = 0; i < given_digits_; i++) {
 		for (int j = 1; j < base; j++) {
@@ -730,8 +729,12 @@ void WindowingDag::compute_dag()
 		}
 		Log::debug("degree[%i] = %i", i, degree[i]);
 		Log::debug("splits[%i] = %i", i, splits[i]);
+	}
 
-
+	// Validate the we did not exceed maximal supported degree.
+	if (*std::max_element(degree.begin(), degree.end()) > max_degree_supported_) {
+		Log::debug("error: degree exceeds maximal supported"); 
+		throw invalid_argument("degree too large");
 	}
 
     for (int i = 3; i < max_power_ && items_per[i]; ++i)
@@ -741,7 +744,6 @@ void WindowingDag::compute_dag()
 
 	for (int i = 0; i < max_power_; i++) {
 		Log::debug("items_per[%i] = %i", i, items_per[i]);
-
 	}
 
 	// size = how many powers we still need to generate. 

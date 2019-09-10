@@ -63,7 +63,7 @@ namespace apsi
             };
 
             int max_power_, window_;
-			int max_degree_; // maximum degree supported.
+			int max_degree_supported_; // maximum degree supported.
 			int given_digits_;  // how many digits are given. 
             std::vector<int> base_powers_;
             std::vector<Node> nodes_;
@@ -77,7 +77,7 @@ namespace apsi
                 window_ = window;
 				//Log::info("window = %i", window);
 				int base = 1 << window_;
-				max_degree_ = max_degree_supported;
+				max_degree_supported_ = max_degree_supported;
 				given_digits_ = given_digits;
 				int actual_power = tools::maximal_power(max_degree_supported, given_digits, base);
 				Log::info("actual power supported = %i", actual_power);

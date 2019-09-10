@@ -476,8 +476,15 @@ void Receiver::generate_powers(const FFieldArray &exfield_items,
     int radix = 1 << window_size;
 
 	// todo: this bound needs to be re-visited. 
-    int bound = static_cast<int>(floor(log2(split_size) / window_size) + 1);
-	bound = 4; // for debugging reason.
+	int max_degree_supported = 4; 
+	// find the bound by enumerating 
+	int bound = split_size;
+	while(bound > 0 && tools::maximal_power(max_degree_supported, bound, radix) >= split_size) {
+		bound--;
+	}
+	bound++;
+    //int bound = static_cast<int>(floor(log2(split_size) / window_size) + 1);
+	// bound = 4; // Fixme: compute this actually.
 
     Log::debug("Generate powers: split_size %i, window_size %i, radix %i, bound %i",
         split_size, window_size, radix, bound);
