@@ -296,7 +296,7 @@ namespace apsi
                 cuckoo_params_.hash_func_count,
                 table_params_.binning_sec_level,
                 table_params_.split_count));
-            Log::info("final sender bin size = %i.", sender_bin_size_); 
+            Log::info("updated sender bin size to %i.", sender_bin_size_); 
         }
 
 

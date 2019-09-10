@@ -32,14 +32,16 @@ SenderDB::SenderDB(const PSIParams &params,
     null_element_(field_),
     neg_null_element_(field_),
     next_locs_(params.table_size(), 0),
-    batch_random_symm_poly_storage_(params.split_count() * params.batch_count() * (params.split_size() + 1))
+    batch_random_symm_poly_storage_(params.split_count() * params.batch_count() * (params.split_size() + 1)) // ahh here need to make split_count larger.
 {
-    for (auto &plain : batch_random_symm_poly_storage_)
-    {
-        // Reserve memory for ciphertext size plaintexts (NTT transformed mod q)
-        plain.reserve(static_cast<int>(params_.encryption_params().coeff_modulus().size() *
-            params_.encryption_params().poly_modulus_degree()));
-    }
+
+	//batch_random_symm_poly_storage_.resize(params.split_count() * params.batch_count() * (params.split_size() + 1));
+ //   for (auto &plain : batch_random_symm_poly_storage_)
+ //   {
+ //       // Reserve memory for ciphertext size plaintexts (NTT transformed mod q)
+ //       plain.reserve(static_cast<int>(params_.encryption_params().coeff_modulus().size() *
+ //           params_.encryption_params().poly_modulus_degree()));
+ //   }
 
 #ifdef USE_SECURE_SEED
     prng_.set_seed(sys_random_seed());
@@ -77,8 +79,12 @@ SenderDB::SenderDB(const PSIParams &params,
 	Log::debug("number of hash functions = %i", params_.hash_func_count());
     int byte_length = static_cast<int>(round_up_to(params_.get_label_bit_count(), 8) / 8);
     int nb = params_.batch_count();
-    int ns = params_.split_count();
 
+	// here, need to make split count larger to fit ...
+	// another place the split count is modified is after add_data.
+	int ns = (params_.sender_bin_size() + params_.split_size() - 1) / params_.split_size(); 
+	params_.set_split_count(ns);
+	params_.set_sender_bin_size(ns * params_.split_size());
 
 	// important: here it resizes the db blocks.
     db_blocks_.resize(nb, ns);
@@ -94,6 +100,15 @@ SenderDB::SenderDB(const PSIParams &params,
                 split_size);
         }
     }
+
+	batch_random_symm_poly_storage_.resize(params_.split_count() * params_.batch_count() * (params_.split_size() + 1));
+	for (auto& plain : batch_random_symm_poly_storage_)
+	{
+		// Reserve memory for ciphertext size plaintexts (NTT transformed mod q)
+		plain.reserve(static_cast<int>(params_.encryption_params().coeff_modulus().size() *
+			params_.encryption_params().poly_modulus_degree()));
+	}
+
 }
 
 void SenderDB::clear_db()
@@ -277,38 +292,6 @@ void SenderDB::add_data_no_hash(gsl::span<const Item> data, MatrixView<u8> value
 				reinterpret_cast<const uint8_t*>(buff.data()), buff.size(),
 				nullptr, 0);
 		}
-		//std::vector<u64> locs(params_.hash_func_count());
-		//std::vector<Item> keys(params_.hash_func_count());
-		//std::vector<bool> skip(params_.hash_func_count());
-
-		// std::array<Item, params_.hash_func_count()> keys;
-		//std::array<bool, params_.hash_func_count()> skip{ false, false, false };
-
-		// Compute bin locations
-		// Set keys and skip
-		//auto cuckoo_item = cuckoo::make_item(data[i].get_value());
-		// Set keys and skip
-		//for (unsigned j = 0; j < params_.hash_func_count(); j++) {
-		//	locs[j] = normal_loc_func[j](cuckoo_item);
-		//	//locs[1] = normal_loc_func[1].location(data[i]);
-		//	//locs[2] = normal_loc_func[2].location(data[i]);
-		//	keys[j] = data[i];
-		//	skip[j] = false;
-		//	if (j > 0) { // check if same. 
-		//		for (unsigned k = 0; k < j; k++) {
-		//			if (locs[j] == locs[k]) {
-		//				skip[j] = true;
-		//				break;
-		//			}
-		//		}
-		//	}
-		//}
-
-		// Claim an empty location in each matching bin
-		//for (unsigned j = 0; j < params_.hash_func_count(); j++)
-		//{
-			// debugging
-
 		u64 loc = i % get_params().table_size();
 
 		loads[loc] ++;
@@ -341,6 +324,11 @@ void SenderDB::add_data_no_hash(gsl::span<const Item> data, MatrixView<u8> value
 	maxload = new_split_count * params_.split_size();
 	params_.set_sender_bin_size(maxload);
 	params_.set_split_count(new_split_count);
+
+
+	// resize the matrix of blocks.
+	db_blocks_.resize(params_.batch_count(), new_split_count);
+
 
 	Log::info("New max load, new split count = %i, %i", params_.sender_bin_size(), params_.split_count());
 

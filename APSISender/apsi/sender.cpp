@@ -106,6 +106,8 @@ void Sender::load_db(const vector<Item> &data, MatrixView<u8> vals)
 	params_.set_split_count(sender_db_->get_params().split_count());
 	params_.set_sender_bin_size(sender_db_->get_params().sender_bin_size());
 
+
+
     // Compute symmetric polys and batch
     offline_compute();
 }
@@ -284,13 +286,13 @@ void Sender::query(
     }
 
     /* Answer the query. */
-    respond(powers, session_context, client_id, channel);
+    respond(powers, num_of_powers, session_context, client_id, channel);
 
     Log::info("Finished processing query");
 }
 
 void Sender::respond(
-    vector<vector<Ciphertext>>& powers,
+    vector<vector<Ciphertext>>& powers, int num_of_powers, 
     SenderSessionContext &session_context,
     const vector<u8>& client_id,
     Channel& channel)
@@ -311,9 +313,12 @@ void Sender::respond(
 
     auto& plain_mod = params_.encryption_params().plain_modulus();
 
+	int max_degree_supported = 4; 
 
+	// int given_powers = powers[0].size(); // or powers.size()? 
+	Log::info("How many powers are given? %i", num_of_powers);
 
-    WindowingDag dag(params_.split_size(), params_.window_size());
+    WindowingDag dag(params_.split_size(), params_.window_size(), max_degree_supported, num_of_powers);
     std::vector<WindowingDag::State> states;
     states.reserve(batch_count);
 
@@ -632,32 +637,49 @@ u64 WindowingDag::pow(u64 base, u64 e)
     return r;
 }
 
-uint64_t WindowingDag::optimal_split(uint64_t x, int base)
+uint64_t WindowingDag::optimal_split(uint64_t x, int base, vector<int> &degrees)
 {
-	// todo: handle special case.
-    vector<uint64_t> digits = conversion_to_digits(x, base);
-    int ndigits = static_cast<int>(digits.size());
-    int hammingweight = 0;
-    for (int i = 0; i < ndigits; i++)
-    {
-        hammingweight += static_cast<int>(digits[i] != 0);
-    }
-    int target = hammingweight / 2;
-    int now = 0;
-    uint64_t result = 0;
-    for (int i = 0; i < ndigits; i++)
-    {
-        if (digits[i] != 0)
-        {
-            now++;
-            result += pow(base, i)*digits[i];
-        }
-        if (now >= target)
-        {
-            break;
-        }
-    }
-    return result;
+	int opt_deg = degrees[x];
+	int opt_split = 0;
+
+	for (int i1 = 1; i1 < x; i1++) {
+		if (degrees[i1] + degrees[x - i1] < opt_deg){
+			opt_split = i1;
+			opt_deg = degrees[i1] + degrees[x - i1];
+		}
+		else if (degrees[i1] + degrees[x - i1] == opt_deg 
+			&& abs((int)(2*i1 - x)) < abs((int)(2*opt_split - x))){
+			opt_split = i1;
+		}
+	}
+	degrees[x] = opt_deg;
+	return opt_split; 
+
+
+	//// todo: handle special case.
+ //   vector<uint64_t> digits = conversion_to_digits(x, base);
+ //   int ndigits = static_cast<int>(digits.size());
+ //   int hammingweight = 0;
+ //   for (int i = 0; i < ndigits; i++)
+ //   {
+ //       hammingweight += static_cast<int>(digits[i] != 0);
+ //   }
+ //   int target = hammingweight / 2;
+ //   int now = 0;
+ //   uint64_t result = 0;
+ //   for (int i = 0; i < ndigits; i++)
+ //   {
+ //       if (digits[i] != 0)
+ //       {
+ //           now++;
+ //           result += pow(base, i)*digits[i];
+ //       }
+ //       if (now >= target)
+ //       {
+ //           break;
+ //       }
+ //   }
+ //   return result;
 }
 
 vector<uint64_t> WindowingDag::conversion_to_digits(uint64_t input, int base)
@@ -674,35 +696,55 @@ vector<uint64_t> WindowingDag::conversion_to_digits(uint64_t input, int base)
 void WindowingDag::compute_dag()
 {
     std::vector<int>
-        depth(max_power_ + 1),
+        degree(max_power_ + 1, INT_MAX),
         splits(max_power_ + 1),
         items_per(max_power_, 0);
 
 	Log::debug("Computing windowing dag: max power = %i", max_power_);
-    for (int i = 1; i <= max_power_; i++)
-    {
-        int i1 = static_cast<int>(optimal_split(i, 1 << window_));
-        int i2 = i - i1;
-        splits[i] = i1;
 
-        if (i1 == 0 || i2 == 0)
-        {
-            base_powers_.emplace_back(i);
-            depth[i] = 1;
-        }
-        else
-        {
-            depth[i] = depth[i1] + depth[i2];
-            ++items_per[depth[i]];
-        }
-		Log::debug("i = %i, depth[i] = %i", i, depth[i]); 
-    }
+	// initialize the degree array.
+	int base = (1 << window_);
+	for (int i = 0; i < given_digits_; i++) {
+		for (int j = 1; j < base; j++) {
+			degree[pow(base, i)*j] = 1;
+		}
+	}
+	degree[0] = 0;
+
+
+	for (int i = 1; i <= max_power_; i++)
+	{
+		int i1 = static_cast<int>(optimal_split(i, 1 << window_, degree));
+		int i2 = i - i1;
+		splits[i] = i1;
+
+		if (i1 == 0 || i2 == 0)
+		{
+			base_powers_.emplace_back(i);
+			degree[i] = 1;
+		}
+		else
+		{
+			degree[i] = degree[i1] + degree[i2];
+			++items_per[degree[i]];
+		}
+		Log::debug("degree[%i] = %i", i, degree[i]);
+		Log::debug("splits[%i] = %i", i, splits[i]);
+
+
+	}
 
     for (int i = 3; i < max_power_ && items_per[i]; ++i)
     {
         items_per[i] += items_per[i - 1];
     }
 
+	for (int i = 0; i < max_power_; i++) {
+		Log::debug("items_per[%i] = %i", i, items_per[i]);
+
+	}
+
+	// size = how many powers we still need to generate. 
     int size = static_cast<int>(max_power_ - base_powers_.size());
     nodes_.resize(size);
 
@@ -713,7 +755,7 @@ void WindowingDag::compute_dag()
 
         if (i1 && i2) // if encryption(y^i) is not given
         {
-            auto d = depth[i] - 1;
+            auto d = degree[i] - 1; 
 
             auto idx = items_per[d]++;
             if (nodes_[idx].output_)
