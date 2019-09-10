@@ -150,7 +150,8 @@ void NetworkChannel::receive(SenderResponseGetParameters& response)
     response.psiconf_params.item_bit_count = msg.get<unsigned int>(idx++);
     response.psiconf_params.use_oprf = msg.get<bool>(idx++);
     response.psiconf_params.use_labels = msg.get<bool>(idx++);
-    response.psiconf_params.sender_size = msg.get<u64>(idx++);
+	response.psiconf_params.use_fast_membership = msg.get<bool>(idx++);
+	response.psiconf_params.sender_size = msg.get<u64>(idx++);
     response.psiconf_params.num_chunks = msg.get<unsigned int>(idx++);
     response.psiconf_params.sender_bin_size = msg.get<unsigned int>(idx++);
     response.psiconf_params.item_bit_length_used_after_oprf = msg.get<unsigned int>(idx++);
@@ -177,6 +178,8 @@ void NetworkChannel::receive(SenderResponseGetParameters& response)
 
     response.seal_params.encryption_params.set_plain_modulus(msg.get<u64>(idx++));
     response.seal_params.decomposition_bit_count = msg.get<unsigned int>(idx++);
+	response.seal_params.max_supported_degree = msg.get<unsigned int>(idx++);
+
 
     // ExFieldParams
     response.exfield_params.characteristic = msg.get<u64>(idx++);
@@ -285,6 +288,7 @@ void NetworkChannel::send_get_parameters_response(const vector<u8>& client_id, c
     msg.add(params.item_bit_count());
     msg.add(params.use_oprf());
     msg.add(params.use_labels());
+	msg.add(params.use_fast_membership());
     msg.add(params.sender_size());
     msg.add(params.num_chunks());
     msg.add(params.sender_bin_size());
@@ -308,6 +312,7 @@ void NetworkChannel::send_get_parameters_response(const vector<u8>& client_id, c
     add_sm_vector(params.encryption_params().coeff_modulus(), msg);
     msg.add(params.encryption_params().plain_modulus().value());
     msg.add(params.decomposition_bit_count());
+	msg.add(params.max_supported_degree());
 
     // ExFieldParams
     msg.add(params.exfield_characteristic());

@@ -36,12 +36,12 @@ namespace apsi
             unsigned item_bit_count;
             bool use_oprf;
             bool use_labels;
+			bool use_fast_membership; // faster configuration assuming query is always one item.
             apsi::u64 sender_size;
             unsigned item_bit_length_used_after_oprf; // how many bits we take after oprf.
 
             // number of chunks to split each item into 
             unsigned num_chunks;
-
             unsigned sender_bin_size; 
         };
 
@@ -67,6 +67,7 @@ namespace apsi
         {
             seal::EncryptionParameters encryption_params{ seal::scheme_type::BFV };
             unsigned decomposition_bit_count;
+			unsigned max_supported_degree;
         };
 
         struct ExFieldParams
@@ -121,6 +122,11 @@ namespace apsi
         {
             return psiconf_params_.use_labels;
         }
+
+		inline bool use_fast_membership() const
+		{
+			return psiconf_params_.use_fast_membership;
+		}
 
         inline apsi::u64 sender_size() const
         {
@@ -191,6 +197,11 @@ namespace apsi
         {
             return seal_params_.decomposition_bit_count;
         }
+
+		inline unsigned int max_supported_degree() const
+		{
+			return seal_params_.max_supported_degree;
+		}
 
         /********************************************
         Parameters from input: ExFieldParams

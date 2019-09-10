@@ -39,6 +39,8 @@ const PSIParams apsi::tools::build_psi_params(
         // Whether to use labels
         psiconf_params.use_labels = cmd.use_labels();
 
+		psiconf_params.use_fast_membership = cmd.use_fast_memberhip();
+
 		psiconf_params.num_chunks = cmd.num_chunks();
 
 		psiconf_params.sender_bin_size = cmd.sender_bin_size();
@@ -128,6 +130,16 @@ const PSIParams apsi::tools::build_psi_params(
         seal_params.encryption_params.set_plain_modulus(cmd.plain_modulus());
 
         seal_params.decomposition_bit_count = cmd.dbc();
+
+		/** Note: now this maximal supported degree for a given set of SEAL parameters is 
+		hardcoded. Would be better to give a formula later.
+		*/
+		if (cmd.poly_modulus() >= 4096 && cmd.plain_modulus() <= 40961) 
+			seal_params.max_supported_degree = 4; 
+		else {
+			seal_params.max_supported_degree = 1; 
+		}
+		Log::debug("setting maximal supported degree to %i", seal_params.max_supported_degree);
     }
 
     PSIParams::ExFieldParams exfield_params;

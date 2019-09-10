@@ -144,11 +144,10 @@ pair<vector<bool>, Matrix<u8>> Receiver::decrypt_result(vector<Item>& items, Cha
 		((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
 
 	vector<int> table_to_input_map(padded_table_size, 0);
-	if (items.size() > 1) {
+	if (items.size() > 1 || (!get_params().use_fast_membership())) {
 		table_to_input_map = cuckoo_indices(items, cuckoo);
 	} else{
 		Log::info("receiver single query table to input map...");
-		// everything initialized with 0 so we are fine.
 	}
 
     /* Receive results */
@@ -349,7 +348,8 @@ pair<
 		item_bit_count = get_params().item_bit_length_used_after_oprf();
 	}
 
-	if (items.size() > 1) {
+	bool fm = get_params().use_fast_membership();
+	if (items.size() > 1 || (!fm)) {
 		cuckoo = cuckoo_hashing(items);
 		exfield_encoding(*cuckoo, *exfield_items);
 	} 
@@ -476,10 +476,10 @@ void Receiver::generate_powers(const FFieldArray &exfield_items,
     int radix = 1 << window_size;
 
 	// todo: this bound needs to be re-visited. 
-	int max_degree_supported = 4; 
+	int max_supported_degree = get_params().max_supported_degree();
 	// find the bound by enumerating 
 	int bound = split_size;
-	while(bound > 0 && tools::maximal_power(max_degree_supported, bound, radix) >= split_size) {
+	while(bound > 0 && tools::maximal_power(max_supported_degree, bound, radix) >= split_size) {
 		bound--;
 	}
 	bound++;

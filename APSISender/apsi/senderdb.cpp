@@ -139,9 +139,9 @@ void SenderDB::set_data(gsl::span<const Item> data, MatrixView<u8> vals, int thr
     clear_db();
 
 
-	bool onequery = true;
-	if (onequery) {
-		Log::info("add data with no hashing....");
+	bool fm = get_params().use_fast_membership();
+	if (fm) {
+		Log::debug("Fast membership:add data with no hashing....");
 		add_data_no_hash(data, vals); 
 	}
 	else {

@@ -313,10 +313,10 @@ void Sender::respond(
 
     auto& plain_mod = params_.encryption_params().plain_modulus();
 
-	int max_degree_supported = 4;  // Fixme
+	int max_supported_degree = params_.max_supported_degree();
 
 
-    WindowingDag dag(params_.split_size(), params_.window_size(), max_degree_supported, num_of_powers);
+    WindowingDag dag(params_.split_size(), params_.window_size(), max_supported_degree, num_of_powers);
     std::vector<WindowingDag::State> states;
     states.reserve(batch_count);
 

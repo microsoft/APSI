@@ -21,6 +21,7 @@ namespace apsi
         {
             add(labels_arg_);
             add(oprf_arg_);
+			add(fast_membership_arg_);
             add(item_bit_length_arg_);
             add(sec_lvl_arg_);
             add(log_tbl_sz_arg_);
@@ -48,6 +49,10 @@ namespace apsi
             oprf_ = oprf_arg_.getValue();
             cout_param("oprf", oprf_ ? "true" : "false");
 
+			fast_membership_ = fast_membership_arg_.getValue();
+			cout_param("fast membership",  fast_membership_? "true" : "false");
+
+
             item_bit_length_ = item_bit_length_arg_.getValue();
             cout_param("itemBitLength", item_bit_length_);
 
@@ -66,7 +71,6 @@ namespace apsi
 
 			split_size_ = split_sz_arg_.getValue();
 			cout_param("splitSize", split_size_);
-
 
             window_size_ = wnd_sz_arg_.getValue();
             cout_param("windowSize", window_size_);
@@ -120,11 +124,14 @@ namespace apsi
 
         bool use_labels() const { return use_labels_; }
         bool use_oprf() const { return oprf_; }
-        unsigned item_bit_length() const { return item_bit_length_; }
+		bool use_fast_memberhip() const { return fast_membership_; }
+
+		unsigned item_bit_length() const { return item_bit_length_; }
         unsigned sec_level() const { return sec_level_; }
         int log_table_size() const { return log_table_size_; }
         int split_count() const { return split_count_; }
 		int split_size() const { return split_size_; }
+		
 
         int window_size() const { return window_size_; }
         int poly_modulus() const { return poly_modulus_; }
@@ -153,6 +160,7 @@ namespace apsi
     private:
         TCLAP::SwitchArg             labels_arg_          = TCLAP::SwitchArg("l", "useLabels", "Use labels", false);
         TCLAP::SwitchArg             oprf_arg_            = TCLAP::SwitchArg("o", "oprf", "Use OPRF", true);
+		TCLAP::SwitchArg             fast_membership_arg_ = TCLAP::SwitchArg("f", "fastMembership", "Use fast membership", false);
         TCLAP::ValueArg<unsigned>    item_bit_length_arg_ = TCLAP::ValueArg<unsigned>("b", "itemBitLength", "Item bit length", false, 60, "unsigned");
         TCLAP::ValueArg<int>         net_port_arg_        = TCLAP::ValueArg<int>("", "port", "Network port to bind to", false, 1212, "int");
         TCLAP::ValueArg<std::string> db_file_arg_         = TCLAP::ValueArg<std::string>("", "db", "Path to the file containing the Sender database", true, "", "string");
@@ -175,7 +183,8 @@ namespace apsi
 
         bool use_labels_;
         bool oprf_;
-        unsigned item_bit_length_;
+		bool fast_membership_;
+		unsigned item_bit_length_;
         unsigned sec_level_;
         int log_table_size_;
         int split_count_;
