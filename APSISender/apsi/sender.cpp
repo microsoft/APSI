@@ -311,6 +311,8 @@ void Sender::respond(
 
     auto& plain_mod = params_.encryption_params().plain_modulus();
 
+
+
     WindowingDag dag(params_.split_size(), params_.window_size());
     std::vector<WindowingDag::State> states;
     states.reserve(batch_count);
@@ -632,6 +634,7 @@ u64 WindowingDag::pow(u64 base, u64 e)
 
 uint64_t WindowingDag::optimal_split(uint64_t x, int base)
 {
+	// todo: handle special case.
     vector<uint64_t> digits = conversion_to_digits(x, base);
     int ndigits = static_cast<int>(digits.size());
     int hammingweight = 0;
@@ -675,7 +678,7 @@ void WindowingDag::compute_dag()
         splits(max_power_ + 1),
         items_per(max_power_, 0);
 
-	Log::debug("max power = %i", max_power_);
+	Log::debug("Computing windowing dag: max power = %i", max_power_);
     for (int i = 1; i <= max_power_; i++)
     {
         int i1 = static_cast<int>(optimal_split(i, 1 << window_));
@@ -708,7 +711,7 @@ void WindowingDag::compute_dag()
         int i1 = splits[i];
         int i2 = i - i1;
 
-        if (i1 && i2)
+        if (i1 && i2) // if encryption(y^i) is not given
         {
             auto d = depth[i] - 1;
 

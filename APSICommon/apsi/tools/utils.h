@@ -42,6 +42,12 @@ namespace apsi
         */
         apsi::u64 optimal_split(const apsi::u64 x, const int base);
 
+		/**
+		Given the supported degree and bound on powers, find the maximal represented power.	
+		i.e., we are given y^((b**i)*j) for i = 1,2,..., bound and j = 1,2,...,b-1.
+		*/
+		apsi::u64 maximal_power(const apsi::u64 degree, const apsi::u64 bound, const int base);
+
         /**
         Convert the given input to digits
         */

@@ -474,7 +474,10 @@ void Receiver::generate_powers(const FFieldArray &exfield_items,
     int split_size = (get_params().sender_bin_size() + get_params().split_count() - 1) / get_params().split_count();
     int window_size = get_params().window_size();
     int radix = 1 << window_size;
+
+	// todo: this bound needs to be re-visited. 
     int bound = static_cast<int>(floor(log2(split_size) / window_size) + 1);
+	bound = 4; // for debugging reason.
 
     Log::debug("Generate powers: split_size %i, window_size %i, radix %i, bound %i",
         split_size, window_size, radix, bound);

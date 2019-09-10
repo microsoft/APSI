@@ -135,6 +135,25 @@ u64 apsi::tools::optimal_split(const u64 x, const int base)
     return result;
 }
 
+// compute F(d,k)
+apsi::u64 apsi::tools::maximal_power(const apsi::u64 degree, const apsi::u64 bound, const int base)
+{
+	// base must be positive
+	if (base < 0) throw invalid_argument("base must be a positive integer");
+
+	// if d >= k-1, use the first formula.
+	if (bound <= degree + 1) {
+		return pow(base, bound) + (degree - bound + 1) * pow(base, bound - 1) * (base - 1);
+	}
+	else { // when d < k -1 i.e. k > d+1. 
+		return maximal_power(degree, degree + 1, base);
+	}
+
+
+
+	return apsi::u64();
+}
+
 vector<u64> apsi::tools::conversion_to_digits(const u64 input, const int base)
 {
     vector<uint64_t> result;
