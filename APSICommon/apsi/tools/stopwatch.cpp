@@ -48,7 +48,7 @@ void Stopwatch::add_timespan_event(const string& name, const time_unit& start, c
             /* max */ duration
         };
 
-        timespan_events_.insert_or_assign(name, summ);
+        timespan_events_[name] = summ;
 
         if (static_cast<int>(name.length()) > max_timespan_event_name_length_)
         {
