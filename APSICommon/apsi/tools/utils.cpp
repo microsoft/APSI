@@ -36,7 +36,7 @@ namespace
         typedef long double T; // typedef boost::multiprecision::number<boost::multiprecision::backends::cpp_bin_float<16> > T;
         T sum = 0.0;
         T sec = 0.0;
-        T diff = 1;
+        // T diff = 1;
         // u64 i = bin_size + 1;
         u64 i = 0;
         T back = pow((1 - T(1.0) / num_bins), num_balls); 

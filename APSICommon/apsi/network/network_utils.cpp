@@ -65,34 +65,7 @@ namespace apsi
         // TODO: add the random number generator
         shared_ptr<UniformRandomGenerator> random_a(rg->create());
         seal::RandomToStandardAdapter engine(random_a);
-
-        // Read the dbc
-        int decomposition_bit_count = relin_keys.decomposition_bit_count();
-        
-        // Find which relin elements exist in relin_keys 
-        // Make a copy of encryption parameters;
-        // at this point we are guaranteed that the parms_id is the same
-        // as first_parms_id() for the given context.
-        //auto parms(context->context_data()->parms());
-
-        // Set the seeded PRNG
-        //parms.set_random_generator(rg);
-
-        // Create SEALContext
-        // auto compression_context = SEALContext::Create(parms, false);
-
-        // Create dummy but valid secret key
-        // SecretKey sk;
-        // sk.data().resize(parms.coeff_modulus().size() * parms.poly_modulus_degree());
-        // sk.data().set_zero();
-        // sk.parms_id() = parms.parms_id();
-
-        // Create the seed-expanded part of the relin keys
-        //KeyGenerator keygen(compression_context, sk);
-        //auto exp_relin_keys = keygen.relin_keys(
-        //    decomposition_bit_count); 
     
-
         // Finally we need to combine exp_relin_keys and relin_keys
         for (std::size_t i = 0; i < relin_keys.data().size(); i++)
         {

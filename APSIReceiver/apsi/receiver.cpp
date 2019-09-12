@@ -371,7 +371,7 @@ unique_ptr<CuckooTable> Receiver::cuckoo_hashing(const vector<Item> &items)
             degree);
     }
 
-    for (int i = 0; i < items.size(); i++)
+    for (size_t i = 0; i < items.size(); i++)
     {
         auto cuckoo_item = make_item(items[i].get_value());
         bool insertionSuccess = cuckoo->insert(cuckoo_item);
@@ -397,13 +397,13 @@ vector<int> Receiver::cuckoo_indices(
     vector<int> indices(padded_cuckoo_capacity, -1);
     auto& table = cuckoo.table();
 
-    for (int i = 0; i < items.size(); i++)
+    for (size_t i = 0; i < items.size(); i++)
     {
         auto cuckoo_item = make_item(items[i].get_value());
         auto q = cuckoo.query(cuckoo_item);
 
         Log::debug("cuckoo_indices: Setting indices at location: %i to: %i", q.location(), i);
-        indices[q.location()] = i;
+        indices[q.location()] = static_cast<int>(i);
 
         if (not_equal(cuckoo_item, table[q.location()]))
             throw runtime_error("items[i] different from encodings[q.location()]");
@@ -450,12 +450,12 @@ void Receiver::generate_powers(const FFieldArray &exfield_items,
         split_size, window_size, radix, bound);
 
     FFieldArray current_power = exfield_items;
-    for (uint64_t j = 0; j < bound; j++)
+    for (uint64_t j = 0; j < static_cast<uint64_t>(bound); j++)
     {
         result.emplace(1ULL << (window_size * j), current_power);
-        for (uint64_t i = 2; i < radix; i++)
+        for (uint64_t i = 2; i < static_cast<uint64_t>(radix); i++)
         {
-            if (i * (1ULL << (window_size * j)) > split_size)
+            if (i * (1ULL << (window_size * j)) > static_cast<uint64_t>(split_size))
             {
                 return;
             }
@@ -540,9 +540,7 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
         block_count = num_of_splits * num_of_batches,
         batch_size = slot_count_;
 
-
-	Log::info("Receiver batch size = %i", batch_size);
-
+    Log::info("Receiver batch size = %i", batch_size);
 
     auto num_threads = thread_count_;
     Log::debug("Decrypting %i blocks(%ib x %is) with %i threads",
@@ -571,7 +569,7 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
     for (auto& thrd : thrds)
         thrd.join();
 
-    return std::move(ret);
+    return ret;
 }
 
 void Receiver::stream_decrypt_worker(
@@ -593,7 +591,7 @@ void Receiver::stream_decrypt_worker(
     bool first = true;
     u64 processed_count = 0;
 
-    for (u64 i = thread_idx; i < block_count; i += num_threads)
+    for (u64 i = thread_idx; i < static_cast<u64>(block_count); i += num_threads)
     {
         bool has_result = false;
         std::vector<char> has_label(batch_size);

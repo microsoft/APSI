@@ -70,7 +70,7 @@ namespace apsi
             /**
             * Return the seed for this PRNG.
             */
-            const block get_seed() const;
+            block get_seed() const;
 
             /**
             * Templated function that returns the a random element

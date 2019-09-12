@@ -70,7 +70,7 @@ u8 PRNG::get_bit()
     return (ret & 0x01);
 }
 
-const block PRNG::get_seed() const
+block PRNG::get_seed() const
 {
     if (buffer_.size())
         return aes_.get_key();
