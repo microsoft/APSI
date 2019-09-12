@@ -1,9 +1,6 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-// STD
-#include <mutex>
-
 // APSI
 #include "stream_channel.h"
 #include "network_utils.h"
@@ -305,7 +302,7 @@ void StreamChannel::read_string(std::string& str)
     istream_.read(reinterpret_cast<char*>(&size), sizeof(size_t));
 
     str.resize(size);
-    istream_.read(str.data(), size);
+    istream_.read(&str[0], size);
 
     bytes_received_ += sizeof(size_t);
     bytes_received_ += size;

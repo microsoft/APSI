@@ -124,7 +124,7 @@ namespace apsi
         vector<FFieldArray> divided_differences;
         divided_differences.reserve(size);
 
-        for (int i = 0; i < size; ++i)
+        for (size_t i = 0; i < size; ++i)
         {
             divided_differences.emplace_back(size - i, field);
         }

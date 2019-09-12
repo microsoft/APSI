@@ -18,6 +18,7 @@ using namespace std;
 using namespace seal;
 using namespace apsi;
 using namespace apsi::tools;
+using namespace apsi::logging;
 
 
 const PSIParams apsi::tools::build_psi_params(

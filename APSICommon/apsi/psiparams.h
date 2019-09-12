@@ -23,8 +23,6 @@
 // Cuckoo
 #include "cuckoo/cuckoo.h"
 
-using namespace apsi::logging;
-
 namespace apsi
 {
     class PSIParams
@@ -89,11 +87,11 @@ namespace apsi
         {
             sender_bin_size_ = psiconf_params_.sender_bin_size;
             if (sender_bin_size_ == 0) { // if bin size is unset.
-                Log::info("updating sender bin size..."); 
+                apsi::logging::Log::info("updating sender bin size...");
                 update_sender_bin_size();
             }
             else {
-                Log::info("taking sender bin size = %i from command line...", sender_bin_size_); 
+                apsi::logging::Log::info("taking sender bin size = %i from command line...", sender_bin_size_);
             }
             validate();
         }
@@ -272,7 +270,7 @@ namespace apsi
 
         void update_sender_bin_size()
         {
-            Log::info("running balls in bins analysis with 2^%i bins and %i balls, with stat sec level = %i", table_params_.log_table_size,
+            apsi::logging::Log::info("running balls in bins analysis with 2^%i bins and %i balls, with stat sec level = %i", table_params_.log_table_size,
                 psiconf_params_.sender_size *
                 cuckoo_params_.hash_func_count,
                 table_params_.binning_sec_level
@@ -283,7 +281,7 @@ namespace apsi
                 cuckoo_params_.hash_func_count,
                 table_params_.binning_sec_level,
                 table_params_.split_count));
-            Log::info("final sender bin size = %i.", sender_bin_size_); 
+            apsi::logging::Log::info("final sender bin size = %i.", sender_bin_size_);
         }
 
         /**

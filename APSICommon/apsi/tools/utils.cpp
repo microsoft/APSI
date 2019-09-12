@@ -41,7 +41,7 @@ namespace
         u64 i = 0;
         T back = pow((1 - T(1.0) / num_bins), num_balls); 
 
-        while (/* diff > T(epsilon) && /*num_balls >= i */  i <= bin_size)
+        while (i <= bin_size)
         {
             // a(i) = a(i-1) * stuff. 
             sum += back;

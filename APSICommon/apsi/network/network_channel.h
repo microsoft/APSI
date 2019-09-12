@@ -3,12 +3,12 @@
 
 #pragma once
 
+// STD
+#include <mutex>
+
+// APSI
 #include "apsi/network/channel.h"
 
-namespace std
-{
-    class mutex;
-}
 
 namespace zmqpp
 {

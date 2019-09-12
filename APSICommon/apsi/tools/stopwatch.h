@@ -11,6 +11,7 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include <mutex>
 
 // APSI
 #include "apsi/apsidefines.h"
@@ -26,11 +27,6 @@
 // Measure a block
 #define STOPWATCH(stopwatch, name) StopwatchScope UNIQUE_STOPWATCH_NAME(stopwatchscope) (stopwatch, name);
 
-
-namespace std
-{
-    class mutex;
-}
 
 namespace apsi
 {

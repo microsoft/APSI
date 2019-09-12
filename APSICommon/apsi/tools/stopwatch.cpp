@@ -1,7 +1,6 @@
 // STD
 #include <cstdint>
 #include <sstream>
-#include <mutex>
 
 // APSI
 #include "apsi/tools/stopwatch.h"
@@ -14,10 +13,10 @@ using namespace apsi::tools;
 const Stopwatch::time_unit Stopwatch::start_time(Stopwatch::time_unit::clock::now());
 
 Stopwatch::Stopwatch()
-    : max_event_name_length_(0),
-      max_timespan_event_name_length_(0),
-      events_mtx_(make_shared<mutex>()),
-      timespan_events_mtx_(make_shared<mutex>())
+    : events_mtx_(make_shared<mutex>()),
+      timespan_events_mtx_(make_shared<mutex>()),
+      max_event_name_length_(0),
+      max_timespan_event_name_length_(0)
 {
 }
 
@@ -26,7 +25,7 @@ void Stopwatch::add_event(const string& name)
     unique_lock<mutex> events_lock(*events_mtx_);
     events_.push_back(Timepoint { name, time_unit::clock::now() });
 
-    if (name.length() > max_event_name_length_)
+    if (static_cast<int>(name.length()) > max_event_name_length_)
     {
         max_event_name_length_ = static_cast<int>(name.length());
     }
@@ -51,7 +50,7 @@ void Stopwatch::add_timespan_event(const string& name, const time_unit& start, c
 
         timespan_events_.insert_or_assign(name, summ);
 
-        if (name.length() > max_timespan_event_name_length_)
+        if (static_cast<int>(name.length()) > max_timespan_event_name_length_)
         {
             max_timespan_event_name_length_ = static_cast<int>(name.length());
         }

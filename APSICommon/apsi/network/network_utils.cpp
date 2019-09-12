@@ -10,6 +10,7 @@
 using namespace std;
 using namespace seal;
 using namespace apsi::network;
+using namespace apsi::logging;
 
 namespace apsi
 {
@@ -90,7 +91,7 @@ namespace apsi
         //KeyGenerator keygen(compression_context, sk);
         //auto exp_relin_keys = keygen.relin_keys(
         //    decomposition_bit_count); 
-	
+    
 
         // Finally we need to combine exp_relin_keys and relin_keys
         for (std::size_t i = 0; i < relin_keys.data().size(); i++)
@@ -102,7 +103,7 @@ namespace apsi
                     // auto &exp_key_ct = exp_relin_keys.data()[i][j];
                     // uniform coefficients
                    // uint64_t *eval_keys_second = relin_keys.data()[i][j].data(2 * i + 1);
-				    
+                    
                     
 
                     // set_poly_coeffs_uniform(context_data, eval_keys_second, random_a);
@@ -111,11 +112,11 @@ namespace apsi
                     size_t coeff_mod_count = complete_key_ct.coeff_mod_count(); 
                     for(std::size_t k = 1; k < complete_key_ct.size(); k += 2)
                     {	
-						Log::debug("checking if relin keys are zero: k = %i", k);
+                        Log::debug("checking if relin keys are zero: k = %i", k);
                         uint64_t *poly = complete_key_ct.data(k);
-						for (size_t ind = 0; ind < 10; ind++) {
-							Log::debug("(%i, %i)", ind, poly[ind]);
-						}
+                        for (size_t ind = 0; ind < 10; ind++) {
+                            Log::debug("(%i, %i)", ind, poly[ind]);
+                        }
 
                         for (size_t jj = 0; jj < coeff_mod_count; jj++)
                         {   

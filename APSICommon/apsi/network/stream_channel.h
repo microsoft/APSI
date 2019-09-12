@@ -6,14 +6,11 @@
 // STD
 #include <istream>
 #include <ostream>
+#include <mutex>
 
 // APSI
 #include "apsi/network/channel.h"
 
-namespace std
-{
-    class mutex;
-}
 
 namespace apsi
 {

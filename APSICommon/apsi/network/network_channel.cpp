@@ -3,7 +3,6 @@
 
 //STD
 #include <sstream>
-#include <mutex>
 
 // APSI
 #include "apsi/result_package.h"
@@ -19,6 +18,7 @@ using namespace std;
 using namespace seal;
 using namespace apsi;
 using namespace apsi::network;
+using namespace apsi::logging;
 using namespace zmqpp;
 
 
