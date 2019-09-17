@@ -314,8 +314,14 @@ void Sender::respond(
 
 	int max_supported_degree = params_.max_supported_degree();
 
+	int window_size = get_params().window_size();
 
-    WindowingDag dag(params_.split_size(), params_.window_size(), max_supported_degree, num_of_powers);
+	int base = 1 << window_size;
+
+	int given_digits = num_of_powers / (base - 1); 
+
+
+    WindowingDag dag(params_.split_size(), params_.window_size(), max_supported_degree, given_digits);
     std::vector<WindowingDag::State> states;
     states.reserve(batch_count);
 
@@ -736,7 +742,9 @@ void WindowingDag::compute_dag()
 	int base = (1 << window_);
 	for (int i = 0; i < given_digits_; i++) {
 		for (int j = 1; j < base; j++) {
-			degree[pow(base, i)*j] = 1;
+			if (pow(base, i) * j < degree.size()) {
+				degree[pow(base, i) * j] = 1;
+			}
 		}
 	}
 	degree[0] = 0;
