@@ -674,8 +674,8 @@ void Receiver::stream_decrypt_worker(
         // recover the sym poly values 
         has_result = false;
         stringstream ss(pkg.data);
-		tmp.load(seal_context_, ss);
-		//compressor_->compressed_load(ss, tmp);
+		//tmp.load(seal_context_, ss);
+		compressor_->compressed_load(ss, tmp);
 		if (first && thread_idx == 0)
         {
             first = false;

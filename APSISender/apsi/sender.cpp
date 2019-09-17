@@ -521,7 +521,7 @@ void Sender::respond_worker(
         // Send the result over the network if needed.
 
         // First compress
-        //compressor_->mod_switch(runningResults[currResult], compressedResult);
+        compressor_->mod_switch(runningResults[currResult], compressedResult);
 
         // Send the compressed result
         ResultPackage pkg;
@@ -530,9 +530,9 @@ void Sender::respond_worker(
 
         {
             stringstream ss;
-			runningResults[currResult].save(ss);
+			//runningResults[currResult].save(ss);
 			//compressedResult.save(ss);
-			//compressor_->compressed_save(compressedResult, ss);
+			compressor_->compressed_save(compressedResult, ss);
             pkg.data = ss.str();
         }
 
