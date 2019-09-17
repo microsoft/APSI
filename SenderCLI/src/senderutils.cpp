@@ -10,7 +10,7 @@
 #include "apsi/psiparams.h"
 
 // SEAL
-#include "seal/defaultparams.h"
+// #include "seal/defaultparams.h"
 #include "seal/smallmodulus.h"
 
 
@@ -132,13 +132,14 @@ const PSIParams apsi::tools::build_psi_params(
         seal_params.decomposition_bit_count = cmd.dbc();
 
 		/** Note: now this maximal supported degree for a given set of SEAL parameters is 
-		hardcoded. Would be better to give a formula later.
+		hardcoded. It be better to give a formula.
 		*/
 		if (cmd.poly_modulus() >= 4096 && cmd.plain_modulus() <= 40961) 
 			seal_params.max_supported_degree = 4; 
 		else {
 			seal_params.max_supported_degree = 1; 
 		}
+		seal_params.max_supported_degree = 2; // for debugging
 		Log::debug("setting maximal supported degree to %i", seal_params.max_supported_degree);
     }
 

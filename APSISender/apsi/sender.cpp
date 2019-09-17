@@ -429,13 +429,26 @@ void Sender::respond_worker(
 
         evaluator_->multiply_plain(powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
 
-        for (int s = 1; s <= params_.split_size(); s++)
+        for (int s = 1; s < params_.split_size(); s++)
         {
             // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
             evaluator_->multiply_plain(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
             evaluator_->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
             currResult ^= 1;
         }
+		// Handle the case for s = params_.split_size(); 
+		int s = params_.split_size(); 
+		if (params_.use_oprf()) {
+			Log::debug("saving the multiplication by 1 step.."); 
+			tmp = powers[batch][s]; 
+		}
+		else {
+			evaluator_->multiply_plain(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
+		}
+		evaluator_->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
+		currResult ^= 1;
+
+
 
 
         if (params_.use_labels())
@@ -502,7 +515,7 @@ void Sender::respond_worker(
         // Send the result over the network if needed.
 
         // First compress
-        compressor_->mod_switch(runningResults[currResult], compressedResult);
+        //compressor_->mod_switch(runningResults[currResult], compressedResult);
 
         // Send the compressed result
         ResultPackage pkg;
@@ -511,7 +524,9 @@ void Sender::respond_worker(
 
         {
             stringstream ss;
-            compressor_->compressed_save(compressedResult, ss);
+			runningResults[currResult].save(ss);
+			//compressedResult.save(ss);
+			//compressor_->compressed_save(compressedResult, ss);
             pkg.data = ss.str();
         }
 

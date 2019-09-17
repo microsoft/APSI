@@ -1,10 +1,12 @@
 #include <memory>
 #include "apsi/tools/sealcompress.h"
+#include "apsi/logging/log.h"
 
 using namespace std;
 using namespace seal;
 using namespace seal::util;
 using namespace apsi;
+using namespace apsi::logging;
 
 
 void CiphertextCompressor::mod_switch(Ciphertext &encrypted) const
@@ -71,7 +73,10 @@ void CiphertextCompressor::compressed_save(const seal::Ciphertext &encrypted,
     char *compr_poly_writer_head = reinterpret_cast<char*>(compr_poly.get());
     const uint64_t *encrypted_coeff_ptr = encrypted.data(); 
     size_t encrypted_uint64_count = encrypted_size * encrypted.poly_modulus_degree();
+	Log::debug("COMPRESSOR: compressing %i uin64s into %i", encrypted_uint64_count, compr_data_uint64_count);
+
     int bit_shift = bits_per_uint64 - coeff_mod_bit_count;
+	Log::debug("bit shift =  %i", bit_shift);
     for(size_t i = 0; i < encrypted_uint64_count; i++, encrypted_coeff_ptr++)
     {
         uint64_t shifted_coeff = *encrypted_coeff_ptr << bit_shift;

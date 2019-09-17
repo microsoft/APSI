@@ -539,12 +539,20 @@ void SenderDB::batched_randomized_symmetric_polys(
             //batch_end = (batch_start + batch_size < table_size ? (batch_start + batch_size) : table_size);
 
         auto &block = db_blocks_.data()[next_block];
-        block.randomized_symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
-        block.batch_random_symm_poly_ = { &batch_random_symm_poly_storage_[indexer(split, batch)] , split_size_plus_one };
+		if (get_params().use_oprf()) {
+			Log::debug("doing oprf -- no need to randomize"); 
+			block.symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
+		}
+		else {
+			Log::debug("computing randomized blocks"); 
+			block.randomized_symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
+		}
+		block.batch_random_symm_poly_ = { &batch_random_symm_poly_storage_[indexer(split, batch)] , split_size_plus_one };
 
         for (int i = 0; i < split_size_plus_one; i++)
         {
             Plaintext &poly = block.batch_random_symm_poly_[i];
+
 
             // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
             for (int k = 0; batch_start + k < batch_end; k++)
@@ -553,6 +561,25 @@ void SenderDB::batched_randomized_symmetric_polys(
                 //fq_nmod_set(batch_vector.data() + k, &symm_block(k, i), batch_vector.field(k)->ctx());
             }
             ex_batch_encoder->compose(batch_vector, poly);
+
+			// debug: print the last one 
+
+			if (get_params().use_oprf())
+			if (i == split_size_plus_one - 1) {
+				Log::debug("Checking last (%i-th) plaintext:", i);
+				Log::debug("coeff count = %i", poly.coeff_count());
+				for (size_t j = 1; j < poly.coeff_count(); j++) {
+					if (poly.data()[j] != 0) {
+						Log::debug("something wrong"); 
+						break;
+					}
+				}
+				if (poly.data()[0] != 1) {
+					Log::debug("something wrong");
+				}
+				// cout << endl;
+			}
+
             evaluator->transform_to_ntt_inplace(poly, seal_context_->first_parms_id(), local_pool);
         }
 

@@ -368,6 +368,9 @@ pair<
     map<uint64_t, vector<SeededCiphertext> > ciphers;
     encrypt(powers, ciphers);
 
+	// debug 
+	
+
     Log::info("Receiver preprocess end");
 
     return { move(ciphers), move(cuckoo) };
@@ -484,7 +487,8 @@ void Receiver::generate_powers(const FFieldArray &exfield_items,
 	}
 	bound++;
     //int bound = static_cast<int>(floor(log2(split_size) / window_size) + 1);
-	// bound = 4; // Fixme: compute this actually.
+	//bound = 4; // hardcoded for debug
+	bound = 2;
 
     Log::debug("Generate powers: split_size %i, window_size %i, radix %i, bound %i",
         split_size, window_size, radix, bound);
@@ -650,9 +654,9 @@ void Receiver::stream_decrypt_worker(
         // recover the sym poly values 
         has_result = false;
         stringstream ss(pkg.data);
-        compressor_->compressed_load(ss, tmp);
-
-        if (first && thread_idx == 0)
+		tmp.load(seal_context_, ss);
+		//compressor_->compressed_load(ss, tmp);
+		if (first && thread_idx == 0)
         {
             first = false;
             Log::info("Noise budget: %i bits", decryptor_->invariant_noise_budget(tmp));

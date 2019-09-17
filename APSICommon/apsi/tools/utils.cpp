@@ -148,9 +148,6 @@ apsi::u64 apsi::tools::maximal_power(const apsi::u64 degree, const apsi::u64 bou
 	else { // when d < k -1 i.e. k > d+1. 
 		return maximal_power(degree, degree + 1, base);
 	}
-
-
-
 	return apsi::u64();
 }
 
