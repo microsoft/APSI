@@ -7,9 +7,13 @@
 // APSI
 #include "apsi/network/network_utils.h"
 
+// SEAL
+#include "seal/util/rlwe.h"
+
 using namespace std;
 using namespace seal;
 using namespace apsi::network;
+using namespace seal::util;
 
 namespace apsi
 {
@@ -60,6 +64,8 @@ namespace apsi
         // TODO: add the random number generator
         shared_ptr<UniformRandomGenerator> random_a(rg->create());
         seal::RandomToStandardAdapter engine(random_a);
+
+		cout << "sender got relin keys seeds " << seeds.first << ", " << seeds.second << endl; 
 
         // Read the dbc
         //int decomposition_bit_count = relin_keys.decomposition_bit_count();
@@ -113,25 +119,24 @@ namespace apsi
                 {
                     // set_poly_coeffs_uniform(context_data, eval_keys_second, random_a);
                     auto &complete_key_ct = relin_keys.data()[i][j];
-                    //for(std::size_t k = 1; k < complete_key_ct.size(); k += 2)
-                    //{	
+					Log::debug("Checking if relin keys = zero"); 
 					uint64_t *poly = complete_key_ct.data().data(1);
 					for (size_t ind = 0; ind < 10; ind++) {
 						Log::debug("(%i, %i)", ind, poly[ind]);
 					}
-
-                    for (size_t jj = 0; jj < coeff_mod_count; jj++)
-                    {   
-                        // FIXME
-                        uint64_t current_modulus = parms.coeff_modulus()[jj].value();
-                        for (size_t ii = 0; ii < coeff_count; ii++, poly++)
-                        {
-                            uint64_t new_coeff = (static_cast<uint64_t>(engine()) << 32) + 
-                                static_cast<uint64_t>(engine());
-                            *poly = new_coeff % current_modulus; 
-                        }
-                    }
-                    // Copy seed-expanded part to secret-dependent part
+					seal::util::sample_poly_uniform(complete_key_ct.data().data(1), random_a, parms);
+                    //for (size_t jj = 0; jj < coeff_mod_count; jj++)
+                    //{   
+                    //    // FIXME
+                    //    uint64_t current_modulus = parms.coeff_modulus()[jj].value();
+                    //    for (size_t ii = 0; ii < coeff_count; ii++, poly++)
+                    //    {
+                    //        uint64_t new_coeff = (static_cast<uint64_t>(engine()) << 32) + 
+                    //            static_cast<uint64_t>(engine());
+                    //        *poly = new_coeff % current_modulus; 
+                    //    }
+                    //}
+                    //// Copy seed-expanded part to secret-dependent part
                         // util::set_poly_poly(
                         //     exp_key_ct.data(k), 
                         //     complete_key_ct.poly_modulus_degree(), 

@@ -102,21 +102,39 @@ void Receiver::initialize()
     {
         if (a.size())
         {
+			size_t count = 0; 
             for (auto &b : a)
             {
-				// b is a public key.
+				cout << (count + 1) << "-th limb of relin keys : ";
+				// b is a public key, b.data() is a Ciphertext object. 
 				auto ctxt = b.data();
                 //for (std::size_t i = 1; i < b.size(); i += 2)
                 //{
                     // Set seed-generated polynomial to zero
+				cout << "Relin key coeff mod count = " << ctxt.coeff_mod_count() << endl;
+
+				cout << "First part of relin keys: ";
+				for (size_t i = 0; i < 10; i++) {
+					cout << ctxt.data()[i] << ", ";
+				}
+				cout << endl;
+				cout << "Second part of relin keys: ";
+				for (size_t i = 0; i < 10; i++) {
+					cout << ctxt.data(1)[i] << ", ";
+				}
+				cout << endl;
+
                 util::set_zero_poly(
                     ctxt.poly_modulus_degree(), ctxt.coeff_mod_count(), ctxt.data(1));
                 //}
+
+				// debug
+
             }
         }
     }
 
-    Log::info("Receiver initialized with relin keys seeds %i and %i", relin_keys_seeds_.first, relin_keys_seeds_.second); 
+    cout << "Receiver initialized with relin keys seeds %i and %i" << relin_keys_seeds_.first << ", " <<  relin_keys_seeds_.second << endl; 
 
     ex_batch_encoder_ = make_shared<FFieldFastBatchEncoder>(seal_context_, *field_);
 

@@ -540,11 +540,10 @@ void SenderDB::batched_randomized_symmetric_polys(
 
         auto &block = db_blocks_.data()[next_block];
 		if (get_params().use_oprf()) {
-			Log::debug("doing oprf -- no need to randomize"); 
 			block.symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
 		}
 		else {
-			Log::debug("computing randomized blocks"); 
+			Log::debug("no oprf -- computing randomized blocks"); 
 			block.randomized_symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
 		}
 		block.batch_random_symm_poly_ = { &batch_random_symm_poly_storage_[indexer(split, batch)] , split_size_plus_one };
@@ -562,12 +561,10 @@ void SenderDB::batched_randomized_symmetric_polys(
             }
             ex_batch_encoder->compose(batch_vector, poly);
 
-			// debug: print the last one 
-
 			if (get_params().use_oprf())
 			if (i == split_size_plus_one - 1) {
-				Log::debug("Checking last (%i-th) plaintext:", i);
-				Log::debug("coeff count = %i", poly.coeff_count());
+				//Log::debug("Checking last (%i-th) plaintext:", i);
+				//Log::debug("coeff count = %i", poly.coeff_count());
 				for (size_t j = 1; j < poly.coeff_count(); j++) {
 					if (poly.data()[j] != 0) {
 						Log::debug("something wrong"); 

@@ -170,7 +170,8 @@ namespace apsi
 		TCLAP::ValueArg<int>         split_sz_arg_ = TCLAP::ValueArg<int>("", "splitSize", "Split size", false, 15, "int");
         TCLAP::ValueArg<int>         wnd_sz_arg_          = TCLAP::ValueArg<int>("w", "windowSize", "Window size", false, 1, "int");
         TCLAP::ValueArg<int>         poly_mod_arg_        = TCLAP::ValueArg<int>("", "polyModulus", "Poly Modulus degree", false, 4096, "int");
-        TCLAP::MultiArg<apsi::u64>   coeff_mod_arg_       = TCLAP::MultiArg<apsi::u64>("", "coeffModulus", "Coefficient Modulus", false, "u64");
+
+		TCLAP::MultiArg<apsi::u64>   coeff_mod_arg_ =   TCLAP::MultiArg<apsi::u64>("c", "coeffModulus", "Coefficient Modulus", false, "u64");
         TCLAP::ValueArg<apsi::u64>   plain_mod_arg_       = TCLAP::ValueArg<apsi::u64>("", "plainModulus", "Plain Modulus", false, 40961, "u64");
         TCLAP::ValueArg<int>         dbc_arg_             = TCLAP::ValueArg<int>("", "dbc", "Decomposition Bit Count", false, 30, "int");
         TCLAP::ValueArg<int>         exfld_degree_arg_    = TCLAP::ValueArg<int>("e", "exfieldDegree", "exField degree", false, 8, "int");

@@ -426,7 +426,7 @@ void Sender::respond_worker(
         // Observe that the first call to mult is always multiplying coeff[0] by 1....
         // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
 
-        // evaluator_->multiply_plain(powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
+        evaluator_->multiply_plain(powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
 
         for (int s = 1; s < params_.split_size(); s++)
         {
@@ -447,7 +447,8 @@ void Sender::respond_worker(
 		currResult ^= 1;
 
 		// handle the s = 0 term 
-		evaluator_->add_plain_inplace(runningResults[currResult], block.batch_random_symm_poly_[0]);
+		//evaluator_->add_plain_inplace(runningResults[currResult], block.batch_random_symm_poly_[0]);
+		
 
 
         if (params_.use_labels())

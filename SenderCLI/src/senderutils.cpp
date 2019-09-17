@@ -133,7 +133,7 @@ const PSIParams apsi::tools::build_psi_params(
 			//                }
         }
         seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
-        seal_params.encryption_params.set_plain_modulus(cmd.plain_modulus());
+		seal_params.encryption_params.set_plain_modulus(cmd.plain_modulus());
 
         seal_params.decomposition_bit_count = cmd.dbc();
 
