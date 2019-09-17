@@ -228,8 +228,9 @@ void DBBlock::batch_interpolate(
     DBInterpolationCache& cache,
     const PSIParams& params)
 {
-    auto mod = seal_context->context_data()->parms().plain_modulus().value();
-    MemoryPoolHandle local_pool = th_context.pool();
+    //auto mod = seal_context->context_data()->parms().plain_modulus().value();
+	auto mod = params.get_seal_params().encryption_params.plain_modulus().value();
+	MemoryPoolHandle local_pool = th_context.pool();
     Position pos;
 
     for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)

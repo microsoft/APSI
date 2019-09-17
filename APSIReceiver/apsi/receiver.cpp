@@ -94,7 +94,7 @@ void Receiver::initialize()
     compressor_ = make_unique<CiphertextCompressor>(seal_context_, 
         dummy_evaluator, pool_);
 
-    auto key_material = generator.relin_keys_seeds_out(get_params().decomposition_bit_count()); 
+    auto key_material = generator.relin_keys_seeds_out(); 
     relin_keys_seeds_ = key_material.first;
     relin_keys_ = key_material.second;
 
@@ -104,12 +104,14 @@ void Receiver::initialize()
         {
             for (auto &b : a)
             {
-                for (std::size_t i = 1; i < b.size(); i += 2)
-                {
+				// b is a public key.
+				auto ctxt = b.data();
+                //for (std::size_t i = 1; i < b.size(); i += 2)
+                //{
                     // Set seed-generated polynomial to zero
-                    util::set_zero_poly(
-                        b.poly_modulus_degree(), b.coeff_mod_count(), b.data(i));
-                }
+                util::set_zero_poly(
+                    ctxt.poly_modulus_degree(), ctxt.coeff_mod_count(), ctxt.data(1));
+                //}
             }
         }
     }

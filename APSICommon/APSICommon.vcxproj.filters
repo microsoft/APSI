@@ -111,9 +111,6 @@
     <ClInclude Include="apsi\tools\fourq.h">
       <Filter>Header Files\Tools</Filter>
     </ClInclude>
-    <ClInclude Include="apsi\tools\bigpoly.h">
-      <Filter>Header Files\Tools</Filter>
-    </ClInclude>
     <ClInclude Include="apsi\network\senderoperation.h">
       <Filter>Header Files\Network</Filter>
     </ClInclude>
@@ -192,9 +189,6 @@
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
     <ClCompile Include="apsi\tools\fourq.cpp">
-      <Filter>Source Files\Tools</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\tools\bigpoly.cpp">
       <Filter>Source Files\Tools</Filter>
     </ClCompile>
     <ClCompile Include="apsi\tools\blake2\blake2b.c">

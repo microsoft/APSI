@@ -52,11 +52,7 @@ namespace apsi
         stringstream ss(str);
         relin_keys.load(context, ss);
 
-        // todo: change that 
-        //std::uint64_t seed_lw, seed_hw;
-        //uncompressed_stream.read(reinterpret_cast<char*>(&seed_lw), sizeof(std::uint64_t));
-        //uncompressed_stream.read(reinterpret_cast<char*>(&seed_hw), sizeof(std::uint64_t));
-
+       
         
         // Initialize the PRNG factory
         std::shared_ptr<UniformRandomGeneratorFactory> rg = 
@@ -66,7 +62,7 @@ namespace apsi
         seal::RandomToStandardAdapter engine(random_a);
 
         // Read the dbc
-        int decomposition_bit_count = relin_keys.decomposition_bit_count();
+        //int decomposition_bit_count = relin_keys.decomposition_bit_count();
         
         // Find which relin elements exist in relin_keys 
         // Make a copy of encryption parameters;
@@ -90,51 +86,58 @@ namespace apsi
         //KeyGenerator keygen(compression_context, sk);
         //auto exp_relin_keys = keygen.relin_keys(
         //    decomposition_bit_count); 
-	
+
+		auto parms_id = relin_keys.parms_id();
+		// Verify parameters.
+		auto context_data_ptr = context->get_context_data(parms_id);
+		if (!context_data_ptr)
+		{
+			throw invalid_argument("parms_id is not valid for encryption parameters");
+		}
+
+		auto& context_data = *context->get_context_data(parms_id);
+		auto& parms = context_data.parms();
+
+		
+		size_t coeff_count = parms.poly_modulus_degree();
+		size_t coeff_mod_count = parms.coeff_modulus().size();
+
 
         // Finally we need to combine exp_relin_keys and relin_keys
         for (std::size_t i = 0; i < relin_keys.data().size(); i++)
         {
             if (relin_keys.data()[i].size())
             {
+				// relin_keys.data()[i] is a vector of public keys;
                 for(std::size_t j = 0; j < relin_keys.data()[i].size(); j++)
                 {
-                    // auto &exp_key_ct = exp_relin_keys.data()[i][j];
-                    // uniform coefficients
-                   // uint64_t *eval_keys_second = relin_keys.data()[i][j].data(2 * i + 1);
-				    
-                    
-
                     // set_poly_coeffs_uniform(context_data, eval_keys_second, random_a);
                     auto &complete_key_ct = relin_keys.data()[i][j];
-                    size_t coeff_count = complete_key_ct.poly_modulus_degree(); 
-                    size_t coeff_mod_count = complete_key_ct.coeff_mod_count(); 
-                    for(std::size_t k = 1; k < complete_key_ct.size(); k += 2)
-                    {	
-						Log::debug("checking if relin keys are zero: k = %i", k);
-                        uint64_t *poly = complete_key_ct.data(k);
-						for (size_t ind = 0; ind < 10; ind++) {
-							Log::debug("(%i, %i)", ind, poly[ind]);
-						}
+                    //for(std::size_t k = 1; k < complete_key_ct.size(); k += 2)
+                    //{	
+					uint64_t *poly = complete_key_ct.data().data(1);
+					for (size_t ind = 0; ind < 10; ind++) {
+						Log::debug("(%i, %i)", ind, poly[ind]);
+					}
 
-                        for (size_t jj = 0; jj < coeff_mod_count; jj++)
-                        {   
-                            // FIXME
-                            uint64_t current_modulus = context->context_data()->parms().coeff_modulus()[jj].value();
-                            for (size_t ii = 0; ii < coeff_count; ii++, poly++)
-                            {
-                                uint64_t new_coeff = (static_cast<uint64_t>(engine()) << 32) + 
-                                    static_cast<uint64_t>(engine());
-                                *poly = new_coeff % current_modulus; 
-                            }
+                    for (size_t jj = 0; jj < coeff_mod_count; jj++)
+                    {   
+                        // FIXME
+                        uint64_t current_modulus = parms.coeff_modulus()[jj].value();
+                        for (size_t ii = 0; ii < coeff_count; ii++, poly++)
+                        {
+                            uint64_t new_coeff = (static_cast<uint64_t>(engine()) << 32) + 
+                                static_cast<uint64_t>(engine());
+                            *poly = new_coeff % current_modulus; 
                         }
-                        // Copy seed-expanded part to secret-dependent part
+                    }
+                    // Copy seed-expanded part to secret-dependent part
                         // util::set_poly_poly(
                         //     exp_key_ct.data(k), 
                         //     complete_key_ct.poly_modulus_degree(), 
                         //     complete_key_ct.coeff_mod_count(), 
                         //     complete_key_ct.data(k));
-                    }
+                    //}
                 }
             }
         }

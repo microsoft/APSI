@@ -10,7 +10,7 @@
 #include "apsi/network/receiverchannel.h"
 #include "apsi/tools/utils.h"
 #include "apsi/logging/log.h"
-#include "seal/defaultparams.h"
+//#include "seal/defaultparams.h"
 
 
 using namespace std;

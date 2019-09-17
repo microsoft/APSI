@@ -12,7 +12,7 @@
 #include "seal/util/polycore.h"
 
 // APSI
-#include "apsi/tools/bigpoly.h"
+//#include "apsi/tools/bigpoly.h"
 
 using namespace std;
 using namespace seal;

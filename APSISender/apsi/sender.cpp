@@ -263,7 +263,7 @@ void Sender::query(
     SecretKey dummySk;  // todo: initialize this.
     dummySk.data().resize(powers[0][0].coeff_mod_count() * powers[0][0].poly_modulus_degree());
     dummySk.data().set_zero();
-    dummySk.parms_id() = powers[0][0].parms_id();
+	dummySk.parms_id() = seal_context_->key_parms_id();
 
 
     for (const auto& pair : query)
@@ -272,14 +272,13 @@ void Sender::query(
 
         for (u64 i = 0; i < powers.size(); i++)
         {
-            // todo: need to change this part to process seeded ciphertext.
             // do we do the logic here? 
             seed128 seed = pair.second[i].first;  // first, locate the seed
             // cout << "sender seed: " << seed.first << ", " << seed.second << endl;
             get_ciphertext(seal_context_, powers[i][power], pair.second[i].second);
             // Then, make the correction. 
             Ciphertext temp; 
-            session_context.encryptor()->encrypt_sk(Plaintext("0"), temp, dummySk, seed);
+            session_context.encryptor()->encrypt_sk_seeds_in(Plaintext("0"), temp, dummySk, seed);
             // todo: correcting the first coefficient, which is  -(a*s+e + Delta*m)
             seal::util::set_poly_poly(temp.data(1), temp.poly_modulus_degree(), temp.coeff_mod_count(), powers[i][power].data(1));      
         }
@@ -427,7 +426,7 @@ void Sender::respond_worker(
         // Observe that the first call to mult is always multiplying coeff[0] by 1....
         // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
 
-        evaluator_->multiply_plain(powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
+        // evaluator_->multiply_plain(powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
 
         for (int s = 1; s < params_.split_size(); s++)
         {
@@ -439,7 +438,6 @@ void Sender::respond_worker(
 		// Handle the case for s = params_.split_size(); 
 		int s = params_.split_size(); 
 		if (params_.use_oprf()) {
-			Log::debug("saving the multiplication by 1 step.."); 
 			tmp = powers[batch][s]; 
 		}
 		else {
@@ -448,7 +446,8 @@ void Sender::respond_worker(
 		evaluator_->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
 		currResult ^= 1;
 
-
+		// handle the s = 0 term 
+		evaluator_->add_plain_inplace(runningResults[currResult], block.batch_random_symm_poly_[0]);
 
 
         if (params_.use_labels())
@@ -602,6 +601,22 @@ void Sender::compute_batch_powers(
     // Iterate until all nodes are computed. We may want to do something smarter here.
     for (i64 i = 0; i < state.nodes_.size(); ++i)
         while (state.nodes_[i] != WindowingDag::NodeState::Done);
+
+
+	// Debugging
+	for (size_t j = 0; j < batch_powers.size(); j++) {
+		Log::debug("printing the %i -th ciphertext ", j); 
+		cout << "c0 part: "; 
+		for (size_t k = 0; k < 10; k++) {
+			cout << batch_powers[j].data()[k] << ", "; 
+		}
+		cout << endl;
+		cout << "c1 part ";
+		for (size_t k = 0; k < 10; k++) {
+			cout << batch_powers[j].data(1)[k] << ", ";
+		}
+		cout << endl;
+	}
 
     auto end = dag.nodes_.size() + batch_powers.size();
     while (idx < end)

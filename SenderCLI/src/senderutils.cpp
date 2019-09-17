@@ -92,39 +92,45 @@ const PSIParams apsi::tools::build_psi_params(
 
         if (coeff_mod_bit_vector.size() == 0)
         {
-            coeff_modulus = DefaultParams::coeff_modulus_128(seal_params.encryption_params.poly_modulus_degree());
-        }
-        else
+			coeff_modulus = CoeffModulus::BFVDefault(seal_params.encryption_params.poly_modulus_degree());
+		}
+
+	    else
         {
-            unordered_map<u64, size_t> mods_added;
-            for (auto bit_size : coeff_mod_bit_vector)
-            {
-                switch (bit_size)
-                {
-                case 30:
-                    coeff_modulus.emplace_back(DefaultParams::small_mods_30bit(static_cast<int>(mods_added[bit_size])));
-                    mods_added[bit_size]++;
-                    break;
+			vector<int> coeff_mod_bit_vector_int(coeff_mod_bit_vector.size());
+			for (int i = 0; i < coeff_mod_bit_vector.size(); i++) {
+				coeff_mod_bit_vector_int[i] = (int)coeff_mod_bit_vector[i];
+			}
+			coeff_modulus = CoeffModulus::Create(seal_params.encryption_params.poly_modulus_degree(), coeff_mod_bit_vector_int);
 
-                case 40:
-                    coeff_modulus.emplace_back(DefaultParams::small_mods_40bit(static_cast<int>(mods_added[bit_size])));
-                    mods_added[bit_size]++;
-                    break;
+            //unordered_map<u64, size_t> mods_added;
+            //for (auto bit_size : coeff_mod_bit_vector)
+            //{
+            //    switch (bit_size)
+            //    {
+            //    case 30:
+            //        coeff_modulus.emplace_back(DefaultParams::small_mods_30bit(static_cast<int>(mods_added[bit_size])));
+            //        mods_added[bit_size]++;
+            //        break;
 
-                case 50:
-                    coeff_modulus.emplace_back(DefaultParams::small_mods_50bit(static_cast<int>(mods_added[bit_size])));
-                    mods_added[bit_size]++;
-                    break;
+            //    case 40:
+            //        coeff_modulus.emplace_back(DefaultParams::small_mods_40bit(static_cast<int>(mods_added[bit_size])));
+            //        mods_added[bit_size]++;
+            //        break;
 
-                case 60:
-                    coeff_modulus.emplace_back(DefaultParams::small_mods_60bit(static_cast<int>(mods_added[bit_size])));
-                    mods_added[bit_size]++;
-                    break;
+            //    case 50:
+            //        coeff_modulus.emplace_back(DefaultParams::small_mods_50bit(static_cast<int>(mods_added[bit_size])));
+            //        mods_added[bit_size]++;
+            //        break;
 
-                default:
-                    throw invalid_argument("invalid coeff modulus bit count");
-                }
-            }
+            //    case 60:
+            //        coeff_modulus.emplace_back(DefaultParams::small_mods_60bit(static_cast<int>(mods_added[bit_size])));
+            //        mods_added[bit_size]++;
+            //        break;
+
+            //    default:
+            //        throw invalid_argument("invalid coeff modulus bit count");
+			//                }
         }
         seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
         seal_params.encryption_params.set_plain_modulus(cmd.plain_modulus());
