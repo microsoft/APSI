@@ -108,12 +108,15 @@ namespace apsi
 		size_t coeff_count = parms.poly_modulus_degree();
 		size_t coeff_mod_count = parms.coeff_modulus().size();
 
+		Log::info("relin keys data size = %i", relin_keys.data().size()); 
+
 
         // Finally we need to combine exp_relin_keys and relin_keys
         for (std::size_t i = 0; i < relin_keys.data().size(); i++)
         {
             if (relin_keys.data()[i].size())
             {
+				Log::info("relin keys data [%i] size = %i", i, relin_keys.data()[i].size());
 				// relin_keys.data()[i] is a vector of public keys;
                 for(std::size_t j = 0; j < relin_keys.data()[i].size(); j++)
                 {
@@ -122,7 +125,7 @@ namespace apsi
 					Log::debug("Checking if relin keys = zero"); 
 					uint64_t *poly = complete_key_ct.data().data(1);
 					for (size_t ind = 0; ind < 10; ind++) {
-						Log::debug("(%i, %i)", ind, poly[ind]);
+						Log::debug("(%i, %i)", ind, *(poly + ind));
 					}
 					seal::util::sample_poly_uniform(complete_key_ct.data().data(1), random_a, parms);
                     //for (size_t jj = 0; jj < coeff_mod_count; jj++)

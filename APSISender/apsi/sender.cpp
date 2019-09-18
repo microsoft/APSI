@@ -259,9 +259,12 @@ void Sender::query(
         }
     }
 
+	size_t coeff_mod_count = get_params().get_seal_params().encryption_params.coeff_modulus().size();
+
     Plaintext dummyPtxt("0"); 
     SecretKey dummySk;  // todo: initialize this.
-    dummySk.data().resize(powers[0][0].coeff_mod_count() * powers[0][0].poly_modulus_degree());
+    dummySk.data().resize(coeff_mod_count
+		* powers[0][0].poly_modulus_degree());
     dummySk.data().set_zero();
 	dummySk.parms_id() = seal_context_->key_parms_id();
 

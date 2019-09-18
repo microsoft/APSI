@@ -107,32 +107,58 @@ void Receiver::initialize()
             {
 				cout << (count + 1) << "-th limb of relin keys : ";
 				// b is a public key, b.data() is a Ciphertext object. 
-				auto ctxt = b.data();
+				// auto ctxt = b.data();
                 //for (std::size_t i = 1; i < b.size(); i += 2)
                 //{
                     // Set seed-generated polynomial to zero
-				cout << "Relin key coeff mod count = " << ctxt.coeff_mod_count() << endl;
+				cout << "Relin key coeff mod count = " << b.data().coeff_mod_count() << endl;
 
 				cout << "First part of relin keys: ";
 				for (size_t i = 0; i < 10; i++) {
-					cout << ctxt.data()[i] << ", ";
+					cout << b.data().data()[i] << ", ";
 				}
 				cout << endl;
 				cout << "Second part of relin keys: ";
 				for (size_t i = 0; i < 10; i++) {
-					cout << ctxt.data(1)[i] << ", ";
+					cout << b.data().data(1)[i] << ", ";
 				}
 				cout << endl;
 
                 util::set_zero_poly(
-                    ctxt.poly_modulus_degree(), ctxt.coeff_mod_count(), ctxt.data(1));
+                    b.data().poly_modulus_degree(), b.data().coeff_mod_count(), b.data().data(1));
                 //}
-
-				// debug
+				count++;
+				
 
             }
         }
     }
+
+	Log::debug("Receiver side check relin keys before sending..."); 
+
+	for (auto& a : relin_keys_.data())
+	{
+		if (a.size())
+		{
+			Log::info("relin keys data size = %i", a.size());
+			// relin_keys.data()[i] is a vector of public keys;
+			size_t count = 0;
+			for (auto& b : a)
+			{
+				Log::debug("%i-th limb of relin keys : ", count+1);			
+			//for (std::size_t j = 0; j < relin_keys_.data()[i].size(); j++)
+			//{
+				// set_poly_coeffs_uniform(context_data, eval_keys_second, random_a);
+				auto& complete_key_ct = b.data();
+				Log::debug("Checking if relin keys = zero");
+				uint64_t* poly = complete_key_ct.data(1);
+				for (size_t ind = 0; ind < 10; ind++) {
+					cout << ind << ", " << *(poly + ind) << endl;
+				}
+				count++;
+			}
+		}
+	}
 
     cout << "Receiver initialized with relin keys seeds %i and %i" << relin_keys_seeds_.first << ", " <<  relin_keys_seeds_.second << endl; 
 
