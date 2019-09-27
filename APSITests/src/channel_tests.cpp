@@ -9,7 +9,6 @@
 #include "apsi/network/receiverchannel.h"
 #include "apsi/network/senderchannel.h"
 #include "seal/publickey.h"
-#include "seal/defaultparams.h"
 #include "seal/keygenerator.h"
 
 
@@ -139,12 +138,12 @@ namespace APSITests
 				EncryptionParameters enc_params(scheme_type::BFV);
 				enc_params.set_plain_modulus(64ul);
 				enc_params.set_poly_modulus_degree(1024);
-				enc_params.set_coeff_modulus(DefaultParams::coeff_modulus_128(1024));
+				enc_params.set_coeff_modulus(CoeffModulus::BFVDefault(1024));
 				shared_ptr<SEALContext> context = SEALContext::Create(enc_params);
 				KeyGenerator key_gen(context);
 
 				PublicKey pubkey = key_gen.public_key();
-				RelinKeys relinkeys = key_gen.relin_keys(10);
+				RelinKeys relinkeys = key_gen.relin_keys();
 				map<u64, vector<SeededCiphertext>> querydata;
                 seed128 relin_keys_seed;
 				vector<SeededCiphertext> vec1;
@@ -213,7 +212,7 @@ namespace APSITests
 		PSIParams::ExFieldParams exfield_params{ 321, 8 };
 		PSIParams::SEALParams seal_params;
 		seal_params.decomposition_bit_count = 10;
-		vector<SmallModulus> smv = DefaultParams::coeff_modulus_128(4096);
+		vector<SmallModulus> smv = CoeffModulus::BFVDefault(4096);
 		seal_params.encryption_params.set_poly_modulus_degree(4096);
 		seal_params.encryption_params.set_plain_modulus(5119);
 		seal_params.encryption_params.set_coeff_modulus(smv);
@@ -306,12 +305,12 @@ namespace APSITests
 				EncryptionParameters enc_params(scheme_type::BFV);
 				enc_params.set_plain_modulus(64ul);
 				enc_params.set_poly_modulus_degree(1024);
-				enc_params.set_coeff_modulus(DefaultParams::coeff_modulus_128(1024));
+				enc_params.set_coeff_modulus(CoeffModulus::BFVDefault(1024));
 				shared_ptr<SEALContext> context = SEALContext::Create(enc_params);
 				KeyGenerator key_gen(context);
 
 				PublicKey pub_key = key_gen.public_key();
-				RelinKeys relin_keys = key_gen.relin_keys(10);
+				RelinKeys relin_keys = key_gen.relin_keys();
 
 				map<u64, vector<SeededCiphertext>> query;
                 seed128 relin_keys_seed;
@@ -354,7 +353,7 @@ namespace APSITests
 				seal_params.decomposition_bit_count = 30;
 				seal_params.encryption_params.set_plain_modulus(5119);
 				seal_params.encryption_params.set_poly_modulus_degree(4096);
-				vector<SmallModulus> coeff_modulus = DefaultParams::coeff_modulus_128(seal_params.encryption_params.poly_modulus_degree());
+				vector<SmallModulus> coeff_modulus = CoeffModulus::BFVDefault(seal_params.encryption_params.poly_modulus_degree());
 				seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
 
 				PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
@@ -475,12 +474,12 @@ namespace APSITests
 		EncryptionParameters enc_params(scheme_type::BFV);
 		enc_params.set_plain_modulus(64ul);
 		enc_params.set_poly_modulus_degree(1024);
-		enc_params.set_coeff_modulus(DefaultParams::coeff_modulus_128(1024));
+		enc_params.set_coeff_modulus(CoeffModulus::BFVDefault(1024));
 		shared_ptr<SEALContext> context = SEALContext::Create(enc_params);
 		KeyGenerator key_gen(context);
 
 		PublicKey pubkey = key_gen.public_key();
-		RelinKeys relinkeys = key_gen.relin_keys(10);
+		RelinKeys relinkeys = key_gen.relin_keys();
 
 		map<u64, vector<SeededCiphertext>> querydata;
         seed128 relin_keys_seed;

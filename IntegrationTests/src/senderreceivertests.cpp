@@ -171,7 +171,7 @@ namespace
         seal_params.decomposition_bit_count = 30;
         seal_params.encryption_params.set_poly_modulus_degree(4096);
 
-        vector<SmallModulus> coeff_modulus = DefaultParams::coeff_modulus_128(seal_params.encryption_params.poly_modulus_degree());
+        vector<SmallModulus> coeff_modulus = CoeffModulus::BFVDefault(seal_params.encryption_params.poly_modulus_degree());
         seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
         seal_params.encryption_params.set_plain_modulus(40961);
 

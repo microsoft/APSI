@@ -4,7 +4,6 @@
 #include "gtest/gtest.h"
 #include "apsi/network/stream_channel.h"
 #include "seal/encryptionparams.h"
-#include "seal/defaultparams.h"
 #include "seal/keygenerator.h"
 #include "seal/relinkeys.h"
 
@@ -60,7 +59,7 @@ namespace APSITests
         seal_params.decomposition_bit_count = 30;
         seal_params.encryption_params.set_plain_modulus(5119);
         seal_params.encryption_params.set_poly_modulus_degree(4096);
-        vector<SmallModulus> coeff_modulus = DefaultParams::coeff_modulus_128(seal_params.encryption_params.poly_modulus_degree());
+        vector<SmallModulus> coeff_modulus = CoeffModulus::BFVDefault(seal_params.encryption_params.poly_modulus_degree());
         seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
 
         PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
@@ -168,7 +167,7 @@ namespace APSITests
         EncryptionParameters enc_params(scheme_type::BFV);
         enc_params.set_plain_modulus(64ul);
         enc_params.set_poly_modulus_degree(1024);
-        enc_params.set_coeff_modulus(DefaultParams::coeff_modulus_128(1024));
+        enc_params.set_coeff_modulus(CoeffModulus::BFVDefault(1024));
         shared_ptr<SEALContext> context = SEALContext::Create(enc_params);
         KeyGenerator key_gen(context);
 

@@ -7,7 +7,6 @@
 #include "apsi/tools/prng.h"
 #include "seal/context.h"
 #include "seal/util/mempool.h"
-#include "seal/defaultparams.h"
 
 using namespace apsi;
 
@@ -52,12 +51,12 @@ namespace APSITests
 	{
 		seal::EncryptionParameters parms(seal::scheme_type::BFV);
 		parms.set_poly_modulus_degree(64);
-		parms.set_coeff_modulus(seal::DefaultParams::coeff_modulus_128(1024));
+		parms.set_coeff_modulus(seal::CoeffModulus::BFVDefault(1024));
 		parms.set_plain_modulus(11);
 
 		auto context = seal::SEALContext::Create(parms);
 
-		auto plain_modulus = context->context_data()->parms().plain_modulus();
+		auto plain_modulus = context->first_context_data()->parms().plain_modulus();
 		u64 numPoints = std::min<u64>(100, plain_modulus.value() - 1);
 		int numTrials = 10;
 
