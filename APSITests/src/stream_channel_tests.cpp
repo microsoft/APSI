@@ -51,12 +51,13 @@ namespace APSITests
         StreamChannel senderchannel(/* istream */ stream1, /* ostream */ stream2);
         StreamChannel receiverchannel(/* istream */ stream2, /* ostream */ stream1);
 
-        PSIParams::PSIConfParams psiconf_params{ 60, true, false, 12345 };
-        PSIParams::TableParams table_params{ 10, 1, 2, 40 };
+        PSIParams::PSIConfParams psiconf_params{ 60, true, false, false, 12345, 90, 45, 128 };
+        PSIParams::TableParams table_params{ 10, 1, 2, 35, 40 };
         PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
         PSIParams::ExFieldParams exfield_params{ 678910, 8 };
         PSIParams::SEALParams seal_params;
         seal_params.decomposition_bit_count = 30;
+        seal_params.max_supported_degree = 20;
         seal_params.encryption_params.set_plain_modulus(5119);
         seal_params.encryption_params.set_poly_modulus_degree(4096);
         vector<SmallModulus> coeff_modulus = CoeffModulus::BFVDefault(seal_params.encryption_params.poly_modulus_degree());
@@ -74,11 +75,16 @@ namespace APSITests
         ASSERT_EQ(60, gpr.psiconf_params.item_bit_count);
         ASSERT_EQ(true, gpr.psiconf_params.use_oprf);
         ASSERT_EQ(false, gpr.psiconf_params.use_labels);
+        ASSERT_EQ(false, gpr.psiconf_params.use_fast_membership);
         ASSERT_EQ((u64)12345, gpr.psiconf_params.sender_size);
+        ASSERT_EQ(90, gpr.psiconf_params.item_bit_length_used_after_oprf);
+        ASSERT_EQ(45, gpr.psiconf_params.num_chunks);
+        ASSERT_EQ(128, gpr.psiconf_params.sender_bin_size);
 
         ASSERT_EQ(10, gpr.table_params.log_table_size);
         ASSERT_EQ(1, gpr.table_params.window_size);
         ASSERT_EQ(2, gpr.table_params.split_count);
+        ASSERT_EQ(35, gpr.table_params.split_size);
         ASSERT_EQ(40, gpr.table_params.binning_sec_level);
 
         ASSERT_EQ(3, gpr.cuckoo_params.hash_func_count);
@@ -89,8 +95,10 @@ namespace APSITests
         ASSERT_EQ(8, gpr.exfield_params.degree);
 
         ASSERT_EQ(30, gpr.seal_params.decomposition_bit_count);
+        ASSERT_EQ(20, gpr.seal_params.max_supported_degree);
         ASSERT_EQ((u64)5119, gpr.seal_params.encryption_params.plain_modulus().value());
         ASSERT_EQ((size_t)4096, gpr.seal_params.encryption_params.poly_modulus_degree());
+        ASSERT_EQ((size_t)3, gpr.seal_params.encryption_params.coeff_modulus().size());
     }
 
     TEST_F(StreamChannelTests, SendPreprocessTest)
@@ -172,7 +180,7 @@ namespace APSITests
         KeyGenerator key_gen(context);
 
         seed128 seeds = { 1, 2 };
-        RelinKeys relin_keys = key_gen.relin_keys_with_seeds(10, seeds);
+        RelinKeys relin_keys = key_gen.relin_keys();
 
         map<u64, vector<SeededCiphertext>> query;
 

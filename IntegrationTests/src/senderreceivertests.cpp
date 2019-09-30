@@ -152,6 +152,7 @@ namespace
         psiconf_params.sender_size = sender_set_size;
         psiconf_params.use_labels = use_labels;
         psiconf_params.use_oprf = use_oprf;
+        psiconf_params.use_fast_membership = false;
         psiconf_params.sender_bin_size = 0; // Size will be calculated
         psiconf_params.num_chunks = 1;
         psiconf_params.item_bit_length_used_after_oprf = 120;
@@ -163,8 +164,9 @@ namespace
 
         PSIParams::TableParams table_params;
         table_params.binning_sec_level = 40;
-        table_params.log_table_size = 10;
-        table_params.split_count = 128;
+        table_params.log_table_size = 9;
+        table_params.split_count = 1;
+        table_params.split_size = 15;
         table_params.window_size = 1;
 
         PSIParams::SEALParams seal_params;

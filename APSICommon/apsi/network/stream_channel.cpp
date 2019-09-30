@@ -74,6 +74,7 @@ void StreamChannel::receive(SenderResponseGetParameters& response)
     // SEALParams
     response.seal_params.encryption_params = EncryptionParameters::Load(istream_);
     istream_.read(reinterpret_cast<char*>(&response.seal_params.decomposition_bit_count), sizeof(unsigned));
+    istream_.read(reinterpret_cast<char*>(&response.seal_params.max_supported_degree), sizeof(unsigned));
 
     // ExFieldParams
     istream_.read(reinterpret_cast<char*>(&response.exfield_params), sizeof(PSIParams::ExFieldParams));
@@ -109,9 +110,11 @@ void StreamChannel::send_get_parameters_response(const vector<u8>& client_id, co
     ostream_.write(reinterpret_cast<const char*>(&cuckooparams), sizeof(PSIParams::CuckooParams));
 
     // SEALParams
-    unsigned dbc = params.decomposition_bit_count();
+    unsigned dbc   = params.decomposition_bit_count();
+    unsigned maxsd = params.max_supported_degree();
     EncryptionParameters::Save(params.get_seal_params().encryption_params, ostream_);
     ostream_.write(reinterpret_cast<const char*>(&dbc), sizeof(unsigned));
+    ostream_.write(reinterpret_cast<const char*>(&maxsd), sizeof(unsigned));
 
     // ExFieldParams
     const PSIParams::ExFieldParams& exfieldparams = params.get_exfield_params();
