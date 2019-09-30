@@ -7,7 +7,7 @@
 // APSI
 #include "log.h" 
 
-#if APSI_LOG_ENABLED
+#if !APSI_LOG_DISABLED
 
 // Logging
 #include "log4cplus/logger.h"

@@ -91,7 +91,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>$(ProjectDir);$(APSILIBS)\Cuckoo\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\log4cplus\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;NOMINMAX;_CRT_SECURE_NO_WARNINGS;HAVE_AVX;APSI_LOG_ENABLED;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;NOMINMAX;_CRT_SECURE_NO_WARNINGS;HAVE_AVX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ShowIncludes>false</ShowIncludes>
     </ClCompile>
@@ -125,7 +125,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>$(ProjectDir);$(APSILIBS)\Cuckoo\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\log4cplus\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;NOMINMAX;_CRT_SECURE_NO_WARNINGS;HAVE_AVX;APSI_LOG_ENABLED;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;NOMINMAX;_CRT_SECURE_NO_WARNINGS;HAVE_AVX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ShowIncludes>false</ShowIncludes>
       <WholeProgramOptimization>false</WholeProgramOptimization>
