@@ -7,6 +7,8 @@
 // APSI
 #include "log.h" 
 
+#if APSI_LOG_ENABLED
+
 // Logging
 #include "log4cplus/logger.h"
 #include "log4cplus/consoleappender.h"
@@ -190,3 +192,43 @@ void Log::format_msg(std::string& msg, const char* format, va_list ap)
     int length = vsnprintf(msgBuffer_, MSG_BUFFER_LEN, format, ap);
     msg = string(msgBuffer_, length);
 }
+
+#else
+
+// Logging is not enabled
+
+using namespace apsi::logging;
+
+void Log::info(const char* format, ...)
+{
+}
+
+void Log::debug(const char* format, ...)
+{
+}
+
+void Log::warning(const char* format, ...)
+{
+}
+
+void Log::error(const char* format, ...)
+{
+}
+
+void Log::set_log_level(Level level)
+{
+}
+
+void Log::set_log_level(const std::string& level)
+{
+}
+
+void Log::set_log_file(const std::string& file)
+{
+}
+
+void Log::set_console_disabled(bool console_disabled)
+{
+}
+
+#endif // APSI_LOG_ENABLED
