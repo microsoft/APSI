@@ -193,7 +193,7 @@ void Log::format_msg(std::string& msg, const char* format, va_list ap)
     msg = string(msgBuffer_, length);
 }
 
-#else
+#else // !APSI_LOG_DISABLED
 
 // Logging is not enabled
 
@@ -231,4 +231,4 @@ void Log::set_console_disabled(bool console_disabled)
 {
 }
 
-#endif // APSI_LOG_ENABLED
+#endif // !APSI_LOG_DISABLED
