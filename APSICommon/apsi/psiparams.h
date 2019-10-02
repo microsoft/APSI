@@ -262,13 +262,13 @@ namespace apsi
         }
 
 		void set_sender_bin_size(unsigned size) {
-			Log::info("manually setting sender bin size to be %i", size);
+			apsi::logging::Log::info("manually setting sender bin size to be %i", size);
 			sender_bin_size_ = size;
 		}
 
 
 		void set_split_count(unsigned count) {
-			Log::info("manually setting split count to be %i", count);
+			apsi::logging::Log::info("manually setting split count to be %i", count);
 			table_params_.split_count = count;
 		}
 

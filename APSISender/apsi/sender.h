@@ -80,7 +80,7 @@ namespace apsi
 				max_degree_supported_ = max_degree_supported;
 				given_digits_ = given_digits;
 				int actual_power = tools::maximal_power(max_degree_supported, given_digits, base);
-				Log::info("actual power supported = %i", actual_power);
+				apsi::logging::Log::info("actual power supported = %i", actual_power);
 				if (actual_power < max_power){
 					throw std::invalid_argument("does not support such max_power");
 				}
