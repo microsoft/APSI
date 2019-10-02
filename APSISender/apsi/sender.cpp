@@ -612,22 +612,6 @@ void Sender::compute_batch_powers(
     for (i64 i = 0; i < state.nodes_.size(); ++i)
         while (state.nodes_[i] != WindowingDag::NodeState::Done);
 
-
-	// Debugging
-	for (size_t j = 0; j < batch_powers.size(); j++) {
-		Log::debug("printing the %i -th ciphertext ", j); 
-		cout << "c0 part: "; 
-		for (size_t k = 0; k < 10; k++) {
-			cout << batch_powers[j].data()[k] << ", "; 
-		}
-		cout << endl;
-		cout << "c1 part ";
-		for (size_t k = 0; k < 10; k++) {
-			cout << batch_powers[j].data(1)[k] << ", ";
-		}
-		cout << endl;
-	}
-
     auto end = dag.nodes_.size() + batch_powers.size();
     while (idx < end)
     {

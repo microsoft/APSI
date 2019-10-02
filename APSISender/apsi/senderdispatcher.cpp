@@ -101,26 +101,6 @@ void SenderDispatcher::dispatch_query(shared_ptr<SenderOperation> sender_op, Cha
 
     get_relin_keys(sender_->get_seal_context(), relin_keys, query_op->relin_keys, query_op->relin_keys_seeds);
 
-
-	Ciphertext ki;
-	// Debug: print these relin keys. 
-	auto key = relin_keys.key(2); 
-	for (size_t i = 0; i < key.size(); i++) {
-		cout << i << "-th limb " << endl;
-		ki = key[i].data(); 
-		cout << "c0 part: "; 
-		for (size_t j = 0; j < 10; j++) {
-			cout << ki.data()[j] << ", "; 
-		}
-		cout << endl;
-		ki = key[i].data();
-		cout << "c1 part: ";
-		for (size_t j = 0; j < 10; j++) {
-			cout << ki.data(1)[j] << ", ";
-		}
-		cout << endl;
-	}
-	// End debug
     // The query response will tell the Receiver how many ResultPackages to expect
     size_t package_count = sender_->get_params().batch_count() * sender_->get_params().split_count();
     channel.send_query_response(sender_op->client_id, package_count);
