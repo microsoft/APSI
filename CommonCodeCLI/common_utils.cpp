@@ -19,7 +19,7 @@
 
 // SEAL
 #include "seal/smallmodulus.h"
-#include "seal/defaultparams.h"
+//#include "seal/defaultparams.h"
 
 
 using namespace std;

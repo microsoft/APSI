@@ -10,7 +10,7 @@
 #include "apsi/network/receiverchannel.h"
 #include "apsi/tools/utils.h"
 #include "apsi/logging/log.h"
-#include "seal/defaultparams.h"
+//#include "seal/defaultparams.h"
 
 
 using namespace std;
@@ -152,6 +152,7 @@ namespace
         psiconf_params.sender_size = sender_set_size;
         psiconf_params.use_labels = use_labels;
         psiconf_params.use_oprf = use_oprf;
+        psiconf_params.use_fast_membership = false;
         psiconf_params.sender_bin_size = 0; // Size will be calculated
         psiconf_params.num_chunks = 1;
         psiconf_params.item_bit_length_used_after_oprf = 120;
@@ -163,15 +164,16 @@ namespace
 
         PSIParams::TableParams table_params;
         table_params.binning_sec_level = 40;
-        table_params.log_table_size = 10;
-        table_params.split_count = 128;
+        table_params.log_table_size = 9;
+        table_params.split_count = 1;
+        table_params.split_size = 15;
         table_params.window_size = 1;
 
         PSIParams::SEALParams seal_params;
         seal_params.decomposition_bit_count = 30;
         seal_params.encryption_params.set_poly_modulus_degree(4096);
 
-        vector<SmallModulus> coeff_modulus = DefaultParams::coeff_modulus_128(seal_params.encryption_params.poly_modulus_degree());
+        vector<SmallModulus> coeff_modulus = CoeffModulus::BFVDefault(seal_params.encryption_params.poly_modulus_degree());
         seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
         seal_params.encryption_params.set_plain_modulus(40961);
 

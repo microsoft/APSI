@@ -60,6 +60,13 @@ namespace apsi
             void add_data(gsl::span<const Item> keys, int thread_count);
             void add_data(gsl::span<const Item> keys, MatrixView<u8> values, int thread_count);
 
+
+
+			// no hash version of add data
+			// specific for one query
+			void add_data_no_hash(gsl::span<const Item> data, MatrixView<u8> values);
+
+
             /**
             Handles the work of one thread for adding items to sender's database
             */
@@ -68,7 +75,7 @@ namespace apsi
                 int thread_count,
                 const apsi::block& seed,
                 gsl::span<const apsi::Item> data,
-                apsi::MatrixView<apsi::u8> values);
+                apsi::MatrixView<apsi::u8> values, std::vector<int> &loads);
 
             /**
             Adds one item to sender's database.
@@ -103,6 +110,9 @@ namespace apsi
             {
                 return db_blocks_.size();
             }
+
+			const apsi::PSIParams& get_params() const { return params_; }
+
 
         private:
             PSIParams params_;
@@ -147,6 +157,8 @@ namespace apsi
             index by cockooIndex. The PRNG and be any PRNG.  
             */
             std::pair<DBBlock*, DBBlock::Position> acquire_db_position(std::size_t cockooIndex, apsi::tools::PRNG& prng);
+
+			std::pair<DBBlock*, DBBlock::Position> acquire_db_position_after_oprf(size_t cuckoo_loc);
 
             apsi::tools::PRNG prng_;
         };

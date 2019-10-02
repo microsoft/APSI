@@ -24,7 +24,7 @@ namespace apsi
         std::shared_ptr<seal::SEALContext> context, FField field) :
         encoder_(make_unique<BatchEncoder>(context)),
         field_(field),
-        n_(context->context_data()->parms().poly_modulus_degree()),
+        n_(context->first_context_data()->parms().poly_modulus_degree()),
         log_n_(get_power_of_two(n_)),
         m_(2 * n_),
         slot_count_(n_ / field_.d_)

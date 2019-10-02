@@ -73,6 +73,33 @@ DBBlock::Position DBBlock::try_aquire_position(int bin_idx, PRNG& prng)
     return {};
 }
 
+DBBlock::Position DBBlock::try_aquire_position_after_oprf(int bin_idx)
+{
+	if (bin_idx >= items_per_batch_)
+	{
+		throw runtime_error("bin_idx should be smaller than items_per_batch");
+	}
+
+	int idx = 0;
+	auto start = bin_idx * items_per_split_;
+	auto end = (bin_idx + 1) * items_per_split_;
+
+	// If still failed, try to do linear scan
+	for (int i = 0; i < items_per_split_; ++i)
+	{
+		bool exp = false;
+		if (has_item_[start + idx].compare_exchange_strong(exp, true))
+		{
+			// Great, found an empty location and have marked it as mine
+			return { bin_idx, idx };
+		}
+
+		idx = (idx + 1) % items_per_split_;
+	}
+
+	return {};
+}
+
 void DBBlock::check(const Position & pos)
 {
     if (!pos.is_initialized() ||
@@ -201,8 +228,9 @@ void DBBlock::batch_interpolate(
     DBInterpolationCache& cache,
     const PSIParams& params)
 {
-    auto mod = seal_context->context_data()->parms().plain_modulus().value();
-    MemoryPoolHandle local_pool = th_context.pool();
+    //auto mod = seal_context->context_data()->parms().plain_modulus().value();
+	auto mod = params.get_seal_params().encryption_params.plain_modulus().value();
+	MemoryPoolHandle local_pool = th_context.pool();
     Position pos;
 
     for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)

@@ -103,13 +103,20 @@ void run_sender_dispatcher(const CLP& cmd)
 
 	Log::info("FPrate = %f", params.log_fp_rate());
 
-	
+
+	auto coeffmod = params.get_seal_params().encryption_params.coeff_modulus();
+	size_t bits = 0; 
+	for (size_t i = 0; i < coeffmod.size(); i++)
+		bits += coeffmod[i].bit_count(); 
+	Log::debug("coeff modulus size = %i ", bits); 
 
     Log::info("Building sender");
     shared_ptr<Sender> sender = make_shared<Sender>(params, cmd.threads(), cmd.threads());
 
     Log::info("Sender loading DB with %i items", items.size());
     sender->load_db(items, labels);
+
+	// make sure sender params gets updated
 
     signal(SIGINT, sigint_handler);
 
