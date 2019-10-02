@@ -96,5 +96,5 @@ void CSVReader::throw_if_file_not_present() const
 {
     filesystem::path pth(file_name_);
     if (!filesystem::exists(pth))
-        throw new invalid_argument("File name does not exist");
+        throw invalid_argument("File name does not exist");
 }

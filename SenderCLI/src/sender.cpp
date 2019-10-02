@@ -34,7 +34,7 @@ using namespace apsi::logging;
 
 
 void run_sender_dispatcher(const CLP& cmd);
-void initialize_db(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels);
+bool initialize_db(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels);
 
 
 int main(int argc, char *argv[])
@@ -97,7 +97,11 @@ void run_sender_dispatcher(const CLP& cmd)
     vector<Item> items;
     Matrix<u8> labels;
 
-    initialize_db(cmd, items, labels);
+    if (!initialize_db(cmd, items, labels))
+    {
+        // Failed to read db file
+        return;
+    }
 
     PSIParams params = build_psi_params(cmd, items.size());
 
@@ -126,11 +130,21 @@ void run_sender_dispatcher(const CLP& cmd)
     dispatcher.run(stop, cmd.net_port());
 }
 
-void initialize_db(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels)
+bool initialize_db(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels)
 {
     auto label_bit_length  = cmd.use_labels() ? cmd.item_bit_length() : 0;
     auto label_byte_length = (label_bit_length + 7) / 8;
 
-    CSVReader reader(cmd.db_file());
-    reader.read(items, labels, label_byte_length);
+    try
+    {
+        CSVReader reader(cmd.db_file());
+        reader.read(items, labels, label_byte_length);
+    }
+    catch (invalid_argument& ex)
+    {
+        Log::error("Could not open or read file: %s: %s", cmd.db_file().c_str(), ex.what());
+        return false;
+    }
+
+    return true;
 }
