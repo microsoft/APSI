@@ -103,10 +103,8 @@ void Sender::load_db(const vector<Item> &data, MatrixView<u8> vals)
 {
     sender_db_->set_data(data, vals, total_thread_count_);
 
-	params_.set_split_count(sender_db_->get_params().split_count());
-	params_.set_sender_bin_size(sender_db_->get_params().sender_bin_size());
-
-
+    params_.set_split_count(sender_db_->get_params().split_count());
+    params_.set_sender_bin_size(sender_db_->get_params().sender_bin_size());
 
     // Compute symmetric polys and batch
     offline_compute();
@@ -259,14 +257,14 @@ void Sender::query(
         }
     }
 
-	size_t coeff_mod_count = get_params().get_seal_params().encryption_params.coeff_modulus().size();
+    size_t coeff_mod_count = get_params().get_seal_params().encryption_params.coeff_modulus().size();
 
     Plaintext dummyPtxt("0"); 
     SecretKey dummySk;  // todo: initialize this.
     dummySk.data().resize(coeff_mod_count
-		* powers[0][0].poly_modulus_degree());
+        * powers[0][0].poly_modulus_degree());
     dummySk.data().set_zero();
-	dummySk.parms_id() = seal_context_->key_parms_id();
+    dummySk.parms_id() = seal_context_->key_parms_id();
 
 
     for (const auto& pair : query)
@@ -277,11 +275,12 @@ void Sender::query(
         {
             // do we do the logic here? 
             seed128 seed = pair.second[i].first;  // first, locate the seed
-            // cout << "sender seed: " << seed.first << ", " << seed.second << endl;
             get_ciphertext(seal_context_, powers[i][power], pair.second[i].second);
+
             // Then, make the correction. 
             Ciphertext temp; 
             session_context.encryptor()->encrypt_sk_seeds_in(Plaintext("0"), temp, dummySk, seed);
+
             // todo: correcting the first coefficient, which is  -(a*s+e + Delta*m)
             seal::util::set_poly_poly(temp.data(1), temp.poly_modulus_degree(), temp.coeff_mod_count(), powers[i][power].data(1));      
         }
@@ -306,7 +305,7 @@ void Sender::respond(
     int	splitStep = batch_count * split_size_plus_one;
     int total_blocks = params_.split_count() * batch_count;
 
-	// like a dummy encryption of 1. 
+    // like a dummy encryption of 1. 
     session_context.encryptor()->encrypt(Plaintext("1"), powers[0][0]);
     for (u64 i = 1; i < powers.size(); ++i)
     {
@@ -315,14 +314,10 @@ void Sender::respond(
 
     auto& plain_mod = params_.encryption_params().plain_modulus();
 
-	int max_supported_degree = params_.max_supported_degree();
-
-	int window_size = get_params().window_size();
-
-	int base = 1 << window_size;
-
-	int given_digits = num_of_powers / (base - 1); 
-
+    int max_supported_degree = params_.max_supported_degree();
+    int window_size = get_params().window_size();
+    int base = 1 << window_size;
+    int given_digits = num_of_powers / (base - 1); 
 
     WindowingDag dag(params_.split_size(), params_.window_size(), max_supported_degree, given_digits);
     std::vector<WindowingDag::State> states;
@@ -444,21 +439,17 @@ void Sender::respond_worker(
             evaluator_->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
             currResult ^= 1;
         }
-		// Handle the case for s = params_.split_size(); 
-		int s = params_.split_size(); 
-		if (params_.use_oprf()) {
-			tmp = powers[batch][s]; 
-		}
-		else {
-			evaluator_->multiply_plain(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
-		}
-		evaluator_->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
-		currResult ^= 1;
 
-		// handle the s = 0 term 
-		//evaluator_->add_plain_inplace(runningResults[currResult], block.batch_random_symm_poly_[0]);
-		
-
+        // Handle the case for s = params_.split_size(); 
+        int s = params_.split_size(); 
+        if (params_.use_oprf()) {
+            tmp = powers[batch][s]; 
+        }
+        else {
+            evaluator_->multiply_plain(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
+        }
+        evaluator_->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
+        currResult ^= 1;
 
         if (params_.use_labels())
         {
@@ -533,9 +524,7 @@ void Sender::respond_worker(
 
         {
             stringstream ss;
-			//runningResults[currResult].save(ss);
-			//compressedResult.save(ss);
-			compressor_->compressed_save(compressedResult, ss);
+            compressor_->compressed_save(compressedResult, ss);
             pkg.data = ss.str();
         }
 
@@ -661,47 +650,26 @@ u64 WindowingDag::pow(u64 base, u64 e)
 
 uint64_t WindowingDag::optimal_split(uint64_t x, int base, vector<int> &degrees)
 {
-	int opt_deg = degrees[x];
-	int opt_split = 0;
+    int opt_deg = degrees[x];
+    int opt_split = 0;
 
-	for (int i1 = 1; i1 < x; i1++) {
-		if (degrees[i1] + degrees[x - i1] < opt_deg){
-			opt_split = i1;
-			opt_deg = degrees[i1] + degrees[x - i1];
-		}
-		else if (degrees[i1] + degrees[x - i1] == opt_deg 
-			&& abs(degrees[i1] - degrees[x-i1]) < abs(degrees[opt_split] - degrees[x- opt_split])){
-			opt_split = i1;
-		}
-	}
-	degrees[x] = opt_deg;
-	return opt_split; 
+    for (int i1 = 1; i1 < x; i1++)
+    {
+        if (degrees[i1] + degrees[x - i1] < opt_deg)
+        {
+            opt_split = i1;
+            opt_deg = degrees[i1] + degrees[x - i1];
+        }
+        else if (degrees[i1] + degrees[x - i1] == opt_deg 
+            && abs(degrees[i1] - degrees[x-i1]) < abs(degrees[opt_split] - degrees[x- opt_split]))
+        {
+            opt_split = i1;
+        }
+    }
 
+    degrees[x] = opt_deg;
 
-	//// todo: handle special case.
- //   vector<uint64_t> digits = conversion_to_digits(x, base);
- //   int ndigits = static_cast<int>(digits.size());
- //   int hammingweight = 0;
- //   for (int i = 0; i < ndigits; i++)
- //   {
- //       hammingweight += static_cast<int>(digits[i] != 0);
- //   }
- //   int target = hammingweight / 2;
- //   int now = 0;
- //   uint64_t result = 0;
- //   for (int i = 0; i < ndigits; i++)
- //   {
- //       if (digits[i] != 0)
- //       {
- //           now++;
- //           result += pow(base, i)*digits[i];
- //       }
- //       if (now >= target)
- //       {
- //           break;
- //       }
- //   }
- //   return result;
+    return opt_split; 
 }
 
 vector<uint64_t> WindowingDag::conversion_to_digits(uint64_t input, int base)
@@ -722,57 +690,61 @@ void WindowingDag::compute_dag()
         splits(max_power_ + 1),
         items_per(max_power_, 0);
 
-	Log::debug("Computing windowing dag: max power = %i", max_power_);
+    Log::debug("Computing windowing dag: max power = %i", max_power_);
 
-	// initialize the degree array.
-	// given digits...
-	int base = (1 << window_);
-	for (int i = 0; i < given_digits_; i++) {
-		for (int j = 1; j < base; j++) {
-			if (pow(base, i) * j < degree.size()) {
-				degree[pow(base, i) * j] = 1;
-			}
-		}
-	}
-	degree[0] = 0;
+    // initialize the degree array.
+    // given digits...
+    int base = (1 << window_);
+    for (int i = 0; i < given_digits_; i++)
+    {
+        for (int j = 1; j < base; j++)
+        {
+            if (pow(base, i) * j < degree.size())
+            {
+                degree[pow(base, i) * j] = 1;
+            }
+        }
+    }
 
+    degree[0] = 0;
 
-	for (int i = 1; i <= max_power_; i++)
-	{
-		int i1 = static_cast<int>(optimal_split(i, 1 << window_, degree));
-		int i2 = i - i1;
-		splits[i] = i1;
+    for (int i = 1; i <= max_power_; i++)
+    {
+        int i1 = static_cast<int>(optimal_split(i, 1 << window_, degree));
+        int i2 = i - i1;
+        splits[i] = i1;
 
-		if (i1 == 0 || i2 == 0)
-		{
-			base_powers_.emplace_back(i);
-			degree[i] = 1;
-		}
-		else
-		{
-			degree[i] = degree[i1] + degree[i2];
-			++items_per[degree[i]];
-		}
-		Log::debug("degree[%i] = %i", i, degree[i]);
-		Log::debug("splits[%i] = %i", i, splits[i]);
-	}
+        if (i1 == 0 || i2 == 0)
+        {
+            base_powers_.emplace_back(i);
+            degree[i] = 1;
+        }
+        else
+        {
+            degree[i] = degree[i1] + degree[i2];
+            ++items_per[degree[i]];
+        }
+        Log::debug("degree[%i] = %i", i, degree[i]);
+        Log::debug("splits[%i] = %i", i, splits[i]);
+    }
 
-	// Validate the we did not exceed maximal supported degree.
-	if (*std::max_element(degree.begin(), degree.end()) > max_degree_supported_) {
-		Log::debug("error: degree exceeds maximal supported"); 
-		throw invalid_argument("degree too large");
-	}
+    // Validate the we did not exceed maximal supported degree.
+    if (*std::max_element(degree.begin(), degree.end()) > max_degree_supported_)
+    {
+        Log::error("Degree exceeds maximal supported"); 
+        throw invalid_argument("degree too large");
+    }
 
     for (int i = 3; i < max_power_ && items_per[i]; ++i)
     {
         items_per[i] += items_per[i - 1];
     }
 
-	for (int i = 0; i < max_power_; i++) {
-		Log::debug("items_per[%i] = %i", i, items_per[i]);
-	}
+    for (int i = 0; i < max_power_; i++) {
+        Log::debug("items_per[%i] = %i", i, items_per[i]);
+    }
 
-	// size = how many powers we still need to generate. 
+    // size = how many powers we still need to generate. 
     int size = static_cast<int>(max_power_ - base_powers_.size());
     nodes_.resize(size);
 

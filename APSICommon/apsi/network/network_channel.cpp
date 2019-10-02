@@ -150,18 +150,17 @@ void NetworkChannel::receive(SenderResponseGetParameters& response)
     response.psiconf_params.item_bit_count = msg.get<unsigned int>(idx++);
     response.psiconf_params.use_oprf = msg.get<bool>(idx++);
     response.psiconf_params.use_labels = msg.get<bool>(idx++);
-	response.psiconf_params.use_fast_membership = msg.get<bool>(idx++);
-	response.psiconf_params.sender_size = msg.get<u64>(idx++);
+    response.psiconf_params.use_fast_membership = msg.get<bool>(idx++);
+    response.psiconf_params.sender_size = msg.get<u64>(idx++);
     response.psiconf_params.num_chunks = msg.get<unsigned int>(idx++);
     response.psiconf_params.sender_bin_size = msg.get<unsigned int>(idx++);
     response.psiconf_params.item_bit_length_used_after_oprf = msg.get<unsigned int>(idx++);
-
 
     // TableParams
     response.table_params.log_table_size = msg.get<unsigned int>(idx++);
     response.table_params.window_size = msg.get<unsigned int>(idx++);
     response.table_params.split_count = msg.get<unsigned int>(idx++);
-	response.table_params.split_size = msg.get<unsigned int>(idx++);
+    response.table_params.split_size = msg.get<unsigned int>(idx++);
     response.table_params.binning_sec_level = msg.get<unsigned int>(idx++);
 
     // CuckooParams
@@ -178,8 +177,7 @@ void NetworkChannel::receive(SenderResponseGetParameters& response)
 
     response.seal_params.encryption_params.set_plain_modulus(msg.get<u64>(idx++));
     response.seal_params.decomposition_bit_count = msg.get<unsigned int>(idx++);
-	response.seal_params.max_supported_degree = msg.get<unsigned int>(idx++);
-
+    response.seal_params.max_supported_degree = msg.get<unsigned int>(idx++);
 
     // ExFieldParams
     response.exfield_params.characteristic = msg.get<u64>(idx++);
@@ -288,7 +286,7 @@ void NetworkChannel::send_get_parameters_response(const vector<u8>& client_id, c
     msg.add(params.item_bit_count());
     msg.add(params.use_oprf());
     msg.add(params.use_labels());
-	msg.add(params.use_fast_membership());
+    msg.add(params.use_fast_membership());
     msg.add(params.sender_size());
     msg.add(params.num_chunks());
     msg.add(params.sender_bin_size());
@@ -299,7 +297,7 @@ void NetworkChannel::send_get_parameters_response(const vector<u8>& client_id, c
     msg.add(params.log_table_size());
     msg.add(params.window_size());
     msg.add(params.split_count());
-	msg.add(params.split_size());
+    msg.add(params.split_size());
     msg.add(params.binning_sec_level());
 
     // CuckooParams
@@ -312,7 +310,7 @@ void NetworkChannel::send_get_parameters_response(const vector<u8>& client_id, c
     add_sm_vector(params.encryption_params().coeff_modulus(), msg);
     msg.add(params.encryption_params().plain_modulus().value());
     msg.add(params.decomposition_bit_count());
-	msg.add(params.max_supported_degree());
+    msg.add(params.max_supported_degree());
 
     // ExFieldParams
     msg.add(params.exfield_characteristic());
@@ -377,7 +375,8 @@ void NetworkChannel::send_query(
     get_string(str, relin_keys);
     msg.add(str);
     bytes_sent_ += str.length();
-    Log::info("relin key length = %i bytes ", str.length());
+
+    Log::debug("send_query: relin key length = %i bytes ", str.length());
 
     add_part(query.size(), msg);
     bytes_sent_ += sizeof(size_t);
@@ -403,14 +402,14 @@ void NetworkChannel::send_query(
         bytes_sent_ += sizeof(u64); // seed2
         bytes_sent_ += sizeof(size_t);
     }
-    Log::info("ciphertext lengths = %i bytes ", bytes_sent_ - sofar);
+
+    Log::debug("send_query: ciphertext lengths = %i bytes ", bytes_sent_ - sofar);
 
     // finally, send relin keys seeds.      
     add_part(relin_key_seeds.first, msg);
     add_part(relin_key_seeds.second, msg);
     bytes_sent_ += sizeof(u64);
     bytes_sent_ += sizeof(u64);
-
 
     send_message(msg);
 }

@@ -34,7 +34,7 @@ namespace apsi
             unsigned item_bit_count;
             bool use_oprf;
             bool use_labels;
-			bool use_fast_membership; // faster configuration assuming query is always one item.
+            bool use_fast_membership; // faster configuration assuming query is always one item.
             apsi::u64 sender_size;
             unsigned item_bit_length_used_after_oprf; // how many bits we take after oprf.
 
@@ -57,7 +57,7 @@ namespace apsi
             unsigned log_table_size;
             unsigned window_size;
             unsigned split_count;
-			unsigned split_size;
+            unsigned split_size;
             unsigned binning_sec_level;
         };
 
@@ -65,7 +65,7 @@ namespace apsi
         {
             seal::EncryptionParameters encryption_params{ seal::scheme_type::BFV };
             unsigned decomposition_bit_count;
-			unsigned max_supported_degree;
+            unsigned max_supported_degree;
         };
 
         struct ExFieldParams
@@ -121,10 +121,10 @@ namespace apsi
             return psiconf_params_.use_labels;
         }
 
-		inline bool use_fast_membership() const
-		{
-			return psiconf_params_.use_fast_membership;
-		}
+        inline bool use_fast_membership() const
+        {
+            return psiconf_params_.use_fast_membership;
+        }
 
         inline apsi::u64 sender_size() const
         {
@@ -155,10 +155,10 @@ namespace apsi
             return table_params_.split_count;
         }
 
-		inline unsigned int split_size() const
-		{
-			return table_params_.split_size;
-		}
+        inline unsigned int split_size() const
+        {
+            return table_params_.split_size;
+        }
 
         inline unsigned int binning_sec_level() const
         {
@@ -196,10 +196,10 @@ namespace apsi
             return seal_params_.decomposition_bit_count;
         }
 
-		inline unsigned int max_supported_degree() const
-		{
-			return seal_params_.max_supported_degree;
-		}
+        inline unsigned int max_supported_degree() const
+        {
+            return seal_params_.max_supported_degree;
+        }
 
         /********************************************
         Parameters from input: ExFieldParams
@@ -261,16 +261,16 @@ namespace apsi
             return ((double)exfield_degree())* (log2(split_size())) + log2(split_count())- bitcount;
         }
 
-		void set_sender_bin_size(unsigned size) {
-			apsi::logging::Log::info("manually setting sender bin size to be %i", size);
-			sender_bin_size_ = size;
-		}
+        void set_sender_bin_size(unsigned size) {
+            apsi::logging::Log::info("manually setting sender bin size to be %i", size);
+            sender_bin_size_ = size;
+        }
 
 
-		void set_split_count(unsigned count) {
-			apsi::logging::Log::info("manually setting split count to be %i", count);
-			table_params_.split_count = count;
-		}
+        void set_split_count(unsigned count) {
+            apsi::logging::Log::info("manually setting split count to be %i", count);
+            table_params_.split_count = count;
+        }
 
         // Allow access to param structures
         const PSIConfParams& get_psiconf_params() const { return psiconf_params_; }

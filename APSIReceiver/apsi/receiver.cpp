@@ -76,7 +76,6 @@ void Receiver::initialize()
         SmallModulus(get_params().exfield_characteristic()),
         get_params().exfield_degree());
 
-    //slot_count_ = static_cast<int>(get_params().encryption_params().poly_modulus_degree() / get_params().exfield_degree());
     slot_count_ = get_params().batch_size();
 
     seal_context_ = SEALContext::Create(get_params().encryption_params());
@@ -102,65 +101,15 @@ void Receiver::initialize()
     {
         if (a.size())
         {
-			size_t count = 0; 
             for (auto &b : a)
             {
-				cout << (count + 1) << "-th limb of relin keys : ";
-				// b is a public key, b.data() is a Ciphertext object. 
-				// auto ctxt = b.data();
-                //for (std::size_t i = 1; i < b.size(); i += 2)
-                //{
-                    // Set seed-generated polynomial to zero
-				cout << "Relin key coeff mod count = " << b.data().coeff_mod_count() << endl;
-
-				cout << "First part of relin keys: ";
-				for (size_t i = 0; i < 10; i++) {
-					cout << b.data().data()[i] << ", ";
-				}
-				cout << endl;
-				cout << "Second part of relin keys: ";
-				for (size_t i = 0; i < 10; i++) {
-					cout << b.data().data(1)[i] << ", ";
-				}
-				cout << endl;
-
                 util::set_zero_poly(
                     b.data().poly_modulus_degree(), b.data().coeff_mod_count(), b.data().data(1));
-                //}
-				count++;
-				
-
             }
         }
     }
 
-	Log::debug("Receiver side check relin keys before sending..."); 
-
-	for (auto& a : relin_keys_.data())
-	{
-		if (a.size())
-		{
-			Log::info("relin keys data size = %i", a.size());
-			// relin_keys.data()[i] is a vector of public keys;
-			size_t count = 0;
-			for (auto& b : a)
-			{
-				Log::debug("%i-th limb of relin keys : ", count+1);			
-			//for (std::size_t j = 0; j < relin_keys_.data()[i].size(); j++)
-			//{
-				// set_poly_coeffs_uniform(context_data, eval_keys_second, random_a);
-				auto& complete_key_ct = b.data();
-				Log::debug("Checking if relin keys = zero");
-				uint64_t* poly = complete_key_ct.data(1);
-				for (size_t ind = 0; ind < 10; ind++) {
-					cout << ind << ", " << *(poly + ind) << endl;
-				}
-				count++;
-			}
-		}
-	}
-
-    cout << "Receiver initialized with relin keys seeds %i and %i" << relin_keys_seeds_.first << ", " <<  relin_keys_seeds_.second << endl; 
+    Log::debug("Receiver initialized with relin keys seeds %ui and %ui", relin_keys_seeds_.first, relin_keys_seeds_.second);
 
     ex_batch_encoder_ = make_shared<FFieldFastBatchEncoder>(seal_context_, *field_);
 
@@ -185,16 +134,16 @@ map<uint64_t, vector<SeededCiphertext>>& Receiver::query(vector<Item>& items)
 
 pair<vector<bool>, Matrix<u8>> Receiver::decrypt_result(vector<Item>& items, Channel& chl)
 {
-	auto& cuckoo = *preprocess_result_.second;
-	unsigned padded_table_size = static_cast<unsigned>(
-		((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
+    auto& cuckoo = *preprocess_result_.second;
+    unsigned padded_table_size = static_cast<unsigned>(
+        ((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
 
-	vector<int> table_to_input_map(padded_table_size, 0);
-	if (items.size() > 1 || (!get_params().use_fast_membership())) {
-		table_to_input_map = cuckoo_indices(items, cuckoo);
-	} else{
-		Log::info("receiver single query table to input map...");
-	}
+    vector<int> table_to_input_map(padded_table_size, 0);
+    if (items.size() > 1 || (!get_params().use_fast_membership())) {
+        table_to_input_map = cuckoo_indices(items, cuckoo);
+    } else{
+        Log::info("Receiver single query table to input map");
+    }
 
     /* Receive results */
     SenderResponseQuery query_resp;
@@ -376,47 +325,42 @@ pair<
     STOPWATCH(recv_stop_watch, "Receiver::preprocess");
     Log::info("Receiver preprocess start");
 
-	// find the item length 
-	
+    // find the item length 
+    unique_ptr<CuckooTable> cuckoo;
+    unique_ptr<FFieldArray> exfield_items;
 
-	unique_ptr<CuckooTable> cuckoo;
-	//if (items.size() > 1) {
+    unsigned padded_cuckoo_capacity = static_cast<unsigned>(
+        ((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
 
+    exfield_items = make_unique<FFieldArray>(padded_cuckoo_capacity, *field_);
 
-	unique_ptr<FFieldArray> exfield_items;
-	unsigned padded_cuckoo_capacity = static_cast<unsigned>(
-		((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
+    int item_bit_count = get_params().item_bit_count();
+    if (get_params().use_oprf())
+    {
+        item_bit_count = get_params().item_bit_length_used_after_oprf();
+    }
 
-	exfield_items = make_unique<FFieldArray>(padded_cuckoo_capacity, *field_);
-
-	int item_bit_count = get_params().item_bit_count();
-	if (get_params().use_oprf()) {
-		item_bit_count = get_params().item_bit_length_used_after_oprf();
-	}
-
-	bool fm = get_params().use_fast_membership();
-	if (items.size() > 1 || (!fm)) {
-		cuckoo = cuckoo_hashing(items);
-		exfield_encoding(*cuckoo, *exfield_items);
-	} 
-	else { //perform repeated encoding. 
-		Log::info("Using repeated encoding for single query....");
-		for (size_t i = 0; i < get_params().table_size(); i++)
-		{
-			exfield_items->set(i, items[0].to_exfield_element(*field_, item_bit_count));
-		}
-	}
-    
+    bool fm = get_params().use_fast_membership();
+    if (items.size() > 1 || (!fm)) {
+        cuckoo = cuckoo_hashing(items);
+        exfield_encoding(*cuckoo, *exfield_items);
+    } 
+    else
+    {
+        // Perform repeated encoding. 
+        Log::info("Using repeated encoding for single query");
+        for (size_t i = 0; i < get_params().table_size(); i++)
+        {
+            exfield_items->set(i, items[0].to_exfield_element(*field_, item_bit_count));
+        }
+    }
     
     map<uint64_t, FFieldArray> powers;
     generate_powers(*exfield_items, powers);
 
     map<uint64_t, vector<SeededCiphertext> > ciphers;
     encrypt(powers, ciphers);
-
-	// debug 
-	
-
+    
     Log::info("Receiver preprocess end");
 
     return { move(ciphers), move(cuckoo) };
@@ -495,14 +439,15 @@ void Receiver::exfield_encoding(
     FFieldArray &ret)
 {
     int item_bit_count = get_params().item_bit_count();
-	if (get_params().use_oprf()) {
-		item_bit_count = get_params().item_bit_length_used_after_oprf();
-	}
-	Log::info("item bit count before decoding: %i", item_bit_count); 
-	// oprf? depends 
-	auto& encodings = cuckoo.table();
+    if (get_params().use_oprf()) {
+        item_bit_count = get_params().item_bit_length_used_after_oprf();
+    }
+    Log::debug("item bit count before decoding: %i", item_bit_count); 
 
-	Log::info("bit count of ptxt modulus = %i", ret.field().ch().bit_count());
+    // oprf? depends 
+    auto& encodings = cuckoo.table();
+
+    Log::debug("bit count of ptxt modulus = %i", ret.field().ch().bit_count());
 
     for (size_t i = 0; i < cuckoo.table_size(); i++)
     {
@@ -524,17 +469,20 @@ void Receiver::generate_powers(const FFieldArray &exfield_items,
     int window_size = get_params().window_size();
     int radix = 1 << window_size;
 
-	// todo: this bound needs to be re-visited. 
-	int max_supported_degree = get_params().max_supported_degree();
-	// find the bound by enumerating 
-	int bound = split_size;
-	while(bound > 0 && tools::maximal_power(max_supported_degree, bound, radix) >= split_size) {
-		bound--;
-	}
-	bound++;
+    // todo: this bound needs to be re-visited. 
+    int max_supported_degree = get_params().max_supported_degree();
+
+    // find the bound by enumerating 
+    int bound = split_size;
+    while (bound > 0 && tools::maximal_power(max_supported_degree, bound, radix) >= split_size)
+    {
+        bound--;
+    }
+    bound++;
+
     //int bound = static_cast<int>(floor(log2(split_size) / window_size) + 1);
-	//bound = 4; // hardcoded for debug
-	bound = 2;
+    //bound = 4; // hardcoded for debug
+    bound = 2;
 
     Log::debug("Generate powers: split_size %i, window_size %i, radix %i, bound %i",
         split_size, window_size, radix, bound);
@@ -560,7 +508,6 @@ void Receiver::generate_powers(const FFieldArray &exfield_items,
 
 void Receiver::encrypt(map<uint64_t, FFieldArray> &input, map<uint64_t, vector<SeededCiphertext>> &destination)
 {
-    // debugging
     size_t count = 0; 
     destination.clear();
     for (auto it = input.begin(); it != input.end(); it++)
@@ -596,13 +543,10 @@ void Receiver::encrypt(const FFieldArray &input, vector<SeededCiphertext> &desti
 
         destination.back().first = seeds;
         Log::debug("Seeds = %i, %i", seeds.first, seeds.second);
-        // debug 
+
         // note: this is not doing the setting to zero yet.
         Log::debug("Fresh encryption noise budget = %i", decryptor_->invariant_noise_budget(destination.back().second)); 
         seal::util::set_zero_poly(destination.back().second.poly_modulus_degree(), destination.back().second.coeff_mod_count(), destination.back().second.data(1));
-        //Log::info("cipher after setting to zero : ");
-        //for (int i = 0; i< 10; i++)
-        //    Log::info("(%i, %i)", i, destination.back().second.data(1)[i]); 
     }
 }
 
@@ -611,8 +555,6 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
     const std::vector<int> &table_to_input_map,
     std::vector<Item> &items)
 {
-
-
     STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt");
     std::pair<std::vector<bool>, Matrix<u8>> ret;
     auto& ret_bools = ret.first;
@@ -698,9 +640,9 @@ void Receiver::stream_decrypt_worker(
         // recover the sym poly values 
         has_result = false;
         stringstream ss(pkg.data);
-		//tmp.load(seal_context_, ss);
-		compressor_->compressed_load(ss, tmp);
-		if (first && thread_idx == 0)
+
+        compressor_->compressed_load(ss, tmp);
+        if (first && thread_idx == 0)
         {
             first = false;
             Log::info("Noise budget: %i bits", decryptor_->invariant_noise_budget(tmp));
@@ -708,8 +650,6 @@ void Receiver::stream_decrypt_worker(
 
         decryptor_->decrypt(tmp, p);
         ex_batch_encoder_->decompose(p, *batch);
-
-        // cout << "Batch = " << pkg.batch_idx << "; Returned array size: " << batch->size() << " / batch_size = " << batch_size << "; degree = " << batch->field().d() << endl;
 
         for (int k = 0; k < batch_size; k++)
         {
@@ -719,12 +659,6 @@ void Receiver::stream_decrypt_worker(
                 auto &is_zero = has_label[k];
 
                 is_zero = batch->is_zero(k);
-                //cout << "Item at slot " << k << ": ";
-                //for (size_t a = 0; a < batch->field().d(); a++)
-                //{
-                    //cout << batch->get_coeff_of(k, a) << " ";
-                //}
-                //cout << endl;
 
                 if (is_zero)
                 {

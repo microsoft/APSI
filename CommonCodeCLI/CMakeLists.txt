@@ -47,7 +47,7 @@ target_compile_features(common_code PUBLIC cxx_std_17)
 
 # Add local include directories for build
 target_include_directories(common_code
-	PUBLIC $<BUILD_INTERFACE:${common_code_SOURCE_DIR}>)
+    PUBLIC $<BUILD_INTERFACE:${common_code_SOURCE_DIR}>)
 
 # Link required libraries
 target_link_libraries(common_code apsi_common TCLAP)

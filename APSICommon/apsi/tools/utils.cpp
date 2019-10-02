@@ -5,10 +5,6 @@
 #include <array>
 #include <vector>
 
-// Boost
-//#include <boost/math/special_functions/binomial.hpp>
-//#include <boost/multiprecision/cpp_bin_float.hpp>
-
 
 using namespace std;
 using namespace apsi;
@@ -21,42 +17,32 @@ namespace
 {
     double get_bin_overflow_prob(u64 num_bins, u64 num_balls, u64 bin_size, double epsilon = 0.0001)
     {
-        // cout << "bin size = " << bin_size;
         if (num_balls <= bin_size)
         {
             return numeric_limits<double>::max();
         }
+
         if (num_balls > numeric_limits<int>::max())
         {
-            auto msg = ("boost::math::binomial_coefficient(...) only supports "
-                + to_string(sizeof(unsigned) * 8) + " bit inputs which was exceeded.");
+            auto msg = ("Number of balls exceeds numeric limit of int");
             throw runtime_error(msg);
         }
 
-        typedef long double T; // typedef boost::multiprecision::number<boost::multiprecision::backends::cpp_bin_float<16> > T;
-        T sum = 0.0;
-        T sec = 0.0;
-        // T diff = 1;
-        // u64 i = bin_size + 1;
+        typedef long double ldouble;
+        ldouble sum = 0.0;
+        ldouble sec = 0.0;
         u64 i = 0;
-        T back = pow((1 - T(1.0) / num_bins), num_balls); 
+        ldouble back = pow((1 - ldouble(1.0) / num_bins), num_balls); 
 
         while (i <= bin_size)
         {
             // a(i) = a(i-1) * stuff. 
             sum += back;
-            back *= T(num_balls - i) / (T(i + 1) * T(num_bins - 1)); 
-            //sum += num_bins * boost::math::binomial_coefficient<T>(static_cast<int>(num_balls), static_cast<int>(i))
-            //    * boost::multiprecision::pow(T(1.0) / num_bins, i) * boost::multiprecision::pow(1 - T(1.0) / num_bins, num_balls - i);
-            // cout << "i = " << i << "sum = " << sum << endl;
-            T sec2 = log2(T(num_bins)* (1 - sum)); 
-            //T sec2 = boost::multiprecision::logb(sum);
-            // diff = abs(sec - sec2); 
-            //diff = boost::multiprecision::abs(sec - sec2);
+            back *= ldouble(num_balls - i) / (ldouble(i + 1) * ldouble(num_bins - 1)); 
+            ldouble sec2 = log2(ldouble(num_bins)* (1 - sum)); 
             sec = sec2;
             i++;
         }
-        // cout << "sec = " << sec << endl;
 
         return max<double>(0, (double)-sec);
     }
@@ -138,17 +124,17 @@ u64 apsi::tools::optimal_split(const u64 x, const int base)
 // compute F(d,k)
 apsi::u64 apsi::tools::maximal_power(const apsi::u64 degree, const apsi::u64 bound, const int base)
 {
-	// base must be positive
-	if (base < 0) throw invalid_argument("base must be a positive integer");
+    // base must be positive
+    if (base < 0) throw invalid_argument("base must be a positive integer");
 
-	// if d >= k-1, use the first formula.
-	if (bound <= degree + 1) {
-		return pow(base, bound)  - base + (degree - bound + 1) * pow(base, bound - 1) * (base - 1);
-	}
-	else { // when d < k -1 i.e. k > d+1. 
-		return maximal_power(degree, degree + 1, base);
-	}
-	return apsi::u64();
+    // if d >= k-1, use the first formula.
+    if (bound <= degree + 1) {
+        return pow(base, bound)  - base + (degree - bound + 1) * pow(base, bound - 1) * (base - 1);
+    }
+    else { // when d < k -1 i.e. k > d+1. 
+        return maximal_power(degree, degree + 1, base);
+    }
+    return apsi::u64();
 }
 
 vector<u64> apsi::tools::conversion_to_digits(const u64 input, const int base)

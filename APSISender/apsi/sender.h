@@ -63,27 +63,27 @@ namespace apsi
             };
 
             int max_power_, window_;
-			int max_degree_supported_; // maximum degree supported.
-			int given_digits_;  // how many digits are given. 
+            int max_degree_supported_; // maximum degree supported.
+            int given_digits_;  // how many digits are given. 
             std::vector<int> base_powers_;
             std::vector<Node> nodes_;
 
-			// add a parameter which is max degree.
-
             WindowingDag(int max_power, int window, int max_degree_supported, int given_digits)
             {
-
                 max_power_ = max_power;
                 window_ = window;
-				//Log::info("window = %i", window);
-				int base = 1 << window_;
-				max_degree_supported_ = max_degree_supported;
-				given_digits_ = given_digits;
-				int actual_power = tools::maximal_power(max_degree_supported, given_digits, base);
-				apsi::logging::Log::info("actual power supported = %i", actual_power);
-				if (actual_power < max_power){
-					throw std::invalid_argument("does not support such max_power");
-				}
+                int base = 1 << window_;
+                max_degree_supported_ = max_degree_supported;
+                given_digits_ = given_digits;
+                int actual_power = tools::maximal_power(max_degree_supported, given_digits, base);
+
+                apsi::logging::Log::debug("actual power supported = %i", actual_power);
+
+                if (actual_power < max_power)
+                {
+                    throw std::invalid_argument("does not support such max_power");
+                }
+
                 compute_dag();
             }
 

@@ -2,6 +2,6 @@
 # Licensed under the MIT license.
 
 target_sources(receiver
-	PRIVATE
-		${CMAKE_CURRENT_LIST_DIR}/receiver.cpp
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/receiver.cpp
 )

@@ -2,16 +2,16 @@
 # Licensed under the MIT license.
 
 target_sources(apsi_common
-	PRIVATE
-		${CMAKE_CURRENT_LIST_DIR}/aes.cpp
-		${CMAKE_CURRENT_LIST_DIR}/bigpoly.cpp
-		${CMAKE_CURRENT_LIST_DIR}/csvreader.cpp
-		${CMAKE_CURRENT_LIST_DIR}/fourq.cpp
-		${CMAKE_CURRENT_LIST_DIR}/interpolate.cpp
-		${CMAKE_CURRENT_LIST_DIR}/prng.cpp
-		${CMAKE_CURRENT_LIST_DIR}/sealcompress.cpp
-		${CMAKE_CURRENT_LIST_DIR}/stopwatch.cpp
-		${CMAKE_CURRENT_LIST_DIR}/utils.cpp
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/aes.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/bigpoly.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/csvreader.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/fourq.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/interpolate.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/prng.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/sealcompress.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/stopwatch.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
 )
 
 add_subdirectory(blake2)

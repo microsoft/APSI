@@ -2,8 +2,8 @@
 # Licensed under the MIT license.
 
 target_sources(apsi_common
-	PRIVATE
-		${CMAKE_CURRENT_LIST_DIR}/log.cpp
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/log.cpp
 )
 
 install(

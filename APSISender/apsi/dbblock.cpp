@@ -75,29 +75,29 @@ DBBlock::Position DBBlock::try_aquire_position(int bin_idx, PRNG& prng)
 
 DBBlock::Position DBBlock::try_aquire_position_after_oprf(int bin_idx)
 {
-	if (bin_idx >= items_per_batch_)
-	{
-		throw runtime_error("bin_idx should be smaller than items_per_batch");
-	}
+    if (bin_idx >= items_per_batch_)
+    {
+        throw runtime_error("bin_idx should be smaller than items_per_batch");
+    }
 
-	int idx = 0;
-	auto start = bin_idx * items_per_split_;
-	auto end = (bin_idx + 1) * items_per_split_;
+    int idx = 0;
+    auto start = bin_idx * items_per_split_;
+    auto end = (bin_idx + 1) * items_per_split_;
 
-	// If still failed, try to do linear scan
-	for (int i = 0; i < items_per_split_; ++i)
-	{
-		bool exp = false;
-		if (has_item_[start + idx].compare_exchange_strong(exp, true))
-		{
-			// Great, found an empty location and have marked it as mine
-			return { bin_idx, idx };
-		}
+    // If still failed, try to do linear scan
+    for (int i = 0; i < items_per_split_; ++i)
+    {
+        bool exp = false;
+        if (has_item_[start + idx].compare_exchange_strong(exp, true))
+        {
+            // Great, found an empty location and have marked it as mine
+            return { bin_idx, idx };
+        }
 
-		idx = (idx + 1) % items_per_split_;
-	}
+        idx = (idx + 1) % items_per_split_;
+    }
 
-	return {};
+    return {};
 }
 
 void DBBlock::check(const Position & pos)
@@ -161,11 +161,6 @@ void DBBlock::symmetric_polys(
                 symm_block_ptr - d,
                 [&ch](auto a, auto b) { return multiply_uint_uint_mod(a, b, ch); });
 
-            //fq_nmod_mul(
-                //symm_block_ptr - 1,
-                //symm_block_ptr,
-                //temp1->data(), ctx);
-
             for (int k = pos.split_offset + 1; k < split_size; k++, symm_block_ptr += d)
             {
                 transform(temp1->data(), temp1->data() + d,
@@ -173,17 +168,10 @@ void DBBlock::symmetric_polys(
                     temp2.data(),
                     [&ch](auto a, auto b) { return multiply_uint_uint_mod(a, b, ch); });
 
-                //fq_nmod_mul(temp2.data(), temp1->data(), symm_block_ptr + 1, ctx);
-
                 transform(symm_block_ptr, symm_block_ptr + d,
                     temp2.data(),
                     symm_block_ptr,
                     [&ch](auto a, auto b) { return add_uint_uint_mod(a, b, ch); });
-
-                //fq_nmod_add(
-                    //symm_block_ptr,
-                    //symm_block_ptr,
-                    //temp2.data(), ctx);
             }
         }
     }
@@ -215,7 +203,6 @@ void DBBlock::randomized_symmetric_polys(
                 r.data(i),
                 symm_block_ptr,
                 [&ch](auto a, auto b) { return multiply_uint_uint_mod(a, b, ch); });
-            //fq_nmod_mul(symm_block_ptr, symm_block_ptr, r.data() + i, field_ctx);
         }
     }
 }
@@ -228,9 +215,8 @@ void DBBlock::batch_interpolate(
     DBInterpolationCache& cache,
     const PSIParams& params)
 {
-    //auto mod = seal_context->context_data()->parms().plain_modulus().value();
-	auto mod = params.get_seal_params().encryption_params.plain_modulus().value();
-	MemoryPoolHandle local_pool = th_context.pool();
+    auto mod = params.get_seal_params().encryption_params.plain_modulus().value();
+    MemoryPoolHandle local_pool = th_context.pool();
     Position pos;
 
     for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)

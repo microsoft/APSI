@@ -2,8 +2,8 @@
 # Licensed under the MIT license.
 
 target_sources(apsi_sender
-	PRIVATE
-		${CMAKE_CURRENT_LIST_DIR}/senderchannel.cpp
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/senderchannel.cpp
 )
 
 install(

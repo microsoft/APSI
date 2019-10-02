@@ -49,11 +49,11 @@ namespace apsi
             TCLAP::ValueArg<int> threadsArg("t", "threads", "Number of threads to use", /* req */ false, /* value */ 1, /* type desc */ "int");
             add(threadsArg);
 
-			TCLAP::ValueArg<std::string> logFileArg("", "logFile", "File where logs will be written to", /* req */ false, /* value */ "", /* type desc */ "file path");
-			add(logFileArg);
+            TCLAP::ValueArg<std::string> logFileArg("", "logFile", "File where logs will be written to", /* req */ false, /* value */ "", /* type desc */ "file path");
+            add(logFileArg);
 
-			TCLAP::SwitchArg disableConsoleLogArg("", "noConsole", "Disable Console output", false);
-			add(disableConsoleLogArg);
+            TCLAP::SwitchArg disableConsoleLogArg("", "noConsole", "Disable Console output", false);
+            add(disableConsoleLogArg);
 
             // No need to add log_level_arg_, already added in constructor
 
@@ -70,14 +70,14 @@ namespace apsi
                 log_level_ = log_level_arg_->getValue();
                 cout_param("logLevel", log_level_);
 
-				disable_console_ = disableConsoleLogArg.getValue();
-				cout_param("noConsole", disable_console_);
+                disable_console_ = disableConsoleLogArg.getValue();
+                cout_param("noConsole", disable_console_);
 
                 get_args();
 
-				log_file_ = logFileArg.getValue();
-				cout_param("logFile", log_file_);
-			}
+                log_file_ = logFileArg.getValue();
+                cout_param("logFile", log_file_);
+            }
             catch (...)
             {
                 std::cout << "Error parsing parameters.";
@@ -89,8 +89,8 @@ namespace apsi
 
         int threads() const { return threads_; }
         const std::string& log_level() const { return log_level_; }
-		const std::string& log_file() const { return log_file_; }
-		bool disable_console() const { return disable_console_; }
+        const std::string& log_file() const { return log_file_; }
+        bool disable_console() const { return disable_console_; }
 
     protected:
         template<class T>
@@ -116,8 +116,8 @@ namespace apsi
         // Parameters from command line
         int threads_;
         std::string log_level_;
-		std::string log_file_;
-		bool disable_console_;
+        std::string log_file_;
+        bool disable_console_;
 
         // Parameters with constraints
         std::unique_ptr<TCLAP::ValueArg<std::string>> log_level_arg_;

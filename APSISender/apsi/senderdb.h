@@ -53,19 +53,16 @@ namespace apsi
             void set_data(gsl::span<const Item> keys, int thread_count);
             void set_data(gsl::span<const Item> keys, MatrixView<u8> values, int thread_count);
 
-
             /**
             Adds the data items to sender's database.
             */
             void add_data(gsl::span<const Item> keys, int thread_count);
             void add_data(gsl::span<const Item> keys, MatrixView<u8> values, int thread_count);
 
-
-
-			// no hash version of add data
-			// specific for one query
-			void add_data_no_hash(gsl::span<const Item> data, MatrixView<u8> values);
-
+            /**
+             No hash version of add data, specific for one query
+            */
+            void add_data_no_hash(gsl::span<const Item> data, MatrixView<u8> values);
 
             /**
             Handles the work of one thread for adding items to sender's database
@@ -111,7 +108,7 @@ namespace apsi
                 return db_blocks_.size();
             }
 
-			const apsi::PSIParams& get_params() const { return params_; }
+            const apsi::PSIParams& get_params() const { return params_; }
 
 
         private:
@@ -158,7 +155,7 @@ namespace apsi
             */
             std::pair<DBBlock*, DBBlock::Position> acquire_db_position(std::size_t cockooIndex, apsi::tools::PRNG& prng);
 
-			std::pair<DBBlock*, DBBlock::Position> acquire_db_position_after_oprf(size_t cuckoo_loc);
+            std::pair<DBBlock*, DBBlock::Position> acquire_db_position_after_oprf(size_t cuckoo_loc);
 
             apsi::tools::PRNG prng_;
         };

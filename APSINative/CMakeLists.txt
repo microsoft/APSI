@@ -52,8 +52,8 @@ target_compile_features(apsinative PUBLIC cxx_std_17)
 
 # Add source files to library
 target_sources(apsinative
-	PRIVATE
-		${CMAKE_CURRENT_LIST_DIR}/apsinative.cpp
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/apsinative.cpp
 )
 
 # Link required libraries

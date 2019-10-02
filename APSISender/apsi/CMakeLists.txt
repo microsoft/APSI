@@ -2,11 +2,11 @@
 # Licensed under the MIT license.
 
 target_sources(apsi_sender
-	PRIVATE
-		${CMAKE_CURRENT_LIST_DIR}/dbblock.cpp
-		${CMAKE_CURRENT_LIST_DIR}/sender.cpp
-		${CMAKE_CURRENT_LIST_DIR}/senderdb.cpp
-		${CMAKE_CURRENT_LIST_DIR}/senderdispatcher.cpp
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/dbblock.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/sender.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/senderdb.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/senderdispatcher.cpp
 )
 
 add_subdirectory(network)
