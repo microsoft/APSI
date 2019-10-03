@@ -480,10 +480,6 @@ void Receiver::generate_powers(const FFieldArray &exfield_items,
     }
     bound++;
 
-    //int bound = static_cast<int>(floor(log2(split_size) / window_size) + 1);
-    //bound = 4; // hardcoded for debug
-    bound = 2;
-
     Log::debug("Generate powers: split_size %i, window_size %i, radix %i, bound %i",
         split_size, window_size, radix, bound);
 
