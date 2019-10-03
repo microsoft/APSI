@@ -20,7 +20,7 @@ namespace apsi
         virtual void add_args()
         {
             add(labels_arg_);
-            add(oprf_arg_);
+            add(no_oprf_arg_);
             add(fast_membership_arg_);
             add(item_bit_length_arg_);
             add(sec_lvl_arg_);
@@ -46,8 +46,9 @@ namespace apsi
             use_labels_ = labels_arg_.getValue();
             cout_param("useLabels", use_labels_ ? "true" : "false");
 
-            oprf_ = oprf_arg_.getValue();
-            cout_param("oprf", oprf_ ? "true" : "false");
+            bool noOprf = no_oprf_arg_.getValue();
+            cout_param("noOprf", noOprf ? "true" : "false");
+            oprf_ = !noOprf;
 
             fast_membership_ = fast_membership_arg_.getValue();
             cout_param("fast membership",  fast_membership_? "true" : "false");
@@ -145,7 +146,7 @@ namespace apsi
 
     private:
         TCLAP::SwitchArg             labels_arg_          = TCLAP::SwitchArg("l", "useLabels", "Use labels", false);
-        TCLAP::SwitchArg             oprf_arg_            = TCLAP::SwitchArg("o", "oprf", "Use OPRF", true);
+        TCLAP::SwitchArg             no_oprf_arg_         = TCLAP::SwitchArg("o", "noOprf", "Do not use OPRF", false);
         TCLAP::SwitchArg             fast_membership_arg_ = TCLAP::SwitchArg("f", "fastMembership", "Use fast membership", false);
         TCLAP::ValueArg<unsigned>    item_bit_length_arg_ = TCLAP::ValueArg<unsigned>("b", "itemBitLength", "Item bit length", false, 60, "unsigned");
         TCLAP::ValueArg<int>         net_port_arg_        = TCLAP::ValueArg<int>("", "port", "Network port to bind to", false, 1212, "int");
