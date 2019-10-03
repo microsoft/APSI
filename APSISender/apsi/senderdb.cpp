@@ -182,59 +182,6 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
     params_.set_split_count(new_split_count);
 
     Log::debug("New max load, new split count = %i, %i", params_.sender_bin_size(), params_.split_count());
-
-    bool validate = false;
-    if (validate)
-    {
-
-        vector<cuckoo::LocFunc> normal_loc_func;
-        for (unsigned i = 0; i < params_.hash_func_count(); i++)
-        {
-            normal_loc_func.emplace_back(cuckoo::LocFunc(
-                params_.log_table_size(),
-                cuckoo::make_item(params_.hash_func_seed() + i, 0)));
-        }
-
-        for (i64 i = 0; i < data.size(); ++i)
-        {
-            // Claim an emply location in each matching bin
-            for (unsigned j = 0; j < params_.hash_func_count(); j++)
-            {
-                Item key;
-                u64 cuckoo_loc;
-
-                // Compute bin locations
-                auto cuckoo_item = cuckoo::make_item(data[i].get_value());
-                cuckoo_loc = normal_loc_func[j](cuckoo_item);
-                key = data[i];
-
-                // Lock-free thread-safe bin position search
-                DBBlock::Position pos;
-                auto batch_idx = cuckoo_loc / params_.batch_size();
-                pos.batch_offset = cuckoo_loc % params_.batch_size();
-
-                auto count = 0;
-                for (u64 j = 0; j < db_blocks_.columns(); ++j)
-                {
-                    auto &blk = *db_blocks_(batch_idx, j);
-                    ;
-                    for (pos.split_offset = 0;
-                        pos.split_offset < blk.items_per_split_;
-                        ++pos.split_offset)
-                    {
-                        if (blk.has_item(pos) &&
-                            blk.get_key(pos) == key)
-                        {
-                            ++count;
-                        }
-                    }
-                }
-
-                if (count != 1)
-                    throw std::runtime_error("");
-            }
-        }
-    }
 }
 
 
