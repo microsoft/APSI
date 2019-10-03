@@ -165,14 +165,15 @@ namespace
         table_params.binning_sec_level = 40;
         table_params.log_table_size = 9;
         table_params.split_count = 1;
-        table_params.split_size = 15;
-        table_params.window_size = 1;
+        table_params.split_size = 16;
+        table_params.window_size = 2;
 
         PSIParams::SEALParams seal_params;
         seal_params.decomposition_bit_count = 30;
         seal_params.encryption_params.set_poly_modulus_degree(4096);
+        seal_params.max_supported_degree = 2;
 
-        vector<SmallModulus> coeff_modulus = CoeffModulus::BFVDefault(seal_params.encryption_params.poly_modulus_degree());
+        vector<SmallModulus> coeff_modulus = CoeffModulus::Create(4096, { 49, 40, 20 });
         seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
         seal_params.encryption_params.set_plain_modulus(40961);
 
