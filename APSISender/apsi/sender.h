@@ -75,11 +75,11 @@ namespace apsi
                 int base = 1 << window_;
                 max_degree_supported_ = max_degree_supported;
                 given_digits_ = given_digits;
-                int actual_power = tools::maximal_power(max_degree_supported, given_digits, base);
+                u64 actual_power = tools::maximal_power(max_degree_supported, given_digits, base);
 
                 apsi::logging::Log::debug("actual power supported = %i", actual_power);
 
-                if (actual_power < max_power)
+                if (static_cast<int>(actual_power) < max_power)
                 {
                     throw std::invalid_argument("does not support such max_power");
                 }

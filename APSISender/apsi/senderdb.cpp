@@ -167,7 +167,7 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
 
     // aggregate and find the max.
     int maxload = 0;
-    for (int i = 0; i < params_.table_size(); i++) {
+    for (unsigned i = 0; i < params_.table_size(); i++) {
         for (int t = 1; t < thread_count; t++) {
             thread_loads[0][i] += thread_loads[t][i]; 
         }
@@ -242,17 +242,15 @@ void SenderDB::add_data_no_hash(gsl::span<const Item> data, MatrixView<u8> value
     }
 
     // debugging: print the bin load 
-    Log::debug("max load = %i", maxload);
+    Log::debug("Original max load = %i", maxload);
 
-    unsigned new_split_count = (maxload + params_.split_size() - 1) / params_.split_size();
+    u64 new_split_count = (maxload + params_.split_size() - 1) / params_.split_size();
     maxload = new_split_count * params_.split_size();
-    params_.set_sender_bin_size(maxload);
-    params_.set_split_count(new_split_count);
-
+    params_.set_sender_bin_size(static_cast<unsigned>(maxload));
+    params_.set_split_count(static_cast<unsigned>(new_split_count));
 
     // resize the matrix of blocks.
     db_blocks_.resize(params_.batch_count(), new_split_count);
-
 
     Log::debug("New max load, new split count = %i, %i", params_.sender_bin_size(), params_.split_count());
 

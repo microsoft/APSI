@@ -432,7 +432,7 @@ void Sender::respond_worker(
 
         evaluator_->multiply_plain(powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
 
-        for (int s = 1; s < params_.split_size(); s++)
+        for (unsigned s = 1; s < params_.split_size(); s++)
         {
             // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
             evaluator_->multiply_plain(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
