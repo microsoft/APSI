@@ -55,25 +55,9 @@ find_package(FourQ MODULE REQUIRED)
 # Import Log4cplus
 find_package(Log4cplus MODULE REQUIRED)
 
-# # Google Test
-# find_path(GTEST_DIR gtest/gtest.h)
-# find_library(GTEST gtest)
-# if (NOT GTEST OR NOT GTEST_DIR)
-#     message(FATAL_ERROR "Could not find Google Test library")
-# else()
-#     message(STATUS "Google Test directory: ${GTEST_DIR}")
-#     message(STATUS "Found Google Test: ${GTEST}")
-# endif()
-
 # Set flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-
-# Includes
-#target_include_directories(int_tests PRIVATE
-#    ${FLINT_DIR}/flint
-#    ${LOG4CPLUS_DIR}
-#)
 
 # C++17
 target_compile_features(int_tests PUBLIC cxx_std_17)
