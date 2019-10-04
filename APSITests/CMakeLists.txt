@@ -61,17 +61,17 @@ find_package(FourQ MODULE REQUIRED)
 # Import Log4cplus
 find_package(Log4cplus MODULE REQUIRED)
 
-# Only build GTest
-option(BUILD_GMOCK OFF)
-option(INSTALL_GTEST OFF)
-mark_as_advanced(BUILD_GMOCK INSTALL_GTEST)
+# # Only build GTest
+# option(BUILD_GMOCK OFF)
+# option(INSTALL_GTEST OFF)
+# mark_as_advanced(BUILD_GMOCK INSTALL_GTEST)
 
-# Add GTest
-set(GTEST_DIR "${CMAKE_CURRENT_LIST_DIR}/thirdparty/googletest")
-if(NOT EXISTS ${GTEST_DIR}/CMakeLists.txt)
-    message(FATAL_ERROR "Could not find `${GTEST_DIR}/CMakeLists.txt`. Run `git submodule update --init` and retry.")
-endif()
-add_subdirectory(${GTEST_DIR})
+# # Add GTest
+# set(GTEST_DIR "${CMAKE_CURRENT_LIST_DIR}/../thirdparty/googletest")
+# if(NOT EXISTS ${GTEST_DIR}/CMakeLists.txt)
+#     message(FATAL_ERROR "Could not find `${GTEST_DIR}/CMakeLists.txt`. Run `git submodule update --init` and retry.")
+# endif()
+# add_subdirectory(${GTEST_DIR})
 
 # Set flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")

@@ -4,7 +4,6 @@
 target_sources(apsi_common
     PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/aes.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/bigpoly.cpp
         ${CMAKE_CURRENT_LIST_DIR}/csvreader.cpp
         ${CMAKE_CURRENT_LIST_DIR}/fourq.cpp
         ${CMAKE_CURRENT_LIST_DIR}/interpolate.cpp
@@ -19,7 +18,6 @@ add_subdirectory(blake2)
 install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/aes.h
-        ${CMAKE_CURRENT_LIST_DIR}/bigpoly.h
         ${CMAKE_CURRENT_LIST_DIR}/csvreader.h
         ${CMAKE_CURRENT_LIST_DIR}/fourq.h
         ${CMAKE_CURRENT_LIST_DIR}/interpolate.h

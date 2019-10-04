@@ -6,6 +6,7 @@
 #include <future>
 #include <chrono>
 #include <array>
+#include <climits>
 
 // APSI
 #include "apsi/sender.h"

@@ -36,6 +36,18 @@ add_subdirectory(APSISender)
 add_subdirectory(APSIReceiver)
 
 if(BUILD_TESTS)
+    # Only build GTest
+    option(BUILD_GMOCK OFF)
+    option(INSTALL_GTEST OFF)
+    mark_as_advanced(BUILD_GMOCK INSTALL_GTEST)
+
+    # Add GTest
+    set(GTEST_DIR "${CMAKE_CURRENT_LIST_DIR}/thirdparty/googletest")
+    if(NOT EXISTS ${GTEST_DIR}/CMakeLists.txt)
+        message(FATAL_ERROR "Could not find `${GTEST_DIR}/CMakeLists.txt`. Run `git submodule update --init` and retry.")
+    endif()
+
+    add_subdirectory(${GTEST_DIR})
     add_subdirectory(APSITests)
     add_subdirectory(IntegrationTests)
 endif()

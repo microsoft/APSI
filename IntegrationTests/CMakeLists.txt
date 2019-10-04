@@ -10,7 +10,7 @@ if (DEFINED MSVC)
 endif()
 
 # Executable will be in ../bin
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/../bin)
 
 # Create executable but add no source files yet
 add_executable(int_tests "")
@@ -29,32 +29,41 @@ message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 list(APPEND CMAKE_MODULE_PATH ${int_tests_SOURCE_DIR}/../cmake)
 
 # Import APSICommon
-find_package(APSICommon 1.0.0 EXACT REQUIRED)
+if(NOT TARGET apsi_common)
+    find_package(APSICommon 1.0.0 EXACT REQUIRED)
+endif()
 
 # Import APSISender
-find_package(APSISender 1.0.0 EXACT REQUIRED)
+if(NOT TARGET apsi_sender)
+    find_package(APSISender 1.0.0 EXACT REQUIRED)
+endif()
 
 # Import APSIReceiver
-find_package(APSIReceiver 1.0.0 EXACT REQUIRED)
+if(NOT TARGET apsi_receiver)
+    find_package(APSIReceiver 1.0.0 EXACT REQUIRED)
+endif()
 
-# Import SEAL
-find_package(SEAL 3.3.2 REQUIRED)
+# Import ZeroMQ
+find_package(ZeroMQ MODULE REQUIRED)
 
-# Import Cuckoo
-find_package(Cuckoo 1.1.0 REQUIRED)
+# Import ZeroMQpp
+find_package(ZeroMQpp MODULE REQUIRED)
+
+# Import FourQ
+find_package(FourQ MODULE REQUIRED)
 
 # Import Log4cplus
 find_package(Log4cplus MODULE REQUIRED)
 
-# Google Test
-find_path(GTEST_DIR gtest/gtest.h)
-find_library(GTEST gtest)
-if (NOT GTEST OR NOT GTEST_DIR)
-    message(FATAL_ERROR "Could not find Google Test library")
-else()
-    message(STATUS "Google Test directory: ${GTEST_DIR}")
-    message(STATUS "Found Google Test: ${GTEST}")
-endif()
+# # Google Test
+# find_path(GTEST_DIR gtest/gtest.h)
+# find_library(GTEST gtest)
+# if (NOT GTEST OR NOT GTEST_DIR)
+#     message(FATAL_ERROR "Could not find Google Test library")
+# else()
+#     message(STATUS "Google Test directory: ${GTEST_DIR}")
+#     message(STATUS "Found Google Test: ${GTEST}")
+# endif()
 
 # Set flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
@@ -71,10 +80,10 @@ target_compile_features(int_tests PUBLIC cxx_std_17)
 
 # Link required libraries
 target_link_libraries(int_tests
-    APSICommon::apsi_common
-    APSISender::apsi_sender
-    APSIReceiver::apsi_receiver
-    ${GTEST}
+    apsi_common
+    apsi_sender
+    apsi_receiver
+    gtest
 )
 
 # Add source files to executable
