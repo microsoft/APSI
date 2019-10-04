@@ -50,7 +50,7 @@ if(NOT TARGET apsi_common)
 endif()
 
 # Import Microsoft SEAL
-find_package(SEAL 3.2.1 EXACT REQUIRED)
+find_package(SEAL 3.3.2 EXACT REQUIRED)
 
 # Import Cuckoo
 find_package(Cuckoo 1.1.0 EXACT REQUIRED)

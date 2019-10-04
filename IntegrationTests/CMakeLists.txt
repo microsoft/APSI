@@ -38,7 +38,7 @@ find_package(APSISender 1.0.0 EXACT REQUIRED)
 find_package(APSIReceiver 1.0.0 EXACT REQUIRED)
 
 # Import SEAL
-find_package(SEAL 3.2.1 REQUIRED)
+find_package(SEAL 3.3.2 REQUIRED)
 
 # Import Cuckoo
 find_package(Cuckoo 1.1.0 REQUIRED)

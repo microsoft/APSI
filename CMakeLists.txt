@@ -37,6 +37,7 @@ add_subdirectory(APSIReceiver)
 
 if(BUILD_TESTS)
     add_subdirectory(APSITests)
+    add_subdirectory(IntegrationTests)
 endif()
 
 add_subdirectory(CommonCodeCLI)
