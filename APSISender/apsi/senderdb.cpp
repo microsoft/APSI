@@ -173,7 +173,7 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
         }
         maxload = max(maxload, thread_loads[0][i]);
     }
-    Log::debug("max load =  %i", maxload); 
+    Log::debug("Original max load =  %i", maxload); 
 
     // making sure maxload is a multiple of split_size
     unsigned new_split_count = (maxload + params_.split_size() - 1) / params_.split_size();
@@ -187,8 +187,7 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
 
 void SenderDB::add_data_no_hash(gsl::span<const Item> data, MatrixView<u8> values)
 {
-
-    STOPWATCH(sender_stop_watch, "SenderDB::add_data_");
+    STOPWATCH(sender_stop_watch, "SenderDB::add_data_no_hash");
 
     u64 start = 0;
     u64 end = data.size();
