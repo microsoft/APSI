@@ -100,7 +100,12 @@ namespace apsi
                 auto get_factor(std::size_t index) const
                     -> ECPoint::scalar_span_const_type
                 {
-                    return get_factor(index);
+                    if (index >= item_count_)
+                    {
+                        throw std::invalid_argument("index out of bounds");
+                    }
+                    return factor_data_.span().subspan(
+                        index * factor_size, factor_size);
                 }
 
             private:

@@ -229,7 +229,7 @@ namespace apsi
             {
                 random_uint64 = [&rg]() {
                     uint64_t res;
-                    rg->generate(sizeof(res), reinterpret_cast<seal::SEAL_BYTE*>(res));
+                    rg->generate(sizeof(res), reinterpret_cast<seal::SEAL_BYTE*>(&res));
                     return res;
                 };
             }
@@ -259,7 +259,7 @@ namespace apsi
             }
 
             // Copy the result to out
-            copy(random_data.cbegin(), random_data.cend(), out.data());
+            memcpy(out.data(), random_data.data(), order_size);
         }
 
         void ECPoint::invert_scalar(
