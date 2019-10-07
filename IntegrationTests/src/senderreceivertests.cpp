@@ -79,7 +79,8 @@ namespace
 
     void RunTest(size_t senderActualSize, PSIParams& params)
     {
-        Log::set_log_level(Log::Level::level_error);
+        //Log::set_log_level(Log::Level::level_error);
+		Log::set_log_level(Log::Level::level_debug);
 
         // Connect the network
         ReceiverChannel recvChl;
@@ -88,6 +89,8 @@ namespace
         recvChl.connect(conn_addr);
 
         unsigned numThreads = thread::hardware_concurrency();
+		//unsigned numThreads = 1; // hao: for debug only.
+
 
         unique_ptr<Receiver> receiver_ptr;
 
@@ -151,8 +154,8 @@ namespace
 
     PSIParams create_params(size_t sender_set_size, bool use_oprf, bool use_labels, bool fast_membership)
     {
-        Log::set_log_level(Log::Level::level_error);
-
+        //Log::set_log_level(Log::Level::level_error);
+		Log::set_log_level(Log::Level::level_debug);
         PSIParams::PSIConfParams psiconf_params;
         psiconf_params.item_bit_count = 60;
         psiconf_params.sender_size = sender_set_size;
