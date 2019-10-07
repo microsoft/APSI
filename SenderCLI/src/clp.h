@@ -31,7 +31,6 @@ namespace apsi
             add(poly_mod_arg_);
             add(coeff_mod_arg_);
             add(plain_mod_arg_);
-            add(dbc_arg_);
             add(exfld_degree_arg_);
             add(db_file_arg_);
             add(net_port_arg_);
@@ -97,9 +96,6 @@ namespace apsi
             plain_modulus_ = plain_mod_arg_.getValue();
             cout_param("plainModulus", plain_modulus_);
 
-            dbc_ = dbc_arg_.getValue();
-            cout_param("dbc", dbc_);
-
             exfield_degree_ = exfld_degree_arg_.getValue();
             cout_param("exfieldDegree", exfield_degree_);
 
@@ -134,7 +130,6 @@ namespace apsi
         int poly_modulus() const { return poly_modulus_; }
         const std::vector<u64>& coeff_modulus() const { return coeff_modulus_; }
         u64 plain_modulus() const { return plain_modulus_; }
-        int dbc() const { return dbc_; }
         int exfield_degree() const { return exfield_degree_; }
         int net_port() const { return net_port_; }
         const std::string& db_file() const { return db_file_; }
@@ -160,7 +155,6 @@ namespace apsi
 
         TCLAP::MultiArg<apsi::u64>   coeff_mod_arg_ =   TCLAP::MultiArg<apsi::u64>("c", "coeffModulus", "Coefficient Modulus", false, "u64");
         TCLAP::ValueArg<apsi::u64>   plain_mod_arg_       = TCLAP::ValueArg<apsi::u64>("", "plainModulus", "Plain Modulus", false, 40961, "u64");
-        TCLAP::ValueArg<int>         dbc_arg_             = TCLAP::ValueArg<int>("", "dbc", "Decomposition Bit Count", false, 30, "int");
         TCLAP::ValueArg<int>         exfld_degree_arg_    = TCLAP::ValueArg<int>("e", "exfieldDegree", "exField degree", false, 8, "int");
         TCLAP::ValueArg<int>         num_chunks_arg_      = TCLAP::ValueArg<int>("", "numChunks", "number of chunks per item", false, 1, "int");
         TCLAP::ValueArg<int>         sender_bin_size_arg_ = TCLAP::ValueArg<int>("", "senderBinSize", "(manually set) sender bin size", false, 0, "int");
@@ -180,7 +174,6 @@ namespace apsi
         int poly_modulus_;
         std::vector<u64> coeff_modulus_;
         u64 plain_modulus_;
-        int dbc_;
         int exfield_degree_;
         int net_port_;
         std::string db_file_;

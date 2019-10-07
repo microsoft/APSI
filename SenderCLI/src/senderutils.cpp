@@ -113,8 +113,6 @@ const PSIParams apsi::tools::build_psi_params(
         seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
         seal_params.encryption_params.set_plain_modulus(cmd.plain_modulus());
 
-        seal_params.decomposition_bit_count = cmd.dbc();
-
         /** Note: now this maximal supported degree for a given set of SEAL parameters is 
         hardcoded. It be better to give a formula.
         */

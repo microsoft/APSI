@@ -230,15 +230,20 @@ void Sender::preprocess(vector<u8>& buff)
 }
 
 void Sender::query(
-    const RelinKeys& relin_keys,
-    const map<u64, vector<pair<seed128, string>>> query,
+    const string& relin_keys,
+    const map<u64, vector<string>> query,
     const vector<u8>& client_id,
     Channel& channel)
 {
     STOPWATCH(sender_stop_watch, "Sender::query");
     Log::info("Start processing query");
 
-    SenderSessionContext session_context(seal_context_, relin_keys);
+    // Load the relinearization keys from string
+    RelinKeys rlk;
+    get_relin_keys(seal_context_, rlk, relin_keys);
+
+    // Create the session context
+    SenderSessionContext session_context(seal_context_, rlk);
 
     /* Receive client's query data. */
     int num_of_powers = static_cast<int>(query.size());
@@ -251,39 +256,18 @@ void Sender::query(
     for (u64 i = 0; i < powers.size(); ++i)
     {
         powers[i].reserve(split_size_plus_one);
-
         for (u64 j = 0; j < split_size_plus_one; ++j)
         {
             powers[i].emplace_back(seal_context_, pool_);
         }
     }
 
-    size_t coeff_mod_count = get_params().get_seal_params().encryption_params.coeff_modulus().size();
-
-    Plaintext dummyPtxt("0"); 
-    SecretKey dummySk;  // todo: initialize this.
-    dummySk.data().resize(coeff_mod_count
-        * powers[0][0].poly_modulus_degree());
-    dummySk.data().set_zero();
-    dummySk.parms_id() = seal_context_->key_parms_id();
-
-
-    for (const auto& pair : query)
+    for (const auto& q : query)
     {
-        u64 power = pair.first;
-
+        u64 power = q.first;
         for (u64 i = 0; i < powers.size(); i++)
         {
-            // do we do the logic here? 
-            seed128 seed = pair.second[i].first;  // first, locate the seed
-            get_ciphertext(seal_context_, powers[i][power], pair.second[i].second);
-
-            // Then, make the correction. 
-            Ciphertext temp; 
-            session_context.encryptor()->encrypt_sk_seeds_in(Plaintext("0"), temp, dummySk, seed);
-
-            // todo: correcting the first coefficient, which is  -(a*s+e + Delta*m)
-            seal::util::set_poly_poly(temp.data(1), temp.poly_modulus_degree(), temp.coeff_mod_count(), powers[i][power].data(1));      
+            get_ciphertext(seal_context_, powers[i][power], q.second[i]);
         }
     }
 

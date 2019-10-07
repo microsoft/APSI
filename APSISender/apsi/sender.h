@@ -124,8 +124,8 @@ namespace apsi
             Generate a response to a query
             */
             void query(
-                const seal::RelinKeys& relin_keys,
-                const std::map<apsi::u64, std::vector<std::pair<seed128, std::string>> >query,
+                const std::string& relin_keys,
+                const std::map<apsi::u64, std::vector<std::string>> query,
                 const std::vector<apsi::u8>& client_id,
                 apsi::network::Channel& channel);
 

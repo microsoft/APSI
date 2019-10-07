@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
 project(APSICommon VERSION 1.0.0 LANGUAGES CXX C)
 
@@ -46,24 +46,47 @@ set(APSICOMMON_CONFIG_INSTALL_DIR lib/cmake/APSICommon)
 list(APPEND CMAKE_MODULE_PATH ${APSICommon_SOURCE_DIR}/../cmake)
 
 # Import Microsoft SEAL
-find_package(SEAL 3.3.2 EXACT REQUIRED)
+find_package(SEAL 3.4.0 EXACT REQUIRED)
 
 # Import Cuckoo
-find_package(Cuckoo 1.1.0 EXACT REQUIRED)
+find_package(Cuckoo 1.0.0 EXACT REQUIRED)
 
 # Import Microsoft GSL
-find_package(msgsl MODULE REQUIRED)
+if(MSGSL_ROOT)
+    unset(MSGSL_INCLUDE_DIR CACHE)
+endif()
+find_package(MSGSL MODULE REQUIRED)
 
 # Import ZeroMQ
+if(ZeroMQ_ROOT)
+    unset(ZEROMQ_INCLUDE_DIR CACHE)
+    unset(ZEROMQ_LIBRARY_DIR CACHE)
+    unset(ZEROMQ_LIBRARY_PATH CACHE)
+endif()
 find_package(ZeroMQ MODULE REQUIRED)
 
 # Import ZeroMQpp
+if(ZeroMQpp_ROOT)
+    unset(ZEROMQPP_INCLUDE_DIR CACHE)
+    unset(ZEROMQPP_LIBRARY_DIR CACHE)
+    unset(ZEROMQPP_LIBRARY_PATH CACHE)
+endif()
 find_package(ZeroMQpp MODULE REQUIRED)
 
 # Import FourQ
+if(FourQ_ROOT)
+    unset(FOURQ_INCLUDE_DIR CACHE)
+    unset(FOURQ_LIBRARY_DIR CACHE)
+    unset(FOURQ_LIBRARY_PATH CACHE)
+endif()
 find_package(FourQ MODULE REQUIRED)
 
 # Import Log4cplus
+if(Log4cplus_ROOT)
+    unset(LOG4CPLUS_INCLUDE_DIR CACHE)
+    unset(LOG4CPLUS_LIBRARY_DIR CACHE)
+    unset(LOG4CPLUS_LIBRARY_PATH CACHE)
+endif()
 find_package(Log4cplus MODULE REQUIRED)
 
 # Set flags
@@ -85,12 +108,12 @@ add_definitions(-D__LINUX__)
 # Link required libraries
 target_link_libraries(apsi_common PUBLIC
     SEAL::seal
-    msgsl
+    MSGSL::MSGSL 
     Cuckoo::cuckoo
-    ZeroMQ
-    ZeroMQpp
-    FourQ
-    Log4cplus)
+    ZeroMQ::ZeroMQ
+    ZeroMQpp::ZeroMQpp
+    FourQ::FourQ
+    Log4cplus::Log4cplus)
 
 # Add source files to library
 add_subdirectory(apsi)
@@ -103,9 +126,6 @@ target_include_directories(apsi_common
 install(TARGETS apsi_common EXPORT apsi_common_export
     ARCHIVE DESTINATION lib
     INCLUDES DESTINATION ${APSICOMMON_INCLUDES_INSTALL_DIR})
-
-# Associate Microsoft GSL to apsi_common_export
-install(TARGETS msgsl EXPORT apsi_common_export)
 
 # Export the targets
 export(EXPORT apsi_common_export

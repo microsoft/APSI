@@ -9,12 +9,6 @@
 #include "seal/publickey.h"
 #include "seal/secretkey.h"
 #include "seal/plaintext.h"
-#include "seal/randomtostd.h"
-// APSI
-#include "apsi/item.h"
-#include "apsi/ffield/ffield_array.h"
-#include "apsi/tools/sealcompress.h"
-#include "apsi/network/channel.h"
 
 namespace apsi
 {
@@ -22,11 +16,6 @@ namespace apsi
     Get string for a public key
     */
     void get_string(std::string& str, const seal::PublicKey& pub_key);
-
-    /**
-    Get string for Relinearization keys
-    */
-    void get_string(std::string& str, const seal::RelinKeys& relin_keys);
 
     /**
     Get string for a Ciphertext
@@ -46,7 +35,7 @@ namespace apsi
     /**
     Get Relinearization keys from a string
     */
-    void get_relin_keys(std::shared_ptr<seal::SEALContext> context, seal::RelinKeys& relin_keys, const std::string& str, seed128 seeds);
+    void get_relin_keys(std::shared_ptr<seal::SEALContext> context, seal::RelinKeys& relin_keys, const std::string& str);
 
     /**
     Get Ciphertext from a string

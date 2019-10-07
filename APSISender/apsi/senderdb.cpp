@@ -303,7 +303,7 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
 
         // Compute bin locations
         // Set keys and skip
-        auto cuckoo_item = cuckoo::make_item(data[i].get_value());
+        auto cuckoo_item = data[i].get_value();
 
         // Set keys and skip
         for (unsigned j = 0; j < params_.hash_func_count(); j++) {

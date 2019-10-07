@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
 project(common_code VERSION 1.0.0 LANGUAGES CXX C)
 
@@ -34,12 +34,15 @@ if(NOT TARGET apsi_common)
 endif()
 
 # Import SEAL
-find_package(SEAL 3.3.2 EXACT REQUIRED)
+find_package(SEAL 3.4.0 EXACT REQUIRED)
 
 # Import Cuckoo
-find_package(Cuckoo 1.1.0 EXACT REQUIRED)
+find_package(Cuckoo 1.0.0 EXACT REQUIRED)
 
-# Import TCLAP
+# Import TCLAP 
+if(TCLAP_ROOT)
+    unset(TCLAP_INCLUDE_DIR CACHE)
+endif()
 find_package(TCLAP MODULE REQUIRED)
 
 # C++17

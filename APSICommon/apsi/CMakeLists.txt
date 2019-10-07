@@ -11,6 +11,7 @@ add_subdirectory(ffield)
 add_subdirectory(logging)
 add_subdirectory(network)
 add_subdirectory(tools)
+add_subdirectory(oprf)
 
 install(
     FILES

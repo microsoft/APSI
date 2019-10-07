@@ -69,8 +69,7 @@ void StreamChannel::receive(SenderResponseGetParameters& response)
     istream_.read(reinterpret_cast<char*>(&response.cuckoo_params), sizeof(PSIParams::CuckooParams));
 
     // SEALParams
-    response.seal_params.encryption_params = EncryptionParameters::Load(istream_);
-    istream_.read(reinterpret_cast<char*>(&response.seal_params.decomposition_bit_count), sizeof(unsigned));
+    response.seal_params.encryption_params.load(istream_);
     istream_.read(reinterpret_cast<char*>(&response.seal_params.max_supported_degree), sizeof(unsigned));
 
     // ExFieldParams
@@ -107,10 +106,8 @@ void StreamChannel::send_get_parameters_response(const vector<u8>& client_id, co
     ostream_.write(reinterpret_cast<const char*>(&cuckooparams), sizeof(PSIParams::CuckooParams));
 
     // SEALParams
-    unsigned dbc   = params.decomposition_bit_count();
     unsigned maxsd = params.max_supported_degree();
-    EncryptionParameters::Save(params.get_seal_params().encryption_params, ostream_);
-    ostream_.write(reinterpret_cast<const char*>(&dbc), sizeof(unsigned));
+    params.get_seal_params().encryption_params.save(ostream_);
     ostream_.write(reinterpret_cast<const char*>(&maxsd), sizeof(unsigned));
 
     // ExFieldParams
@@ -191,50 +188,33 @@ void StreamChannel::receive(SenderResponseQuery& response)
 }
 
 void StreamChannel::send_query(
-    const RelinKeys& relin_keys,
-    const map<u64, vector<SeededCiphertext>>& query,
-    const seed128 relin_key_seeds)
+    const string& relin_keys,
+    const map<u64, vector<string>>& query)
 {
     write_operation_type(SOP_query);
 
-    string str;
-    get_string(str, relin_keys);
-    write_string(str);
+    write_string(relin_keys);
 
     size_t size = query.size();
     ostream_.write(reinterpret_cast<const char*>(&size), sizeof(size_t));
     bytes_sent_ += sizeof(size_t);
 
-    for (const auto& pair : query)
+    for (const auto& q : query)
     {
-        u64 power = pair.first;
-        size = pair.second.size();
+        u64 power = q.first;
+        size = q.second.size();
 
         ostream_.write(reinterpret_cast<const char*>(&power), sizeof(u64));
-        ostream_.write(reinterpret_cast<const char*>(&size), sizeof(size_t));
         bytes_sent_ += sizeof(u64);
+
+        ostream_.write(reinterpret_cast<const char*>(&size), sizeof(size_t));
         bytes_sent_ += sizeof(size_t);
 
-        for (const auto& seededcipher : pair.second)
+        for (const auto& seededcipher : q.second)
         {
-            u64 seed;
-            seed = seededcipher.first.first;
-            ostream_.write(reinterpret_cast<const char*>(&seed), sizeof(u64));
-            seed = seededcipher.first.second;
-            ostream_.write(reinterpret_cast<const char*>(&seed), sizeof(u64));
-            bytes_sent_ += (sizeof(u64) * 2);
-
-            get_string(str, seededcipher.second);
-            write_string(str);
+            write_string(seededcipher);
         }
     }
-
-    u64 seed;
-    seed = relin_key_seeds.first;
-    ostream_.write(reinterpret_cast<const char*>(&seed), sizeof(u64));
-    seed = relin_key_seeds.second;
-    ostream_.write(reinterpret_cast<const char*>(&seed), sizeof(u64));
-    bytes_sent_ += (sizeof(u64) * 2);
 }
 
 void StreamChannel::send_query_response(const vector<u8>& client_id, const size_t package_count)
@@ -338,7 +318,7 @@ shared_ptr<SenderOperation> StreamChannel::decode_query()
     istream_.read(reinterpret_cast<char*>(&qsize), sizeof(size_t));
     bytes_received_ += sizeof(size_t);
 
-    map<u64, vector<pair<seed128, string>>> query;
+    map<u64, vector<string>> query;
 
     for (size_t qidx = 0; qidx < qsize; qidx++)
     {
@@ -350,28 +330,18 @@ shared_ptr<SenderOperation> StreamChannel::decode_query()
         bytes_received_ += sizeof(u64);
         bytes_received_ += sizeof(size_t);
 
-        vector<pair<seed128, string>> power_entry(vecsize);
+        vector<string> power_entry;
+        power_entry.reserve(vecsize);
 
         for (size_t vecidx = 0; vecidx < vecsize; vecidx++)
         {
-            seed128 seed;
-            istream_.read(reinterpret_cast<char*>(&seed.first), sizeof(u64));
-            istream_.read(reinterpret_cast<char*>(&seed.second), sizeof(u64));
-            bytes_received_ += (sizeof(u64) * 2);
-
             string cipher;
             read_string(cipher);
-
-            power_entry[vecidx] = make_pair(seed, cipher);
+            power_entry.emplace_back(move(cipher));
         }
 
         query[power] = power_entry;
     }
 
-    seed128 relin_seeds;
-    istream_.read(reinterpret_cast<char*>(&relin_seeds.first), sizeof(u64));
-    istream_.read(reinterpret_cast<char*>(&relin_seeds.second), sizeof(u64));
-    bytes_received_ += (sizeof(u64) * 2);
-
-    return make_shared<SenderOperationQuery>(relin_keys, move(query), relin_seeds);
+    return make_shared<SenderOperationQuery>(relin_keys, move(query));
 }

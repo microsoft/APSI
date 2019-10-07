@@ -56,7 +56,6 @@ namespace APSITests
         PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
         PSIParams::ExFieldParams exfield_params{ 678910, 8 };
         PSIParams::SEALParams seal_params;
-        seal_params.decomposition_bit_count = 30;
         seal_params.max_supported_degree = 20;
         seal_params.encryption_params.set_plain_modulus(5119);
         seal_params.encryption_params.set_poly_modulus_degree(4096);
@@ -94,7 +93,6 @@ namespace APSITests
         ASSERT_EQ((u64)678910, gpr.exfield_params.characteristic);
         ASSERT_EQ(8, gpr.exfield_params.degree);
 
-        ASSERT_EQ(30, gpr.seal_params.decomposition_bit_count);
         ASSERT_EQ(20, gpr.seal_params.max_supported_degree);
         ASSERT_EQ((u64)5119, gpr.seal_params.encryption_params.plain_modulus().value());
         ASSERT_EQ((size_t)4096, gpr.seal_params.encryption_params.poly_modulus_degree());

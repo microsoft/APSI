@@ -93,30 +93,16 @@ void Receiver::initialize()
     compressor_ = make_unique<CiphertextCompressor>(seal_context_, 
         dummy_evaluator, pool_);
 
-    auto key_material = generator.relin_keys_seeds_out(); 
-    relin_keys_seeds_ = key_material.first;
-    relin_keys_ = key_material.second;
-
-    for (auto &a : relin_keys_.data())
-    {
-        if (a.size())
-        {
-            for (auto &b : a)
-            {
-                util::set_zero_poly(
-                    b.data().poly_modulus_degree(), b.data().coeff_mod_count(), b.data().data(1));
-            }
-        }
-    }
-
-    Log::debug("Receiver initialized with relin keys seeds %ui and %ui", relin_keys_seeds_.first, relin_keys_seeds_.second);
+    stringstream relin_keys_ss;
+    generator.relin_keys_save(relin_keys_ss, compr_mode_type::deflate);
+    relin_keys_ = relin_keys_ss.str();
 
     ex_batch_encoder_ = make_shared<FFieldFastBatchEncoder>(seal_context_, *field_);
 
     Log::info("Receiver initialized");
 }
 
-map<uint64_t, vector<SeededCiphertext>>& Receiver::query(vector<Item>& items)
+map<uint64_t, vector<string>>& Receiver::query(vector<Item>& items)
 {
     STOPWATCH(recv_stop_watch, "Receiver::query");
     Log::info("Receiver starting query");
@@ -188,7 +174,7 @@ pair<vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Channel& chl
     auto& encrypted_query = query(items);
 
     // Send encrypted query
-    chl.send_query(relin_keys_, encrypted_query, relin_keys_seeds_);
+    chl.send_query(relin_keys_, encrypted_query);
 
     // Decrypt result
     return decrypt_result(items, chl);
@@ -297,8 +283,7 @@ void Receiver::handshake(Channel& chl)
         sender_params.cuckoo_params.hash_func_seed,
         sender_params.cuckoo_params.max_probe);
     Log::debug(
-        "decomposition bit count: %i, poly modulus degree: %i, plain modulus: 0x%llx",
-        sender_params.seal_params.decomposition_bit_count,
+        "poly modulus degree: %i, plain modulus: 0x%llx",
         sender_params.seal_params.encryption_params.poly_modulus_degree(),
         sender_params.seal_params.encryption_params.plain_modulus().value());
     Log::debug("coeff modulus: %i elements", sender_params.seal_params.encryption_params.coeff_modulus().size());
@@ -318,7 +303,7 @@ void Receiver::handshake(Channel& chl)
 }
 
 pair<
-    map<uint64_t, vector<SeededCiphertext> >,
+    map<uint64_t, vector<string>>,
     unique_ptr<CuckooTable> >
     Receiver::preprocess(vector<Item> &items)
 {
@@ -358,7 +343,7 @@ pair<
     map<uint64_t, FFieldArray> powers;
     generate_powers(*exfield_items, powers);
 
-    map<uint64_t, vector<SeededCiphertext> > ciphers;
+    map<uint64_t, vector<string>> ciphers;
     encrypt(powers, ciphers);
     
     Log::info("Receiver preprocess end");
@@ -368,15 +353,15 @@ pair<
 
 unique_ptr<CuckooTable> Receiver::cuckoo_hashing(const vector<Item> &items)
 {
-    auto receiver_null_item = all_one_block;
+    auto receiver_null_item = all_one_item;
 
-    unique_ptr<CuckooTable> cuckoo{ make_unique<CuckooTable>(
+    auto cuckoo = make_unique<CuckooTable>(
         get_params().log_table_size(),
         0, // stash size
         get_params().hash_func_count(),
-        make_item(get_params().hash_func_seed(), 0),
+        item_type{ get_params().hash_func_seed(), 0 },
         get_params().max_probe(),
-        receiver_null_item) };
+        receiver_null_item);
 
     auto coeff_bit_count = field_->ch().bit_count() - 1;
     auto degree = field_ ? field_->d() : 1;
@@ -396,7 +381,7 @@ unique_ptr<CuckooTable> Receiver::cuckoo_hashing(const vector<Item> &items)
 
     for (size_t i = 0; i < items.size(); i++)
     {
-        auto cuckoo_item = make_item(items[i].get_value());
+        auto cuckoo_item = items[i].get_value();
         bool insertionSuccess = cuckoo->insert(cuckoo_item);
         if (!insertionSuccess)
         {
@@ -422,13 +407,13 @@ vector<int> Receiver::cuckoo_indices(
 
     for (size_t i = 0; i < items.size(); i++)
     {
-        auto cuckoo_item = make_item(items[i].get_value());
+        auto cuckoo_item = items[i].get_value();
         auto q = cuckoo.query(cuckoo_item);
 
         Log::debug("cuckoo_indices: Setting indices at location: %i to: %i", q.location(), i);
         indices[q.location()] = static_cast<int>(i);
 
-        if (not_equal(cuckoo_item, table[q.location()]))
+        if (!are_equal_item(cuckoo_item, table[q.location()]))
             throw runtime_error("items[i] different from encodings[q.location()]");
     }
     return indices;
@@ -502,7 +487,7 @@ void Receiver::generate_powers(const FFieldArray &exfield_items,
     }
 }
 
-void Receiver::encrypt(map<uint64_t, FFieldArray> &input, map<uint64_t, vector<SeededCiphertext>> &destination)
+void Receiver::encrypt(map<uint64_t, FFieldArray> &input, map<uint64_t, vector<string>> &destination)
 {
     size_t count = 0; 
     destination.clear();
@@ -514,7 +499,7 @@ void Receiver::encrypt(map<uint64_t, FFieldArray> &input, map<uint64_t, vector<S
     Log::debug("Receiver sending %i ciphertexts", count); 
 }
 
-void Receiver::encrypt(const FFieldArray &input, vector<SeededCiphertext> &destination)
+void Receiver::encrypt(const FFieldArray &input, vector<string> &destination)
 {
     int batch_size = slot_count_, num_of_batches = static_cast<int>((input.size() + batch_size - 1) / batch_size);
     vector<uint64_t> integer_batch(batch_size, 0);
@@ -522,7 +507,7 @@ void Receiver::encrypt(const FFieldArray &input, vector<SeededCiphertext> &desti
     destination.reserve(num_of_batches);
     Plaintext plain(pool_);
     FFieldArray batch(ex_batch_encoder_->create_array());
-    random_device rd;
+
     for (int i = 0; i < num_of_batches; i++)
     {
         for (int j = 0; j < batch_size; j++)
@@ -532,17 +517,22 @@ void Receiver::encrypt(const FFieldArray &input, vector<SeededCiphertext> &desti
             batch.set(stj, sti * batch_size + stj, input);
         }
         ex_batch_encoder_->compose(batch, plain);
-        seed128 seeds_placeholder;
-        destination.push_back({seeds_placeholder,  Ciphertext(seal_context_, pool_)});
 
-        seed128 seeds = encryptor_->encrypt_sk_seeds_out(plain, destination.back().second, secret_key_,  pool_);
-
-        destination.back().first = seeds;
-        Log::debug("Seeds = %i, %i", seeds.first, seeds.second);
+        stringstream ss;
+        encryptor_->encrypt_sk(plain, secret_key_, ss, pool_);
+        destination.emplace_back(ss.str());
 
         // note: this is not doing the setting to zero yet.
-        Log::debug("Fresh encryption noise budget = %i", decryptor_->invariant_noise_budget(destination.back().second)); 
-        seal::util::set_zero_poly(destination.back().second.poly_modulus_degree(), destination.back().second.coeff_mod_count(), destination.back().second.data(1));
+        Log::debug("Fresh encryption noise budget = %i",
+            decryptor_->invariant_noise_budget(
+                [this](const string &ct_str) -> Ciphertext {
+                    Ciphertext ct_out;
+                    stringstream ss(ct_str);
+                    ct_out.load(seal_context_, ss);
+                    return ct_out;
+                }(destination.back())
+            )
+        );
     }
 }
 

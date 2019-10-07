@@ -176,7 +176,6 @@ namespace
         table_params.window_size = 2;
 
         PSIParams::SEALParams seal_params;
-        seal_params.decomposition_bit_count = 30;
         seal_params.encryption_params.set_poly_modulus_degree(4096);
         seal_params.max_supported_degree = 2;
 

@@ -295,8 +295,7 @@ void DBBlock::batch_interpolate(
                 temp_array.set_coeff_of(b, c, cache.coeff_temp[b].get_coeff_of(s, c));
         }
 
-
-        auto capacity = static_cast<Plaintext::size_type>(params.encryption_params().coeff_modulus().size() *
+        auto capacity = static_cast<size_t>(params.encryption_params().coeff_modulus().size() *
             params.encryption_params().poly_modulus_degree());
         batched_coeff.reserve(capacity);
 

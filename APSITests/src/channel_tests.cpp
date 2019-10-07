@@ -211,7 +211,6 @@ namespace APSITests
         PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
         PSIParams::ExFieldParams exfield_params{ 321, 8 };
         PSIParams::SEALParams seal_params;
-        seal_params.decomposition_bit_count = 10;
         vector<SmallModulus> smv = CoeffModulus::BFVDefault(4096);
         seal_params.encryption_params.set_poly_modulus_degree(4096);
         seal_params.encryption_params.set_plain_modulus(5119);
@@ -350,7 +349,6 @@ namespace APSITests
                 PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
                 PSIParams::ExFieldParams exfield_params{ 678910, 8 };
                 PSIParams::SEALParams seal_params;
-                seal_params.decomposition_bit_count = 30;
                 seal_params.max_supported_degree = 25;
                 seal_params.encryption_params.set_plain_modulus(5119);
                 seal_params.encryption_params.set_poly_modulus_degree(4096);
@@ -394,7 +392,6 @@ namespace APSITests
         ASSERT_EQ((unsigned)1, get_params_response.cuckoo_params.max_probe);
         ASSERT_EQ((u64)678910, get_params_response.exfield_params.characteristic);
         ASSERT_EQ((unsigned)8, get_params_response.exfield_params.degree);
-        ASSERT_EQ((unsigned)30, get_params_response.seal_params.decomposition_bit_count);
         ASSERT_EQ((unsigned)25, get_params_response.seal_params.max_supported_degree);
         ASSERT_EQ((u64)5119, get_params_response.seal_params.encryption_params.plain_modulus().value());
         ASSERT_EQ((size_t)4096, get_params_response.seal_params.encryption_params.poly_modulus_degree());
@@ -420,7 +417,6 @@ namespace APSITests
         ASSERT_EQ((unsigned)1, get_params_response2.cuckoo_params.max_probe);
         ASSERT_EQ((u64)678910, get_params_response2.exfield_params.characteristic);
         ASSERT_EQ((unsigned)8, get_params_response2.exfield_params.degree);
-        ASSERT_EQ((unsigned)30, get_params_response2.seal_params.decomposition_bit_count);
         ASSERT_EQ((u64)5119, get_params_response2.seal_params.encryption_params.plain_modulus().value());
         ASSERT_EQ((size_t)4096, get_params_response2.seal_params.encryption_params.poly_modulus_degree());
         ASSERT_EQ((size_t)3, get_params_response2.seal_params.encryption_params.coeff_modulus().size());

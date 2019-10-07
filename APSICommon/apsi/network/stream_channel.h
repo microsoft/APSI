@@ -85,10 +85,8 @@ namespace apsi
             * Send a request for a Query response to Sender
             */
             virtual void send_query(
-                const seal::RelinKeys& relin_keys,
-                const std::map<apsi::u64, std::vector<SeededCiphertext>>& query,
-                const seed128 relin_key_seeds
-            );
+                const std::string& relin_keys,
+                const std::map<apsi::u64, std::vector<std::string>>& query);
 
             /**
             Send a response to a Query request

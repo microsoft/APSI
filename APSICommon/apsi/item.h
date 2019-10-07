@@ -115,5 +115,8 @@ namespace apsi
         std::array<std::uint64_t, 2> value_;
 
         u32 muladd(u32 item[4], int mul, int add);
+
+    public:
+        static constexpr std::size_t item_byte_count = sizeof(value_);
     };
 }

@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
 project(APSISender VERSION 1.0.0 LANGUAGES CXX C)
 
@@ -50,12 +50,17 @@ if(NOT TARGET apsi_common)
 endif()
 
 # Import Microsoft SEAL
-find_package(SEAL 3.3.2 EXACT REQUIRED)
+find_package(SEAL 3.4.0 EXACT REQUIRED)
 
 # Import Cuckoo
-find_package(Cuckoo 1.1.0 EXACT REQUIRED)
+find_package(Cuckoo 1.0.0 EXACT REQUIRED)
 
 # Import FourQ
+if(FourQ_ROOT)
+    unset(FOURQ_INCLUDE_DIR CACHE)
+    unset(FOURQ_LIBRARY_DIR CACHE)
+    unset(FOURQ_LIBRARY_PATH CACHE)
+endif()
 find_package(FourQ MODULE REQUIRED)
 
 # Set flags

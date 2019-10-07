@@ -64,7 +64,6 @@ namespace apsi
         struct SEALParams
         {
             seal::EncryptionParameters encryption_params{ seal::scheme_type::BFV };
-            unsigned decomposition_bit_count;
             unsigned max_supported_degree;
         };
 
@@ -189,11 +188,6 @@ namespace apsi
         inline const seal::EncryptionParameters& encryption_params() const
         {
             return seal_params_.encryption_params;
-        }
-
-        inline unsigned int decomposition_bit_count() const
-        {
-            return seal_params_.decomposition_bit_count;
         }
 
         inline unsigned int max_supported_degree() const

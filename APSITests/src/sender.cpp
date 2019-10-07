@@ -58,7 +58,6 @@
 // 		{
 // 			PSIParams params(8, 8, 1, 10, 32, 2, 4);
 // 			params.set_item_bit_length(32);
-// 			params.set_decomposition_bit_count(2);
 // 			params.set_log_poly_degree(11);
 // 			params.set_exfield_characteristic(0x101);
 // 			params.set_exfield_polymod(string("1x^16 + 3"));

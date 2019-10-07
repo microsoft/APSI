@@ -63,7 +63,7 @@ namespace apsi
             is a same-size vector of bool values. If an item is in the intersection, the corresponding bool value is true on the
             same position in the result vector .
             */
-            std::map<std::uint64_t, std::vector<apsi::SeededCiphertext>>& query(std::vector<Item> &items);
+            std::map<std::uint64_t, std::vector<std::string>>& query(std::vector<Item> &items);
 
             /**
             Decrypt the result of a query to a remote sender and get the intersection result. The query is a vector of items, and the result
@@ -104,28 +104,12 @@ namespace apsi
                 return *params_.get();
             }
 
-            /**
-            Get the relinearization keys
-            */
-            const seal::RelinKeys& relin_keys() const
-            {
-                return relin_keys_;
-            }
-
-            /**
-            Get the relinearization keys seeds
-            */
-            const apsi::seed128 relin_keys_seeds() const
-            {
-                return relin_keys_seeds_;
-            }
-
         private:
             /**
             Preprocesses the PSI items. Returns the power map of the items, and the indices of them in the hash table.
             */
             std::pair<
-                std::map<std::uint64_t, std::vector<SeededCiphertext>>,
+                std::map<std::uint64_t, std::vector<std::string>>,
                 std::unique_ptr<cuckoo::CuckooTable>
             > preprocess(std::vector<Item> &items);
 
@@ -163,14 +147,14 @@ namespace apsi
             ciphertexts in a vector depends on the slot count in generalized batching. For example, if an input vector has size 1024, the slot count
             is 256, then there are 1024/256 = 4 ciphertext in the Ciphertext vector.
             */
-            void encrypt(std::map<std::uint64_t, FFieldArray> &input, std::map<std::uint64_t, std::vector<SeededCiphertext>> &destination);
+            void encrypt(std::map<std::uint64_t, FFieldArray> &input, std::map<std::uint64_t, std::vector<std::string>> &destination);
 
             /**
             Encrypts a vector of elements to a corresponding vector of SEAL Ciphertext, using generalized batching. The number of
             ciphertexts in the vector depends on the slot count in generalized batching. For example, if an input vector has size 1024,
             the slot count is 256, then there are 1024/256 = 4 ciphertext in the Ciphertext vector.
             */
-            void encrypt(const FFieldArray &input, std::vector<SeededCiphertext> &destination);
+            void encrypt(const FFieldArray &input, std::vector<std::string> &destination);
 
             /**
             Stream decryption of ciphers from the sender. Ciphertext will be acquired from the sender in a streaming fashion one by one in
@@ -240,8 +224,6 @@ namespace apsi
 
             std::unique_ptr<seal::Decryptor> decryptor_;
 
-            seal::RelinKeys relin_keys_;
-
             std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder_;
 
             int slot_count_;
@@ -251,15 +233,14 @@ namespace apsi
 
             // Preprocess result
             std::pair<
-                std::map<std::uint64_t, std::vector<apsi::SeededCiphertext>>,
+                std::map<std::uint64_t, std::vector<std::string>>,
                 std::unique_ptr<cuckoo::CuckooTable>
             > preprocess_result_;
 
             // For OPRF deobfuscation
             std::vector<std::vector<apsi::u64>> mult_factor_;
 
-            // seed for generating (the a part) of the relin keys. 
-            seed128 relin_keys_seeds_; 
+            std::string relin_keys_;
         };
     }
 }

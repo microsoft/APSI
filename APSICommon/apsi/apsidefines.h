@@ -7,9 +7,11 @@
 #include <cstdint>
 #include <utility> 
 
+// Cuckoo
+#include <cuckoo/cuckoo.h>
+
 // Intrinsics
 #include <wmmintrin.h>
-
 
 #ifdef _MSC_VER
 #ifdef _DEBUG
@@ -33,13 +35,14 @@ namespace apsi
     typedef std::int32_t i32;
     typedef std::uint8_t u8;
     typedef std::int8_t i8;
-    typedef std::pair<u64, u64> seed128; 
-    typedef std::pair<seed128, seal::Ciphertext> SeededCiphertext; 
-
-
 
     extern const block zero_block;
     extern const block one_block;
     extern const block all_one_block;
     extern const block cc_block;
+
+    using item_type = cuckoo::item_type;
+    extern const item_type zero_item;
+    extern const item_type one_item;
+    extern const item_type all_one_item;
 }

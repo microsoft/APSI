@@ -103,25 +103,23 @@ namespace apsi
         {
         public:
             SenderOperationQuery() = delete;
-            SenderOperationQuery(const std::string& relin, std::map<apsi::u64, std::vector<std::pair<seed128, std::string> > >&& queryp, seed128 relin_seeds)
+            SenderOperationQuery(const std::string& relin, std::map<apsi::u64, std::vector<std::string>>&& queryp)
                 : SenderOperation(SOP_query),
                   relin_keys(relin),
-                  query(queryp),
-                  relin_keys_seeds(relin_seeds)
+                  query(std::move(queryp))
             {}
-            SenderOperationQuery(std::vector<apsi::u8>&& client_id, const std::string& relin, std::map<apsi::u64, std::vector<std::pair<seed128, std::string> > >&& queryp, seed128 relin_seeds)
+
+            SenderOperationQuery(std::vector<apsi::u8>&& client_id, const std::string& relin, std::map<apsi::u64, std::vector<std::string>>&& queryp)
                 : SenderOperation(SOP_query, std::move(client_id)),
                   relin_keys(relin),
-                  query(queryp),
-                  relin_keys_seeds(relin_seeds)
+                  query(std::move(queryp))
             {}
 
             virtual ~SenderOperationQuery() = default;
 
             // std::string public_key;
             std::string relin_keys;
-            std::map<apsi::u64, std::vector<std::pair<seed128, std::string>>> query;
-            seed128 relin_keys_seeds;
+            std::map<apsi::u64, std::vector<std::string>> query;
         };
     }
 }

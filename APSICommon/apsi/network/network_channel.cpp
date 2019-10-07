@@ -176,7 +176,6 @@ void NetworkChannel::receive(SenderResponseGetParameters& response)
     response.seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
 
     response.seal_params.encryption_params.set_plain_modulus(msg.get<u64>(idx++));
-    response.seal_params.decomposition_bit_count = msg.get<unsigned int>(idx++);
     response.seal_params.max_supported_degree = msg.get<unsigned int>(idx++);
 
     // ExFieldParams
@@ -309,7 +308,6 @@ void NetworkChannel::send_get_parameters_response(const vector<u8>& client_id, c
     msg.add(params.encryption_params().poly_modulus_degree());
     add_sm_vector(params.encryption_params().coeff_modulus(), msg);
     msg.add(params.encryption_params().plain_modulus().value());
-    msg.add(params.decomposition_bit_count());
     msg.add(params.max_supported_degree());
 
     // ExFieldParams
@@ -360,58 +358,47 @@ void NetworkChannel::send_preprocess_response(const vector<u8>& client_id, const
 }
 
 void NetworkChannel::send_query(
-    const RelinKeys& relin_keys,
-    const map<u64, vector<SeededCiphertext>>& query, const seed128 relin_key_seeds)
+    const string& relin_keys,
+    const map<u64, vector<string>>& query)
 {
     throw_if_not_connected();
+
+    size_t bytes_sent = 0;
 
     message_t msg;
     SenderOperationType type = SOP_query;
     add_message_type(type, msg);
-    bytes_sent_ += sizeof(SenderOperationType);
+    bytes_sent += sizeof(SenderOperationType);
 
-    string str;
+    msg.add(relin_keys);
+    bytes_sent += relin_keys.length();
 
-    get_string(str, relin_keys);
-    msg.add(str);
-    bytes_sent_ += str.length();
-
-    Log::debug("send_query: relin key length = %i bytes ", str.length());
+    Log::debug("send_query: relin key length = %i bytes ", relin_keys.length());
 
     add_part(query.size(), msg);
-    bytes_sent_ += sizeof(size_t);
+    bytes_sent += sizeof(size_t);
 
     u64 sofar = bytes_sent_;
 
-    for (const auto& pair : query)
+    for (const auto& q : query)
     {
-        add_part(pair.first, msg);
-        add_part(pair.second.size(), msg);
+        add_part(q.first, msg);
+        bytes_sent += sizeof(u64);
 
-        for (const auto& seededctxt : pair.second)
+        add_part(q.second.size(), msg);
+        bytes_sent += sizeof(size_t);
+
+        for (const auto& seededctxt : q.second)
         {
-            add_part(seededctxt.first.first, msg);
-            add_part(seededctxt.first.second, msg);
-            get_string(str, seededctxt.second);
-            msg.add(str);
-            bytes_sent_ += str.length();
+            msg.add(seededctxt);
+            bytes_sent += seededctxt.length();
         }
-
-        bytes_sent_ += sizeof(u64);
-        bytes_sent_ += sizeof(u64); // seed1
-        bytes_sent_ += sizeof(u64); // seed2
-        bytes_sent_ += sizeof(size_t);
     }
 
     Log::debug("send_query: ciphertext lengths = %i bytes ", bytes_sent_ - sofar);
 
-    // finally, send relin keys seeds.      
-    add_part(relin_key_seeds.first, msg);
-    add_part(relin_key_seeds.second, msg);
-    bytes_sent_ += sizeof(u64);
-    bytes_sent_ += sizeof(u64);
-
     send_message(msg);
+    bytes_sent_ += bytes_sent;
 }
 
 void NetworkChannel::send_query_response(const vector<u8>& client_id, const size_t package_count)
@@ -421,14 +408,17 @@ void NetworkChannel::send_query_response(const vector<u8>& client_id, const size
     message_t msg;
     SenderOperationType type = SOP_query;
     add_client_id(msg, client_id);
-    add_message_type(type, msg);
 
+    add_message_type(type, msg);
     msg.add(package_count);
 
-    bytes_sent_ += sizeof(SenderOperationType);
-    bytes_sent_ += sizeof(size_t);
-
     send_message(msg);
+
+    // Message type
+    bytes_sent_ += sizeof(SenderOperationType);
+
+    // Package count
+    bytes_sent_ += sizeof(size_t);
 }
 
 void NetworkChannel::send(const vector<u8>& client_id, const ResultPackage& pkg)
@@ -579,9 +569,8 @@ shared_ptr<SenderOperation> NetworkChannel::decode_query(const message_t& msg)
     vector<u8> client_id;
     extract_client_id(msg, client_id);
 
-    // string pub_key;
     string relin_keys;
-    map<u64, vector<pair<seed128, string>>> query;
+    map<u64, vector<string>> query;
 
     size_t msg_idx = 2;
 
@@ -596,39 +585,24 @@ shared_ptr<SenderOperation> NetworkChannel::decode_query(const message_t& msg)
     {
         u64 power;
         get_part(power, msg, msg_idx++);
+        bytes_received_ += sizeof(u64);
 
         size_t num_elems;
         get_part(num_elems, msg, msg_idx++);
+        bytes_received_ += sizeof(size_t);
 
-        vector<pair<seed128, string>> powers(num_elems);
+        vector<string> powers(num_elems);
 
         for (u64 j = 0; j < num_elems; j++)
         {
-            seed128 seed;
-            get_part(powers[j].first.first, msg, msg_idx++);
-            get_part(powers[j].first.second, msg, msg_idx++);
-            msg.get(powers[j].second, msg_idx++);
-
-            bytes_received_ += powers[j].second.length();
-            bytes_received_ += sizeof(u64) * 2;
-
-
-
+            msg.get(powers[j], msg_idx++);
+            bytes_received_ += powers[j].length();
         }
 
         query.insert_or_assign(power, powers);
-
-        bytes_received_ += sizeof(u64);
-        bytes_received_ += sizeof(size_t);
     }
 
-    // relin key seed
-    seed128 relin_keys_seeds;
-    get_part(relin_keys_seeds.first, msg, msg_idx++);
-    get_part(relin_keys_seeds.second, msg, msg_idx++);
-
-
-    return make_shared<SenderOperationQuery>(std::move(client_id), relin_keys, std::move(query), relin_keys_seeds);
+    return make_shared<SenderOperationQuery>(std::move(client_id), relin_keys, std::move(query));
 }
 
 bool NetworkChannel::receive_message(message_t& msg, bool wait_for_message)

@@ -49,7 +49,7 @@ Item &Item::operator =(uint64_t assign)
 
 Item &Item::operator =(const cuckoo::item_type& assign)
 {
-    value_ = cuckoo::item_to_uint64_array(assign);
+    value_ = assign;
     return *this;
 }
 
