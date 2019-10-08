@@ -61,7 +61,7 @@ namespace apsi
             {
                 oprf_key_ = std::move(seal::IntArray<unsigned char>(
                     oprf_key_size,
-                    seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW)));
+                    seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true)));
             }
 
             inline oprf_key_span_const_type key_span() const noexcept
