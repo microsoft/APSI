@@ -290,8 +290,16 @@ void Sender::respond(
     int	splitStep = batch_count * split_size_plus_one;
     int total_blocks = params_.split_count() * batch_count;
 
-    // like a dummy encryption of 1. 
-    session_context.encryptor()->encrypt(Plaintext("1"), powers[0][0]);
+    // Make the ciphertext non-transparent
+    powers[0][0].resize(2);
+    auto ct_span = powers[0][0].data_span();
+    for (ptrdiff_t i = 0; i < ct_span.extent<1>(); i++)
+    {
+        ct_span[1][i][0] = 1;
+    }
+
+    // Create a dummy encryption of 1
+    evaluator_->add_plain_inplace(powers[0][0], Plaintext("1"));
     for (u64 i = 1; i < powers.size(); ++i)
     {
         powers[i][0] = powers[0][0];

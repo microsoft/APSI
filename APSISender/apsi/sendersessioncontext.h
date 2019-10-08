@@ -12,8 +12,8 @@
 #include "seal/publickey.h"
 #include "seal/secretkey.h"
 #include "seal/relinkeys.h"
-#include "seal/encryptor.h"
 #include "seal/decryptor.h"
+#include "seal/encryptor.h"
 
 // apsi
 #include  "apsi/ffield/ffield_array.h"
@@ -32,18 +32,6 @@ namespace apsi
                 seal_context_(std::move(context)), 
                 relin_keys_(relin_keys)
             {
-                seal::PublicKey dummyPk;  // todo: initialize this.
-                auto parms = seal_context_->key_context_data()->parms();
-                size_t coeff_count = seal_context_->key_context_data()->parms().poly_modulus_degree();
-                size_t coeff_mod_count = seal_context_->key_context_data()->parms().coeff_modulus().size();
-                dummyPk.data().resize(seal_context_, seal_context_->key_context_data()->parms_id(), 2);
-                
-                // set it all to zero.
-                seal::util::set_zero_poly(coeff_count << 1, coeff_mod_count, dummyPk.data().data()); 
-
-                dummyPk.parms_id() = seal_context_->key_context_data()->parms_id();
-                public_key_ = dummyPk;
-                encryptor_ = std::make_shared<seal::Encryptor>(seal_context_, public_key_);
             }
 
             SenderSessionContext(std::shared_ptr<seal::SEALContext> context) : 
