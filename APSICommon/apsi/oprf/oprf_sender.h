@@ -28,16 +28,19 @@ namespace apsi
         class OPRFKey
         {
         public:
-            OPRFKey()
+            OPRFKey(std::shared_ptr<
+                seal::UniformRandomGeneratorFactory> random_gen = nullptr) :
+                random_(std::move(random_gen))
             {
+                create();
             }
 
-            OPRFKey(std::shared_ptr<seal::UniformRandomGeneratorFactory> random_gen)
+            inline void create()
             {
                 // Create a random key
                 ECPoint::make_random_nonzero_scalar(
                     { oprf_key_.begin(), oprf_key_size },
-                    random_gen ? random_gen->create() : nullptr);
+                    random_ ? random_->create() : nullptr);
             }
 
             void save(std::ostream &stream) const;
@@ -54,11 +57,11 @@ namespace apsi
                 std::copy_n(oprf_key.data(), oprf_key_size, oprf_key_.begin());
             }
 
-            inline void reset()
+            inline void clear()
             {
-                oprf_key_ = seal::IntArray<unsigned char>(
+                oprf_key_ = std::move(seal::IntArray<unsigned char>(
                     oprf_key_size,
-                    seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW));
+                    seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW)));
             }
 
             inline oprf_key_span_const_type key_span() const noexcept
@@ -67,6 +70,8 @@ namespace apsi
             }
 
         private:
+            std::shared_ptr<seal::UniformRandomGeneratorFactory> random_{ nullptr };
+
             seal::IntArray<unsigned char> oprf_key_{
                 oprf_key_size,
                 seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true) };

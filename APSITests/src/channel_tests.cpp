@@ -5,6 +5,7 @@
 #include "utils.h"
 #include <limits>
 #include <thread>
+#include <string>
 #include "apsi/result_package.h"
 #include "apsi/network/receiverchannel.h"
 #include "apsi/network/senderchannel.h"
@@ -95,8 +96,10 @@ namespace APSITests
 
         PublicKey pub_key;
         RelinKeys relin_keys;
-        map<u64, vector<SeededCiphertext>> query_data;
-        seed128 relin_keys_seeds;
+        stringstream ss;
+        relin_keys.save(ss);
+        string relin_keys_str = ss.str();
+        map<u64, vector<string>> query_data;
 
         // Receives
         ASSERT_ANY_THROW(mychannel.receive(get_params_resp));
@@ -110,7 +113,7 @@ namespace APSITests
         ASSERT_ANY_THROW(mychannel.send_get_parameters_response(empty_client_id, params));
         ASSERT_ANY_THROW(mychannel.send_preprocess(buff));
         ASSERT_ANY_THROW(mychannel.send_preprocess_response(empty_client_id, buff));
-        ASSERT_ANY_THROW(mychannel.send_query(relin_keys, query_data, relin_keys_seeds));
+        ASSERT_ANY_THROW(mychannel.send_query(relin_keys_str, query_data));
         ASSERT_ANY_THROW(mychannel.send_query_response(empty_client_id, 10));
     }
 
@@ -142,27 +145,33 @@ namespace APSITests
                 shared_ptr<SEALContext> context = SEALContext::Create(enc_params);
                 KeyGenerator key_gen(context);
 
-                PublicKey pubkey = key_gen.public_key();
-                RelinKeys relinkeys = key_gen.relin_keys();
-                map<u64, vector<SeededCiphertext>> querydata;
-                seed128 relin_keys_seed;
-                vector<SeededCiphertext> vec1;
-                vector<SeededCiphertext> vec2;
-                SeededCiphertext txt;
+                stringstream ss;
+                key_gen.relin_keys_save(ss, compr_mode_type::none);
+                string relinkeys_str = ss.str();
+                ASSERT_EQ(relinkeys_str.length(), 8425);
 
-                vec1.push_back(txt);
-                vec2.push_back(txt);
+                Ciphertext ct(context);
+                ss = stringstream();
+                ct.save(ss, compr_mode_type::none);
+                string ct_str = ss.str();
+                ASSERT_EQ(ct_str.length(), 105);
+
+                map<u64, vector<string>> querydata;
+                vector<string> vec1;
+                vec1.push_back(ct_str);
+                vector<string> vec2;
+                vec2.push_back(ct_str);
                 querydata.insert_or_assign(1, vec1);
                 querydata.insert_or_assign(2, vec2);
 
                 // This should be:
                 // SenderOperationType size
-                // 73 for pubkey and 44 for relinkeys
+                // 8425 for relinkeys
                 // size_t size (number of entries in querydata)
                 // u64 size * 2 (each entry in querydata)
                 // size_t size * 2 (each entry in querydata)
-                // Ciphertexts will generate strings of length 73
-                clt.send_query(relinkeys, querydata, relin_keys_seed);
+                // Ciphertexts will generate strings of length 105
+                clt.send_query(relinkeys_str, querydata);
 
                 SenderResponseGetParameters get_params_resp;
                 clt.receive(get_params_resp);
@@ -201,8 +210,8 @@ namespace APSITests
         expected_total += sizeof(SenderOperationType);
         expected_total += sizeof(size_t) * 3;
         expected_total += sizeof(u64) * 2;
-        expected_total += 16537; // pubkey + relinkeys
-        expected_total += 73 * 2; // Ciphertexts
+        expected_total += 8425; // relinkeys
+        expected_total += 105 * 2; // Ciphertexts
         ASSERT_EQ(expected_total, svr.get_total_data_received());
 
         // get parameters response
@@ -300,27 +309,29 @@ namespace APSITests
     TEST_F(ChannelTests, SendQueryTest)
     {
         thread clientth([this]
-            {
-                EncryptionParameters enc_params(scheme_type::BFV);
-                enc_params.set_plain_modulus(64ul);
-                enc_params.set_poly_modulus_degree(1024);
-                enc_params.set_coeff_modulus(CoeffModulus::BFVDefault(1024));
-                shared_ptr<SEALContext> context = SEALContext::Create(enc_params);
-                KeyGenerator key_gen(context);
+        {
+            EncryptionParameters enc_params(scheme_type::BFV);
+            enc_params.set_plain_modulus(64ul);
+            enc_params.set_poly_modulus_degree(1024);
+            enc_params.set_coeff_modulus(CoeffModulus::BFVDefault(1024));
+            shared_ptr<SEALContext> context = SEALContext::Create(enc_params);
+            KeyGenerator key_gen(context);
 
-                PublicKey pub_key = key_gen.public_key();
-                RelinKeys relin_keys = key_gen.relin_keys();
+            PublicKey pub_key = key_gen.public_key();
+            RelinKeys relin_keys = key_gen.relin_keys();
+            stringstream ss;
+            relin_keys.save(ss);
+            string relin_keys_str = ss.str();
 
-                map<u64, vector<SeededCiphertext>> query;
-                seed128 relin_keys_seed;
+            map<u64, vector<string>> query;
 
-                vector<SeededCiphertext> vec;
-                vec.push_back(SeededCiphertext());
+            vector<string> vec;
+            vec.push_back(string());
 
-                query.insert_or_assign(5, vec);
+            query.insert_or_assign(5, vec);
 
-                client_.send_query(relin_keys, query, relin_keys_seed);
-            });
+            client_.send_query(relin_keys_str, query);
+        });
 
         shared_ptr<SenderOperation> sender_op;
         server_.receive(sender_op, /* wait_for_message */ true);
@@ -485,12 +496,14 @@ namespace APSITests
 
         PublicKey pubkey = key_gen.public_key();
         RelinKeys relinkeys = key_gen.relin_keys();
+        stringstream ss;
+        relinkeys.save(ss);
+        string relinkeys_str = ss.str();
 
-        map<u64, vector<SeededCiphertext>> querydata;
-        seed128 relin_keys_seed;
+        map<u64, vector<string>> querydata;
 
         // Send empty info, it is ignored
-        client_.send_query(relinkeys, querydata, relin_keys_seed);
+        client_.send_query(relinkeys_str, querydata);
 
         SenderResponseQuery query_response;
         client_.receive(query_response);

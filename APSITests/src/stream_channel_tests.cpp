@@ -177,27 +177,29 @@ namespace APSITests
         shared_ptr<SEALContext> context = SEALContext::Create(enc_params);
         KeyGenerator key_gen(context);
 
-        seed128 seeds = { 1, 2 };
-        RelinKeys relin_keys = key_gen.relin_keys();
+        stringstream ss;
+        key_gen.relin_keys_save(ss, compr_mode_type::none);
+        string relin_keys_str = ss.str();
+        ASSERT_EQ(relin_keys_str.length(), 8425);
 
-        map<u64, vector<SeededCiphertext>> query;
+        Ciphertext ct(context);
+        ss = stringstream();
+        ct.save(ss, compr_mode_type::none);
+        string ct_str = ss.str();
+        ASSERT_EQ(ct_str.length(), 105);
 
-        vector<SeededCiphertext> vec;
-        seeds = { 2, 3 };
-        vec.push_back(SeededCiphertext(seeds, Ciphertext()));
+        map<u64, vector<string>> query;
 
+        vector<string> vec;
+        vec.push_back(ct_str);
+        vec.push_back(ct_str);
         query.insert_or_assign(5, vec);
 
         vec.clear();
-        seeds = { 4, 5 };
-        vec.push_back(SeededCiphertext(seeds, Ciphertext()));
-        seeds = { 5, 6 };
-        vec.push_back(SeededCiphertext(seeds, Ciphertext()));
-
+        vec.push_back(ct_str);
         query.insert_or_assign(10, vec);
 
-        seeds = { 6, 7 };
-        receiverchannel.send_query(relin_keys, query, seeds);
+        receiverchannel.send_query(relin_keys_str, query);
         stream1.seekp(0);
 
         shared_ptr<SenderOperation> sender_op;
@@ -210,16 +212,8 @@ namespace APSITests
 
         ASSERT_TRUE(query_op->relin_keys.length() > 0);
         ASSERT_EQ((size_t)2, query_op->query.size());
-        ASSERT_EQ((size_t)1, query_op->query.at(5).size());
-        ASSERT_EQ((u64)2, query_op->query.at(5).at(0).first.first);
-        ASSERT_EQ((u64)3, query_op->query.at(5).at(0).first.second);
-        ASSERT_EQ((size_t)2, query_op->query.at(10).size());
-        ASSERT_EQ((u64)4, query_op->query.at(10).at(0).first.first);
-        ASSERT_EQ((u64)5, query_op->query.at(10).at(0).first.second);
-        ASSERT_EQ((u64)5, query_op->query.at(10).at(1).first.first);
-        ASSERT_EQ((u64)6, query_op->query.at(10).at(1).first.second);
-        ASSERT_EQ((u64)6, query_op->relin_keys_seeds.first);
-        ASSERT_EQ((u64)7, query_op->relin_keys_seeds.second);
+        ASSERT_EQ((size_t)2, query_op->query.at(5).size());
+        ASSERT_EQ((size_t)1, query_op->query.at(10).size());
     }
 
     TEST_F(StreamChannelTests, SendQueryResponseTest)

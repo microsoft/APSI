@@ -53,4 +53,4 @@ target_include_directories(common_code
     PUBLIC $<BUILD_INTERFACE:${common_code_SOURCE_DIR}>)
 
 # Link required libraries
-target_link_libraries(common_code apsi_common TCLAP)
+target_link_libraries(common_code apsi_common TCLAP::TCLAP)

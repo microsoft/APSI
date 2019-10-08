@@ -53,6 +53,9 @@
     <ClCompile Include="src\utils_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="src\oprf_tests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="src\csvreader_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
