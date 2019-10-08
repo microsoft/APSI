@@ -84,7 +84,7 @@ void Receiver::initialize()
     public_key_ = generator.public_key();
     secret_key_ = generator.secret_key();
 
-    encryptor_ = make_unique<Encryptor>(seal_context_, public_key_);
+    encryptor_ = make_unique<Encryptor>(seal_context_, public_key_, secret_key_);
     decryptor_ = make_unique<Decryptor>(seal_context_, secret_key_);
 
     // Initializing tools for dealing with compressed ciphertexts
@@ -519,7 +519,7 @@ void Receiver::encrypt(const FFieldArray &input, vector<string> &destination)
         ex_batch_encoder_->compose(batch, plain);
 
         stringstream ss;
-        encryptor_->encrypt_sk(plain, secret_key_, ss, pool_);
+        encryptor_->encrypt_symmetric_save(plain, ss, compr_mode_type::deflate, pool_);
         destination.emplace_back(ss.str());
 
         // note: this is not doing the setting to zero yet.
