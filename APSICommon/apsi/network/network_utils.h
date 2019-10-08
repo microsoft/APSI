@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 #pragma once
 
@@ -10,23 +10,12 @@
 #include "seal/secretkey.h"
 #include "seal/plaintext.h"
 
-// APSI
-#include "apsi/item.h"
-#include "apsi/ffield/ffield_array.h"
-#include "apsi/tools/sealcompress.h"
-#include "apsi/network/channel.h"
-
 namespace apsi
 {
     /**
     Get string for a public key
     */
     void get_string(std::string& str, const seal::PublicKey& pub_key);
-
-    /**
-    Get string for Relinearization keys
-    */
-    void get_string(std::string& str, const seal::RelinKeys& relin_keys);
 
     /**
     Get string for a Ciphertext

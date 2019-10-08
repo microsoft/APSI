@@ -1,11 +1,12 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 // STD
 #include <thread>
 #include <future>
 #include <chrono>
 #include <array>
+#include <climits>
 
 // APSI
 #include "apsi/sender.h"
@@ -18,7 +19,8 @@
 #include "apsi/result_package.h"
 
 // SEAL
-#include "seal/util/common.h"
+#include <seal/util/common.h>
+#include <seal/smallmodulus.h>
 
 
 using namespace std;
@@ -30,11 +32,11 @@ using namespace apsi::tools;
 using namespace apsi::network;
 using namespace apsi::sender;
 
-
 Sender::Sender(const PSIParams &params, int total_thread_count, 
         int session_thread_count, const MemoryPoolHandle &pool) :
     params_(params),
     pool_(pool),
+    field_(SmallModulus(params_.exfield_characteristic()), params_.exfield_degree()),
     total_thread_count_(total_thread_count),
     session_thread_count_(session_thread_count),
     thread_contexts_(total_thread_count_)
@@ -52,16 +54,14 @@ void Sender::initialize()
 
     // Construct shared Evaluator and BatchEncoder
     evaluator_ = make_shared<Evaluator>(seal_context_);
-    vector<shared_ptr<FField> > field_vec;
+    FField field(
+        SmallModulus(params_.exfield_characteristic()),
+        params_.exfield_degree());
     ex_batch_encoder_ = make_shared<FFieldFastBatchEncoder>(
-        params_.exfield_characteristic(),
-        params_.exfield_degree(),
-        get_power_of_two(params_.encryption_params().poly_modulus_degree())
-    );
-    field_vec = ex_batch_encoder_->fields();
+        seal_context_, field);
 
     // Create SenderDB
-    sender_db_ = make_unique<SenderDB>(params_, seal_context_, field_vec);
+    sender_db_ = make_unique<SenderDB>(params_, seal_context_, field);
 
     compressor_ = make_shared<CiphertextCompressor>(seal_context_, evaluator_);
 
@@ -85,7 +85,7 @@ void Sender::initialize()
             thread_contexts_[i].set_id(i);
             thread_contexts_[i].set_prng(seed);
             thread_contexts_[i].set_pool(local_pool);
-            thread_contexts_[i].set_exfield(field_vec);
+            thread_contexts_[i].set_field(field);
 
             // Allocate memory for repeated use from the given memory pool.
             thread_contexts_[i].construct_variables(params_);
@@ -104,6 +104,9 @@ void Sender::load_db(const vector<Item> &data, MatrixView<u8> vals)
 {
     sender_db_->set_data(data, vals, total_thread_count_);
 
+    params_.set_split_count(sender_db_->get_params().split_count());
+    params_.set_sender_bin_size(sender_db_->get_params().sender_bin_size());
+
     // Compute symmetric polys and batch
     offline_compute();
 }
@@ -112,6 +115,11 @@ void Sender::offline_compute()
 {
     STOPWATCH(sender_stop_watch, "Sender::offline_compute");
     Log::info("Offline compute started");
+
+    for (auto& ctx : thread_contexts_)
+    {
+        ctx.clear_processed_counts();
+    }
 
     vector<thread> thread_pool(total_thread_count_);
     for (int i = 0; i < total_thread_count_; i++)
@@ -153,7 +161,6 @@ void Sender::offline_compute_work()
     int blocks_to_process = end_block - start_block;
     Log::debug("Thread %i processing %i blocks.", thread_context_idx, blocks_to_process);
 
-    context.clear_processed_counts();
     context.set_total_randomized_polys(blocks_to_process);
     if (params_.use_labels())
     {
@@ -223,8 +230,7 @@ void Sender::preprocess(vector<u8>& buff)
 }
 
 void Sender::query(
-    const PublicKey& pub_key,
-    const RelinKeys& relin_keys,
+    const string& relin_keys,
     const map<u64, vector<string>> query,
     const vector<u8>& client_id,
     Channel& channel)
@@ -232,7 +238,12 @@ void Sender::query(
     STOPWATCH(sender_stop_watch, "Sender::query");
     Log::info("Start processing query");
 
-    SenderSessionContext session_context(seal_context_, pub_key, relin_keys);
+    // Load the relinearization keys from string
+    RelinKeys rlk;
+    get_relin_keys(seal_context_, rlk, relin_keys);
+
+    // Create the session context
+    SenderSessionContext session_context(seal_context_, rlk);
 
     /* Receive client's query data. */
     int num_of_powers = static_cast<int>(query.size());
@@ -245,31 +256,29 @@ void Sender::query(
     for (u64 i = 0; i < powers.size(); ++i)
     {
         powers[i].reserve(split_size_plus_one);
-
         for (u64 j = 0; j < split_size_plus_one; ++j)
         {
             powers[i].emplace_back(seal_context_, pool_);
         }
     }
 
-    for (const auto& pair : query)
+    for (const auto& q : query)
     {
-        u64 power = pair.first;
-
+        u64 power = q.first;
         for (u64 i = 0; i < powers.size(); i++)
         {
-            get_ciphertext(seal_context_, powers[i][power], pair.second[i]);
+            get_ciphertext(seal_context_, powers[i][power], q.second[i]);
         }
     }
 
     /* Answer the query. */
-    respond(powers, session_context, client_id, channel);
+    respond(powers, num_of_powers, session_context, client_id, channel);
 
     Log::info("Finished processing query");
 }
 
 void Sender::respond(
-    vector<vector<Ciphertext>>& powers,
+    vector<vector<Ciphertext>>& powers, int num_of_powers, 
     SenderSessionContext &session_context,
     const vector<u8>& client_id,
     Channel& channel)
@@ -281,7 +290,16 @@ void Sender::respond(
     int	splitStep = batch_count * split_size_plus_one;
     int total_blocks = params_.split_count() * batch_count;
 
-    session_context.encryptor()->encrypt(Plaintext("1"), powers[0][0]);
+    // Make the ciphertext non-transparent
+    powers[0][0].resize(2);
+    auto ct_span = powers[0][0].data_span();
+    for (ptrdiff_t i = 0; i < ct_span.extent<1>(); i++)
+    {
+        ct_span[1][i][0] = 1;
+    }
+
+    // Create a dummy encryption of 1
+    evaluator_->add_plain_inplace(powers[0][0], Plaintext("1"));
     for (u64 i = 1; i < powers.size(); ++i)
     {
         powers[i][0] = powers[0][0];
@@ -289,7 +307,12 @@ void Sender::respond(
 
     auto& plain_mod = params_.encryption_params().plain_modulus();
 
-    WindowingDag dag(params_.split_size(), params_.window_size());
+    int max_supported_degree = params_.max_supported_degree();
+    int window_size = get_params().window_size();
+    int base = 1 << window_size;
+    int given_digits = num_of_powers / (base - 1); 
+
+    WindowingDag dag(params_.split_size(), params_.window_size(), max_supported_degree, given_digits);
     std::vector<WindowingDag::State> states;
     states.reserve(batch_count);
 
@@ -399,9 +422,10 @@ void Sender::respond_worker(
         // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
         // Observe that the first call to mult is always multiplying coeff[0] by 1....
         // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
+
         evaluator_->multiply_plain(powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
 
-        for (int s = 1; s <= params_.split_size(); s++)
+        for (unsigned s = 1; s < params_.split_size(); s++)
         {
             // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
             evaluator_->multiply_plain(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
@@ -409,6 +433,16 @@ void Sender::respond_worker(
             currResult ^= 1;
         }
 
+        // Handle the case for s = params_.split_size(); 
+        int s = params_.split_size(); 
+        if (params_.use_oprf()) {
+            tmp = powers[batch][s]; 
+        }
+        else {
+            evaluator_->multiply_plain(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
+        }
+        evaluator_->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
+        currResult ^= 1;
 
         if (params_.use_labels())
         {
@@ -441,7 +475,8 @@ void Sender::respond_worker(
                     }
                 }
             }
-            else if (block.batched_label_coeffs_.size())
+            else if (block.batched_label_coeffs_.size() &&
+                !block.batched_label_coeffs_[0].is_zero())
             {
                 // only reachable if user calls PSIParams.set_use_low_degree_poly(true);
 
@@ -606,31 +641,28 @@ u64 WindowingDag::pow(u64 base, u64 e)
     return r;
 }
 
-uint64_t WindowingDag::optimal_split(uint64_t x, int base)
+uint64_t WindowingDag::optimal_split(uint64_t x, int base, vector<int> &degrees)
 {
-    vector<uint64_t> digits = conversion_to_digits(x, base);
-    int ndigits = static_cast<int>(digits.size());
-    int hammingweight = 0;
-    for (int i = 0; i < ndigits; i++)
+    int opt_deg = degrees[x];
+    int opt_split = 0;
+
+    for (int i1 = 1; i1 < x; i1++)
     {
-        hammingweight += static_cast<int>(digits[i] != 0);
-    }
-    int target = hammingweight / 2;
-    int now = 0;
-    uint64_t result = 0;
-    for (int i = 0; i < ndigits; i++)
-    {
-        if (digits[i] != 0)
+        if (degrees[i1] + degrees[x - i1] < opt_deg)
         {
-            now++;
-            result += pow(base, i)*digits[i];
+            opt_split = i1;
+            opt_deg = degrees[i1] + degrees[x - i1];
         }
-        if (now >= target)
+        else if (degrees[i1] + degrees[x - i1] == opt_deg 
+            && abs(degrees[i1] - degrees[x-i1]) < abs(degrees[opt_split] - degrees[x- opt_split]))
         {
-            break;
+            opt_split = i1;
         }
     }
-    return result;
+
+    degrees[x] = opt_deg;
+
+    return opt_split; 
 }
 
 vector<uint64_t> WindowingDag::conversion_to_digits(uint64_t input, int base)
@@ -647,26 +679,53 @@ vector<uint64_t> WindowingDag::conversion_to_digits(uint64_t input, int base)
 void WindowingDag::compute_dag()
 {
     std::vector<int>
-        depth(max_power_ + 1),
+        degree(max_power_ + 1, INT_MAX),
         splits(max_power_ + 1),
         items_per(max_power_, 0);
 
+    Log::debug("Computing windowing dag: max power = %i", max_power_);
+
+    // initialize the degree array.
+    // given digits...
+    int base = (1 << window_);
+    for (int i = 0; i < given_digits_; i++)
+    {
+        for (int j = 1; j < base; j++)
+        {
+            if (pow(base, i) * j < degree.size())
+            {
+                degree[pow(base, i) * j] = 1;
+            }
+        }
+    }
+
+    degree[0] = 0;
+
     for (int i = 1; i <= max_power_; i++)
     {
-        int i1 = static_cast<int>(optimal_split(i, 1 << window_));
+        int i1 = static_cast<int>(optimal_split(i, 1 << window_, degree));
         int i2 = i - i1;
         splits[i] = i1;
 
         if (i1 == 0 || i2 == 0)
         {
             base_powers_.emplace_back(i);
-            depth[i] = 1;
+            degree[i] = 1;
         }
         else
         {
-            depth[i] = depth[i1] + depth[i2];
-            ++items_per[depth[i]];
+            degree[i] = degree[i1] + degree[i2];
+            ++items_per[degree[i]];
         }
+        Log::debug("degree[%i] = %i", i, degree[i]);
+        Log::debug("splits[%i] = %i", i, splits[i]);
+    }
+
+    // Validate the we did not exceed maximal supported degree.
+    if (*std::max_element(degree.begin(), degree.end()) > max_degree_supported_)
+    {
+        Log::error("Degree exceeds maximal supported"); 
+        throw invalid_argument("degree too large");
     }
 
     for (int i = 3; i < max_power_ && items_per[i]; ++i)
@@ -674,6 +733,11 @@ void WindowingDag::compute_dag()
         items_per[i] += items_per[i - 1];
     }
 
+    for (int i = 0; i < max_power_; i++) {
+        Log::debug("items_per[%i] = %i", i, items_per[i]);
+    }
+
+    // size = how many powers we still need to generate. 
     int size = static_cast<int>(max_power_ - base_powers_.size());
     nodes_.resize(size);
 
@@ -682,9 +746,9 @@ void WindowingDag::compute_dag()
         int i1 = splits[i];
         int i2 = i - i1;
 
-        if (i1 && i2)
+        if (i1 && i2) // if encryption(y^i) is not given
         {
-            auto d = depth[i] - 1;
+            auto d = degree[i] - 1; 
 
             auto idx = items_per[d]++;
             if (nodes_[idx].output_)

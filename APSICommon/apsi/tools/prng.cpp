@@ -26,8 +26,7 @@ PRNG::PRNG(const Item& seed, u64 buffer_size)
         throw std::runtime_error("Size of block and size of Item are different");
     }
 
-    block& bseed = static_cast<block&>(seed);
-    set_seed(bseed, buffer_size);
+    set_seed(_mm_set_epi64x(seed[1], seed[0]), buffer_size);
 }
 
 PRNG::PRNG(PRNG && s) :
@@ -71,7 +70,7 @@ u8 PRNG::get_bit()
     return (ret & 0x01);
 }
 
-const block PRNG::get_seed() const
+block PRNG::get_seed() const
 {
     if (buffer_.size())
         return aes_.get_key();

@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 
 target_sources(sender
-	PRIVATE
-		${CMAKE_CURRENT_LIST_DIR}/sender.cpp
-		${CMAKE_CURRENT_LIST_DIR}/senderutils.cpp
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/sender.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/senderutils.cpp
 )

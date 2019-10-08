@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 #include "common_utils.h"
 
@@ -19,7 +19,7 @@
 
 // SEAL
 #include "seal/smallmodulus.h"
-#include "seal/defaultparams.h"
+//#include "seal/defaultparams.h"
 
 
 using namespace std;

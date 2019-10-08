@@ -1,15 +1,17 @@
 #include <memory>
 #include "apsi/tools/sealcompress.h"
+#include "apsi/logging/log.h"
 
 using namespace std;
 using namespace seal;
 using namespace seal::util;
 using namespace apsi;
+using namespace apsi::logging;
 
 
 void CiphertextCompressor::mod_switch(Ciphertext &encrypted) const
 {
-    if(!seal_context_->context_data(encrypted.parms_id()))
+    if(!seal_context_->get_context_data(encrypted.parms_id()))
     {
         throw invalid_argument("encrypted is not valid for the encryption parameters");
     }
@@ -31,7 +33,7 @@ void CiphertextCompressor::compressed_save(const seal::Ciphertext &encrypted,
     {
         throw invalid_argument("can only compress fully relinearized ciphertexts");
     }
-    if(!seal_context_->context_data(encrypted.parms_id()))
+    if(!seal_context_->get_context_data(encrypted.parms_id()))
     {
         throw invalid_argument("encrypted is not valid for the encryption parameters");
     }
@@ -44,8 +46,7 @@ void CiphertextCompressor::compressed_save(const seal::Ciphertext &encrypted,
         throw invalid_argument(" cannot be NTT transformed");
     }
 
-    //auto &context_data = seal_context_->context_data(seal_context_->last_parms_id()).value().get();
-    auto& context_data = *seal_context_->context_data(seal_context_->last_parms_id());
+    auto& context_data = *seal_context_->get_context_data(seal_context_->last_parms_id());
     auto &parms = context_data.parms();
     
     size_t coeff_count = parms.poly_modulus_degree();
@@ -71,7 +72,11 @@ void CiphertextCompressor::compressed_save(const seal::Ciphertext &encrypted,
     char *compr_poly_writer_head = reinterpret_cast<char*>(compr_poly.get());
     const uint64_t *encrypted_coeff_ptr = encrypted.data(); 
     size_t encrypted_uint64_count = encrypted_size * encrypted.poly_modulus_degree();
+    Log::debug("COMPRESSOR: compressing %i uin64s into %i", encrypted_uint64_count, compr_data_uint64_count);
+
     int bit_shift = bits_per_uint64 - coeff_mod_bit_count;
+    Log::debug("bit shift =  %i", bit_shift);
+
     for(size_t i = 0; i < encrypted_uint64_count; i++, encrypted_coeff_ptr++)
     {
         uint64_t shifted_coeff = *encrypted_coeff_ptr << bit_shift;
@@ -102,7 +107,7 @@ void CiphertextCompressor::compressed_load(std::istream &stream,
     {
         throw invalid_argument("can only decompress fully relinearized ciphertexts");
     }
-    if(!seal_context_->context_data(destination.parms_id()))
+    if(!seal_context_->get_context_data(destination.parms_id()))
     {
         throw invalid_argument("destination is not valid for the encryption parameters");
     }
@@ -115,7 +120,7 @@ void CiphertextCompressor::compressed_load(std::istream &stream,
         throw invalid_argument("destination cannot be NTT transformed");
     }
 
-    auto& context_data = *seal_context_->context_data(seal_context_->last_parms_id());
+    auto& context_data = *seal_context_->get_context_data(seal_context_->last_parms_id());
     auto &parms = context_data.parms();
 
     size_t coeff_count = parms.poly_modulus_degree();

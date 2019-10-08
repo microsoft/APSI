@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 // STD
 #include <sstream>
@@ -97,11 +97,6 @@ void SenderDispatcher::dispatch_preprocess(shared_ptr<SenderOperation> sender_op
 void SenderDispatcher::dispatch_query(shared_ptr<SenderOperation> sender_op, Channel& channel)
 {
     auto query_op = dynamic_pointer_cast<SenderOperationQuery>(sender_op);
-    PublicKey pub_key;
-    RelinKeys relin_keys;
-
-    get_public_key(sender_->get_seal_context(), pub_key, query_op->public_key);
-    get_relin_keys(sender_->get_seal_context(), relin_keys, query_op->relin_keys);
 
     // The query response will tell the Receiver how many ResultPackages to expect
     size_t package_count = sender_->get_params().batch_count() * sender_->get_params().split_count();
@@ -109,8 +104,7 @@ void SenderDispatcher::dispatch_query(shared_ptr<SenderOperation> sender_op, Cha
 
     // Query will send result to client in a stream of ResultPackages
     sender_->query(
-        pub_key,
-        relin_keys,
+        query_op->relin_keys,
         query_op->query,
         sender_op->client_id,
         channel);

@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 // STD
 #include <iostream>
@@ -79,15 +79,6 @@ int main(int argc, char *argv[])
 
     remote_query(cmd);
 
-//#ifdef _MSC_VER
-//    if (IsDebuggerPresent())
-//    {
-//        // Wait for ENTER before closing screen.
-//        cout << endl << "Press ENTER to exit" << endl;
-//        char ignore;
-//        cin.get(ignore);
-//    }
-//#endif
     return 0;
 }
 
@@ -107,6 +98,11 @@ void remote_query(const CLP& cmd)
     vector<Item> items;
     Matrix<u8> labels;
     int intersection_size = initialize_query(cmd, items);
+    if (-1 == intersection_size)
+    {
+        // There was an error reading query file
+        return;
+    }
 
     receiver.handshake(channel);
     auto result = receiver.query(items, channel);
@@ -214,9 +210,18 @@ string get_conn_addr(const CLP& cmd)
 int initialize_query(const CLP& cmd, vector<Item>& items)
 {
     // Read items that should exist from file
-    Matrix<u8> unused;
-    CSVReader reader(cmd.query_file());
-    reader.read(items, unused, /* label_byte_count */ 0);
+    try
+    {
+        Matrix<u8> unused;
+        CSVReader reader(cmd.query_file());
+        reader.read(items, unused, /* label_byte_count */ 0);
+    }
+    catch (invalid_argument& ex)
+    {
+        // Error reading or opening file
+        Log::error("Could not open or read file: %s: %s", cmd.query_file().c_str(), ex.what());
+        return -1;
+    }
 
     return static_cast<int>(items.size());
 }

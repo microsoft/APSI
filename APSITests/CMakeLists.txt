@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
 project(unit_tests VERSION 1.0.0 LANGUAGES CXX C)
 
@@ -10,7 +10,7 @@ if (DEFINED MSVC)
 endif()
 
 # Executable will be in ../bin
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../bin)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/../bin)
 
 # Create executable but add no source files yet
 add_executable(unit_tests "")
@@ -25,75 +25,65 @@ if (NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
+# For extra modules
+list(APPEND CMAKE_MODULE_PATH ${unit_tests_SOURCE_DIR}/../cmake)
+
 # Import APSICommon
-find_package(APSICommon 1.0.0 EXACT REQUIRED)
+if(NOT TARGET apsi_common)
+    find_package(APSICommon 1.0.0 EXACT REQUIRED)
+endif()
 
 # Import APSISender
-find_package(APSISender 1.0.0 EXACT REQUIRED)
+if(NOT TARGET apsi_sender)
+    find_package(APSISender 1.0.0 EXACT REQUIRED)
+endif()
 
 # Import APSIReceiver
-find_package(APSIReceiver 1.0.0 EXACT REQUIRED)
+if(NOT TARGET apsi_receiver)
+    find_package(APSIReceiver 1.0.0 EXACT REQUIRED)
+endif()
 
 # Import SEAL
-find_package(SEAL 3.2.0 REQUIRED)
+find_package(SEAL 3.4.0 REQUIRED)
 
 # Import Cuckoo
-find_package(Cuckoo 1.0 REQUIRED)
+find_package(Cuckoo 1.0.0 REQUIRED)
 
-# FLINT library
-find_path(FLINT_DIR NAMES flint/fmpz.h)
-if (NOT FLINT_DIR)
-    message(FATAL_ERROR "Could not find FLINT library")
-else()
-    message(STATUS "Flint directory: ${FLINT_DIR}")
+# Import ZeroMQ
+if(ZeroMQ_ROOT)
+    unset(ZEROMQ_INCLUDE_DIR CACHE)
+    unset(ZEROMQ_LIBRARY_DIR CACHE)
+    unset(ZEROMQ_LIBRARY_PATH CACHE)
 endif()
+find_package(ZeroMQ MODULE REQUIRED)
 
-# FourQ
-find_path(FOURQ_DIR NAMES FourQ/FourQ.h)
-if (NOT FOURQ_DIR)
-    message(FATAL_ERROR "Could not find FourQ library")
-else()
-    message(STATUS "FourQ directory: ${FOURQ_DIR}")
+# Import ZeroMQpp
+if(ZeroMQpp_ROOT)
+    unset(ZEROMQPP_INCLUDE_DIR CACHE)
+    unset(ZEROMQPP_LIBRARY_DIR CACHE)
+    unset(ZEROMQPP_LIBRARY_PATH CACHE)
 endif()
+find_package(ZeroMQpp MODULE REQUIRED)
 
-# Log4cplus
-find_path(LOG4CPLUS_DIR log4cplus/logger.h)
-find_library(LOG4CPLUS log4cplus)
-if (NOT LOG4CPLUS_DIR OR NOT LOG4CPLUS)
-    message(FATAL_ERROR "Could not find log4cplus library")
-else()
-    message(STATUS "log4cplus directory: ${LOG4CPLUS_DIR}")
-    message(STATUS "Found log4cplus: ${LOG4CPLUS}")
+# Import FourQ
+if(FourQ_ROOT)
+    unset(FOURQ_INCLUDE_DIR CACHE)
+    unset(FOURQ_LIBRARY_DIR CACHE)
+    unset(FOURQ_LIBRARY_PATH CACHE)
 endif()
+find_package(FourQ MODULE REQUIRED)
 
-# CryptoPP
-find_library(CRYPTOPP cryptopp)
-if (NOT CRYPTOPP)
-    message(FATAL_ERROR "Could not find cryptopp library")
-else()
-    message(STATUS "Found cryptopp: ${CRYPTOPP}")
+# Import Log4cplus
+if(Log4cplus_ROOT)
+    unset(LOG4CPLUS_INCLUDE_DIR CACHE)
+    unset(LOG4CPLUS_LIBRARY_DIR CACHE)
+    unset(LOG4CPLUS_LIBRARY_PATH CACHE)
 endif()
-
-# Google Test
-find_path(GTEST_DIR gtest/gtest.h)
-find_library(GTEST gtest)
-if (NOT GTEST OR NOT GTEST_DIR)
-    message(FATAL_ERROR "Could not find Google Test library")
-else()
-    message(STATUS "Google Test directory: ${GTEST_DIR}")
-    message(STATUS "Found Google Test: ${GTEST}")
-endif()
+find_package(Log4cplus MODULE REQUIRED)
 
 # Set flags
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-
-# Includes
-target_include_directories(unit_tests PRIVATE
-    ${FLINT_DIR}/flint
-    ${FOURQ_DIR}/FourQ
-    ${LOG4CPLUS_DIR}
-)
 
 # C++17
 target_compile_features(unit_tests PUBLIC cxx_std_17)
@@ -106,13 +96,11 @@ add_definitions(-D__LINUX__)
 
 # Link required libraries
 target_link_libraries(unit_tests
-    APSICommon::apsi_common
-    APSISender::apsi_sender
-    APSIReceiver::apsi_receiver
-    ${GTEST}
+    apsi_common
+    apsi_sender
+    apsi_receiver
+    gtest
     stdc++fs
-    ${LOG4CPLUS}
-    ${CRYPTOPP}
 )
 
 # Add source files to executable

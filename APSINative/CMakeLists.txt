@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
 project(apsinative VERSION 1.0.0 LANGUAGES CXX C)
 
@@ -52,8 +52,8 @@ target_compile_features(apsinative PUBLIC cxx_std_17)
 
 # Add source files to library
 target_sources(apsinative
-	PRIVATE
-		${CMAKE_CURRENT_LIST_DIR}/apsinative.cpp
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/apsinative.cpp
 )
 
 # Link required libraries

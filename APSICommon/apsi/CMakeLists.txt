@@ -2,15 +2,16 @@
 # Licensed under the MIT license.
 
 target_sources(apsi_common
-	PRIVATE
-		${CMAKE_CURRENT_LIST_DIR}/apsidefines.cpp
-		${CMAKE_CURRENT_LIST_DIR}/item.cpp
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/apsidefines.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/item.cpp
 )
 
 add_subdirectory(ffield)
 add_subdirectory(logging)
 add_subdirectory(network)
 add_subdirectory(tools)
+add_subdirectory(oprf)
 
 install(
     FILES

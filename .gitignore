@@ -4,6 +4,7 @@ obj/*
 bin/*
 */lib/*
 */.build/*
+*/out/*
 *.o
 *.so
 *.a
@@ -29,14 +30,10 @@ APSISender/cmake/APSISenderTargets.cmake
 APSIReceiver/cmake/APSIReceiverConfig.cmake
 APSIReceiver/cmake/APSIReceiverConfigVersion.cmake
 APSIReceiver/cmake/APSIReceiverTargets.cmake
-Cuckoo/cuckoo/config.h
-Cuckoo/cmake/CuckooConfig.cmake
-Cuckoo/cmake/CuckooConfigVersion.cmake
-Cuckoo/cmake/CuckooTargets.cmake
 doc/html
 doc/latex
 **/CMakeCache.txt
-**/CMakeFiles/
-**/Makefile
-**/cmake_install.cmake
 **/install_manifest.txt
+**/cmake_install.cmake
+**/CMakeFiles
+**/Makefile

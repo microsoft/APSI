@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 #pragma once
 
@@ -40,7 +40,7 @@ namespace apsi
         public:
             SenderDB(const PSIParams &params, 
                 std::shared_ptr<seal::SEALContext> &seal_context,
-                std::vector<std::shared_ptr<FField> > &ex_field);
+                FField field);
 
             /**
             Clears sender's database and set all entries to sender's null item.
@@ -53,12 +53,16 @@ namespace apsi
             void set_data(gsl::span<const Item> keys, int thread_count);
             void set_data(gsl::span<const Item> keys, MatrixView<u8> values, int thread_count);
 
-
             /**
             Adds the data items to sender's database.
             */
             void add_data(gsl::span<const Item> keys, int thread_count);
             void add_data(gsl::span<const Item> keys, MatrixView<u8> values, int thread_count);
+
+            /**
+             No hash version of add data, specific for one query
+            */
+            void add_data_no_hash(gsl::span<const Item> data, MatrixView<u8> values);
 
             /**
             Handles the work of one thread for adding items to sender's database
@@ -68,7 +72,7 @@ namespace apsi
                 int thread_count,
                 const apsi::block& seed,
                 gsl::span<const apsi::Item> data,
-                apsi::MatrixView<apsi::u8> values);
+                apsi::MatrixView<apsi::u8> values, std::vector<int> &loads);
 
             /**
             Adds one item to sender's database.
@@ -85,19 +89,18 @@ namespace apsi
                 int start_block,
                 int end_block,
                 std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder);
+                std::shared_ptr<FFieldFastBatchEncoder> batch_encoder);
 
             void batched_interpolate_polys(
                 SenderThreadContext& th_context,
                 int start_block,
                 int end_block,
                 std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder
-                );
+                std::shared_ptr<FFieldFastBatchEncoder> batch_encoder);
 
             DBBlock& get_block(int batch, int split)
             {
-                return db_blocks_(batch, split);
+                return *db_blocks_(batch, split);
             }
 
             u64 get_block_count() const
@@ -105,12 +108,15 @@ namespace apsi
                 return db_blocks_.size();
             }
 
+            const apsi::PSIParams& get_params() const { return params_; }
+
+
         private:
             PSIParams params_;
             std::shared_ptr<seal::SEALContext> seal_context_;
-            std::vector<std::shared_ptr<FField> > ex_field_;
-            FFieldArray null_element_;
-            FFieldArray neg_null_element_;
+            FField field_;
+            FFieldElt null_element_;
+            FFieldElt neg_null_element_;
             int encoding_bit_length_;
 
             /* 
@@ -147,7 +153,9 @@ namespace apsi
             Thread safe function to insert an item into the bin 
             index by cockooIndex. The PRNG and be any PRNG.  
             */
-            std::pair<DBBlock*, DBBlock::Position> aquire_db_position(int cockooIndex, apsi::tools::PRNG& prng);
+            std::pair<DBBlock*, DBBlock::Position> acquire_db_position(std::size_t cockooIndex, apsi::tools::PRNG& prng);
+
+            std::pair<DBBlock*, DBBlock::Position> acquire_db_position_after_oprf(size_t cuckoo_loc);
 
             apsi::tools::PRNG prng_;
         };

@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 #pragma once
 
@@ -12,8 +12,8 @@
 #include "seal/publickey.h"
 #include "seal/secretkey.h"
 #include "seal/relinkeys.h"
-#include "seal/encryptor.h"
 #include "seal/decryptor.h"
+#include "seal/encryptor.h"
 
 // apsi
 #include  "apsi/ffield/ffield_array.h"
@@ -27,13 +27,11 @@ namespace apsi
         friend class Sender;
 
         public:
-            SenderSessionContext(std::shared_ptr<seal::SEALContext> context, const seal::PublicKey &pub_key, 
+            SenderSessionContext(std::shared_ptr<seal::SEALContext> context,
                 const seal::RelinKeys &relin_keys) : 
                 seal_context_(std::move(context)), 
-                public_key_(pub_key), 
                 relin_keys_(relin_keys)
             {
-                encryptor_ = std::make_shared<seal::Encryptor>(seal_context_, public_key_);
             }
 
             SenderSessionContext(std::shared_ptr<seal::SEALContext> context) : 

@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 #pragma once
 
@@ -70,7 +70,7 @@ namespace apsi
             /**
             * Return the seed for this PRNG.
             */
-            const block get_seed() const;
+            block get_seed() const;
 
             /**
             * Templated function that returns the a random element

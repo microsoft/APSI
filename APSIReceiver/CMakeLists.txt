@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
 project(APSIReceiver VERSION 1.0.0 LANGUAGES CXX C)
 
@@ -10,7 +10,7 @@ if (DEFINED MSVC)
 endif()
 
 # Library will be in ../lib
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/../lib)
 
 # Create library but add no source files yet
 add_library(apsi_receiver STATIC "")
@@ -32,6 +32,7 @@ if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
 else()
     set(APSI_DEBUG_DEFAULT OFF)
 endif()
+set(APSI_DEBUG ${APSI_DEBUG_DEFAULT})
 
 # Required files and directories
 set(APSIRECEIVER_INCLUDES_INSTALL_DIR include)
@@ -41,37 +42,29 @@ set(APSIRECEIVER_TARGETS_FILENAME ${APSIReceiver_SOURCE_DIR}/cmake/APSIReceiverT
 set(APSIRECEIVER_CONFIG_VERSION_FILENAME ${APSIReceiver_SOURCE_DIR}/cmake/APSIReceiverConfigVersion.cmake)
 set(APSIRECEIVER_CONFIG_INSTALL_DIR lib/cmake/APSIReceiver)
 
+# For extra modules
+list(APPEND CMAKE_MODULE_PATH ${APSIReceiver_SOURCE_DIR}/../cmake)
+
 # Import APSICommon
-find_package(APSICommon 1.0.0 EXACT REQUIRED)
+if(NOT TARGET apsi_common)
+    find_package(APSICommon 1.0.0 EXACT REQUIRED)
+endif()
 
 # Import Microsoft SEAL
-find_package(SEAL 3.2.0 EXACT REQUIRED)
+find_package(SEAL 3.4.0 EXACT REQUIRED)
 
-# Import Cuckoo library
-find_package(Cuckoo 1.0 REQUIRED)
+# Import Cuckoo
+find_package(Cuckoo 1.0.0 REQUIRED)
 
-# Import FLINT library
-find_path(FLINT_DIR NAMES flint/fmpz.h)
-find_library(FLINT flint)
-if (NOT FLINT OR NOT FLINT_DIR)
-    message(FATAL_ERROR "Could not find FLINT library")
-else()
-    message(STATUS "Flint directory: ${FLINT_DIR}")
-    message(STATUS "Found FLINT: ${FLINT}")
+# Import FourQ
+if(FourQ_ROOT)
+    unset(FOURQ_INCLUDE_DIR CACHE)
+    unset(FOURQ_LIBRARY_DIR CACHE)
+    unset(FOURQ_LIBRARY_PATH CACHE)
 endif()
-
-# FourQ
-find_path(FOURQ_DIR NAMES FourQ/FourQ.h)
-find_library(FOURQ FourQ)
-if (NOT FOURQ OR NOT FOURQ_DIR)
-    message(FATAL_ERROR "Could not find FourQ library")
-else()
-    message(STATUS "FourQ directory: ${FOURQ_DIR}")
-    message(STATUS "Found FourQ: ${FOURQ}")
-endif()
+find_package(FourQ MODULE REQUIRED)
 
 # Set flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -maes")
 
@@ -87,19 +80,15 @@ add_definitions(-D_AVX2_)
 add_definitions(-D_ASM_)
 add_definitions(-D__LINUX__)
 
-# Includes
-include_directories(${FLINT_DIR}/flint)
-include_directories(${FOURQ_DIR}/FourQ)
-
 # Link required libraries
-target_link_libraries(apsi_receiver APSICommon::apsi_common SEAL::seal Cuckoo::cuckoo ${FLINT} ${FOURQ})
+target_link_libraries(apsi_receiver apsi_common)
 
 # Add source files to library
 add_subdirectory(apsi)
 
 # Add local include directories for build
 target_include_directories(apsi_receiver
-	PRIVATE $<BUILD_INTERFACE:${APSIReceiver_SOURCE_DIR}>)
+	PUBLIC $<BUILD_INTERFACE:${APSIReceiver_SOURCE_DIR}>)
 
 # Associate APSI to export apsi_receiver_export
 install(TARGETS apsi_receiver EXPORT apsi_receiver_export

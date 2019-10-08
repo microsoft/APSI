@@ -1,5 +1,9 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
+
+// STD
+#include <algorithm>
+#include <memory>
 
 // APSI
 #include "apsi/dbblock.h"
@@ -7,6 +11,8 @@
 #include "apsi/tools/interpolate.h"
 #include "apsi/logging/log.h"
 
+// SEAL
+#include <seal/util/uintarithsmallmod.h>
 
 using namespace std;
 using namespace apsi;
@@ -14,7 +20,7 @@ using namespace apsi::sender;
 using namespace apsi::tools;
 using namespace apsi::logging;
 using namespace seal;
-
+using namespace seal::util;
 
 void DBBlock::clear()
 {
@@ -67,6 +73,33 @@ DBBlock::Position DBBlock::try_aquire_position(int bin_idx, PRNG& prng)
     return {};
 }
 
+DBBlock::Position DBBlock::try_aquire_position_after_oprf(int bin_idx)
+{
+    if (bin_idx >= items_per_batch_)
+    {
+        throw runtime_error("bin_idx should be smaller than items_per_batch");
+    }
+
+    int idx = 0;
+    auto start = bin_idx * items_per_split_;
+    auto end = (bin_idx + 1) * items_per_split_;
+
+    // If still failed, try to do linear scan
+    for (int i = 0; i < items_per_split_; ++i)
+    {
+        bool exp = false;
+        if (has_item_[start + idx].compare_exchange_strong(exp, true))
+        {
+            // Great, found an empty location and have marked it as mine
+            return { bin_idx, idx };
+        }
+
+        idx = (idx + 1) % items_per_split_;
+    }
+
+    return {};
+}
+
 void DBBlock::check(const Position & pos)
 {
     if (!pos.is_initialized() ||
@@ -85,30 +118,33 @@ void DBBlock::check(const Position & pos)
 
 void DBBlock::symmetric_polys(
     SenderThreadContext &th_context,
-    MatrixView<_ffield_array_elt_t> symm_block,
+    MatrixView<_ffield_elt_coeff_t> symm_block,
     int encoding_bit_length,
-    const FFieldArray &neg_null_element)
+    const FFieldElt &neg_null_element)
 {
     int split_size = items_per_split_;
     int batch_size = items_per_batch_;
     auto num_rows = batch_size;
-    auto &field_vec = th_context.exfield();
+    auto field = th_context.field();
+
+    auto ch = field.ch();
+    auto d = field.d();
 
     Position pos;
     for (pos.batch_offset = 0; pos.batch_offset < num_rows; pos.batch_offset++)
     {
-        FFieldElt temp11(field_vec[pos.batch_offset]);
-        FFieldElt temp2(field_vec[pos.batch_offset]);
+        FFieldElt temp11(field);
+        FFieldElt temp2(field);
         FFieldElt *temp1;
-        FFieldElt curr_neg_null_element(neg_null_element.get(pos.batch_offset));
-        auto &ctx = field_vec[pos.batch_offset]->ctx();
-        fq_nmod_one(&symm_block(pos.batch_offset, split_size), field_vec[pos.batch_offset]->ctx());
+
+        // Set symm_block[pos.batch_offset, split_size] to 1
+        fill_n(symm_block(pos.batch_offset, split_size), d, 1);
 
         for (pos.split_offset = split_size - 1; pos.split_offset >= 0; pos.split_offset--)
         {
             if (!has_item(pos))
             {
-                temp1 = &curr_neg_null_element;
+                temp1 = const_cast<FFieldElt*>(&neg_null_element);
             }
             else
             {
@@ -118,20 +154,24 @@ void DBBlock::symmetric_polys(
                 temp1->neg();
             }
 
-            auto symm_block_ptr = &symm_block(pos.batch_offset, pos.split_offset + 1);
+            auto symm_block_ptr = symm_block(pos.batch_offset, pos.split_offset + 1);
 
-            fq_nmod_mul(
-                symm_block_ptr - 1,
-                symm_block_ptr,
-                temp1->data(), ctx);
+            transform(symm_block_ptr, symm_block_ptr + d,
+                temp1->data(),
+                symm_block_ptr - d,
+                [&ch](auto a, auto b) { return multiply_uint_uint_mod(a, b, ch); });
 
-            for (int k = pos.split_offset + 1; k < split_size; k++, symm_block_ptr++)
+            for (int k = pos.split_offset + 1; k < split_size; k++, symm_block_ptr += d)
             {
-                fq_nmod_mul(temp2.data(), temp1->data(), symm_block_ptr + 1, ctx);
-                fq_nmod_add(
+                transform(temp1->data(), temp1->data() + d,
+                    symm_block_ptr + d,
+                    temp2.data(),
+                    [&ch](auto a, auto b) { return multiply_uint_uint_mod(a, b, ch); });
+
+                transform(symm_block_ptr, symm_block_ptr + d,
+                    temp2.data(),
                     symm_block_ptr,
-                    symm_block_ptr,
-                    temp2.data(), ctx);
+                    [&ch](auto a, auto b) { return add_uint_uint_mod(a, b, ch); });
             }
         }
     }
@@ -139,9 +179,9 @@ void DBBlock::symmetric_polys(
 
 void DBBlock::randomized_symmetric_polys(
     SenderThreadContext &th_context,
-    MatrixView<_ffield_array_elt_t> symm_block,
+    MatrixView<_ffield_elt_coeff_t> symm_block,
     int encoding_bit_length,
-    FFieldArray &neg_null_element)
+    const FFieldElt &neg_null_element)
 {
     int split_size_plus_one = items_per_split_ + 1;
     symmetric_polys(th_context, symm_block, encoding_bit_length, neg_null_element);
@@ -149,16 +189,20 @@ void DBBlock::randomized_symmetric_polys(
     auto num_rows = items_per_batch_;
     PRNG &prng = th_context.prng();
 
-    FFieldArray r(th_context.exfield());
+    FFieldArray r(symm_block.rows(), th_context.field());
     r.set_random_nonzero(prng);
 
+    auto ch = th_context.field().ch();
+    auto d = th_context.field().d();
     auto symm_block_ptr = symm_block.data();
     for (int i = 0; i < num_rows; i++)
     {
-        auto &field_ctx = th_context.exfield()[i]->ctx();
-        for (int j = 0; j < split_size_plus_one; j++, symm_block_ptr++)
+        for (int j = 0; j < split_size_plus_one; j++, symm_block_ptr += d)
         {
-            fq_nmod_mul(symm_block_ptr, symm_block_ptr, r.data() + i, field_ctx);
+            transform(symm_block_ptr, symm_block_ptr + d,
+                r.data(i),
+                symm_block_ptr,
+                [&ch](auto a, auto b) { return multiply_uint_uint_mod(a, b, ch); });
         }
     }
 }
@@ -171,13 +215,13 @@ void DBBlock::batch_interpolate(
     DBInterpolationCache& cache,
     const PSIParams& params)
 {
-    auto mod = seal_context->context_data()->parms().plain_modulus().value();
+    auto mod = params.get_seal_params().encryption_params.plain_modulus().value();
     MemoryPoolHandle local_pool = th_context.pool();
     Position pos;
 
     for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
     {
-        FFieldElt temp(ex_batch_encoder->field(pos.batch_offset));
+        FFieldElt temp(ex_batch_encoder->field());
         FFieldArray& x = cache.x_temp[pos.batch_offset];
         FFieldArray& y = cache.y_temp[pos.batch_offset];
 
@@ -228,7 +272,6 @@ void DBBlock::batch_interpolate(
             ++cache.temp_vec[0];
         }
 
-
         ffield_newton_interpolate_poly(
             x, y,
             // We don't use the cache for divided differences.
@@ -239,7 +282,7 @@ void DBBlock::batch_interpolate(
     batched_label_coeffs_.resize(items_per_split_);
 
     // We assume there are all the same
-    unsigned degree = th_context.exfield()[0]->d();
+    auto degree = th_context.field().d();
     FFieldArray temp_array(ex_batch_encoder->create_array());
     for (int s = 0; s < items_per_split_; s++)
     {
@@ -252,8 +295,7 @@ void DBBlock::batch_interpolate(
                 temp_array.set_coeff_of(b, c, cache.coeff_temp[b].get_coeff_of(s, c));
         }
 
-
-        auto capacity = static_cast<Plaintext::size_type>(params.encryption_params().coeff_modulus().size() *
+        auto capacity = static_cast<size_t>(params.encryption_params().coeff_modulus().size() *
             params.encryption_params().poly_modulus_degree());
         batched_coeff.reserve(capacity);
 
@@ -274,12 +316,11 @@ DBInterpolationCache::DBInterpolationCache(
 
     for (u64 i = 0; i < items_per_batch_; ++i)
     {
-        coeff_temp.emplace_back(ex_batch_encoder->field(i), items_per_split_);
-        x_temp.emplace_back(ex_batch_encoder->field(i), items_per_split_);
-        y_temp.emplace_back(ex_batch_encoder->field(i), items_per_split_);
+        coeff_temp.emplace_back(items_per_split_, ex_batch_encoder->field());
+        x_temp.emplace_back(items_per_split_, ex_batch_encoder->field());
+        y_temp.emplace_back(items_per_split_, ex_batch_encoder->field());
     }
 
     temp_vec.resize((value_byte_length_ + sizeof(u64)) / sizeof(u64), 0);
     key_set.reserve(items_per_split_);
 }
-

@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 #pragma once
 
@@ -25,7 +25,7 @@ namespace apsi
         const FFieldArray &points, const FFieldArray &values,
         FFieldArray& result);
 
-    std::vector<FFieldArray> get_div_diff_temp(const std::shared_ptr<FField>& field, int size);
+    std::vector<FFieldArray> get_div_diff_temp(FField field, std::size_t size);
 
     void u64_newton_interpolate_poly(
         gsl::span<std::pair<std::uint64_t, std::uint64_t> > input,

@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
-#pragma once
 #pragma once
 
 // STD
@@ -42,6 +41,12 @@ namespace apsi
         Find optimal split
         */
         apsi::u64 optimal_split(const apsi::u64 x, const int base);
+
+        /**
+        Given the supported degree and bound on powers, find the maximal represented power.	
+        i.e., we are given y^((b**i)*j) for i = 1,2,..., bound and j = 1,2,...,b-1.
+        */
+        apsi::u64 maximal_power(const apsi::u64 degree, const apsi::u64 bound, const apsi::u64 base);
 
         /**
         Convert the given input to digits

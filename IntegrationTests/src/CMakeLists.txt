@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 
 target_sources(int_tests
-	PRIVATE
-		${CMAKE_CURRENT_LIST_DIR}/IntegrationTests.cpp
-		${CMAKE_CURRENT_LIST_DIR}/senderreceivertests.cpp
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/IntegrationTests.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/senderreceivertests.cpp
 )

@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 #pragma once
 
@@ -42,8 +42,8 @@ namespace apsi
 
             static void set_log_level(Level level);
             static void set_log_level(const std::string& level);
-			static void set_log_file(const std::string& file);
-			static void set_console_disabled(bool console_disabled);
+            static void set_log_file(const std::string& file);
+            static void set_console_disabled(bool console_disabled);
 
         private:
             static void format_msg(std::string& msg, const char* format, va_list ap);

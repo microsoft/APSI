@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 #pragma once
 
@@ -20,9 +20,9 @@ class Matrix : public MatrixView<T>
 public:
     Matrix() = default;
 
-    Matrix(u64 rows, u64 cols)
+    Matrix(u64 rows, u64 cols, std::size_t elt_size = 1)
     {
-        resize(rows, cols);
+        resize(rows, cols, elt_size);
     }
 
     /**
@@ -32,9 +32,9 @@ public:
      * When the needed capacity is less than the current capacity, the memory
      * use will remain the same and the matrix will be reduced only logically.
      */
-    void resize(u64 newRows, u64 newCols)
+    void resize(u64 newRows, u64 newCols, std::size_t elt_size = 1)
     {
-        u64 newCapacity = newRows * newCols;
+        u64 newCapacity = newRows * newCols * elt_size;
 
         if (newCapacity > data_.size())
         {
@@ -43,7 +43,7 @@ public:
 
         if (newRows != this->rows() || newCols != this->columns())
         {
-            MatrixView<T>::resize(data_.data(), newRows, newCols);
+            MatrixView<T>::resize(data_.data(), newRows, newCols, elt_size);
         }
     }
 

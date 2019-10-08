@@ -1,16 +1,16 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.12)
 
-project(APSICOMMON VERSION 1.0.0 LANGUAGES CXX C)
+project(APSICommon VERSION 1.0.0 LANGUAGES CXX C)
 
 if (DEFINED MSVC)
     message(FATAL_ERROR "Please build APSI using the attached Visual Studio solution/project file")
 endif()
 
 # Library will be in ../lib
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../lib)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/../lib)
 
 # Create library but add no source files yet
 add_library(apsi_common STATIC "")
@@ -18,7 +18,7 @@ set_property(TARGET apsi_common PROPERTY POSITION_INDEPENDENT_CODE ON)
 
 # Build in release mode by default
 set(APSI_DEFAULT_BUILD_TYPE "Release")
-if (NOT CMAKE_BUILD_TYPE)
+if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE ${APSI_DEFAULT_BUILD_TYPE} CACHE
         STRING "Build type" FORCE)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
@@ -32,73 +32,64 @@ if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
 else()
     set(APSI_DEBUG_DEFAULT OFF)
 endif()
+set(APSI_DEBUG ${APSI_DEBUG_DEFAULT})
 
 # Required files and directories
 set(APSICOMMON_INCLUDES_INSTALL_DIR include)
-set(APSICOMMON_CONFIG_IN_FILENAME ${APSICOMMON_SOURCE_DIR}/cmake/APSICommonConfig.cmake.in)
-set(APSICOMMON_CONFIG_FILENAME ${APSICOMMON_SOURCE_DIR}/cmake/APSICommonConfig.cmake)
-set(APSICOMMON_TARGETS_FILENAME ${APSICOMMON_SOURCE_DIR}/cmake/APSICommonTargets.cmake)
-set(APSICOMMON_CONFIG_VERSION_FILENAME ${APSICOMMON_SOURCE_DIR}/cmake/APSICommonConfigVersion.cmake)
+set(APSICOMMON_CONFIG_IN_FILENAME ${APSICommon_SOURCE_DIR}/cmake/APSICommonConfig.cmake.in)
+set(APSICOMMON_CONFIG_FILENAME ${APSICommon_SOURCE_DIR}/cmake/APSICommonConfig.cmake)
+set(APSICOMMON_TARGETS_FILENAME ${APSICommon_SOURCE_DIR}/cmake/APSICommonTargets.cmake)
+set(APSICOMMON_CONFIG_VERSION_FILENAME ${APSICommon_SOURCE_DIR}/cmake/APSICommonConfigVersion.cmake)
 set(APSICOMMON_CONFIG_INSTALL_DIR lib/cmake/APSICommon)
 
+# For extra modules
+list(APPEND CMAKE_MODULE_PATH ${APSICommon_SOURCE_DIR}/../cmake)
+
 # Import Microsoft SEAL
-find_package(SEAL 3.2.0 EXACT REQUIRED)
+find_package(SEAL 3.4.0 EXACT REQUIRED)
 
-# Import Cuckoo library
-find_package(Cuckoo 1.0 REQUIRED)
+# Import Cuckoo
+find_package(Cuckoo 1.0.0 EXACT REQUIRED)
 
-# Import FLINT library
-find_path(FLINT_DIR NAMES flint/fmpz.h)
-find_library(FLINT flint)
-if (NOT FLINT OR NOT FLINT_DIR)
-    message(FATAL_ERROR "Could not find FLINT library")
-else()
-    message(STATUS "Flint directory: ${FLINT_DIR}")
-    message(STATUS "Found FLINT: ${FLINT}")
+# Import Microsoft GSL
+if(MSGSL_ROOT)
+    unset(MSGSL_INCLUDE_DIR CACHE)
 endif()
+find_package(MSGSL MODULE REQUIRED)
 
-# FourQ
-find_path(FOURQ_DIR NAMES FourQ/FourQ.h)
-find_library(FOURQ FourQ)
-if (NOT FOURQ OR NOT FOURQ_DIR)
-    message(FATAL_ERROR "Could not find FourQ library")
-else()
-    message(STATUS "FourQ directory: ${FOURQ_DIR}")
-    message(STATUS "Found FourQ: ${FOURQ}")
+# Import ZeroMQ
+if(ZeroMQ_ROOT)
+    unset(ZEROMQ_INCLUDE_DIR CACHE)
+    unset(ZEROMQ_LIBRARY_DIR CACHE)
+    unset(ZEROMQ_LIBRARY_PATH CACHE)
 endif()
+find_package(ZeroMQ MODULE REQUIRED)
 
-# Log4cplus
-find_path(LOG4CPLUS_DIR log4cplus/logger.h)
-find_library(LOG4CPLUS log4cplus)
-if (NOT LOG4CPLUS_DIR OR NOT LOG4CPLUS)
-    message(FATAL_ERROR "Could not find log4cplus library")
-else()
-    message(STATUS "log4cplus directory: ${LOG4CPLUS_DIR}")
-    message(STATUS "Found log4cplus: ${LOG4CPLUS}")
+# Import ZeroMQpp
+if(ZeroMQpp_ROOT)
+    unset(ZEROMQPP_INCLUDE_DIR CACHE)
+    unset(ZEROMQPP_LIBRARY_DIR CACHE)
+    unset(ZEROMQPP_LIBRARY_PATH CACHE)
 endif()
+find_package(ZeroMQpp MODULE REQUIRED)
 
-# ZeroMQ
-find_path(ZMQ_DIR zmqpp/zmqpp.hpp)
-find_library(ZMQ zmq)
-find_library(ZMQPP zmqpp)
-if (NOT ZMQ OR NOT ZMQPP OR NOT ZMQ_DIR)
-    message(FATAL_ERROR "Could not find zmq or zmqpp libraries")
-else()
-    message(STATUS "zmqpp directory:  ${ZMQ_DIR}")
-    message(STATUS "Found zmq: ${ZMQ}")
-    message(STATUS "Found zmqpp: ${ZMQPP}")
+# Import FourQ
+if(FourQ_ROOT)
+    unset(FOURQ_INCLUDE_DIR CACHE)
+    unset(FOURQ_LIBRARY_DIR CACHE)
+    unset(FOURQ_LIBRARY_PATH CACHE)
 endif()
+find_package(FourQ MODULE REQUIRED)
 
-# GMP
-find_library(GMP gmp)
-if (NOT GMP)
-    message(FATAL_ERROR "Could not find gmp library")
-else()
-    message(STATUS "Found gmp: ${GMP}")
+# Import Log4cplus
+if(Log4cplus_ROOT)
+    unset(LOG4CPLUS_INCLUDE_DIR CACHE)
+    unset(LOG4CPLUS_LIBRARY_DIR CACHE)
+    unset(LOG4CPLUS_LIBRARY_PATH CACHE)
 endif()
+find_package(Log4cplus MODULE REQUIRED)
 
 # Set flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-ignored-attributes")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -maes")
 
@@ -114,20 +105,22 @@ add_definitions(-D_AVX2_)
 add_definitions(-D_ASM_)
 add_definitions(-D__LINUX__)
 
-# Includes
-include_directories(${FLINT_DIR}/flint)
-include_directories(${FOURQ_DIR}/FourQ)
-include_directories(${LOG4CPLUS_DIR})
-
 # Link required libraries
-target_link_libraries(apsi_common SEAL::seal Cuckoo::cuckoo ${FLINT} ${FOURQ} ${ZMQ} ${ZMQPP} ${GMP})
+target_link_libraries(apsi_common PUBLIC
+    SEAL::seal
+    MSGSL::MSGSL 
+    Cuckoo::cuckoo
+    ZeroMQ::ZeroMQ
+    ZeroMQpp::ZeroMQpp
+    FourQ::FourQ
+    Log4cplus::Log4cplus)
 
 # Add source files to library
 add_subdirectory(apsi)
 
 # Add local include directories for build
 target_include_directories(apsi_common
-	PRIVATE $<BUILD_INTERFACE:${APSICOMMON_SOURCE_DIR}>)
+	PUBLIC $<BUILD_INTERFACE:${APSICommon_SOURCE_DIR}>)
 
 # Associate APSI to export apsi_export
 install(TARGETS apsi_common EXPORT apsi_common_export

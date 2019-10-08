@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 #include "sender.h"
 
@@ -34,7 +34,7 @@ using namespace apsi::logging;
 
 
 void run_sender_dispatcher(const CLP& cmd);
-void initialize_db(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels);
+bool initialize_db(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels);
 
 
 int main(int argc, char *argv[])
@@ -97,9 +97,22 @@ void run_sender_dispatcher(const CLP& cmd)
     vector<Item> items;
     Matrix<u8> labels;
 
-    initialize_db(cmd, items, labels);
+    if (!initialize_db(cmd, items, labels))
+    {
+        // Failed to read db file
+        return;
+    }
 
     PSIParams params = build_psi_params(cmd, items.size());
+
+    Log::debug("FPrate = %f", params.log_fp_rate());
+
+
+    auto coeffmod = params.get_seal_params().encryption_params.coeff_modulus();
+    size_t bits = 0; 
+    for (size_t i = 0; i < coeffmod.size(); i++)
+        bits += coeffmod[i].bit_count(); 
+    Log::debug("coeff modulus size = %i ", bits); 
 
     Log::info("Building sender");
     shared_ptr<Sender> sender = make_shared<Sender>(params, cmd.threads(), cmd.threads());
@@ -117,11 +130,21 @@ void run_sender_dispatcher(const CLP& cmd)
     dispatcher.run(stop, cmd.net_port());
 }
 
-void initialize_db(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels)
+bool initialize_db(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels)
 {
     auto label_bit_length  = cmd.use_labels() ? cmd.item_bit_length() : 0;
     auto label_byte_length = (label_bit_length + 7) / 8;
 
-    CSVReader reader(cmd.db_file());
-    reader.read(items, labels, label_byte_length);
+    try
+    {
+        CSVReader reader(cmd.db_file());
+        reader.read(items, labels, label_byte_length);
+    }
+    catch (invalid_argument& ex)
+    {
+        Log::error("Could not open or read file: %s: %s", cmd.db_file().c_str(), ex.what());
+        return false;
+    }
+
+    return true;
 }

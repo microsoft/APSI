@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 // STD
 #include <vector>
@@ -10,7 +10,7 @@
 #include "apsi/psiparams.h"
 
 // SEAL
-#include "seal/defaultparams.h"
+// #include "seal/defaultparams.h"
 #include "seal/smallmodulus.h"
 
 
@@ -18,6 +18,7 @@ using namespace std;
 using namespace seal;
 using namespace apsi;
 using namespace apsi::tools;
+using namespace apsi::logging;
 
 
 const PSIParams apsi::tools::build_psi_params(
@@ -38,13 +39,27 @@ const PSIParams apsi::tools::build_psi_params(
 
         // Whether to use labels
         psiconf_params.use_labels = cmd.use_labels();
+
+        // Whether to use fast membership (single item query)
+        psiconf_params.use_fast_membership = cmd.use_fast_memberhip();
+
+        // Number of chunks to use
+        psiconf_params.num_chunks = cmd.num_chunks();
+
+        // Sender bin size
+        psiconf_params.sender_bin_size = cmd.sender_bin_size();
+
+        // Length of items after OPRF
+        psiconf_params.item_bit_length_used_after_oprf = cmd.item_bit_length_used_after_oprf();
+
+        Log::debug("item bit length after oprf when initializing = %i", psiconf_params.item_bit_length_used_after_oprf); 
     }
 
     // Cuckoo hash parameters
     PSIParams::CuckooParams cuckoo_params;
     {
         // Cuckoo hash function count
-        cuckoo_params.hash_func_count = 3;
+        cuckoo_params.hash_func_count = cmd.hash_func_count();
 
         // Set the hash function seed
         cuckoo_params.hash_func_seed = 0;
@@ -61,6 +76,8 @@ const PSIParams apsi::tools::build_psi_params(
 
         // Number of splits to use
         // Larger means lower depth but bigger S-->R communication
+        table_params.split_size = cmd.split_size();
+
         table_params.split_count = cmd.split_count();
 
         // Negative log failure probability for simple hashing
@@ -80,44 +97,36 @@ const PSIParams apsi::tools::build_psi_params(
 
         if (coeff_mod_bit_vector.size() == 0)
         {
-            coeff_modulus = DefaultParams::coeff_modulus_128(seal_params.encryption_params.poly_modulus_degree());
+            coeff_modulus = CoeffModulus::BFVDefault(seal_params.encryption_params.poly_modulus_degree());
         }
         else
         {
-            unordered_map<u64, size_t> mods_added;
-            for (auto bit_size : coeff_mod_bit_vector)
+            vector<int> coeff_mod_bit_vector_int(coeff_mod_bit_vector.size());
+            for (int i = 0; i < coeff_mod_bit_vector.size(); i++)
             {
-                switch (bit_size)
-                {
-                case 30:
-                    coeff_modulus.emplace_back(DefaultParams::small_mods_30bit(static_cast<int>(mods_added[bit_size])));
-                    mods_added[bit_size]++;
-                    break;
-
-                case 40:
-                    coeff_modulus.emplace_back(DefaultParams::small_mods_40bit(static_cast<int>(mods_added[bit_size])));
-                    mods_added[bit_size]++;
-                    break;
-
-                case 50:
-                    coeff_modulus.emplace_back(DefaultParams::small_mods_50bit(static_cast<int>(mods_added[bit_size])));
-                    mods_added[bit_size]++;
-                    break;
-
-                case 60:
-                    coeff_modulus.emplace_back(DefaultParams::small_mods_60bit(static_cast<int>(mods_added[bit_size])));
-                    mods_added[bit_size]++;
-                    break;
-
-                default:
-                    throw invalid_argument("invalid coeff modulus bit count");
-                }
+                coeff_mod_bit_vector_int[i] = (int)coeff_mod_bit_vector[i];
             }
+
+            coeff_modulus = CoeffModulus::Create(seal_params.encryption_params.poly_modulus_degree(), coeff_mod_bit_vector_int);
         }
+
         seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
         seal_params.encryption_params.set_plain_modulus(cmd.plain_modulus());
 
-        seal_params.decomposition_bit_count = cmd.dbc();
+        /** Note: now this maximal supported degree for a given set of SEAL parameters is 
+        hardcoded. It be better to give a formula.
+        */
+        if (cmd.poly_modulus() >= 4096 && cmd.plain_modulus() <= 40961)
+        {
+            seal_params.max_supported_degree = 4;
+        }
+        else
+        {
+            seal_params.max_supported_degree = 1; 
+        }
+
+        seal_params.max_supported_degree = 2; // for debugging
+        Log::debug("setting maximal supported degree to %i", seal_params.max_supported_degree);
     }
 
     PSIParams::ExFieldParams exfield_params;
@@ -131,5 +140,6 @@ const PSIParams apsi::tools::build_psi_params(
     Creating the PSIParams class.
     */
     PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
+    
     return params;
 }

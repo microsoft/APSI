@@ -1,14 +1,17 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 #pragma once
 
 // STD
 #include <cstdint>
+#include <utility> 
+
+// Cuckoo
+#include <cuckoo/cuckoo.h>
 
 // Intrinsics
 #include <wmmintrin.h>
-
 
 #ifdef _MSC_VER
 #ifdef _DEBUG
@@ -19,6 +22,8 @@
 #endif
 #endif
 #endif
+
+#include "seal/ciphertext.h"
 
 namespace apsi
 {
@@ -35,4 +40,9 @@ namespace apsi
     extern const block one_block;
     extern const block all_one_block;
     extern const block cc_block;
+
+    using item_type = cuckoo::item_type;
+    extern const item_type zero_item;
+    extern const item_type one_item;
+    extern const item_type all_one_item;
 }

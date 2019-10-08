@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 #pragma once
 
@@ -51,7 +51,7 @@ namespace apsi
             */
             constexpr static unsigned int byte_count()
             {
-                return sizeof(f2elm_t) - 1;
+                return sizeof(f2elm_t);
             }
 
             /**

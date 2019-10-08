@@ -1,6 +1,7 @@
 // STD
 #include <fstream>
 #include <cctype>
+#include <sstream>
 
 #if _MSC_VER || (__GNUC__ >= 8)
 #include <filesystem>
@@ -47,7 +48,7 @@ void CSVReader::read(std::istream& stream, std::vector<Item>& items, Matrix<u8>&
     // Transfer temp_labels to real labels, if needed
     if (label_byte_count > 0 && temp_labels.size() > 0)
     {
-        labels.resize(temp_labels.size(), label_byte_count);
+        labels.resize(temp_labels.size(), label_byte_count, 1);
         for (u64 i = 0; i < temp_labels.size(); i++)
         {
             memcpy(labels[i].data(), temp_labels[i].data(), label_byte_count);
@@ -95,5 +96,5 @@ void CSVReader::throw_if_file_not_present() const
 {
     filesystem::path pth(file_name_);
     if (!filesystem::exists(pth))
-        throw new invalid_argument("File name does not exist");
+        throw invalid_argument("File name does not exist");
 }

@@ -1,5 +1,5 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 #pragma once
 
@@ -63,19 +63,32 @@ namespace apsi
             };
 
             int max_power_, window_;
+            int max_degree_supported_; // maximum degree supported.
+            int given_digits_;  // how many digits are given. 
             std::vector<int> base_powers_;
             std::vector<Node> nodes_;
 
-
-            WindowingDag(int max_power, int window)
+            WindowingDag(int max_power, int window, int max_degree_supported, int given_digits)
             {
                 max_power_ = max_power;
                 window_ = window;
+                int base = 1 << window_;
+                max_degree_supported_ = max_degree_supported;
+                given_digits_ = given_digits;
+                u64 actual_power = tools::maximal_power(max_degree_supported, given_digits, base);
+
+                apsi::logging::Log::debug("actual power supported = %i", actual_power);
+
+                if (static_cast<int>(actual_power) < max_power)
+                {
+                    throw std::invalid_argument("does not support such max_power");
+                }
+
                 compute_dag();
             }
 
             u64 pow(u64 base, u64 e);
-            uint64_t optimal_split(uint64_t x, int base);
+            uint64_t optimal_split(uint64_t x, int base, std::vector<int> &degrees);
             std::vector<uint64_t> conversion_to_digits(uint64_t input, int base);
             void compute_dag();
         };
@@ -111,8 +124,7 @@ namespace apsi
             Generate a response to a query
             */
             void query(
-                const seal::PublicKey& pub_key,
-                const seal::RelinKeys& relin_keys,
+                const std::string& relin_keys,
                 const std::map<apsi::u64, std::vector<std::string>> query,
                 const std::vector<apsi::u8>& client_id,
                 apsi::network::Channel& channel);
@@ -179,7 +191,7 @@ namespace apsi
             @see compute_dot_product for an explanation of the result.
             */
             void respond(
-                std::vector<std::vector<seal::Ciphertext> > &query,
+                std::vector<std::vector<seal::Ciphertext> > &query, int num_of_powers,
                 apsi::sender::SenderSessionContext &session_context,
                 const std::vector<apsi::u8>& client_id,
                 apsi::network::Channel& channel);
@@ -223,7 +235,7 @@ namespace apsi
 
             seal::MemoryPoolHandle pool_;
 
-            std::vector<std::shared_ptr<FField> > ex_field_;
+            FField field_;
 
             std::shared_ptr<seal::SEALContext> seal_context_;
 

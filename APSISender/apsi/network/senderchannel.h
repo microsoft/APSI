@@ -1,10 +1,10 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.using System;
+// Licensed under the MIT license.
 
 #pragma once 
 
 // APSI
-#include "apsi/network/channel.h"
+#include "apsi/network/network_channel.h"
 
 namespace apsi
 {
@@ -13,7 +13,7 @@ namespace apsi
         /**
         Represents a network channel for a Sender.
         */
-        class SenderChannel : public Channel
+        class SenderChannel : public NetworkChannel
         {
         public:
             SenderChannel() = default;

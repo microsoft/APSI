@@ -5,10 +5,6 @@
 #include <array>
 #include <vector>
 
-// Boost
-#include <boost/math/special_functions/binomial.hpp>
-#include <boost/multiprecision/cpp_bin_float.hpp>
-
 
 using namespace std;
 using namespace apsi;
@@ -25,28 +21,26 @@ namespace
         {
             return numeric_limits<double>::max();
         }
+
         if (num_balls > numeric_limits<int>::max())
         {
-            auto msg = ("boost::math::binomial_coefficient(...) only supports "
-                + to_string(sizeof(unsigned) * 8) + " bit inputs which was exceeded.");
+            auto msg = ("Number of balls exceeds numeric limit of int");
             throw runtime_error(msg);
         }
 
-        typedef boost::multiprecision::number<boost::multiprecision::backends::cpp_bin_float<16> > T;
-        T sum = 0.0;
-        T sec = 0.0;
-        T diff = 1;
-        u64 i = bin_size + 1;
+        typedef long double ldouble;
+        ldouble sum = 0.0;
+        ldouble sec = 0.0;
+        u64 i = 0;
+        ldouble back = pow((1 - ldouble(1.0) / num_bins), num_balls); 
 
-        while (diff > T(epsilon) && num_balls >= i)
+        while (i <= bin_size)
         {
-            sum += num_bins * boost::math::binomial_coefficient<T>(static_cast<int>(num_balls), static_cast<int>(i))
-                * boost::multiprecision::pow(T(1.0) / num_bins, i) * boost::multiprecision::pow(1 - T(1.0) / num_bins, num_balls - i);
-
-            T sec2 = boost::multiprecision::logb(sum);
-            diff = boost::multiprecision::abs(sec - sec2);
+            // a(i) = a(i-1) * stuff. 
+            sum += back;
+            back *= ldouble(num_balls - i) / (ldouble(i + 1) * ldouble(num_bins - 1)); 
+            ldouble sec2 = log2(ldouble(num_bins)* (1 - sum)); 
             sec = sec2;
-
             i++;
         }
 
@@ -60,7 +54,7 @@ namespace
         u64 step = 1;
         bool doubling = true;
 
-        while (currentProb < stat_sec_param || step > 1)
+        while (currentProb < static_cast<double>(stat_sec_param) || step > 1)
         {
             if (stat_sec_param > currentProb)
             {
@@ -127,6 +121,25 @@ u64 apsi::tools::optimal_split(const u64 x, const int base)
     return result;
 }
 
+// compute F(d,k)
+apsi::u64 apsi::tools::maximal_power(const apsi::u64 degree, const apsi::u64 bound, const u64 base)
+{
+    // base must be positive
+    if (base < 0) throw invalid_argument("base must be a positive integer");
+
+    // if d >= k-1, use the first formula.
+    if (bound <= degree + 1)
+    {
+        double result = pow(base, bound) - base + (degree - bound + 1) * pow(base, bound - 1) * (base - 1);
+        return static_cast<u64>(result);
+    }
+    else
+    { // when d < k -1 i.e. k > d+1. 
+        return maximal_power(degree, degree + 1, base);
+    }
+    return apsi::u64();
+}
+
 vector<u64> apsi::tools::conversion_to_digits(const u64 input, const int base)
 {
     vector<uint64_t> result;
@@ -160,13 +173,13 @@ std::vector<std::string> apsi::tools::split(const std::string &s, const char del
 
 seal::Plaintext apsi::tools::random_plaintext(const seal::SEALContext &context)
 {
-    u64 plain_mod = context.context_data()->parms().plain_modulus().value();
-    size_t coeff_count = context.context_data()->parms().poly_modulus_degree();
+    u64 plain_mod = context.first_context_data()->parms().plain_modulus().value();
+    size_t coeff_count = context.first_context_data()->parms().poly_modulus_degree();
     seal::Plaintext random(coeff_count);
     u64* random_ptr = random.data();
 
     random_device rd;
-    for (int i = 0; i < coeff_count - 1; i++)
+    for (size_t i = 0; i < coeff_count - 1; i++)
     {
         random_ptr[i] = static_cast<u64>(rd());
         random_ptr[i] <<= 32;
