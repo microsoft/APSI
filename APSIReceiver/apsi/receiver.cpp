@@ -489,10 +489,10 @@ void Receiver::generate_powers(const FFieldArray &exfield_items,
         result.emplace(1ULL << (window_size * j), current_power);
         for (uint64_t i = 2; i < static_cast<uint64_t>(radix); i++)
         {
-            if (i * (1ULL << (window_size * j)) > static_cast<uint64_t>(split_size))
-            {
-                return;
-            }
+            //if (i * (1ULL << (window_size * j)) > static_cast<uint64_t>(split_size))
+            //{
+            //    return;
+            //}
             result.emplace(i * (1ULL << (window_size * j)), result.at((i - 1) * (1ULL << (window_size * j))) * current_power);
         }
         for (int k = 0; k < window_size; k++)
@@ -678,12 +678,17 @@ void Receiver::stream_decrypt_worker(
 
             ex_batch_encoder_->decompose(p, *batch);
 
+            //if (batch->is_zero()) {
+            Log::debug("decrypted label data is zero? %i", batch->is_zero()); 
+            //}
+            
             for (int k = 0; k < batch_size; k++)
             {
                 if (has_label[k])
                 {
                     auto idx = table_to_input_map[base_idx + k];
                     Log::debug("Found label at thread_idx: %i, base_idx: %i, k: %i, idx: %i", thread_idx, base_idx, k, idx);
+
                     batch->get(k).decode(ret_labels[idx], get_params().get_label_bit_count());
                 }
             }

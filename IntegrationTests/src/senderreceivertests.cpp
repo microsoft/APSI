@@ -63,6 +63,13 @@ namespace
                 if (compare_labels)
                 {
                     auto idx = label_idx[i];
+                    
+                    cout << "Comparing actual label with expected: " << endl;
+                    for (int j = 0; j < labels[idx].size(); j++) {
+                        cout << "( " << labels[idx][j] << ", " << intersection.second[i][j] << "), "; 
+                    }
+                    cout << endl;
+
                     int lblcmp = memcmp(intersection.second[i].data(), labels[idx].data(), labels[idx].size());
 
                     // Label is not the expected value
@@ -88,8 +95,8 @@ namespace
         string conn_addr = "tcp://localhost:5550";
         recvChl.connect(conn_addr);
 
-        unsigned numThreads = thread::hardware_concurrency();
-		//unsigned numThreads = 1; // hao: for debug only.
+        //unsigned numThreads = thread::hardware_concurrency();
+		unsigned numThreads = 1; // hao: for debug only.
 
 
         unique_ptr<Receiver> receiver_ptr;
@@ -174,8 +181,8 @@ namespace
         PSIParams::TableParams table_params;
         table_params.binning_sec_level = 40;
         table_params.log_table_size = 9;
-        table_params.split_count = 1;
-        table_params.split_size = 16;
+        table_params.split_count = 5;
+        table_params.split_size = 2;
         table_params.window_size = 2;
 
         PSIParams::SEALParams seal_params;
@@ -241,36 +248,36 @@ namespace APSITests
 {
     TEST(SenderReceiverTests, OPRFandLabelsTest)
     {
-        size_t senderActualSize = 2000;
+        size_t senderActualSize = 100;
         PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ true, /* fast_matching */ false);
         RunTest(senderActualSize, params);
     }
 
-    TEST(SenderReceiverTests, OPRFTest)
-    {
-        size_t senderActualSize = 3000;
-        PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_label */ false, /* fast_matching */ false);
-        RunTest(senderActualSize, params);
-    }
+    //TEST(SenderReceiverTests, OPRFTest)
+    //{
+    //    size_t senderActualSize = 3000;
+    //    PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_label */ false, /* fast_matching */ false);
+    //    RunTest(senderActualSize, params);
+    //}
 
-    TEST(SenderReceiverTests, LabelsTest)
-    {
-        size_t senderActualSize = 2000;
-        PSIParams params = create_params(senderActualSize, /* use_oprf */ false, /* use_labels */ true, /* fast_matching */ false);
-        RunTest(senderActualSize, params);
-    }
+    //TEST(SenderReceiverTests, LabelsTest)
+    //{
+    //    size_t senderActualSize = 2000;
+    //    PSIParams params = create_params(senderActualSize, /* use_oprf */ false, /* use_labels */ true, /* fast_matching */ false);
+    //    RunTest(senderActualSize, params);
+    //}
 
-    TEST(SenderReceiverTests, NoOPRFNoLabelsTest)
-    {
-        size_t senderActualSize = 3000;
-        PSIParams params = create_params(senderActualSize, /* use_oprf */ false, /* use_labels */ false, /* fast_matching */ false);
-        RunTest(senderActualSize, params);
-    }
+    //TEST(SenderReceiverTests, NoOPRFNoLabelsTest)
+    //{
+    //    size_t senderActualSize = 3000;
+    //    PSIParams params = create_params(senderActualSize, /* use_oprf */ false, /* use_labels */ false, /* fast_matching */ false);
+    //    RunTest(senderActualSize, params);
+    //}
 
-    TEST(SenderReceiverTests, OPRFFastMembershipTest)
-    {
-        size_t senderActualSize = 3000;
-        PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ false, /* fast_matching */ true);
-        RunTest(senderActualSize, params);
-    }
+    //TEST(SenderReceiverTests, OPRFFastMembershipTest)
+    //{
+    //    size_t senderActualSize = 3000;
+    //    PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ false, /* fast_matching */ true);
+    //    RunTest(senderActualSize, params);
+    //}
 }

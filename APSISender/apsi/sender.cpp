@@ -272,18 +272,21 @@ void Sender::query(
     {
         u64 power = pair.first;
 
-        for (u64 i = 0; i < powers.size(); i++)
-        {
-            // do we do the logic here? 
-            seed128 seed = pair.second[i].first;  // first, locate the seed
-            get_ciphertext(seal_context_, powers[i][power], pair.second[i].second);
+        if (power < split_size_plus_one) { // Hao: temporary hack
 
-            // Then, make the correction. 
-            Ciphertext temp; 
-            session_context.encryptor()->encrypt_sk_seeds_in(Plaintext("0"), temp, dummySk, seed);
+            for (u64 i = 0; i < powers.size(); i++)
+            {
+                // do we do the logic here? 
+                seed128 seed = pair.second[i].first;  // first, locate the seed
+                get_ciphertext(seal_context_, powers[i][power], pair.second[i].second);
 
-            // todo: correcting the first coefficient, which is  -(a*s+e + Delta*m)
-            seal::util::set_poly_poly(temp.data(1), temp.poly_modulus_degree(), temp.coeff_mod_count(), powers[i][power].data(1));      
+                // Then, make the correction. 
+                Ciphertext temp;
+                session_context.encryptor()->encrypt_sk_seeds_in(Plaintext("0"), temp, dummySk, seed);
+
+                // todo: correcting the first coefficient, which is  -(a*s+e + Delta*m)
+                seal::util::set_poly_poly(temp.data(1), temp.poly_modulus_degree(), temp.coeff_mod_count(), powers[i][power].data(1));
+            }
         }
     }
 

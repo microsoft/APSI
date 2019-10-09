@@ -242,6 +242,9 @@ void DBBlock::batch_interpolate(
             }
         }
 
+        bool empty_row = false;
+        if (size == 0) empty_row = true;
+
         // pad the points to have max degree (split_size)
         // with (x,x) points where x is unique.
         cache.key_set.clear();
@@ -277,6 +280,20 @@ void DBBlock::batch_interpolate(
             // We don't use the cache for divided differences.
             // cache.div_diff_temp[pos.batch_offset],
             cache.coeff_temp[pos.batch_offset]);
+
+
+        // debug
+        auto degree = th_context.field().d();
+        if (!empty_row && split_idx_ ==1 ) {
+            Log::debug("interpolated poly for empty row %i (split index = %i) is:", pos.batch_offset, split_idx_);
+            for (int k = 0; k < cache.coeff_temp[pos.batch_offset].size(); k++) {
+                for (int m = 0; m < degree; m++) {
+                    cout << cache.coeff_temp[pos.batch_offset].get_coeff_of(k, m) << ", ";
+                }
+                cout << endl;
+            }
+        }
+
     }
 
     batched_label_coeffs_.resize(items_per_split_);
@@ -295,12 +312,33 @@ void DBBlock::batch_interpolate(
                 temp_array.set_coeff_of(b, c, cache.coeff_temp[b].get_coeff_of(s, c));
         }
 
+        Log::debug("temp array is zero? %i", temp_array.is_zero()); 
+
 
         auto capacity = static_cast<Plaintext::size_type>(params.encryption_params().coeff_modulus().size() *
             params.encryption_params().poly_modulus_degree());
         batched_coeff.reserve(capacity);
 
         ex_batch_encoder->compose(temp_array, batched_coeff);
+
+        Log::debug("s = %i, is_zero = %i", s, batched_coeff.is_zero()); 
+
+
+        Position temppos;
+        temppos.split_offset = s;
+
+        // Debug
+        for (int j = 0; j < items_per_batch_; j++) {
+            temppos.batch_offset = j; 
+            if (has_item(temppos) && split_idx_ == 1) {
+                Log::debug("real item at batch offset %i and split offset %i", j, s); 
+                Log::debug("label for this item is 0x%llx", get_label_u64(temppos));
+            }
+        }
+        cout << endl;
+
+
+
         evaluator->transform_to_ntt_inplace(batched_coeff, seal_context->first_parms_id());
     }
 }

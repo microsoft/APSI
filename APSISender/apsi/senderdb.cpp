@@ -181,6 +181,10 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
     params_.set_sender_bin_size(maxload);
     params_.set_split_count(new_split_count);
 
+    // resize the matrix of blocks.
+    db_blocks_.resize(params_.batch_count(), new_split_count);
+
+
     Log::debug("New max load, new split count = %i, %i", params_.sender_bin_size(), params_.split_count());
 }
 
