@@ -89,7 +89,7 @@ namespace apsi
         {
             if (relin_keys.data()[i].size())
             {
-                Log::info("relin keys data [%i] size = %i", i, relin_keys.data()[i].size());
+                Log::debug("relin keys data [%i] size = %i", i, relin_keys.data()[i].size());
 
                 // relin_keys.data()[i] is a vector of public keys;
                 for(std::size_t j = 0; j < relin_keys.data()[i].size(); j++)

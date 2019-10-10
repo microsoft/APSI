@@ -79,13 +79,13 @@ namespace apsi
                     [ch](auto a, auto b) {
                         _ffield_elt_coeff_t inv;
                         if (!seal::util::try_invert_uint_mod(b, ch, inv)) {
-							if (a == 0) {
-								// could return any element 
-								return _ffield_elt_coeff_t(0);
-							}
-							else {
-								throw std::logic_error("division by zero");
-							}
+                            if (a == 0) {
+                                // could return any element 
+                                return _ffield_elt_coeff_t(0);
+                            }
+                            else {
+                                throw std::logic_error("division by zero");
+                            }
                         }
                         return seal::util::multiply_uint_uint_mod(a, inv, ch);
                     });

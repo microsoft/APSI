@@ -472,15 +472,15 @@ void Sender::respond_worker(
 
                 // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
 
-				if (s < block.batched_label_coeffs_.size()) {
-					evaluator_->multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], label_results[curr_label]);
-				}
-				else {
-					session_context.encryptor_->encrypt_zero(label_results[curr_label]);
-					evaluator_->transform_to_ntt_inplace(label_results[curr_label]);
-					// just set it to be an encryption of zero. 
-					// encryptor_->encrypt; 
-				}
+                if (s < block.batched_label_coeffs_.size()) {
+                    evaluator_->multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], label_results[curr_label]);
+                }
+                else {
+                    session_context.encryptor_->encrypt_zero(label_results[curr_label]);
+                    evaluator_->transform_to_ntt_inplace(label_results[curr_label]);
+                    // just set it to be an encryption of zero. 
+                    // encryptor_->encrypt; 
+                }
 
                 while (++s < block.batched_label_coeffs_.size())
                 {
@@ -515,9 +515,8 @@ void Sender::respond_worker(
             }
 
             // TODO: We need to randomize the result. This is fine for now.
-            
-			evaluator_->add(runningResults[currResult], label_results[curr_label], label_results[curr_label ^ 1]);
-			curr_label ^= 1;
+            evaluator_->add(runningResults[currResult], label_results[curr_label], label_results[curr_label ^ 1]);
+            curr_label ^= 1;
 
             evaluator_->transform_from_ntt_inplace(label_results[curr_label]);
         }
