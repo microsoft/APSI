@@ -91,7 +91,7 @@ namespace apsi
 
         private:
             // Initialize to neutral element
-            point_t pt_{{ .x = { 0 }, .y = { 1 } }};
+            point_t pt_ = { { 0, 1 } }; // { {.x = { 0 }, .y = { 1 } }};
         };
     }
 }
