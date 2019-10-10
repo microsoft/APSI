@@ -52,6 +52,9 @@ namespace
     void verify_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<u8>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<u8>& labels)
     {
         bool correct = true;
+     
+
+        
         for (int i = 0; i < client_items.size(); i++)
         {
 
@@ -64,11 +67,15 @@ namespace
                 {
                     auto idx = label_idx[i];
                     
-                    cout << "Comparing actual label with expected: " << endl;
-                    for (int j = 0; j < labels[idx].size(); j++) {
-                        cout << "( " << labels[idx][j] << ", " << intersection.second[i][j] << "), "; 
-                    }
-                    cout << endl;
+                    //cout << "Comparing (expected, actual) labels: the " << i << "th item: " << endl;
+                    //cout << "Idx = " << idx << endl;
+                    //// temp.encode(gsl::span<u64>{client_items[i].get_value()}, .get_label_bit_count());
+
+                    //cout << "item = " << client_items[i].get_value()[0] << ", " << client_items[i].get_value()[1] << endl;
+                    //for (int j = 0; j < labels[idx].size(); j++) {
+                    //    cout << "( " << unsigned(labels[idx][j]) << ", " << unsigned(intersection.second[i][j]) << "), "; 
+                    //}
+                    //cout << endl;
 
                     int lblcmp = memcmp(intersection.second[i].data(), labels[idx].data(), labels[idx].size());
 
@@ -181,8 +188,8 @@ namespace
         PSIParams::TableParams table_params;
         table_params.binning_sec_level = 40;
         table_params.log_table_size = 9;
-        table_params.split_count = 5;
-        table_params.split_size = 2;
+        table_params.split_count = 1;
+        table_params.split_size = 16;
         table_params.window_size = 2;
 
         PSIParams::SEALParams seal_params;
@@ -248,7 +255,7 @@ namespace APSITests
 {
     TEST(SenderReceiverTests, OPRFandLabelsTest)
     {
-        size_t senderActualSize = 100;
+        size_t senderActualSize = 2000;
         PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ true, /* fast_matching */ false);
         RunTest(senderActualSize, params);
     }

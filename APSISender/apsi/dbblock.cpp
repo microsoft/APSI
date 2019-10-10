@@ -230,9 +230,13 @@ void DBBlock::batch_interpolate(
         {
             if (has_item(pos))
             {
+
+
                 auto& key_item = get_key(pos);
+
                 temp.encode(gsl::span<u64>{key_item.get_value()}, params.get_label_bit_count());
                 x.set(size, temp);
+
 
                 auto src = get_label(pos);
                 temp.encode(gsl::span<u8>{src, value_byte_length_}, params.get_label_bit_count());
@@ -242,9 +246,10 @@ void DBBlock::batch_interpolate(
             }
         }
 
-        bool empty_row = false;
-        if (size == 0) empty_row = true;
 
+        bool empty_row = (size == 0); 
+
+ 
         // pad the points to have max degree (split_size)
         // with (x,x) points where x is unique.
         cache.key_set.clear();
@@ -275,25 +280,12 @@ void DBBlock::batch_interpolate(
             ++cache.temp_vec[0];
         }
 
+
         ffield_newton_interpolate_poly(
             x, y,
             // We don't use the cache for divided differences.
             // cache.div_diff_temp[pos.batch_offset],
             cache.coeff_temp[pos.batch_offset]);
-
-
-        // debug
-        auto degree = th_context.field().d();
-        if (!empty_row && split_idx_ ==1 ) {
-            Log::debug("interpolated poly for empty row %i (split index = %i) is:", pos.batch_offset, split_idx_);
-            for (int k = 0; k < cache.coeff_temp[pos.batch_offset].size(); k++) {
-                for (int m = 0; m < degree; m++) {
-                    cout << cache.coeff_temp[pos.batch_offset].get_coeff_of(k, m) << ", ";
-                }
-                cout << endl;
-            }
-        }
-
     }
 
     batched_label_coeffs_.resize(items_per_split_);
@@ -312,7 +304,7 @@ void DBBlock::batch_interpolate(
                 temp_array.set_coeff_of(b, c, cache.coeff_temp[b].get_coeff_of(s, c));
         }
 
-        Log::debug("temp array is zero? %i", temp_array.is_zero()); 
+        // Log::debug("temp array is zero? %i", temp_array.is_zero()); 
 
 
         auto capacity = static_cast<Plaintext::size_type>(params.encryption_params().coeff_modulus().size() *
@@ -321,7 +313,7 @@ void DBBlock::batch_interpolate(
 
         ex_batch_encoder->compose(temp_array, batched_coeff);
 
-        Log::debug("s = %i, is_zero = %i", s, batched_coeff.is_zero()); 
+        // Log::debug("s = %i, is_zero = %i", s, batched_coeff.is_zero()); 
 
 
         Position temppos;

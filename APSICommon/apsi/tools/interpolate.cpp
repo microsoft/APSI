@@ -94,11 +94,14 @@ namespace apsi
 
         // Horner's method
         // We reuse numerator
+
+        // result[0] = DD[0][size-1]; 
         result.set(0, size-1, divided_differences[0]);
         for (int  i = 1; i < size; i++)
         {
             for (int j = i - 1; j >= 0; j--)
             {
+                // result[j+1] = result[j] ? 
                 result.set(j + 1, j, result);
             }
 
@@ -122,6 +125,9 @@ namespace apsi
                     result.data(j),
                     [ch](auto a, auto b) { return seal::util::sub_uint_uint_mod(a, b, ch); });
             }
+
+            std::transform(result.data(), result.data(1), divided_differences[0].data(size-1-i), result.data(), [ch](auto a, auto b) { return seal::util::add_uint_uint_mod(a, b, ch); });
+            // fq_nmod_add(result.data(), result.data(), divided_differences[0].data() + (size - 1 - i), field->ctx());
         }
     }
 

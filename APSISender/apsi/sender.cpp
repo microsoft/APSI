@@ -321,7 +321,7 @@ void Sender::respond(
     int max_supported_degree = params_.max_supported_degree();
     int window_size = get_params().window_size();
     int base = 1 << window_size;
-    int given_digits = num_of_powers / (base - 1); 
+    int given_digits = (num_of_powers + base - 2) / (base - 1);   // ceiling of num_of_powers / (base - 1)
 
     WindowingDag dag(params_.split_size(), params_.window_size(), max_supported_degree, given_digits);
     std::vector<WindowingDag::State> states;
