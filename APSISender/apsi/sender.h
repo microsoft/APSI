@@ -99,7 +99,7 @@ namespace apsi
             Sender(const PSIParams &params,
                 int total_thread_count,
                 int session_thread_count,
-                const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::Global());
+                const seal::MemoryPoolHandle pool = seal::MemoryPoolHandle::Global());
 
             /**
             Clears data in sender's database.

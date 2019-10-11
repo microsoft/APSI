@@ -5,20 +5,14 @@ cmake_minimum_required(VERSION 3.12)
 
 project(APSISender VERSION 1.0.0 LANGUAGES CXX C)
 
-if (DEFINED MSVC)
+if(MSVC)
     message(FATAL_ERROR "Please build APSI using the attached Visual Studio solution/project file")
 endif()
 
-# Library will be in ../lib
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/../lib)
-
-# Create library but add no source files yet
-add_library(apsi_sender STATIC "")
-
 # Build in release mode by default
-set(APSI_DEFAULT_BUILD_TYPE "Release")
-if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE ${APSI_DEFAULT_BUILD_TYPE} CACHE
+set(DEFAULT_BUILD_TYPE "Release")
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE ${DEFAULT_BUILD_TYPE} CACHE
         STRING "Build type" FORCE)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
         "Release" "Debug" "MinSizeRel" "RelWithDebInfo")
@@ -32,92 +26,112 @@ else()
     set(APSI_DEBUG_DEFAULT OFF)
 endif()
 set(APSI_DEBUG ${APSI_DEBUG_DEFAULT})
+message(STATUS "${PROJECT_NAME} set APSI debug mode: ${APSI_DEBUG}")
 
 # Required files and directories
-set(APSISENDER_INCLUDES_INSTALL_DIR include)
-set(APSISENDER_CONFIG_IN_FILENAME ${APSISender_SOURCE_DIR}/cmake/APSISenderConfig.cmake.in)
-set(APSISENDER_CONFIG_FILENAME ${APSISender_SOURCE_DIR}/cmake/APSISenderConfig.cmake)
-set(APSISENDER_TARGETS_FILENAME ${APSISender_SOURCE_DIR}/cmake/APSISenderTargets.cmake)
-set(APSISENDER_CONFIG_VERSION_FILENAME ${APSISender_SOURCE_DIR}/cmake/APSISenderConfigVersion.cmake)
-set(APSISENDER_CONFIG_INSTALL_DIR lib/cmake/APSISender)
+include(GNUInstallDirs)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/../lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/../lib)
+set(CMAKE_LIBRARY_RUNTIME_DIRECTORY ${PROJECT_SOURCE_DIR}/../bin)
+set(PROJECT_TARGETS_FILENAME ${PROJECT_SOURCE_DIR}/cmake/${PROJECT_NAME}Targets.cmake)
+set(PROJECT_CONFIG_IN_FILENAME ${PROJECT_SOURCE_DIR}/cmake/${PROJECT_NAME}Config.cmake.in)
+set(PROJECT_CONFIG_FILENAME ${PROJECT_SOURCE_DIR}/cmake/${PROJECT_NAME}Config.cmake)
+set(PROJECT_CONFIG_VERSION_FILENAME ${PROJECT_SOURCE_DIR}/cmake/${PROJECT_NAME}ConfigVersion.cmake)
+set(PROJECT_CONFIG_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+set(PROJECT_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 
-# For extra modules
-list(APPEND CMAKE_MODULE_PATH ${APSISender_SOURCE_DIR}/../cmake)
+# Should we build a shared library?
+set(DEFAULT_LIB_BUILD_TYPE "Static")
+if(NOT APSISender_LIB_BUILD_TYPE)
+    set(APSISender_LIB_BUILD_TYPE ${DEFAULT_LIB_BUILD_TYPE} CACHE
+        STRING "${PROJECT_NAME} build type" FORCE)
+    set_property(CACHE APSISender_LIB_BUILD_TYPE PROPERTY
+        STRINGS "Static" "Shared")
+endif()
+message(STATUS "${PROJECT_NAME} build type: ${APSISender_LIB_BUILD_TYPE}")
 
 # Import APSICommon
-if(NOT TARGET apsi_common)
-    find_package(APSICommon 1.0.0 EXACT REQUIRED)
+find_package(APSICommon 1.0.0 EXACT REQUIRED)
+
+# Create library but add no source files yet
+if(APSISender_LIB_BUILD_TYPE STREQUAL "Shared")
+    add_library(Sender SHARED "")
+
+    # Set SOVERSION for shared library
+    set_target_properties(Sender PROPERTIES
+        SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+else()
+    add_library(Sender STATIC "")
+
+    # For a static library indicate version in the filename
+    set_target_properties(Sender PROPERTIES
+        OUTPUT_NAME apsi_sender-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 endif()
 
-# Import Microsoft SEAL
-find_package(SEAL 3.4.0 EXACT REQUIRED)
+# Set VERSION for all library build types
+set_target_properties(Sender PROPERTIES
+    VERSION ${APSISender_VERSION})
 
-# Import Cuckoo
-find_package(Cuckoo 1.0.0 EXACT REQUIRED)
+# Set PIC for all build types
+set_target_properties(Sender PROPERTIES
+    POSITION_INDEPENDENT_CODE ON)
 
-# Import FourQ
-if(FourQ_ROOT)
-    unset(FOURQ_INCLUDE_DIR CACHE)
-    unset(FOURQ_LIBRARY_DIR CACHE)
-    unset(FOURQ_LIBRARY_PATH CACHE)
-endif()
-find_package(FourQ MODULE REQUIRED)
-
-# Set flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -maes")
-
-# C++17
-target_compile_features(apsi_sender PUBLIC cxx_std_17)
-
-# Defines
-add_definitions(-DHAVE_CONFIG)
-add_definitions(-DUSE_SECURE_SEED)
-add_definitions(-DNDEBUG)
-add_definitions(-D_AMD64_)
-add_definitions(-D_AVX2_)
-add_definitions(-D_ASM_)
-add_definitions(-D__LINUX__)
+# C++14
+target_compile_features(Sender PUBLIC cxx_std_14)
 
 # Link required libraries
-target_link_libraries(apsi_sender apsi_common)
+target_link_libraries(Sender PUBLIC APSI::Common)
 
 # Add source files to library
 add_subdirectory(apsi)
 
 # Add local include directories for build
-target_include_directories(apsi_sender
-	PUBLIC $<BUILD_INTERFACE:${APSISender_SOURCE_DIR}>)
+target_include_directories(Sender PUBLIC
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:${PROJECT_INCLUDES_INSTALL_DIR}>)
 
-# Associate APSI to export apsi_sender_export
-install(TARGETS apsi_sender EXPORT apsi_sender_export
-    ARCHIVE DESTINATION lib
-    INCLUDES DESTINATION ${APSISENDER_INCLUDES_INSTALL_DIR})
-
-# Export the targets
-export(EXPORT apsi_sender_export
-    FILE ${APSISENDER_TARGETS_FILENAME}
-    NAMESPACE APSISender::)
+# Associate APSI to export APSISenderTargets
+install(TARGETS Sender EXPORT APSISenderTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # Create the CMake config file
-configure_file(${APSISENDER_CONFIG_IN_FILENAME} ${APSISENDER_CONFIG_FILENAME} @ONLY)
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+    ${PROJECT_CONFIG_IN_FILENAME} ${PROJECT_CONFIG_FILENAME}
+    INSTALL_DESTINATION ${PROJECT_CONFIG_INSTALL_DIR})
+
+# Export the targets
+export(EXPORT APSISenderTargets
+    FILE ${PROJECT_TARGETS_FILENAME}
+    NAMESPACE APSI::)
+
+# Create the CMake config file
+configure_file(${PROJECT_CONFIG_IN_FILENAME} ${PROJECT_CONFIG_FILENAME} @ONLY)
 
 # Install the export
 install(
-    EXPORT apsi_sender_export
-    FILE APSISenderTargets.cmake
-    NAMESPACE APSISender::
-    DESTINATION ${APSISENDER_CONFIG_INSTALL_DIR})
+    EXPORT APSISenderTargets
+    NAMESPACE APSI::
+    DESTINATION ${PROJECT_CONFIG_INSTALL_DIR})
 
 # Version file; we require exact version match for downstream
-include(CMakePackageConfigHelpers)
-write_basic_package_version_file(${APSISENDER_CONFIG_VERSION_FILENAME}
-    VERSION ${APSISender_VERSION}
+write_basic_package_version_file(
+    ${PROJECT_CONFIG_VERSION_FILENAME}
+    VERSION ${PROJECT_VERSION}
     COMPATIBILITY ExactVersion)
 
-# Install other files 
+# Install config and module files
 install(
     FILES
-        ${APSISENDER_CONFIG_FILENAME}
-        ${APSISENDER_CONFIG_VERSION_FILENAME}
-    DESTINATION ${APSISENDER_CONFIG_INSTALL_DIR})
+        ${PROJECT_CONFIG_FILENAME}
+        ${PROJECT_CONFIG_VERSION_FILENAME}
+    DESTINATION ${PROJECT_CONFIG_INSTALL_DIR})
+
+# We export APSISenderTargets from the build tree so it can be used by other projects
+# without requiring an install.
+export(
+    EXPORT APSISenderTargets
+    NAMESPACE APSI::
+    FILE ${PROJECT_TARGETS_FILENAME})

@@ -17,8 +17,8 @@
 #include "apsi/tools/matrix.h"
 #include "apsi/network/channel.h"
 
-// Cuckoo
-#include "cuckoo/cuckoo.h"
+// Kuku
+#include "kuku/kuku.h"
 
 // SEAL
 #include "seal/context.h"
@@ -110,13 +110,13 @@ namespace apsi
             */
             std::pair<
                 std::map<std::uint64_t, std::vector<std::string>>,
-                std::unique_ptr<cuckoo::CuckooTable>
+                std::unique_ptr<kuku::KukuTable>
             > preprocess(std::vector<Item> &items);
 
             /**
             Hash all items in the input vector into a cuckoo hashing table.
             */
-            std::unique_ptr<cuckoo::CuckooTable> cuckoo_hashing(
+            std::unique_ptr<kuku::KukuTable> cuckoo_hashing(
                 const std::vector<Item> &items);
 
             /**
@@ -124,13 +124,13 @@ namespace apsi
             */
             std::vector<int> cuckoo_indices(
                 const std::vector<Item> &items,
-                cuckoo::CuckooTable &cuckoo);
+                kuku::KukuTable &cuckoo);
 
             /**
             Encodes items in the cuckoo hashing table into ExField elements.
             */
             void exfield_encoding(
-                cuckoo::CuckooTable &cuckoo,
+                kuku::KukuTable &cuckoo,
                 FFieldArray& ret);
 
             /**
@@ -234,7 +234,7 @@ namespace apsi
             // Preprocess result
             std::pair<
                 std::map<std::uint64_t, std::vector<std::string>>,
-                std::unique_ptr<cuckoo::CuckooTable>
+                std::unique_ptr<kuku::KukuTable>
             > preprocess_result_;
 
             // For OPRF deobfuscation

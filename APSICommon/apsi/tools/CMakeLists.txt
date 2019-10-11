@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
-target_sources(apsi_common
+target_sources(Common
     PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/aes.cpp
         ${CMAKE_CURRENT_LIST_DIR}/csvreader.cpp
@@ -12,8 +12,6 @@ target_sources(apsi_common
         ${CMAKE_CURRENT_LIST_DIR}/stopwatch.cpp
         ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
 )
-
-add_subdirectory(blake2)
 
 install(
     FILES
@@ -29,5 +27,5 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/thread_pool.h
         ${CMAKE_CURRENT_LIST_DIR}/utils.h
     DESTINATION
-        ${APSICOMMON_INCLUDES_INSTALL_DIR}/apsi/tools
+        ${PROJECT_INCLUDES_INSTALL_DIR}/apsi/tools
 )

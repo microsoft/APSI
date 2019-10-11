@@ -16,18 +16,18 @@
 #include "apsi/tools/prng.h"
 #include "apsi/tools/utils.h"
 #include "apsi/result_package.h"
-#include "apsi/tools/blake2/blake2.h"
 
 // SEAL
-#include "seal/util/common.h"
-#include "seal/util/uintcore.h"
-#include "seal/encryptionparams.h"
-#include "seal/keygenerator.h"
+#include <seal/util/common.h>
+#include <seal/util/uintcore.h>
+#include <seal/encryptionparams.h>
+#include <seal/keygenerator.h>
+#include <seal/util/blake2.h>
 
 using namespace std;
 using namespace seal;
 using namespace seal::util;
-using namespace cuckoo;
+using namespace kuku;
 using namespace apsi;
 using namespace apsi::logging;
 using namespace apsi::tools;
@@ -304,14 +304,14 @@ void Receiver::handshake(Channel& chl)
 
 pair<
     map<uint64_t, vector<string>>,
-    unique_ptr<CuckooTable> >
+    unique_ptr<KukuTable> >
     Receiver::preprocess(vector<Item> &items)
 {
     STOPWATCH(recv_stop_watch, "Receiver::preprocess");
     Log::info("Receiver preprocess start");
 
     // find the item length 
-    unique_ptr<CuckooTable> cuckoo;
+    unique_ptr<KukuTable> cuckoo;
     unique_ptr<FFieldArray> exfield_items;
 
     unsigned padded_cuckoo_capacity = static_cast<unsigned>(
@@ -351,11 +351,11 @@ pair<
     return { move(ciphers), move(cuckoo) };
 }
 
-unique_ptr<CuckooTable> Receiver::cuckoo_hashing(const vector<Item> &items)
+unique_ptr<KukuTable> Receiver::cuckoo_hashing(const vector<Item> &items)
 {
     auto receiver_null_item = all_one_item;
 
-    auto cuckoo = make_unique<CuckooTable>(
+    auto cuckoo = make_unique<KukuTable>(
         get_params().log_table_size(),
         0, // stash size
         get_params().hash_func_count(),
@@ -396,7 +396,7 @@ unique_ptr<CuckooTable> Receiver::cuckoo_hashing(const vector<Item> &items)
 
 vector<int> Receiver::cuckoo_indices(
     const vector<Item> &items,
-    cuckoo::CuckooTable &cuckoo)
+    kuku::KukuTable &cuckoo)
 {
     // This is the true size of the table; a multiple of slot_count_
     unsigned padded_cuckoo_capacity = static_cast<unsigned>(
@@ -420,7 +420,7 @@ vector<int> Receiver::cuckoo_indices(
 }
 
 void Receiver::exfield_encoding(
-    CuckooTable &cuckoo,
+    KukuTable &cuckoo,
     FFieldArray &ret)
 {
     int item_bit_count = get_params().item_bit_count();

@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
-target_sources(apsi_sender
+target_sources(Sender
     PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/dbblock.cpp
         ${CMAKE_CURRENT_LIST_DIR}/sender.cpp
@@ -20,5 +20,5 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/sendersessioncontext.h
         ${CMAKE_CURRENT_LIST_DIR}/senderthreadcontext.h
     DESTINATION
-        ${APSISENDER_INCLUDES_INSTALL_DIR}/apsi
+        ${PROJECT_INCLUDES_INSTALL_DIR}/apsi
 )

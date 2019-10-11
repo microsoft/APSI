@@ -5,21 +5,14 @@ cmake_minimum_required(VERSION 3.12)
 
 project(APSICommon VERSION 1.0.0 LANGUAGES CXX C)
 
-if (DEFINED MSVC)
+if(MSVC)
     message(FATAL_ERROR "Please build APSI using the attached Visual Studio solution/project file")
 endif()
 
-# Library will be in ../lib
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/../lib)
-
-# Create library but add no source files yet
-add_library(apsi_common STATIC "")
-set_property(TARGET apsi_common PROPERTY POSITION_INDEPENDENT_CODE ON)
-
 # Build in release mode by default
-set(APSI_DEFAULT_BUILD_TYPE "Release")
+set(DEFAULT_BUILD_TYPE "Release")
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE ${APSI_DEFAULT_BUILD_TYPE} CACHE
+    set(CMAKE_BUILD_TYPE ${DEFAULT_BUILD_TYPE} CACHE
         STRING "Build type" FORCE)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
         "Release" "Debug" "MinSizeRel" "RelWithDebInfo")
@@ -33,23 +26,45 @@ else()
     set(APSI_DEBUG_DEFAULT OFF)
 endif()
 set(APSI_DEBUG ${APSI_DEBUG_DEFAULT})
+message(STATUS "${PROJECT_NAME} set APSI debug mode: ${APSI_DEBUG}")
 
 # Required files and directories
-set(APSICOMMON_INCLUDES_INSTALL_DIR include)
-set(APSICOMMON_CONFIG_IN_FILENAME ${APSICommon_SOURCE_DIR}/cmake/APSICommonConfig.cmake.in)
-set(APSICOMMON_CONFIG_FILENAME ${APSICommon_SOURCE_DIR}/cmake/APSICommonConfig.cmake)
-set(APSICOMMON_TARGETS_FILENAME ${APSICommon_SOURCE_DIR}/cmake/APSICommonTargets.cmake)
-set(APSICOMMON_CONFIG_VERSION_FILENAME ${APSICommon_SOURCE_DIR}/cmake/APSICommonConfigVersion.cmake)
-set(APSICOMMON_CONFIG_INSTALL_DIR lib/cmake/APSICommon)
+include(GNUInstallDirs)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/../lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/../lib)
+set(CMAKE_LIBRARY_RUNTIME_DIRECTORY ${PROJECT_SOURCE_DIR}/../bin)
+set(PROJECT_TARGETS_FILENAME ${PROJECT_SOURCE_DIR}/cmake/${PROJECT_NAME}Targets.cmake)
+set(PROJECT_CONFIG_IN_FILENAME ${PROJECT_SOURCE_DIR}/cmake/${PROJECT_NAME}Config.cmake.in)
+set(PROJECT_CONFIG_FILENAME ${PROJECT_SOURCE_DIR}/cmake/${PROJECT_NAME}Config.cmake)
+set(PROJECT_CONFIG_VERSION_FILENAME ${PROJECT_SOURCE_DIR}/cmake/${PROJECT_NAME}ConfigVersion.cmake)
+set(PROJECT_CONFIG_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+set(PROJECT_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 
-# For extra modules
-list(APPEND CMAKE_MODULE_PATH ${APSICommon_SOURCE_DIR}/../cmake)
+# Find module scripts
+set(FOURQ_FIND_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake/FindFourQ.cmake)
+set(LOG4CPLUS_FIND_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake/FindLog4cplus.cmake)
+set(MSGSL_FIND_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake/FindMSGSL.cmake)
+set(ZEROMQ_FIND_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake/FindZeroMQ.cmake)
+set(ZEROMQPP_FIND_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake/FindZeroMQpp.cmake)
+
+# For locating all modules
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake)
+
+# Should we build a shared library?
+set(DEFAULT_LIB_BUILD_TYPE "Static")
+if(NOT APSICommon_LIB_BUILD_TYPE)
+    set(APSICommon_LIB_BUILD_TYPE ${DEFAULT_LIB_BUILD_TYPE} CACHE
+        STRING "${PROJECT_NAME} build type" FORCE)
+    set_property(CACHE APSICommon_LIB_BUILD_TYPE PROPERTY
+        STRINGS "Static" "Shared")
+endif()
+message(STATUS "${PROJECT_NAME} build type: ${APSICommon_LIB_BUILD_TYPE}")
 
 # Import Microsoft SEAL
 find_package(SEAL 3.4.0 EXACT REQUIRED)
 
-# Import Cuckoo
-find_package(Cuckoo 1.0.0 EXACT REQUIRED)
+# Import Kuku
+find_package(Kuku 1.0.0 EXACT REQUIRED)
 
 # Import Microsoft GSL
 if(MSGSL_ROOT)
@@ -89,27 +104,55 @@ if(Log4cplus_ROOT)
 endif()
 find_package(Log4cplus MODULE REQUIRED)
 
-# Set flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -maes")
+# Create library but add no source files yet
+if(APSICommon_LIB_BUILD_TYPE STREQUAL "Shared")
+    add_library(Common SHARED "")
 
-# C++17
-target_compile_features(apsi_common PUBLIC cxx_std_17)
+    # Set SOVERSION for shared library
+    set_target_properties(Common PROPERTIES
+        SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+else()
+    add_library(Common STATIC "")
+
+    # For a static library indicate version in the filename
+    set_target_properties(Common PROPERTIES
+        OUTPUT_NAME apsi_common-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+endif()
+
+# Set VERSION for all library build types
+set_target_properties(Common PROPERTIES
+    VERSION ${APSICommon_VERSION})
+
+# Set PIC for all build types
+set_target_properties(Common PROPERTIES
+    POSITION_INDEPENDENT_CODE ON)
+
+# C++14
+target_compile_features(Common PUBLIC cxx_std_14)
 
 # Defines
-add_definitions(-DHAVE_CONFIG)
-add_definitions(-DUSE_SECURE_SEED)
-add_definitions(-DNDEBUG)
-add_definitions(-D_AMD64_)
-add_definitions(-D_AVX2_)
-add_definitions(-D_ASM_)
-add_definitions(-D__LINUX__)
+message(WARNING "${PROJECT_NAME} adding define -DHAVE_CONFIG; needed?")
+target_compile_options(Common PUBLIC -DHAVE_CONFIG)
+message(WARNING "${PROJECT_NAME} adding define -DUSE_SECURE_SEED; needed?")
+target_compile_options(Common PUBLIC -DUSE_SECURE_SEED)
+message(WARNING "${PROJECT_NAME} adding define -D_AMD64_; needed?")
+target_compile_options(Common PUBLIC -D_AMD64_)
+message(WARNING "${PROJECT_NAME} adding define -D_AVX2_; needed?")
+target_compile_options(Common PUBLIC -D_AVX2_)
+message(WARNING "${PROJECT_NAME} adding define -D_ASM_; needed?")
+target_compile_options(Common PUBLIC -D_ASM_)
+message(WARNING "${PROJECT_NAME} adding define -D__LINUX__; needed?")
+target_compile_options(Common PUBLIC -D__LINUX__)
+message(WARNING "${PROJECT_NAME} adding compile option -maes; needed?")
+target_compile_options(Common PUBLIC -maes)
+message(WARNING "${PROJECT_NAME} adding compile option -march=native; needed?")
+target_compile_options(Common PUBLIC -march=native)
 
 # Link required libraries
-target_link_libraries(apsi_common PUBLIC
+target_link_libraries(Common PUBLIC
     SEAL::seal
-    MSGSL::MSGSL 
-    Cuckoo::cuckoo
+    MSGSL::MSGSL
+    Kuku::kuku
     ZeroMQ::ZeroMQ
     ZeroMQpp::ZeroMQpp
     FourQ::FourQ
@@ -119,38 +162,57 @@ target_link_libraries(apsi_common PUBLIC
 add_subdirectory(apsi)
 
 # Add local include directories for build
-target_include_directories(apsi_common
-	PUBLIC $<BUILD_INTERFACE:${APSICommon_SOURCE_DIR}>)
+target_include_directories(Common PUBLIC
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:${PROJECT_INCLUDES_INSTALL_DIR}>)
 
-# Associate APSI to export apsi_export
-install(TARGETS apsi_common EXPORT apsi_common_export
-    ARCHIVE DESTINATION lib
-    INCLUDES DESTINATION ${APSICOMMON_INCLUDES_INSTALL_DIR})
-
-# Export the targets
-export(EXPORT apsi_common_export
-    FILE ${APSICOMMON_TARGETS_FILENAME}
-    NAMESPACE APSICommon::)
+# Associate APSI to export APSICommonTargets
+install(TARGETS Common EXPORT APSICommonTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # Create the CMake config file
-configure_file(${APSICOMMON_CONFIG_IN_FILENAME} ${APSICOMMON_CONFIG_FILENAME} @ONLY)
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+    ${PROJECT_CONFIG_IN_FILENAME} ${PROJECT_CONFIG_FILENAME}
+    INSTALL_DESTINATION ${PROJECT_CONFIG_INSTALL_DIR})
+
+# Export the targets
+export(EXPORT APSICommonTargets
+    FILE ${PROJECT_TARGETS_FILENAME}
+    NAMESPACE APSI::)
+
+# Create the CMake config file
+configure_file(${PROJECT_CONFIG_IN_FILENAME} ${PROJECT_CONFIG_FILENAME} @ONLY)
 
 # Install the export
 install(
-    EXPORT apsi_common_export
-    FILE APSICommonTargets.cmake
-    NAMESPACE APSICommon::
-    DESTINATION ${APSICOMMON_CONFIG_INSTALL_DIR})
+    EXPORT APSICommonTargets
+    NAMESPACE APSI::
+    DESTINATION ${PROJECT_CONFIG_INSTALL_DIR})
 
 # Version file; we require exact version match for downstream
-include(CMakePackageConfigHelpers)
-write_basic_package_version_file(${APSICOMMON_CONFIG_VERSION_FILENAME}
-    VERSION ${APSICommon_VERSION}
+write_basic_package_version_file(
+    ${PROJECT_CONFIG_VERSION_FILENAME}
+    VERSION ${PROJECT_VERSION}
     COMPATIBILITY ExactVersion)
 
-# Install other files 
+# Install config and module files
 install(
     FILES
-        ${APSICOMMON_CONFIG_FILENAME}
-        ${APSICOMMON_CONFIG_VERSION_FILENAME}
-    DESTINATION ${APSICOMMON_CONFIG_INSTALL_DIR})
+        ${PROJECT_CONFIG_FILENAME}
+        ${PROJECT_CONFIG_VERSION_FILENAME}
+        ${FOURQ_FIND_MODULE_PATH}
+        ${LOG4CPLUS_FIND_MODULE_PATH}
+        ${MSGSL_FIND_MODULE_PATH}
+        ${ZEROMQ_FIND_MODULE_PATH}
+        ${ZEROMQPP_FIND_MODULE_PATH}
+    DESTINATION ${PROJECT_CONFIG_INSTALL_DIR})
+
+# We export APSICommonTargets from the build tree so it can be used by other projects
+# without requiring an install.
+export(
+    EXPORT APSICommonTargets
+    NAMESPACE APSI::
+    FILE ${PROJECT_TARGETS_FILENAME})

@@ -10,10 +10,10 @@
 #include "apsi/apsidefines.h"
 #include "apsi/tools/prng.h"
 #include "apsi/tools/fourq.h"
-#include "apsi/tools/blake2/blake2.h"
 
 // SEAL
 #include <seal/evaluator.h>
+#include <seal/util/blake2.h>
 
 using namespace std;
 using namespace seal;

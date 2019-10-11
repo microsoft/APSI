@@ -1,13 +1,49 @@
-# Exports target APSICommon::apsi_common
-#
-# Creates variables:
-#   APSI_BUILD_TYPE : The build configuration used
-#   APSI_DEBUG : Set to non-zero value if APSI is compiled with extra debugging code
+# Exports target APSI::Common
 
-set(APSI_BUILD_TYPE @CMAKE_BUILD_TYPE@)
-set(APSI_DEBUG @APSI_DEBUG@)
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+macro(warning_when_not_quiet msg)
+    if(NOT APSICommon_FIND_QUIETLY)
+        message(WARNING ${msg})
+    endif()
+endmacro()
+
+macro(status_when_not_quiet msg)
+    if(NOT APSICommon_FIND_QUIETLY)
+        message(STATUS ${msg})
+    endif()
+endmacro()
+
+macro(find_apsi_dependency dep)
+    find_dependency(${dep})
+    if(NOT ${dep}_FOUND)
+        warning_when_not_quiet("Could not find dependency `${dep}`")
+        set(APSICommon_FOUND FALSE)
+        return()
+    endif()
+endmacro()
+
+set(APSICommon_FOUND FALSE)
+
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
+
+# Locate all dependencies before setting up target
+find_apsi_dependency(SEAL 3.4.0 EXACT REQUIRED)
+find_apsi_dependency(Kuku 1.0.0 EXACT REQUIRED)
+find_apsi_dependency(MSGSL REQUIRED)
+find_apsi_dependency(ZeroMQ REQUIRED)
+find_apsi_dependency(ZeroMQpp REQUIRED)
+find_apsi_dependency(FourQ REQUIRED)
+find_apsi_dependency(Log4cplus REQUIRED)
 
 include(${CMAKE_CURRENT_LIST_DIR}/APSICommonTargets.cmake)
-message(STATUS "APSICommon detected (version ${APSICommon_VERSION})")
-message(STATUS "APSICommon build type: ${APSI_BUILD_TYPE}")
-message(STATUS "APSICommon debug mode: ${APSI_DEBUG}")
+
+if(TARGET APSI::Common)
+    status_when_not_quiet("APSICommon -> Version ${APSICommon_VERSION} detected")
+    set(APSICommon_FOUND TRUE)
+else()
+    warning_when_not_quiet("APSICommon -> NOT FOUND")
+    set(APSICommon_FOUND FALSE)
+endif()

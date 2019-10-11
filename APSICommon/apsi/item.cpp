@@ -11,11 +11,14 @@
 // APSI
 #include "apsi/item.h"
 #include "apsi/apsidefines.h"
-#include "apsi/tools/blake2/blake2.h"
 
 // SEAL
-#include "seal/util/uintcore.h"
-#include "seal/util/common.h"
+#include <seal/util/uintcore.h>
+#include <seal/util/common.h>
+#include <seal/util/blake2.h>
+
+// Kuku
+#include <kuku/common.h>
 
 using namespace std;
 using namespace seal;
@@ -47,13 +50,13 @@ Item &Item::operator =(uint64_t assign)
     return *this;
 }
 
-Item &Item::operator =(const cuckoo::item_type& assign)
+Item &Item::operator =(const kuku::item_type& assign)
 {
     value_ = assign;
     return *this;
 }
 
-Item::Item(const cuckoo::item_type & item)
+Item::Item(const kuku::item_type & item)
 {
     operator =(item);
 }

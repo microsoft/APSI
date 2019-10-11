@@ -8,7 +8,6 @@
 #include <stdexcept>
 
 #include "apsi/ffield/ffield_elt.h"
-#include "cuckoo/cuckoo.h"
 
 namespace apsi
 {

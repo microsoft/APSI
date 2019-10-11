@@ -3,7 +3,7 @@
 
 cmake_minimum_required(VERSION 3.12)
 
-project(APSIReceiver VERSION 1.0.0 LANGUAGES CXX C)
+project(CommonCLI VERSION 1.0.0 LANGUAGES CXX C)
 
 if(MSVC)
     message(FATAL_ERROR "Please build APSI using the attached Visual Studio solution/project file")
@@ -40,58 +40,74 @@ set(PROJECT_CONFIG_VERSION_FILENAME ${PROJECT_SOURCE_DIR}/cmake/${PROJECT_NAME}C
 set(PROJECT_CONFIG_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 set(PROJECT_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 
+# Find module scripts
+set(TCLAP_FIND_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake/FindTCLAP.cmake)
+
+# For locating all modules
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake)
+
 # Should we build a shared library?
 set(DEFAULT_LIB_BUILD_TYPE "Static")
-if(NOT APSIReceiver_LIB_BUILD_TYPE)
-    set(APSIReceiver_LIB_BUILD_TYPE ${DEFAULT_LIB_BUILD_TYPE} CACHE
+if(NOT CommonCLI_LIB_BUILD_TYPE)
+    set(CommonCLI_LIB_BUILD_TYPE ${DEFAULT_LIB_BUILD_TYPE} CACHE
         STRING "${PROJECT_NAME} build type" FORCE)
-    set_property(CACHE APSIReceiver_LIB_BUILD_TYPE PROPERTY
+    set_property(CACHE CommonCLI_LIB_BUILD_TYPE PROPERTY
         STRINGS "Static" "Shared")
 endif()
-message(STATUS "${PROJECT_NAME} build type: ${APSIReceiver_LIB_BUILD_TYPE}")
+message(STATUS "${PROJECT_NAME} build type: ${CommonCLI_LIB_BUILD_TYPE}")
 
 # Import APSICommon
 find_package(APSICommon 1.0.0 EXACT REQUIRED)
 
+# Import TCLAP
+if(TCLAP_ROOT)
+    unset(TCLAP_INCLUDE_DIR CACHE)
+endif()
+find_package(TCLAP MODULE REQUIRED)
+
 # Create library but add no source files yet
-if(APSIReceiver_LIB_BUILD_TYPE STREQUAL "Shared")
-    add_library(Receiver SHARED "")
+if(CommonCLI_LIB_BUILD_TYPE STREQUAL "Shared")
+    add_library(CommonCLI SHARED "")
 
     # Set SOVERSION for shared library
-    set_target_properties(Receiver PROPERTIES
+    set_target_properties(CommonCLI PROPERTIES
         SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 else()
-    add_library(Receiver STATIC "")
+    add_library(CommonCLI STATIC "") 
 
     # For a static library indicate version in the filename
-    set_target_properties(Receiver PROPERTIES
-        OUTPUT_NAME apsi_receiver-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
+    set_target_properties(CommonCLI PROPERTIES
+        OUTPUT_NAME common_cli-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR})
 endif()
 
 # Set VERSION for all library build types
-set_target_properties(Receiver PROPERTIES
-    VERSION ${APSIReceiver_VERSION})
+set_target_properties(CommonCLI PROPERTIES
+    VERSION ${CommonCLI_VERSION})
 
 # Set PIC for all build types
-set_target_properties(Receiver PROPERTIES
+set_target_properties(CommonCLI PROPERTIES
     POSITION_INDEPENDENT_CODE ON)
 
 # C++14
-target_compile_features(Receiver PUBLIC cxx_std_14)
+target_compile_features(CommonCLI PUBLIC cxx_std_14)
 
 # Link required libraries
-target_link_libraries(Receiver PUBLIC APSI::Common)
+target_link_libraries(CommonCLI PUBLIC
+    APSI::Common
+    TCLAP::TCLAP)
 
 # Add source files to library
-add_subdirectory(apsi)
+target_sources(CommonCLI PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/common_utils.cpp
+)
 
 # Add local include directories for build
-target_include_directories(Receiver PUBLIC
+target_include_directories(CommonCLI PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${PROJECT_INCLUDES_INSTALL_DIR}>)
 
-# Associate APSI to export APSIReceiverTargets
-install(TARGETS Receiver EXPORT APSIReceiverTargets
+# Associate APSI to export CommonCLITargets
+install(TARGETS CommonCLI EXPORT CommonCLITargets
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -103,7 +119,7 @@ configure_package_config_file(
     INSTALL_DESTINATION ${PROJECT_CONFIG_INSTALL_DIR})
 
 # Export the targets
-export(EXPORT APSIReceiverTargets
+export(EXPORT CommonCLITargets
     FILE ${PROJECT_TARGETS_FILENAME}
     NAMESPACE APSI::)
 
@@ -112,7 +128,7 @@ configure_file(${PROJECT_CONFIG_IN_FILENAME} ${PROJECT_CONFIG_FILENAME} @ONLY)
 
 # Install the export
 install(
-    EXPORT APSIReceiverTargets
+    EXPORT CommonCLITargets
     NAMESPACE APSI::
     DESTINATION ${PROJECT_CONFIG_INSTALL_DIR})
 
@@ -122,16 +138,26 @@ write_basic_package_version_file(
     VERSION ${PROJECT_VERSION}
     COMPATIBILITY ExactVersion)
 
+# Install header files
+install(
+    FILES
+        ${CMAKE_CURRENT_LIST_DIR}/base_clp.h
+        ${CMAKE_CURRENT_LIST_DIR}/common_utils.h
+    DESTINATION
+        ${PROJECT_INCLUDES_INSTALL_DIR})
+
 # Install config and module files
 install(
     FILES
         ${PROJECT_CONFIG_FILENAME}
         ${PROJECT_CONFIG_VERSION_FILENAME}
+        ${PROJECT_CONFIG_VERSION_FILENAME}
+        ${TCLAP_FIND_MODULE_PATH}
     DESTINATION ${PROJECT_CONFIG_INSTALL_DIR})
 
-# We export APSIReceiverTargets from the build tree so it can be used by other projects
+# We export CommonCLITargets from the build tree so it can be used by other projects
 # without requiring an install.
 export(
-    EXPORT APSIReceiverTargets
+    EXPORT CommonCLITargets
     NAMESPACE APSI::
     FILE ${PROJECT_TARGETS_FILENAME})

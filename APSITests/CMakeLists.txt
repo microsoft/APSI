@@ -46,8 +46,8 @@ endif()
 # Import SEAL
 find_package(SEAL 3.4.0 REQUIRED)
 
-# Import Cuckoo
-find_package(Cuckoo 1.0.0 REQUIRED)
+# Import Kuku
+find_package(Kuku 1.0.0 REQUIRED)
 
 # Import ZeroMQ
 if(ZeroMQ_ROOT)
