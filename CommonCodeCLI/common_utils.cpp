@@ -17,10 +17,6 @@
 #include "apsi/psiparams.h"
 #include "apsi/tools/utils.h"
 
-// SEAL
-#include "seal/smallmodulus.h"
-//#include "seal/defaultparams.h"
-
 
 using namespace std;
 using namespace apsi;
