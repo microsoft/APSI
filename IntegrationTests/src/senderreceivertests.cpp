@@ -158,7 +158,7 @@ namespace
         psiconf_params.sender_size = sender_set_size;
         psiconf_params.use_labels = use_labels;
         psiconf_params.use_oprf = use_oprf;
-        psiconf_params.use_fast_membership = false;
+        psiconf_params.use_fast_membership = fast_membership;
         psiconf_params.sender_bin_size = 0; // Size will be calculated
         psiconf_params.num_chunks = 1;
         psiconf_params.item_bit_length_used_after_oprf = 120;
