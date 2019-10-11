@@ -524,7 +524,7 @@ void Sender::respond_worker(
         if (params_.use_labels())
         {
             // Compress label
-            compressor_->mod_switch(label_results[currResult], compressedResult);
+            compressor_->mod_switch(label_results[curr_label], compressedResult);
 
             stringstream ss;
             compressor_->compressed_save(compressedResult, ss);

@@ -79,7 +79,7 @@ namespace
 
     void RunTest(size_t senderActualSize, PSIParams& params)
     {
-        Log::set_log_level(Log::Level::level_error);
+        Log::set_log_level(Log::Level::level_debug);
 
         // Connect the network
         ReceiverChannel recvChl;
@@ -87,8 +87,8 @@ namespace
         string conn_addr = "tcp://localhost:5550";
         recvChl.connect(conn_addr);
 
-        unsigned numThreads = thread::hardware_concurrency();
-
+        //unsigned numThreads = thread::hardware_concurrency();
+		unsigned numThreads = 1;
         unique_ptr<Receiver> receiver_ptr;
 
         auto f = std::async([&]()
@@ -151,7 +151,7 @@ namespace
 
     PSIParams create_params(size_t sender_set_size, bool use_oprf, bool use_labels, bool fast_membership)
     {
-        Log::set_log_level(Log::Level::level_error);
+        Log::set_log_level(Log::Level::level_debug);
 
         PSIParams::PSIConfParams psiconf_params;
         psiconf_params.item_bit_count = 60;
@@ -235,6 +235,13 @@ namespace
 
 namespace APSITests
 {
+    TEST(SenderReceiverTests, OPRFandLabelsSmallTest)
+    {
+        size_t senderActualSize = 100;
+        PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ true, /* fast_matching */ false);
+        RunTest(senderActualSize, params);
+    }
+
     TEST(SenderReceiverTests, OPRFandLabelsTest)
     {
         size_t senderActualSize = 2000;
