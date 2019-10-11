@@ -116,6 +116,9 @@ namespace apsi
                     result.data(j),
                     [ch](auto a, auto b) { return seal::util::sub_uint_uint_mod(a, b, ch); });
             }
+
+            std::transform(result.data(), result.data(1), divided_differences[0].data(size-1-i), result.data(), [ch](auto a, auto b) { return seal::util::add_uint_uint_mod(a, b, ch); });
+
         }
     }
 
