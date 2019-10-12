@@ -57,7 +57,9 @@ endif()
 message(STATUS "${PROJECT_NAME} build type: ${CommonCLI_LIB_BUILD_TYPE}")
 
 # Import APSICommon
-find_package(APSICommon 1.0.0 EXACT REQUIRED)
+find_package(APSICommon 1.0.0 EXACT REQUIRED
+    PATHS ${PROJECT_SOURCE_DIR}/../APSICommon/cmake
+)
 
 # Import TCLAP
 if(TCLAP_ROOT)

@@ -51,7 +51,9 @@ endif()
 message(STATUS "${PROJECT_NAME} build type: ${APSIReceiver_LIB_BUILD_TYPE}")
 
 # Import APSICommon
-find_package(APSICommon 1.0.0 EXACT REQUIRED)
+find_package(APSICommon 1.0.0 EXACT REQUIRED
+    PATHS ${PROJECT_SOURCE_DIR}/../APSICommon/cmake
+)
 
 # Create library but add no source files yet
 if(APSIReceiver_LIB_BUILD_TYPE STREQUAL "Shared")

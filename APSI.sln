@@ -23,7 +23,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Sender", "SenderCLI\Sender.
 		{72D055E7-8FC0-4E63-90AB-87DAB308F201} = {72D055E7-8FC0-4E63-90AB-87DAB308F201}
 	EndProjectSection
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CommonCode", "CommonCodeCLI\CommonCode.vcxproj", "{E3FE0731-D244-44C3-8BB9-7165391DD886}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CommonCLI", "CommonCLI\CommonCLI.vcxproj", "{E3FE0731-D244-44C3-8BB9-7165391DD886}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "IntegrationTests", "IntegrationTests\IntegrationTests.vcxproj", "{305E8743-DC5A-4BC1-94E2-7764E7468DB6}"
 	ProjectSection(ProjectDependencies) = postProject
