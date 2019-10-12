@@ -33,9 +33,9 @@ using namespace apsi::network;
 using namespace apsi::sender;
 
 Sender::Sender(const PSIParams &params, int total_thread_count, 
-        int session_thread_count, const MemoryPoolHandle &pool) :
+        int session_thread_count, MemoryPoolHandle pool) :
     params_(params),
-    pool_(pool),
+    pool_(move(pool)),
     field_(SmallModulus(params_.exfield_characteristic()), params_.exfield_degree()),
     total_thread_count_(total_thread_count),
     session_thread_count_(session_thread_count),

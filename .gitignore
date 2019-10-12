@@ -30,6 +30,9 @@ APSISender/cmake/APSISenderTargets.cmake
 APSIReceiver/cmake/APSIReceiverConfig.cmake
 APSIReceiver/cmake/APSIReceiverConfigVersion.cmake
 APSIReceiver/cmake/APSIReceiverTargets.cmake
+CommonCLI/cmake/CommonCLIConfig.cmake
+CommonCLI/cmake/CommonCLIConfigVersion.cmake
+CommonCLI/cmake/CommonCLITargets.cmake
 doc/html
 doc/latex
 **/CMakeCache.txt

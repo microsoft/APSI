@@ -1,0 +1,44 @@
+# Exports target APSI::CommonCLI
+
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+macro(warning_when_not_quiet msg)
+    if(NOT CommonCLI_FIND_QUIETLY)
+        message(WARNING ${msg})
+    endif()
+endmacro()
+
+macro(status_when_not_quiet msg)
+    if(NOT CommonCLI_FIND_QUIETLY)
+        message(STATUS ${msg})
+    endif()
+endmacro()
+
+macro(find_apsi_dependency dep)
+    find_dependency(${dep})
+    if(NOT ${dep}_FOUND)
+        warning_when_not_quiet("Could not find dependency `${dep}`")
+        set(CommonCLI_FOUND FALSE)
+        return()
+    endif()
+endmacro()
+
+set(CommonCLI_FOUND FALSE)
+
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
+
+# Locate dependencies 
+find_apsi_dependency(APSICommon 1.0.0 EXACT REQUIRED)
+find_apsi_dependency(TCLAP 1.0.0 EXACT REQUIRED)
+
+include(${CMAKE_CURRENT_LIST_DIR}/CommonCLITargets.cmake)
+
+if(TARGET APSI::CommonCLI)
+    status_when_not_quiet("CommonCLI -> Version ${CommonCLI_VERSION} detected")
+    set(CommonCLI_FOUND TRUE)
+else()
+    warning_when_not_quiet("CommonCLI -> NOT FOUND")
+    set(CommonCLI_FOUND FALSE)
+endif()
