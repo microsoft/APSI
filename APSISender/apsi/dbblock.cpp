@@ -230,9 +230,13 @@ void DBBlock::batch_interpolate(
         {
             if (has_item(pos))
             {
+
+
                 auto& key_item = get_key(pos);
+
                 temp.encode(gsl::span<u64>{key_item.get_value()}, params.get_label_bit_count());
                 x.set(size, temp);
+
 
                 auto src = get_label(pos);
                 temp.encode(gsl::span<u8>{src, value_byte_length_}, params.get_label_bit_count());
@@ -242,6 +246,10 @@ void DBBlock::batch_interpolate(
             }
         }
 
+
+        bool empty_row = (size == 0); 
+
+ 
         // pad the points to have max degree (split_size)
         // with (x,x) points where x is unique.
         cache.key_set.clear();
@@ -272,6 +280,7 @@ void DBBlock::batch_interpolate(
             ++cache.temp_vec[0];
         }
 
+
         ffield_newton_interpolate_poly(
             x, y,
             // We don't use the cache for divided differences.
@@ -300,6 +309,25 @@ void DBBlock::batch_interpolate(
         batched_coeff.reserve(capacity);
 
         ex_batch_encoder->compose(temp_array, batched_coeff);
+
+        // Log::debug("s = %i, is_zero = %i", s, batched_coeff.is_zero()); 
+
+
+        Position temppos;
+        temppos.split_offset = s;
+
+        // Debug
+        for (int j = 0; j < items_per_batch_; j++) {
+            temppos.batch_offset = j; 
+            if (has_item(temppos) && split_idx_ == 1) {
+                Log::debug("real item at batch offset %i and split offset %i", j, s); 
+                Log::debug("label for this item is 0x%llx", get_label_u64(temppos));
+            }
+        }
+        cout << endl;
+
+
+
         evaluator->transform_to_ntt_inplace(batched_coeff, seal_context->first_parms_id());
     }
 }

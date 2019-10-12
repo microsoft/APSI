@@ -47,7 +47,7 @@ namespace APSITests
         return result;
     }
 
-        TEST(InterpolateTests, basic_ffield_interpolate_test)
+    TEST(InterpolateTests, basic_ffield_interpolate_test)
     {
         seal::EncryptionParameters parms(seal::scheme_type::BFV);
         parms.set_poly_modulus_degree(64);

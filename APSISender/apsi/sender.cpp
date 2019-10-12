@@ -310,7 +310,7 @@ void Sender::respond(
     int max_supported_degree = params_.max_supported_degree();
     int window_size = get_params().window_size();
     int base = 1 << window_size;
-    int given_digits = num_of_powers / (base - 1); 
+    int given_digits = (num_of_powers + base - 2) / (base - 1);   // ceiling of num_of_powers / (base - 1)
 
     WindowingDag dag(params_.split_size(), params_.window_size(), max_supported_degree, given_digits);
     std::vector<WindowingDag::State> states;
@@ -457,11 +457,19 @@ void Sender::respond_worker(
 
                 // label_result = coeff[0] * x^0 = coeff[0];
                 int s = 0;
-                while (block.batched_label_coeffs_[s].is_zero()) ++s;
+                while (s < block.batched_label_coeffs_.size() && block.batched_label_coeffs_[s].is_zero()) ++s;
 
                 // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
-                evaluator_->multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], label_results[curr_label]);
 
+                if (s < block.batched_label_coeffs_.size()) {
+                    evaluator_->multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], label_results[curr_label]);
+                }
+                else {
+                    session_context.encryptor_->encrypt_zero(label_results[curr_label]);
+                    evaluator_->transform_to_ntt_inplace(label_results[curr_label]);
+                    // just set it to be an encryption of zero. 
+                    // encryptor_->encrypt; 
+                }
 
                 while (++s < block.batched_label_coeffs_.size())
                 {

@@ -52,6 +52,9 @@ namespace
     void verify_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<u8>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<u8>& labels)
     {
         bool correct = true;
+     
+
+        
         for (int i = 0; i < client_items.size(); i++)
         {
 
@@ -63,6 +66,17 @@ namespace
                 if (compare_labels)
                 {
                     auto idx = label_idx[i];
+                    
+                    //cout << "Comparing (expected, actual) labels: the " << i << "th item: " << endl;
+                    //cout << "Idx = " << idx << endl;
+                    //// temp.encode(gsl::span<u64>{client_items[i].get_value()}, .get_label_bit_count());
+
+                    //cout << "item = " << client_items[i].get_value()[0] << ", " << client_items[i].get_value()[1] << endl;
+                    //for (int j = 0; j < labels[idx].size(); j++) {
+                    //    cout << "( " << unsigned(labels[idx][j]) << ", " << unsigned(intersection.second[i][j]) << "), "; 
+                    //}
+                    //cout << endl;
+
                     int lblcmp = memcmp(intersection.second[i].data(), labels[idx].data(), labels[idx].size());
 
                     // Label is not the expected value
@@ -86,6 +100,7 @@ namespace
         recvChl.connect(conn_addr);
 
         unsigned numThreads = thread::hardware_concurrency();
+
         unique_ptr<Receiver> receiver_ptr;
 
         auto f = std::async([&]()
@@ -246,6 +261,7 @@ namespace APSITests
         RunTest(senderActualSize, params);
     }
 
+
     TEST(SenderReceiverTests, OPRFTest)
     {
         size_t senderActualSize = 3000;
@@ -274,7 +290,7 @@ namespace APSITests
         RunTest(senderActualSize, params);
     }
 
-    TEST(SenderReceiverTests, OPRFandLabelsFastMembershipTest)
+    TEST(SenderReceiverTests, OPRFFastMembershipLabelsTest)
     {
         size_t senderActualSize = 3000;
         PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ true, /* fast_matching */ true);

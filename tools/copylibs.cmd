@@ -1,7 +1,7 @@
 rem @echo off
 
 setlocal
-set DESTDIR=C:\Users\haoche\Documents\Libraries\APSI\bin\x64\%1
+set DESTDIR=C:\Users\haoche\Documents\Libraries\APSI\x64\%1
 
 copy %APSILIBS%\flint2\lib\x64\%1\dll_flint.dll %DESTDIR%
 copy %APSILIBS%\flint2\lib\x64\%1\dll_flint.pdb %DESTDIR%

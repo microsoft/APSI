@@ -36,7 +36,7 @@ using namespace apsi::receiver;
 
 
 
-Receiver::Receiver(int thread_count, const MemoryPoolHandle &pool) :
+Receiver::Receiver(int thread_count, const MemoryPoolHandle& pool) :
     thread_count_(thread_count),
     pool_(pool),
     field_(nullptr),
@@ -52,10 +52,10 @@ Receiver::Receiver(const PSIParams& params,
     int thread_count,
     const MemoryPoolHandle& pool)
     : params_(make_unique<PSIParams>(params)),
-      thread_count_(thread_count),
-      pool_(pool),
-      field_(nullptr),
-      slot_count_(0)
+    thread_count_(thread_count),
+    pool_(pool),
+    field_(nullptr),
+    slot_count_(0)
 {
     if (thread_count_ <= 0)
     {
@@ -90,7 +90,7 @@ void Receiver::initialize()
     // Initializing tools for dealing with compressed ciphertexts
     // We don't actually need the evaluator
     shared_ptr<Evaluator> dummy_evaluator = nullptr;
-    compressor_ = make_unique<CiphertextCompressor>(seal_context_, 
+    compressor_ = make_unique<CiphertextCompressor>(seal_context_,
         dummy_evaluator, pool_);
 
     stringstream relin_keys_ss;
@@ -127,7 +127,8 @@ pair<vector<bool>, Matrix<u8>> Receiver::decrypt_result(vector<Item>& items, Cha
     vector<int> table_to_input_map(padded_table_size, 0);
     if (items.size() > 1 || (!get_params().use_fast_membership())) {
         table_to_input_map = cuckoo_indices(items, cuckoo);
-    } else{
+    }
+    else {
         Log::info("Receiver single query table to input map");
     }
 
@@ -169,7 +170,7 @@ pair<vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Channel& chl
 
         deobfuscate_items(items, preprocess_resp.buffer);
     }
-    
+
     // Then get encrypted query
     auto& encrypted_query = query(items);
 
@@ -329,7 +330,7 @@ pair<
     if (items.size() > 1 || (!fm)) {
         cuckoo = cuckoo_hashing(items);
         exfield_encoding(*cuckoo, *exfield_items);
-    } 
+    }
     else
     {
         // Perform repeated encoding. 
@@ -339,13 +340,13 @@ pair<
             exfield_items->set(i, items[0].to_exfield_element(*field_, item_bit_count));
         }
     }
-    
+
     map<uint64_t, FFieldArray> powers;
     generate_powers(*exfield_items, powers);
 
     map<uint64_t, vector<string>> ciphers;
     encrypt(powers, ciphers);
-    
+
     Log::info("Receiver preprocess end");
 
     return { move(ciphers), move(cuckoo) };
@@ -427,7 +428,7 @@ void Receiver::exfield_encoding(
     if (get_params().use_oprf()) {
         item_bit_count = get_params().item_bit_length_used_after_oprf();
     }
-    Log::debug("item bit count before decoding: %i", item_bit_count); 
+    Log::debug("item bit count before decoding: %i", item_bit_count);
 
     // oprf? depends 
     auto& encodings = cuckoo.table();
@@ -440,15 +441,15 @@ void Receiver::exfield_encoding(
     }
 
     auto empty_field_item = Item(cuckoo.empty_item())
-        .to_exfield_element(ret.field(), item_bit_count); 
+        .to_exfield_element(ret.field(), item_bit_count);
     for (size_t i = cuckoo.table_size(); i < ret.size(); i++)
     {
         ret.set(i, empty_field_item);
     }
 }
 
-void Receiver::generate_powers(const FFieldArray &exfield_items,
-    map<uint64_t, FFieldArray> &result)
+void Receiver::generate_powers(const FFieldArray& exfield_items,
+    map<uint64_t, FFieldArray>& result)
 {
     int split_size = (get_params().sender_bin_size() + get_params().split_count() - 1) / get_params().split_count();
     int window_size = get_params().window_size();
@@ -489,14 +490,14 @@ void Receiver::generate_powers(const FFieldArray &exfield_items,
 
 void Receiver::encrypt(map<uint64_t, FFieldArray> &input, map<uint64_t, vector<string>> &destination)
 {
-    size_t count = 0; 
+    size_t count = 0;
     destination.clear();
     for (auto it = input.begin(); it != input.end(); it++)
     {
         encrypt(it->second, destination[it->first]);
-        count += (it->second.size() + static_cast<size_t>(slot_count_) - 1) / static_cast<size_t>(slot_count_); 
+        count += (it->second.size() + static_cast<size_t>(slot_count_) - 1) / static_cast<size_t>(slot_count_);
     }
-    Log::debug("Receiver sending %i ciphertexts", count); 
+    Log::debug("Receiver sending %i ciphertexts", count);
 }
 
 void Receiver::encrypt(const FFieldArray &input, vector<string> &destination)
@@ -538,8 +539,8 @@ void Receiver::encrypt(const FFieldArray &input, vector<string> &destination)
 
 std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
     Channel& channel,
-    const std::vector<int> &table_to_input_map,
-    std::vector<Item> &items)
+    const std::vector<int>& table_to_input_map,
+    std::vector<Item>& items)
 {
     STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt");
     std::pair<std::vector<bool>, Matrix<u8>> ret;
@@ -571,17 +572,17 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
     for (u64 t = 0; t < thrds.size(); ++t)
     {
         thrds[t] = std::thread([&](int idx)
-        {
-            stream_decrypt_worker(
-                idx,
-                batch_size,
-                thread_count_,
-                block_count,
-                channel,
-                table_to_input_map,
-                ret_bools,
-                ret_labels);
-        }, static_cast<int>(t));
+            {
+                stream_decrypt_worker(
+                    idx,
+                    batch_size,
+                    thread_count_,
+                    block_count,
+                    channel,
+                    table_to_input_map,
+                    ret_bools,
+                    ret_labels);
+            }, static_cast<int>(t));
     }
 
     for (auto& thrd : thrds)
@@ -596,7 +597,7 @@ void Receiver::stream_decrypt_worker(
     int num_threads,
     int block_count,
     Channel& channel,
-    const vector<int> &table_to_input_map,
+    const vector<int>& table_to_input_map,
     vector<bool>& ret_bools,
     Matrix<u8>& ret_labels)
 {
@@ -642,7 +643,7 @@ void Receiver::stream_decrypt_worker(
             auto idx = table_to_input_map[base_idx + k];
             if (idx >= 0)
             {
-                auto &is_zero = has_label[k];
+                auto& is_zero = has_label[k];
 
                 is_zero = batch->is_zero(k);
 
@@ -668,12 +669,17 @@ void Receiver::stream_decrypt_worker(
 
             ex_batch_encoder_->decompose(p, *batch);
 
+            //if (batch->is_zero()) {
+            Log::debug("decrypted label data is zero? %i", batch->is_zero());
+            //}
+
             for (int k = 0; k < batch_size; k++)
             {
                 if (has_label[k])
                 {
                     auto idx = table_to_input_map[base_idx + k];
                     Log::debug("Found label at thread_idx: %i, base_idx: %i, k: %i, idx: %i", thread_idx, base_idx, k, idx);
+
                     batch->get(k).decode(ret_labels[idx], get_params().get_label_bit_count());
                 }
             }

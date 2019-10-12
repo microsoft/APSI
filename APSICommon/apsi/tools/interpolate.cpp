@@ -84,7 +84,6 @@ namespace apsi
                                 return _ffield_elt_coeff_t(0);
                             }
                             else {
-                                //Log::debug("Interpolation error: two points with same x coordinate but different y coordinates ");
                                 throw std::logic_error("division by zero");
                             }
                         }
@@ -95,11 +94,14 @@ namespace apsi
 
         // Horner's method
         // We reuse numerator
+
+        // result[0] = DD[0][size-1]; 
         result.set(0, size-1, divided_differences[0]);
-        for (size_t i = 1; i < size; i++)
+        for (int  i = 1; i < size; i++)
         {
-            for (int j = static_cast<int>(i - 1); j >= 0; j--)
+            for (int j = i - 1; j >= 0; j--)
             {
+                // result[j+1] = result[j] ? 
                 result.set(j + 1, j, result);
             }
 
@@ -125,7 +127,6 @@ namespace apsi
             }
 
             std::transform(result.data(), result.data(1), divided_differences[0].data(size-1-i), result.data(), [ch](auto a, auto b) { return seal::util::add_uint_uint_mod(a, b, ch); });
-
         }
     }
 
