@@ -79,7 +79,14 @@ namespace apsi
                     [ch](auto a, auto b) {
                         _ffield_elt_coeff_t inv;
                         if (!seal::util::try_invert_uint_mod(b, ch, inv)) {
-                            throw std::logic_error("division by zero");
+                            if (a == 0) {
+                                // could return any element 
+                                return _ffield_elt_coeff_t(0);
+                            }
+                            else {
+                                //Log::debug("Interpolation error: two points with same x coordinate but different y coordinates ");
+                                throw std::logic_error("division by zero");
+                            }
                         }
                         return seal::util::multiply_uint_uint_mod(a, inv, ch);
                     });
@@ -91,7 +98,7 @@ namespace apsi
         result.set(0, size-1, divided_differences[0]);
         for (size_t i = 1; i < size; i++)
         {
-            for (size_t j = i - 1; j >= 0; j--)
+            for (int j = static_cast<int>(i - 1); j >= 0; j--)
             {
                 result.set(j + 1, j, result);
             }
@@ -116,6 +123,9 @@ namespace apsi
                     result.data(j),
                     [ch](auto a, auto b) { return seal::util::sub_uint_uint_mod(a, b, ch); });
             }
+
+            std::transform(result.data(), result.data(1), divided_differences[0].data(size-1-i), result.data(), [ch](auto a, auto b) { return seal::util::add_uint_uint_mod(a, b, ch); });
+
         }
     }
 

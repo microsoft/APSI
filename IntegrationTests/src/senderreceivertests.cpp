@@ -79,8 +79,6 @@ namespace
 
     void RunTest(size_t senderActualSize, PSIParams& params)
     {
-        Log::set_log_level(Log::Level::level_error);
-
         // Connect the network
         ReceiverChannel recvChl;
 
@@ -88,7 +86,6 @@ namespace
         recvChl.connect(conn_addr);
 
         unsigned numThreads = thread::hardware_concurrency();
-
         unique_ptr<Receiver> receiver_ptr;
 
         auto f = std::async([&]()
@@ -158,7 +155,7 @@ namespace
         psiconf_params.sender_size = sender_set_size;
         psiconf_params.use_labels = use_labels;
         psiconf_params.use_oprf = use_oprf;
-        psiconf_params.use_fast_membership = false;
+        psiconf_params.use_fast_membership = fast_membership;
         psiconf_params.sender_bin_size = 0; // Size will be calculated
         psiconf_params.num_chunks = 1;
         psiconf_params.item_bit_length_used_after_oprf = 120;
@@ -235,7 +232,14 @@ namespace
 
 namespace APSITests
 {
-    TEST(SenderReceiverTests, OPRFandLabelsTest)
+    TEST(SenderReceiverTests, OPRFandLabelsSmallTest)
+    {
+        size_t senderActualSize = 100;
+        PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ true, /* fast_matching */ false);
+        RunTest(senderActualSize, params);
+    }
+
+    TEST(SenderReceiverTests, DISABLED_OPRFandLabelsTest)
     {
         size_t senderActualSize = 2000;
         PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ true, /* fast_matching */ false);
@@ -249,14 +253,14 @@ namespace APSITests
         RunTest(senderActualSize, params);
     }
 
-    TEST(SenderReceiverTests, LabelsTest)
+    TEST(SenderReceiverTests, DISABLED_LabelsTest)
     {
         size_t senderActualSize = 2000;
         PSIParams params = create_params(senderActualSize, /* use_oprf */ false, /* use_labels */ true, /* fast_matching */ false);
         RunTest(senderActualSize, params);
     }
 
-    TEST(SenderReceiverTests, NoOPRFNoLabelsTest)
+    TEST(SenderReceiverTests, DISABLED_NoOPRFNoLabelsTest)
     {
         size_t senderActualSize = 3000;
         PSIParams params = create_params(senderActualSize, /* use_oprf */ false, /* use_labels */ false, /* fast_matching */ false);
@@ -267,6 +271,13 @@ namespace APSITests
     {
         size_t senderActualSize = 3000;
         PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ false, /* fast_matching */ true);
+        RunTest(senderActualSize, params);
+    }
+
+    TEST(SenderReceiverTests, OPRFandLabelsFastMembershipTest)
+    {
+        size_t senderActualSize = 3000;
+        PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ true, /* fast_matching */ true);
         RunTest(senderActualSize, params);
     }
 }
