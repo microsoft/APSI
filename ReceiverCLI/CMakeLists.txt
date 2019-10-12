@@ -32,8 +32,12 @@ message(STATUS "${PROJECT_NAME} set APSI debug mode: ${APSI_DEBUG}")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/../bin)
 
 # Imports 
-find_package(APSIReceiver 1.0.0 EXACT REQUIRED)
-find_package(CommonCLI 1.0.0 EXACT REQUIRED)
+find_package(APSIReceiver 1.0.0 EXACT REQUIRED
+    PATHS ${PROJECT_SOURCE_DIR}/../APSIReceiver/cmake
+)
+find_package(CommonCLI 1.0.0 EXACT REQUIRED
+    PATHS ${PROJECT_SOURCE_DIR}/../CommonCLI/cmake
+)
 
 # Create executable but add no source files yet
 add_executable(receiver "")

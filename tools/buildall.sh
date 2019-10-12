@@ -66,9 +66,9 @@ print_banner "Building IntegrationTests"
 cd $apsidir/IntegrationTests
 build_without_install
 
-# CommonCodeCLI
-print_banner "Building CommonCodeCLI"
-cd $apsidir/CommonCodeCLI
+# CommonCLI
+print_banner "Building CommonCLI"
+cd $apsidir/CommonCLI/
 build_without_install
 
 # Sender

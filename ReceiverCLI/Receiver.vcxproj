@@ -86,13 +86,13 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\APSICommon;$(ProjectDir)..\APSIReceiver;$(ProjectDir)..\CommonCodeCLI;$(APSILIBS)\Cuckoo\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\GSL;$(APSILIBS)\tclap-1.2.2\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\APSICommon;$(ProjectDir)..\APSIReceiver;$(ProjectDir)..\CommonCLI;$(APSILIBS)\Cuckoo\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\GSL;$(APSILIBS)\tclap-1.2.2\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;_ITERATOR_DEBUG_LEVEL=2;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>$(ProjectDir)..\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\log4cplus\lib\$(IntDir);$(APSILIBS)\libzmqpp\lib\$(IntDir);$(APSILIBS)\libzmq\dll\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SEAL.lib;Cuckoo.lib;APSICommon.lib;APSIReceiver.lib;FourQ.lib;zmqpp.lib;libzmq.lib;CommonCode.lib;log4cplusSD.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>SEAL.lib;Cuckoo.lib;APSICommon.lib;APSIReceiver.lib;FourQ.lib;zmqpp.lib;libzmq.lib;CommonCLI.lib;log4cplusSD.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -115,7 +115,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\APSICommon;$(ProjectDir)..\APSIReceiver;$(ProjectDir)..\CommonCodeCLI;$(APSILIBS)\Cuckoo\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\GSL;$(APSILIBS)\tclap-1.2.2\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\APSICommon;$(ProjectDir)..\APSIReceiver;$(ProjectDir)..\CommonCLI;$(APSILIBS)\Cuckoo\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\GSL;$(APSILIBS)\tclap-1.2.2\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;_ITERATOR_DEBUG_LEVEL=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <WholeProgramOptimization>false</WholeProgramOptimization>
@@ -125,7 +125,7 @@
       <EnableCOMDATFolding>false</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>$(ProjectDir)..\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\log4cplus\lib\$(IntDir);$(APSILIBS)\libzmqpp\lib\$(IntDir);$(APSILIBS)\libzmq\dll\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>SEAL.lib;Cuckoo.lib;APSICommon.lib;APSIReceiver.lib;FourQ.lib;zmqpp.lib;libzmq.lib;CommonCode.lib;log4cplusS.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>SEAL.lib;Cuckoo.lib;APSICommon.lib;APSIReceiver.lib;FourQ.lib;zmqpp.lib;libzmq.lib;CommonCLI.lib;log4cplusS.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

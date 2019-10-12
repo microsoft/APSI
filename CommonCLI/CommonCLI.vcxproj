@@ -29,9 +29,9 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{E3FE0731-D244-44C3-8BB9-7165391DD886}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>CommonCode</RootNamespace>
+    <RootNamespace>CommonCLI</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
-    <ProjectName>CommonCode</ProjectName>
+    <ProjectName>CommonCLI</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

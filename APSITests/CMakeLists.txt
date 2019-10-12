@@ -29,8 +29,12 @@ message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 list(APPEND CMAKE_MODULE_PATH ${unit_tests_SOURCE_DIR}/../cmake)
 
 # Import APSI
-find_package(APSISender 1.0.0 EXACT REQUIRED)
-find_package(APSIReceiver 1.0.0 EXACT REQUIRED)
+find_package(APSISender 1.0.0 EXACT REQUIRED
+    PATHS ${PROJECT_SOURCE_DIR}/../APSISender/cmake
+)
+find_package(APSIReceiver 1.0.0 EXACT REQUIRED
+    PATHS ${PROJECT_SOURCE_DIR}/../APSIReceiver/cmake
+)
 
 if(NOT TARGET gtest)
     message(FATAL_ERROR "Target `gtest` not found. Please use the top-level CMake file.")
