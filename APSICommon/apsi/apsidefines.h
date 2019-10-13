@@ -7,8 +7,8 @@
 #include <cstdint>
 #include <utility> 
 
-// Cuckoo
-#include <cuckoo/cuckoo.h>
+// Kuku
+#include <kuku/kuku.h>
 
 // Intrinsics
 #include <wmmintrin.h>
@@ -41,7 +41,7 @@ namespace apsi
     extern const block all_one_block;
     extern const block cc_block;
 
-    using item_type = cuckoo::item_type;
+    using item_type = kuku::item_type;
     extern const item_type zero_item;
     extern const item_type one_item;
     extern const item_type all_one_item;

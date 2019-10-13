@@ -3,11 +3,16 @@
 
 #pragma once
 
+// STD
 #include <array>
 #include <string>
 #include <stdexcept>
 
+// APSI
 #include "apsi/ffield/ffield_elt.h"
+
+// Kuku
+#include <kuku/common.h>
 
 namespace apsi
 {
@@ -39,7 +44,7 @@ namespace apsi
         Item(std::uint64_t item);
 
 
-        Item(const cuckoo::item_type& item);
+        Item(const kuku::item_type& item);
         
         /**
         Convert this item into an exfield element. Assuming that this item has been reduced in a hash table,
@@ -59,7 +64,7 @@ namespace apsi
 
         Item& operator =(const Item &assign);
 
-        Item& operator =(const cuckoo::item_type &assign);
+        Item& operator =(const kuku::item_type &assign);
 
         bool operator ==(const Item &other) const
         {

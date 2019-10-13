@@ -20,8 +20,8 @@
 #include <seal/encryptionparams.h>
 #include <seal/biguint.h>
 
-// Cuckoo
-#include "cuckoo/cuckoo.h"
+// Kuku
+#include "kuku/kuku.h"
 
 namespace apsi
 {

@@ -23,8 +23,8 @@
 #include "apsi/tools/matrixview.h"
 #include "apsi/tools/matrix.h"
 
-// Cuckoo
-#include "cuckoo/cuckoo.h"
+// Kuku
+#include "kuku/kuku.h"
 
 // SEAL
 #include "seal/plaintext.h"
