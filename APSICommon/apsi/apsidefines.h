@@ -23,18 +23,16 @@
 #endif
 #endif
 
-#include "seal/ciphertext.h"
-
 namespace apsi
 {
-    typedef __m128i block;
+    using block = __m128i;
 
-    typedef std::uint64_t u64;
-    typedef std::int64_t i64;
-    typedef std::uint32_t u32;
-    typedef std::int32_t i32;
-    typedef std::uint8_t u8;
-    typedef std::int8_t i8;
+    using u64 = std::uint64_t;
+    using i64 = std::int64_t;
+    using u32 = std::uint32_t;
+    using i32 = std::int32_t;
+    using u8 = std::uint8_t;
+    using i8 = std::int8_t;
 
     extern const block zero_block;
     extern const block one_block;
