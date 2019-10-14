@@ -271,12 +271,12 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
     PRNG pp(cc_block);
     FourQCoordinate key(pp);
 
-    vector<cuckoo::LocFunc> normal_loc_func;
+    vector<kuku::LocFunc> normal_loc_func;
     for (unsigned i = 0; i < params_.hash_func_count(); i++)
     {
         normal_loc_func.emplace_back(
             params_.log_table_size(),
-            cuckoo::make_item(params_.hash_func_seed() + i, 0));
+            kuku::make_item(params_.hash_func_seed() + i, 0));
     }
 
     loads.resize(params_.table_size(), 0);

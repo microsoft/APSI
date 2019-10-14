@@ -90,7 +90,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(APSILIBS)\Cuckoo\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\log4cplus\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(APSILIBS)\Kuku\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\log4cplus\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;NOMINMAX;_CRT_SECURE_NO_WARNINGS;HAVE_AVX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ShowIncludes>false</ShowIncludes>
@@ -124,7 +124,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(APSILIBS)\Cuckoo\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\log4cplus\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(APSILIBS)\Kuku\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\log4cplus\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;NOMINMAX;_CRT_SECURE_NO_WARNINGS;HAVE_AVX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ShowIncludes>false</ShowIncludes>
@@ -197,7 +197,6 @@
     <ClCompile Include="apsi\oprf\oprf_sender.cpp" />
     <ClCompile Include="apsi\oprf\oprf_receiver.cpp" />
     <ClCompile Include="apsi\tools\aes.cpp" />
-    <ClCompile Include="apsi\tools\blake2\blake2b.c" />
     <ClCompile Include="apsi\tools\csvreader.cpp" />
     <ClCompile Include="apsi\tools\fourq.cpp" />
     <ClCompile Include="apsi\tools\interpolate.cpp" />

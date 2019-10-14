@@ -46,9 +46,6 @@
     <Filter Include="Header Files\tools\blake2">
       <UniqueIdentifier>{c61f079e-6a99-484a-a216-8e7329a4fb9b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\tools\blake2">
-      <UniqueIdentifier>{7572cfd6-8f59-42fe-8c60-d41b20fcf644}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="apsi\apsi.h">
@@ -217,9 +214,6 @@
     </ClCompile>
     <ClCompile Include="apsi\tools\fourq.cpp">
       <Filter>Source Files\tools</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\tools\blake2\blake2b.c">
-      <Filter>Source Files\tools\blake2</Filter>
     </ClCompile>
     <ClCompile Include="apsi\network\network_channel.cpp">
       <Filter>Source Files\network</Filter>
