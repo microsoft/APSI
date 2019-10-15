@@ -23,6 +23,7 @@ namespace apsi
         Constructs a zero item.
         */
         Item()
+            : value_({ 0, 0 })
         {
         }
 

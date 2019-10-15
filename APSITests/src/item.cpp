@@ -11,6 +11,15 @@ using namespace apsi;
 
 namespace APSITests
 {
+    TEST(ItemTests, constructor_test)
+    {
+        // Zero item test
+        Item item;
+
+        ASSERT_EQ(0ul, item[0]);
+        ASSERT_EQ(0ul, item[1]);
+    }
+
     TEST(ItemTests, parse_test)
     {
         // 128 bit string
