@@ -116,11 +116,6 @@ namespace apsi
             void load_db(const std::vector<Item> &data, MatrixView<u8> vals = {});
 
             /**
-            Preprocess items from Receiver encoded in given buffer
-            */
-            void preprocess(std::vector<apsi::u8>& buff);
-
-            /**
             Generate a response to a query
             */
             void query(

@@ -7,7 +7,6 @@ target_sources(unit_tests
         ${CMAKE_CURRENT_LIST_DIR}/bit_copy_test.cpp
         ${CMAKE_CURRENT_LIST_DIR}/channel_tests.cpp
         ${CMAKE_CURRENT_LIST_DIR}/csvreader_tests.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/fourq_tests.cpp
         ${CMAKE_CURRENT_LIST_DIR}/interpolate_tests.cpp
         ${CMAKE_CURRENT_LIST_DIR}/item.cpp
         ${CMAKE_CURRENT_LIST_DIR}/matrix_tests.cpp

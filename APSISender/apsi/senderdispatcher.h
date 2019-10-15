@@ -15,6 +15,11 @@
 
 namespace apsi
 {
+    namespace oprf
+    {
+        class OPRFKey;
+    }
+
     namespace sender
     {
         /**
@@ -35,6 +40,7 @@ namespace apsi
 
         private:
             std::shared_ptr<apsi::sender::Sender> sender_;
+            std::shared_ptr<apsi::oprf::OPRFKey> oprf_key_;
 
             /**
             Dispatch a Get Parameters request to the Sender.
@@ -50,6 +56,8 @@ namespace apsi
             Dispatch a Query request to the Sender.
             */
             void dispatch_query(std::shared_ptr<apsi::network::SenderOperation> sender_op, apsi::network::Channel& channel);
+
+            void init_oprf_key();
         };
     }
 }

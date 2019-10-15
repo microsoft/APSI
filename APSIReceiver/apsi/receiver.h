@@ -34,6 +34,11 @@
 
 namespace apsi
 {
+    namespace oprf
+    {
+        class OPRFReceiver;
+    }
+
     namespace receiver
     {
         class Receiver
@@ -241,6 +246,8 @@ namespace apsi
             std::vector<std::vector<apsi::u64>> mult_factor_;
 
             std::string relin_keys_;
+
+            std::shared_ptr<apsi::oprf::OPRFReceiver> oprf_receiver_;
         };
     }
 }

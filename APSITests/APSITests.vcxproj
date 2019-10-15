@@ -97,7 +97,6 @@
     <ClCompile Include="src\bit_copy_test.cpp" />
     <ClCompile Include="src\channel_tests.cpp" />
     <ClCompile Include="src\csvreader_tests.cpp" />
-    <ClCompile Include="src\fourq_tests.cpp" />
     <ClCompile Include="src\interpolate_tests.cpp" />
     <ClCompile Include="src\item.cpp" />
     <ClCompile Include="src\matrix_tests.cpp" />

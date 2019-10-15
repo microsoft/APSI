@@ -123,9 +123,6 @@
     <ClInclude Include="apsi\tools\csvreader.h">
       <Filter>Header Files\tools</Filter>
     </ClInclude>
-    <ClInclude Include="apsi\tools\fourq.h">
-      <Filter>Header Files\tools</Filter>
-    </ClInclude>
     <ClInclude Include="apsi\network\senderoperation.h">
       <Filter>Header Files\network</Filter>
     </ClInclude>
@@ -210,9 +207,6 @@
       <Filter>Source Files\logging</Filter>
     </ClCompile>
     <ClCompile Include="apsi\tools\csvreader.cpp">
-      <Filter>Source Files\tools</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\tools\fourq.cpp">
       <Filter>Source Files\tools</Filter>
     </ClCompile>
     <ClCompile Include="apsi\network\network_channel.cpp">
