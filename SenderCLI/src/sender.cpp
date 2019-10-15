@@ -19,18 +19,23 @@
 #include "apsi/logging/log.h"
 #include "apsi/tools/csvreader.h"
 #include "apsi/tools/utils.h"
+#include "apsi/oprf/oprf_sender.h"
 
+// SEAL
+#include "seal/randomgen.h"
 
 // For now version is a constant
 #define SENDER_VERSION "0.1"
 
 
 using namespace std;
+using namespace seal;
 using namespace apsi;
 using namespace apsi::tools;
 using namespace apsi::sender;
 using namespace apsi::network;
 using namespace apsi::logging;
+using namespace apsi::oprf;
 
 
 void run_sender_dispatcher(const CLP& cmd);
@@ -97,6 +102,8 @@ void run_sender_dispatcher(const CLP& cmd)
     vector<Item> items;
     Matrix<u8> labels;
 
+    shared_ptr<OPRFKey> oprf_key;
+
     if (!initialize_db(cmd, items, labels))
     {
         // Failed to read db file
@@ -114,6 +121,18 @@ void run_sender_dispatcher(const CLP& cmd)
         bits += coeffmod[i].bit_count(); 
     Log::debug("coeff modulus size = %i ", bits); 
 
+    if (cmd.use_oprf())
+    {
+        Log::info("OPRF fort input items");
+        STOPWATCH(sender_stop_watch, "Sender::OPRF");
+
+        shared_ptr<UniformRandomGeneratorFactory> rng_factory(make_shared<BlakePRNGFactory>());
+        oprf_key = make_shared<OPRFKey>(rng_factory);
+
+        vector<Item> original_data(items);
+        OPRFSender::ComputeHashes(original_data, *oprf_key, items);
+    }
+
     Log::info("Building sender");
     shared_ptr<Sender> sender = make_shared<Sender>(params, cmd.threads(), cmd.threads());
 
@@ -127,7 +146,7 @@ void run_sender_dispatcher(const CLP& cmd)
     SenderDispatcher dispatcher(sender);
 
     // The dispatcher will run until stopped.
-    dispatcher.run(stop, cmd.net_port());
+    dispatcher.run(stop, cmd.net_port(), oprf_key);
 }
 
 bool initialize_db(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels)

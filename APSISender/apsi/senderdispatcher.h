@@ -36,7 +36,7 @@ namespace apsi
             /**
             Run the dispatcher on the given port.
             */
-            void run(const std::atomic<bool>& stop, const int port);
+            void run(const std::atomic<bool>& stop, const int port, const std::shared_ptr<apsi::oprf::OPRFKey>& oprf_key);
 
         private:
             std::shared_ptr<apsi::sender::Sender> sender_;
@@ -56,8 +56,6 @@ namespace apsi
             Dispatch a Query request to the Sender.
             */
             void dispatch_query(std::shared_ptr<apsi::network::SenderOperation> sender_op, apsi::network::Channel& channel);
-
-            void init_oprf_key();
         };
     }
 }

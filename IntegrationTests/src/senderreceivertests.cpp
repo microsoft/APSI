@@ -10,6 +10,7 @@
 #include "apsi/network/receiverchannel.h"
 #include "apsi/tools/utils.h"
 #include "apsi/logging/log.h"
+#include "apsi/oprf/oprf_sender.h"
 
 
 using namespace std;
@@ -19,6 +20,7 @@ using namespace apsi::sender;
 using namespace apsi::network;
 using namespace apsi::tools;
 using namespace apsi::logging;
+using namespace apsi::oprf;
 using namespace seal;
 
 
@@ -143,13 +145,24 @@ namespace
         for (int i = 0; i < (receiverActualSize - intersectionSize); ++i)
             c1.emplace_back(i + s1.size());
 
+        shared_ptr<OPRFKey> oprf_key;
+
+        if (params.use_oprf())
+        {
+            shared_ptr<UniformRandomGeneratorFactory> rng_factory(make_shared<BlakePRNGFactory>());
+            oprf_key = make_shared<OPRFKey>(rng_factory);
+
+            vector<Item> original_data(s1);
+            OPRFSender::ComputeHashes(original_data, *oprf_key, s1);
+        }
+
         sender->load_db(s1, labels);
 
         atomic<bool> stop_sender = false;
 
         auto thrd = thread([&]() {
             SenderDispatcher dispatcher(sender);
-            dispatcher.run(stop_sender, /* port */ 5550);
+            dispatcher.run(stop_sender, /* port */ 5550, oprf_key);
             });
 
         receiver.handshake(recvChl);

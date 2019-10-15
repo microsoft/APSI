@@ -94,7 +94,7 @@
       </PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderOutputFile />
-      <AdditionalIncludeDirectories>$(ProjectDir)..\APSICommon;$(ProjectDir)..\APSIReceiver;$(ProjectDir)..\APSISender;$(APSILIBS)\Kuku\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\GSL;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\APSICommon;$(ProjectDir)..\APSIReceiver;$(ProjectDir)..\APSISender;$(APSILIBS)\Kuku\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -151,7 +151,7 @@
       </PrecompiledHeaderFile>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <PrecompiledHeaderOutputFile />
-      <AdditionalIncludeDirectories>$(ProjectDir)..\APSICommon;$(ProjectDir)..\APSIReceiver;$(ProjectDir)..\APSISender;$(APSILIBS)\Kuku\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\GSL;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\APSICommon;$(ProjectDir)..\APSIReceiver;$(ProjectDir)..\APSISender;$(APSILIBS)\Kuku\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>
     <Link>

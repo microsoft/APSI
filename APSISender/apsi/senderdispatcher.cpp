@@ -15,7 +15,6 @@
 // SEAL
 #include "seal/publickey.h"
 #include "seal/relinkeys.h"
-#include "seal/randomgen.h"
 
 
 using namespace std;
@@ -27,7 +26,7 @@ using namespace apsi::logging;
 using namespace apsi::oprf;
 
 
-void SenderDispatcher::run(const atomic<bool>& stop, const int port)
+void SenderDispatcher::run(const atomic<bool>& stop, const int port, const shared_ptr<OPRFKey>& oprf_key)
 {
     SenderChannel channel;
 
@@ -37,7 +36,7 @@ void SenderDispatcher::run(const atomic<bool>& stop, const int port)
     Log::info("Sender binding to address: %s", ss.str().c_str());
     channel.bind(ss.str());
 
-    init_oprf_key();
+    oprf_key_ = oprf_key;
 
     bool logged_waiting = false;
 
@@ -114,10 +113,4 @@ void SenderDispatcher::dispatch_query(shared_ptr<SenderOperation> sender_op, Cha
         query_op->query,
         sender_op->client_id,
         channel);
-}
-
-void SenderDispatcher::init_oprf_key()
-{
-    shared_ptr<UniformRandomGeneratorFactory> rng_factory(make_shared<BlakePRNGFactory>());
-    oprf_key_ = make_shared<OPRFKey>(rng_factory);
 }
