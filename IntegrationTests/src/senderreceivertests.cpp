@@ -68,17 +68,6 @@ namespace
                 if (compare_labels)
                 {
                     auto idx = label_idx[i];
-                    
-                    //cout << "Comparing (expected, actual) labels: the " << i << "th item: " << endl;
-                    //cout << "Idx = " << idx << endl;
-                    //// temp.encode(gsl::span<u64>{client_items[i].get_value()}, .get_label_bit_count());
-
-                    //cout << "item = " << client_items[i].get_value()[0] << ", " << client_items[i].get_value()[1] << endl;
-                    //for (int j = 0; j < labels[idx].size(); j++) {
-                    //    cout << "( " << unsigned(labels[idx][j]) << ", " << unsigned(intersection.second[i][j]) << "), "; 
-                    //}
-                    //cout << endl;
-
                     int lblcmp = memcmp(intersection.second[i].data(), labels[idx].data(), labels[idx].size());
 
                     // Label is not the expected value
