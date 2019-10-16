@@ -10,6 +10,7 @@
 #include "apsi/network/senderchannel.h"
 #include "apsi/network/network_utils.h"
 #include "apsi/logging/log.h"
+#include "apsi/oprf/oprf_sender.h"
 
 // SEAL
 #include "seal/publickey.h"
@@ -22,9 +23,10 @@ using namespace apsi;
 using namespace apsi::sender;
 using namespace apsi::network;
 using namespace apsi::logging;
+using namespace apsi::oprf;
 
 
-void SenderDispatcher::run(const atomic<bool>& stop, const int port)
+void SenderDispatcher::run(const atomic<bool>& stop, const int port, const shared_ptr<OPRFKey>& oprf_key)
 {
     SenderChannel channel;
 
@@ -33,6 +35,8 @@ void SenderDispatcher::run(const atomic<bool>& stop, const int port)
 
     Log::info("Sender binding to address: %s", ss.str().c_str());
     channel.bind(ss.str());
+
+    oprf_key_ = oprf_key;
 
     bool logged_waiting = false;
 
@@ -90,8 +94,9 @@ void SenderDispatcher::dispatch_preprocess(shared_ptr<SenderOperation> sender_op
 {
     auto preprocess_op = dynamic_pointer_cast<SenderOperationPreprocess>(sender_op);
     
-    sender_->preprocess(preprocess_op->buffer);
-    channel.send_preprocess_response(sender_op->client_id, preprocess_op->buffer);
+    vector<u8> result(preprocess_op->buffer.size());
+    OPRFSender::ProcessQueries(preprocess_op->buffer, *oprf_key_, result);
+    channel.send_preprocess_response(sender_op->client_id, result);
 }
 
 void SenderDispatcher::dispatch_query(shared_ptr<SenderOperation> sender_op, Channel& channel)

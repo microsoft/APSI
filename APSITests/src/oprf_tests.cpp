@@ -100,4 +100,40 @@ namespace APSITests
             ASSERT_EQ(out_items[i][1], receiver_hashes[i][1]);
         }
     }
+
+    TEST(OPRFTests, OPRFInplaceOperation)
+    {
+        int item_count = 100;
+        vector<Item> items;
+
+        shared_ptr<UniformRandomGeneratorFactory> rng_factory(make_shared<BlakePRNGFactory>());
+        auto rng = rng_factory->create();
+        for (auto i = 0; i < item_count; i++)
+        {
+            Item it;
+            rng->generate(Item::item_byte_count, reinterpret_cast<SEAL_BYTE*>(it.data()));
+            items.emplace_back(move(it));
+        }
+
+        // Create random key
+        OPRFKey oprf_key(rng_factory);
+
+        vector<Item> original_items(items);
+        OPRFSender::ComputeHashes(items, oprf_key);
+
+        vector<unsigned char> query(item_count * oprf_query_size);
+        OPRFReceiver receiver(original_items, query);
+
+        vector<unsigned char> responses(item_count * oprf_response_size);
+        OPRFSender::ProcessQueries(query, oprf_key, responses);
+
+        vector<Item> receiver_hashes(item_count);
+        receiver.process_responses(responses, receiver_hashes);
+
+        for (auto i = 0; i < item_count; i++)
+        {
+            ASSERT_EQ(items[i][0], receiver_hashes[i][0]);
+            ASSERT_EQ(items[i][1], receiver_hashes[i][1]);
+        }
+    }
 }

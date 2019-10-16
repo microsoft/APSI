@@ -62,9 +62,6 @@
     <ClCompile Include="src\stopwatch_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\fourq_tests.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\stream_channel_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>

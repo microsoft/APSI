@@ -15,6 +15,11 @@
 
 namespace apsi
 {
+    namespace oprf
+    {
+        class OPRFKey;
+    }
+
     namespace sender
     {
         /**
@@ -31,10 +36,11 @@ namespace apsi
             /**
             Run the dispatcher on the given port.
             */
-            void run(const std::atomic<bool>& stop, const int port);
+            void run(const std::atomic<bool>& stop, const int port, const std::shared_ptr<apsi::oprf::OPRFKey>& oprf_key);
 
         private:
             std::shared_ptr<apsi::sender::Sender> sender_;
+            std::shared_ptr<apsi::oprf::OPRFKey> oprf_key_;
 
             /**
             Dispatch a Get Parameters request to the Sender.

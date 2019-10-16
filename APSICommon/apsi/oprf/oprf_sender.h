@@ -92,6 +92,10 @@ namespace apsi
                 const OPRFKey &oprf_key,
                 gsl::span<oprf_hash_type, gsl::dynamic_extent> oprf_hashes);
 
+            static void ComputeHashes(
+                gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items,
+                const OPRFKey& oprf_key);
+
         private:
         };
     }
