@@ -59,28 +59,28 @@ SenderDB::SenderDB(const PSIParams &params,
     int split_size = params_.split_size();
 
     // debugging 
-    int num_ctxts = params_.batch_count() * params_.sender_bin_size(); 
+    u64 num_ctxts = params_.batch_count() * params_.sender_bin_size();
     Log::debug("sender size = %i", params_.sender_size());
     Log::debug("table size = %i", params_.table_size());
     Log::debug("sender bin size = %i", params_.sender_bin_size());
     Log::debug("split size = %i", split_size); 
     Log::debug("number of ciphertexts in senderdb = %i", num_ctxts);
     Log::debug("number of hash functions = %i", params_.hash_func_count());
-    int byte_length = static_cast<int>(round_up_to(params_.get_label_bit_count(), 8) / 8);
-    int nb = params_.batch_count();
+    u32 byte_length = round_up_to(params_.get_label_bit_count(), 8u) / 8;
+    u64 nb = params_.batch_count();
 
     // here, need to make split count larger to fit
     // another place the split count is modified is after add_data.
-    int ns = (params_.sender_bin_size() + params_.split_size() - 1) / params_.split_size(); 
-    params_.set_split_count(ns);
+    u64 ns = (params_.sender_bin_size() + params_.split_size() - 1) / params_.split_size(); 
+    params_.set_split_count(static_cast<u32>(ns));
     params_.set_sender_bin_size(ns * params_.split_size());
 
     // important: here it resizes the db blocks.
     db_blocks_.resize(nb, ns);
 
-    for (int b_idx = 0; b_idx < nb; b_idx++)
+    for (u64 b_idx = 0; b_idx < nb; b_idx++)
     {
-        for (int s_idx = 0; s_idx < ns; s_idx++)
+        for (u64 s_idx = 0; s_idx < ns; s_idx++)
         {
             db_blocks_(b_idx, s_idx)->init(
                 b_idx, s_idx,

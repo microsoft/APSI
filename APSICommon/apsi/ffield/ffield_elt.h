@@ -91,7 +91,7 @@ namespace apsi
 
         inline void set_random(apsi::tools::PRNG &prng)
         {
-            auto max_int = std::numeric_limits<_ffield_elt_coeff_t>::max(); 
+            constexpr auto max_int = std::numeric_limits<_ffield_elt_coeff_t>::max(); 
             _ffield_elt_coeff_t max_value = max_int - max_int % field_.ch_.value();
             for (std::size_t i = 0; i < field_.d_; i++)
             {

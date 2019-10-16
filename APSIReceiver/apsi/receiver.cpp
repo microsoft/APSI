@@ -403,15 +403,15 @@ void Receiver::exfield_encoding(
 void Receiver::generate_powers(const FFieldArray& exfield_items,
     map<uint64_t, FFieldArray>& result)
 {
-    int split_size = (get_params().sender_bin_size() + get_params().split_count() - 1) / get_params().split_count();
-    int window_size = get_params().window_size();
-    int radix = 1 << window_size;
+    u64 split_size = (get_params().sender_bin_size() + get_params().split_count() - 1) / get_params().split_count();
+    u32 window_size = get_params().window_size();
+    u32 radix = 1 << window_size;
 
     // todo: this bound needs to be re-visited. 
     int max_supported_degree = get_params().max_supported_degree();
 
     // find the bound by enumerating 
-    int bound = split_size;
+    i64 bound = split_size;
     while (bound > 0 && tools::maximal_power(max_supported_degree, bound, radix) >= split_size)
     {
         bound--;
@@ -422,12 +422,12 @@ void Receiver::generate_powers(const FFieldArray& exfield_items,
         split_size, window_size, radix, bound);
 
     FFieldArray current_power = exfield_items;
-    for (uint64_t j = 0; j < static_cast<uint64_t>(bound); j++)
+    for (u64 j = 0; j < static_cast<u64>(bound); j++)
     {
         result.emplace(1ULL << (window_size * j), current_power);
-        for (uint64_t i = 2; i < static_cast<uint64_t>(radix); i++)
+        for (u64 i = 2; i < static_cast<u64>(radix); i++)
         {
-            if (i * (1ULL << (window_size * j)) > static_cast<uint64_t>(split_size))
+            if (i * (1ULL << (window_size * j)) > static_cast<u64>(split_size))
             {
                 return;
             }
