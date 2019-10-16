@@ -123,14 +123,13 @@ void run_sender_dispatcher(const CLP& cmd)
 
     if (cmd.use_oprf())
     {
-        Log::info("OPRF fort input items");
+        Log::info("OPRF for input items");
         STOPWATCH(sender_stop_watch, "Sender::OPRF");
 
         shared_ptr<UniformRandomGeneratorFactory> rng_factory(make_shared<BlakePRNGFactory>());
         oprf_key = make_shared<OPRFKey>(rng_factory);
 
-        vector<Item> original_data(items);
-        OPRFSender::ComputeHashes(original_data, *oprf_key, items);
+        OPRFSender::ComputeHashes(items, *oprf_key);
     }
 
     Log::info("Building sender");

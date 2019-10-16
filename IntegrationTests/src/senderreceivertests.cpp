@@ -152,8 +152,7 @@ namespace
             shared_ptr<UniformRandomGeneratorFactory> rng_factory(make_shared<BlakePRNGFactory>());
             oprf_key = make_shared<OPRFKey>(rng_factory);
 
-            vector<Item> original_data(s1);
-            OPRFSender::ComputeHashes(original_data, *oprf_key, s1);
+            OPRFSender::ComputeHashes(s1, *oprf_key);
         }
 
         sender->load_db(s1, labels);
