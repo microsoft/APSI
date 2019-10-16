@@ -251,14 +251,14 @@ namespace APSITests
     TEST(SenderReceiverTests, OPRFandLabelsSmallTest)
     {
         size_t senderActualSize = 100;
-        PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ true, /* fast_matching */ false);
+        PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ true, /* fast_membership */ false);
         RunTest(senderActualSize, params);
     }
 
     TEST(SenderReceiverTests, DISABLED_OPRFandLabelsTest)
     {
         size_t senderActualSize = 2000;
-        PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ true, /* fast_matching */ false);
+        PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ true, /* fast_membership */ false);
         RunTest(senderActualSize, params);
     }
 
@@ -266,35 +266,35 @@ namespace APSITests
     TEST(SenderReceiverTests, OPRFTest)
     {
         size_t senderActualSize = 3000;
-        PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_label */ false, /* fast_matching */ false);
+        PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_label */ false, /* fast_membership */ false);
         RunTest(senderActualSize, params);
     }
 
     TEST(SenderReceiverTests, DISABLED_LabelsTest)
     {
         size_t senderActualSize = 2000;
-        PSIParams params = create_params(senderActualSize, /* use_oprf */ false, /* use_labels */ true, /* fast_matching */ false);
+        PSIParams params = create_params(senderActualSize, /* use_oprf */ false, /* use_labels */ true, /* fast_membership */ false);
         RunTest(senderActualSize, params);
     }
 
     TEST(SenderReceiverTests, DISABLED_NoOPRFNoLabelsTest)
     {
         size_t senderActualSize = 3000;
-        PSIParams params = create_params(senderActualSize, /* use_oprf */ false, /* use_labels */ false, /* fast_matching */ false);
+        PSIParams params = create_params(senderActualSize, /* use_oprf */ false, /* use_labels */ false, /* fast_membership */ false);
         RunTest(senderActualSize, params);
     }
 
     TEST(SenderReceiverTests, OPRFFastMembershipTest)
     {
         size_t senderActualSize = 3000;
-        PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ false, /* fast_matching */ true);
+        PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ false, /* fast_membership */ true);
         RunTest(senderActualSize, params);
     }
 
     TEST(SenderReceiverTests, OPRFFastMembershipLabelsTest)
     {
         size_t senderActualSize = 3000;
-        PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ true, /* fast_matching */ true);
+        PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ true, /* fast_membership */ true);
         RunTest(senderActualSize, params);
     }
 }
