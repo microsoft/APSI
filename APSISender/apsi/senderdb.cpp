@@ -12,7 +12,6 @@
 
 // SEAL
 #include <seal/evaluator.h>
-#include <seal/util/blake2.h>
 
 using namespace std;
 using namespace seal;
