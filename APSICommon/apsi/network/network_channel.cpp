@@ -317,7 +317,7 @@ void NetworkChannel::send_get_parameters_response(const vector<u8>& client_id, c
 
     send_message(msg);
 
-    bytes_sent_ += sizeof(SenderOperationType);
+    bytes_sent_ += sizeof(u32); // SenderOperationType
     bytes_sent_ += sizeof(PSIParams::PSIConfParams);
     bytes_sent_ += sizeof(PSIParams::TableParams);
     bytes_sent_ += sizeof(PSIParams::CuckooParams);
@@ -337,7 +337,7 @@ void NetworkChannel::send_preprocess(const vector<u8>& buffer)
 
     send_message(msg);
 
-    bytes_sent_ += sizeof(SenderOperationType);
+    bytes_sent_ += sizeof(u32);
     bytes_sent_ += buffer.size();
 }
 
@@ -354,7 +354,7 @@ void NetworkChannel::send_preprocess_response(const vector<u8>& client_id, const
 
     send_message(msg);
 
-    bytes_sent_ += sizeof(SenderOperationType);
+    bytes_sent_ += sizeof(u32);
     bytes_sent_ += buffer.size();
 }
 
@@ -369,15 +369,16 @@ void NetworkChannel::send_query(
     message_t msg;
     SenderOperationType type = SOP_query;
     add_message_type(type, msg);
-    bytes_sent += sizeof(SenderOperationType);
+    bytes_sent += sizeof(u32);
 
     msg.add(relin_keys);
     bytes_sent += relin_keys.length();
 
     Log::debug("send_query: relin key length = %i bytes ", relin_keys.length());
 
-    add_part(query.size(), msg);
-    bytes_sent += sizeof(size_t);
+    u64 query_size = static_cast<u64>(query.size());
+    add_part(query_size, msg);
+    bytes_sent += sizeof(u64);
 
     u64 sofar = bytes_sent_;
 
@@ -386,8 +387,9 @@ void NetworkChannel::send_query(
         add_part(q.first, msg);
         bytes_sent += sizeof(u64);
 
-        add_part(q.second.size(), msg);
-        bytes_sent += sizeof(size_t);
+        u64 num_elems = static_cast<u64>(q.second.size());
+        add_part(num_elems, msg);
+        bytes_sent += sizeof(u64);
 
         for (const auto& seededctxt : q.second)
         {
@@ -411,15 +413,16 @@ void NetworkChannel::send_query_response(const vector<u8>& client_id, const size
     add_client_id(msg, client_id);
 
     add_message_type(type, msg);
-    msg.add(package_count);
+    u64 pkg_count = static_cast<u64>(package_count);
+    msg.add(pkg_count);
 
     send_message(msg);
 
     // Message type
-    bytes_sent_ += sizeof(SenderOperationType);
+    bytes_sent_ += sizeof(u32);
 
     // Package count
-    bytes_sent_ += sizeof(size_t);
+    bytes_sent_ += sizeof(u64);
 }
 
 void NetworkChannel::send(const vector<u8>& client_id, const ResultPackage& pkg)
@@ -446,14 +449,14 @@ void NetworkChannel::get_buffer(vector<u8>& buff, const message_t& msg, int part
     if (msg.parts() < static_cast<size_t>(part_start) + 1)
         throw runtime_error("Should have size at least");
 
-    size_t size;
+    u64 size;
     get_part(size, msg, /* part */ part_start);
 
     // If the vector is not empty, we need the part with the data
     if (size > 0 && msg.parts() < static_cast<size_t>(part_start) + 2)
         throw runtime_error("Should have size and data.");
 
-    buff.resize(size);
+    buff.resize(static_cast<size_t>(size));
 
     if (size > 0)
     {
@@ -468,7 +471,8 @@ void NetworkChannel::get_buffer(vector<u8>& buff, const message_t& msg, int part
 void NetworkChannel::add_buffer(const vector<u8>& buff, message_t& msg) const
 {
     // First part is size
-    add_part(buff.size(), msg);
+    u64 size = static_cast<u64>(buff.size());
+    add_part(size, msg);
 
     if (buff.size() > 0)
     {
@@ -483,13 +487,13 @@ void NetworkChannel::get_sm_vector(vector<SmallModulus>& smv, const message_t& m
     if (msg.parts() < (part_idx + 1))
         throw runtime_error("Should have size at least");
 
-    size_t size;
+    u64 size;
     get_part(size, msg, /* part */ part_idx++);
 
     if (msg.parts() < (part_idx + size))
         throw runtime_error("Insufficient parts for SmallModulus vector");
 
-    smv.resize(size);
+    smv.resize(static_cast<size_t>(size));
     for (u64 sm_idx = 0; sm_idx < size; sm_idx++)
     {
         string str = msg.get(part_idx++);
@@ -500,7 +504,8 @@ void NetworkChannel::get_sm_vector(vector<SmallModulus>& smv, const message_t& m
 void NetworkChannel::add_sm_vector(const vector<SmallModulus>& smv, message_t& msg) const
 {
     // First part is size
-    add_part(smv.size(), msg);
+    u64 size = static_cast<u64>(smv.size());
+    add_part(size, msg);
 
     for (const SmallModulus& sm : smv)
     {
@@ -514,7 +519,7 @@ void NetworkChannel::add_sm_vector(const vector<SmallModulus>& smv, message_t& m
 void NetworkChannel::add_message_type(const SenderOperationType type, message_t& msg) const
 {
     // Transform to int to have it have a fixed size
-    add_part(static_cast<int>(type), msg);
+    add_part(static_cast<u32>(type), msg);
 }
 
 SenderOperationType NetworkChannel::get_message_type(const message_t& msg, const size_t part) const
@@ -524,7 +529,7 @@ SenderOperationType NetworkChannel::get_message_type(const message_t& msg, const
         throw invalid_argument("Message should have at least type");
 
     // Get message type
-    int msg_type;
+    u32 msg_type;
     get_part(msg_type, msg, /* part */ part);
     SenderOperationType type = static_cast<SenderOperationType>(msg_type);
     return type;
@@ -578,9 +583,9 @@ shared_ptr<SenderOperation> NetworkChannel::decode_query(const message_t& msg)
     msg.get(relin_keys, /* part */  msg_idx++);
     bytes_received_ += relin_keys.length();
 
-    size_t query_count;
+    u64 query_count;
     get_part(query_count, msg, /* part */  msg_idx++);
-    bytes_received_ += sizeof(size_t);
+    bytes_received_ += sizeof(u64);
 
     for (u64 i = 0; i < query_count; i++)
     {
@@ -588,11 +593,11 @@ shared_ptr<SenderOperation> NetworkChannel::decode_query(const message_t& msg)
         get_part(power, msg, msg_idx++);
         bytes_received_ += sizeof(u64);
 
-        size_t num_elems;
+        u64 num_elems;
         get_part(num_elems, msg, msg_idx++);
-        bytes_received_ += sizeof(size_t);
+        bytes_received_ += sizeof(u64);
 
-        vector<string> powers(num_elems);
+        vector<string> powers(static_cast<size_t>(num_elems));
 
         for (u64 j = 0; j < num_elems; j++)
         {
