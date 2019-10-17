@@ -230,10 +230,10 @@ void NetworkChannel::receive(SenderResponseQuery& response)
         throw runtime_error("Message should be query type");
 
     // Number of result packages
-    response.package_count = msg.get<size_t>(/* part */ 1);
+    response.package_count = msg.get<u64>(/* part */ 1);
 
-    bytes_received_ += sizeof(SenderOperationType);
-    bytes_received_ += sizeof(size_t);
+    bytes_received_ += sizeof(u32); // SenderOperationType
+    bytes_received_ += sizeof(u64);
 }
 
 void NetworkChannel::receive(ResultPackage& pkg)
