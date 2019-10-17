@@ -84,7 +84,14 @@ namespace
 block apsi::tools::sys_random_seed()
 {
     std::random_device rd;
-    auto ret = std::array<unsigned int, 4> { rd(), rd(), rd(), rd() };
+    auto ret = std::array<u32, 4>
+    {
+        static_cast<u32>(rd()),
+        static_cast<u32>(rd()),
+        static_cast<u32>(rd()),
+        static_cast<u32>(rd())
+    };
+
     return *(reinterpret_cast<block*>(&ret));
 }
 

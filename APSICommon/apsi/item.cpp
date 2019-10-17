@@ -130,7 +130,7 @@ void Item::to_exfield_element(FFieldElt &ring_item, int bit_length)
     // How many coefficients do we need in the ExFieldElement
     int split_index_bound = (bit_length + split_length - 1) / split_length;
 
-    for (int j = 0; static_cast<unsigned>(j) < exfield.d() && j < split_index_bound; j++)
+    for (int j = 0; static_cast<u64>(j) < exfield.d() && j < split_index_bound; j++)
     {
         auto coeff = item_part(value_, j, split_length);
         ring_item.set_coeff(j, coeff);
