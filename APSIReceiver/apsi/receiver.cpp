@@ -120,14 +120,16 @@ map<uint64_t, vector<string>>& Receiver::query(vector<Item>& items)
 pair<vector<bool>, Matrix<u8>> Receiver::decrypt_result(vector<Item>& items, Channel& chl)
 {
     auto& cuckoo = *preprocess_result_.second;
-    unsigned padded_table_size = static_cast<unsigned>(
+    size_t padded_table_size = static_cast<size_t>(
         ((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
 
     vector<int> table_to_input_map(padded_table_size, 0);
-    if (items.size() > 1 || (!get_params().use_fast_membership())) {
+    if (items.size() > 1 || (!get_params().use_fast_membership()))
+    {
         table_to_input_map = cuckoo_indices(items, cuckoo);
     }
-    else {
+    else
+    {
         Log::info("Receiver single query table to input map");
     }
 
@@ -352,7 +354,7 @@ vector<int> Receiver::cuckoo_indices(
     kuku::KukuTable &cuckoo)
 {
     // This is the true size of the table; a multiple of slot_count_
-    unsigned padded_cuckoo_capacity = static_cast<unsigned>(
+    size_t padded_cuckoo_capacity = static_cast<size_t>(
         ((cuckoo.table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
 
     vector<int> indices(padded_cuckoo_capacity, -1);
@@ -377,7 +379,8 @@ void Receiver::exfield_encoding(
     FFieldArray &ret)
 {
     int item_bit_count = get_params().item_bit_count();
-    if (get_params().use_oprf()) {
+    if (get_params().use_oprf())
+    {
         item_bit_count = get_params().item_bit_length_used_after_oprf();
     }
     Log::debug("item bit count before decoding: %i", item_bit_count);

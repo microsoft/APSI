@@ -33,7 +33,7 @@ namespace
         set<int> ss;
         while (ss.size() != size)
         {
-            ss.emplace(static_cast<int>(prn.get<unsigned int>() % items.size()));
+            ss.emplace(static_cast<int>(prn.get<u32>() % items.size()));
         }
         auto ssIter = ss.begin();
 
@@ -90,7 +90,7 @@ namespace
         string conn_addr = "tcp://localhost:5550";
         recvChl.connect(conn_addr);
 
-        unsigned numThreads = thread::hardware_concurrency();
+        u32 numThreads = thread::hardware_concurrency();
 
         unique_ptr<Receiver> receiver_ptr;
 
@@ -204,7 +204,7 @@ namespace
         return params;
     }
 
-    void initialize_db(vector<Item>& items, Matrix<u8>& labels, size_t item_count, unsigned label_byte_count)
+    void initialize_db(vector<Item>& items, Matrix<u8>& labels, size_t item_count, size_t label_byte_count)
     {
         items.resize(item_count);
         labels.resize(item_count, label_byte_count);

@@ -215,7 +215,7 @@ namespace apsi
 
             std::shared_ptr<seal::SEALContext> seal_context_;
 
-            int thread_count_;
+            apsi::i32 thread_count_;
 
             seal::MemoryPoolHandle pool_;
 
@@ -231,7 +231,7 @@ namespace apsi
 
             std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder_;
 
-            int slot_count_;
+            apsi::i32 slot_count_;
 
             // Objects for compressed ciphertexts
             std::unique_ptr<CiphertextCompressor> compressor_;

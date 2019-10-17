@@ -298,10 +298,15 @@ void DBBlock::batch_interpolate(
         Plaintext &batched_coeff = batched_label_coeffs_[s];
 
         // transpose the coeffs into temp_array
-        for (int b = 0; b < items_per_batch_; b++)
+        for (i64 b = 0; b < items_per_batch_; b++)
         {
-            for (unsigned c = 0; c < degree; ++c)
-                temp_array.set_coeff_of(b, c, cache.coeff_temp[b].get_coeff_of(s, c));
+            for (u64 c = 0; c < degree; ++c)
+                temp_array.set_coeff_of(
+                    static_cast<size_t>(b),
+                    static_cast<size_t>(c),
+                    cache.coeff_temp[b].get_coeff_of(
+                        static_cast<size_t>(s),
+                        static_cast<size_t>(c)));
         }
 
         auto capacity = static_cast<size_t>(params.encryption_params().coeff_modulus().size() *

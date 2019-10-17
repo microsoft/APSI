@@ -119,8 +119,8 @@ namespace apsi
         bool use_oprf() const { return oprf_; }
         bool use_fast_memberhip() const { return fast_membership_; }
 
-        unsigned item_bit_length() const { return item_bit_length_; }
-        unsigned sec_level() const { return sec_level_; }
+        apsi::u32 item_bit_length() const { return item_bit_length_; }
+        apsi::u32 sec_level() const { return sec_level_; }
         int log_table_size() const { return log_table_size_; }
         int split_count() const { return split_count_; }
         int split_size() const { return split_size_; }
@@ -129,7 +129,7 @@ namespace apsi
         int window_size() const { return window_size_; }
         int poly_modulus() const { return poly_modulus_; }
         const std::vector<u64>& coeff_modulus() const { return coeff_modulus_; }
-        u64 plain_modulus() const { return plain_modulus_; }
+        apsi::u64 plain_modulus() const { return plain_modulus_; }
         int exfield_degree() const { return exfield_degree_; }
         int net_port() const { return net_port_; }
         const std::string& db_file() const { return db_file_; }
@@ -137,16 +137,16 @@ namespace apsi
         int sender_bin_size() const { return sender_bin_size_; }
         int hash_func_count() const { return hash_func_count_; }
 
-        unsigned item_bit_length_used_after_oprf() const { return item_bit_length_used_after_oprf_; }
+        apsi::u32 item_bit_length_used_after_oprf() const { return item_bit_length_used_after_oprf_; }
 
     private:
         TCLAP::SwitchArg             labels_arg_          = TCLAP::SwitchArg("l", "useLabels", "Use labels", false);
         TCLAP::SwitchArg             no_oprf_arg_         = TCLAP::SwitchArg("o", "noOprf", "Do not use OPRF", false);
         TCLAP::SwitchArg             fast_membership_arg_ = TCLAP::SwitchArg("f", "fastMembership", "Use fast membership", false);
-        TCLAP::ValueArg<unsigned>    item_bit_length_arg_ = TCLAP::ValueArg<unsigned>("b", "itemBitLength", "Item bit length", false, 60, "unsigned");
+        TCLAP::ValueArg<apsi::u32>   item_bit_length_arg_ = TCLAP::ValueArg<apsi::u32>("b", "itemBitLength", "Item bit length", false, 60, "unsigned");
         TCLAP::ValueArg<int>         net_port_arg_        = TCLAP::ValueArg<int>("", "port", "Network port to bind to", false, 1212, "int");
         TCLAP::ValueArg<std::string> db_file_arg_         = TCLAP::ValueArg<std::string>("", "db", "Path to the file containing the Sender database", true, "", "string");
-        TCLAP::ValueArg<unsigned>    sec_lvl_arg_         = TCLAP::ValueArg<unsigned>("", "secLevel", "Security level", false, 40, "unsigned");
+        TCLAP::ValueArg<apsi::u32>   sec_lvl_arg_         = TCLAP::ValueArg<apsi::u32>("", "secLevel", "Security level", false, 40, "unsigned");
         TCLAP::ValueArg<int>         log_tbl_sz_arg_      = TCLAP::ValueArg<int>("", "logTableSize", "Table Size", false, 9, "int");
         TCLAP::ValueArg<int>         split_cnt_arg_       = TCLAP::ValueArg<int>("", "splitCount", "Split count", false, 1, "int");
         TCLAP::ValueArg<int>         split_sz_arg_ = TCLAP::ValueArg<int>("", "splitSize", "Split size", false, 15, "int");
@@ -159,27 +159,27 @@ namespace apsi
         TCLAP::ValueArg<int>         num_chunks_arg_      = TCLAP::ValueArg<int>("", "numChunks", "number of chunks per item", false, 1, "int");
         TCLAP::ValueArg<int>         sender_bin_size_arg_ = TCLAP::ValueArg<int>("", "senderBinSize", "(manually set) sender bin size", false, 0, "int");
         TCLAP::ValueArg<int>         hash_func_count_arg_ = TCLAP::ValueArg<int>("", "numHashes", "number of hash functions in cuckoo hashing", false, 2, "int");
-        TCLAP::ValueArg<unsigned>    item_bit_length_used_after_oprf_arg_
-                                                          = TCLAP::ValueArg<unsigned>("i", "itemBitLengthUsedAfterOPRF", "Item bit length used after oprf", false, 120, "unsigned");
+        TCLAP::ValueArg<apsi::u32>   item_bit_length_used_after_oprf_arg_
+                                                          = TCLAP::ValueArg<apsi::u32>("i", "itemBitLengthUsedAfterOPRF", "Item bit length used after oprf", false, 120, "unsigned");
 
         bool use_labels_;
         bool oprf_;
         bool fast_membership_;
-        unsigned item_bit_length_;
-        unsigned sec_level_;
+        apsi::u32 item_bit_length_;
+        apsi::u32 sec_level_;
         int log_table_size_;
         int split_count_;
         int split_size_;
         int window_size_;
         int poly_modulus_;
         std::vector<u64> coeff_modulus_;
-        u64 plain_modulus_;
+        apsi::u64 plain_modulus_;
         int exfield_degree_;
         int net_port_;
         std::string db_file_;
         int num_chunks_;
         int sender_bin_size_;
         int hash_func_count_;
-        unsigned item_bit_length_used_after_oprf_;
+        apsi::u32 item_bit_length_used_after_oprf_;
     };
 }
