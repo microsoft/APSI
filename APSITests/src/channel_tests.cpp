@@ -256,10 +256,10 @@ namespace APSITests
         svr.send(sender_op->client_id, pkg2);
         svr.send(sender_op->client_id, pkg3);
 
-        expected_total += sizeof(int) * 6;
+        expected_total += sizeof(i64) * 6;
         expected_total += 25; // strings
-        expected_total += sizeof(SenderOperationType);
-        expected_total += sizeof(size_t); // size of vector
+        expected_total += sizeof(u32); // SenderOperationType
+        expected_total += sizeof(u64); // size of vector
         ASSERT_EQ(expected_total, svr.get_total_data_sent());
 
         clientth.join();
