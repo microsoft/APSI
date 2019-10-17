@@ -122,8 +122,8 @@ void DBBlock::symmetric_polys(
     int encoding_bit_length,
     const FFieldElt &neg_null_element)
 {
-    int split_size = items_per_split_;
-    int batch_size = items_per_batch_;
+    i64 split_size = items_per_split_;
+    i64 batch_size = items_per_batch_;
     auto num_rows = batch_size;
     auto field = th_context.field();
 
@@ -161,7 +161,7 @@ void DBBlock::symmetric_polys(
                 symm_block_ptr - d,
                 [&ch](auto a, auto b) { return multiply_uint_uint_mod(a, b, ch); });
 
-            for (int k = pos.split_offset + 1; k < split_size; k++, symm_block_ptr += d)
+            for (i64 k = pos.split_offset + 1; k < split_size; k++, symm_block_ptr += d)
             {
                 transform(temp1->data(), temp1->data() + d,
                     symm_block_ptr + d,
@@ -183,7 +183,7 @@ void DBBlock::randomized_symmetric_polys(
     int encoding_bit_length,
     const FFieldElt &neg_null_element)
 {
-    int split_size_plus_one = items_per_split_ + 1;
+    i64 split_size_plus_one = items_per_split_ + 1;
     symmetric_polys(th_context, symm_block, encoding_bit_length, neg_null_element);
 
     auto num_rows = items_per_batch_;
@@ -195,12 +195,12 @@ void DBBlock::randomized_symmetric_polys(
     auto ch = th_context.field().ch();
     auto d = th_context.field().d();
     auto symm_block_ptr = symm_block.data();
-    for (int i = 0; i < num_rows; i++)
+    for (i64 i = 0; i < num_rows; i++)
     {
-        for (int j = 0; j < split_size_plus_one; j++, symm_block_ptr += d)
+        for (i64 j = 0; j < split_size_plus_one; j++, symm_block_ptr += d)
         {
             transform(symm_block_ptr, symm_block_ptr + d,
-                r.data(i),
+                r.data(static_cast<size_t>(i)),
                 symm_block_ptr,
                 [&ch](auto a, auto b) { return multiply_uint_uint_mod(a, b, ch); });
         }
@@ -298,10 +298,15 @@ void DBBlock::batch_interpolate(
         Plaintext &batched_coeff = batched_label_coeffs_[s];
 
         // transpose the coeffs into temp_array
-        for (int b = 0; b < items_per_batch_; b++)
+        for (i64 b = 0; b < items_per_batch_; b++)
         {
-            for (unsigned c = 0; c < degree; ++c)
-                temp_array.set_coeff_of(b, c, cache.coeff_temp[b].get_coeff_of(s, c));
+            for (u64 c = 0; c < degree; ++c)
+                temp_array.set_coeff_of(
+                    static_cast<size_t>(b),
+                    static_cast<size_t>(c),
+                    cache.coeff_temp[b].get_coeff_of(
+                        static_cast<size_t>(s),
+                        static_cast<size_t>(c)));
         }
 
         auto capacity = static_cast<size_t>(params.encryption_params().coeff_modulus().size() *

@@ -84,7 +84,14 @@ namespace
 block apsi::tools::sys_random_seed()
 {
     std::random_device rd;
-    auto ret = std::array<unsigned int, 4> { rd(), rd(), rd(), rd() };
+    auto ret = std::array<u32, 4>
+    {
+        static_cast<u32>(rd()),
+        static_cast<u32>(rd()),
+        static_cast<u32>(rd()),
+        static_cast<u32>(rd())
+    };
+
     return *(reinterpret_cast<block*>(&ret));
 }
 
@@ -190,7 +197,7 @@ seal::Plaintext apsi::tools::random_plaintext(const seal::SEALContext &context)
     return random;
 }
 
-u64 apsi::tools::compute_sender_bin_size(unsigned log_table_size, u64 sender_set_size, unsigned hash_func_count, unsigned binning_sec_level, unsigned split_count)
+u64 apsi::tools::compute_sender_bin_size(u32 log_table_size, u64 sender_set_size, u32 hash_func_count, u32 binning_sec_level, u32 split_count)
 {
     return round_up_to(
         get_bin_size(

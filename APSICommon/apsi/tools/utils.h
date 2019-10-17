@@ -78,7 +78,7 @@ namespace apsi
         /**
         Compute secure Sender bin size
         */
-        apsi::u64 compute_sender_bin_size(unsigned log_table_size, apsi::u64 sender_set_size, unsigned hash_func_count, unsigned binning_sec_level, unsigned split_count);
+        apsi::u64 compute_sender_bin_size(apsi::u32 log_table_size, apsi::u64 sender_set_size, apsi::u32 hash_func_count, apsi::u32 binning_sec_level, apsi::u32 split_count);
 
         extern apsi::tools::Stopwatch sender_stop_watch, recv_stop_watch;
     }

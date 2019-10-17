@@ -120,14 +120,16 @@ map<uint64_t, vector<string>>& Receiver::query(vector<Item>& items)
 pair<vector<bool>, Matrix<u8>> Receiver::decrypt_result(vector<Item>& items, Channel& chl)
 {
     auto& cuckoo = *preprocess_result_.second;
-    unsigned padded_table_size = static_cast<unsigned>(
+    size_t padded_table_size = static_cast<size_t>(
         ((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
 
     vector<int> table_to_input_map(padded_table_size, 0);
-    if (items.size() > 1 || (!get_params().use_fast_membership())) {
+    if (items.size() > 1 || (!get_params().use_fast_membership()))
+    {
         table_to_input_map = cuckoo_indices(items, cuckoo);
     }
-    else {
+    else
+    {
         Log::info("Receiver single query table to input map");
     }
 
@@ -267,7 +269,7 @@ pair<
     unique_ptr<KukuTable> cuckoo;
     unique_ptr<FFieldArray> exfield_items;
 
-    unsigned padded_cuckoo_capacity = static_cast<unsigned>(
+    u32 padded_cuckoo_capacity = static_cast<u32>(
         ((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
 
     exfield_items = make_unique<FFieldArray>(padded_cuckoo_capacity, *field_);
@@ -352,7 +354,7 @@ vector<int> Receiver::cuckoo_indices(
     kuku::KukuTable &cuckoo)
 {
     // This is the true size of the table; a multiple of slot_count_
-    unsigned padded_cuckoo_capacity = static_cast<unsigned>(
+    size_t padded_cuckoo_capacity = static_cast<size_t>(
         ((cuckoo.table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
 
     vector<int> indices(padded_cuckoo_capacity, -1);
@@ -377,7 +379,8 @@ void Receiver::exfield_encoding(
     FFieldArray &ret)
 {
     int item_bit_count = get_params().item_bit_count();
-    if (get_params().use_oprf()) {
+    if (get_params().use_oprf())
+    {
         item_bit_count = get_params().item_bit_length_used_after_oprf();
     }
     Log::debug("item bit count before decoding: %i", item_bit_count);
@@ -403,15 +406,15 @@ void Receiver::exfield_encoding(
 void Receiver::generate_powers(const FFieldArray& exfield_items,
     map<uint64_t, FFieldArray>& result)
 {
-    int split_size = (get_params().sender_bin_size() + get_params().split_count() - 1) / get_params().split_count();
-    int window_size = get_params().window_size();
-    int radix = 1 << window_size;
+    u64 split_size = (get_params().sender_bin_size() + get_params().split_count() - 1) / get_params().split_count();
+    u32 window_size = get_params().window_size();
+    u32 radix = 1 << window_size;
 
     // todo: this bound needs to be re-visited. 
     int max_supported_degree = get_params().max_supported_degree();
 
     // find the bound by enumerating 
-    int bound = split_size;
+    i64 bound = split_size;
     while (bound > 0 && tools::maximal_power(max_supported_degree, bound, radix) >= split_size)
     {
         bound--;
@@ -422,18 +425,18 @@ void Receiver::generate_powers(const FFieldArray& exfield_items,
         split_size, window_size, radix, bound);
 
     FFieldArray current_power = exfield_items;
-    for (uint64_t j = 0; j < static_cast<uint64_t>(bound); j++)
+    for (u64 j = 0; j < static_cast<u64>(bound); j++)
     {
         result.emplace(1ULL << (window_size * j), current_power);
-        for (uint64_t i = 2; i < static_cast<uint64_t>(radix); i++)
+        for (u32 i = 2; i < radix; i++)
         {
-            if (i * (1ULL << (window_size * j)) > static_cast<uint64_t>(split_size))
+            if (i * (1ULL << (window_size * j)) > static_cast<u64>(split_size))
             {
                 return;
             }
             result.emplace(i * (1ULL << (window_size * j)), result.at((i - 1) * (1ULL << (window_size * j))) * current_power);
         }
-        for (int k = 0; k < window_size; k++)
+        for (u32 k = 0; k < window_size; k++)
         {
             current_power.sq();
         }

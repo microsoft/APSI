@@ -59,28 +59,28 @@ SenderDB::SenderDB(const PSIParams &params,
     int split_size = params_.split_size();
 
     // debugging 
-    int num_ctxts = params_.batch_count() * params_.sender_bin_size(); 
+    u64 num_ctxts = params_.batch_count() * params_.sender_bin_size();
     Log::debug("sender size = %i", params_.sender_size());
     Log::debug("table size = %i", params_.table_size());
     Log::debug("sender bin size = %i", params_.sender_bin_size());
     Log::debug("split size = %i", split_size); 
     Log::debug("number of ciphertexts in senderdb = %i", num_ctxts);
     Log::debug("number of hash functions = %i", params_.hash_func_count());
-    int byte_length = static_cast<int>(round_up_to(params_.get_label_bit_count(), 8) / 8);
-    int nb = params_.batch_count();
+    u32 byte_length = round_up_to(params_.get_label_bit_count(), 8u) / 8;
+    u64 nb = params_.batch_count();
 
     // here, need to make split count larger to fit
     // another place the split count is modified is after add_data.
-    int ns = (params_.sender_bin_size() + params_.split_size() - 1) / params_.split_size(); 
-    params_.set_split_count(ns);
+    u64 ns = (params_.sender_bin_size() + params_.split_size() - 1) / params_.split_size(); 
+    params_.set_split_count(static_cast<u32>(ns));
     params_.set_sender_bin_size(ns * params_.split_size());
 
     // important: here it resizes the db blocks.
     db_blocks_.resize(nb, ns);
 
-    for (int b_idx = 0; b_idx < nb; b_idx++)
+    for (u64 b_idx = 0; b_idx < nb; b_idx++)
     {
-        for (int s_idx = 0; s_idx < ns; s_idx++)
+        for (u64 s_idx = 0; s_idx < ns; s_idx++)
         {
             db_blocks_(b_idx, s_idx)->init(
                 b_idx, s_idx,
@@ -165,8 +165,10 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
 
     // aggregate and find the max.
     int maxload = 0;
-    for (unsigned i = 0; i < params_.table_size(); i++) {
-        for (int t = 1; t < thread_count; t++) {
+    for (u32 i = 0; i < params_.table_size(); i++)
+    {
+        for (int t = 1; t < thread_count; t++)
+        {
             thread_loads[0][i] += thread_loads[t][i]; 
         }
         maxload = max(maxload, thread_loads[0][i]);
@@ -174,7 +176,7 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
     Log::debug("Original max load =  %i", maxload); 
 
     // making sure maxload is a multiple of split_size
-    unsigned new_split_count = (maxload + params_.split_size() - 1) / params_.split_size();
+    u32 new_split_count = (maxload + params_.split_size() - 1) / params_.split_size();
     maxload = new_split_count * params_.split_size();	
     params_.set_sender_bin_size(maxload);
     params_.set_split_count(new_split_count);
@@ -227,8 +229,8 @@ void SenderDB::add_data_no_hash(gsl::span<const Item> data, MatrixView<u8> value
 
     u64 new_split_count = (maxload + params_.split_size() - 1) / params_.split_size();
     maxload = new_split_count * params_.split_size();
-    params_.set_sender_bin_size(static_cast<unsigned>(maxload));
-    params_.set_split_count(static_cast<unsigned>(new_split_count));
+    params_.set_sender_bin_size(maxload);
+    params_.set_split_count(static_cast<u32>(new_split_count));
 
     // resize the matrix of blocks.
     db_blocks_.resize(params_.batch_count(), new_split_count);
@@ -246,7 +248,7 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
     u64 end = (thread_idx + 1) * data.size() / thread_count;
 
     vector<kuku::LocFunc> normal_loc_func;
-    for (unsigned i = 0; i < params_.hash_func_count(); i++)
+    for (u32 i = 0; i < params_.hash_func_count(); i++)
     {
         normal_loc_func.emplace_back(
             params_.log_table_size(),
@@ -267,14 +269,17 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
         auto cuckoo_item = data[i].get_value();
 
         // Set keys and skip
-        for (unsigned j = 0; j < params_.hash_func_count(); j++) {
+        for (u32 j = 0; j < params_.hash_func_count(); j++)
+        {
             locs[j] = normal_loc_func[j](cuckoo_item);
             keys[j] = data[i]; 
             skip[j] = false;
 
             if (j > 0) { // check if same. 
-                for (unsigned k = 0; k < j; k++) {
-                    if (locs[j] == locs[k]) {
+                for (u32 k = 0; k < j; k++)
+                {
+                    if (locs[j] == locs[k])
+                    {
                         skip[j] = true; 
                         break; 
                     }
@@ -283,11 +288,12 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
         }
         
         // Claim an empty location in each matching bin
-        for (unsigned j = 0; j < params_.hash_func_count(); j++)
+        for (u32 j = 0; j < params_.hash_func_count(); j++)
         {
             // debugging
             loads[locs[j]] ++;
-            if (loads[locs[j]] > maxload) {
+            if (loads[locs[j]] > maxload)
+            {
                 maxload = loads[locs[j]]; 
             }
 
@@ -296,11 +302,13 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
 
                 // Lock-free thread-safe bin position search
                 std::pair<DBBlock*, DBBlock::Position> block_pos;
-                if (params_.use_oprf()) {
+                if (params_.use_oprf())
+                {
                     // Log::info("find db position with oprf");
                     block_pos = acquire_db_position_after_oprf(locs[j]);
                 }
-                else {
+                else
+                {
                     block_pos = acquire_db_position(locs[j], prng);
                 }
 

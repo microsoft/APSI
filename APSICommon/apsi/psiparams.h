@@ -31,46 +31,46 @@ namespace apsi
         struct PSIConfParams
         {
             // Should not exceed 128. Moreover, should reserve several bits because of the requirement of current Cuckoo hashing impl.
-            unsigned item_bit_count;
+            apsi::u32 item_bit_count;
             bool use_oprf;
             bool use_labels;
             bool use_fast_membership; // faster configuration assuming query is always one item.
             apsi::u64 sender_size;
-            unsigned item_bit_length_used_after_oprf; // how many bits we take after oprf.
+            apsi::u32 item_bit_length_used_after_oprf; // how many bits we take after oprf.
 
             // number of chunks to split each item into 
-            unsigned num_chunks;
-            unsigned sender_bin_size; 
+            apsi::u32 num_chunks;
+            apsi::u64 sender_bin_size; 
         };
 
         struct CuckooParams
         {
             // Should not be too big, both due to the performance consideration and the requirement of current Cuckoo hashing impl.
             // For example, if item_bit_count = 120, then hash_func_count should be smaller than 2^6 = 64. But typically, 3 is enough.
-            unsigned hash_func_count;
-            unsigned hash_func_seed;
-            unsigned max_probe;
+            apsi::u32 hash_func_count;
+            apsi::u32 hash_func_seed;
+            apsi::u32 max_probe;
         };
 
         struct TableParams
         {
-            unsigned log_table_size;
-            unsigned window_size;
-            unsigned split_count;
-            unsigned split_size;
-            unsigned binning_sec_level;
+            apsi::u32 log_table_size;
+            apsi::u32 window_size;
+            apsi::u32 split_count;
+            apsi::u32 split_size;
+            apsi::u32 binning_sec_level;
         };
 
         struct SEALParams
         {
             seal::EncryptionParameters encryption_params{ seal::scheme_type::BFV };
-            unsigned max_supported_degree;
+            apsi::u32 max_supported_degree;
         };
 
         struct ExFieldParams
         {
             u64 characteristic;
-            unsigned degree;
+            apsi::u32 degree;
         };
 
     public:
@@ -87,25 +87,29 @@ namespace apsi
               exfield_params_(exfield_params)
         {
             sender_bin_size_ = psiconf_params_.sender_bin_size;
-            if (sender_bin_size_ == 0) { // if bin size is unset.
-                apsi::logging::Log::info("updating sender bin size...");
+            if (sender_bin_size_ == 0)
+            {
+                // if bin size is unset.
+                apsi::logging::Log::debug("Updating sender bin size");
                 update_sender_bin_size();
             }
-            else {
-                apsi::logging::Log::info("taking sender bin size = %i from command line...", sender_bin_size_);
+            else
+            {
+                apsi::logging::Log::debug("Taking sender bin size = %i from command line", sender_bin_size_);
             }
+
             validate();
         }
 
         /********************************************
         Parameters from input: PSIConfParameters
         *********************************************/
-        inline unsigned int item_bit_count() const
+        inline apsi::u32 item_bit_count() const
         {
             return psiconf_params_.item_bit_count;
         }
 
-        inline unsigned int item_bit_length_used_after_oprf() const
+        inline apsi::u32 item_bit_length_used_after_oprf() const
         {
             return psiconf_params_.item_bit_length_used_after_oprf;
         }
@@ -130,7 +134,7 @@ namespace apsi
             return psiconf_params_.sender_size;
         }
 
-        inline unsigned int num_chunks() const
+        inline apsi::u32 num_chunks() const
         {
             return psiconf_params_.num_chunks;
         }
@@ -139,27 +143,27 @@ namespace apsi
         /********************************************
         Parameters from input: TableParameters
         *********************************************/
-        inline unsigned int log_table_size() const
+        inline apsi::u32 log_table_size() const
         {
             return table_params_.log_table_size;
         }
 
-        inline unsigned int window_size() const
+        inline apsi::u32 window_size() const
         {
             return table_params_.window_size;
         }
 
-        inline unsigned int split_count() const
+        inline apsi::u32 split_count() const
         {
             return table_params_.split_count;
         }
 
-        inline unsigned int split_size() const
+        inline apsi::u32 split_size() const
         {
             return table_params_.split_size;
         }
 
-        inline unsigned int binning_sec_level() const
+        inline apsi::u32 binning_sec_level() const
         {
             return table_params_.binning_sec_level;
         }
@@ -167,17 +171,17 @@ namespace apsi
         /********************************************
         Parameters from input: CuckooParams
         *********************************************/
-        inline unsigned int hash_func_count() const
+        inline apsi::u32 hash_func_count() const
         {
             return cuckoo_params_.hash_func_count;
         }
 
-        inline unsigned int hash_func_seed() const
+        inline apsi::u32 hash_func_seed() const
         {
             return cuckoo_params_.hash_func_seed;
         }
 
-        inline unsigned int max_probe() const
+        inline apsi::u32 max_probe() const
         {
             return cuckoo_params_.max_probe;
         }
@@ -190,7 +194,7 @@ namespace apsi
             return seal_params_.encryption_params;
         }
 
-        inline unsigned int max_supported_degree() const
+        inline apsi::u32 max_supported_degree() const
         {
             return seal_params_.max_supported_degree;
         }
@@ -203,7 +207,7 @@ namespace apsi
             return exfield_params_.characteristic;
         }
 
-        inline unsigned int exfield_degree() const
+        inline apsi::u32 exfield_degree() const
         {
             return exfield_params_.degree;
         }
@@ -211,28 +215,28 @@ namespace apsi
         /********************************************
         Calculated parameters
         *********************************************/
-        inline unsigned int sender_bin_size() const
+        inline apsi::u64 sender_bin_size() const
         {
             return sender_bin_size_;
         }
 
-        inline unsigned int table_size() const
+        inline apsi::u32 table_size() const
         {
             return 1 << table_params_.log_table_size;
         }
 
-        inline int batch_size() const
+        inline apsi::u32 batch_size() const
         {
-            return static_cast<int>(encryption_params().poly_modulus_degree() / exfield_degree());
+            return static_cast<apsi::u32>(encryption_params().poly_modulus_degree() / exfield_degree());
         }
 
-        inline int batch_count() const
+        inline apsi::u32 batch_count() const
         {
-            int batch = batch_size();
+            apsi::u32 batch = batch_size();
             return (table_size() + batch - 1) / batch;
         }
 
-        inline int get_label_bit_count() const
+        inline apsi::u32 get_label_bit_count() const
         {
             if (!psiconf_params_.use_labels)
                 return 0;
@@ -240,7 +244,7 @@ namespace apsi
             return psiconf_params_.item_bit_count;
         }
 
-        inline int get_label_byte_count() const
+        inline apsi::u32 get_label_byte_count() const
         {
             if (!psiconf_params_.use_labels)
                 return 0;
@@ -251,17 +255,21 @@ namespace apsi
         // assuming one query.
         double log_fp_rate() {
             int bitcount = item_bit_count(); 
-            if (psiconf_params_.use_oprf) { bitcount = item_bit_length_used_after_oprf(); } // currently hardcoded.
+            if (use_oprf())
+            {
+                bitcount = item_bit_length_used_after_oprf(); // currently hardcoded.
+            }
+
             return ((double)exfield_degree())* (log2(split_size())) + log2(split_count())- bitcount;
         }
 
-        void set_sender_bin_size(unsigned size) {
+        void set_sender_bin_size(apsi::u64 size) {
             apsi::logging::Log::info("manually setting sender bin size to be %i", size);
             sender_bin_size_ = size;
         }
 
 
-        void set_split_count(unsigned count) {
+        void set_split_count(apsi::u32 count) {
             apsi::logging::Log::info("manually setting split count to be %i", count);
             table_params_.split_count = count;
         }
@@ -284,7 +292,7 @@ namespace apsi
         SEALParams    seal_params_;
         ExFieldParams exfield_params_;
 
-        int sender_bin_size_;
+        apsi::u64 sender_bin_size_;
 
         void update_sender_bin_size()
         {
@@ -293,12 +301,12 @@ namespace apsi
                 cuckoo_params_.hash_func_count,
                 table_params_.binning_sec_level
                 );
-            sender_bin_size_ = static_cast<int>(apsi::tools::compute_sender_bin_size(
+            sender_bin_size_ = apsi::tools::compute_sender_bin_size(
                 table_params_.log_table_size,
                 psiconf_params_.sender_size,
                 cuckoo_params_.hash_func_count,
                 table_params_.binning_sec_level,
-                table_params_.split_count));
+                table_params_.split_count);
             apsi::logging::Log::info("updated sender bin size to %i.", sender_bin_size_); 
         }
 
@@ -323,13 +331,15 @@ namespace apsi
                 throw std::invalid_argument("Item bit count cannot exceed max.");
             }
 
-
-            int bitcount = item_bit_count(); 
-            if (use_oprf()) {
+            apsi::u32 bitcount = item_bit_count();
+            if (use_oprf())
+            {
                 bitcount = item_bit_length_used_after_oprf();
             }
-            int supported_bitcount = ((uint64_t)exfield_degree())* (seal_params_.encryption_params.plain_modulus().bit_count() - 1); 
-            if (bitcount > supported_bitcount){
+
+            apsi::u64 supported_bitcount = ((uint64_t)exfield_degree()) * (seal_params_.encryption_params.plain_modulus().bit_count() - 1);
+            if (bitcount > supported_bitcount)
+            {
                 apsi::logging::Log::warning("item bit count (%i) is too large to fit in slots (%i bits). ", bitcount, supported_bitcount);
             }
 

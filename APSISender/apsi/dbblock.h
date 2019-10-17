@@ -47,8 +47,8 @@ namespace apsi
         {
             struct Position
             {
-                int batch_offset;
-                int split_offset = -1;
+                apsi::i64 batch_offset;
+                apsi::i64 split_offset = -1;
 
                 bool is_initialized() const
                 {
@@ -57,11 +57,11 @@ namespace apsi
             };
 
             void init(
-                int batch_idx,
-                int split_idx,
-                int value_byte_length,
-                int batch_size,
-                int items_per_split)
+                apsi::i64 batch_idx,
+                apsi::i64 split_idx,
+                apsi::i64 value_byte_length,
+                apsi::i64 batch_size,
+                apsi::i64 items_per_split)
             {
                 label_data_.resize(batch_size * items_per_split * value_byte_length);
                 key_data_.resize(batch_size * items_per_split);
@@ -78,16 +78,16 @@ namespace apsi
 
             std::unique_ptr<std::atomic_bool[]> has_item_;
             // the index of this region
-            int batch_idx_, split_idx_;
+            apsi::i64 batch_idx_, split_idx_;
 
             // the number of bytes that each label is
-            int value_byte_length_;
+            apsi::i64 value_byte_length_;
 
             // the number of cuckoo slots that this regions spans.
-            int items_per_batch_;
+            apsi::i64 items_per_batch_;
 
             // the number of items that are in a split. 
-            int items_per_split_;
+            apsi::i64 items_per_split_;
 
             gsl::span<seal::Plaintext> batch_random_symm_poly_;
 

@@ -147,40 +147,41 @@ void NetworkChannel::receive(SenderResponseGetParameters& response)
     size_t idx = 1;
 
     // PSIConfParams
-    response.psiconf_params.item_bit_count = msg.get<unsigned int>(idx++);
+    response.psiconf_params.item_bit_count = msg.get<u32>(idx++);
     response.psiconf_params.use_oprf = msg.get<bool>(idx++);
     response.psiconf_params.use_labels = msg.get<bool>(idx++);
     response.psiconf_params.use_fast_membership = msg.get<bool>(idx++);
     response.psiconf_params.sender_size = msg.get<u64>(idx++);
-    response.psiconf_params.num_chunks = msg.get<unsigned int>(idx++);
-    response.psiconf_params.sender_bin_size = msg.get<unsigned int>(idx++);
-    response.psiconf_params.item_bit_length_used_after_oprf = msg.get<unsigned int>(idx++);
+    response.psiconf_params.num_chunks = msg.get<u32>(idx++);
+    response.psiconf_params.sender_bin_size = msg.get<u64>(idx++);
+    response.psiconf_params.item_bit_length_used_after_oprf = msg.get<u32>(idx++);
 
     // TableParams
-    response.table_params.log_table_size = msg.get<unsigned int>(idx++);
-    response.table_params.window_size = msg.get<unsigned int>(idx++);
-    response.table_params.split_count = msg.get<unsigned int>(idx++);
-    response.table_params.split_size = msg.get<unsigned int>(idx++);
-    response.table_params.binning_sec_level = msg.get<unsigned int>(idx++);
+    response.table_params.log_table_size = msg.get<u32>(idx++);
+    response.table_params.window_size = msg.get<u32>(idx++);
+    response.table_params.split_count = msg.get<u32>(idx++);
+    response.table_params.split_size = msg.get<u32>(idx++);
+    response.table_params.binning_sec_level = msg.get<u32>(idx++);
 
     // CuckooParams
-    response.cuckoo_params.hash_func_count = msg.get<unsigned int>(idx++);
-    response.cuckoo_params.hash_func_seed = msg.get<unsigned int>(idx++);
-    response.cuckoo_params.max_probe = msg.get<unsigned int>(idx++);
+    response.cuckoo_params.hash_func_count = msg.get<u32>(idx++);
+    response.cuckoo_params.hash_func_seed = msg.get<u32>(idx++);
+    response.cuckoo_params.max_probe = msg.get<u32>(idx++);
 
     // SEALParams
-    response.seal_params.encryption_params.set_poly_modulus_degree(msg.get<size_t>(idx++));
+    u64 poly_modulus_degree = msg.get<u64>(idx++);
+    response.seal_params.encryption_params.set_poly_modulus_degree(static_cast<size_t>(poly_modulus_degree));
 
     vector<SmallModulus> coeff_modulus;
     get_sm_vector(coeff_modulus, msg, idx);
     response.seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
 
     response.seal_params.encryption_params.set_plain_modulus(msg.get<u64>(idx++));
-    response.seal_params.max_supported_degree = msg.get<unsigned int>(idx++);
+    response.seal_params.max_supported_degree = msg.get<u32>(idx++);
 
     // ExFieldParams
     response.exfield_params.characteristic = msg.get<u64>(idx++);
-    response.exfield_params.degree = msg.get<unsigned int>(idx++);
+    response.exfield_params.degree = msg.get<u32>(idx++);
 
     bytes_received_ += sizeof(SenderOperationType);
     bytes_received_ += sizeof(PSIParams::PSIConfParams);
@@ -229,10 +230,10 @@ void NetworkChannel::receive(SenderResponseQuery& response)
         throw runtime_error("Message should be query type");
 
     // Number of result packages
-    response.package_count = msg.get<size_t>(/* part */ 1);
+    response.package_count = msg.get<u64>(/* part */ 1);
 
-    bytes_received_ += sizeof(SenderOperationType);
-    bytes_received_ += sizeof(size_t);
+    bytes_received_ += sizeof(u32); // SenderOperationType
+    bytes_received_ += sizeof(u64);
 }
 
 void NetworkChannel::receive(ResultPackage& pkg)
@@ -249,8 +250,8 @@ void NetworkChannel::receive(ResultPackage& pkg)
         throw runtime_error(ss.str());
     }
 
-    pkg.split_idx = msg.get<int>(/* part */ 0);
-    pkg.batch_idx = msg.get<int>(/* part */ 1);
+    pkg.split_idx = msg.get<i64>(/* part */ 0);
+    pkg.batch_idx = msg.get<i64>(/* part */ 1);
     pkg.data = msg.get(/* part */ 2);
     pkg.label_data = msg.get(/* part */ 3);
 
@@ -291,7 +292,6 @@ void NetworkChannel::send_get_parameters_response(const vector<u8>& client_id, c
     msg.add(params.sender_bin_size());
     msg.add(params.item_bit_length_used_after_oprf());
 
-
     // TableParams
     msg.add(params.log_table_size());
     msg.add(params.window_size());
@@ -305,7 +305,8 @@ void NetworkChannel::send_get_parameters_response(const vector<u8>& client_id, c
     msg.add(params.max_probe());
 
     // SEALParams
-    msg.add(params.encryption_params().poly_modulus_degree());
+    u64 poly_modulus_degree = static_cast<u64>(params.encryption_params().poly_modulus_degree());
+    msg.add(poly_modulus_degree);
     add_sm_vector(params.encryption_params().coeff_modulus(), msg);
     msg.add(params.encryption_params().plain_modulus().value());
     msg.add(params.max_supported_degree());
@@ -316,7 +317,7 @@ void NetworkChannel::send_get_parameters_response(const vector<u8>& client_id, c
 
     send_message(msg);
 
-    bytes_sent_ += sizeof(SenderOperationType);
+    bytes_sent_ += sizeof(u32); // SenderOperationType
     bytes_sent_ += sizeof(PSIParams::PSIConfParams);
     bytes_sent_ += sizeof(PSIParams::TableParams);
     bytes_sent_ += sizeof(PSIParams::CuckooParams);
@@ -336,7 +337,7 @@ void NetworkChannel::send_preprocess(const vector<u8>& buffer)
 
     send_message(msg);
 
-    bytes_sent_ += sizeof(SenderOperationType);
+    bytes_sent_ += sizeof(u32);
     bytes_sent_ += buffer.size();
 }
 
@@ -353,7 +354,7 @@ void NetworkChannel::send_preprocess_response(const vector<u8>& client_id, const
 
     send_message(msg);
 
-    bytes_sent_ += sizeof(SenderOperationType);
+    bytes_sent_ += sizeof(u32);
     bytes_sent_ += buffer.size();
 }
 
@@ -368,15 +369,16 @@ void NetworkChannel::send_query(
     message_t msg;
     SenderOperationType type = SOP_query;
     add_message_type(type, msg);
-    bytes_sent += sizeof(SenderOperationType);
+    bytes_sent += sizeof(u32);
 
     msg.add(relin_keys);
     bytes_sent += relin_keys.length();
 
     Log::debug("send_query: relin key length = %i bytes ", relin_keys.length());
 
-    add_part(query.size(), msg);
-    bytes_sent += sizeof(size_t);
+    u64 query_size = static_cast<u64>(query.size());
+    add_part(query_size, msg);
+    bytes_sent += sizeof(u64);
 
     u64 sofar = bytes_sent_;
 
@@ -385,8 +387,9 @@ void NetworkChannel::send_query(
         add_part(q.first, msg);
         bytes_sent += sizeof(u64);
 
-        add_part(q.second.size(), msg);
-        bytes_sent += sizeof(size_t);
+        u64 num_elems = static_cast<u64>(q.second.size());
+        add_part(num_elems, msg);
+        bytes_sent += sizeof(u64);
 
         for (const auto& seededctxt : q.second)
         {
@@ -410,15 +413,16 @@ void NetworkChannel::send_query_response(const vector<u8>& client_id, const size
     add_client_id(msg, client_id);
 
     add_message_type(type, msg);
-    msg.add(package_count);
+    u64 pkg_count = static_cast<u64>(package_count);
+    msg.add(pkg_count);
 
     send_message(msg);
 
     // Message type
-    bytes_sent_ += sizeof(SenderOperationType);
+    bytes_sent_ += sizeof(u32);
 
     // Package count
-    bytes_sent_ += sizeof(size_t);
+    bytes_sent_ += sizeof(u64);
 }
 
 void NetworkChannel::send(const vector<u8>& client_id, const ResultPackage& pkg)
@@ -445,14 +449,14 @@ void NetworkChannel::get_buffer(vector<u8>& buff, const message_t& msg, int part
     if (msg.parts() < static_cast<size_t>(part_start) + 1)
         throw runtime_error("Should have size at least");
 
-    size_t size;
+    u64 size;
     get_part(size, msg, /* part */ part_start);
 
     // If the vector is not empty, we need the part with the data
     if (size > 0 && msg.parts() < static_cast<size_t>(part_start) + 2)
         throw runtime_error("Should have size and data.");
 
-    buff.resize(size);
+    buff.resize(static_cast<size_t>(size));
 
     if (size > 0)
     {
@@ -467,7 +471,8 @@ void NetworkChannel::get_buffer(vector<u8>& buff, const message_t& msg, int part
 void NetworkChannel::add_buffer(const vector<u8>& buff, message_t& msg) const
 {
     // First part is size
-    add_part(buff.size(), msg);
+    u64 size = static_cast<u64>(buff.size());
+    add_part(size, msg);
 
     if (buff.size() > 0)
     {
@@ -482,13 +487,13 @@ void NetworkChannel::get_sm_vector(vector<SmallModulus>& smv, const message_t& m
     if (msg.parts() < (part_idx + 1))
         throw runtime_error("Should have size at least");
 
-    size_t size;
+    u64 size;
     get_part(size, msg, /* part */ part_idx++);
 
     if (msg.parts() < (part_idx + size))
         throw runtime_error("Insufficient parts for SmallModulus vector");
 
-    smv.resize(size);
+    smv.resize(static_cast<size_t>(size));
     for (u64 sm_idx = 0; sm_idx < size; sm_idx++)
     {
         string str = msg.get(part_idx++);
@@ -499,7 +504,8 @@ void NetworkChannel::get_sm_vector(vector<SmallModulus>& smv, const message_t& m
 void NetworkChannel::add_sm_vector(const vector<SmallModulus>& smv, message_t& msg) const
 {
     // First part is size
-    add_part(smv.size(), msg);
+    u64 size = static_cast<u64>(smv.size());
+    add_part(size, msg);
 
     for (const SmallModulus& sm : smv)
     {
@@ -513,7 +519,7 @@ void NetworkChannel::add_sm_vector(const vector<SmallModulus>& smv, message_t& m
 void NetworkChannel::add_message_type(const SenderOperationType type, message_t& msg) const
 {
     // Transform to int to have it have a fixed size
-    add_part(static_cast<int>(type), msg);
+    add_part(static_cast<u32>(type), msg);
 }
 
 SenderOperationType NetworkChannel::get_message_type(const message_t& msg, const size_t part) const
@@ -523,7 +529,7 @@ SenderOperationType NetworkChannel::get_message_type(const message_t& msg, const
         throw invalid_argument("Message should have at least type");
 
     // Get message type
-    int msg_type;
+    u32 msg_type;
     get_part(msg_type, msg, /* part */ part);
     SenderOperationType type = static_cast<SenderOperationType>(msg_type);
     return type;
@@ -577,9 +583,9 @@ shared_ptr<SenderOperation> NetworkChannel::decode_query(const message_t& msg)
     msg.get(relin_keys, /* part */  msg_idx++);
     bytes_received_ += relin_keys.length();
 
-    size_t query_count;
+    u64 query_count;
     get_part(query_count, msg, /* part */  msg_idx++);
-    bytes_received_ += sizeof(size_t);
+    bytes_received_ += sizeof(u64);
 
     for (u64 i = 0; i < query_count; i++)
     {
@@ -587,11 +593,11 @@ shared_ptr<SenderOperation> NetworkChannel::decode_query(const message_t& msg)
         get_part(power, msg, msg_idx++);
         bytes_received_ += sizeof(u64);
 
-        size_t num_elems;
+        u64 num_elems;
         get_part(num_elems, msg, msg_idx++);
-        bytes_received_ += sizeof(size_t);
+        bytes_received_ += sizeof(u64);
 
-        vector<string> powers(num_elems);
+        vector<string> powers(static_cast<size_t>(num_elems));
 
         for (u64 j = 0; j < num_elems; j++)
         {

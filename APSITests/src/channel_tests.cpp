@@ -167,9 +167,9 @@ namespace APSITests
                 // This should be:
                 // SenderOperationType size
                 // 8425 for relinkeys
-                // size_t size (number of entries in querydata)
+                // u64 size (number of entries in querydata)
                 // u64 size * 2 (each entry in querydata)
-                // size_t size * 2 (each entry in querydata)
+                // u64 size * 2 (each entry in querydata)
                 // Ciphertexts will generate strings of length 105
                 clt.send_query(relinkeys_str, querydata);
 
@@ -196,19 +196,19 @@ namespace APSITests
         // get parameters
         shared_ptr<SenderOperation> sender_op;
         svr.receive(sender_op, /* wait_for_message */ true);
-        size_t expected_total = sizeof(SenderOperationType);
+        size_t expected_total = sizeof(u32); // SenderOperationType
         ASSERT_EQ(expected_total, svr.get_total_data_received());
 
         // preprocess
         svr.receive(sender_op, /* wait_for_message */ true);
         expected_total += 1000;
-        expected_total += sizeof(SenderOperationType);
+        expected_total += sizeof(u32); // SenderOperationType
         ASSERT_EQ(expected_total, svr.get_total_data_received());
 
         // query
         svr.receive(sender_op, /* wait_for_message */ true);
-        expected_total += sizeof(SenderOperationType);
-        expected_total += sizeof(size_t) * 3;
+        expected_total += sizeof(u32); // SenderOperationType
+        expected_total += sizeof(u64) * 3;
         expected_total += sizeof(u64) * 2;
         expected_total += 8425; // relinkeys
         expected_total += 105 * 2; // Ciphertexts
@@ -227,7 +227,7 @@ namespace APSITests
         PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
 
         svr.send_get_parameters_response(sender_op->client_id, params);
-        expected_total = sizeof(SenderOperationType);
+        expected_total = sizeof(u32); // SenderOperationType
         expected_total += sizeof(PSIParams::PSIConfParams);
         expected_total += sizeof(PSIParams::TableParams);
         expected_total += sizeof(PSIParams::CuckooParams);
@@ -239,7 +239,7 @@ namespace APSITests
         vector<u8> preproc;
         InitU8Vector(preproc, 50);
         svr.send_preprocess_response(sender_op->client_id, preproc);
-        expected_total += sizeof(SenderOperationType);
+        expected_total += sizeof(u32); // SenderOperationType
         expected_total += preproc.size();
         ASSERT_EQ(expected_total, svr.get_total_data_sent());
 
@@ -256,10 +256,10 @@ namespace APSITests
         svr.send(sender_op->client_id, pkg2);
         svr.send(sender_op->client_id, pkg3);
 
-        expected_total += sizeof(int) * 6;
+        expected_total += sizeof(i64) * 6;
         expected_total += 25; // strings
-        expected_total += sizeof(SenderOperationType);
-        expected_total += sizeof(size_t); // size of vector
+        expected_total += sizeof(u32); // SenderOperationType
+        expected_total += sizeof(u64); // size of vector
         ASSERT_EQ(expected_total, svr.get_total_data_sent());
 
         clientth.join();
@@ -389,21 +389,21 @@ namespace APSITests
         ASSERT_EQ(true, get_params_response.psiconf_params.use_oprf);
         ASSERT_EQ(true, get_params_response.psiconf_params.use_labels);
         ASSERT_EQ(false, get_params_response.psiconf_params.use_fast_membership);
-        ASSERT_EQ((unsigned)60, get_params_response.psiconf_params.item_bit_count);
-        ASSERT_EQ((unsigned)120, get_params_response.psiconf_params.item_bit_length_used_after_oprf);
-        ASSERT_EQ((unsigned)40, get_params_response.psiconf_params.num_chunks);
-        ASSERT_EQ((unsigned)50, get_params_response.psiconf_params.sender_bin_size);
-        ASSERT_EQ((unsigned)10, get_params_response.table_params.log_table_size);
-        ASSERT_EQ((unsigned)1, get_params_response.table_params.window_size);
-        ASSERT_EQ((unsigned)2, get_params_response.table_params.split_count);
-        ASSERT_EQ((unsigned)10, get_params_response.table_params.split_size);
-        ASSERT_EQ((unsigned)40, get_params_response.table_params.binning_sec_level);
-        ASSERT_EQ((unsigned)3, get_params_response.cuckoo_params.hash_func_count);
-        ASSERT_EQ((unsigned)2, get_params_response.cuckoo_params.hash_func_seed);
-        ASSERT_EQ((unsigned)1, get_params_response.cuckoo_params.max_probe);
+        ASSERT_EQ((u32)60, get_params_response.psiconf_params.item_bit_count);
+        ASSERT_EQ((u32)120, get_params_response.psiconf_params.item_bit_length_used_after_oprf);
+        ASSERT_EQ((u32)40, get_params_response.psiconf_params.num_chunks);
+        ASSERT_EQ((u32)50, get_params_response.psiconf_params.sender_bin_size);
+        ASSERT_EQ((u32)10, get_params_response.table_params.log_table_size);
+        ASSERT_EQ((u32)1, get_params_response.table_params.window_size);
+        ASSERT_EQ((u32)2, get_params_response.table_params.split_count);
+        ASSERT_EQ((u32)10, get_params_response.table_params.split_size);
+        ASSERT_EQ((u32)40, get_params_response.table_params.binning_sec_level);
+        ASSERT_EQ((u32)3, get_params_response.cuckoo_params.hash_func_count);
+        ASSERT_EQ((u32)2, get_params_response.cuckoo_params.hash_func_seed);
+        ASSERT_EQ((u32)1, get_params_response.cuckoo_params.max_probe);
         ASSERT_EQ((u64)678910, get_params_response.exfield_params.characteristic);
-        ASSERT_EQ((unsigned)8, get_params_response.exfield_params.degree);
-        ASSERT_EQ((unsigned)25, get_params_response.seal_params.max_supported_degree);
+        ASSERT_EQ((u32)8, get_params_response.exfield_params.degree);
+        ASSERT_EQ((u32)25, get_params_response.seal_params.max_supported_degree);
         ASSERT_EQ((u64)5119, get_params_response.seal_params.encryption_params.plain_modulus().value());
         ASSERT_EQ((size_t)4096, get_params_response.seal_params.encryption_params.poly_modulus_degree());
         ASSERT_EQ((size_t)3, get_params_response.seal_params.encryption_params.coeff_modulus().size());
@@ -418,16 +418,16 @@ namespace APSITests
         ASSERT_EQ((u64)54321, get_params_response2.psiconf_params.sender_size);
         ASSERT_EQ(false, get_params_response2.psiconf_params.use_oprf);
         ASSERT_EQ(false, get_params_response2.psiconf_params.use_labels);
-        ASSERT_EQ((unsigned)80, get_params_response2.psiconf_params.item_bit_count);
-        ASSERT_EQ((unsigned)10, get_params_response2.table_params.log_table_size);
-        ASSERT_EQ((unsigned)1, get_params_response2.table_params.window_size);
-        ASSERT_EQ((unsigned)2, get_params_response2.table_params.split_count);
-        ASSERT_EQ((unsigned)40, get_params_response2.table_params.binning_sec_level);
-        ASSERT_EQ((unsigned)3, get_params_response2.cuckoo_params.hash_func_count);
-        ASSERT_EQ((unsigned)2, get_params_response2.cuckoo_params.hash_func_seed);
-        ASSERT_EQ((unsigned)1, get_params_response2.cuckoo_params.max_probe);
+        ASSERT_EQ((u32)80, get_params_response2.psiconf_params.item_bit_count);
+        ASSERT_EQ((u32)10, get_params_response2.table_params.log_table_size);
+        ASSERT_EQ((u32)1, get_params_response2.table_params.window_size);
+        ASSERT_EQ((u32)2, get_params_response2.table_params.split_count);
+        ASSERT_EQ((u32)40, get_params_response2.table_params.binning_sec_level);
+        ASSERT_EQ((u32)3, get_params_response2.cuckoo_params.hash_func_count);
+        ASSERT_EQ((u32)2, get_params_response2.cuckoo_params.hash_func_seed);
+        ASSERT_EQ((u32)1, get_params_response2.cuckoo_params.max_probe);
         ASSERT_EQ((u64)678910, get_params_response2.exfield_params.characteristic);
-        ASSERT_EQ((unsigned)8, get_params_response2.exfield_params.degree);
+        ASSERT_EQ((u32)8, get_params_response2.exfield_params.degree);
         ASSERT_EQ((u64)5119, get_params_response2.seal_params.encryption_params.plain_modulus().value());
         ASSERT_EQ((size_t)4096, get_params_response2.seal_params.encryption_params.poly_modulus_degree());
         ASSERT_EQ((size_t)3, get_params_response2.seal_params.encryption_params.coeff_modulus().size());
@@ -508,7 +508,7 @@ namespace APSITests
         SenderResponseQuery query_response;
         client_.receive(query_response);
 
-        ASSERT_EQ((size_t)4, query_response.package_count);
+        ASSERT_EQ((u64)4, query_response.package_count);
 
         ResultPackage pkg;
         client_.receive(pkg);
@@ -573,9 +573,9 @@ namespace APSITests
             });
 
         vector<thread> clients(5);
-        for (unsigned i = 0; i < clients.size(); i++)
+        for (size_t i = 0; i < clients.size(); i++)
         {
-            clients[i] = thread([this](unsigned idx)
+            clients[i] = thread([this](size_t idx)
                 {
                     ReceiverChannel recv;
 
@@ -584,7 +584,7 @@ namespace APSITests
                     u8 a = static_cast<u8>(idx) * 2;
                     u8 b = a + 1;
 
-                    for (unsigned i = 0; i < 5; i++)
+                    for (u32 i = 0; i < 5; i++)
                     {
                         vector<u8> buffer(2);
                         buffer[0] = a;
@@ -602,7 +602,7 @@ namespace APSITests
                 }, i);
         }
 
-        for (unsigned i = 0; i < clients.size(); i++)
+        for (size_t i = 0; i < clients.size(); i++)
         {
             clients[i].join();
         }

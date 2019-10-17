@@ -44,9 +44,9 @@ namespace APSITests
         {
             PRNG prng(to_block(t));
 
-            auto srcOffset = prng.get<u32>() % (size * 4);
-            auto destOffset = prng.get<u32>() % (size * 4);
-            auto bitLength = prng.get<u32>() % (size * 4 - 1) + 1;
+            u32 srcOffset = prng.get<u32>() % (size * 4);
+            u32 destOffset = prng.get<u32>() % (size * 4);
+            u32 bitLength = prng.get<u32>() % (size * 4 - 1) + 1;
 
             char srcVal = (t & 1) * ~0;
             char destVal = ~srcVal;
@@ -59,21 +59,21 @@ namespace APSITests
             u32 src_idx = srcOffset;
             u32 dst_idx = 0;
 
-            for (unsigned i = 0; i < destOffset; ++i)
+            for (u32 i = 0; i < destOffset; ++i)
             {
                 ASSERT_EQ((u8)(destVal & 1), get_bit(dest, dst_idx));
                 dst_idx++;
             }
 
-            for (unsigned i = 0; i < bitLength; ++i)
+            for (u32 i = 0; i < bitLength; ++i)
             {
                 ASSERT_EQ(get_bit(src, src_idx), get_bit(dest, dst_idx));
                 src_idx++;
                 dst_idx++;
             }
 
-            auto rem = size * 8 - destOffset - bitLength;
-            for (unsigned i = 0; i < rem; ++i)
+            u32 rem = size * 8 - destOffset - bitLength;
+            for (u32 i = 0; i < rem; ++i)
             {
                 ASSERT_EQ((u8)(destVal & 1), get_bit(dest, dst_idx));
                 dst_idx++;
