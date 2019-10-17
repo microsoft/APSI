@@ -31,6 +31,9 @@ message(STATUS "${PROJECT_NAME} set APSI debug mode: ${APSI_DEBUG}")
 # Output directory
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/../bin)
 
+# For locating all modules
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake)
+
 # Imports 
 find_package(APSIReceiver 1.0.0 EXACT REQUIRED
     PATHS ${PROJECT_SOURCE_DIR}/../APSIReceiver/cmake

@@ -36,7 +36,7 @@ namespace apsi
             /**
             Run the dispatcher on the given port.
             */
-            void run(const std::atomic<bool>& stop, const int port, const std::shared_ptr<apsi::oprf::OPRFKey>& oprf_key);
+            void run(const std::atomic<bool>& stop, int port, const std::shared_ptr<apsi::oprf::OPRFKey>& oprf_key);
 
         private:
             std::shared_ptr<apsi::sender::Sender> sender_;
