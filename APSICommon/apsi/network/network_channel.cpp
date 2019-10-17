@@ -147,40 +147,41 @@ void NetworkChannel::receive(SenderResponseGetParameters& response)
     size_t idx = 1;
 
     // PSIConfParams
-    response.psiconf_params.item_bit_count = msg.get<unsigned int>(idx++);
+    response.psiconf_params.item_bit_count = msg.get<u32>(idx++);
     response.psiconf_params.use_oprf = msg.get<bool>(idx++);
     response.psiconf_params.use_labels = msg.get<bool>(idx++);
     response.psiconf_params.use_fast_membership = msg.get<bool>(idx++);
     response.psiconf_params.sender_size = msg.get<u64>(idx++);
-    response.psiconf_params.num_chunks = msg.get<unsigned int>(idx++);
-    response.psiconf_params.sender_bin_size = msg.get<unsigned int>(idx++);
-    response.psiconf_params.item_bit_length_used_after_oprf = msg.get<unsigned int>(idx++);
+    response.psiconf_params.num_chunks = msg.get<u32>(idx++);
+    response.psiconf_params.sender_bin_size = msg.get<u64>(idx++);
+    response.psiconf_params.item_bit_length_used_after_oprf = msg.get<u32>(idx++);
 
     // TableParams
-    response.table_params.log_table_size = msg.get<unsigned int>(idx++);
-    response.table_params.window_size = msg.get<unsigned int>(idx++);
-    response.table_params.split_count = msg.get<unsigned int>(idx++);
-    response.table_params.split_size = msg.get<unsigned int>(idx++);
-    response.table_params.binning_sec_level = msg.get<unsigned int>(idx++);
+    response.table_params.log_table_size = msg.get<u32>(idx++);
+    response.table_params.window_size = msg.get<u32>(idx++);
+    response.table_params.split_count = msg.get<u32>(idx++);
+    response.table_params.split_size = msg.get<u32>(idx++);
+    response.table_params.binning_sec_level = msg.get<u32>(idx++);
 
     // CuckooParams
-    response.cuckoo_params.hash_func_count = msg.get<unsigned int>(idx++);
-    response.cuckoo_params.hash_func_seed = msg.get<unsigned int>(idx++);
-    response.cuckoo_params.max_probe = msg.get<unsigned int>(idx++);
+    response.cuckoo_params.hash_func_count = msg.get<u32>(idx++);
+    response.cuckoo_params.hash_func_seed = msg.get<u32>(idx++);
+    response.cuckoo_params.max_probe = msg.get<u32>(idx++);
 
     // SEALParams
-    response.seal_params.encryption_params.set_poly_modulus_degree(msg.get<size_t>(idx++));
+    u64 poly_modulus_degree = msg.get<u64>(idx++);
+    response.seal_params.encryption_params.set_poly_modulus_degree(static_cast<size_t>(poly_modulus_degree));
 
     vector<SmallModulus> coeff_modulus;
     get_sm_vector(coeff_modulus, msg, idx);
     response.seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
 
     response.seal_params.encryption_params.set_plain_modulus(msg.get<u64>(idx++));
-    response.seal_params.max_supported_degree = msg.get<unsigned int>(idx++);
+    response.seal_params.max_supported_degree = msg.get<u32>(idx++);
 
     // ExFieldParams
     response.exfield_params.characteristic = msg.get<u64>(idx++);
-    response.exfield_params.degree = msg.get<unsigned int>(idx++);
+    response.exfield_params.degree = msg.get<u32>(idx++);
 
     bytes_received_ += sizeof(SenderOperationType);
     bytes_received_ += sizeof(PSIParams::PSIConfParams);
@@ -291,7 +292,6 @@ void NetworkChannel::send_get_parameters_response(const vector<u8>& client_id, c
     msg.add(params.sender_bin_size());
     msg.add(params.item_bit_length_used_after_oprf());
 
-
     // TableParams
     msg.add(params.log_table_size());
     msg.add(params.window_size());
@@ -305,7 +305,8 @@ void NetworkChannel::send_get_parameters_response(const vector<u8>& client_id, c
     msg.add(params.max_probe());
 
     // SEALParams
-    msg.add(params.encryption_params().poly_modulus_degree());
+    u64 poly_modulus_degree = static_cast<u64>(params.encryption_params().poly_modulus_degree());
+    msg.add(poly_modulus_degree);
     add_sm_vector(params.encryption_params().coeff_modulus(), msg);
     msg.add(params.encryption_params().plain_modulus().value());
     msg.add(params.max_supported_degree());

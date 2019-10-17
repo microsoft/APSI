@@ -40,7 +40,7 @@ namespace apsi
 
             // number of chunks to split each item into 
             apsi::u32 num_chunks;
-            apsi::u32 sender_bin_size; 
+            apsi::u64 sender_bin_size; 
         };
 
         struct CuckooParams
