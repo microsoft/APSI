@@ -208,7 +208,7 @@ namespace APSITests
         // query
         svr.receive(sender_op, /* wait_for_message */ true);
         expected_total += sizeof(SenderOperationType);
-        expected_total += sizeof(size_t) * 3;
+        expected_total += sizeof(u64) * 3;
         expected_total += sizeof(u64) * 2;
         expected_total += 8425; // relinkeys
         expected_total += 105 * 2; // Ciphertexts

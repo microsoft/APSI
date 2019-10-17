@@ -70,7 +70,7 @@ void StreamChannel::receive(SenderResponseGetParameters& response)
 
     // SEALParams
     response.seal_params.encryption_params.load(istream_);
-    istream_.read(reinterpret_cast<char*>(&response.seal_params.max_supported_degree), sizeof(unsigned));
+    istream_.read(reinterpret_cast<char*>(&response.seal_params.max_supported_degree), sizeof(u32));
 
     // ExFieldParams
     istream_.read(reinterpret_cast<char*>(&response.exfield_params), sizeof(PSIParams::ExFieldParams));
@@ -106,9 +106,9 @@ void StreamChannel::send_get_parameters_response(const vector<u8>& client_id, co
     ostream_.write(reinterpret_cast<const char*>(&cuckooparams), sizeof(PSIParams::CuckooParams));
 
     // SEALParams
-    unsigned maxsd = params.max_supported_degree();
+    u32 maxsd = params.max_supported_degree();
     params.get_seal_params().encryption_params.save(ostream_);
-    ostream_.write(reinterpret_cast<const char*>(&maxsd), sizeof(unsigned));
+    ostream_.write(reinterpret_cast<const char*>(&maxsd), sizeof(u32));
 
     // ExFieldParams
     const PSIParams::ExFieldParams& exfieldparams = params.get_exfield_params();
@@ -130,14 +130,14 @@ void StreamChannel::receive(SenderResponsePreprocess& response)
         throw runtime_error("Should be preprocess type");
 
     // Size of buffer
-    size_t size;
-    istream_.read(reinterpret_cast<char*>(&size), sizeof(size_t));
+    u64 size;
+    istream_.read(reinterpret_cast<char*>(&size), sizeof(u64));
 
     // Actual buffer
-    response.buffer.resize(size);
+    response.buffer.resize(static_cast<size_t>(size));
     istream_.read(reinterpret_cast<char*>(response.buffer.data()), size);
 
-    bytes_received_ += sizeof(size_t);
+    bytes_received_ += sizeof(u64);
     bytes_received_ += size;
 }
 
@@ -147,13 +147,13 @@ void StreamChannel::send_preprocess(const vector<u8>& buffer)
     write_operation_type(SOP_preprocess);
 
     // Size of buffer
-    size_t size = buffer.size();
-    ostream_.write(reinterpret_cast<const char*>(&size), sizeof(size_t));
+    u64 size = static_cast<u64>(buffer.size());
+    ostream_.write(reinterpret_cast<const char*>(&size), sizeof(u64));
 
     // Actual buffer
     ostream_.write(reinterpret_cast<const char*>(buffer.data()), size);
 
-    bytes_sent_ += sizeof(size_t);
+    bytes_sent_ += sizeof(u64);
     bytes_sent_ += size;
 }
 
@@ -165,13 +165,13 @@ void StreamChannel::send_preprocess_response(const vector<u8>& client_id, const 
     write_operation_type(SOP_preprocess);
 
     // Size of buffer
-    size_t size = buffer.size();
-    ostream_.write(reinterpret_cast<const char*>(&size), sizeof(size_t));
+    u64 size = static_cast<u64>(buffer.size());
+    ostream_.write(reinterpret_cast<const char*>(&size), sizeof(u64));
 
     // Actual buffer
     ostream_.write(reinterpret_cast<const char*>(buffer.data()), size);
 
-    bytes_sent_ += sizeof(size_t);
+    bytes_sent_ += sizeof(u64);
     bytes_sent_ += size;
 }
 
@@ -195,9 +195,9 @@ void StreamChannel::send_query(
 
     write_string(relin_keys);
 
-    size_t size = query.size();
-    ostream_.write(reinterpret_cast<const char*>(&size), sizeof(size_t));
-    bytes_sent_ += sizeof(size_t);
+    u64 size = query.size();
+    ostream_.write(reinterpret_cast<const char*>(&size), sizeof(u64));
+    bytes_sent_ += sizeof(u64);
 
     for (const auto& q : query)
     {
@@ -207,8 +207,8 @@ void StreamChannel::send_query(
         ostream_.write(reinterpret_cast<const char*>(&power), sizeof(u64));
         bytes_sent_ += sizeof(u64);
 
-        ostream_.write(reinterpret_cast<const char*>(&size), sizeof(size_t));
-        bytes_sent_ += sizeof(size_t);
+        ostream_.write(reinterpret_cast<const char*>(&size), sizeof(u64));
+        bytes_sent_ += sizeof(u64);
 
         for (const auto& seededcipher : q.second)
         {
@@ -222,21 +222,22 @@ void StreamChannel::send_query_response(const vector<u8>& client_id, const size_
     // client_id is ignored
     write_operation_type(SOP_query);
 
-    ostream_.write(reinterpret_cast<const char*>(&package_count), sizeof(size_t));
-    bytes_sent_ += sizeof(size_t);
+    u64 pkg_count = static_cast<u64>(package_count);
+    ostream_.write(reinterpret_cast<const char*>(&pkg_count), sizeof(u64));
+    bytes_sent_ += sizeof(u64);
 }
 
 void StreamChannel::receive(apsi::ResultPackage& pkg)
 {
     unique_lock<mutex> rec_lock(*receive_mutex_);
 
-    istream_.read(reinterpret_cast<char*>(&pkg.batch_idx), sizeof(int));
-    istream_.read(reinterpret_cast<char*>(&pkg.split_idx), sizeof(int));
+    istream_.read(reinterpret_cast<char*>(&pkg.batch_idx), sizeof(i64));
+    istream_.read(reinterpret_cast<char*>(&pkg.split_idx), sizeof(i64));
     
     read_string(pkg.data);
     read_string(pkg.label_data);
 
-    bytes_received_ += (sizeof(int) * 2);
+    bytes_received_ += (sizeof(i64) * 2);
 }
 
 void StreamChannel::send(const vector<u8>& client_id, const ResultPackage& pkg)
@@ -244,50 +245,50 @@ void StreamChannel::send(const vector<u8>& client_id, const ResultPackage& pkg)
     unique_lock<mutex> snd_lock(*send_mutex_);
 
     // client_id is ignored
-    ostream_.write(reinterpret_cast<const char*>(&pkg.batch_idx), sizeof(int));
-    ostream_.write(reinterpret_cast<const char*>(&pkg.split_idx), sizeof(int));
+    ostream_.write(reinterpret_cast<const char*>(&pkg.batch_idx), sizeof(i64));
+    ostream_.write(reinterpret_cast<const char*>(&pkg.split_idx), sizeof(i64));
 
     write_string(pkg.data);
     write_string(pkg.label_data);
 
-    bytes_sent_ += (sizeof(int) * 2);
+    bytes_sent_ += (sizeof(i64) * 2);
 }
 
 void StreamChannel::write_operation_type(const SenderOperationType type)
 {
-    ostream_.write(reinterpret_cast<const char*>(&type), sizeof(SenderOperationType));
-    bytes_sent_ += sizeof(SenderOperationType);
+    u32 sotype = static_cast<u32>(type);
+    ostream_.write(reinterpret_cast<const char*>(&sotype), sizeof(u32));
+    bytes_sent_ += sizeof(u32);
 }
 
 SenderOperationType StreamChannel::read_operation_type()
 {
-    SenderOperationType type;
-    istream_.read(reinterpret_cast<char*>(&type), sizeof(SenderOperationType));
-    bytes_received_ += sizeof(SenderOperationType);
+    u32 type;
+    istream_.read(reinterpret_cast<char*>(&type), sizeof(u32));
+    bytes_received_ += sizeof(u32);
 
-    return type;
+    return static_cast<SenderOperationType>(type);
 }
-
 
 void StreamChannel::write_string(const std::string& str)
 {
-    size_t size = str.length();
-    ostream_.write(reinterpret_cast<const char*>(&size), sizeof(size_t));
+    u64 size = static_cast<u64>(str.length());
+    ostream_.write(reinterpret_cast<const char*>(&size), sizeof(u64));
     ostream_.write(str.data(), size);
 
-    bytes_sent_ += sizeof(size_t);
+    bytes_sent_ += sizeof(u64);
     bytes_sent_ += size;
 }
 
 void StreamChannel::read_string(std::string& str)
 {
-    size_t size;
-    istream_.read(reinterpret_cast<char*>(&size), sizeof(size_t));
+    u64 size;
+    istream_.read(reinterpret_cast<char*>(&size), sizeof(u64));
 
-    str.resize(size);
+    str.resize(static_cast<size_t>(size));
     istream_.read(&str[0], size);
 
-    bytes_received_ += sizeof(size_t);
+    bytes_received_ += sizeof(u64);
     bytes_received_ += size;
 }
 
@@ -300,10 +301,10 @@ shared_ptr<SenderOperation> StreamChannel::decode_get_parameters()
 shared_ptr<SenderOperation> StreamChannel::decode_preprocess()
 {
     vector<u8> buffer;
-    size_t size;
-    istream_.read(reinterpret_cast<char*>(&size), sizeof(size_t));
+    u64 size;
+    istream_.read(reinterpret_cast<char*>(&size), sizeof(u64));
     
-    buffer.resize(size);
+    buffer.resize(static_cast<size_t>(size));
     istream_.read(reinterpret_cast<char*>(buffer.data()), size);
 
     return make_shared<SenderOperationPreprocess>(move(buffer));
@@ -314,26 +315,25 @@ shared_ptr<SenderOperation> StreamChannel::decode_query()
     string relin_keys;
     read_string(relin_keys);
 
-    size_t qsize;
-    istream_.read(reinterpret_cast<char*>(&qsize), sizeof(size_t));
-    bytes_received_ += sizeof(size_t);
+    u64 qsize;
+    istream_.read(reinterpret_cast<char*>(&qsize), sizeof(u64));
+    bytes_received_ += sizeof(u64);
 
     map<u64, vector<string>> query;
 
-    for (size_t qidx = 0; qidx < qsize; qidx++)
+    for (u64 qidx = 0; qidx < qsize; qidx++)
     {
         u64 power;
-        size_t vecsize;
+        u64 vecsize;
 
         istream_.read(reinterpret_cast<char*>(&power), sizeof(u64));
-        istream_.read(reinterpret_cast<char*>(&vecsize), sizeof(size_t));
-        bytes_received_ += sizeof(u64);
-        bytes_received_ += sizeof(size_t);
+        istream_.read(reinterpret_cast<char*>(&vecsize), sizeof(u64));
+        bytes_received_ += (sizeof(u64) * 2);
 
         vector<string> power_entry;
         power_entry.reserve(vecsize);
 
-        for (size_t vecidx = 0; vecidx < vecsize; vecidx++)
+        for (u64 vecidx = 0; vecidx < vecsize; vecidx++)
         {
             string cipher;
             read_string(cipher);
