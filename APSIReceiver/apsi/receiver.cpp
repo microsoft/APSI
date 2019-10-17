@@ -267,7 +267,7 @@ pair<
     unique_ptr<KukuTable> cuckoo;
     unique_ptr<FFieldArray> exfield_items;
 
-    unsigned padded_cuckoo_capacity = static_cast<unsigned>(
+    u32 padded_cuckoo_capacity = static_cast<u32>(
         ((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
 
     exfield_items = make_unique<FFieldArray>(padded_cuckoo_capacity, *field_);
