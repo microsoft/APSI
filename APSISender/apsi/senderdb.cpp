@@ -9,11 +9,9 @@
 #include "apsi/senderdb.h"
 #include "apsi/apsidefines.h"
 #include "apsi/tools/prng.h"
-#include "apsi/tools/fourq.h"
 
 // SEAL
 #include <seal/evaluator.h>
-#include <seal/util/blake2.h>
 
 using namespace std;
 using namespace seal;
@@ -196,31 +194,11 @@ void SenderDB::add_data_no_hash(gsl::span<const Item> data, MatrixView<u8> value
     u64 start = 0;
     u64 end = data.size();
 
-    vector<u8> buff(FourQCoordinate::byte_count());
-    PRNG pp(cc_block);
-    FourQCoordinate key(pp);
-
     vector<int> loads(params_.table_size(), 0);
     u64 maxload = 0;
 
     for (size_t i = start; i < end; i++)
     {
-        // Do we do OPRF for Sender's security?
-        if (params_.use_oprf())
-        {
-            // Compute EC PRF first for data
-            PRNG p(data[i], /* buffer_size */ 8);
-            FourQCoordinate a(p);
-            a.multiply_mod_order(key);
-            a.to_buffer(buff.data());
-
-            // Then compress with BLAKE2b
-            blake2(
-                reinterpret_cast<uint8_t*>(const_cast<uint64_t*>(data[i].data())),
-                sizeof(block),
-                reinterpret_cast<const uint8_t*>(buff.data()), buff.size(),
-                nullptr, 0);
-        }
         u64 loc = i % get_params().table_size();
 
         loads[loc] ++;
@@ -267,16 +245,12 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
     u64 start = thread_idx * data.size() / thread_count;
     u64 end = (thread_idx + 1) * data.size() / thread_count;
 
-    vector<u8> buff(FourQCoordinate::byte_count());
-    PRNG pp(cc_block);
-    FourQCoordinate key(pp);
-
-    vector<cuckoo::LocFunc> normal_loc_func;
+    vector<kuku::LocFunc> normal_loc_func;
     for (unsigned i = 0; i < params_.hash_func_count(); i++)
     {
         normal_loc_func.emplace_back(
             params_.log_table_size(),
-            cuckoo::make_item(params_.hash_func_seed() + i, 0));
+            kuku::make_item(params_.hash_func_seed() + i, 0));
     }
 
     loads.resize(params_.table_size(), 0);
@@ -284,23 +258,6 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
     
     for (size_t i = start; i < end; i++)
     {
-        // Do we do OPRF for Sender's security?
-        if (params_.use_oprf())
-        {
-            // Compute EC PRF first for data
-            PRNG p(data[i], /* buffer_size */ 8);
-            FourQCoordinate a(p);
-            a.multiply_mod_order(key);
-            a.to_buffer(buff.data());
-
-            // Then compress with BLAKE2b
-            blake2(
-                reinterpret_cast<uint8_t*>(const_cast<uint64_t*>(data[i].data())),
-                sizeof(block),
-                reinterpret_cast<const uint8_t*>(buff.data()), buff.size(),
-                nullptr, 0);
-        }
-
         std::vector<u64> locs(params_.hash_func_count());
         std::vector<Item> keys(params_.hash_func_count());
         std::vector<bool> skip(params_.hash_func_count());

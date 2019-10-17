@@ -12,17 +12,16 @@
 #include "apsi/logging/log.h"
 #include "apsi/network/network_utils.h"
 #include "apsi/network/channel.h"
-#include "apsi/tools/fourq.h"
 #include "apsi/tools/prng.h"
 #include "apsi/tools/utils.h"
 #include "apsi/result_package.h"
+#include "apsi/oprf/oprf_receiver.h"
 
 // SEAL
 #include <seal/util/common.h>
 #include <seal/util/uintcore.h>
 #include <seal/encryptionparams.h>
 #include <seal/keygenerator.h>
-#include <seal/util/blake2.h>
 
 using namespace std;
 using namespace seal;
@@ -33,7 +32,7 @@ using namespace apsi::logging;
 using namespace apsi::tools;
 using namespace apsi::network;
 using namespace apsi::receiver;
-
+using namespace apsi::oprf;
 
 
 Receiver::Receiver(int thread_count, const MemoryPoolHandle& pool) :
@@ -185,62 +184,15 @@ void Receiver::obfuscate_items(std::vector<Item>& items, std::vector<u8>& items_
 {
     Log::info("Obfuscating items");
 
-    PRNG prng(zero_block);
-    FourQCoordinate x;
-
-    mult_factor_.clear();
-    mult_factor_.reserve(items.size());
-
-    auto step = FourQCoordinate::byte_count();
-    items_buffer.resize(items.size() * step);
-    auto iter = items_buffer.data();
-
-    for (u64 i = 0; i < items.size(); i++)
-    {
-        x.random(prng);
-        mult_factor_.emplace_back(x.data(), x.data() + FourQCoordinate::word_count());
-
-        PRNG pp(items[i], /* buffer_size */ 8);
-
-        x.random(pp);
-        x.multiply_mod_order(mult_factor_[i].data());
-        x.to_buffer(iter);
-
-        iter += step;
-    }
-
-    // compute 1/b so that we can compute (x^ba)^(1/b) = x^a
-    for (u64 i = 0; i < items.size(); ++i)
-    {
-        FourQCoordinate inv(mult_factor_[i].data());
-        inv.inversion_mod_order();
-        mult_factor_[i] = vector<u64>(inv.data(), inv.data() + FourQCoordinate::word_count());
-    }
+    items_buffer.resize(items.size() * oprf_query_size);
+    oprf_receiver_ = make_shared<OPRFReceiver>(items, items_buffer);
 }
 
 void Receiver::deobfuscate_items(std::vector<Item>& items, std::vector<u8>& items_buffer)
 {
     Log::info("Deobfuscating items");
 
-    auto step = FourQCoordinate::byte_count();
-    auto iter = items_buffer.data();
-    FourQCoordinate x;
-
-    for (u64 i = 0; i < items.size(); i++)
-    {
-        x.from_buffer(iter);
-        x.multiply_mod_order(mult_factor_[i].data());
-        x.to_buffer(iter);
-
-        // Compress with BLAKE2b
-        blake2(
-            reinterpret_cast<uint8_t*>(items[i].data()),
-            sizeof(items[i].get_value()),
-            reinterpret_cast<const uint8_t*>(iter), step,
-            nullptr, 0);
-
-        iter += step;
-    }
+    oprf_receiver_->process_responses(items_buffer, items);
 }
 
 void Receiver::handshake(Channel& chl)

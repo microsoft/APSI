@@ -15,7 +15,6 @@
 #include "apsi/network/network_utils.h"
 #include "apsi/tools/utils.h"
 #include "apsi/tools/prng.h"
-#include "apsi/tools/fourq.h"
 #include "apsi/result_package.h"
 
 // SEAL
@@ -203,30 +202,6 @@ void Sender::report_offline_compute_progress(int total_threads, atomic<bool>& wo
         // Check for progress 10 times per second
         this_thread::sleep_for(100ms);
     }
-}
-
-void Sender::preprocess(vector<u8>& buff)
-{
-    STOPWATCH(sender_stop_watch, "Sender::preprocess");
-    Log::info("Starting pre-processing");
-
-    PRNG pp(cc_block);
-    FourQCoordinate key(pp);
-    auto iter = buff.data();
-    auto step = FourQCoordinate::byte_count();
-    FourQCoordinate x;
-    u64 num = buff.size() / step;
-
-    for (u64 i = 0; i < num; i++)
-    {
-        x.from_buffer(iter);
-        x.multiply_mod_order(key);
-        x.to_buffer(iter);
-
-        iter += step;
-    }
-
-    Log::info("Pre-processing done");
 }
 
 void Sender::query(

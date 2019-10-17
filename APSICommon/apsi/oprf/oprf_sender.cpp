@@ -114,5 +114,27 @@ namespace apsi
                     ECPoint::hash_size });
             }
         }
+
+        void OPRFSender::ComputeHashes(
+            gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items,
+            const OPRFKey& oprf_key)
+        {
+            for (ptrdiff_t i = 0; i < oprf_items.size(); i++)
+            {
+                // Create an elliptic curve point from the item
+                ECPoint ecpt({
+                    reinterpret_cast<unsigned char*>(oprf_items[i].data()),
+                    oprf_item_size });
+
+                // Multiply with key
+                ecpt.scalar_multiply(oprf_key.key_span());
+
+                // Extract the hash inplace
+                oprf_items[i] = oprf_item_type();
+                ecpt.extract_hash({
+                    reinterpret_cast<unsigned char*>(oprf_items[i].data()),
+                    ECPoint::hash_size });
+            }
+        }
     }
 }

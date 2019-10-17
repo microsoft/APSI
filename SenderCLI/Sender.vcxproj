@@ -86,13 +86,13 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\APSICommon;$(ProjectDir)..\APSISender;$(ProjectDir)..\CommonCLI;$(APSILIBS)\Cuckoo\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\GSL;$(APSILIBS)\tclap-1.2.2\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\APSICommon;$(ProjectDir)..\APSISender;$(ProjectDir)..\CommonCLI;$(APSILIBS)\Kuku\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\tclap-1.2.2\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PreprocessorDefinitions>USE_SECURE_SEED;_DISABLE_EXTENDED_ALIGNED_STORAGE;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>__WINDOWS__;_AVX2_;_AMD64_;USE_SECURE_SEED;_DISABLE_EXTENDED_ALIGNED_STORAGE;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\libzmqpp\lib\$(IntDir);$(APSILIBS)\libzmq\dll\$(IntDir);$(APSILIBS)\log4cplus\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>APSICommon.lib;APSISender.lib;SEAL.lib;Cuckoo.lib;FourQ.lib;zmqpp.lib;libzmq.lib;CommonCLI.lib;log4cplusSD.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\lib\$(IntDir);$(APSILIBS)\Kuku\lib\$(IntDir);$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\libzmqpp\lib\$(IntDir);$(APSILIBS)\libzmq\dll\$(IntDir);$(APSILIBS)\log4cplus\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>APSICommon.lib;APSISender.lib;SEAL.lib;Kuku.lib;FourQ.lib;zmqpp.lib;libzmq.lib;CommonCLI.lib;log4cplusSD.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -115,17 +115,17 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\APSICommon;$(ProjectDir)..\APSISender;$(ProjectDir)..\CommonCLI;$(APSILIBS)\Cuckoo\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\GSL;$(APSILIBS)\tclap-1.2.2\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)..\APSICommon;$(ProjectDir)..\APSISender;$(ProjectDir)..\CommonCLI;$(APSILIBS)\Kuku\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\tclap-1.2.2\include;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
-      <PreprocessorDefinitions>USE_SECURE_SEED;_DISABLE_EXTENDED_ALIGNED_STORAGE;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>__WINDOWS__;_AVX2_;_AMD64_;USE_SECURE_SEED;_DISABLE_EXTENDED_ALIGNED_STORAGE;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <ControlFlowGuard>Guard</ControlFlowGuard>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\lib\$(IntDir);$(APSILIBS)\Cuckoo\lib\$(IntDir);$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\libzmqpp\lib\$(IntDir);$(APSILIBS)\libzmq\dll\$(IntDir);$(APSILIBS)\log4cplus\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>APSICommon.lib;APSISender.lib;SEAL.lib;Cuckoo.lib;FourQ.lib;zmqpp.lib;libzmq.lib;CommonCLI.lib;log4cplusS.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\lib\$(IntDir);$(APSILIBS)\Kuku\lib\$(IntDir);$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\libzmqpp\lib\$(IntDir);$(APSILIBS)\libzmq\dll\$(IntDir);$(APSILIBS)\log4cplus\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>APSICommon.lib;APSISender.lib;SEAL.lib;Kuku.lib;FourQ.lib;zmqpp.lib;libzmq.lib;CommonCLI.lib;log4cplusS.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
