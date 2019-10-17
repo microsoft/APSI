@@ -250,8 +250,8 @@ void NetworkChannel::receive(ResultPackage& pkg)
         throw runtime_error(ss.str());
     }
 
-    pkg.split_idx = msg.get<int>(/* part */ 0);
-    pkg.batch_idx = msg.get<int>(/* part */ 1);
+    pkg.split_idx = msg.get<i64>(/* part */ 0);
+    pkg.batch_idx = msg.get<i64>(/* part */ 1);
     pkg.data = msg.get(/* part */ 2);
     pkg.label_data = msg.get(/* part */ 3);
 
