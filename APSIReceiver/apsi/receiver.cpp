@@ -425,7 +425,7 @@ void Receiver::generate_powers(const FFieldArray& exfield_items,
     for (u64 j = 0; j < static_cast<u64>(bound); j++)
     {
         result.emplace(1ULL << (window_size * j), current_power);
-        for (u64 i = 2; i < static_cast<u64>(radix); i++)
+        for (u32 i = 2; i < radix; i++)
         {
             if (i * (1ULL << (window_size * j)) > static_cast<u64>(split_size))
             {
@@ -433,7 +433,7 @@ void Receiver::generate_powers(const FFieldArray& exfield_items,
             }
             result.emplace(i * (1ULL << (window_size * j)), result.at((i - 1) * (1ULL << (window_size * j))) * current_power);
         }
-        for (int k = 0; k < window_size; k++)
+        for (u32 k = 0; k < window_size; k++)
         {
             current_power.sq();
         }
