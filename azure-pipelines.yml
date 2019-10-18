@@ -48,6 +48,7 @@ steps:
   displayName: 'Run Roslyn Analyzers'
 
 - task: CmdLine@2
+  displayName: 'Copy dependencies for Tests'
   inputs:
     script: |
       echo Copying library DLLs for test execution
