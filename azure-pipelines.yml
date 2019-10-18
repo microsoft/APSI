@@ -26,6 +26,12 @@ steps:
   inputs:
     restoreSolution: '$(solution)'
 
+- task: NuGetCommand@2
+  displayName: 'NuGet restore Configuration Packages'
+  inputs:
+    restoreSolution: tools/config/packages.config
+    restoreDirectory: ConfigPackages
+
 - task: CredScan@2
   displayName: 'Run CredScan'
   inputs:
