@@ -291,7 +291,7 @@ namespace APSITests
         RunTest(senderActualSize, params);
     }
 
-    TEST(SenderReceiverTests, OPRFFastMembershipLabelsTest)
+    TEST(SenderReceiverTests, DISABLED_OPRFFastMembershipLabelsTest)
     {
         size_t senderActualSize = 3000;
         PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_labels */ true, /* fast_membership */ true);
