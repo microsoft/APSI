@@ -51,10 +51,8 @@ steps:
   inputs:
     testSelector: 'testAssemblies'
     testAssemblyVer2: |
-      **\*test*.dll
-      **\*test*.exe
-      !**\*TestAdapter.dll
-      !**\obj\**
+      **\*IntegrationTests.exe
+      **\*APSITests.exe
     searchFolder: '$(System.DefaultWorkingDirectory)'
     platform: '$(buildPlatform)'
     configuration: '$(buildConfiguration)'
