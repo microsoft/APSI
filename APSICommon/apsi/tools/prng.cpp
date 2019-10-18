@@ -6,17 +6,18 @@
 #include "apsi/item.h"
 
 
+using namespace std;
 using namespace apsi;
 using namespace apsi::tools;
 
-PRNG::PRNG(const block& seed, u64 buffer_size)
+PRNG::PRNG(const block& seed, size_t buffer_size)
     : bytes_idx_(0),
       block_idx_(0)
 {
     set_seed(seed, buffer_size);
 }
 
-PRNG::PRNG(const Item& seed, u64 buffer_size)
+PRNG::PRNG(const Item& seed, size_t buffer_size)
     : bytes_idx_(0),
       block_idx_(0)
 {
@@ -50,7 +51,7 @@ void PRNG::operator=(PRNG&&s)
     clear(s);
 }
 
-void PRNG::set_seed(const block& seed, u64 buffer_size)
+void PRNG::set_seed(const block& seed, size_t buffer_size)
 {
     aes_.set_key(seed);
     block_idx_ = 0;

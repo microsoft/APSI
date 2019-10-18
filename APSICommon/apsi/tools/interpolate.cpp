@@ -97,7 +97,7 @@ namespace apsi
 
         // result[0] = DD[0][size-1]; 
         result.set(0, size-1, divided_differences[0]);
-        for (int  i = 1; i < size; i++)
+        for (size_t i = 1; i < size; i++)
         {
             for (int j = i - 1; j >= 0; j--)
             {

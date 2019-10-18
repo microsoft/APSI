@@ -55,7 +55,7 @@ namespace apsi
 
         FFieldElt(FField field) : field_(std::move(field))
         {
-            elt_.resize(field_.d_);
+            elt_.resize(static_cast<size_t>(field_.d_));
         }
 
         FFieldElt(FField field, const _ffield_elt_coeff_t *value) : field_(field)

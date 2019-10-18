@@ -20,7 +20,7 @@ class Matrix : public MatrixView<T>
 public:
     Matrix() = default;
 
-    Matrix(u64 rows, u64 cols, std::size_t elt_size = 1)
+    Matrix(std::size_t rows, std::size_t cols, std::size_t elt_size = 1)
     {
         resize(rows, cols, elt_size);
     }
@@ -32,9 +32,9 @@ public:
      * When the needed capacity is less than the current capacity, the memory
      * use will remain the same and the matrix will be reduced only logically.
      */
-    void resize(u64 newRows, u64 newCols, std::size_t elt_size = 1)
+    void resize(std::size_t newRows, std::size_t newCols, std::size_t elt_size = 1)
     {
-        u64 newCapacity = newRows * newCols * elt_size;
+        std::size_t newCapacity = newRows * newCols * elt_size;
 
         if (newCapacity > data_.size())
         {
@@ -52,7 +52,7 @@ protected:
      * Get the actual size of the backing vector. This might be different
      * from the logical size, specially if the matrix has been resized.
      */
-    u64 capacity() const { return data_.size(); }
+    std::size_t capacity() const { return data_.size(); }
 
 private:
     std::vector<T> data_;

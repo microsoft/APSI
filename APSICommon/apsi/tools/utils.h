@@ -32,7 +32,7 @@ namespace apsi
         /**
         Fill a given number of 64 bit words with zeros
         */
-        inline void zero_uint(apsi::u64 *destination, const apsi::u64 u64_count)
+        inline void zero_uint(apsi::u64 *destination, const std::size_t u64_count)
         {
             std::memset(reinterpret_cast<unsigned char*>(destination), 0, 8 * u64_count);
         }
