@@ -109,6 +109,14 @@ namespace apsi
                 return *params_.get();
             }
 
+            /**
+            Get the relinearization keys
+            */
+            const std::string& relin_keys() const
+            {
+                return relin_keys_;
+            }
+
         private:
             /**
             Preprocesses the PSI items. Returns the power map of the items, and the indices of them in the hash table.
