@@ -26,13 +26,13 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <Platformtoolset>v142</Platformtoolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <Platformtoolset>v142</Platformtoolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
@@ -78,12 +78,26 @@
     <TargetExt>.lib</TargetExt>
     <OutDir>$(ProjectDir)../lib/$(Platform)\$(Configuration)\</OutDir>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <OutDir>$(ProjectDir)../lib/$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <OutDir>$(ProjectDir)../lib/$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(APSILIBS)\Kuku\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\log4cplus\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_X86_;_GENERIC_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;NOMINMAX;_CRT_SECURE_NO_WARNINGS;HAVE_AVX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
+    <Lib>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(IntDir)\;$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\log4cplus\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -91,7 +105,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>$(ProjectDir);$(APSILIBS)\Kuku\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\log4cplus\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;NOMINMAX;_CRT_SECURE_NO_WARNINGS;HAVE_AVX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;NOMINMAX;_CRT_SECURE_NO_WARNINGS;HAVE_AVX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ShowIncludes>false</ShowIncludes>
     </ClCompile>
@@ -100,7 +114,7 @@
       </AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\x64\$(Configuration)\;$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\log4cplus\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(IntDir)\;$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\log4cplus\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <LinkTimeCodeGeneration>false</LinkTimeCodeGeneration>
     </Lib>
   </ItemDefinitionGroup>
@@ -111,11 +125,17 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(APSILIBS)\Kuku\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\log4cplus\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_X86_;_GENERIC_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;NOMINMAX;_CRT_SECURE_NO_WARNINGS;HAVE_AVX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
     </Link>
+    <Lib>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(IntDir)\;$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\log4cplus\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Lib>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -125,7 +145,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <AdditionalIncludeDirectories>$(ProjectDir);$(APSILIBS)\Kuku\include;$(APSILIBS)\SEAL\include;$(APSILIBS)\FourQlib\include;$(APSILIBS)\GSL;$(APSILIBS)\libzmqpp\include;$(APSILIBS)\libzmq\include;$(APSILIBS)\log4cplus\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;BOOST_ALL_NO_LIB;BOOST_ALL_DYN_LINK;NOMINMAX;_CRT_SECURE_NO_WARNINGS;HAVE_AVX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>MSVC;_WIN32_WINNT=0x0501;__WINDOWS__;_AVX2_;_AMD64_;_HAS_AUTO_PTR_ETC;_SILENCE_CXX17_OLD_ALLOCATOR_MEMBERS_DEPRECATION_WARNING;_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING;USE_SECURE_SEED;NOMINMAX;_CRT_SECURE_NO_WARNINGS;HAVE_AVX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <ShowIncludes>false</ShowIncludes>
       <WholeProgramOptimization>false</WholeProgramOptimization>
@@ -140,7 +160,7 @@
       </AdditionalDependencies>
     </Lib>
     <Lib>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\x64\$(Configuration)\;$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\log4cplus\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\bin\$(IntDir)\;$(APSILIBS)\SEAL\lib\$(IntDir);$(APSILIBS)\FourQlib\lib\$(IntDir);$(APSILIBS)\log4cplus\lib\$(IntDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <LinkTimeCodeGeneration>false</LinkTimeCodeGeneration>
     </Lib>
   </ItemDefinitionGroup>

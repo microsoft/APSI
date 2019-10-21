@@ -62,7 +62,7 @@ namespace apsi
 
         inline FFieldArray create_array() const
         {
-            return { slot_count_, field_ };
+            return { static_cast<size_t>(slot_count_), field_ };
         }
 
         void compose(const FFieldArray &values, seal::Plaintext &destination) const;

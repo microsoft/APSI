@@ -464,7 +464,7 @@ void NetworkChannel::get_buffer(vector<u8>& buff, const message_t& msg, int part
         if (msg.size(/* part */ static_cast<size_t>(part_start) + 1) < size)
             throw runtime_error("Second Part has less data than expected");
 
-        memcpy(buff.data(), msg.raw_data(/* part */ static_cast<size_t>(part_start) + 1), size);
+        memcpy(buff.data(), msg.raw_data(/* part */ static_cast<size_t>(part_start) + 1), static_cast<size_t>(size));
     }
 }
 
@@ -494,7 +494,7 @@ void NetworkChannel::get_sm_vector(vector<SmallModulus>& smv, const message_t& m
         throw runtime_error("Insufficient parts for SmallModulus vector");
 
     smv.resize(static_cast<size_t>(size));
-    for (u64 sm_idx = 0; sm_idx < size; sm_idx++)
+    for (size_t sm_idx = 0; sm_idx < size; sm_idx++)
     {
         string str = msg.get(part_idx++);
         get_small_modulus(smv[sm_idx], str);
@@ -599,7 +599,7 @@ shared_ptr<SenderOperation> NetworkChannel::decode_query(const message_t& msg)
 
         vector<string> powers(static_cast<size_t>(num_elems));
 
-        for (u64 j = 0; j < num_elems; j++)
+        for (size_t j = 0; j < num_elems; j++)
         {
             msg.get(powers[j], msg_idx++);
             bytes_received_ += powers[j].length();

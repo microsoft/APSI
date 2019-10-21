@@ -23,11 +23,33 @@ namespace apsi
         namespace
         {
             // Curve constants
-            felm_t c0{ 1064406672104372656ULL, 4737573565184866938ULL };
-            felm_t b0{ 11442141257964318772ULL, 5379339658566403666ULL };
-            felm_t b1{ 17ULL, 9223372036854775796ULL };
-            felm_t A0{ 1289ULL, 9223372036854774896ULL };
-            felm_t A1{ 12311914987857864728ULL, 7168186187914912079ULL };
+            std::uint64_t c0h = 1064406672104372656ULL;
+            std::uint64_t c0l = 4737573565184866938ULL;
+            std::uint64_t b0h = 11442141257964318772ULL;
+            std::uint64_t b0l = 5379339658566403666ULL;
+            std::uint64_t b1h = 17ULL;
+            std::uint64_t b1l = 9223372036854775796ULL;
+            std::uint64_t A0h = 1289ULL;
+            std::uint64_t A0l = 9223372036854774896ULL;
+            std::uint64_t A1h = 12311914987857864728ULL;
+            std::uint64_t A1l = 7168186187914912079ULL;
+
+#ifndef _X86_
+            felm_t c0{ c0h, c0l };
+            felm_t b0{ b0h, b0l };
+            felm_t b1{ b1h, b1l };
+            felm_t A0{ A0h, A0l };
+            felm_t A1{ A1h, A1l };
+#else
+#define HIGHOF64(x)  static_cast<std::uint32_t>(x >> 32)
+#define LOWOF64(x)   static_cast<std::uint32_t>(x)
+
+            felm_t c0{ HIGHOF64(c0h), LOWOF64(c0h), HIGHOF64(c0l), LOWOF64(c0l) };
+            felm_t b0{ HIGHOF64(b0h), LOWOF64(b0h), HIGHOF64(b0l), LOWOF64(b0l) };
+            felm_t b1{ HIGHOF64(b1h), LOWOF64(b1h), HIGHOF64(b1l), LOWOF64(b1l) };
+            felm_t A0{ HIGHOF64(A0h), LOWOF64(A0h), HIGHOF64(A0l), LOWOF64(A0l) };
+            felm_t A1{ HIGHOF64(A1h), LOWOF64(A1h), HIGHOF64(A1l), LOWOF64(A1l) };
+#endif
 
             inline void fpsqrt1271(felm_t in, felm_t out)
             {

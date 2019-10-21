@@ -242,7 +242,7 @@ void Receiver::handshake(Channel& chl)
         sender_params.seal_params.encryption_params.poly_modulus_degree(),
         sender_params.seal_params.encryption_params.plain_modulus().value());
     Log::debug("coeff modulus: %i elements", sender_params.seal_params.encryption_params.coeff_modulus().size());
-    for (u64 i = 0; i < sender_params.seal_params.encryption_params.coeff_modulus().size(); i++)
+    for (size_t i = 0; i < sender_params.seal_params.encryption_params.coeff_modulus().size(); i++)
     {
         Log::debug("Coeff modulus %i: 0x%llx", i, sender_params.seal_params.encryption_params.coeff_modulus()[i].value());
     }
@@ -524,7 +524,7 @@ std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
         num_threads);
 
     std::vector<std::thread> thrds(num_threads);
-    for (u64 t = 0; t < thrds.size(); ++t)
+    for (size_t t = 0; t < thrds.size(); ++t)
     {
         thrds[t] = std::thread([&](int idx)
             {
@@ -576,7 +576,7 @@ void Receiver::stream_decrypt_worker(
             channel.receive(pkg);
         }
 
-        auto base_idx = pkg.batch_idx * batch_size;
+        int base_idx = static_cast<int>(pkg.batch_idx * batch_size);
         Log::debug("Thread idx: %i, pkg.batch_idx: %i", thread_idx, pkg.batch_idx);
 
         // recover the sym poly values 

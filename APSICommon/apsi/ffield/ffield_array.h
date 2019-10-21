@@ -28,7 +28,7 @@ namespace apsi
             field_(field)
         {
             // Initialize array
-            array_.resize(field_.d_ * size_, 0);
+            array_.resize(static_cast<size_t>(field_.d_ * size_), 0);
         }
 
         FFieldArray(const FFieldArray &copy) = default;

@@ -126,7 +126,7 @@ string print_hex(gsl::span<u8> s)
 
 void print_intersection_results(pair<vector<bool>, Matrix<u8>>& intersection)
 {
-    for (int i = 0; i < intersection.first.size(); i++)
+    for (size_t i = 0; i < intersection.first.size(); i++)
     {
         stringstream msg;
         msg << "Item at index " << i << " is ";

@@ -331,7 +331,7 @@ shared_ptr<SenderOperation> StreamChannel::decode_query()
         bytes_received_ += (sizeof(u64) * 2);
 
         vector<string> power_entry;
-        power_entry.reserve(vecsize);
+        power_entry.reserve(static_cast<size_t>(vecsize));
 
         for (u64 vecidx = 0; vecidx < vecsize; vecidx++)
         {

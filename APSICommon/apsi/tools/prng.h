@@ -37,13 +37,13 @@ namespace apsi
             * Explicit constructor to initialize the PRNG with the
             * given seed and buffer_size number of AES blocks
             */
-            PRNG(const block& seed, u64 buffer_size = 256);
+            PRNG(const block& seed, std::size_t buffer_size = 256);
 
             /**
              * Explicit construction to initialize the PRNG with the
              * given seed and buffer_size number of AES blocks
              */
-            PRNG(const Item& seed, u64 buffer_size = 256);
+            PRNG(const Item& seed, std::size_t buffer_size = 256);
 
             /*
             * Standard move constructor. The moved from PRNG is invalid
@@ -65,7 +65,7 @@ namespace apsi
             /**
             * Set seed from a block and set the desired buffer size.
             */
-            void set_seed(const block& b, u64 buffer_size = 256);
+            void set_seed(const block& b, std::size_t buffer_size = 256);
 
             /**
             * Return the seed for this PRNG.
@@ -101,7 +101,7 @@ namespace apsi
                 {
                     u64 step = std::min(lengthu8, buffer_byte_capacity_ - bytes_idx_);
 
-                    memcpy(destu8, reinterpret_cast<u8*>(buffer_.data()) + bytes_idx_, step);
+                    memcpy(destu8, reinterpret_cast<u8*>(buffer_.data()) + bytes_idx_, static_cast<size_t>(step));
 
                     destu8 += step;
                     lengthu8 -= step;
