@@ -52,7 +52,7 @@ namespace APSITests
         StreamChannel receiverchannel(/* istream */ stream2, /* ostream */ stream1);
 
         PSIParams::PSIConfParams psiconf_params{ 60, true, false, false, 12345, 90, 45, 128 };
-        PSIParams::TableParams table_params{ 10, 1, 2, 35, 40 };
+        PSIParams::TableParams table_params{ 10, 1, 2, 35, 40, true };
         PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
         PSIParams::ExFieldParams exfield_params{ 678910, 8 };
         PSIParams::SEALParams seal_params;
@@ -85,6 +85,7 @@ namespace APSITests
         ASSERT_EQ(2, gpr.table_params.split_count);
         ASSERT_EQ(35, gpr.table_params.split_size);
         ASSERT_EQ(40, gpr.table_params.binning_sec_level);
+        ASSERT_TRUE(gpr.table_params.dynamic_split_count);
 
         ASSERT_EQ(3, gpr.cuckoo_params.hash_func_count);
         ASSERT_EQ(2, gpr.cuckoo_params.hash_func_seed);

@@ -147,7 +147,6 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
 
     vector<thread> thrds(thread_count);
 
-
     vector<vector<int>> thread_loads(thread_count);
     for (int t = 0; t < thrds.size(); t++)
     {
@@ -175,17 +174,19 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
     }
     Log::debug("Original max load =  %i", maxload); 
 
-    // making sure maxload is a multiple of split_size
-    u32 new_split_count = (maxload + params_.split_size() - 1) / params_.split_size();
-    maxload = new_split_count * params_.split_size();	
-    params_.set_sender_bin_size(maxload);
-    params_.set_split_count(new_split_count);
+    if (get_params().dynamic_split_count())
+    {
+        // making sure maxload is a multiple of split_size
+        u32 new_split_count = (maxload + params_.split_size() - 1) / params_.split_size();
+        maxload = new_split_count * params_.split_size();
+        params_.set_sender_bin_size(maxload);
+        params_.set_split_count(new_split_count);
 
-    // resize the matrix of blocks.
-    db_blocks_.resize(params_.batch_count(), new_split_count);
+        // resize the matrix of blocks.
+        db_blocks_.resize(params_.batch_count(), new_split_count);
 
-
-    Log::debug("New max load, new split count = %i, %i", params_.sender_bin_size(), params_.split_count());
+        Log::debug("New max load, new split count = %i, %i", params_.sender_bin_size(), params_.split_count());
+    }
 }
 
 
@@ -227,16 +228,18 @@ void SenderDB::add_data_no_hash(gsl::span<const Item> data, MatrixView<u8> value
     // debugging: print the bin load 
     Log::debug("Original max load = %i", maxload);
 
-    u64 new_split_count = (maxload + params_.split_size() - 1) / params_.split_size();
-    maxload = new_split_count * params_.split_size();
-    params_.set_sender_bin_size(maxload);
-    params_.set_split_count(static_cast<u32>(new_split_count));
+    if (get_params().dynamic_split_count())
+    {
+        u64 new_split_count = (maxload + params_.split_size() - 1) / params_.split_size();
+        maxload = new_split_count * params_.split_size();
+        params_.set_sender_bin_size(maxload);
+        params_.set_split_count(static_cast<u32>(new_split_count));
 
-    // resize the matrix of blocks.
-    db_blocks_.resize(params_.batch_count(), new_split_count);
+        // resize the matrix of blocks.
+        db_blocks_.resize(params_.batch_count(), new_split_count);
 
-    Log::debug("New max load, new split count = %i, %i", params_.sender_bin_size(), params_.split_count());
-
+        Log::debug("New max load, new split count = %i, %i", params_.sender_bin_size(), params_.split_count());
+    }
 }
 
 void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& seed, gsl::span<const Item> data, MatrixView<u8> values, vector<int> &loads)

@@ -262,10 +262,9 @@ namespace APSITests
         RunTest(senderActualSize, params);
     }
 
-
     TEST(SenderReceiverTests, OPRFTest)
     {
-        size_t senderActualSize = 3000;
+        size_t senderActualSize = 65536;
         PSIParams params = create_params(senderActualSize, /* use_oprf */ true, /* use_label */ false, /* fast_membership */ false);
         RunTest(senderActualSize, params);
     }

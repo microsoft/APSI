@@ -40,7 +40,7 @@ namespace apsi
 
             // number of chunks to split each item into 
             apsi::u32 num_chunks;
-            apsi::u64 sender_bin_size; 
+            apsi::u64 sender_bin_size;
         };
 
         struct CuckooParams
@@ -59,6 +59,7 @@ namespace apsi
             apsi::u32 split_count;
             apsi::u32 split_size;
             apsi::u32 binning_sec_level;
+            bool      dynamic_split_count;
         };
 
         struct SEALParams
@@ -168,6 +169,11 @@ namespace apsi
             return table_params_.binning_sec_level;
         }
 
+        inline bool dynamic_split_count() const
+        {
+            return table_params_.dynamic_split_count;
+        }
+
         /********************************************
         Parameters from input: CuckooParams
         *********************************************/
@@ -264,13 +270,13 @@ namespace apsi
         }
 
         void set_sender_bin_size(apsi::u64 size) {
-            apsi::logging::Log::info("manually setting sender bin size to be %i", size);
+            apsi::logging::Log::debug("Manually setting sender bin size to be %i", size);
             sender_bin_size_ = size;
         }
 
 
         void set_split_count(apsi::u32 count) {
-            apsi::logging::Log::info("manually setting split count to be %i", count);
+            apsi::logging::Log::debug("Manually setting split count to be %i", count);
             table_params_.split_count = count;
         }
 
@@ -296,7 +302,7 @@ namespace apsi
 
         void update_sender_bin_size()
         {
-            apsi::logging::Log::info("running balls in bins analysis with 2^%i bins and %i balls, with stat sec level = %i", table_params_.log_table_size,
+            apsi::logging::Log::debug("running balls in bins analysis with 2^%i bins and %i balls, with stat sec level = %i", table_params_.log_table_size,
                 psiconf_params_.sender_size *
                 cuckoo_params_.hash_func_count,
                 table_params_.binning_sec_level
@@ -307,7 +313,7 @@ namespace apsi
                 cuckoo_params_.hash_func_count,
                 table_params_.binning_sec_level,
                 table_params_.split_count);
-            apsi::logging::Log::info("updated sender bin size to %i.", sender_bin_size_); 
+            apsi::logging::Log::debug("updated sender bin size to %i.", sender_bin_size_); 
         }
 
 

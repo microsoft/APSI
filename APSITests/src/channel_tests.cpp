@@ -356,7 +356,7 @@ namespace APSITests
                 ASSERT_EQ(SOP_get_parameters, sender_op->type);
 
                 PSIParams::PSIConfParams psiconf_params{ 60, true, true, false, 12345, 120, 40, 50 };
-                PSIParams::TableParams table_params{ 10, 1, 2, 10, 40 };
+                PSIParams::TableParams table_params{ 10, 1, 2, 10, 40, false };
                 PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
                 PSIParams::ExFieldParams exfield_params{ 678910, 8 };
                 PSIParams::SEALParams seal_params;
@@ -398,6 +398,7 @@ namespace APSITests
         ASSERT_EQ((u32)2, get_params_response.table_params.split_count);
         ASSERT_EQ((u32)10, get_params_response.table_params.split_size);
         ASSERT_EQ((u32)40, get_params_response.table_params.binning_sec_level);
+        ASSERT_FALSE(get_params_response.table_params.dynamic_split_count);
         ASSERT_EQ((u32)3, get_params_response.cuckoo_params.hash_func_count);
         ASSERT_EQ((u32)2, get_params_response.cuckoo_params.hash_func_seed);
         ASSERT_EQ((u32)1, get_params_response.cuckoo_params.max_probe);
