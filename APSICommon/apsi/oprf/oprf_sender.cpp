@@ -117,9 +117,38 @@ namespace apsi
 
         void OPRFSender::ComputeHashes(
             gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items,
+            const OPRFKey& oprf_key,
+            const int threads)
+        {
+            int thread_count = threads;
+            if (-1 == thread_count)
+            {
+                thread_count = thread::hardware_concurrency();
+            }
+
+            vector<thread> thrds(thread_count);
+
+            for (int t = 0; t < thrds.size(); t++)
+            {
+                thrds[t] = thread([&](int idx)
+                    {
+                        compute_hashes_worker(idx, thread_count, oprf_items, oprf_key);
+                    }, t);
+            }
+
+            for (auto& t : thrds)
+            {
+                t.join();
+            }
+        }
+
+        void OPRFSender::compute_hashes_worker(
+            const int threadidx,
+            const int threads,
+            gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items,
             const OPRFKey& oprf_key)
         {
-            for (ptrdiff_t i = 0; i < oprf_items.size(); i++)
+            for (ptrdiff_t i = threadidx; i < oprf_items.size(); i += threads)
             {
                 // Create an elliptic curve point from the item
                 ECPoint ecpt({

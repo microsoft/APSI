@@ -94,9 +94,15 @@ namespace apsi
 
             static void ComputeHashes(
                 gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items,
-                const OPRFKey& oprf_key);
+                const OPRFKey& oprf_key,
+                const int threads = -1);
 
         private:
+            static void compute_hashes_worker(
+                const int threadidx,
+                const int threads,
+                gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items,
+                const OPRFKey& oprf_key);
         };
     }
 }
