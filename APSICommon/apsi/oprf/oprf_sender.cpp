@@ -52,7 +52,7 @@ namespace apsi
             const OPRFKey &oprf_key,
             gsl::span<unsigned char, gsl::dynamic_extent> oprf_responses)
         {
-            if (static_cast<size_t>(oprf_queries.size()) != oprf_responses.size())
+            if (oprf_queries.size() != oprf_responses.size())
             {
                 throw invalid_argument("oprf_queries size is incompatible with oprf_responses size");
             }
@@ -128,12 +128,12 @@ namespace apsi
 
             vector<thread> thrds(thread_count);
 
-            for (int t = 0; t < thrds.size(); t++)
+            for (size_t t = 0; t < thrds.size(); t++)
             {
                 thrds[t] = thread([&](int idx)
                     {
                         compute_hashes_worker(idx, thread_count, oprf_items, oprf_key);
-                    }, t);
+                    }, static_cast<int>(t));
             }
 
             for (auto& t : thrds)

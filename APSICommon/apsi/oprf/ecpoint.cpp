@@ -244,7 +244,7 @@ namespace apsi
             shared_ptr<seal::UniformRandomGenerator> rg)
         {
             array<uint64_t, 4> random_data;
-            static_assert(sizeof(random_data) == order_size);
+            static_assert(sizeof(random_data) == order_size, "Size of random_data should be the same as order_size");
 
             function<uint64_t()> random_uint64;
             if (rg)
