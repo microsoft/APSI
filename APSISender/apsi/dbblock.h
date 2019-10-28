@@ -63,8 +63,8 @@ namespace apsi
                 apsi::i64 batch_size,
                 apsi::i64 items_per_split)
             {
-                label_data_.resize(batch_size * items_per_split * value_byte_length);
-                key_data_.resize(batch_size * items_per_split);
+                label_data_.resize(static_cast<size_t>(batch_size * items_per_split * value_byte_length));
+                key_data_.resize(static_cast<size_t>(batch_size * items_per_split));
 
                 batch_idx_ = batch_idx;
                 split_idx_ = split_idx;
@@ -148,7 +148,7 @@ namespace apsi
 #ifndef NDEBUG
                 check(pos);
 #endif
-                return key_data_[pos.batch_offset * items_per_split_ + pos.split_offset];
+                return key_data_[static_cast<size_t>(pos.batch_offset * items_per_split_ + pos.split_offset)];
             }
 
             u8* get_label(const Position& pos)
@@ -157,7 +157,7 @@ namespace apsi
                 check(pos);
 #endif
 
-                return &label_data_[(pos.batch_offset * items_per_split_ + pos.split_offset) * value_byte_length_];
+                return &label_data_[static_cast<size_t>((pos.batch_offset * items_per_split_ + pos.split_offset) * value_byte_length_)];
             }
 
             u64 get_key_u64(const Position& pos)
@@ -170,7 +170,7 @@ namespace apsi
             {
                 auto l = get_label(pos);
                 u64 r = 0;
-                memcpy(&r, l, value_byte_length_);
+                memcpy(&r, l, static_cast<size_t>(value_byte_length_));
                 return r;
             }
 

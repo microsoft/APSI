@@ -135,7 +135,7 @@ void Sender::offline_compute()
         report_offline_compute_progress(total_thread_count_, work_finished);
     });
 
-    for (int i = 0; i < thread_pool.size(); i++)
+    for (size_t i = 0; i < thread_pool.size(); i++)
     {
         thread_pool[i].join();
     }
@@ -228,10 +228,10 @@ void Sender::query(
     vector<vector<Ciphertext>> powers(params_.batch_count());
     auto split_size_plus_one = params_.split_size() + 1;
 
-    for (u64 i = 0; i < powers.size(); ++i)
+    for (size_t i = 0; i < powers.size(); ++i)
     {
         powers[i].reserve(split_size_plus_one);
-        for (u64 j = 0; j < split_size_plus_one; ++j)
+        for (size_t j = 0; j < split_size_plus_one; ++j)
         {
             powers[i].emplace_back(seal_context_, pool_);
         }
@@ -239,8 +239,8 @@ void Sender::query(
 
     for (const auto& q : query)
     {
-        u64 power = q.first;
-        for (u64 i = 0; i < powers.size(); i++)
+        size_t power = static_cast<size_t>(q.first);
+        for (size_t i = 0; i < powers.size(); i++)
         {
             get_ciphertext(seal_context_, powers[i][power], q.second[i]);
         }
@@ -275,7 +275,7 @@ void Sender::respond(
 
     // Create a dummy encryption of 1
     evaluator_->add_plain_inplace(powers[0][0], Plaintext("1"));
-    for (u64 i = 1; i < powers.size(); ++i)
+    for (size_t i = 1; i < powers.size(); ++i)
     {
         powers[i][0] = powers[0][0];
     }
@@ -299,7 +299,7 @@ void Sender::respond(
     auto batches_done_fut = batches_done_prom.get_future().share();
 
     vector<thread> thread_pool(session_thread_count_);
-    for (int i = 0; i < thread_pool.size(); i++)
+    for (size_t i = 0; i < thread_pool.size(); i++)
     {
         thread_pool[i] = thread([&]()
         {
@@ -319,7 +319,7 @@ void Sender::respond(
         });
     }
 
-    for (int i = 0; i < thread_pool.size(); i++)
+    for (size_t i = 0; i < thread_pool.size(); i++)
     {
         thread_pool[i].join();
     }
@@ -353,7 +353,7 @@ void Sender::respond_worker(
     u64 batch_start = thread_context_idx * batch_count / total_threads;
     auto thread_idx = std::this_thread::get_id();
 
-    for (u64 batch = batch_start, loop_idx = 0ul; loop_idx < batch_count; ++loop_idx)
+    for (int batch = static_cast<int>(batch_start), loop_idx = 0ul; loop_idx < batch_count; ++loop_idx)
     {
         compute_batch_powers(static_cast<int>(batch), powers[batch], session_context, thread_context, dag, states[batch]);
         batch = (batch + 1) % batch_count;
@@ -431,7 +431,7 @@ void Sender::respond_worker(
                 // TODO: edge case where all block.batched_label_coeffs_[s] are zero.
 
                 // label_result = coeff[0] * x^0 = coeff[0];
-                int s = 0;
+                size_t s = 0;
                 while (s < block.batched_label_coeffs_.size() && block.batched_label_coeffs_[s].is_zero()) ++s;
 
                 // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
@@ -542,7 +542,7 @@ void Sender::compute_batch_powers(
 
     MemoryPoolHandle local_pool = thread_context.pool();
 
-    int idx = (*state.next_node_)++;
+    size_t idx = (*state.next_node_)++;
     while (idx < dag.nodes_.size())
     {
         auto& node = dag.nodes_[idx];
@@ -558,7 +558,7 @@ void Sender::compute_batch_powers(
         }
 
         // spin lock on the input nodes
-        for (u64 i = 0; i < 2; ++i)
+        for (size_t i = 0; i < 2; ++i)
             while (state.nodes_[node.inputs_[i]] != WindowingDag::NodeState::Done);
 
         evaluator_->multiply(batch_powers[node.inputs_[0]], batch_powers[node.inputs_[1]], batch_powers[node.output_], local_pool);
@@ -574,7 +574,7 @@ void Sender::compute_batch_powers(
     }
 
     // Iterate until all nodes are computed. We may want to do something smarter here.
-    for (i64 i = 0; i < state.nodes_.size(); ++i)
+    for (int i = 0; i < state.nodes_.size(); ++i)
         while (state.nodes_[i] != WindowingDag::NodeState::Done);
 
     auto end = dag.nodes_.size() + batch_powers.size();
@@ -624,12 +624,12 @@ u64 WindowingDag::pow(u64 base, u64 e)
     return r;
 }
 
-uint64_t WindowingDag::optimal_split(uint64_t x, int base, vector<int> &degrees)
+uint64_t WindowingDag::optimal_split(size_t x, int base, vector<int> &degrees)
 {
     int opt_deg = degrees[x];
     int opt_split = 0;
 
-    for (int i1 = 1; i1 < x; i1++)
+    for (size_t i1 = 1; i1 < x; i1++)
     {
         if (degrees[i1] + degrees[x - i1] < opt_deg)
         {
@@ -677,7 +677,7 @@ void WindowingDag::compute_dag()
         {
             if (pow(base, i) * j < degree.size())
             {
-                degree[pow(base, i) * j] = 1;
+                degree[static_cast<size_t>(pow(base, i) * j)] = 1;
             }
         }
     }
