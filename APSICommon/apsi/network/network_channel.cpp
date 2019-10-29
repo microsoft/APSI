@@ -148,7 +148,6 @@ void NetworkChannel::receive(SenderResponseGetParameters& response)
 
     // PSIConfParams
     response.psiconf_params.item_bit_count = msg.get<u32>(idx++);
-    response.psiconf_params.use_oprf = msg.get<bool>(idx++);
     response.psiconf_params.use_labels = msg.get<bool>(idx++);
     response.psiconf_params.use_fast_membership = msg.get<bool>(idx++);
     response.psiconf_params.sender_size = msg.get<u64>(idx++);
@@ -285,7 +284,6 @@ void NetworkChannel::send_get_parameters_response(const vector<u8>& client_id, c
 
     // PSIConfParams
     msg.add(params.item_bit_count());
-    msg.add(params.use_oprf());
     msg.add(params.use_labels());
     msg.add(params.use_fast_membership());
     msg.add(params.sender_size());

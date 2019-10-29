@@ -20,7 +20,6 @@ namespace apsi
         virtual void add_args()
         {
             add(labels_arg_);
-            add(no_oprf_arg_);
             add(fast_membership_arg_);
             add(item_bit_length_arg_);
             add(sec_lvl_arg_);
@@ -44,10 +43,6 @@ namespace apsi
         {
             use_labels_ = labels_arg_.getValue();
             cout_param("useLabels", use_labels_ ? "true" : "false");
-
-            bool noOprf = no_oprf_arg_.getValue();
-            cout_param("noOprf", noOprf ? "true" : "false");
-            oprf_ = !noOprf;
 
             fast_membership_ = fast_membership_arg_.getValue();
             cout_param("fast membership",  fast_membership_? "true" : "false");
@@ -122,7 +117,6 @@ namespace apsi
         }
 
         bool use_labels() const { return use_labels_; }
-        bool use_oprf() const { return oprf_; }
         bool use_fast_memberhip() const { return fast_membership_; }
 
         apsi::u32 item_bit_length() const { return item_bit_length_; }
@@ -147,7 +141,6 @@ namespace apsi
 
     private:
         TCLAP::SwitchArg             labels_arg_          = TCLAP::SwitchArg("l", "useLabels", "Use labels", false);
-        TCLAP::SwitchArg             no_oprf_arg_         = TCLAP::SwitchArg("o", "noOprf", "Do not use OPRF", false);
         TCLAP::SwitchArg             fast_membership_arg_ = TCLAP::SwitchArg("f", "fastMembership", "Use fast membership", false);
         TCLAP::ValueArg<apsi::u32>   item_bit_length_arg_ = TCLAP::ValueArg<apsi::u32>("b", "itemBitLength", "Item bit length", false, 60, "unsigned");
         TCLAP::ValueArg<int>         net_port_arg_        = TCLAP::ValueArg<int>("", "port", "Network port to bind to", false, 1212, "int");
@@ -169,7 +162,6 @@ namespace apsi
                                                           = TCLAP::ValueArg<apsi::u32>("i", "itemBitLengthUsedAfterOPRF", "Item bit length used after oprf", false, 120, "unsigned");
 
         bool use_labels_;
-        bool oprf_;
         bool fast_membership_;
         apsi::u32 item_bit_length_;
         apsi::u32 sec_level_;

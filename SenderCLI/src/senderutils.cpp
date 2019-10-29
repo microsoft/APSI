@@ -34,9 +34,6 @@ const PSIParams apsi::tools::build_psi_params(
         // Size of the Sender's DB
         psiconf_params.sender_size = sender_set_size;
 
-        // Whether to use an OPRF
-        psiconf_params.use_oprf = cmd.use_oprf();
-
         // Whether to use labels
         psiconf_params.use_labels = cmd.use_labels();
 

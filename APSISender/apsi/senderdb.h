@@ -149,12 +149,6 @@ namespace apsi
             */
             Matrix<DBBlock> db_blocks_;
 
-            /* 
-            Thread safe function to insert an item into the bin 
-            index by cockooIndex. The PRNG and be any PRNG.  
-            */
-            std::pair<DBBlock*, DBBlock::Position> acquire_db_position(std::size_t cockooIndex, apsi::tools::PRNG& prng);
-
             std::pair<DBBlock*, DBBlock::Position> acquire_db_position_after_oprf(size_t cuckoo_loc);
 
             apsi::tools::PRNG prng_;
