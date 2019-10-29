@@ -121,16 +121,13 @@ void run_sender_dispatcher(const CLP& cmd)
         bits += coeffmod[i].bit_count(); 
     Log::debug("coeff modulus size = %i ", bits); 
 
-    if (cmd.use_oprf())
-    {
-        Log::info("OPRF for input items");
-        STOPWATCH(sender_stop_watch, "Sender::OPRF");
+    Log::info("OPRF for input items");
+    STOPWATCH(sender_stop_watch, "Sender::OPRF");
 
-        shared_ptr<UniformRandomGeneratorFactory> rng_factory(make_shared<BlakePRNGFactory>());
-        oprf_key = make_shared<OPRFKey>(rng_factory);
+    shared_ptr<UniformRandomGeneratorFactory> rng_factory(make_shared<BlakePRNGFactory>());
+    oprf_key = make_shared<OPRFKey>(rng_factory);
 
-        OPRFSender::ComputeHashes(items, *oprf_key);
-    }
+    OPRFSender::ComputeHashes(items, *oprf_key);
 
     Log::info("Building sender");
     shared_ptr<Sender> sender = make_shared<Sender>(params, cmd.threads(), cmd.threads());

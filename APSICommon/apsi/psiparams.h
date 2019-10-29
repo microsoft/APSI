@@ -32,7 +32,6 @@ namespace apsi
         {
             // Should not exceed 128. Moreover, should reserve several bits because of the requirement of current Cuckoo hashing impl.
             apsi::u32 item_bit_count;
-            bool use_oprf;
             bool use_labels;
             bool use_fast_membership; // faster configuration assuming query is always one item.
             apsi::u64 sender_size;
@@ -113,11 +112,6 @@ namespace apsi
         inline apsi::u32 item_bit_length_used_after_oprf() const
         {
             return psiconf_params_.item_bit_length_used_after_oprf;
-        }
-
-        inline bool use_oprf() const
-        {
-            return psiconf_params_.use_oprf;
         }
 
         inline bool use_labels() const
@@ -260,11 +254,7 @@ namespace apsi
 
         // assuming one query.
         double log_fp_rate() {
-            int bitcount = item_bit_count(); 
-            if (use_oprf())
-            {
-                bitcount = item_bit_length_used_after_oprf(); // currently hardcoded.
-            }
+            int bitcount = item_bit_length_used_after_oprf(); // currently hardcoded.
 
             return ((double)exfield_degree())* (log2(split_size())) + log2(split_count())- bitcount;
         }
@@ -337,11 +327,7 @@ namespace apsi
                 throw std::invalid_argument("Item bit count cannot exceed max.");
             }
 
-            apsi::u32 bitcount = item_bit_count();
-            if (use_oprf())
-            {
-                bitcount = item_bit_length_used_after_oprf();
-            }
+            apsi::u32 bitcount = item_bit_length_used_after_oprf();
 
             apsi::u64 supported_bitcount = ((uint64_t)exfield_degree()) * (seal_params_.encryption_params.plain_modulus().bit_count() - 1);
             if (bitcount > supported_bitcount)

@@ -85,7 +85,7 @@ namespace APSITests
         SenderResponseQuery query_resp;
         shared_ptr<SenderOperation> sender_op;
 
-        PSIParams::PSIConfParams psiconf_params{ 60, true, true, true, 12345, 120, 10, 20 };
+        PSIParams::PSIConfParams psiconf_params{ 60, true, true, 12345, 120, 10, 20 };
         PSIParams::TableParams table_params{ 10, 1, 2, 10, 40 };
         PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
         PSIParams::SEALParams seal_params;
@@ -215,7 +215,7 @@ namespace APSITests
         ASSERT_EQ(expected_total, svr.get_total_data_received());
 
         // get parameters response
-        PSIParams::PSIConfParams psiconf_params{ 60, true, true, true, 12345, 120, 10, 20 };
+        PSIParams::PSIConfParams psiconf_params{ 60, true, true, 12345, 120, 10, 20 };
         PSIParams::TableParams table_params{ 10, 1, 2, 10, 40 };
         PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
         PSIParams::ExFieldParams exfield_params{ 321, 8 };
@@ -355,7 +355,7 @@ namespace APSITests
                 server_.receive(sender_op, /* wait_for_message */ true);
                 ASSERT_EQ(SOP_get_parameters, sender_op->type);
 
-                PSIParams::PSIConfParams psiconf_params{ 60, true, true, false, 12345, 120, 40, 50 };
+                PSIParams::PSIConfParams psiconf_params{ 60, true, false, 12345, 120, 40, 50 };
                 PSIParams::TableParams table_params{ 10, 1, 2, 10, 40, false };
                 PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
                 PSIParams::ExFieldParams exfield_params{ 678910, 8 };
@@ -372,7 +372,6 @@ namespace APSITests
 
                 psiconf_params.sender_size = 54321;
                 psiconf_params.item_bit_count = 80;
-                psiconf_params.use_oprf = false;
                 psiconf_params.use_labels = false;
                 PSIParams params2(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
 
@@ -386,7 +385,6 @@ namespace APSITests
         client_.receive(get_params_response);
 
         ASSERT_EQ((u64)12345, get_params_response.psiconf_params.sender_size);
-        ASSERT_EQ(true, get_params_response.psiconf_params.use_oprf);
         ASSERT_EQ(true, get_params_response.psiconf_params.use_labels);
         ASSERT_EQ(false, get_params_response.psiconf_params.use_fast_membership);
         ASSERT_EQ((u32)60, get_params_response.psiconf_params.item_bit_count);
@@ -417,7 +415,6 @@ namespace APSITests
         client_.receive(get_params_response2);
 
         ASSERT_EQ((u64)54321, get_params_response2.psiconf_params.sender_size);
-        ASSERT_EQ(false, get_params_response2.psiconf_params.use_oprf);
         ASSERT_EQ(false, get_params_response2.psiconf_params.use_labels);
         ASSERT_EQ((u32)80, get_params_response2.psiconf_params.item_bit_count);
         ASSERT_EQ((u32)10, get_params_response2.table_params.log_table_size);

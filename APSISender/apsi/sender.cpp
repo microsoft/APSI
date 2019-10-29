@@ -166,10 +166,8 @@ void Sender::offline_compute_work()
         context.set_total_interpolate_polys(blocks_to_process);
     }
 
-    {
-        STOPWATCH(sender_stop_watch, "Sender::offline_compute_work::calc_symmpoly");
-        sender_db_->batched_randomized_symmetric_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
-    }
+    STOPWATCH(sender_stop_watch, "Sender::offline_compute_work::calc_symmpoly");
+    sender_db_->batched_randomized_symmetric_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
 
     if (params_.use_labels())
     {
@@ -410,12 +408,7 @@ void Sender::respond_worker(
 
         // Handle the case for s = params_.split_size(); 
         int s = params_.split_size(); 
-        if (params_.use_oprf()) {
-            tmp = powers[batch][s]; 
-        }
-        else {
-            evaluator_->multiply_plain(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
-        }
+        tmp = powers[batch][s]; 
         evaluator_->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
         currResult ^= 1;
 

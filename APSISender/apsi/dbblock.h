@@ -121,9 +121,7 @@ namespace apsi
                 int encoding_bit_length,
                 const FFieldElt &neg_null_element);
 
-            Position try_aquire_position(int cuckoo_loc, apsi::tools::PRNG& prng);
-
-            DBBlock::Position try_aquire_position_after_oprf(int bin_idx);
+            DBBlock::Position try_acquire_position_after_oprf(int bin_idx);
 
             void batch_interpolate(
                 SenderThreadContext &th_context,

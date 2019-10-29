@@ -154,23 +154,20 @@ pair<vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Channel& chl
     Log::info("Receiver starting full query");
 
     // OPRF
-    if (get_params().use_oprf())
-    {
-        STOPWATCH(recv_stop_watch, "Receiver::OPRF");
-        Log::info("OPRF processing");
+    STOPWATCH(recv_stop_watch, "Receiver::OPRF");
+    Log::info("OPRF processing");
 
-        vector<u8> items_buffer;
-        obfuscate_items(items, items_buffer);
+    vector<u8> items_buffer;
+    obfuscate_items(items, items_buffer);
 
-        // Send obfuscated buffer to Sender
-        chl.send_preprocess(items_buffer);
+    // Send obfuscated buffer to Sender
+    chl.send_preprocess(items_buffer);
 
-        // Get response and remove our obfuscation
-        SenderResponsePreprocess preprocess_resp;
-        chl.receive(preprocess_resp);
+    // Get response and remove our obfuscation
+    SenderResponsePreprocess preprocess_resp;
+    chl.receive(preprocess_resp);
 
-        deobfuscate_items(items, preprocess_resp.buffer);
-    }
+    deobfuscate_items(items, preprocess_resp.buffer);
 
     // Then get encrypted query
     auto& encrypted_query = query(items);
@@ -225,7 +222,6 @@ void Receiver::handshake(Channel& chl)
         sender_params.psiconf_params.item_bit_count,
         sender_params.psiconf_params.sender_size,
         sender_params.psiconf_params.sender_bin_size,
-        sender_params.psiconf_params.use_oprf ? "true" : "false",
         sender_params.psiconf_params.use_labels ? "true" : "false",
         sender_params.psiconf_params.use_fast_membership ? "true" : "false",
         sender_params.psiconf_params.num_chunks);
@@ -280,11 +276,7 @@ pair<
 
     exfield_items = make_unique<FFieldArray>(padded_cuckoo_capacity, *field_);
 
-    int item_bit_count = get_params().item_bit_count();
-    if (get_params().use_oprf())
-    {
-        item_bit_count = get_params().item_bit_length_used_after_oprf();
-    }
+    int item_bit_count = get_params().item_bit_length_used_after_oprf();
 
     bool fm = get_params().use_fast_membership();
     if (items.size() > 1 || (!fm)) {
@@ -384,11 +376,7 @@ void Receiver::exfield_encoding(
     KukuTable &cuckoo,
     FFieldArray &ret)
 {
-    int item_bit_count = get_params().item_bit_count();
-    if (get_params().use_oprf())
-    {
-        item_bit_count = get_params().item_bit_length_used_after_oprf();
-    }
+    int item_bit_count = get_params().item_bit_length_used_after_oprf();
     Log::debug("item bit count before decoding: %i", item_bit_count);
 
     // oprf? depends 

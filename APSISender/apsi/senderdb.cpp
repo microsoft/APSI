@@ -45,11 +45,8 @@ SenderDB::SenderDB(const PSIParams &params,
     sender_null_item_[1] = ~0;
 
     // What is the actual length of strings stored in the hash table
-    encoding_bit_length_ = params.item_bit_count();
-    if (params_.use_oprf()) {
-        encoding_bit_length_ = params.item_bit_length_used_after_oprf();
-        Log::debug("encoding bit length = %i", encoding_bit_length_); 
-    }
+    encoding_bit_length_ = params.item_bit_length_used_after_oprf();
+    Log::debug("encoding bit length = %i", encoding_bit_length_); 
 
     // Create the null ExFieldElement (note: encoding truncation affects high bits)
     null_element_ = sender_null_item_.to_exfield_element(field_, encoding_bit_length_);
@@ -305,15 +302,9 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
 
                 // Lock-free thread-safe bin position search
                 std::pair<DBBlock*, DBBlock::Position> block_pos;
-                if (params_.use_oprf())
-                {
-                    // Log::info("find db position with oprf");
-                    block_pos = acquire_db_position_after_oprf(locs[j]);
-                }
-                else
-                {
-                    block_pos = acquire_db_position(locs[j], prng);
-                }
+
+                // Log::info("find db position with oprf");
+                block_pos = acquire_db_position_after_oprf(locs[j]);
 
                 auto& db_block = *block_pos.first;
                 auto pos = block_pos.second;
@@ -339,28 +330,6 @@ void SenderDB::add_data(gsl::span<const Item> data, int thread_count)
 }
 
 std::pair<DBBlock*, DBBlock::Position>
-    SenderDB::acquire_db_position(size_t cuckoo_loc, PRNG &prng)
-{
-    auto batch_idx = cuckoo_loc / params_.batch_size();
-    auto batch_offset = cuckoo_loc % params_.batch_size();
-
-    auto s_idx = prng.get<u32>() % db_blocks_.stride();
-    for (int i = 0; i < db_blocks_.stride(); ++i)
-    {
-        auto pos = db_blocks_(batch_idx, s_idx)->try_aquire_position(static_cast<int>(batch_offset), prng);
-        if (pos.is_initialized())
-        {
-            return { db_blocks_(batch_idx, s_idx) , pos };
-        }
-
-        s_idx = (s_idx + 1) % db_blocks_.stride();
-    }
-
-    // Throw an error because bin overflowed
-    throw runtime_error("simple hashing failed due to bin overflow");
-}
-
-std::pair<DBBlock*, DBBlock::Position>
 SenderDB::acquire_db_position_after_oprf(size_t cuckoo_loc)
 {
     auto batch_idx = cuckoo_loc / params_.batch_size();
@@ -369,7 +338,7 @@ SenderDB::acquire_db_position_after_oprf(size_t cuckoo_loc)
     auto s_idx = 0;
     for (int i = 0; i < db_blocks_.stride(); ++i)
     {
-        auto pos = db_blocks_(batch_idx, s_idx)->try_aquire_position_after_oprf(static_cast<int>(batch_offset));
+        auto pos = db_blocks_(batch_idx, s_idx)->try_acquire_position_after_oprf(static_cast<int>(batch_offset));
         if (pos.is_initialized())
         {
             return { db_blocks_(batch_idx, s_idx) , pos };
@@ -380,8 +349,6 @@ SenderDB::acquire_db_position_after_oprf(size_t cuckoo_loc)
     // Throw an error because bin overflowed
     throw runtime_error("simple hashing failed due to bin overflow");
 }
-
-
 
 void SenderDB::add_data(const Item &item, int thread_count)
 {
@@ -423,13 +390,7 @@ void SenderDB::batched_randomized_symmetric_polys(
             batch_end = batch_start + batch_size;
 
         auto &block = db_blocks_.data()[next_block];
-        if (get_params().use_oprf()) {
-            block.symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
-        }
-        else {
-            Log::debug("no oprf -- computing randomized blocks"); 
-            block.randomized_symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
-        }
+        block.symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
         block.batch_random_symm_poly_ = { &batch_random_symm_poly_storage_[indexer(split, batch)] , split_size_plus_one };
 
         for (int i = 0; i < split_size_plus_one; i++)
@@ -444,19 +405,16 @@ void SenderDB::batched_randomized_symmetric_polys(
             }
             ex_batch_encoder->compose(batch_vector, poly);
 
-            if (get_params().use_oprf())
+            if (i == split_size_plus_one - 1)
             {
-                if (i == split_size_plus_one - 1)
-                {
-                    for (size_t j = 1; j < poly.coeff_count(); j++) {
-                        if (poly.data()[j] != 0) {
-                            Log::debug("something wrong");
-                            break;
-                        }
-                    }
-                    if (poly.data()[0] != 1) {
+                for (size_t j = 1; j < poly.coeff_count(); j++) {
+                    if (poly.data()[j] != 0) {
                         Log::debug("something wrong");
+                        break;
                     }
+                }
+                if (poly.data()[0] != 1) {
+                    Log::debug("something wrong");
                 }
             }
 

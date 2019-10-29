@@ -34,46 +34,7 @@ void DBBlock::clear()
     }
 }
 
-DBBlock::Position DBBlock::try_aquire_position(int bin_idx, PRNG& prng)
-{
-    if (bin_idx >= items_per_batch_)
-    {
-        throw runtime_error("bin_idx should be smaller than items_per_batch");
-    }
-
-    int idx = 0;
-    auto start = bin_idx * items_per_split_;
-    auto end = (bin_idx + 1) * items_per_split_;
-
-    // For 100 tries, guess a bin location can try to insert item there
-    for (int i = 0; i < 100; i++)
-    {
-        idx = prng.get<apsi::u32>() % items_per_split_;
-
-        bool exp = false;
-        if (has_item_[start + idx].compare_exchange_strong(exp, true))
-        {
-            return { bin_idx, idx };
-        }
-    }
-
-    // If still failed, try to do linear scan
-    for (int i = 0; i < items_per_split_; ++i)
-    {
-        bool exp = false;
-        if (has_item_[start + idx].compare_exchange_strong(exp, true))
-        {
-            // Great, found an empty location and have marked it as mine
-            return { bin_idx, idx };
-        }
-
-        idx = (idx + 1) % items_per_split_;
-    }
-
-    return {};
-}
-
-DBBlock::Position DBBlock::try_aquire_position_after_oprf(int bin_idx)
+DBBlock::Position DBBlock::try_acquire_position_after_oprf(int bin_idx)
 {
     if (bin_idx >= items_per_batch_)
     {
@@ -173,36 +134,6 @@ void DBBlock::symmetric_polys(
                     symm_block_ptr,
                     [&ch](auto a, auto b) { return add_uint_uint_mod(a, b, ch); });
             }
-        }
-    }
-}
-
-void DBBlock::randomized_symmetric_polys(
-    SenderThreadContext &th_context,
-    MatrixView<_ffield_elt_coeff_t> symm_block,
-    int encoding_bit_length,
-    const FFieldElt &neg_null_element)
-{
-    i64 split_size_plus_one = items_per_split_ + 1;
-    symmetric_polys(th_context, symm_block, encoding_bit_length, neg_null_element);
-
-    auto num_rows = items_per_batch_;
-    PRNG &prng = th_context.prng();
-
-    FFieldArray r(symm_block.rows(), th_context.field());
-    r.set_random_nonzero(prng);
-
-    auto ch = th_context.field().ch();
-    auto d = th_context.field().d();
-    auto symm_block_ptr = symm_block.data();
-    for (i64 i = 0; i < num_rows; i++)
-    {
-        for (i64 j = 0; j < split_size_plus_one; j++, symm_block_ptr += d)
-        {
-            transform(symm_block_ptr, symm_block_ptr + d,
-                r.data(static_cast<size_t>(i)),
-                symm_block_ptr,
-                [&ch](auto a, auto b) { return multiply_uint_uint_mod(a, b, ch); });
         }
     }
 }
