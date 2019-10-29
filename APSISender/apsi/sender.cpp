@@ -266,7 +266,7 @@ void Sender::respond(
     // Make the ciphertext non-transparent
     powers[0][0].resize(2);
     auto &ct = powers[0][0];
-    for (ptrdiff_t i = 0; i < ct.coeff_mod_count(); i++)
+    for (size_t i = 0; i < ct.coeff_mod_count(); i++)
     {
         powers[0][0].data(1)[i * ct.poly_modulus_degree()] = 1;
     }
