@@ -28,6 +28,15 @@ message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 # For extra modules
 list(APPEND CMAKE_MODULE_PATH ${unit_tests_SOURCE_DIR}/../cmake)
 
+# For locating local build of APSICommon config
+list(APPEND CMAKE_PREFIX_PATH ${PROJECT_SOURCE_DIR}/../APSICommon/cmake)
+
+# For locating local build of APSISender config
+list(APPEND CMAKE_PREFIX_PATH ${PROJECT_SOURCE_DIR}/../APSISender/cmake)
+
+# For locating local build of APSIReceiver config
+list(APPEND CMAKE_PREFIX_PATH ${PROJECT_SOURCE_DIR}/../APSIReceiver/cmake)
+
 # Import APSI
 find_package(APSISender 1.0.0 EXACT REQUIRED
     PATHS ${PROJECT_SOURCE_DIR}/../APSISender/cmake

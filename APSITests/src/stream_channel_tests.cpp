@@ -173,15 +173,15 @@ namespace APSITests
 
         EncryptionParameters enc_params(scheme_type::BFV);
         enc_params.set_plain_modulus(64ul);
-        enc_params.set_poly_modulus_degree(1024);
-        enc_params.set_coeff_modulus(CoeffModulus::BFVDefault(1024));
+        enc_params.set_poly_modulus_degree(4096);
+        enc_params.set_coeff_modulus(CoeffModulus::BFVDefault(4096));
         shared_ptr<SEALContext> context = SEALContext::Create(enc_params);
         KeyGenerator key_gen(context);
 
         stringstream ss;
         key_gen.relin_keys_save(ss, compr_mode_type::none);
         string relin_keys_str = ss.str();
-        ASSERT_EQ(relin_keys_str.length(), 8425);
+        ASSERT_EQ(relin_keys_str.length(), 197010);
 
         Ciphertext ct(context);
         ss = stringstream();

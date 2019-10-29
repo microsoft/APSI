@@ -267,10 +267,10 @@ void Sender::respond(
 
     // Make the ciphertext non-transparent
     powers[0][0].resize(2);
-    auto ct_span = powers[0][0].data_span();
-    for (ptrdiff_t i = 0; i < ct_span.extent<1>(); i++)
+    auto &ct = powers[0][0];
+    for (ptrdiff_t i = 0; i < ct.coeff_mod_count(); i++)
     {
-        ct_span[1][i][0] = 1;
+        powers[0][0].data(1)[i * ct.poly_modulus_degree()] = 1;
     }
 
     // Create a dummy encryption of 1

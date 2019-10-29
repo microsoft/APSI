@@ -140,15 +140,15 @@ namespace APSITests
 
                 EncryptionParameters enc_params(scheme_type::BFV);
                 enc_params.set_plain_modulus(64ul);
-                enc_params.set_poly_modulus_degree(1024);
-                enc_params.set_coeff_modulus(CoeffModulus::BFVDefault(1024));
+                enc_params.set_poly_modulus_degree(4096);
+                enc_params.set_coeff_modulus(CoeffModulus::BFVDefault(4096));
                 shared_ptr<SEALContext> context = SEALContext::Create(enc_params);
                 KeyGenerator key_gen(context);
 
                 stringstream ss;
                 key_gen.relin_keys_save(ss, compr_mode_type::none);
                 string relinkeys_str = ss.str();
-                ASSERT_EQ(relinkeys_str.length(), 8425);
+                ASSERT_EQ(relinkeys_str.length(), 197010);
 
                 Ciphertext ct(context);
                 ss = stringstream();
@@ -210,7 +210,7 @@ namespace APSITests
         expected_total += sizeof(u32); // SenderOperationType
         expected_total += sizeof(u64) * 3;
         expected_total += sizeof(u64) * 2;
-        expected_total += 8425; // relinkeys
+        expected_total += 197010; // relinkeys
         expected_total += 105 * 2; // Ciphertexts
         ASSERT_EQ(expected_total, svr.get_total_data_received());
 
@@ -312,8 +312,8 @@ namespace APSITests
         {
             EncryptionParameters enc_params(scheme_type::BFV);
             enc_params.set_plain_modulus(64ul);
-            enc_params.set_poly_modulus_degree(1024);
-            enc_params.set_coeff_modulus(CoeffModulus::BFVDefault(1024));
+            enc_params.set_poly_modulus_degree(4096);
+            enc_params.set_coeff_modulus(CoeffModulus::BFVDefault(4096));
             shared_ptr<SEALContext> context = SEALContext::Create(enc_params);
             KeyGenerator key_gen(context);
 
@@ -490,8 +490,8 @@ namespace APSITests
 
         EncryptionParameters enc_params(scheme_type::BFV);
         enc_params.set_plain_modulus(64ul);
-        enc_params.set_poly_modulus_degree(1024);
-        enc_params.set_coeff_modulus(CoeffModulus::BFVDefault(1024));
+        enc_params.set_poly_modulus_degree(4096);
+        enc_params.set_coeff_modulus(CoeffModulus::BFVDefault(4096));
         shared_ptr<SEALContext> context = SEALContext::Create(enc_params);
         KeyGenerator key_gen(context);
 

@@ -34,6 +34,9 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/../bin)
 # For locating all modules
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake)
 
+# For locating local build of APSICommon config
+list(APPEND CMAKE_PREFIX_PATH ${PROJECT_SOURCE_DIR}/../APSICommon/cmake)
+
 # Imports 
 find_package(APSISender 1.0.0 EXACT REQUIRED
     PATHS ${PROJECT_SOURCE_DIR}/../APSISender/cmake
