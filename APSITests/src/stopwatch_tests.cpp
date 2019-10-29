@@ -54,7 +54,7 @@ namespace APSITests
         Stopwatch sw;
 
         vector<thread> threads(20);
-        for (int i = 0; i < threads.size(); i++)
+        for (size_t i = 0; i < threads.size(); i++)
         {
             threads[i] = thread([&](int idx)
                 {
@@ -69,7 +69,7 @@ namespace APSITests
 
                         sw.add_event(evt_name);
                     }
-                }, i);
+                }, static_cast<int>(i));
         }
 
         for (auto& thr : threads)
@@ -150,7 +150,7 @@ namespace APSITests
         Stopwatch sw;
 
         vector<thread> threads(30);
-        for (int i = 0; i < threads.size(); i++)
+        for (size_t i = 0; i < threads.size(); i++)
         {
             threads[i] = thread([&](int idx)
                 {
@@ -171,7 +171,7 @@ namespace APSITests
                         StopwatchScope sw3(sw, thr_name);
                         this_thread::sleep_for(15ms);
                     }
-                }, i);
+                }, static_cast<int>(i));
         }
 
         for (auto& thr : threads)

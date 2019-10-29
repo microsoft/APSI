@@ -117,10 +117,10 @@ namespace APSITests
         ASSERT_EQ((u8)7, labels[1][0]);
         ASSERT_EQ((u8)12, labels[2][0]);
 
-        for (int r = 0; r < labels.rows(); r++)
+        for (size_t r = 0; r < labels.rows(); r++)
         {
             // Other than column 0, the rest should be zero
-            for (int c = 1; c < labels.columns(); c++)
+            for (size_t c = 1; c < labels.columns(); c++)
             {
                 ASSERT_EQ((u8)0, labels[r][c]);
             }
@@ -166,10 +166,10 @@ namespace APSITests
         ASSERT_EQ((u8)12, labels[6][0]);
         ASSERT_EQ((u8)0, labels[7][0]);
 
-        for (int r = 0; r < labels.rows(); r++)
+        for (size_t r = 0; r < labels.rows(); r++)
         {
             // Other than column 0, the rest should be zero
-            for (int c = 1; c < labels.columns(); c++)
+            for (size_t c = 1; c < labels.columns(); c++)
             {
                 ASSERT_EQ((u8)0, labels[r][c]);
             }
@@ -214,9 +214,9 @@ namespace APSITests
         ASSERT_EQ(0xFFFFFFFFFFFFFFFF, items[0][0]);
         ASSERT_EQ(0xFFFFFFFFFFFFFFFF, items[0][1]);
 
-        for (int r = 0; r < labels.rows(); r++)
+        for (size_t r = 0; r < labels.rows(); r++)
         {
-            for (int c = 0; c < labels.columns(); c++)
+            for (size_t c = 0; c < labels.columns(); c++)
             {
                 ASSERT_EQ((u8)0xFF, labels[r][c]);
             }

@@ -105,7 +105,7 @@ const PSIParams apsi::tools::build_psi_params(
         else
         {
             vector<int> coeff_mod_bit_vector_int(coeff_mod_bit_vector.size());
-            for (int i = 0; i < coeff_mod_bit_vector.size(); i++)
+            for (size_t i = 0; i < coeff_mod_bit_vector.size(); i++)
             {
                 coeff_mod_bit_vector_int[i] = (int)coeff_mod_bit_vector[i];
             }

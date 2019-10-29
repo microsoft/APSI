@@ -633,13 +633,13 @@ uint64_t WindowingDag::optimal_split(size_t x, int base, vector<int> &degrees)
     {
         if (degrees[i1] + degrees[x - i1] < opt_deg)
         {
-            opt_split = i1;
+            opt_split = static_cast<int>(i1);
             opt_deg = degrees[i1] + degrees[x - i1];
         }
         else if (degrees[i1] + degrees[x - i1] == opt_deg 
             && abs(degrees[i1] - degrees[x-i1]) < abs(degrees[opt_split] - degrees[x- opt_split]))
         {
-            opt_split = i1;
+            opt_split = static_cast<int>(i1);
         }
     }
 

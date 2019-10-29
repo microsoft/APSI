@@ -39,7 +39,7 @@ namespace APSITests
         //std::cout << "f(" << x << ") = ";
         u64 result = 0, xx = 1;
 
-        for (int i = 0; i < poly.size(); ++i)
+        for (size_t i = 0; i < poly.size(); ++i)
         {
             result = (result + poly[i] * xx) % mod.value();
             xx = (xx * x) % mod.value();
@@ -66,9 +66,9 @@ namespace APSITests
 
         FField field(parms.plain_modulus(), degree); 
 
-        FFieldArray points(numPoints, field);
-        FFieldArray values(numPoints, field);
-        FFieldArray result(numPoints, field);
+        FFieldArray points(static_cast<size_t>(numPoints), field);
+        FFieldArray values(static_cast<size_t>(numPoints), field);
+        FFieldArray result(static_cast<size_t>(numPoints), field);
 
 
         apsi::tools::PRNG prng(apsi::zero_block);
@@ -76,7 +76,7 @@ namespace APSITests
 
         //std::vector<std::pair<u64, u64>> points(numPoints);
 
-        for (int j = 0; j < points.size(); j++) {
+        for (size_t j = 0; j < points.size(); j++) {
             for (int k = 0; k < degree; k++) {
                 // random points 
                 points.set_coeff_of(j, k, (j*degree + k) % plain_modulus.value());
@@ -93,7 +93,7 @@ namespace APSITests
         // Check the result: interpolating (x,x) should result in polynomial coeffs (0,1,0,...,0)
         // std::vector<u64> tempresult(points.size());
         for (int k = 0; k < degree; k++) {
-            for (int j = 0; j < points.size(); ++j)
+            for (size_t j = 0; j < points.size(); ++j)
             {
                 if (j != 1 && result.get_coeff_of(j, k) != 0) {
                     FAIL();
@@ -106,7 +106,7 @@ namespace APSITests
 
 
         // Next: interpolate zero 
-        for (int j = 0; j < points.size(); j++) {
+        for (size_t j = 0; j < points.size(); j++) {
             for (int k = 0; k < degree; k++) {
                 // random points 
                 points.set_coeff_of(j, k, (j * degree + k) % plain_modulus.value());
@@ -123,7 +123,7 @@ namespace APSITests
         // Check the result: interpolating (x,0) should result in zero polynomial.
         // std::vector<u64> tempresult(points.size());
         for (int k = 0; k < degree; k++) {
-            for (int j = 0; j < points.size(); ++j)
+            for (size_t j = 0; j < points.size(); ++j)
             {
                 if (result.get_coeff_of(j, k) != 0) {
                     FAIL();
@@ -151,9 +151,9 @@ namespace APSITests
 
         FField field(parms.plain_modulus(), degree);
 
-        FFieldArray points(numPoints, field);
-        FFieldArray values(numPoints, field);
-        FFieldArray result(numPoints, field);
+        FFieldArray points(static_cast<size_t>(numPoints), field);
+        FFieldArray values(static_cast<size_t>(numPoints), field);
+        FFieldArray result(static_cast<size_t>(numPoints), field);
 
 
         apsi::tools::PRNG prng(apsi::zero_block);
@@ -163,7 +163,7 @@ namespace APSITests
 
             //std::vector<std::pair<u64, u64>> points(numPoints);
 
-            for (int j = 0; j < points.size(); j++) {
+            for (size_t j = 0; j < points.size(); j++) {
                 for (int k = 0; k < degree; k++) {
                     // random points 
                     points.set_coeff_of(j, k, (j * degree + k) % plain_modulus.value());
@@ -181,12 +181,12 @@ namespace APSITests
             // Check the result
             std::vector<u64> tempresult(points.size());
             for (int k = 0; k < degree; k++) {
-                for (int j = 0; j < points.size(); ++j)
+                for (size_t j = 0; j < points.size(); ++j)
                 {
                     tempresult[j] = result.get_coeff_of(j, k);
                     // tempresult[j] = values.get_coeff_of(j, k);
                 }
-                for (int j = 0; j < points.size(); ++j) {
+                for (size_t j = 0; j < points.size(); ++j) {
                     u64 x = points.get_coeff_of(j, k);
                     u64 y = values.get_coeff_of(j, k);
                     //auto& y = points[i].second;
@@ -222,9 +222,9 @@ namespace APSITests
         for (int i = 0; i < numTrials; ++i)
         {
 
-            std::vector<std::pair<u64, u64>> points(numPoints);
+            std::vector<std::pair<u64, u64>> points(static_cast<size_t>(numPoints));
 
-            for (int i = 0; i < points.size(); i++) {
+            for (size_t i = 0; i < points.size(); i++) {
                 points[i].first = i;
                 points[i].second = prng.get<uint64_t>() % plain_modulus.value();
             }
@@ -234,7 +234,7 @@ namespace APSITests
 
             apsi::u64_newton_interpolate_poly(points, result, plain_modulus);
 
-            for (int i = 0; i < points.size(); ++i)
+            for (size_t i = 0; i < points.size(); ++i)
             {
                 auto& x = points[i].first;
                 auto& y = points[i].second;

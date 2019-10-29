@@ -76,13 +76,15 @@ SenderDB::SenderDB(const PSIParams &params,
     params_.set_sender_bin_size(ns * params_.split_size());
 
     // important: here it resizes the db blocks.
-    db_blocks_.resize(nb, ns);
+    db_blocks_.resize(static_cast<size_t>(nb),
+                      static_cast<size_t>(ns));
 
     for (u64 b_idx = 0; b_idx < nb; b_idx++)
     {
         for (u64 s_idx = 0; s_idx < ns; s_idx++)
         {
-            db_blocks_(b_idx, s_idx)->init(
+            db_blocks_(static_cast<size_t>(b_idx),
+                       static_cast<size_t>(s_idx))->init(
                 b_idx, s_idx,
                 byte_length,
                 batch_size,
@@ -148,13 +150,13 @@ void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int t
     vector<thread> thrds(thread_count);
 
     vector<vector<int>> thread_loads(thread_count);
-    for (int t = 0; t < thrds.size(); t++)
+    for (size_t t = 0; t < thrds.size(); t++)
     {
         auto seed = prng_.get<block>();
         thrds[t] = thread([&, t, seed](int idx)
         {
             add_data_worker(idx, thread_count, seed, data, values, thread_loads[t]);
-        }, t);
+        }, static_cast<int>(t));
     }
 
     for (auto &t : thrds)
@@ -200,9 +202,9 @@ void SenderDB::add_data_no_hash(gsl::span<const Item> data, MatrixView<u8> value
     vector<int> loads(params_.table_size(), 0);
     u64 maxload = 0;
 
-    for (size_t i = start; i < end; i++)
+    for (size_t i = static_cast<size_t>(start); i < end; i++)
     {
-        u64 loc = i % get_params().table_size();
+        size_t loc = i % get_params().table_size();
 
         loads[loc] ++;
         if (loads[loc] > maxload) {
@@ -236,7 +238,7 @@ void SenderDB::add_data_no_hash(gsl::span<const Item> data, MatrixView<u8> value
         params_.set_split_count(static_cast<u32>(new_split_count));
 
         // resize the matrix of blocks.
-        db_blocks_.resize(params_.batch_count(), new_split_count);
+        db_blocks_.resize(params_.batch_count(), static_cast<size_t>(new_split_count));
 
         Log::debug("New max load, new split count = %i, %i", params_.sender_bin_size(), params_.split_count());
     }
@@ -261,7 +263,7 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
     loads.resize(params_.table_size(), 0);
     u64 maxload = 0; 
     
-    for (size_t i = start; i < end; i++)
+    for (size_t i = static_cast<size_t>(start); i < end; i++)
     {
         std::vector<u64> locs(params_.hash_func_count());
         std::vector<Item> keys(params_.hash_func_count());
@@ -294,10 +296,11 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
         for (u32 j = 0; j < params_.hash_func_count(); j++)
         {
             // debugging
-            loads[locs[j]] ++;
-            if (loads[locs[j]] > maxload)
+            size_t idxlocs = static_cast<size_t>(locs[j]);
+            loads[idxlocs] ++;
+            if (loads[idxlocs] > maxload)
             {
-                maxload = loads[locs[j]]; 
+                maxload = loads[idxlocs]; 
             }
 
             if (skip[j] == false)
@@ -308,11 +311,11 @@ void SenderDB::add_data_worker(int thread_idx, int thread_count, const block& se
                 if (params_.use_oprf())
                 {
                     // Log::info("find db position with oprf");
-                    block_pos = acquire_db_position_after_oprf(locs[j]);
+                    block_pos = acquire_db_position_after_oprf(idxlocs);
                 }
                 else
                 {
-                    block_pos = acquire_db_position(locs[j], prng);
+                    block_pos = acquire_db_position(idxlocs, prng);
                 }
 
                 auto& db_block = *block_pos.first;
@@ -345,7 +348,7 @@ std::pair<DBBlock*, DBBlock::Position>
     auto batch_offset = cuckoo_loc % params_.batch_size();
 
     auto s_idx = prng.get<u32>() % db_blocks_.stride();
-    for (int i = 0; i < db_blocks_.stride(); ++i)
+    for (size_t i = 0; i < db_blocks_.stride(); ++i)
     {
         auto pos = db_blocks_(batch_idx, s_idx)->try_aquire_position(static_cast<int>(batch_offset), prng);
         if (pos.is_initialized())
@@ -367,7 +370,7 @@ SenderDB::acquire_db_position_after_oprf(size_t cuckoo_loc)
     auto batch_offset = cuckoo_loc % params_.batch_size();
 
     auto s_idx = 0;
-    for (int i = 0; i < db_blocks_.stride(); ++i)
+    for (size_t i = 0; i < db_blocks_.stride(); ++i)
     {
         auto pos = db_blocks_(batch_idx, s_idx)->try_aquire_position_after_oprf(static_cast<int>(batch_offset));
         if (pos.is_initialized())
