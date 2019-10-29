@@ -71,7 +71,13 @@ namespace apsi
             poly_modulus_ = poly_mod_arg_.getValue();
             cout_param("polyModulus", poly_modulus_);
 
-            coeff_modulus_ = coeff_mod_arg_.getValue();
+            coeff_modulus_.clear();
+            const std::vector<std::size_t>& cma = coeff_mod_arg_.getValue();
+            for (std::size_t coef : cma)
+            {
+                coeff_modulus_.push_back(static_cast<apsi::u64>(coef));
+            }
+
             std::string coeffVal;
             if (coeff_modulus_.size() == 0)
             {
@@ -146,8 +152,8 @@ namespace apsi
         TCLAP::ValueArg<int>         wnd_sz_arg_          = TCLAP::ValueArg<int>("w", "windowSize", "Window size", false, 1, "int");
         TCLAP::ValueArg<int>         poly_mod_arg_        = TCLAP::ValueArg<int>("", "polyModulus", "Poly Modulus degree", false, 4096, "int");
 
-        TCLAP::MultiArg<apsi::u64>   coeff_mod_arg_ =   TCLAP::MultiArg<apsi::u64>("c", "coeffModulus", "Coefficient Modulus", false, "u64");
-        TCLAP::ValueArg<apsi::u64>   plain_mod_arg_       = TCLAP::ValueArg<apsi::u64>("", "plainModulus", "Plain Modulus", false, 40961, "u64");
+        TCLAP::MultiArg<std::size_t> coeff_mod_arg_       = TCLAP::MultiArg<std::size_t>("c", "coeffModulus", "Coefficient Modulus", false, "u64");
+        TCLAP::ValueArg<std::size_t> plain_mod_arg_       = TCLAP::ValueArg<std::size_t>("", "plainModulus", "Plain Modulus", false, 40961, "u64");
         TCLAP::ValueArg<int>         exfld_degree_arg_    = TCLAP::ValueArg<int>("e", "exfieldDegree", "exField degree", false, 8, "int");
         TCLAP::ValueArg<int>         num_chunks_arg_      = TCLAP::ValueArg<int>("", "numChunks", "number of chunks per item", false, 1, "int");
         TCLAP::ValueArg<int>         sender_bin_size_arg_ = TCLAP::ValueArg<int>("", "senderBinSize", "(manually set) sender bin size", false, 0, "int");

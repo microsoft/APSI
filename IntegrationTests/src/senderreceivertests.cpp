@@ -44,7 +44,7 @@ namespace
         }
         auto iter = ss.begin();
         vector<int> s(size);
-        for (u64 i = 0; i < size; ++i)
+        for (size_t i = 0; i < static_cast<size_t>(size); ++i)
         {
             s[i] = *iter++;
         }
@@ -57,10 +57,10 @@ namespace
      
 
         
-        for (int i = 0; i < client_items.size(); i++)
+        for (size_t i = 0; i < client_items.size(); i++)
         {
 
-            if (i < intersection_size)
+            if (i < static_cast<size_t>(intersection_size))
             {
                 // Item should be in intersection
                 ASSERT_EQ(true, (bool)intersection.first[i]);
@@ -115,15 +115,15 @@ namespace
 
         auto s1 = vector<Item>(senderActualSize);
         Matrix<u8> labels(senderActualSize, params.get_label_byte_count());
-        for (int i = 0; i < s1.size(); i++)
+        for (size_t i = 0; i < s1.size(); i++)
         {
             s1[i] = i;
 
             if (label_bit_length) {
                 memset(labels[i].data(), 0, labels[i].size());
 
-                labels[i][0] = i;
-                labels[i][1] = (i >> 8);
+                labels[i][0] = static_cast<u8>(i);
+                labels[i][1] = static_cast<u8>(i >> 8);
             }
         }
 
@@ -205,7 +205,7 @@ namespace
         items.resize(item_count);
         labels.resize(item_count, label_byte_count);
 
-        for (int i = 0; i < items.size(); i++)
+        for (size_t i = 0; i < items.size(); i++)
         {
             items[i] = i;
 
@@ -213,8 +213,8 @@ namespace
             {
                 memset(labels[i].data(), 0, labels[i].size());
 
-                labels[i][0] = i;
-                labels[i][1] = (i >> 8);
+                labels[i][0] = static_cast<u8>(i);
+                labels[i][1] = static_cast<u8>(i >> 8);
             }
         }
     }

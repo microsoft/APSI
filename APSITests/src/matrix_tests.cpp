@@ -17,11 +17,11 @@ namespace APSITests
     class MatrixViewTester : public apsi::MatrixView<T>
     {
     public:
-        MatrixViewTester(T* data, apsi::u64 rows, apsi::u64 cols) :
+        MatrixViewTester(T* data, size_t rows, size_t cols) :
             apsi::MatrixView<T>(data, rows, cols)
         {}
 
-        void resize_test(T* data, apsi::u64 rows, apsi::u64 cols)
+        void resize_test(T* data, size_t rows, size_t cols)
         {
             this->resize(data, rows, cols, /* elt_size */ 1);
         }
@@ -34,11 +34,11 @@ namespace APSITests
     class MatrixTester : public apsi::Matrix<T>
     {
     public:
-        MatrixTester(apsi::u64 rows, apsi::u64 cols)
+        MatrixTester(size_t rows, size_t cols)
             : apsi::Matrix<T>(rows, cols)
         {}
 
-        apsi::u64 capacity_test() const
+        size_t capacity_test() const
         {
             return this->capacity();
         }
@@ -161,9 +161,9 @@ namespace APSITests
     TEST(MatrixTests, ResizeTest)
     {
         MatrixTester<int> m(5, 5);
-        for (apsi::u64 i = 0; i < m.rows(); i++)
+        for (size_t i = 0; i < m.rows(); i++)
         {
-            for (apsi::u64 j = 0; j < m.columns(); j++)
+            for (size_t j = 0; j < m.columns(); j++)
             {
                 m[i][j] = static_cast<int>(i * m.columns() + j + 1);
             }

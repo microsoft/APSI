@@ -44,11 +44,11 @@ namespace apsi
 #define HIGHOF64(x)  static_cast<std::uint32_t>(x >> 32)
 #define LOWOF64(x)   static_cast<std::uint32_t>(x)
 
-            felm_t c0{ HIGHOF64(c0h), LOWOF64(c0h), HIGHOF64(c0l), LOWOF64(c0l) };
-            felm_t b0{ HIGHOF64(b0h), LOWOF64(b0h), HIGHOF64(b0l), LOWOF64(b0l) };
-            felm_t b1{ HIGHOF64(b1h), LOWOF64(b1h), HIGHOF64(b1l), LOWOF64(b1l) };
-            felm_t A0{ HIGHOF64(A0h), LOWOF64(A0h), HIGHOF64(A0l), LOWOF64(A0l) };
-            felm_t A1{ HIGHOF64(A1h), LOWOF64(A1h), HIGHOF64(A1l), LOWOF64(A1l) };
+            felm_t c0{ LOWOF64(c0h), HIGHOF64(c0h), LOWOF64(c0l), HIGHOF64(c0l) };
+            felm_t b0{ LOWOF64(b0h), HIGHOF64(b0h), LOWOF64(b0l), HIGHOF64(b0l) };
+            felm_t b1{ LOWOF64(b1h), HIGHOF64(b1h), LOWOF64(b1l), HIGHOF64(b1l) };
+            felm_t A0{ LOWOF64(A0h), HIGHOF64(A0h), LOWOF64(A0l), HIGHOF64(A0l) };
+            felm_t A1{ LOWOF64(A1h), HIGHOF64(A1h), LOWOF64(A1l), HIGHOF64(A1l) };
 #endif
 
             inline void fpsqrt1271(felm_t in, felm_t out)

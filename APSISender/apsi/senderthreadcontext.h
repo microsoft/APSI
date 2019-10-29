@@ -86,7 +86,7 @@ namespace apsi
                         symm_block_vec_->data(),
                         params.batch_size(), 
                         params.split_size() + 1,
-                        field_->d());
+                        static_cast<size_t>(field_->d()));
                 }
             }
 

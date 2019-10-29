@@ -88,7 +88,8 @@ namespace apsi
         void OPRFSender::ComputeHashes(
             gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items,
             const OPRFKey &oprf_key,
-            gsl::span<oprf_hash_type, gsl::dynamic_extent> oprf_hashes)
+            gsl::span<oprf_hash_type, gsl::dynamic_extent> oprf_hashes,
+            const int threads)
         {
             if (oprf_items.size() != oprf_hashes.size())
             {
@@ -98,30 +99,8 @@ namespace apsi
             // Write zero item everywhere
             fill(oprf_hashes.begin(), oprf_hashes.end(), oprf_hash_type());
 
-            for (ptrdiff_t i = 0; i < oprf_items.size(); i++)
-            {
-                // Create an elliptic curve point from the item
-                ECPoint ecpt({
-                    reinterpret_cast<const unsigned char*>(oprf_items[i].data()),
-                    oprf_item_size });
-                
-                // Multiply with key
-                ecpt.scalar_multiply(oprf_key.key_span());
-
-                // Extract the hash
-                ecpt.extract_hash({
-                    reinterpret_cast<unsigned char*>(oprf_hashes[i].data()),
-                    ECPoint::hash_size });
-            }
-        }
-
-        void OPRFSender::ComputeHashes(
-            gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items,
-            const OPRFKey& oprf_key,
-            const int threads)
-        {
             int thread_count = threads;
-            if (-1 == thread_count)
+            if (thread_count < 1)
             {
                 thread_count = thread::hardware_concurrency();
             }
@@ -132,7 +111,34 @@ namespace apsi
             {
                 thrds[t] = thread([&](int idx)
                     {
-                        compute_hashes_worker(idx, thread_count, oprf_items, oprf_key);
+                        compute_hashes_worker(idx, thread_count, oprf_items, oprf_key, oprf_hashes);
+                    }, static_cast<int>(t));
+            }
+
+            for (auto& t : thrds)
+            {
+                t.join();
+            }
+        }
+
+        void OPRFSender::ComputeHashes(
+            gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items,
+            const OPRFKey& oprf_key,
+            const int threads)
+        {
+            int thread_count = threads;
+            if (thread_count < 1)
+            {
+                thread_count = thread::hardware_concurrency();
+            }
+
+            vector<thread> thrds(thread_count);
+
+            for (size_t t = 0; t < thrds.size(); t++)
+            {
+                thrds[t] = thread([&](int idx)
+                    {
+                        compute_hashes_inplace_worker(idx, thread_count, oprf_items, oprf_key);
                     }, static_cast<int>(t));
             }
 
@@ -143,6 +149,30 @@ namespace apsi
         }
 
         void OPRFSender::compute_hashes_worker(
+            const int threadidx,
+            const int threads,
+            gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items,
+            const OPRFKey& oprf_key,
+            gsl::span<oprf_hash_type, gsl::dynamic_extent> oprf_hashes)
+        {
+            for (ptrdiff_t i = threadidx; i < oprf_items.size(); i += threads)
+            {
+                // Create an elliptic curve point from the item
+                ECPoint ecpt({
+                    reinterpret_cast<const unsigned char*>(oprf_items[i].data()),
+                    oprf_item_size });
+
+                // Multiply with key
+                ecpt.scalar_multiply(oprf_key.key_span());
+
+                // Extract the hash
+                ecpt.extract_hash({
+                    reinterpret_cast<unsigned char*>(oprf_hashes[i].data()),
+                    ECPoint::hash_size });
+            }
+        }
+
+        void OPRFSender::compute_hashes_inplace_worker(
             const int threadidx,
             const int threads,
             gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items,

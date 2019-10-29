@@ -28,7 +28,7 @@ void DBBlock::clear()
     has_item_ = make_unique<atomic_bool[]>(ss);
 
     // Make sure all entries are false
-    for (int i = 0; i < ss; i++)
+    for (size_t i = 0; i < ss; i++)
     {
         has_item_[i] = false;
     }
@@ -49,7 +49,7 @@ DBBlock::Position DBBlock::try_acquire_position_after_oprf(int bin_idx)
     for (int i = 0; i < items_per_split_; ++i)
     {
         bool exp = false;
-        if (has_item_[start + idx].compare_exchange_strong(exp, true))
+        if (has_item_[static_cast<size_t>(start + idx)].compare_exchange_strong(exp, true))
         {
             // Great, found an empty location and have marked it as mine
             return { bin_idx, idx };
@@ -99,7 +99,7 @@ void DBBlock::symmetric_polys(
         FFieldElt *temp1;
 
         // Set symm_block[pos.batch_offset, split_size] to 1
-        fill_n(symm_block(pos.batch_offset, split_size), d, 1);
+        fill_n(symm_block(static_cast<size_t>(pos.batch_offset), static_cast<size_t>(split_size)), d, 1);
 
         for (pos.split_offset = split_size - 1; pos.split_offset >= 0; pos.split_offset--)
         {
@@ -115,7 +115,7 @@ void DBBlock::symmetric_polys(
                 temp1->neg();
             }
 
-            auto symm_block_ptr = symm_block(pos.batch_offset, pos.split_offset + 1);
+            auto symm_block_ptr = symm_block(static_cast<size_t>(pos.batch_offset), static_cast<size_t>(pos.split_offset + 1));
 
             transform(symm_block_ptr, symm_block_ptr + d,
                 temp1->data(),
@@ -153,8 +153,8 @@ void DBBlock::batch_interpolate(
     for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
     {
         FFieldElt temp(ex_batch_encoder->field());
-        FFieldArray& x = cache.x_temp[pos.batch_offset];
-        FFieldArray& y = cache.y_temp[pos.batch_offset];
+        FFieldArray& x = cache.x_temp[static_cast<size_t>(pos.batch_offset)];
+        FFieldArray& y = cache.y_temp[static_cast<size_t>(pos.batch_offset)];
 
         int size = 0;
         for (pos.split_offset = 0; pos.split_offset < items_per_split_; ++pos.split_offset)
@@ -170,7 +170,7 @@ void DBBlock::batch_interpolate(
 
 
                 auto src = get_label(pos);
-                temp.encode(gsl::span<u8>{src, value_byte_length_}, params.get_label_bit_count());
+                temp.encode(gsl::span<u8>{src, static_cast<ptrdiff_t>(value_byte_length_)}, params.get_label_bit_count());
                 y.set(size, temp);
 
                 ++size;
@@ -216,10 +216,10 @@ void DBBlock::batch_interpolate(
             x, y,
             // We don't use the cache for divided differences.
             // cache.div_diff_temp[pos.batch_offset],
-            cache.coeff_temp[pos.batch_offset]);
+            cache.coeff_temp[static_cast<size_t>(pos.batch_offset)]);
     }
 
-    batched_label_coeffs_.resize(items_per_split_);
+    batched_label_coeffs_.resize(static_cast<size_t>(items_per_split_));
 
     // We assume there are all the same
     auto degree = th_context.field().d();
@@ -235,7 +235,7 @@ void DBBlock::batch_interpolate(
                 temp_array.set_coeff_of(
                     static_cast<size_t>(b),
                     static_cast<size_t>(c),
-                    cache.coeff_temp[b].get_coeff_of(
+                    cache.coeff_temp[static_cast<size_t>(b)].get_coeff_of(
                         static_cast<size_t>(s),
                         static_cast<size_t>(c)));
         }
