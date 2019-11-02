@@ -3,7 +3,6 @@
 
 target_sources(unit_tests
     PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/aes_tests.cpp
         ${CMAKE_CURRENT_LIST_DIR}/bit_copy_test.cpp
         ${CMAKE_CURRENT_LIST_DIR}/channel_tests.cpp
         ${CMAKE_CURRENT_LIST_DIR}/csvreader_tests.cpp
@@ -11,7 +10,6 @@ target_sources(unit_tests
         ${CMAKE_CURRENT_LIST_DIR}/item.cpp
         ${CMAKE_CURRENT_LIST_DIR}/matrix_tests.cpp
         ${CMAKE_CURRENT_LIST_DIR}/oprf_tests.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/prng_tests.cpp
         ${CMAKE_CURRENT_LIST_DIR}/receiver.cpp
         ${CMAKE_CURRENT_LIST_DIR}/sender.cpp
         ${CMAKE_CURRENT_LIST_DIR}/stopwatch_tests.cpp

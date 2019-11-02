@@ -61,7 +61,7 @@ endif()
 message(STATUS "${PROJECT_NAME} build type: ${APSICommon_LIB_BUILD_TYPE}")
 
 # Import Microsoft SEAL
-find_package(SEAL 3.4.3 EXACT REQUIRED)
+find_package(SEAL 3.4.4 EXACT REQUIRED)
 
 # Import Kuku
 find_package(Kuku 1.0.0 EXACT REQUIRED)

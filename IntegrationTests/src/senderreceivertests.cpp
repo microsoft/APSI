@@ -2,8 +2,6 @@
 // Licensed under the MIT license.
 
 #include "gtest/gtest.h"
-#include <random>
-#include <memory>
 #include "apsi/sender.h"
 #include "apsi/senderdispatcher.h"
 #include "apsi/receiver.h"
@@ -12,6 +10,9 @@
 #include "apsi/logging/log.h"
 #include "apsi/oprf/oprf_sender.h"
 
+#include <random>
+#include <cstdint>
+#include <memory>
 
 using namespace std;
 using namespace apsi;
@@ -28,12 +29,12 @@ namespace
 {
     std::pair<vector<Item>, vector<int>> rand_subset(const vector<Item>& items, int size)
     {
-        PRNG prn(zero_block);
+        random_device rd;
 
         set<int> ss;
         while (ss.size() != size)
         {
-            ss.emplace(static_cast<int>(prn.get<u32>() % items.size()));
+            ss.emplace(static_cast<int>(rd() % items.size()));
         }
         auto ssIter = ss.begin();
 
@@ -51,7 +52,7 @@ namespace
         return { ret, s };
     }
 
-    void verify_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<u8>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<u8>& labels)
+    void verify_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<uint8_t>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<uint8_t>& labels)
     {
         bool correct = true;
      
@@ -90,7 +91,7 @@ namespace
         string conn_addr = "tcp://localhost:5550";
         recvChl.connect(conn_addr);
 
-        u32 numThreads = thread::hardware_concurrency();
+        uint32_t numThreads = thread::hardware_concurrency();
 
         unique_ptr<Receiver> receiver_ptr;
 
@@ -114,7 +115,7 @@ namespace
         }
 
         auto s1 = vector<Item>(senderActualSize);
-        Matrix<u8> labels(senderActualSize, params.get_label_byte_count());
+        Matrix<uint8_t> labels(senderActualSize, params.get_label_byte_count());
         for (size_t i = 0; i < s1.size(); i++)
         {
             s1[i] = i;
@@ -122,8 +123,8 @@ namespace
             if (label_bit_length) {
                 memset(labels[i].data(), 0, labels[i].size());
 
-                labels[i][0] = static_cast<u8>(i);
-                labels[i][1] = static_cast<u8>(i >> 8);
+                labels[i][0] = static_cast<uint8_t>(i);
+                labels[i][1] = static_cast<uint8_t>(i >> 8);
             }
         }
 
@@ -200,7 +201,7 @@ namespace
         return params;
     }
 
-    void initialize_db(vector<Item>& items, Matrix<u8>& labels, size_t item_count, size_t label_byte_count)
+    void initialize_db(vector<Item>& items, Matrix<uint8_t>& labels, size_t item_count, size_t label_byte_count)
     {
         items.resize(item_count);
         labels.resize(item_count, label_byte_count);
@@ -213,8 +214,8 @@ namespace
             {
                 memset(labels[i].data(), 0, labels[i].size());
 
-                labels[i][0] = static_cast<u8>(i);
-                labels[i][1] = static_cast<u8>(i >> 8);
+                labels[i][0] = static_cast<uint8_t>(i);
+                labels[i][1] = static_cast<uint8_t>(i >> 8);
             }
         }
     }

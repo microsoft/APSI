@@ -3,10 +3,8 @@
 
 target_sources(Common
     PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/aes.cpp
         ${CMAKE_CURRENT_LIST_DIR}/csvreader.cpp
         ${CMAKE_CURRENT_LIST_DIR}/interpolate.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/prng.cpp
         ${CMAKE_CURRENT_LIST_DIR}/sealcompress.cpp
         ${CMAKE_CURRENT_LIST_DIR}/stopwatch.cpp
         ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
@@ -14,12 +12,10 @@ target_sources(Common
 
 install(
     FILES
-        ${CMAKE_CURRENT_LIST_DIR}/aes.h
         ${CMAKE_CURRENT_LIST_DIR}/csvreader.h
         ${CMAKE_CURRENT_LIST_DIR}/interpolate.h
         ${CMAKE_CURRENT_LIST_DIR}/matrix.h
         ${CMAKE_CURRENT_LIST_DIR}/matrixview.h
-        ${CMAKE_CURRENT_LIST_DIR}/prng.h
         ${CMAKE_CURRENT_LIST_DIR}/sealcompress.h
         ${CMAKE_CURRENT_LIST_DIR}/stopwatch.h
         ${CMAKE_CURRENT_LIST_DIR}/thread_pool.h

@@ -3,28 +3,23 @@
 
 #include "gtest/gtest.h"
 #include "apsi/ffield/ffield_elt.h"
+#include <cstdint>
+#include <random>
 #include <vector>
 
 using namespace std;
 using namespace apsi;
-using namespace apsi::tools;
 
 namespace
 {
-    block to_block(int i)
-    {
-        block result = _mm_set_epi64x(0, (u64)i);
-        return result;
-    }
-
-    u8 get_bit(vector<u8>& vec, u32 position)
+    uint8_t get_bit(vector<uint8_t>& vec, uint32_t position)
     {
         if (position >= (vec.size() * 8))
             throw out_of_range("position");
 
-        u32 byte_idx = position / 8;
-        u32 bit_idx = position % 8;
-        u8 mask = (u8)(1 << bit_idx);
+        uint32_t byte_idx = position / 8;
+        uint32_t bit_idx = position % 8;
+        uint8_t mask = (uint8_t)(1 << bit_idx);
         if (0 == (vec[byte_idx] & mask))
             return 0;
 
@@ -39,14 +34,14 @@ namespace APSITests
         int trials = 1000;
         int size = 10;
 
-        std::vector<u8> src(size), dest(size);
+        std::vector<uint8_t> src(size), dest(size);
         for (int t = 6; t < trials; ++t)
         {
-            PRNG prng(to_block(t));
+            random_device rd;
 
-            u32 srcOffset = prng.get<u32>() % (size * 4);
-            u32 destOffset = prng.get<u32>() % (size * 4);
-            u32 bitLength = prng.get<u32>() % (size * 4 - 1) + 1;
+            uint32_t srcOffset = rd() % (size * 4);
+            uint32_t destOffset = rd() % (size * 4);
+            uint32_t bitLength = rd() % (size * 4 - 1) + 1;
 
             char srcVal = (t & 1) * ~0;
             char destVal = ~srcVal;
@@ -56,26 +51,26 @@ namespace APSITests
 
             apsi::details::copy_with_bit_offset(src, srcOffset, destOffset, bitLength, dest);
 
-            u32 src_idx = srcOffset;
-            u32 dst_idx = 0;
+            uint32_t src_idx = srcOffset;
+            uint32_t dst_idx = 0;
 
-            for (u32 i = 0; i < destOffset; ++i)
+            for (uint32_t i = 0; i < destOffset; ++i)
             {
-                ASSERT_EQ((u8)(destVal & 1), get_bit(dest, dst_idx));
+                ASSERT_EQ((uint8_t)(destVal & 1), get_bit(dest, dst_idx));
                 dst_idx++;
             }
 
-            for (u32 i = 0; i < bitLength; ++i)
+            for (uint32_t i = 0; i < bitLength; ++i)
             {
                 ASSERT_EQ(get_bit(src, src_idx), get_bit(dest, dst_idx));
                 src_idx++;
                 dst_idx++;
             }
 
-            u32 rem = size * 8 - destOffset - bitLength;
-            for (u32 i = 0; i < rem; ++i)
+            uint32_t rem = size * 8 - destOffset - bitLength;
+            for (uint32_t i = 0; i < rem; ++i)
             {
-                ASSERT_EQ((u8)(destVal & 1), get_bit(dest, dst_idx));
+                ASSERT_EQ((uint8_t)(destVal & 1), get_bit(dest, dst_idx));
                 dst_idx++;
             }
         }

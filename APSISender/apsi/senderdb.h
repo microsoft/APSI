@@ -70,9 +70,8 @@ namespace apsi
             void add_data_worker(
                 int thread_idx,
                 int thread_count,
-                const apsi::block& seed,
                 gsl::span<const apsi::Item> data,
-                apsi::MatrixView<apsi::u8> values, std::vector<int> &loads);
+                apsi::MatrixView<std::uint8_t> values, std::vector<int> &loads);
 
             /**
             Adds one item to sender's database.
@@ -150,8 +149,6 @@ namespace apsi
             Matrix<DBBlock> db_blocks_;
 
             std::pair<DBBlock*, DBBlock::Position> acquire_db_position_after_oprf(size_t cuckoo_loc);
-
-            apsi::tools::PRNG prng_;
         };
     }
 }
