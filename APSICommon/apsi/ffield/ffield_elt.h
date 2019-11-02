@@ -6,10 +6,12 @@
 // STD
 #include <limits>
 #include <algorithm>
+#include <memory>
+#include <cstdint>
+#include <cstddef>
 
 // APSI
 #include "apsi/ffield/ffield.h"
-#include "apsi/tools/prng.h"
 
 // GSL
 #include <gsl/span>
@@ -18,6 +20,7 @@
 #include <seal/smallmodulus.h>
 #include <seal/util/uintarithsmallmod.h>
 #include <seal/util/numth.h>
+#include <seal/randomgen.h>
 
 namespace apsi
 {
@@ -27,20 +30,20 @@ namespace apsi
         // Bits are written to dest starting at the first bit. All other bits in 
         // dest are unchanged, e.g. the bit indexed by [bitLength, bitLength + 1, ...]
         void copy_with_bit_offset(
-            gsl::span<const apsi::u8> src,
+            gsl::span<const std::uint8_t> src,
             std::int32_t bitOffset,
             int32_t bitLength,
-            gsl::span<apsi::u8> dest);
+            gsl::span<std::uint8_t> dest);
 
         // Copies bitLength bits from src starting at the bit index by srcBitOffset.
         // Bits are written to dest starting at the destBitOffset bit. All other bits in 
         // dest are unchanged, e.g. the bit indexed by [0,1,...,destBitOffset - 1], [destBitOffset + bitLength, ...]
         void copy_with_bit_offset(
-            gsl::span<const apsi::u8> src,
+            gsl::span<const std::uint8_t> src,
             std::int32_t srcBitOffset,
             std::int32_t destBitOffset,
             std::int32_t bitLength,
-            gsl::span<apsi::u8> dest);
+            gsl::span<std::uint8_t> dest);
     }
 
     class FFieldElt
@@ -55,7 +58,7 @@ namespace apsi
 
         FFieldElt(FField field) : field_(std::move(field))
         {
-            elt_.resize(static_cast<size_t>(field_.d_));
+            elt_.resize(static_cast<std::size_t>(field_.d_));
         }
 
         FFieldElt(FField field, const _ffield_elt_coeff_t *value) : field_(field)
@@ -89,8 +92,9 @@ namespace apsi
             std::fill(elt_.begin(), elt_.end(), 1);
         }
 
-        inline void set_random(apsi::tools::PRNG &prng)
+        inline void set_random(std::shared_ptr<seal::UniformRandomGeneratorFactory> rg)
         {
+            auto random = rg->create();
             constexpr auto max_int = std::numeric_limits<_ffield_elt_coeff_t>::max(); 
             _ffield_elt_coeff_t max_value = max_int - max_int % field_.ch_.value();
             for (std::size_t i = 0; i < field_.d_; i++)
@@ -99,17 +103,19 @@ namespace apsi
                 _ffield_elt_coeff_t temp_value;
                 do
                 {
-                    temp_value = prng.get<_ffield_elt_coeff_t>();
+                    random->generate(
+                        sizeof(_ffield_elt_coeff_t),
+                        reinterpret_cast<seal::SEAL_BYTE*>(&temp_value));
                 } while(temp_value > max_value);
                 elt_[i] = temp_value % field_.ch_.value();
             }
         }
 
-        inline void set_random_nonzero(apsi::tools::PRNG &prng)
+        inline void set_random_nonzero(std::shared_ptr<seal::UniformRandomGeneratorFactory> rg)
         {
             do
             {
-                set_random(prng);
+                set_random(rg);
             } while (is_zero());
         }
 
@@ -307,7 +313,7 @@ namespace apsi
         typename std::enable_if<std::is_pod<T>::value>::type
             encode(gsl::span<T> value, int bit_length)
         {
-            gsl::span<const apsi::u8> v2(reinterpret_cast<apsi::u8*>(value.data()), value.size() * sizeof(T));
+            gsl::span<const std::uint8_t> v2(reinterpret_cast<std::uint8_t*>(value.data()), value.size() * sizeof(T));
 
             // Should minus 1 to avoid wrapping around p
             int split_length = field_.ch_.bit_count() - 1;
@@ -326,7 +332,7 @@ namespace apsi
             {
                 auto size = std::min<int>(split_length, bit_length);
                 details::copy_with_bit_offset(v2, offset, size,
-                    { reinterpret_cast<apsi::u8*>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) });
+                    { reinterpret_cast<std::uint8_t*>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) });
 
                 offset += split_length;
                 bit_length -= split_length;
@@ -337,7 +343,7 @@ namespace apsi
         typename std::enable_if<std::is_pod<T>::value>::type
             decode(gsl::span<T> value, int bit_length)
         {
-            gsl::span<apsi::u8> v2(reinterpret_cast<apsi::u8*>(value.data()), value.size() * sizeof(T));
+            gsl::span<std::uint8_t> v2(reinterpret_cast<std::uint8_t*>(value.data()), value.size() * sizeof(T));
 
             // Should minus 1 to avoid wrapping around p
             int split_length = field_.ch_.bit_count() - 1;
@@ -357,7 +363,7 @@ namespace apsi
             {
                 auto size = std::min<int>(split_length, bit_length);
                 details::copy_with_bit_offset(
-                    { reinterpret_cast<apsi::u8*>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) },
+                    { reinterpret_cast<std::uint8_t*>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) },
                     0, offset, size, v2);
 
                 offset += split_length;

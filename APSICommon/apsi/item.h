@@ -7,6 +7,8 @@
 #include <array>
 #include <string>
 #include <stdexcept>
+#include <cstdint>
+#include <cstddef>
 
 // APSI
 #include "apsi/ffield/ffield_elt.h"
@@ -77,7 +79,7 @@ namespace apsi
             return value_[i];
         }
 
-        const std::uint64_t &operator[](size_t i) const
+        const std::uint64_t &operator[](std::size_t i) const
         {
             return value_[i];
         }
@@ -119,7 +121,7 @@ namespace apsi
     private:
         std::array<std::uint64_t, 2> value_;
 
-        u32 muladd(u32 item[4], int mul, int add);
+        std::uint32_t muladd(std::uint32_t item[4], int mul, int add);
 
     public:
         static constexpr std::size_t item_byte_count = sizeof(value_);

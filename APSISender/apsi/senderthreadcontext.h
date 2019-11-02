@@ -15,7 +15,6 @@
 #include "apsi/ffield/ffield_elt.h"
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/tools/matrixview.h"
-#include "apsi/tools/prng.h"
 
 // SEAL
 #include <seal/memorymanager.h>
@@ -61,11 +60,6 @@ namespace apsi
                 field_ = std::make_unique<FField>(field);
             }
 
-            void set_prng(apsi::block block)
-            {
-                prng_.set_seed(block, /* buffer_size */ 256);
-            }
-
             inline void construct_variables(PSIParams &params)
             {
                 // Is the MPH initialized? It better be.
@@ -93,11 +87,6 @@ namespace apsi
             inline MatrixView<_ffield_elt_coeff_t> symm_block()
             {
                 return symm_block_;
-            }
-
-            apsi::tools::PRNG& prng()
-            {
-                return prng_;
             }
 
             void set_total_randomized_polys(int total)
@@ -154,8 +143,6 @@ namespace apsi
 
             MatrixView<_ffield_elt_coeff_t> symm_block_;
             
-            apsi::tools::PRNG prng_;
-
             std::atomic<int> randomized_polys_processed_;
             std::atomic<int> interpolate_polys_processed_;
             int total_randomized_polys_;

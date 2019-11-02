@@ -12,7 +12,6 @@
 #include "apsi/logging/log.h"
 #include "apsi/network/network_utils.h"
 #include "apsi/network/channel.h"
-#include "apsi/tools/prng.h"
 #include "apsi/tools/utils.h"
 #include "apsi/result_package.h"
 #include "apsi/oprf/oprf_receiver.h"

@@ -11,7 +11,6 @@
 // APSI
 #include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_elt.h"
-#include "apsi/tools/prng.h"
 
 // GSL
 #include <gsl/span>
@@ -125,8 +124,9 @@ namespace apsi
             std::fill_n(data(index), field_.d_, 0);
         }
 
-        inline void set_random(apsi::tools::PRNG &prng)
+        inline void set_random(std::shared_ptr<seal::UniformRandomGeneratorFactory> rg)
         {
+            auto random = rg->create();
             constexpr auto max_int = std::numeric_limits<_ffield_elt_coeff_t>::max(); 
             _ffield_elt_coeff_t max_value = max_int - max_int % field_.ch_.value();
             for (std::size_t i = 0; i < array_.size(); i++)
@@ -135,14 +135,18 @@ namespace apsi
                 _ffield_elt_coeff_t temp_value;
                 do
                 {
-                    temp_value = prng.get<_ffield_elt_coeff_t>();
+                    random->generate(
+                        sizeof(_ffield_elt_coeff_t),
+                        reinterpret_cast<seal::SEAL_BYTE*>(&temp_value));
                 } while(temp_value > max_value);
                 array_[i] = temp_value % field_.ch_.value();
             }
         }
 
-        inline void set_random_nonzero(apsi::tools::PRNG &prng)
+        inline void set_random_nonzero(
+            std::shared_ptr<seal::UniformRandomGeneratorFactory> rg)
         {
+            auto random = rg->create();
             constexpr auto max_int = std::numeric_limits<_ffield_elt_coeff_t>::max(); 
             _ffield_elt_coeff_t max_value = max_int - max_int % field_.ch_.value();
             for (std::size_t i = 0; i < array_.size(); i++)
@@ -151,7 +155,9 @@ namespace apsi
                 _ffield_elt_coeff_t temp_value;
                 do
                 {
-                    temp_value = prng.get<_ffield_elt_coeff_t>();
+                    random->generate(
+                        sizeof(_ffield_elt_coeff_t),
+                        reinterpret_cast<seal::SEAL_BYTE*>(&temp_value));
                 } while(temp_value > max_value || !temp_value);
                 array_[i] = temp_value % field_.ch_.value();
             }

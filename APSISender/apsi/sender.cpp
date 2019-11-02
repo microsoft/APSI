@@ -14,7 +14,6 @@
 #include "apsi/logging/log.h"
 #include "apsi/network/network_utils.h"
 #include "apsi/tools/utils.h"
-#include "apsi/tools/prng.h"
 #include "apsi/result_package.h"
 
 // SEAL
@@ -66,23 +65,14 @@ void Sender::initialize()
 
     vector<thread> thrds(total_thread_count_);
 
-#ifdef USE_SECURE_SEED
-    prng_.set_seed(sys_random_seed());
-#else
-    TODO("***************** INSECURE *****************, define USE_SECURE_SEED to fix");
-    prng_.set_seed(zero_block);
-#endif
-
     // Set local exfields for multi-threaded efficient use of memory pools.
     for (int i = 0; i < total_thread_count_; i++)
     {
         available_thread_contexts_.push_back(i);
-        auto seed = prng_.get<block>();
-        thrds[i] = thread([&, i, seed]()
+        thrds[i] = thread([&, i]()
         {
             auto local_pool = MemoryPoolHandle::New();
             thread_contexts_[i].set_id(i);
-            thread_contexts_[i].set_prng(seed);
             thread_contexts_[i].set_pool(local_pool);
             thread_contexts_[i].set_field(field);
 
@@ -95,8 +85,6 @@ void Sender::initialize()
     {
         thrd.join();
     }
-
-    prng_.set_seed(zero_block);
 }
 
 void Sender::load_db(const vector<Item> &data, MatrixView<u8> vals)

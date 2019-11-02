@@ -25,7 +25,6 @@
 #include "apsi/ffield/ffield_fast_batch_encoder.h"
 #include "apsi/tools/sealcompress.h"
 #include "apsi/tools/matrixview.h"
-#include "apsi/tools/prng.h"
 #include "apsi/network/channel.h"
 
 // SEAL
@@ -250,8 +249,6 @@ namespace apsi
             std::deque<int> available_thread_contexts_;
 
             std::mutex thread_context_mtx_;
-
-            apsi::tools::PRNG prng_;
         };
     }
 }
