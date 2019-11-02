@@ -218,7 +218,7 @@ void Receiver::handshake(Channel& chl)
 
     Log::debug("Received parameters from Sender:");
     Log::debug(
-        "item bit count: %i, sender size: %lli, sender bin size: %lli, use OPRF: %s, use labels: %s, use fast membership: %s, num chunks: %i",
+        "item bit count: %i, sender size: %lli, sender bin size: %lli, use labels: %s, use fast membership: %s, num chunks: %i",
         sender_params.psiconf_params.item_bit_count,
         sender_params.psiconf_params.sender_size,
         sender_params.psiconf_params.sender_bin_size,

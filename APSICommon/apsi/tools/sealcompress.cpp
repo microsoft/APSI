@@ -72,7 +72,7 @@ void CiphertextCompressor::compressed_save(const seal::Ciphertext &encrypted,
     char *compr_poly_writer_head = reinterpret_cast<char*>(compr_poly.get());
     const uint64_t *encrypted_coeff_ptr = encrypted.data(); 
     size_t encrypted_uint64_count = encrypted_size * encrypted.poly_modulus_degree();
-    Log::debug("COMPRESSOR: compressing %i uin64s into %i", encrypted_uint64_count, compr_data_uint64_count);
+    Log::debug("COMPRESSOR: compressing %i uint64s into %i", encrypted_uint64_count, compr_data_uint64_count);
 
     int bit_shift = bits_per_uint64 - coeff_mod_bit_count;
     Log::debug("bit shift =  %i", bit_shift);
