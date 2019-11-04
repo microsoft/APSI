@@ -34,7 +34,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/../bin)
 # For locating all modules
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake)
 
-# For locating local build of APSICommon config
+# For locating local APSICommon config
 list(APPEND CMAKE_PREFIX_PATH ${PROJECT_SOURCE_DIR}/../APSICommon/cmake)
 
 # Imports 
@@ -55,5 +55,4 @@ add_subdirectory(src)
 target_link_libraries(receiver
     APSI::Receiver
     APSI::CommonCLI
-    stdc++fs
 )

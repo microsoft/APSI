@@ -55,5 +55,4 @@ add_subdirectory(src)
 target_link_libraries(sender
     APSI::Sender
     APSI::CommonCLI
-    stdc++fs
 )

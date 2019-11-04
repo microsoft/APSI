@@ -64,7 +64,7 @@ message(STATUS "${PROJECT_NAME} build type: ${APSICommon_LIB_BUILD_TYPE}")
 find_package(SEAL 3.4.4 EXACT REQUIRED)
 
 # Import Kuku
-find_package(Kuku 1.0.0 EXACT REQUIRED)
+find_package(Kuku 1.1.1 EXACT REQUIRED)
 
 # Import Microsoft GSL
 if(MSGSL_ROOT)
@@ -150,6 +150,7 @@ target_compile_options(Common PUBLIC -march=native)
 
 # Link required libraries
 target_link_libraries(Common PUBLIC
+    stdc++fs
     SEAL::seal
     MSGSL::MSGSL
     Kuku::kuku
