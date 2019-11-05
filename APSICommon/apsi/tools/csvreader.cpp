@@ -3,7 +3,7 @@
 #include <cctype>
 #include <sstream>
 
-#if _MSC_VER || (__GNUC__ >= 8)
+#if _MSC_VER || (__GNUC__ >= 8) || __clang__
 #include <filesystem>
 #else
 // filesystem appears to be experimental in GCC < 8
@@ -14,7 +14,7 @@
 #include "csvreader.h"
 
 
-#if !_MSC_VER && (__GNUC__ < 8)
+#if !_MSC_VER && (__GNUC__ < 8) && !__clang__
 using namespace std::experimental;
 #endif
 
