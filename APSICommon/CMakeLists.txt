@@ -139,7 +139,7 @@ message(WARNING "${PROJECT_NAME} adding define -D_AMD64_; needed?")
 target_compile_options(Common PUBLIC -D_AMD64_)
 message(WARNING "${PROJECT_NAME} adding define -D_AVX2_; needed?")
 target_compile_options(Common PUBLIC -D_AVX2_)
-if (!APPLE)
+if (NOT APPLE)
     message(WARNING "${PROJECT_NAME} adding define -D_ASM_; needed?")
     target_compile_options(Common PUBLIC -D_ASM_)
 endif()
@@ -159,7 +159,7 @@ target_link_libraries(Common PUBLIC
     ZeroMQpp::ZeroMQpp
     FourQ::FourQ
     Log4cplus::Log4cplus)
-if (!APPLE)
+if (NOT APPLE)
     target_link_libraries(Common PUBLIC stdc++fs)
 endif()
 

@@ -56,7 +56,7 @@ target_link_libraries(unit_tests
     APSI::Receiver
     gtest
 )
-if (!APPLE)
+if (NOT APPLE)
     target_link_libraries(unit_tests stdc++fs)
 endif()
 
