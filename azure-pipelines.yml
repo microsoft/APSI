@@ -55,7 +55,6 @@ steps:
       
       copy %APSILIBS%\libzmq\dll\x64\Release\libzmq.dll x64\Release
       copy %APSILIBS%\libzmqpp\lib\x64\Release\zmqpp.dll x64\Release
-      copy %APSILIBS%\zlib\x64\zlib1.dll x64\Release
     workingDirectory: '$(Build.SourcesDirectory)'
     failOnStderr: true
 
