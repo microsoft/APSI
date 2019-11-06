@@ -55,8 +55,10 @@ target_link_libraries(unit_tests
     APSI::Sender
     APSI::Receiver
     gtest
-    stdc++fs
 )
+if (NOT APPLE)
+    target_link_libraries(unit_tests stdc++fs)
+endif()
 
 # Add source files to executable
 add_subdirectory(src)

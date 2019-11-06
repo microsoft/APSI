@@ -3,6 +3,7 @@
 
 // STD
 #include <cstdio>
+#include <memory>
 
 // APSI
 #include "log.h" 
@@ -62,14 +63,14 @@ namespace
         if (!disable_console_)
         {
             SharedAppenderPtr appender(new ConsoleAppender);
-            appender->setLayout(auto_ptr<Layout>(new PatternLayout("%-5p %D{%H:%M:%S:%Q}: %m%n")));
+            appender->setLayout(make_unique<PatternLayout>("%-5p %D{%H:%M:%S:%Q}: %m%n"));
             logger_.addAppender(appender);
         }
 
         if (!log_file_.empty())
         {
             SharedAppenderPtr appender(new RollingFileAppender(log_file_));
-            appender->setLayout(auto_ptr<Layout>(new PatternLayout("%-5p %D{%H:%M:%S:%Q}: %m%n")));
+            appender->setLayout(make_unique<PatternLayout>("%-5p %D{%H:%M:%S:%Q}: %m%n"));
             logger_.addAppender(appender);
         }
 
