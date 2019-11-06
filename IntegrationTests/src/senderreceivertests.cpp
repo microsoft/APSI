@@ -245,21 +245,14 @@ namespace
 
 namespace APSITests
 {
-    TEST(SenderReceiverTests, OPRFandLabelsSmallTest)
+    TEST(SenderReceiverTests, LabelsSmallTest)
     {
         size_t senderActualSize = 100;
         PSIParams params = create_params(senderActualSize, /* use_labels */ true, /* fast_membership */ false);
         RunTest(senderActualSize, params);
     }
 
-    TEST(SenderReceiverTests, DISABLED_OPRFandLabelsTest)
-    {
-        size_t senderActualSize = 2000;
-        PSIParams params = create_params(senderActualSize, /* use_labels */ true, /* fast_membership */ false);
-        RunTest(senderActualSize, params);
-    }
-
-    TEST(SenderReceiverTests, OPRFTest)
+    TEST(SenderReceiverTests, NoLabels64KTest)
     {
         size_t senderActualSize = 65536;
         PSIParams params = create_params(senderActualSize, /* use_label */ false, /* fast_membership */ false);
@@ -273,21 +266,21 @@ namespace APSITests
         RunTest(senderActualSize, params);
     }
 
-    TEST(SenderReceiverTests, DISABLED_NoOPRFNoLabelsTest)
+    TEST(SenderReceiverTests, NoLabels3KTest)
     {
         size_t senderActualSize = 3000;
         PSIParams params = create_params(senderActualSize,  /* use_labels */ false, /* fast_membership */ false);
         RunTest(senderActualSize, params);
     }
 
-    TEST(SenderReceiverTests, OPRFFastMembershipTest)
+    TEST(SenderReceiverTests, NoLabelsFastMembershipTest)
     {
         size_t senderActualSize = 3000;
         PSIParams params = create_params(senderActualSize, /* use_labels */ false, /* fast_membership */ true);
         RunTest(senderActualSize, params);
     }
 
-    TEST(SenderReceiverTests, DISABLED_OPRFFastMembershipLabels)
+    TEST(SenderReceiverTests, DISABLED_LabelsFastMembership)
     {
         size_t senderActualSize = 3000;
         PSIParams params = create_params(senderActualSize, /* use_labels */ true, /* fast_membership */ true);

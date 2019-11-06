@@ -41,12 +41,6 @@
     <ClCompile Include="src\unit_tests_runner.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\aes_tests.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\prng_tests.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\channel_tests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
