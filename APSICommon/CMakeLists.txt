@@ -131,6 +131,7 @@ set_target_properties(Common PROPERTIES
 target_compile_features(Common PUBLIC cxx_std_14)
 
 # Defines
+# FIXME: What are these warnings?
 message(WARNING "${PROJECT_NAME} adding define -DHAVE_CONFIG; needed?")
 target_compile_options(Common PUBLIC -DHAVE_CONFIG)
 message(WARNING "${PROJECT_NAME} adding define -DUSE_SECURE_SEED; needed?")

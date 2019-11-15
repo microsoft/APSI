@@ -16,25 +16,18 @@ set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/../lib)
 add_library(apsinative SHARED "")
 set_property(TARGET apsinative PROPERTY POSITION_INDEPENDENT_CODE ON)
 
+# For locating all modules
+list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake)
+
 # Import APSICommon
-find_package(APSICommon 1.0.0 EXACT REQUIRED)
+find_package(APSICommon 1.0.0 EXACT REQUIRED
+    PATHS ${PROJECT_SOURCE_DIR}/../APSICommon/cmake
+)
 
 # Import APSIReceiver
-find_package(APSIReceiver 1.0.0 EXACT REQUIRED)
-
-# Import SEAL
-find_package(SEAL 3.2.0 REQUIRED)
-
-# Import Cuckoo
-find_package(Cuckoo 1.0 REQUIRED)
-
-# Import FLINT library
-find_path(FLINT_DIR NAMES flint/fmpz.h)
-if (NOT FLINT_DIR)
-    message(FATAL_ERROR "Could not find FLINT library")
-else()
-    message(STATUS "Flint directory: ${FLINT_DIR}")
-endif()
+find_package(APSIReceiver 1.0.0 EXACT REQUIRED
+    PATHS ${PROJECT_SOURCE_DIR}/../APSIReceiver/cmake
+)
 
 # Includes
 target_include_directories(apsinative PRIVATE
@@ -58,8 +51,8 @@ target_sources(apsinative
 
 # Link required libraries
 target_link_libraries(apsinative
-    APSICommon::apsi_common
-    APSIReceiver::apsi_receiver
+    APSI::Common
+    APSI::Receiver
     SEAL::seal
-    Cuckoo::cuckoo
+    Kuku::kuku
 )
