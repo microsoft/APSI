@@ -8,7 +8,6 @@
 
 // APSI
 #include "apsi/receiver.h"
-#include "apsi/apsidefines.h"
 #include "apsi/logging/log.h"
 #include "apsi/network/network_utils.h"
 #include "apsi/network/channel.h"
@@ -100,7 +99,7 @@ void Receiver::initialize()
     Log::info("Receiver initialized");
 }
 
-map<uint64_t, vector<string>>& Receiver::query(vector<Item>& items)
+map<u64, vector<string>>& Receiver::query(vector<Item>& items)
 {
     STOPWATCH(recv_stop_watch, "Receiver::query");
     Log::info("Receiver starting query");
@@ -259,7 +258,7 @@ void Receiver::handshake(Channel& chl)
 }
 
 pair<
-    map<uint64_t, vector<string>>,
+    map<u64, vector<string>>,
     unique_ptr<KukuTable> >
     Receiver::preprocess(vector<Item> &items)
 {
@@ -292,10 +291,10 @@ pair<
         }
     }
 
-    map<uint64_t, FFieldArray> powers;
+    map<u64, FFieldArray> powers;
     generate_powers(*exfield_items, powers);
 
-    map<uint64_t, vector<string>> ciphers;
+    map<u64, vector<string>> ciphers;
     encrypt(powers, ciphers);
 
     Log::info("Receiver preprocess end");
@@ -397,7 +396,7 @@ void Receiver::exfield_encoding(
 }
 
 void Receiver::generate_powers(const FFieldArray& exfield_items,
-    map<uint64_t, FFieldArray>& result)
+    map<u64, FFieldArray>& result)
 {
     u64 split_size = (get_params().sender_bin_size() + get_params().split_count() - 1) / get_params().split_count();
     u32 window_size = get_params().window_size();
@@ -436,7 +435,7 @@ void Receiver::generate_powers(const FFieldArray& exfield_items,
     }
 }
 
-void Receiver::encrypt(map<uint64_t, FFieldArray> &input, map<uint64_t, vector<string>> &destination)
+void Receiver::encrypt(map<u64, FFieldArray> &input, map<u64, vector<string>> &destination)
 {
     size_t count = 0;
     destination.clear();
@@ -451,7 +450,7 @@ void Receiver::encrypt(map<uint64_t, FFieldArray> &input, map<uint64_t, vector<s
 void Receiver::encrypt(const FFieldArray &input, vector<string> &destination)
 {
     int batch_size = slot_count_, num_of_batches = static_cast<int>((input.size() + batch_size - 1) / batch_size);
-    vector<uint64_t> integer_batch(batch_size, 0);
+    vector<u64> integer_batch(batch_size, 0);
     destination.clear();
     destination.reserve(num_of_batches);
     Plaintext plain(pool_);

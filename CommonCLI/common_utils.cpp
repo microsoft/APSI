@@ -13,7 +13,6 @@
 
 // APSI
 #include "base_clp.h"
-#include "apsi/apsidefines.h"
 #include "apsi/psiparams.h"
 #include "apsi/tools/utils.h"
 

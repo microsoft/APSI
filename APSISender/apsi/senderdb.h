@@ -12,7 +12,6 @@
 
 // APSI
 #include "apsi/item.h"
-#include "apsi/apsidefines.h"
 #include "apsi/psiparams.h"
 #include "apsi/dbblock.h"
 #include "apsi/senderthreadcontext.h"

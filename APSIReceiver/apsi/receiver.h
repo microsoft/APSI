@@ -68,7 +68,7 @@ namespace apsi
             is a same-size vector of bool values. If an item is in the intersection, the corresponding bool value is true on the
             same position in the result vector .
             */
-            std::map<std::uint64_t, std::vector<std::string>>& query(std::vector<Item> &items);
+            std::map<u64, std::vector<std::string>>& query(std::vector<Item> &items);
 
             /**
             Decrypt the result of a query to a remote sender and get the intersection result. The query is a vector of items, and the result
@@ -122,7 +122,7 @@ namespace apsi
             Preprocesses the PSI items. Returns the power map of the items, and the indices of them in the hash table.
             */
             std::pair<
-                std::map<std::uint64_t, std::vector<std::string>>,
+                std::map<u64, std::vector<std::string>>,
                 std::unique_ptr<kuku::KukuTable>
             > preprocess(std::vector<Item> &items);
 
@@ -153,14 +153,14 @@ namespace apsi
             The return result is a map from k to y^k.
             */
             void generate_powers(const FFieldArray &exfield_items,
-                std::map<std::uint64_t, FFieldArray> &ret);
+                std::map<u64, FFieldArray> &ret);
 
             /**
             Encrypts every vector of elements in the input map to a corresponding vector of SEAL Ciphertext, using generalized batching. The number of
             ciphertexts in a vector depends on the slot count in generalized batching. For example, if an input vector has size 1024, the slot count
             is 256, then there are 1024/256 = 4 ciphertext in the Ciphertext vector.
             */
-            void encrypt(std::map<std::uint64_t, FFieldArray> &input, std::map<std::uint64_t, std::vector<std::string>> &destination);
+            void encrypt(std::map<u64, FFieldArray> &input, std::map<u64, std::vector<std::string>> &destination);
 
             /**
             Encrypts a vector of elements to a corresponding vector of SEAL Ciphertext, using generalized batching. The number of
@@ -246,7 +246,7 @@ namespace apsi
 
             // Preprocess result
             std::pair<
-                std::map<std::uint64_t, std::vector<std::string>>,
+                std::map<u64, std::vector<std::string>>,
                 std::unique_ptr<kuku::KukuTable>
             > preprocess_result_;
 

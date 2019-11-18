@@ -20,7 +20,7 @@ namespace apsi
 
         namespace
         {
-            double get_bin_overflow_prob(uint64_t num_bins, uint64_t num_balls, uint64_t bin_size, double epsilon = 0.0001)
+            double get_bin_overflow_prob(u64 num_bins, u64 num_balls, u64 bin_size, double epsilon = 0.0001)
             {
                 if (num_balls <= bin_size)
                 {
@@ -36,7 +36,7 @@ namespace apsi
                 using ldouble = long double;
                 ldouble sum = 0.0;
                 ldouble sec = 0.0;
-                uint64_t i = 0;
+                u64 i = 0;
                 ldouble back = pow((1 - ldouble(1.0) / num_bins), num_balls); 
 
                 while (i <= bin_size)
@@ -52,11 +52,11 @@ namespace apsi
                 return max<double>(0, (double)-sec);
             }
 
-            uint64_t get_bin_size(uint64_t num_bins, uint64_t num_balls, uint64_t stat_sec_param)
+            u64 get_bin_size(u64 num_bins, u64 num_balls, u64 stat_sec_param)
             {
-                auto B = max<uint64_t>(1, num_balls / num_bins);
+                auto B = max<u64>(1, num_balls / num_bins);
                 double currentProb = get_bin_overflow_prob(num_bins, num_balls, B);
-                uint64_t step = 1;
+                u64 step = 1;
                 bool doubling = true;
 
                 while (currentProb < static_cast<double>(stat_sec_param) || step > 1)
@@ -65,18 +65,18 @@ namespace apsi
                     {
                         if (doubling)
                         {
-                            step = max<uint64_t>(1, step * 2);
+                            step = max<u64>(1, step * 2);
                         }
                         else
                         {
-                            step = max<uint64_t>(1, step / 2);
+                            step = max<u64>(1, step / 2);
                         }
                         B += step;
                     }
                     else
                     {
                         doubling = false;
-                        step = max<uint64_t>(1, step / 2);
+                        step = max<u64>(1, step / 2);
                         B -= step;
                     }
                     currentProb = get_bin_overflow_prob(num_bins, num_balls, B);
@@ -86,9 +86,9 @@ namespace apsi
             }
         }
 
-        uint64_t optimal_split(const uint64_t x, const int base)
+        u64 optimal_split(const u64 x, const int base)
         {
-            vector<uint64_t> digits = conversion_to_digits(x, base);
+            vector<u64> digits = conversion_to_digits(x, base);
             int ndigits = static_cast<int>(digits.size());
             int hammingweight = 0;
             for (int i = 0; i < ndigits; i++)
@@ -97,13 +97,13 @@ namespace apsi
             }
             int target = hammingweight / 2;
             int now = 0;
-            uint64_t result = 0;
+            u64 result = 0;
             for (int i = 0; i < ndigits; i++)
             {
                 if (digits[i] != 0)
                 {
                     now++;
-                    result += static_cast<uint64_t>(pow(base, i) * digits[i]);
+                    result += static_cast<u64>(pow(base, i) * digits[i]);
                 }
                 if (now >= target)
                 {
@@ -114,7 +114,7 @@ namespace apsi
         }
 
         // compute F(d,k)
-        uint64_t maximal_power(const uint64_t degree, const uint64_t bound, const uint64_t base)
+        u64 maximal_power(const u64 degree, const u64 bound, const u64 base)
         {
             // base must be positive
             if (base < 0) throw invalid_argument("base must be a positive integer");
@@ -123,19 +123,19 @@ namespace apsi
             if (bound <= degree + 1)
             {
                 double result = pow(base, bound) - base + (degree - bound + 1) * pow(base, bound - 1) * (base - 1);
-                return static_cast<uint64_t>(result);
+                return static_cast<u64>(result);
             }
             else
             { // when d < k -1 i.e. k > d+1. 
                 return maximal_power(degree, degree + 1, base);
             }
-            return uint64_t();
+            return u64();
         }
 
-        vector<uint64_t> conversion_to_digits(const uint64_t input, const int base)
+        vector<u64> conversion_to_digits(const u64 input, const int base)
         {
-            vector<uint64_t> result;
-            uint64_t number = input;
+            vector<u64> result;
+            u64 number = input;
 
             while (number > 0)
             {
@@ -163,16 +163,16 @@ namespace apsi
             return elems;
         }
 
-        uint64_t compute_sender_bin_size(
-            uint32_t log_table_size, uint64_t sender_set_size,
-            uint32_t hash_func_count, uint32_t binning_sec_level, uint32_t split_count)
+        u64 compute_sender_bin_size(
+            u32 log_table_size, u64 sender_set_size,
+            u32 hash_func_count, u32 binning_sec_level, u32 split_count)
         {
             return round_up_to(
                 get_bin_size(
                     1ull << log_table_size,
                     sender_set_size * hash_func_count,
                     binning_sec_level),
-                static_cast<uint64_t>(split_count));
+                static_cast<u64>(split_count));
         }
     }
 }

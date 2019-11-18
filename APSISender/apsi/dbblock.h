@@ -9,7 +9,6 @@
 #include <unordered_set>
 
 // APSI
-#include "apsi/apsidefines.h"
 #include "apsi/item.h"
 #include "apsi/senderthreadcontext.h"
 #include "apsi/ffield/ffield_fast_batch_encoder.h"

@@ -10,7 +10,6 @@
 
 // APSI
 #include "apsi/sender.h"
-#include "apsi/apsidefines.h"
 #include "apsi/logging/log.h"
 #include "apsi/network/network_utils.h"
 #include "apsi/tools/utils.h"
@@ -605,7 +604,7 @@ u64 WindowingDag::pow(u64 base, u64 e)
     return r;
 }
 
-uint64_t WindowingDag::optimal_split(size_t x, int base, vector<int> &degrees)
+u64 WindowingDag::optimal_split(size_t x, int base, vector<int> &degrees)
 {
     int opt_deg = degrees[x];
     int opt_split = 0;
@@ -629,9 +628,9 @@ uint64_t WindowingDag::optimal_split(size_t x, int base, vector<int> &degrees)
     return opt_split; 
 }
 
-vector<uint64_t> WindowingDag::conversion_to_digits(uint64_t input, int base)
+vector<u64> WindowingDag::conversion_to_digits(u64 input, int base)
 {
-    vector<uint64_t> result;
+    vector<u64> result;
     while (input > 0)
     {
         result.push_back(input % base);

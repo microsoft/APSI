@@ -1,6 +1,7 @@
 #include <memory>
 #include "apsi/tools/sealcompress.h"
 #include "apsi/logging/log.h"
+#include "apsi/apsidefines.h"
 
 using namespace std;
 using namespace seal;
@@ -70,7 +71,7 @@ void CiphertextCompressor::compressed_save(const seal::Ciphertext &encrypted,
     auto compr_poly(allocate_zero_uint(compr_data_uint64_count, pool_));
 
     char *compr_poly_writer_head = reinterpret_cast<char*>(compr_poly.get());
-    const uint64_t *encrypted_coeff_ptr = encrypted.data(); 
+    const u64 *encrypted_coeff_ptr = encrypted.data(); 
     size_t encrypted_uint64_count = encrypted_size * encrypted.poly_modulus_degree();
     Log::debug("COMPRESSOR: compressing %i uint64s into %i", encrypted_uint64_count, compr_data_uint64_count);
 
@@ -79,7 +80,7 @@ void CiphertextCompressor::compressed_save(const seal::Ciphertext &encrypted,
 
     for(size_t i = 0; i < encrypted_uint64_count; i++, encrypted_coeff_ptr++)
     {
-        uint64_t shifted_coeff = *encrypted_coeff_ptr << bit_shift;
+        u64 shifted_coeff = *encrypted_coeff_ptr << bit_shift;
         memcpy(compr_poly_writer_head, 
                 reinterpret_cast<char*>(&shifted_coeff) + bytes_per_uint64 - compr_coeff_byte_count, 
                 compr_coeff_byte_count); 
@@ -155,12 +156,12 @@ void CiphertextCompressor::compressed_load(std::istream &stream,
 
     // Finally parse and write to destination
     const char *compr_poly_reader_head = reinterpret_cast<const char*>(compr_poly.get());
-    uint64_t *destination_coeff_ptr = destination.data(); 
+    u64 *destination_coeff_ptr = destination.data(); 
     size_t encrypted_uint64_count = encrypted_size * destination.poly_modulus_degree();
     int bit_shift = bits_per_uint64 - coeff_mod_bit_count;
     for(size_t i = 0; i < encrypted_uint64_count; i++, destination_coeff_ptr++)
     {
-        uint64_t shifted_coeff = 0;
+        u64 shifted_coeff = 0;
         memcpy(reinterpret_cast<char*>(&shifted_coeff), compr_poly_reader_head, 
             compr_coeff_byte_count); 
         *destination_coeff_ptr = shifted_coeff << 

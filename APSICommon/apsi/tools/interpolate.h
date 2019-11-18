@@ -28,7 +28,7 @@ namespace apsi
     std::vector<FFieldArray> get_div_diff_temp(FField field, std::size_t size);
 
     void u64_newton_interpolate_poly(
-        gsl::span<std::pair<std::uint64_t, std::uint64_t> > input,
-        gsl::span<std::uint64_t> result,
+        gsl::span<std::pair<u64, u64> > input,
+        gsl::span<u64> result,
         const seal::SmallModulus &plain_modulus);
 }

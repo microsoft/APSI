@@ -7,7 +7,6 @@
 #include <limits>
 #include <algorithm>
 #include <memory>
-#include <cstdint>
 #include <cstddef>
 
 // APSI
@@ -31,8 +30,8 @@ namespace apsi
         // dest are unchanged, e.g. the bit indexed by [bitLength, bitLength + 1, ...]
         void copy_with_bit_offset(
             gsl::span<const std::uint8_t> src,
-            std::int32_t bitOffset,
-            int32_t bitLength,
+            i32 bitOffset,
+            i32 bitLength,
             gsl::span<std::uint8_t> dest);
 
         // Copies bitLength bits from src starting at the bit index by srcBitOffset.
@@ -40,9 +39,9 @@ namespace apsi
         // dest are unchanged, e.g. the bit indexed by [0,1,...,destBitOffset - 1], [destBitOffset + bitLength, ...]
         void copy_with_bit_offset(
             gsl::span<const std::uint8_t> src,
-            std::int32_t srcBitOffset,
-            std::int32_t destBitOffset,
-            std::int32_t bitLength,
+            i32 srcBitOffset,
+            i32 destBitOffset,
+            i32 bitLength,
             gsl::span<std::uint8_t> dest);
     }
 
@@ -197,7 +196,7 @@ namespace apsi
             neg(*this);
         }
 
-        inline void pow(FFieldElt &out, std::uint64_t e) const
+        inline void pow(FFieldElt &out, u64 e) const
         {
             const seal::SmallModulus &ch = field_.ch_;
             std::transform(elt_.cbegin(), elt_.cend(), out.elt_.begin(),
@@ -252,7 +251,7 @@ namespace apsi
             return result;
         }
 
-        inline FFieldElt operator ^(std::uint64_t e) const
+        inline FFieldElt operator ^(u64 e) const
         {
             FFieldElt result(field_);
             pow(result, e);
@@ -279,7 +278,7 @@ namespace apsi
             div(*this, in);
         }
 
-        inline void operator ^=(std::uint64_t e)
+        inline void operator ^=(u64 e)
         {
             pow(*this, e);
         }
@@ -323,7 +322,7 @@ namespace apsi
 
             static_assert(std::is_pod<_ffield_elt_coeff_t>::value, "must be pod type");
 
-            if (field_.d_ < static_cast<std::uint64_t>(split_index_bound)) {
+            if (field_.d_ < static_cast<u64>(split_index_bound)) {
                 throw std::invalid_argument("bit_length too large for extension field");
             }
 
@@ -351,7 +350,7 @@ namespace apsi
             // How many coefficients do we need in the FFieldElt
             int split_index_bound = (bit_length + split_length - 1) / split_length;
 #ifndef NDEBUG
-            if (static_cast<std::uint64_t>(split_index_bound) > field_.d_)
+            if (static_cast<u64>(split_index_bound) > field_.d_)
             {
                 throw std::invalid_argument("too many bits required");
             }

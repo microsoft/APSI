@@ -9,7 +9,6 @@
 #include <memory>
 
 // APSI
-#include "apsi/apsidefines.h"
 #include "apsi/network/senderoperation.h"
 #include "apsi/network/senderoperationresponse.h"
 

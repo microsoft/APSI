@@ -7,7 +7,6 @@
 #include <vector>
 
 // APSI
-#include "apsi/apsidefines.h"
 #include "apsi/result_package.h"
 #include "apsi/psiparams.h"
 

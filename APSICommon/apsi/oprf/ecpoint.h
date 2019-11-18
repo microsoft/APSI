@@ -5,7 +5,6 @@
 
 // STD
 #include <array>
-#include <cstdint>
 #include <iostream>
 #include <cstddef>
 #include <cstring>
@@ -19,6 +18,9 @@
 
 // SEAL
 #include <seal/randomgen.h>
+
+// APSI
+#include "apsi/apsidefines.h"
 
 namespace apsi
 {

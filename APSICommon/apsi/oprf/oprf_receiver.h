@@ -4,7 +4,6 @@
 #pragma once
 
 // STD
-#include <cstdint>
 #include <cstddef>
 #include <stdexcept>
 #include <iostream>
@@ -18,6 +17,7 @@
 
 // APSI
 #include "apsi/oprf/oprf_common.h"
+#include "apsi/apsidefines.h"
 
 namespace apsi
 {

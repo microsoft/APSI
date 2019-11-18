@@ -4,9 +4,11 @@
 #pragma once
 
 // STD
-#include <cstdint>
 #include <vector>
 #include <memory>
+
+// APSI
+#include "apsi/apsidefines.h"
 
 // SEAL
 #include <seal/smallmodulus.h>
@@ -14,7 +16,7 @@
 namespace apsi
 {
     using _ch_t = seal::SmallModulus;
-    using _ffield_elt_coeff_t = std::uint64_t; 
+    using _ffield_elt_coeff_t = u64; 
     using _ffield_elt_t = std::vector<_ffield_elt_coeff_t>;
    
     class FFieldElt;
@@ -26,7 +28,7 @@ namespace apsi
         friend class FFieldFastBatchEncoder;
 
     public:
-        FField(_ch_t ch, std::uint64_t d) : ch_(ch), d_(d)
+        FField(_ch_t ch, u64 d) : ch_(ch), d_(d)
         {
         }
 
@@ -35,7 +37,7 @@ namespace apsi
             return ch_;
         }
 
-        inline std::uint64_t d() const
+        inline u64 d() const
         {
             return d_;
         }
@@ -57,6 +59,6 @@ namespace apsi
 
     private:
         _ch_t ch_;
-        std::uint64_t d_;
+        u64 d_;
     };
 }

@@ -11,8 +11,8 @@ namespace apsi
 {
     void details::copy_with_bit_offset(
         gsl::span<const uint8_t> src,
-        int32_t bitOffset,
-        int32_t bitLength,
+        i32 bitOffset,
+        i32 bitLength,
         gsl::span<uint8_t> dest)
     {
         // the number of bits to shift by to align with dest
@@ -108,9 +108,9 @@ namespace apsi
     // dest are unchanged, e.g. the bit indexed by [0,1,...,destBitOffset - 1], [destBitOffset + bitLength, ...]
     void details::copy_with_bit_offset(
         gsl::span<const uint8_t> src,
-        int32_t srcBitOffset,
-        int32_t destBitOffset,
-        int32_t bitLength,
+        i32 srcBitOffset,
+        i32 destBitOffset,
+        i32 bitLength,
         gsl::span<uint8_t> dest)
     {
         auto destNext = (destBitOffset + 7) >> 3;

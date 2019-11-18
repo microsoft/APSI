@@ -9,10 +9,8 @@
 #include <cmath>
 #include <numeric>
 #include <stdexcept>
-#include <cstdint>
 
 // APSI
-#include "apsi/apsidefines.h"
 #include "apsi/logging/log.h"
 #include "apsi/tools/utils.h"
 
@@ -319,7 +317,7 @@ namespace apsi
 
             if ((item_bit_count() + 63) / 64 != (item_bit_count() + static_cast<int>(floor(log2(hash_func_count()))) + 1 + 1 + 63) / 64)
             {
-                throw std::invalid_argument("Invalid for cuckoo: null bit and location index overflow to new uint64_t.");
+                throw std::invalid_argument("Invalid for cuckoo: null bit and location index overflow to new u64.");
             }
 
             if (item_bit_count() > max_item_bit_count)
@@ -329,7 +327,7 @@ namespace apsi
 
             apsi::u32 bitcount = item_bit_length_used_after_oprf();
 
-            apsi::u64 supported_bitcount = ((uint64_t)exfield_degree()) * (seal_params_.encryption_params.plain_modulus().bit_count() - 1);
+            apsi::u64 supported_bitcount = ((u64)exfield_degree()) * (seal_params_.encryption_params.plain_modulus().bit_count() - 1);
             if (bitcount > supported_bitcount)
             {
                 apsi::logging::Log::warning("item bit count (%i) is too large to fit in slots (%i bits). ", bitcount, supported_bitcount);

@@ -144,15 +144,15 @@ namespace apsi
     }
 
     void u64_newton_interpolate_poly(
-        gsl::span<pair<uint64_t, uint64_t> > input,
-        gsl::span<uint64_t> result,
+        gsl::span<pair<u64, u64> > input,
+        gsl::span<u64> result,
         const seal::SmallModulus &plain_modulus)
     {
         int size = static_cast<int>(input.size());
-        vector<vector<uint64_t>> divided_differences(size);
-        uint64_t numerator;
-        uint64_t denominator;
-        uint64_t inverse = 0;
+        vector<vector<u64>> divided_differences(size);
+        u64 numerator;
+        u64 denominator;
+        u64 inverse = 0;
 
         for (int i = 0; i < size; i++) {
             divided_differences[i].resize(size - i);
