@@ -56,7 +56,7 @@ namespace apsi
             The query is a vector of items, and the result is a same-size vector of bool values. If an item is in the intersection, the
             corresponding bool value is true on the same position in the result vector.
             *************************************************************************************************************************************/
-            std::pair<std::vector<bool>, Matrix<u8>> query(std::vector<Item>& items, apsi::network::Channel& chl);
+            std::pair<std::vector<bool>, Matrix<u8>> query(std::vector<Item>& items, network::Channel& chl);
 
 
             /************************************************************************************************************************************
@@ -75,7 +75,7 @@ namespace apsi
             is a same-size vector of bool values. If an item is in the intersection, the corresponding bool value is true on the
             same position in the result vector
             */
-            std::pair<std::vector<bool>, Matrix<u8>> decrypt_result(std::vector<Item>& items, apsi::network::Channel& chl);
+            std::pair<std::vector<bool>, Matrix<u8>> decrypt_result(std::vector<Item>& items, network::Channel& chl);
 
             /**
             Obfuscates the items and initializes the given vector with the buffer that must be sent to the Sender for OPRF
@@ -94,7 +94,7 @@ namespace apsi
             Sender will send configuration parameters that the Receiver will use to configure itself.
             A handshake needs to be performed before any full query call. Otherwise, default parameters will be used.
             */
-            void handshake(apsi::network::Channel& channel);
+            void handshake(network::Channel& channel);
 
             /**
             Get current configuration parameters
@@ -180,7 +180,7 @@ namespace apsi
             larger than table_size.
             */
             std::pair<std::vector<bool>, Matrix<u8> > stream_decrypt(
-                apsi::network::Channel& channel,
+                network::Channel& channel,
                 const std::vector<int>& table_to_input_map,
                 std::vector<Item>& items);
 
@@ -192,10 +192,10 @@ namespace apsi
                 int batch_size,
                 int num_threads,
                 int block_count,
-                apsi::network::Channel& channel,
+                network::Channel& channel,
                 const std::vector<int> &table_to_input_map,
                 std::vector<bool>& ret_bools,
-                apsi::Matrix<apsi::u8>& ret_labels);
+                Matrix<u8>& ret_labels);
 
             std::shared_ptr<FField> field() const
             {
@@ -223,7 +223,7 @@ namespace apsi
 
             std::shared_ptr<seal::SEALContext> seal_context_;
 
-            apsi::i32 thread_count_;
+            i32 thread_count_;
 
             seal::MemoryPoolHandle pool_;
 
@@ -239,7 +239,7 @@ namespace apsi
 
             std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder_;
 
-            apsi::i32 slot_count_;
+            i32 slot_count_;
 
             // Objects for compressed ciphertexts
             std::unique_ptr<CiphertextCompressor> compressor_;
@@ -252,7 +252,7 @@ namespace apsi
 
             std::string relin_keys_;
 
-            std::shared_ptr<apsi::oprf::OPRFReceiver> oprf_receiver_;
-        };
-    }
-}
+            std::shared_ptr<oprf::OPRFReceiver> oprf_receiver_;
+        }; // class Receiver
+    } // namespace receiver
+} // namespace apsi

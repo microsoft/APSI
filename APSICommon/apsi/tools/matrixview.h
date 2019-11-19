@@ -1,8 +1,8 @@
 #pragma once
 
-#include "apsi/apsidefines.h"
 #include <gsl/span>
 #include <gsl/gsl_assert>
+#include "apsi/apsidefines.h"
 
 namespace apsi
 {
@@ -123,5 +123,5 @@ namespace apsi
         std::size_t rows_ = 0;
         std::size_t cols_ = 0;
         std::size_t elt_size_;
-    };
-}
+    }; // class MatrixView
+} // namespace apsi

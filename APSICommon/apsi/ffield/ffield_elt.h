@@ -3,23 +3,14 @@
 
 #pragma once
 
-// STD
 #include <limits>
 #include <algorithm>
-#include <memory>
 #include <cstddef>
-
-// APSI
-#include "apsi/ffield/ffield.h"
-
-// GSL
 #include <gsl/span>
-
-// SEAL
-#include <seal/smallmodulus.h>
 #include <seal/util/uintarithsmallmod.h>
 #include <seal/util/numth.h>
 #include <seal/randomgen.h>
+#include "apsi/ffield/ffield.h"
 
 namespace apsi
 {
@@ -43,7 +34,7 @@ namespace apsi
             i32 destBitOffset,
             i32 bitLength,
             gsl::span<std::uint8_t> dest);
-    }
+    } // namespace details
 
     class FFieldElt
     {
@@ -373,7 +364,7 @@ namespace apsi
     private:
         FField field_;
         _ffield_elt_t elt_;
-    };
+    }; // class FFieldElt
 
     // Easy printing
     inline std::ostream &operator <<(std::ostream &os, const FFieldElt &in)
@@ -384,4 +375,4 @@ namespace apsi
         os << in.data()[in.field().d()];
         return os;
     }
-}
+} // namespace apsi

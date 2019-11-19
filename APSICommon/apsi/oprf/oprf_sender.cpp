@@ -195,5 +195,5 @@ namespace apsi
                     ECPoint::hash_size });
             }
         }
-    }
-}
+    }// namespace oprf
+} // namespace apsi

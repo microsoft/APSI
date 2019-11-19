@@ -69,8 +69,8 @@ namespace apsi
             void add_data_worker(
                 int thread_idx,
                 int thread_count,
-                gsl::span<const apsi::Item> data,
-                apsi::MatrixView<std::uint8_t> values, std::vector<int> &loads);
+                gsl::span<const Item> data,
+                MatrixView<std::uint8_t> values, std::vector<int> &loads);
 
             /**
             Adds one item to sender's database.
@@ -106,7 +106,7 @@ namespace apsi
                 return db_blocks_.size();
             }
 
-            const apsi::PSIParams& get_params() const { return params_; }
+            const PSIParams& get_params() const { return params_; }
 
 
         private:
@@ -148,6 +148,6 @@ namespace apsi
             Matrix<DBBlock> db_blocks_;
 
             std::pair<DBBlock*, DBBlock::Position> acquire_db_position_after_oprf(size_t cuckoo_loc);
-        };
-    }
-}
+        }; // class SenderDB
+    } // namespace sender
+} // namespace apsi

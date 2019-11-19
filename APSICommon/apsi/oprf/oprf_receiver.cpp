@@ -87,5 +87,5 @@ namespace apsi
                 advance(oprf_in_ptr, oprf_response_size);
             }
         }
-    }
-}
+    } // namespace oprf
+} // namespace apsi

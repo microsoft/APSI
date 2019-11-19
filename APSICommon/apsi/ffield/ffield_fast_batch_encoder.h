@@ -3,19 +3,10 @@
 
 #pragma once
 
-// STD
-#include <memory>
-#include <vector>
-
-// APSI 
-#include "apsi/ffield/ffield.h"
-#include "apsi/ffield/ffield_elt.h"
-#include "apsi/ffield/ffield_array.h"
-
-// SEAL
 #include <seal/context.h>
 #include <seal/plaintext.h>
 #include <seal/batchencoder.h>
+#include "apsi/ffield/ffield_array.h"
 
 namespace apsi
 {
@@ -75,5 +66,5 @@ namespace apsi
         const int log_n_;
         const u64 m_;
         const u64 slot_count_;
-    };
-}
+    }; // class FFieldFastBatchEncoder
+} // namespace apsi

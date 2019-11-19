@@ -76,7 +76,7 @@ namespace apsi
                 given_digits_ = given_digits;
                 u64 actual_power = tools::maximal_power(max_degree_supported, given_digits, base);
 
-                apsi::logging::Log::debug("actual power supported = %i", actual_power);
+                logging::Log::debug("actual power supported = %i", actual_power);
 
                 if (static_cast<int>(actual_power) < max_power)
                 {
@@ -90,7 +90,7 @@ namespace apsi
             u64 optimal_split(std::size_t x, int base, std::vector<int> &degrees);
             std::vector<u64> conversion_to_digits(u64 input, int base);
             void compute_dag();
-        };
+        }; // struct WindowingDag
 
         class Sender
         {
@@ -119,14 +119,14 @@ namespace apsi
             */
             void query(
                 const std::string& relin_keys,
-                const std::map<apsi::u64, std::vector<std::string>> query,
-                const std::vector<apsi::u8>& client_id,
-                apsi::network::Channel& channel);
+                const std::map<u64, std::vector<std::string>> query,
+                const std::vector<u8>& client_id,
+                network::Channel& channel);
 
             /**
             Return a reference to the PSI parameters used by the Sender
             */
-            const apsi::PSIParams& get_params() const { return params_; }
+            const PSIParams& get_params() const { return params_; }
 
             /**
             Return the SEALContext
@@ -186,9 +186,9 @@ namespace apsi
             */
             void respond(
                 std::vector<std::vector<seal::Ciphertext> > &query, int num_of_powers,
-                apsi::sender::SenderSessionContext &session_context,
-                const std::vector<apsi::u8>& client_id,
-                apsi::network::Channel& channel);
+                SenderSessionContext &session_context,
+                const std::vector<u8>& client_id,
+                network::Channel& channel);
 
             /**
             Method that handles the work of a single thread that computes the response to a query.
@@ -200,12 +200,12 @@ namespace apsi
                 std::promise<void>& batches_done_prom,
                 std::shared_future<void>& batches_done_fut,
                 std::vector<std::vector<seal::Ciphertext>>& powers,
-                apsi::sender::SenderSessionContext &session_context,
-                apsi::sender::WindowingDag& dag,
-                std::vector<apsi::sender::WindowingDag::State>& states,
+                SenderSessionContext &session_context,
+                WindowingDag& dag,
+                std::vector<WindowingDag::State>& states,
                 std::atomic<int>& remaining_batches,
-                const std::vector<apsi::u8>& client_id,
-                apsi::network::Channel& channel);
+                const std::vector<u8>& client_id,
+                network::Channel& channel);
 
 
             /**
@@ -249,6 +249,6 @@ namespace apsi
             std::deque<int> available_thread_contexts_;
 
             std::mutex thread_context_mtx_;
-        };
-    }
-}
+        }; // class Sender
+    } // namespace sender
+} // namespace apsi

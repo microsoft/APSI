@@ -3,10 +3,8 @@
 
 #pragma once
 
-// STD
 #include <string>
 #include <cstdarg>
-
 
 namespace apsi
 {
@@ -47,6 +45,6 @@ namespace apsi
 
         private:
             static void format_msg(std::string& msg, const char* format, va_list ap);
-        };
-    }
-}
+        }; // class Log
+    } // namespace logging
+} // namespace apsi

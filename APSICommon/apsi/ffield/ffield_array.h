@@ -3,17 +3,7 @@
 
 #pragma once
 
-// STD
-#include <memory>
-#include <algorithm>
-#include <vector>
-
-// APSI
-#include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_elt.h"
-
-// GSL
-#include <gsl/span>
 
 namespace apsi
 {
@@ -449,5 +439,5 @@ namespace apsi
         std::size_t size_;
         FField field_;
         std::vector<_ffield_elt_coeff_t> array_;
-    };
-}
+    }; // class FFieldArray
+} // namespace apsi

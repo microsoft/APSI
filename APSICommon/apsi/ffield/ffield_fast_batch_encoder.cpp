@@ -1,31 +1,22 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-// STD
 #include <iostream>
-
-// APSI
-#include "apsi/ffield/ffield_fast_batch_encoder.h"
-#include "apsi/ffield/ffield_array.h"
-
-// SEAL
 #include <seal/util/common.h>
 #include <seal/util/uintcore.h>
+#include "apsi/ffield/ffield_fast_batch_encoder.h"
 
 using namespace std;
 using namespace seal;
-using namespace seal::util;
-using namespace gsl;
-
 
 namespace apsi
 {
     FFieldFastBatchEncoder::FFieldFastBatchEncoder(
-        std::shared_ptr<seal::SEALContext> context, FField field) :
+        shared_ptr<SEALContext> context, FField field) :
         encoder_(make_unique<BatchEncoder>(context)),
         field_(field),
         n_(context->first_context_data()->parms().poly_modulus_degree()),
-        log_n_(get_power_of_two(n_)),
+        log_n_(util::get_power_of_two(n_)),
         m_(2 * n_),
         slot_count_(n_ / field_.d_)
     {
@@ -61,4 +52,4 @@ namespace apsi
         }
         encoder_->decode(plain, destination.array_);
     }
-}
+} // namespace apsi

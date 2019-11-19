@@ -1,13 +1,10 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-// APSI
-#include "apsi/tools/utils.h" 
-
-// STD
 #include <array>
 #include <vector>
 #include <numeric>
+#include "apsi/tools/utils.h"
 
 using namespace std;
 
@@ -37,19 +34,19 @@ namespace apsi
                 ldouble sum = 0.0;
                 ldouble sec = 0.0;
                 u64 i = 0;
-                ldouble back = pow((1 - ldouble(1.0) / num_bins), num_balls); 
+                ldouble back = pow((1 - static_cast<ldouble>(1.0) / num_bins), num_balls); 
 
                 while (i <= bin_size)
                 {
                     // a(i) = a(i-1) * stuff. 
                     sum += back;
-                    back *= ldouble(num_balls - i) / (ldouble(i + 1) * ldouble(num_bins - 1)); 
-                    ldouble sec2 = log2(ldouble(num_bins)* (1 - sum)); 
+                    back *= static_cast<ldouble>(num_balls - i) / (static_cast<ldouble>(i + 1) * static_cast<ldouble>(num_bins - 1));
+                    ldouble sec2 = log2(static_cast<ldouble>(num_bins)* (1 - sum)); 
                     sec = sec2;
                     i++;
                 }
 
-                return max<double>(0, (double)-sec);
+                return max<double>(0, static_cast<double>(-sec));
             }
 
             u64 get_bin_size(u64 num_bins, u64 num_balls, u64 stat_sec_param)
@@ -174,5 +171,5 @@ namespace apsi
                     binning_sec_level),
                 static_cast<u64>(split_count));
         }
-    }
-}
+    } // namespace tools
+} // namespace apsi

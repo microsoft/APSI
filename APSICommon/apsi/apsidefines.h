@@ -33,4 +33,4 @@ namespace apsi
     extern const item_type zero_item;
     extern const item_type one_item;
     extern const item_type all_one_item;
-}
+} // namespace apsi

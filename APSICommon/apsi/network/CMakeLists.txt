@@ -3,7 +3,6 @@
 
 target_sources(Common
     PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/channel.cpp
         ${CMAKE_CURRENT_LIST_DIR}/network_channel.cpp
         ${CMAKE_CURRENT_LIST_DIR}/network_utils.cpp
         ${CMAKE_CURRENT_LIST_DIR}/stream_channel.cpp

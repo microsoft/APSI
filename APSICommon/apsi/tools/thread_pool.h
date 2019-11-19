@@ -3,7 +3,6 @@
 
 #pragma once
 
-// STD
 #include <vector>
 #include <queue>
 #include <memory>
@@ -117,6 +116,6 @@ namespace apsi
             std::mutex queue_mutex_;
             std::condition_variable condition_;
             bool stop_;
-        };
-    }
-}
+        }; // class ThreadPool
+    } // namespace tools
+} // namespace apsi

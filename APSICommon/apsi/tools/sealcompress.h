@@ -3,14 +3,11 @@
 
 #pragma once
 
-// STD
 #include <iostream>
-
-// SEAL
-#include "seal/secretkey.h"
-#include "seal/ciphertext.h"
-#include "seal/context.h"
-#include "seal/evaluator.h"
+#include <seal/secretkey.h>
+#include <seal/ciphertext.h>
+#include <seal/context.h>
+#include <seal/evaluator.h>
 
 namespace apsi
 {
@@ -39,5 +36,5 @@ namespace apsi
         seal::MemoryPoolHandle pool_;
         std::shared_ptr<seal::SEALContext> seal_context_;
         std::shared_ptr<seal::Evaluator> evaluator_;
-    };
-}
+    }; // class CiphertextCompressor
+} // namespace apsi

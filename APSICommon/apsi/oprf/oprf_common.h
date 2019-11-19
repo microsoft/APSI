@@ -3,9 +3,8 @@
 
 #pragma once
 
-// APSI
-#include "apsi/item.h"
 #include "apsi/oprf/ecpoint.h"
+#include "apsi/item.h"
 
 namespace apsi
 {
@@ -25,5 +24,5 @@ namespace apsi
         using oprf_key_const_type = const ECPoint::scalar_type;
         using oprf_key_span_type = ECPoint::scalar_span_type;
         using oprf_key_span_const_type = ECPoint::scalar_span_const_type;
-    }
-}
+    } // namespace oprf
+} // namespace apsi

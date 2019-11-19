@@ -3,15 +3,10 @@
 
 #pragma once
 
-// STD
 #include <vector>
 #include <memory>
-
-// APSI
-#include "apsi/apsidefines.h"
-
-// SEAL
 #include <seal/smallmodulus.h>
+#include "apsi/apsidefines.h"
 
 namespace apsi
 {
@@ -60,5 +55,5 @@ namespace apsi
     private:
         _ch_t ch_;
         u64 d_;
-    };
-}
+    }; // class FField
+} // namespace apsi

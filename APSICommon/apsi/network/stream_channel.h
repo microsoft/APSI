@@ -3,14 +3,10 @@
 
 #pragma once
 
-// STD
 #include <istream>
 #include <ostream>
 #include <mutex>
-
-// APSI
 #include "apsi/network/channel.h"
-
 
 namespace apsi
 {
@@ -39,27 +35,27 @@ namespace apsi
             /**
             * Receive a Sender Operation.
             */
-            virtual bool receive(std::shared_ptr<apsi::network::SenderOperation>& sender_op);
+            virtual bool receive(std::shared_ptr<SenderOperation>& sender_op);
 
             /**
             * Receive Get Parameters response from Sender
             */
-            virtual void receive(apsi::network::SenderResponseGetParameters& response);
+            virtual void receive(SenderResponseGetParameters& response);
 
             /**
             * Receive item preprocessing response from Sender
             */
-            virtual void receive(apsi::network::SenderResponsePreprocess& response);
+            virtual void receive(SenderResponsePreprocess& response);
 
             /**
             * Receive Query response from Sender
             */
-            virtual void receive(apsi::network::SenderResponseQuery& response);
+            virtual void receive(SenderResponseQuery& response);
 
             /**
             Receive a ResultPackage structure
             */
-            virtual void receive(apsi::ResultPackage& pkg);
+            virtual void receive(ResultPackage& pkg);
 
             /**
             Send a request to Get Parameters from Sender
@@ -69,34 +65,34 @@ namespace apsi
             /**
             Send a response to a request to Get Parameters
             */
-            virtual void send_get_parameters_response(const std::vector<apsi::u8>& client_id, const apsi::PSIParams& params);
+            virtual void send_get_parameters_response(const std::vector<u8>& client_id, const PSIParams& params);
 
             /**
             Send a request to Preprocess items on Sender
             */
-            virtual void send_preprocess(const std::vector<apsi::u8>& buffer);
+            virtual void send_preprocess(const std::vector<u8>& buffer);
 
             /**
             * Send a response to a request to Preprocess items
             */
-            virtual void send_preprocess_response(const std::vector<apsi::u8>& client_id, const std::vector<apsi::u8>& buffer);
+            virtual void send_preprocess_response(const std::vector<u8>& client_id, const std::vector<u8>& buffer);
 
             /**
             * Send a request for a Query response to Sender
             */
             virtual void send_query(
                 const std::string& relin_keys,
-                const std::map<apsi::u64, std::vector<std::string>>& query);
+                const std::map<u64, std::vector<std::string>>& query);
 
             /**
             Send a response to a Query request
             */
-            virtual void send_query_response(const std::vector<apsi::u8>& client_id, const size_t package_count);
+            virtual void send_query_response(const std::vector<u8>& client_id, const size_t package_count);
 
             /**
             * Send a ResultPackage structure
             */
-            virtual void send(const std::vector<apsi::u8>& client_id, const apsi::ResultPackage& pkg);
+            virtual void send(const std::vector<u8>& client_id, const ResultPackage& pkg);
 
         protected:
             std::istream& istream_;
@@ -129,20 +125,20 @@ namespace apsi
             /**
             Decode a Get Parameters message
             */
-            std::shared_ptr<apsi::network::SenderOperation>
+            std::shared_ptr<SenderOperation>
                 decode_get_parameters();
 
             /**
             Decode a Preprocess message
             */
-            std::shared_ptr<apsi::network::SenderOperation>
+            std::shared_ptr<SenderOperation>
                 decode_preprocess();
 
             /**
             Decode a Query message
             */
-            std::shared_ptr<apsi::network::SenderOperation>
+            std::shared_ptr<SenderOperation>
                 decode_query();
-        };
-    }
-}
+        }; // class StreamChannel
+    } // namespace network
+} // namespace apsi

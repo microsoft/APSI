@@ -1,18 +1,15 @@
-// STD
-#include <mutex>
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license.
 
-// APSI
+#include <mutex>
+#include <seal/util/uintarithsmallmod.h>
+#include <seal/util/numth.h>
 #include "apsi/tools/interpolate.h"
 #include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_array.h"
 
-// SEAL
-#include <seal/util/uintarithsmallmod.h>
-#include <seal/util/numth.h>
-
 using namespace std;
 using namespace seal;
-using namespace seal::util;
 
 namespace apsi
 {
@@ -44,50 +41,50 @@ namespace apsi
             divided_differences.emplace_back(size - i, field);
 #ifndef NDEBUG
             if (divided_differences[i].size() != size - i)
-                throw std::runtime_error("");
+                throw runtime_error("");
 #endif
             divided_differences[i].set(0, i, values);
         }
 
-        const seal::SmallModulus &ch = field.ch();
+        const SmallModulus &ch = field.ch();
 
         for (size_t j = 1; j < size; j++)
         {
             for (size_t i = 0; i < size - j; i++)
             {
                 // numerator = DD[i + 1][j - 1] - DD[i][j - 1]
-                std::transform(
+                transform(
                     divided_differences[i + 1].data(j - 1),
                     divided_differences[i + 1].data(j),
                     divided_differences[i].data(j - 1), numerator.data(),
-                    [ch](auto a, auto b) { return seal::util::sub_uint_uint_mod(a, b, ch); });
+                    [ch](auto a, auto b) { return util::sub_uint_uint_mod(a, b, ch); });
 
                 // denominator = points[i + j] - points[i]
-                std::transform(
+                transform(
                     points.data(i + j),
                     points.data(i + j + 1),
                     points.data(i),
                     denominator.data(),
-                    [ch](auto a, auto b) { return seal::util::sub_uint_uint_mod(a, b, ch); });
+                    [ch](auto a, auto b) { return util::sub_uint_uint_mod(a, b, ch); });
 
                 // DD[i][j] = numerator / denominator
-                std::transform(
+                transform(
                     numerator.data(),
                     numerator.data() + field.d(),
                     denominator.data(),
                     divided_differences[i].data(j),
                     [ch](auto a, auto b) {
                         _ffield_elt_coeff_t inv;
-                        if (!seal::util::try_invert_uint_mod(b, ch, inv)) {
+                        if (!util::try_invert_uint_mod(b, ch, inv)) {
                             if (a == 0) {
                                 // could return any element 
                                 return _ffield_elt_coeff_t(0);
                             }
                             else {
-                                throw std::logic_error("division by zero");
+                                throw logic_error("division by zero");
                             }
                         }
-                        return seal::util::multiply_uint_uint_mod(a, inv, ch);
+                        return util::multiply_uint_uint_mod(a, inv, ch);
                     });
             }
         }
@@ -110,23 +107,23 @@ namespace apsi
             for (size_t j = 0; j < i; j++)
             {
                 // numerator = points[size - 1 - i] * result[j + 1]
-                std::transform(
+                transform(
                     points.data(size - 1 - i),
                     points.data(size - i),
                     result.data(j + 1),
                     numerator.data(),
-                    [ch](auto a, auto b) { return seal::util::multiply_uint_uint_mod(a, b, ch); });
+                    [ch](auto a, auto b) { return util::multiply_uint_uint_mod(a, b, ch); });
 
                 // result[j] -= numerator
-                std::transform(
+                transform(
                     result.data(j),
                     result.data(j + 1),
                     numerator.data(),
                     result.data(j),
-                    [ch](auto a, auto b) { return seal::util::sub_uint_uint_mod(a, b, ch); });
+                    [ch](auto a, auto b) { return util::sub_uint_uint_mod(a, b, ch); });
             }
 
-            std::transform(result.data(), result.data(1), divided_differences[0].data(size-1-i), result.data(), [ch](auto a, auto b) { return seal::util::add_uint_uint_mod(a, b, ch); });
+            transform(result.data(), result.data(1), divided_differences[0].data(size-1-i), result.data(), [ch](auto a, auto b) { return util::add_uint_uint_mod(a, b, ch); });
         }
     }
 
@@ -146,7 +143,7 @@ namespace apsi
     void u64_newton_interpolate_poly(
         gsl::span<pair<u64, u64> > input,
         gsl::span<u64> result,
-        const seal::SmallModulus &plain_modulus)
+        const SmallModulus &plain_modulus)
     {
         int size = static_cast<int>(input.size());
         vector<vector<u64>> divided_differences(size);
@@ -161,10 +158,10 @@ namespace apsi
 
         for (int j = 1; j < size; j++) {
             for (int i = 0; i < size - j; i++) {
-                numerator = sub_uint_uint_mod(divided_differences[i + 1][j - 1], divided_differences[i][j - 1], plain_modulus);
-                denominator = sub_uint_uint_mod(input[i + j].first, input[i].first, plain_modulus);
-                try_invert_uint_mod(denominator, plain_modulus, inverse);
-                divided_differences[i][j] = multiply_uint_uint_mod(numerator, inverse, plain_modulus);
+                numerator = util::sub_uint_uint_mod(divided_differences[i + 1][j - 1], divided_differences[i][j - 1], plain_modulus);
+                denominator = util::sub_uint_uint_mod(input[i + j].first, input[i].first, plain_modulus);
+                util::try_invert_uint_mod(denominator, plain_modulus, inverse);
+                divided_differences[i][j] = util::multiply_uint_uint_mod(numerator, inverse, plain_modulus);
             }
         }
 
@@ -180,9 +177,9 @@ namespace apsi
             }
             result[0] = 0;
             for (int j = 0; j < i; j++) {
-                result[j] = sub_uint_uint_mod(result[j], multiply_uint_uint_mod(input[size - 1 - i].first, result[j + 1], plain_modulus), plain_modulus);
+                result[j] = util::sub_uint_uint_mod(result[j], util::multiply_uint_uint_mod(input[size - 1 - i].first, result[j + 1], plain_modulus), plain_modulus);
             }
-            result[0] = add_uint_uint_mod(result[0], divided_differences[0][size - 1 - i], plain_modulus);
+            result[0] = util::add_uint_uint_mod(result[0], divided_differences[0][size - 1 - i], plain_modulus);
         }
     }
-}
+} // namespace apsi

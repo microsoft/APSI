@@ -3,17 +3,11 @@
 
 #pragma once
 
-// STD
-#include <vector>
 #include <string>
 #include <type_traits>
-
-// APSI
+#include <seal/context.h>
+#include <seal/plaintext.h>
 #include "apsi/tools/stopwatch.h"
-
-// SEAL
-#include "seal/context.h"
-#include "seal/plaintext.h"
 
 namespace apsi
 {
@@ -61,5 +55,5 @@ namespace apsi
         u64 compute_sender_bin_size(u32 log_table_size, u64 sender_set_size, u32 hash_func_count, u32 binning_sec_level, u32 split_count);
 
         extern Stopwatch sender_stop_watch, recv_stop_watch;
-    }
-}
+    } // namespace tools
+} // namespace apsi

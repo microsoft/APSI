@@ -1,27 +1,15 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-// STD
-#include <stdexcept>
 #include <cctype>
-
-// GSL
 #include <gsl/span>
-
-// APSI
-#include "apsi/item.h"
-
-// SEAL
 #include <seal/util/uintcore.h>
 #include <seal/util/common.h>
 #include <seal/util/blake2.h>
-
-// Kuku
-#include <kuku/common.h>
+#include "apsi/item.h"
 
 using namespace std;
 using namespace seal;
-using namespace seal::util;
 
 namespace apsi
 {
@@ -93,7 +81,7 @@ namespace apsi
         return ring_item;
     }
 
-    u64 item_part(const std::array<u64, 2>& value_, u32 i, u32 split_length)
+    u64 item_part(const array<u64, 2>& value_, u32 i, u32 split_length)
     {
         int i1 = (i * split_length) >> 6,
             i2 = ((i + 1) * split_length) >> 6,
@@ -162,10 +150,10 @@ namespace apsi
             if (base == 10 && !isdigit(chr))
                 break;
 
-            if (base == 16 && !is_hex_char(chr))
+            if (base == 16 && !util::is_hex_char(chr))
                 break;
 
-            rem = muladd(item, base, hex_to_nibble(chr));
+            rem = muladd(item, base, util::hex_to_nibble(chr));
             if (rem != 0)
             {
                 throw invalid_argument("Input represents more than 128 bits");
@@ -182,7 +170,7 @@ namespace apsi
         int base = 10;
 
         // Trim initial whitespace
-        num.erase(num.begin(), find_if(num.begin(), num.end(), [](int ch) { return !std::isspace(ch); }));
+        num.erase(num.begin(), find_if(num.begin(), num.end(), [](int ch) { return !isspace(ch); }));
 
         if (num.length() >= 2 && num[0] == '0' && (num[1] == 'x' || num[1] == 'X'))
         {
@@ -214,4 +202,4 @@ namespace apsi
 
         return static_cast<u32>(temp >> 32);
     }
-}
+} // namespace apsi

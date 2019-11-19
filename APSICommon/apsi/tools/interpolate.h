@@ -3,19 +3,11 @@
 
 #pragma once
 
-// STD
 #include <utility>
 #include <vector>
-
-// GSL
 #include <gsl/span>
-
-// SEAL
-#include "seal/plaintext.h"
-
-// APSI
+#include <seal/plaintext.h>
 #include "apsi/ffield/ffield_array.h"
-
 
 namespace apsi
 {
@@ -31,4 +23,4 @@ namespace apsi
         gsl::span<std::pair<u64, u64> > input,
         gsl::span<u64> result,
         const seal::SmallModulus &plain_modulus);
-}
+} // namespace apsi

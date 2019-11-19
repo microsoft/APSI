@@ -30,5 +30,5 @@ namespace apsi
             */
             virtual void set_socket_options(zmqpp::socket_t* socket);
         };
-    }
-}
+    } // namespace network
+} // namespace apsi

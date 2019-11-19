@@ -3,15 +3,9 @@
 
 #pragma once
 
-// STD
-#include <vector>
-#include <map>
 #include <memory>
-
-// APSI
 #include "apsi/network/senderoperation.h"
 #include "apsi/network/senderoperationresponse.h"
-
 
 namespace apsi
 {
@@ -44,27 +38,27 @@ namespace apsi
             /**
             * Receive a Sender Operation.
             */
-            virtual bool receive(std::shared_ptr<apsi::network::SenderOperation>& sender_op) = 0;
+            virtual bool receive(std::shared_ptr<SenderOperation>& sender_op) = 0;
 
             /**
             * Receive Get Parameters response from Sender
             */
-            virtual void receive(apsi::network::SenderResponseGetParameters& response) = 0;
+            virtual void receive(SenderResponseGetParameters& response) = 0;
 
             /**
             * Receive item preprocessing response from Sender
             */
-            virtual void receive(apsi::network::SenderResponsePreprocess& response) = 0;
+            virtual void receive(SenderResponsePreprocess& response) = 0;
 
             /**
             * Receive Query response from Sender
             */
-            virtual void receive(apsi::network::SenderResponseQuery& response) = 0;
+            virtual void receive(SenderResponseQuery& response) = 0;
 
             /**
             Receive a ResultPackage structure
             */
-            virtual void receive(apsi::ResultPackage& pkg) = 0;
+            virtual void receive(ResultPackage& pkg) = 0;
 
             /**
             Send a request to Get Parameters from Sender
@@ -74,34 +68,34 @@ namespace apsi
             /**
             Send a response to a request to Get Parameters
             */
-            virtual void send_get_parameters_response(const std::vector<apsi::u8>& client_id, const apsi::PSIParams& params) = 0;
+            virtual void send_get_parameters_response(const std::vector<u8>& client_id, const PSIParams& params) = 0;
 
             /**
             Send a request to Preprocess items on Sender
             */
-            virtual void send_preprocess(const std::vector<apsi::u8>& buffer) = 0;
+            virtual void send_preprocess(const std::vector<u8>& buffer) = 0;
 
             /**
             * Send a response to a request to Preprocess items
             */
-            virtual void send_preprocess_response(const std::vector<apsi::u8>& client_id, const std::vector<apsi::u8>& buffer) = 0;
+            virtual void send_preprocess_response(const std::vector<u8>& client_id, const std::vector<u8>& buffer) = 0;
 
             /**
             * Send a request for a Query response to Sender
             */
             virtual void send_query(
                 const std::string& relin_keys, 
-                const std::map<apsi::u64, std::vector<std::string>>& query) = 0;
+                const std::map<u64, std::vector<std::string>>& query) = 0;
 
             /**
             Send a response to a Query request
             */
-            virtual void send_query_response(const std::vector<apsi::u8>& client_id, const size_t package_count) = 0;
+            virtual void send_query_response(const std::vector<u8>& client_id, const size_t package_count) = 0;
 
             /**
             * Send a ResultPackage structure
             */
-            virtual void send(const std::vector<apsi::u8>& client_id, const apsi::ResultPackage& pkg) = 0;
+            virtual void send(const std::vector<u8>& client_id, const ResultPackage& pkg) = 0;
 
             /**
             * Get the amount of data that has been sent through the channel
@@ -116,6 +110,6 @@ namespace apsi
         protected:
             u64 bytes_sent_;
             u64 bytes_received_;
-        };
-    }
-}
+        }; // class Channel
+    } // namespace network
+} // namespace apsi

@@ -3,21 +3,10 @@
 
 #pragma once
 
-// STD
-#include <cstddef>
 #include <stdexcept>
-#include <iostream>
-
-// SEAL
 #include <seal/intarray.h>
 #include <seal/memorymanager.h>
-
-// Microsoft GSL
-#include <gsl/span>
-
-// APSI
 #include "apsi/oprf/oprf_common.h"
-#include "apsi/apsidefines.h"
 
 namespace apsi
 {
@@ -121,6 +110,6 @@ namespace apsi
             }
             
             FactorData inv_factor_data_;
-        };
-    }
-}
+        }; // class OPRFReceiver
+    } // namespace oprf
+} // namespace apsi

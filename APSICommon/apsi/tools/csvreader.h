@@ -3,11 +3,8 @@
 
 #pragma once
 
-// STD
 #include <string>
 #include <vector>
-
-// APSI
 #include "apsi/item.h"
 #include "apsi/tools/matrix.h"
 
@@ -45,6 +42,6 @@ namespace apsi
 
             void process_line(std::string line, std::vector<Item>& items, std::vector<Item>& labels) const;
             void throw_if_file_not_present() const;
-        };
-    }
-}
+        }; // class CSVReader
+    } // namespace tools
+} // namespace apsi

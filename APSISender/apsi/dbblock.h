@@ -18,7 +18,6 @@
 #include "seal/context.h"
 #include "seal/evaluator.h"
 
-
 namespace apsi
 {
     namespace sender
@@ -37,7 +36,7 @@ namespace apsi
             std::vector<FFieldArray> coeff_temp, x_temp, y_temp;
             std::unordered_set<u64> key_set;
             std::vector<u64> temp_vec;
-        };
+        }; // struct DBInterpolationCache
 
         /**
         Represents a specific batch/split and stores the associated data.
@@ -46,21 +45,21 @@ namespace apsi
         {
             struct Position
             {
-                apsi::i64 batch_offset;
-                apsi::i64 split_offset = -1;
+                i64 batch_offset;
+                i64 split_offset = -1;
 
                 bool is_initialized() const
                 {
                     return split_offset != -1;
                 }
-            };
+            }; // struct Position
 
             void init(
-                apsi::i64 batch_idx,
-                apsi::i64 split_idx,
-                apsi::i64 value_byte_length,
-                apsi::i64 batch_size,
-                apsi::i64 items_per_split)
+                i64 batch_idx,
+                i64 split_idx,
+                i64 value_byte_length,
+                i64 batch_size,
+                i64 items_per_split)
             {
                 label_data_.resize(static_cast<size_t>(batch_size * items_per_split * value_byte_length));
                 key_data_.resize(static_cast<size_t>(batch_size * items_per_split));
@@ -77,16 +76,16 @@ namespace apsi
 
             std::unique_ptr<std::atomic_bool[]> has_item_;
             // the index of this region
-            apsi::i64 batch_idx_, split_idx_;
+            i64 batch_idx_, split_idx_;
 
             // the number of bytes that each label is
-            apsi::i64 value_byte_length_;
+            i64 value_byte_length_;
 
             // the number of cuckoo slots that this regions spans.
-            apsi::i64 items_per_batch_;
+            i64 items_per_batch_;
 
             // the number of items that are in a split. 
-            apsi::i64 items_per_split_;
+            i64 items_per_split_;
 
             gsl::span<seal::Plaintext> batch_random_symm_poly_;
 
@@ -172,6 +171,6 @@ namespace apsi
             }
 
             void clear();
-        };
-    }
-}
+        }; // struct DBBlock
+    } // namespace sender
+} // namespace apsi

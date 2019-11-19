@@ -1,20 +1,14 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-// APSI
-#include "apsi/oprf/ecpoint.h"
-
-// STD
 #include <algorithm>
 #include <functional>
-
-// FourQ
 #include <FourQ_internal.h>
-
-// SEAL
 #include <seal/util/blake2.h>
+#include "apsi/oprf/ecpoint.h"
 
 using namespace std;
+using namespace seal;
 
 namespace apsi
 {
@@ -241,31 +235,31 @@ namespace apsi
 
         void ECPoint::make_random_nonzero_scalar(
             scalar_span_type out,
-            shared_ptr<seal::UniformRandomGenerator> rg)
+            shared_ptr<UniformRandomGenerator> rg)
         {
             array<u64, 4> random_data;
             static_assert(sizeof(random_data) == order_size, "Size of random_data should be the same as order_size");
 
-            function<u64()> random_uint64;
+            function<u64()> rand_u64;
             if (rg)
             {
-                random_uint64 = [&rg]() {
+                rand_u64 = [&rg]() {
                     u64 res;
-                    rg->generate(sizeof(res), reinterpret_cast<seal::SEAL_BYTE*>(&res));
+                    rg->generate(sizeof(res), reinterpret_cast<SEAL_BYTE*>(&res));
                     return res;
                 };
             }
             else
             {
-                random_uint64 = seal::random_uint64;
+                rand_u64 = random_uint64;
             }
 
-            auto reduced_random_uint64 = [&]() {
+            auto reduced_rand_u64 = [&]() {
                 // Rejection sampling
                 u64 ret;
                 do
                 {
-                    ret = random_uint64();
+                    ret = rand_u64();
                 }
                 while (ret >= (~u64(0) >> 1));
                 return ret;
@@ -273,10 +267,10 @@ namespace apsi
 
             // Loop until we find a non-zero element
             while(!(
-                (random_data[0] = random_uint64()) |
-                (random_data[1] = reduced_random_uint64()) |
-                (random_data[2] = random_uint64()) |
-                (random_data[3] = reduced_random_uint64())))
+                (random_data[0] = rand_u64()) |
+                (random_data[1] = reduced_rand_u64()) |
+                (random_data[2] = rand_u64()) |
+                (random_data[3] = reduced_rand_u64())))
             {
             }
 
@@ -311,7 +305,7 @@ namespace apsi
             return pteq(pt_, compare.pt_);
         }
 
-        void ECPoint::save(std::ostream &stream)
+        void ECPoint::save(ostream &stream)
         {
             auto old_ex_mask = stream.exceptions();
             stream.exceptions(ios_base::failbit | ios_base::badbit);
@@ -330,7 +324,7 @@ namespace apsi
             stream.exceptions(old_ex_mask);
         }
 
-        void ECPoint::load(std::istream &stream)
+        void ECPoint::load(istream &stream)
         {
             auto old_ex_mask = stream.exceptions();
             stream.exceptions(ios_base::failbit | ios_base::badbit);
@@ -370,5 +364,5 @@ namespace apsi
         {
             memcpy(out.data(), pt_->y, hash_size);
         }
-    }
-}
+    } // namespace oprf
+} // namespace apsi

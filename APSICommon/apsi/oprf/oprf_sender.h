@@ -3,23 +3,11 @@
 
 #pragma once
 
-// STD
-#include <cstddef>
 #include <stdexcept>
 #include <algorithm>
-#include <iostream>
-#include <memory>
-
-// SEAL
-#include <seal/memorymanager.h>
 #include <seal/intarray.h>
-
-// Microsoft GSL
-#include <gsl/span>
-
-// APSI
+#include <seal/memorymanager.h>
 #include "apsi/oprf/oprf_common.h"
-#include "apsi/apsidefines.h"
 
 namespace apsi
 {
@@ -75,7 +63,7 @@ namespace apsi
             seal::IntArray<unsigned char> oprf_key_{
                 oprf_key_size,
                 seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true) };
-        };
+        }; // class OPRFKey
 
         class OPRFSender
         {
@@ -111,6 +99,6 @@ namespace apsi
                 const int threads,
                 gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items,
                 const OPRFKey& oprf_key);
-        };
-    }
-}
+        }; // class OPRFSender
+    } // namespace oprf
+} // namespace apsi

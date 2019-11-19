@@ -18,7 +18,7 @@ namespace apsi
         */
         const PSIParams build_psi_params(
             const CLP& cmd,
-            const apsi::u64 sender_set_size);
-    }
-}
+            const u64 sender_set_size);
+    } // namespace tools
+} // namespace apsi
 

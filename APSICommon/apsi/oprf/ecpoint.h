@@ -3,23 +3,14 @@
 
 #pragma once
 
-// STD
 #include <array>
 #include <iostream>
 #include <cstddef>
 #include <cstring>
 #include <memory>
-
-// FourQ
 #include <FourQ.h>
-
-// Microsoft GSL
 #include <gsl/span>
-
-// SEAL
 #include <seal/randomgen.h>
-
-// APSI
 #include "apsi/apsidefines.h"
 
 namespace apsi
@@ -94,6 +85,6 @@ namespace apsi
         private:
             // Initialize to neutral element
             point_t pt_ = { { 0, 1 } }; // { {.x = { 0 }, .y = { 1 } }};
-        };
-    }
-}
+        }; // class ECPoint
+    } // namespace oprf
+} // namespace apsi

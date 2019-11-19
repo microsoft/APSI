@@ -3,17 +3,12 @@
 
 #pragma once
 
-// STD
 #include <array>
 #include <string>
 #include <stdexcept>
 #include <cstddef>
-
-// APSI
-#include "apsi/ffield/ffield_elt.h"
-
-// Kuku
 #include <kuku/common.h>
+#include "apsi/ffield/ffield_elt.h"
 
 namespace apsi
 {
@@ -124,5 +119,5 @@ namespace apsi
 
     public:
         static constexpr std::size_t item_byte_count = sizeof(value_);
-    };
-}
+    }; // class Item
+} // namespace apsi

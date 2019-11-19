@@ -207,7 +207,6 @@
     <ClCompile Include="apsi\ffield\ffield_fast_batch_encoder.cpp" />
     <ClCompile Include="apsi\item.cpp" />
     <ClCompile Include="apsi\logging\log.cpp" />
-    <ClCompile Include="apsi\network\channel.cpp" />
     <ClCompile Include="apsi\network\network_channel.cpp" />
     <ClCompile Include="apsi\network\network_utils.cpp" />
     <ClCompile Include="apsi\network\stream_channel.cpp" />
