@@ -53,8 +53,8 @@ namespace apsi
         {
             // Use BLAKE2b as random oracle
             blake2(
-                reinterpret_cast<uint8_t*>(&value_), sizeof(value_),
-                reinterpret_cast<const uint8_t*>(str.data()), str.size(),
+                reinterpret_cast<Byte*>(&value_), sizeof(value_),
+                reinterpret_cast<const Byte*>(str.data()), str.size(),
                 nullptr, 0);
         }
         else

@@ -70,7 +70,7 @@ namespace apsi
                 int thread_idx,
                 int thread_count,
                 gsl::span<const Item> data,
-                MatrixView<std::uint8_t> values, std::vector<int> &loads);
+                MatrixView<Byte> values, std::vector<int> &loads);
 
             /**
             Adds one item to sender's database.

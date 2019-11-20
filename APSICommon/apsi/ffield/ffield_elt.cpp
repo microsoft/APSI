@@ -11,10 +11,10 @@ namespace apsi
     namespace details
     {
         void copy_with_bit_offset(
-            gsl::span<const uint8_t> src,
+            gsl::span<const Byte> src,
             i32 bitOffset,
             i32 bitLength,
-            gsl::span<uint8_t> dest)
+            gsl::span<Byte> dest)
         {
             // the number of bits to shift by to align with dest
             auto lowOffset = bitOffset & 7;
@@ -39,8 +39,8 @@ namespace apsi
                 int i = 0;
                 while (i < fullByteCount)
                 {
-                    uint8_t  low = src[wordBegin + 0] >> lowOffset;
-                    uint8_t high = src[wordBegin + 1] << (8 - lowOffset);
+                    Byte  low = src[wordBegin + 0] >> lowOffset;
+                    Byte high = src[wordBegin + 1] << (8 - lowOffset);
                     dest[i] = low | high;
                     wordBegin++;
                     i++;
@@ -69,7 +69,7 @@ namespace apsi
                 if (oneWordSrc)
                 {
                     // case 1: all the remaining bits live in src[wordBegin]
-                    uint8_t mask = (1 << remBits) - 1;
+                    Byte mask = (1 << remBits) - 1;
 
                     auto low = src[wordBegin];
                     low = low >> lowOffset;
@@ -85,17 +85,17 @@ namespace apsi
                     //extract the top bits out of src[wordBegin].
                     // these will become the bottom bits of destWord
                     auto lowCount = 8 - lowOffset;
-                    uint8_t lowMask = (1 << lowCount) - 1;
+                    Byte lowMask = (1 << lowCount) - 1;
                     auto low = (src[wordBegin] >> lowOffset) & lowMask;
 
                     //extract the bottom bits out of src[wordBegin + 1].
                     // these will become the middle bits of destWord
                     auto midCount = remBits - lowCount;
-                    uint8_t midMask = (1 << midCount) - 1;
+                    Byte midMask = (1 << midCount) - 1;
                     auto mid = (src[wordBegin + 1] & midMask) << lowCount;
 
                     // keep the high bits of destWord
-                    uint8_t highMask = (~0) << remBits;
+                    Byte highMask = (~0) << remBits;
                     auto high = destWord & highMask;
 
                     // for everythign together;
@@ -108,11 +108,11 @@ namespace apsi
         // Bits are written to dest starting at the destBitOffset bit. All other bits in 
         // dest are unchanged, e.g. the bit indexed by [0,1,...,destBitOffset - 1], [destBitOffset + bitLength, ...]
         void copy_with_bit_offset(
-            gsl::span<const uint8_t> src,
+            gsl::span<const Byte> src,
             i32 srcBitOffset,
             i32 destBitOffset,
             i32 bitLength,
-            gsl::span<uint8_t> dest)
+            gsl::span<Byte> dest)
         {
                 i32 destNext = (destBitOffset + 7) >> 3;
                 i32 diff = destNext * 8 - destBitOffset;
@@ -137,8 +137,8 @@ namespace apsi
 
                 if (highDiff <= 0)
                 {
-                    uint8_t mask = (1 << diff) - 1;
-                    uint8_t mid = (src[srcBegin] >> srcOffset) & mask;
+                    Byte mask = (1 << diff) - 1;
+                    Byte mid = (src[srcBegin] >> srcOffset) & mask;
 
                     mask = ~(mask << destOffset);
                     mid = mid << destOffset;
@@ -149,17 +149,17 @@ namespace apsi
                 {
                     auto lowDiff = diff - highDiff;
 
-                    uint8_t lowMask = (1 << lowDiff) - 1;
-                    uint8_t low = src[srcBegin] >> srcOffset;
+                    Byte lowMask = (1 << lowDiff) - 1;
+                    Byte low = src[srcBegin] >> srcOffset;
                     low &= lowMask;
 
-                    uint8_t highMask = (1 << highDiff) - 1;
-                    uint8_t high = src[srcBegin + 1] & highMask;
+                    Byte highMask = (1 << highDiff) - 1;
+                    Byte high = src[srcBegin + 1] & highMask;
 
                     low <<= destOffset;
                     high <<= (destOffset + lowDiff);
 
-                    uint8_t mask = ~(((1 << diff) - 1) << destOffset);
+                    Byte mask = ~(((1 << diff) - 1) << destOffset);
 
                     destVal = (destVal & mask) | low | high;
                 }

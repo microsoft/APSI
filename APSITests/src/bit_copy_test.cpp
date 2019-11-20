@@ -12,14 +12,14 @@ using namespace apsi;
 
 namespace
 {
-    uint8_t get_bit(vector<uint8_t>& vec, uint32_t position)
+    Byte get_bit(vector<Byte>& vec, uint32_t position)
     {
         if (position >= (vec.size() * 8))
             throw out_of_range("position");
 
         uint32_t byte_idx = position / 8;
         uint32_t bit_idx = position % 8;
-        uint8_t mask = (uint8_t)(1 << bit_idx);
+        Byte mask = (Byte)(1 << bit_idx);
         if (0 == (vec[byte_idx] & mask))
             return 0;
 
@@ -34,7 +34,7 @@ namespace APSITests
         int trials = 1000;
         int size = 10;
 
-        std::vector<uint8_t> src(size), dest(size);
+        std::vector<Byte> src(size), dest(size);
         for (int t = 6; t < trials; ++t)
         {
             random_device rd;
@@ -56,7 +56,7 @@ namespace APSITests
 
             for (uint32_t i = 0; i < destOffset; ++i)
             {
-                ASSERT_EQ((uint8_t)(destVal & 1), get_bit(dest, dst_idx));
+                ASSERT_EQ((Byte)(destVal & 1), get_bit(dest, dst_idx));
                 dst_idx++;
             }
 
@@ -70,7 +70,7 @@ namespace APSITests
             uint32_t rem = size * 8 - destOffset - bitLength;
             for (uint32_t i = 0; i < rem; ++i)
             {
-                ASSERT_EQ((uint8_t)(destVal & 1), get_bit(dest, dst_idx));
+                ASSERT_EQ((Byte)(destVal & 1), get_bit(dest, dst_idx));
                 dst_idx++;
             }
         }

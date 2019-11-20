@@ -347,12 +347,12 @@ namespace apsi
             stream.exceptions(old_ex_mask);
         }
 
-        void ECPoint::save(gsl::span<uint8_t, save_size> out)
+        void ECPoint::save(gsl::span<Byte, save_size> out)
         {
             encode(pt_, out.data());
         }
 
-        void ECPoint::load(gsl::span<const uint8_t, save_size> in)
+        void ECPoint::load(gsl::span<const Byte, save_size> in)
         {
             if (decode(in.data(), pt_) != ECCRYPTO_SUCCESS)
             {

@@ -52,7 +52,7 @@ namespace
         return { ret, s };
     }
 
-    void verify_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<uint8_t>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<uint8_t>& labels)
+    void verify_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<Byte>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<Byte>& labels)
     {
         bool correct = true;
      
@@ -115,7 +115,7 @@ namespace
         }
 
         auto s1 = vector<Item>(senderActualSize);
-        Matrix<uint8_t> labels(senderActualSize, params.get_label_byte_count());
+        Matrix<Byte> labels(senderActualSize, params.get_label_byte_count());
         for (size_t i = 0; i < s1.size(); i++)
         {
             s1[i] = i;
@@ -123,8 +123,8 @@ namespace
             if (label_bit_length) {
                 memset(labels[i].data(), 0, labels[i].size());
 
-                labels[i][0] = static_cast<uint8_t>(i);
-                labels[i][1] = static_cast<uint8_t>(i >> 8);
+                labels[i][0] = static_cast<Byte>(i);
+                labels[i][1] = static_cast<Byte>(i >> 8);
             }
         }
 
@@ -201,7 +201,7 @@ namespace
         return params;
     }
 
-    void initialize_db(vector<Item>& items, Matrix<uint8_t>& labels, size_t item_count, size_t label_byte_count)
+    void initialize_db(vector<Item>& items, Matrix<Byte>& labels, size_t item_count, size_t label_byte_count)
     {
         items.resize(item_count);
         labels.resize(item_count, label_byte_count);
@@ -214,8 +214,8 @@ namespace
             {
                 memset(labels[i].data(), 0, labels[i].size());
 
-                labels[i][0] = static_cast<uint8_t>(i);
-                labels[i][1] = static_cast<uint8_t>(i >> 8);
+                labels[i][0] = static_cast<Byte>(i);
+                labels[i][1] = static_cast<Byte>(i >> 8);
             }
         }
     }
