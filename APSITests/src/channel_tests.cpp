@@ -37,14 +37,20 @@ namespace
         }
     }
 
-    void InitU8Vector(vector<Byte>& vec, int size)
+    void InitByteVector(vector<SEAL_BYTE>& vec, int size)
     {
         vec.resize(size);
 
         for (int i = 0; i < size; i++)
         {
-            vec[i] = i % 0xFF;
+            vec[i] = static_cast<SEAL_BYTE>(i % 0xFF);
         }
+    }
+
+    template<typename... Ts>
+    vector<SEAL_BYTE> CreateByteVector(Ts&&... args)
+    {
+        return { SEAL_BYTE(forward<Ts>(args))... };
     }
 }
 
@@ -92,7 +98,7 @@ namespace APSITests
         PSIParams::ExFieldParams exfield_params;
         PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
 
-        vector<Byte> buff = { 1, 2, 3, 4, 5 };
+        vector<SEAL_BYTE> buff = CreateByteVector(1, 2, 3, 4, 5);
 
         PublicKey pub_key;
         RelinKeys relin_keys;
@@ -108,7 +114,7 @@ namespace APSITests
         ASSERT_ANY_THROW(mychannel.receive(sender_op));
 
         // Sends
-        vector<Byte> empty_client_id;
+        vector<SEAL_BYTE> empty_client_id;
         ASSERT_ANY_THROW(mychannel.send_get_parameters());
         ASSERT_ANY_THROW(mychannel.send_get_parameters_response(empty_client_id, params));
         ASSERT_ANY_THROW(mychannel.send_preprocess(buff));
@@ -132,8 +138,8 @@ namespace APSITests
                 // This should be SenderOperationType size
                 clt.send_get_parameters();
 
-                vector<Byte> data1;
-                InitU8Vector(data1, 1000);
+                vector<SEAL_BYTE> data1;
+                InitByteVector(data1, 1000);
 
                 // This should be 1000 bytes + SenderOperationType size
                 clt.send_preprocess(data1);
@@ -236,8 +242,8 @@ namespace APSITests
         ASSERT_EQ(expected_total, svr.get_total_data_sent());
 
         // Preprocess response
-        vector<Byte> preproc;
-        InitU8Vector(preproc, 50);
+        vector<SEAL_BYTE> preproc;
+        InitByteVector(preproc, 50);
         svr.send_preprocess_response(sender_op->client_id, preproc);
         expected_total += sizeof(u32); // SenderOperationType
         expected_total += preproc.size();
@@ -285,7 +291,7 @@ namespace APSITests
     {
         thread clientth([this]
             {
-                vector<Byte> buff = { 1, 2, 3, 4, 5 };
+                vector<SEAL_BYTE> buff = CreateByteVector(1, 2, 3, 4, 5);
                 client_.send_preprocess(buff);
             });
 
@@ -297,11 +303,11 @@ namespace APSITests
 
         ASSERT_TRUE(preproc != nullptr);
         ASSERT_EQ((size_t)5, preproc->buffer.size());
-        ASSERT_EQ((Byte)1, preproc->buffer[0]);
-        ASSERT_EQ((Byte)2, preproc->buffer[1]);
-        ASSERT_EQ((Byte)3, preproc->buffer[2]);
-        ASSERT_EQ((Byte)4, preproc->buffer[3]);
-        ASSERT_EQ((Byte)5, preproc->buffer[4]);
+        ASSERT_EQ((Byte)1, (Byte)preproc->buffer[0]);
+        ASSERT_EQ((Byte)2, (Byte)preproc->buffer[1]);
+        ASSERT_EQ((Byte)3, (Byte)preproc->buffer[2]);
+        ASSERT_EQ((Byte)4, (Byte)preproc->buffer[3]);
+        ASSERT_EQ((Byte)5, (Byte)preproc->buffer[4]);
 
         clientth.join();
     }
@@ -442,23 +448,23 @@ namespace APSITests
                 server_.receive(sender_op, /* wait_for_message */ true);
                 ASSERT_EQ(SOP_preprocess, sender_op->type);
 
-                vector<Byte> buffer = { 10, 9, 8, 7, 6 };
+                vector<SEAL_BYTE> buffer = CreateByteVector(10, 9, 8, 7, 6);
                 server_.send_preprocess_response(sender_op->client_id, buffer);
             });
 
         // This buffer will actually be ignored
-        vector<Byte> buff = { 1 };
+        vector<SEAL_BYTE> buff = CreateByteVector(1);
         client_.send_preprocess(buff);
 
         SenderResponsePreprocess preprocess_response;
         client_.receive(preprocess_response);
 
         ASSERT_EQ((size_t)5, preprocess_response.buffer.size());
-        ASSERT_EQ((Byte)10, preprocess_response.buffer[0]);
-        ASSERT_EQ((Byte)9, preprocess_response.buffer[1]);
-        ASSERT_EQ((Byte)8, preprocess_response.buffer[2]);
-        ASSERT_EQ((Byte)7, preprocess_response.buffer[3]);
-        ASSERT_EQ((Byte)6, preprocess_response.buffer[4]);
+        ASSERT_EQ((Byte)10, (Byte)preprocess_response.buffer[0]);
+        ASSERT_EQ((Byte)9, (Byte)preprocess_response.buffer[1]);
+        ASSERT_EQ((Byte)8, (Byte)preprocess_response.buffer[2]);
+        ASSERT_EQ((Byte)7, (Byte)preprocess_response.buffer[3]);
+        ASSERT_EQ((Byte)6, (Byte)preprocess_response.buffer[4]);
 
         serverth.join();
     }
@@ -564,7 +570,7 @@ namespace APSITests
                     // Preprocessing will multiply two numbers and add them to the result
                     auto preproc_op = dynamic_pointer_cast<SenderOperationPreprocess>(sender_op);
                     preproc_op->buffer.resize(3);
-                    preproc_op->buffer[2] = preproc_op->buffer[0] * preproc_op->buffer[1];
+                    preproc_op->buffer[2] = (SEAL_BYTE)((Byte)preproc_op->buffer[0] * (Byte)preproc_op->buffer[1]);
 
                     sender.send_preprocess_response(preproc_op->client_id, preproc_op->buffer);
                 }
@@ -584,9 +590,7 @@ namespace APSITests
 
                     for (u32 i = 0; i < 5; i++)
                     {
-                        vector<Byte> buffer(2);
-                        buffer[0] = a;
-                        buffer[1] = b;
+                        vector<SEAL_BYTE> buffer = CreateByteVector(a, b);
 
                         recv.send_preprocess(buffer);
 
@@ -594,7 +598,7 @@ namespace APSITests
                         recv.receive(preproc);
 
                         ASSERT_EQ((size_t)3, preproc.buffer.size());
-                        ASSERT_EQ((Byte)(a * b), preproc.buffer[2]);
+                        ASSERT_EQ((Byte)(a * b), (Byte)preproc.buffer[2]);
                     }
 
                 }, i);

@@ -156,7 +156,7 @@ namespace apsi
             STOPWATCH(recv_stop_watch, "Receiver::OPRF");
             Log::info("OPRF processing");
 
-            vector<Byte> items_buffer;
+            vector<SEAL_BYTE> items_buffer;
             obfuscate_items(items, items_buffer);
 
             // Send obfuscated buffer to Sender
@@ -178,7 +178,7 @@ namespace apsi
             return decrypt_result(items, chl);
         }
 
-        void Receiver::obfuscate_items(std::vector<Item>& items, std::vector<Byte>& items_buffer)
+        void Receiver::obfuscate_items(std::vector<Item>& items, std::vector<SEAL_BYTE>& items_buffer)
         {
             Log::info("Obfuscating items");
 
@@ -186,7 +186,7 @@ namespace apsi
             oprf_receiver_ = make_shared<OPRFReceiver>(items, items_buffer);
         }
 
-        void Receiver::deobfuscate_items(std::vector<Item>& items, std::vector<Byte>& items_buffer)
+        void Receiver::deobfuscate_items(std::vector<Item>& items, std::vector<SEAL_BYTE>& items_buffer)
         {
             Log::info("Deobfuscating items");
 

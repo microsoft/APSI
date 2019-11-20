@@ -48,9 +48,9 @@ namespace apsi
         }
 
         void OPRFSender::ProcessQueries(
-            gsl::span<const Byte, gsl::dynamic_extent> oprf_queries,
+            gsl::span<const seal::SEAL_BYTE, gsl::dynamic_extent> oprf_queries,
             const OPRFKey &oprf_key,
-            gsl::span<Byte, gsl::dynamic_extent> oprf_responses)
+            gsl::span<seal::SEAL_BYTE, gsl::dynamic_extent> oprf_responses)
         {
             if (oprf_queries.size() != oprf_responses.size())
             {
@@ -64,8 +64,8 @@ namespace apsi
             size_t query_count =
                 static_cast<size_t>(oprf_queries.size()) / oprf_query_size;
 
-            auto oprf_in_ptr = oprf_queries.data();
-            auto oprf_out_ptr = oprf_responses.data();
+            auto oprf_in_ptr = (Byte *)oprf_queries.data();
+            auto oprf_out_ptr = (Byte *)oprf_responses.data();
 
             for (size_t i = 0; i < query_count; i++)
             {

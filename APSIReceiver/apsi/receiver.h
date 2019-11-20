@@ -81,13 +81,13 @@ namespace apsi
             Obfuscates the items and initializes the given vector with the buffer that must be sent to the Sender for OPRF
             processing.
             */
-            void obfuscate_items(std::vector<Item>& items, std::vector<Byte>& items_buffer);
+            void obfuscate_items(std::vector<Item>& items, std::vector<seal::SEAL_BYTE>& items_buffer);
 
             /**
             Process obfuscated items received from Sender.
             Remove the Receiver obfuscation so only the Sender obfuscation remains.
             */
-            void deobfuscate_items(std::vector<Item>& items, std::vector<Byte>& items_buffer);
+            void deobfuscate_items(std::vector<Item>& items, std::vector<seal::SEAL_BYTE>& items_buffer);
 
             /**
             Perform a handshake between the Sender and this Receiver.

@@ -194,7 +194,7 @@ namespace apsi
         void Sender::query(
             const string& relin_keys,
             const map<u64, vector<string>> query,
-            const vector<Byte>& client_id,
+            const vector<SEAL_BYTE>& client_id,
             Channel& channel)
         {
             STOPWATCH(sender_stop_watch, "Sender::query");
@@ -242,7 +242,7 @@ namespace apsi
         void Sender::respond(
             vector<vector<Ciphertext>>& powers, int num_of_powers, 
             SenderSessionContext &session_context,
-            const vector<Byte>& client_id,
+            const vector<SEAL_BYTE>& client_id,
             Channel& channel)
         {
             STOPWATCH(sender_stop_watch, "Sender::respond");
@@ -323,7 +323,7 @@ namespace apsi
             WindowingDag& dag,
             vector<WindowingDag::State>& states,
             atomic<int>& remaining_batches,
-            const vector<Byte>& client_id,
+            const vector<SEAL_BYTE>& client_id,
             Channel& channel)
         {
             STOPWATCH(sender_stop_watch, "Sender::respond_worker");

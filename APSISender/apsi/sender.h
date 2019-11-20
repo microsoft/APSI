@@ -120,7 +120,7 @@ namespace apsi
             void query(
                 const std::string& relin_keys,
                 const std::map<u64, std::vector<std::string>> query,
-                const std::vector<Byte>& client_id,
+                const std::vector<seal::SEAL_BYTE>& client_id,
                 network::Channel& channel);
 
             /**
@@ -187,7 +187,7 @@ namespace apsi
             void respond(
                 std::vector<std::vector<seal::Ciphertext> > &query, int num_of_powers,
                 SenderSessionContext &session_context,
-                const std::vector<Byte>& client_id,
+                const std::vector<seal::SEAL_BYTE>& client_id,
                 network::Channel& channel);
 
             /**
@@ -204,7 +204,7 @@ namespace apsi
                 WindowingDag& dag,
                 std::vector<WindowingDag::State>& states,
                 std::atomic<int>& remaining_batches,
-                const std::vector<Byte>& client_id,
+                const std::vector<seal::SEAL_BYTE>& client_id,
                 network::Channel& channel);
 
 

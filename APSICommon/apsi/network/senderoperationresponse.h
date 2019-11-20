@@ -28,7 +28,7 @@ namespace apsi
         */
         struct SenderResponsePreprocess
         {
-            std::vector<Byte> buffer;
+            std::vector<seal::SEAL_BYTE> buffer;
         }; // struct SenderResponsePreprocess
 
         /**

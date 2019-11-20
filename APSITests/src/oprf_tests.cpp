@@ -85,10 +85,10 @@ namespace APSITests
         vector<Item> out_items(item_count);
         OPRFSender::ComputeHashes(items, oprf_key, out_items);
 
-        vector<Byte> query(item_count * oprf_query_size);
+        vector<SEAL_BYTE> query(item_count * oprf_query_size);
         OPRFReceiver receiver(items, query);
 
-        vector<Byte> responses(item_count * oprf_response_size);
+        vector<SEAL_BYTE> responses(item_count * oprf_response_size);
         OPRFSender::ProcessQueries(query, oprf_key, responses);
 
         vector<Item> receiver_hashes(item_count);
@@ -121,10 +121,10 @@ namespace APSITests
         vector<Item> original_items(items);
         OPRFSender::ComputeHashes(items, oprf_key);
 
-        vector<Byte> query(item_count * oprf_query_size);
+        vector<SEAL_BYTE> query(item_count * oprf_query_size);
         OPRFReceiver receiver(original_items, query);
 
-        vector<Byte> responses(item_count * oprf_response_size);
+        vector<SEAL_BYTE> responses(item_count * oprf_response_size);
         OPRFSender::ProcessQueries(query, oprf_key, responses);
 
         vector<Item> receiver_hashes(item_count);

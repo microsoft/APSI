@@ -101,17 +101,17 @@ namespace apsi
             /**
             Send a response to a request to Get Parameters
             */
-            virtual void send_get_parameters_response(const std::vector<Byte>& client_id, const PSIParams& params);
+            virtual void send_get_parameters_response(const std::vector<seal::SEAL_BYTE>& client_id, const PSIParams& params);
 
             /**
             Send a request to Preprocess items on Sender
             */
-            virtual void send_preprocess(const std::vector<Byte>& buffer);
+            virtual void send_preprocess(const std::vector<seal::SEAL_BYTE>& buffer);
 
             /**
             * Send a response to a request to Preprocess items
             */
-            virtual void send_preprocess_response(const std::vector<Byte>& client_id, const std::vector<Byte>& buffer);
+            virtual void send_preprocess_response(const std::vector<seal::SEAL_BYTE>& client_id, const std::vector<seal::SEAL_BYTE>& buffer);
 
             /**
             * Send a request for a Query response to Sender
@@ -123,12 +123,12 @@ namespace apsi
             /**
             Send a response to a Query request
             */
-            virtual void send_query_response(const std::vector<Byte>& client_id, const size_t package_count);
+            virtual void send_query_response(const std::vector<seal::SEAL_BYTE>& client_id, const size_t package_count);
 
             /**
             * Send a ResultPackage structure
             */
-            virtual void send(const std::vector<Byte>& client_id, const ResultPackage& pkg);
+            virtual void send(const std::vector<seal::SEAL_BYTE>& client_id, const ResultPackage& pkg);
 
         protected:
             /**
@@ -188,22 +188,22 @@ namespace apsi
             /**
             Extract client ID from a message
             */
-            void extract_client_id(const zmqpp::message_t& msg, std::vector<Byte>& id) const;
+            void extract_client_id(const zmqpp::message_t& msg, std::vector<seal::SEAL_BYTE>& id) const;
 
             /**
             Add client ID to message
             */
-            void add_client_id(zmqpp::message_t& msg, const std::vector<Byte>& id) const;
+            void add_client_id(zmqpp::message_t& msg, const std::vector<seal::SEAL_BYTE>& id) const;
 
             /**
             Get buffer from message, located at part_start
             */
-            void get_buffer(std::vector<Byte>& buff, const zmqpp::message_t& msg, int part_start) const;
+            void get_buffer(std::vector<seal::SEAL_BYTE>& buff, const zmqpp::message_t& msg, int part_start) const;
 
             /**
             Add buffer to the given message
             */
-            void add_buffer(const std::vector<Byte>& buff, zmqpp::message_t& msg) const;
+            void add_buffer(const std::vector<seal::SEAL_BYTE>& buff, zmqpp::message_t& msg) const;
 
             /**
             Get a vector of SmallModulus from message at the given part index.
