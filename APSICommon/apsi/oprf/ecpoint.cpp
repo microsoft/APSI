@@ -220,7 +220,7 @@ namespace apsi
 
                 // Compute a Blake2b hash of the value
                 blake2b(
-                    reinterpret_cast<unsigned char*>(r), sizeof(f2elm_t),
+                    reinterpret_cast<Byte*>(r), sizeof(f2elm_t),
                     value.data(), static_cast<size_t>(value.size()),
                     nullptr, 0);
 
@@ -293,7 +293,7 @@ namespace apsi
         }
 
         void ECPoint::scalar_multiply(
-            gsl::span<const unsigned char, order_size> scalar)
+            gsl::span<const Byte, order_size> scalar)
         {
             ecc_mul(pt_, const_cast<digit_t*>(
             reinterpret_cast<const digit_t*>(scalar.data())),
@@ -312,7 +312,7 @@ namespace apsi
 
             try
             {
-                array<unsigned char, save_size> buf;
+                array<Byte, save_size> buf;
                 encode(pt_, buf.data());
                 stream.write(reinterpret_cast<const char*>(buf.data()), save_size);
             }
@@ -331,7 +331,7 @@ namespace apsi
 
             try
             {
-                array<unsigned char, save_size> buf;
+                array<Byte, save_size> buf;
                 stream.read(reinterpret_cast<char*>(buf.data()), save_size);
                 if (decode(buf.data(), pt_) != ECCRYPTO_SUCCESS)
                 {
@@ -360,7 +360,7 @@ namespace apsi
             }
         }
 
-        void ECPoint::extract_hash(gsl::span<unsigned char, hash_size> out)
+        void ECPoint::extract_hash(gsl::span<Byte, hash_size> out)
         {
             memcpy(out.data(), pt_->y, hash_size);
         }

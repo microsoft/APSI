@@ -11,7 +11,7 @@ namespace apsi
     {
         void OPRFReceiver::process_items(
             gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items,
-            gsl::span<unsigned char, gsl::dynamic_extent> oprf_queries)
+            gsl::span<Byte, gsl::dynamic_extent> oprf_queries)
         {
             if (static_cast<size_t>(oprf_queries.size()) !=
                 static_cast<size_t>(oprf_items.size()) * oprf_query_size)
@@ -26,7 +26,7 @@ namespace apsi
             {
                 // Create an elliptic curve point from the item
                 ECPoint ecpt({
-                    reinterpret_cast<const unsigned char*>(
+                    reinterpret_cast<const Byte*>(
                         oprf_items[static_cast<ptrdiff_t>(i)].data()),
                     oprf_item_size });
 
@@ -47,7 +47,7 @@ namespace apsi
         }
 
         void OPRFReceiver::process_responses(
-            gsl::span<const unsigned char, gsl::dynamic_extent> oprf_responses,
+            gsl::span<const Byte, gsl::dynamic_extent> oprf_responses,
             gsl::span<oprf_hash_type, gsl::dynamic_extent> oprf_hashes) const
         {
             if (static_cast<size_t>(oprf_hashes.size()) != item_count())
@@ -63,7 +63,7 @@ namespace apsi
             // Write zero item everywhere
             fill(oprf_hashes.begin(), oprf_hashes.end(), oprf_hash_type());
             auto oprf_in_ptr =
-                reinterpret_cast<const unsigned char*>(oprf_responses.data());
+                reinterpret_cast<const Byte*>(oprf_responses.data());
 
             for (size_t i = 0; i < item_count(); i++)
             {
@@ -80,7 +80,7 @@ namespace apsi
                 // This was already done earlier, but might be a performance issue
                 // in some cases.
                 ecpt.extract_hash({
-                    reinterpret_cast<unsigned char*>(oprf_hashes[i].data()),
+                    reinterpret_cast<Byte*>(oprf_hashes[i].data()),
                     ECPoint::hash_size });
 
                 // Move forward

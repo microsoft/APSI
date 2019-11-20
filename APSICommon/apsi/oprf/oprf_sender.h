@@ -47,7 +47,7 @@ namespace apsi
 
             inline void clear()
             {
-                oprf_key_ = seal::IntArray<unsigned char>(
+                oprf_key_ = seal::IntArray<Byte>(
                     oprf_key_size,
                     seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true));
             }
@@ -60,7 +60,7 @@ namespace apsi
         private:
             std::shared_ptr<seal::UniformRandomGeneratorFactory> random_{ nullptr };
 
-            seal::IntArray<unsigned char> oprf_key_{
+            seal::IntArray<Byte> oprf_key_{
                 oprf_key_size,
                 seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true) };
         }; // class OPRFKey
@@ -71,9 +71,9 @@ namespace apsi
             OPRFSender() = delete;
 
             static void ProcessQueries(
-                gsl::span<const unsigned char, gsl::dynamic_extent> oprf_queries,
+                gsl::span<const Byte, gsl::dynamic_extent> oprf_queries,
                 const OPRFKey &oprf_key,
-                gsl::span<unsigned char, gsl::dynamic_extent> oprf_responses);
+                gsl::span<Byte, gsl::dynamic_extent> oprf_responses);
 
             static void ComputeHashes(
                 gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items,
