@@ -32,7 +32,7 @@ namespace apsi
             SenderOperation(SenderOperationType type)
                 : type(type)
             {}
-            SenderOperation(SenderOperationType type, std::vector<u8>&& clt_id)
+            SenderOperation(SenderOperationType type, std::vector<Byte>&& clt_id)
                 : type(type),
                   client_id(clt_id)
             {}
@@ -47,7 +47,7 @@ namespace apsi
             /**
             Client ID
             */
-            std::vector<u8> client_id;
+            std::vector<Byte> client_id;
         }; // class SenderOperation
 
         /**
@@ -59,7 +59,7 @@ namespace apsi
             SenderOperationGetParameters()
                 : SenderOperation(SOP_get_parameters)
             {}
-            SenderOperationGetParameters(std::vector<u8>&& client_id)
+            SenderOperationGetParameters(std::vector<Byte>&& client_id)
                 : SenderOperation(SOP_get_parameters, std::move(client_id))
             {}
 
@@ -73,11 +73,11 @@ namespace apsi
         {
         public:
             SenderOperationPreprocess() = delete;
-            SenderOperationPreprocess(std::vector<u8>&& buff)
+            SenderOperationPreprocess(std::vector<Byte>&& buff)
                 : SenderOperation(SOP_preprocess),
                   buffer(buff)
             {}
-            SenderOperationPreprocess(std::vector<u8>&& client_id, std::vector<u8>&& buff)
+            SenderOperationPreprocess(std::vector<Byte>&& client_id, std::vector<Byte>&& buff)
                 : SenderOperation(SOP_preprocess, std::move(client_id)),
                   buffer(buff)
             {}
@@ -87,7 +87,7 @@ namespace apsi
             /**
             Items to preprocess
             */
-            std::vector<u8> buffer;
+            std::vector<Byte> buffer;
         }; // class SenderOperationPreprocess
 
         /**
@@ -103,7 +103,7 @@ namespace apsi
                   query(std::move(queryp))
             {}
 
-            SenderOperationQuery(std::vector<u8>&& client_id, const std::string& relin, std::map<u64, std::vector<std::string>>&& queryp)
+            SenderOperationQuery(std::vector<Byte>&& client_id, const std::string& relin, std::map<u64, std::vector<std::string>>&& queryp)
                 : SenderOperation(SOP_query, std::move(client_id)),
                   relin_keys(relin),
                   query(std::move(queryp))

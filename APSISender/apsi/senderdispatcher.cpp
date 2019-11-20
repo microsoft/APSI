@@ -96,7 +96,7 @@ namespace apsi
         {
             auto preprocess_op = dynamic_pointer_cast<SenderOperationPreprocess>(sender_op);
             
-            vector<u8> result(preprocess_op->buffer.size());
+            vector<Byte> result(preprocess_op->buffer.size());
             OPRFSender::ProcessQueries(preprocess_op->buffer, *oprf_key_, result);
             channel.send_preprocess_response(sender_op->client_id, result);
         }

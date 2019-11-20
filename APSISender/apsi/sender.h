@@ -112,7 +112,7 @@ namespace apsi
             Loads the input data into sender's database, and precomputes all necessary components for the PSI protocol,
             including symmetric polynomials, batching, etc.
             */
-            void load_db(const std::vector<Item> &data, MatrixView<u8> vals = {});
+            void load_db(const std::vector<Item> &data, MatrixView<Byte> vals = {});
 
             /**
             Generate a response to a query
@@ -120,7 +120,7 @@ namespace apsi
             void query(
                 const std::string& relin_keys,
                 const std::map<u64, std::vector<std::string>> query,
-                const std::vector<u8>& client_id,
+                const std::vector<Byte>& client_id,
                 network::Channel& channel);
 
             /**
@@ -187,7 +187,7 @@ namespace apsi
             void respond(
                 std::vector<std::vector<seal::Ciphertext> > &query, int num_of_powers,
                 SenderSessionContext &session_context,
-                const std::vector<u8>& client_id,
+                const std::vector<Byte>& client_id,
                 network::Channel& channel);
 
             /**
@@ -204,7 +204,7 @@ namespace apsi
                 WindowingDag& dag,
                 std::vector<WindowingDag::State>& states,
                 std::atomic<int>& remaining_batches,
-                const std::vector<u8>& client_id,
+                const std::vector<Byte>& client_id,
                 network::Channel& channel);
 
 

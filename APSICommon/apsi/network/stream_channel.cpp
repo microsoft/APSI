@@ -88,7 +88,7 @@ namespace apsi
             write_operation_type(SOP_get_parameters);
         }
 
-        void StreamChannel::send_get_parameters_response(const vector<u8>& client_id, const PSIParams& params)
+        void StreamChannel::send_get_parameters_response(const vector<Byte>& client_id, const PSIParams& params)
         {
             // client_id is unused for StreamChannel.
             write_operation_type(SOP_get_parameters);
@@ -141,7 +141,7 @@ namespace apsi
             bytes_received_ += size;
         }
 
-        void StreamChannel::send_preprocess(const vector<u8>& buffer)
+        void StreamChannel::send_preprocess(const vector<Byte>& buffer)
         {
             // Type
             write_operation_type(SOP_preprocess);
@@ -157,7 +157,7 @@ namespace apsi
             bytes_sent_ += size;
         }
 
-        void StreamChannel::send_preprocess_response(const vector<u8>& client_id, const vector<u8>& buffer)
+        void StreamChannel::send_preprocess_response(const vector<Byte>& client_id, const vector<Byte>& buffer)
         {
             // client_id is ignored
 
@@ -217,7 +217,7 @@ namespace apsi
             }
         }
 
-        void StreamChannel::send_query_response(const vector<u8>& client_id, const size_t package_count)
+        void StreamChannel::send_query_response(const vector<Byte>& client_id, const size_t package_count)
         {
             // client_id is ignored
             write_operation_type(SOP_query);
@@ -240,7 +240,7 @@ namespace apsi
             bytes_received_ += (sizeof(i64) * 2);
         }
 
-        void StreamChannel::send(const vector<u8>& client_id, const ResultPackage& pkg)
+        void StreamChannel::send(const vector<Byte>& client_id, const ResultPackage& pkg)
         {
             unique_lock<mutex> snd_lock(*send_mutex_);
 
@@ -300,7 +300,7 @@ namespace apsi
 
         shared_ptr<SenderOperation> StreamChannel::decode_preprocess()
         {
-            vector<u8> buffer;
+            vector<Byte> buffer;
             u64 size;
             istream_.read(reinterpret_cast<char*>(&size), sizeof(u64));
             

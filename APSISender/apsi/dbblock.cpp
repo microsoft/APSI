@@ -171,7 +171,7 @@ namespace apsi
 
 
                         auto src = get_label(pos);
-                        temp.encode(gsl::span<u8>{src, static_cast<ptrdiff_t>(value_byte_length_)}, params.get_label_bit_count());
+                        temp.encode(gsl::span<Byte>{src, static_cast<ptrdiff_t>(value_byte_length_)}, params.get_label_bit_count());
                         y.set(size, temp);
 
                         ++size;

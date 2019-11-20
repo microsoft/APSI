@@ -39,7 +39,7 @@ using namespace apsi::oprf;
 
 
 void run_sender_dispatcher(const CLP& cmd);
-bool initialize_db(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels);
+bool initialize_db(const CLP& cmd, vector<Item>& items, Matrix<Byte>& labels);
 
 
 int main(int argc, char *argv[])
@@ -100,7 +100,7 @@ void run_sender_dispatcher(const CLP& cmd)
     Log::info("Preparing sender DB");
 
     vector<Item> items;
-    Matrix<u8> labels;
+    Matrix<Byte> labels;
 
     shared_ptr<OPRFKey> oprf_key;
 
@@ -145,7 +145,7 @@ void run_sender_dispatcher(const CLP& cmd)
     dispatcher.run(stop, cmd.net_port(), oprf_key);
 }
 
-bool initialize_db(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels)
+bool initialize_db(const CLP& cmd, vector<Item>& items, Matrix<Byte>& labels)
 {
     auto label_bit_length  = cmd.use_labels() ? cmd.item_bit_length() : 0;
     auto label_byte_length = (label_bit_length + 7) / 8;

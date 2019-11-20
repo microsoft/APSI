@@ -56,7 +56,7 @@ namespace apsi
             The query is a vector of items, and the result is a same-size vector of bool values. If an item is in the intersection, the
             corresponding bool value is true on the same position in the result vector.
             *************************************************************************************************************************************/
-            std::pair<std::vector<bool>, Matrix<u8>> query(std::vector<Item>& items, network::Channel& chl);
+            std::pair<std::vector<bool>, Matrix<Byte>> query(std::vector<Item>& items, network::Channel& chl);
 
 
             /************************************************************************************************************************************
@@ -75,19 +75,19 @@ namespace apsi
             is a same-size vector of bool values. If an item is in the intersection, the corresponding bool value is true on the
             same position in the result vector
             */
-            std::pair<std::vector<bool>, Matrix<u8>> decrypt_result(std::vector<Item>& items, network::Channel& chl);
+            std::pair<std::vector<bool>, Matrix<Byte>> decrypt_result(std::vector<Item>& items, network::Channel& chl);
 
             /**
             Obfuscates the items and initializes the given vector with the buffer that must be sent to the Sender for OPRF
             processing.
             */
-            void obfuscate_items(std::vector<Item>& items, std::vector<u8>& items_buffer);
+            void obfuscate_items(std::vector<Item>& items, std::vector<Byte>& items_buffer);
 
             /**
             Process obfuscated items received from Sender.
             Remove the Receiver obfuscation so only the Sender obfuscation remains.
             */
-            void deobfuscate_items(std::vector<Item>& items, std::vector<u8>& items_buffer);
+            void deobfuscate_items(std::vector<Item>& items, std::vector<Byte>& items_buffer);
 
             /**
             Perform a handshake between the Sender and this Receiver.
@@ -179,7 +179,7 @@ namespace apsi
             @result Matrix of size (#splits x table_size_ceiling). Here table_size_ceiling is defined as (#batches x batch_size), which might be
             larger than table_size.
             */
-            std::pair<std::vector<bool>, Matrix<u8> > stream_decrypt(
+            std::pair<std::vector<bool>, Matrix<Byte> > stream_decrypt(
                 network::Channel& channel,
                 const std::vector<int>& table_to_input_map,
                 std::vector<Item>& items);
@@ -195,7 +195,7 @@ namespace apsi
                 network::Channel& channel,
                 const std::vector<int> &table_to_input_map,
                 std::vector<bool>& ret_bools,
-                Matrix<u8>& ret_labels);
+                Matrix<Byte>& ret_labels);
 
             std::shared_ptr<FField> field() const
             {

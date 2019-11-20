@@ -37,7 +37,7 @@ namespace
         }
     }
 
-    void InitU8Vector(vector<u8>& vec, int size)
+    void InitU8Vector(vector<Byte>& vec, int size)
     {
         vec.resize(size);
 
@@ -92,7 +92,7 @@ namespace APSITests
         PSIParams::ExFieldParams exfield_params;
         PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
 
-        vector<u8> buff = { 1, 2, 3, 4, 5 };
+        vector<Byte> buff = { 1, 2, 3, 4, 5 };
 
         PublicKey pub_key;
         RelinKeys relin_keys;
@@ -108,7 +108,7 @@ namespace APSITests
         ASSERT_ANY_THROW(mychannel.receive(sender_op));
 
         // Sends
-        vector<u8> empty_client_id;
+        vector<Byte> empty_client_id;
         ASSERT_ANY_THROW(mychannel.send_get_parameters());
         ASSERT_ANY_THROW(mychannel.send_get_parameters_response(empty_client_id, params));
         ASSERT_ANY_THROW(mychannel.send_preprocess(buff));
@@ -132,7 +132,7 @@ namespace APSITests
                 // This should be SenderOperationType size
                 clt.send_get_parameters();
 
-                vector<u8> data1;
+                vector<Byte> data1;
                 InitU8Vector(data1, 1000);
 
                 // This should be 1000 bytes + SenderOperationType size
@@ -236,7 +236,7 @@ namespace APSITests
         ASSERT_EQ(expected_total, svr.get_total_data_sent());
 
         // Preprocess response
-        vector<u8> preproc;
+        vector<Byte> preproc;
         InitU8Vector(preproc, 50);
         svr.send_preprocess_response(sender_op->client_id, preproc);
         expected_total += sizeof(u32); // SenderOperationType
@@ -285,7 +285,7 @@ namespace APSITests
     {
         thread clientth([this]
             {
-                vector<u8> buff = { 1, 2, 3, 4, 5 };
+                vector<Byte> buff = { 1, 2, 3, 4, 5 };
                 client_.send_preprocess(buff);
             });
 
@@ -297,11 +297,11 @@ namespace APSITests
 
         ASSERT_TRUE(preproc != nullptr);
         ASSERT_EQ((size_t)5, preproc->buffer.size());
-        ASSERT_EQ((u8)1, preproc->buffer[0]);
-        ASSERT_EQ((u8)2, preproc->buffer[1]);
-        ASSERT_EQ((u8)3, preproc->buffer[2]);
-        ASSERT_EQ((u8)4, preproc->buffer[3]);
-        ASSERT_EQ((u8)5, preproc->buffer[4]);
+        ASSERT_EQ((Byte)1, preproc->buffer[0]);
+        ASSERT_EQ((Byte)2, preproc->buffer[1]);
+        ASSERT_EQ((Byte)3, preproc->buffer[2]);
+        ASSERT_EQ((Byte)4, preproc->buffer[3]);
+        ASSERT_EQ((Byte)5, preproc->buffer[4]);
 
         clientth.join();
     }
@@ -442,23 +442,23 @@ namespace APSITests
                 server_.receive(sender_op, /* wait_for_message */ true);
                 ASSERT_EQ(SOP_preprocess, sender_op->type);
 
-                vector<u8> buffer = { 10, 9, 8, 7, 6 };
+                vector<Byte> buffer = { 10, 9, 8, 7, 6 };
                 server_.send_preprocess_response(sender_op->client_id, buffer);
             });
 
         // This buffer will actually be ignored
-        vector<u8> buff = { 1 };
+        vector<Byte> buff = { 1 };
         client_.send_preprocess(buff);
 
         SenderResponsePreprocess preprocess_response;
         client_.receive(preprocess_response);
 
         ASSERT_EQ((size_t)5, preprocess_response.buffer.size());
-        ASSERT_EQ((u8)10, preprocess_response.buffer[0]);
-        ASSERT_EQ((u8)9, preprocess_response.buffer[1]);
-        ASSERT_EQ((u8)8, preprocess_response.buffer[2]);
-        ASSERT_EQ((u8)7, preprocess_response.buffer[3]);
-        ASSERT_EQ((u8)6, preprocess_response.buffer[4]);
+        ASSERT_EQ((Byte)10, preprocess_response.buffer[0]);
+        ASSERT_EQ((Byte)9, preprocess_response.buffer[1]);
+        ASSERT_EQ((Byte)8, preprocess_response.buffer[2]);
+        ASSERT_EQ((Byte)7, preprocess_response.buffer[3]);
+        ASSERT_EQ((Byte)6, preprocess_response.buffer[4]);
 
         serverth.join();
     }
@@ -579,12 +579,12 @@ namespace APSITests
 
                     recv.connect("tcp://localhost:5552");
 
-                    u8 a = static_cast<u8>(idx) * 2;
-                    u8 b = a + 1;
+                    Byte a = static_cast<Byte>(idx) * 2;
+                    Byte b = a + 1;
 
                     for (u32 i = 0; i < 5; i++)
                     {
-                        vector<u8> buffer(2);
+                        vector<Byte> buffer(2);
                         buffer[0] = a;
                         buffer[1] = b;
 
@@ -594,7 +594,7 @@ namespace APSITests
                         recv.receive(preproc);
 
                         ASSERT_EQ((size_t)3, preproc.buffer.size());
-                        ASSERT_EQ((u8)(a * b), preproc.buffer[2]);
+                        ASSERT_EQ((Byte)(a * b), preproc.buffer[2]);
                     }
 
                 }, i);

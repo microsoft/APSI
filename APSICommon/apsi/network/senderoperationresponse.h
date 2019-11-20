@@ -28,7 +28,7 @@ namespace apsi
         */
         struct SenderResponsePreprocess
         {
-            std::vector<u8> buffer;
+            std::vector<Byte> buffer;
         }; // struct SenderResponsePreprocess
 
         /**

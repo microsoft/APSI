@@ -50,18 +50,18 @@ namespace apsi
             Sets the sender's database by hashing the data items with all hash functions.
             */
             void set_data(gsl::span<const Item> keys, int thread_count);
-            void set_data(gsl::span<const Item> keys, MatrixView<u8> values, int thread_count);
+            void set_data(gsl::span<const Item> keys, MatrixView<Byte> values, int thread_count);
 
             /**
             Adds the data items to sender's database.
             */
             void add_data(gsl::span<const Item> keys, int thread_count);
-            void add_data(gsl::span<const Item> keys, MatrixView<u8> values, int thread_count);
+            void add_data(gsl::span<const Item> keys, MatrixView<Byte> values, int thread_count);
 
             /**
              No hash version of add data, specific for one query
             */
-            void add_data_no_hash(gsl::span<const Item> data, MatrixView<u8> values);
+            void add_data_no_hash(gsl::span<const Item> data, MatrixView<Byte> values);
 
             /**
             Handles the work of one thread for adding items to sender's database

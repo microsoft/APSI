@@ -68,17 +68,17 @@ namespace apsi
             /**
             Send a response to a request to Get Parameters
             */
-            virtual void send_get_parameters_response(const std::vector<u8>& client_id, const PSIParams& params) = 0;
+            virtual void send_get_parameters_response(const std::vector<Byte>& client_id, const PSIParams& params) = 0;
 
             /**
             Send a request to Preprocess items on Sender
             */
-            virtual void send_preprocess(const std::vector<u8>& buffer) = 0;
+            virtual void send_preprocess(const std::vector<Byte>& buffer) = 0;
 
             /**
             * Send a response to a request to Preprocess items
             */
-            virtual void send_preprocess_response(const std::vector<u8>& client_id, const std::vector<u8>& buffer) = 0;
+            virtual void send_preprocess_response(const std::vector<Byte>& client_id, const std::vector<Byte>& buffer) = 0;
 
             /**
             * Send a request for a Query response to Sender
@@ -90,12 +90,12 @@ namespace apsi
             /**
             Send a response to a Query request
             */
-            virtual void send_query_response(const std::vector<u8>& client_id, const size_t package_count) = 0;
+            virtual void send_query_response(const std::vector<Byte>& client_id, const size_t package_count) = 0;
 
             /**
             * Send a ResultPackage structure
             */
-            virtual void send(const std::vector<u8>& client_id, const ResultPackage& pkg) = 0;
+            virtual void send(const std::vector<Byte>& client_id, const ResultPackage& pkg) = 0;
 
             /**
             * Get the amount of data that has been sent through the channel

@@ -269,7 +269,7 @@ namespace apsi
             bytes_sent_ += sizeof(SenderOperationType);
         }
 
-        void NetworkChannel::send_get_parameters_response(const vector<u8>& client_id, const PSIParams& params)
+        void NetworkChannel::send_get_parameters_response(const vector<Byte>& client_id, const PSIParams& params)
         {
             throw_if_not_connected();
 
@@ -322,7 +322,7 @@ namespace apsi
             bytes_sent_ += sizeof(PSIParams::ExFieldParams);
         }
 
-        void NetworkChannel::send_preprocess(const vector<u8>& buffer)
+        void NetworkChannel::send_preprocess(const vector<Byte>& buffer)
         {
             throw_if_not_connected();
 
@@ -338,7 +338,7 @@ namespace apsi
             bytes_sent_ += buffer.size();
         }
 
-        void NetworkChannel::send_preprocess_response(const vector<u8>& client_id, const vector<u8>& buffer)
+        void NetworkChannel::send_preprocess_response(const vector<Byte>& client_id, const vector<Byte>& buffer)
         {
             throw_if_not_connected();
 
@@ -401,7 +401,7 @@ namespace apsi
             bytes_sent_ += bytes_sent;
         }
 
-        void NetworkChannel::send_query_response(const vector<u8>& client_id, const size_t package_count)
+        void NetworkChannel::send_query_response(const vector<Byte>& client_id, const size_t package_count)
         {
             throw_if_not_connected();
 
@@ -422,7 +422,7 @@ namespace apsi
             bytes_sent_ += sizeof(u64);
         }
 
-        void NetworkChannel::send(const vector<u8>& client_id, const ResultPackage& pkg)
+        void NetworkChannel::send(const vector<Byte>& client_id, const ResultPackage& pkg)
         {
             throw_if_not_connected();
 
@@ -440,7 +440,7 @@ namespace apsi
             bytes_sent_ += pkg.size();
         }
 
-        void NetworkChannel::get_buffer(vector<u8>& buff, const message_t& msg, int part_start) const
+        void NetworkChannel::get_buffer(vector<Byte>& buff, const message_t& msg, int part_start) const
         {
             // Need to have size
             if (msg.parts() < static_cast<size_t>(part_start) + 1)
@@ -465,7 +465,7 @@ namespace apsi
             }
         }
 
-        void NetworkChannel::add_buffer(const vector<u8>& buff, message_t& msg) const
+        void NetworkChannel::add_buffer(const vector<Byte>& buff, message_t& msg) const
         {
             // First part is size
             u64 size = static_cast<u64>(buff.size());
@@ -532,7 +532,7 @@ namespace apsi
             return type;
         }
 
-        void NetworkChannel::extract_client_id(const message_t& msg, vector<u8>& id) const
+        void NetworkChannel::extract_client_id(const message_t& msg, vector<Byte>& id) const
         {
             // ID should always be part 0
             size_t id_size = msg.size(/* part */ 0);
@@ -540,14 +540,14 @@ namespace apsi
             memcpy(id.data(), msg.raw_data(/* part */ 0), id_size);
         }
 
-        void NetworkChannel::add_client_id(message_t& msg, const vector<u8>& id) const
+        void NetworkChannel::add_client_id(message_t& msg, const vector<Byte>& id) const
         {
             msg.add_raw(id.data(), id.size());
         }
 
         shared_ptr<SenderOperation> NetworkChannel::decode_get_parameters(const message_t& msg)
         {
-            vector<u8> client_id;
+            vector<Byte> client_id;
             extract_client_id(msg, client_id);
 
             // Nothing in the message to decode.
@@ -556,10 +556,10 @@ namespace apsi
 
         shared_ptr<SenderOperation> NetworkChannel::decode_preprocess(const message_t& msg)
         {
-            vector<u8> client_id;
+            vector<Byte> client_id;
             extract_client_id(msg, client_id);
 
-            vector<u8> buffer;
+            vector<Byte> buffer;
             get_buffer(buffer, msg, /* part_start */ 2);
 
             bytes_received_ += buffer.size();
@@ -569,7 +569,7 @@ namespace apsi
 
         shared_ptr<SenderOperation> NetworkChannel::decode_query(const message_t& msg)
         {
-            vector<u8> client_id;
+            vector<Byte> client_id;
             extract_client_id(msg, client_id);
 
             string relin_keys;

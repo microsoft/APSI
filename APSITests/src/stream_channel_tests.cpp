@@ -64,7 +64,7 @@ namespace APSITests
 
         PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
 
-        vector<u8> client_id;
+        vector<Byte> client_id;
         senderchannel.send_get_parameters_response(client_id, params);
         stream2.seekp(0);
 
@@ -107,7 +107,7 @@ namespace APSITests
         StreamChannel senderchannel(/* istream */ stream1, /* ostream */ stream2);
         StreamChannel receiverchannel(/* istream */ stream2, /* ostream */ stream1);
 
-        vector<u8> items = { 10, 20, 30, 40, 50 };
+        vector<Byte> items = { 10, 20, 30, 40, 50 };
 
         receiverchannel.send_preprocess(items);
         stream1.seekp(0);
@@ -136,9 +136,9 @@ namespace APSITests
         StreamChannel senderchannel(/* istream */ stream1, /* ostream */ stream2);
         StreamChannel receiverchannel(/* istream */ stream2, /* ostream */ stream1);
 
-        vector<u8> buffer{ 100, 95, 80, 75, 60, 55, 40, 35, 20, 15, 10, 4, 3, 2 , 1 };
+        vector<Byte> buffer{ 100, 95, 80, 75, 60, 55, 40, 35, 20, 15, 10, 4, 3, 2 , 1 };
 
-        vector<u8> client_id;
+        vector<Byte> client_id;
         senderchannel.send_preprocess_response(client_id, buffer);
         stream2.seekp(0);
 
@@ -146,21 +146,21 @@ namespace APSITests
         receiverchannel.receive(pr);
 
         ASSERT_EQ((size_t)15, pr.buffer.size());
-        ASSERT_EQ((u8)100, pr.buffer[0]);
-        ASSERT_EQ((u8)95, pr.buffer[1]);
-        ASSERT_EQ((u8)80, pr.buffer[2]);
-        ASSERT_EQ((u8)75, pr.buffer[3]);
-        ASSERT_EQ((u8)60, pr.buffer[4]);
-        ASSERT_EQ((u8)55, pr.buffer[5]);
-        ASSERT_EQ((u8)40, pr.buffer[6]);
-        ASSERT_EQ((u8)35, pr.buffer[7]);
-        ASSERT_EQ((u8)20, pr.buffer[8]);
-        ASSERT_EQ((u8)15, pr.buffer[9]);
-        ASSERT_EQ((u8)10, pr.buffer[10]);
-        ASSERT_EQ((u8)4, pr.buffer[11]);
-        ASSERT_EQ((u8)3, pr.buffer[12]);
-        ASSERT_EQ((u8)2, pr.buffer[13]);
-        ASSERT_EQ((u8)1, pr.buffer[14]);
+        ASSERT_EQ((Byte)100, pr.buffer[0]);
+        ASSERT_EQ((Byte)95, pr.buffer[1]);
+        ASSERT_EQ((Byte)80, pr.buffer[2]);
+        ASSERT_EQ((Byte)75, pr.buffer[3]);
+        ASSERT_EQ((Byte)60, pr.buffer[4]);
+        ASSERT_EQ((Byte)55, pr.buffer[5]);
+        ASSERT_EQ((Byte)40, pr.buffer[6]);
+        ASSERT_EQ((Byte)35, pr.buffer[7]);
+        ASSERT_EQ((Byte)20, pr.buffer[8]);
+        ASSERT_EQ((Byte)15, pr.buffer[9]);
+        ASSERT_EQ((Byte)10, pr.buffer[10]);
+        ASSERT_EQ((Byte)4, pr.buffer[11]);
+        ASSERT_EQ((Byte)3, pr.buffer[12]);
+        ASSERT_EQ((Byte)2, pr.buffer[13]);
+        ASSERT_EQ((Byte)1, pr.buffer[14]);
     }
 
     TEST_F(StreamChannelTests, SendQueryTest)
@@ -223,7 +223,7 @@ namespace APSITests
         StreamChannel senderchannel(/* istream */ stream1, /* ostream */ stream2);
         StreamChannel receiverchannel(/* istream */ stream2, /* ostream */ stream1);
 
-        vector<u8> client_id;
+        vector<Byte> client_id;
         senderchannel.send_query_response(client_id, 50);
         stream2.seekp(0);
 
@@ -247,7 +247,7 @@ namespace APSITests
         pkg.data = "One";
         pkg.label_data = "Two";
 
-        vector<u8> client_id;
+        vector<Byte> client_id;
         senderchannel.send(client_id, pkg);
 
         pkg.batch_idx = 3;

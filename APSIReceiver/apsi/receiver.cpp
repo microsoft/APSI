@@ -116,7 +116,7 @@ namespace apsi
             return ciphertexts;
         }
 
-        pair<vector<bool>, Matrix<u8>> Receiver::decrypt_result(vector<Item>& items, Channel& chl)
+        pair<vector<bool>, Matrix<Byte>> Receiver::decrypt_result(vector<Item>& items, Channel& chl)
         {
             auto& cuckoo = *preprocess_result_.second;
             size_t padded_table_size = static_cast<size_t>(
@@ -147,7 +147,7 @@ namespace apsi
             return intersection;
         }
 
-        pair<vector<bool>, Matrix<u8>> Receiver::query(vector<Item>& items, Channel& chl)
+        pair<vector<bool>, Matrix<Byte>> Receiver::query(vector<Item>& items, Channel& chl)
         {
             STOPWATCH(recv_stop_watch, "Receiver::query_full");
             Log::info("Receiver starting full query");
@@ -156,7 +156,7 @@ namespace apsi
             STOPWATCH(recv_stop_watch, "Receiver::OPRF");
             Log::info("OPRF processing");
 
-            vector<u8> items_buffer;
+            vector<Byte> items_buffer;
             obfuscate_items(items, items_buffer);
 
             // Send obfuscated buffer to Sender
@@ -178,7 +178,7 @@ namespace apsi
             return decrypt_result(items, chl);
         }
 
-        void Receiver::obfuscate_items(std::vector<Item>& items, std::vector<u8>& items_buffer)
+        void Receiver::obfuscate_items(std::vector<Item>& items, std::vector<Byte>& items_buffer)
         {
             Log::info("Obfuscating items");
 
@@ -186,7 +186,7 @@ namespace apsi
             oprf_receiver_ = make_shared<OPRFReceiver>(items, items_buffer);
         }
 
-        void Receiver::deobfuscate_items(std::vector<Item>& items, std::vector<u8>& items_buffer)
+        void Receiver::deobfuscate_items(std::vector<Item>& items, std::vector<Byte>& items_buffer)
         {
             Log::info("Deobfuscating items");
 
@@ -485,13 +485,13 @@ namespace apsi
             }
         }
 
-        std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
+        std::pair<std::vector<bool>, Matrix<Byte>> Receiver::stream_decrypt(
             Channel& channel,
             const std::vector<int>& table_to_input_map,
             std::vector<Item>& items)
         {
             STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt");
-            std::pair<std::vector<bool>, Matrix<u8>> ret;
+            std::pair<std::vector<bool>, Matrix<Byte>> ret;
             auto& ret_bools = ret.first;
             auto& ret_labels = ret.second;
 
@@ -547,7 +547,7 @@ namespace apsi
             Channel& channel,
             const vector<int>& table_to_input_map,
             vector<bool>& ret_bools,
-            Matrix<u8>& ret_labels)
+            Matrix<Byte>& ret_labels)
         {
             STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt_worker");
             MemoryPoolHandle local_pool(MemoryPoolHandle::New());
