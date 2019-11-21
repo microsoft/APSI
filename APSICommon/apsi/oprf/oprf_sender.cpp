@@ -64,8 +64,8 @@ namespace apsi
             size_t query_count =
                 static_cast<size_t>(oprf_queries.size()) / oprf_query_size;
 
-            auto oprf_in_ptr = (Byte *)oprf_queries.data();
-            auto oprf_out_ptr = (Byte *)oprf_responses.data();
+            auto oprf_in_ptr = reinterpret_cast<const u8 *>(oprf_queries.data());
+            auto oprf_out_ptr = reinterpret_cast<u8 *>(oprf_responses.data());
 
             for (size_t i = 0; i < query_count; i++)
             {
@@ -159,7 +159,7 @@ namespace apsi
             {
                 // Create an elliptic curve point from the item
                 ECPoint ecpt({
-                    reinterpret_cast<const Byte*>(oprf_items[i].data()),
+                    reinterpret_cast<const u8*>(oprf_items[i].data()),
                     oprf_item_size });
 
                 // Multiply with key
@@ -167,7 +167,7 @@ namespace apsi
 
                 // Extract the hash
                 ecpt.extract_hash({
-                    reinterpret_cast<Byte*>(oprf_hashes[i].data()),
+                    reinterpret_cast<u8*>(oprf_hashes[i].data()),
                     ECPoint::hash_size });
             }
         }
@@ -182,7 +182,7 @@ namespace apsi
             {
                 // Create an elliptic curve point from the item
                 ECPoint ecpt({
-                    reinterpret_cast<Byte*>(oprf_items[i].data()),
+                    reinterpret_cast<u8*>(oprf_items[i].data()),
                     oprf_item_size });
 
                 // Multiply with key
@@ -191,7 +191,7 @@ namespace apsi
                 // Extract the hash inplace
                 oprf_items[i] = oprf_item_type();
                 ecpt.extract_hash({
-                    reinterpret_cast<Byte*>(oprf_items[i].data()),
+                    reinterpret_cast<u8*>(oprf_items[i].data()),
                     ECPoint::hash_size });
             }
         }

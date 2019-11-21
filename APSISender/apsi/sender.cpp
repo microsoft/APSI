@@ -88,7 +88,7 @@ namespace apsi
             }
         }
 
-        void Sender::load_db(const vector<Item> &data, MatrixView<Byte> vals)
+        void Sender::load_db(const vector<Item> &data, MatrixView<u8> vals)
         {
             sender_db_->set_data(data, vals, total_thread_count_);
 

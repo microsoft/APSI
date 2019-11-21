@@ -71,7 +71,7 @@ namespace apsi
                 items_per_split_ = items_per_split;
             }
 
-            std::vector<Byte> label_data_;
+            std::vector<u8> label_data_;
             std::vector<Item> key_data_;
 
             std::unique_ptr<std::atomic_bool[]> has_item_;
@@ -147,7 +147,7 @@ namespace apsi
                 return key_data_[static_cast<size_t>(pos.batch_offset * items_per_split_ + pos.split_offset)];
             }
 
-            Byte* get_label(const Position& pos)
+            u8* get_label(const Position& pos)
             {
 #ifndef NDEBUG
                 check(pos);

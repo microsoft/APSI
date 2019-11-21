@@ -113,7 +113,7 @@ namespace apsi
             set_data(data, {}, thread_count);
         }
 
-        void SenderDB::set_data(gsl::span<const Item> data, MatrixView<Byte> vals, int thread_count)
+        void SenderDB::set_data(gsl::span<const Item> data, MatrixView<u8> vals, int thread_count)
         {
             STOPWATCH(sender_stop_watch, "SenderDB::set_data");
             clear_db();
@@ -129,7 +129,7 @@ namespace apsi
             }
         }
 
-        void SenderDB::add_data(gsl::span<const Item> data, MatrixView<Byte> values, int thread_count)
+        void SenderDB::add_data(gsl::span<const Item> data, MatrixView<u8> values, int thread_count)
         {
             STOPWATCH(sender_stop_watch, "SenderDB::add_data");
 
@@ -180,7 +180,7 @@ namespace apsi
         }
 
 
-        void SenderDB::add_data_no_hash(gsl::span<const Item> data, MatrixView<Byte> values)
+        void SenderDB::add_data_no_hash(gsl::span<const Item> data, MatrixView<u8> values)
         {
             STOPWATCH(sender_stop_watch, "SenderDB::add_data_no_hash");
 
@@ -232,7 +232,7 @@ namespace apsi
             }
         }
 
-        void SenderDB::add_data_worker(int thread_idx, int thread_count, gsl::span<const Item> data, MatrixView<Byte> values, vector<int> &loads)
+        void SenderDB::add_data_worker(int thread_idx, int thread_count, gsl::span<const Item> data, MatrixView<u8> values, vector<int> &loads)
         {
             STOPWATCH(sender_stop_watch, "SenderDB::add_data_worker");
 

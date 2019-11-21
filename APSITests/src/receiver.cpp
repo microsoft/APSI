@@ -35,14 +35,14 @@
 			
 // 			unique_ptr<PermutationBasedCuckoo> cuckoo = receiver.cuckoo_hashing(data);
 
-// 			const uint64_t *null_value = cuckoo->null_value();
+// 			const u64 *null_value = cuckoo->null_value();
 
-// 			Assert::AreEqual(cuckoo->capacity(), (uint64_t)2048);
+// 			Assert::AreEqual(cuckoo->capacity(), (u64)2048);
 
 // 			int null_count = 0;
 // 			for (int i = 0; i < 2048; i++)
 // 			{
-// 				const uint64_t *tmp = cuckoo->hash_table_item(i);
+// 				const u64 *tmp = cuckoo->hash_table_item(i);
 // 				if (tmp[0] == null_value[0] && tmp[1] == null_value[1])
 // 					null_count++;
 // 			}
@@ -60,12 +60,12 @@
 
 // 			unique_ptr<PermutationBasedCuckoo> cuckoo = receiver.cuckoo_hashing(data);
 
-// 			const uint64_t *null_value = cuckoo->null_value();
+// 			const u64 *null_value = cuckoo->null_value();
 
 // 			set<int> indices;
 // 			for (int i = 0; i < 2048; i++)
 // 			{
-// 				const uint64_t *tmp = cuckoo->hash_table_item(i);
+// 				const u64 *tmp = cuckoo->hash_table_item(i);
 // 				if (tmp[0] == null_value[0] && tmp[1] == null_value[1])
 // 					continue;
 // 				indices.emplace(i);
@@ -95,7 +95,7 @@
 
 // 			for (int i = 0; i < 2048; i++)
 // 			{
-// 				const uint64_t *item = cuckoo->hash_table_item(i);
+// 				const u64 *item = cuckoo->hash_table_item(i);
 // 				Item tmp;
 // 				tmp[0] = item[0];
 // 				tmp[1] = item[1];
@@ -112,10 +112,10 @@
 // 			vector<ExFieldElement> v1(10);
 // 			for (int i = 0; i < 10; i++)
 // 				v1[i] = ring->random_element();
-// 			map<uint64_t, vector<ExFieldElement>> r1 = receiver.generate_powers(v1);
-// 			for (map<uint64_t, vector<ExFieldElement>>::iterator it = r1.begin(); it != r1.end(); it++)
+// 			map<u64, vector<ExFieldElement>> r1 = receiver.generate_powers(v1);
+// 			for (map<u64, vector<ExFieldElement>>::iterator it = r1.begin(); it != r1.end(); it++)
 // 			{
-// 				uint64_t exponent = it->first;
+// 				u64 exponent = it->first;
 // 				for (int i = 0; i < it->second.size(); i++)
 // 				{
 // 					Assert::IsTrue(it->second[i] == (v1[i] ^ exponent));

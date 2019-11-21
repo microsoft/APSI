@@ -20,20 +20,20 @@ namespace apsi
         // Bits are written to dest starting at the first bit. All other bits in 
         // dest are unchanged, e.g. the bit indexed by [bitLength, bitLength + 1, ...]
         void copy_with_bit_offset(
-            gsl::span<const Byte> src,
+            gsl::span<const u8> src,
             i32 bitOffset,
             i32 bitLength,
-            gsl::span<Byte> dest);
+            gsl::span<u8> dest);
 
         // Copies bitLength bits from src starting at the bit index by srcBitOffset.
         // Bits are written to dest starting at the destBitOffset bit. All other bits in 
         // dest are unchanged, e.g. the bit indexed by [0,1,...,destBitOffset - 1], [destBitOffset + bitLength, ...]
         void copy_with_bit_offset(
-            gsl::span<const Byte> src,
+            gsl::span<const u8> src,
             i32 srcBitOffset,
             i32 destBitOffset,
             i32 bitLength,
-            gsl::span<Byte> dest);
+            gsl::span<u8> dest);
     } // namespace details
 
     class FFieldElt
@@ -303,7 +303,7 @@ namespace apsi
         typename std::enable_if<std::is_pod<T>::value>::type
             encode(gsl::span<T> value, int bit_length)
         {
-            gsl::span<const Byte> v2(reinterpret_cast<Byte*>(value.data()), value.size() * sizeof(T));
+            gsl::span<const u8> v2(reinterpret_cast<u8*>(value.data()), value.size() * sizeof(T));
 
             // Should minus 1 to avoid wrapping around p
             int split_length = field_.ch_.bit_count() - 1;
@@ -322,7 +322,7 @@ namespace apsi
             {
                 auto size = std::min<int>(split_length, bit_length);
                 details::copy_with_bit_offset(v2, offset, size,
-                    { reinterpret_cast<Byte*>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) });
+                    { reinterpret_cast<u8*>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) });
 
                 offset += split_length;
                 bit_length -= split_length;
@@ -333,7 +333,7 @@ namespace apsi
         typename std::enable_if<std::is_pod<T>::value>::type
             decode(gsl::span<T> value, int bit_length)
         {
-            gsl::span<Byte> v2(reinterpret_cast<Byte*>(value.data()), value.size() * sizeof(T));
+            gsl::span<u8> v2(reinterpret_cast<u8*>(value.data()), value.size() * sizeof(T));
 
             // Should minus 1 to avoid wrapping around p
             int split_length = field_.ch_.bit_count() - 1;
@@ -353,7 +353,7 @@ namespace apsi
             {
                 auto size = std::min<int>(split_length, bit_length);
                 details::copy_with_bit_offset(
-                    { reinterpret_cast<Byte*>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) },
+                    { reinterpret_cast<u8*>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) },
                     0, offset, size, v2);
 
                 offset += split_length;

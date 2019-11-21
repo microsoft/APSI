@@ -130,11 +130,11 @@ namespace APSITests
         ASSERT_TRUE(nullptr != preprocess_op);
 
         ASSERT_EQ((size_t)5, preprocess_op->buffer.size());
-        ASSERT_EQ((Byte)10, (Byte)preprocess_op->buffer[0]);
-        ASSERT_EQ((Byte)20, (Byte)preprocess_op->buffer[1]);
-        ASSERT_EQ((Byte)30, (Byte)preprocess_op->buffer[2]);
-        ASSERT_EQ((Byte)40, (Byte)preprocess_op->buffer[3]);
-        ASSERT_EQ((Byte)50, (Byte)preprocess_op->buffer[4]);
+        ASSERT_EQ((u8)10, (u8)preprocess_op->buffer[0]);
+        ASSERT_EQ((u8)20, (u8)preprocess_op->buffer[1]);
+        ASSERT_EQ((u8)30, (u8)preprocess_op->buffer[2]);
+        ASSERT_EQ((u8)40, (u8)preprocess_op->buffer[3]);
+        ASSERT_EQ((u8)50, (u8)preprocess_op->buffer[4]);
     }
 
     TEST_F(StreamChannelTests, SendPreprocessResponseTest)
@@ -155,21 +155,21 @@ namespace APSITests
         receiverchannel.receive(pr);
 
         ASSERT_EQ((size_t)15, pr.buffer.size());
-        ASSERT_EQ((Byte)100, (Byte)pr.buffer[0]);
-        ASSERT_EQ((Byte)95, (Byte)pr.buffer[1]);
-        ASSERT_EQ((Byte)80, (Byte)pr.buffer[2]);
-        ASSERT_EQ((Byte)75, (Byte)pr.buffer[3]);
-        ASSERT_EQ((Byte)60, (Byte)pr.buffer[4]);
-        ASSERT_EQ((Byte)55, (Byte)pr.buffer[5]);
-        ASSERT_EQ((Byte)40, (Byte)pr.buffer[6]);
-        ASSERT_EQ((Byte)35, (Byte)pr.buffer[7]);
-        ASSERT_EQ((Byte)20, (Byte)pr.buffer[8]);
-        ASSERT_EQ((Byte)15, (Byte)pr.buffer[9]);
-        ASSERT_EQ((Byte)10, (Byte)pr.buffer[10]);
-        ASSERT_EQ((Byte)4, (Byte)pr.buffer[11]);
-        ASSERT_EQ((Byte)3, (Byte)pr.buffer[12]);
-        ASSERT_EQ((Byte)2, (Byte)pr.buffer[13]);
-        ASSERT_EQ((Byte)1, (Byte)pr.buffer[14]);
+        ASSERT_EQ((u8)100, (u8)pr.buffer[0]);
+        ASSERT_EQ((u8)95, (u8)pr.buffer[1]);
+        ASSERT_EQ((u8)80, (u8)pr.buffer[2]);
+        ASSERT_EQ((u8)75, (u8)pr.buffer[3]);
+        ASSERT_EQ((u8)60, (u8)pr.buffer[4]);
+        ASSERT_EQ((u8)55, (u8)pr.buffer[5]);
+        ASSERT_EQ((u8)40, (u8)pr.buffer[6]);
+        ASSERT_EQ((u8)35, (u8)pr.buffer[7]);
+        ASSERT_EQ((u8)20, (u8)pr.buffer[8]);
+        ASSERT_EQ((u8)15, (u8)pr.buffer[9]);
+        ASSERT_EQ((u8)10, (u8)pr.buffer[10]);
+        ASSERT_EQ((u8)4, (u8)pr.buffer[11]);
+        ASSERT_EQ((u8)3, (u8)pr.buffer[12]);
+        ASSERT_EQ((u8)2, (u8)pr.buffer[13]);
+        ASSERT_EQ((u8)1, (u8)pr.buffer[14]);
     }
 
     TEST_F(StreamChannelTests, SendQueryTest)

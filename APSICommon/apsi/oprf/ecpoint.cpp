@@ -220,7 +220,7 @@ namespace apsi
 
                 // Compute a Blake2b hash of the value
                 blake2b(
-                    reinterpret_cast<Byte*>(r), sizeof(f2elm_t),
+                    reinterpret_cast<u8*>(r), sizeof(f2elm_t),
                     value.data(), static_cast<size_t>(value.size()),
                     nullptr, 0);
 
@@ -293,7 +293,7 @@ namespace apsi
         }
 
         void ECPoint::scalar_multiply(
-            gsl::span<const Byte, order_size> scalar)
+            gsl::span<const u8, order_size> scalar)
         {
             ecc_mul(pt_, const_cast<digit_t*>(
             reinterpret_cast<const digit_t*>(scalar.data())),
@@ -312,7 +312,7 @@ namespace apsi
 
             try
             {
-                array<Byte, save_size> buf;
+                array<u8, save_size> buf;
                 encode(pt_, buf.data());
                 stream.write(reinterpret_cast<const char*>(buf.data()), save_size);
             }
@@ -331,7 +331,7 @@ namespace apsi
 
             try
             {
-                array<Byte, save_size> buf;
+                array<u8, save_size> buf;
                 stream.read(reinterpret_cast<char*>(buf.data()), save_size);
                 if (decode(buf.data(), pt_) != ECCRYPTO_SUCCESS)
                 {
@@ -347,12 +347,12 @@ namespace apsi
             stream.exceptions(old_ex_mask);
         }
 
-        void ECPoint::save(gsl::span<Byte, save_size> out)
+        void ECPoint::save(gsl::span<u8, save_size> out)
         {
             encode(pt_, out.data());
         }
 
-        void ECPoint::load(gsl::span<const Byte, save_size> in)
+        void ECPoint::load(gsl::span<const u8, save_size> in)
         {
             if (decode(in.data(), pt_) != ECCRYPTO_SUCCESS)
             {
@@ -360,7 +360,7 @@ namespace apsi
             }
         }
 
-        void ECPoint::extract_hash(gsl::span<Byte, hash_size> out)
+        void ECPoint::extract_hash(gsl::span<u8, hash_size> out)
         {
             memcpy(out.data(), pt_->y, hash_size);
         }

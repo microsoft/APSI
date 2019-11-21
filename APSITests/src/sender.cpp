@@ -36,8 +36,8 @@
 // 			vector<ExFieldElement> v1(10);
 // 			for (int i = 0; i < 10; i++)
 // 				v1[i] = ring->random_element();
-// 			map<uint64_t, vector<ExFieldElement>> r1 = receiver.generate_powers(v1);
-// 			map<uint64_t, vector<Ciphertext>> enc_r1 = receiver.encrypt(r1);
+// 			map<u64, vector<ExFieldElement>> r1 = receiver.generate_powers(v1);
+// 			map<u64, vector<Ciphertext>> enc_r1 = receiver.encrypt(r1);
 
 // 			vector<vector<Ciphertext>> enc_powers;
 // 			sender.compute_all_powers(enc_r1, enc_powers);

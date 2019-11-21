@@ -47,7 +47,7 @@ namespace apsi
 
             inline void clear()
             {
-                oprf_key_ = seal::IntArray<Byte>(
+                oprf_key_ = seal::IntArray<u8>(
                     oprf_key_size,
                     seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true));
             }
@@ -60,7 +60,7 @@ namespace apsi
         private:
             std::shared_ptr<seal::UniformRandomGeneratorFactory> random_{ nullptr };
 
-            seal::IntArray<Byte> oprf_key_{
+            seal::IntArray<u8> oprf_key_{
                 oprf_key_size,
                 seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true) };
         }; // class OPRFKey

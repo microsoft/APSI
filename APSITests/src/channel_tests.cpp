@@ -303,11 +303,11 @@ namespace APSITests
 
         ASSERT_TRUE(preproc != nullptr);
         ASSERT_EQ((size_t)5, preproc->buffer.size());
-        ASSERT_EQ((Byte)1, (Byte)preproc->buffer[0]);
-        ASSERT_EQ((Byte)2, (Byte)preproc->buffer[1]);
-        ASSERT_EQ((Byte)3, (Byte)preproc->buffer[2]);
-        ASSERT_EQ((Byte)4, (Byte)preproc->buffer[3]);
-        ASSERT_EQ((Byte)5, (Byte)preproc->buffer[4]);
+        ASSERT_EQ((u8)1, (u8)preproc->buffer[0]);
+        ASSERT_EQ((u8)2, (u8)preproc->buffer[1]);
+        ASSERT_EQ((u8)3, (u8)preproc->buffer[2]);
+        ASSERT_EQ((u8)4, (u8)preproc->buffer[3]);
+        ASSERT_EQ((u8)5, (u8)preproc->buffer[4]);
 
         clientth.join();
     }
@@ -460,11 +460,11 @@ namespace APSITests
         client_.receive(preprocess_response);
 
         ASSERT_EQ((size_t)5, preprocess_response.buffer.size());
-        ASSERT_EQ((Byte)10, (Byte)preprocess_response.buffer[0]);
-        ASSERT_EQ((Byte)9, (Byte)preprocess_response.buffer[1]);
-        ASSERT_EQ((Byte)8, (Byte)preprocess_response.buffer[2]);
-        ASSERT_EQ((Byte)7, (Byte)preprocess_response.buffer[3]);
-        ASSERT_EQ((Byte)6, (Byte)preprocess_response.buffer[4]);
+        ASSERT_EQ((u8)10, (u8)preprocess_response.buffer[0]);
+        ASSERT_EQ((u8)9, (u8)preprocess_response.buffer[1]);
+        ASSERT_EQ((u8)8, (u8)preprocess_response.buffer[2]);
+        ASSERT_EQ((u8)7, (u8)preprocess_response.buffer[3]);
+        ASSERT_EQ((u8)6, (u8)preprocess_response.buffer[4]);
 
         serverth.join();
     }
@@ -570,7 +570,7 @@ namespace APSITests
                     // Preprocessing will multiply two numbers and add them to the result
                     auto preproc_op = dynamic_pointer_cast<SenderOperationPreprocess>(sender_op);
                     preproc_op->buffer.resize(3);
-                    preproc_op->buffer[2] = (SEAL_BYTE)((Byte)preproc_op->buffer[0] * (Byte)preproc_op->buffer[1]);
+                    preproc_op->buffer[2] = (SEAL_BYTE)((u8)preproc_op->buffer[0] * (u8)preproc_op->buffer[1]);
 
                     sender.send_preprocess_response(preproc_op->client_id, preproc_op->buffer);
                 }
@@ -585,8 +585,8 @@ namespace APSITests
 
                     recv.connect("tcp://localhost:5552");
 
-                    Byte a = static_cast<Byte>(idx) * 2;
-                    Byte b = a + 1;
+                    u8 a = static_cast<u8>(idx) * 2;
+                    u8 b = a + 1;
 
                     for (u32 i = 0; i < 5; i++)
                     {
@@ -598,7 +598,7 @@ namespace APSITests
                         recv.receive(preproc);
 
                         ASSERT_EQ((size_t)3, preproc.buffer.size());
-                        ASSERT_EQ((Byte)(a * b), (Byte)preproc.buffer[2]);
+                        ASSERT_EQ((u8)(a * b), (u8)preproc.buffer[2]);
                     }
 
                 }, i);

@@ -26,7 +26,9 @@ namespace apsi
     using i64 = std::int64_t;
     using u32 = std::uint32_t;
     using i32 = std::int32_t;
-    using Byte = unsigned char; // avoid int8_t, uint8_t, or char
+    using u8 = unsigned char; // avoid uint8_t for aliasing
+    // use char when necessary
+    // use SEAL_BYTE for non-computable raw bytes
 
     using item_type = kuku::item_type;
     extern const item_type zero_item;

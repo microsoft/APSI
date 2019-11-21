@@ -24,19 +24,19 @@ namespace apsi
             static constexpr std::size_t point_size = sizeof(point_t);
             static constexpr std::size_t order_size = sizeof(digit_t) * NWORDS_ORDER;
 
-            using scalar_type = std::array<Byte, order_size>;
+            using scalar_type = std::array<u8, order_size>;
             using scalar_const_type = const scalar_type;
 
-            using scalar_span_type = gsl::span<Byte, order_size>;
-            using scalar_span_const_type = gsl::span<const Byte, order_size>;
+            using scalar_span_type = gsl::span<u8, order_size>;
+            using scalar_span_const_type = gsl::span<const u8, order_size>;
 
             using input_span_const_type =
-                gsl::span<const Byte, gsl::dynamic_extent>;
+                gsl::span<const u8, gsl::dynamic_extent>;
 
             // Output hash size is 120 bits
             static constexpr std::size_t hash_size = 15;
 
-            using hash_span_type = gsl::span<Byte, hash_size>;
+            using hash_span_type = gsl::span<u8, hash_size>;
 
             // Initializes the ECPoint with the neutral element
             ECPoint() = default;
@@ -76,11 +76,11 @@ namespace apsi
 
             void load(std::istream &stream);
 
-            void save(gsl::span<Byte, save_size> out);
+            void save(gsl::span<u8, save_size> out);
 
-            void load(gsl::span<const Byte, save_size> in);
+            void load(gsl::span<const u8, save_size> in);
 
-            void extract_hash(gsl::span<Byte, hash_size> out);
+            void extract_hash(gsl::span<u8, hash_size> out);
 
         private:
             // Initialize to neutral element
