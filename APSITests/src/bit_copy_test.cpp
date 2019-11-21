@@ -43,8 +43,8 @@ namespace APSITests
             u32 destOffset = rd() % (size * 4);
             u32 bitLength = rd() % (size * 4 - 1) + 1;
 
-            char srcVal = (t & 1) * ~0;
-            char destVal = ~srcVal;
+            int srcVal = (t & 1) * ~0;
+            int destVal = ~srcVal;
 
             memset(src.data(), srcVal, src.size());
             memset(dest.data(), destVal, dest.size());

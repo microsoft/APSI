@@ -377,7 +377,7 @@ namespace apsi
                 //Plaintext* sender_coeffs(&sender_db_.batch_random_symm_polys()[split * splitStep + batch * split_size_plus_one]);
 
                 // Iterate over the coeffs multiplying them with the query powers  and summing the results
-                char currResult = 0, curr_label = 0;
+                u8 currResult = 0, curr_label = 0;
 
                 // TODO: optimize this to allow low degree poly? need to take into account noise levels.
 

@@ -561,7 +561,7 @@ namespace apsi
             for (u64 i = thread_idx; i < static_cast<u64>(block_count); i += num_threads)
             {
                 bool has_result = false;
-                std::vector<char> has_label(batch_size);
+                std::vector<u8> has_label(batch_size);
 
                 ResultPackage pkg;
                 {
