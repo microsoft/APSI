@@ -103,7 +103,7 @@ namespace
         f.get();
         Receiver& receiver = *receiver_ptr;
 
-        auto label_bit_length = params.get_label_bit_count();
+        auto label_bit_length = params.label_bit_count();
         auto receiverActualSize = 20;
         auto intersectionSize = 10;
 
@@ -115,7 +115,7 @@ namespace
         }
 
         auto s1 = vector<Item>(senderActualSize);
-        Matrix<u8> labels(senderActualSize, params.get_label_byte_count());
+        Matrix<u8> labels(senderActualSize, params.label_byte_count());
         for (size_t i = 0; i < s1.size(); i++)
         {
             s1[i] = i;

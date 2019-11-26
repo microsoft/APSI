@@ -91,7 +91,7 @@ namespace APSITests
         SenderResponseQuery query_resp;
         shared_ptr<SenderOperation> sender_op;
 
-        PSIParams::PSIConfParams psiconf_params{ 60, true, true, 12345, 120, 10, 20 };
+        PSIParams::PSIConfParams psiconf_params{ 12345, 20, 60, 120, 10, true, true };
         PSIParams::TableParams table_params{ 10, 1, 2, 10, 40 };
         PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
         PSIParams::SEALParams seal_params;
@@ -221,7 +221,7 @@ namespace APSITests
         ASSERT_EQ(expected_total, svr.get_total_data_received());
 
         // get parameters response
-        PSIParams::PSIConfParams psiconf_params{ 60, true, true, 12345, 120, 10, 20 };
+        PSIParams::PSIConfParams psiconf_params{ 12345, 20, 60, 120, 10, true, true };
         PSIParams::TableParams table_params{ 10, 1, 2, 10, 40 };
         PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
         PSIParams::ExFieldParams exfield_params{ 321, 8 };
@@ -361,7 +361,7 @@ namespace APSITests
                 server_.receive(sender_op, /* wait_for_message */ true);
                 ASSERT_EQ(SOP_get_parameters, sender_op->type);
 
-                PSIParams::PSIConfParams psiconf_params{ 60, true, false, 12345, 120, 40, 50 };
+                PSIParams::PSIConfParams psiconf_params{ 12345, 50, 60, 120, 40, true, false };
                 PSIParams::TableParams table_params{ 10, 1, 2, 10, 40, false };
                 PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
                 PSIParams::ExFieldParams exfield_params{ 678910, 8 };

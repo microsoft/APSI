@@ -147,7 +147,7 @@ namespace apsi
             DBInterpolationCache& cache,
             const PSIParams& params)
         {
-            auto mod = params.get_seal_params().encryption_params.plain_modulus().value();
+            auto mod = params.seal_params().encryption_params.plain_modulus().value();
             MemoryPoolHandle local_pool = th_context.pool();
             Position pos;
 
@@ -166,12 +166,12 @@ namespace apsi
 
                         auto& key_item = get_key(pos);
 
-                        temp.encode(gsl::span<u64>{key_item.get_value()}, params.get_label_bit_count());
+                        temp.encode(gsl::span<u64>{key_item.get_value()}, params.label_bit_count());
                         x.set(size, temp);
 
 
                         auto src = get_label(pos);
-                        temp.encode(gsl::span<u8>{src, static_cast<ptrdiff_t>(value_byte_length_)}, params.get_label_bit_count());
+                        temp.encode(gsl::span<u8>{src, static_cast<ptrdiff_t>(value_byte_length_)}, params.label_bit_count());
                         y.set(size, temp);
 
                         ++size;
@@ -202,7 +202,7 @@ namespace apsi
 
                     if (cache.key_set.find(cache.temp_vec[0]) == cache.key_set.end())
                     {
-                        temp.encode(gsl::span<u64>{cache.temp_vec}, params.get_label_bit_count());
+                        temp.encode(gsl::span<u64>{cache.temp_vec}, params.label_bit_count());
 
                         x.set(size, temp);
                         y.set(size, temp);

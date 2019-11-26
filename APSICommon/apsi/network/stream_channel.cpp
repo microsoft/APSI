@@ -94,24 +94,24 @@ namespace apsi
             write_operation_type(SOP_get_parameters);
 
             // PSIConfParams
-            const PSIParams::PSIConfParams& psiconfparams = params.get_psiconf_params();
+            const PSIParams::PSIConfParams& psiconfparams = params.psiconf_params();
             ostream_.write(reinterpret_cast<const char*>(&psiconfparams), sizeof(PSIParams::PSIConfParams));
 
             // TableParams
-            const PSIParams::TableParams& tableparams = params.get_table_params();
+            const PSIParams::TableParams& tableparams = params.table_params();
             ostream_.write(reinterpret_cast<const char*>(&tableparams), sizeof(PSIParams::TableParams));
 
             // CuckooParams
-            const PSIParams::CuckooParams& cuckooparams = params.get_cuckoo_params();
+            const PSIParams::CuckooParams& cuckooparams = params.cuckoo_params();
             ostream_.write(reinterpret_cast<const char*>(&cuckooparams), sizeof(PSIParams::CuckooParams));
 
             // SEALParams
             u32 maxsd = params.max_supported_degree();
-            params.get_seal_params().encryption_params.save(ostream_);
+            params.seal_params().encryption_params.save(ostream_);
             ostream_.write(reinterpret_cast<const char*>(&maxsd), sizeof(u32));
 
             // ExFieldParams
-            const PSIParams::ExFieldParams& exfieldparams = params.get_exfield_params();
+            const PSIParams::ExFieldParams& exfieldparams = params.exfield_params();
             ostream_.write(reinterpret_cast<const char*>(&exfieldparams), sizeof(PSIParams::ExFieldParams));
 
             bytes_sent_ += sizeof(PSIParams::PSIConfParams);

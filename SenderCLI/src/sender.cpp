@@ -115,7 +115,7 @@ void run_sender_dispatcher(const CLP& cmd)
     Log::debug("FPrate = %f", params.log_fp_rate());
 
 
-    auto coeffmod = params.get_seal_params().encryption_params.coeff_modulus();
+    auto coeffmod = params.seal_params().encryption_params.coeff_modulus();
     size_t bits = 0; 
     for (size_t i = 0; i < coeffmod.size(); i++)
         bits += coeffmod[i].bit_count(); 

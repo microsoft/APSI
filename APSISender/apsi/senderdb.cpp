@@ -56,7 +56,7 @@ namespace apsi
             Log::debug("split size = %i", split_size); 
             Log::debug("number of ciphertexts in senderdb = %i", num_ctxts);
             Log::debug("number of hash functions = %i", params_.hash_func_count());
-            u32 byte_length = round_up_to(params_.get_label_bit_count(), 8u) / 8;
+            u32 byte_length = round_up_to(params_.label_bit_count(), 8u) / 8;
             u64 nb = params_.batch_count();
 
             // here, need to make split count larger to fit
@@ -133,7 +133,7 @@ namespace apsi
         {
             STOPWATCH(sender_stop_watch, "SenderDB::add_data");
 
-            if (values.stride() != params_.get_label_byte_count())
+            if (values.stride() != params_.label_byte_count())
                 throw invalid_argument("unexpacted label length");
 
             vector<thread> thrds(thread_count);
@@ -211,7 +211,7 @@ namespace apsi
                 if (params_.use_labels())
                 {
                     auto dest = db_block.get_label(pos);
-                    memcpy(dest, values[i].data(), params_.get_label_byte_count());
+                    memcpy(dest, values[i].data(), params_.label_byte_count());
                 }
             }
 
@@ -307,7 +307,7 @@ namespace apsi
                         if (params_.use_labels())
                         {
                             auto dest = db_block.get_label(pos);
-                            memcpy(dest, values[i].data(), params_.get_label_byte_count());
+                            memcpy(dest, values[i].data(), params_.label_byte_count());
                         }
                     }
                 }
@@ -427,7 +427,7 @@ namespace apsi
         {
             auto &mod = params_.encryption_params().plain_modulus();
 
-            DBInterpolationCache cache(ex_batch_encoder, params_.batch_size(), params_.split_size(), params_.get_label_byte_count());
+            DBInterpolationCache cache(ex_batch_encoder, params_.batch_size(), params_.split_size(), params_.label_byte_count());
             // minus 1 to be safe.
             auto coeffBitCount = seal::util::get_significant_bit_count(mod.value()) - 1;
             u64 degree = 1;
@@ -437,7 +437,7 @@ namespace apsi
                 degree = ex_batch_encoder->d();
             }
 
-            if (params_.get_label_bit_count() >= coeffBitCount * degree)
+            if (params_.label_bit_count() >= coeffBitCount * degree)
             {
                 throw runtime_error("labels are too large for exfield.");
             }

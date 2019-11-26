@@ -60,7 +60,7 @@ namespace APSITests
         StreamChannel senderchannel(/* istream */ stream1, /* ostream */ stream2);
         StreamChannel receiverchannel(/* istream */ stream2, /* ostream */ stream1);
 
-        PSIParams::PSIConfParams psiconf_params{ 60, false, false, 12345, 90, 45, 128 };
+        PSIParams::PSIConfParams psiconf_params{ 12345, 128, 60, 90, 45, false, false };
         PSIParams::TableParams table_params{ 10, 1, 2, 35, 40, true };
         PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
         PSIParams::ExFieldParams exfield_params{ 678910, 8 };

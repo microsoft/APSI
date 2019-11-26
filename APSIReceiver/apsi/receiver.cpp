@@ -499,7 +499,7 @@ namespace apsi
 
             if (get_params().use_labels())
             {
-                ret_labels.resize(items.size(), get_params().get_label_byte_count());
+                ret_labels.resize(items.size(), get_params().label_byte_count());
             }
 
             int num_of_splits = get_params().split_count(),
@@ -628,7 +628,7 @@ namespace apsi
                             auto idx = table_to_input_map[base_idx + k];
                             Log::debug("Found label at thread_idx: %i, base_idx: %i, k: %i, idx: %i", thread_idx, base_idx, k, idx);
 
-                            batch->get(k).decode(ret_labels[idx], get_params().get_label_bit_count());
+                            batch->get(k).decode(ret_labels[idx], get_params().label_bit_count());
                         }
                     }
                 }
