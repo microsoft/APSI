@@ -153,20 +153,23 @@ namespace apsi
             Log::info("Receiver starting full query");
 
             // OPRF
-            STOPWATCH(recv_stop_watch, "Receiver::OPRF");
-            Log::info("OPRF processing");
+            // This block is used so the Receiver::OPRF stopwatch measures only OPRF, and nothing else
+            { 
+                STOPWATCH(recv_stop_watch, "Receiver::OPRF");
+                Log::info("OPRF processing");
 
-            vector<SEAL_BYTE> items_buffer;
-            obfuscate_items(items, items_buffer);
+                vector<SEAL_BYTE> items_buffer;
+                obfuscate_items(items, items_buffer);
 
-            // Send obfuscated buffer to Sender
-            chl.send_preprocess(items_buffer);
+                // Send obfuscated buffer to Sender
+                chl.send_preprocess(items_buffer);
 
-            // Get response and remove our obfuscation
-            SenderResponsePreprocess preprocess_resp;
-            chl.receive(preprocess_resp);
+                // Get response and remove our obfuscation
+                SenderResponsePreprocess preprocess_resp;
+                chl.receive(preprocess_resp);
 
-            deobfuscate_items(items, preprocess_resp.buffer);
+                deobfuscate_items(items, preprocess_resp.buffer);
+            }
 
             // Then get encrypted query
             auto& encrypted_query = query(items);
