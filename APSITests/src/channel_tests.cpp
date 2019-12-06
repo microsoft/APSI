@@ -237,7 +237,7 @@ namespace APSITests
         expected_total += sizeof(PSIParams::PSIConfParams);
         expected_total += sizeof(PSIParams::TableParams);
         expected_total += sizeof(PSIParams::CuckooParams);
-        expected_total += sizeof(PSIParams::SEALParams);
+        expected_total += sizeof(u64) + sizeof(u64) + sizeof(u32);//sizeof(PSIParams::SEALParams);
         expected_total += sizeof(PSIParams::ExFieldParams);
         ASSERT_EQ(expected_total, svr.get_total_data_sent());
 

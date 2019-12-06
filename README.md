@@ -17,7 +17,6 @@ Fast asymmetric PSI library
         ```
         git clone git@github.com:log4cplus/log4cplus.git --recurse-submodules
         cd log4cplus
-        git checkout 2.0.x
         ./configure
         cmake .
         sudo make install -j

@@ -144,13 +144,13 @@ namespace apsi
             size_t idx = 1;
 
             // PSIConfParams
+            response.psiconf_params.sender_size = msg.get<u64>(idx++);
+            response.psiconf_params.sender_bin_size = msg.get<u64>(idx++);
             response.psiconf_params.item_bit_count = msg.get<u32>(idx++);
+            response.psiconf_params.item_bit_length_used_after_oprf = msg.get<u32>(idx++);
+            response.psiconf_params.num_chunks = msg.get<u32>(idx++);
             response.psiconf_params.use_labels = msg.get<bool>(idx++);
             response.psiconf_params.use_fast_membership = msg.get<bool>(idx++);
-            response.psiconf_params.sender_size = msg.get<u64>(idx++);
-            response.psiconf_params.num_chunks = msg.get<u32>(idx++);
-            response.psiconf_params.sender_bin_size = msg.get<u64>(idx++);
-            response.psiconf_params.item_bit_length_used_after_oprf = msg.get<u32>(idx++);
 
             // TableParams
             response.table_params.log_table_size = msg.get<u32>(idx++);
@@ -184,7 +184,7 @@ namespace apsi
             bytes_received_ += sizeof(PSIParams::PSIConfParams);
             bytes_received_ += sizeof(PSIParams::TableParams);
             bytes_received_ += sizeof(PSIParams::CuckooParams);
-            bytes_received_ += sizeof(PSIParams::SEALParams);
+            bytes_received_ += sizeof(u64) + sizeof(u64) + sizeof(u32);//sizeof(PSIParams::SEALParams);
             bytes_received_ += sizeof(PSIParams::ExFieldParams);
         }
 
@@ -280,13 +280,13 @@ namespace apsi
             add_message_type(type, msg);
 
             // PSIConfParams
+            msg.add(params.sender_size());
+            msg.add(params.sender_bin_size());
             msg.add(params.item_bit_count());
+            msg.add(params.item_bit_length_used_after_oprf());
+            msg.add(params.num_chunks());
             msg.add(params.use_labels());
             msg.add(params.use_fast_membership());
-            msg.add(params.sender_size());
-            msg.add(params.num_chunks());
-            msg.add(params.sender_bin_size());
-            msg.add(params.item_bit_length_used_after_oprf());
 
             // TableParams
             msg.add(params.log_table_size());
@@ -318,7 +318,7 @@ namespace apsi
             bytes_sent_ += sizeof(PSIParams::PSIConfParams);
             bytes_sent_ += sizeof(PSIParams::TableParams);
             bytes_sent_ += sizeof(PSIParams::CuckooParams);
-            bytes_sent_ += sizeof(PSIParams::SEALParams);
+            bytes_sent_ += sizeof(u64) + sizeof(u64) + sizeof(u32); //sizeof(PSIParams::SEALParams);
             bytes_sent_ += sizeof(PSIParams::ExFieldParams);
         }
 
