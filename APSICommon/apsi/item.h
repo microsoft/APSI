@@ -47,13 +47,13 @@ namespace apsi
         Convert this item into an exfield element. Assuming that this item has been reduced in a hash table,
         we will only use 'reduced_bit_length_' bits of this item.
         */
-        FFieldElt to_exfield_element(FField exfield, int bit_length);
+        FFieldElt to_ffield_element(FField exfield, int bit_length);
 
         /**
         Convert this item into the specified exfield element. Assuming that this item has been reduced in a hash table,
         we will only use 'reduced_bit_length_' bits of this item.
         */
-        void to_exfield_element(FFieldElt &ring_item, int bit_length);
+        void to_ffield_element(FFieldElt &ring_item, int bit_length);
 
         Item& operator =(const std::string &assign);
 

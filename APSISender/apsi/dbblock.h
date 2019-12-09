@@ -11,7 +11,7 @@
 // APSI
 #include "apsi/item.h"
 #include "apsi/senderthreadcontext.h"
-#include "apsi/ffield/ffield_fast_batch_encoder.h"
+#include "apsi/ffield/ffield_batch_encoder.h"
 
 // SEAL
 #include "seal/plaintext.h"
@@ -25,12 +25,11 @@ namespace apsi
         struct DBInterpolationCache
         {
             DBInterpolationCache(
-                std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
+                std::shared_ptr<FFieldBatchEncoder> ex_batch_encoder,
                 int batch_size,
                 int items_per_split,
-                int value_byte_length
+                int value_byte_count
             );
-
 
             std::vector<std::vector<FFieldArray>> div_diff_temp;
             std::vector<FFieldArray> coeff_temp, x_temp, y_temp;
@@ -125,7 +124,7 @@ namespace apsi
                 SenderThreadContext &th_context,
                 std::shared_ptr<seal::SEALContext> seal_context,
                 std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
+                std::shared_ptr<FFieldBatchEncoder> ex_batch_encoder,
                 DBInterpolationCache &cache,
                 const PSIParams &params);
 

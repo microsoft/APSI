@@ -56,7 +56,7 @@ namespace apsi
             FField field(
                 SmallModulus(params_.exfield_characteristic()),
                 params_.exfield_degree());
-            ex_batch_encoder_ = make_shared<FFieldFastBatchEncoder>(
+            ex_batch_encoder_ = make_shared<FFieldBatchEncoder>(
                 seal_context_, field);
 
             // Create SenderDB

@@ -4,14 +4,14 @@
 #include <iostream>
 #include <seal/util/common.h>
 #include <seal/util/uintcore.h>
-#include "apsi/ffield/ffield_fast_batch_encoder.h"
+#include "apsi/ffield/ffield_batch_encoder.h"
 
 using namespace std;
 using namespace seal;
 
 namespace apsi
 {
-    FFieldFastBatchEncoder::FFieldFastBatchEncoder(
+    FFieldBatchEncoder::FFieldBatchEncoder(
         shared_ptr<SEALContext> context, FField field) :
         encoder_(make_unique<BatchEncoder>(context)),
         field_(field),
@@ -27,7 +27,7 @@ namespace apsi
         } 
     }
 
-    void FFieldFastBatchEncoder::compose(const FFieldArray &values, Plaintext &destination) const
+    void FFieldBatchEncoder::compose(const FFieldArray &values, Plaintext &destination) const
     {
         if (values.size_ != slot_count_)
         {
@@ -40,7 +40,7 @@ namespace apsi
         encoder_->encode(values.array_, destination);
     }
 
-    void FFieldFastBatchEncoder::decompose(const Plaintext &plain, FFieldArray &destination) const
+    void FFieldBatchEncoder::decompose(const Plaintext &plain, FFieldArray &destination) const
     {
         if (destination.size_ != slot_count_)
         {

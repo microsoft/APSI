@@ -11,7 +11,7 @@
 // APSI
 #include "apsi/item.h"
 #include "apsi/psiparams.h"
-#include "apsi/ffield/ffield_fast_batch_encoder.h"
+#include "apsi/ffield/ffield_batch_encoder.h"
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/tools/sealcompress.h"
 #include "apsi/tools/matrix.h"
@@ -202,7 +202,7 @@ namespace apsi
                 return field_;
             }
 
-            std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder() const
+            std::shared_ptr<FFieldBatchEncoder> ex_batch_encoder() const
             {
                 return ex_batch_encoder_;
             }
@@ -237,7 +237,7 @@ namespace apsi
 
             std::unique_ptr<seal::Decryptor> decryptor_;
 
-            std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder_;
+            std::shared_ptr<FFieldBatchEncoder> ex_batch_encoder_;
 
             i32 slot_count_;
 

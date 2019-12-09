@@ -18,7 +18,7 @@
 #include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_elt.h"
 #include "apsi/ffield/ffield_array.h"
-#include "apsi/ffield/ffield_fast_batch_encoder.h"
+#include "apsi/ffield/ffield_batch_encoder.h"
 #include "apsi/tools/matrixview.h"
 #include "apsi/tools/matrix.h"
 
@@ -87,14 +87,14 @@ namespace apsi
                 int start_block,
                 int end_block,
                 std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<FFieldFastBatchEncoder> batch_encoder);
+                std::shared_ptr<FFieldBatchEncoder> batch_encoder);
 
             void batched_interpolate_polys(
                 SenderThreadContext& th_context,
                 int start_block,
                 int end_block,
                 std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<FFieldFastBatchEncoder> batch_encoder);
+                std::shared_ptr<FFieldBatchEncoder> batch_encoder);
 
             DBBlock& get_block(int batch, int split)
             {

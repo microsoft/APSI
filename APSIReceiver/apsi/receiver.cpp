@@ -95,7 +95,7 @@ namespace apsi
             generator.relin_keys_save(relin_keys_ss, compr_mode_type::deflate);
             relin_keys_ = relin_keys_ss.str();
 
-            ex_batch_encoder_ = make_shared<FFieldFastBatchEncoder>(seal_context_, *field_);
+            ex_batch_encoder_ = make_shared<FFieldBatchEncoder>(seal_context_, *field_);
 
             Log::info("Receiver initialized");
         }
@@ -291,7 +291,7 @@ namespace apsi
                 Log::info("Using repeated encoding for single query");
                 for (size_t i = 0; i < get_params().table_size(); i++)
                 {
-                    exfield_items->set(i, items[0].to_exfield_element(*field_, item_bit_count));
+                    exfield_items->set(i, items[0].to_ffield_element(*field_, item_bit_count));
                 }
             }
 
@@ -388,11 +388,11 @@ namespace apsi
 
             for (size_t i = 0; i < cuckoo.table_size(); i++)
             {
-                ret.set(i, Item(encodings[i]).to_exfield_element(ret.field(), item_bit_count));
+                ret.set(i, Item(encodings[i]).to_ffield_element(ret.field(), item_bit_count));
             }
 
             auto empty_field_item = Item(cuckoo.empty_item())
-                .to_exfield_element(ret.field(), item_bit_count);
+                .to_ffield_element(ret.field(), item_bit_count);
             for (size_t i = cuckoo.table_size(); i < ret.size(); i++)
             {
                 ret.set(i, empty_field_item);

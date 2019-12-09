@@ -10,8 +10,6 @@ target_sources(unit_tests
         ${CMAKE_CURRENT_LIST_DIR}/item.cpp
         ${CMAKE_CURRENT_LIST_DIR}/matrix_tests.cpp
         ${CMAKE_CURRENT_LIST_DIR}/oprf_tests.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/receiver.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/sender.cpp
         ${CMAKE_CURRENT_LIST_DIR}/stopwatch_tests.cpp
         ${CMAKE_CURRENT_LIST_DIR}/stream_channel_tests.cpp
         ${CMAKE_CURRENT_LIST_DIR}/unit_tests_runner.cpp

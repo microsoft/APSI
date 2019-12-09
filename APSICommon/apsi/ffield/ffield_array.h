@@ -4,12 +4,15 @@
 #pragma once
 
 #include "apsi/ffield/ffield_elt.h"
+#include <cstddef>
+#include <algorithm>
+#include <stdexcept>
 
 namespace apsi
 {
     class FFieldArray
     {
-        friend class FFieldFastBatchEncoder;
+        friend class FFieldBatchEncoder;
 
     public:
         FFieldArray(std::size_t size, FField field) : 
@@ -17,7 +20,7 @@ namespace apsi
             field_(field)
         {
             // Initialize array
-            array_.resize(static_cast<size_t>(field_.d_ * size_), 0);
+            array_.resize(static_cast<std::size_t>(field_.d_ * size_), 0);
         }
 
         FFieldArray(const FFieldArray &copy) = default;
@@ -29,7 +32,7 @@ namespace apsi
 
         inline FFieldElt get(std::size_t index) const
         {
-#ifndef NDEBUG
+#ifdef APSI_DEBUG
             if (index >= size_)
             {
                 throw std::out_of_range("index");
@@ -40,7 +43,7 @@ namespace apsi
 
         inline _ffield_elt_coeff_t get_coeff_of(std::size_t index, std::size_t coeff) const
         {
-#ifndef NDEBUG
+#ifdef APSI_DEBUG
             if (index >= size_)
             {
                 throw std::out_of_range("index");
@@ -55,7 +58,7 @@ namespace apsi
 
         inline void set(std::size_t index, const FFieldElt &in)
         {
-#ifndef NDEBUG
+#ifdef APSI_DEBUG
             if (index >= size_)
             {
                 throw std::out_of_range("index");
@@ -70,7 +73,7 @@ namespace apsi
 
         inline void set(std::size_t dest_index, std::size_t src_index, const FFieldArray &in)
         {
-#ifndef NDEBUG
+#ifdef APSI_DEBUG
             if (dest_index >= size_)
             {
                 throw std::out_of_range("dest_index");
@@ -90,7 +93,7 @@ namespace apsi
         inline void set_coeff_of(
             std::size_t index, std::size_t coeff, _ffield_elt_coeff_t value)
         {
-#ifndef NDEBUG
+#ifdef APSI_DEBUG
             if (index >= size_)
             {
                 throw std::out_of_range("index");
@@ -105,52 +108,13 @@ namespace apsi
 
         inline void set_zero(std::size_t index)
         {
-#ifndef NDEBUG
+#ifdef APSI_DEBUG
             if (index >= size_)
             {
                 throw std::out_of_range("index");
             }
 #endif
             std::fill_n(data(index), field_.d_, 0);
-        }
-
-        inline void set_random(std::shared_ptr<seal::UniformRandomGeneratorFactory> rg)
-        {
-            auto random = rg->create();
-            constexpr auto max_int = std::numeric_limits<_ffield_elt_coeff_t>::max(); 
-            _ffield_elt_coeff_t max_value = max_int - max_int % field_.ch_.value();
-            for (std::size_t i = 0; i < array_.size(); i++)
-            {
-                // Rejection sampling
-                _ffield_elt_coeff_t temp_value;
-                do
-                {
-                    random->generate(
-                        sizeof(_ffield_elt_coeff_t),
-                        reinterpret_cast<seal::SEAL_BYTE*>(&temp_value));
-                } while(temp_value > max_value);
-                array_[i] = temp_value % field_.ch_.value();
-            }
-        }
-
-        inline void set_random_nonzero(
-            std::shared_ptr<seal::UniformRandomGeneratorFactory> rg)
-        {
-            auto random = rg->create();
-            constexpr auto max_int = std::numeric_limits<_ffield_elt_coeff_t>::max(); 
-            _ffield_elt_coeff_t max_value = max_int - max_int % field_.ch_.value();
-            for (std::size_t i = 0; i < array_.size(); i++)
-            {
-                // Rejection sampling
-                _ffield_elt_coeff_t temp_value;
-                do
-                {
-                    random->generate(
-                        sizeof(_ffield_elt_coeff_t),
-                        reinterpret_cast<seal::SEAL_BYTE*>(&temp_value));
-                } while(temp_value > max_value || !temp_value);
-                array_[i] = temp_value % field_.ch_.value();
-            }
         }
 
         inline bool is_zero() const
@@ -167,7 +131,7 @@ namespace apsi
 
         inline void set(const FFieldArray &in) 
         {
-#ifndef NDEBUG
+#ifdef APSI_DEBUG
             if (in.size_ != size_)
             {
                 throw std::out_of_range("size mismatch");
@@ -182,7 +146,7 @@ namespace apsi
 
         inline bool equals(const FFieldArray &in) const
         {
-#ifndef NDEBUG
+#ifdef APSI_DEBUG
             if (in.size_ != size_)
             {
                 throw std::out_of_range("size mismatch");
@@ -202,7 +166,7 @@ namespace apsi
 
         inline void add(FFieldArray &out, const FFieldArray &in) const
         {
-#ifndef NDEBUG
+#ifdef APSI_DEBUG
             if (in.size_ != size_ || out.size_ != size_)
             {
                 throw std::out_of_range("size mismatch");
@@ -219,7 +183,7 @@ namespace apsi
 
         inline void sub(FFieldArray &out, const FFieldArray &in) const
         {
-#ifndef NDEBUG
+#ifdef APSI_DEBUG
             if (in.size_ != size_ || out.size_ != size_)
             {
                 throw std::out_of_range("size mismatch");
@@ -236,7 +200,7 @@ namespace apsi
 
         inline void mul(FFieldArray &out, const FFieldArray &in) const
         {
-#ifndef NDEBUG
+#ifdef APSI_DEBUG
             if (in.size_ != size_ || out.size_ != size_)
             {
                 throw std::out_of_range("size mismatch");
@@ -253,7 +217,7 @@ namespace apsi
 
         inline void div(FFieldArray &out, const FFieldArray &in) const
         {
-#ifndef NDEBUG
+#ifdef APSI_DEBUG
             if (in.size_ != size_ || out.size_ != size_)
             {
                 throw std::out_of_range("size mismatch");
@@ -276,7 +240,7 @@ namespace apsi
 
         inline void inv(FFieldArray &out) const
         {
-#ifndef NDEBUG
+#ifdef APSI_DEBUG
             if (out.size_ != size_)
             {
                 throw std::out_of_range("size mismatch");
@@ -287,7 +251,8 @@ namespace apsi
             }
 #endif
             const seal::SmallModulus &ch = field_.ch_;
-            std::transform(array_.cbegin(), array_.cend(), out.array_.begin(), [&ch](auto a) {
+            std::transform(array_.cbegin(), array_.cend(), out.array_.begin(),
+                [&ch](auto a) {
                     _ffield_elt_coeff_t inv;
                     if (!seal::util::try_invert_uint_mod(a, ch, inv)) {
                         throw std::logic_error("division by zero");
@@ -303,7 +268,7 @@ namespace apsi
 
         inline void neg(FFieldArray &out) const
         {
-#ifndef NDEBUG
+#ifdef APSI_DEBUG
             if (out.size_ != size_)
             {
                 throw std::out_of_range("size mismatch");
@@ -325,7 +290,7 @@ namespace apsi
 
         inline void sq(FFieldArray &out) const
         {
-#ifndef NDEBUG
+#ifdef APSI_DEBUG
             if (out.size_ != size_)
             {
                 throw std::out_of_range("size mismatch");

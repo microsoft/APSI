@@ -22,7 +22,7 @@
 #include "apsi/sendersessioncontext.h"
 #include "apsi/senderthreadcontext.h"
 #include "apsi/ffield/ffield.h"
-#include "apsi/ffield/ffield_fast_batch_encoder.h"
+#include "apsi/ffield/ffield_batch_encoder.h"
 #include "apsi/tools/sealcompress.h"
 #include "apsi/tools/matrixview.h"
 #include "apsi/network/channel.h"
@@ -235,7 +235,7 @@ namespace apsi
 
             std::shared_ptr<seal::Evaluator> evaluator_;
 
-            std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder_;
+            std::shared_ptr<FFieldBatchEncoder> ex_batch_encoder_;
 
             // Objects for compressed ciphertexts
             std::shared_ptr<CiphertextCompressor> compressor_;

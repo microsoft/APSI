@@ -21,12 +21,12 @@ namespace apsi
 
     Item::Item(const string &str)
     {
-        operator=(str);
+        operator =(str);
     }
 
     Item::Item(u64 item)
     {
-        operator=(item);
+        operator =(item);
     }
 
     Item &Item::operator =(u64 assign)
@@ -74,10 +74,10 @@ namespace apsi
         return *this;
     }
 
-    FFieldElt Item::to_exfield_element(FField exfield, int bit_length)
+    FFieldElt Item::to_ffield_element(FField exfield, int bit_length)
     {
         FFieldElt ring_item(exfield);
-        to_exfield_element(ring_item, bit_length);
+        to_ffield_element(ring_item, bit_length);
         return ring_item;
     }
 
@@ -105,7 +105,7 @@ namespace apsi
     }
 
 
-    void Item::to_exfield_element(FFieldElt &ring_item, int bit_length)
+    void Item::to_ffield_element(FFieldElt &ring_item, int bit_length)
     {
         auto exfield = ring_item.field();
 

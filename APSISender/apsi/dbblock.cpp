@@ -110,7 +110,7 @@ namespace apsi
                     }
                     else
                     {
-                        get_key(pos).to_exfield_element(temp11, encoding_bit_length);
+                        get_key(pos).to_ffield_element(temp11, encoding_bit_length);
 
                         temp1 = &temp11;
                         temp1->neg();
@@ -143,7 +143,7 @@ namespace apsi
             SenderThreadContext &th_context,
             shared_ptr<SEALContext> seal_context,
             shared_ptr<Evaluator> evaluator,
-            shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
+            shared_ptr<FFieldBatchEncoder> ex_batch_encoder,
             DBInterpolationCache& cache,
             const PSIParams& params)
         {
@@ -162,13 +162,10 @@ namespace apsi
                 {
                     if (has_item(pos))
                     {
-
-
                         auto& key_item = get_key(pos);
 
                         temp.encode(gsl::span<u64>{key_item.get_value()}, params.label_bit_count());
                         x.set(size, temp);
-
 
                         auto src = get_label(pos);
                         temp.encode(gsl::span<u8>{src, static_cast<ptrdiff_t>(value_byte_length_)}, params.label_bit_count());
@@ -196,8 +193,7 @@ namespace apsi
                 {
                     if (cache.temp_vec[0] >= mod)
                     {
-                        std::cout << cache.temp_vec[0] << " >= " << mod;
-                        throw std::runtime_error("");
+                        throw std::runtime_error(to_string(cache.temp_vec[0]) + " >= " + to_string(mod));
                     }
 
                     if (cache.key_set.find(cache.temp_vec[0]) == cache.key_set.end())
@@ -211,7 +207,6 @@ namespace apsi
 
                     ++cache.temp_vec[0];
                 }
-
 
                 ffield_newton_interpolate_poly(
                     x, y,
@@ -227,33 +222,22 @@ namespace apsi
             FFieldArray temp_array(ex_batch_encoder->create_array());
             for (int s = 0; s < items_per_split_; s++)
             {
-                Plaintext &batched_coeff = batched_label_coeffs_[s];
-
-                // transpose the coeffs into temp_array
+                // Transpose the coeffs into temp_array
                 for (i64 b = 0; b < items_per_batch_; b++)
                 {
-                    for (u64 c = 0; c < degree; ++c)
-                        temp_array.set_coeff_of(
-                            static_cast<size_t>(b),
-                            static_cast<size_t>(c),
-                            cache.coeff_temp[static_cast<size_t>(b)].get_coeff_of(
-                                static_cast<size_t>(s),
-                                static_cast<size_t>(c)));
+                    for (u64 c = 0; c < degree; c++)
+                    {
+                        // Set FROM cache.coeff_temp[b] location s TO temp_array location b
+                        temp_array.set(b, s, cache.coeff_temp[static_cast<size_t>(b)]);
+                    }
                 }
 
-                auto capacity = static_cast<size_t>(params.encryption_params().coeff_modulus().size() *
-                    params.encryption_params().poly_modulus_degree());
-                batched_coeff.reserve(capacity);
-
+                Plaintext &batched_coeff = batched_label_coeffs_[s];
                 ex_batch_encoder->compose(temp_array, batched_coeff);
-
-                // Log::debug("s = %i, is_zero = %i", s, batched_coeff.is_zero()); 
-
-
+#ifdef APSI_DEBUG
                 Position temppos;
                 temppos.split_offset = s;
 
-                // Debug
                 for (int j = 0; j < items_per_batch_; j++) {
                     temppos.batch_offset = j; 
                     if (has_item(temppos) && split_idx_ == 1) {
@@ -261,33 +245,30 @@ namespace apsi
                         Log::debug("label for this item is 0x%llx", get_label_u64(temppos));
                     }
                 }
-                cout << endl;
-
-
-
+#endif
                 evaluator->transform_to_ntt_inplace(batched_coeff, seal_context->first_parms_id());
             }
         }
 
         DBInterpolationCache::DBInterpolationCache(
-            std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
-            int items_per_batch_,
-            int items_per_split_,
-            int value_byte_length_)
+            std::shared_ptr<FFieldBatchEncoder> ex_batch_encoder,
+            int items_per_batch,
+            int items_per_split,
+            int value_byte_count)
         {
-            coeff_temp.reserve(items_per_batch_);
-            x_temp.reserve(items_per_batch_);
-            y_temp.reserve(items_per_batch_);
+            coeff_temp.reserve(items_per_batch);
+            x_temp.reserve(items_per_batch);
+            y_temp.reserve(items_per_batch);
 
-            for (u64 i = 0; i < items_per_batch_; ++i)
+            for (u64 i = 0; i < items_per_batch; ++i)
             {
-                coeff_temp.emplace_back(items_per_split_, ex_batch_encoder->field());
-                x_temp.emplace_back(items_per_split_, ex_batch_encoder->field());
-                y_temp.emplace_back(items_per_split_, ex_batch_encoder->field());
+                coeff_temp.emplace_back(items_per_split, ex_batch_encoder->field());
+                x_temp.emplace_back(items_per_split, ex_batch_encoder->field());
+                y_temp.emplace_back(items_per_split, ex_batch_encoder->field());
             }
 
-            temp_vec.resize((value_byte_length_ + sizeof(u64)) / sizeof(u64), 0);
-            key_set.reserve(items_per_split_);
+            temp_vec.resize((value_byte_count + sizeof(u64)) / sizeof(u64), 0);
+            key_set.reserve(items_per_split);
         }
     } // namespace sender
 } // namespace apsi

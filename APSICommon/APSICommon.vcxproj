@@ -170,7 +170,7 @@
     <ClInclude Include="apsi\ffield\ffield.h" />
     <ClInclude Include="apsi\ffield\ffield_array.h" />
     <ClInclude Include="apsi\ffield\ffield_elt.h" />
-    <ClInclude Include="apsi\ffield\ffield_fast_batch_encoder.h" />
+    <ClInclude Include="apsi\ffield\ffield_batch_encoder.h" />
     <ClInclude Include="apsi\item.h" />
     <ClInclude Include="apsi\logging\log.h" />
     <ClInclude Include="apsi\network\channel.h" />
@@ -204,7 +204,7 @@
     <ClCompile Include="apsi\apsidefines.cpp" />
     <ClCompile Include="apsi\ffield\ffield.cpp" />
     <ClCompile Include="apsi\ffield\ffield_elt.cpp" />
-    <ClCompile Include="apsi\ffield\ffield_fast_batch_encoder.cpp" />
+    <ClCompile Include="apsi\ffield\ffield_batch_encoder.cpp" />
     <ClCompile Include="apsi\item.cpp" />
     <ClCompile Include="apsi\logging\log.cpp" />
     <ClCompile Include="apsi\network\network_channel.cpp" />

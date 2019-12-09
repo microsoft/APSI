@@ -42,7 +42,7 @@ namespace apsi
             Log::debug("encoding bit length = %i", encoding_bit_length_); 
 
             // Create the null ExFieldElement (note: encoding truncation affects high bits)
-            null_element_ = sender_null_item_.to_exfield_element(field_, encoding_bit_length_);
+            null_element_ = sender_null_item_.to_ffield_element(field_, encoding_bit_length_);
             neg_null_element_ = -null_element_;
 
             int batch_size = params_.batch_size();
@@ -353,7 +353,7 @@ namespace apsi
             int start_block,
             int end_block,
             shared_ptr<Evaluator> evaluator,
-            shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder)
+            shared_ptr<FFieldBatchEncoder> ex_batch_encoder)
         {
             // Get the symmetric block
             auto symm_block = context.symm_block();
@@ -423,12 +423,13 @@ namespace apsi
             int start_block,
             int end_block,
             shared_ptr<Evaluator> evaluator,
-            shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder)
+            shared_ptr<FFieldBatchEncoder> ex_batch_encoder)
         {
             auto &mod = params_.encryption_params().plain_modulus();
 
             DBInterpolationCache cache(ex_batch_encoder, params_.batch_size(), params_.split_size(), params_.label_byte_count());
-            // minus 1 to be safe.
+
+            // Minus 1 to be safe.
             auto coeffBitCount = seal::util::get_significant_bit_count(mod.value()) - 1;
             u64 degree = 1;
 

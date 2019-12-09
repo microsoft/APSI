@@ -10,10 +10,10 @@
 
 namespace apsi
 {
-    class FFieldFastBatchEncoder
+    class FFieldBatchEncoder
     {
     public:
-        FFieldFastBatchEncoder(
+        FFieldBatchEncoder(
             std::shared_ptr<seal::SEALContext> context, FField field);
 
         inline seal::SmallModulus ch() const
@@ -66,5 +66,5 @@ namespace apsi
         const int log_n_;
         const u64 m_;
         const u64 slot_count_;
-    }; // class FFieldFastBatchEncoder
+    }; // class FFieldBatchEncoder
 } // namespace apsi

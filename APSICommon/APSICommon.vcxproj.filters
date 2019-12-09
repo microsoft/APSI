@@ -96,7 +96,7 @@
     <ClInclude Include="apsi\tools\prng.h">
       <Filter>Header Files\tools</Filter>
     </ClInclude>
-    <ClInclude Include="apsi\ffield\ffield_fast_batch_encoder.h">
+    <ClInclude Include="apsi\ffield\ffield_batch_encoder.h">
       <Filter>Header Files\ffield</Filter>
     </ClInclude>
     <ClInclude Include="apsi\network\channel.h">
@@ -185,7 +185,7 @@
     <ClCompile Include="apsi\tools\sealcompress.cpp">
       <Filter>Source Files\tools</Filter>
     </ClCompile>
-    <ClCompile Include="apsi\ffield\ffield_fast_batch_encoder.cpp">
+    <ClCompile Include="apsi\ffield\ffield_batch_encoder.cpp">
       <Filter>Source Files\ffield</Filter>
     <ClCompile Include="apsi\tools\utils.cpp">
       <Filter>Source Files\tools</Filter>

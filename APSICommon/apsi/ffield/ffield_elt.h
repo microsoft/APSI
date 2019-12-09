@@ -9,7 +9,6 @@
 #include <gsl/span>
 #include <seal/util/uintarithsmallmod.h>
 #include <seal/util/numth.h>
-#include <seal/randomgen.h>
 #include "apsi/ffield/ffield.h"
 
 namespace apsi
@@ -39,7 +38,7 @@ namespace apsi
     class FFieldElt
     {
         friend class FFieldArray;
-        friend class FFieldFastBatchEncoder;
+        friend class FFieldBatchEncoder;
 
     public:
         FFieldElt(FField field, const _ffield_elt_t &elt) : field_(field), elt_(elt)
@@ -80,33 +79,6 @@ namespace apsi
         inline void set_one()
         {
             std::fill(elt_.begin(), elt_.end(), 1);
-        }
-
-        inline void set_random(std::shared_ptr<seal::UniformRandomGeneratorFactory> rg)
-        {
-            auto random = rg->create();
-            constexpr auto max_int = std::numeric_limits<_ffield_elt_coeff_t>::max(); 
-            _ffield_elt_coeff_t max_value = max_int - max_int % field_.ch_.value();
-            for (std::size_t i = 0; i < field_.d_; i++)
-            {
-                // Rejection sampling
-                _ffield_elt_coeff_t temp_value;
-                do
-                {
-                    random->generate(
-                        sizeof(_ffield_elt_coeff_t),
-                        reinterpret_cast<seal::SEAL_BYTE*>(&temp_value));
-                } while(temp_value > max_value);
-                elt_[i] = temp_value % field_.ch_.value();
-            }
-        }
-
-        inline void set_random_nonzero(std::shared_ptr<seal::UniformRandomGeneratorFactory> rg)
-        {
-            do
-            {
-                set_random(rg);
-            } while (is_zero());
         }
 
         inline bool is_zero() const

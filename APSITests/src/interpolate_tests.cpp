@@ -3,10 +3,11 @@
 
 #include "gtest/gtest.h"
 
+#include "apsi/apsidefines.h"
 #include "apsi/tools/interpolate.h"
-#include "seal/context.h"
-#include "seal/util/mempool.h"
-
+#include <seal/context.h>
+#include <seal/util/mempool.h>
+#include <seal/smallmodulus.h>
 #include <random>
 
 using namespace apsi;
@@ -60,7 +61,7 @@ namespace APSITests
 
         int degree = 2; 
         auto plain_modulus = context->first_context_data()->parms().plain_modulus();
-        u64 numPoints = min<u64>(3,  plain_modulus.value() / degree);
+        u64 numPoints = min<u64>(3, plain_modulus.value() / degree);
         int numTrials = 10;
 
         FField field(parms.plain_modulus(), degree); 
@@ -87,7 +88,7 @@ namespace APSITests
                     FAIL();
                 }
                 if (j == 1 && result.get_coeff_of(j, k) != 1) {
-                FAIL();
+                    FAIL();
                 }
             }
         }
@@ -118,37 +119,27 @@ namespace APSITests
 
     TEST(InterpolateTests, ffield_interpolate_test)
     {
-        seal::EncryptionParameters parms(seal::scheme_type::BFV);
-        parms.set_poly_modulus_degree(64);
-        parms.set_coeff_modulus(seal::CoeffModulus::BFVDefault(1024));
-        parms.set_plain_modulus(40961);
-
-        auto context = seal::SEALContext::Create(parms);
-
         int degree = 2;
-        auto plain_modulus = context->first_context_data()->parms().plain_modulus();
+        seal::SmallModulus plain_modulus(40961);
         u64 numPoints = min<u64>(3, plain_modulus.value() / degree);
         int numTrials = 10;
 
-        FField field(parms.plain_modulus(), degree);
+        FField field(plain_modulus, degree);
         FFieldArray points(static_cast<size_t>(numPoints), field);
         FFieldArray values(static_cast<size_t>(numPoints), field);
         FFieldArray result(static_cast<size_t>(numPoints), field);
 
+        random_device rd;
+
         for (int i = 0; i < numTrials; ++i)
         {
-
-            //vector<pair<u64, u64>> points(numPoints);
-
             for (size_t j = 0; j < points.size(); j++) {
                 for (int k = 0; k < degree; k++) {
                     // random points 
-                    points.set_coeff_of(j, k, (j * degree + k) % plain_modulus.value());
+                    points.set_coeff_of(j, k, rd() % plain_modulus.value());
                     values.set_coeff_of(j, k, (j * degree + k) % plain_modulus.value());
                 }
             }
-
-            auto pool = seal::MemoryPoolHandle::Global();
 
             ffield_newton_interpolate_poly(points, values, result);
 
@@ -158,12 +149,11 @@ namespace APSITests
                 for (size_t j = 0; j < points.size(); ++j)
                 {
                     tempresult[j] = result.get_coeff_of(j, k);
-                    // tempresult[j] = values.get_coeff_of(j, k);
                 }
                 for (size_t j = 0; j < points.size(); ++j) {
                     u64 x = points.get_coeff_of(j, k);
                     u64 y = values.get_coeff_of(j, k);
-                    //auto& y = points[i].second;
+
                     auto yy = u64_poly_eval(tempresult, x, plain_modulus);
                     if (yy != y)
                     {
@@ -172,55 +162,6 @@ namespace APSITests
                             << "y[" << i << "] = " << y << endl;
                         FAIL();
                     }
-                }
-            }
-        }
-    }
-
-    TEST(InterpolateTests, u64_interpolate_test)
-    {
-        seal::EncryptionParameters parms(seal::scheme_type::BFV);
-        parms.set_poly_modulus_degree(64);
-        parms.set_coeff_modulus(seal::CoeffModulus::BFVDefault(1024));
-        parms.set_plain_modulus(11);
-
-        auto context = seal::SEALContext::Create(parms);
-
-        auto plain_modulus = context->first_context_data()->parms().plain_modulus();
-        u64 numPoints = min<u64>(100, plain_modulus.value() - 1);
-        int numTrials = 10;
-
-        auto random_uint64 = []() {
-            random_device rd;
-            return (static_cast<u64>(rd()) << 32) | static_cast<u32>(rd());
-        };
-
-        for (int i = 0; i < numTrials; ++i)
-        {
-
-            vector<pair<u64, u64>> points(static_cast<size_t>(numPoints));
-
-            for (size_t i = 0; i < points.size(); i++) {
-                points[i].first = i;
-                points[i].second = random_uint64() % plain_modulus.value();
-            }
-
-            auto pool = seal::MemoryPoolHandle::Global();
-            vector<u64> result(points.size());
-
-            apsi::u64_newton_interpolate_poly(points, result, plain_modulus);
-
-            for (size_t i = 0; i < points.size(); ++i)
-            {
-                auto& x = points[i].first;
-                auto& y = points[i].second;
-                auto yy = u64_poly_eval(result, x, plain_modulus);
-                if (yy != y)
-                {
-                    cout << " poly(x[" << i << "]) = " << yy
-                        << "  != \n"
-                        << "y[" << i << "] = " << y << endl;
-                    FAIL();
                 }
             }
         }

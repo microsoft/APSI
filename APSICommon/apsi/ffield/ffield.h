@@ -4,7 +4,6 @@
 #pragma once
 
 #include <vector>
-#include <memory>
 #include <seal/smallmodulus.h>
 #include "apsi/apsidefines.h"
 
@@ -20,7 +19,7 @@ namespace apsi
     {
         friend class FFieldElt;
         friend class FFieldArray;
-        friend class FFieldFastBatchEncoder;
+        friend class FFieldBatchEncoder;
 
     public:
         FField(_ch_t ch, u64 d) : ch_(ch), d_(d)
