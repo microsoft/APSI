@@ -74,9 +74,9 @@ namespace apsi
         return *this;
     }
 
-    FFieldElt Item::to_ffield_element(FField exfield, int bit_length)
+    FFieldElt Item::to_ffield_element(FField ffield, int bit_length)
     {
-        FFieldElt ring_item(exfield);
+        FFieldElt ring_item(ffield);
         to_ffield_element(ring_item, bit_length);
         return ring_item;
     }
@@ -107,16 +107,16 @@ namespace apsi
 
     void Item::to_ffield_element(FFieldElt &ring_item, int bit_length)
     {
-        auto exfield = ring_item.field();
+        auto ffield = ring_item.field();
 
         // Should minus 1 to avoid wrapping around p
         // Hao: why? 
-        int split_length = exfield.ch().bit_count() - 1;
+        int split_length = ffield.ch().bit_count() - 1;
 
-        // How many coefficients do we need in the ExFieldElement
+        // How many coefficients do we need in the FFieldElement
         int split_index_bound = (bit_length + split_length - 1) / split_length;
 
-        for (int j = 0; static_cast<u64>(j) < exfield.d() && j < split_index_bound; j++)
+        for (int j = 0; static_cast<u64>(j) < ffield.d() && j < split_index_bound; j++)
         {
             auto coeff = item_part(value_, j, split_length);
             ring_item.set_coeff(j, coeff);

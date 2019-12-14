@@ -193,11 +193,11 @@ namespace
         seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
         seal_params.encryption_params.set_plain_modulus(40961);
 
-        PSIParams::ExFieldParams exfield_params;
-        exfield_params.characteristic = seal_params.encryption_params.plain_modulus().value();
-        exfield_params.degree = 8;
+        PSIParams::FFieldParams ffield_params;
+        ffield_params.characteristic = seal_params.encryption_params.plain_modulus().value();
+        ffield_params.degree = 8;
 
-        PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
+        PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
         return params;
     }
 

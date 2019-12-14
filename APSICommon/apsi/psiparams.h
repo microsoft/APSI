@@ -184,25 +184,25 @@ namespace apsi
         /**
         Extension field parameters and getters.
         */
-        struct ExFieldParams
+        struct FFieldParams
         {
             u64 characteristic;
             u32 degree;
-        }; // struct ExFieldParams
+        }; // struct FFieldParams
 
-        const ExFieldParams& exfield_params() const
+        const FFieldParams& ffield_params() const
         {
-            return exfield_params_;
+            return ffield_params_;
         }
 
-        inline u64 exfield_characteristic() const
+        inline u64 ffield_characteristic() const
         {
-            return exfield_params_.characteristic;
+            return ffield_params_.characteristic;
         }
 
-        inline u32 exfield_degree() const
+        inline u32 ffield_degree() const
         {
-            return exfield_params_.degree;
+            return ffield_params_.degree;
         }
 
         /**
@@ -228,7 +228,7 @@ namespace apsi
 
         inline u32 batch_size() const
         {
-            return static_cast<u32>(encryption_params().poly_modulus_degree() / exfield_degree());
+            return static_cast<u32>(encryption_params().poly_modulus_degree() / ffield_degree());
         }
 
         inline u32 batch_count() const
@@ -250,7 +250,7 @@ namespace apsi
         // assuming one query.
         inline double log_fp_rate() const
         {
-            return static_cast<double>(exfield_degree()) * log2(split_size()) +
+            return static_cast<double>(ffield_degree()) * log2(split_size()) +
                 log2(split_count()) - item_bit_length_used_after_oprf();
         }
 
@@ -259,12 +259,12 @@ namespace apsi
             const TableParams& table_params,
             const CuckooParams& cuckoo_params,
             const SEALParams& seal_params,
-            const ExFieldParams& exfield_params)
+            const FFieldParams& ffield_params)
             : psiconf_params_(psi_params),
               table_params_(table_params),
               cuckoo_params_(cuckoo_params),
               seal_params_(seal_params),
-              exfield_params_(exfield_params)
+              ffield_params_(ffield_params)
         {
             if (psiconf_params_.sender_bin_size == 0)
             {
@@ -288,7 +288,7 @@ namespace apsi
         TableParams   table_params_;
         CuckooParams  cuckoo_params_;
         SEALParams    seal_params_;
-        ExFieldParams exfield_params_;
+        FFieldParams ffield_params_;
 
         void update_sender_bin_size()
         {
@@ -329,7 +329,7 @@ namespace apsi
                 // Not an error, but a warning.
                 logging::Log::warning("Item bit count is close to its upper limit. Several bits should be reserved for appropriate Cuckoo hashing.");
             }
-            u64 supported_bitcount = ((u64)exfield_degree()) * (seal_params_.encryption_params.plain_modulus().bit_count() - 1);
+            u64 supported_bitcount = ((u64)ffield_degree()) * (seal_params_.encryption_params.plain_modulus().bit_count() - 1);
             if (item_bit_length_used_after_oprf() > supported_bitcount)
             {
                 logging::Log::warning(

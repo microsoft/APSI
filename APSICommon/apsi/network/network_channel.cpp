@@ -176,16 +176,16 @@ namespace apsi
             response.seal_params.encryption_params.set_plain_modulus(msg.get<u64>(idx++));
             response.seal_params.max_supported_degree = msg.get<u32>(idx++);
 
-            // ExFieldParams
-            response.exfield_params.characteristic = msg.get<u64>(idx++);
-            response.exfield_params.degree = msg.get<u32>(idx++);
+            // FFieldParams
+            response.ffield_params.characteristic = msg.get<u64>(idx++);
+            response.ffield_params.degree = msg.get<u32>(idx++);
 
             bytes_received_ += sizeof(SenderOperationType);
             bytes_received_ += sizeof(PSIParams::PSIConfParams);
             bytes_received_ += sizeof(PSIParams::TableParams);
             bytes_received_ += sizeof(PSIParams::CuckooParams);
             bytes_received_ += sizeof(u64) + sizeof(u64) + sizeof(u32);//sizeof(PSIParams::SEALParams);
-            bytes_received_ += sizeof(PSIParams::ExFieldParams);
+            bytes_received_ += sizeof(PSIParams::FFieldParams);
         }
 
         void NetworkChannel::receive(SenderResponsePreprocess& response)
@@ -308,9 +308,9 @@ namespace apsi
             msg.add(params.encryption_params().plain_modulus().value());
             msg.add(params.max_supported_degree());
 
-            // ExFieldParams
-            msg.add(params.exfield_characteristic());
-            msg.add(params.exfield_degree());
+            // FFieldParams
+            msg.add(params.ffield_characteristic());
+            msg.add(params.ffield_degree());
 
             send_message(msg);
 
@@ -319,7 +319,7 @@ namespace apsi
             bytes_sent_ += sizeof(PSIParams::TableParams);
             bytes_sent_ += sizeof(PSIParams::CuckooParams);
             bytes_sent_ += sizeof(u64) + sizeof(u64) + sizeof(u32); //sizeof(PSIParams::SEALParams);
-            bytes_sent_ += sizeof(PSIParams::ExFieldParams);
+            bytes_sent_ += sizeof(PSIParams::FFieldParams);
         }
 
         void NetworkChannel::send_preprocess(const vector<SEAL_BYTE>& buffer)

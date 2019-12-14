@@ -143,7 +143,7 @@ namespace apsi
             SenderThreadContext &th_context,
             shared_ptr<SEALContext> seal_context,
             shared_ptr<Evaluator> evaluator,
-            shared_ptr<FFieldBatchEncoder> ex_batch_encoder,
+            shared_ptr<FFieldBatchEncoder> batch_encoder,
             DBInterpolationCache& cache,
             const PSIParams& params)
         {
@@ -153,7 +153,7 @@ namespace apsi
 
             for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
             {
-                FFieldElt temp(ex_batch_encoder->field());
+                FFieldElt temp(batch_encoder->field());
                 FFieldArray& x = cache.x_temp[static_cast<size_t>(pos.batch_offset)];
                 FFieldArray& y = cache.y_temp[static_cast<size_t>(pos.batch_offset)];
 
@@ -219,7 +219,7 @@ namespace apsi
 
             // We assume there are all the same
             auto degree = th_context.field().d();
-            FFieldArray temp_array(ex_batch_encoder->create_array());
+            FFieldArray temp_array(batch_encoder->create_array());
             for (int s = 0; s < items_per_split_; s++)
             {
                 // Transpose the coeffs into temp_array
@@ -233,7 +233,7 @@ namespace apsi
                 }
 
                 Plaintext &batched_coeff = batched_label_coeffs_[s];
-                ex_batch_encoder->compose(temp_array, batched_coeff);
+                batch_encoder->compose(temp_array, batched_coeff);
 #ifdef APSI_DEBUG
                 Position temppos;
                 temppos.split_offset = s;
@@ -251,7 +251,7 @@ namespace apsi
         }
 
         DBInterpolationCache::DBInterpolationCache(
-            std::shared_ptr<FFieldBatchEncoder> ex_batch_encoder,
+            std::shared_ptr<FFieldBatchEncoder> batch_encoder,
             int items_per_batch,
             int items_per_split,
             int value_byte_count)
@@ -262,9 +262,9 @@ namespace apsi
 
             for (u64 i = 0; i < items_per_batch; ++i)
             {
-                coeff_temp.emplace_back(items_per_split, ex_batch_encoder->field());
-                x_temp.emplace_back(items_per_split, ex_batch_encoder->field());
-                y_temp.emplace_back(items_per_split, ex_batch_encoder->field());
+                coeff_temp.emplace_back(items_per_split, batch_encoder->field());
+                x_temp.emplace_back(items_per_split, batch_encoder->field());
+                y_temp.emplace_back(items_per_split, batch_encoder->field());
             }
 
             temp_vec.resize((value_byte_count + sizeof(u64)) / sizeof(u64), 0);

@@ -235,12 +235,12 @@ namespace apsi
 
             std::shared_ptr<seal::Evaluator> evaluator_;
 
-            std::shared_ptr<FFieldBatchEncoder> ex_batch_encoder_;
+            std::shared_ptr<FFieldBatchEncoder> batch_encoder_;
 
             // Objects for compressed ciphertexts
             std::shared_ptr<CiphertextCompressor> compressor_;
 
-            /* Sender's database, including raw data, hashed data, ExField data, and symmetric polynomials. */
+            /* Sender's database, including raw data, hashed data, FField data, and symmetric polynomials. */
             std::unique_ptr<SenderDB> sender_db_;
 
             /* One context for one thread, to improve preformance by using single-thread memory pool. */

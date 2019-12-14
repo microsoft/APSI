@@ -137,7 +137,7 @@ namespace apsi
             */
             Item sender_null_item_;
 
-            /* The ExField encoding of the sender null value. */
+            /* The FField encoding of the sender null value. */
 
             /* 
             B x m, where B is sender's bin size, m is table size.

@@ -133,17 +133,17 @@ namespace apsi
                 Log::debug("setting maximal supported degree to %i", seal_params.max_supported_degree);
             }
 
-            PSIParams::ExFieldParams exfield_params;
+            PSIParams::FFieldParams ffield_params;
             {
                 // This must be equal to plain_modulus
-                exfield_params.characteristic = seal_params.encryption_params.plain_modulus().value();
-                exfield_params.degree = cmd.exfield_degree();
+                ffield_params.characteristic = seal_params.encryption_params.plain_modulus().value();
+                ffield_params.degree = cmd.ffield_degree();
             }
 
             /*
             Creating the PSIParams class.
             */
-            PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
+            PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
             
             return params;
         }

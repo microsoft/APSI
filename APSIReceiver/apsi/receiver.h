@@ -140,9 +140,9 @@ namespace apsi
                 kuku::KukuTable &cuckoo);
 
             /**
-            Encodes items in the cuckoo hashing table into ExField elements.
+            Encodes items in the cuckoo hashing table into FField elements.
             */
-            void exfield_encoding(
+            void ffield_encoding(
                 kuku::KukuTable &cuckoo,
                 FFieldArray& ret);
 
@@ -152,7 +152,7 @@ namespace apsi
             we break the bits of sender's split_size into segment of window size).
             The return result is a map from k to y^k.
             */
-            void generate_powers(const FFieldArray &exfield_items,
+            void generate_powers(const FFieldArray &ffield_items,
                 std::map<u64, FFieldArray> &ret);
 
             /**
@@ -202,9 +202,9 @@ namespace apsi
                 return field_;
             }
 
-            std::shared_ptr<FFieldBatchEncoder> ex_batch_encoder() const
+            std::shared_ptr<FFieldBatchEncoder> batch_encoder() const
             {
-                return ex_batch_encoder_;
+                return batch_encoder_;
             }
 
             const seal::PublicKey& public_key() const
@@ -237,7 +237,7 @@ namespace apsi
 
             std::unique_ptr<seal::Decryptor> decryptor_;
 
-            std::shared_ptr<FFieldBatchEncoder> ex_batch_encoder_;
+            std::shared_ptr<FFieldBatchEncoder> batch_encoder_;
 
             i32 slot_count_;
 

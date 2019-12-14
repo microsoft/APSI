@@ -72,14 +72,14 @@ namespace apsi
             response.seal_params.encryption_params.load(istream_);
             istream_.read(reinterpret_cast<char*>(&response.seal_params.max_supported_degree), sizeof(u32));
 
-            // ExFieldParams
-            istream_.read(reinterpret_cast<char*>(&response.exfield_params), sizeof(PSIParams::ExFieldParams));
+            // FFieldParams
+            istream_.read(reinterpret_cast<char*>(&response.ffield_params), sizeof(PSIParams::FFieldParams));
 
             bytes_received_ += sizeof(PSIParams::PSIConfParams);
             bytes_received_ += sizeof(PSIParams::TableParams);
             bytes_received_ += sizeof(PSIParams::CuckooParams);
             bytes_received_ += sizeof(PSIParams::SEALParams);
-            bytes_received_ += sizeof(PSIParams::ExFieldParams);
+            bytes_received_ += sizeof(PSIParams::FFieldParams);
         }
 
         void StreamChannel::send_get_parameters()
@@ -110,15 +110,15 @@ namespace apsi
             params.seal_params().encryption_params.save(ostream_);
             ostream_.write(reinterpret_cast<const char*>(&maxsd), sizeof(u32));
 
-            // ExFieldParams
-            const PSIParams::ExFieldParams& exfieldparams = params.exfield_params();
-            ostream_.write(reinterpret_cast<const char*>(&exfieldparams), sizeof(PSIParams::ExFieldParams));
+            // FFieldParams
+            const PSIParams::FFieldParams& ffieldparams = params.ffield_params();
+            ostream_.write(reinterpret_cast<const char*>(&ffieldparams), sizeof(PSIParams::FFieldParams));
 
             bytes_sent_ += sizeof(PSIParams::PSIConfParams);
             bytes_sent_ += sizeof(PSIParams::TableParams);
             bytes_sent_ += sizeof(PSIParams::CuckooParams);
             bytes_sent_ += sizeof(PSIParams::SEALParams);
-            bytes_sent_ += sizeof(PSIParams::ExFieldParams);
+            bytes_sent_ += sizeof(PSIParams::FFieldParams);
         }
 
         void StreamChannel::receive(SenderResponsePreprocess& response)

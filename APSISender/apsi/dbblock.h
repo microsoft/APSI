@@ -25,7 +25,7 @@ namespace apsi
         struct DBInterpolationCache
         {
             DBInterpolationCache(
-                std::shared_ptr<FFieldBatchEncoder> ex_batch_encoder,
+                std::shared_ptr<FFieldBatchEncoder> batch_encoder,
                 int batch_size,
                 int items_per_split,
                 int value_byte_count
@@ -124,7 +124,7 @@ namespace apsi
                 SenderThreadContext &th_context,
                 std::shared_ptr<seal::SEALContext> seal_context,
                 std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<FFieldBatchEncoder> ex_batch_encoder,
+                std::shared_ptr<FFieldBatchEncoder> batch_encoder,
                 DBInterpolationCache &cache,
                 const PSIParams &params);
 

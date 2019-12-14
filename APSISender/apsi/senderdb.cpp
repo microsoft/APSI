@@ -41,7 +41,7 @@ namespace apsi
             encoding_bit_length_ = params.item_bit_length_used_after_oprf();
             Log::debug("encoding bit length = %i", encoding_bit_length_); 
 
-            // Create the null ExFieldElement (note: encoding truncation affects high bits)
+            // Create the null FFieldElement (note: encoding truncation affects high bits)
             null_element_ = sender_null_item_.to_ffield_element(field_, encoding_bit_length_);
             neg_null_element_ = -null_element_;
 
@@ -353,7 +353,7 @@ namespace apsi
             int start_block,
             int end_block,
             shared_ptr<Evaluator> evaluator,
-            shared_ptr<FFieldBatchEncoder> ex_batch_encoder)
+            shared_ptr<FFieldBatchEncoder> batch_encoder)
         {
             // Get the symmetric block
             auto symm_block = context.symm_block();
@@ -391,12 +391,12 @@ namespace apsi
                     Plaintext &poly = block.batch_random_symm_poly_[i];
 
 
-                    // This branch works even if ex_field_ is an integer field, but it is slower than normal batching.
+                    // This branch works even if FField is an integer field, but it is slower than normal batching.
                     for (int k = 0; batch_start + k < batch_end; k++)
                     {
                         copy_n(symm_block(k, i), batch_vector.field().d(), batch_vector.data(k));
                     }
-                    ex_batch_encoder->compose(batch_vector, poly);
+                    batch_encoder->compose(batch_vector, poly);
 
                     if (i == split_size_plus_one - 1)
                     {
@@ -423,30 +423,30 @@ namespace apsi
             int start_block,
             int end_block,
             shared_ptr<Evaluator> evaluator,
-            shared_ptr<FFieldBatchEncoder> ex_batch_encoder)
+            shared_ptr<FFieldBatchEncoder> batch_encoder)
         {
             auto &mod = params_.encryption_params().plain_modulus();
 
-            DBInterpolationCache cache(ex_batch_encoder, params_.batch_size(), params_.split_size(), params_.label_byte_count());
+            DBInterpolationCache cache(batch_encoder, params_.batch_size(), params_.split_size(), params_.label_byte_count());
 
             // Minus 1 to be safe.
             auto coeffBitCount = seal::util::get_significant_bit_count(mod.value()) - 1;
             u64 degree = 1;
 
-            if (ex_batch_encoder)
+            if (batch_encoder)
             {
-                degree = ex_batch_encoder->d();
+                degree = batch_encoder->d();
             }
 
             if (params_.label_bit_count() >= coeffBitCount * degree)
             {
-                throw runtime_error("labels are too large for exfield.");
+                throw runtime_error("labels are too large for ffield.");
             }
 
             for (int bIdx = start_block; bIdx < end_block; bIdx++)
             {
                 auto &block = *db_blocks_(bIdx);
-                block.batch_interpolate(th_context, seal_context_, evaluator, ex_batch_encoder, cache, params_);
+                block.batch_interpolate(th_context, seal_context_, evaluator, batch_encoder, cache, params_);
                 th_context.inc_interpolate_polys();
             }
         }

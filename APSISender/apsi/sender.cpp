@@ -35,7 +35,7 @@ namespace apsi
                 int session_thread_count, MemoryPoolHandle pool) :
             params_(params),
             pool_(move(pool)),
-            field_(SmallModulus(params_.exfield_characteristic()), params_.exfield_degree()),
+            field_(SmallModulus(params_.ffield_characteristic()), params_.ffield_degree()),
             total_thread_count_(total_thread_count),
             session_thread_count_(session_thread_count),
             thread_contexts_(total_thread_count_)
@@ -54,9 +54,9 @@ namespace apsi
             // Construct shared Evaluator and BatchEncoder
             evaluator_ = make_shared<Evaluator>(seal_context_);
             FField field(
-                SmallModulus(params_.exfield_characteristic()),
-                params_.exfield_degree());
-            ex_batch_encoder_ = make_shared<FFieldBatchEncoder>(
+                SmallModulus(params_.ffield_characteristic()),
+                params_.ffield_degree());
+            batch_encoder_ = make_shared<FFieldBatchEncoder>(
                 seal_context_, field);
 
             // Create SenderDB
@@ -66,7 +66,7 @@ namespace apsi
 
             vector<thread> thrds(total_thread_count_);
 
-            // Set local exfields for multi-threaded efficient use of memory pools.
+            // Set local ffields for multi-threaded efficient use of memory pools.
             for (int i = 0; i < total_thread_count_; i++)
             {
                 available_thread_contexts_.push_back(i);
@@ -156,12 +156,12 @@ namespace apsi
             }
 
             STOPWATCH(sender_stop_watch, "Sender::offline_compute_work::calc_symmpoly");
-            sender_db_->batched_randomized_symmetric_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
+            sender_db_->batched_randomized_symmetric_polys(context, start_block, end_block, evaluator_, batch_encoder_);
 
             if (params_.use_labels())
             {
                 STOPWATCH(sender_stop_watch, "Sender::offline_compute_work::calc_interpolation");
-                sender_db_->batched_interpolate_polys(context, start_block, end_block, evaluator_, ex_batch_encoder_);
+                sender_db_->batched_interpolate_polys(context, start_block, end_block, evaluator_, batch_encoder_);
             }
 
             release_thread_context(context.id());

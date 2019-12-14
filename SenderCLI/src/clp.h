@@ -30,7 +30,7 @@ namespace apsi
             add(poly_mod_arg_);
             add(coeff_mod_arg_);
             add(plain_mod_arg_);
-            add(exfld_degree_arg_);
+            add(ffield_degree_arg_);
             add(db_file_arg_);
             add(net_port_arg_);
             add(num_chunks_arg_); 
@@ -97,8 +97,8 @@ namespace apsi
             plain_modulus_ = plain_mod_arg_.getValue();
             cout_param("plainModulus", plain_modulus_);
 
-            exfield_degree_ = exfld_degree_arg_.getValue();
-            cout_param("exfieldDegree", exfield_degree_);
+            ffield_degree_ = ffield_degree_arg_.getValue();
+            cout_param("ffieldDegree", ffield_degree_);
 
             db_file_ = db_file_arg_.getValue();
             cout_param("db", db_file_);
@@ -130,7 +130,7 @@ namespace apsi
         int poly_modulus() const { return poly_modulus_; }
         const std::vector<u64>& coeff_modulus() const { return coeff_modulus_; }
         u64 plain_modulus() const { return plain_modulus_; }
-        int exfield_degree() const { return exfield_degree_; }
+        int ffield_degree() const { return ffield_degree_; }
         int net_port() const { return net_port_; }
         const std::string& db_file() const { return db_file_; }
         int num_chunks() const { return num_chunks_; }	
@@ -154,7 +154,7 @@ namespace apsi
 
         TCLAP::MultiArg<std::size_t> coeff_mod_arg_       = TCLAP::MultiArg<std::size_t>("c", "coeffModulus", "Coefficient Modulus", false, "u64");
         TCLAP::ValueArg<std::size_t> plain_mod_arg_       = TCLAP::ValueArg<std::size_t>("", "plainModulus", "Plain Modulus", false, 40961, "u64");
-        TCLAP::ValueArg<int>         exfld_degree_arg_    = TCLAP::ValueArg<int>("e", "exfieldDegree", "exField degree", false, 8, "int");
+        TCLAP::ValueArg<int>         ffield_degree_arg_    = TCLAP::ValueArg<int>("e", "ffieldDegree", "FField degree", false, 8, "int");
         TCLAP::ValueArg<int>         num_chunks_arg_      = TCLAP::ValueArg<int>("", "numChunks", "number of chunks per item", false, 1, "int");
         TCLAP::ValueArg<int>         sender_bin_size_arg_ = TCLAP::ValueArg<int>("", "senderBinSize", "(manually set) sender bin size", false, 0, "int");
         TCLAP::ValueArg<int>         hash_func_count_arg_ = TCLAP::ValueArg<int>("", "numHashes", "number of hash functions in cuckoo hashing", false, 2, "int");
@@ -172,7 +172,7 @@ namespace apsi
         int poly_modulus_;
         std::vector<u64> coeff_modulus_;
         u64 plain_modulus_;
-        int exfield_degree_;
+        int ffield_degree_;
         int net_port_;
         std::string db_file_;
         int num_chunks_;

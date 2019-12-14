@@ -20,7 +20,7 @@ namespace apsi
             PSIParams::TableParams   table_params;
             PSIParams::CuckooParams  cuckoo_params;
             PSIParams::SEALParams    seal_params;
-            PSIParams::ExFieldParams exfield_params;
+            PSIParams::FFieldParams ffield_params;
         }; // struct SenderResponseGetParameters
 
         /**

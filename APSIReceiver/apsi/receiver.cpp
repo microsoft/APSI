@@ -71,8 +71,8 @@ namespace apsi
             Log::info("Initializing Receiver");
 
             field_ = make_unique<FField>(
-                SmallModulus(get_params().exfield_characteristic()),
-                get_params().exfield_degree());
+                SmallModulus(get_params().ffield_characteristic()),
+                get_params().ffield_degree());
 
             slot_count_ = get_params().batch_size();
 
@@ -95,7 +95,7 @@ namespace apsi
             generator.relin_keys_save(relin_keys_ss, compr_mode_type::deflate);
             relin_keys_ = relin_keys_ss.str();
 
-            ex_batch_encoder_ = make_shared<FFieldBatchEncoder>(seal_context_, *field_);
+            batch_encoder_ = make_shared<FFieldBatchEncoder>(seal_context_, *field_);
 
             Log::info("Receiver initialized");
         }
@@ -216,7 +216,7 @@ namespace apsi
                 sender_params.table_params,
                 sender_params.cuckoo_params,
                 sender_params.seal_params,
-                sender_params.exfield_params);
+                sender_params.ffield_params);
 
             Log::debug("Received parameters from Sender:");
             Log::debug(
@@ -251,9 +251,9 @@ namespace apsi
                 Log::debug("Coeff modulus %i: 0x%llx", i, sender_params.seal_params.encryption_params.coeff_modulus()[i].value());
             }
             Log::debug(
-                "exfield characteristic: 0x%llx, exfield degree: %i",
-                sender_params.exfield_params.characteristic,
-                sender_params.exfield_params.degree);
+                "ffield characteristic: 0x%llx, ffield degree: %i",
+                sender_params.ffield_params.characteristic,
+                sender_params.ffield_params.degree);
 
             // Once we have parameters, initialize Receiver
             initialize();
@@ -271,19 +271,19 @@ namespace apsi
 
             // find the item length 
             unique_ptr<KukuTable> cuckoo;
-            unique_ptr<FFieldArray> exfield_items;
+            unique_ptr<FFieldArray> ffield_items;
 
             u32 padded_cuckoo_capacity = static_cast<u32>(
                 ((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
 
-            exfield_items = make_unique<FFieldArray>(padded_cuckoo_capacity, *field_);
+            ffield_items = make_unique<FFieldArray>(padded_cuckoo_capacity, *field_);
 
             int item_bit_count = get_params().item_bit_length_used_after_oprf();
 
             bool fm = get_params().use_fast_membership();
             if (items.size() > 1 || (!fm)) {
                 cuckoo = cuckoo_hashing(items);
-                exfield_encoding(*cuckoo, *exfield_items);
+                ffield_encoding(*cuckoo, *ffield_items);
             }
             else
             {
@@ -291,12 +291,12 @@ namespace apsi
                 Log::info("Using repeated encoding for single query");
                 for (size_t i = 0; i < get_params().table_size(); i++)
                 {
-                    exfield_items->set(i, items[0].to_ffield_element(*field_, item_bit_count));
+                    ffield_items->set(i, items[0].to_ffield_element(*field_, item_bit_count));
                 }
             }
 
             map<u64, FFieldArray> powers;
-            generate_powers(*exfield_items, powers);
+            generate_powers(*ffield_items, powers);
 
             map<u64, vector<string>> ciphers;
             encrypt(powers, ciphers);
@@ -328,7 +328,7 @@ namespace apsi
             }
             else
             {
-                Log::debug("Using %i out of %ix%i bits of exfield element",
+                Log::debug("Using %i out of %ix%i bits of ffield element",
                     get_params().item_bit_count(),
                     coeff_bit_count - 1,
                     degree);
@@ -374,7 +374,7 @@ namespace apsi
             return indices;
         }
 
-        void Receiver::exfield_encoding(
+        void Receiver::ffield_encoding(
             KukuTable &cuckoo,
             FFieldArray &ret)
         {
@@ -399,7 +399,7 @@ namespace apsi
             }
         }
 
-        void Receiver::generate_powers(const FFieldArray& exfield_items,
+        void Receiver::generate_powers(const FFieldArray& ffield_items,
             map<u64, FFieldArray>& result)
         {
             u64 split_size = (get_params().sender_bin_size() + get_params().split_count() - 1) / get_params().split_count();
@@ -420,7 +420,7 @@ namespace apsi
             Log::debug("Generate powers: split_size %i, window_size %i, radix %i, bound %i",
                 split_size, window_size, radix, bound);
 
-            FFieldArray current_power = exfield_items;
+            FFieldArray current_power = ffield_items;
             for (u64 j = 0; j < static_cast<u64>(bound); j++)
             {
                 result.emplace(1ULL << (window_size * j), current_power);
@@ -458,7 +458,7 @@ namespace apsi
             destination.clear();
             destination.reserve(num_of_batches);
             Plaintext plain(pool_);
-            FFieldArray batch(ex_batch_encoder_->create_array());
+            FFieldArray batch(batch_encoder_->create_array());
 
             for (int i = 0; i < num_of_batches; i++)
             {
@@ -468,7 +468,7 @@ namespace apsi
                     size_t stj = static_cast<size_t>(j);
                     batch.set(stj, sti * batch_size + stj, input);
                 }
-                ex_batch_encoder_->compose(batch, plain);
+                batch_encoder_->compose(batch, plain);
 
                 stringstream ss;
                 encryptor_->encrypt_symmetric_save(plain, ss, compr_mode_type::deflate, pool_);
@@ -556,7 +556,7 @@ namespace apsi
             MemoryPoolHandle local_pool(MemoryPoolHandle::New());
             Plaintext p(local_pool);
             Ciphertext tmp(seal_context_, local_pool);
-            unique_ptr<FFieldArray> batch = make_unique<FFieldArray>(ex_batch_encoder_->create_array());
+            unique_ptr<FFieldArray> batch = make_unique<FFieldArray>(batch_encoder_->create_array());
 
             bool first = true;
             u64 processed_count = 0;
@@ -587,7 +587,7 @@ namespace apsi
                 }
 
                 decryptor_->decrypt(tmp, p);
-                ex_batch_encoder_->decompose(p, *batch);
+                batch_encoder_->decompose(p, *batch);
 
                 for (int k = 0; k < batch_size; k++)
                 {
@@ -616,9 +616,9 @@ namespace apsi
                     decryptor_->decrypt(tmp, p);
 
                     // make sure its the right size. decrypt will shorted when there are zero coeffs at the top.
-                    p.resize(static_cast<i32>(ex_batch_encoder_->n()));
+                    p.resize(static_cast<i32>(batch_encoder_->n()));
 
-                    ex_batch_encoder_->decompose(p, *batch);
+                    batch_encoder_->decompose(p, *batch);
 
                     //if (batch->is_zero()) {
                     Log::debug("decrypted label data is zero? %i", batch->is_zero());

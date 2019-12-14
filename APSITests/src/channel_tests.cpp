@@ -95,8 +95,8 @@ namespace APSITests
         PSIParams::TableParams table_params{ 10, 1, 2, 10, 40 };
         PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
         PSIParams::SEALParams seal_params;
-        PSIParams::ExFieldParams exfield_params;
-        PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
+        PSIParams::FFieldParams ffield_params;
+        PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
 
         vector<SEAL_BYTE> buff = CreateByteVector(1, 2, 3, 4, 5);
 
@@ -224,13 +224,13 @@ namespace APSITests
         PSIParams::PSIConfParams psiconf_params{ 12345, 20, 60, 120, 10, true, true };
         PSIParams::TableParams table_params{ 10, 1, 2, 10, 40 };
         PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
-        PSIParams::ExFieldParams exfield_params{ 321, 8 };
+        PSIParams::FFieldParams ffield_params{ 321, 8 };
         PSIParams::SEALParams seal_params;
         vector<SmallModulus> smv = CoeffModulus::BFVDefault(4096);
         seal_params.encryption_params.set_poly_modulus_degree(4096);
         seal_params.encryption_params.set_plain_modulus(5119);
         seal_params.encryption_params.set_coeff_modulus(smv);
-        PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
+        PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
 
         svr.send_get_parameters_response(sender_op->client_id, params);
         expected_total = sizeof(u32); // SenderOperationType
@@ -238,7 +238,7 @@ namespace APSITests
         expected_total += sizeof(PSIParams::TableParams);
         expected_total += sizeof(PSIParams::CuckooParams);
         expected_total += sizeof(u64) + sizeof(u64) + sizeof(u32);//sizeof(PSIParams::SEALParams);
-        expected_total += sizeof(PSIParams::ExFieldParams);
+        expected_total += sizeof(PSIParams::FFieldParams);
         ASSERT_EQ(expected_total, svr.get_total_data_sent());
 
         // Preprocess response
@@ -364,7 +364,7 @@ namespace APSITests
                 PSIParams::PSIConfParams psiconf_params{ 12345, 50, 60, 120, 40, true, false };
                 PSIParams::TableParams table_params{ 10, 1, 2, 10, 40, false };
                 PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
-                PSIParams::ExFieldParams exfield_params{ 678910, 8 };
+                PSIParams::FFieldParams ffield_params{ 678910, 8 };
                 PSIParams::SEALParams seal_params;
                 seal_params.max_supported_degree = 25;
                 seal_params.encryption_params.set_plain_modulus(5119);
@@ -372,14 +372,14 @@ namespace APSITests
                 vector<SmallModulus> coeff_modulus = CoeffModulus::BFVDefault(seal_params.encryption_params.poly_modulus_degree());
                 seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
 
-                PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
+                PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
 
                 server_.send_get_parameters_response(sender_op->client_id, params);
 
                 psiconf_params.sender_size = 54321;
                 psiconf_params.item_bit_count = 80;
                 psiconf_params.use_labels = false;
-                PSIParams params2(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
+                PSIParams params2(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
 
                 server_.send_get_parameters_response(sender_op->client_id, params2);
             });
@@ -406,8 +406,8 @@ namespace APSITests
         ASSERT_EQ((u32)3, get_params_response.cuckoo_params.hash_func_count);
         ASSERT_EQ((u32)2, get_params_response.cuckoo_params.hash_func_seed);
         ASSERT_EQ((u32)1, get_params_response.cuckoo_params.max_probe);
-        ASSERT_EQ((u64)678910, get_params_response.exfield_params.characteristic);
-        ASSERT_EQ((u32)8, get_params_response.exfield_params.degree);
+        ASSERT_EQ((u64)678910, get_params_response.ffield_params.characteristic);
+        ASSERT_EQ((u32)8, get_params_response.ffield_params.degree);
         ASSERT_EQ((u32)25, get_params_response.seal_params.max_supported_degree);
         ASSERT_EQ((u64)5119, get_params_response.seal_params.encryption_params.plain_modulus().value());
         ASSERT_EQ((size_t)4096, get_params_response.seal_params.encryption_params.poly_modulus_degree());
@@ -430,8 +430,8 @@ namespace APSITests
         ASSERT_EQ((u32)3, get_params_response2.cuckoo_params.hash_func_count);
         ASSERT_EQ((u32)2, get_params_response2.cuckoo_params.hash_func_seed);
         ASSERT_EQ((u32)1, get_params_response2.cuckoo_params.max_probe);
-        ASSERT_EQ((u64)678910, get_params_response2.exfield_params.characteristic);
-        ASSERT_EQ((u32)8, get_params_response2.exfield_params.degree);
+        ASSERT_EQ((u64)678910, get_params_response2.ffield_params.characteristic);
+        ASSERT_EQ((u32)8, get_params_response2.ffield_params.degree);
         ASSERT_EQ((u64)5119, get_params_response2.seal_params.encryption_params.plain_modulus().value());
         ASSERT_EQ((size_t)4096, get_params_response2.seal_params.encryption_params.poly_modulus_degree());
         ASSERT_EQ((size_t)3, get_params_response2.seal_params.encryption_params.coeff_modulus().size());
