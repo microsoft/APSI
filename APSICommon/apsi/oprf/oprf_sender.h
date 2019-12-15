@@ -23,6 +23,14 @@ namespace apsi
                 create();
             }
 
+            OPRFKey(const OPRFKey &copy) :
+                OPRFKey(copy.random_)
+            {
+                oprf_key_ = copy.oprf_key_;
+            }
+
+            OPRFKey(OPRFKey &&copy) = default;
+
             inline void create()
             {
                 // Create a random key

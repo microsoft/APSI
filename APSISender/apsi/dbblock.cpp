@@ -251,7 +251,7 @@ namespace apsi
         }
 
         DBInterpolationCache::DBInterpolationCache(
-            std::shared_ptr<FFieldBatchEncoder> batch_encoder,
+            FField field,
             int items_per_batch,
             int items_per_split,
             int value_byte_count)
@@ -262,9 +262,9 @@ namespace apsi
 
             for (u64 i = 0; i < items_per_batch; ++i)
             {
-                coeff_temp.emplace_back(items_per_split, batch_encoder->field());
-                x_temp.emplace_back(items_per_split, batch_encoder->field());
-                y_temp.emplace_back(items_per_split, batch_encoder->field());
+                coeff_temp.emplace_back(items_per_split, field);
+                x_temp.emplace_back(items_per_split, field);
+                y_temp.emplace_back(items_per_split, field);
             }
 
             temp_vec.resize((value_byte_count + sizeof(u64)) / sizeof(u64), 0);

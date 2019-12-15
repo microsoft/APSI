@@ -28,7 +28,11 @@ namespace apsi
 
     namespace sender
     {
-        void SenderDispatcher::run(const atomic<bool>& stop, const int port, const shared_ptr<OPRFKey>& oprf_key)
+        void SenderDispatcher::run(
+            const atomic<bool>& stop,
+            const int port,
+            shared_ptr<const OPRFKey> oprf_key,
+            shared_ptr<SenderDB> sender_db)
         {
             SenderChannel channel;
 
@@ -38,7 +42,8 @@ namespace apsi
             Log::info("Sender binding to address: %s", ss.str().c_str());
             channel.bind(ss.str());
 
-            oprf_key_ = oprf_key;
+            oprf_key_ = move(oprf_key);
+            sender_->set_db(move(sender_db));
 
             bool logged_waiting = false;
 

@@ -22,8 +22,6 @@
 #include "apsi/sendersessioncontext.h"
 #include "apsi/senderthreadcontext.h"
 #include "apsi/ffield/ffield.h"
-#include "apsi/ffield/ffield_batch_encoder.h"
-#include "apsi/tools/sealcompress.h"
 #include "apsi/tools/matrixview.h"
 #include "apsi/network/channel.h"
 
@@ -32,6 +30,7 @@
 #include "seal/ciphertext.h"
 #include "seal/context.h"
 #include "seal/evaluator.h"
+#include "seal/memorymanager.h"
 
 
 namespace apsi
@@ -95,17 +94,14 @@ namespace apsi
         class Sender
         {
         public:
-            Sender(const PSIParams &params,
-                int total_thread_count,
-                int session_thread_count,
-                seal::MemoryPoolHandle pool = seal::MemoryPoolHandle::Global());
+            Sender(const PSIParams &params, int thread_count);
 
             /**
             Clears data in sender's database.
             */
             inline void clear_db()
             {
-                sender_db_->clear_db();
+                sender_db_.release();
             }
 
             /**
@@ -137,18 +133,12 @@ namespace apsi
             }
 
         private:
-            void initialize();
-
-            int acquire_thread_context();
-
-            void release_thread_context(int idx);
-
             /**
             Adds the data items to sender's database.
             */
             inline void add_data(const std::vector<Item> &data)
             {
-                sender_db_->add_data(data, total_thread_count_);
+                sender_db_->add_data(data, thread_count_);
             }
 
             /**
@@ -156,25 +146,8 @@ namespace apsi
             */
             inline void add_data(const Item &item)
             {
-                sender_db_->add_data(item, total_thread_count_);
+                sender_db_->add_data(item, thread_count_);
             }
-
-            /**
-            Precomputes all necessary components for the PSI protocol, including symmetric polynomials, batching, etc.
-            This function is expensive and can be called after sender finishes adding items to the database.
-            */
-            void offline_compute();
-
-            /**
-            Handles work for offline_compute for a single thread.
-            */
-            void offline_compute_work();
-
-            /**
-            Report progress of the offline_compute operation.
-            Progress is reported to the Log.
-            */
-            void report_offline_compute_progress(int total_threads, std::atomic<bool>& work_finished);
 
             /**
             Responds to a query from the receiver. Input is a map of powers of receiver's items, from k to y^k, where k is an
@@ -194,6 +167,7 @@ namespace apsi
             Method that handles the work of a single thread that computes the response to a query.
             */
             void respond_worker(
+                int thread_index,
                 int batch_count,
                 int total_threads,
                 int total_blocks,
@@ -218,37 +192,15 @@ namespace apsi
             @params[out] all_powers All powers computed from the input for the specified batch.
             */
             void compute_batch_powers(int batch, std::vector<seal::Ciphertext> &batch_powers,
-                SenderSessionContext &session_context, SenderThreadContext &thread_context,
-                const WindowingDag& dag, WindowingDag::State& state);
+                SenderSessionContext &session_context, 
+                const WindowingDag& dag, WindowingDag::State& state,
+                seal::MemoryPoolHandle pool);
 
             PSIParams params_;
 
-            int total_thread_count_;
-
-            int session_thread_count_;
-
-            seal::MemoryPoolHandle pool_;
-
-            FField field_;
+            int thread_count_;
 
             std::shared_ptr<seal::SEALContext> seal_context_;
-
-            std::shared_ptr<seal::Evaluator> evaluator_;
-
-            std::shared_ptr<FFieldBatchEncoder> batch_encoder_;
-
-            // Objects for compressed ciphertexts
-            std::shared_ptr<CiphertextCompressor> compressor_;
-
-            /* Sender's database, including raw data, hashed data, FField data, and symmetric polynomials. */
-            std::unique_ptr<SenderDB> sender_db_;
-
-            /* One context for one thread, to improve preformance by using single-thread memory pool. */
-            std::vector<SenderThreadContext> thread_contexts_;
-
-            std::deque<int> available_thread_contexts_;
-
-            std::mutex thread_context_mtx_;
         }; // class Sender
     } // namespace sender
 } // namespace apsi

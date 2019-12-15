@@ -4,8 +4,13 @@
 #pragma once
 
 // STD
+#include <cstddef>
+#include <utility>
 #include <memory>
 #include <vector>
+#include <atomic>
+#include <deque>
+#include <mutex>
 
 // GSL
 #include <gsl/span>
@@ -15,10 +20,10 @@
 #include "apsi/psiparams.h"
 #include "apsi/dbblock.h"
 #include "apsi/senderthreadcontext.h"
+#include "apsi/sendersessioncontext.h"
 #include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_elt.h"
 #include "apsi/ffield/ffield_array.h"
-#include "apsi/ffield/ffield_batch_encoder.h"
 #include "apsi/tools/matrixview.h"
 #include "apsi/tools/matrix.h"
 
@@ -27,8 +32,6 @@
 
 // SEAL
 #include "seal/plaintext.h"
-#include "seal/evaluator.h"
-
 
 namespace apsi
 {
@@ -37,9 +40,9 @@ namespace apsi
         class SenderDB
         {
         public:
-            SenderDB(const PSIParams &params, 
-                std::shared_ptr<seal::SEALContext> &seal_context,
-                FField field);
+            SenderDB(
+                const PSIParams &params, 
+                std::shared_ptr<seal::SEALContext> &seal_context);
 
             /**
             Clears sender's database and set all entries to sender's null item.
@@ -78,23 +81,19 @@ namespace apsi
             void add_data(const Item &item, int thread_count);
 
             /**
-            Batches the randomized symmetric polynonmials for the specified split and the specified batch in sender's database.
+            Batches the randomized symmetric polynomials for the specified split and the specified batch in sender's database.
 
             @see randomized_symmetric_polys for computing randomized symmetric polynomials.
             */
             void batched_randomized_symmetric_polys(
                 SenderThreadContext &th_context,
                 int start_block,
-                int end_block,
-                std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<FFieldBatchEncoder> batch_encoder);
+                int end_block);
 
             void batched_interpolate_polys(
                 SenderThreadContext& th_context,
                 int start_block,
-                int end_block,
-                std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<FFieldBatchEncoder> batch_encoder);
+                int end_block);
 
             DBBlock& get_block(int batch, int split)
             {
@@ -112,7 +111,6 @@ namespace apsi
         private:
             PSIParams params_;
             std::shared_ptr<seal::SEALContext> seal_context_;
-            FField field_;
             FFieldElt null_element_;
             FFieldElt neg_null_element_;
             int encoding_bit_length_;
@@ -147,7 +145,37 @@ namespace apsi
             */
             Matrix<DBBlock> db_blocks_;
 
-            std::pair<DBBlock*, DBBlock::Position> acquire_db_position_after_oprf(size_t cuckoo_loc);
+            std::pair<DBBlock*, DBBlock::Position> acquire_db_position_after_oprf(std::size_t cuckoo_loc);
+
+            /* One context for one thread, to improve performance by using single-thread memory pool. */
+            std::vector<SenderThreadContext> thread_contexts_;
+
+            std::deque<int> available_thread_contexts_;
+
+            std::mutex thread_context_mtx_;
+
+            SenderSessionContext session_context_;
+
+            /**
+            Precomputes all necessary components for the PSI protocol, including symmetric polynomials, batching, etc.
+            This function is expensive and can be called after sender finishes adding items to the database.
+            */
+            void offline_compute();
+
+            /**
+            Handles work for offline_compute for a single thread.
+            */
+            void offline_compute_work();
+
+            /**
+            Report progress of the offline_compute operation.
+            Progress is reported to the Log.
+            */
+            void report_offline_compute_progress(int total_threads, std::atomic<bool>& work_finished);
+
+            int acquire_thread_context();
+
+            void release_thread_context(int idx);
         }; // class SenderDB
     } // namespace sender
 } // namespace apsi

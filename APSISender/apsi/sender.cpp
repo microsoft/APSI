@@ -31,164 +31,11 @@ namespace apsi
 
     namespace sender
     {
-        Sender::Sender(const PSIParams &params, int total_thread_count, 
-                int session_thread_count, MemoryPoolHandle pool) :
+        Sender::Sender(const PSIParams &params, int thread_count) :
             params_(params),
-            pool_(move(pool)),
-            field_(SmallModulus(params_.ffield_characteristic()), params_.ffield_degree()),
-            total_thread_count_(total_thread_count),
-            session_thread_count_(session_thread_count),
-            thread_contexts_(total_thread_count_)
+            thread_count_(thread_count),
+            seal_context_(SEALContext::Create(params_.encryption_params()))
         {
-            if (session_thread_count_ <= 0 || (session_thread_count_ > total_thread_count_))
-            {
-                throw invalid_argument("invalid thread count");
-            }
-            initialize();
-        }
-
-        void Sender::initialize()
-        {
-            seal_context_ = SEALContext::Create(params_.encryption_params());
-
-            // Construct shared Evaluator and BatchEncoder
-            evaluator_ = make_shared<Evaluator>(seal_context_);
-            FField field(
-                SmallModulus(params_.ffield_characteristic()),
-                params_.ffield_degree());
-            batch_encoder_ = make_shared<FFieldBatchEncoder>(
-                seal_context_, field);
-
-            // Create SenderDB
-            sender_db_ = make_unique<SenderDB>(params_, seal_context_, field);
-
-            compressor_ = make_shared<CiphertextCompressor>(seal_context_, evaluator_);
-
-            vector<thread> thrds(total_thread_count_);
-
-            // Set local ffields for multi-threaded efficient use of memory pools.
-            for (int i = 0; i < total_thread_count_; i++)
-            {
-                available_thread_contexts_.push_back(i);
-                thrds[i] = thread([&, i]()
-                {
-                    auto local_pool = MemoryPoolHandle::New();
-                    thread_contexts_[i].set_id(i);
-                    thread_contexts_[i].set_pool(local_pool);
-                    thread_contexts_[i].set_field(field);
-
-                    // Allocate memory for repeated use from the given memory pool.
-                    thread_contexts_[i].construct_variables(params_);
-                });
-            }
-
-            for (auto &thrd : thrds)
-            {
-                thrd.join();
-            }
-        }
-
-        void Sender::load_db(const vector<Item> &data, MatrixView<u8> vals)
-        {
-            sender_db_->set_data(data, vals, total_thread_count_);
-
-            params_.set_split_count(sender_db_->get_params().split_count());
-            params_.set_sender_bin_size(sender_db_->get_params().sender_bin_size());
-
-            // Compute symmetric polys and batch
-            offline_compute();
-        }
-
-        void Sender::offline_compute()
-        {
-            STOPWATCH(sender_stop_watch, "Sender::offline_compute");
-            Log::info("Offline compute started");
-
-            for (auto& ctx : thread_contexts_)
-            {
-                ctx.clear_processed_counts();
-            }
-
-            vector<thread> thread_pool(total_thread_count_);
-            for (int i = 0; i < total_thread_count_; i++)
-            {
-                thread_pool[i] = thread([&]()
-                {
-                    offline_compute_work();
-                });
-            }
-
-            atomic<bool> work_finished = false;
-            thread progress_thread([&]()
-            {
-                report_offline_compute_progress(total_thread_count_, work_finished);
-            });
-
-            for (size_t i = 0; i < thread_pool.size(); i++)
-            {
-                thread_pool[i].join();
-            }
-
-            // Signal progress thread work is done
-            work_finished = true;
-            progress_thread.join();
-
-            Log::info("Offline compute finished.");
-        }
-
-        void Sender::offline_compute_work()
-        {
-            STOPWATCH(sender_stop_watch, "Sender::offline_compute_work");
-
-            int thread_context_idx = acquire_thread_context();
-
-            SenderThreadContext &context = thread_contexts_[thread_context_idx];
-            int start_block = static_cast<int>(thread_context_idx * sender_db_->get_block_count() / total_thread_count_);
-            int end_block = static_cast<int>((thread_context_idx + 1) * sender_db_->get_block_count() / total_thread_count_);
-
-            int blocks_to_process = end_block - start_block;
-            Log::debug("Thread %i processing %i blocks.", thread_context_idx, blocks_to_process);
-
-            context.set_total_randomized_polys(blocks_to_process);
-            if (params_.use_labels())
-            {
-                context.set_total_interpolate_polys(blocks_to_process);
-            }
-
-            STOPWATCH(sender_stop_watch, "Sender::offline_compute_work::calc_symmpoly");
-            sender_db_->batched_randomized_symmetric_polys(context, start_block, end_block, evaluator_, batch_encoder_);
-
-            if (params_.use_labels())
-            {
-                STOPWATCH(sender_stop_watch, "Sender::offline_compute_work::calc_interpolation");
-                sender_db_->batched_interpolate_polys(context, start_block, end_block, evaluator_, batch_encoder_);
-            }
-
-            release_thread_context(context.id());
-        }
-
-        void Sender::report_offline_compute_progress(int total_threads, atomic<bool>& work_finished)
-        {
-            int progress = 0;
-            while (!work_finished)
-            {
-                float threads_progress = 0.0f;
-                for (int i = 0; i < total_threads; i++)
-                {
-                    threads_progress += thread_contexts_[i].get_progress();
-                }
-
-                int int_progress = static_cast<int>((threads_progress / total_threads) * 100.0f);
-
-                if (int_progress > progress)
-                {
-                    progress = int_progress;
-                    Log::info("Offline compute progress: %i%%", progress);
-                }
-
-                // Check for progress 10 times per second
-                this_thread::sleep_for(100ms);
-            }
         }
 
         void Sender::query(
@@ -205,7 +52,9 @@ namespace apsi
             get_relin_keys(seal_context_, rlk, relin_keys);
 
             // Create the session context
-            SenderSessionContext session_context(seal_context_, rlk);
+            SenderSessionContext session_context(seal_context_);
+            session_context.set_relin_keys(rlk);
+            session_context.set_ffield({ params_.ffield_characteristic(), params_.ffield_degree() });
 
             /* Receive client's query data. */
             int num_of_powers = static_cast<int>(query.size());
@@ -220,7 +69,7 @@ namespace apsi
                 powers[i].reserve(split_size_plus_one);
                 for (size_t j = 0; j < split_size_plus_one; ++j)
                 {
-                    powers[i].emplace_back(seal_context_, pool_);
+                    powers[i].emplace_back(seal_context_);
                 }
             }
 
@@ -261,7 +110,7 @@ namespace apsi
             }
 
             // Create a dummy encryption of 1
-            evaluator_->add_plain_inplace(powers[0][0], Plaintext("1"));
+            session_context.evaluator()->add_plain_inplace(powers[0][0], Plaintext("1"));
             for (size_t i = 1; i < powers.size(); ++i)
             {
                 powers[i][0] = powers[0][0];
@@ -281,16 +130,17 @@ namespace apsi
             for (u64 i = 0; i < batch_count; ++i)
                 states.emplace_back(dag);
 
-            atomic<int> remaining_batches(session_thread_count_);
+            atomic<int> remaining_batches(thread_count_);
             promise<void> batches_done_prom;
             auto batches_done_fut = batches_done_prom.get_future().share();
 
-            vector<thread> thread_pool(session_thread_count_);
+            vector<thread> thread_pool(thread_count_);
             for (size_t i = 0; i < thread_pool.size(); i++)
             {
                 thread_pool[i] = thread([&]()
                 {
                     respond_worker(
+                        static_cast<int>(i),
                         batch_count,
                         static_cast<int>(thread_pool.size()),
                         total_blocks,
@@ -313,6 +163,7 @@ namespace apsi
         }
 
         void Sender::respond_worker(
+            int thread_index,
             int batch_count,
             int total_threads,
             int total_blocks,
@@ -329,20 +180,17 @@ namespace apsi
             STOPWATCH(sender_stop_watch, "Sender::respond_worker");
 
             /* Multiple client sessions can enter this function to compete for thread context resources. */
-            int thread_context_idx = acquire_thread_context();
-            auto& thread_context = thread_contexts_[thread_context_idx];
-            thread_context.construct_variables(params_);
-            auto local_pool = thread_context.pool();
+            auto local_pool = MemoryManager::GetPool(mm_prof_opt::FORCE_NEW);
 
             Ciphertext tmp(local_pool);
             Ciphertext compressedResult(seal_context_, local_pool);
 
-            u64 batch_start = thread_context_idx * batch_count / total_threads;
+            u64 batch_start = thread_index * batch_count / total_threads;
             auto thread_idx = std::this_thread::get_id();
 
             for (int batch = static_cast<int>(batch_start), loop_idx = 0ul; loop_idx < batch_count; ++loop_idx)
             {
-                compute_batch_powers(static_cast<int>(batch), powers[batch], session_context, thread_context, dag, states[batch]);
+                compute_batch_powers(static_cast<int>(batch), powers[batch], session_context, dag, states[batch], local_pool);
                 batch = (batch + 1) % batch_count;
             }
 
@@ -356,17 +204,17 @@ namespace apsi
                 batches_done_fut.get();
             }
 
-            int start_block = thread_context_idx * total_blocks / total_thread_count_;
-            int end_block = (thread_context_idx + 1) * total_blocks / total_thread_count_;
+            int start_block = thread_index * total_blocks / thread_count_;
+            int end_block = (thread_index + 1) * total_blocks / thread_count_;
 
-            // Constuct two ciphertext to store the result.  One keeps track of the current result, 
+            // Constuct two ciphertexts to store the result. One keeps track of the current result, 
             // one is used as a temp. Their roles switch each iteration. Saved needing to make a 
             // copy in eval->add(...)
-            array<Ciphertext, 2> runningResults{ thread_context.pool(), thread_context.pool() },
-                label_results{ thread_context.pool(), thread_context.pool() };
+            array<Ciphertext, 2> runningResults{ local_pool, local_pool },
+                label_results{ local_pool, local_pool };
 
             u64 processed_blocks = 0;
-
+            Evaluator &evaluator = *session_context.evaluator();
             for (int block_idx = start_block; block_idx < end_block; block_idx++)
             {
                 int batch = block_idx / params_.split_count(),
@@ -385,20 +233,20 @@ namespace apsi
                 // Observe that the first call to mult is always multiplying coeff[0] by 1....
                 // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
 
-                evaluator_->multiply_plain(powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
+                evaluator.multiply_plain(powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
 
                 for (u32 s = 1; s < params_.split_size(); s++)
                 {
                     // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
-                    evaluator_->multiply_plain(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
-                    evaluator_->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
+                    evaluator.multiply_plain(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
+                    evaluator.add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
                     currResult ^= 1;
                 }
 
                 // Handle the case for s = params_.split_size(); 
                 int s = params_.split_size(); 
                 tmp = powers[batch][s]; 
-                evaluator_->add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
+                evaluator.add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
                 currResult ^= 1;
 
                 if (params_.use_labels())
@@ -419,11 +267,11 @@ namespace apsi
                         // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
 
                         if (s < block.batched_label_coeffs_.size()) {
-                            evaluator_->multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], label_results[curr_label]);
+                            evaluator.multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], label_results[curr_label]);
                         }
                         else {
                             session_context.encryptor_->encrypt_zero(label_results[curr_label]);
-                            evaluator_->transform_to_ntt_inplace(label_results[curr_label]);
+                            evaluator.transform_to_ntt_inplace(label_results[curr_label]);
                             // just set it to be an encryption of zero. 
                             // encryptor_->encrypt; 
                         }
@@ -434,8 +282,8 @@ namespace apsi
                             if (block.batched_label_coeffs_[s].is_zero() == false)
                             {
                                 // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
-                                evaluator_->multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], tmp);
-                                evaluator_->add(tmp, label_results[curr_label], label_results[curr_label ^ 1]);
+                                evaluator.multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], tmp);
+                                evaluator.add(tmp, label_results[curr_label], label_results[curr_label ^ 1]);
                                 curr_label ^= 1;
                             }
                         }
@@ -451,7 +299,7 @@ namespace apsi
                         // TODO: edge case where block.batched_label_coeffs_[0] is zero. 
 
                         // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
-                        evaluator_->multiply_plain(powers[batch][0], block.batched_label_coeffs_[0], label_results[curr_label]);
+                        evaluator.multiply_plain(powers[batch][0], block.batched_label_coeffs_[0], label_results[curr_label]);
                     }
                     else
                     {
@@ -461,19 +309,20 @@ namespace apsi
                     }
 
                     // TODO: We need to randomize the result. This is fine for now.
-                    evaluator_->add(runningResults[currResult], label_results[curr_label], label_results[curr_label ^ 1]);
+                    evaluator.add(runningResults[currResult], label_results[curr_label], label_results[curr_label ^ 1]);
                     curr_label ^= 1;
 
-                    evaluator_->transform_from_ntt_inplace(label_results[curr_label]);
+                    evaluator.transform_from_ntt_inplace(label_results[curr_label]);
                 }
 
                 // Transform back from ntt form.
-                evaluator_->transform_from_ntt_inplace(runningResults[currResult]);
+                evaluator.transform_from_ntt_inplace(runningResults[currResult]);
 
                 // Send the result over the network if needed.
 
                 // First compress
-                compressor_->mod_switch(runningResults[currResult], compressedResult);
+                CiphertextCompressor &compressor = *session_context.compressor();
+                compressor.mod_switch(runningResults[currResult], compressedResult);
 
                 // Send the compressed result
                 ResultPackage pkg;
@@ -482,17 +331,17 @@ namespace apsi
 
                 {
                     stringstream ss;
-                    compressor_->compressed_save(compressedResult, ss);
+                    compressor.compressed_save(compressedResult, ss);
                     pkg.data = ss.str();
                 }
 
                 if (params_.use_labels())
                 {
                     // Compress label
-                    compressor_->mod_switch(label_results[curr_label], compressedResult);
+                    compressor.mod_switch(label_results[curr_label], compressedResult);
 
                     stringstream ss;
-                    compressor_->compressed_save(compressedResult, ss);
+                    compressor.compressed_save(compressedResult, ss);
                     pkg.label_data = ss.str();
                 }
 
@@ -500,19 +349,16 @@ namespace apsi
                 processed_blocks++;
             }
 
-            Log::debug("Thread %d sent %d blocks", thread_context.id(), processed_blocks);
-
-            /* After this point, this thread will no longer use the context resource, so it is free to return it. */
-            release_thread_context(thread_context.id());
+            Log::debug("Thread %d sent %d blocks", thread_index, processed_blocks);
         }
 
         void Sender::compute_batch_powers(
             int batch,
             vector<Ciphertext>& batch_powers,
             SenderSessionContext& session_context,
-            SenderThreadContext& thread_context,
             const WindowingDag& dag,
-            WindowingDag::State& state)
+            WindowingDag::State& state,
+            MemoryPoolHandle pool)
         {
             auto thrdIdx = std::this_thread::get_id();
 
@@ -522,9 +368,8 @@ namespace apsi
                 throw std::runtime_error("");
             }
 
-            MemoryPoolHandle local_pool = thread_context.pool();
-
             size_t idx = (*state.next_node_)++;
+            Evaluator &evaluator = *session_context.evaluator();
             while (idx < dag.nodes_.size())
             {
                 auto& node = dag.nodes_[idx];
@@ -543,8 +388,8 @@ namespace apsi
                 for (size_t i = 0; i < 2; ++i)
                     while (state.nodes_[node.inputs_[i]] != WindowingDag::NodeState::Done);
 
-                evaluator_->multiply(batch_powers[node.inputs_[0]], batch_powers[node.inputs_[1]], batch_powers[node.output_], local_pool);
-                evaluator_->relinearize_inplace(batch_powers[node.output_], session_context.relin_keys_, local_pool);
+                evaluator.multiply(batch_powers[node.inputs_[0]], batch_powers[node.inputs_[1]], batch_powers[node.output_], pool);
+                evaluator.relinearize_inplace(batch_powers[node.output_], session_context.relin_keys_, pool);
 
                 // a simple write should be sufficient but lets be safe
                 exp = WindowingDag::NodeState::Pending;
@@ -564,39 +409,9 @@ namespace apsi
             {
                 auto i = idx - dag.nodes_.size();
 
-                evaluator_->transform_to_ntt_inplace(batch_powers[i]);
+                evaluator.transform_to_ntt_inplace(batch_powers[i]);
                 idx = (*state.next_node_)++;
             }
-        }
-
-        int Sender::acquire_thread_context()
-        {
-            // Multiple threads can enter this function to compete for thread context resources.
-            int thread_context_idx = -1;
-            while (thread_context_idx == -1)
-            {
-                if (!available_thread_contexts_.empty())
-                {
-                    unique_lock<mutex> lock(thread_context_mtx_);
-                    if (!available_thread_contexts_.empty())
-                    {
-                        thread_context_idx = available_thread_contexts_.front();
-                        available_thread_contexts_.pop_front();
-                    }
-                }
-                else
-                {
-                    this_thread::sleep_for(chrono::milliseconds(50));
-                }
-            }
-
-            return thread_context_idx;
-        }
-
-        void Sender::release_thread_context(int idx)
-        {
-            unique_lock<mutex> lock(thread_context_mtx_);
-            available_thread_contexts_.push_back(idx);
         }
 
         u64 WindowingDag::pow(u64 base, u64 e)

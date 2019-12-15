@@ -45,42 +45,27 @@ namespace apsi
                 return pool_;
             }
 
-            inline void set_pool(const seal::MemoryPoolHandle &pool)
+            inline void set_pool(seal::MemoryPoolHandle pool)
             {
-                pool_ = pool;
+                pool_ = std::move(pool);
             }
 
-            inline FField field()
+            inline void construct_variables(PSIParams &params, FField field)
             {
-                return *field_;
-            }
-
-            inline void set_field(FField field)
-            {
-                field_ = std::make_unique<FField>(field);
-            }
-
-            inline void construct_variables(PSIParams &params)
-            {
-                // Is the MPH initialized? It better be.
-                if (!pool_)
-                {
-                    throw std::logic_error("MemoryPoolHandle is null");
-                }
                 if (!symm_block_vec_)
                 {
                     // Number of field elements needed
                     std::size_t total_size = params.batch_size() * (params.split_size() + 1);
 
                     // Set up backing array
-                    symm_block_vec_ = std::make_unique<FFieldArray>(total_size, *field_);
+                    symm_block_vec_ = std::make_unique<FFieldArray>(total_size, field);
 
                     // Create matrix view
                     symm_block_ = MatrixView<_ffield_elt_coeff_t>(
                         symm_block_vec_->data(),
                         params.batch_size(), 
                         params.split_size() + 1,
-                        static_cast<size_t>(field_->d()));
+                        static_cast<size_t>(field.d()));
                 }
             }
 
@@ -137,14 +122,13 @@ namespace apsi
 
             seal::MemoryPoolHandle pool_;
 
-            std::unique_ptr<FField> field_ = nullptr;
-
             std::unique_ptr<FFieldArray> symm_block_vec_ = nullptr;
 
             MatrixView<_ffield_elt_coeff_t> symm_block_;
             
             std::atomic<int> randomized_polys_processed_;
             std::atomic<int> interpolate_polys_processed_;
+
             int total_randomized_polys_;
             int total_interpolate_polys_;
         };
