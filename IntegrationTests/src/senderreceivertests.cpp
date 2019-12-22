@@ -3,6 +3,7 @@
 
 #include "gtest/gtest.h"
 #include "apsi/sender.h"
+#include "apsi/senderdb.h"
 #include "apsi/senderdispatcher.h"
 #include "apsi/receiver.h"
 #include "apsi/network/receiverchannel.h"
@@ -23,7 +24,6 @@ using namespace apsi::tools;
 using namespace apsi::logging;
 using namespace apsi::oprf;
 using namespace seal;
-
 
 namespace
 {
@@ -55,9 +55,6 @@ namespace
     void verify_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<u8>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<u8>& labels)
     {
         bool correct = true;
-     
-
-        
         for (size_t i = 0; i < client_items.size(); i++)
         {
 
@@ -95,11 +92,10 @@ namespace
 
         unique_ptr<Receiver> receiver_ptr;
 
-        auto f = std::async([&]()
-            {
-                receiver_ptr = make_unique<Receiver>(numThreads, MemoryPoolHandle::New());
-            });
-        shared_ptr<Sender> sender = make_shared<Sender>(params, numThreads, numThreads, MemoryPoolHandle::New());
+        auto f = std::async([&]() {
+            receiver_ptr = make_unique<Receiver>(numThreads);
+        });
+        shared_ptr<Sender> sender = make_shared<Sender>(params, numThreads);
         f.get();
         Receiver& receiver = *receiver_ptr;
 
@@ -142,14 +138,15 @@ namespace
 
         OPRFSender::ComputeHashes(s1, *oprf_key);
 
-        sender->load_db(s1, labels);
+        shared_ptr<SenderDB> sender_db = make_shared<SenderDB>(params);
+        sender_db->load_db(numThreads, s1, labels);
 
         atomic<bool> stop_sender = false;
 
         auto thrd = thread([&]() {
             SenderDispatcher dispatcher(sender);
-            dispatcher.run(stop_sender, /* port */ 5550, oprf_key);
-            });
+            dispatcher.run(stop_sender, /* port */ 5550, oprf_key, sender_db);
+        });
 
         receiver.handshake(recvChl);
         auto intersection = receiver.query(c1, recvChl);

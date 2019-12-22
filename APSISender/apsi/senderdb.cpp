@@ -4,6 +4,8 @@
 // STD
 #include <memory>
 #include <thread>
+#include <deque>
+#include <mutex>
 
 // APSI
 #include "apsi/senderdb.h"
@@ -18,13 +20,17 @@ namespace apsi
 
     namespace sender
     {
-        SenderDB::SenderDB(const PSIParams &params, 
-            shared_ptr<SEALContext> &seal_context) :
+        SenderDB::SenderDB(PSIParams params) :
             params_(params),
-            seal_context_(move(seal_context)),
+            field_(params_.ffield_characteristic(), params_.ffield_degree()),
+            null_element_(field_),
+            neg_null_element_(field_),
             next_locs_(params.table_size(), 0),
-            batch_random_symm_poly_storage_(params.split_count() * params.batch_count() * (params.split_size() + 1))
+            batch_random_symm_poly_storage_(params.split_count() * params.batch_count() * (params.split_size() + 1)),
+            session_context_(SEALContext::Create(params.encryption_params()))
         {
+            session_context_.set_ffield(field_);
+
             // Set null value for sender: 1111...1110 (128 bits)
             // Receiver's null value comes from the Cuckoo class: 1111...1111
             sender_null_item_[0] = ~1;
@@ -35,8 +41,7 @@ namespace apsi
             Log::debug("encoding bit length = %i", encoding_bit_length_); 
 
             // Create the null FFieldElement (note: encoding truncation affects high bits)
-            FField field(params_.ffield_characteristic(), params_.ffield_degree());
-            null_element_ = sender_null_item_.to_ffield_element(field, encoding_bit_length_);
+            null_element_ = sender_null_item_.to_ffield_element(field_, encoding_bit_length_);
             neg_null_element_ = -null_element_;
 
             int batch_size = params_.batch_size();
@@ -83,27 +88,6 @@ namespace apsi
                 plain.reserve(static_cast<int>(params_.encryption_params().coeff_modulus().size() *
                     params_.encryption_params().poly_modulus_degree()));
             }
-
-            //// Set local ffields for multi-threaded efficient use of memory pools.
-            //vector<thread> thrds;
-            //for (int i = 0; i < total_thread_count_; i++)
-            //{
-                //available_thread_contexts_.push_back(i);
-                //thrds[i] = thread([&, i]()
-                //{
-                    //auto local_pool = MemoryPoolHandle::New();
-                    //thread_contexts_[i].set_id(i);
-                    //thread_contexts_[i].set_pool(local_pool);
-
-                    //// Allocate memory for repeated use from the given memory pool.
-                    //thread_contexts_[i].construct_variables(params_);
-                //});
-            //}
-
-            //for (auto &thrd : thrds)
-            //{
-                //thrd.join();
-            //}
         }
 
         void SenderDB::clear_db()
@@ -133,7 +117,6 @@ namespace apsi
             STOPWATCH(sender_stop_watch, "SenderDB::set_data");
             clear_db();
 
-
             bool fm = get_params().use_fast_membership();
             if (fm) {
                 Log::debug("Fast membership: add data with no hashing");
@@ -151,15 +134,19 @@ namespace apsi
             if (values.stride() != params_.label_byte_count())
                 throw invalid_argument("unexpacted label length");
 
-            vector<thread> thrds(thread_count);
-
+            // Divide the work across threads
             vector<vector<int>> thread_loads(thread_count);
-            for (size_t t = 0; t < thrds.size(); t++)
+            vector<thread> thrds;
+            for (int t = 0; t < thread_count; t++)
             {
-                thrds[t] = thread([&, t](int idx)
-                {
-                    add_data_worker(idx, thread_count, data, values, thread_loads[t]);
-                }, static_cast<int>(t));
+                thrds.emplace_back([&, t]() {
+                    add_data_worker(
+                        static_cast<int>(t),
+                        thread_count,
+                        data,
+                        values,
+                        thread_loads[t]);
+                });
             }
 
             for (auto &t : thrds)
@@ -247,7 +234,12 @@ namespace apsi
             }
         }
 
-        void SenderDB::add_data_worker(int thread_idx, int thread_count, gsl::span<const Item> data, MatrixView<u8> values, vector<int> &loads)
+        void SenderDB::add_data_worker(
+            int thread_idx,
+            int thread_count,
+            gsl::span<const Item> data,
+            MatrixView<u8> values,
+            vector<int> &loads)
         {
             STOPWATCH(sender_stop_watch, "SenderDB::add_data_worker");
 
@@ -368,9 +360,6 @@ namespace apsi
             int start_block,
             int end_block)
         {
-            // Get the symmetric block
-            auto symm_block = context.symm_block();
-
             int table_size = params_.table_size(),
                 batch_size = params_.batch_size(),
                 split_size_plus_one = params_.split_size() + 1;
@@ -396,7 +385,7 @@ namespace apsi
                     batch_end = batch_start + batch_size;
 
                 auto &block = db_blocks_.data()[next_block];
-                block.symmetric_polys(context, symm_block, encoding_bit_length_, neg_null_element_);
+                block.symmetric_polys(context, encoding_bit_length_, neg_null_element_);
                 block.batch_random_symm_poly_ = { &batch_random_symm_poly_storage_[indexer(split, batch)] , split_size_plus_one };
 
                 for (int i = 0; i < split_size_plus_one; i++)
@@ -406,9 +395,11 @@ namespace apsi
                     // This branch works even if FField is an integer field, but it is slower than normal batching.
                     for (int k = 0; batch_start + k < batch_end; k++)
                     {
-                        copy_n(symm_block(k, i), batch_vector.field().d(), batch_vector.data(k));
+                        copy_n(context.symm_block()(k, i), batch_vector.field().d(), batch_vector.data(k));
                     }
                     session_context_.encoder()->compose(batch_vector, poly);
+                    if (!is_valid_for(poly, session_context_.seal_context()))
+                        throw;
 
                     if (i == split_size_plus_one - 1)
                     {
@@ -423,7 +414,7 @@ namespace apsi
                         }
                     }
 
-                    session_context_.evaluator()->transform_to_ntt_inplace(poly, seal_context_->first_parms_id(), local_pool);
+                    session_context_.evaluator()->transform_to_ntt_inplace(poly, session_context_.seal_context()->first_parms_id(), local_pool);
                 }
 
                 context.inc_randomized_polys();
@@ -456,7 +447,7 @@ namespace apsi
                 auto &block = *db_blocks_(bIdx);
                 block.batch_interpolate(
                     th_context,
-                    seal_context_,
+                    session_context_.seal_context(),
                     session_context_.evaluator(),
                     session_context_.encoder(),
                     cache,
@@ -465,45 +456,70 @@ namespace apsi
             }
         }
 
-        void SenderDB::load_db(const vector<Item> &data, MatrixView<u8> vals)
+        void SenderDB::load_db(int thread_count, const vector<Item> &data, MatrixView<u8> vals)
         {
-            set_data(data, vals, total_thread_count_);
+            set_data(data, vals, thread_count);
 
             params_.set_split_count(params_.split_count());
             params_.set_sender_bin_size(params_.sender_bin_size());
 
             // Compute symmetric polys and batch
-            offline_compute();
+            offline_compute(thread_count);
         }
 
-        void SenderDB::offline_compute()
+        void SenderDB::offline_compute(int thread_count)
         {
             STOPWATCH(sender_stop_watch, "SenderDB::offline_compute");
             Log::info("Offline compute started");
 
-            for (auto& ctx : thread_contexts_)
+            // Thread contexts
+            vector<SenderThreadContext> thread_contexts(thread_count);
+
+            // Field is needed to create the thread contexts
+            FField field(params_.ffield_characteristic(), params_.ffield_degree());
+
+            // Set local ffields for multi-threaded efficient use of memory pools.
+            vector<thread> thrds;
+            for (int i = 0; i < thread_count; i++)
+            {
+                thrds.emplace_back([&, i]() {
+                    thread_contexts[i].set_id(i);
+                    thread_contexts[i].set_pool(MemoryManager::GetPool(mm_prof_opt::FORCE_NEW));
+
+                    // Allocate memory for repeated use from the given memory pool.
+                    thread_contexts[i].construct_variables(params_, field);
+                });
+            }
+
+            for (auto &thrd : thrds)
+            {
+                thrd.join();
+            }
+
+            thrds.clear();
+
+            for (auto &ctx : thread_contexts)
             {
                 ctx.clear_processed_counts();
             }
 
-            vector<thread> thread_pool(total_thread_count_);
-            for (int i = 0; i < total_thread_count_; i++)
+            for (int i = 0; i < thread_count; i++)
             {
-                thread_pool[i] = thread([&]()
+                thrds.emplace_back([&, i]()
                 {
-                    offline_compute_work();
+                    offline_compute_work(thread_contexts[i], thread_count);
                 });
             }
 
             atomic<bool> work_finished = false;
             thread progress_thread([&]()
             {
-                report_offline_compute_progress(total_thread_count_, work_finished);
+                report_offline_compute_progress(thread_contexts, work_finished);
             });
 
-            for (size_t i = 0; i < thread_pool.size(); i++)
+            for (auto &thrd : thrds)
             {
-                thread_pool[i].join();
+                thrd.join();
             }
 
             // Signal progress thread work is done
@@ -513,49 +529,46 @@ namespace apsi
             Log::info("Offline compute finished.");
         }
 
-        void SenderDB::offline_compute_work()
+        void SenderDB::offline_compute_work(SenderThreadContext &th_context, int total_thread_count)
         {
             STOPWATCH(sender_stop_watch, "SenderDB::offline_compute_work");
 
-            int thread_context_idx = acquire_thread_context();
-
-            SenderThreadContext &context = thread_contexts_[thread_context_idx];
-            int start_block = static_cast<int>(thread_context_idx * get_block_count() / total_thread_count_);
-            int end_block = static_cast<int>((thread_context_idx + 1) * get_block_count() / total_thread_count_);
+            int thread_context_idx = th_context.id();
+            int start_block = static_cast<int>(thread_context_idx * get_block_count() / total_thread_count);
+            int end_block = static_cast<int>((thread_context_idx + 1) * get_block_count() / total_thread_count);
 
             int blocks_to_process = end_block - start_block;
             Log::debug("Thread %i processing %i blocks.", thread_context_idx, blocks_to_process);
 
-            context.set_total_randomized_polys(blocks_to_process);
+            th_context.set_total_randomized_polys(blocks_to_process);
             if (params_.use_labels())
             {
-                context.set_total_interpolate_polys(blocks_to_process);
+                th_context.set_total_interpolate_polys(blocks_to_process);
             }
 
             STOPWATCH(sender_stop_watch, "SenderDB::offline_compute_work::calc_symmpoly");
-            batched_randomized_symmetric_polys(context, start_block, end_block, evaluator_, batch_encoder_);
+            batched_randomized_symmetric_polys(th_context, start_block, end_block);
 
             if (params_.use_labels())
             {
                 STOPWATCH(sender_stop_watch, "SenderDB::offline_compute_work::calc_interpolation");
-                batched_interpolate_polys(context, start_block, end_block, evaluator_, batch_encoder_);
+                batched_interpolate_polys(th_context, start_block, end_block);
             }
-
-            release_thread_context(context.id());
         }
 
-        void SenderDB::report_offline_compute_progress(int total_threads, atomic<bool>& work_finished)
+        void SenderDB::report_offline_compute_progress(vector<SenderThreadContext> &thread_contexts, atomic<bool> &work_finished)
         {
+            int thread_count = static_cast<int>(thread_contexts.size());
             int progress = 0;
             while (!work_finished)
             {
                 float threads_progress = 0.0f;
-                for (int i = 0; i < total_threads; i++)
+                for (int i = 0; i < thread_count; i++)
                 {
-                    threads_progress += thread_contexts_[i].get_progress();
+                    threads_progress += thread_contexts[i].get_progress();
                 }
 
-                int int_progress = static_cast<int>((threads_progress / total_threads) * 100.0f);
+                int int_progress = static_cast<int>((threads_progress / thread_count) * 100.0f);
 
                 if (int_progress > progress)
                 {
@@ -566,36 +579,6 @@ namespace apsi
                 // Check for progress 10 times per second
                 this_thread::sleep_for(100ms);
             }
-        }
-
-        int SenderDB::acquire_thread_context()
-        {
-            // Multiple threads can enter this function to compete for thread context resources.
-            int thread_context_idx = -1;
-            while (thread_context_idx == -1)
-            {
-                if (!available_thread_contexts_.empty())
-                {
-                    unique_lock<mutex> lock(thread_context_mtx_);
-                    if (!available_thread_contexts_.empty())
-                    {
-                        thread_context_idx = available_thread_contexts_.front();
-                        available_thread_contexts_.pop_front();
-                    }
-                }
-                else
-                {
-                    this_thread::sleep_for(chrono::milliseconds(50));
-                }
-            }
-
-            return thread_context_idx;
-        }
-
-        void SenderDB::release_thread_context(int idx)
-        {
-            unique_lock<mutex> lock(thread_context_mtx_);
-            available_thread_contexts_.push_back(idx);
         }
     } // namespace sender
 } // namespace apsi

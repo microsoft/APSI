@@ -80,14 +80,13 @@ namespace apsi
 
         void DBBlock::symmetric_polys(
             SenderThreadContext &th_context,
-            MatrixView<_ffield_elt_coeff_t> symm_block,
             int encoding_bit_length,
             const FFieldElt &neg_null_element)
         {
             i64 split_size = items_per_split_;
             i64 batch_size = items_per_batch_;
             auto num_rows = batch_size;
-            auto field = th_context.field();
+            auto field = neg_null_element.field();
 
             auto ch = field.ch();
             auto d = field.d();
@@ -100,7 +99,7 @@ namespace apsi
                 FFieldElt *temp1;
 
                 // Set symm_block[pos.batch_offset, split_size] to 1
-                fill_n(symm_block(static_cast<size_t>(pos.batch_offset), static_cast<size_t>(split_size)), d, 1);
+                fill_n(th_context.symm_block()(static_cast<size_t>(pos.batch_offset), static_cast<size_t>(split_size)), d, 1);
 
                 for (pos.split_offset = split_size - 1; pos.split_offset >= 0; pos.split_offset--)
                 {
@@ -116,7 +115,7 @@ namespace apsi
                         temp1->neg();
                     }
 
-                    auto symm_block_ptr = symm_block(static_cast<size_t>(pos.batch_offset), static_cast<size_t>(pos.split_offset + 1));
+                    auto symm_block_ptr = th_context.symm_block()(static_cast<size_t>(pos.batch_offset), static_cast<size_t>(pos.split_offset + 1));
 
                     transform(symm_block_ptr, symm_block_ptr + d,
                         temp1->data(),
@@ -142,8 +141,8 @@ namespace apsi
         void DBBlock::batch_interpolate(
             SenderThreadContext &th_context,
             shared_ptr<SEALContext> seal_context,
-            shared_ptr<Evaluator> evaluator,
-            shared_ptr<FFieldBatchEncoder> batch_encoder,
+            const unique_ptr<Evaluator> &evaluator,
+            const unique_ptr<FFieldBatchEncoder> &batch_encoder,
             DBInterpolationCache& cache,
             const PSIParams& params)
         {
@@ -218,7 +217,7 @@ namespace apsi
             batched_label_coeffs_.resize(static_cast<size_t>(items_per_split_));
 
             // We assume there are all the same
-            auto degree = th_context.field().d();
+            auto degree = params.ffield_degree();
             FFieldArray temp_array(batch_encoder->create_array());
             for (int s = 0; s < items_per_split_; s++)
             {

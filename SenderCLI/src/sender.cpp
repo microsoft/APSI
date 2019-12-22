@@ -130,10 +130,11 @@ void run_sender_dispatcher(const CLP& cmd)
     OPRFSender::ComputeHashes(items, *oprf_key);
 
     Log::info("Building sender");
-    shared_ptr<Sender> sender = make_shared<Sender>(params, cmd.threads(), cmd.threads());
+    shared_ptr<Sender> sender = make_shared<Sender>(params, cmd.threads());
 
     Log::info("Sender loading DB with %i items", items.size());
-    sender->load_db(items, labels);
+    shared_ptr<SenderDB> sender_db = make_shared<SenderDB>(params);
+    sender_db->load_db(cmd.threads(), items, labels);
 
     signal(SIGINT, sigint_handler);
 
@@ -142,7 +143,7 @@ void run_sender_dispatcher(const CLP& cmd)
     SenderDispatcher dispatcher(sender);
 
     // The dispatcher will run until stopped.
-    dispatcher.run(stop, cmd.net_port(), oprf_key);
+    dispatcher.run(stop, cmd.net_port(), oprf_key, sender_db);
 }
 
 bool initialize_db(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels)

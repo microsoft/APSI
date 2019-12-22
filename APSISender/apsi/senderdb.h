@@ -9,8 +9,6 @@
 #include <memory>
 #include <vector>
 #include <atomic>
-#include <deque>
-#include <mutex>
 
 // GSL
 #include <gsl/span>
@@ -40,14 +38,18 @@ namespace apsi
         class SenderDB
         {
         public:
-            SenderDB(
-                const PSIParams &params, 
-                std::shared_ptr<seal::SEALContext> &seal_context);
+            SenderDB(PSIParams params);
 
             /**
             Clears sender's database and set all entries to sender's null item.
             */
             void clear_db();
+
+            /**
+            Loads the input data into sender's database, and precomputes all necessary components for the PSI protocol,
+            including symmetric polynomials, batching, etc.
+            */
+            void load_db(int thread_count, const std::vector<Item> &data, MatrixView<u8> vals = {});
 
             /**
             Sets the sender's database by hashing the data items with all hash functions.
@@ -110,7 +112,7 @@ namespace apsi
 
         private:
             PSIParams params_;
-            std::shared_ptr<seal::SEALContext> seal_context_;
+            FField field_;
             FFieldElt null_element_;
             FFieldElt neg_null_element_;
             int encoding_bit_length_;
@@ -147,35 +149,24 @@ namespace apsi
 
             std::pair<DBBlock*, DBBlock::Position> acquire_db_position_after_oprf(std::size_t cuckoo_loc);
 
-            /* One context for one thread, to improve performance by using single-thread memory pool. */
-            std::vector<SenderThreadContext> thread_contexts_;
-
-            std::deque<int> available_thread_contexts_;
-
-            std::mutex thread_context_mtx_;
-
             SenderSessionContext session_context_;
 
             /**
             Precomputes all necessary components for the PSI protocol, including symmetric polynomials, batching, etc.
             This function is expensive and can be called after sender finishes adding items to the database.
             */
-            void offline_compute();
+            void offline_compute(int thread_count);
 
             /**
             Handles work for offline_compute for a single thread.
             */
-            void offline_compute_work();
+            void offline_compute_work(SenderThreadContext &th_context, int total_thread_count);
 
             /**
             Report progress of the offline_compute operation.
             Progress is reported to the Log.
             */
-            void report_offline_compute_progress(int total_threads, std::atomic<bool>& work_finished);
-
-            int acquire_thread_context();
-
-            void release_thread_context(int idx);
+            void report_offline_compute_progress(std::vector<SenderThreadContext> &thread_contexts, std::atomic<bool> &work_finished);
         }; // class SenderDB
     } // namespace sender
 } // namespace apsi

@@ -44,6 +44,11 @@ namespace apsi
             const vector<SEAL_BYTE>& client_id,
             Channel& channel)
         {
+            if (!sender_db_)
+            {
+                throw logic_error("SenderDB is not set");
+            }
+
             STOPWATCH(sender_stop_watch, "Sender::query");
             Log::info("Start processing query");
 
@@ -73,7 +78,7 @@ namespace apsi
                 }
             }
 
-            for (const auto& q : query)
+            for (const auto &q : query)
             {
                 size_t power = static_cast<size_t>(q.first);
                 for (size_t i = 0; i < powers.size(); i++)

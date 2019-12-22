@@ -20,17 +20,15 @@
 #include "apsi/psiparams.h"
 #include "apsi/senderdb.h"
 #include "apsi/sendersessioncontext.h"
-#include "apsi/senderthreadcontext.h"
 #include "apsi/ffield/ffield.h"
 #include "apsi/tools/matrixview.h"
 #include "apsi/network/channel.h"
 
 // SEAL
-#include "seal/encryptionparams.h"
-#include "seal/ciphertext.h"
-#include "seal/context.h"
-#include "seal/evaluator.h"
-#include "seal/memorymanager.h"
+#include <seal/encryptionparams.h>
+#include <seal/ciphertext.h>
+#include <seal/context.h>
+#include <seal/memorymanager.h>
 
 
 namespace apsi
@@ -101,14 +99,13 @@ namespace apsi
             */
             inline void clear_db()
             {
-                sender_db_.release();
+                sender_db_.reset();
             }
 
-            /**
-            Loads the input data into sender's database, and precomputes all necessary components for the PSI protocol,
-            including symmetric polynomials, batching, etc.
-            */
-            void load_db(const std::vector<Item> &data, MatrixView<u8> vals = {});
+            inline void set_db(std::shared_ptr<SenderDB> sender_db)
+            {
+                sender_db_ = sender_db;
+            }
 
             /**
             Generate a response to a query
@@ -201,6 +198,8 @@ namespace apsi
             int thread_count_;
 
             std::shared_ptr<seal::SEALContext> seal_context_;
+
+            std::shared_ptr<SenderDB> sender_db_;
         }; // class Sender
     } // namespace sender
 } // namespace apsi

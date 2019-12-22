@@ -34,9 +34,8 @@ namespace apsi
 
     namespace receiver
     {
-        Receiver::Receiver(int thread_count, const MemoryPoolHandle& pool) :
+        Receiver::Receiver(int thread_count) :
             thread_count_(thread_count),
-            pool_(pool),
             field_(nullptr),
             slot_count_(0)
         {
@@ -46,12 +45,9 @@ namespace apsi
             }
         }
 
-        Receiver::Receiver(const PSIParams& params,
-            int thread_count,
-            const MemoryPoolHandle& pool)
-            : params_(make_unique<PSIParams>(params)),
+        Receiver::Receiver(const PSIParams& params, int thread_count) :
+            params_(make_unique<PSIParams>(params)),
             thread_count_(thread_count),
-            pool_(pool),
             field_(nullptr),
             slot_count_(0)
         {
@@ -86,10 +82,9 @@ namespace apsi
             decryptor_ = make_unique<Decryptor>(seal_context_, secret_key_);
 
             // Initializing tools for dealing with compressed ciphertexts
-            // We don't actually need the evaluator
-            shared_ptr<Evaluator> dummy_evaluator = nullptr;
-            compressor_ = make_unique<CiphertextCompressor>(seal_context_,
-                dummy_evaluator, pool_);
+            compressor_ = make_unique<CiphertextCompressor>(
+                seal_context_,
+                MemoryManager::GetPool(mm_prof_opt::FORCE_NEW));
 
             stringstream relin_keys_ss;
             generator.relin_keys_save(relin_keys_ss, compr_mode_type::deflate);
@@ -263,7 +258,7 @@ namespace apsi
 
         pair<
             map<u64, vector<string>>,
-            unique_ptr<KukuTable> >
+            unique_ptr<KukuTable>>
             Receiver::preprocess(vector<Item> &items)
         {
             STOPWATCH(recv_stop_watch, "Receiver::preprocess");
@@ -457,7 +452,9 @@ namespace apsi
             vector<u64> integer_batch(batch_size, 0);
             destination.clear();
             destination.reserve(num_of_batches);
-            Plaintext plain(pool_);
+
+            auto local_pool = MemoryManager::GetPool(mm_prof_opt::FORCE_NEW);
+            Plaintext plain(local_pool);
             FFieldArray batch(batch_encoder_->create_array());
 
             for (int i = 0; i < num_of_batches; i++)
@@ -471,10 +468,11 @@ namespace apsi
                 batch_encoder_->compose(batch, plain);
 
                 stringstream ss;
-                encryptor_->encrypt_symmetric_save(plain, ss, compr_mode_type::deflate, pool_);
+                encryptor_->encrypt_symmetric_save(plain, ss, compr_mode_type::deflate, local_pool);
                 destination.emplace_back(ss.str());
 
                 // note: this is not doing the setting to zero yet.
+#ifdef APSI_DEBUG
                 Log::debug("Fresh encryption noise budget = %i",
                     decryptor_->invariant_noise_budget(
                         [this](const string &ct_str) -> Ciphertext {
@@ -485,6 +483,7 @@ namespace apsi
                         }(destination.back())
                     )
                 );
+#endif
             }
         }
 

@@ -33,7 +33,7 @@ namespace apsi
                 seal_context_(std::move(context))
             {
                 evaluator_ = std::make_unique<seal::Evaluator>(seal_context_);
-                compressor_ = std::make_unique<CiphertextCompressor>(seal_context_, evaluator_);
+                compressor_ = std::make_unique<CiphertextCompressor>(seal_context_);
             }
 
             void set_public_key(const seal::PublicKey &public_key)
@@ -50,7 +50,7 @@ namespace apsi
             void set_ffield(FField field)
             {
                 field_ = std::make_unique<FField>(field);
-                encoder_ = std::make_unique<FFieldBatchEncoder>(seal_context_, field_);
+                encoder_ = std::make_unique<FFieldBatchEncoder>(seal_context_, *field_);
             }
 
             /**

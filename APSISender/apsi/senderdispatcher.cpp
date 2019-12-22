@@ -29,8 +29,8 @@ namespace apsi
     namespace sender
     {
         void SenderDispatcher::run(
-            const atomic<bool>& stop,
-            const int port,
+            const atomic<bool> &stop,
+            int port,
             shared_ptr<const OPRFKey> oprf_key,
             shared_ptr<SenderDB> sender_db)
         {

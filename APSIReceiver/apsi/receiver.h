@@ -44,12 +44,9 @@ namespace apsi
         class Receiver
         {
         public:
-            Receiver(int thread_count,
-                const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::Global());
+            Receiver(int thread_count);
 
-            Receiver(const PSIParams& params,
-                int thread_count,
-                const seal::MemoryPoolHandle& pool = seal::MemoryPoolHandle::Global());
+            Receiver(const PSIParams& params, int thread_count);
 
             /************************************************************************************************************************************
             Perform a full query.
@@ -224,8 +221,6 @@ namespace apsi
             std::shared_ptr<seal::SEALContext> seal_context_;
 
             i32 thread_count_;
-
-            seal::MemoryPoolHandle pool_;
 
             std::shared_ptr<FField> field_;
 
