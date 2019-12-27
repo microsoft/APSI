@@ -6,11 +6,13 @@
 // STD
 #include <deque>
 #include <mutex>
+#include <atomic>
 #include <memory>
 #include <vector>
 #include <iostream>
 #include <map>
 #include <future>
+#include <array>
 
 // GSL
 #include <gsl/span>
@@ -37,7 +39,8 @@ namespace apsi
     {
         struct WindowingDag
         {
-            enum class NodeState {
+            enum class NodeState
+            {
                 Ready = 0,
                 Pending = 1,
                 Done = 2
@@ -45,36 +48,35 @@ namespace apsi
 
             struct State
             {
-                std::unique_ptr<std::atomic<int>> next_node_;
-                std::unique_ptr<std::atomic<NodeState>[]> node_state_storage_;
-                gsl::span<std::atomic<NodeState>> nodes_;
+                std::unique_ptr<std::atomic<int>> next_node;
+                std::unique_ptr<std::atomic<NodeState>[]> node_state_storage;
+                gsl::span<std::atomic<NodeState>> nodes;
 
-                State(WindowingDag& dag);
+                State(WindowingDag &dag);
             };
 
             struct Node
             {
-                std::array<int, 2> inputs_;
-                int output_ = 0;
+                std::array<int, 2> inputs;
+                int output = 0;
             };
 
-            int max_power_, window_;
-            int max_degree_supported_; // maximum degree supported.
-            int given_digits_;  // how many digits are given. 
-            std::vector<int> base_powers_;
-            std::vector<Node> nodes_;
+            int max_power, window;
+            int max_degree_supported; // maximum degree supported.
+            int given_digits;  // how many digits are given. 
+            std::vector<int> base_powers;
+            std::vector<Node> nodes;
 
-            WindowingDag(int max_power, int window, int max_degree_supported, int given_digits)
+            WindowingDag(int max_power, int window, int max_degree_supported, int given_digits) :
+                max_power(max_power),
+                window(window),
+                max_degree_supported(max_degree_supported),
+                given_digits(given_digits)
             {
-                max_power_ = max_power;
-                window_ = window;
-                int base = 1 << window_;
-                max_degree_supported_ = max_degree_supported;
-                given_digits_ = given_digits;
+                int base = 1 << window;
                 u64 actual_power = tools::maximal_power(max_degree_supported, given_digits, base);
 
                 logging::Log::debug("actual power supported = %i", actual_power);
-
                 if (static_cast<int>(actual_power) < max_power)
                 {
                     throw std::invalid_argument("does not support such max_power");
@@ -105,6 +107,8 @@ namespace apsi
             inline void set_db(std::shared_ptr<SenderDB> sender_db)
             {
                 sender_db_ = sender_db;
+                params_.set_split_count(sender_db_->get_params().split_count());
+                params_.set_sender_bin_size(sender_db_->get_params().sender_bin_size());
             }
 
             /**

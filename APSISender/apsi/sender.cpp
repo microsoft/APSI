@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 // STD
+#include <numeric>
 #include <thread>
 #include <future>
 #include <chrono>
@@ -94,60 +95,60 @@ namespace apsi
         }
 
         void Sender::respond(
-            vector<vector<Ciphertext>>& powers, int num_of_powers, 
+            vector<vector<Ciphertext>> &powers, int num_of_powers, 
             SenderSessionContext &session_context,
-            const vector<SEAL_BYTE>& client_id,
-            Channel& channel)
+            const vector<SEAL_BYTE> &client_id,
+            Channel &channel)
         {
             STOPWATCH(sender_stop_watch, "Sender::respond");
 
             auto batch_count = params_.batch_count();
             int split_size_plus_one = params_.split_size() + 1;
-            int	splitStep = batch_count * split_size_plus_one;
             int total_blocks = params_.split_count() * batch_count;
 
             // Make the ciphertext non-transparent
             powers[0][0].resize(2);
-            auto &ct = powers[0][0];
-            for (size_t i = 0; i < ct.coeff_mod_count(); i++)
+            for (size_t i = 0; i < powers[0][0].coeff_mod_count(); i++)
             {
-                powers[0][0].data(1)[i * ct.poly_modulus_degree()] = 1;
+                powers[0][0].data(1)[i * powers[0][0].poly_modulus_degree()] = 1;
             }
 
-            // Create a dummy encryption of 1
+            // Create a dummy encryption of 1 and duplicate to all batches
             session_context.evaluator()->add_plain_inplace(powers[0][0], Plaintext("1"));
-            for (size_t i = 1; i < powers.size(); ++i)
+            for (size_t i = 1; i < powers.size(); i++)
             {
                 powers[i][0] = powers[0][0];
             }
 
-            auto& plain_mod = params_.encryption_params().plain_modulus();
-
             int max_supported_degree = params_.max_supported_degree();
             int window_size = get_params().window_size();
             int base = 1 << window_size;
-            int given_digits = (num_of_powers + base - 2) / (base - 1);   // ceiling of num_of_powers / (base - 1)
+
+            // Ceiling of num_of_powers / (base - 1)
+            int given_digits = (num_of_powers + base - 2) / (base - 1);
 
             WindowingDag dag(params_.split_size(), params_.window_size(), max_supported_degree, given_digits);
+
             std::vector<WindowingDag::State> states;
             states.reserve(batch_count);
-
-            for (u64 i = 0; i < batch_count; ++i)
+            for (u64 i = 0; i < batch_count; i++)
+            {
                 states.emplace_back(dag);
+            }
 
             atomic<int> remaining_batches(thread_count_);
             promise<void> batches_done_prom;
             auto batches_done_fut = batches_done_prom.get_future().share();
 
-            vector<thread> thread_pool(thread_count_);
-            for (size_t i = 0; i < thread_pool.size(); i++)
+            vector<thread> thread_pool;
+            for (size_t i = 0; i < thread_count_; i++)
             {
-                thread_pool[i] = thread([&]()
+                thread_pool.emplace_back([&, i]()
                 {
                     respond_worker(
                         static_cast<int>(i),
                         batch_count,
-                        static_cast<int>(thread_pool.size()),
+                        static_cast<int>(thread_count_),
                         total_blocks,
                         batches_done_prom,
                         batches_done_fut,
@@ -373,12 +374,12 @@ namespace apsi
                 throw std::runtime_error("");
             }
 
-            size_t idx = (*state.next_node_)++;
+            size_t idx = (*state.next_node)++;
             Evaluator &evaluator = *session_context.evaluator();
-            while (idx < dag.nodes_.size())
+            while (idx < dag.nodes.size())
             {
-                auto& node = dag.nodes_[idx];
-                auto& node_state = state.nodes_[node.output_];
+                auto& node = dag.nodes[idx];
+                auto& node_state = state.nodes[node.output];
 
                 // a simple write should be sufficient but lets be safe
                 auto exp = WindowingDag::NodeState::Ready;
@@ -390,32 +391,38 @@ namespace apsi
                 }
 
                 // spin lock on the input nodes
-                for (size_t i = 0; i < 2; ++i)
-                    while (state.nodes_[node.inputs_[i]] != WindowingDag::NodeState::Done);
+                for (size_t i = 0; i < 2; i++)
+                {
+                    while (state.nodes[node.inputs[i]] != WindowingDag::NodeState::Done);
+                }
 
-                evaluator.multiply(batch_powers[node.inputs_[0]], batch_powers[node.inputs_[1]], batch_powers[node.output_], pool);
-                evaluator.relinearize_inplace(batch_powers[node.output_], session_context.relin_keys_, pool);
+                evaluator.multiply(batch_powers[node.inputs[0]], batch_powers[node.inputs[1]], batch_powers[node.output], pool);
+                evaluator.relinearize_inplace(batch_powers[node.output], session_context.relin_keys_, pool);
 
                 // a simple write should be sufficient but lets be safe
                 exp = WindowingDag::NodeState::Pending;
                 r = node_state.compare_exchange_strong(exp, WindowingDag::NodeState::Done);
                 if (r == false)
+                {
                     throw std::runtime_error("");
+                }
 
-                idx = (*state.next_node_)++;
+                idx = (*state.next_node)++;
             }
 
             // Iterate until all nodes are computed. We may want to do something smarter here.
-            for (int i = 0; i < state.nodes_.size(); ++i)
-                while (state.nodes_[i] != WindowingDag::NodeState::Done);
+            for (int i = 0; i < state.nodes.size(); ++i)
+            {
+                while (state.nodes[i] != WindowingDag::NodeState::Done);
+            }
 
-            auto end = dag.nodes_.size() + batch_powers.size();
+            auto end = dag.nodes.size() + batch_powers.size();
             while (idx < end)
             {
-                auto i = idx - dag.nodes_.size();
+                auto i = idx - dag.nodes.size();
 
                 evaluator.transform_to_ntt_inplace(batch_powers[i]);
-                idx = (*state.next_node_)++;
+                idx = (*state.next_node)++;
             }
         }
 
@@ -439,7 +446,7 @@ namespace apsi
                     opt_deg = degrees[i1] + degrees[x - i1];
                 }
                 else if (degrees[i1] + degrees[x - i1] == opt_deg 
-                    && abs(degrees[i1] - degrees[x-i1]) < abs(degrees[opt_split] - degrees[x- opt_split]))
+                    && abs(degrees[i1] - degrees[x-i1]) < abs(degrees[opt_split] - degrees[x - opt_split]))
                 {
                     opt_split = static_cast<int>(i1);
                 }
@@ -463,17 +470,16 @@ namespace apsi
 
         void WindowingDag::compute_dag()
         {
-            std::vector<int>
-                degree(max_power_ + 1, INT_MAX),
-                splits(max_power_ + 1),
-                items_per(max_power_, 0);
+            vector<int> degree(max_power + 1, numeric_limits<int>::max());
+            vector<int> splits(max_power + 1);
+            vector<int> items_per(max_power, 0);
 
-            Log::debug("Computing windowing dag: max power = %i", max_power_);
+            Log::debug("Computing windowing dag: max power = %i", max_power);
 
             // initialize the degree array.
             // given digits...
-            int base = (1 << window_);
-            for (int i = 0; i < given_digits_; i++)
+            int base = (1 << window);
+            for (int i = 0; i < given_digits; i++)
             {
                 for (int j = 1; j < base; j++)
                 {
@@ -486,15 +492,15 @@ namespace apsi
 
             degree[0] = 0;
 
-            for (int i = 1; i <= max_power_; i++)
+            for (int i = 1; i <= max_power; i++)
             {
-                int i1 = static_cast<int>(optimal_split(i, 1 << window_, degree));
+                int i1 = static_cast<int>(optimal_split(i, 1 << window, degree));
                 int i2 = i - i1;
                 splits[i] = i1;
 
                 if (i1 == 0 || i2 == 0)
                 {
-                    base_powers_.emplace_back(i);
+                    base_powers.emplace_back(i);
                     degree[i] = 1;
                 }
                 else
@@ -507,26 +513,26 @@ namespace apsi
             }
 
             // Validate the we did not exceed maximal supported degree.
-            if (*std::max_element(degree.begin(), degree.end()) > max_degree_supported_)
+            if (*std::max_element(degree.begin(), degree.end()) > max_degree_supported)
             {
                 Log::error("Degree exceeds maximal supported"); 
                 throw invalid_argument("degree too large");
             }
 
-            for (int i = 3; i < max_power_ && items_per[i]; ++i)
+            for (int i = 3; i < max_power && items_per[i]; i++)
             {
                 items_per[i] += items_per[i - 1];
             }
 
-            for (int i = 0; i < max_power_; i++) {
+            for (int i = 0; i < max_power; i++) {
                 Log::debug("items_per[%i] = %i", i, items_per[i]);
             }
 
             // size = how many powers we still need to generate. 
-            int size = static_cast<int>(max_power_ - base_powers_.size());
-            nodes_.resize(size);
+            int size = static_cast<int>(max_power - base_powers.size());
+            nodes.resize(size);
 
-            for (int i = 1; i <= max_power_; i++)
+            for (int i = 1; i <= max_power; i++)
             {
                 int i1 = splits[i];
                 int i2 = i - i1;
@@ -536,30 +542,33 @@ namespace apsi
                     auto d = degree[i] - 1; 
 
                     auto idx = items_per[d]++;
-                    if (nodes_[idx].output_)
+                    if (nodes[idx].output)
+                    {
                         throw std::runtime_error("");
+                    }
 
-                    nodes_[idx].inputs_ = { i1,i2 };
-                    nodes_[idx].output_ = i;
-
+                    nodes[idx].inputs = { i1,i2 };
+                    nodes[idx].output = i;
                 }
             }
         }
 
-        WindowingDag::State::State(WindowingDag & dag)
+        WindowingDag::State::State(WindowingDag &dag)
         {
-            next_node_ = make_unique<std::atomic<int>>();
-            *next_node_ = 0;
-            node_state_storage_ = make_unique<std::atomic<NodeState>[]>(dag.max_power_ + 1);
-            nodes_ = { node_state_storage_.get(), dag.max_power_ + 1 };
+            next_node = make_unique<std::atomic<int>>();
+            *next_node = 0;
+            node_state_storage = make_unique<std::atomic<NodeState>[]>(dag.max_power + 1);
+            nodes = { node_state_storage.get(), dag.max_power + 1 };
 
-            for (auto& n : nodes_)
-                n = NodeState::Ready;
-
-            nodes_[0] = NodeState::Done;
-            for (auto& n : dag.base_powers_)
+            for (auto &n : nodes)
             {
-                nodes_[n] = NodeState::Done;
+                n = NodeState::Ready;
+            }
+
+            nodes[0] = NodeState::Done;
+            for (auto &n : dag.base_powers)
+            {
+                nodes[n] = NodeState::Done;
             }
         }
     } // namespace sender

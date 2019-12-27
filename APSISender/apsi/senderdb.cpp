@@ -460,9 +460,6 @@ namespace apsi
         {
             set_data(data, vals, thread_count);
 
-            params_.set_split_count(params_.split_count());
-            params_.set_sender_bin_size(params_.sender_bin_size());
-
             // Compute symmetric polys and batch
             offline_compute(thread_count);
         }
