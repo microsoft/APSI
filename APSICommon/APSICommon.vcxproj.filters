@@ -111,9 +111,6 @@
     <ClInclude Include="apsi\tools\utils.h">
       <Filter>Header Files\tools</Filter>
     </ClInclude>
-    <ClInclude Include="apsi\tools\thread_pool.h">
-      <Filter>Header Files\tools</Filter>
-    </ClInclude>
     <ClInclude Include="apsi\logging\log.h">
       <Filter>Header Files\logging</Filter>
     </ClInclude>
