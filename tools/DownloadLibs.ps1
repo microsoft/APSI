@@ -8,6 +8,6 @@ $LibsZipFile = Join-Path -Path $LibsDirectory -ChildPath Libs.zip
 
 mkdir -Path $LibsDirectory
 
-Invoke-WebRequest -Uri "https://seal.file.core.windows.net/apsilibs/Libs.zip?sp=rl&st=2019-07-22T19:08:08Z&se=2021-07-23T19:08:00Z&sv=2018-03-28&sig=%2FOpDjExw7tll1hN12d8%2FOdjO8N7II8yCgLa%2FCUJ4Cm4%3D&sr=f" -OutFile $LibsZipFile
+Invoke-WebRequest -Uri "https://seal.file.core.windows.net/apsilibs/Libs.zip?sp=rl&st=2020-01-22T23:31:10Z&se=2022-01-23T23:31:00Z&sv=2019-02-02&sig=h3gcPt9Aoy7%2BwaWrTcgX6HqPGCFr3RL0t3wWrsoLCYQ%3D&sr=f" -OutFile $LibsZipFile
 Expand-Archive -Path $LibsZipFile -DestinationPath $LibsDirectory
 
