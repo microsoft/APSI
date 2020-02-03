@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{6E84A852-E68E-4C1D-8266-08CEEAB6ADE6}</ProjectGuid>
     <RootNamespace>APSI</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.16299.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
     <ProjectName>APSICommon</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -185,16 +185,10 @@
     <ClInclude Include="apsi\oprf\oprf_common.h" />
     <ClInclude Include="apsi\oprf\oprf_sender.h" />
     <ClInclude Include="apsi\oprf\oprf_receiver.h" />
-    <ClInclude Include="apsi\tools\blake2\blake2-config.h" />
-    <ClInclude Include="apsi\tools\blake2\blake2-impl.h" />
-    <ClInclude Include="apsi\tools\blake2\blake2.h" />
-    <ClInclude Include="apsi\tools\blake2\blake2b-load-sse2.h" />
-    <ClInclude Include="apsi\tools\blake2\blake2b-load-sse41.h" />
-    <ClInclude Include="apsi\tools\blake2\blake2b-round.h" />
     <ClInclude Include="apsi\tools\csvreader.h" />
     <ClInclude Include="apsi\tools\interpolate.h" />
     <ClInclude Include="apsi\tools\matrix.h" />
-    <ClInclude Include="apsi\tools\prng.h" />
+    <ClInclude Include="apsi\tools\matrixview.h" />
     <ClInclude Include="apsi\tools\sealcompress.h" />
     <ClInclude Include="apsi\tools\stopwatch.h" />
     <ClInclude Include="apsi\tools\utils.h" />

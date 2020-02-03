@@ -1,180 +1,38 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project toolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Source Files">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
-    <Filter Include="Header Files">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
-    </Filter>
-    <Filter Include="Resource Files">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
-    </Filter>
-    <Filter Include="Header Files\network">
-      <UniqueIdentifier>{1d7550ee-b676-45fd-92a7-e3960c3f4180}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\network">
-      <UniqueIdentifier>{bc1b2fb6-fe51-4c78-aaa8-d0ce85877950}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\oprf">
-      <UniqueIdentifier>{b2e92ba2-ff3c-49ec-8352-e6222c7728e4}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\oprf">
-      <UniqueIdentifier>{bcf8dcb8-2911-4d71-9c99-223adea69716}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\tools">
-      <UniqueIdentifier>{3724c067-3d6b-42ac-b9ab-cbf3c5c3fc09}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\tools">
-      <UniqueIdentifier>{3071dd66-85f2-4ab2-a9d1-1b986e2921e9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\ffield">
-      <UniqueIdentifier>{ac40a90d-a74a-497e-bf3e-fa0c9f9ef422}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\ffield">
-      <UniqueIdentifier>{2410c2d4-ab26-45d4-8505-d7f3cf1b99c0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\logging">
-      <UniqueIdentifier>{a816c5eb-9d2c-4624-8b09-68f8b09b1512}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\logging">
-      <UniqueIdentifier>{9865b702-dfe7-405d-830a-1a09e38d309f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\tools\blake2">
-      <UniqueIdentifier>{c61f079e-6a99-484a-a216-8e7329a4fb9b}</UniqueIdentifier>
-    </Filter>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="apsi\apsi.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\item.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\network\network_utils.h">
-      <Filter>Header Files\network</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\psiparams.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\tools\stopwatch.h">
-      <Filter>Header Files\tools</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\apsidefines.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\ffield\ffield.h">
-      <Filter>Header Files\ffield</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\ffield\ffield_array.h">
-      <Filter>Header Files\ffield</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\ffield\ffield_elt.h">
-      <Filter>Header Files\ffield</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\oprf\ecpoint.h">
-      <Filter>Header Files\oprf</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\oprf\oprf_common.h">
-      <Filter>Header Files\oprf</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\oprf\oprf_sender.h">
-      <Filter>Header Files\oprf</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\oprf\oprf_receiver.h">
-      <Filter>Header Files\oprf</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\tools\interpolate.h">
-      <Filter>Header Files\tools</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\tools\sealcompress.h">
-      <Filter>Header Files\tools</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\tools\prng.h">
-      <Filter>Header Files\tools</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\ffield\ffield_batch_encoder.h">
-      <Filter>Header Files\ffield</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\network\channel.h">
-      <Filter>Header Files\network</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\tools\matrix.h">
-      <Filter>Header Files\tools</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\result_package.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\tools\utils.h">
-      <Filter>Header Files\tools</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\logging\log.h">
-      <Filter>Header Files\logging</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\tools\csvreader.h">
-      <Filter>Header Files\tools</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\network\senderoperation.h">
-      <Filter>Header Files\network</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\network\senderoperationresponse.h">
-      <Filter>Header Files\network</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\tools\blake2\blake2.h">
-      <Filter>Header Files\tools\blake2</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\tools\blake2\blake2b-load-sse2.h">
-      <Filter>Header Files\tools\blake2</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\tools\blake2\blake2b-load-sse41.h">
-      <Filter>Header Files\tools\blake2</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\tools\blake2\blake2b-round.h">
-      <Filter>Header Files\tools\blake2</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\tools\blake2\blake2-config.h">
-      <Filter>Header Files\tools\blake2</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\tools\blake2\blake2-impl.h">
-      <Filter>Header Files\tools\blake2</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\network\network_channel.h">
-      <Filter>Header Files\network</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\network\stream_channel.h">
-      <Filter>Header Files\network</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="apsi\apsidefines.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\item.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\network\network_utils.cpp">
-      <Filter>Source Files\network</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\tools\stopwatch.cpp">
-      <Filter>Source Files\tools</Filter>
-    </ClCompile>
     <ClCompile Include="apsi\ffield\ffield.cpp">
+      <Filter>Source Files\ffield</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\ffield\ffield_batch_encoder.cpp">
       <Filter>Source Files\ffield</Filter>
     </ClCompile>
     <ClCompile Include="apsi\ffield\ffield_elt.cpp">
       <Filter>Source Files\ffield</Filter>
     </ClCompile>
-    <ClCompile Include="apsi\oprf\ecpoint.cpp">
+    <ClCompile Include="apsi\logging\log.cpp">
+      <Filter>Source Files\logging</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\network\network_channel.cpp">
+      <Filter>Source Files\network</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\network\network_utils.cpp">
+      <Filter>Source Files\network</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\network\stream_channel.cpp">
+      <Filter>Source Files\network</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\oprf\oprf_receiver.cpp">
       <Filter>Source Files\oprf</Filter>
     </ClCompile>
     <ClCompile Include="apsi\oprf\oprf_sender.cpp">
       <Filter>Source Files\oprf</Filter>
     </ClCompile>
-    <ClCompile Include="apsi\oprf\oprf_receiver.cpp">
+    <ClCompile Include="apsi\oprf\ecpoint.cpp">
       <Filter>Source Files\oprf</Filter>
+    </ClCompile>
+    <ClCompile Include="apsi\tools\csvreader.cpp">
+      <Filter>Source Files\tools</Filter>
     </ClCompile>
     <ClCompile Include="apsi\tools\interpolate.cpp">
       <Filter>Source Files\tools</Filter>
@@ -182,22 +40,138 @@
     <ClCompile Include="apsi\tools\sealcompress.cpp">
       <Filter>Source Files\tools</Filter>
     </ClCompile>
-    <ClCompile Include="apsi\ffield\ffield_batch_encoder.cpp">
-      <Filter>Source Files\ffield</Filter>
+    <ClCompile Include="apsi\tools\stopwatch.cpp">
+      <Filter>Source Files\tools</Filter>
+    </ClCompile>
     <ClCompile Include="apsi\tools\utils.cpp">
       <Filter>Source Files\tools</Filter>
     </ClCompile>
-    <ClCompile Include="apsi\logging\log.cpp">
-      <Filter>Source Files\logging</Filter>
+    <ClCompile Include="apsi\apsidefines.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="apsi\tools\csvreader.cpp">
-      <Filter>Source Files\tools</Filter>
+    <ClCompile Include="apsi\item.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="apsi\network\network_channel.cpp">
-      <Filter>Source Files\network</Filter>
-    </ClCompile>
-    <ClCompile Include="apsi\network\stream_channel.cpp">
-      <Filter>Source Files\network</Filter>
-    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="apsi\ffield\ffield.h">
+      <Filter>Header Files\ffield</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\ffield\ffield_array.h">
+      <Filter>Header Files\ffield</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\ffield\ffield_batch_encoder.h">
+      <Filter>Header Files\ffield</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\ffield\ffield_elt.h">
+      <Filter>Header Files\ffield</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\logging\log.h">
+      <Filter>Header Files\logging</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\network\channel.h">
+      <Filter>Header Files\network</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\network\network_channel.h">
+      <Filter>Header Files\network</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\network\network_utils.h">
+      <Filter>Header Files\network</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\network\senderoperationresponse.h">
+      <Filter>Header Files\network</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\network\senderoperation.h">
+      <Filter>Header Files\network</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\network\stream_channel.h">
+      <Filter>Header Files\network</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\oprf\ecpoint.h">
+      <Filter>Header Files\oprf</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\oprf\oprf_common.h">
+      <Filter>Header Files\oprf</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\oprf\oprf_receiver.h">
+      <Filter>Header Files\oprf</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\oprf\oprf_sender.h">
+      <Filter>Header Files\oprf</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\csvreader.h">
+      <Filter>Header Files\tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\interpolate.h">
+      <Filter>Header Files\tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\matrix.h">
+      <Filter>Header Files\tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\matrixview.h">
+      <Filter>Header Files\tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\sealcompress.h">
+      <Filter>Header Files\tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\stopwatch.h">
+      <Filter>Header Files\tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\tools\utils.h">
+      <Filter>Header Files\tools</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\apsi.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\apsidefines.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\item.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\psiparams.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="apsi\result_package.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{1fbdf0ce-86e9-4a20-ab66-2d68176984a4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4a5ed6f5-f431-4297-9e6d-3b77552b6c37}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\ffield">
+      <UniqueIdentifier>{334e1c3f-203e-4fd9-a485-2dccd9c019b5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\logging">
+      <UniqueIdentifier>{a26debd1-ca73-48ef-aafa-27f587535879}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\network">
+      <UniqueIdentifier>{1f50a789-0de8-40a9-9464-72b5eb8ea612}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\oprf">
+      <UniqueIdentifier>{6286e7e0-56ac-41df-bd70-33822a76e7f8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\tools">
+      <UniqueIdentifier>{0e3e388d-44f8-4f10-9340-302b72b96740}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\ffield">
+      <UniqueIdentifier>{fc81cbfa-f2bf-46a0-9835-74407ac09052}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\logging">
+      <UniqueIdentifier>{4df88e42-da05-446e-a567-0cb4eb00ff4c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\network">
+      <UniqueIdentifier>{dd51e4d0-094b-47d6-80c8-d91a2cf36a62}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\tools">
+      <UniqueIdentifier>{9dff5086-413a-46f0-a391-12a70671eaad}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\oprf">
+      <UniqueIdentifier>{4c15ccb9-b86f-479c-8b9f-f3c1a77d193f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>
