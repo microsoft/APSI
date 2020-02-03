@@ -87,7 +87,8 @@ namespace apsi
                 MemoryManager::GetPool(mm_prof_opt::FORCE_NEW));
 
             stringstream relin_keys_ss;
-            generator.relin_keys_save(relin_keys_ss, compr_mode_type::deflate);
+            Serializable<RelinKeys> relin_keys = generator.relin_keys();
+            relin_keys.save(relin_keys_ss, compr_mode_type::deflate);
             relin_keys_ = relin_keys_ss.str();
 
             batch_encoder_ = make_shared<FFieldBatchEncoder>(seal_context_, *field_);
@@ -468,7 +469,8 @@ namespace apsi
                 batch_encoder_->compose(batch, plain);
 
                 stringstream ss;
-                encryptor_->encrypt_symmetric_save(plain, ss, compr_mode_type::deflate, local_pool);
+                Serializable<Ciphertext> ser_cipher = encryptor_->encrypt_symmetric(plain, local_pool);
+                ser_cipher.save(ss, compr_mode_type::deflate);
                 destination.emplace_back(ss.str());
 
                 // note: this is not doing the setting to zero yet.

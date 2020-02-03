@@ -152,7 +152,8 @@ namespace APSITests
                 KeyGenerator key_gen(context);
 
                 stringstream ss;
-                key_gen.relin_keys_save(ss, compr_mode_type::none);
+                Serializable<RelinKeys> ser_relinkeys = key_gen.relin_keys();
+                ser_relinkeys.save(ss, compr_mode_type::none);
                 string relinkeys_str = ss.str();
                 ASSERT_EQ(relinkeys_str.length(), 197010);
 
@@ -324,7 +325,7 @@ namespace APSITests
             KeyGenerator key_gen(context);
 
             PublicKey pub_key = key_gen.public_key();
-            RelinKeys relin_keys = key_gen.relin_keys();
+            RelinKeys relin_keys = key_gen.relin_keys_local();
             stringstream ss;
             relin_keys.save(ss);
             string relin_keys_str = ss.str();
@@ -499,7 +500,7 @@ namespace APSITests
         KeyGenerator key_gen(context);
 
         PublicKey pubkey = key_gen.public_key();
-        RelinKeys relinkeys = key_gen.relin_keys();
+        RelinKeys relinkeys = key_gen.relin_keys_local();
         stringstream ss;
         relinkeys.save(ss);
         string relinkeys_str = ss.str();

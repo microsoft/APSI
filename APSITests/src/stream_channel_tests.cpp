@@ -187,7 +187,8 @@ namespace APSITests
         KeyGenerator key_gen(context);
 
         stringstream ss;
-        key_gen.relin_keys_save(ss, compr_mode_type::none);
+        Serializable<RelinKeys> ser_relinkeys = key_gen.relin_keys();
+        ser_relinkeys.save(ss, compr_mode_type::none);
         string relin_keys_str = ss.str();
         ASSERT_EQ(relin_keys_str.length(), 197010);
 
