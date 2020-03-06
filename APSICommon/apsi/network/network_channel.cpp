@@ -126,7 +126,7 @@ bool NetworkChannel::receive(shared_ptr<SenderOperation>& sender_op)
     return receive(sender_op, /* wait_for_message */ false);
 }
 
-void NetworkChannel::receive(SenderResponseGetParameters& response)
+bool NetworkChannel::receive(SenderResponseGetParameters& response)
 {
     throw_if_not_connected();
 
@@ -135,13 +135,13 @@ void NetworkChannel::receive(SenderResponseGetParameters& response)
 
     // We should have at least 18 parts
     if (msg.parts() < 18)
-        throw runtime_error("Message should have at least 18 parts");
+        return false;
 
     // First part is message type
     SenderOperationType type = get_message_type(msg, /* part */ 0);
 
     if (type != SOP_get_parameters)
-        throw runtime_error("Message should be get parameters type");
+        return false;
 
     // Parameters start from second part
     size_t idx = 1;
@@ -189,9 +189,11 @@ void NetworkChannel::receive(SenderResponseGetParameters& response)
     bytes_received_ += sizeof(PSIParams::CuckooParams);
     bytes_received_ += sizeof(PSIParams::SEALParams);
     bytes_received_ += sizeof(PSIParams::ExFieldParams);
+
+    return true;
 }
 
-void NetworkChannel::receive(SenderResponsePreprocess& response)
+bool NetworkChannel::receive(SenderResponsePreprocess& response)
 {
     throw_if_not_connected();
 
@@ -200,21 +202,23 @@ void NetworkChannel::receive(SenderResponsePreprocess& response)
 
     // We should have 3 parts
     if (msg.parts() != 3)
-        throw runtime_error("Message should have three parts");
+        return false;
 
     SenderOperationType type = get_message_type(msg, /* part */ 0);
     if (type != SOP_preprocess)
-        throw runtime_error("Message should be preprocess type");
+        return false;
 
     // Buffer starts at part 1
     get_buffer(response.buffer, msg, /* part_start */ 1);
 
     bytes_received_ += sizeof(SenderOperationType);
     bytes_received_ += response.buffer.size();
+
+    return true;
 }
 
 
-void NetworkChannel::receive(SenderResponseQuery& response)
+bool NetworkChannel::receive(SenderResponseQuery& response)
 {
     throw_if_not_connected();
 
@@ -223,20 +227,22 @@ void NetworkChannel::receive(SenderResponseQuery& response)
 
     // We should have at least 2 parts
     if (msg.parts() < 2)
-        throw runtime_error("Message should have at least two parts");
+        return false;
 
     SenderOperationType type = get_message_type(msg, /* part */ 0);
     if (type != SOP_query)
-        throw runtime_error("Message should be query type");
+        return false;
 
     // Number of result packages
     response.package_count = msg.get<u64>(/* part */ 1);
 
     bytes_received_ += sizeof(u32); // SenderOperationType
     bytes_received_ += sizeof(u64);
+
+    return true;
 }
 
-void NetworkChannel::receive(ResultPackage& pkg)
+bool NetworkChannel::receive(ResultPackage& pkg)
 {
     throw_if_not_connected();
 
@@ -245,9 +251,7 @@ void NetworkChannel::receive(ResultPackage& pkg)
 
     if (msg.parts() != 4)
     {
-        stringstream ss;
-        ss << "Should have 4 parts, has " << msg.parts();
-        throw runtime_error(ss.str());
+        return false;;
     }
 
     pkg.split_idx = msg.get<i64>(/* part */ 0);
@@ -256,6 +260,8 @@ void NetworkChannel::receive(ResultPackage& pkg)
     pkg.label_data = msg.get(/* part */ 3);
 
     bytes_received_ += pkg.size();
+
+    return true;
 }
 
 void NetworkChannel::send_get_parameters()

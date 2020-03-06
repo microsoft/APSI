@@ -136,7 +136,13 @@ pair<vector<bool>, Matrix<u8>> Receiver::decrypt_result(vector<Item>& items, Cha
     SenderResponseQuery query_resp;
     {
         STOPWATCH(recv_stop_watch, "Receiver::query::wait_response");
-        chl.receive(query_resp);
+        if (!chl.receive(query_resp))
+        {
+            Log::error("Not able to receive query response");
+            pair<vector<bool>, Matrix<u8>> empty_result;
+            return empty_result;
+        }
+
         Log::debug("Sender will send %i result packages", query_resp.package_count);
     }
 
@@ -566,7 +572,11 @@ void Receiver::stream_decrypt_worker(
         ResultPackage pkg;
         {
             STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt_worker_wait");
-            channel.receive(pkg);
+            if (!channel.receive(pkg))
+            {
+                Log::error("Could not receive Result package");
+                return;
+            }
         }
 
         int base_idx = static_cast<int>(pkg.batch_idx * batch_size);

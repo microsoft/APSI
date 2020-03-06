@@ -51,13 +51,13 @@ bool StreamChannel::receive(shared_ptr<SenderOperation>& sender_op)
     return true;
 }
 
-void StreamChannel::receive(SenderResponseGetParameters& response)
+bool StreamChannel::receive(SenderResponseGetParameters& response)
 {
     // First part is message type
     SenderOperationType senderOpType = read_operation_type();
 
     if (senderOpType != SOP_get_parameters)
-        throw runtime_error("Should be get parameters type");
+        return false;
 
     // PSIConfParams
     istream_.read(reinterpret_cast<char*>(&response.psiconf_params), sizeof(PSIParams::PSIConfParams));
@@ -80,6 +80,8 @@ void StreamChannel::receive(SenderResponseGetParameters& response)
     bytes_received_ += sizeof(PSIParams::CuckooParams);
     bytes_received_ += sizeof(PSIParams::SEALParams);
     bytes_received_ += sizeof(PSIParams::ExFieldParams);
+
+    return true;
 }
 
 void StreamChannel::send_get_parameters()
@@ -121,13 +123,13 @@ void StreamChannel::send_get_parameters_response(const vector<u8>& client_id, co
     bytes_sent_ += sizeof(PSIParams::ExFieldParams);
 }
 
-void StreamChannel::receive(SenderResponsePreprocess& response)
+bool StreamChannel::receive(SenderResponsePreprocess& response)
 {
     // First part is message type
     SenderOperationType type = read_operation_type();
 
     if (type != SOP_preprocess)
-        throw runtime_error("Should be preprocess type");
+        return false;
 
     // Size of buffer
     u64 size;
@@ -139,6 +141,8 @@ void StreamChannel::receive(SenderResponsePreprocess& response)
 
     bytes_received_ += sizeof(u64);
     bytes_received_ += size;
+
+    return true;
 }
 
 void StreamChannel::send_preprocess(const vector<u8>& buffer)
@@ -175,16 +179,18 @@ void StreamChannel::send_preprocess_response(const vector<u8>& client_id, const 
     bytes_sent_ += size;
 }
 
-void StreamChannel::receive(SenderResponseQuery& response)
+bool StreamChannel::receive(SenderResponseQuery& response)
 {
     SenderOperationType type = read_operation_type();
 
     if (type != SOP_query)
-        throw runtime_error("Type should be query");
+        return false;
 
     // Package count
     istream_.read(reinterpret_cast<char*>(&response.package_count), sizeof(u64));
     bytes_received_ += sizeof(u64);
+
+    return true;
 }
 
 void StreamChannel::send_query(
@@ -227,7 +233,7 @@ void StreamChannel::send_query_response(const vector<u8>& client_id, const size_
     bytes_sent_ += sizeof(u64);
 }
 
-void StreamChannel::receive(apsi::ResultPackage& pkg)
+bool StreamChannel::receive(apsi::ResultPackage& pkg)
 {
     unique_lock<mutex> rec_lock(*receive_mutex_);
 
@@ -238,6 +244,8 @@ void StreamChannel::receive(apsi::ResultPackage& pkg)
     read_string(pkg.label_data);
 
     bytes_received_ += (sizeof(i64) * 2);
+
+    return true;
 }
 
 void StreamChannel::send(const vector<u8>& client_id, const ResultPackage& pkg)
