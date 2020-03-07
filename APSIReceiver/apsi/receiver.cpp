@@ -110,15 +110,23 @@ map<uint64_t, vector<string>>& Receiver::query(vector<Item>& items)
         throw runtime_error("No parameters have been configured.");
     }
 
-    preprocess_result_ = preprocess(items);
-    auto& ciphertexts = preprocess_result_.first;
+    preprocess_result_ = make_unique<pair<map<uint64_t, vector<string>>, unique_ptr<KukuTable>>>
+        (preprocess(items));
+    auto& ciphertexts = preprocess_result_->first;
 
     return ciphertexts;
 }
 
 pair<vector<bool>, Matrix<u8>> Receiver::decrypt_result(vector<Item>& items, Channel& chl)
 {
-    auto& cuckoo = *preprocess_result_.second;
+    pair<vector<bool>, Matrix<u8>> empty_result;
+
+    if (nullptr == preprocess_result_)
+    {
+        return empty_result;
+    }
+
+    auto& cuckoo = *(preprocess_result_->second);
     size_t padded_table_size = static_cast<size_t>(
         ((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
 
@@ -139,7 +147,6 @@ pair<vector<bool>, Matrix<u8>> Receiver::decrypt_result(vector<Item>& items, Cha
         if (!chl.receive(query_resp))
         {
             Log::error("Not able to receive query response");
-            pair<vector<bool>, Matrix<u8>> empty_result;
             return empty_result;
         }
 
