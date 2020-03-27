@@ -580,15 +580,15 @@ namespace apsi
                 bool has_result = false;
                 std::vector<u8> has_label(batch_size);
 
-        ResultPackage pkg;
-        {
-            STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt_worker_wait");
-            if (!channel.receive(pkg))
-            {
-                Log::error("Could not receive Result package");
-                return;
-            }
-        }
+                ResultPackage pkg;
+                {
+                    STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt_worker_wait");
+                    if (!channel.receive(pkg))
+                    {
+                        Log::error("Could not receive Result package");
+                        return;
+                    }
+                }
 
                 int base_idx = static_cast<int>(pkg.batch_idx * batch_size);
                 Log::debug("Thread idx: %i, pkg.batch_idx: %i", thread_idx, pkg.batch_idx);
