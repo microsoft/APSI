@@ -240,10 +240,11 @@ namespace apsi
             std::unique_ptr<CiphertextCompressor> compressor_;
 
             // Preprocess result
+            std::unique_ptr<
             std::pair<
                 std::map<u64, std::vector<std::string>>,
                 std::unique_ptr<kuku::KukuTable>
-            > preprocess_result_;
+            >> preprocess_result_;
 
             std::string relin_keys_;
 

@@ -40,22 +40,22 @@ namespace apsi
             /**
             * Receive Get Parameters response from Sender
             */
-            virtual void receive(SenderResponseGetParameters& response);
+            virtual bool receive(apsi::network::SenderResponseGetParameters& response);
 
             /**
             * Receive item preprocessing response from Sender
             */
-            virtual void receive(SenderResponsePreprocess& response);
+            virtual bool receive(apsi::network::SenderResponsePreprocess& response);
 
             /**
             * Receive Query response from Sender
             */
-            virtual void receive(SenderResponseQuery& response);
+            virtual bool receive(apsi::network::SenderResponseQuery& response);
 
             /**
             Receive a ResultPackage structure
             */
-            virtual void receive(ResultPackage& pkg);
+            virtual bool receive(apsi::ResultPackage& pkg);
 
             /**
             Send a request to Get Parameters from Sender
