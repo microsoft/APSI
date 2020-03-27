@@ -123,22 +123,22 @@ namespace apsi
             return receive(sender_op, /* wait_for_message */ false);
         }
 
-bool NetworkChannel::receive(SenderResponseGetParameters& response)
-{
-    throw_if_not_connected();
+        bool NetworkChannel::receive(SenderResponseGetParameters& response)
+        {
+            throw_if_not_connected();
 
             message_t msg;
             receive_message(msg);
 
-    // We should have at least 18 parts
-    if (msg.parts() < 18)
-        return false;
+            // We should have at least 18 parts
+            if (msg.parts() < 18)
+                return false;
 
             // First part is message type
             SenderOperationType type = get_message_type(msg, /* part */ 0);
 
-    if (type != SOP_get_parameters)
-        return false;
+            if (type != SOP_get_parameters)
+                return false;
 
             // Parameters start from second part
             size_t idx = 1;
@@ -180,86 +180,86 @@ bool NetworkChannel::receive(SenderResponseGetParameters& response)
             response.ffield_params.characteristic = msg.get<u64>(idx++);
             response.ffield_params.degree = msg.get<u32>(idx++);
 
-    bytes_received_ += sizeof(SenderOperationType);
-    bytes_received_ += sizeof(PSIParams::PSIConfParams);
-    bytes_received_ += sizeof(PSIParams::TableParams);
-    bytes_received_ += sizeof(PSIParams::CuckooParams);
-    bytes_received_ += sizeof(PSIParams::SEALParams);
-    bytes_received_ += sizeof(PSIParams::ExFieldParams);
+            bytes_received_ += sizeof(SenderOperationType);
+            bytes_received_ += sizeof(PSIParams::PSIConfParams);
+            bytes_received_ += sizeof(PSIParams::TableParams);
+            bytes_received_ += sizeof(PSIParams::CuckooParams);
+            bytes_received_ += sizeof(u64) + sizeof(u64) + sizeof(u32);//sizeof(PSIParams::SEALParams);
+            bytes_received_ += sizeof(PSIParams::FFieldParams);
 
-    return true;
-}
+            return true;
+        }
 
-bool NetworkChannel::receive(SenderResponsePreprocess& response)
-{
-    throw_if_not_connected();
+        bool NetworkChannel::receive(SenderResponsePreprocess& response)
+        {
+            throw_if_not_connected();
 
             message_t msg;
             receive_message(msg);
 
-    // We should have 3 parts
-    if (msg.parts() != 3)
-        return false;
+            // We should have 3 parts
+            if (msg.parts() != 3)
+                return false;
 
-    SenderOperationType type = get_message_type(msg, /* part */ 0);
-    if (type != SOP_preprocess)
-        return false;
+            SenderOperationType type = get_message_type(msg, /* part */ 0);
+            if (type != SOP_preprocess)
+                return false;
 
             // Buffer starts at part 1
             get_buffer(response.buffer, msg, /* part_start */ 1);
 
-    bytes_received_ += sizeof(SenderOperationType);
-    bytes_received_ += response.buffer.size();
+            bytes_received_ += sizeof(SenderOperationType);
+            bytes_received_ += response.buffer.size();
 
-    return true;
-}
+            return true;
+        }
 
 
-bool NetworkChannel::receive(SenderResponseQuery& response)
-{
-    throw_if_not_connected();
+        bool NetworkChannel::receive(SenderResponseQuery& response)
+        {
+            throw_if_not_connected();
 
             message_t msg;
             receive_message(msg);
 
-    // We should have at least 2 parts
-    if (msg.parts() < 2)
-        return false;
+            // We should have at least 2 parts
+            if (msg.parts() < 2)
+                return false;
 
-    SenderOperationType type = get_message_type(msg, /* part */ 0);
-    if (type != SOP_query)
-        return false;
+            SenderOperationType type = get_message_type(msg, /* part */ 0);
+            if (type != SOP_query)
+                return false;
 
             // Number of result packages
             response.package_count = msg.get<u64>(/* part */ 1);
 
-    bytes_received_ += sizeof(u32); // SenderOperationType
-    bytes_received_ += sizeof(u64);
+            bytes_received_ += sizeof(u32); // SenderOperationType
+            bytes_received_ += sizeof(u64);
 
-    return true;
-}
+            return true;
+        }
 
-bool NetworkChannel::receive(ResultPackage& pkg)
-{
-    throw_if_not_connected();
+        bool NetworkChannel::receive(ResultPackage& pkg)
+        {
+            throw_if_not_connected();
 
             message_t msg;
             receive_message(msg);
 
-    if (msg.parts() != 4)
-    {
-        return false;;
-    }
+            if (msg.parts() != 4)
+            {
+                return false;;
+            }
 
             pkg.split_idx = msg.get<i64>(/* part */ 0);
             pkg.batch_idx = msg.get<i64>(/* part */ 1);
             pkg.data = msg.get(/* part */ 2);
             pkg.label_data = msg.get(/* part */ 3);
 
-    bytes_received_ += pkg.size();
+            bytes_received_ += pkg.size();
 
-    return true;
-}
+            return true;
+        }
 
         void NetworkChannel::send_get_parameters()
         {

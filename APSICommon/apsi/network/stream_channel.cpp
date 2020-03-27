@@ -51,13 +51,13 @@ namespace apsi
             return true;
         }
 
-bool StreamChannel::receive(SenderResponseGetParameters& response)
-{
-    // First part is message type
-    SenderOperationType senderOpType = read_operation_type();
+        bool StreamChannel::receive(SenderResponseGetParameters& response)
+        {
+            // First part is message type
+            SenderOperationType senderOpType = read_operation_type();
 
-    if (senderOpType != SOP_get_parameters)
-        return false;
+            if (senderOpType != SOP_get_parameters)
+                return false;
 
             // PSIConfParams
             istream_.read(reinterpret_cast<char*>(&response.psiconf_params), sizeof(PSIParams::PSIConfParams));
@@ -75,14 +75,14 @@ bool StreamChannel::receive(SenderResponseGetParameters& response)
             // FFieldParams
             istream_.read(reinterpret_cast<char*>(&response.ffield_params), sizeof(PSIParams::FFieldParams));
 
-    bytes_received_ += sizeof(PSIParams::PSIConfParams);
-    bytes_received_ += sizeof(PSIParams::TableParams);
-    bytes_received_ += sizeof(PSIParams::CuckooParams);
-    bytes_received_ += sizeof(PSIParams::SEALParams);
-    bytes_received_ += sizeof(PSIParams::ExFieldParams);
+            bytes_received_ += sizeof(PSIParams::PSIConfParams);
+            bytes_received_ += sizeof(PSIParams::TableParams);
+            bytes_received_ += sizeof(PSIParams::CuckooParams);
+            bytes_received_ += sizeof(PSIParams::SEALParams);
+            bytes_received_ += sizeof(PSIParams::FFieldParams);
 
-    return true;
-}
+            return true;
+        }
 
         void StreamChannel::send_get_parameters()
         {
@@ -123,13 +123,13 @@ bool StreamChannel::receive(SenderResponseGetParameters& response)
             bytes_sent_ += sizeof(PSIParams::FFieldParams);
         }
 
-bool StreamChannel::receive(SenderResponsePreprocess& response)
-{
-    // First part is message type
-    SenderOperationType type = read_operation_type();
+        bool StreamChannel::receive(SenderResponsePreprocess& response)
+        {
+            // First part is message type
+            SenderOperationType type = read_operation_type();
 
-    if (type != SOP_preprocess)
-        return false;
+            if (type != SOP_preprocess)
+                return false;
 
             // Size of buffer
             u64 size;
@@ -139,11 +139,11 @@ bool StreamChannel::receive(SenderResponsePreprocess& response)
             response.buffer.resize(static_cast<size_t>(size));
             istream_.read(reinterpret_cast<char*>(response.buffer.data()), size);
 
-    bytes_received_ += sizeof(u64);
-    bytes_received_ += size;
+            bytes_received_ += sizeof(u64);
+            bytes_received_ += size;
 
-    return true;
-}
+            return true;
+        }
 
         void StreamChannel::send_preprocess(const vector<SEAL_BYTE>& buffer)
         {
@@ -179,19 +179,19 @@ bool StreamChannel::receive(SenderResponsePreprocess& response)
             bytes_sent_ += size;
         }
 
-bool StreamChannel::receive(SenderResponseQuery& response)
-{
-    SenderOperationType type = read_operation_type();
+        bool StreamChannel::receive(SenderResponseQuery& response)
+        {
+            SenderOperationType type = read_operation_type();
 
-    if (type != SOP_query)
-        return false;
+            if (type != SOP_query)
+                return false;
 
-    // Package count
-    istream_.read(reinterpret_cast<char*>(&response.package_count), sizeof(u64));
-    bytes_received_ += sizeof(u64);
+            // Package count
+            istream_.read(reinterpret_cast<char*>(&response.package_count), sizeof(u64));
+            bytes_received_ += sizeof(u64);
 
-    return true;
-}
+            return true;
+        }
 
         void StreamChannel::send_query(
             const string& relin_keys,
@@ -233,20 +233,20 @@ bool StreamChannel::receive(SenderResponseQuery& response)
             bytes_sent_ += sizeof(u64);
         }
 
-bool StreamChannel::receive(apsi::ResultPackage& pkg)
-{
-    unique_lock<mutex> rec_lock(*receive_mutex_);
+        bool StreamChannel::receive(apsi::ResultPackage& pkg)
+        {
+            unique_lock<mutex> rec_lock(*receive_mutex_);
 
             istream_.read(reinterpret_cast<char*>(&pkg.batch_idx), sizeof(i64));
             istream_.read(reinterpret_cast<char*>(&pkg.split_idx), sizeof(i64));
-            
+
             read_string(pkg.data);
             read_string(pkg.label_data);
 
-    bytes_received_ += (sizeof(i64) * 2);
+            bytes_received_ += (sizeof(i64) * 2);
 
-    return true;
-}
+            return true;
+        }
 
         void StreamChannel::send(const vector<SEAL_BYTE>& client_id, const ResultPackage& pkg)
         {

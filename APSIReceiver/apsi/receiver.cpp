@@ -106,25 +106,25 @@ namespace apsi
                 throw runtime_error("No parameters have been configured.");
             }
 
-    preprocess_result_ = make_unique<pair<map<uint64_t, vector<string>>, unique_ptr<KukuTable>>>
-        (preprocess(items));
-    auto& ciphertexts = preprocess_result_->first;
+            preprocess_result_ = make_unique<pair<map<uint64_t, vector<string>>, unique_ptr<KukuTable>>>
+                (preprocess(items));
+            auto& ciphertexts = preprocess_result_->first;
 
             return ciphertexts;
         }
 
-pair<vector<bool>, Matrix<u8>> Receiver::decrypt_result(vector<Item>& items, Channel& chl)
-{
-    pair<vector<bool>, Matrix<u8>> empty_result;
+        pair<vector<bool>, Matrix<u8>> Receiver::decrypt_result(vector<Item>& items, Channel& chl)
+        {
+            pair<vector<bool>, Matrix<u8>> empty_result;
 
-    if (nullptr == preprocess_result_)
-    {
-        return empty_result;
-    }
+            if (nullptr == preprocess_result_)
+            {
+                return empty_result;
+            }
 
-    auto& cuckoo = *(preprocess_result_->second);
-    size_t padded_table_size = static_cast<size_t>(
-        ((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
+            auto& cuckoo = *(preprocess_result_->second);
+            size_t padded_table_size = static_cast<size_t>(
+                ((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
 
             vector<int> table_to_input_map(padded_table_size, 0);
             if (items.size() > 1 || (!get_params().use_fast_membership()))
@@ -136,18 +136,18 @@ pair<vector<bool>, Matrix<u8>> Receiver::decrypt_result(vector<Item>& items, Cha
                 Log::info("Receiver single query table to input map");
             }
 
-    /* Receive results */
-    SenderResponseQuery query_resp;
-    {
-        STOPWATCH(recv_stop_watch, "Receiver::query::wait_response");
-        if (!chl.receive(query_resp))
-        {
-            Log::error("Not able to receive query response");
-            return empty_result;
-        }
+            /* Receive results */
+            SenderResponseQuery query_resp;
+            {
+                STOPWATCH(recv_stop_watch, "Receiver::query::wait_response");
+                if (!chl.receive(query_resp))
+                {
+                    Log::error("Not able to receive query response");
+                    return empty_result;
+                }
 
-        Log::debug("Sender will send %i result packages", query_resp.package_count);
-    }
+                Log::debug("Sender will send %i result packages", query_resp.package_count);
+            }
 
             auto intersection = stream_decrypt(chl, table_to_input_map, items);
 
@@ -163,7 +163,7 @@ pair<vector<bool>, Matrix<u8>> Receiver::decrypt_result(vector<Item>& items, Cha
 
             // OPRF
             // This block is used so the Receiver::OPRF stopwatch measures only OPRF, and nothing else
-            { 
+            {
                 STOPWATCH(recv_stop_watch, "Receiver::OPRF");
                 Log::info("OPRF processing");
 
