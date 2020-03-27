@@ -40,11 +40,11 @@ namespace apsi
 {
     namespace logging
     {
-        bool configured = false;
-        Logger logger = Logger::getInstance("APSI");
-        string log_file;
-        bool disable_console = false;
-        char msgBuffer[MSG_BUFFER_LEN];
+        static bool configured = false;
+        static Logger logger;
+        static string log_file;
+        static bool disable_console = false;
+        static char msgBuffer[MSG_BUFFER_LEN];
 
 #ifndef _MSC_VER
 // auto_ptr shows a warning in GCC.
@@ -58,6 +58,8 @@ namespace apsi
             {
                 throw runtime_error("Logger is already configured.");
             }
+
+            logger = Logger::getInstance("APSI");
 
             if (!disable_console)
             {
