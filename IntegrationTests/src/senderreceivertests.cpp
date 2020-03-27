@@ -3,6 +3,7 @@
 
 #include "gtest/gtest.h"
 #include "apsi/sender.h"
+#include "apsi/senderdb.h"
 #include "apsi/senderdispatcher.h"
 #include "apsi/receiver.h"
 #include "apsi/network/receiverchannel.h"
@@ -23,7 +24,6 @@ using namespace apsi::tools;
 using namespace apsi::logging;
 using namespace apsi::oprf;
 using namespace seal;
-
 
 namespace
 {
@@ -52,12 +52,9 @@ namespace
         return { ret, s };
     }
 
-    void verify_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<uint8_t>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<uint8_t>& labels)
+    void verify_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<u8>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<u8>& labels)
     {
         bool correct = true;
-     
-
-        
         for (size_t i = 0; i < client_items.size(); i++)
         {
 
@@ -91,19 +88,18 @@ namespace
         string conn_addr = "tcp://localhost:5550";
         recvChl.connect(conn_addr);
 
-        uint32_t numThreads = thread::hardware_concurrency();
+        u32 numThreads = thread::hardware_concurrency();
 
         unique_ptr<Receiver> receiver_ptr;
 
-        auto f = std::async([&]()
-            {
-                receiver_ptr = make_unique<Receiver>(numThreads, MemoryPoolHandle::New());
-            });
-        shared_ptr<Sender> sender = make_shared<Sender>(params, numThreads, numThreads, MemoryPoolHandle::New());
+        auto f = std::async([&]() {
+            receiver_ptr = make_unique<Receiver>(numThreads);
+        });
+        shared_ptr<Sender> sender = make_shared<Sender>(params, numThreads);
         f.get();
         Receiver& receiver = *receiver_ptr;
 
-        auto label_bit_length = params.get_label_bit_count();
+        auto label_bit_length = params.label_bit_count();
         auto receiverActualSize = 20;
         auto intersectionSize = 10;
 
@@ -115,7 +111,7 @@ namespace
         }
 
         auto s1 = vector<Item>(senderActualSize);
-        Matrix<uint8_t> labels(senderActualSize, params.get_label_byte_count());
+        Matrix<u8> labels(senderActualSize, params.label_byte_count());
         for (size_t i = 0; i < s1.size(); i++)
         {
             s1[i] = i;
@@ -123,8 +119,8 @@ namespace
             if (label_bit_length) {
                 memset(labels[i].data(), 0, labels[i].size());
 
-                labels[i][0] = static_cast<uint8_t>(i);
-                labels[i][1] = static_cast<uint8_t>(i >> 8);
+                labels[i][0] = static_cast<u8>(i);
+                labels[i][1] = static_cast<u8>(i >> 8);
             }
         }
 
@@ -142,14 +138,15 @@ namespace
 
         OPRFSender::ComputeHashes(s1, *oprf_key);
 
-        sender->load_db(s1, labels);
+        shared_ptr<SenderDB> sender_db = make_shared<SenderDB>(params);
+        sender_db->load_db(numThreads, s1, labels);
 
         atomic<bool> stop_sender = false;
 
         auto thrd = thread([&]() {
             SenderDispatcher dispatcher(sender);
-            dispatcher.run(stop_sender, /* port */ 5550, oprf_key);
-            });
+            dispatcher.run(stop_sender, /* port */ 5550, oprf_key, sender_db);
+        });
 
         receiver.handshake(recvChl);
         auto intersection = receiver.query(c1, recvChl);
@@ -169,7 +166,10 @@ namespace
         psiconf_params.sender_size = sender_set_size;
         psiconf_params.use_labels = use_labels;
         psiconf_params.use_fast_membership = fast_membership;
-        psiconf_params.sender_bin_size = 0; // Size will be calculated
+
+        // TODO: Remove sender_bin_size so this is not needed
+        psiconf_params.sender_bin_size = 2 * sender_set_size / (1 << 9) + 100;
+
         psiconf_params.num_chunks = 1;
         psiconf_params.item_bit_length_used_after_oprf = 120;
 
@@ -193,15 +193,15 @@ namespace
         seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
         seal_params.encryption_params.set_plain_modulus(40961);
 
-        PSIParams::ExFieldParams exfield_params;
-        exfield_params.characteristic = seal_params.encryption_params.plain_modulus().value();
-        exfield_params.degree = 8;
+        PSIParams::FFieldParams ffield_params;
+        ffield_params.characteristic = seal_params.encryption_params.plain_modulus().value();
+        ffield_params.degree = 8;
 
-        PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
+        PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
         return params;
     }
 
-    void initialize_db(vector<Item>& items, Matrix<uint8_t>& labels, size_t item_count, size_t label_byte_count)
+    void initialize_db(vector<Item>& items, Matrix<u8>& labels, size_t item_count, size_t label_byte_count)
     {
         items.resize(item_count);
         labels.resize(item_count, label_byte_count);
@@ -214,8 +214,8 @@ namespace
             {
                 memset(labels[i].data(), 0, labels[i].size());
 
-                labels[i][0] = static_cast<uint8_t>(i);
-                labels[i][1] = static_cast<uint8_t>(i >> 8);
+                labels[i][0] = static_cast<u8>(i);
+                labels[i][1] = static_cast<u8>(i >> 8);
             }
         }
     }

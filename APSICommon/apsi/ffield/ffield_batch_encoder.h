@@ -3,26 +3,17 @@
 
 #pragma once
 
-// STD
-#include <memory>
-#include <vector>
-
-// APSI 
-#include "apsi/ffield/ffield.h"
-#include "apsi/ffield/ffield_elt.h"
-#include "apsi/ffield/ffield_array.h"
-
-// SEAL
 #include <seal/context.h>
 #include <seal/plaintext.h>
 #include <seal/batchencoder.h>
+#include "apsi/ffield/ffield_array.h"
 
 namespace apsi
 {
-    class FFieldFastBatchEncoder
+    class FFieldBatchEncoder
     {
     public:
-        FFieldFastBatchEncoder(
+        FFieldBatchEncoder(
             std::shared_ptr<seal::SEALContext> context, FField field);
 
         inline seal::SmallModulus ch() const
@@ -30,17 +21,17 @@ namespace apsi
             return field_.ch_;
         }
 
-        inline std::uint64_t d() const
+        inline u64 d() const
         {
             return field_.d_;
         }
 
-        inline std::uint64_t n() const
+        inline u64 n() const
         {
             return n_;
         }
 
-        inline std::uint64_t m() const
+        inline u64 m() const
         {
             return m_;
         }
@@ -50,7 +41,7 @@ namespace apsi
             return log_n_;
         }
 
-        inline std::uint64_t slot_count() const
+        inline u64 slot_count() const
         {
             return slot_count_;
         }
@@ -71,9 +62,9 @@ namespace apsi
     private:
         std::unique_ptr<seal::BatchEncoder> encoder_;
         FField field_;
-        const std::uint64_t n_;
+        const u64 n_;
         const int log_n_;
-        const std::uint64_t m_;
-        const std::uint64_t slot_count_;
-    };
-}
+        const u64 m_;
+        const u64 slot_count_;
+    }; // class FFieldBatchEncoder
+} // namespace apsi

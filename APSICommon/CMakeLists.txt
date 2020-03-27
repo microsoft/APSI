@@ -42,7 +42,6 @@ set(PROJECT_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME}-${P
 
 # Find module scripts
 set(FOURQ_FIND_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake/FindFourQ.cmake)
-set(LOG4CPLUS_FIND_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake/FindLog4cplus.cmake)
 set(MSGSL_FIND_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake/FindMSGSL.cmake)
 set(ZEROMQ_FIND_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake/FindZeroMQ.cmake)
 set(ZEROMQPP_FIND_MODULE_PATH ${PROJECT_SOURCE_DIR}/../cmake/FindZeroMQpp.cmake)
@@ -61,7 +60,7 @@ endif()
 message(STATUS "${PROJECT_NAME} build type: ${APSICommon_LIB_BUILD_TYPE}")
 
 # Import Microsoft SEAL
-find_package(SEAL 3.4.4 EXACT REQUIRED)
+find_package(SEAL 3.4 REQUIRED)
 
 # Import Kuku
 find_package(Kuku 1.1.1 EXACT REQUIRED)
@@ -97,12 +96,7 @@ endif()
 find_package(FourQ MODULE REQUIRED)
 
 # Import Log4cplus
-if(Log4cplus_ROOT)
-    unset(LOG4CPLUS_INCLUDE_DIR CACHE)
-    unset(LOG4CPLUS_LIBRARY_DIR CACHE)
-    unset(LOG4CPLUS_LIBRARY_PATH CACHE)
-endif()
-find_package(Log4cplus MODULE REQUIRED)
+find_package(log4cplus 3.0 REQUIRED)
 
 # Create library but add no source files yet
 if(APSICommon_LIB_BUILD_TYPE STREQUAL "Shared")
@@ -131,6 +125,7 @@ set_target_properties(Common PROPERTIES
 target_compile_features(Common PUBLIC cxx_std_14)
 
 # Defines
+# FIXME: What are these warnings?
 message(WARNING "${PROJECT_NAME} adding define -DHAVE_CONFIG; needed?")
 target_compile_options(Common PUBLIC -DHAVE_CONFIG)
 message(WARNING "${PROJECT_NAME} adding define -DUSE_SECURE_SEED; needed?")
@@ -158,7 +153,7 @@ target_link_libraries(Common PUBLIC
     ZeroMQ::ZeroMQ
     ZeroMQpp::ZeroMQpp
     FourQ::FourQ
-    Log4cplus::Log4cplus)
+    log4cplus::log4cplus)
 if (NOT APPLE)
     target_link_libraries(Common PUBLIC stdc++fs)
 endif()
@@ -209,7 +204,6 @@ install(
         ${PROJECT_CONFIG_FILENAME}
         ${PROJECT_CONFIG_VERSION_FILENAME}
         ${FOURQ_FIND_MODULE_PATH}
-        ${LOG4CPLUS_FIND_MODULE_PATH}
         ${MSGSL_FIND_MODULE_PATH}
         ${ZEROMQ_FIND_MODULE_PATH}
         ${ZEROMQPP_FIND_MODULE_PATH}

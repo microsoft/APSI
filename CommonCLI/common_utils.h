@@ -28,11 +28,11 @@ namespace apsi
         /**
         Generate timing report for timespans
         */
-        void generate_timespan_report(std::vector<std::string>& report, const std::vector<apsi::tools::Stopwatch::TimespanSummary>& timespans, int max_name_length);
+        void generate_timespan_report(std::vector<std::string>& report, const std::vector<Stopwatch::TimespanSummary>& timespans, int max_name_length);
 
         /**
         Generate timing report for single events
         */
-        void generate_event_report(std::vector<std::string>& report, const std::vector<apsi::tools::Stopwatch::Timepoint>& timepoints, int max_name_length);
-    }
-}
+        void generate_event_report(std::vector<std::string>& report, const std::vector<Stopwatch::Timepoint>& timepoints, int max_name_length);
+    } // namespace tools
+} // namespace apsi

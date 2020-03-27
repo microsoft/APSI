@@ -6,11 +6,13 @@
 // STD
 #include <deque>
 #include <mutex>
+#include <atomic>
 #include <memory>
 #include <vector>
 #include <iostream>
 #include <map>
 #include <future>
+#include <array>
 
 // GSL
 #include <gsl/span>
@@ -20,18 +22,15 @@
 #include "apsi/psiparams.h"
 #include "apsi/senderdb.h"
 #include "apsi/sendersessioncontext.h"
-#include "apsi/senderthreadcontext.h"
 #include "apsi/ffield/ffield.h"
-#include "apsi/ffield/ffield_fast_batch_encoder.h"
-#include "apsi/tools/sealcompress.h"
 #include "apsi/tools/matrixview.h"
 #include "apsi/network/channel.h"
 
 // SEAL
-#include "seal/encryptionparams.h"
-#include "seal/ciphertext.h"
-#include "seal/context.h"
-#include "seal/evaluator.h"
+#include <seal/encryptionparams.h>
+#include <seal/ciphertext.h>
+#include <seal/context.h>
+#include <seal/memorymanager.h>
 
 
 namespace apsi
@@ -40,7 +39,8 @@ namespace apsi
     {
         struct WindowingDag
         {
-            enum class NodeState {
+            enum class NodeState
+            {
                 Ready = 0,
                 Pending = 1,
                 Done = 2
@@ -48,36 +48,35 @@ namespace apsi
 
             struct State
             {
-                std::unique_ptr<std::atomic<int>> next_node_;
-                std::unique_ptr<std::atomic<NodeState>[]> node_state_storage_;
-                gsl::span<std::atomic<NodeState>> nodes_;
+                std::unique_ptr<std::atomic<int>> next_node;
+                std::unique_ptr<std::atomic<NodeState>[]> node_state_storage;
+                gsl::span<std::atomic<NodeState>> nodes;
 
-                State(WindowingDag& dag);
+                State(WindowingDag &dag);
             };
 
             struct Node
             {
-                std::array<int, 2> inputs_;
-                int output_ = 0;
+                std::array<int, 2> inputs;
+                int output = 0;
             };
 
-            int max_power_, window_;
-            int max_degree_supported_; // maximum degree supported.
-            int given_digits_;  // how many digits are given. 
-            std::vector<int> base_powers_;
-            std::vector<Node> nodes_;
+            int max_power, window;
+            int max_degree_supported; // maximum degree supported.
+            int given_digits;  // how many digits are given. 
+            std::vector<int> base_powers;
+            std::vector<Node> nodes;
 
-            WindowingDag(int max_power, int window, int max_degree_supported, int given_digits)
+            WindowingDag(int max_power, int window, int max_degree_supported, int given_digits) :
+                max_power(max_power),
+                window(window),
+                max_degree_supported(max_degree_supported),
+                given_digits(given_digits)
             {
-                max_power_ = max_power;
-                window_ = window;
-                int base = 1 << window_;
-                max_degree_supported_ = max_degree_supported;
-                given_digits_ = given_digits;
+                int base = 1 << window;
                 u64 actual_power = tools::maximal_power(max_degree_supported, given_digits, base);
 
-                apsi::logging::Log::debug("actual power supported = %i", actual_power);
-
+                logging::Log::debug("actual power supported = %i", actual_power);
                 if (static_cast<int>(actual_power) < max_power)
                 {
                     throw std::invalid_argument("does not support such max_power");
@@ -87,46 +86,44 @@ namespace apsi
             }
 
             u64 pow(u64 base, u64 e);
-            uint64_t optimal_split(std::size_t x, int base, std::vector<int> &degrees);
-            std::vector<uint64_t> conversion_to_digits(uint64_t input, int base);
+            u64 optimal_split(std::size_t x, int base, std::vector<int> &degrees);
+            std::vector<u64> conversion_to_digits(u64 input, int base);
             void compute_dag();
-        };
+        }; // struct WindowingDag
 
         class Sender
         {
         public:
-            Sender(const PSIParams &params,
-                int total_thread_count,
-                int session_thread_count,
-                seal::MemoryPoolHandle pool = seal::MemoryPoolHandle::Global());
+            Sender(const PSIParams &params, int thread_count);
 
             /**
             Clears data in sender's database.
             */
             inline void clear_db()
             {
-                sender_db_->clear_db();
+                sender_db_.reset();
             }
 
-            /**
-            Loads the input data into sender's database, and precomputes all necessary components for the PSI protocol,
-            including symmetric polynomials, batching, etc.
-            */
-            void load_db(const std::vector<Item> &data, MatrixView<u8> vals = {});
+            inline void set_db(std::shared_ptr<SenderDB> sender_db)
+            {
+                sender_db_ = sender_db;
+                params_.set_split_count(sender_db_->get_params().split_count());
+                params_.set_sender_bin_size(sender_db_->get_params().sender_bin_size());
+            }
 
             /**
             Generate a response to a query
             */
             void query(
                 const std::string& relin_keys,
-                const std::map<apsi::u64, std::vector<std::string>> query,
-                const std::vector<apsi::u8>& client_id,
-                apsi::network::Channel& channel);
+                const std::map<u64, std::vector<std::string>> query,
+                const std::vector<seal::SEAL_BYTE>& client_id,
+                network::Channel& channel);
 
             /**
             Return a reference to the PSI parameters used by the Sender
             */
-            const apsi::PSIParams& get_params() const { return params_; }
+            const PSIParams& get_params() const { return params_; }
 
             /**
             Return the SEALContext
@@ -137,18 +134,12 @@ namespace apsi
             }
 
         private:
-            void initialize();
-
-            int acquire_thread_context();
-
-            void release_thread_context(int idx);
-
             /**
             Adds the data items to sender's database.
             */
             inline void add_data(const std::vector<Item> &data)
             {
-                sender_db_->add_data(data, total_thread_count_);
+                sender_db_->add_data(data, thread_count_);
             }
 
             /**
@@ -156,25 +147,8 @@ namespace apsi
             */
             inline void add_data(const Item &item)
             {
-                sender_db_->add_data(item, total_thread_count_);
+                sender_db_->add_data(item, thread_count_);
             }
-
-            /**
-            Precomputes all necessary components for the PSI protocol, including symmetric polynomials, batching, etc.
-            This function is expensive and can be called after sender finishes adding items to the database.
-            */
-            void offline_compute();
-
-            /**
-            Handles work for offline_compute for a single thread.
-            */
-            void offline_compute_work();
-
-            /**
-            Report progress of the offline_compute operation.
-            Progress is reported to the Log.
-            */
-            void report_offline_compute_progress(int total_threads, std::atomic<bool>& work_finished);
 
             /**
             Responds to a query from the receiver. Input is a map of powers of receiver's items, from k to y^k, where k is an
@@ -186,26 +160,27 @@ namespace apsi
             */
             void respond(
                 std::vector<std::vector<seal::Ciphertext> > &query, int num_of_powers,
-                apsi::sender::SenderSessionContext &session_context,
-                const std::vector<apsi::u8>& client_id,
-                apsi::network::Channel& channel);
+                SenderSessionContext &session_context,
+                const std::vector<seal::SEAL_BYTE>& client_id,
+                network::Channel& channel);
 
             /**
             Method that handles the work of a single thread that computes the response to a query.
             */
             void respond_worker(
+                int thread_index,
                 int batch_count,
                 int total_threads,
                 int total_blocks,
                 std::promise<void>& batches_done_prom,
                 std::shared_future<void>& batches_done_fut,
                 std::vector<std::vector<seal::Ciphertext>>& powers,
-                apsi::sender::SenderSessionContext &session_context,
-                apsi::sender::WindowingDag& dag,
-                std::vector<apsi::sender::WindowingDag::State>& states,
+                SenderSessionContext &session_context,
+                WindowingDag& dag,
+                std::vector<WindowingDag::State>& states,
                 std::atomic<int>& remaining_batches,
-                const std::vector<apsi::u8>& client_id,
-                apsi::network::Channel& channel);
+                const std::vector<seal::SEAL_BYTE>& client_id,
+                network::Channel& channel);
 
 
             /**
@@ -218,37 +193,17 @@ namespace apsi
             @params[out] all_powers All powers computed from the input for the specified batch.
             */
             void compute_batch_powers(int batch, std::vector<seal::Ciphertext> &batch_powers,
-                SenderSessionContext &session_context, SenderThreadContext &thread_context,
-                const WindowingDag& dag, WindowingDag::State& state);
+                SenderSessionContext &session_context, 
+                const WindowingDag& dag, WindowingDag::State& state,
+                seal::MemoryPoolHandle pool);
 
             PSIParams params_;
 
-            int total_thread_count_;
-
-            int session_thread_count_;
-
-            seal::MemoryPoolHandle pool_;
-
-            FField field_;
+            int thread_count_;
 
             std::shared_ptr<seal::SEALContext> seal_context_;
 
-            std::shared_ptr<seal::Evaluator> evaluator_;
-
-            std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder_;
-
-            // Objects for compressed ciphertexts
-            std::shared_ptr<CiphertextCompressor> compressor_;
-
-            /* Sender's database, including raw data, hashed data, ExField data, and symmetric polynomials. */
-            std::unique_ptr<SenderDB> sender_db_;
-
-            /* One context for one thread, to improve preformance by using single-thread memory pool. */
-            std::vector<SenderThreadContext> thread_contexts_;
-
-            std::deque<int> available_thread_contexts_;
-
-            std::mutex thread_context_mtx_;
-        };
-    }
-}
+            std::shared_ptr<SenderDB> sender_db_;
+        }; // class Sender
+    } // namespace sender
+} // namespace apsi

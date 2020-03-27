@@ -9,16 +9,14 @@
 #include <unordered_set>
 
 // APSI
-#include "apsi/apsidefines.h"
 #include "apsi/item.h"
 #include "apsi/senderthreadcontext.h"
-#include "apsi/ffield/ffield_fast_batch_encoder.h"
+#include "apsi/ffield/ffield_batch_encoder.h"
 
 // SEAL
 #include "seal/plaintext.h"
 #include "seal/context.h"
 #include "seal/evaluator.h"
-
 
 namespace apsi
 {
@@ -27,18 +25,17 @@ namespace apsi
         struct DBInterpolationCache
         {
             DBInterpolationCache(
-                std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
+                FField field,
                 int batch_size,
                 int items_per_split,
-                int value_byte_length
+                int value_byte_count
             );
-
 
             std::vector<std::vector<FFieldArray>> div_diff_temp;
             std::vector<FFieldArray> coeff_temp, x_temp, y_temp;
             std::unordered_set<u64> key_set;
             std::vector<u64> temp_vec;
-        };
+        }; // struct DBInterpolationCache
 
         /**
         Represents a specific batch/split and stores the associated data.
@@ -47,21 +44,21 @@ namespace apsi
         {
             struct Position
             {
-                apsi::i64 batch_offset;
-                apsi::i64 split_offset = -1;
+                i64 batch_offset;
+                i64 split_offset = -1;
 
                 bool is_initialized() const
                 {
                     return split_offset != -1;
                 }
-            };
+            }; // struct Position
 
             void init(
-                apsi::i64 batch_idx,
-                apsi::i64 split_idx,
-                apsi::i64 value_byte_length,
-                apsi::i64 batch_size,
-                apsi::i64 items_per_split)
+                i64 batch_idx,
+                i64 split_idx,
+                i64 value_byte_length,
+                i64 batch_size,
+                i64 items_per_split)
             {
                 label_data_.resize(static_cast<size_t>(batch_size * items_per_split * value_byte_length));
                 key_data_.resize(static_cast<size_t>(batch_size * items_per_split));
@@ -78,16 +75,16 @@ namespace apsi
 
             std::unique_ptr<std::atomic_bool[]> has_item_;
             // the index of this region
-            apsi::i64 batch_idx_, split_idx_;
+            i64 batch_idx_, split_idx_;
 
             // the number of bytes that each label is
-            apsi::i64 value_byte_length_;
+            i64 value_byte_length_;
 
             // the number of cuckoo slots that this regions spans.
-            apsi::i64 items_per_batch_;
+            i64 items_per_batch_;
 
             // the number of items that are in a split. 
-            apsi::i64 items_per_split_;
+            i64 items_per_split_;
 
             gsl::span<seal::Plaintext> batch_random_symm_poly_;
 
@@ -104,30 +101,16 @@ namespace apsi
             */
             void symmetric_polys(
                 SenderThreadContext &th_context,
-                MatrixView<_ffield_elt_coeff_t> symm_block,
                 int encoding_bit_length,
                 const FFieldElt &neg_null_element);
 
-            /**
-            Computes the randomized symmetric polynomials for the specified split and the specified batch in sender's database. Basically, it
-            multiplies each term in a symmetric polynomial with the same random number. Different symmetric polynomials are multiplied with
-            different random numbers.
-
-            @see symmetric_polys for computing symmetric polynomials.
-            */
-            void randomized_symmetric_polys(
-                SenderThreadContext &th_context,
-                MatrixView<_ffield_elt_coeff_t> symm_block,
-                int encoding_bit_length,
-                const FFieldElt &neg_null_element);
-
-            DBBlock::Position try_acquire_position_after_oprf(int bin_idx);
+            Position try_acquire_position_after_oprf(int bin_idx);
 
             void batch_interpolate(
                 SenderThreadContext &th_context,
                 std::shared_ptr<seal::SEALContext> seal_context,
-                std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder,
+                const std::unique_ptr<seal::Evaluator> &evaluator,
+                const std::unique_ptr<FFieldBatchEncoder> &batch_encoder,
                 DBInterpolationCache &cache,
                 const PSIParams &params);
 
@@ -173,6 +156,6 @@ namespace apsi
             }
 
             void clear();
-        };
-    }
-}
+        }; // struct DBBlock
+    } // namespace sender
+} // namespace apsi

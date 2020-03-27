@@ -11,15 +11,11 @@
 #include "apsi/network/senderoperation.h"
 #include "apsi/network/channel.h"
 #include "apsi/sender.h"
-
+#include "apsi/senderdb.h"
+#include "apsi/oprf/oprf_sender.h"
 
 namespace apsi
 {
-    namespace oprf
-    {
-        class OPRFKey;
-    }
-
     namespace sender
     {
         /**
@@ -29,33 +25,38 @@ namespace apsi
         {
         public:
             SenderDispatcher() = delete;
-            SenderDispatcher(std::shared_ptr<apsi::sender::Sender> sender)
+            SenderDispatcher(std::shared_ptr<sender::Sender> sender)
                 : sender_(sender)
             {}
 
             /**
             Run the dispatcher on the given port.
             */
-            void run(const std::atomic<bool>& stop, int port, const std::shared_ptr<apsi::oprf::OPRFKey>& oprf_key);
+            void run(
+                const std::atomic<bool> &stop,
+                int port,
+                std::shared_ptr<const oprf::OPRFKey> oprf_key,
+                std::shared_ptr<SenderDB> sender_db);
 
         private:
-            std::shared_ptr<apsi::sender::Sender> sender_;
-            std::shared_ptr<apsi::oprf::OPRFKey> oprf_key_;
+            std::shared_ptr<sender::Sender> sender_;
+            std::shared_ptr<const oprf::OPRFKey> oprf_key_;
+            std::shared_ptr<SenderDB> sender_db_;
 
             /**
             Dispatch a Get Parameters request to the Sender.
             */
-            void dispatch_get_parameters(std::shared_ptr<apsi::network::SenderOperation> sender_op, apsi::network::Channel& channel);
+            void dispatch_get_parameters(std::shared_ptr<network::SenderOperation> sender_op, network::Channel& channel);
 
             /**
             Dispatch a Preprocess request to the Sender.
             */
-            void dispatch_preprocess(std::shared_ptr<apsi::network::SenderOperation> sender_op, apsi::network::Channel& channel);
+            void dispatch_preprocess(std::shared_ptr<network::SenderOperation> sender_op, network::Channel& channel);
 
             /**
             Dispatch a Query request to the Sender.
             */
-            void dispatch_query(std::shared_ptr<apsi::network::SenderOperation> sender_op, apsi::network::Channel& channel);
-        };
-    }
-}
+            void dispatch_query(std::shared_ptr<network::SenderOperation> sender_op, network::Channel& channel);
+        }; // class SenderDispatcher
+    } // namespace sender
+} // namespace apsi

@@ -3,18 +3,12 @@
 
 #pragma once
 
-// STD
 #include <array>
 #include <string>
 #include <stdexcept>
-#include <cstdint>
 #include <cstddef>
-
-// APSI
-#include "apsi/ffield/ffield_elt.h"
-
-// Kuku
 #include <kuku/common.h>
+#include "apsi/ffield/ffield_elt.h"
 
 namespace apsi
 {
@@ -32,9 +26,9 @@ namespace apsi
         Item(const Item&) = default;
 
         /**
-        Constructs an item by hahsing the std::uint64_t array and using 'item_bit_count_' bits of the hash.
+        Constructs an item by hahsing the u64 array and using 'item_bit_count_' bits of the hash.
         */
-        Item(std::uint64_t *pointer);
+        Item(u64 *pointer);
 
         /**
         Constructs an item by hashing the string and using 'item_bit_count_' bits of the hash.
@@ -42,28 +36,28 @@ namespace apsi
         Item(const std::string &str);
 
         /**
-        Constructs a short item (without hashing) by using 'item_bit_count_' bits of the specified std::uint64_t value.
+        Constructs a short item (without hashing) by using 'item_bit_count_' bits of the specified u64 value.
         */
-        Item(std::uint64_t item);
+        Item(u64 item);
 
 
         Item(const kuku::item_type& item);
         
         /**
-        Convert this item into an exfield element. Assuming that this item has been reduced in a hash table,
+        Convert this item into an ffield element. Assuming that this item has been reduced in a hash table,
         we will only use 'reduced_bit_length_' bits of this item.
         */
-        FFieldElt to_exfield_element(FField exfield, int bit_length);
+        FFieldElt to_ffield_element(FField ffield, int bit_length);
 
         /**
-        Convert this item into the specified exfield element. Assuming that this item has been reduced in a hash table,
+        Convert this item into the specified ffield element. Assuming that this item has been reduced in a hash table,
         we will only use 'reduced_bit_length_' bits of this item.
         */
-        void to_exfield_element(FFieldElt &ring_item, int bit_length);
+        void to_ffield_element(FFieldElt &ring_item, int bit_length);
 
         Item& operator =(const std::string &assign);
 
-        Item& operator =(std::uint64_t assign);
+        Item& operator =(u64 assign);
 
         Item& operator =(const Item &assign);
 
@@ -74,22 +68,22 @@ namespace apsi
             return value_ == other.value_;
         }
 
-        std::uint64_t& operator[](size_t i)
+        u64& operator[](size_t i)
         {
             return value_[i];
         }
 
-        const std::uint64_t &operator[](std::size_t i) const
+        const u64 &operator[](std::size_t i) const
         {
             return value_[i];
         }
 
-        std::uint64_t *data()
+        u64 *data()
         {
             return value_.data();
         }
 
-        const std::uint64_t *data() const
+        const u64 *data() const
         {
             return value_.data();
         }
@@ -119,11 +113,11 @@ namespace apsi
         void parse(const std::string& input);
 
     private:
-        std::array<std::uint64_t, 2> value_;
+        std::array<u64, 2> value_;
 
-        std::uint32_t muladd(std::uint32_t item[4], int mul, int add);
+        u32 muladd(u32 item[4], int mul, int add);
 
     public:
         static constexpr std::size_t item_byte_count = sizeof(value_);
-    };
-}
+    }; // class Item
+} // namespace apsi

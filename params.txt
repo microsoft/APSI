@@ -20,6 +20,6 @@ Command line options:
 -windowSize
 -polyModulus (default 4096)
 -plainModulus (5119)
--exfieldDegree (default 8)
+-ffieldDegree (default 8)
 -coeffModulus (default empty, otherwise list of 60,50,40,30)
 -trec (default 1, receiver's threading)

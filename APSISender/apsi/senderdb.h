@@ -4,22 +4,24 @@
 #pragma once
 
 // STD
+#include <cstddef>
+#include <utility>
 #include <memory>
 #include <vector>
+#include <atomic>
 
 // GSL
 #include <gsl/span>
 
 // APSI
 #include "apsi/item.h"
-#include "apsi/apsidefines.h"
 #include "apsi/psiparams.h"
 #include "apsi/dbblock.h"
 #include "apsi/senderthreadcontext.h"
+#include "apsi/sendersessioncontext.h"
 #include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_elt.h"
 #include "apsi/ffield/ffield_array.h"
-#include "apsi/ffield/ffield_fast_batch_encoder.h"
 #include "apsi/tools/matrixview.h"
 #include "apsi/tools/matrix.h"
 
@@ -28,8 +30,6 @@
 
 // SEAL
 #include "seal/plaintext.h"
-#include "seal/evaluator.h"
-
 
 namespace apsi
 {
@@ -38,14 +38,18 @@ namespace apsi
         class SenderDB
         {
         public:
-            SenderDB(const PSIParams &params, 
-                std::shared_ptr<seal::SEALContext> &seal_context,
-                FField field);
+            SenderDB(PSIParams params);
 
             /**
             Clears sender's database and set all entries to sender's null item.
             */
             void clear_db();
+
+            /**
+            Loads the input data into sender's database, and precomputes all necessary components for the PSI protocol,
+            including symmetric polynomials, batching, etc.
+            */
+            void load_db(int thread_count, const std::vector<Item> &data, MatrixView<u8> vals = {});
 
             /**
             Sets the sender's database by hashing the data items with all hash functions.
@@ -70,8 +74,8 @@ namespace apsi
             void add_data_worker(
                 int thread_idx,
                 int thread_count,
-                gsl::span<const apsi::Item> data,
-                apsi::MatrixView<std::uint8_t> values, std::vector<int> &loads);
+                gsl::span<const Item> data,
+                MatrixView<u8> values, std::vector<int> &loads);
 
             /**
             Adds one item to sender's database.
@@ -79,23 +83,19 @@ namespace apsi
             void add_data(const Item &item, int thread_count);
 
             /**
-            Batches the randomized symmetric polynonmials for the specified split and the specified batch in sender's database.
+            Batches the randomized symmetric polynomials for the specified split and the specified batch in sender's database.
 
             @see randomized_symmetric_polys for computing randomized symmetric polynomials.
             */
             void batched_randomized_symmetric_polys(
                 SenderThreadContext &th_context,
                 int start_block,
-                int end_block,
-                std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<FFieldFastBatchEncoder> batch_encoder);
+                int end_block);
 
             void batched_interpolate_polys(
                 SenderThreadContext& th_context,
                 int start_block,
-                int end_block,
-                std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<FFieldFastBatchEncoder> batch_encoder);
+                int end_block);
 
             DBBlock& get_block(int batch, int split)
             {
@@ -107,12 +107,11 @@ namespace apsi
                 return db_blocks_.size();
             }
 
-            const apsi::PSIParams& get_params() const { return params_; }
+            const PSIParams& get_params() const { return params_; }
 
 
         private:
             PSIParams params_;
-            std::shared_ptr<seal::SEALContext> seal_context_;
             FField field_;
             FFieldElt null_element_;
             FFieldElt neg_null_element_;
@@ -138,7 +137,7 @@ namespace apsi
             */
             Item sender_null_item_;
 
-            /* The ExField encoding of the sender null value. */
+            /* The FField encoding of the sender null value. */
 
             /* 
             B x m, where B is sender's bin size, m is table size.
@@ -148,7 +147,26 @@ namespace apsi
             */
             Matrix<DBBlock> db_blocks_;
 
-            std::pair<DBBlock*, DBBlock::Position> acquire_db_position_after_oprf(size_t cuckoo_loc);
-        };
-    }
-}
+            std::pair<DBBlock*, DBBlock::Position> acquire_db_position_after_oprf(std::size_t cuckoo_loc);
+
+            SenderSessionContext session_context_;
+
+            /**
+            Precomputes all necessary components for the PSI protocol, including symmetric polynomials, batching, etc.
+            This function is expensive and can be called after sender finishes adding items to the database.
+            */
+            void offline_compute(int thread_count);
+
+            /**
+            Handles work for offline_compute for a single thread.
+            */
+            void offline_compute_work(SenderThreadContext &th_context, int total_thread_count);
+
+            /**
+            Report progress of the offline_compute operation.
+            Progress is reported to the Log.
+            */
+            void report_offline_compute_progress(std::vector<SenderThreadContext> &thread_contexts, std::atomic<bool> &work_finished);
+        }; // class SenderDB
+    } // namespace sender
+} // namespace apsi

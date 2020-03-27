@@ -3,7 +3,6 @@
 
 #pragma once
 
-// STD
 #include <list>
 #include <string>
 #include <chrono>
@@ -12,8 +11,6 @@
 #include <map>
 #include <memory>
 #include <mutex>
-
-// APSI
 #include "apsi/apsidefines.h"
 
 
@@ -26,7 +23,6 @@
 
 // Measure a block
 #define STOPWATCH(stopwatch, name) StopwatchScope UNIQUE_STOPWATCH_NAME(stopwatchscope) (stopwatch, name);
-
 
 namespace apsi
 {
@@ -50,8 +46,8 @@ namespace apsi
                 std::string event_name;
                 int event_count;
                 double avg;
-                apsi::u64 min;
-                apsi::u64 max;
+                u64 min;
+                u64 max;
             };
 
             /**
@@ -115,7 +111,7 @@ namespace apsi
             Add a time event with beginning and end
             */
             void add_timespan_event(const std::string& name, const time_unit& start, const time_unit& end);
-        };
+        }; // class Stopwatch
 
         /**
         Class used to time a scope.
@@ -132,6 +128,6 @@ namespace apsi
             Stopwatch& stopwatch_;
             std::string event_name_;
             Stopwatch::time_unit start_;
-        };
-    }
-}
+        }; // class StopwatchScope
+    } // namespace tools
+} // namespace apsi

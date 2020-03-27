@@ -3,10 +3,7 @@
 
 #pragma once
 
-// STD
 #include <string>
-
-// APSI
 #include "apsi/apsidefines.h"
 
 namespace apsi
@@ -17,17 +14,17 @@ namespace apsi
     */
     struct ResultPackage
     {
-        apsi::i64 split_idx;
-        apsi::i64 batch_idx;
+        i64 split_idx;
+        i64 batch_idx;
         std::string data;
         std::string label_data;
 
         // Calculate size of data in the structure
-        apsi::u64 size() const
+        u64 size() const
         {
-            return sizeof(apsi::i64) * 2 +
+            return sizeof(i64) * 2 +
                 data.length() +
                 label_data.length();
         }
-    };
-}
+    }; // struct ResultPackage
+} // namespace apsi

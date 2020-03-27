@@ -177,8 +177,6 @@
     <ClCompile Include="src\item.cpp" />
     <ClCompile Include="src\matrix_tests.cpp" />
     <ClCompile Include="src\oprf_tests.cpp" />
-    <ClCompile Include="src\receiver.cpp" />
-    <ClCompile Include="src\sender.cpp" />
     <ClCompile Include="src\stopwatch_tests.cpp" />
     <ClCompile Include="src\stream_channel_tests.cpp" />
     <ClCompile Include="src\unit_tests_runner.cpp" />

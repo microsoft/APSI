@@ -37,14 +37,20 @@ namespace
         }
     }
 
-    void InitU8Vector(vector<u8>& vec, int size)
+    void InitByteVector(vector<SEAL_BYTE>& vec, int size)
     {
         vec.resize(size);
 
         for (int i = 0; i < size; i++)
         {
-            vec[i] = i % 0xFF;
+            vec[i] = static_cast<SEAL_BYTE>(i % 0xFF);
         }
+    }
+
+    template<typename... Ts>
+    vector<SEAL_BYTE> CreateByteVector(Ts&&... args)
+    {
+        return { SEAL_BYTE(forward<Ts>(args))... };
     }
 }
 
@@ -85,14 +91,14 @@ namespace APSITests
         SenderResponseQuery query_resp;
         shared_ptr<SenderOperation> sender_op;
 
-        PSIParams::PSIConfParams psiconf_params{ 60, true, true, 12345, 120, 10, 20 };
+        PSIParams::PSIConfParams psiconf_params{ 12345, 20, 60, 120, 10, true, true };
         PSIParams::TableParams table_params{ 10, 1, 2, 10, 40 };
         PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
         PSIParams::SEALParams seal_params;
-        PSIParams::ExFieldParams exfield_params;
-        PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
+        PSIParams::FFieldParams ffield_params;
+        PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
 
-        vector<u8> buff = { 1, 2, 3, 4, 5 };
+        vector<SEAL_BYTE> buff = CreateByteVector(1, 2, 3, 4, 5);
 
         PublicKey pub_key;
         RelinKeys relin_keys;
@@ -108,7 +114,7 @@ namespace APSITests
         ASSERT_ANY_THROW(mychannel.receive(sender_op));
 
         // Sends
-        vector<u8> empty_client_id;
+        vector<SEAL_BYTE> empty_client_id;
         ASSERT_ANY_THROW(mychannel.send_get_parameters());
         ASSERT_ANY_THROW(mychannel.send_get_parameters_response(empty_client_id, params));
         ASSERT_ANY_THROW(mychannel.send_preprocess(buff));
@@ -132,8 +138,8 @@ namespace APSITests
                 // This should be SenderOperationType size
                 clt.send_get_parameters();
 
-                vector<u8> data1;
-                InitU8Vector(data1, 1000);
+                vector<SEAL_BYTE> data1;
+                InitByteVector(data1, 1000);
 
                 // This should be 1000 bytes + SenderOperationType size
                 clt.send_preprocess(data1);
@@ -146,7 +152,8 @@ namespace APSITests
                 KeyGenerator key_gen(context);
 
                 stringstream ss;
-                key_gen.relin_keys_save(ss, compr_mode_type::none);
+                Serializable<RelinKeys> ser_relinkeys = key_gen.relin_keys();
+                ser_relinkeys.save(ss, compr_mode_type::none);
                 string relinkeys_str = ss.str();
                 ASSERT_EQ(relinkeys_str.length(), 197010);
 
@@ -215,29 +222,29 @@ namespace APSITests
         ASSERT_EQ(expected_total, svr.get_total_data_received());
 
         // get parameters response
-        PSIParams::PSIConfParams psiconf_params{ 60, true, true, 12345, 120, 10, 20 };
+        PSIParams::PSIConfParams psiconf_params{ 12345, 20, 60, 120, 10, true, true };
         PSIParams::TableParams table_params{ 10, 1, 2, 10, 40 };
         PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
-        PSIParams::ExFieldParams exfield_params{ 321, 8 };
+        PSIParams::FFieldParams ffield_params{ 321, 8 };
         PSIParams::SEALParams seal_params;
         vector<SmallModulus> smv = CoeffModulus::BFVDefault(4096);
         seal_params.encryption_params.set_poly_modulus_degree(4096);
         seal_params.encryption_params.set_plain_modulus(5119);
         seal_params.encryption_params.set_coeff_modulus(smv);
-        PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
+        PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
 
         svr.send_get_parameters_response(sender_op->client_id, params);
         expected_total = sizeof(u32); // SenderOperationType
         expected_total += sizeof(PSIParams::PSIConfParams);
         expected_total += sizeof(PSIParams::TableParams);
         expected_total += sizeof(PSIParams::CuckooParams);
-        expected_total += sizeof(PSIParams::SEALParams);
-        expected_total += sizeof(PSIParams::ExFieldParams);
+        expected_total += sizeof(u64) + sizeof(u64) + sizeof(u32);//sizeof(PSIParams::SEALParams);
+        expected_total += sizeof(PSIParams::FFieldParams);
         ASSERT_EQ(expected_total, svr.get_total_data_sent());
 
         // Preprocess response
-        vector<u8> preproc;
-        InitU8Vector(preproc, 50);
+        vector<SEAL_BYTE> preproc;
+        InitByteVector(preproc, 50);
         svr.send_preprocess_response(sender_op->client_id, preproc);
         expected_total += sizeof(u32); // SenderOperationType
         expected_total += preproc.size();
@@ -285,7 +292,7 @@ namespace APSITests
     {
         thread clientth([this]
             {
-                vector<u8> buff = { 1, 2, 3, 4, 5 };
+                vector<SEAL_BYTE> buff = CreateByteVector(1, 2, 3, 4, 5);
                 client_.send_preprocess(buff);
             });
 
@@ -297,11 +304,11 @@ namespace APSITests
 
         ASSERT_TRUE(preproc != nullptr);
         ASSERT_EQ((size_t)5, preproc->buffer.size());
-        ASSERT_EQ((u8)1, preproc->buffer[0]);
-        ASSERT_EQ((u8)2, preproc->buffer[1]);
-        ASSERT_EQ((u8)3, preproc->buffer[2]);
-        ASSERT_EQ((u8)4, preproc->buffer[3]);
-        ASSERT_EQ((u8)5, preproc->buffer[4]);
+        ASSERT_EQ((u8)1, (u8)preproc->buffer[0]);
+        ASSERT_EQ((u8)2, (u8)preproc->buffer[1]);
+        ASSERT_EQ((u8)3, (u8)preproc->buffer[2]);
+        ASSERT_EQ((u8)4, (u8)preproc->buffer[3]);
+        ASSERT_EQ((u8)5, (u8)preproc->buffer[4]);
 
         clientth.join();
     }
@@ -318,7 +325,7 @@ namespace APSITests
             KeyGenerator key_gen(context);
 
             PublicKey pub_key = key_gen.public_key();
-            RelinKeys relin_keys = key_gen.relin_keys();
+            RelinKeys relin_keys = key_gen.relin_keys_local();
             stringstream ss;
             relin_keys.save(ss);
             string relin_keys_str = ss.str();
@@ -355,10 +362,10 @@ namespace APSITests
                 server_.receive(sender_op, /* wait_for_message */ true);
                 ASSERT_EQ(SOP_get_parameters, sender_op->type);
 
-                PSIParams::PSIConfParams psiconf_params{ 60, true, false, 12345, 120, 40, 50 };
+                PSIParams::PSIConfParams psiconf_params{ 12345, 50, 60, 120, 40, true, false };
                 PSIParams::TableParams table_params{ 10, 1, 2, 10, 40, false };
                 PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
-                PSIParams::ExFieldParams exfield_params{ 678910, 8 };
+                PSIParams::FFieldParams ffield_params{ 678910, 8 };
                 PSIParams::SEALParams seal_params;
                 seal_params.max_supported_degree = 25;
                 seal_params.encryption_params.set_plain_modulus(5119);
@@ -366,14 +373,14 @@ namespace APSITests
                 vector<SmallModulus> coeff_modulus = CoeffModulus::BFVDefault(seal_params.encryption_params.poly_modulus_degree());
                 seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
 
-                PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
+                PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
 
                 server_.send_get_parameters_response(sender_op->client_id, params);
 
                 psiconf_params.sender_size = 54321;
                 psiconf_params.item_bit_count = 80;
                 psiconf_params.use_labels = false;
-                PSIParams params2(psiconf_params, table_params, cuckoo_params, seal_params, exfield_params);
+                PSIParams params2(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
 
                 server_.send_get_parameters_response(sender_op->client_id, params2);
             });
@@ -400,8 +407,8 @@ namespace APSITests
         ASSERT_EQ((u32)3, get_params_response.cuckoo_params.hash_func_count);
         ASSERT_EQ((u32)2, get_params_response.cuckoo_params.hash_func_seed);
         ASSERT_EQ((u32)1, get_params_response.cuckoo_params.max_probe);
-        ASSERT_EQ((u64)678910, get_params_response.exfield_params.characteristic);
-        ASSERT_EQ((u32)8, get_params_response.exfield_params.degree);
+        ASSERT_EQ((u64)678910, get_params_response.ffield_params.characteristic);
+        ASSERT_EQ((u32)8, get_params_response.ffield_params.degree);
         ASSERT_EQ((u32)25, get_params_response.seal_params.max_supported_degree);
         ASSERT_EQ((u64)5119, get_params_response.seal_params.encryption_params.plain_modulus().value());
         ASSERT_EQ((size_t)4096, get_params_response.seal_params.encryption_params.poly_modulus_degree());
@@ -424,8 +431,8 @@ namespace APSITests
         ASSERT_EQ((u32)3, get_params_response2.cuckoo_params.hash_func_count);
         ASSERT_EQ((u32)2, get_params_response2.cuckoo_params.hash_func_seed);
         ASSERT_EQ((u32)1, get_params_response2.cuckoo_params.max_probe);
-        ASSERT_EQ((u64)678910, get_params_response2.exfield_params.characteristic);
-        ASSERT_EQ((u32)8, get_params_response2.exfield_params.degree);
+        ASSERT_EQ((u64)678910, get_params_response2.ffield_params.characteristic);
+        ASSERT_EQ((u32)8, get_params_response2.ffield_params.degree);
         ASSERT_EQ((u64)5119, get_params_response2.seal_params.encryption_params.plain_modulus().value());
         ASSERT_EQ((size_t)4096, get_params_response2.seal_params.encryption_params.poly_modulus_degree());
         ASSERT_EQ((size_t)3, get_params_response2.seal_params.encryption_params.coeff_modulus().size());
@@ -442,23 +449,23 @@ namespace APSITests
                 server_.receive(sender_op, /* wait_for_message */ true);
                 ASSERT_EQ(SOP_preprocess, sender_op->type);
 
-                vector<u8> buffer = { 10, 9, 8, 7, 6 };
+                vector<SEAL_BYTE> buffer = CreateByteVector(10, 9, 8, 7, 6);
                 server_.send_preprocess_response(sender_op->client_id, buffer);
             });
 
         // This buffer will actually be ignored
-        vector<u8> buff = { 1 };
+        vector<SEAL_BYTE> buff = CreateByteVector(1);
         client_.send_preprocess(buff);
 
         SenderResponsePreprocess preprocess_response;
         client_.receive(preprocess_response);
 
         ASSERT_EQ((size_t)5, preprocess_response.buffer.size());
-        ASSERT_EQ((u8)10, preprocess_response.buffer[0]);
-        ASSERT_EQ((u8)9, preprocess_response.buffer[1]);
-        ASSERT_EQ((u8)8, preprocess_response.buffer[2]);
-        ASSERT_EQ((u8)7, preprocess_response.buffer[3]);
-        ASSERT_EQ((u8)6, preprocess_response.buffer[4]);
+        ASSERT_EQ((u8)10, (u8)preprocess_response.buffer[0]);
+        ASSERT_EQ((u8)9, (u8)preprocess_response.buffer[1]);
+        ASSERT_EQ((u8)8, (u8)preprocess_response.buffer[2]);
+        ASSERT_EQ((u8)7, (u8)preprocess_response.buffer[3]);
+        ASSERT_EQ((u8)6, (u8)preprocess_response.buffer[4]);
 
         serverth.join();
     }
@@ -493,7 +500,7 @@ namespace APSITests
         KeyGenerator key_gen(context);
 
         PublicKey pubkey = key_gen.public_key();
-        RelinKeys relinkeys = key_gen.relin_keys();
+        RelinKeys relinkeys = key_gen.relin_keys_local();
         stringstream ss;
         relinkeys.save(ss);
         string relinkeys_str = ss.str();
@@ -564,7 +571,7 @@ namespace APSITests
                     // Preprocessing will multiply two numbers and add them to the result
                     auto preproc_op = dynamic_pointer_cast<SenderOperationPreprocess>(sender_op);
                     preproc_op->buffer.resize(3);
-                    preproc_op->buffer[2] = preproc_op->buffer[0] * preproc_op->buffer[1];
+                    preproc_op->buffer[2] = (SEAL_BYTE)((u8)preproc_op->buffer[0] * (u8)preproc_op->buffer[1]);
 
                     sender.send_preprocess_response(preproc_op->client_id, preproc_op->buffer);
                 }
@@ -584,9 +591,7 @@ namespace APSITests
 
                     for (u32 i = 0; i < 5; i++)
                     {
-                        vector<u8> buffer(2);
-                        buffer[0] = a;
-                        buffer[1] = b;
+                        vector<SEAL_BYTE> buffer = CreateByteVector(a, b);
 
                         recv.send_preprocess(buffer);
 
@@ -594,7 +599,7 @@ namespace APSITests
                         recv.receive(preproc);
 
                         ASSERT_EQ((size_t)3, preproc.buffer.size());
-                        ASSERT_EQ((u8)(a * b), preproc.buffer[2]);
+                        ASSERT_EQ((u8)(a * b), (u8)preproc.buffer[2]);
                     }
 
                 }, i);

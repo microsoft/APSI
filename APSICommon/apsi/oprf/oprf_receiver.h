@@ -3,20 +3,9 @@
 
 #pragma once
 
-// STD
-#include <cstdint>
-#include <cstddef>
 #include <stdexcept>
-#include <iostream>
-
-// SEAL
 #include <seal/intarray.h>
 #include <seal/memorymanager.h>
-
-// Microsoft GSL
-#include <gsl/span>
-
-// APSI
 #include "apsi/oprf/oprf_common.h"
 
 namespace apsi
@@ -32,7 +21,7 @@ namespace apsi
 
             OPRFReceiver(
                 gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items,
-                gsl::span<unsigned char, gsl::dynamic_extent> oprf_queries)
+                gsl::span<seal::SEAL_BYTE, gsl::dynamic_extent> oprf_queries)
             {
                 process_items(oprf_items, oprf_queries);
             }
@@ -43,13 +32,13 @@ namespace apsi
             }
 
             void process_responses(
-                gsl::span<const unsigned char, gsl::dynamic_extent> oprf_responses,
+                gsl::span<const seal::SEAL_BYTE, gsl::dynamic_extent> oprf_responses,
                 gsl::span<oprf_hash_type, gsl::dynamic_extent> oprf_hashes) const;
 
         private:
             void process_items(
                 gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items,
-                gsl::span<unsigned char, gsl::dynamic_extent> oprf_queries);
+                gsl::span<seal::SEAL_BYTE, gsl::dynamic_extent> oprf_queries);
 
             // For decrypting OPRF response
             class FactorData
@@ -109,7 +98,7 @@ namespace apsi
                 }
 
             private:
-                seal::IntArray<unsigned char> factor_data_{
+                seal::IntArray<u8> factor_data_{
                     seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true) };
 
                 std::size_t item_count_ = 0;
@@ -121,6 +110,6 @@ namespace apsi
             }
             
             FactorData inv_factor_data_;
-        };
-    }
-}
+        }; // class OPRFReceiver
+    } // namespace oprf
+} // namespace apsi

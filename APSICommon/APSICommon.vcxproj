@@ -170,7 +170,7 @@
     <ClInclude Include="apsi\ffield\ffield.h" />
     <ClInclude Include="apsi\ffield\ffield_array.h" />
     <ClInclude Include="apsi\ffield\ffield_elt.h" />
-    <ClInclude Include="apsi\ffield\ffield_fast_batch_encoder.h" />
+    <ClInclude Include="apsi\ffield\ffield_batch_encoder.h" />
     <ClInclude Include="apsi\item.h" />
     <ClInclude Include="apsi\logging\log.h" />
     <ClInclude Include="apsi\network\channel.h" />
@@ -185,29 +185,21 @@
     <ClInclude Include="apsi\oprf\oprf_common.h" />
     <ClInclude Include="apsi\oprf\oprf_sender.h" />
     <ClInclude Include="apsi\oprf\oprf_receiver.h" />
-    <ClInclude Include="apsi\tools\blake2\blake2-config.h" />
-    <ClInclude Include="apsi\tools\blake2\blake2-impl.h" />
-    <ClInclude Include="apsi\tools\blake2\blake2.h" />
-    <ClInclude Include="apsi\tools\blake2\blake2b-load-sse2.h" />
-    <ClInclude Include="apsi\tools\blake2\blake2b-load-sse41.h" />
-    <ClInclude Include="apsi\tools\blake2\blake2b-round.h" />
     <ClInclude Include="apsi\tools\csvreader.h" />
     <ClInclude Include="apsi\tools\interpolate.h" />
     <ClInclude Include="apsi\tools\matrix.h" />
-    <ClInclude Include="apsi\tools\prng.h" />
+    <ClInclude Include="apsi\tools\matrixview.h" />
     <ClInclude Include="apsi\tools\sealcompress.h" />
     <ClInclude Include="apsi\tools\stopwatch.h" />
-    <ClInclude Include="apsi\tools\thread_pool.h" />
     <ClInclude Include="apsi\tools\utils.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="apsi\apsidefines.cpp" />
     <ClCompile Include="apsi\ffield\ffield.cpp" />
     <ClCompile Include="apsi\ffield\ffield_elt.cpp" />
-    <ClCompile Include="apsi\ffield\ffield_fast_batch_encoder.cpp" />
+    <ClCompile Include="apsi\ffield\ffield_batch_encoder.cpp" />
     <ClCompile Include="apsi\item.cpp" />
     <ClCompile Include="apsi\logging\log.cpp" />
-    <ClCompile Include="apsi\network\channel.cpp" />
     <ClCompile Include="apsi\network\network_channel.cpp" />
     <ClCompile Include="apsi\network\network_utils.cpp" />
     <ClCompile Include="apsi\network\stream_channel.cpp" />

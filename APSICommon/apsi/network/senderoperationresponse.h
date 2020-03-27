@@ -3,11 +3,7 @@
 
 #pragma once
 
-// STD
 #include <vector>
-
-// APSI
-#include "apsi/apsidefines.h"
 #include "apsi/result_package.h"
 #include "apsi/psiparams.h"
 
@@ -20,27 +16,27 @@ namespace apsi
         */
         struct SenderResponseGetParameters
         {
-            apsi::PSIParams::PSIConfParams psiconf_params;
-            apsi::PSIParams::TableParams   table_params;
-            apsi::PSIParams::CuckooParams  cuckoo_params;
-            apsi::PSIParams::SEALParams    seal_params;
-            apsi::PSIParams::ExFieldParams exfield_params;
-        };
+            PSIParams::PSIConfParams psiconf_params;
+            PSIParams::TableParams   table_params;
+            PSIParams::CuckooParams  cuckoo_params;
+            PSIParams::SEALParams    seal_params;
+            PSIParams::FFieldParams ffield_params;
+        }; // struct SenderResponseGetParameters
 
         /**
         Response for Preprocess request
         */
         struct SenderResponsePreprocess
         {
-            std::vector<apsi::u8> buffer;
-        };
+            std::vector<seal::SEAL_BYTE> buffer;
+        }; // struct SenderResponsePreprocess
 
         /**
         Response for Query request
         */
         struct SenderResponseQuery
         {
-            apsi::u64 package_count;
-        };
-    }
-}
+            u64 package_count;
+        }; // struct SenderResponseQuery
+    } // namespace network
+} // namespace apsi

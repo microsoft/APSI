@@ -11,7 +11,7 @@
 // APSI
 #include "apsi/item.h"
 #include "apsi/psiparams.h"
-#include "apsi/ffield/ffield_fast_batch_encoder.h"
+#include "apsi/ffield/ffield_batch_encoder.h"
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/tools/sealcompress.h"
 #include "apsi/tools/matrix.h"
@@ -44,19 +44,16 @@ namespace apsi
         class Receiver
         {
         public:
-            Receiver(int thread_count,
-                const seal::MemoryPoolHandle &pool = seal::MemoryPoolHandle::Global());
+            Receiver(int thread_count);
 
-            Receiver(const PSIParams& params,
-                int thread_count,
-                const seal::MemoryPoolHandle& pool = seal::MemoryPoolHandle::Global());
+            Receiver(const PSIParams& params, int thread_count);
 
             /************************************************************************************************************************************
             Perform a full query.
             The query is a vector of items, and the result is a same-size vector of bool values. If an item is in the intersection, the
             corresponding bool value is true on the same position in the result vector.
             *************************************************************************************************************************************/
-            std::pair<std::vector<bool>, Matrix<u8>> query(std::vector<Item>& items, apsi::network::Channel& chl);
+            std::pair<std::vector<bool>, Matrix<u8>> query(std::vector<Item>& items, network::Channel& chl);
 
 
             /************************************************************************************************************************************
@@ -68,33 +65,33 @@ namespace apsi
             is a same-size vector of bool values. If an item is in the intersection, the corresponding bool value is true on the
             same position in the result vector .
             */
-            std::map<std::uint64_t, std::vector<std::string>>& query(std::vector<Item> &items);
+            std::map<u64, std::vector<std::string>>& query(std::vector<Item> &items);
 
             /**
             Decrypt the result of a query to a remote sender and get the intersection result. The query is a vector of items, and the result
             is a same-size vector of bool values. If an item is in the intersection, the corresponding bool value is true on the
             same position in the result vector
             */
-            std::pair<std::vector<bool>, Matrix<u8>> decrypt_result(std::vector<Item>& items, apsi::network::Channel& chl);
+            std::pair<std::vector<bool>, Matrix<u8>> decrypt_result(std::vector<Item>& items, network::Channel& chl);
 
             /**
             Obfuscates the items and initializes the given vector with the buffer that must be sent to the Sender for OPRF
             processing.
             */
-            void obfuscate_items(std::vector<Item>& items, std::vector<u8>& items_buffer);
+            void obfuscate_items(std::vector<Item>& items, std::vector<seal::SEAL_BYTE>& items_buffer);
 
             /**
             Process obfuscated items received from Sender.
             Remove the Receiver obfuscation so only the Sender obfuscation remains.
             */
-            void deobfuscate_items(std::vector<Item>& items, std::vector<u8>& items_buffer);
+            void deobfuscate_items(std::vector<Item>& items, std::vector<seal::SEAL_BYTE>& items_buffer);
 
             /**
             Perform a handshake between the Sender and this Receiver.
             Sender will send configuration parameters that the Receiver will use to configure itself.
             A handshake needs to be performed before any full query call. Otherwise, default parameters will be used.
             */
-            void handshake(apsi::network::Channel& channel);
+            void handshake(network::Channel& channel);
 
             /**
             Get current configuration parameters
@@ -122,7 +119,7 @@ namespace apsi
             Preprocesses the PSI items. Returns the power map of the items, and the indices of them in the hash table.
             */
             std::pair<
-                std::map<std::uint64_t, std::vector<std::string>>,
+                std::map<u64, std::vector<std::string>>,
                 std::unique_ptr<kuku::KukuTable>
             > preprocess(std::vector<Item> &items);
 
@@ -140,9 +137,9 @@ namespace apsi
                 kuku::KukuTable &cuckoo);
 
             /**
-            Encodes items in the cuckoo hashing table into ExField elements.
+            Encodes items in the cuckoo hashing table into FField elements.
             */
-            void exfield_encoding(
+            void ffield_encoding(
                 kuku::KukuTable &cuckoo,
                 FFieldArray& ret);
 
@@ -152,15 +149,15 @@ namespace apsi
             we break the bits of sender's split_size into segment of window size).
             The return result is a map from k to y^k.
             */
-            void generate_powers(const FFieldArray &exfield_items,
-                std::map<std::uint64_t, FFieldArray> &ret);
+            void generate_powers(const FFieldArray &ffield_items,
+                std::map<u64, FFieldArray> &ret);
 
             /**
             Encrypts every vector of elements in the input map to a corresponding vector of SEAL Ciphertext, using generalized batching. The number of
             ciphertexts in a vector depends on the slot count in generalized batching. For example, if an input vector has size 1024, the slot count
             is 256, then there are 1024/256 = 4 ciphertext in the Ciphertext vector.
             */
-            void encrypt(std::map<std::uint64_t, FFieldArray> &input, std::map<std::uint64_t, std::vector<std::string>> &destination);
+            void encrypt(std::map<u64, FFieldArray> &input, std::map<u64, std::vector<std::string>> &destination);
 
             /**
             Encrypts a vector of elements to a corresponding vector of SEAL Ciphertext, using generalized batching. The number of
@@ -180,7 +177,7 @@ namespace apsi
             larger than table_size.
             */
             std::pair<std::vector<bool>, Matrix<u8> > stream_decrypt(
-                apsi::network::Channel& channel,
+                network::Channel& channel,
                 const std::vector<int>& table_to_input_map,
                 std::vector<Item>& items);
 
@@ -192,19 +189,19 @@ namespace apsi
                 int batch_size,
                 int num_threads,
                 int block_count,
-                apsi::network::Channel& channel,
+                network::Channel& channel,
                 const std::vector<int> &table_to_input_map,
                 std::vector<bool>& ret_bools,
-                apsi::Matrix<apsi::u8>& ret_labels);
+                Matrix<u8>& ret_labels);
 
             std::shared_ptr<FField> field() const
             {
                 return field_;
             }
 
-            std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder() const
+            std::shared_ptr<FFieldBatchEncoder> batch_encoder() const
             {
-                return ex_batch_encoder_;
+                return batch_encoder_;
             }
 
             const seal::PublicKey& public_key() const
@@ -223,9 +220,7 @@ namespace apsi
 
             std::shared_ptr<seal::SEALContext> seal_context_;
 
-            apsi::i32 thread_count_;
-
-            seal::MemoryPoolHandle pool_;
+            i32 thread_count_;
 
             std::shared_ptr<FField> field_;
 
@@ -237,9 +232,9 @@ namespace apsi
 
             std::unique_ptr<seal::Decryptor> decryptor_;
 
-            std::shared_ptr<FFieldFastBatchEncoder> ex_batch_encoder_;
+            std::shared_ptr<FFieldBatchEncoder> batch_encoder_;
 
-            apsi::i32 slot_count_;
+            i32 slot_count_;
 
             // Objects for compressed ciphertexts
             std::unique_ptr<CiphertextCompressor> compressor_;
@@ -247,13 +242,13 @@ namespace apsi
             // Preprocess result
             std::unique_ptr<
             std::pair<
-                std::map<std::uint64_t, std::vector<std::string>>,
+                std::map<u64, std::vector<std::string>>,
                 std::unique_ptr<kuku::KukuTable>
             >> preprocess_result_;
 
             std::string relin_keys_;
 
-            std::shared_ptr<apsi::oprf::OPRFReceiver> oprf_receiver_;
-        };
-    }
-}
+            std::shared_ptr<oprf::OPRFReceiver> oprf_receiver_;
+        }; // class Receiver
+    } // namespace receiver
+} // namespace apsi

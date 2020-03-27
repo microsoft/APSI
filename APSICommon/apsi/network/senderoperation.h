@@ -3,19 +3,13 @@
 
 #pragma once
 
-// STD
 #include <vector>
 #include <map>
 #include <algorithm>
-
-// APSI
+#include <seal/publickey.h>
+#include <seal/relinkeys.h>
+#include <seal/ciphertext.h>
 #include "apsi/apsidefines.h"
-
-// SEAL
-#include "seal/publickey.h"
-#include "seal/relinkeys.h"
-#include "seal/ciphertext.h"
-
 
 namespace apsi
 {
@@ -26,7 +20,7 @@ namespace apsi
             SOP_get_parameters = 1,
             SOP_preprocess = 2,
             SOP_query = 3
-        };
+        }; // enum SenderOperationType
 
         /**
         Generic Sender Operation
@@ -38,7 +32,7 @@ namespace apsi
             SenderOperation(SenderOperationType type)
                 : type(type)
             {}
-            SenderOperation(SenderOperationType type, std::vector<apsi::u8>&& clt_id)
+            SenderOperation(SenderOperationType type, std::vector<seal::SEAL_BYTE>&& clt_id)
                 : type(type),
                   client_id(clt_id)
             {}
@@ -53,8 +47,8 @@ namespace apsi
             /**
             Client ID
             */
-            std::vector<apsi::u8> client_id;
-        };
+            std::vector<seal::SEAL_BYTE> client_id;
+        }; // class SenderOperation
 
         /**
         Sender Operation: Get Parameters
@@ -65,12 +59,12 @@ namespace apsi
             SenderOperationGetParameters()
                 : SenderOperation(SOP_get_parameters)
             {}
-            SenderOperationGetParameters(std::vector<apsi::u8>&& client_id)
+            SenderOperationGetParameters(std::vector<seal::SEAL_BYTE>&& client_id)
                 : SenderOperation(SOP_get_parameters, std::move(client_id))
             {}
 
             virtual ~SenderOperationGetParameters() = default;
-        };
+        }; // class SenderOperationGetParameters
 
         /**
         Sender Operation: Preprocess
@@ -79,11 +73,11 @@ namespace apsi
         {
         public:
             SenderOperationPreprocess() = delete;
-            SenderOperationPreprocess(std::vector<apsi::u8>&& buff)
+            SenderOperationPreprocess(std::vector<seal::SEAL_BYTE>&& buff)
                 : SenderOperation(SOP_preprocess),
                   buffer(buff)
             {}
-            SenderOperationPreprocess(std::vector<apsi::u8>&& client_id, std::vector<apsi::u8>&& buff)
+            SenderOperationPreprocess(std::vector<seal::SEAL_BYTE>&& client_id, std::vector<seal::SEAL_BYTE>&& buff)
                 : SenderOperation(SOP_preprocess, std::move(client_id)),
                   buffer(buff)
             {}
@@ -93,8 +87,8 @@ namespace apsi
             /**
             Items to preprocess
             */
-            std::vector<apsi::u8> buffer;
-        };
+            std::vector<seal::SEAL_BYTE> buffer;
+        }; // class SenderOperationPreprocess
 
         /**
         Sender Operation: Query
@@ -103,13 +97,13 @@ namespace apsi
         {
         public:
             SenderOperationQuery() = delete;
-            SenderOperationQuery(const std::string& relin, std::map<apsi::u64, std::vector<std::string>>&& queryp)
+            SenderOperationQuery(const std::string& relin, std::map<u64, std::vector<std::string>>&& queryp)
                 : SenderOperation(SOP_query),
                   relin_keys(relin),
                   query(std::move(queryp))
             {}
 
-            SenderOperationQuery(std::vector<apsi::u8>&& client_id, const std::string& relin, std::map<apsi::u64, std::vector<std::string>>&& queryp)
+            SenderOperationQuery(std::vector<seal::SEAL_BYTE>&& client_id, const std::string& relin, std::map<u64, std::vector<std::string>>&& queryp)
                 : SenderOperation(SOP_query, std::move(client_id)),
                   relin_keys(relin),
                   query(std::move(queryp))
@@ -119,7 +113,7 @@ namespace apsi
 
             // std::string public_key;
             std::string relin_keys;
-            std::map<apsi::u64, std::vector<std::string>> query;
-        };
-    }
-}
+            std::map<u64, std::vector<std::string>> query;
+        }; // class SenderOperationQuery
+    } // namespace network
+} // namespace apsi

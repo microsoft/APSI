@@ -36,7 +36,6 @@ using namespace apsi::tools;
 using namespace apsi::receiver;
 using namespace apsi::network;
 using namespace apsi::logging;
-using namespace seal::util;
 using namespace seal;
 
 
@@ -49,24 +48,24 @@ int initialize_query(const CLP& cmd, vector<Item>& items);
 
 namespace {
     struct Colors {
-        static const std::string Red;
-        static const std::string Green;
-        static const std::string RedBold;
-        static const std::string GreenBold;
-        static const std::string Reset;
+        static const string Red;
+        static const string Green;
+        static const string RedBold;
+        static const string GreenBold;
+        static const string Reset;
     };
 
-    const std::string Colors::Red = "\033[31m";
-    const std::string Colors::Green = "\033[32m";
-    const std::string Colors::RedBold = "\033[1;31m";
-    const std::string Colors::GreenBold = "\033[1;32m";
-    const std::string Colors::Reset = "\033[0m";
+    const string Colors::Red = "\033[31m";
+    const string Colors::Green = "\033[32m";
+    const string Colors::RedBold = "\033[1;31m";
+    const string Colors::GreenBold = "\033[1;32m";
+    const string Colors::Reset = "\033[0m";
 }
 
 
 int main(int argc, char *argv[])
 {
-    apsi::CLP cmd("Example Implementation of APSI Receiver", RECEIVER_VERSION);
+    CLP cmd("Example Implementation of APSI Receiver", RECEIVER_VERSION);
 
     if (!cmd.parse_args(argc, argv))
         return -1;
@@ -118,7 +117,7 @@ string print_hex(gsl::span<u8> s)
     ss << "{ ";
     for (int i = static_cast<int>(s.size()) - 1; i >= 0; i--)
     {
-        ss << std::setw(2) << std::setfill('0') << std::hex << int(s[i]) << (i ? ", " : " }");
+        ss << setw(2) << setfill('0') << hex << int(s[i]) << (i ? ", " : " }");
     }
 
     return ss.str();

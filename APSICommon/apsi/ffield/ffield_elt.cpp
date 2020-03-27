@@ -1,167 +1,169 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-// APSI
 #include "apsi/ffield/ffield_elt.h"
 
 using namespace std;
-using namespace gsl;
+using namespace seal;
 
 namespace apsi
 {
-    void details::copy_with_bit_offset(
-        gsl::span<const uint8_t> src,
-        int32_t bitOffset,
-        int32_t bitLength,
-        gsl::span<uint8_t> dest)
+    namespace details
     {
-        // the number of bits to shift by to align with dest
-        auto lowOffset = bitOffset & 7;
-
-        // the number of full bytes that should be written to dest
-        auto fullByteCount = bitLength >> 3;
-
-        // the index of the first src word which contains our bits
-        auto wordBegin = bitOffset >> 3;
-
-        auto remBits = bitLength - fullByteCount * 8;
-#ifndef NDEBUG
-        if (bitOffset + bitLength > src.size() * 8)
-            throw std::invalid_argument("invalid split_length, or index out of range");
-        if (bitLength > dest.size() * 8)
-            throw std::invalid_argument("bit length too long for dest");
-#endif
-        if (lowOffset)
+        void copy_with_bit_offset(
+            gsl::span<const u8> src,
+            i32 bitOffset,
+            i32 bitLength,
+            gsl::span<u8> dest)
         {
-            // lowOffset mean we need to shift the bytes. 
-            // Populates all of the full bytes in dest.
-            int i = 0;
-            while (i < fullByteCount)
+            // the number of bits to shift by to align with dest
+            auto lowOffset = bitOffset & 7;
+
+            // the number of full bytes that should be written to dest
+            auto fullByteCount = bitLength >> 3;
+
+            // the index of the first src word which contains our bits
+            auto wordBegin = bitOffset >> 3;
+
+            auto remBits = bitLength - fullByteCount * 8;
+    #ifndef NDEBUG
+            if (bitOffset + bitLength > src.size() * 8)
+                    throw invalid_argument("invalid split_length, or index out of range");
+            if (bitLength > dest.size() * 8)
+                    throw invalid_argument("bit length too long for dest");
+    #endif
+            if (lowOffset)
             {
-                uint8_t  low = src[wordBegin + 0] >> lowOffset;
-                uint8_t high = src[wordBegin + 1] << (8 - lowOffset);
-                dest[i] = low | high;
-                wordBegin++;
-                i++;
-            }
-        }
-        else
-        {
-            // simple case, just do memcpy for all of the full bytes
-            memcpy(dest.data(), &src[wordBegin], fullByteCount);
-            wordBegin += fullByteCount;
-        }
-
-        // we are now done with
-        // dest[0], ..., dest[fullByteCount - 1].
-        // 
-        // what remains is to populate dest[fullByteCount] 
-        // if needed there are some remaining bits.
-        if (remBits)
-        {
-            auto& destWord = dest[fullByteCount];
-
-            // we now populate the last byte of dest. Branch on
-            // if the src bits are contained in a single byte or
-            // in two bytes.
-            bool oneWordSrc = lowOffset + remBits <= 8;
-            if (oneWordSrc)
-            {
-                // case 1: all the remaining bits live in src[wordBegin]
-                uint8_t mask = (1 << remBits) - 1;
-
-                auto low = src[wordBegin];
-                low = low >> lowOffset;
-                low = low & mask;
-
-                auto high = destWord;
-                high = high & (~mask);
-
-                destWord = low | high;
+                // lowOffset mean we need to shift the bytes. 
+                // Populates all of the full bytes in dest.
+                int i = 0;
+                while (i < fullByteCount)
+                {
+                    u8  low = src[wordBegin + 0] >> lowOffset;
+                    u8 high = src[wordBegin + 1] << (8 - lowOffset);
+                    dest[i] = low | high;
+                    wordBegin++;
+                    i++;
+                }
             }
             else
             {
-                //extract the top bits out of src[wordBegin].
-                // these will become the bottom bits of destWord
-                auto lowCount = 8 - lowOffset;
-                uint8_t lowMask = (1 << lowCount) - 1;
-                auto low = (src[wordBegin] >> lowOffset) & lowMask;
-
-                //extract the bottom bits out of src[wordBegin + 1].
-                // these will become the middle bits of destWord
-                auto midCount = remBits - lowCount;
-                uint8_t midMask = (1 << midCount) - 1;
-                auto mid = (src[wordBegin + 1] & midMask) << lowCount;
-
-                // keep the high bits of destWord
-                uint8_t highMask = (~0) << remBits;
-                auto high = destWord & highMask;
-
-                // for everythign together;
-                destWord = low | mid | high;
+                // simple case, just do memcpy for all of the full bytes
+                memcpy(dest.data(), &src[wordBegin], fullByteCount);
+                wordBegin += fullByteCount;
             }
-        }
-    };
 
-    // Copies bitLength bits from src starting at the bit index by srcBitOffset.
-    // Bits are written to dest starting at the destBitOffset bit. All other bits in 
-    // dest are unchanged, e.g. the bit indexed by [0,1,...,destBitOffset - 1], [destBitOffset + bitLength, ...]
-    void details::copy_with_bit_offset(
-        gsl::span<const uint8_t> src,
-        int32_t srcBitOffset,
-        int32_t destBitOffset,
-        int32_t bitLength,
-        gsl::span<uint8_t> dest)
-    {
-        auto destNext = (destBitOffset + 7) >> 3;
-        auto diff = destNext * 8 - destBitOffset;
-
-        if (bitLength - diff > 0)
-        {
-            copy_with_bit_offset(src, srcBitOffset + diff, bitLength - diff, dest.subspan(destNext));
-        }
-        else
-        {
-            diff = bitLength;
-        }
-
-        if (diff)
-        {
-            auto srcBegin = srcBitOffset >> 3;
-            auto destBegin = destBitOffset >> 3;
-            auto destOffset = destBitOffset & 7;
-            auto srcOffset = srcBitOffset & 7;
-            auto highDiff = srcOffset + diff - 8;
-            auto& destVal = dest[destBegin];
-
-            if (highDiff <= 0)
+            // we are now done with
+            // dest[0], ..., dest[fullByteCount - 1].
+            // 
+            // what remains is to populate dest[fullByteCount] 
+            // if needed there are some remaining bits.
+            if (remBits)
             {
-                uint8_t mask = (1 << diff) - 1;
-                uint8_t mid = (src[srcBegin] >> srcOffset) & mask;
+                auto& destWord = dest[fullByteCount];
 
-                mask = ~(mask << destOffset);
-                mid = mid << destOffset;
+                // we now populate the last u8 of dest. Branch on
+                // if the src bits are contained in a single u8 or
+                // in two bytes.
+                bool oneWordSrc = lowOffset + remBits <= 8;
+                if (oneWordSrc)
+                {
+                    // case 1: all the remaining bits live in src[wordBegin]
+                    u8 mask = (1 << remBits) - 1;
 
-                destVal = (destVal & mask) | mid;
+                    auto low = src[wordBegin];
+                    low = low >> lowOffset;
+                    low = low & mask;
+
+                    auto high = destWord;
+                    high = high & (~mask);
+
+                    destWord = low | high;
+                }
+                else
+                {
+                    //extract the top bits out of src[wordBegin].
+                    // these will become the bottom bits of destWord
+                    auto lowCount = 8 - lowOffset;
+                    u8 lowMask = (1 << lowCount) - 1;
+                    auto low = (src[wordBegin] >> lowOffset) & lowMask;
+
+                    //extract the bottom bits out of src[wordBegin + 1].
+                    // these will become the middle bits of destWord
+                    auto midCount = remBits - lowCount;
+                    u8 midMask = (1 << midCount) - 1;
+                    auto mid = (src[wordBegin + 1] & midMask) << lowCount;
+
+                    // keep the high bits of destWord
+                    u8 highMask = (~0) << remBits;
+                    auto high = destWord & highMask;
+
+                    // for everythign together;
+                    destWord = low | mid | high;
+                }
+            }
+        };
+
+        // Copies bitLength bits from src starting at the bit index by srcBitOffset.
+        // Bits are written to dest starting at the destBitOffset bit. All other bits in 
+        // dest are unchanged, e.g. the bit indexed by [0,1,...,destBitOffset - 1], [destBitOffset + bitLength, ...]
+        void copy_with_bit_offset(
+            gsl::span<const u8> src,
+            i32 srcBitOffset,
+            i32 destBitOffset,
+            i32 bitLength,
+            gsl::span<u8> dest)
+        {
+                i32 destNext = (destBitOffset + 7) >> 3;
+                i32 diff = destNext * 8 - destBitOffset;
+
+            if (bitLength - diff > 0)
+            {
+                copy_with_bit_offset(src, srcBitOffset + diff, bitLength - diff, dest.subspan(destNext));
             }
             else
             {
-                auto lowDiff = diff - highDiff;
+                diff = bitLength;
+            }
 
-                uint8_t lowMask = (1 << lowDiff) - 1;
-                uint8_t low = src[srcBegin] >> srcOffset;
-                low &= lowMask;
+            if (diff)
+            {
+                auto srcBegin = srcBitOffset >> 3;
+                auto destBegin = destBitOffset >> 3;
+                auto destOffset = destBitOffset & 7;
+                auto srcOffset = srcBitOffset & 7;
+                auto highDiff = srcOffset + diff - 8;
+                auto& destVal = dest[destBegin];
 
-                uint8_t highMask = (1 << highDiff) - 1;
-                uint8_t high = src[srcBegin + 1] & highMask;
+                if (highDiff <= 0)
+                {
+                    u8 mask = (1 << diff) - 1;
+                    u8 mid = (src[srcBegin] >> srcOffset) & mask;
 
-                low <<= destOffset;
-                high <<= (destOffset + lowDiff);
+                    mask = ~(mask << destOffset);
+                    mid = mid << destOffset;
 
-                uint8_t mask = ~(((1 << diff) - 1) << destOffset);
+                    destVal = (destVal & mask) | mid;
+                }
+                else
+                {
+                    auto lowDiff = diff - highDiff;
 
-                destVal = (destVal & mask) | low | high;
+                    u8 lowMask = (1 << lowDiff) - 1;
+                    u8 low = src[srcBegin] >> srcOffset;
+                    low &= lowMask;
+
+                    u8 highMask = (1 << highDiff) - 1;
+                    u8 high = src[srcBegin + 1] & highMask;
+
+                    low <<= destOffset;
+                    high <<= (destOffset + lowDiff);
+
+                    u8 mask = ~(((1 << diff) - 1) << destOffset);
+
+                    destVal = (destVal & mask) | low | high;
+                }
             }
         }
-    }
-}
+    } // namespace details
+} // namespace apsi

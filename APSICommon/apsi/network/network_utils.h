@@ -3,12 +3,11 @@
 
 #pragma once
 
-// SEAL
-#include "seal/ciphertext.h"
-#include "seal/relinkeys.h"
-#include "seal/publickey.h"
-#include "seal/secretkey.h"
-#include "seal/plaintext.h"
+#include <seal/ciphertext.h>
+#include <seal/relinkeys.h>
+#include <seal/publickey.h>
+#include <seal/secretkey.h>
+#include <seal/plaintext.h>
 
 namespace apsi
 {
@@ -46,4 +45,4 @@ namespace apsi
     Get SmallModulus from a string
     */
     void get_small_modulus(seal::SmallModulus& sm, const std::string& str);
-}
+} // namespace apsi
