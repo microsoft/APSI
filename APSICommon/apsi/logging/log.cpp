@@ -222,11 +222,11 @@ namespace apsi
         {
         }
 
-        void Log::set_log_level(const string& level)
+        void Log::set_log_level(const std::string& level)
         {
         }
 
-        void Log::set_log_file(const string& file)
+        void Log::set_log_file(const std::string& file)
         {
         }
 
