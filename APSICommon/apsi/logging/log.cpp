@@ -182,6 +182,11 @@ namespace apsi
             get_log_properties().disable_console = disable_console;
         }
 
+        void Log::terminate()
+        {
+            log4cplus::deinitialize();
+        }
+
         void Log::set_log_level(const string& level)
         {
             Log::Level actual;
@@ -256,6 +261,11 @@ namespace apsi
         void Log::set_console_disabled(bool console_disabled)
         {
         }
+
+        void Log::terminate()
+        {
+        }
+
     } // namespace logging
 } // namespace apsi
 

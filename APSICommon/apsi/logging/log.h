@@ -43,6 +43,8 @@ namespace apsi
             static void set_log_file(const std::string& file);
             static void set_console_disabled(bool console_disabled);
 
+            static void terminate();
+
         private:
             static void format_msg(std::string& msg, const char* format, va_list ap);
         }; // class Log
