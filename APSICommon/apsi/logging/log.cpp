@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 #include <cstdio>
+#include <cstdlib>
 #include <memory>
 #include "log.h" 
 
@@ -18,7 +19,9 @@ using namespace log4cplus;
 
 #define CheckLogLevel(log_level) \
 {\
-    if (instance().getLogLevel() > log_level) \
+    configure_if_needed(); \
+    Logger& logger = Logger::getInstance("APSI"); \
+    if (logger.getLogLevel() > log_level) \
     { \
         return; \
     } \
@@ -31,70 +34,89 @@ using namespace log4cplus;
     va_start(ap, format); \
     format_msg(msg, format, ap); \
     va_end(ap); \
-    instance().log(log_level, msg); \
+    configure_if_needed(); \
+    Logger& logger = Logger::getInstance("APSI"); \
+    logger.log(log_level, msg); \
 }
 
-#define MSG_BUFFER_LEN 512
+constexpr auto MSG_BUFFER_LEN = 512;
 
 namespace apsi
 {
     namespace logging
     {
-        static bool configured = false;
-        static Logger logger;
-        static string log_file;
-        static bool disable_console = false;
-        static char msgBuffer[MSG_BUFFER_LEN];
+        class LogProperties
+        {
+        public:
+            bool configured = false;
+            string log_file;
+            bool disable_console = false;
+        };
 
-#ifndef _MSC_VER
-// auto_ptr shows a warning in GCC.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-        
+        static char msgBuffer[MSG_BUFFER_LEN];
+        static LogProperties* log_properties;
+
+        LogProperties& get_log_properties()
+        {
+            if (nullptr == log_properties)
+            {
+                log_properties = new LogProperties();
+            }
+
+            return *log_properties;
+        }
+
+        void exit_handler()
+        {
+            if (nullptr != log_properties)
+            {
+                delete log_properties;
+                log_properties = nullptr;
+            }
+        }
+
         void configure()
         {
-            if (configured)
+            if (nullptr != log_properties && log_properties->configured)
             {
                 throw runtime_error("Logger is already configured.");
             }
 
-            logger = Logger::getInstance("APSI");
+            std::atexit(exit_handler);
 
-            if (!disable_console)
+            if (!get_log_properties().disable_console)
             {
                 SharedAppenderPtr appender(new ConsoleAppender);
                 appender->setLayout(make_unique<PatternLayout>("%-5p %D{%H:%M:%S:%Q}: %m%n"));
+                Logger& logger = Logger::getInstance("APSI");
                 logger.addAppender(appender);
             }
 
-            if (!log_file.empty())
+            if (!get_log_properties().log_file.empty())
             {
-                SharedAppenderPtr appender(new RollingFileAppender(log_file));
+                SharedAppenderPtr appender(new RollingFileAppender(get_log_properties().log_file));
                 appender->setLayout(make_unique<PatternLayout>("%-5p %D{%H:%M:%S:%Q}: %m%n"));
+                Logger& logger = Logger::getInstance("APSI");
                 logger.addAppender(appender);
             }
 
-            if (disable_console && log_file.empty())
+            if (get_log_properties().disable_console && get_log_properties().log_file.empty())
             {
                 // Log4CPlus needs at least one appender. Use the null appender if the user doesn't want any output.
                 SharedAppenderPtr appender(new NullAppender());
+                Logger& logger = Logger::getInstance("APSI");
                 logger.addAppender(appender);
             }
 
-            configured = true;
+            get_log_properties().configured = true;
         }
 
-#ifndef _MSC_VER
-#pragma GCC diagnostic pop
-#endif
-
-        Logger& instance()
+        void configure_if_needed()
         {
-            if (!configured)
+            if (!get_log_properties().configured)
+            {
                 configure();
-
-            return logger;
+            }
         }
 
         void Log::info(const char* format, ...)
@@ -146,17 +168,18 @@ namespace apsi
                     throw invalid_argument("Unknown log level");
             }
 
-            instance().setLogLevel(actual);
+            Logger& logger = Logger::getInstance("APSI");
+            logger.setLogLevel(actual);
         }
 
         void Log::set_log_file(const string& file)
         {
-            log_file = file;
+            get_log_properties().log_file = file;
         }
 
         void Log::set_console_disabled(bool disable_console)
         {
-            disable_console = disable_console;
+            get_log_properties().disable_console = disable_console;
         }
 
         void Log::set_log_level(const string& level)
