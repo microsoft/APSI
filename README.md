@@ -43,3 +43,47 @@ TODO: All CMakeFiles need to know whether we are building shared or static?
 - [Google Test](https://github.com/google/googletest) - For unit tests and integration tests projects
 - [TCLAP](https://sourceforge.net/projects/tclap/) - Command line parser for stand alone executables (Receiver / Sender)
     - Linux: `sudo apt install libtclap-dev `
+
+## Directory structure
+
+The APSI library includes 3 separate components: common library, receiver library, and sender library.
+On top of C++ APIs, there is optionally a exported C wrapper layer and furthur a .NET wrapper layer.
+
+```
+APSI
+|-- README.md
+|-- CMakeLists.txt
+|-- APSI.sln
+|-- common
+|   |-- native
+|   |   |-- *.cpp
+|   |   |-- *.h
+|   |   |-- *.vscproj
+|   |   `-- c
+|   |       |-- *.cpp
+|   |       `-- *.h
+|   `-- dotnet
+|       |-- *.cs
+|       `-- *.vscproj
+|-- sender
+|   ...
+|-- receiver
+|   ...
+|-- tests
+|   |-- data
+|   |-- unit
+|   `-- integration
+|-- pipelines
+|-- tools
+|-- thirdparty
+`-- cli
+    |-- common
+    |-- sender
+    `-- receiver
+```
+
+TODO: move `cli` directory to foundry99/Private AI/APSI-CLI which already  have the most up-to-date version of files.
+TODO: fix CMake in subdirectories of `cli`.
+TODO: fix CMake in subdirectories of `tests`.
+TODO: fix CMake library/project names.
+TODO: fix all `.vscproj` files including their names.
