@@ -22,9 +22,9 @@ namespace apsi
     void get_string(std::string &str, const seal::Ciphertext &ciphertext);
 
     /**
-    Get string for a SmallModulus
+    Get string for a Modulus
     */
-    void get_string(std::string &str, const seal::SmallModulus &sm);
+    void get_string(std::string &str, const seal::Modulus &sm);
 
     /**
     Get public key from a string
@@ -44,7 +44,7 @@ namespace apsi
         std::shared_ptr<seal::SEALContext> context, seal::Ciphertext &ciphertext, const std::string &str);
 
     /**
-    Get SmallModulus from a string
+    Get Modulus from a string
     */
-    void get_small_modulus(seal::SmallModulus &sm, const std::string &str);
+    void get_modulus(seal::Modulus &sm, const std::string &str);
 } // namespace apsi

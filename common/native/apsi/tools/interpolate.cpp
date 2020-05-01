@@ -37,7 +37,7 @@ namespace apsi
             divided_differences[i].set(0, i, values);
         }
 
-        const SmallModulus &ch = field.ch();
+        const Modulus &ch = field.ch();
 
         for (size_t j = 1; j < size; j++)
         {

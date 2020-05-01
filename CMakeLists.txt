@@ -166,11 +166,7 @@ set(MSGSL_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindMSGSL.cmake)
 set(ZEROMQ_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQ.cmake)
 set(ZEROMQPP_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQpp.cmake)
 find_package(SEAL 3.5 REQUIRED)
-find_package(Kuku 1.1.1 EXACT REQUIRED)
-if(MSGSL_ROOT)
-    unset(MSGSL_INCLUDE_DIR CACHE)
-endif()
-find_package(MSGSL MODULE REQUIRED)
+find_package(Kuku 2.0.0 EXACT REQUIRED)
 if(ZeroMQ_ROOT)
     unset(ZEROMQ_INCLUDE_DIR CACHE)
     unset(ZEROMQ_LIBRARY_DIR CACHE)
@@ -266,14 +262,13 @@ target_include_directories(common PUBLIC
     $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
 
 # Link dependencies
-#target_link_libraries(common PUBLIC
-#    SEAL::seal
-#    MSGSL::MSGSL
-#    Kuku::kuku
-#    ZeroMQ::ZeroMQ
-#    ZeroMQpp::ZeroMQpp
-#    FourQ::FourQ
-#    log4cplus::log4cplus)
+target_link_libraries(common PUBLIC
+    SEAL::seal
+    Kuku::kuku
+    ZeroMQ::ZeroMQ
+    ZeroMQpp::ZeroMQpp
+    FourQ::FourQ
+    log4cplus::log4cplus)
 if (NOT APPLE)
     target_link_libraries(common PUBLIC stdc++fs)
 endif()

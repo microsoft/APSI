@@ -23,7 +23,7 @@ namespace apsi
         str = ss.str();
     }
 
-    void get_string(string &str, const SmallModulus &sm)
+    void get_string(string &str, const Modulus &sm)
     {
         stringstream ss;
         sm.save(ss);
@@ -48,7 +48,7 @@ namespace apsi
         ciphertext.load(context, ss);
     }
 
-    void get_small_modulus(SmallModulus &sm, const string &str)
+    void get_modulus(Modulus &sm, const string &str)
     {
         stringstream ss(str);
         sm.load(ss);

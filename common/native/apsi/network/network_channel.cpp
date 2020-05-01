@@ -166,7 +166,7 @@ namespace apsi
             u64 poly_modulus_degree = msg.get<u64>(idx++);
             response.seal_params.encryption_params.set_poly_modulus_degree(static_cast<size_t>(poly_modulus_degree));
 
-            vector<SmallModulus> coeff_modulus;
+            vector<Modulus> coeff_modulus;
             get_sm_vector(coeff_modulus, msg, idx);
             response.seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
 
@@ -482,7 +482,7 @@ namespace apsi
             }
         }
 
-        void NetworkChannel::get_sm_vector(vector<SmallModulus> &smv, const message_t &msg, size_t &part_idx) const
+        void NetworkChannel::get_sm_vector(vector<Modulus> &smv, const message_t &msg, size_t &part_idx) const
         {
             // Need to have size
             if (msg.parts() < (part_idx + 1))
@@ -492,23 +492,23 @@ namespace apsi
             get_part(size, msg, /* part */ part_idx++);
 
             if (msg.parts() < (part_idx + size))
-                throw runtime_error("Insufficient parts for SmallModulus vector");
+                throw runtime_error("Insufficient parts for Modulus vector");
 
             smv.resize(static_cast<size_t>(size));
             for (size_t sm_idx = 0; sm_idx < size; sm_idx++)
             {
                 string str = msg.get(part_idx++);
-                get_small_modulus(smv[sm_idx], str);
+                get_modulus(smv[sm_idx], str);
             }
         }
 
-        void NetworkChannel::add_sm_vector(const vector<SmallModulus> &smv, message_t &msg) const
+        void NetworkChannel::add_sm_vector(const vector<Modulus> &smv, message_t &msg) const
         {
             // First part is size
             u64 size = static_cast<u64>(smv.size());
             add_part(size, msg);
 
-            for (const SmallModulus &sm : smv)
+            for (const Modulus &sm : smv)
             {
                 // Add each element as a string
                 string str;

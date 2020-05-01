@@ -17,7 +17,7 @@
 #include "apsi/tools/utils.h"
 
 // SEAL
-#include <seal/smallmodulus.h>
+#include <seal/modulus.h>
 #include <seal/util/common.h>
 
 using namespace std;

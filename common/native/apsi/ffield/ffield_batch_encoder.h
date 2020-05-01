@@ -15,7 +15,7 @@ namespace apsi
     public:
         FFieldBatchEncoder(std::shared_ptr<seal::SEALContext> context, FField field);
 
-        inline seal::SmallModulus ch() const
+        inline seal::Modulus ch() const
         {
             return field_.ch_;
         }

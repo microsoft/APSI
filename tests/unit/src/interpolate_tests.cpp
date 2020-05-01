@@ -3,7 +3,7 @@
 
 #include <random>
 #include <seal/context.h>
-#include <seal/smallmodulus.h>
+#include <seal/modulus.h>
 #include <seal/util/mempool.h>
 #include "apsi/apsidefines.h"
 #include "apsi/tools/interpolate.h"
@@ -36,7 +36,7 @@ namespace APSITests
     }
 
     // return poly(x)
-    u64 u64_poly_eval(const vector<u64> &poly, const u64 &x, const seal::SmallModulus &mod)
+    u64 u64_poly_eval(const vector<u64> &poly, const u64 &x, const seal::Modulus &mod)
     {
         // cout << "f(" << x << ") = ";
         u64 result = 0, xx = 1;
@@ -128,7 +128,7 @@ namespace APSITests
     TEST(InterpolateTests, ffield_interpolate_test)
     {
         int degree = 2;
-        seal::SmallModulus plain_modulus(40961);
+        seal::Modulus plain_modulus(40961);
         u64 numPoints = min<u64>(3, plain_modulus.value() / degree);
         int numTrials = 10;
 

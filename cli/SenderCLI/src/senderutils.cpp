@@ -11,7 +11,7 @@
 
 // SEAL
 // #include "seal/defaultparams.h"
-#include "seal/smallmodulus.h"
+#include "seal/modulus.h"
 
 
 using namespace std;
@@ -53,7 +53,7 @@ namespace apsi
                 // Length of items after OPRF
                 psiconf_params.item_bit_length_used_after_oprf = cmd.item_bit_length_used_after_oprf();
 
-                Log::debug("item bit length after oprf when initializing = %i", psiconf_params.item_bit_length_used_after_oprf); 
+                Log::debug("item bit length after oprf when initializing = %i", psiconf_params.item_bit_length_used_after_oprf);
             }
 
             // Cuckoo hash parameters
@@ -96,7 +96,7 @@ namespace apsi
             {
                 seal_params.encryption_params.set_poly_modulus_degree(cmd.poly_modulus());
 
-                vector<SmallModulus> coeff_modulus;
+                vector<Modulus> coeff_modulus;
                 auto coeff_mod_bit_vector = cmd.coeff_modulus();
 
                 if (coeff_mod_bit_vector.size() == 0)
@@ -117,7 +117,7 @@ namespace apsi
                 seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
                 seal_params.encryption_params.set_plain_modulus(cmd.plain_modulus());
 
-                /** Note: now this maximal supported degree for a given set of SEAL parameters is 
+                /** Note: now this maximal supported degree for a given set of SEAL parameters is
                 hardcoded. It be better to give a formula.
                 */
                 if (cmd.poly_modulus() >= 4096 && cmd.plain_modulus() <= 40961)
@@ -126,7 +126,7 @@ namespace apsi
                 }
                 else
                 {
-                    seal_params.max_supported_degree = 1; 
+                    seal_params.max_supported_degree = 1;
                 }
 
                 seal_params.max_supported_degree = 2; // for debugging
@@ -144,7 +144,7 @@ namespace apsi
             Creating the PSIParams class.
             */
             PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
-            
+
             return params;
         }
     } // namespace tools

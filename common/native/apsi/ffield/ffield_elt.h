@@ -89,7 +89,7 @@ namespace apsi
 
         inline void add(FFieldElt &out, const FFieldElt &in) const
         {
-            const seal::SmallModulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.ch_;
             std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(), [&ch](auto a, auto b) {
                 return seal::util::add_uint_uint_mod(a, b, ch);
             });
@@ -97,7 +97,7 @@ namespace apsi
 
         inline void sub(FFieldElt &out, const FFieldElt &in) const
         {
-            const seal::SmallModulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.ch_;
             std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(), [&ch](auto a, auto b) {
                 return seal::util::sub_uint_uint_mod(a, b, ch);
             });
@@ -105,7 +105,7 @@ namespace apsi
 
         inline void mul(FFieldElt &out, const FFieldElt &in) const
         {
-            const seal::SmallModulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.ch_;
             std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(), [&ch](auto a, auto b) {
                 return seal::util::multiply_uint_uint_mod(a, b, ch);
             });
@@ -113,7 +113,7 @@ namespace apsi
 
         inline void div(FFieldElt &out, const FFieldElt &in) const
         {
-            const seal::SmallModulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.ch_;
             std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(), [&ch](auto a, auto b) {
                 _ffield_elt_coeff_t inv;
                 if (!seal::util::try_invert_uint_mod(b, ch, inv))
@@ -126,7 +126,7 @@ namespace apsi
 
         inline void inv(FFieldElt &out) const
         {
-            const seal::SmallModulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.ch_;
             std::transform(elt_.cbegin(), elt_.cend(), out.elt_.begin(), [&ch](auto a) {
                 _ffield_elt_coeff_t inv;
                 if (!seal::util::try_invert_uint_mod(a, ch, inv))
@@ -144,7 +144,7 @@ namespace apsi
 
         inline void neg(FFieldElt &out) const
         {
-            const seal::SmallModulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.ch_;
             std::transform(elt_.cbegin(), elt_.cend(), out.elt_.begin(), [&ch](auto a) {
                 return seal::util::negate_uint_mod(a, ch);
             });
@@ -157,7 +157,7 @@ namespace apsi
 
         inline void pow(FFieldElt &out, u64 e) const
         {
-            const seal::SmallModulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.ch_;
             std::transform(elt_.cbegin(), elt_.cend(), out.elt_.begin(), [ch, e](auto a) {
                 return seal::util::exponentiate_uint_mod(a, e, ch);
             });

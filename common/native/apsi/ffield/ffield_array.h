@@ -171,7 +171,7 @@ namespace apsi
                 throw std::invalid_argument("field mismatch");
             }
 #endif
-            const seal::SmallModulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.ch_;
             std::transform(
                 array_.cbegin(), array_.cend(), in.array_.cbegin(), out.array_.begin(),
                 [&ch](auto a, auto b) { return seal::util::add_uint_uint_mod(a, b, ch); });
@@ -189,7 +189,7 @@ namespace apsi
                 throw std::invalid_argument("field mismatch");
             }
 #endif
-            const seal::SmallModulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.ch_;
             std::transform(
                 array_.cbegin(), array_.cend(), in.array_.cbegin(), out.array_.begin(),
                 [&ch](auto a, auto b) { return seal::util::sub_uint_uint_mod(a, b, ch); });
@@ -207,7 +207,7 @@ namespace apsi
                 throw std::invalid_argument("field mismatch");
             }
 #endif
-            const seal::SmallModulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.ch_;
             std::transform(
                 array_.cbegin(), array_.cend(), in.array_.cbegin(), out.array_.begin(),
                 [&ch](auto a, auto b) { return seal::util::multiply_uint_uint_mod(a, b, ch); });
@@ -225,7 +225,7 @@ namespace apsi
                 throw std::invalid_argument("field mismatch");
             }
 #endif
-            const seal::SmallModulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.ch_;
             std::transform(
                 array_.cbegin(), array_.cend(), in.array_.cbegin(), out.array_.begin(), [&ch](auto a, auto b) {
                     _ffield_elt_coeff_t inv;
@@ -249,7 +249,7 @@ namespace apsi
                 throw std::invalid_argument("field mismatch");
             }
 #endif
-            const seal::SmallModulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.ch_;
             std::transform(array_.cbegin(), array_.cend(), out.array_.begin(), [&ch](auto a) {
                 _ffield_elt_coeff_t inv;
                 if (!seal::util::try_invert_uint_mod(a, ch, inv))
@@ -277,7 +277,7 @@ namespace apsi
                 throw std::invalid_argument("field mismatch");
             }
 #endif
-            const seal::SmallModulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.ch_;
             std::transform(array_.cbegin(), array_.cend(), out.array_.begin(), [&ch](auto a) {
                 return seal::util::negate_uint_mod(a, ch);
             });
@@ -300,7 +300,7 @@ namespace apsi
                 throw std::invalid_argument("field mismatch");
             }
 #endif
-            const seal::SmallModulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.ch_;
             std::transform(array_.cbegin(), array_.cend(), out.array_.begin(), [&ch](auto a) {
                 return seal::util::multiply_uint_uint_mod(a, a, ch);
             });

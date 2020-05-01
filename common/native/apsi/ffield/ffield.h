@@ -3,13 +3,13 @@
 
 #pragma once
 
-#include <seal/smallmodulus.h>
+#include <seal/modulus.h>
 #include <vector>
 #include "apsi/apsidefines.h"
 
 namespace apsi
 {
-    using _ch_t = seal::SmallModulus;
+    using _ch_t = seal::Modulus;
     using _ffield_elt_coeff_t = u64;
     using _ffield_elt_t = std::vector<_ffield_elt_coeff_t>;
 

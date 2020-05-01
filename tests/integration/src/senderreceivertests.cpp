@@ -188,7 +188,7 @@ namespace
         seal_params.encryption_params.set_poly_modulus_degree(4096);
         seal_params.max_supported_degree = 2;
 
-        vector<SmallModulus> coeff_modulus = CoeffModulus::Create(4096, { 49, 40, 20 });
+        vector<Modulus> coeff_modulus = CoeffModulus::Create(4096, { 49, 40, 20 });
         seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
         seal_params.encryption_params.set_plain_modulus(40961);
 

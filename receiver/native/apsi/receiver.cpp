@@ -60,7 +60,7 @@ namespace apsi
             Log::info("Initializing Receiver");
 
             field_ =
-                make_unique<FField>(SmallModulus(get_params().ffield_characteristic()), get_params().ffield_degree());
+                make_unique<FField>(Modulus(get_params().ffield_characteristic()), get_params().ffield_degree());
 
             slot_count_ = get_params().batch_size();
 
