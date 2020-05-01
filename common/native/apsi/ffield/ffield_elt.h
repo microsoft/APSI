@@ -3,12 +3,12 @@
 
 #pragma once
 
-#include <limits>
 #include <algorithm>
 #include <cstddef>
 #include <gsl/span>
-#include <seal/util/uintarithsmallmod.h>
+#include <limits>
 #include <seal/util/numth.h>
+#include <seal/util/uintarithsmallmod.h>
 #include "apsi/ffield/ffield.h"
 
 namespace apsi
@@ -16,23 +16,15 @@ namespace apsi
     namespace details
     {
         // Copies bitLength bits from src starting at the bit index by bitOffset.
-        // Bits are written to dest starting at the first bit. All other bits in 
+        // Bits are written to dest starting at the first bit. All other bits in
         // dest are unchanged, e.g. the bit indexed by [bitLength, bitLength + 1, ...]
-        void copy_with_bit_offset(
-            gsl::span<const u8> src,
-            i32 bitOffset,
-            i32 bitLength,
-            gsl::span<u8> dest);
+        void copy_with_bit_offset(gsl::span<const u8> src, i32 bitOffset, i32 bitLength, gsl::span<u8> dest);
 
         // Copies bitLength bits from src starting at the bit index by srcBitOffset.
-        // Bits are written to dest starting at the destBitOffset bit. All other bits in 
+        // Bits are written to dest starting at the destBitOffset bit. All other bits in
         // dest are unchanged, e.g. the bit indexed by [0,1,...,destBitOffset - 1], [destBitOffset + bitLength, ...]
         void copy_with_bit_offset(
-            gsl::span<const u8> src,
-            i32 srcBitOffset,
-            i32 destBitOffset,
-            i32 bitLength,
-            gsl::span<u8> dest);
+            gsl::span<const u8> src, i32 srcBitOffset, i32 destBitOffset, i32 bitLength, gsl::span<u8> dest);
     } // namespace details
 
     class FFieldElt
@@ -42,8 +34,7 @@ namespace apsi
 
     public:
         FFieldElt(FField field, const _ffield_elt_t &elt) : field_(field), elt_(elt)
-        {
-        }
+        {}
 
         FFieldElt(FField field) : field_(std::move(field))
         {
@@ -99,47 +90,51 @@ namespace apsi
         inline void add(FFieldElt &out, const FFieldElt &in) const
         {
             const seal::SmallModulus &ch = field_.ch_;
-            std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(),
-                [&ch](auto a, auto b) { return seal::util::add_uint_uint_mod(a, b, ch); });
+            std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(), [&ch](auto a, auto b) {
+                return seal::util::add_uint_uint_mod(a, b, ch);
+            });
         }
 
         inline void sub(FFieldElt &out, const FFieldElt &in) const
         {
             const seal::SmallModulus &ch = field_.ch_;
-            std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(),
-                [&ch](auto a, auto b) { return seal::util::sub_uint_uint_mod(a, b, ch); });
+            std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(), [&ch](auto a, auto b) {
+                return seal::util::sub_uint_uint_mod(a, b, ch);
+            });
         }
 
         inline void mul(FFieldElt &out, const FFieldElt &in) const
         {
             const seal::SmallModulus &ch = field_.ch_;
-            std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(),
-                [&ch](auto a, auto b) { return seal::util::multiply_uint_uint_mod(a, b, ch); });
+            std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(), [&ch](auto a, auto b) {
+                return seal::util::multiply_uint_uint_mod(a, b, ch);
+            });
         }
 
         inline void div(FFieldElt &out, const FFieldElt &in) const
         {
             const seal::SmallModulus &ch = field_.ch_;
-            std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(),
-                [&ch](auto a, auto b) {
-                    _ffield_elt_coeff_t inv;
-                    if (!seal::util::try_invert_uint_mod(b, ch, inv)) {
-                        throw std::logic_error("division by zero");
-                    }
-                    return seal::util::multiply_uint_uint_mod(a, inv, ch);
-                });
+            std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(), [&ch](auto a, auto b) {
+                _ffield_elt_coeff_t inv;
+                if (!seal::util::try_invert_uint_mod(b, ch, inv))
+                {
+                    throw std::logic_error("division by zero");
+                }
+                return seal::util::multiply_uint_uint_mod(a, inv, ch);
+            });
         }
 
         inline void inv(FFieldElt &out) const
         {
             const seal::SmallModulus &ch = field_.ch_;
             std::transform(elt_.cbegin(), elt_.cend(), out.elt_.begin(), [&ch](auto a) {
-                    _ffield_elt_coeff_t inv;
-                    if (!seal::util::try_invert_uint_mod(a, ch, inv)) {
-                        throw std::logic_error("division by zero");
-                    }
-                    return inv;
-                });
+                _ffield_elt_coeff_t inv;
+                if (!seal::util::try_invert_uint_mod(a, ch, inv))
+                {
+                    throw std::logic_error("division by zero");
+                }
+                return inv;
+            });
         }
 
         inline void inv()
@@ -150,8 +145,9 @@ namespace apsi
         inline void neg(FFieldElt &out) const
         {
             const seal::SmallModulus &ch = field_.ch_;
-            std::transform(elt_.cbegin(), elt_.cend(), out.elt_.begin(),
-                [&ch](auto a) { return seal::util::negate_uint_mod(a, ch); });
+            std::transform(elt_.cbegin(), elt_.cend(), out.elt_.begin(), [&ch](auto a) {
+                return seal::util::negate_uint_mod(a, ch);
+            });
         }
 
         inline void neg()
@@ -162,13 +158,15 @@ namespace apsi
         inline void pow(FFieldElt &out, u64 e) const
         {
             const seal::SmallModulus &ch = field_.ch_;
-            std::transform(elt_.cbegin(), elt_.cend(), out.elt_.begin(),
-                [ch, e](auto a) { return seal::util::exponentiate_uint_mod(a, e, ch); });
+            std::transform(elt_.cbegin(), elt_.cend(), out.elt_.begin(), [ch, e](auto a) {
+                return seal::util::exponentiate_uint_mod(a, e, ch);
+            });
         }
 
         inline void set(const FFieldElt &in)
         {
-            if (field_ != in.field_) {
+            if (field_ != in.field_)
+            {
                 throw std::logic_error("incompatible fields");
             }
             std::copy(in.elt_.cbegin(), in.elt_.cend(), elt_.begin());
@@ -179,86 +177,86 @@ namespace apsi
             return std::equal(elt_.cbegin(), elt_.cend(), in.elt_.cbegin());
         }
 
-        inline FFieldElt operator +(const FFieldElt &in) const
+        inline FFieldElt operator+(const FFieldElt &in) const
         {
             FFieldElt result(field_);
             add(result, in);
             return result;
         }
 
-        inline FFieldElt operator -(const FFieldElt &in) const
+        inline FFieldElt operator-(const FFieldElt &in) const
         {
             FFieldElt result(field_);
             sub(result, in);
             return result;
         }
 
-        inline FFieldElt operator *(const FFieldElt &in) const
+        inline FFieldElt operator*(const FFieldElt &in) const
         {
             FFieldElt result(field_);
             mul(result, in);
             return result;
         }
 
-        inline FFieldElt operator /(const FFieldElt &in) const
+        inline FFieldElt operator/(const FFieldElt &in) const
         {
             FFieldElt result(field_);
             div(result, in);
             return result;
         }
 
-        inline FFieldElt operator -() const
+        inline FFieldElt operator-() const
         {
             FFieldElt result(field_);
             neg(result);
             return result;
         }
 
-        inline FFieldElt operator ^(u64 e) const
+        inline FFieldElt operator^(u64 e) const
         {
             FFieldElt result(field_);
             pow(result, e);
             return result;
         }
 
-        inline void operator +=(const FFieldElt &in)
+        inline void operator+=(const FFieldElt &in)
         {
             add(*this, in);
         }
 
-        inline void operator -=(const FFieldElt &in)
+        inline void operator-=(const FFieldElt &in)
         {
             sub(*this, in);
         }
 
-        inline void operator *=(const FFieldElt &in)
+        inline void operator*=(const FFieldElt &in)
         {
             mul(*this, in);
         }
 
-        inline void operator /=(const FFieldElt &in)
+        inline void operator/=(const FFieldElt &in)
         {
             div(*this, in);
         }
 
-        inline void operator ^=(u64 e)
+        inline void operator^=(u64 e)
         {
             pow(*this, e);
         }
 
-        inline void operator =(const FFieldElt &in)
+        inline void operator=(const FFieldElt &in)
         {
             set(in);
         }
 
-        inline bool operator ==(const FFieldElt &compare) const
+        inline bool operator==(const FFieldElt &compare) const
         {
             return equals(compare);
         }
 
-        inline bool operator !=(const FFieldElt &compare) const
+        inline bool operator!=(const FFieldElt &compare) const
         {
-            return !operator ==(compare);
+            return !operator==(compare);
         }
 
         inline _ffield_elt_coeff_t *data()
@@ -271,11 +269,10 @@ namespace apsi
             return elt_.data();
         }
 
-        template<typename T>
-        typename std::enable_if<std::is_pod<T>::value>::type
-            encode(gsl::span<T> value, int bit_length)
+        template <typename T>
+        typename std::enable_if<std::is_pod<T>::value>::type encode(gsl::span<T> value, int bit_length)
         {
-            gsl::span<const u8> v2(reinterpret_cast<u8*>(value.data()), value.size() * sizeof(T));
+            gsl::span<const u8> v2(reinterpret_cast<u8 *>(value.data()), value.size() * sizeof(T));
 
             // Should minus 1 to avoid wrapping around p
             int split_length = field_.ch_.bit_count() - 1;
@@ -285,7 +282,8 @@ namespace apsi
 
             static_assert(std::is_pod<_ffield_elt_coeff_t>::value, "must be pod type");
 
-            if (field_.d_ < static_cast<u64>(split_index_bound)) {
+            if (field_.d_ < static_cast<u64>(split_index_bound))
+            {
                 throw std::invalid_argument("bit_length too large for extension field");
             }
 
@@ -293,19 +291,18 @@ namespace apsi
             for (int j = 0; j < split_index_bound; j++)
             {
                 auto size = std::min<int>(split_length, bit_length);
-                details::copy_with_bit_offset(v2, offset, size,
-                    { reinterpret_cast<u8*>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) });
+                details::copy_with_bit_offset(
+                    v2, offset, size, { reinterpret_cast<u8 *>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) });
 
                 offset += split_length;
                 bit_length -= split_length;
             }
         }
 
-        template<typename T>
-        typename std::enable_if<std::is_pod<T>::value>::type
-            decode(gsl::span<T> value, int bit_length)
+        template <typename T>
+        typename std::enable_if<std::is_pod<T>::value>::type decode(gsl::span<T> value, int bit_length)
         {
-            gsl::span<u8> v2(reinterpret_cast<u8*>(value.data()), value.size() * sizeof(T));
+            gsl::span<u8> v2(reinterpret_cast<u8 *>(value.data()), value.size() * sizeof(T));
 
             // Should minus 1 to avoid wrapping around p
             int split_length = field_.ch_.bit_count() - 1;
@@ -325,8 +322,7 @@ namespace apsi
             {
                 auto size = std::min<int>(split_length, bit_length);
                 details::copy_with_bit_offset(
-                    { reinterpret_cast<u8*>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) },
-                    0, offset, size, v2);
+                    { reinterpret_cast<u8 *>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) }, 0, offset, size, v2);
 
                 offset += split_length;
                 bit_length -= split_length;
@@ -339,9 +335,10 @@ namespace apsi
     }; // class FFieldElt
 
     // Easy printing
-    inline std::ostream &operator <<(std::ostream &os, const FFieldElt &in)
+    inline std::ostream &operator<<(std::ostream &os, const FFieldElt &in)
     {
-        for (std::size_t i = 0; i < in.field().d() - 1; i++) {
+        for (std::size_t i = 0; i < in.field().d() - 1; i++)
+        {
             os << in.data()[i] << " ";
         }
         os << in.data()[in.field().d()];

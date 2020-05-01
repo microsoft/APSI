@@ -1,7 +1,7 @@
 #pragma once
 
-#include <gsl/span>
 #include <gsl/gsl_assert>
+#include <gsl/span>
 #include "apsi/apsidefines.h"
 
 namespace apsi
@@ -9,7 +9,7 @@ namespace apsi
     /**
      * Simple bi-dimensional Matrix implementation using gsl::span.
      **/
-    template<class T>
+    template <class T>
     class MatrixView
     {
         // For iterating through the elements in the view
@@ -18,19 +18,15 @@ namespace apsi
     public:
         MatrixView() = default;
 
-        MatrixView(T* elems, std::size_t rows, std::size_t cols, std::size_t elt_size = 1) :
-            data_(gsl::span<T>(elems, rows * cols * elt_size)),
-            rows_(rows),
-            cols_(cols),
-            elt_size_(elt_size)
-        {
-        }
+        MatrixView(T *elems, std::size_t rows, std::size_t cols, std::size_t elt_size = 1)
+            : data_(gsl::span<T>(elems, rows * cols * elt_size)), rows_(rows), cols_(cols), elt_size_(elt_size)
+        {}
 
         /**
          * Return a subspan with a row in the matrix. Useful for accesing
          * elements like so: matrix[row][col]
          */
-        constexpr gsl::span<T> operator[] (std::size_t row)
+        constexpr gsl::span<T> operator[](std::size_t row)
         {
             Expects(row < rows_);
             return data_.subspan(
@@ -41,7 +37,7 @@ namespace apsi
         /**
          * Initialize this matrix from another matrix.
          */
-        constexpr MatrixView& operator=(const MatrixView& other)
+        constexpr MatrixView &operator=(const MatrixView &other)
         {
             rows_ = other.rows_;
             cols_ = other.cols_;
@@ -74,43 +70,64 @@ namespace apsi
         /**
          * Get the stride
          */
-        std::size_t stride() const { return cols_ * elt_size_; }
+        std::size_t stride() const
+        {
+            return cols_ * elt_size_;
+        }
 
         /**
          * Get the rows
          */
-        std::size_t rows() const { return rows_; }
+        std::size_t rows() const
+        {
+            return rows_;
+        }
 
         /**
          * Get the columns
          */
-        std::size_t columns() const { return cols_; }
+        std::size_t columns() const
+        {
+            return cols_;
+        }
 
         /**
          * Get a pointer to the actual data
          */
-        T* data() const { return data_.data(); }
+        T *data() const
+        {
+            return data_.data();
+        }
 
         /**
          * Get the number of elements
          */
-        std::size_t size() const { return data_.size(); }
+        std::size_t size() const
+        {
+            return data_.size();
+        }
 
         /**
          * Get initial iterator
          */
-        iterator begin() const { return data_.begin(); }
+        iterator begin() const
+        {
+            return data_.begin();
+        }
 
         /**
          * Get ending iterator
          */
-        iterator end() const { return data_.end(); }
+        iterator end() const
+        {
+            return data_.end();
+        }
 
     protected:
         /**
          * Re-initialize the view.
          */
-        void resize(T* data, std::size_t rows, std::size_t cols, std::size_t elt_size)
+        void resize(T *data, std::size_t rows, std::size_t cols, std::size_t elt_size)
         {
             rows_ = rows;
             cols_ = cols;

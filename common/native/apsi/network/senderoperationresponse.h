@@ -4,8 +4,8 @@
 #pragma once
 
 #include <vector>
-#include "apsi/result_package.h"
 #include "apsi/psiparams.h"
+#include "apsi/result_package.h"
 
 namespace apsi
 {
@@ -17,9 +17,9 @@ namespace apsi
         struct SenderResponseGetParameters
         {
             PSIParams::PSIConfParams psiconf_params;
-            PSIParams::TableParams   table_params;
-            PSIParams::CuckooParams  cuckoo_params;
-            PSIParams::SEALParams    seal_params;
+            PSIParams::TableParams table_params;
+            PSIParams::CuckooParams cuckoo_params;
+            PSIParams::SEALParams seal_params;
             PSIParams::FFieldParams ffield_params;
         }; // struct SenderResponseGetParameters
 
@@ -38,5 +38,5 @@ namespace apsi
         {
             u64 package_count;
         }; // struct SenderResponseQuery
-    } // namespace network
+    }      // namespace network
 } // namespace apsi

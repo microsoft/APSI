@@ -1,25 +1,24 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "gtest/gtest.h"
-#include "apsi/tools/stopwatch.h"
 #include <algorithm>
 #include <thread>
-
+#include "apsi/tools/stopwatch.h"
+#include "gtest/gtest.h"
 
 using namespace std;
 using namespace apsi;
 using namespace apsi::tools;
 
-
-namespace {
-    void get_thread_name(int idx, string& str)
+namespace
+{
+    void get_thread_name(int idx, string &str)
     {
         stringstream ss;
         ss << "th" << idx;
         str = ss.str();
     }
-}
+} // namespace
 
 namespace APSITests
 {
@@ -38,7 +37,8 @@ namespace APSITests
         ASSERT_TRUE("one" == timepoints[0].event_name);
         ASSERT_TRUE("two" == timepoints[1].event_name);
 
-        auto diff = chrono::duration_cast<chrono::milliseconds>(timepoints[1].time_point - timepoints[0].time_point).count();
+        auto diff =
+            chrono::duration_cast<chrono::milliseconds>(timepoints[1].time_point - timepoints[0].time_point).count();
         string msg;
         {
             stringstream ss;
@@ -56,8 +56,8 @@ namespace APSITests
         vector<thread> threads(20);
         for (size_t i = 0; i < threads.size(); i++)
         {
-            threads[i] = thread([&](int idx)
-                {
+            threads[i] = thread(
+                [&](int idx) {
                     string evt_name;
                     get_thread_name(idx, evt_name);
 
@@ -69,10 +69,11 @@ namespace APSITests
 
                         sw.add_event(evt_name);
                     }
-                }, static_cast<int>(i));
+                },
+                static_cast<int>(i));
         }
 
-        for (auto& thr : threads)
+        for (auto &thr : threads)
         {
             thr.join();
         }
@@ -87,23 +88,20 @@ namespace APSITests
     {
         Stopwatch sw;
 
-        thread th1([&sw]
-            {
-                StopwatchScope sc(sw, "one");
-                this_thread::sleep_for(60ms);
-            });
+        thread th1([&sw] {
+            StopwatchScope sc(sw, "one");
+            this_thread::sleep_for(60ms);
+        });
 
-        thread th2([&sw]
-            {
-                StopwatchScope sc(sw, "two");
-                this_thread::sleep_for(30ms);
-            });
+        thread th2([&sw] {
+            StopwatchScope sc(sw, "two");
+            this_thread::sleep_for(30ms);
+        });
 
-        thread th3([&sw]
-            {
-                StopwatchScope sc(sw, "one");
-                this_thread::sleep_for(40ms);
-            });
+        thread th3([&sw] {
+            StopwatchScope sc(sw, "one");
+            this_thread::sleep_for(40ms);
+        });
 
         th1.join();
         th2.join();
@@ -114,7 +112,8 @@ namespace APSITests
 
         ASSERT_EQ((size_t)2, tsp.size());
 
-        auto timesp = std::find_if(tsp.begin(), tsp.end(), [](Stopwatch::TimespanSummary& tss) { return tss.event_name == "one"; });
+        auto timesp = std::find_if(
+            tsp.begin(), tsp.end(), [](Stopwatch::TimespanSummary &tss) { return tss.event_name == "one"; });
         ASSERT_TRUE(timesp != tsp.end());
         ASSERT_EQ(2, timesp->event_count);
 
@@ -140,7 +139,8 @@ namespace APSITests
         }
         ASSERT_TRUE(timesp->max >= 60 && timesp->max < 80);
 
-        timesp = std::find_if(tsp.begin(), tsp.end(), [](Stopwatch::TimespanSummary& tss) { return tss.event_name == "two"; });
+        timesp = std::find_if(
+            tsp.begin(), tsp.end(), [](Stopwatch::TimespanSummary &tss) { return tss.event_name == "two"; });
         ASSERT_TRUE(timesp != tsp.end());
         ASSERT_EQ(1, timesp->event_count);
     }
@@ -152,8 +152,8 @@ namespace APSITests
         vector<thread> threads(30);
         for (size_t i = 0; i < threads.size(); i++)
         {
-            threads[i] = thread([&](int idx)
-                {
+            threads[i] = thread(
+                [&](int idx) {
                     string thr_name;
                     get_thread_name(idx, thr_name);
 
@@ -171,10 +171,11 @@ namespace APSITests
                         StopwatchScope sw3(sw, thr_name);
                         this_thread::sleep_for(15ms);
                     }
-                }, static_cast<int>(i));
+                },
+                static_cast<int>(i));
         }
 
-        for (auto& thr : threads)
+        for (auto &thr : threads)
         {
             thr.join();
         }
@@ -183,9 +184,9 @@ namespace APSITests
         sw.get_timespans(tsp);
 
         ASSERT_EQ((size_t)30, tsp.size());
-        for (auto& tss : tsp)
+        for (auto &tss : tsp)
         {
             ASSERT_EQ(3, tss.event_count);
         }
     }
-}
+} // namespace APSITests

@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#pragma once 
+#pragma once
 
 // APSI
 #include "apsi/network/network_channel.h"
@@ -28,7 +28,7 @@ namespace apsi
             The Sender needs to set a couple of socket options to ensure
             messages are not dropped.
             */
-            virtual void set_socket_options(zmqpp::socket_t* socket);
+            virtual void set_socket_options(zmqpp::socket_t *socket);
         };
     } // namespace network
 } // namespace apsi

@@ -1,10 +1,10 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include <sstream>
-#include "apsi/result_package.h"
 #include "apsi/network/network_channel.h"
+#include <sstream>
 #include "apsi/network/network_utils.h"
+#include "apsi/result_package.h"
 
 // ZeroMQ
 #pragma warning(push, 0)
@@ -20,12 +20,9 @@ namespace apsi
     namespace network
     {
         NetworkChannel::NetworkChannel()
-            : end_point_(""),
-            receive_mutex_(make_unique<mutex>()),
-            send_mutex_(make_unique<mutex>()),
-            context_(make_unique<context_t>())
-        {
-        }
+            : end_point_(""), receive_mutex_(make_unique<mutex>()), send_mutex_(make_unique<mutex>()),
+              context_(make_unique<context_t>())
+        {}
 
         NetworkChannel::~NetworkChannel()
         {
@@ -35,7 +32,7 @@ namespace apsi
             }
         }
 
-        void NetworkChannel::bind(const string& end_point)
+        void NetworkChannel::bind(const string &end_point)
         {
             throw_if_connected();
 
@@ -43,7 +40,7 @@ namespace apsi
             get_socket()->bind(end_point);
         }
 
-        void NetworkChannel::connect(const string& end_point)
+        void NetworkChannel::connect(const string &end_point)
         {
             throw_if_connected();
 
@@ -78,7 +75,7 @@ namespace apsi
                 throw runtime_error("Socket is already connected");
         }
 
-        bool NetworkChannel::receive(shared_ptr<SenderOperation>& sender_op, bool wait_for_message)
+        bool NetworkChannel::receive(shared_ptr<SenderOperation> &sender_op, bool wait_for_message)
         {
             throw_if_not_connected();
 
@@ -118,12 +115,12 @@ namespace apsi
             return true;
         }
 
-        bool NetworkChannel::receive(shared_ptr<SenderOperation>& sender_op)
+        bool NetworkChannel::receive(shared_ptr<SenderOperation> &sender_op)
         {
             return receive(sender_op, /* wait_for_message */ false);
         }
 
-        bool NetworkChannel::receive(SenderResponseGetParameters& response)
+        bool NetworkChannel::receive(SenderResponseGetParameters &response)
         {
             throw_if_not_connected();
 
@@ -184,13 +181,13 @@ namespace apsi
             bytes_received_ += sizeof(PSIParams::PSIConfParams);
             bytes_received_ += sizeof(PSIParams::TableParams);
             bytes_received_ += sizeof(PSIParams::CuckooParams);
-            bytes_received_ += sizeof(u64) + sizeof(u64) + sizeof(u32);//sizeof(PSIParams::SEALParams);
+            bytes_received_ += sizeof(u64) + sizeof(u64) + sizeof(u32); // sizeof(PSIParams::SEALParams);
             bytes_received_ += sizeof(PSIParams::FFieldParams);
 
             return true;
         }
 
-        bool NetworkChannel::receive(SenderResponsePreprocess& response)
+        bool NetworkChannel::receive(SenderResponsePreprocess &response)
         {
             throw_if_not_connected();
 
@@ -214,8 +211,7 @@ namespace apsi
             return true;
         }
 
-
-        bool NetworkChannel::receive(SenderResponseQuery& response)
+        bool NetworkChannel::receive(SenderResponseQuery &response)
         {
             throw_if_not_connected();
 
@@ -239,7 +235,7 @@ namespace apsi
             return true;
         }
 
-        bool NetworkChannel::receive(ResultPackage& pkg)
+        bool NetworkChannel::receive(ResultPackage &pkg)
         {
             throw_if_not_connected();
 
@@ -248,7 +244,8 @@ namespace apsi
 
             if (msg.parts() != 4)
             {
-                return false;;
+                return false;
+                ;
             }
 
             pkg.split_idx = msg.get<i64>(/* part */ 0);
@@ -275,7 +272,7 @@ namespace apsi
             bytes_sent_ += sizeof(SenderOperationType);
         }
 
-        void NetworkChannel::send_get_parameters_response(const vector<SEAL_BYTE>& client_id, const PSIParams& params)
+        void NetworkChannel::send_get_parameters_response(const vector<SEAL_BYTE> &client_id, const PSIParams &params)
         {
             throw_if_not_connected();
 
@@ -324,11 +321,11 @@ namespace apsi
             bytes_sent_ += sizeof(PSIParams::PSIConfParams);
             bytes_sent_ += sizeof(PSIParams::TableParams);
             bytes_sent_ += sizeof(PSIParams::CuckooParams);
-            bytes_sent_ += sizeof(u64) + sizeof(u64) + sizeof(u32); //sizeof(PSIParams::SEALParams);
+            bytes_sent_ += sizeof(u64) + sizeof(u64) + sizeof(u32); // sizeof(PSIParams::SEALParams);
             bytes_sent_ += sizeof(PSIParams::FFieldParams);
         }
 
-        void NetworkChannel::send_preprocess(const vector<SEAL_BYTE>& buffer)
+        void NetworkChannel::send_preprocess(const vector<SEAL_BYTE> &buffer)
         {
             throw_if_not_connected();
 
@@ -344,7 +341,8 @@ namespace apsi
             bytes_sent_ += buffer.size();
         }
 
-        void NetworkChannel::send_preprocess_response(const vector<SEAL_BYTE>& client_id, const vector<SEAL_BYTE>& buffer)
+        void NetworkChannel::send_preprocess_response(
+            const vector<SEAL_BYTE> &client_id, const vector<SEAL_BYTE> &buffer)
         {
             throw_if_not_connected();
 
@@ -361,9 +359,7 @@ namespace apsi
             bytes_sent_ += buffer.size();
         }
 
-        void NetworkChannel::send_query(
-            const string& relin_keys,
-            const map<u64, vector<string>>& query)
+        void NetworkChannel::send_query(const string &relin_keys, const map<u64, vector<string>> &query)
         {
             throw_if_not_connected();
 
@@ -385,7 +381,7 @@ namespace apsi
 
             u64 sofar = bytes_sent_;
 
-            for (const auto& q : query)
+            for (const auto &q : query)
             {
                 add_part(q.first, msg);
                 bytes_sent += sizeof(u64);
@@ -394,7 +390,7 @@ namespace apsi
                 add_part(num_elems, msg);
                 bytes_sent += sizeof(u64);
 
-                for (const auto& seededctxt : q.second)
+                for (const auto &seededctxt : q.second)
                 {
                     msg.add(seededctxt);
                     bytes_sent += seededctxt.length();
@@ -407,7 +403,7 @@ namespace apsi
             bytes_sent_ += bytes_sent;
         }
 
-        void NetworkChannel::send_query_response(const vector<SEAL_BYTE>& client_id, const size_t package_count)
+        void NetworkChannel::send_query_response(const vector<SEAL_BYTE> &client_id, const size_t package_count)
         {
             throw_if_not_connected();
 
@@ -428,7 +424,7 @@ namespace apsi
             bytes_sent_ += sizeof(u64);
         }
 
-        void NetworkChannel::send(const vector<SEAL_BYTE>& client_id, const ResultPackage& pkg)
+        void NetworkChannel::send(const vector<SEAL_BYTE> &client_id, const ResultPackage &pkg)
         {
             throw_if_not_connected();
 
@@ -446,7 +442,7 @@ namespace apsi
             bytes_sent_ += pkg.size();
         }
 
-        void NetworkChannel::get_buffer(vector<SEAL_BYTE>& buff, const message_t& msg, int part_start) const
+        void NetworkChannel::get_buffer(vector<SEAL_BYTE> &buff, const message_t &msg, int part_start) const
         {
             // Need to have size
             if (msg.parts() < static_cast<size_t>(part_start) + 1)
@@ -467,11 +463,13 @@ namespace apsi
                 if (msg.size(/* part */ static_cast<size_t>(part_start) + 1) < size)
                     throw runtime_error("Second Part has less data than expected");
 
-                memcpy(buff.data(), msg.raw_data(/* part */ static_cast<size_t>(part_start) + 1), static_cast<size_t>(size));
+                memcpy(
+                    buff.data(), msg.raw_data(/* part */ static_cast<size_t>(part_start) + 1),
+                    static_cast<size_t>(size));
             }
         }
 
-        void NetworkChannel::add_buffer(const vector<SEAL_BYTE>& buff, message_t& msg) const
+        void NetworkChannel::add_buffer(const vector<SEAL_BYTE> &buff, message_t &msg) const
         {
             // First part is size
             u64 size = static_cast<u64>(buff.size());
@@ -484,7 +482,7 @@ namespace apsi
             }
         }
 
-        void NetworkChannel::get_sm_vector(vector<SmallModulus>& smv, const message_t& msg, size_t& part_idx) const
+        void NetworkChannel::get_sm_vector(vector<SmallModulus> &smv, const message_t &msg, size_t &part_idx) const
         {
             // Need to have size
             if (msg.parts() < (part_idx + 1))
@@ -504,13 +502,13 @@ namespace apsi
             }
         }
 
-        void NetworkChannel::add_sm_vector(const vector<SmallModulus>& smv, message_t& msg) const
+        void NetworkChannel::add_sm_vector(const vector<SmallModulus> &smv, message_t &msg) const
         {
             // First part is size
             u64 size = static_cast<u64>(smv.size());
             add_part(size, msg);
 
-            for (const SmallModulus& sm : smv)
+            for (const SmallModulus &sm : smv)
             {
                 // Add each element as a string
                 string str;
@@ -519,13 +517,13 @@ namespace apsi
             }
         }
 
-        void NetworkChannel::add_message_type(const SenderOperationType type, message_t& msg) const
+        void NetworkChannel::add_message_type(const SenderOperationType type, message_t &msg) const
         {
             // Transform to int to have it have a fixed size
             add_part(static_cast<u32>(type), msg);
         }
 
-        SenderOperationType NetworkChannel::get_message_type(const message_t& msg, const size_t part) const
+        SenderOperationType NetworkChannel::get_message_type(const message_t &msg, const size_t part) const
         {
             // We should have at least the parts we want to get
             if (msg.parts() < (part + 1))
@@ -538,7 +536,7 @@ namespace apsi
             return type;
         }
 
-        void NetworkChannel::extract_client_id(const message_t& msg, vector<SEAL_BYTE>& id) const
+        void NetworkChannel::extract_client_id(const message_t &msg, vector<SEAL_BYTE> &id) const
         {
             // ID should always be part 0
             size_t id_size = msg.size(/* part */ 0);
@@ -546,12 +544,12 @@ namespace apsi
             memcpy(id.data(), msg.raw_data(/* part */ 0), id_size);
         }
 
-        void NetworkChannel::add_client_id(message_t& msg, const vector<SEAL_BYTE>& id) const
+        void NetworkChannel::add_client_id(message_t &msg, const vector<SEAL_BYTE> &id) const
         {
             msg.add_raw(id.data(), id.size());
         }
 
-        shared_ptr<SenderOperation> NetworkChannel::decode_get_parameters(const message_t& msg)
+        shared_ptr<SenderOperation> NetworkChannel::decode_get_parameters(const message_t &msg)
         {
             vector<SEAL_BYTE> client_id;
             extract_client_id(msg, client_id);
@@ -560,7 +558,7 @@ namespace apsi
             return make_shared<SenderOperationGetParameters>(move(client_id));
         }
 
-        shared_ptr<SenderOperation> NetworkChannel::decode_preprocess(const message_t& msg)
+        shared_ptr<SenderOperation> NetworkChannel::decode_preprocess(const message_t &msg)
         {
             vector<SEAL_BYTE> client_id;
             extract_client_id(msg, client_id);
@@ -573,7 +571,7 @@ namespace apsi
             return make_shared<SenderOperationPreprocess>(move(client_id), move(buffer));
         }
 
-        shared_ptr<SenderOperation> NetworkChannel::decode_query(const message_t& msg)
+        shared_ptr<SenderOperation> NetworkChannel::decode_query(const message_t &msg)
         {
             vector<SEAL_BYTE> client_id;
             extract_client_id(msg, client_id);
@@ -583,11 +581,11 @@ namespace apsi
 
             size_t msg_idx = 2;
 
-            msg.get(relin_keys, /* part */  msg_idx++);
+            msg.get(relin_keys, /* part */ msg_idx++);
             bytes_received_ += relin_keys.length();
 
             u64 query_count;
-            get_part(query_count, msg, /* part */  msg_idx++);
+            get_part(query_count, msg, /* part */ msg_idx++);
             bytes_received_ += sizeof(u64);
 
             for (u64 i = 0; i < query_count; i++)
@@ -614,7 +612,7 @@ namespace apsi
             return make_shared<SenderOperationQuery>(move(client_id), relin_keys, move(query));
         }
 
-        bool NetworkChannel::receive_message(message_t& msg, bool wait_for_message)
+        bool NetworkChannel::receive_message(message_t &msg, bool wait_for_message)
         {
             unique_lock<mutex> rec_lock(*receive_mutex_);
             bool received = get_socket()->receive(msg, !wait_for_message);
@@ -625,7 +623,7 @@ namespace apsi
             return received;
         }
 
-        void NetworkChannel::send_message(message_t& msg)
+        void NetworkChannel::send_message(message_t &msg)
         {
             unique_lock<mutex> snd_lock(*send_mutex_);
             bool sent = get_socket()->send(msg);
@@ -634,23 +632,22 @@ namespace apsi
                 throw runtime_error("Failed to send message");
         }
 
-        template<typename T>
-        typename enable_if<is_pod<T>::value, void>::type
-        NetworkChannel::get_part(T& data, const message_t& msg, const size_t part) const
+        template <typename T>
+        typename enable_if<is_pod<T>::value, void>::type NetworkChannel::get_part(
+            T &data, const message_t &msg, const size_t part) const
         {
-            const T* presult;
+            const T *presult;
             msg.get(&presult, part);
             memcpy(&data, presult, sizeof(T));
         }
 
-        template<typename T>
-        typename enable_if<is_pod<T>::value, void>::type
-        NetworkChannel::add_part(const T& data, message_t& msg) const
+        template <typename T>
+        typename enable_if<is_pod<T>::value, void>::type NetworkChannel::add_part(const T &data, message_t &msg) const
         {
             msg.add_raw(&data, sizeof(T));
         }
 
-        unique_ptr<socket_t>& NetworkChannel::get_socket()
+        unique_ptr<socket_t> &NetworkChannel::get_socket()
         {
             if (nullptr == socket_)
             {

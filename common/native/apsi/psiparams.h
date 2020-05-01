@@ -3,16 +3,16 @@
 
 #pragma once
 
-#include <string>
-#include <map>
 #include <cmath>
+#include <map>
 #include <numeric>
-#include <stdexcept>
-#include <seal/encryptionparams.h>
 #include <seal/biguint.h>
-#include "kuku/kuku.h"
+#include <seal/encryptionparams.h>
+#include <stdexcept>
+#include <string>
 #include "apsi/logging/log.h"
 #include "apsi/tools/utils.h"
+#include "kuku/kuku.h"
 
 namespace apsi
 {
@@ -29,14 +29,14 @@ namespace apsi
         {
             u64 sender_size;
             u64 sender_bin_size;
-            u32 item_bit_count; // <=max_item_bit_count=128, reserve extra bits for Kuku
+            u32 item_bit_count;                  // <=max_item_bit_count=128, reserve extra bits for Kuku
             u32 item_bit_length_used_after_oprf; // the number of bits we take after oprf
-            u32 num_chunks; // the number of chunks to split each item into 
+            u32 num_chunks;                      // the number of chunks to split each item into
             bool use_labels;
             bool use_fast_membership; // faster configuration assuming query is always one item
-        }; // struct PSIConfParams
-        
-        const PSIConfParams& psiconf_params() const
+        };                            // struct PSIConfParams
+
+        const PSIConfParams &psiconf_params() const
         {
             return psiconf_params_;
         }
@@ -87,9 +87,9 @@ namespace apsi
             u32 split_size;
             u32 binning_sec_level;
             bool dynamic_split_count; // TODO: Do not use bool for "*count".
-        }; // struct TableParams
+        };                            // struct TableParams
 
-        const TableParams& table_params() const
+        const TableParams &table_params() const
         {
             return table_params_;
         }
@@ -137,7 +137,7 @@ namespace apsi
             u32 max_probe;
         }; // struct CuckooParams
 
-        const CuckooParams& cuckoo_params() const
+        const CuckooParams &cuckoo_params() const
         {
             return cuckoo_params_;
         }
@@ -166,12 +166,12 @@ namespace apsi
             u32 max_supported_degree;
         }; // struct SEALParams
 
-        const SEALParams& seal_params() const
+        const SEALParams &seal_params() const
         {
             return seal_params_;
         }
 
-        inline const seal::EncryptionParameters& encryption_params() const
+        inline const seal::EncryptionParameters &encryption_params() const
         {
             return seal_params_.encryption_params;
         }
@@ -190,7 +190,7 @@ namespace apsi
             u32 degree;
         }; // struct FFieldParams
 
-        const FFieldParams& ffield_params() const
+        const FFieldParams &ffield_params() const
         {
             return ffield_params_;
         }
@@ -208,12 +208,14 @@ namespace apsi
         /**
         Manual setters.
         */
-        void set_sender_bin_size(u64 size) {
+        void set_sender_bin_size(u64 size)
+        {
             logging::Log::debug("Manually setting sender bin size to be %i", size);
             psiconf_params_.sender_bin_size = size;
         }
 
-        void set_split_count(u32 count) {
+        void set_split_count(u32 count)
+        {
             logging::Log::debug("Manually setting split count to be %i", count);
             table_params_.split_count = count;
         }
@@ -250,21 +252,15 @@ namespace apsi
         // assuming one query.
         inline double log_fp_rate() const
         {
-            return static_cast<double>(ffield_degree()) * log2(split_size()) +
-                log2(split_count()) - item_bit_length_used_after_oprf();
+            return static_cast<double>(ffield_degree()) * log2(split_size()) + log2(split_count()) -
+                   item_bit_length_used_after_oprf();
         }
 
         PSIParams(
-            const PSIConfParams& psi_params,
-            const TableParams& table_params,
-            const CuckooParams& cuckoo_params,
-            const SEALParams& seal_params,
-            const FFieldParams& ffield_params)
-            : psiconf_params_(psi_params),
-              table_params_(table_params),
-              cuckoo_params_(cuckoo_params),
-              seal_params_(seal_params),
-              ffield_params_(ffield_params)
+            const PSIConfParams &psi_params, const TableParams &table_params, const CuckooParams &cuckoo_params,
+            const SEALParams &seal_params, const FFieldParams &ffield_params)
+            : psiconf_params_(psi_params), table_params_(table_params), cuckoo_params_(cuckoo_params),
+              seal_params_(seal_params), ffield_params_(ffield_params)
         {
             if (psiconf_params_.sender_bin_size == 0)
             {
@@ -285,25 +281,21 @@ namespace apsi
 
     private:
         PSIConfParams psiconf_params_;
-        TableParams   table_params_;
-        CuckooParams  cuckoo_params_;
-        SEALParams    seal_params_;
+        TableParams table_params_;
+        CuckooParams cuckoo_params_;
+        SEALParams seal_params_;
         FFieldParams ffield_params_;
 
         void update_sender_bin_size()
         {
             logging::Log::debug(
                 "running balls in bins analysis with 2^%i bins and %i balls, with stat sec level = %i",
-                table_params_.log_table_size,
-                psiconf_params_.sender_size * cuckoo_params_.hash_func_count,
+                table_params_.log_table_size, psiconf_params_.sender_size * cuckoo_params_.hash_func_count,
                 table_params_.binning_sec_level);
             psiconf_params_.sender_bin_size = tools::compute_sender_bin_size(
-                table_params_.log_table_size,
-                psiconf_params_.sender_size,
-                cuckoo_params_.hash_func_count,
-                table_params_.binning_sec_level,
-                table_params_.split_count);
-            logging::Log::debug("updated sender bin size to %i.", psiconf_params_.sender_bin_size); 
+                table_params_.log_table_size, psiconf_params_.sender_size, cuckoo_params_.hash_func_count,
+                table_params_.binning_sec_level, table_params_.split_count);
+            logging::Log::debug("updated sender bin size to %i.", psiconf_params_.sender_bin_size);
         }
 
         /**
@@ -327,14 +319,15 @@ namespace apsi
             if (item_bit_count() > (max_item_bit_count - 8))
             {
                 // Not an error, but a warning.
-                logging::Log::warning("Item bit count is close to its upper limit. Several bits should be reserved for appropriate Cuckoo hashing.");
+                logging::Log::warning("Item bit count is close to its upper limit. Several bits should be reserved for "
+                                      "appropriate Cuckoo hashing.");
             }
-            u64 supported_bitcount = ((u64)ffield_degree()) * (seal_params_.encryption_params.plain_modulus().bit_count() - 1);
+            u64 supported_bitcount =
+                ((u64)ffield_degree()) * (seal_params_.encryption_params.plain_modulus().bit_count() - 1);
             if (item_bit_length_used_after_oprf() > supported_bitcount)
             {
                 logging::Log::warning(
-                    "item bit count (%i) is too large to fit in slots (%i bits). ",
-                    item_bit_length_used_after_oprf(),
+                    "item bit count (%i) is too large to fit in slots (%i bits). ", item_bit_length_used_after_oprf(),
                     supported_bitcount);
             }
         }

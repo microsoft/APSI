@@ -3,17 +3,15 @@
 
 #pragma once
 
-#include <utility>
-#include <vector>
 #include <gsl/span>
 #include <seal/plaintext.h>
+#include <utility>
+#include <vector>
 #include "apsi/ffield/ffield_array.h"
 
 namespace apsi
 {
-    // compute the coefficients of the polynomial which intercepts 
+    // compute the coefficients of the polynomial which intercepts
     // the provided extension field points (input).
-    void ffield_newton_interpolate_poly(
-        const FFieldArray &points, const FFieldArray &values,
-        FFieldArray& result);
+    void ffield_newton_interpolate_poly(const FFieldArray &points, const FFieldArray &values, FFieldArray &result);
 } // namespace apsi

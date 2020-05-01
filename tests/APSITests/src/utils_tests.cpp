@@ -1,15 +1,13 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "gtest/gtest.h" 
-#include "apsi/tools/utils.h"
-
 #include <vector>
+#include "apsi/tools/utils.h"
+#include "gtest/gtest.h"
 
 using namespace std;
 using namespace apsi;
 using namespace apsi::tools;
-
 
 namespace APSITests
 {
@@ -39,4 +37,4 @@ namespace APSITests
         ASSERT_EQ((u64)2, digits[1]);
         ASSERT_EQ((u64)2, digits[0]);
     }
-}
+} // namespace APSITests

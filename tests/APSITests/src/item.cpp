@@ -1,14 +1,13 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
+#include "apsi/item.h"
 #include <cstdint>
 #include "gtest/gtest.h"
-#include "apsi/item.h"
 #include "utils.h"
 
 using namespace std;
 using namespace apsi;
-
 
 namespace APSITests
 {
@@ -143,4 +142,4 @@ namespace APSITests
         ASSERT_EQ((u64)4566789, item[0]);
         ASSERT_EQ((u64)0, item[1]);
     }
-}
+} // namespace APSITests

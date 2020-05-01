@@ -1,8 +1,8 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include <sstream>
 #include "apsi/tools/stopwatch.h"
+#include <sstream>
 
 using namespace std;
 
@@ -13,17 +13,14 @@ namespace apsi
         const Stopwatch::time_unit Stopwatch::start_time(Stopwatch::time_unit::clock::now());
 
         Stopwatch::Stopwatch()
-            : events_mtx_(make_shared<mutex>()),
-            timespan_events_mtx_(make_shared<mutex>()),
-            max_event_name_length_(0),
-            max_timespan_event_name_length_(0)
-        {
-        }
+            : events_mtx_(make_shared<mutex>()), timespan_events_mtx_(make_shared<mutex>()), max_event_name_length_(0),
+              max_timespan_event_name_length_(0)
+        {}
 
-        void Stopwatch::add_event(const string& name)
+        void Stopwatch::add_event(const string &name)
         {
             unique_lock<mutex> events_lock(*events_mtx_);
-            events_.push_back(Timepoint { name, time_unit::clock::now() });
+            events_.push_back(Timepoint{ name, time_unit::clock::now() });
 
             if (static_cast<int>(name.length()) > max_event_name_length_)
             {
@@ -31,7 +28,7 @@ namespace apsi
             }
         }
 
-        void Stopwatch::add_timespan_event(const string& name, const time_unit& start, const time_unit& end)
+        void Stopwatch::add_timespan_event(const string &name, const time_unit &start, const time_unit &end)
         {
             unique_lock<mutex> timespan_events_lock(*timespan_events_mtx_);
             u64 duration = static_cast<u64>(chrono::duration_cast<chrono::milliseconds>(end - start).count());
@@ -40,13 +37,11 @@ namespace apsi
             if (timespan_evt == timespan_events_.end())
             {
                 // Insert new
-                TimespanSummary summ = {
-                    /* name */ name,
-                    /* count */ 1,
-                    /* average */ static_cast<double>(duration),
-                    /* min */ duration,
-                    /* max */ duration
-                };
+                TimespanSummary summ = { /* name */ name,
+                                         /* count */ 1,
+                                         /* average */ static_cast<double>(duration),
+                                         /* min */ duration,
+                                         /* max */ duration };
 
                 timespan_events_[name] = summ;
 
@@ -59,7 +54,9 @@ namespace apsi
             {
                 // Update existing
                 timespan_evt->second.event_count++;
-                timespan_evt->second.avg = (timespan_evt->second.avg * (timespan_evt->second.event_count - 1) + duration) / timespan_evt->second.event_count;
+                timespan_evt->second.avg =
+                    (timespan_evt->second.avg * (timespan_evt->second.event_count - 1) + duration) /
+                    timespan_evt->second.event_count;
 
                 if (timespan_evt->second.min > duration)
                 {
@@ -73,32 +70,31 @@ namespace apsi
             }
         }
 
-        void Stopwatch::get_timespans(vector<TimespanSummary>& timespans)
+        void Stopwatch::get_timespans(vector<TimespanSummary> &timespans)
         {
             unique_lock<mutex> timespan_events_lock(*timespan_events_mtx_);
 
             timespans.clear();
-            for (const auto& timespan_evt : timespan_events_)
+            for (const auto &timespan_evt : timespan_events_)
             {
                 timespans.push_back(timespan_evt.second);
             }
         }
 
-        void Stopwatch::get_events(vector<Timepoint>& events)
+        void Stopwatch::get_events(vector<Timepoint> &events)
         {
             unique_lock<mutex> events_lock(*events_mtx_);
 
             events.clear();
-            for (const auto& evt : events_)
+            for (const auto &evt : events_)
             {
                 events.push_back(evt);
             }
         }
 
-        StopwatchScope::StopwatchScope(Stopwatch& stopwatch, const string& event_name)
+        StopwatchScope::StopwatchScope(Stopwatch &stopwatch, const string &event_name)
             : stopwatch_(stopwatch), event_name_(event_name), start_(Stopwatch::time_unit::clock::now())
-        {
-        }
+        {}
 
         StopwatchScope::~StopwatchScope()
         {

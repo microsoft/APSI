@@ -10,14 +10,13 @@
 #include <vector>
 
 // APSINative
-#include "stdafx.h"
 #include "apsinative.h"
+#include "stdafx.h"
 
 // APSI
 #include "apsi/item.h"
-#include "apsi/receiver.h"
 #include "apsi/network/receiverchannel.h"
-
+#include "apsi/receiver.h"
 
 using namespace std;
 using namespace apsi;
@@ -28,9 +27,9 @@ namespace
 {
     unique_ptr<Receiver> receiver_;
     unique_ptr<ReceiverChannel> rec_channel_;
-}
+} // namespace
 
-APSIEXPORT bool APSICALL ReceiverConnect(char* address, int port)
+APSIEXPORT bool APSICALL ReceiverConnect(char *address, int port)
 {
     if (nullptr != receiver_)
         return false;
@@ -66,7 +65,7 @@ APSIEXPORT bool APSICALL ReceiverIsConnected()
     return rec_channel_->is_connected();
 }
 
-APSIEXPORT bool APSICALL ReceiverQuery(int length, u64apsi* items, int* result, u64apsi* labels)
+APSIEXPORT bool APSICALL ReceiverQuery(int length, u64apsi *items, int *result, u64apsi *labels)
 {
     if (nullptr == items)
         return false;

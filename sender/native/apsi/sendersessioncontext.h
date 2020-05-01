@@ -9,12 +9,12 @@
 
 // SEAL
 #include "seal/context.h"
-#include "seal/publickey.h"
-#include "seal/secretkey.h"
-#include "seal/relinkeys.h"
 #include "seal/decryptor.h"
 #include "seal/encryptor.h"
 #include "seal/evaluator.h"
+#include "seal/publickey.h"
+#include "seal/relinkeys.h"
+#include "seal/secretkey.h"
 
 // APSI
 #include "apsi/ffield/ffield_batch_encoder.h"
@@ -29,8 +29,7 @@ namespace apsi
             friend class Sender;
 
         public:
-            SenderSessionContext(std::shared_ptr<seal::SEALContext> context) : 
-                seal_context_(std::move(context))
+            SenderSessionContext(std::shared_ptr<seal::SEALContext> context) : seal_context_(std::move(context))
             {
                 evaluator_ = std::make_unique<seal::Evaluator>(seal_context_);
                 compressor_ = std::make_unique<CiphertextCompressor>(seal_context_);
@@ -96,7 +95,7 @@ namespace apsi
             {
                 return compressor_;
             }
-            
+
             // the plaintext of the receiver's query. Used to debug.
             std::unique_ptr<FFieldArray> debug_plain_query_;
 
@@ -121,5 +120,5 @@ namespace apsi
 
             std::unique_ptr<CiphertextCompressor> compressor_;
         };
-    }
-}
+    } // namespace sender
+} // namespace apsi

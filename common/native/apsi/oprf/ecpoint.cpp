@@ -1,18 +1,18 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
+#include "apsi/oprf/ecpoint.h"
+#include <FourQ_internal.h>
 #include <algorithm>
 #include <functional>
-#include <FourQ_internal.h>
 #include <seal/util/blake2.h>
-#include "apsi/oprf/ecpoint.h"
 
 using namespace std;
 using namespace seal;
 
 namespace apsi
 {
-    namespace oprf 
+    namespace oprf
     {
         namespace
         {
@@ -35,8 +35,8 @@ namespace apsi
             felm_t A0{ A0h, A0l };
             felm_t A1{ A1h, A1l };
 #else
-#define HIGHOF64(x)  static_cast<u32>(x >> 32)
-#define LOWOF64(x)   static_cast<u32>(x)
+#define HIGHOF64(x) static_cast<u32>(x >> 32)
+#define LOWOF64(x) static_cast<u32>(x)
 
             felm_t c0{ LOWOF64(c0h), HIGHOF64(c0h), LOWOF64(c0l), HIGHOF64(c0l) };
             felm_t b0{ LOWOF64(b0h), HIGHOF64(b0h), LOWOF64(b0l), HIGHOF64(b0l) };
@@ -210,7 +210,7 @@ namespace apsi
                 cofactor_clearing(P);
                 eccnorm(P, out);
             }
-        }
+        } // namespace
 
         ECPoint::ECPoint(input_span_const_type value)
         {
@@ -220,8 +220,7 @@ namespace apsi
 
                 // Compute a Blake2b hash of the value
                 blake2b(
-                    reinterpret_cast<u8*>(r), sizeof(f2elm_t),
-                    value.data(), static_cast<size_t>(value.size()),
+                    reinterpret_cast<u8 *>(r), sizeof(f2elm_t), value.data(), static_cast<size_t>(value.size()),
                     nullptr, 0);
 
                 // Reduce r
@@ -233,9 +232,7 @@ namespace apsi
             }
         }
 
-        void ECPoint::make_random_nonzero_scalar(
-            scalar_span_type out,
-            shared_ptr<UniformRandomGenerator> rg)
+        void ECPoint::make_random_nonzero_scalar(scalar_span_type out, shared_ptr<UniformRandomGenerator> rg)
         {
             array<u64, 4> random_data;
             static_assert(sizeof(random_data) == order_size, "Size of random_data should be the same as order_size");
@@ -245,7 +242,7 @@ namespace apsi
             {
                 rand_u64 = [&rg]() {
                     u64 res;
-                    rg->generate(sizeof(res), reinterpret_cast<SEAL_BYTE*>(&res));
+                    rg->generate(sizeof(res), reinterpret_cast<SEAL_BYTE *>(&res));
                     return res;
                 };
             }
@@ -260,17 +257,14 @@ namespace apsi
                 do
                 {
                     ret = rand_u64();
-                }
-                while (ret >= (~u64(0) >> 1));
+                } while (ret >= (~u64(0) >> 1));
                 return ret;
             };
 
             // Loop until we find a non-zero element
-            while(!(
-                (random_data[0] = rand_u64()) |
-                (random_data[1] = reduced_rand_u64()) |
-                (random_data[2] = rand_u64()) |
-                (random_data[3] = reduced_rand_u64())))
+            while (
+                !((random_data[0] = rand_u64()) | (random_data[1] = reduced_rand_u64()) |
+                  (random_data[2] = rand_u64()) | (random_data[3] = reduced_rand_u64())))
             {
             }
 
@@ -278,29 +272,22 @@ namespace apsi
             memcpy(out.data(), random_data.data(), order_size);
         }
 
-        void ECPoint::invert_scalar(
-            scalar_span_const_type in, scalar_span_type out)
+        void ECPoint::invert_scalar(scalar_span_const_type in, scalar_span_type out)
         {
             to_Montgomery(
-                const_cast<digit_t*>(reinterpret_cast<const digit_t*>(in.data())),
-                reinterpret_cast<digit_t*>(out.data()));
+                const_cast<digit_t *>(reinterpret_cast<const digit_t *>(in.data())),
+                reinterpret_cast<digit_t *>(out.data()));
             Montgomery_inversion_mod_order(
-                    reinterpret_cast<digit_t*>(out.data()),
-                    reinterpret_cast<digit_t*>(out.data()));
-            from_Montgomery(
-                reinterpret_cast<digit_t*>(out.data()),
-                reinterpret_cast<digit_t*>(out.data()));
+                reinterpret_cast<digit_t *>(out.data()), reinterpret_cast<digit_t *>(out.data()));
+            from_Montgomery(reinterpret_cast<digit_t *>(out.data()), reinterpret_cast<digit_t *>(out.data()));
         }
 
-        void ECPoint::scalar_multiply(
-            gsl::span<const u8, order_size> scalar)
+        void ECPoint::scalar_multiply(gsl::span<const u8, order_size> scalar)
         {
-            ecc_mul(pt_, const_cast<digit_t*>(
-            reinterpret_cast<const digit_t*>(scalar.data())),
-                pt_, false);
+            ecc_mul(pt_, const_cast<digit_t *>(reinterpret_cast<const digit_t *>(scalar.data())), pt_, false);
         }
 
-        bool ECPoint::operator ==(const ECPoint &compare)
+        bool ECPoint::operator==(const ECPoint &compare)
         {
             return pteq(pt_, compare.pt_);
         }
@@ -314,7 +301,7 @@ namespace apsi
             {
                 array<u8, save_size> buf;
                 encode(pt_, buf.data());
-                stream.write(reinterpret_cast<const char*>(buf.data()), save_size);
+                stream.write(reinterpret_cast<const char *>(buf.data()), save_size);
             }
             catch (const ios_base::failure &)
             {
@@ -332,7 +319,7 @@ namespace apsi
             try
             {
                 array<u8, save_size> buf;
-                stream.read(reinterpret_cast<char*>(buf.data()), save_size);
+                stream.read(reinterpret_cast<char *>(buf.data()), save_size);
                 if (decode(buf.data(), pt_) != ECCRYPTO_SUCCESS)
                 {
                     stream.exceptions(old_ex_mask);

@@ -5,7 +5,7 @@
 
 // STD
 #include <cstdint>
-#include <utility> 
+#include <utility>
 
 // Kuku
 #include <kuku/kuku.h>

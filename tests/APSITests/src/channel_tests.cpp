@@ -1,17 +1,16 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "gtest/gtest.h"
-#include "utils.h"
+#include "seal/keygenerator.h"
+#include "seal/publickey.h"
 #include <limits>
-#include <thread>
 #include <string>
-#include "apsi/result_package.h"
+#include <thread>
 #include "apsi/network/receiverchannel.h"
 #include "apsi/network/senderchannel.h"
-#include "seal/publickey.h"
-#include "seal/keygenerator.h"
-
+#include "apsi/result_package.h"
+#include "gtest/gtest.h"
+#include "utils.h"
 
 using namespace std;
 using namespace seal;
@@ -19,13 +18,12 @@ using namespace apsi;
 using namespace apsi::network;
 using namespace apsi::tools;
 
-
 namespace
 {
     SenderChannel server_;
     ReceiverChannel client_;
 
-    void InitStringVector(vector<string>& vec, int size)
+    void InitStringVector(vector<string> &vec, int size)
     {
         vec.resize(size);
 
@@ -37,7 +35,7 @@ namespace
         }
     }
 
-    void InitByteVector(vector<SEAL_BYTE>& vec, int size)
+    void InitByteVector(vector<SEAL_BYTE> &vec, int size)
     {
         vec.resize(size);
 
@@ -47,12 +45,12 @@ namespace
         }
     }
 
-    template<typename... Ts>
-    vector<SEAL_BYTE> CreateByteVector(Ts&&... args)
+    template <typename... Ts>
+    vector<SEAL_BYTE> CreateByteVector(Ts &&... args)
     {
         return { SEAL_BYTE(forward<Ts>(args))... };
     }
-}
+} // namespace
 
 namespace APSITests
 {
@@ -75,10 +73,10 @@ namespace APSITests
         ~ChannelTests()
         {
             // Do not disconnect, as the Constructor / Destructor is called for every test.
-            //if (client_.is_connected())
+            // if (client_.is_connected())
             //	client_.disconnect();
 
-            //if (server_.is_connected())
+            // if (server_.is_connected())
             //	server_.disconnect();
         }
     };
@@ -131,69 +129,68 @@ namespace APSITests
         svr.bind("tcp://*:5554");
         clt.connect("tcp://localhost:5554");
 
-        thread clientth([this, &clt]
-            {
-                this_thread::sleep_for(50ms);
+        thread clientth([this, &clt] {
+            this_thread::sleep_for(50ms);
 
-                // This should be SenderOperationType size
-                clt.send_get_parameters();
+            // This should be SenderOperationType size
+            clt.send_get_parameters();
 
-                vector<SEAL_BYTE> data1;
-                InitByteVector(data1, 1000);
+            vector<SEAL_BYTE> data1;
+            InitByteVector(data1, 1000);
 
-                // This should be 1000 bytes + SenderOperationType size
-                clt.send_preprocess(data1);
+            // This should be 1000 bytes + SenderOperationType size
+            clt.send_preprocess(data1);
 
-                EncryptionParameters enc_params(scheme_type::BFV);
-                enc_params.set_plain_modulus(64ul);
-                enc_params.set_poly_modulus_degree(4096);
-                enc_params.set_coeff_modulus(CoeffModulus::BFVDefault(4096));
-                shared_ptr<SEALContext> context = SEALContext::Create(enc_params);
-                KeyGenerator key_gen(context);
+            EncryptionParameters enc_params(scheme_type::BFV);
+            enc_params.set_plain_modulus(64ul);
+            enc_params.set_poly_modulus_degree(4096);
+            enc_params.set_coeff_modulus(CoeffModulus::BFVDefault(4096));
+            shared_ptr<SEALContext> context = SEALContext::Create(enc_params);
+            KeyGenerator key_gen(context);
 
-                stringstream ss;
-                Serializable<RelinKeys> ser_relinkeys = key_gen.relin_keys();
-                ser_relinkeys.save(ss, compr_mode_type::none);
-                string relinkeys_str = ss.str();
-                ASSERT_EQ(relinkeys_str.length(), 197010);
+            stringstream ss;
+            Serializable<RelinKeys> ser_relinkeys = key_gen.relin_keys();
+            ser_relinkeys.save(ss, compr_mode_type::none);
+            string relinkeys_str = ss.str();
+            ASSERT_EQ(relinkeys_str.length(), 197010);
 
-                Ciphertext ct(context);
-                ss = stringstream();
-                ct.save(ss, compr_mode_type::none);
-                string ct_str = ss.str();
-                ASSERT_EQ(ct_str.length(), 105);
+            Ciphertext ct(context);
+            ss = stringstream();
+            ct.save(ss, compr_mode_type::none);
+            string ct_str = ss.str();
+            ASSERT_EQ(ct_str.length(), 105);
 
-                map<u64, vector<string>> querydata;
-                vector<string> vec1;
-                vec1.push_back(ct_str);
-                vector<string> vec2;
-                vec2.push_back(ct_str);
-                querydata.insert_or_assign(1, vec1);
-                querydata.insert_or_assign(2, vec2);
+            map<u64, vector<string>> querydata;
+            vector<string> vec1;
+            vec1.push_back(ct_str);
+            vector<string> vec2;
+            vec2.push_back(ct_str);
+            querydata.insert_or_assign(1, vec1);
+            querydata.insert_or_assign(2, vec2);
 
-                // This should be:
-                // SenderOperationType size
-                // 8425 for relinkeys
-                // u64 size (number of entries in querydata)
-                // u64 size * 2 (each entry in querydata)
-                // u64 size * 2 (each entry in querydata)
-                // Ciphertexts will generate strings of length 105
-                clt.send_query(relinkeys_str, querydata);
+            // This should be:
+            // SenderOperationType size
+            // 8425 for relinkeys
+            // u64 size (number of entries in querydata)
+            // u64 size * 2 (each entry in querydata)
+            // u64 size * 2 (each entry in querydata)
+            // Ciphertexts will generate strings of length 105
+            clt.send_query(relinkeys_str, querydata);
 
-                SenderResponseGetParameters get_params_resp;
-                clt.receive(get_params_resp);
+            SenderResponseGetParameters get_params_resp;
+            clt.receive(get_params_resp);
 
-                SenderResponsePreprocess preprocess_resp;
-                clt.receive(preprocess_resp);
+            SenderResponsePreprocess preprocess_resp;
+            clt.receive(preprocess_resp);
 
-                SenderResponseQuery query_resp;
-                clt.receive(query_resp);
+            SenderResponseQuery query_resp;
+            clt.receive(query_resp);
 
-                ResultPackage pkg;
-                clt.receive(pkg);
-                clt.receive(pkg);
-                clt.receive(pkg);
-            });
+            ResultPackage pkg;
+            clt.receive(pkg);
+            clt.receive(pkg);
+            clt.receive(pkg);
+        });
 
         ASSERT_EQ((u64)0, clt.get_total_data_received());
         ASSERT_EQ((u64)0, clt.get_total_data_sent());
@@ -217,7 +214,7 @@ namespace APSITests
         expected_total += sizeof(u32); // SenderOperationType
         expected_total += sizeof(u64) * 3;
         expected_total += sizeof(u64) * 2;
-        expected_total += 197010; // relinkeys
+        expected_total += 197010;  // relinkeys
         expected_total += 105 * 2; // Ciphertexts
         ASSERT_EQ(expected_total, svr.get_total_data_received());
 
@@ -238,7 +235,7 @@ namespace APSITests
         expected_total += sizeof(PSIParams::PSIConfParams);
         expected_total += sizeof(PSIParams::TableParams);
         expected_total += sizeof(PSIParams::CuckooParams);
-        expected_total += sizeof(u64) + sizeof(u64) + sizeof(u32);//sizeof(PSIParams::SEALParams);
+        expected_total += sizeof(u64) + sizeof(u64) + sizeof(u32); // sizeof(PSIParams::SEALParams);
         expected_total += sizeof(PSIParams::FFieldParams);
         ASSERT_EQ(expected_total, svr.get_total_data_sent());
 
@@ -264,7 +261,7 @@ namespace APSITests
         svr.send(sender_op->client_id, pkg3);
 
         expected_total += sizeof(i64) * 6;
-        expected_total += 25; // strings
+        expected_total += 25;          // strings
         expected_total += sizeof(u32); // SenderOperationType
         expected_total += sizeof(u64); // size of vector
         ASSERT_EQ(expected_total, svr.get_total_data_sent());
@@ -274,10 +271,7 @@ namespace APSITests
 
     TEST_F(ChannelTests, SendGetParametersTest)
     {
-        thread clientth([this]
-            {
-                client_.send_get_parameters();
-            });
+        thread clientth([this] { client_.send_get_parameters(); });
 
         shared_ptr<SenderOperation> sender_op;
         server_.receive(sender_op, /* wait_for_message */ true);
@@ -290,11 +284,10 @@ namespace APSITests
 
     TEST_F(ChannelTests, SendPreprocessTest)
     {
-        thread clientth([this]
-            {
-                vector<SEAL_BYTE> buff = CreateByteVector(1, 2, 3, 4, 5);
-                client_.send_preprocess(buff);
-            });
+        thread clientth([this] {
+            vector<SEAL_BYTE> buff = CreateByteVector(1, 2, 3, 4, 5);
+            client_.send_preprocess(buff);
+        });
 
         shared_ptr<SenderOperation> sender_op;
         server_.receive(sender_op, /* wait_for_message */ true);
@@ -315,8 +308,7 @@ namespace APSITests
 
     TEST_F(ChannelTests, SendQueryTest)
     {
-        thread clientth([this]
-        {
+        thread clientth([this] {
             EncryptionParameters enc_params(scheme_type::BFV);
             enc_params.set_plain_modulus(64ul);
             enc_params.set_poly_modulus_degree(4096);
@@ -356,34 +348,34 @@ namespace APSITests
 
     TEST_F(ChannelTests, SendGetParametersResponseTest)
     {
-        thread serverth([this]
-            {
-                shared_ptr<SenderOperation> sender_op;
-                server_.receive(sender_op, /* wait_for_message */ true);
-                ASSERT_EQ(SOP_get_parameters, sender_op->type);
+        thread serverth([this] {
+            shared_ptr<SenderOperation> sender_op;
+            server_.receive(sender_op, /* wait_for_message */ true);
+            ASSERT_EQ(SOP_get_parameters, sender_op->type);
 
-                PSIParams::PSIConfParams psiconf_params{ 12345, 50, 60, 120, 40, true, false };
-                PSIParams::TableParams table_params{ 10, 1, 2, 10, 40, false };
-                PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
-                PSIParams::FFieldParams ffield_params{ 678910, 8 };
-                PSIParams::SEALParams seal_params;
-                seal_params.max_supported_degree = 25;
-                seal_params.encryption_params.set_plain_modulus(5119);
-                seal_params.encryption_params.set_poly_modulus_degree(4096);
-                vector<SmallModulus> coeff_modulus = CoeffModulus::BFVDefault(seal_params.encryption_params.poly_modulus_degree());
-                seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
+            PSIParams::PSIConfParams psiconf_params{ 12345, 50, 60, 120, 40, true, false };
+            PSIParams::TableParams table_params{ 10, 1, 2, 10, 40, false };
+            PSIParams::CuckooParams cuckoo_params{ 3, 2, 1 };
+            PSIParams::FFieldParams ffield_params{ 678910, 8 };
+            PSIParams::SEALParams seal_params;
+            seal_params.max_supported_degree = 25;
+            seal_params.encryption_params.set_plain_modulus(5119);
+            seal_params.encryption_params.set_poly_modulus_degree(4096);
+            vector<SmallModulus> coeff_modulus =
+                CoeffModulus::BFVDefault(seal_params.encryption_params.poly_modulus_degree());
+            seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
 
-                PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
+            PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
 
-                server_.send_get_parameters_response(sender_op->client_id, params);
+            server_.send_get_parameters_response(sender_op->client_id, params);
 
-                psiconf_params.sender_size = 54321;
-                psiconf_params.item_bit_count = 80;
-                psiconf_params.use_labels = false;
-                PSIParams params2(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
+            psiconf_params.sender_size = 54321;
+            psiconf_params.item_bit_count = 80;
+            psiconf_params.use_labels = false;
+            PSIParams params2(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
 
-                server_.send_get_parameters_response(sender_op->client_id, params2);
-            });
+            server_.send_get_parameters_response(sender_op->client_id, params2);
+        });
 
         client_.send_get_parameters();
         serverth.join();
@@ -413,10 +405,12 @@ namespace APSITests
         ASSERT_EQ((u64)5119, get_params_response.seal_params.encryption_params.plain_modulus().value());
         ASSERT_EQ((size_t)4096, get_params_response.seal_params.encryption_params.poly_modulus_degree());
         ASSERT_EQ((size_t)3, get_params_response.seal_params.encryption_params.coeff_modulus().size());
-        ASSERT_EQ((u64)0x0000000FFFFEE001, get_params_response.seal_params.encryption_params.coeff_modulus()[0].value());
-        ASSERT_EQ((u64)0x0000000FFFFC4001, get_params_response.seal_params.encryption_params.coeff_modulus()[1].value());
-        ASSERT_EQ((u64)0x0000001FFFFE0001, get_params_response.seal_params.encryption_params.coeff_modulus()[2].value());
-
+        ASSERT_EQ(
+            (u64)0x0000000FFFFEE001, get_params_response.seal_params.encryption_params.coeff_modulus()[0].value());
+        ASSERT_EQ(
+            (u64)0x0000000FFFFC4001, get_params_response.seal_params.encryption_params.coeff_modulus()[1].value());
+        ASSERT_EQ(
+            (u64)0x0000001FFFFE0001, get_params_response.seal_params.encryption_params.coeff_modulus()[2].value());
 
         SenderResponseGetParameters get_params_response2;
         client_.receive(get_params_response2);
@@ -436,22 +430,24 @@ namespace APSITests
         ASSERT_EQ((u64)5119, get_params_response2.seal_params.encryption_params.plain_modulus().value());
         ASSERT_EQ((size_t)4096, get_params_response2.seal_params.encryption_params.poly_modulus_degree());
         ASSERT_EQ((size_t)3, get_params_response2.seal_params.encryption_params.coeff_modulus().size());
-        ASSERT_EQ((u64)0x0000000FFFFEE001, get_params_response2.seal_params.encryption_params.coeff_modulus()[0].value());
-        ASSERT_EQ((u64)0x0000000FFFFC4001, get_params_response2.seal_params.encryption_params.coeff_modulus()[1].value());
-        ASSERT_EQ((u64)0x0000001FFFFE0001, get_params_response2.seal_params.encryption_params.coeff_modulus()[2].value());
+        ASSERT_EQ(
+            (u64)0x0000000FFFFEE001, get_params_response2.seal_params.encryption_params.coeff_modulus()[0].value());
+        ASSERT_EQ(
+            (u64)0x0000000FFFFC4001, get_params_response2.seal_params.encryption_params.coeff_modulus()[1].value());
+        ASSERT_EQ(
+            (u64)0x0000001FFFFE0001, get_params_response2.seal_params.encryption_params.coeff_modulus()[2].value());
     }
 
     TEST_F(ChannelTests, SendPreprocessResponseTest)
     {
-        thread serverth([this]
-            {
-                shared_ptr<SenderOperation> sender_op;
-                server_.receive(sender_op, /* wait_for_message */ true);
-                ASSERT_EQ(SOP_preprocess, sender_op->type);
+        thread serverth([this] {
+            shared_ptr<SenderOperation> sender_op;
+            server_.receive(sender_op, /* wait_for_message */ true);
+            ASSERT_EQ(SOP_preprocess, sender_op->type);
 
-                vector<SEAL_BYTE> buffer = CreateByteVector(10, 9, 8, 7, 6);
-                server_.send_preprocess_response(sender_op->client_id, buffer);
-            });
+            vector<SEAL_BYTE> buffer = CreateByteVector(10, 9, 8, 7, 6);
+            server_.send_preprocess_response(sender_op->client_id, buffer);
+        });
 
         // This buffer will actually be ignored
         vector<SEAL_BYTE> buff = CreateByteVector(1);
@@ -472,25 +468,24 @@ namespace APSITests
 
     TEST_F(ChannelTests, SendQueryResponseTest)
     {
-        thread serverth([this]
-            {
-                shared_ptr<SenderOperation> sender_op;
-                server_.receive(sender_op, /* wait_for_message */ true);
-                ASSERT_EQ(SOP_query, sender_op->type);
+        thread serverth([this] {
+            shared_ptr<SenderOperation> sender_op;
+            server_.receive(sender_op, /* wait_for_message */ true);
+            ASSERT_EQ(SOP_query, sender_op->type);
 
-                vector<ResultPackage> result(4);
+            vector<ResultPackage> result(4);
 
-                result[0] = ResultPackage{ 1, 2, "hello", "world" };
-                result[1] = ResultPackage{ 3, 4, "one", "two" };
-                result[2] = ResultPackage{ 11, 10, "", "non empty" };
-                result[3] = ResultPackage{ 15, 20, "data", "" };
+            result[0] = ResultPackage{ 1, 2, "hello", "world" };
+            result[1] = ResultPackage{ 3, 4, "one", "two" };
+            result[2] = ResultPackage{ 11, 10, "", "non empty" };
+            result[3] = ResultPackage{ 15, 20, "data", "" };
 
-                server_.send_query_response(sender_op->client_id, 4);
-                server_.send(sender_op->client_id, result[0]);
-                server_.send(sender_op->client_id, result[1]);
-                server_.send(sender_op->client_id, result[2]);
-                server_.send(sender_op->client_id, result[3]);
-            });
+            server_.send_query_response(sender_op->client_id, 4);
+            server_.send(sender_op->client_id, result[0]);
+            server_.send(sender_op->client_id, result[1]);
+            server_.send(sender_op->client_id, result[2]);
+            server_.send(sender_op->client_id, result[3]);
+        });
 
         EncryptionParameters enc_params(scheme_type::BFV);
         enc_params.set_plain_modulus(64ul);
@@ -551,37 +546,36 @@ namespace APSITests
     {
         atomic<bool> finished = false;
 
-        thread serverth([this, &finished]
+        thread serverth([this, &finished] {
+            SenderChannel sender;
+
+            sender.bind("tcp://*:5552");
+
+            while (!finished)
             {
-                SenderChannel sender;
-
-                sender.bind("tcp://*:5552");
-
-                while (!finished)
+                shared_ptr<SenderOperation> sender_op;
+                if (!sender.receive(sender_op))
                 {
-                    shared_ptr<SenderOperation> sender_op;
-                    if (!sender.receive(sender_op))
-                    {
-                        this_thread::sleep_for(50ms);
-                        continue;
-                    }
-
-                    ASSERT_EQ(SOP_preprocess, sender_op->type);
-
-                    // Preprocessing will multiply two numbers and add them to the result
-                    auto preproc_op = dynamic_pointer_cast<SenderOperationPreprocess>(sender_op);
-                    preproc_op->buffer.resize(3);
-                    preproc_op->buffer[2] = (SEAL_BYTE)((u8)preproc_op->buffer[0] * (u8)preproc_op->buffer[1]);
-
-                    sender.send_preprocess_response(preproc_op->client_id, preproc_op->buffer);
+                    this_thread::sleep_for(50ms);
+                    continue;
                 }
-            });
+
+                ASSERT_EQ(SOP_preprocess, sender_op->type);
+
+                // Preprocessing will multiply two numbers and add them to the result
+                auto preproc_op = dynamic_pointer_cast<SenderOperationPreprocess>(sender_op);
+                preproc_op->buffer.resize(3);
+                preproc_op->buffer[2] = (SEAL_BYTE)((u8)preproc_op->buffer[0] * (u8)preproc_op->buffer[1]);
+
+                sender.send_preprocess_response(preproc_op->client_id, preproc_op->buffer);
+            }
+        });
 
         vector<thread> clients(5);
         for (size_t i = 0; i < clients.size(); i++)
         {
-            clients[i] = thread([this](size_t idx)
-                {
+            clients[i] = thread(
+                [this](size_t idx) {
                     ReceiverChannel recv;
 
                     recv.connect("tcp://localhost:5552");
@@ -601,8 +595,8 @@ namespace APSITests
                         ASSERT_EQ((size_t)3, preproc.buffer.size());
                         ASSERT_EQ((u8)(a * b), (u8)preproc.buffer[2]);
                     }
-
-                }, i);
+                },
+                i);
         }
 
         for (size_t i = 0; i < clients.size(); i++)
@@ -616,28 +610,27 @@ namespace APSITests
 
     TEST_F(ChannelTests, SendResultPackageTest)
     {
-        thread serverth([this]
-            {
-                shared_ptr<SenderOperation> sender_op;
-                server_.receive(sender_op, /* wait_for_message */ true);
-                ASSERT_EQ(SOP_get_parameters, sender_op->type);
+        thread serverth([this] {
+            shared_ptr<SenderOperation> sender_op;
+            server_.receive(sender_op, /* wait_for_message */ true);
+            ASSERT_EQ(SOP_get_parameters, sender_op->type);
 
-                ResultPackage pkg;
-                pkg.split_idx = 1;
-                pkg.batch_idx = 2;
-                pkg.data = "This is data";
-                pkg.label_data = "Not label data";
+            ResultPackage pkg;
+            pkg.split_idx = 1;
+            pkg.batch_idx = 2;
+            pkg.data = "This is data";
+            pkg.label_data = "Not label data";
 
-                server_.send(sender_op->client_id, pkg);
+            server_.send(sender_op->client_id, pkg);
 
-                ResultPackage pkg2;
-                pkg2.split_idx = 3;
-                pkg2.batch_idx = 4;
-                pkg2.data = "small data";
-                pkg2.label_data = "";
+            ResultPackage pkg2;
+            pkg2.split_idx = 3;
+            pkg2.batch_idx = 4;
+            pkg2.data = "small data";
+            pkg2.label_data = "";
 
-                server_.send(sender_op->client_id, pkg2);
-            });
+            server_.send(sender_op->client_id, pkg2);
+        });
 
         client_.send_get_parameters();
 
@@ -659,4 +652,4 @@ namespace APSITests
 
         serverth.join();
     }
-}
+} // namespace APSITests

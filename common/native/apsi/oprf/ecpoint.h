@@ -3,19 +3,19 @@
 
 #pragma once
 
+#include <FourQ.h>
 #include <array>
-#include <iostream>
 #include <cstddef>
 #include <cstring>
-#include <memory>
-#include <FourQ.h>
 #include <gsl/span>
+#include <iostream>
+#include <memory>
 #include <seal/randomgen.h>
 #include "apsi/apsidefines.h"
 
 namespace apsi
 {
-    namespace oprf 
+    namespace oprf
     {
         class ECPoint
         {
@@ -30,8 +30,7 @@ namespace apsi
             using scalar_span_type = gsl::span<u8, order_size>;
             using scalar_span_const_type = gsl::span<const u8, order_size>;
 
-            using input_span_const_type =
-                gsl::span<const u8, gsl::dynamic_extent>;
+            using input_span_const_type = gsl::span<const u8, gsl::dynamic_extent>;
 
             // Output hash size is 120 bits
             static constexpr std::size_t hash_size = 15;
@@ -48,22 +47,20 @@ namespace apsi
             // Creates a random non-zero number modulo the prime order subgroup
             // order and computes its inverse.
             static void make_random_nonzero_scalar(
-                scalar_span_type out,
-                std::shared_ptr<seal::UniformRandomGenerator> rg = nullptr);
+                scalar_span_type out, std::shared_ptr<seal::UniformRandomGenerator> rg = nullptr);
 
-            static void invert_scalar(
-                scalar_span_const_type in, scalar_span_type out);
+            static void invert_scalar(scalar_span_const_type in, scalar_span_type out);
 
             void scalar_multiply(scalar_span_const_type scalar);
 
-            bool operator ==(const ECPoint &compare);
+            bool operator==(const ECPoint &compare);
 
-            inline bool operator !=(const ECPoint &compare)
+            inline bool operator!=(const ECPoint &compare)
             {
-                return !operator ==(compare);
+                return !operator==(compare);
             }
 
-            ECPoint &operator =(const ECPoint &assign)
+            ECPoint &operator=(const ECPoint &assign)
             {
                 if (&assign != this)
                 {
@@ -85,6 +82,6 @@ namespace apsi
         private:
             // Initialize to neutral element
             point_t pt_ = { { 0, 1 } }; // { {.x = { 0 }, .y = { 1 } }};
-        }; // class ECPoint
-    } // namespace oprf
+        };                              // class ECPoint
+    }                                   // namespace oprf
 } // namespace apsi

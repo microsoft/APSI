@@ -1,19 +1,18 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "gtest/gtest.h"
+#include <cstdint>
+#include <memory>
+#include <random>
+#include "apsi/logging/log.h"
+#include "apsi/network/receiverchannel.h"
+#include "apsi/oprf/oprf_sender.h"
+#include "apsi/receiver.h"
 #include "apsi/sender.h"
 #include "apsi/senderdb.h"
 #include "apsi/senderdispatcher.h"
-#include "apsi/receiver.h"
-#include "apsi/network/receiverchannel.h"
 #include "apsi/tools/utils.h"
-#include "apsi/logging/log.h"
-#include "apsi/oprf/oprf_sender.h"
-
-#include <random>
-#include <cstdint>
-#include <memory>
+#include "gtest/gtest.h"
 
 using namespace std;
 using namespace apsi;
@@ -27,7 +26,7 @@ using namespace seal;
 
 namespace
 {
-    std::pair<vector<Item>, vector<int>> rand_subset(const vector<Item>& items, int size)
+    std::pair<vector<Item>, vector<int>> rand_subset(const vector<Item> &items, int size)
     {
         random_device rd;
 
@@ -52,12 +51,13 @@ namespace
         return { ret, s };
     }
 
-    void verify_intersection_results(vector<Item>& client_items, int intersection_size, pair<vector<bool>, Matrix<u8>>& intersection, bool compare_labels, vector<int>& label_idx, Matrix<u8>& labels)
+    void verify_intersection_results(
+        vector<Item> &client_items, int intersection_size, pair<vector<bool>, Matrix<u8>> &intersection,
+        bool compare_labels, vector<int> &label_idx, Matrix<u8> &labels)
     {
         bool correct = true;
         for (size_t i = 0; i < client_items.size(); i++)
         {
-
             if (i < static_cast<size_t>(intersection_size))
             {
                 // Item should be in intersection
@@ -80,7 +80,7 @@ namespace
         }
     }
 
-    void RunTest(size_t senderActualSize, PSIParams& params)
+    void RunTest(size_t senderActualSize, PSIParams &params)
     {
         // Connect the network
         ReceiverChannel recvChl;
@@ -92,12 +92,10 @@ namespace
 
         unique_ptr<Receiver> receiver_ptr;
 
-        auto f = std::async([&]() {
-            receiver_ptr = make_unique<Receiver>(numThreads);
-        });
+        auto f = std::async([&]() { receiver_ptr = make_unique<Receiver>(numThreads); });
         shared_ptr<Sender> sender = make_shared<Sender>(params, numThreads);
         f.get();
-        Receiver& receiver = *receiver_ptr;
+        Receiver &receiver = *receiver_ptr;
 
         auto label_bit_length = params.label_bit_count();
         auto receiverActualSize = 20;
@@ -116,7 +114,8 @@ namespace
         {
             s1[i] = i;
 
-            if (label_bit_length) {
+            if (label_bit_length)
+            {
                 memset(labels[i].data(), 0, labels[i].size());
 
                 labels[i][0] = static_cast<u8>(i);
@@ -125,7 +124,7 @@ namespace
         }
 
         auto cc1 = rand_subset(s1, intersectionSize);
-        auto& c1 = cc1.first;
+        auto &c1 = cc1.first;
 
         c1.reserve(receiverActualSize);
         for (int i = 0; i < (receiverActualSize - intersectionSize); ++i)
@@ -201,7 +200,7 @@ namespace
         return params;
     }
 
-    void initialize_db(vector<Item>& items, Matrix<u8>& labels, size_t item_count, size_t label_byte_count)
+    void initialize_db(vector<Item> &items, Matrix<u8> &labels, size_t item_count, size_t label_byte_count)
     {
         items.resize(item_count);
         labels.resize(item_count, label_byte_count);
@@ -220,7 +219,7 @@ namespace
         }
     }
 
-    void initialize_query(std::vector<apsi::Item>& items, size_t item_count)
+    void initialize_query(std::vector<apsi::Item> &items, size_t item_count)
     {
         items.resize(20);
 
@@ -240,8 +239,7 @@ namespace
             items[i] = (item_count + i);
         }
     }
-}
-
+} // namespace
 
 namespace APSITests
 {
@@ -262,14 +260,14 @@ namespace APSITests
     TEST(SenderReceiverTests, DISABLED_LabelsTest)
     {
         size_t senderActualSize = 2000;
-        PSIParams params = create_params(senderActualSize,  /* use_labels */ true, /* fast_membership */ false);
+        PSIParams params = create_params(senderActualSize, /* use_labels */ true, /* fast_membership */ false);
         RunTest(senderActualSize, params);
     }
 
     TEST(SenderReceiverTests, NoLabels3KTest)
     {
         size_t senderActualSize = 3000;
-        PSIParams params = create_params(senderActualSize,  /* use_labels */ false, /* fast_membership */ false);
+        PSIParams params = create_params(senderActualSize, /* use_labels */ false, /* fast_membership */ false);
         RunTest(senderActualSize, params);
     }
 
@@ -286,4 +284,4 @@ namespace APSITests
         PSIParams params = create_params(senderActualSize, /* use_labels */ true, /* fast_membership */ true);
         RunTest(senderActualSize, params);
     }
-}
+} // namespace APSITests

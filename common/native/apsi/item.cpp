@@ -1,12 +1,12 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
+#include "apsi/item.h"
 #include <cctype>
 #include <gsl/span>
-#include <seal/util/uintcore.h>
-#include <seal/util/common.h>
 #include <seal/util/blake2.h>
-#include "apsi/item.h"
+#include <seal/util/common.h>
+#include <seal/util/uintcore.h>
 
 using namespace std;
 using namespace seal;
@@ -21,40 +21,39 @@ namespace apsi
 
     Item::Item(const string &str)
     {
-        operator =(str);
+        operator=(str);
     }
 
     Item::Item(u64 item)
     {
-        operator =(item);
+        operator=(item);
     }
 
-    Item &Item::operator =(u64 assign)
+    Item &Item::operator=(u64 assign)
     {
         value_[0] = assign;
         value_[1] = 0;
         return *this;
     }
 
-    Item &Item::operator =(const kuku::item_type& assign)
+    Item &Item::operator=(const kuku::item_type &assign)
     {
         value_ = assign;
         return *this;
     }
 
-    Item::Item(const kuku::item_type & item)
+    Item::Item(const kuku::item_type &item)
     {
-        operator =(item);
+        operator=(item);
     }
 
-    Item &Item::operator =(const string &str)
+    Item &Item::operator=(const string &str)
     {
         if (str.size() > sizeof(value_))
         {
             // Use BLAKE2b as random oracle
             blake2(
-                reinterpret_cast<u8*>(&value_), sizeof(value_),
-                reinterpret_cast<const u8*>(str.data()), str.size(),
+                reinterpret_cast<u8 *>(&value_), sizeof(value_), reinterpret_cast<const u8 *>(str.data()), str.size(),
                 nullptr, 0);
         }
         else
@@ -67,7 +66,7 @@ namespace apsi
         return *this;
     }
 
-    Item &Item::operator =(const Item &assign)
+    Item &Item::operator=(const Item &assign)
     {
         for (size_t i = 0; i < value_.size(); i++)
             value_[i] = assign.value_[i];
@@ -81,12 +80,11 @@ namespace apsi
         return ring_item;
     }
 
-    u64 item_part(const array<u64, 2>& value_, u32 i, u32 split_length)
+    u64 item_part(const array<u64, 2> &value_, u32 i, u32 split_length)
     {
-        int i1 = (i * split_length) >> 6,
-            i2 = ((i + 1) * split_length) >> 6,
-            j1 = (i * split_length) & 0x3F,  // mod 64
-            j2 = ((i + 1) * split_length) & 0x3F;  // mod 64
+        int i1 = (i * split_length) >> 6, i2 = ((i + 1) * split_length) >> 6,
+            j1 = (i * split_length) & 0x3F,       // mod 64
+            j2 = ((i + 1) * split_length) & 0x3F; // mod 64
 #ifdef _DEBUG
         if (split_length > 64 || i2 > static_cast<int>(value_.size()))
         {
@@ -104,13 +102,12 @@ namespace apsi
         }
     }
 
-
     void Item::to_ffield_element(FFieldElt &ring_item, int bit_length)
     {
         auto ffield = ring_item.field();
 
         // Should minus 1 to avoid wrapping around p
-        // Hao: why? 
+        // Hao: why?
         int split_length = ffield.ch().bit_count() - 1;
 
         // How many coefficients do we need in the FFieldElement
@@ -125,15 +122,15 @@ namespace apsi
 
     void Item::save(ostream &stream) const
     {
-        stream.write(reinterpret_cast<const char*>(&value_), sizeof(value_));
+        stream.write(reinterpret_cast<const char *>(&value_), sizeof(value_));
     }
 
     void Item::load(istream &stream)
     {
-        stream.read(reinterpret_cast<char*>(&value_), sizeof(value_));
+        stream.read(reinterpret_cast<char *>(&value_), sizeof(value_));
     }
 
-    void Item::parse(const string& input, int base)
+    void Item::parse(const string &input, int base)
     {
         if (base != 10 && base != 16)
             throw invalid_argument("Only base 10 and 16 is supported.");
@@ -142,7 +139,7 @@ namespace apsi
         u32 item[4] = { 0 };
         u32 rem = 0;
 
-        for (const auto& chr : input)
+        for (const auto &chr : input)
         {
             if (iswspace(chr))
                 continue;
@@ -164,7 +161,7 @@ namespace apsi
         value_[1] = (static_cast<i64>(item[3]) << 32) + item[2];
     }
 
-    void Item::parse(const string& input)
+    void Item::parse(const string &input)
     {
         string num = input;
         int base = 10;

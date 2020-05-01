@@ -2,20 +2,19 @@
 // Licensed under the MIT license.
 
 // STD
-#include <sstream>
 #include <memory>
+#include <sstream>
 
 // APSI
-#include "apsi/senderdispatcher.h"
-#include "apsi/network/senderchannel.h"
-#include "apsi/network/network_utils.h"
 #include "apsi/logging/log.h"
+#include "apsi/network/network_utils.h"
+#include "apsi/network/senderchannel.h"
 #include "apsi/oprf/oprf_sender.h"
+#include "apsi/senderdispatcher.h"
 
 // SEAL
 #include "seal/publickey.h"
 #include "seal/relinkeys.h"
-
 
 using namespace std;
 using namespace seal;
@@ -29,10 +28,7 @@ namespace apsi
     namespace sender
     {
         void SenderDispatcher::run(
-            const atomic<bool> &stop,
-            int port,
-            shared_ptr<const OPRFKey> oprf_key,
-            shared_ptr<SenderDB> sender_db)
+            const atomic<bool> &stop, int port, shared_ptr<const OPRFKey> oprf_key, shared_ptr<SenderDB> sender_db)
         {
             SenderChannel channel;
 
@@ -91,22 +87,22 @@ namespace apsi
             }
         }
 
-        void SenderDispatcher::dispatch_get_parameters(shared_ptr<SenderOperation> sender_op, Channel& channel)
+        void SenderDispatcher::dispatch_get_parameters(shared_ptr<SenderOperation> sender_op, Channel &channel)
         {
             // No need to cast to SenderOperationGetParameters, we just need the client_id.
             channel.send_get_parameters_response(sender_op->client_id, sender_->get_params());
         }
 
-        void SenderDispatcher::dispatch_preprocess(shared_ptr<SenderOperation> sender_op, Channel& channel)
+        void SenderDispatcher::dispatch_preprocess(shared_ptr<SenderOperation> sender_op, Channel &channel)
         {
             auto preprocess_op = dynamic_pointer_cast<SenderOperationPreprocess>(sender_op);
-            
+
             vector<SEAL_BYTE> result(preprocess_op->buffer.size());
             OPRFSender::ProcessQueries(preprocess_op->buffer, *oprf_key_, result);
             channel.send_preprocess_response(sender_op->client_id, result);
         }
 
-        void SenderDispatcher::dispatch_query(shared_ptr<SenderOperation> sender_op, Channel& channel)
+        void SenderDispatcher::dispatch_query(shared_ptr<SenderOperation> sender_op, Channel &channel)
         {
             auto query_op = dynamic_pointer_cast<SenderOperationQuery>(sender_op);
 
@@ -115,11 +111,7 @@ namespace apsi
             channel.send_query_response(sender_op->client_id, package_count);
 
             // Query will send result to client in a stream of ResultPackages
-            sender_->query(
-                query_op->relin_keys,
-                query_op->query,
-                sender_op->client_id,
-                channel);
+            sender_->query(query_op->relin_keys, query_op->query, sender_op->client_id, channel);
         }
     } // namespace sender
 } // namespace apsi

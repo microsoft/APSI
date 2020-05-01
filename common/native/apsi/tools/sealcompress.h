@@ -5,24 +5,22 @@
 
 #include <iostream>
 #include <memory>
-#include <seal/secretkey.h>
 #include <seal/ciphertext.h>
 #include <seal/context.h>
 #include <seal/evaluator.h>
 #include <seal/memorymanager.h>
+#include <seal/secretkey.h>
 
 namespace apsi
 {
     class CiphertextCompressor
     {
     public:
-        CiphertextCompressor(std::shared_ptr<seal::SEALContext> seal_context,
-            seal::MemoryPoolHandle pool = seal::MemoryPoolHandle::Global()) :
-            pool_(std::move(pool)),
-            seal_context_(std::move(seal_context)),
-            evaluator_(seal_context_)
-        {
-        }
+        CiphertextCompressor(
+            std::shared_ptr<seal::SEALContext> seal_context,
+            seal::MemoryPoolHandle pool = seal::MemoryPoolHandle::Global())
+            : pool_(std::move(pool)), seal_context_(std::move(seal_context)), evaluator_(seal_context_)
+        {}
 
         void mod_switch(seal::Ciphertext &encrypted);
 

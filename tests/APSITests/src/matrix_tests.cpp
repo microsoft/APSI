@@ -1,27 +1,24 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "gtest/gtest.h"
-#include "apsi/tools/matrixview.h"
-#include "apsi/tools/matrix.h"
-
 #include <string>
-
+#include "apsi/tools/matrix.h"
+#include "apsi/tools/matrixview.h"
+#include "gtest/gtest.h"
 
 namespace APSITests
 {
     /**
      * This class only exists to expose the resize method.
      */
-    template<class T>
+    template <class T>
     class MatrixViewTester : public apsi::MatrixView<T>
     {
     public:
-        MatrixViewTester(T* data, size_t rows, size_t cols) :
-            apsi::MatrixView<T>(data, rows, cols)
+        MatrixViewTester(T *data, size_t rows, size_t cols) : apsi::MatrixView<T>(data, rows, cols)
         {}
 
-        void resize_test(T* data, size_t rows, size_t cols)
+        void resize_test(T *data, size_t rows, size_t cols)
         {
             this->resize(data, rows, cols, /* elt_size */ 1);
         }
@@ -30,12 +27,11 @@ namespace APSITests
     /**
      * This class only exists to expose the capacity method.
      */
-    template<class T>
+    template <class T>
     class MatrixTester : public apsi::Matrix<T>
     {
     public:
-        MatrixTester(size_t rows, size_t cols)
-            : apsi::Matrix<T>(rows, cols)
+        MatrixTester(size_t rows, size_t cols) : apsi::Matrix<T>(rows, cols)
         {}
 
         size_t capacity_test() const
@@ -43,7 +39,6 @@ namespace APSITests
             return this->capacity();
         }
     };
-
 
     TEST(MatrixViewTests, ConstructorTest)
     {
@@ -116,8 +111,7 @@ namespace APSITests
 
     TEST(MatrixViewTests, ResizeTest)
     {
-        int array[20] = { 1,  2,  3,  4,  5,  6,  7,  8,  9,  10,
-                          11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
+        int array[20] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
         MatrixViewTester<int> mv(array, 5, 4);
 
         ASSERT_EQ(1, *mv(0, 0));
@@ -137,19 +131,19 @@ namespace APSITests
 
     TEST(MatrixViewTests, IteratorTest)
     {
-        int array[10] = { 1,  2,  3,  4,  5,  6,  7,  8,  9,  10 };
+        int array[10] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
         apsi::MatrixView mv(array, 5, 2);
         apsi::MatrixView mv2(array, 5, 1);
 
         apsi::u64 sum = 0;
         apsi::u64 sum2 = 0;
 
-        for (auto& elem : mv)
+        for (auto &elem : mv)
         {
             sum += elem;
         }
 
-        for (auto& elem : mv2)
+        for (auto &elem : mv2)
         {
             sum2 += elem;
         }
@@ -189,4 +183,4 @@ namespace APSITests
         ASSERT_EQ(4, *m(1, 1));
         ASSERT_EQ((apsi::u64)100, m.capacity_test());
     }
-}
+} // namespace APSITests

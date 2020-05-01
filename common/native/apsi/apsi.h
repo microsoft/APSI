@@ -4,6 +4,6 @@
 #pragma once
 
 #include "apsidefines.h"
-#include "psiparams.h"
 #include "item.h"
+#include "psiparams.h"
 #include "tools/sealcompress.h"

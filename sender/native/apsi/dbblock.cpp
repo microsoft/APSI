@@ -7,8 +7,8 @@
 
 // APSI
 #include "apsi/dbblock.h"
-#include "apsi/tools/interpolate.h"
 #include "apsi/logging/log.h"
+#include "apsi/tools/interpolate.h"
 
 // SEAL
 #include <seal/util/uintarithsmallmod.h>
@@ -62,26 +62,21 @@ namespace apsi
             return {};
         }
 
-        void DBBlock::check(const Position & pos)
+        void DBBlock::check(const Position &pos)
         {
-            if (!pos.is_initialized() ||
-                pos.batch_offset >= items_per_batch_ ||
-                pos.split_offset >= items_per_split_)
+            if (!pos.is_initialized() || pos.batch_offset >= items_per_batch_ || pos.split_offset >= items_per_split_)
             {
                 stringstream ss;
-                ss
-                    << !pos.is_initialized() << "\n"
-                    << pos.batch_offset << " >= " << items_per_batch_ << "\n"
-                    << pos.split_offset << " >= " << items_per_split_;
+                ss << !pos.is_initialized() << "\n"
+                   << pos.batch_offset << " >= " << items_per_batch_ << "\n"
+                   << pos.split_offset << " >= " << items_per_split_;
                 Log::error(ss.str().c_str());
                 throw std::runtime_error("bad index");
             }
         }
 
         void DBBlock::symmetric_polys(
-            SenderThreadContext &th_context,
-            int encoding_bit_length,
-            const FFieldElt &neg_null_element)
+            SenderThreadContext &th_context, int encoding_bit_length, const FFieldElt &neg_null_element)
         {
             i64 split_size = items_per_split_;
             i64 batch_size = items_per_batch_;
@@ -99,13 +94,15 @@ namespace apsi
                 FFieldElt *temp1;
 
                 // Set symm_block[pos.batch_offset, split_size] to 1
-                fill_n(th_context.symm_block()(static_cast<size_t>(pos.batch_offset), static_cast<size_t>(split_size)), d, 1);
+                fill_n(
+                    th_context.symm_block()(static_cast<size_t>(pos.batch_offset), static_cast<size_t>(split_size)), d,
+                    1);
 
                 for (pos.split_offset = split_size - 1; pos.split_offset >= 0; pos.split_offset--)
                 {
                     if (!has_item(pos))
                     {
-                        temp1 = const_cast<FFieldElt*>(&neg_null_element);
+                        temp1 = const_cast<FFieldElt *>(&neg_null_element);
                     }
                     else
                     {
@@ -115,23 +112,21 @@ namespace apsi
                         temp1->neg();
                     }
 
-                    auto symm_block_ptr = th_context.symm_block()(static_cast<size_t>(pos.batch_offset), static_cast<size_t>(pos.split_offset + 1));
+                    auto symm_block_ptr = th_context.symm_block()(
+                        static_cast<size_t>(pos.batch_offset), static_cast<size_t>(pos.split_offset + 1));
 
-                    transform(symm_block_ptr, symm_block_ptr + d,
-                        temp1->data(),
-                        symm_block_ptr - d,
+                    transform(
+                        symm_block_ptr, symm_block_ptr + d, temp1->data(), symm_block_ptr - d,
                         [&ch](auto a, auto b) { return util::multiply_uint_uint_mod(a, b, ch); });
 
                     for (i64 k = pos.split_offset + 1; k < split_size; k++, symm_block_ptr += d)
                     {
-                        transform(temp1->data(), temp1->data() + d,
-                            symm_block_ptr + d,
-                            temp2.data(),
+                        transform(
+                            temp1->data(), temp1->data() + d, symm_block_ptr + d, temp2.data(),
                             [&ch](auto a, auto b) { return util::multiply_uint_uint_mod(a, b, ch); });
 
-                        transform(symm_block_ptr, symm_block_ptr + d,
-                            temp2.data(),
-                            symm_block_ptr,
+                        transform(
+                            symm_block_ptr, symm_block_ptr + d, temp2.data(), symm_block_ptr,
                             [&ch](auto a, auto b) { return util::add_uint_uint_mod(a, b, ch); });
                     }
                 }
@@ -139,12 +134,9 @@ namespace apsi
         }
 
         void DBBlock::batch_interpolate(
-            SenderThreadContext &th_context,
-            shared_ptr<SEALContext> seal_context,
-            const unique_ptr<Evaluator> &evaluator,
-            const unique_ptr<FFieldBatchEncoder> &batch_encoder,
-            DBInterpolationCache& cache,
-            const PSIParams& params)
+            SenderThreadContext &th_context, shared_ptr<SEALContext> seal_context,
+            const unique_ptr<Evaluator> &evaluator, const unique_ptr<FFieldBatchEncoder> &batch_encoder,
+            DBInterpolationCache &cache, const PSIParams &params)
         {
             auto mod = params.seal_params().encryption_params.plain_modulus().value();
             MemoryPoolHandle local_pool = th_context.pool();
@@ -153,31 +145,30 @@ namespace apsi
             for (pos.batch_offset = 0; pos.batch_offset < items_per_batch_; ++pos.batch_offset)
             {
                 FFieldElt temp(batch_encoder->field());
-                FFieldArray& x = cache.x_temp[static_cast<size_t>(pos.batch_offset)];
-                FFieldArray& y = cache.y_temp[static_cast<size_t>(pos.batch_offset)];
+                FFieldArray &x = cache.x_temp[static_cast<size_t>(pos.batch_offset)];
+                FFieldArray &y = cache.y_temp[static_cast<size_t>(pos.batch_offset)];
 
                 int size = 0;
                 for (pos.split_offset = 0; pos.split_offset < items_per_split_; ++pos.split_offset)
                 {
                     if (has_item(pos))
                     {
-                        auto& key_item = get_key(pos);
+                        auto &key_item = get_key(pos);
 
-                        temp.encode(gsl::span<u64>{key_item.get_value()}, params.label_bit_count());
+                        temp.encode(gsl::span<u64>{ key_item.get_value() }, params.label_bit_count());
                         x.set(size, temp);
 
                         auto src = get_label(pos);
-                        temp.encode(gsl::span<u8>{src, static_cast<ptrdiff_t>(value_byte_length_)}, params.label_bit_count());
+                        temp.encode(
+                            gsl::span<u8>{ src, static_cast<ptrdiff_t>(value_byte_length_) }, params.label_bit_count());
                         y.set(size, temp);
 
                         ++size;
                     }
                 }
 
+                bool empty_row = (size == 0);
 
-                bool empty_row = (size == 0); 
-
-        
                 // pad the points to have max degree (split_size)
                 // with (x,x) points where x is unique.
                 cache.key_set.clear();
@@ -197,7 +188,7 @@ namespace apsi
 
                     if (cache.key_set.find(cache.temp_vec[0]) == cache.key_set.end())
                     {
-                        temp.encode(gsl::span<u64>{cache.temp_vec}, params.label_bit_count());
+                        temp.encode(gsl::span<u64>{ cache.temp_vec }, params.label_bit_count());
 
                         x.set(size, temp);
                         y.set(size, temp);
@@ -237,10 +228,12 @@ namespace apsi
                 Position temppos;
                 temppos.split_offset = s;
 
-                for (int j = 0; j < items_per_batch_; j++) {
-                    temppos.batch_offset = j; 
-                    if (has_item(temppos) && split_idx_ == 1) {
-                        Log::debug("real item at batch offset %i and split offset %i", j, s); 
+                for (int j = 0; j < items_per_batch_; j++)
+                {
+                    temppos.batch_offset = j;
+                    if (has_item(temppos) && split_idx_ == 1)
+                    {
+                        Log::debug("real item at batch offset %i and split offset %i", j, s);
                         Log::debug("label for this item is 0x%llx", get_label_u64(temppos));
                     }
                 }
@@ -250,10 +243,7 @@ namespace apsi
         }
 
         DBInterpolationCache::DBInterpolationCache(
-            FField field,
-            int items_per_batch,
-            int items_per_split,
-            int value_byte_count)
+            FField field, int items_per_batch, int items_per_split, int value_byte_count)
         {
             coeff_temp.reserve(items_per_batch);
             x_temp.reserve(items_per_batch);

@@ -4,19 +4,19 @@
 #pragma once
 
 // STD
-#include <vector>
 #include <memory>
 #include <unordered_set>
+#include <vector>
 
 // APSI
+#include "apsi/ffield/ffield_batch_encoder.h"
 #include "apsi/item.h"
 #include "apsi/senderthreadcontext.h"
-#include "apsi/ffield/ffield_batch_encoder.h"
 
 // SEAL
-#include "seal/plaintext.h"
 #include "seal/context.h"
 #include "seal/evaluator.h"
+#include "seal/plaintext.h"
 
 namespace apsi
 {
@@ -24,12 +24,7 @@ namespace apsi
     {
         struct DBInterpolationCache
         {
-            DBInterpolationCache(
-                FField field,
-                int batch_size,
-                int items_per_split,
-                int value_byte_count
-            );
+            DBInterpolationCache(FField field, int batch_size, int items_per_split, int value_byte_count);
 
             std::vector<std::vector<FFieldArray>> div_diff_temp;
             std::vector<FFieldArray> coeff_temp, x_temp, y_temp;
@@ -53,12 +48,7 @@ namespace apsi
                 }
             }; // struct Position
 
-            void init(
-                i64 batch_idx,
-                i64 split_idx,
-                i64 value_byte_length,
-                i64 batch_size,
-                i64 items_per_split)
+            void init(i64 batch_idx, i64 split_idx, i64 value_byte_length, i64 batch_size, i64 items_per_split)
             {
                 label_data_.resize(static_cast<size_t>(batch_size * items_per_split * value_byte_length));
                 key_data_.resize(static_cast<size_t>(batch_size * items_per_split));
@@ -83,7 +73,7 @@ namespace apsi
             // the number of cuckoo slots that this regions spans.
             i64 items_per_batch_;
 
-            // the number of items that are in a split. 
+            // the number of items that are in a split.
             i64 items_per_split_;
 
             gsl::span<seal::Plaintext> batch_random_symm_poly_;
@@ -100,23 +90,19 @@ namespace apsi
             Output polynomial terms: (1, \sum_i a_i, \sum_{i,j} a_i*a_j, ...).
             */
             void symmetric_polys(
-                SenderThreadContext &th_context,
-                int encoding_bit_length,
-                const FFieldElt &neg_null_element);
+                SenderThreadContext &th_context, int encoding_bit_length, const FFieldElt &neg_null_element);
 
             Position try_acquire_position_after_oprf(int bin_idx);
 
             void batch_interpolate(
-                SenderThreadContext &th_context,
-                std::shared_ptr<seal::SEALContext> seal_context,
+                SenderThreadContext &th_context, std::shared_ptr<seal::SEALContext> seal_context,
                 const std::unique_ptr<seal::Evaluator> &evaluator,
-                const std::unique_ptr<FFieldBatchEncoder> &batch_encoder,
-                DBInterpolationCache &cache,
+                const std::unique_ptr<FFieldBatchEncoder> &batch_encoder, DBInterpolationCache &cache,
                 const PSIParams &params);
 
-            void check(const Position& pos);
+            void check(const Position &pos);
 
-            bool has_item(const Position& pos)
+            bool has_item(const Position &pos)
             {
 #ifndef NDEBUG
                 check(pos);
@@ -124,7 +110,7 @@ namespace apsi
                 return has_item_.get()[pos.batch_offset * items_per_split_ + pos.split_offset];
             }
 
-            Item& get_key(const Position& pos)
+            Item &get_key(const Position &pos)
             {
 #ifndef NDEBUG
                 check(pos);
@@ -132,22 +118,23 @@ namespace apsi
                 return key_data_[static_cast<size_t>(pos.batch_offset * items_per_split_ + pos.split_offset)];
             }
 
-            u8* get_label(const Position& pos)
+            u8 *get_label(const Position &pos)
             {
 #ifndef NDEBUG
                 check(pos);
 #endif
 
-                return &label_data_[static_cast<size_t>((pos.batch_offset * items_per_split_ + pos.split_offset) * value_byte_length_)];
+                return &label_data_[static_cast<size_t>(
+                    (pos.batch_offset * items_per_split_ + pos.split_offset) * value_byte_length_)];
             }
 
-            u64 get_key_u64(const Position& pos)
+            u64 get_key_u64(const Position &pos)
             {
-                auto& i = get_key(pos);
-                return *(u64*)&i;
+                auto &i = get_key(pos);
+                return *(u64 *)&i;
             }
 
-            u64 get_label_u64(const Position& pos)
+            u64 get_label_u64(const Position &pos)
             {
                 auto l = get_label(pos);
                 u64 r = 0;
@@ -157,5 +144,5 @@ namespace apsi
 
             void clear();
         }; // struct DBBlock
-    } // namespace sender
+    }      // namespace sender
 } // namespace apsi

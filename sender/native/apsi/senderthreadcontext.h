@@ -6,14 +6,14 @@
 // STD
 #include <memory>
 #include <stdexcept>
-#include <vector>
 #include <utility>
+#include <vector>
 
 // APSI
-#include "apsi/psiparams.h"
 #include "apsi/ffield/ffield.h"
-#include "apsi/ffield/ffield_elt.h"
 #include "apsi/ffield/ffield_array.h"
+#include "apsi/ffield/ffield_elt.h"
+#include "apsi/psiparams.h"
 #include "apsi/tools/matrixview.h"
 
 // SEAL
@@ -62,9 +62,7 @@ namespace apsi
 
                     // Create matrix view
                     symm_block_ = MatrixView<_ffield_elt_coeff_t>(
-                        symm_block_vec_->data(),
-                        params.batch_size(), 
-                        params.split_size() + 1,
+                        symm_block_vec_->data(), params.batch_size(), params.split_size() + 1,
                         static_cast<size_t>(field.d()));
                 }
             }
@@ -106,13 +104,15 @@ namespace apsi
             */
             float get_progress() const
             {
-                float randomized_polys_progress = static_cast<float>(randomized_polys_processed_) / total_randomized_polys_;
+                float randomized_polys_progress =
+                    static_cast<float>(randomized_polys_processed_) / total_randomized_polys_;
 
                 // If we are not using labels, only report randomized polynomials progress
                 if (total_interpolate_polys_ == 0)
                     return randomized_polys_progress;
 
-                float interpolate_polys_progress = static_cast<float>(interpolate_polys_processed_) / total_interpolate_polys_;
+                float interpolate_polys_progress =
+                    static_cast<float>(interpolate_polys_processed_) / total_interpolate_polys_;
 
                 return (randomized_polys_progress + interpolate_polys_progress) / 2;
             }
@@ -125,12 +125,12 @@ namespace apsi
             std::unique_ptr<FFieldArray> symm_block_vec_ = nullptr;
 
             MatrixView<_ffield_elt_coeff_t> symm_block_;
-            
+
             std::atomic<int> randomized_polys_processed_;
             std::atomic<int> interpolate_polys_processed_;
 
             int total_randomized_polys_;
             int total_interpolate_polys_;
         };
-    }
-}
+    } // namespace sender
+} // namespace apsi

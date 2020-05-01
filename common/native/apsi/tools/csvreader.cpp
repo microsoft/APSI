@@ -1,8 +1,8 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include <fstream>
 #include <cctype>
+#include <fstream>
 #include <sstream>
 
 #if _MSC_VER || (__GNUC__ >= 8) || __clang__
@@ -12,7 +12,6 @@
 #include <experimental/filesystem>
 #endif
 #include "csvreader.h"
-
 
 #if !_MSC_VER && (__GNUC__ < 8) && !__clang__
 using namespace experimental;
@@ -24,18 +23,15 @@ namespace apsi
 {
     namespace tools
     {
-        CSVReader::CSVReader(const string& file_name)
-            : file_name_(file_name)
+        CSVReader::CSVReader(const string &file_name) : file_name_(file_name)
         {
             throw_if_file_not_present();
         }
 
-        CSVReader::CSVReader()
-            : file_name_("")
-        {
-        }
+        CSVReader::CSVReader() : file_name_("")
+        {}
 
-        void CSVReader::read(istream& stream, vector<Item>& items, Matrix<u8>& labels, int label_byte_count) const
+        void CSVReader::read(istream &stream, vector<Item> &items, Matrix<u8> &labels, int label_byte_count) const
         {
             string line;
             vector<Item> temp_labels;
@@ -57,14 +53,14 @@ namespace apsi
             }
         }
 
-        void CSVReader::read(vector<Item>& items, Matrix<u8>& labels, int label_byte_count) const
+        void CSVReader::read(vector<Item> &items, Matrix<u8> &labels, int label_byte_count) const
         {
             throw_if_file_not_present();
             ifstream file(file_name_);
             read(file, items, labels, label_byte_count);
         }
 
-        void CSVReader::process_line(string line, vector<Item>& items, vector<Item>& labels) const
+        void CSVReader::process_line(string line, vector<Item> &items, vector<Item> &labels) const
         {
             stringstream ss(line);
             string token;

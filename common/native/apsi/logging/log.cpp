@@ -1,43 +1,43 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
+#include "log.h"
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
-#include "log.h" 
 
 #if !APSI_LOG_DISABLED
 // Logging is not disabled
 
-#include "log4cplus/logger.h"
 #include "log4cplus/consoleappender.h"
 #include "log4cplus/fileappender.h"
+#include "log4cplus/logger.h"
 #include "log4cplus/nullappender.h"
 
 using namespace std;
 using namespace log4cplus;
 
-#define CheckLogLevel(log_level) \
-{\
-    configure_if_needed(); \
-    Logger& logger = Logger::getInstance("APSI"); \
-    if (logger.getLogLevel() > log_level) \
-    { \
-        return; \
-    } \
-}
+#define CheckLogLevel(log_level)                      \
+    {                                                 \
+        configure_if_needed();                        \
+        Logger &logger = Logger::getInstance("APSI"); \
+        if (logger.getLogLevel() > log_level)         \
+        {                                             \
+            return;                                   \
+        }                                             \
+    }
 
-#define FormatLogMessage(format, log_level) \
-{ \
-    string msg; \
-    va_list ap; \
-    va_start(ap, format); \
-    format_msg(msg, format, ap); \
-    va_end(ap); \
-    configure_if_needed(); \
-    Logger& logger = Logger::getInstance("APSI"); \
-    logger.log(log_level, msg); \
-}
+#define FormatLogMessage(format, log_level)           \
+    {                                                 \
+        string msg;                                   \
+        va_list ap;                                   \
+        va_start(ap, format);                         \
+        format_msg(msg, format, ap);                  \
+        va_end(ap);                                   \
+        configure_if_needed();                        \
+        Logger &logger = Logger::getInstance("APSI"); \
+        logger.log(log_level, msg);                   \
+    }
 
 constexpr auto MSG_BUFFER_LEN = 512;
 
@@ -54,9 +54,9 @@ namespace apsi
         };
 
         static char msgBuffer[MSG_BUFFER_LEN];
-        static LogProperties* log_properties;
+        static LogProperties *log_properties;
 
-        LogProperties& get_log_properties()
+        LogProperties &get_log_properties()
         {
             if (nullptr == log_properties)
             {
@@ -88,7 +88,7 @@ namespace apsi
             {
                 SharedAppenderPtr appender(new ConsoleAppender);
                 appender->setLayout(make_unique<PatternLayout>("%-5p %D{%H:%M:%S:%Q}: %m%n"));
-                Logger& logger = Logger::getInstance("APSI");
+                Logger &logger = Logger::getInstance("APSI");
                 logger.addAppender(appender);
             }
 
@@ -96,7 +96,7 @@ namespace apsi
             {
                 SharedAppenderPtr appender(new RollingFileAppender(get_log_properties().log_file));
                 appender->setLayout(make_unique<PatternLayout>("%-5p %D{%H:%M:%S:%Q}: %m%n"));
-                Logger& logger = Logger::getInstance("APSI");
+                Logger &logger = Logger::getInstance("APSI");
                 logger.addAppender(appender);
             }
 
@@ -104,7 +104,7 @@ namespace apsi
             {
                 // Log4CPlus needs at least one appender. Use the null appender if the user doesn't want any output.
                 SharedAppenderPtr appender(new NullAppender());
-                Logger& logger = Logger::getInstance("APSI");
+                Logger &logger = Logger::getInstance("APSI");
                 logger.addAppender(appender);
             }
 
@@ -119,25 +119,25 @@ namespace apsi
             }
         }
 
-        void Log::info(const char* format, ...)
+        void Log::info(const char *format, ...)
         {
             CheckLogLevel(INFO_LOG_LEVEL);
             FormatLogMessage(format, INFO_LOG_LEVEL);
         }
 
-        void Log::warning(const char* format, ...)
+        void Log::warning(const char *format, ...)
         {
             CheckLogLevel(WARN_LOG_LEVEL);
             FormatLogMessage(format, WARN_LOG_LEVEL);
         }
 
-        void Log::debug(const char* format, ...)
+        void Log::debug(const char *format, ...)
         {
             CheckLogLevel(DEBUG_LOG_LEVEL);
             FormatLogMessage(format, DEBUG_LOG_LEVEL);
         }
 
-        void Log::error(const char* format, ...)
+        void Log::error(const char *format, ...)
         {
             CheckLogLevel(ERROR_LOG_LEVEL);
             FormatLogMessage(format, ERROR_LOG_LEVEL);
@@ -149,30 +149,30 @@ namespace apsi
             LogLevel actual = ALL_LOG_LEVEL;
             switch (level)
             {
-                case Level::level_all:
-                    actual = ALL_LOG_LEVEL;
-                    break;
-                case Level::level_debug:
-                    actual = DEBUG_LOG_LEVEL;
-                    break;
-                case Level::level_info:
-                    actual = INFO_LOG_LEVEL;
-                    break;
-                case Level::level_warning:
-                    actual = WARN_LOG_LEVEL;
-                    break;
-                case Level::level_error:
-                    actual = ERROR_LOG_LEVEL;
-                    break;
-                default:
-                    throw invalid_argument("Unknown log level");
+            case Level::level_all:
+                actual = ALL_LOG_LEVEL;
+                break;
+            case Level::level_debug:
+                actual = DEBUG_LOG_LEVEL;
+                break;
+            case Level::level_info:
+                actual = INFO_LOG_LEVEL;
+                break;
+            case Level::level_warning:
+                actual = WARN_LOG_LEVEL;
+                break;
+            case Level::level_error:
+                actual = ERROR_LOG_LEVEL;
+                break;
+            default:
+                throw invalid_argument("Unknown log level");
             }
 
-            Logger& logger = Logger::getInstance("APSI");
+            Logger &logger = Logger::getInstance("APSI");
             logger.setLogLevel(actual);
         }
 
-        void Log::set_log_file(const string& file)
+        void Log::set_log_file(const string &file)
         {
             get_log_properties().log_file = file;
         }
@@ -187,7 +187,7 @@ namespace apsi
             log4cplus::deinitialize();
         }
 
-        void Log::set_log_level(const string& level)
+        void Log::set_log_level(const string &level)
         {
             Log::Level actual;
 
@@ -215,7 +215,7 @@ namespace apsi
             set_log_level(actual);
         }
 
-        void Log::format_msg(string& msg, const char* format, va_list ap)
+        void Log::format_msg(string &msg, const char *format, va_list ap)
         {
             int length = vsnprintf(msgBuffer, MSG_BUFFER_LEN, format, ap);
             msg = string(msgBuffer, length);
@@ -230,41 +230,32 @@ namespace apsi
 {
     namespace logging
     {
-        void Log::info(const char* format, ...)
-        {
-        }
+        void Log::info(const char *format, ...)
+        {}
 
-        void Log::debug(const char* format, ...)
-        {
-        }
+        void Log::debug(const char *format, ...)
+        {}
 
-        void Log::warning(const char* format, ...)
-        {
-        }
+        void Log::warning(const char *format, ...)
+        {}
 
-        void Log::error(const char* format, ...)
-        {
-        }
+        void Log::error(const char *format, ...)
+        {}
 
         void Log::set_log_level(Level level)
-        {
-        }
+        {}
 
-        void Log::set_log_level(const std::string& level)
-        {
-        }
+        void Log::set_log_level(const std::string &level)
+        {}
 
-        void Log::set_log_file(const std::string& file)
-        {
-        }
+        void Log::set_log_file(const std::string &file)
+        {}
 
         void Log::set_console_disabled(bool console_disabled)
-        {
-        }
+        {}
 
         void Log::terminate()
-        {
-        }
+        {}
 
     } // namespace logging
 } // namespace apsi

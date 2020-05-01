@@ -1,11 +1,11 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "gtest/gtest.h"
-#include "apsi/network/stream_channel.h"
 #include "seal/encryptionparams.h"
 #include "seal/keygenerator.h"
 #include "seal/relinkeys.h"
+#include "apsi/network/stream_channel.h"
+#include "gtest/gtest.h"
 
 using namespace std;
 using namespace apsi;
@@ -14,12 +14,12 @@ using namespace seal;
 
 namespace
 {
-    template<typename... Ts>
-    vector<SEAL_BYTE> CreateByteVector(Ts&&... args)
+    template <typename... Ts>
+    vector<SEAL_BYTE> CreateByteVector(Ts &&... args)
     {
         return { SEAL_BYTE(forward<Ts>(args))... };
     }
-}
+} // namespace
 
 namespace APSITests
 {
@@ -27,12 +27,10 @@ namespace APSITests
     {
     protected:
         StreamChannelTests()
-        {
-        }
+        {}
 
         ~StreamChannelTests()
-        {
-        }
+        {}
     };
 
     TEST_F(StreamChannelTests, SendGetParametersTest)
@@ -68,7 +66,8 @@ namespace APSITests
         seal_params.max_supported_degree = 20;
         seal_params.encryption_params.set_plain_modulus(5119);
         seal_params.encryption_params.set_poly_modulus_degree(4096);
-        vector<SmallModulus> coeff_modulus = CoeffModulus::BFVDefault(seal_params.encryption_params.poly_modulus_degree());
+        vector<SmallModulus> coeff_modulus =
+            CoeffModulus::BFVDefault(seal_params.encryption_params.poly_modulus_degree());
         seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
 
         PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
@@ -126,7 +125,8 @@ namespace APSITests
 
         ASSERT_EQ(SOP_preprocess, sender_op->type);
 
-        shared_ptr<SenderOperationPreprocess> preprocess_op = dynamic_pointer_cast<SenderOperationPreprocess>(sender_op);
+        shared_ptr<SenderOperationPreprocess> preprocess_op =
+            dynamic_pointer_cast<SenderOperationPreprocess>(sender_op);
         ASSERT_TRUE(nullptr != preprocess_op);
 
         ASSERT_EQ((size_t)5, preprocess_op->buffer.size());
@@ -145,7 +145,7 @@ namespace APSITests
         StreamChannel senderchannel(/* istream */ stream1, /* ostream */ stream2);
         StreamChannel receiverchannel(/* istream */ stream2, /* ostream */ stream1);
 
-        vector<SEAL_BYTE> buffer = CreateByteVector(100, 95, 80, 75, 60, 55, 40, 35, 20, 15, 10, 4, 3, 2 , 1);
+        vector<SEAL_BYTE> buffer = CreateByteVector(100, 95, 80, 75, 60, 55, 40, 35, 20, 15, 10, 4, 3, 2, 1);
 
         vector<SEAL_BYTE> client_id;
         senderchannel.send_preprocess_response(client_id, buffer);
@@ -297,4 +297,4 @@ namespace APSITests
         ASSERT_TRUE(received.data == "Five");
         ASSERT_TRUE(received.label_data == "Six");
     }
-}
+} // namespace APSITests

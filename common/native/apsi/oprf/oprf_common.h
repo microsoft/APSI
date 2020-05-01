@@ -3,12 +3,12 @@
 
 #pragma once
 
-#include "apsi/oprf/ecpoint.h"
 #include "apsi/item.h"
+#include "apsi/oprf/ecpoint.h"
 
 namespace apsi
 {
-    namespace oprf 
+    namespace oprf
     {
         using oprf_item_type = Item;
         constexpr auto oprf_item_size = oprf_item_type::item_byte_count;

@@ -2,24 +2,23 @@
 // Licensed under the MIT license.
 
 // STD
+#include <array>
+#include <chrono>
+#include <climits>
+#include <future>
 #include <numeric>
 #include <thread>
-#include <future>
-#include <chrono>
-#include <array>
-#include <climits>
 
 // APSI
-#include "apsi/sender.h"
 #include "apsi/logging/log.h"
 #include "apsi/network/network_utils.h"
-#include "apsi/tools/utils.h"
 #include "apsi/result_package.h"
+#include "apsi/sender.h"
+#include "apsi/tools/utils.h"
 
 // SEAL
-#include <seal/util/common.h>
 #include <seal/smallmodulus.h>
-
+#include <seal/util/common.h>
 
 using namespace std;
 using namespace seal;
@@ -32,18 +31,14 @@ namespace apsi
 
     namespace sender
     {
-        Sender::Sender(const PSIParams &params, int thread_count) :
-            params_(params),
-            thread_count_(thread_count),
-            seal_context_(SEALContext::Create(params_.encryption_params()))
-        {
-        }
+        Sender::Sender(const PSIParams &params, int thread_count)
+            : params_(params), thread_count_(thread_count),
+              seal_context_(SEALContext::Create(params_.encryption_params()))
+        {}
 
         void Sender::query(
-            const string& relin_keys,
-            const map<u64, vector<string>> query,
-            const vector<SEAL_BYTE>& client_id,
-            Channel& channel)
+            const string &relin_keys, const map<u64, vector<string>> query, const vector<SEAL_BYTE> &client_id,
+            Channel &channel)
         {
             if (!sender_db_)
             {
@@ -95,10 +90,8 @@ namespace apsi
         }
 
         void Sender::respond(
-            vector<vector<Ciphertext>> &powers, int num_of_powers, 
-            SenderSessionContext &session_context,
-            const vector<SEAL_BYTE> &client_id,
-            Channel &channel)
+            vector<vector<Ciphertext>> &powers, int num_of_powers, SenderSessionContext &session_context,
+            const vector<SEAL_BYTE> &client_id, Channel &channel)
         {
             STOPWATCH(sender_stop_watch, "Sender::respond");
 
@@ -143,22 +136,11 @@ namespace apsi
             vector<thread> thread_pool;
             for (size_t i = 0; i < thread_count_; i++)
             {
-                thread_pool.emplace_back([&, i]()
-                {
+                thread_pool.emplace_back([&, i]() {
                     respond_worker(
-                        static_cast<int>(i),
-                        batch_count,
-                        static_cast<int>(thread_count_),
-                        total_blocks,
-                        batches_done_prom,
-                        batches_done_fut,
-                        powers,
-                        session_context,
-                        dag,
-                        states,
-                        remaining_batches,
-                        client_id,
-                        channel);
+                        static_cast<int>(i), batch_count, static_cast<int>(thread_count_), total_blocks,
+                        batches_done_prom, batches_done_fut, powers, session_context, dag, states, remaining_batches,
+                        client_id, channel);
                 });
             }
 
@@ -169,19 +151,10 @@ namespace apsi
         }
 
         void Sender::respond_worker(
-            int thread_index,
-            int batch_count,
-            int total_threads,
-            int total_blocks,
-            promise<void>& batches_done_prom,
-            shared_future<void>& batches_done_fut,
-            vector<vector<Ciphertext>>& powers,
-            SenderSessionContext &session_context,
-            WindowingDag& dag,
-            vector<WindowingDag::State>& states,
-            atomic<int>& remaining_batches,
-            const vector<SEAL_BYTE>& client_id,
-            Channel& channel)
+            int thread_index, int batch_count, int total_threads, int total_blocks, promise<void> &batches_done_prom,
+            shared_future<void> &batches_done_fut, vector<vector<Ciphertext>> &powers,
+            SenderSessionContext &session_context, WindowingDag &dag, vector<WindowingDag::State> &states,
+            atomic<int> &remaining_batches, const vector<SEAL_BYTE> &client_id, Channel &channel)
         {
             STOPWATCH(sender_stop_watch, "Sender::respond_worker");
 
@@ -196,7 +169,8 @@ namespace apsi
 
             for (int batch = static_cast<int>(batch_start), loop_idx = 0ul; loop_idx < batch_count; ++loop_idx)
             {
-                compute_batch_powers(static_cast<int>(batch), powers[batch], session_context, dag, states[batch], local_pool);
+                compute_batch_powers(
+                    static_cast<int>(batch), powers[batch], session_context, dag, states[batch], local_pool);
                 batch = (batch + 1) % batch_count;
             }
 
@@ -213,22 +187,21 @@ namespace apsi
             int start_block = thread_index * total_blocks / thread_count_;
             int end_block = (thread_index + 1) * total_blocks / thread_count_;
 
-            // Constuct two ciphertexts to store the result. One keeps track of the current result, 
-            // one is used as a temp. Their roles switch each iteration. Saved needing to make a 
+            // Constuct two ciphertexts to store the result. One keeps track of the current result,
+            // one is used as a temp. Their roles switch each iteration. Saved needing to make a
             // copy in eval->add(...)
-            array<Ciphertext, 2> runningResults{ local_pool, local_pool },
-                label_results{ local_pool, local_pool };
+            array<Ciphertext, 2> runningResults{ local_pool, local_pool }, label_results{ local_pool, local_pool };
 
             u64 processed_blocks = 0;
             Evaluator &evaluator = *session_context.evaluator();
             for (int block_idx = start_block; block_idx < end_block; block_idx++)
             {
-                int batch = block_idx / params_.split_count(),
-                    split = block_idx % params_.split_count();
-                auto& block = sender_db_->get_block(batch, split);
+                int batch = block_idx / params_.split_count(), split = block_idx % params_.split_count();
+                auto &block = sender_db_->get_block(batch, split);
 
                 // Get the pointer to the first poly of this batch.
-                //Plaintext* sender_coeffs(&sender_db_.batch_random_symm_polys()[split * splitStep + batch * split_size_plus_one]);
+                // Plaintext* sender_coeffs(&sender_db_.batch_random_symm_polys()[split * splitStep + batch *
+                // split_size_plus_one]);
 
                 // Iterate over the coeffs multiplying them with the query powers  and summing the results
                 u8 currResult = 0, curr_label = 0;
@@ -239,19 +212,21 @@ namespace apsi
                 // Observe that the first call to mult is always multiplying coeff[0] by 1....
                 // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
 
-                evaluator.multiply_plain(powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
+                evaluator.multiply_plain(
+                    powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
 
                 for (u32 s = 1; s < params_.split_size(); s++)
                 {
-                    // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
+                    // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call
+                    // multiply_plain_ntt
                     evaluator.multiply_plain(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
                     evaluator.add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
                     currResult ^= 1;
                 }
 
-                // Handle the case for s = params_.split_size(); 
-                int s = params_.split_size(); 
-                tmp = powers[batch][s]; 
+                // Handle the case for s = params_.split_size();
+                int s = params_.split_size();
+                tmp = powers[batch][s];
                 evaluator.add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
                 currResult ^= 1;
 
@@ -268,18 +243,23 @@ namespace apsi
 
                         // label_result = coeff[0] * x^0 = coeff[0];
                         size_t s = 0;
-                        while (s < block.batched_label_coeffs_.size() && block.batched_label_coeffs_[s].is_zero()) ++s;
+                        while (s < block.batched_label_coeffs_.size() && block.batched_label_coeffs_[s].is_zero())
+                            ++s;
 
-                        // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
+                        // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call
+                        // multiply_plain_ntt
 
-                        if (s < block.batched_label_coeffs_.size()) {
-                            evaluator.multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], label_results[curr_label]);
+                        if (s < block.batched_label_coeffs_.size())
+                        {
+                            evaluator.multiply_plain(
+                                powers[batch][s], block.batched_label_coeffs_[s], label_results[curr_label]);
                         }
-                        else {
+                        else
+                        {
                             session_context.encryptor_->encrypt_zero(label_results[curr_label]);
                             evaluator.transform_to_ntt_inplace(label_results[curr_label]);
-                            // just set it to be an encryption of zero. 
-                            // encryptor_->encrypt; 
+                            // just set it to be an encryption of zero.
+                            // encryptor_->encrypt;
                         }
 
                         while (++s < block.batched_label_coeffs_.size())
@@ -287,25 +267,27 @@ namespace apsi
                             // label_result += coeff[s] * x^s;
                             if (block.batched_label_coeffs_[s].is_zero() == false)
                             {
-                                // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
+                                // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call
+                                // multiply_plain_ntt
                                 evaluator.multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], tmp);
                                 evaluator.add(tmp, label_results[curr_label], label_results[curr_label ^ 1]);
                                 curr_label ^= 1;
                             }
                         }
                     }
-                    else if (block.batched_label_coeffs_.size() &&
-                        !block.batched_label_coeffs_[0].is_zero())
+                    else if (block.batched_label_coeffs_.size() && !block.batched_label_coeffs_[0].is_zero())
                     {
                         // only reachable if user calls PSIParams.set_use_low_degree_poly(true);
 
                         // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
                         // Observe that the first call to mult is always multiplying coeff[0] by 1....
 
-                        // TODO: edge case where block.batched_label_coeffs_[0] is zero. 
+                        // TODO: edge case where block.batched_label_coeffs_[0] is zero.
 
-                        // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
-                        evaluator.multiply_plain(powers[batch][0], block.batched_label_coeffs_[0], label_results[curr_label]);
+                        // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call
+                        // multiply_plain_ntt
+                        evaluator.multiply_plain(
+                            powers[batch][0], block.batched_label_coeffs_[0], label_results[curr_label]);
                     }
                     else
                     {
@@ -359,12 +341,8 @@ namespace apsi
         }
 
         void Sender::compute_batch_powers(
-            int batch,
-            vector<Ciphertext>& batch_powers,
-            SenderSessionContext& session_context,
-            const WindowingDag& dag,
-            WindowingDag::State& state,
-            MemoryPoolHandle pool)
+            int batch, vector<Ciphertext> &batch_powers, SenderSessionContext &session_context, const WindowingDag &dag,
+            WindowingDag::State &state, MemoryPoolHandle pool)
         {
             auto thrdIdx = std::this_thread::get_id();
 
@@ -378,8 +356,8 @@ namespace apsi
             Evaluator &evaluator = *session_context.evaluator();
             while (idx < dag.nodes.size())
             {
-                auto& node = dag.nodes[idx];
-                auto& node_state = state.nodes[node.output];
+                auto &node = dag.nodes[idx];
+                auto &node_state = state.nodes[node.output];
 
                 // a simple write should be sufficient but lets be safe
                 auto exp = WindowingDag::NodeState::Ready;
@@ -393,10 +371,12 @@ namespace apsi
                 // spin lock on the input nodes
                 for (size_t i = 0; i < 2; i++)
                 {
-                    while (state.nodes[node.inputs[i]] != WindowingDag::NodeState::Done);
+                    while (state.nodes[node.inputs[i]] != WindowingDag::NodeState::Done)
+                        ;
                 }
 
-                evaluator.multiply(batch_powers[node.inputs[0]], batch_powers[node.inputs[1]], batch_powers[node.output], pool);
+                evaluator.multiply(
+                    batch_powers[node.inputs[0]], batch_powers[node.inputs[1]], batch_powers[node.output], pool);
                 evaluator.relinearize_inplace(batch_powers[node.output], session_context.relin_keys_, pool);
 
                 // a simple write should be sufficient but lets be safe
@@ -413,7 +393,8 @@ namespace apsi
             // Iterate until all nodes are computed. We may want to do something smarter here.
             for (int i = 0; i < state.nodes.size(); ++i)
             {
-                while (state.nodes[i] != WindowingDag::NodeState::Done);
+                while (state.nodes[i] != WindowingDag::NodeState::Done)
+                    ;
             }
 
             auto end = dag.nodes.size() + batch_powers.size();
@@ -429,7 +410,8 @@ namespace apsi
         u64 WindowingDag::pow(u64 base, u64 e)
         {
             u64 r = 1;
-            while (e--) r *= base;
+            while (e--)
+                r *= base;
             return r;
         }
 
@@ -445,8 +427,9 @@ namespace apsi
                     opt_split = static_cast<int>(i1);
                     opt_deg = degrees[i1] + degrees[x - i1];
                 }
-                else if (degrees[i1] + degrees[x - i1] == opt_deg 
-                    && abs(degrees[i1] - degrees[x-i1]) < abs(degrees[opt_split] - degrees[x - opt_split]))
+                else if (
+                    degrees[i1] + degrees[x - i1] == opt_deg &&
+                    abs(degrees[i1] - degrees[x - i1]) < abs(degrees[opt_split] - degrees[x - opt_split]))
                 {
                     opt_split = static_cast<int>(i1);
                 }
@@ -454,7 +437,7 @@ namespace apsi
 
             degrees[x] = opt_deg;
 
-            return opt_split; 
+            return opt_split;
         }
 
         vector<u64> WindowingDag::conversion_to_digits(u64 input, int base)
@@ -515,7 +498,7 @@ namespace apsi
             // Validate the we did not exceed maximal supported degree.
             if (*std::max_element(degree.begin(), degree.end()) > max_degree_supported)
             {
-                Log::error("Degree exceeds maximal supported"); 
+                Log::error("Degree exceeds maximal supported");
                 throw invalid_argument("degree too large");
             }
 
@@ -524,11 +507,12 @@ namespace apsi
                 items_per[i] += items_per[i - 1];
             }
 
-            for (int i = 0; i < max_power; i++) {
+            for (int i = 0; i < max_power; i++)
+            {
                 Log::debug("items_per[%i] = %i", i, items_per[i]);
             }
 
-            // size = how many powers we still need to generate. 
+            // size = how many powers we still need to generate.
             int size = static_cast<int>(max_power - base_powers.size());
             nodes.resize(size);
 
@@ -539,7 +523,7 @@ namespace apsi
 
                 if (i1 && i2) // if encryption(y^i) is not given
                 {
-                    auto d = degree[i] - 1; 
+                    auto d = degree[i] - 1;
 
                     auto idx = items_per[d]++;
                     if (nodes[idx].output)
@@ -547,7 +531,7 @@ namespace apsi
                         throw std::runtime_error("");
                     }
 
-                    nodes[idx].inputs = { i1,i2 };
+                    nodes[idx].inputs = { i1, i2 };
                     nodes[idx].output = i;
                 }
             }

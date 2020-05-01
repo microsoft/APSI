@@ -9,7 +9,6 @@
 #include "zmqpp/zmqpp.hpp"
 #pragma warning(pop)
 
-
 namespace apsi
 {
     namespace network
@@ -19,7 +18,7 @@ namespace apsi
             return zmqpp::socket_type::dealer;
         }
 
-        void ReceiverChannel::set_socket_options(zmqpp::socket_t* socket)
+        void ReceiverChannel::set_socket_options(zmqpp::socket_t *socket)
         {
             // Ensure messages are not dropped
             socket->set(zmqpp::socket_option::receive_high_water_mark, 70000);

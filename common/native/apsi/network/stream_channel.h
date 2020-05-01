@@ -4,8 +4,8 @@
 #pragma once
 
 #include <istream>
-#include <ostream>
 #include <mutex>
+#include <ostream>
 #include "apsi/network/channel.h"
 
 namespace apsi
@@ -13,49 +13,49 @@ namespace apsi
     namespace network
     {
         /**
-        * Communication channel between Sender and Receiver through a Stream.
-        *
-        * No data is actually sent, it is all saved to a stringstream that can be accessed to get the data.
-        */
+         * Communication channel between Sender and Receiver through a Stream.
+         *
+         * No data is actually sent, it is all saved to a stringstream that can be accessed to get the data.
+         */
         class StreamChannel : public Channel
         {
         public:
             StreamChannel() = delete;
 
             /**
-            * Create an instance of StreamChannel using the given streams
-            */
-            StreamChannel(std::istream& istream, std::ostream& ostream);
+             * Create an instance of StreamChannel using the given streams
+             */
+            StreamChannel(std::istream &istream, std::ostream &ostream);
 
             /**
-            * Destroy an instance of StreamChannel
-            */
+             * Destroy an instance of StreamChannel
+             */
             virtual ~StreamChannel();
 
             /**
-            * Receive a Sender Operation.
-            */
-            virtual bool receive(std::shared_ptr<SenderOperation>& sender_op);
+             * Receive a Sender Operation.
+             */
+            virtual bool receive(std::shared_ptr<SenderOperation> &sender_op);
 
             /**
-            * Receive Get Parameters response from Sender
-            */
-            virtual bool receive(apsi::network::SenderResponseGetParameters& response);
+             * Receive Get Parameters response from Sender
+             */
+            virtual bool receive(apsi::network::SenderResponseGetParameters &response);
 
             /**
-            * Receive item preprocessing response from Sender
-            */
-            virtual bool receive(apsi::network::SenderResponsePreprocess& response);
+             * Receive item preprocessing response from Sender
+             */
+            virtual bool receive(apsi::network::SenderResponsePreprocess &response);
 
             /**
-            * Receive Query response from Sender
-            */
-            virtual bool receive(apsi::network::SenderResponseQuery& response);
+             * Receive Query response from Sender
+             */
+            virtual bool receive(apsi::network::SenderResponseQuery &response);
 
             /**
             Receive a ResultPackage structure
             */
-            virtual bool receive(apsi::ResultPackage& pkg);
+            virtual bool receive(apsi::ResultPackage &pkg);
 
             /**
             Send a request to Get Parameters from Sender
@@ -65,38 +65,39 @@ namespace apsi
             /**
             Send a response to a request to Get Parameters
             */
-            virtual void send_get_parameters_response(const std::vector<seal::SEAL_BYTE>& client_id, const PSIParams& params);
+            virtual void send_get_parameters_response(
+                const std::vector<seal::SEAL_BYTE> &client_id, const PSIParams &params);
 
             /**
             Send a request to Preprocess items on Sender
             */
-            virtual void send_preprocess(const std::vector<seal::SEAL_BYTE>& buffer);
+            virtual void send_preprocess(const std::vector<seal::SEAL_BYTE> &buffer);
 
             /**
-            * Send a response to a request to Preprocess items
-            */
-            virtual void send_preprocess_response(const std::vector<seal::SEAL_BYTE>& client_id, const std::vector<seal::SEAL_BYTE>& buffer);
+             * Send a response to a request to Preprocess items
+             */
+            virtual void send_preprocess_response(
+                const std::vector<seal::SEAL_BYTE> &client_id, const std::vector<seal::SEAL_BYTE> &buffer);
 
             /**
-            * Send a request for a Query response to Sender
-            */
+             * Send a request for a Query response to Sender
+             */
             virtual void send_query(
-                const std::string& relin_keys,
-                const std::map<u64, std::vector<std::string>>& query);
+                const std::string &relin_keys, const std::map<u64, std::vector<std::string>> &query);
 
             /**
             Send a response to a Query request
             */
-            virtual void send_query_response(const std::vector<seal::SEAL_BYTE>& client_id, const size_t package_count);
+            virtual void send_query_response(const std::vector<seal::SEAL_BYTE> &client_id, const size_t package_count);
 
             /**
-            * Send a ResultPackage structure
-            */
-            virtual void send(const std::vector<seal::SEAL_BYTE>& client_id, const ResultPackage& pkg);
+             * Send a ResultPackage structure
+             */
+            virtual void send(const std::vector<seal::SEAL_BYTE> &client_id, const ResultPackage &pkg);
 
         protected:
-            std::istream& istream_;
-            std::ostream& ostream_;
+            std::istream &istream_;
+            std::ostream &ostream_;
 
         private:
             std::unique_ptr<std::mutex> receive_mutex_;
@@ -115,30 +116,27 @@ namespace apsi
             /**
             Write a string
             */
-            void write_string(const std::string& str);
+            void write_string(const std::string &str);
 
             /**
             Read a string
             */
-            void read_string(std::string& str);
+            void read_string(std::string &str);
 
             /**
             Decode a Get Parameters message
             */
-            std::shared_ptr<SenderOperation>
-                decode_get_parameters();
+            std::shared_ptr<SenderOperation> decode_get_parameters();
 
             /**
             Decode a Preprocess message
             */
-            std::shared_ptr<SenderOperation>
-                decode_preprocess();
+            std::shared_ptr<SenderOperation> decode_preprocess();
 
             /**
             Decode a Query message
             */
-            std::shared_ptr<SenderOperation>
-                decode_query();
+            std::shared_ptr<SenderOperation> decode_query();
         }; // class StreamChannel
-    } // namespace network
+    }      // namespace network
 } // namespace apsi

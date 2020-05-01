@@ -3,21 +3,21 @@
 
 #pragma once
 
-#include <stdexcept>
 #include <seal/intarray.h>
 #include <seal/memorymanager.h>
+#include <stdexcept>
 #include "apsi/oprf/oprf_common.h"
 
 namespace apsi
 {
-    namespace oprf 
+    namespace oprf
     {
         class OPRFReceiver
         {
         public:
             OPRFReceiver(const OPRFReceiver &) = delete;
 
-            OPRFReceiver &operator =(const OPRFReceiver &) = delete;
+            OPRFReceiver &operator=(const OPRFReceiver &) = delete;
 
             OPRFReceiver(
                 gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items,
@@ -55,7 +55,7 @@ namespace apsi
 
                 FactorData(const FactorData &) = delete;
 
-                FactorData &operator =(const FactorData &) = delete;
+                FactorData &operator=(const FactorData &) = delete;
 
                 inline void resize(std::size_t item_count = 0)
                 {
@@ -70,36 +70,30 @@ namespace apsi
 
                 inline void clear()
                 {
-                    factor_data_ = {
-                        seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true) };
+                    factor_data_ = { seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true) };
                     item_count_ = 0;
                 }
 
-                auto get_factor(std::size_t index)
-                    -> ECPoint::scalar_span_type
+                auto get_factor(std::size_t index) -> ECPoint::scalar_span_type
                 {
                     if (index >= item_count_)
                     {
                         throw std::invalid_argument("index out of bounds");
                     }
-                    return factor_data_.span().subspan(
-                        index * factor_size, factor_size);
+                    return factor_data_.span().subspan(index * factor_size, factor_size);
                 }
 
-                auto get_factor(std::size_t index) const
-                    -> ECPoint::scalar_span_const_type
+                auto get_factor(std::size_t index) const -> ECPoint::scalar_span_const_type
                 {
                     if (index >= item_count_)
                     {
                         throw std::invalid_argument("index out of bounds");
                     }
-                    return factor_data_.span().subspan(
-                        index * factor_size, factor_size);
+                    return factor_data_.span().subspan(index * factor_size, factor_size);
                 }
 
             private:
-                seal::IntArray<u8> factor_data_{
-                    seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true) };
+                seal::IntArray<u8> factor_data_{ seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true) };
 
                 std::size_t item_count_ = 0;
             };
@@ -108,8 +102,8 @@ namespace apsi
             {
                 inv_factor_data_.resize(item_count);
             }
-            
+
             FactorData inv_factor_data_;
         }; // class OPRFReceiver
-    } // namespace oprf
+    }      // namespace oprf
 } // namespace apsi

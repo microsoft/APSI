@@ -3,9 +3,9 @@
 
 #pragma once
 
+#include <seal/batchencoder.h>
 #include <seal/context.h>
 #include <seal/plaintext.h>
-#include <seal/batchencoder.h>
 #include "apsi/ffield/ffield_array.h"
 
 namespace apsi
@@ -13,8 +13,7 @@ namespace apsi
     class FFieldBatchEncoder
     {
     public:
-        FFieldBatchEncoder(
-            std::shared_ptr<seal::SEALContext> context, FField field);
+        FFieldBatchEncoder(std::shared_ptr<seal::SEALContext> context, FField field);
 
         inline seal::SmallModulus ch() const
         {

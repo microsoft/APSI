@@ -3,8 +3,8 @@
 
 #pragma once
 
-#include <string>
 #include <cstdarg>
+#include <string>
 
 namespace apsi
 {
@@ -33,20 +33,20 @@ namespace apsi
             */
             Log() = delete;
 
-            static void info(const char* format, ...);
-            static void debug(const char* format, ...);
-            static void warning(const char* format, ...);
-            static void error(const char* format, ...);
+            static void info(const char *format, ...);
+            static void debug(const char *format, ...);
+            static void warning(const char *format, ...);
+            static void error(const char *format, ...);
 
             static void set_log_level(Level level);
-            static void set_log_level(const std::string& level);
-            static void set_log_file(const std::string& file);
+            static void set_log_level(const std::string &level);
+            static void set_log_file(const std::string &file);
             static void set_console_disabled(bool console_disabled);
 
             static void terminate();
 
         private:
-            static void format_msg(std::string& msg, const char* format, va_list ap);
+            static void format_msg(std::string &msg, const char *format, va_list ap);
         }; // class Log
-    } // namespace logging
+    }      // namespace logging
 } // namespace apsi

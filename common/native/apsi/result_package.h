@@ -9,9 +9,9 @@
 namespace apsi
 {
     /**
-    * Structure used to communicate results between Sender
-    * and Receiver
-    */
+     * Structure used to communicate results between Sender
+     * and Receiver
+     */
     struct ResultPackage
     {
         i64 split_idx;
@@ -22,9 +22,7 @@ namespace apsi
         // Calculate size of data in the structure
         u64 size() const
         {
-            return sizeof(i64) * 2 +
-                data.length() +
-                label_data.length();
+            return sizeof(i64) * 2 + data.length() + label_data.length();
         }
     }; // struct ResultPackage
 } // namespace apsi

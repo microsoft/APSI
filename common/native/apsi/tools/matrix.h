@@ -10,11 +10,11 @@ namespace apsi
 {
     /**
      * Simple bi-dimensional Matrix.
-     * 
+     *
      * - Deletes its data when destroyed.
      * - Allows resizing.
      */
-    template<class T>
+    template <class T>
     class Matrix : public MatrixView<T>
     {
     public:
@@ -52,7 +52,10 @@ namespace apsi
          * Get the actual size of the backing vector. This might be different
          * from the logical size, specially if the matrix has been resized.
          */
-        std::size_t capacity() const { return data_.size(); }
+        std::size_t capacity() const
+        {
+            return data_.size();
+        }
 
     private:
         std::vector<T> data_;

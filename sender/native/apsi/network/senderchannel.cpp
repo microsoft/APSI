@@ -18,7 +18,7 @@ namespace apsi
             return zmqpp::socket_type::router;
         }
 
-        void SenderChannel::set_socket_options(zmqpp::socket_t* socket)
+        void SenderChannel::set_socket_options(zmqpp::socket_t *socket)
         {
             // Ensure messages are not dropped
             socket->set(zmqpp::socket_option::send_high_water_mark, 70000);

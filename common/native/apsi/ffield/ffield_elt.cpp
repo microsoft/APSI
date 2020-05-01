@@ -10,11 +10,7 @@ namespace apsi
 {
     namespace details
     {
-        void copy_with_bit_offset(
-            gsl::span<const u8> src,
-            i32 bitOffset,
-            i32 bitLength,
-            gsl::span<u8> dest)
+        void copy_with_bit_offset(gsl::span<const u8> src, i32 bitOffset, i32 bitLength, gsl::span<u8> dest)
         {
             // the number of bits to shift by to align with dest
             auto lowOffset = bitOffset & 7;
@@ -26,20 +22,20 @@ namespace apsi
             auto wordBegin = bitOffset >> 3;
 
             auto remBits = bitLength - fullByteCount * 8;
-    #ifndef NDEBUG
+#ifndef NDEBUG
             if (bitOffset + bitLength > src.size() * 8)
-                    throw invalid_argument("invalid split_length, or index out of range");
+                throw invalid_argument("invalid split_length, or index out of range");
             if (bitLength > dest.size() * 8)
-                    throw invalid_argument("bit length too long for dest");
-    #endif
+                throw invalid_argument("bit length too long for dest");
+#endif
             if (lowOffset)
             {
-                // lowOffset mean we need to shift the bytes. 
+                // lowOffset mean we need to shift the bytes.
                 // Populates all of the full bytes in dest.
                 int i = 0;
                 while (i < fullByteCount)
                 {
-                    u8  low = src[wordBegin + 0] >> lowOffset;
+                    u8 low = src[wordBegin + 0] >> lowOffset;
                     u8 high = src[wordBegin + 1] << (8 - lowOffset);
                     dest[i] = low | high;
                     wordBegin++;
@@ -55,12 +51,12 @@ namespace apsi
 
             // we are now done with
             // dest[0], ..., dest[fullByteCount - 1].
-            // 
-            // what remains is to populate dest[fullByteCount] 
+            //
+            // what remains is to populate dest[fullByteCount]
             // if needed there are some remaining bits.
             if (remBits)
             {
-                auto& destWord = dest[fullByteCount];
+                auto &destWord = dest[fullByteCount];
 
                 // we now populate the last u8 of dest. Branch on
                 // if the src bits are contained in a single u8 or
@@ -82,13 +78,13 @@ namespace apsi
                 }
                 else
                 {
-                    //extract the top bits out of src[wordBegin].
+                    // extract the top bits out of src[wordBegin].
                     // these will become the bottom bits of destWord
                     auto lowCount = 8 - lowOffset;
                     u8 lowMask = (1 << lowCount) - 1;
                     auto low = (src[wordBegin] >> lowOffset) & lowMask;
 
-                    //extract the bottom bits out of src[wordBegin + 1].
+                    // extract the bottom bits out of src[wordBegin + 1].
                     // these will become the middle bits of destWord
                     auto midCount = remBits - lowCount;
                     u8 midMask = (1 << midCount) - 1;
@@ -105,17 +101,13 @@ namespace apsi
         };
 
         // Copies bitLength bits from src starting at the bit index by srcBitOffset.
-        // Bits are written to dest starting at the destBitOffset bit. All other bits in 
+        // Bits are written to dest starting at the destBitOffset bit. All other bits in
         // dest are unchanged, e.g. the bit indexed by [0,1,...,destBitOffset - 1], [destBitOffset + bitLength, ...]
         void copy_with_bit_offset(
-            gsl::span<const u8> src,
-            i32 srcBitOffset,
-            i32 destBitOffset,
-            i32 bitLength,
-            gsl::span<u8> dest)
+            gsl::span<const u8> src, i32 srcBitOffset, i32 destBitOffset, i32 bitLength, gsl::span<u8> dest)
         {
-                i32 destNext = (destBitOffset + 7) >> 3;
-                i32 diff = destNext * 8 - destBitOffset;
+            i32 destNext = (destBitOffset + 7) >> 3;
+            i32 diff = destNext * 8 - destBitOffset;
 
             if (bitLength - diff > 0)
             {
@@ -133,7 +125,7 @@ namespace apsi
                 auto destOffset = destBitOffset & 7;
                 auto srcOffset = srcBitOffset & 7;
                 auto highDiff = srcOffset + diff - 8;
-                auto& destVal = dest[destBegin];
+                auto &destVal = dest[destBegin];
 
                 if (highDiff <= 0)
                 {

@@ -1,8 +1,8 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "gtest/gtest.h"
 #include "apsi/tools/csvreader.h"
+#include "gtest/gtest.h"
 #include "utils.h"
 
 using namespace std;
@@ -275,4 +275,4 @@ namespace APSITests
     {
         ASSERT_ANY_THROW(CSVReader reader("this file should not exist"));
     }
-}
+} // namespace APSITests

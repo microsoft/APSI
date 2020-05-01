@@ -7,7 +7,7 @@
 //
 // This API is provided as a simple interface for the APSI library
 // that can be PInvoked by .Net code.
-// 
+//
 ///////////////////////////////////////////////////////////////////////////
 
 #ifdef _MSC_VER
@@ -29,7 +29,7 @@ Connect a Receiver to the given address and port.
 Connecting will internally create a Receiver instance
 and initialize it by performing a handshake with the Sender.
 */
-APSIEXPORT bool APSICALL ReceiverConnect(char* address, int port);
+APSIEXPORT bool APSICALL ReceiverConnect(char *address, int port);
 
 /**
 Disconnect a Receiver.
@@ -47,4 +47,4 @@ Perform a Query for the given items.
 The 'result' array consist of booleans encoded as integers. Any value other than 0
 is considered 'true', 0 is considered as 'false'.
 */
-APSIEXPORT bool APSICALL ReceiverQuery(int length, u64apsi* items, int* result, u64apsi* labels);
+APSIEXPORT bool APSICALL ReceiverQuery(int length, u64apsi *items, int *result, u64apsi *labels);

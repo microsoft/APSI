@@ -1,10 +1,10 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include <array>
-#include <vector>
-#include <numeric>
 #include "apsi/tools/utils.h"
+#include <array>
+#include <numeric>
+#include <vector>
 
 using namespace std;
 
@@ -34,14 +34,15 @@ namespace apsi
                 ldouble sum = 0.0;
                 ldouble sec = 0.0;
                 u64 i = 0;
-                ldouble back = pow((1 - static_cast<ldouble>(1.0) / num_bins), num_balls); 
+                ldouble back = pow((1 - static_cast<ldouble>(1.0) / num_bins), num_balls);
 
                 while (i <= bin_size)
                 {
-                    // a(i) = a(i-1) * stuff. 
+                    // a(i) = a(i-1) * stuff.
                     sum += back;
-                    back *= static_cast<ldouble>(num_balls - i) / (static_cast<ldouble>(i + 1) * static_cast<ldouble>(num_bins - 1));
-                    ldouble sec2 = log2(static_cast<ldouble>(num_bins)* (1 - sum)); 
+                    back *= static_cast<ldouble>(num_balls - i) /
+                            (static_cast<ldouble>(i + 1) * static_cast<ldouble>(num_bins - 1));
+                    ldouble sec2 = log2(static_cast<ldouble>(num_bins) * (1 - sum));
                     sec = sec2;
                     i++;
                 }
@@ -81,7 +82,7 @@ namespace apsi
 
                 return B;
             }
-        }
+        } // namespace
 
         u64 optimal_split(const u64 x, const int base)
         {
@@ -114,7 +115,8 @@ namespace apsi
         u64 maximal_power(const u64 degree, const u64 bound, const u64 base)
         {
             // base must be positive
-            if (base < 0) throw invalid_argument("base must be a positive integer");
+            if (base < 0)
+                throw invalid_argument("base must be a positive integer");
 
             // if d >= k-1, use the first formula.
             if (bound <= degree + 1)
@@ -123,7 +125,7 @@ namespace apsi
                 return static_cast<u64>(result);
             }
             else
-            { // when d < k -1 i.e. k > d+1. 
+            { // when d < k -1 i.e. k > d+1.
                 return maximal_power(degree, degree + 1, base);
             }
             return u64();
@@ -161,14 +163,10 @@ namespace apsi
         }
 
         u64 compute_sender_bin_size(
-            u32 log_table_size, u64 sender_set_size,
-            u32 hash_func_count, u32 binning_sec_level, u32 split_count)
+            u32 log_table_size, u64 sender_set_size, u32 hash_func_count, u32 binning_sec_level, u32 split_count)
         {
             return round_up_to(
-                get_bin_size(
-                    1ull << log_table_size,
-                    sender_set_size * hash_func_count,
-                    binning_sec_level),
+                get_bin_size(1ull << log_table_size, sender_set_size * hash_func_count, binning_sec_level),
                 static_cast<u64>(split_count));
         }
     } // namespace tools
