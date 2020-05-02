@@ -101,7 +101,7 @@ namespace apsi
 
             // Make the ciphertext non-transparent
             powers[0][0].resize(2);
-            for (size_t i = 0; i < powers[0][0].coeff_mod_count(); i++)
+            for (size_t i = 0; i < powers[0][0].coeff_modulus_size(); i++)
             {
                 powers[0][0].data(1)[i * powers[0][0].poly_modulus_degree()] = 1;
             }
@@ -542,7 +542,7 @@ namespace apsi
             next_node = make_unique<std::atomic<int>>();
             *next_node = 0;
             node_state_storage = make_unique<std::atomic<NodeState>[]>(dag.max_power + 1);
-            nodes = { node_state_storage.get(), dag.max_power + 1 };
+            nodes = { node_state_storage.get(), static_cast<size_t>(dag.max_power + 1) };
 
             for (auto &n : nodes)
             {

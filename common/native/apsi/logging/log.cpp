@@ -17,26 +17,24 @@
 using namespace std;
 using namespace log4cplus;
 
-#define CheckLogLevel(log_level)                      \
-    {                                                 \
-        configure_if_needed();                        \
-        Logger &logger = Logger::getInstance("APSI"); \
-        if (logger.getLogLevel() > log_level)         \
-        {                                             \
-            return;                                   \
-        }                                             \
+#define CheckLogLevel(log_level)                                    \
+    {                                                               \
+        configure_if_needed();                                      \
+        if (Logger::getInstance("APSI").getLogLevel() > log_level)  \
+        {                                                           \
+            return;                                                 \
+        }                                                           \
     }
 
-#define FormatLogMessage(format, log_level)           \
-    {                                                 \
-        string msg;                                   \
-        va_list ap;                                   \
-        va_start(ap, format);                         \
-        format_msg(msg, format, ap);                  \
-        va_end(ap);                                   \
-        configure_if_needed();                        \
-        Logger &logger = Logger::getInstance("APSI"); \
-        logger.log(log_level, msg);                   \
+#define FormatLogMessage(format, log_level)             \
+    {                                                   \
+        string msg;                                     \
+        va_list ap;                                     \
+        va_start(ap, format);                           \
+        format_msg(msg, format, ap);                    \
+        va_end(ap);                                     \
+        configure_if_needed();                          \
+        Logger::getInstance("APSI").log(log_level, msg);\
     }
 
 constexpr auto MSG_BUFFER_LEN = 512;
@@ -88,24 +86,21 @@ namespace apsi
             {
                 SharedAppenderPtr appender(new ConsoleAppender);
                 appender->setLayout(make_unique<PatternLayout>("%-5p %D{%H:%M:%S:%Q}: %m%n"));
-                Logger &logger = Logger::getInstance("APSI");
-                logger.addAppender(appender);
+                Logger::getInstance("APSI").addAppender(appender);
             }
 
             if (!get_log_properties().log_file.empty())
             {
                 SharedAppenderPtr appender(new RollingFileAppender(get_log_properties().log_file));
                 appender->setLayout(make_unique<PatternLayout>("%-5p %D{%H:%M:%S:%Q}: %m%n"));
-                Logger &logger = Logger::getInstance("APSI");
-                logger.addAppender(appender);
+                Logger::getInstance("APSI").addAppender(appender);
             }
 
             if (get_log_properties().disable_console && get_log_properties().log_file.empty())
             {
                 // Log4CPlus needs at least one appender. Use the null appender if the user doesn't want any output.
                 SharedAppenderPtr appender(new NullAppender());
-                Logger &logger = Logger::getInstance("APSI");
-                logger.addAppender(appender);
+                Logger::getInstance("APSI").addAppender(appender);
             }
 
             get_log_properties().configured = true;
@@ -168,8 +163,7 @@ namespace apsi
                 throw invalid_argument("Unknown log level");
             }
 
-            Logger &logger = Logger::getInstance("APSI");
-            logger.setLogLevel(actual);
+            Logger::getInstance("APSI").setLogLevel(actual);
         }
 
         void Log::set_log_file(const string &file)

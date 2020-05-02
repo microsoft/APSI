@@ -128,15 +128,15 @@ namespace apsi
                 return false;
 
             // Size of buffer
-            u64 size;
-            istream_.read(reinterpret_cast<char *>(&size), sizeof(u64));
+            streamsize size;
+            istream_.read(reinterpret_cast<char *>(&size), sizeof(streamsize));
 
             // Actual buffer
             response.buffer.resize(static_cast<size_t>(size));
             istream_.read(reinterpret_cast<char *>(response.buffer.data()), size);
 
-            bytes_received_ += sizeof(u64);
-            bytes_received_ += size;
+            bytes_received_ += sizeof(streamsize);
+            bytes_received_ += static_cast<u64>(size);
 
             return true;
         }
@@ -147,14 +147,14 @@ namespace apsi
             write_operation_type(SOP_preprocess);
 
             // Size of buffer
-            u64 size = static_cast<u64>(buffer.size());
-            ostream_.write(reinterpret_cast<const char *>(&size), sizeof(u64));
+            streamsize size = static_cast<streamsize>(buffer.size());
+            ostream_.write(reinterpret_cast<const char *>(&size), sizeof(streamsize));
 
             // Actual buffer
             ostream_.write(reinterpret_cast<const char *>(buffer.data()), size);
 
-            bytes_sent_ += sizeof(u64);
-            bytes_sent_ += size;
+            bytes_sent_ += sizeof(streamsize);
+            bytes_sent_ += static_cast<u64>(size);
         }
 
         void StreamChannel::send_preprocess_response(
@@ -166,14 +166,14 @@ namespace apsi
             write_operation_type(SOP_preprocess);
 
             // Size of buffer
-            u64 size = static_cast<u64>(buffer.size());
-            ostream_.write(reinterpret_cast<const char *>(&size), sizeof(u64));
+            streamsize size = static_cast<streamsize>(buffer.size());
+            ostream_.write(reinterpret_cast<const char *>(&size), sizeof(streamsize));
 
             // Actual buffer
             ostream_.write(reinterpret_cast<const char *>(buffer.data()), size);
 
-            bytes_sent_ += sizeof(u64);
-            bytes_sent_ += size;
+            bytes_sent_ += sizeof(streamsize);
+            bytes_sent_ += static_cast<u64>(size);
         }
 
         bool StreamChannel::receive(SenderResponseQuery &response)
@@ -275,24 +275,24 @@ namespace apsi
 
         void StreamChannel::write_string(const string &str)
         {
-            u64 size = static_cast<u64>(str.length());
-            ostream_.write(reinterpret_cast<const char *>(&size), sizeof(u64));
+            streamsize size = static_cast<streamsize>(str.length());
+            ostream_.write(reinterpret_cast<const char *>(&size), sizeof(streamsize));
             ostream_.write(str.data(), size);
 
-            bytes_sent_ += sizeof(u64);
-            bytes_sent_ += size;
+            bytes_sent_ += sizeof(streamsize);
+            bytes_sent_ += static_cast<u64>(size);
         }
 
         void StreamChannel::read_string(string &str)
         {
-            u64 size;
-            istream_.read(reinterpret_cast<char *>(&size), sizeof(u64));
+            streamsize size;
+            istream_.read(reinterpret_cast<char *>(&size), sizeof(streamsize));
 
             str.resize(static_cast<size_t>(size));
             istream_.read(&str[0], size);
 
-            bytes_received_ += sizeof(u64);
-            bytes_received_ += size;
+            bytes_received_ += sizeof(streamsize);
+            bytes_received_ += static_cast<u64>(size);
         }
 
         shared_ptr<SenderOperation> StreamChannel::decode_get_parameters()
@@ -304,8 +304,8 @@ namespace apsi
         shared_ptr<SenderOperation> StreamChannel::decode_preprocess()
         {
             vector<SEAL_BYTE> buffer;
-            u64 size;
-            istream_.read(reinterpret_cast<char *>(&size), sizeof(u64));
+            streamsize size;
+            istream_.read(reinterpret_cast<char *>(&size), sizeof(streamsize));
 
             buffer.resize(static_cast<size_t>(size));
             istream_.read(reinterpret_cast<char *>(buffer.data()), size);

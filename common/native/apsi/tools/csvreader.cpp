@@ -45,10 +45,10 @@ namespace apsi
             // Transfer temp_labels to real labels, if needed
             if (label_byte_count > 0 && temp_labels.size() > 0)
             {
-                labels.resize(temp_labels.size(), label_byte_count, 1);
+                labels.resize(temp_labels.size(), static_cast<size_t>(label_byte_count), 1);
                 for (size_t i = 0; i < temp_labels.size(); i++)
                 {
-                    memcpy(labels[i].data(), temp_labels[i].data(), label_byte_count);
+                    memcpy(labels[i].data(), temp_labels[i].data(), static_cast<size_t>(label_byte_count));
                 }
             }
         }

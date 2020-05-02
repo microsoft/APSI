@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
-find_path(FOURQ_INCLUDE_DIR NAMES FourQ.h)
+find_path(FOURQ_INCLUDE_DIR NAMES FourQ/FourQ.h)
 find_library(FOURQ_LIBRARY_PATH NAMES FourQ)
 
 find_package(PackageHandleStandardArgs)

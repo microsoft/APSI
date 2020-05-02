@@ -308,7 +308,7 @@ namespace apsi
                 throw std::invalid_argument("Sender bin size must be a multiple of number of splits.");
             }
             if ((item_bit_count() + 63) / 64 !=
-                (item_bit_count() + static_cast<int>(floor(log2(hash_func_count()))) + 1 + 1 + 63) / 64)
+                (item_bit_count() + static_cast<u32>(floor(log2(hash_func_count()))) + 1 + 1 + 63) / 64)
             {
                 throw std::invalid_argument("Invalid for cuckoo: null bit and location index overflow to new u64.");
             }
@@ -323,7 +323,7 @@ namespace apsi
                                       "appropriate Cuckoo hashing.");
             }
             u64 supported_bitcount =
-                ((u64)ffield_degree()) * (seal_params_.encryption_params.plain_modulus().bit_count() - 1);
+                static_cast<u64>(ffield_degree()) * static_cast<u64>(seal_params_.encryption_params.plain_modulus().bit_count() - 1);
             if (item_bit_length_used_after_oprf() > supported_bitcount)
             {
                 logging::Log::warning(

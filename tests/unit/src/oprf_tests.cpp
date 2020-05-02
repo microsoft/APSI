@@ -25,15 +25,15 @@ namespace APSITests
         // Set the key to zero
         oprf_key.clear();
         auto oprf_key_span = oprf_key.key_span();
-        ASSERT_TRUE(all_of(oprf_key_span.cbegin(), oprf_key_span.cend(), [](auto a) { return a == 0; }));
+        ASSERT_TRUE(all_of(oprf_key_span.begin(), oprf_key_span.end(), [](auto a) { return a == 0; }));
 
         // Create some new random keys
         oprf_key.create();
-        ASSERT_FALSE(all_of(oprf_key_span.cbegin(), oprf_key_span.cend(), [](auto a) { return a == 0; }));
+        ASSERT_FALSE(all_of(oprf_key_span.begin(), oprf_key_span.end(), [](auto a) { return a == 0; }));
         OPRFKey oprf_key2;
         auto oprf_key2_span = oprf_key2.key_span();
-        ASSERT_FALSE(all_of(oprf_key2_span.cbegin(), oprf_key2_span.cend(), [](auto a) { return a == 0; }));
-        ASSERT_FALSE(equal(oprf_key_span.cbegin(), oprf_key_span.cend(), oprf_key2_span.cbegin()));
+        ASSERT_FALSE(all_of(oprf_key2_span.begin(), oprf_key2_span.end(), [](auto a) { return a == 0; }));
+        ASSERT_FALSE(equal(oprf_key_span.begin(), oprf_key_span.end(), oprf_key2_span.begin()));
 
         // Set up seeded PRNG
         shared_ptr<UniformRandomGeneratorFactory> rg =
@@ -42,9 +42,9 @@ namespace APSITests
         auto oprf_key3_span = oprf_key3.key_span();
         OPRFKey oprf_key4(rg);
         auto oprf_key4_span = oprf_key4.key_span();
-        ASSERT_FALSE(all_of(oprf_key3_span.cbegin(), oprf_key3_span.cend(), [](auto a) { return a == 0; }));
-        ASSERT_FALSE(all_of(oprf_key4_span.cbegin(), oprf_key4_span.cend(), [](auto a) { return a == 0; }));
-        ASSERT_TRUE(equal(oprf_key3_span.cbegin(), oprf_key3_span.cend(), oprf_key4_span.cbegin()));
+        ASSERT_FALSE(all_of(oprf_key3_span.begin(), oprf_key3_span.end(), [](auto a) { return a == 0; }));
+        ASSERT_FALSE(all_of(oprf_key4_span.begin(), oprf_key4_span.end(), [](auto a) { return a == 0; }));
+        ASSERT_TRUE(equal(oprf_key3_span.begin(), oprf_key3_span.end(), oprf_key4_span.begin()));
     }
 
     TEST(OPRFTests, OPRFKeySaveLoad)
@@ -57,7 +57,7 @@ namespace APSITests
 
         auto oprf_key_span = oprf_key.key_span();
         auto oprf_key2_span = oprf_key2.key_span();
-        ASSERT_TRUE(equal(oprf_key_span.cbegin(), oprf_key_span.cend(), oprf_key2_span.cbegin()));
+        ASSERT_TRUE(equal(oprf_key_span.begin(), oprf_key_span.end(), oprf_key2_span.begin()));
     }
 
     TEST(OPRFTests, OPRFOperation)

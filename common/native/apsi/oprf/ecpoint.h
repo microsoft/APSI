@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <FourQ.h>
+#include <FourQ/FourQ.h>
 #include <array>
 #include <cstddef>
 #include <cstring>
@@ -81,7 +81,7 @@ namespace apsi
 
         private:
             // Initialize to neutral element
-            point_t pt_ = { { 0, 1 } }; // { {.x = { 0 }, .y = { 1 } }};
+            point_t pt_ = { { {{0}}, {{1}} } }; // { {.x = { 0 }, .y = { 1 } }};
         };                              // class ECPoint
     }                                   // namespace oprf
 } // namespace apsi

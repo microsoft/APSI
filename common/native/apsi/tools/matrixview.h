@@ -13,7 +13,7 @@ namespace apsi
     class MatrixView
     {
         // For iterating through the elements in the view
-        using iterator = gsl::details::span_iterator<gsl::span<T>, false>;
+        using iterator = gsl::details::span_iterator<T>;
 
     public:
         MatrixView() = default;

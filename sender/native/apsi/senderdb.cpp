@@ -367,7 +367,7 @@ namespace apsi
                 auto &block = db_blocks_.data()[next_block];
                 block.symmetric_polys(context, encoding_bit_length_, neg_null_element_);
                 block.batch_random_symm_poly_ = { &batch_random_symm_poly_storage_[indexer(split, batch)],
-                                                  split_size_plus_one };
+                                                  static_cast<size_t>(split_size_plus_one) };
 
                 for (int i = 0; i < split_size_plus_one; i++)
                 {

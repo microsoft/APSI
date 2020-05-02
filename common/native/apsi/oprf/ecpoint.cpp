@@ -2,7 +2,7 @@
 // Licensed under the MIT license.
 
 #include "apsi/oprf/ecpoint.h"
-#include <FourQ_internal.h>
+#include <FourQ/FourQ_internal.h>
 #include <algorithm>
 #include <functional>
 #include <seal/util/blake2.h>

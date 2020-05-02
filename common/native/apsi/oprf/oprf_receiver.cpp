@@ -25,7 +25,7 @@ namespace apsi
             {
                 // Create an elliptic curve point from the item
                 ECPoint ecpt(
-                    { reinterpret_cast<const u8 *>(oprf_items[static_cast<ptrdiff_t>(i)].data()), oprf_item_size });
+                    { reinterpret_cast<const u8 *>(oprf_items[i].data()), oprf_item_size });
 
                 // Create a random scalar for OPRF and save its inverse
                 ECPoint::scalar_type random_scalar;

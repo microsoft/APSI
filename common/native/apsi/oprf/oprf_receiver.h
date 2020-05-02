@@ -80,7 +80,7 @@ namespace apsi
                     {
                         throw std::invalid_argument("index out of bounds");
                     }
-                    return factor_data_.span().subspan(index * factor_size, factor_size);
+                    return ECPoint::scalar_span_type(factor_data_.span().subspan(index * factor_size, factor_size).data(), factor_size);
                 }
 
                 auto get_factor(std::size_t index) const -> ECPoint::scalar_span_const_type
@@ -89,7 +89,7 @@ namespace apsi
                     {
                         throw std::invalid_argument("index out of bounds");
                     }
-                    return factor_data_.span().subspan(index * factor_size, factor_size);
+                    return ECPoint::scalar_span_const_type(factor_data_.span().subspan(index * factor_size, factor_size).data(), factor_size);
                 }
 
             private:

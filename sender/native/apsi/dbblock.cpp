@@ -44,7 +44,6 @@ namespace apsi
 
             int idx = 0;
             auto start = bin_idx * items_per_split_;
-            auto end = (bin_idx + 1) * items_per_split_;
 
             // If still failed, try to do linear scan
             for (int i = 0; i < items_per_split_; ++i)
@@ -160,7 +159,7 @@ namespace apsi
 
                         auto src = get_label(pos);
                         temp.encode(
-                            gsl::span<u8>{ src, static_cast<ptrdiff_t>(value_byte_length_) }, params.label_bit_count());
+                            gsl::span<u8>{ src, static_cast<size_t>(value_byte_length_) }, params.label_bit_count());
                         y.set(size, temp);
 
                         ++size;
