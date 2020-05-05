@@ -160,6 +160,9 @@ endmacro()
 #########################
 # External Dependencies #
 #########################
+
+set(THIRDPARTY_DIR ${APSI_SOURCE_DIR}/thirdparty)
+
 # TODO: external dependencies are currently installed manually.
 set(FOURQ_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindFourQ.cmake)
 set(MSGSL_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindMSGSL.cmake)
@@ -185,7 +188,7 @@ if(FourQ_ROOT)
     unset(FOURQ_LIBRARY_PATH CACHE)
 endif()
 find_package(FourQ MODULE REQUIRED)
-find_package(log4cplus 3.0 REQUIRED)
+##find_package(log4cplus 3.0 REQUIRED)
 
 # Microsoft SEAL + MSGSL + ZLIB
 # MSGSL and ZLIB should be installed with Microsoft SEAL
@@ -205,43 +208,105 @@ endif()
 # FourQ
 
 # Log4cplus
+# Download and configure
+if(NOT MSVC)
+    message(STATUS "Setting up log4cplus ...")
 
-# Use Google Test
-if(APSI_BUILD_TESTS)
-    # This follows the example in
-    # https://github.com/google/googletest/blob/release-1.10.0/googletest/README.md.
+    if(NOT CMAKE_TOOLCHAIN_FILE)
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+            OUTPUT_QUIET
+            RESULT_VARIABLE result
+            WORKING_DIRECTORY ${THIRDPARTY_DIR}/log4cplus)
+    else()
+        create_cache_entries(${THIRDPARTY_DIR}/log4cplus)
+        if(EXISTS ${THIRDPARTY_DIR}/log4cplus/CMakeCache.txt)
+            # Force regenerating make files. When cross compiling we might be
+            # compiling more than one platform at a time.
+            file(REMOVE ${THIRDPARTY_DIR}/log4cplus/CMakeCache.txt)
+        endif()
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" . -Ccache_init.txt
+            OUTPUT_QUIET
+            RESULT_VARIABLE result
+            WORKING_DIRECTORY ${THIRDPARTY_DIR}/log4cplus)
+    endif()
+    if(result)
+        message(FATAL_ERROR "Failed to download log4cplus (${result})")
+    endif()
+    mark_as_advanced(AMD64)
+    mark_as_advanced(ASM686)
+    mark_as_advanced(EXECUTABLE_OUTPUT_PATH)
+    mark_as_advanced(CMAKE_INSTALL_PREFIX)
+    mark_as_advanced(INSTALL_BIN_DIR)
+    mark_as_advanced(INSTALL_INC_DIR)
+    mark_as_advanced(INSTALL_LIB_DIR)
+    mark_as_advanced(INSTALL_MAN_DIR)
+    mark_as_advanced(INSTALL_PKGCONFIG_DIR)
+    mark_as_advanced(LIBRARY_OUTPUT_PATH)
+    mark_as_advanced(CMAKE_BACKWARDS_COMPATIBILITY)
+endif()
 
-    # Download
-    message(STATUS "Setting up Google Test ...")
-    add_subdirectory(thirdparty/googletest)
-    execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+# Build
+if(NOT MSVC)
+    execute_process(COMMAND ${CMAKE_COMMAND} --build .
         OUTPUT_QUIET
         RESULT_VARIABLE result
-        WORKING_DIRECTORY thirdparty/googletest)
+        WORKING_DIRECTORY ${THIRDPARTY_DIR}/log4cplus)
+    if(result)
+        message(FATAL_ERROR "Failed to build log4cplus (${result})`")
+    endif()
+endif()
+
+# Set up the targets
+if(NOT MSVC)
+    add_subdirectory(
+        ${THIRDPARTY_DIR}/log4cplus/src
+        EXCLUDE_FROM_ALL)
+    list(APPEND LOG4CPLUS_INCLUDE_DIRS ${THIRDPARTY_DIR}/log4cplus/src/include)
+    set_target_properties(${log4cplus} PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${LOG4CPLUS_INCLUDE_DIRS}")
+    set(log4cplus_LIBRARY_PATH ${THIRDPARTY_DIR}/log4cplus/build/liblog4cplus.a)
+endif()
+
+# Google Test
+# This follows the example in
+# https://github.com/google/googletest/blob/release-1.10.0/googletest/README.md.
+
+# Download and configure
+if(APSI_BUILD_TESTS AND NOT MSVC)
+    message(STATUS "Setting up Google Test ...")
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+        OUTPUT_QUIET
+        RESULT_VARIABLE result
+        WORKING_DIRECTORY ${THIRDPARTY_DIR}/googletest)
     if(result)
         message(WARNING "Failed to download Google Test (${result}); disabling `APSI_BUILD_TESTS`")
     endif()
-
     set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
     mark_as_advanced(BUILD_GMOCK)
     set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
     mark_as_advanced(INSTALL_GTEST)
+endif()
 
-    # Build
+# Build
+if(APSI_BUILD_TESTS AND NOT MSVC)
     execute_process(COMMAND ${CMAKE_COMMAND} --build .
         OUTPUT_QUIET
         RESULT_VARIABLE result
-        WORKING_DIRECTORY thirdparty/googletest)
+        WORKING_DIRECTORY ${THIRDPARTY_DIR}/googletest)
     if(result)
         message(WARNING "Failed to build Google Test (${result}); disabling `APSI_BUILD_TESTS`")
     endif()
+endif()
 
+# Set up the targets
+if(APSI_BUILD_TESTS AND NOT MSVC)
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-
-    # Set up the targets
     add_subdirectory(
-        thirdparty/googletest/src
-        thirdparty/googletest/build
+        ${THIRDPARTY_DIR}/googletest/src
+        ${THIRDPARTY_DIR}/googletest/build
         EXCLUDE_FROM_ALL)
 endif()
 
@@ -268,7 +333,7 @@ target_link_libraries(common PUBLIC
     ZeroMQ::ZeroMQ
     ZeroMQpp::ZeroMQpp
     FourQ::FourQ
-    log4cplus::log4cplus)
+    ${log4cplus})
 if (NOT APPLE)
     target_link_libraries(common PUBLIC stdc++fs)
 endif()
