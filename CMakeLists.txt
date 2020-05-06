@@ -161,10 +161,25 @@ endmacro()
 # External Dependencies #
 #########################
 
+function(create_cache_entries dir_name)
+    set(cce_file_name ${dir_name}/cache_init.txt)
+    file(WRITE  "${cce_file_name}" "set(CMAKE_C_COMPILER \"${CMAKE_C_COMPILER}\" CACHE STRING \"\" FORCE)\n")
+    file(APPEND "${cce_file_name}" "set(CMAKE_CXX_COMPILER \"${CMAKE_CXX_COMPILER}\" CACHE STRING \"\" FORCE)\n")
+    file(APPEND "${cce_file_name}" "set(CMAKE_TOOLCHAIN_FILE \"${CMAKE_TOOLCHAIN_FILE}\" CACHE FILEPATH \"\" FORCE)\n")
+    file(APPEND "${cce_file_name}" "set(ANDROID_ABI ${ANDROID_ABI} CACHE STRING \"\" FORCE)\n")
+    file(APPEND "${cce_file_name}" "set(ANDROID_NDK \"${ANDROID_NDK}\" CACHE FILEPATH \"\" FORCE)\n")
+    file(APPEND "${cce_file_name}" "set(ANDROID_PLATFORM ${ANDROID_PLATFORM} CACHE STRING \"\" FORCE)\n")
+    file(APPEND "${cce_file_name}" "set(CMAKE_ANDROID_ARCH_ABI ${CMAKE_ANDROID_ARCH_ABI} CACHE STRING \"\" FORCE)\n")
+    file(APPEND "${cce_file_name}" "set(CMAKE_ANDROID_NDK \"${CMAKE_ANDROID_NDK}\" CACHE STRING \"\" FORCE)\n")
+    file(APPEND "${cce_file_name}" "set(CMAKE_MAKE_PROGRAM \"${CMAKE_MAKE_PROGRAM}\" CACHE STRING \"\" FORCE)\n")
+    file(APPEND "${cce_file_name}" "set(CMAKE_SYSTEM_NAME ${CMAKE_SYSTEM_NAME} CACHE STRING \"\" FORCE)\n")
+    file(APPEND "${cce_file_name}" "set(CMAKE_SYSTEM_VERSION ${CMAKE_SYSTEM_VERSION} CACHE STRING \"\" FORCE)\n")
+endfunction()
+
 set(THIRDPARTY_DIR ${APSI_SOURCE_DIR}/thirdparty)
 
 # TODO: external dependencies are currently installed manually.
-set(FOURQ_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindFourQ.cmake)
+#set(FOURQ_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindFourQ.cmake)
 set(MSGSL_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindMSGSL.cmake)
 set(ZEROMQ_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQ.cmake)
 set(ZEROMQPP_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQpp.cmake)
@@ -182,12 +197,12 @@ if(ZeroMQpp_ROOT)
     unset(ZEROMQPP_LIBRARY_PATH CACHE)
 endif()
 find_package(ZeroMQpp MODULE REQUIRED)
-if(FourQ_ROOT)
-    unset(FOURQ_INCLUDE_DIR CACHE)
-    unset(FOURQ_LIBRARY_DIR CACHE)
-    unset(FOURQ_LIBRARY_PATH CACHE)
-endif()
-find_package(FourQ MODULE REQUIRED)
+#if(FourQ_ROOT)
+#    unset(FOURQ_INCLUDE_DIR CACHE)
+#    unset(FOURQ_LIBRARY_DIR CACHE)
+#    unset(FOURQ_LIBRARY_PATH CACHE)
+#endif()
+#find_package(FourQ MODULE REQUIRED)
 ##find_package(log4cplus 3.0 REQUIRED)
 
 # Microsoft SEAL + MSGSL + ZLIB
@@ -206,6 +221,56 @@ endif()
 # ZeroMQpp
 
 # FourQ
+# This is a fork of https://github.com/microsoft/FourQlib.
+# It is built with Makefile
+
+# Download
+if(NOT MSVC)
+    message(STATUS "Setting up FourQ ...")
+
+    if(NOT CMAKE_TOOLCHAIN_FILE)
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+            OUTPUT_QUIET
+            RESULT_VARIABLE result
+            WORKING_DIRECTORY ${THIRDPARTY_DIR}/fourq)
+    else()
+        create_cache_entries(${THIRDPARTY_DIR}/fourq)
+        if(EXISTS ${THIRDPARTY_DIR}/fourq/CMakeCache.txt)
+            # Force regenerating make files. When cross compiling we might be
+            # compiling more than one platform at a time.
+            file(REMOVE ${THIRDPARTY_DIR}/fourq/CMakeCache.txt)
+        endif()
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" . -Ccache_init.txt
+            OUTPUT_QUIET
+            RESULT_VARIABLE result
+            WORKING_DIRECTORY ${THIRDPARTY_DIR}/fourq)
+    endif()
+    if(result)
+        message(FATAL_ERROR "Failed to download fourq (${result})")
+    endif()
+endif()
+
+# Build
+if(NOT MSVC)
+    execute_process(COMMAND ${CMAKE_COMMAND} --build .
+        OUTPUT_QUIET
+        RESULT_VARIABLE result
+        WORKING_DIRECTORY ${THIRDPARTY_DIR}/fourq)
+    if(result)
+        message(FATAL_ERROR "Failed to build fourq (${result})`")
+    endif()
+endif()
+
+# Set up the targets
+# Create imported target for FourQ
+if(NOT MSVC)
+    add_library(FourQ UNKNOWN IMPORTED)
+    set_target_properties(FourQ PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES ${THIRDPARTY_DIR}//fourq/src/FourQ_64bit_and_portable
+        IMPORTED_LOCATION ${THIRDPARTY_DIR}//fourq/src/FourQ_64bit_and_portable/libFourQ.a)
+endif()
 
 # Log4cplus
 # Download and configure
@@ -226,7 +291,7 @@ if(NOT MSVC)
             file(REMOVE ${THIRDPARTY_DIR}/log4cplus/CMakeCache.txt)
         endif()
         execute_process(
-            COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" . -Ccache_init.txt
+            COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
             OUTPUT_QUIET
             RESULT_VARIABLE result
             WORKING_DIRECTORY ${THIRDPARTY_DIR}/log4cplus)
@@ -234,17 +299,29 @@ if(NOT MSVC)
     if(result)
         message(FATAL_ERROR "Failed to download log4cplus (${result})")
     endif()
-    mark_as_advanced(AMD64)
-    mark_as_advanced(ASM686)
-    mark_as_advanced(EXECUTABLE_OUTPUT_PATH)
-    mark_as_advanced(CMAKE_INSTALL_PREFIX)
-    mark_as_advanced(INSTALL_BIN_DIR)
-    mark_as_advanced(INSTALL_INC_DIR)
-    mark_as_advanced(INSTALL_LIB_DIR)
-    mark_as_advanced(INSTALL_MAN_DIR)
-    mark_as_advanced(INSTALL_PKGCONFIG_DIR)
-    mark_as_advanced(LIBRARY_OUTPUT_PATH)
-    mark_as_advanced(CMAKE_BACKWARDS_COMPATIBILITY)
+    mark_as_advanced(ENABLE_SYMBOLS_VISIBILITY)
+    mark_as_advanced(LIBADVAPI32)
+    mark_as_advanced(LIBCPOSIX)
+    mark_as_advanced(LIBICONV)
+    mark_as_advanced(LIBKERNEL32)
+    mark_as_advanced(LIBNSL)
+    mark_as_advanced(LIBPOSIX4)
+    mark_as_advanced(LIBRT)
+    mark_as_advanced(LIBSOCKET)
+    mark_as_advanced(LIBWS2_32)
+    mark_as_advanced(LOG4CPLUS_BUILD_LOGGINGSERVER)
+    mark_as_advanced(LOG4CPLUS_BUILD_TESTING)
+    mark_as_advanced(FORCE LOG4CPLUS_ENABLE_DECORATED_LIB)
+    mark_as_advanced(LOG4CPLUS_QT4)
+    mark_as_advanced(LOG4CPLUS_QT5)
+    mark_as_advanced(FORCE LOG4CPLUS_REQUIRE_EXPLICIT_INI)
+    mark_as_advanced(LOG4CPLUS_SINGLE_THREADED)
+    mark_as_advanced(LOG4CPLUS_WORKING_C_LOCALE)
+    mark_as_advanced(LOG4CPLUS_WORKING_LOCALE)
+    mark_as_advanced(UNICODE)
+    mark_as_advanced(WITH_ICONV)
+    mark_as_advanced(WITH_UNIT_TESTS)
+    mark_as_advanced(_WIN32_WINNT)
 endif()
 
 # Build
@@ -266,7 +343,7 @@ if(NOT MSVC)
     list(APPEND LOG4CPLUS_INCLUDE_DIRS ${THIRDPARTY_DIR}/log4cplus/src/include)
     set_target_properties(${log4cplus} PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${LOG4CPLUS_INCLUDE_DIRS}")
-    set(log4cplus_LIBRARY_PATH ${THIRDPARTY_DIR}/log4cplus/build/liblog4cplus.a)
+    set(LOG4CPLUS_LIBRARY_PATH ${THIRDPARTY_DIR}/log4cplus/build/liblog4cplus.a)
 endif()
 
 # Google Test
@@ -332,7 +409,7 @@ target_link_libraries(common PUBLIC
     Kuku::kuku
     ZeroMQ::ZeroMQ
     ZeroMQpp::ZeroMQpp
-    FourQ::FourQ
+    FourQ
     ${log4cplus})
 if (NOT APPLE)
     target_link_libraries(common PUBLIC stdc++fs)
