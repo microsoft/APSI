@@ -1,9 +1,0 @@
-[submodule "thirdparty/FourQlib"]
-	path = thirdparty/FourQlib
-	url = https://github.com/kiromaru/FourQlib.git
-[submodule "APSITests/thirdparty/googletest"]
-	path = APSITests/thirdparty/googletest
-	url = https://github.com/google/googletest.git
-[submodule "thirdparty/googletest"]
-	path = thirdparty/googletest
-	url = https://github.com/google/googletest.git

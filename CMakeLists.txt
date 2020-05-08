@@ -291,7 +291,7 @@ if(NOT MSVC)
             file(REMOVE ${THIRDPARTY_DIR}/log4cplus/CMakeCache.txt)
         endif()
         execute_process(
-            COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+            COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" . -Ccache_init.txt
             OUTPUT_QUIET
             RESULT_VARIABLE result
             WORKING_DIRECTORY ${THIRDPARTY_DIR}/log4cplus)
@@ -309,17 +309,21 @@ if(NOT MSVC)
     mark_as_advanced(LIBRT)
     mark_as_advanced(LIBSOCKET)
     mark_as_advanced(LIBWS2_32)
+    set(LOG4CPLUS_BUILD_LOGGINGSERVER OFF CACHE BOOL "" FORCE)
     mark_as_advanced(LOG4CPLUS_BUILD_LOGGINGSERVER)
+    set(LOG4CPLUS_BUILD_TESTING OFF CACHE BOOL "" FORCE)
     mark_as_advanced(LOG4CPLUS_BUILD_TESTING)
-    mark_as_advanced(FORCE LOG4CPLUS_ENABLE_DECORATED_LIB)
+    set(LOG4CPLUS_ENABLE_DECORATED_LIBRARY_NAME OFF CACHE BOOL "" FORCE)
+    mark_as_advanced(LOG4CPLUS_ENABLE_DECORATED_LIBRARY_NAME)
     mark_as_advanced(LOG4CPLUS_QT4)
     mark_as_advanced(LOG4CPLUS_QT5)
-    mark_as_advanced(FORCE LOG4CPLUS_REQUIRE_EXPLICIT_INI)
+    mark_as_advanced(LOG4CPLUS_REQUIRE_EXPLICIT_INITIALIZATION)
     mark_as_advanced(LOG4CPLUS_SINGLE_THREADED)
     mark_as_advanced(LOG4CPLUS_WORKING_C_LOCALE)
     mark_as_advanced(LOG4CPLUS_WORKING_LOCALE)
     mark_as_advanced(UNICODE)
     mark_as_advanced(WITH_ICONV)
+    set(WITH_UNIT_TESTS OFF CACHE BOOL "" FORCE)
     mark_as_advanced(WITH_UNIT_TESTS)
     mark_as_advanced(_WIN32_WINNT)
 endif()
@@ -343,7 +347,7 @@ if(NOT MSVC)
     list(APPEND LOG4CPLUS_INCLUDE_DIRS ${THIRDPARTY_DIR}/log4cplus/src/include)
     set_target_properties(${log4cplus} PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${LOG4CPLUS_INCLUDE_DIRS}")
-    set(LOG4CPLUS_LIBRARY_PATH ${THIRDPARTY_DIR}/log4cplus/build/liblog4cplus.a)
+    set(LOG4CPLUS_LIBRARY_PATH ${THIRDPARTY_DIR}/log4cplus/src/src/liblog4cplus.a)
 endif()
 
 # Google Test
@@ -410,7 +414,7 @@ target_link_libraries(common PUBLIC
     ZeroMQ::ZeroMQ
     ZeroMQpp::ZeroMQpp
     FourQ
-    ${log4cplus})
+    log4cplus)
 if (NOT APPLE)
     target_link_libraries(common PUBLIC stdc++fs)
 endif()
@@ -432,11 +436,33 @@ set_target_properties(common PROPERTIES OUTPUT_NAME apsi_common-${APSI_VERSION_M
 link_threads(common)
 install_target(common APSITargets)
 
+# In UNIX-like platforms combine manually common and log4cplus into a single archive; not pretty, but works
+if(NOT MSVC)
+    if(CMAKE_HOST_WIN32)
+        get_filename_component(CXX_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+        set(AR_CMD_PATH "${CXX_DIR}/llvm-ar.exe")
+        file(TO_NATIVE_PATH "${AR_CMD_PATH}" AR_CMD_PATH)
+        set(DEL_CMD "del")
+        set(DEL_CMD_OPTS "")
+    else()
+        set(AR_CMD_PATH "ar")
+        set(DEL_CMD "rm")
+        set(DEL_CMD_OPTS "-rf")
+    endif()
+    file(COPY "${LOG4CPLUS_LIBRARY_PATH}" DESTINATION "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+    add_custom_command(TARGET common POST_BUILD
+        COMMAND "${AR_CMD_PATH}" x $<TARGET_FILE:common>
+        COMMAND "${AR_CMD_PATH}" x $<TARGET_FILE_DIR:common>/liblog4cplus.a
+        COMMAND "${AR_CMD_PATH}" rcs $<TARGET_FILE:common> *.o
+        COMMAND ${DEL_CMD} ${DEL_CMD_OPTS} *.o
+        WORKING_DIRECTORY $<TARGET_FILE_DIR:common>)
+endif()
+
 ###########################
 # APSI sender C++ library #
 ###########################
 
-add_library(sender SHARED)
+add_library(sender STATIC)
 add_subdirectory(sender/native/apsi)
 set_target_properties(sender PROPERTIES OUTPUT_NAME apsi_sender)
 set_version(sender)
@@ -454,7 +480,7 @@ install_target(sender APSITargets)
 # APSI receiver C++ library #
 #############################
 
-add_library(receiver SHARED)
+add_library(receiver STATIC)
 add_subdirectory(receiver/native/apsi)
 set_target_properties(receiver PROPERTIES OUTPUT_NAME apsi_receiver)
 set_version(receiver)
