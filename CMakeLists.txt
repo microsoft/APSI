@@ -171,14 +171,14 @@ macro(combine_archives target dependency)
             set(DEL_CMD "rm")
             set(DEL_CMD_OPTS "-rf")
         endif()
-        add_custom_command(TARGET common POST_BUILD
-            COMMAND "${AR_CMD_PATH}" x $<TARGET_FILE:target>
-            COMMAND "${AR_CMD_PATH}" x $<TARGET_FILE:dependency>
-            COMMAND "${AR_CMD_PATH}" rcs $<TARGET_FILE:target> *.o
+        add_custom_command(TARGET ${target} POST_BUILD
+            COMMAND "${AR_CMD_PATH}" x $<TARGET_FILE:${target}>
+            COMMAND "${AR_CMD_PATH}" x $<TARGET_FILE:${dependency}>
+            COMMAND "${AR_CMD_PATH}" rcs $<TARGET_FILE:${target}> *.o
             COMMAND ${DEL_CMD} ${DEL_CMD_OPTS} *.o
             WORKING_DIRECTORY lib)
     endif()
-endmarcro()
+endmacro()
 
 #########################
 # External Dependencies #
