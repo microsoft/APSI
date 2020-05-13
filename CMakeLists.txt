@@ -157,6 +157,29 @@ macro(install_target target export)
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endmacro()
 
+# Manually combine archives on Unix-like platforms
+macro(combine_archives target dependency)
+    if(NOT MSVC)
+        if(CMAKE_HOST_WIN32)
+            get_filename_component(CXX_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+            set(AR_CMD_PATH "${CXX_DIR}/llvm-ar.exe")
+            file(TO_NATIVE_PATH "${AR_CMD_PATH}" AR_CMD_PATH)
+            set(DEL_CMD "del")
+            set(DEL_CMD_OPTS "")
+        else()
+            set(AR_CMD_PATH "ar")
+            set(DEL_CMD "rm")
+            set(DEL_CMD_OPTS "-rf")
+        endif()
+        add_custom_command(TARGET common POST_BUILD
+            COMMAND "${AR_CMD_PATH}" x $<TARGET_FILE:target>
+            COMMAND "${AR_CMD_PATH}" x $<TARGET_FILE:dependency>
+            COMMAND "${AR_CMD_PATH}" rcs $<TARGET_FILE:target> *.o
+            COMMAND ${DEL_CMD} ${DEL_CMD_OPTS} *.o
+            WORKING_DIRECTORY lib)
+    endif()
+endmarcro()
+
 #########################
 # External Dependencies #
 #########################
@@ -436,27 +459,7 @@ set_target_properties(common PROPERTIES OUTPUT_NAME apsi_common-${APSI_VERSION_M
 link_threads(common)
 install_target(common APSITargets)
 
-# In UNIX-like platforms combine manually common and log4cplus into a single archive; not pretty, but works
-if(NOT MSVC)
-    if(CMAKE_HOST_WIN32)
-        get_filename_component(CXX_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
-        set(AR_CMD_PATH "${CXX_DIR}/llvm-ar.exe")
-        file(TO_NATIVE_PATH "${AR_CMD_PATH}" AR_CMD_PATH)
-        set(DEL_CMD "del")
-        set(DEL_CMD_OPTS "")
-    else()
-        set(AR_CMD_PATH "ar")
-        set(DEL_CMD "rm")
-        set(DEL_CMD_OPTS "-rf")
-    endif()
-    file(COPY "${LOG4CPLUS_LIBRARY_PATH}" DESTINATION "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
-    add_custom_command(TARGET common POST_BUILD
-        COMMAND "${AR_CMD_PATH}" x $<TARGET_FILE:common>
-        COMMAND "${AR_CMD_PATH}" x $<TARGET_FILE_DIR:common>/liblog4cplus.a
-        COMMAND "${AR_CMD_PATH}" rcs $<TARGET_FILE:common> *.o
-        COMMAND ${DEL_CMD} ${DEL_CMD_OPTS} *.o
-        WORKING_DIRECTORY $<TARGET_FILE_DIR:common>)
-endif()
+combine_archives(common log4cplus)
 
 ###########################
 # APSI sender C++ library #
