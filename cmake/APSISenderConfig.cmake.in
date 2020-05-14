@@ -7,22 +7,12 @@
 
 include(CMakeFindDependencyMacro)
 
-macro(warning_when_not_quiet msg)
-    if(NOT APSISender_FIND_QUIETLY)
-        message(WARNING ${msg})
-    endif()
-endmacro()
-
-macro(status_when_not_quiet msg)
-    if(NOT APSISender_FIND_QUIETLY)
-        message(STATUS ${msg})
-    endif()
-endmacro()
-
-macro(find_apsi_dependency dep)
+macro(apsi_find_dependency dep)
     find_dependency(${dep})
     if(NOT ${dep}_FOUND)
-        warning_when_not_quiet("Could not find dependency `${dep}`")
+        if(NOT APSISender_FIND_QUIETLY)
+            message(WARNING "Could not find dependency `${dep}`")
+        endif()
         set(APSISender_FOUND FALSE)
         return()
     endif()
@@ -31,14 +21,18 @@ endmacro()
 set(APSISender_FOUND FALSE)
 
 # Locate APSICommon dependency
-find_apsi_dependency(APSICommon 1.0.0 EXACT REQUIRED)
+apsi_find_dependency(APSICommon 1.0.0 EXACT REQUIRED)
 
 include(${CMAKE_CURRENT_LIST_DIR}/APSISenderTargets.cmake)
 
 if(TARGET APSI::Sender)
-    status_when_not_quiet("APSISender -> Version ${APSISender_VERSION} detected")
+    if(NOT APSISender_FIND_QUIETLY)
+        message(STATUS "APSISender -> Version ${APSISender_VERSION} detected")
+    endif()
     set(APSISender_FOUND TRUE)
 else()
-    warning_when_not_quiet("APSISender -> NOT FOUND")
+    if(NOT APSISender_FIND_QUIETLY)
+        message(WARNING "APSISender -> NOT FOUND")
+    endif()
     set(APSISender_FOUND FALSE)
 endif()

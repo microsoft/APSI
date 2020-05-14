@@ -110,34 +110,34 @@ endif()
 ##################################
 
 # Set the C++ language version
-macro(set_language target)
+macro(apsi_set_language target)
     target_compile_features(${target} PUBLIC cxx_std_14)
 endmacro()
 
 # Set the VERSION property
-macro(set_version target)
+macro(apsi_set_version target)
     set_target_properties(${target} PROPERTIES VERSION ${APSI_VERSION})
 endmacro()
 
 # Set the library filename to reflect version
-macro(set_version_filename target)
+macro(apsi_set_version_filename target)
     set_target_properties(${target} PROPERTIES OUTPUT_NAME ${target}-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
 endmacro()
 
 # Set the SOVERSION property
-macro(set_soversion target)
+macro(apsi_set_soversion target)
     set_target_properties(${target} PROPERTIES SOVERSION ${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
 endmacro()
 
 # Set include directories for build and install interfaces
-macro(set_include_directories target)
+macro(apsi_set_include_directories target)
     target_include_directories(${target} PUBLIC
         $<BUILD_INTERFACE:${APSI_INCLUDES_BUILD_DIR}>
         $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
 endmacro()
 
 # Link a thread library
-macro(link_threads target)
+macro(apsi_link_threads target)
     # Require thread library
     if(NOT TARGET Threads::Threads)
         set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
@@ -150,34 +150,32 @@ macro(link_threads target)
 endmacro()
 
 # Include target to given export
-macro(install_target target export)
+macro(apsi_install_target target export)
     install(TARGETS ${target} EXPORT ${export}
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endmacro()
 
-# Manually combine archives on Unix-like platforms
-macro(combine_archives target dependency)
-    if(NOT MSVC)
-        if(CMAKE_HOST_WIN32)
-            get_filename_component(CXX_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
-            set(AR_CMD_PATH "${CXX_DIR}/llvm-ar.exe")
-            file(TO_NATIVE_PATH "${AR_CMD_PATH}" AR_CMD_PATH)
-            set(DEL_CMD "del")
-            set(DEL_CMD_OPTS "")
-        else()
-            set(AR_CMD_PATH "ar")
-            set(DEL_CMD "rm")
-            set(DEL_CMD_OPTS "-rf")
-        endif()
-        add_custom_command(TARGET ${target} POST_BUILD
-            COMMAND "${AR_CMD_PATH}" x $<TARGET_FILE:${target}>
-            COMMAND "${AR_CMD_PATH}" x $<TARGET_FILE:${dependency}>
-            COMMAND "${AR_CMD_PATH}" rcs $<TARGET_FILE:${target}> *.o
-            COMMAND ${DEL_CMD} ${DEL_CMD_OPTS} *.o
-            WORKING_DIRECTORY lib)
+# Manually combine archives, using ${CMAKE_LIBRARY_OUTPUT_DIRECTORY} to keep temporary files.
+macro(apsi_combine_archives target dependency)
+    if(CMAKE_HOST_WIN32)
+        get_filename_component(CXX_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+        set(AR_CMD_PATH "${CXX_DIR}/llvm-ar.exe")
+        file(TO_NATIVE_PATH "${AR_CMD_PATH}" AR_CMD_PATH)
+        set(DEL_CMD "del")
+        set(DEL_CMD_OPTS "")
+    else()
+        set(AR_CMD_PATH "ar")
+        set(DEL_CMD "rm")
+        set(DEL_CMD_OPTS "-rf")
     endif()
+    add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND "${AR_CMD_PATH}" x $<TARGET_FILE:${target}>
+        COMMAND "${AR_CMD_PATH}" x $<TARGET_FILE:${dependency}>
+        COMMAND "${AR_CMD_PATH}" rcs $<TARGET_FILE:${target}> *.o
+        COMMAND ${DEL_CMD} ${DEL_CMD_OPTS} *.o
+        WORKING_DIRECTORY ${CMAKE_LIBRARY_OUTPUT_DIRECTORY})
 endmacro()
 
 #########################
@@ -203,10 +201,10 @@ set(THIRDPARTY_DIR ${APSI_SOURCE_DIR}/thirdparty)
 
 # TODO: external dependencies are currently installed manually.
 #set(FOURQ_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindFourQ.cmake)
-set(MSGSL_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindMSGSL.cmake)
+#set(MSGSL_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindMSGSL.cmake)
 set(ZEROMQ_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQ.cmake)
 set(ZEROMQPP_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQpp.cmake)
-find_package(SEAL 3.5 REQUIRED)
+#find_package(SEAL 3.5 REQUIRED)
 find_package(Kuku 2.0.0 EXACT REQUIRED)
 if(ZeroMQ_ROOT)
     unset(ZEROMQ_INCLUDE_DIR CACHE)
@@ -230,11 +228,48 @@ find_package(ZeroMQpp MODULE REQUIRED)
 
 # Microsoft SEAL + MSGSL + ZLIB
 # MSGSL and ZLIB should be installed with Microsoft SEAL
-if(NOT SEAL_USE_MSGSL)
-#    message(FATAL_ERROR "Microsoft SEAL should be built with MSGSL enabled.")
+# Download and configure
+if(NOT MSVC)
+    message(STATUS "Setting up Microsoft SEAL ...")
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+        OUTPUT_QUIET
+        RESULT_VARIABLE result
+        WORKING_DIRECTORY ${THIRDPARTY_DIR}/seal)
+    if(result)
+        message(FATAL_ERROR "Failed to download Microsoft SEAL (${result})")
+    endif()
+    mark_as_advanced(SEAL_BUILD_EXAMPLES)
+    mark_as_advanced(SEAL_BUILD_SEAL_C)
+    mark_as_advanced(SEAL_BUILD_TESTS)
+    mark_as_advanced(SEAL_USE_CXX17)
+    mark_as_advanced(SEAL_USE_INTRIN)
+    mark_as_advanced(SEAL_USE_MSGSL)
+    mark_as_advanced(SEAL_USE_ZLIB)
+    mark_as_advanced(SEAL_USE__ADDCARRY_U64)
+    mark_as_advanced(SEAL_USE__SUBBORROW_U64)
+    mark_as_advanced(SEAL_USE___BUILTIN_CLZLL)
+    mark_as_advanced(SEAL_USE___INT128)
 endif()
-if(NOT SEAL_USE_ZLIB)
-#    message(FATAL_ERROR "Microsft SEAL should be built with ZLIB enabled.")
+
+# Build
+if(NOT MSVC)
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} --build .
+        OUTPUT_QUIET
+        RESULT_VARIABLE result
+        WORKING_DIRECTORY ${THIRDPARTY_DIR}/seal)
+    if(result)
+        message(FATAL_ERROR "Failed to build Microsoft SEAL (${result})")
+    endif()
+endif()
+
+# Set up the targets
+if(NOT MSVC)
+    add_subdirectory(
+        ${THIRDPARTY_DIR}/seal/src
+        ${THIRDPARTY_DIR}/seal/build
+        EXCLUDE_FROM_ALL)
 endif()
 
 # Kuku
@@ -245,12 +280,10 @@ endif()
 
 # FourQ
 # This is a fork of https://github.com/microsoft/FourQlib.
-# It is built with Makefile
-
+# It is built with Makefile.
 # Download
 if(NOT MSVC)
     message(STATUS "Setting up FourQ ...")
-
     if(NOT CMAKE_TOOLCHAIN_FILE)
         execute_process(
             COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
@@ -271,26 +304,27 @@ if(NOT MSVC)
             WORKING_DIRECTORY ${THIRDPARTY_DIR}/fourq)
     endif()
     if(result)
-        message(FATAL_ERROR "Failed to download fourq (${result})")
+        message(FATAL_ERROR "Failed to download FourQ (${result})")
     endif()
 endif()
 
 # Build
 if(NOT MSVC)
-    execute_process(COMMAND ${CMAKE_COMMAND} --build .
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} --build .
         OUTPUT_QUIET
         RESULT_VARIABLE result
         WORKING_DIRECTORY ${THIRDPARTY_DIR}/fourq)
     if(result)
-        message(FATAL_ERROR "Failed to build fourq (${result})`")
+        message(FATAL_ERROR "Failed to build FourQ (${result})`")
     endif()
 endif()
 
 # Set up the targets
 # Create imported target for FourQ
 if(NOT MSVC)
-    add_library(FourQ UNKNOWN IMPORTED)
-    set_target_properties(FourQ PROPERTIES
+    add_library(fourq UNKNOWN IMPORTED)
+    set_target_properties(fourq PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES ${THIRDPARTY_DIR}//fourq/src/FourQ_64bit_and_portable
         IMPORTED_LOCATION ${THIRDPARTY_DIR}//fourq/src/FourQ_64bit_and_portable/libFourQ.a)
 endif()
@@ -299,7 +333,6 @@ endif()
 # Download and configure
 if(NOT MSVC)
     message(STATUS "Setting up log4cplus ...")
-
     if(NOT CMAKE_TOOLCHAIN_FILE)
         execute_process(
             COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
@@ -353,7 +386,8 @@ endif()
 
 # Build
 if(NOT MSVC)
-    execute_process(COMMAND ${CMAKE_COMMAND} --build .
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} --build .
         OUTPUT_QUIET
         RESULT_VARIABLE result
         WORKING_DIRECTORY ${THIRDPARTY_DIR}/log4cplus)
@@ -370,7 +404,6 @@ if(NOT MSVC)
     list(APPEND LOG4CPLUS_INCLUDE_DIRS ${THIRDPARTY_DIR}/log4cplus/src/include)
     set_target_properties(${log4cplus} PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${LOG4CPLUS_INCLUDE_DIRS}")
-    set(LOG4CPLUS_LIBRARY_PATH ${THIRDPARTY_DIR}/log4cplus/src/src/liblog4cplus.a)
 endif()
 
 # Google Test
@@ -425,18 +458,18 @@ add_library(common STATIC)
 add_subdirectory(common/native/apsi)
 
 # Set C++ language version and include directories for the object library
-set_language(common)
+apsi_set_language(common)
 target_include_directories(common PUBLIC
     $<BUILD_INTERFACE:${APSI_SOURCE_DIR}/common/native>
     $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
 
 # Link dependencies
 target_link_libraries(common PUBLIC
-    SEAL::seal
+    seal
     Kuku::kuku
     ZeroMQ::ZeroMQ
     ZeroMQpp::ZeroMQpp
-    FourQ
+    fourq
     log4cplus)
 if (NOT APPLE)
     target_link_libraries(common PUBLIC stdc++fs)
@@ -454,12 +487,15 @@ target_compile_options(common PUBLIC -D__LINUX__)
 target_compile_options(common PUBLIC -maes)
 target_compile_options(common PUBLIC -march=native)
 
-set_version(common)
+apsi_set_version(common)
 set_target_properties(common PROPERTIES OUTPUT_NAME apsi_common-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
-link_threads(common)
-install_target(common APSITargets)
+apsi_link_threads(common)
+apsi_install_target(common APSITargets)
 
-combine_archives(common log4cplus)
+if(NOT MSVC)
+    apsi_combine_archives(common seal)
+    apsi_combine_archives(common log4cplus)
+endif()
 
 ###########################
 # APSI sender C++ library #
@@ -468,16 +504,16 @@ combine_archives(common log4cplus)
 add_library(sender STATIC)
 add_subdirectory(sender/native/apsi)
 set_target_properties(sender PROPERTIES OUTPUT_NAME apsi_sender)
-set_version(sender)
-set_soversion(sender)
-set_language(sender)
+apsi_set_version(sender)
+apsi_set_soversion(sender)
+apsi_set_language(sender)
 target_link_libraries(sender PUBLIC common)
 target_include_directories(sender PUBLIC
     $<BUILD_INTERFACE:${APSI_SOURCE_DIR}/sender/native>
     $<BUILD_INTERFACE:${APSI_SOURCE_DIR}/common/native>
     $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
-link_threads(sender)
-install_target(sender APSITargets)
+apsi_link_threads(sender)
+apsi_install_target(sender APSITargets)
 
 #############################
 # APSI receiver C++ library #
@@ -486,16 +522,16 @@ install_target(sender APSITargets)
 add_library(receiver STATIC)
 add_subdirectory(receiver/native/apsi)
 set_target_properties(receiver PROPERTIES OUTPUT_NAME apsi_receiver)
-set_version(receiver)
-set_soversion(receiver)
-set_language(receiver)
+apsi_set_version(receiver)
+apsi_set_soversion(receiver)
+apsi_set_language(receiver)
 target_link_libraries(receiver PUBLIC common)
 target_include_directories(receiver PUBLIC
     $<BUILD_INTERFACE:${APSI_SOURCE_DIR}/receiver/native>
     $<BUILD_INTERFACE:${APSI_SOURCE_DIR}/common/native>
     $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
-link_threads(receiver)
-install_target(receiver APSITargets)
+apsi_link_threads(receiver)
+apsi_install_target(receiver APSITargets)
 
 ###################
 # APSI unit tests #

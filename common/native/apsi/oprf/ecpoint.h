@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <FourQ/FourQ.h>
+#include <FourQ.h>
 #include <array>
 #include <cstddef>
 #include <cstring>
