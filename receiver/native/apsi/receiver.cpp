@@ -304,7 +304,7 @@ namespace apsi
             auto receiver_null_item = all_one_item;
 
             auto cuckoo = make_unique<KukuTable>(
-                get_params().log_table_size(),
+                get_params().table_size(),
                 0, // stash size
                 get_params().hash_func_count(), item_type{ get_params().hash_func_seed(), 0 }, get_params().max_probe(),
                 receiver_null_item);

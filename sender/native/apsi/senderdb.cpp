@@ -237,7 +237,7 @@ namespace apsi
             for (u32 i = 0; i < params_.hash_func_count(); i++)
             {
                 normal_loc_func.emplace_back(
-                    params_.log_table_size(), kuku::make_item(params_.hash_func_seed() + i, 0));
+                    params_.table_size(), kuku::make_item(params_.hash_func_seed() + i, 0));
             }
 
             loads.resize(params_.table_size(), 0);
