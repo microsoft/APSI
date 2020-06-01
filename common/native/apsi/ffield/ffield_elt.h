@@ -91,7 +91,7 @@ namespace apsi
         {
             const seal::Modulus &ch = field_.ch_;
             std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(), [&ch](auto a, auto b) {
-                return seal::util::add_uint_uint_mod(a, b, ch);
+                return seal::util::add_uint64_mod(a, b, ch);
             });
         }
 
@@ -99,7 +99,7 @@ namespace apsi
         {
             const seal::Modulus &ch = field_.ch_;
             std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(), [&ch](auto a, auto b) {
-                return seal::util::sub_uint_uint_mod(a, b, ch);
+                return seal::util::sub_uint64_mod(a, b, ch);
             });
         }
 
@@ -107,7 +107,7 @@ namespace apsi
         {
             const seal::Modulus &ch = field_.ch_;
             std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(), [&ch](auto a, auto b) {
-                return seal::util::multiply_uint_uint_mod(a, b, ch);
+                return seal::util::multiply_uint_mod(a, b, ch);
             });
         }
 
@@ -120,7 +120,7 @@ namespace apsi
                 {
                     throw std::logic_error("division by zero");
                 }
-                return seal::util::multiply_uint_uint_mod(a, inv, ch);
+                return seal::util::multiply_uint_mod(a, inv, ch);
             });
         }
 

@@ -116,17 +116,17 @@ namespace apsi
 
                     transform(
                         symm_block_ptr, symm_block_ptr + d, temp1->data(), symm_block_ptr - d,
-                        [&ch](auto a, auto b) { return util::multiply_uint_uint_mod(a, b, ch); });
+                        [&ch](auto a, auto b) { return util::multiply_uint_mod(a, b, ch); });
 
                     for (i64 k = pos.split_offset + 1; k < split_size; k++, symm_block_ptr += d)
                     {
                         transform(
                             temp1->data(), temp1->data() + d, symm_block_ptr + d, temp2.data(),
-                            [&ch](auto a, auto b) { return util::multiply_uint_uint_mod(a, b, ch); });
+                            [&ch](auto a, auto b) { return util::multiply_uint_mod(a, b, ch); });
 
                         transform(
                             symm_block_ptr, symm_block_ptr + d, temp2.data(), symm_block_ptr,
-                            [&ch](auto a, auto b) { return util::add_uint_uint_mod(a, b, ch); });
+                            [&ch](auto a, auto b) { return util::add_uint64_mod(a, b, ch); });
                     }
                 }
             }

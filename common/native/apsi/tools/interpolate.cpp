@@ -47,12 +47,12 @@ namespace apsi
                 transform(
                     divided_differences[i + 1].data(j - 1), divided_differences[i + 1].data(j),
                     divided_differences[i].data(j - 1), numerator.data(),
-                    [ch](auto a, auto b) { return util::sub_uint_uint_mod(a, b, ch); });
+                    [ch](auto a, auto b) { return util::sub_uint64_mod(a, b, ch); });
 
                 // denominator = points[i + j] - points[i]
                 transform(
                     points.data(i + j), points.data(i + j + 1), points.data(i), denominator.data(),
-                    [ch](auto a, auto b) { return util::sub_uint_uint_mod(a, b, ch); });
+                    [ch](auto a, auto b) { return util::sub_uint64_mod(a, b, ch); });
 
                 // DD[i][j] = numerator / denominator
                 transform(
@@ -71,7 +71,7 @@ namespace apsi
                                 throw logic_error("division by zero");
                             }
                         }
-                        return util::multiply_uint_uint_mod(a, inv, ch);
+                        return util::multiply_uint_mod(a, inv, ch);
                     });
             }
         }
@@ -96,17 +96,17 @@ namespace apsi
                 // numerator = points[size - 1 - i] * result[j + 1]
                 transform(
                     points.data(size - 1 - i), points.data(size - i), result.data(j + 1), numerator.data(),
-                    [ch](auto a, auto b) { return util::multiply_uint_uint_mod(a, b, ch); });
+                    [ch](auto a, auto b) { return util::multiply_uint_mod(a, b, ch); });
 
                 // result[j] -= numerator
                 transform(result.data(j), result.data(j + 1), numerator.data(), result.data(j), [ch](auto a, auto b) {
-                    return util::sub_uint_uint_mod(a, b, ch);
+                    return util::sub_uint64_mod(a, b, ch);
                 });
             }
 
             transform(
                 result.data(), result.data(1), divided_differences[0].data(size - 1 - i), result.data(),
-                [ch](auto a, auto b) { return util::add_uint_uint_mod(a, b, ch); });
+                [ch](auto a, auto b) { return util::add_uint64_mod(a, b, ch); });
         }
     }
 } // namespace apsi

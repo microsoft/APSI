@@ -199,33 +199,6 @@ endfunction()
 
 set(THIRDPARTY_DIR ${APSI_SOURCE_DIR}/thirdparty)
 
-# TODO: external dependencies are currently installed manually.
-#set(FOURQ_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindFourQ.cmake)
-#set(MSGSL_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindMSGSL.cmake)
-set(ZEROMQ_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQ.cmake)
-set(ZEROMQPP_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQpp.cmake)
-#find_package(SEAL 3.5 REQUIRED)
-find_package(Kuku 2.0 REQUIRED)
-if(ZeroMQ_ROOT)
-    unset(ZEROMQ_INCLUDE_DIR CACHE)
-    unset(ZEROMQ_LIBRARY_DIR CACHE)
-    unset(ZEROMQ_LIBRARY_PATH CACHE)
-endif()
-find_package(ZeroMQ MODULE REQUIRED)
-if(ZeroMQpp_ROOT)
-    unset(ZEROMQPP_INCLUDE_DIR CACHE)
-    unset(ZEROMQPP_LIBRARY_DIR CACHE)
-    unset(ZEROMQPP_LIBRARY_PATH CACHE)
-endif()
-find_package(ZeroMQpp MODULE REQUIRED)
-#if(FourQ_ROOT)
-#    unset(FOURQ_INCLUDE_DIR CACHE)
-#    unset(FOURQ_LIBRARY_DIR CACHE)
-#    unset(FOURQ_LIBRARY_PATH CACHE)
-#endif()
-#find_package(FourQ MODULE REQUIRED)
-##find_package(log4cplus 3.0 REQUIRED)
-
 # Microsoft SEAL + MSGSL + ZLIB
 # MSGSL and ZLIB should be installed with Microsoft SEAL
 # Download and configure
@@ -272,11 +245,42 @@ if(NOT MSVC)
         EXCLUDE_FROM_ALL)
 endif()
 
-# Kuku
+# Microsoft Kuku
+# Download and configure
+if(NOT MSVC)
+    message(STATUS "Setting up Microsoft Kuku ...")
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+        OUTPUT_QUIET
+        RESULT_VARIABLE result
+        WORKING_DIRECTORY ${THIRDPARTY_DIR}/kuku)
+    if(result)
+        message(FATAL_ERROR "Failed to download Microsoft Kuku (${result})")
+    endif()
+    mark_as_advanced(KUKU_BUILD_EXAMPLES)
+    mark_as_advanced(KUKU_BUILD_KUKU_C)
+    mark_as_advanced(KUKU_BUILD_TESTS)
+endif()
 
-# ZeroMQ
+# Build
+if(NOT MSVC)
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} --build .
+        OUTPUT_QUIET
+        RESULT_VARIABLE result
+        WORKING_DIRECTORY ${THIRDPARTY_DIR}/kuku)
+    if(result)
+        message(FATAL_ERROR "Failed to build Microsoft Kuku (${result})")
+    endif()
+endif()
 
-# ZeroMQpp
+# Set up the targets
+if(NOT MSVC)
+    add_subdirectory(
+        ${THIRDPARTY_DIR}/kuku/src
+        ${THIRDPARTY_DIR}/kuku/build
+        EXCLUDE_FROM_ALL)
+endif()
 
 # FourQ
 # This is a fork of https://github.com/microsoft/FourQlib.
@@ -447,6 +451,22 @@ if(APSI_BUILD_TESTS AND NOT MSVC)
         EXCLUDE_FROM_ALL)
 endif()
 
+# ZeroMQ and ZeroMQpp
+set(ZEROMQ_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQ.cmake)
+set(ZEROMQPP_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQpp.cmake)
+if(ZeroMQ_ROOT)
+    unset(ZEROMQ_INCLUDE_DIR CACHE)
+    unset(ZEROMQ_LIBRARY_DIR CACHE)
+    unset(ZEROMQ_LIBRARY_PATH CACHE)
+endif()
+find_package(ZeroMQ MODULE REQUIRED)
+if(ZeroMQpp_ROOT)
+    unset(ZEROMQPP_INCLUDE_DIR CACHE)
+    unset(ZEROMQPP_LIBRARY_DIR CACHE)
+    unset(ZEROMQPP_LIBRARY_PATH CACHE)
+endif()
+find_package(ZeroMQpp MODULE REQUIRED)
+
 ###########################
 # APSI common C++ library #
 ###########################
@@ -466,7 +486,7 @@ target_include_directories(common PUBLIC
 # Link dependencies
 target_link_libraries(common PUBLIC
     seal
-    Kuku::kuku
+    kuku
     ZeroMQ::ZeroMQ
     ZeroMQpp::ZeroMQpp
     fourq

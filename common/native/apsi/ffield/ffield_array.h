@@ -174,7 +174,7 @@ namespace apsi
             const seal::Modulus &ch = field_.ch_;
             std::transform(
                 array_.cbegin(), array_.cend(), in.array_.cbegin(), out.array_.begin(),
-                [&ch](auto a, auto b) { return seal::util::add_uint_uint_mod(a, b, ch); });
+                [&ch](auto a, auto b) { return seal::util::add_uint64_mod(a, b, ch); });
         }
 
         inline void sub(FFieldArray &out, const FFieldArray &in) const
@@ -192,7 +192,7 @@ namespace apsi
             const seal::Modulus &ch = field_.ch_;
             std::transform(
                 array_.cbegin(), array_.cend(), in.array_.cbegin(), out.array_.begin(),
-                [&ch](auto a, auto b) { return seal::util::sub_uint_uint_mod(a, b, ch); });
+                [&ch](auto a, auto b) { return seal::util::sub_uint64_mod(a, b, ch); });
         }
 
         inline void mul(FFieldArray &out, const FFieldArray &in) const
@@ -210,7 +210,7 @@ namespace apsi
             const seal::Modulus &ch = field_.ch_;
             std::transform(
                 array_.cbegin(), array_.cend(), in.array_.cbegin(), out.array_.begin(),
-                [&ch](auto a, auto b) { return seal::util::multiply_uint_uint_mod(a, b, ch); });
+                [&ch](auto a, auto b) { return seal::util::multiply_uint_mod(a, b, ch); });
         }
 
         inline void div(FFieldArray &out, const FFieldArray &in) const
@@ -233,7 +233,7 @@ namespace apsi
                     {
                         throw std::logic_error("division by zero");
                     }
-                    return seal::util::multiply_uint_uint_mod(a, inv, ch);
+                    return seal::util::multiply_uint_mod(a, inv, ch);
                 });
         }
 
@@ -302,7 +302,7 @@ namespace apsi
 #endif
             const seal::Modulus &ch = field_.ch_;
             std::transform(array_.cbegin(), array_.cend(), out.array_.begin(), [&ch](auto a) {
-                return seal::util::multiply_uint_uint_mod(a, a, ch);
+                return seal::util::multiply_uint_mod(a, a, ch);
             });
         }
 
