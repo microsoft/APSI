@@ -45,8 +45,8 @@ namespace apsi
                 std::string event_name;
                 int event_count;
                 double avg;
-                u64 min;
-                u64 max;
+                std::uint64_t min;
+                std::uint64_t max;
             };
 
             /**

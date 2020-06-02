@@ -10,7 +10,7 @@
 namespace apsi
 {
     using _ch_t = seal::Modulus;
-    using _ffield_elt_coeff_t = u64;
+    using _ffield_elt_coeff_t = std::uint64_t;
     using _ffield_elt_t = std::vector<_ffield_elt_coeff_t>;
 
     class FFieldElt;
@@ -22,7 +22,7 @@ namespace apsi
         friend class FFieldBatchEncoder;
 
     public:
-        FField(_ch_t ch, u64 d) : ch_(ch), d_(d)
+        FField(_ch_t ch, std::uint64_t d) : ch_(ch), d_(d)
         {}
 
         inline const _ch_t &ch() const
@@ -30,7 +30,7 @@ namespace apsi
             return ch_;
         }
 
-        inline u64 d() const
+        inline std::uint64_t d() const
         {
             return d_;
         }
@@ -51,6 +51,6 @@ namespace apsi
 
     private:
         _ch_t ch_;
-        u64 d_;
+        std::uint64_t d_;
     }; // class FField
 } // namespace apsi

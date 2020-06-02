@@ -52,8 +52,8 @@ namespace
     }
 
     void verify_intersection_results(
-        vector<Item> &client_items, int intersection_size, pair<vector<bool>, Matrix<u8>> &intersection,
-        bool compare_labels, vector<int> &label_idx, Matrix<u8> &labels)
+        vector<Item> &client_items, int intersection_size, pair<vector<bool>, Matrix<unsigned char>> &intersection,
+        bool compare_labels, vector<int> &label_idx, Matrix<unsigned char> &labels)
     {
         bool correct = true;
         for (size_t i = 0; i < client_items.size(); i++)
@@ -88,7 +88,7 @@ namespace
         string conn_addr = "tcp://localhost:5550";
         recvChl.connect(conn_addr);
 
-        u32 numThreads = thread::hardware_concurrency();
+        uint32_t numThreads = thread::hardware_concurrency();
 
         unique_ptr<Receiver> receiver_ptr;
 
@@ -109,7 +109,7 @@ namespace
         }
 
         auto s1 = vector<Item>(senderActualSize);
-        Matrix<u8> labels(senderActualSize, params.label_byte_count());
+        Matrix<unsigned char> labels(senderActualSize, params.label_byte_count());
         for (size_t i = 0; i < s1.size(); i++)
         {
             s1[i] = i;
@@ -118,8 +118,8 @@ namespace
             {
                 memset(labels[i].data(), 0, labels[i].size());
 
-                labels[i][0] = static_cast<u8>(i);
-                labels[i][1] = static_cast<u8>(i >> 8);
+                labels[i][0] = static_cast<unsigned char>(i);
+                labels[i][1] = static_cast<unsigned char>(i >> 8);
             }
         }
 
@@ -200,7 +200,7 @@ namespace
         return params;
     }
 
-    void initialize_db(vector<Item> &items, Matrix<u8> &labels, size_t item_count, size_t label_byte_count)
+    void initialize_db(vector<Item> &items, Matrix<unsigned char> &labels, size_t item_count, size_t label_byte_count)
     {
         items.resize(item_count);
         labels.resize(item_count, label_byte_count);
@@ -213,8 +213,8 @@ namespace
             {
                 memset(labels[i].data(), 0, labels[i].size());
 
-                labels[i][0] = static_cast<u8>(i);
-                labels[i][1] = static_cast<u8>(i >> 8);
+                labels[i][0] = static_cast<unsigned char>(i);
+                labels[i][1] = static_cast<unsigned char>(i >> 8);
             }
         }
     }

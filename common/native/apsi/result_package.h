@@ -14,15 +14,15 @@ namespace apsi
      */
     struct ResultPackage
     {
-        i64 split_idx;
-        i64 batch_idx;
+        std::int64_t split_idx;
+        std::int64_t batch_idx;
         std::string data;
         std::string label_data;
 
         // Calculate size of data in the structure
-        u64 size() const
+        std::uint64_t size() const
         {
-            return sizeof(i64) * 2 + data.length() + label_data.length();
+            return sizeof(std::int64_t) * 2 + data.length() + label_data.length();
         }
     }; // struct ResultPackage
 } // namespace apsi

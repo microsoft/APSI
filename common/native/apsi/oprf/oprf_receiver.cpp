@@ -20,12 +20,12 @@ namespace apsi
 
             set_item_count(static_cast<size_t>(oprf_items.size()));
 
-            auto oprf_out_ptr = reinterpret_cast<u8 *>(oprf_queries.data());
+            auto oprf_out_ptr = reinterpret_cast<unsigned char *>(oprf_queries.data());
             for (size_t i = 0; i < item_count(); i++)
             {
                 // Create an elliptic curve point from the item
                 ECPoint ecpt(
-                    { reinterpret_cast<const u8 *>(oprf_items[i].data()), oprf_item_size });
+                    { reinterpret_cast<const unsigned char *>(oprf_items[i].data()), oprf_item_size });
 
                 // Create a random scalar for OPRF and save its inverse
                 ECPoint::scalar_type random_scalar;
@@ -58,7 +58,7 @@ namespace apsi
 
             // Write zero item everywhere
             fill(oprf_hashes.begin(), oprf_hashes.end(), oprf_hash_type());
-            auto oprf_in_ptr = reinterpret_cast<const u8 *>(oprf_responses.data());
+            auto oprf_in_ptr = reinterpret_cast<const unsigned char *>(oprf_responses.data());
 
             for (size_t i = 0; i < item_count(); i++)
             {
@@ -71,10 +71,10 @@ namespace apsi
 
                 // Write the hash to the appropriate item
                 // Warning: the hash has size ECPoint::hash_size == 15! Thus, the
-                // last u8 is not touched and must be set to zero separately.
+                // last unsigned char is not touched and must be set to zero separately.
                 // This was already done earlier, but might be a performance issue
                 // in some cases.
-                ecpt.extract_hash({ reinterpret_cast<u8 *>(oprf_hashes[i].data()), ECPoint::hash_size });
+                ecpt.extract_hash({ reinterpret_cast<unsigned char *>(oprf_hashes[i].data()), ECPoint::hash_size });
 
                 // Move forward
                 advance(oprf_in_ptr, oprf_response_size);

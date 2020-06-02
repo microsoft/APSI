@@ -21,7 +21,7 @@
 #define FALSE 0
 #endif
 
-typedef unsigned long long u64apsi;
+typedef unsigned long long std::uint64_tapsi;
 
 /**
 Connect a Receiver to the given address and port.
@@ -47,4 +47,4 @@ Perform a Query for the given items.
 The 'result' array consist of booleans encoded as integers. Any value other than 0
 is considered 'true', 0 is considered as 'false'.
 */
-APSIEXPORT bool APSICALL ReceiverQuery(int length, u64apsi *items, int *result, u64apsi *labels);
+APSIEXPORT bool APSICALL ReceiverQuery(int length, std::uint64_tapsi *items, int *result, std::uint64_tapsi *labels);

@@ -141,47 +141,47 @@ namespace apsi
             size_t idx = 1;
 
             // PSIConfParams
-            response.psiconf_params.sender_size = msg.get<u64>(idx++);
-            response.psiconf_params.sender_bin_size = msg.get<u64>(idx++);
-            response.psiconf_params.item_bit_count = msg.get<u32>(idx++);
-            response.psiconf_params.item_bit_length_used_after_oprf = msg.get<u32>(idx++);
-            response.psiconf_params.num_chunks = msg.get<u32>(idx++);
+            response.psiconf_params.sender_size = msg.get<uint64_t>(idx++);
+            response.psiconf_params.sender_bin_size = msg.get<uint64_t>(idx++);
+            response.psiconf_params.item_bit_count = msg.get<uint32_t>(idx++);
+            response.psiconf_params.item_bit_length_used_after_oprf = msg.get<uint32_t>(idx++);
+            response.psiconf_params.num_chunks = msg.get<uint32_t>(idx++);
             response.psiconf_params.use_labels = msg.get<bool>(idx++);
             response.psiconf_params.use_fast_membership = msg.get<bool>(idx++);
 
             // TableParams
-            response.table_params.log_table_size = msg.get<u32>(idx++);
-            response.table_params.window_size = msg.get<u32>(idx++);
-            response.table_params.split_count = msg.get<u32>(idx++);
-            response.table_params.split_size = msg.get<u32>(idx++);
-            response.table_params.binning_sec_level = msg.get<u32>(idx++);
+            response.table_params.log_table_size = msg.get<uint32_t>(idx++);
+            response.table_params.window_size = msg.get<uint32_t>(idx++);
+            response.table_params.split_count = msg.get<uint32_t>(idx++);
+            response.table_params.split_size = msg.get<uint32_t>(idx++);
+            response.table_params.binning_sec_level = msg.get<uint32_t>(idx++);
             response.table_params.dynamic_split_count = msg.get<bool>(idx++);
 
             // CuckooParams
-            response.cuckoo_params.hash_func_count = msg.get<u32>(idx++);
-            response.cuckoo_params.hash_func_seed = msg.get<u32>(idx++);
-            response.cuckoo_params.max_probe = msg.get<u32>(idx++);
+            response.cuckoo_params.hash_func_count = msg.get<uint32_t>(idx++);
+            response.cuckoo_params.hash_func_seed = msg.get<uint32_t>(idx++);
+            response.cuckoo_params.max_probe = msg.get<uint32_t>(idx++);
 
             // SEALParams
-            u64 poly_modulus_degree = msg.get<u64>(idx++);
+            uint64_t poly_modulus_degree = msg.get<uint64_t>(idx++);
             response.seal_params.encryption_params.set_poly_modulus_degree(static_cast<size_t>(poly_modulus_degree));
 
             vector<Modulus> coeff_modulus;
             get_sm_vector(coeff_modulus, msg, idx);
             response.seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
 
-            response.seal_params.encryption_params.set_plain_modulus(msg.get<u64>(idx++));
-            response.seal_params.max_supported_degree = msg.get<u32>(idx++);
+            response.seal_params.encryption_params.set_plain_modulus(msg.get<uint64_t>(idx++));
+            response.seal_params.max_supported_degree = msg.get<uint32_t>(idx++);
 
             // FFieldParams
-            response.ffield_params.characteristic = msg.get<u64>(idx++);
-            response.ffield_params.degree = msg.get<u32>(idx++);
+            response.ffield_params.characteristic = msg.get<uint64_t>(idx++);
+            response.ffield_params.degree = msg.get<uint32_t>(idx++);
 
             bytes_received_ += sizeof(SenderOperationType);
             bytes_received_ += sizeof(PSIParams::PSIConfParams);
             bytes_received_ += sizeof(PSIParams::TableParams);
             bytes_received_ += sizeof(PSIParams::CuckooParams);
-            bytes_received_ += sizeof(u64) + sizeof(u64) + sizeof(u32); // sizeof(PSIParams::SEALParams);
+            bytes_received_ += sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t); // sizeof(PSIParams::SEALParams);
             bytes_received_ += sizeof(PSIParams::FFieldParams);
 
             return true;
@@ -227,10 +227,10 @@ namespace apsi
                 return false;
 
             // Number of result packages
-            response.package_count = msg.get<u64>(/* part */ 1);
+            response.package_count = msg.get<uint64_t>(/* part */ 1);
 
-            bytes_received_ += sizeof(u32); // SenderOperationType
-            bytes_received_ += sizeof(u64);
+            bytes_received_ += sizeof(uint32_t); // SenderOperationType
+            bytes_received_ += sizeof(uint64_t);
 
             return true;
         }
@@ -248,8 +248,8 @@ namespace apsi
                 ;
             }
 
-            pkg.split_idx = msg.get<i64>(/* part */ 0);
-            pkg.batch_idx = msg.get<i64>(/* part */ 1);
+            pkg.split_idx = msg.get<int64_t>(/* part */ 0);
+            pkg.batch_idx = msg.get<int64_t>(/* part */ 1);
             pkg.data = msg.get(/* part */ 2);
             pkg.label_data = msg.get(/* part */ 3);
 
@@ -305,7 +305,7 @@ namespace apsi
             msg.add(params.max_probe());
 
             // SEALParams
-            u64 poly_modulus_degree = static_cast<u64>(params.encryption_params().poly_modulus_degree());
+            uint64_t poly_modulus_degree = static_cast<uint64_t>(params.encryption_params().poly_modulus_degree());
             msg.add(poly_modulus_degree);
             add_sm_vector(params.encryption_params().coeff_modulus(), msg);
             msg.add(params.encryption_params().plain_modulus().value());
@@ -317,11 +317,11 @@ namespace apsi
 
             send_message(msg);
 
-            bytes_sent_ += sizeof(u32); // SenderOperationType
+            bytes_sent_ += sizeof(uint32_t); // SenderOperationType
             bytes_sent_ += sizeof(PSIParams::PSIConfParams);
             bytes_sent_ += sizeof(PSIParams::TableParams);
             bytes_sent_ += sizeof(PSIParams::CuckooParams);
-            bytes_sent_ += sizeof(u64) + sizeof(u64) + sizeof(u32); // sizeof(PSIParams::SEALParams);
+            bytes_sent_ += sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t); // sizeof(PSIParams::SEALParams);
             bytes_sent_ += sizeof(PSIParams::FFieldParams);
         }
 
@@ -337,7 +337,7 @@ namespace apsi
 
             send_message(msg);
 
-            bytes_sent_ += sizeof(u32);
+            bytes_sent_ += sizeof(uint32_t);
             bytes_sent_ += buffer.size();
         }
 
@@ -355,11 +355,11 @@ namespace apsi
 
             send_message(msg);
 
-            bytes_sent_ += sizeof(u32);
+            bytes_sent_ += sizeof(uint32_t);
             bytes_sent_ += buffer.size();
         }
 
-        void NetworkChannel::send_query(const string &relin_keys, const map<u64, vector<string>> &query)
+        void NetworkChannel::send_query(const string &relin_keys, const map<uint64_t, vector<string>> &query)
         {
             throw_if_not_connected();
 
@@ -368,27 +368,27 @@ namespace apsi
             message_t msg;
             SenderOperationType type = SOP_query;
             add_message_type(type, msg);
-            bytes_sent += sizeof(u32);
+            bytes_sent += sizeof(uint32_t);
 
             msg.add(relin_keys);
             bytes_sent += relin_keys.length();
 
             logging::Log::debug("send_query: relin key length = %i bytes ", relin_keys.length());
 
-            u64 query_size = static_cast<u64>(query.size());
+            uint64_t query_size = static_cast<uint64_t>(query.size());
             add_part(query_size, msg);
-            bytes_sent += sizeof(u64);
+            bytes_sent += sizeof(uint64_t);
 
-            u64 sofar = bytes_sent_;
+            uint64_t sofar = bytes_sent_;
 
             for (const auto &q : query)
             {
                 add_part(q.first, msg);
-                bytes_sent += sizeof(u64);
+                bytes_sent += sizeof(uint64_t);
 
-                u64 num_elems = static_cast<u64>(q.second.size());
+                uint64_t num_elems = static_cast<uint64_t>(q.second.size());
                 add_part(num_elems, msg);
-                bytes_sent += sizeof(u64);
+                bytes_sent += sizeof(uint64_t);
 
                 for (const auto &seededctxt : q.second)
                 {
@@ -412,16 +412,16 @@ namespace apsi
             add_client_id(msg, client_id);
 
             add_message_type(type, msg);
-            u64 pkg_count = static_cast<u64>(package_count);
+            uint64_t pkg_count = static_cast<uint64_t>(package_count);
             msg.add(pkg_count);
 
             send_message(msg);
 
             // Message type
-            bytes_sent_ += sizeof(u32);
+            bytes_sent_ += sizeof(uint32_t);
 
             // Package count
-            bytes_sent_ += sizeof(u64);
+            bytes_sent_ += sizeof(uint64_t);
         }
 
         void NetworkChannel::send(const vector<SEAL_BYTE> &client_id, const ResultPackage &pkg)
@@ -448,7 +448,7 @@ namespace apsi
             if (msg.parts() < static_cast<size_t>(part_start) + 1)
                 throw runtime_error("Should have size at least");
 
-            u64 size;
+            uint64_t size;
             get_part(size, msg, part_start);
 
             // If the vector is not empty, we need the part with the data
@@ -472,7 +472,7 @@ namespace apsi
         void NetworkChannel::add_buffer(const vector<SEAL_BYTE> &buff, message_t &msg) const
         {
             // First part is size
-            u64 size = static_cast<u64>(buff.size());
+            uint64_t size = static_cast<uint64_t>(buff.size());
             add_part(size, msg);
 
             if (buff.size() > 0)
@@ -488,7 +488,7 @@ namespace apsi
             if (msg.parts() < (part_idx + 1))
                 throw runtime_error("Should have size at least");
 
-            u64 size;
+            uint64_t size;
             get_part(size, msg, /* part */ part_idx++);
 
             if (msg.parts() < (part_idx + size))
@@ -505,7 +505,7 @@ namespace apsi
         void NetworkChannel::add_sm_vector(const vector<Modulus> &smv, message_t &msg) const
         {
             // First part is size
-            u64 size = static_cast<u64>(smv.size());
+            uint64_t size = static_cast<uint64_t>(smv.size());
             add_part(size, msg);
 
             for (const Modulus &sm : smv)
@@ -520,7 +520,7 @@ namespace apsi
         void NetworkChannel::add_message_type(const SenderOperationType type, message_t &msg) const
         {
             // Transform to int to have it have a fixed size
-            add_part(static_cast<u32>(type), msg);
+            add_part(static_cast<uint32_t>(type), msg);
         }
 
         SenderOperationType NetworkChannel::get_message_type(const message_t &msg, const size_t part) const
@@ -530,7 +530,7 @@ namespace apsi
                 throw invalid_argument("Message should have at least type");
 
             // Get message type
-            u32 msg_type;
+            uint32_t msg_type;
             get_part(msg_type, msg, /* part */ part);
             SenderOperationType type = static_cast<SenderOperationType>(msg_type);
             return type;
@@ -577,26 +577,26 @@ namespace apsi
             extract_client_id(msg, client_id);
 
             string relin_keys;
-            map<u64, vector<string>> query;
+            map<uint64_t, vector<string>> query;
 
             size_t msg_idx = 2;
 
             msg.get(relin_keys, /* part */ msg_idx++);
             bytes_received_ += relin_keys.length();
 
-            u64 query_count;
+            uint64_t query_count;
             get_part(query_count, msg, /* part */ msg_idx++);
-            bytes_received_ += sizeof(u64);
+            bytes_received_ += sizeof(uint64_t);
 
-            for (u64 i = 0; i < query_count; i++)
+            for (uint64_t i = 0; i < query_count; i++)
             {
-                u64 power;
+                uint64_t power;
                 get_part(power, msg, msg_idx++);
-                bytes_received_ += sizeof(u64);
+                bytes_received_ += sizeof(uint64_t);
 
-                u64 num_elems;
+                uint64_t num_elems;
                 get_part(num_elems, msg, msg_idx++);
-                bytes_received_ += sizeof(u64);
+                bytes_received_ += sizeof(uint64_t);
 
                 vector<string> powers(static_cast<size_t>(num_elems));
 

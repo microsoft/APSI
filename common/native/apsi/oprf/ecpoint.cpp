@@ -17,16 +17,16 @@ namespace apsi
         namespace
         {
             // Curve constants
-            u64 c0h = 1064406672104372656ULL;
-            u64 c0l = 4737573565184866938ULL;
-            u64 b0h = 11442141257964318772ULL;
-            u64 b0l = 5379339658566403666ULL;
-            u64 b1h = 17ULL;
-            u64 b1l = 9223372036854775796ULL;
-            u64 A0h = 1289ULL;
-            u64 A0l = 9223372036854774896ULL;
-            u64 A1h = 12311914987857864728ULL;
-            u64 A1l = 7168186187914912079ULL;
+            uint64_t c0h = 1064406672104372656ULL;
+            uint64_t c0l = 4737573565184866938ULL;
+            uint64_t b0h = 11442141257964318772ULL;
+            uint64_t b0l = 5379339658566403666ULL;
+            uint64_t b1h = 17ULL;
+            uint64_t b1l = 9223372036854775796ULL;
+            uint64_t A0h = 1289ULL;
+            uint64_t A0l = 9223372036854774896ULL;
+            uint64_t A1h = 12311914987857864728ULL;
+            uint64_t A1l = 7168186187914912079ULL;
 
 #ifndef _X86_
             felm_t c0{ c0h, c0l };
@@ -35,8 +35,8 @@ namespace apsi
             felm_t A0{ A0h, A0l };
             felm_t A1{ A1h, A1l };
 #else
-#define HIGHOF64(x) static_cast<u32>(x >> 32)
-#define LOWOF64(x) static_cast<u32>(x)
+#define HIGHOF64(x) static_cast<uint32_t>(x >> 32)
+#define LOWOF64(x) static_cast<uint32_t>(x)
 
             felm_t c0{ LOWOF64(c0h), HIGHOF64(c0h), LOWOF64(c0l), HIGHOF64(c0l) };
             felm_t b0{ LOWOF64(b0h), HIGHOF64(b0h), LOWOF64(b0l), HIGHOF64(b0l) };
@@ -220,7 +220,7 @@ namespace apsi
 
                 // Compute a Blake2b hash of the value
                 blake2b(
-                    reinterpret_cast<u8 *>(r), sizeof(f2elm_t), value.data(), static_cast<size_t>(value.size()),
+                    reinterpret_cast<unsigned char *>(r), sizeof(f2elm_t), value.data(), static_cast<size_t>(value.size()),
                     nullptr, 0);
 
                 // Reduce r
@@ -234,37 +234,37 @@ namespace apsi
 
         void ECPoint::make_random_nonzero_scalar(scalar_span_type out, shared_ptr<UniformRandomGenerator> rg)
         {
-            array<u64, 4> random_data;
+            array<uint64_t, 4> random_data;
             static_assert(sizeof(random_data) == order_size, "Size of random_data should be the same as order_size");
 
-            function<u64()> rand_u64;
+            function<uint64_t()> rand_uint64_t;
             if (rg)
             {
-                rand_u64 = [&rg]() {
-                    u64 res;
+                rand_uint64_t = [&rg]() {
+                    uint64_t res;
                     rg->generate(sizeof(res), reinterpret_cast<SEAL_BYTE *>(&res));
                     return res;
                 };
             }
             else
             {
-                rand_u64 = random_uint64;
+                rand_uint64_t = random_uint64;
             }
 
-            auto reduced_rand_u64 = [&]() {
+            auto reduced_rand_uint64_t = [&]() {
                 // Rejection sampling
-                u64 ret;
+                uint64_t ret;
                 do
                 {
-                    ret = rand_u64();
-                } while (ret >= (~u64(0) >> 1));
+                    ret = rand_uint64_t();
+                } while (ret >= (~uint64_t(0) >> 1));
                 return ret;
             };
 
             // Loop until we find a non-zero element
             while (
-                !((random_data[0] = rand_u64()) | (random_data[1] = reduced_rand_u64()) |
-                  (random_data[2] = rand_u64()) | (random_data[3] = reduced_rand_u64())))
+                !((random_data[0] = rand_uint64_t()) | (random_data[1] = reduced_rand_uint64_t()) |
+                  (random_data[2] = rand_uint64_t()) | (random_data[3] = reduced_rand_uint64_t())))
             {
             }
 
@@ -282,7 +282,7 @@ namespace apsi
             from_Montgomery(reinterpret_cast<digit_t *>(out.data()), reinterpret_cast<digit_t *>(out.data()));
         }
 
-        void ECPoint::scalar_multiply(gsl::span<const u8, order_size> scalar)
+        void ECPoint::scalar_multiply(gsl::span<const unsigned char, order_size> scalar)
         {
             ecc_mul(pt_, const_cast<digit_t *>(reinterpret_cast<const digit_t *>(scalar.data())), pt_, false);
         }
@@ -299,7 +299,7 @@ namespace apsi
 
             try
             {
-                array<u8, save_size> buf;
+                array<unsigned char, save_size> buf;
                 encode(pt_, buf.data());
                 stream.write(reinterpret_cast<const char *>(buf.data()), save_size);
             }
@@ -318,7 +318,7 @@ namespace apsi
 
             try
             {
-                array<u8, save_size> buf;
+                array<unsigned char, save_size> buf;
                 stream.read(reinterpret_cast<char *>(buf.data()), save_size);
                 if (decode(buf.data(), pt_) != ECCRYPTO_SUCCESS)
                 {
@@ -334,12 +334,12 @@ namespace apsi
             stream.exceptions(old_ex_mask);
         }
 
-        void ECPoint::save(gsl::span<u8, save_size> out)
+        void ECPoint::save(gsl::span<unsigned char, save_size> out)
         {
             encode(pt_, out.data());
         }
 
-        void ECPoint::load(gsl::span<const u8, save_size> in)
+        void ECPoint::load(gsl::span<const unsigned char, save_size> in)
         {
             if (decode(in.data(), pt_) != ECCRYPTO_SUCCESS)
             {
@@ -347,7 +347,7 @@ namespace apsi
             }
         }
 
-        void ECPoint::extract_hash(gsl::span<u8, hash_size> out)
+        void ECPoint::extract_hash(gsl::span<unsigned char, hash_size> out)
         {
             memcpy(out.data(), pt_->y, hash_size);
         }

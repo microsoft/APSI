@@ -36,7 +36,7 @@ namespace apsi
         */
         struct SenderResponseQuery
         {
-            u64 package_count;
+            std::uint64_t package_count;
         }; // struct SenderResponseQuery
     }      // namespace network
 } // namespace apsi

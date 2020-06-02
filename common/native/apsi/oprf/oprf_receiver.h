@@ -93,7 +93,7 @@ namespace apsi
                 }
 
             private:
-                seal::IntArray<u8> factor_data_{ seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true) };
+                seal::IntArray<unsigned char> factor_data_{ seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true) };
 
                 std::size_t item_count_ = 0;
             };

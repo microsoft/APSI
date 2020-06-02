@@ -51,7 +51,7 @@ namespace apsi
             The query is a vector of items, and the result is a same-size vector of bool values. If an item is in the
             intersection, the corresponding bool value is true on the same position in the result vector.
             *************************************************************************************************************************************/
-            std::pair<std::vector<bool>, Matrix<u8>> query(std::vector<Item> &items, network::Channel &chl);
+            std::pair<std::vector<bool>, Matrix<unsigned char>> query(std::vector<Item> &items, network::Channel &chl);
 
             /************************************************************************************************************************************
             The following methods are the individual parts that when put together form a full Query to a Sender.
@@ -62,14 +62,14 @@ namespace apsi
             of items, and the result is a same-size vector of bool values. If an item is in the intersection, the
             corresponding bool value is true on the same position in the result vector .
             */
-            std::map<u64, std::vector<std::string>> &query(std::vector<Item> &items);
+            std::map<std::uint64_t, std::vector<std::string>> &query(std::vector<Item> &items);
 
             /**
             Decrypt the result of a query to a remote sender and get the intersection result. The query is a vector of
             items, and the result is a same-size vector of bool values. If an item is in the intersection, the
             corresponding bool value is true on the same position in the result vector
             */
-            std::pair<std::vector<bool>, Matrix<u8>> decrypt_result(std::vector<Item> &items, network::Channel &chl);
+            std::pair<std::vector<bool>, Matrix<unsigned char>> decrypt_result(std::vector<Item> &items, network::Channel &chl);
 
             /**
             Obfuscates the items and initializes the given vector with the buffer that must be sent to the Sender for
@@ -115,7 +115,7 @@ namespace apsi
             /**
             Preprocesses the PSI items. Returns the power map of the items, and the indices of them in the hash table.
             */
-            std::pair<std::map<u64, std::vector<std::string>>, std::unique_ptr<kuku::KukuTable>> preprocess(
+            std::pair<std::map<std::uint64_t, std::vector<std::string>>, std::unique_ptr<kuku::KukuTable>> preprocess(
                 std::vector<Item> &items);
 
             /**
@@ -139,7 +139,7 @@ namespace apsi
             we break the bits of sender's split_size into segment of window size).
             The return result is a map from k to y^k.
             */
-            void generate_powers(const FFieldArray &ffield_items, std::map<u64, FFieldArray> &ret);
+            void generate_powers(const FFieldArray &ffield_items, std::map<std::uint64_t, FFieldArray> &ret);
 
             /**
             Encrypts every vector of elements in the input map to a corresponding vector of SEAL Ciphertext, using
@@ -147,7 +147,7 @@ namespace apsi
             batching. For example, if an input vector has size 1024, the slot count is 256, then there are 1024/256 = 4
             ciphertext in the Ciphertext vector.
             */
-            void encrypt(std::map<u64, FFieldArray> &input, std::map<u64, std::vector<std::string>> &destination);
+            void encrypt(std::map<std::uint64_t, FFieldArray> &input, std::map<std::uint64_t, std::vector<std::string>> &destination);
 
             /**
             Encrypts a vector of elements to a corresponding vector of SEAL Ciphertext, using generalized batching. The
@@ -167,7 +167,7 @@ namespace apsi
             @result Matrix of size (#splits x table_size_ceiling). Here table_size_ceiling is defined as (#batches x
             batch_size), which might be larger than table_size.
             */
-            std::pair<std::vector<bool>, Matrix<u8>> stream_decrypt(
+            std::pair<std::vector<bool>, Matrix<unsigned char>> stream_decrypt(
                 network::Channel &channel, const std::vector<int> &table_to_input_map, std::vector<Item> &items);
 
             /**
@@ -175,7 +175,7 @@ namespace apsi
             */
             void stream_decrypt_worker(
                 int thread_idx, int batch_size, int num_threads, int block_count, network::Channel &channel,
-                const std::vector<int> &table_to_input_map, std::vector<bool> &ret_bools, Matrix<u8> &ret_labels);
+                const std::vector<int> &table_to_input_map, std::vector<bool> &ret_bools, Matrix<unsigned char> &ret_labels);
 
             std::shared_ptr<FField> field() const
             {
@@ -203,7 +203,7 @@ namespace apsi
 
             std::shared_ptr<seal::SEALContext> seal_context_;
 
-            i32 thread_count_;
+            std::int32_t thread_count_;
 
             std::shared_ptr<FField> field_;
 
@@ -217,13 +217,13 @@ namespace apsi
 
             std::shared_ptr<FFieldBatchEncoder> batch_encoder_;
 
-            i32 slot_count_;
+            std::int32_t slot_count_;
 
             // Objects for compressed ciphertexts
             std::unique_ptr<CiphertextCompressor> compressor_;
 
             // Preprocess result
-            std::unique_ptr<std::pair<std::map<u64, std::vector<std::string>>, std::unique_ptr<kuku::KukuTable>>>
+            std::unique_ptr<std::pair<std::map<std::uint64_t, std::vector<std::string>>, std::unique_ptr<kuku::KukuTable>>>
                 preprocess_result_;
 
             std::string relin_keys_;

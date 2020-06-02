@@ -10,7 +10,7 @@ namespace apsi
 {
     namespace details
     {
-        void copy_with_bit_offset(gsl::span<const u8> src, size_t bitOffset, size_t bitLength, gsl::span<u8> dest)
+        void copy_with_bit_offset(gsl::span<const unsigned char> src, size_t bitOffset, size_t bitLength, gsl::span<unsigned char> dest)
         {
             // the number of bits to shift by to align with dest
             size_t lowOffset = bitOffset & 7;
@@ -35,8 +35,8 @@ namespace apsi
                 size_t i = 0;
                 while (i < fullByteCount)
                 {
-                    u8 low = src[wordBegin + 0] >> lowOffset;
-                    u8 high = static_cast<u8>(static_cast<uint32_t>(src[wordBegin + 1]) << (8 - lowOffset));
+                    unsigned char low = src[wordBegin + 0] >> lowOffset;
+                    unsigned char high = static_cast<unsigned char>(static_cast<uint32_t>(src[wordBegin + 1]) << (8 - lowOffset));
                     dest[i] = low | high;
                     wordBegin++;
                     i++;
@@ -56,22 +56,22 @@ namespace apsi
             // if needed there are some remaining bits.
             if (remBits)
             {
-                u8 &destWord = dest[fullByteCount];
+                unsigned char &destWord = dest[fullByteCount];
 
-                // we now populate the last u8 of dest. Branch on
-                // if the src bits are contained in a single u8 or
+                // we now populate the last unsigned char of dest. Branch on
+                // if the src bits are contained in a single unsigned char or
                 // in two bytes.
                 bool oneWordSrc = lowOffset + remBits <= 8;
                 if (oneWordSrc)
                 {
                     // case 1: all the remaining bits live in src[wordBegin]
-                    u8 mask = static_cast<u8>(uint32_t(1) << remBits) - 1;
+                    unsigned char mask = static_cast<unsigned char>(uint32_t(1) << remBits) - 1;
 
-                    u8 low = src[wordBegin];
+                    unsigned char low = src[wordBegin];
                     low = low >> lowOffset;
                     low = low & mask;
 
-                    u8 high = destWord;
+                    unsigned char high = destWord;
                     high = high & (~mask);
 
                     destWord = low | high;
@@ -81,18 +81,18 @@ namespace apsi
                     // extract the top bits out of src[wordBegin].
                     // these will become the bottom bits of destWord
                     size_t lowCount = 8 - lowOffset;
-                    u8 lowMask = static_cast<u8>(uint32_t(1) << lowCount) - 1;
-                    u8 low = (src[wordBegin] >> lowOffset) & lowMask;
+                    unsigned char lowMask = static_cast<unsigned char>(uint32_t(1) << lowCount) - 1;
+                    unsigned char low = (src[wordBegin] >> lowOffset) & lowMask;
 
                     // extract the bottom bits out of src[wordBegin + 1].
                     // these will become the middle bits of destWord
                     size_t midCount = remBits - lowCount;
-                    u8 midMask = static_cast<u8>(uint32_t(1) << midCount) - 1;
-                    u8 mid = static_cast<u8>(static_cast<uint32_t>(src[wordBegin + 1] & midMask) << lowCount);
+                    unsigned char midMask = static_cast<unsigned char>(uint32_t(1) << midCount) - 1;
+                    unsigned char mid = static_cast<unsigned char>(static_cast<uint32_t>(src[wordBegin + 1] & midMask) << lowCount);
 
                     // keep the high bits of destWord
-                    u8 highMask = static_cast<u8>((~uint32_t(0)) << remBits);
-                    u8 high = destWord & highMask;
+                    unsigned char highMask = static_cast<unsigned char>((~uint32_t(0)) << remBits);
+                    unsigned char high = destWord & highMask;
 
                     // for everythign together;
                     destWord = low | mid | high;
@@ -104,7 +104,7 @@ namespace apsi
         // Bits are written to dest starting at the destBitOffset bit. All other bits in
         // dest are unchanged, e.g. the bit indexed by [0,1,...,destBitOffset - 1], [destBitOffset + bitLength, ...]
         void copy_with_bit_offset(
-            gsl::span<const u8> src, size_t srcBitOffset, size_t destBitOffset, size_t bitLength, gsl::span<u8> dest)
+            gsl::span<const unsigned char> src, size_t srcBitOffset, size_t destBitOffset, size_t bitLength, gsl::span<unsigned char> dest)
         {
             size_t destNext = (destBitOffset + 7) >> 3;
             int diff = static_cast<int>(destNext * 8 - destBitOffset);
@@ -125,15 +125,15 @@ namespace apsi
                 size_t destOffset = destBitOffset & 7;
                 size_t srcOffset = srcBitOffset & 7;
                 int highDiff = static_cast<int>(srcOffset) + diff - 8;
-                u8 &destVal = dest[destBegin];
+                unsigned char &destVal = dest[destBegin];
 
                 if (highDiff <= 0)
                 {
-                    u8 mask = static_cast<u8>(uint32_t(1) << diff) - 1;
-                    u8 mid = (src[srcBegin] >> srcOffset) & mask;
+                    unsigned char mask = static_cast<unsigned char>(uint32_t(1) << diff) - 1;
+                    unsigned char mid = (src[srcBegin] >> srcOffset) & mask;
 
-                    mask = ~static_cast<u8>(static_cast<uint32_t>(mask) << destOffset);
-                    mid = static_cast<u8>(static_cast<uint32_t>(mid) << destOffset);
+                    mask = ~static_cast<unsigned char>(static_cast<uint32_t>(mask) << destOffset);
+                    mid = static_cast<unsigned char>(static_cast<uint32_t>(mid) << destOffset);
 
                     destVal = (destVal & mask) | mid;
                 }
@@ -141,17 +141,17 @@ namespace apsi
                 {
                     int lowDiff = diff - highDiff;
 
-                    u8 lowMask = static_cast<u8>(uint32_t(1) << lowDiff) - 1;
-                    u8 low = src[srcBegin] >> srcOffset;
+                    unsigned char lowMask = static_cast<unsigned char>(uint32_t(1) << lowDiff) - 1;
+                    unsigned char low = src[srcBegin] >> srcOffset;
                     low &= lowMask;
 
-                    u8 highMask = static_cast<u8>(uint32_t(1) << highDiff) - 1;
-                    u8 high = src[srcBegin + 1] & highMask;
+                    unsigned char highMask = static_cast<unsigned char>(uint32_t(1) << highDiff) - 1;
+                    unsigned char high = src[srcBegin + 1] & highMask;
 
                     low <<= destOffset;
                     high <<= (destOffset + static_cast<size_t>(lowDiff));
 
-                    u8 mask = ~static_cast<u8>(((uint32_t(1) << diff) - 1) << destOffset);
+                    unsigned char mask = ~static_cast<unsigned char>(((uint32_t(1) << diff) - 1) << destOffset);
 
                     destVal = (destVal & mask) | low | high;
                 }

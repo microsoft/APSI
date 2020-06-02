@@ -31,7 +31,7 @@ namespace apsi
         CSVReader::CSVReader() : file_name_("")
         {}
 
-        void CSVReader::read(istream &stream, vector<Item> &items, Matrix<u8> &labels, int label_byte_count) const
+        void CSVReader::read(istream &stream, vector<Item> &items, Matrix<unsigned char> &labels, int label_byte_count) const
         {
             string line;
             vector<Item> temp_labels;
@@ -53,7 +53,7 @@ namespace apsi
             }
         }
 
-        void CSVReader::read(vector<Item> &items, Matrix<u8> &labels, int label_byte_count) const
+        void CSVReader::read(vector<Item> &items, Matrix<unsigned char> &labels, int label_byte_count) const
         {
             throw_if_file_not_present();
             ifstream file(file_name_);

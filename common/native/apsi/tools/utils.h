@@ -16,18 +16,18 @@ namespace apsi
         /**
         Find optimal split
         */
-        u64 optimal_split(const u64 x, const u64 base);
+        std::uint64_t optimal_split(const std::uint64_t x, const std::uint64_t base);
 
         /**
         Given the supported degree and bound on powers, find the maximal represented power.
         i.e., we are given y^((b**i)*j) for i = 1,2,..., bound and j = 1,2,...,b-1.
         */
-        u64 maximal_power(const u64 degree, const u64 bound, const u64 base);
+        std::uint64_t maximal_power(const std::uint64_t degree, const std::uint64_t bound, const std::uint64_t base);
 
         /**
         Convert the given input to digits
         */
-        std::vector<u64> conversion_to_digits(const u64 input, const u64 base);
+        std::vector<std::uint64_t> conversion_to_digits(const std::uint64_t input, const std::uint64_t base);
 
         /**
         Split the given string
@@ -51,8 +51,8 @@ namespace apsi
         /**
         Compute secure Sender bin size
         */
-        u64 compute_sender_bin_size(
-            u32 log_table_size, u64 sender_set_size, u32 hash_func_count, u32 binning_sec_level, u32 split_count);
+        std::uint64_t compute_sender_bin_size(
+            std::uint32_t log_table_size, std::uint64_t sender_set_size, std::uint32_t hash_func_count, std::uint32_t binning_sec_level, std::uint32_t split_count);
 
         extern Stopwatch sender_stop_watch, recv_stop_watch;
     } // namespace tools

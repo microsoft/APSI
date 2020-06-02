@@ -31,7 +31,7 @@ namespace apsi
         void Stopwatch::add_timespan_event(const string &name, const time_unit &start, const time_unit &end)
         {
             unique_lock<mutex> timespan_events_lock(*timespan_events_mtx_);
-            u64 duration = static_cast<u64>(chrono::duration_cast<chrono::milliseconds>(end - start).count());
+            uint64_t duration = static_cast<uint64_t>(chrono::duration_cast<chrono::milliseconds>(end - start).count());
             auto timespan_evt = timespan_events_.find(name);
 
             if (timespan_evt == timespan_events_.end())

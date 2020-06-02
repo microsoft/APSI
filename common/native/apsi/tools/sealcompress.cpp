@@ -70,7 +70,7 @@ namespace apsi
         auto compr_poly(util::allocate_zero_uint(static_cast<size_t>(compr_data_uint64_count), pool_));
 
         char *compr_poly_writer_head = reinterpret_cast<char *>(compr_poly.get());
-        const u64 *encrypted_coeff_ptr = encrypted.data();
+        const uint64_t *encrypted_coeff_ptr = encrypted.data();
         size_t encrypted_uint64_count = encrypted_size * encrypted.poly_modulus_degree();
         logging::Log::debug(
             "COMPRESSOR: compressing %i uint64s into %i", encrypted_uint64_count, compr_data_uint64_count);
@@ -80,7 +80,7 @@ namespace apsi
 
         for (size_t i = 0; i < encrypted_uint64_count; i++, encrypted_coeff_ptr++)
         {
-            u64 shifted_coeff = *encrypted_coeff_ptr << bit_shift;
+            uint64_t shifted_coeff = *encrypted_coeff_ptr << bit_shift;
             memcpy(
                 compr_poly_writer_head,
                 reinterpret_cast<char *>(&shifted_coeff) + static_cast<size_t>(util::bytes_per_uint64) - compr_coeff_byte_count,
@@ -155,12 +155,12 @@ namespace apsi
 
         // Finally parse and write to destination
         const char *compr_poly_reader_head = reinterpret_cast<const char *>(compr_poly.get());
-        u64 *destination_coeff_ptr = destination.data();
+        uint64_t *destination_coeff_ptr = destination.data();
         size_t encrypted_uint64_count = encrypted_size * destination.poly_modulus_degree();
         int bit_shift = util::bits_per_uint64 - coeff_mod_bit_count;
         for (size_t i = 0; i < encrypted_uint64_count; i++, destination_coeff_ptr++)
         {
-            u64 shifted_coeff = 0;
+            uint64_t shifted_coeff = 0;
             memcpy(reinterpret_cast<char *>(&shifted_coeff), compr_poly_reader_head, compr_coeff_byte_count);
             *destination_coeff_ptr =
                 shifted_coeff << (util::bits_per_byte * (util::bytes_per_uint64 - static_cast<int>(compr_coeff_byte_count)) - bit_shift);

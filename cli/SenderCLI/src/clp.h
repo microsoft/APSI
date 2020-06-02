@@ -33,10 +33,10 @@ namespace apsi
             add(ffield_degree_arg_);
             add(db_file_arg_);
             add(net_port_arg_);
-            add(num_chunks_arg_); 
+            add(num_chunks_arg_);
             add(sender_bin_size_arg_);
-            add(item_bit_length_used_after_oprf_arg_); 
-            add(hash_func_count_arg_); 
+            add(item_bit_length_used_after_oprf_arg_);
+            add(hash_func_count_arg_);
         }
 
         virtual void get_args()
@@ -75,7 +75,7 @@ namespace apsi
             const std::vector<std::size_t>& cma = coeff_mod_arg_.getValue();
             for (std::size_t coef : cma)
             {
-                coeff_modulus_.push_back(static_cast<u64>(coef));
+                coeff_modulus_.push_back(static_cast<std::uint64_t>(coef));
             }
 
             std::string coeffVal;
@@ -119,65 +119,65 @@ namespace apsi
         bool use_labels() const { return use_labels_; }
         bool use_fast_memberhip() const { return fast_membership_; }
 
-        u32 item_bit_length() const { return item_bit_length_; }
-        u32 sec_level() const { return sec_level_; }
+        std::uint32_t item_bit_length() const { return item_bit_length_; }
+        std::uint32_t sec_level() const { return sec_level_; }
         int log_table_size() const { return log_table_size_; }
         int split_count() const { return split_count_; }
         int split_size() const { return split_size_; }
-        
+
 
         int window_size() const { return window_size_; }
         int poly_modulus() const { return poly_modulus_; }
-        const std::vector<u64>& coeff_modulus() const { return coeff_modulus_; }
-        u64 plain_modulus() const { return plain_modulus_; }
+        const std::vector<std::uint64_t>& coeff_modulus() const { return coeff_modulus_; }
+        std::uint64_t plain_modulus() const { return plain_modulus_; }
         int ffield_degree() const { return ffield_degree_; }
         int net_port() const { return net_port_; }
         const std::string& db_file() const { return db_file_; }
-        int num_chunks() const { return num_chunks_; }	
+        int num_chunks() const { return num_chunks_; }
         int sender_bin_size() const { return sender_bin_size_; }
         int hash_func_count() const { return hash_func_count_; }
 
-        u32 item_bit_length_used_after_oprf() const { return item_bit_length_used_after_oprf_; }
+        std::uint32_t item_bit_length_used_after_oprf() const { return item_bit_length_used_after_oprf_; }
 
     private:
         TCLAP::SwitchArg             labels_arg_          = TCLAP::SwitchArg("l", "useLabels", "Use labels", false);
         TCLAP::SwitchArg             fast_membership_arg_ = TCLAP::SwitchArg("f", "fastMembership", "Use fast membership", false);
-        TCLAP::ValueArg<u32>   item_bit_length_arg_ = TCLAP::ValueArg<u32>("b", "itemBitLength", "Item bit length", false, 60, "unsigned");
+        TCLAP::ValueArg<std::uint32_t>   item_bit_length_arg_ = TCLAP::ValueArg<std::uint32_t>("b", "itemBitLength", "Item bit length", false, 60, "unsigned");
         TCLAP::ValueArg<int>         net_port_arg_        = TCLAP::ValueArg<int>("", "port", "Network port to bind to", false, 1212, "int");
         TCLAP::ValueArg<std::string> db_file_arg_         = TCLAP::ValueArg<std::string>("", "db", "Path to the file containing the Sender database", true, "", "string");
-        TCLAP::ValueArg<u32>   sec_lvl_arg_         = TCLAP::ValueArg<u32>("", "secLevel", "Security level", false, 40, "unsigned");
+        TCLAP::ValueArg<std::uint32_t>   sec_lvl_arg_         = TCLAP::ValueArg<std::uint32_t>("", "secLevel", "Security level", false, 40, "unsigned");
         TCLAP::ValueArg<int>         log_tbl_sz_arg_      = TCLAP::ValueArg<int>("", "logTableSize", "Table Size", false, 9, "int");
         TCLAP::ValueArg<int>         split_cnt_arg_       = TCLAP::ValueArg<int>("", "splitCount", "Split count", false, 1, "int");
         TCLAP::ValueArg<int>         split_sz_arg_ = TCLAP::ValueArg<int>("", "splitSize", "Split size", false, 15, "int");
         TCLAP::ValueArg<int>         wnd_sz_arg_          = TCLAP::ValueArg<int>("w", "windowSize", "Window size", false, 1, "int");
         TCLAP::ValueArg<int>         poly_mod_arg_        = TCLAP::ValueArg<int>("", "polyModulus", "Poly Modulus degree", false, 4096, "int");
 
-        TCLAP::MultiArg<std::size_t> coeff_mod_arg_       = TCLAP::MultiArg<std::size_t>("c", "coeffModulus", "Coefficient Modulus", false, "u64");
-        TCLAP::ValueArg<std::size_t> plain_mod_arg_       = TCLAP::ValueArg<std::size_t>("", "plainModulus", "Plain Modulus", false, 40961, "u64");
+        TCLAP::MultiArg<std::size_t> coeff_mod_arg_       = TCLAP::MultiArg<std::size_t>("c", "coeffModulus", "Coefficient Modulus", false, "std::uint64_t");
+        TCLAP::ValueArg<std::size_t> plain_mod_arg_       = TCLAP::ValueArg<std::size_t>("", "plainModulus", "Plain Modulus", false, 40961, "std::uint64_t");
         TCLAP::ValueArg<int>         ffield_degree_arg_    = TCLAP::ValueArg<int>("e", "ffieldDegree", "FField degree", false, 8, "int");
         TCLAP::ValueArg<int>         num_chunks_arg_      = TCLAP::ValueArg<int>("", "numChunks", "number of chunks per item", false, 1, "int");
         TCLAP::ValueArg<int>         sender_bin_size_arg_ = TCLAP::ValueArg<int>("", "senderBinSize", "(manually set) sender bin size", false, 0, "int");
         TCLAP::ValueArg<int>         hash_func_count_arg_ = TCLAP::ValueArg<int>("", "numHashes", "number of hash functions in cuckoo hashing", false, 2, "int");
-        TCLAP::ValueArg<u32>   item_bit_length_used_after_oprf_arg_
-                                                          = TCLAP::ValueArg<u32>("i", "itemBitLengthUsedAfterOPRF", "Item bit length used after oprf", false, 120, "unsigned");
+        TCLAP::ValueArg<std::uint32_t>   item_bit_length_used_after_oprf_arg_
+                                                          = TCLAP::ValueArg<std::uint32_t>("i", "itemBitLengthUsedAfterOPRF", "Item bit length used after oprf", false, 120, "unsigned");
 
         bool use_labels_;
         bool fast_membership_;
-        u32 item_bit_length_;
-        u32 sec_level_;
+        std::uint32_t item_bit_length_;
+        std::uint32_t sec_level_;
         int log_table_size_;
         int split_count_;
         int split_size_;
         int window_size_;
         int poly_modulus_;
-        std::vector<u64> coeff_modulus_;
-        u64 plain_modulus_;
+        std::vector<std::uint64_t> coeff_modulus_;
+        std::uint64_t plain_modulus_;
         int ffield_degree_;
         int net_port_;
         std::string db_file_;
         int num_chunks_;
         int sender_bin_size_;
         int hash_func_count_;
-        u32 item_bit_length_used_after_oprf_;
+        std::uint32_t item_bit_length_used_after_oprf_;
     };
 }

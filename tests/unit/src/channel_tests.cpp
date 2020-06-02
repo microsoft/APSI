@@ -103,7 +103,7 @@ namespace APSITests
         stringstream ss;
         relin_keys.save(ss);
         string relin_keys_str = ss.str();
-        map<u64, vector<string>> query_data;
+        map<uint64_t, vector<string>> query_data;
 
         // Receives
         ASSERT_ANY_THROW(mychannel.receive(get_params_resp));
@@ -160,7 +160,7 @@ namespace APSITests
             string ct_str = ss.str();
             ASSERT_EQ(ct_str.length(), 105);
 
-            map<u64, vector<string>> querydata;
+            map<uint64_t, vector<string>> querydata;
             vector<string> vec1;
             vec1.push_back(ct_str);
             vector<string> vec2;
@@ -171,9 +171,9 @@ namespace APSITests
             // This should be:
             // SenderOperationType size
             // 8425 for relinkeys
-            // u64 size (number of entries in querydata)
-            // u64 size * 2 (each entry in querydata)
-            // u64 size * 2 (each entry in querydata)
+            // uint64_t size (number of entries in querydata)
+            // uint64_t size * 2 (each entry in querydata)
+            // uint64_t size * 2 (each entry in querydata)
             // Ciphertexts will generate strings of length 105
             clt.send_query(relinkeys_str, querydata);
 
@@ -192,28 +192,28 @@ namespace APSITests
             clt.receive(pkg);
         });
 
-        ASSERT_EQ((u64)0, clt.get_total_data_received());
-        ASSERT_EQ((u64)0, clt.get_total_data_sent());
-        ASSERT_EQ((u64)0, svr.get_total_data_received());
-        ASSERT_EQ((u64)0, svr.get_total_data_sent());
+        ASSERT_EQ((uint64_t)0, clt.get_total_data_received());
+        ASSERT_EQ((uint64_t)0, clt.get_total_data_sent());
+        ASSERT_EQ((uint64_t)0, svr.get_total_data_received());
+        ASSERT_EQ((uint64_t)0, svr.get_total_data_sent());
 
         // get parameters
         shared_ptr<SenderOperation> sender_op;
         svr.receive(sender_op, /* wait_for_message */ true);
-        size_t expected_total = sizeof(u32); // SenderOperationType
+        size_t expected_total = sizeof(uint32_t); // SenderOperationType
         ASSERT_EQ(expected_total, svr.get_total_data_received());
 
         // preprocess
         svr.receive(sender_op, /* wait_for_message */ true);
         expected_total += 1000;
-        expected_total += sizeof(u32); // SenderOperationType
+        expected_total += sizeof(uint32_t); // SenderOperationType
         ASSERT_EQ(expected_total, svr.get_total_data_received());
 
         // query
         svr.receive(sender_op, /* wait_for_message */ true);
-        expected_total += sizeof(u32); // SenderOperationType
-        expected_total += sizeof(u64) * 3;
-        expected_total += sizeof(u64) * 2;
+        expected_total += sizeof(uint32_t); // SenderOperationType
+        expected_total += sizeof(uint64_t) * 3;
+        expected_total += sizeof(uint64_t) * 2;
         expected_total += 197010;  // relinkeys
         expected_total += 105 * 2; // Ciphertexts
         ASSERT_EQ(expected_total, svr.get_total_data_received());
@@ -231,11 +231,11 @@ namespace APSITests
         PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
 
         svr.send_get_parameters_response(sender_op->client_id, params);
-        expected_total = sizeof(u32); // SenderOperationType
+        expected_total = sizeof(uint32_t); // SenderOperationType
         expected_total += sizeof(PSIParams::PSIConfParams);
         expected_total += sizeof(PSIParams::TableParams);
         expected_total += sizeof(PSIParams::CuckooParams);
-        expected_total += sizeof(u64) + sizeof(u64) + sizeof(u32); // sizeof(PSIParams::SEALParams);
+        expected_total += sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t); // sizeof(PSIParams::SEALParams);
         expected_total += sizeof(PSIParams::FFieldParams);
         ASSERT_EQ(expected_total, svr.get_total_data_sent());
 
@@ -243,7 +243,7 @@ namespace APSITests
         vector<SEAL_BYTE> preproc;
         InitByteVector(preproc, 50);
         svr.send_preprocess_response(sender_op->client_id, preproc);
-        expected_total += sizeof(u32); // SenderOperationType
+        expected_total += sizeof(uint32_t); // SenderOperationType
         expected_total += preproc.size();
         ASSERT_EQ(expected_total, svr.get_total_data_sent());
 
@@ -260,10 +260,10 @@ namespace APSITests
         svr.send(sender_op->client_id, pkg2);
         svr.send(sender_op->client_id, pkg3);
 
-        expected_total += sizeof(i64) * 6;
+        expected_total += sizeof(int64_t) * 6;
         expected_total += 25;          // strings
-        expected_total += sizeof(u32); // SenderOperationType
-        expected_total += sizeof(u64); // size of vector
+        expected_total += sizeof(uint32_t); // SenderOperationType
+        expected_total += sizeof(uint64_t); // size of vector
         ASSERT_EQ(expected_total, svr.get_total_data_sent());
 
         clientth.join();
@@ -297,11 +297,11 @@ namespace APSITests
 
         ASSERT_TRUE(preproc != nullptr);
         ASSERT_EQ((size_t)5, preproc->buffer.size());
-        ASSERT_EQ((u8)1, (u8)preproc->buffer[0]);
-        ASSERT_EQ((u8)2, (u8)preproc->buffer[1]);
-        ASSERT_EQ((u8)3, (u8)preproc->buffer[2]);
-        ASSERT_EQ((u8)4, (u8)preproc->buffer[3]);
-        ASSERT_EQ((u8)5, (u8)preproc->buffer[4]);
+        ASSERT_EQ((unsigned char)1, (unsigned char)preproc->buffer[0]);
+        ASSERT_EQ((unsigned char)2, (unsigned char)preproc->buffer[1]);
+        ASSERT_EQ((unsigned char)3, (unsigned char)preproc->buffer[2]);
+        ASSERT_EQ((unsigned char)4, (unsigned char)preproc->buffer[3]);
+        ASSERT_EQ((unsigned char)5, (unsigned char)preproc->buffer[4]);
 
         clientth.join();
     }
@@ -322,7 +322,7 @@ namespace APSITests
             relin_keys.save(ss);
             string relin_keys_str = ss.str();
 
-            map<u64, vector<string>> query;
+            map<uint64_t, vector<string>> query;
 
             vector<string> vec;
             vec.push_back(string());
@@ -383,59 +383,59 @@ namespace APSITests
         SenderResponseGetParameters get_params_response;
         client_.receive(get_params_response);
 
-        ASSERT_EQ((u64)12345, get_params_response.psiconf_params.sender_size);
+        ASSERT_EQ((uint64_t)12345, get_params_response.psiconf_params.sender_size);
         ASSERT_EQ(true, get_params_response.psiconf_params.use_labels);
         ASSERT_EQ(false, get_params_response.psiconf_params.use_fast_membership);
-        ASSERT_EQ((u32)60, get_params_response.psiconf_params.item_bit_count);
-        ASSERT_EQ((u32)120, get_params_response.psiconf_params.item_bit_length_used_after_oprf);
-        ASSERT_EQ((u32)40, get_params_response.psiconf_params.num_chunks);
-        ASSERT_EQ((u32)50, get_params_response.psiconf_params.sender_bin_size);
-        ASSERT_EQ((u32)10, get_params_response.table_params.log_table_size);
-        ASSERT_EQ((u32)1, get_params_response.table_params.window_size);
-        ASSERT_EQ((u32)2, get_params_response.table_params.split_count);
-        ASSERT_EQ((u32)10, get_params_response.table_params.split_size);
-        ASSERT_EQ((u32)40, get_params_response.table_params.binning_sec_level);
+        ASSERT_EQ((uint32_t)60, get_params_response.psiconf_params.item_bit_count);
+        ASSERT_EQ((uint32_t)120, get_params_response.psiconf_params.item_bit_length_used_after_oprf);
+        ASSERT_EQ((uint32_t)40, get_params_response.psiconf_params.num_chunks);
+        ASSERT_EQ((uint32_t)50, get_params_response.psiconf_params.sender_bin_size);
+        ASSERT_EQ((uint32_t)10, get_params_response.table_params.log_table_size);
+        ASSERT_EQ((uint32_t)1, get_params_response.table_params.window_size);
+        ASSERT_EQ((uint32_t)2, get_params_response.table_params.split_count);
+        ASSERT_EQ((uint32_t)10, get_params_response.table_params.split_size);
+        ASSERT_EQ((uint32_t)40, get_params_response.table_params.binning_sec_level);
         ASSERT_FALSE(get_params_response.table_params.dynamic_split_count);
-        ASSERT_EQ((u32)3, get_params_response.cuckoo_params.hash_func_count);
-        ASSERT_EQ((u32)2, get_params_response.cuckoo_params.hash_func_seed);
-        ASSERT_EQ((u32)1, get_params_response.cuckoo_params.max_probe);
-        ASSERT_EQ((u64)678910, get_params_response.ffield_params.characteristic);
-        ASSERT_EQ((u32)8, get_params_response.ffield_params.degree);
-        ASSERT_EQ((u32)25, get_params_response.seal_params.max_supported_degree);
-        ASSERT_EQ((u64)5119, get_params_response.seal_params.encryption_params.plain_modulus().value());
+        ASSERT_EQ((uint32_t)3, get_params_response.cuckoo_params.hash_func_count);
+        ASSERT_EQ((uint32_t)2, get_params_response.cuckoo_params.hash_func_seed);
+        ASSERT_EQ((uint32_t)1, get_params_response.cuckoo_params.max_probe);
+        ASSERT_EQ((uint64_t)678910, get_params_response.ffield_params.characteristic);
+        ASSERT_EQ((uint32_t)8, get_params_response.ffield_params.degree);
+        ASSERT_EQ((uint32_t)25, get_params_response.seal_params.max_supported_degree);
+        ASSERT_EQ((uint64_t)5119, get_params_response.seal_params.encryption_params.plain_modulus().value());
         ASSERT_EQ((size_t)4096, get_params_response.seal_params.encryption_params.poly_modulus_degree());
         ASSERT_EQ((size_t)3, get_params_response.seal_params.encryption_params.coeff_modulus().size());
         ASSERT_EQ(
-            (u64)0x0000000FFFFEE001, get_params_response.seal_params.encryption_params.coeff_modulus()[0].value());
+            (uint64_t)0x0000000FFFFEE001, get_params_response.seal_params.encryption_params.coeff_modulus()[0].value());
         ASSERT_EQ(
-            (u64)0x0000000FFFFC4001, get_params_response.seal_params.encryption_params.coeff_modulus()[1].value());
+            (uint64_t)0x0000000FFFFC4001, get_params_response.seal_params.encryption_params.coeff_modulus()[1].value());
         ASSERT_EQ(
-            (u64)0x0000001FFFFE0001, get_params_response.seal_params.encryption_params.coeff_modulus()[2].value());
+            (uint64_t)0x0000001FFFFE0001, get_params_response.seal_params.encryption_params.coeff_modulus()[2].value());
 
         SenderResponseGetParameters get_params_response2;
         client_.receive(get_params_response2);
 
-        ASSERT_EQ((u64)54321, get_params_response2.psiconf_params.sender_size);
+        ASSERT_EQ((uint64_t)54321, get_params_response2.psiconf_params.sender_size);
         ASSERT_EQ(false, get_params_response2.psiconf_params.use_labels);
-        ASSERT_EQ((u32)80, get_params_response2.psiconf_params.item_bit_count);
-        ASSERT_EQ((u32)10, get_params_response2.table_params.log_table_size);
-        ASSERT_EQ((u32)1, get_params_response2.table_params.window_size);
-        ASSERT_EQ((u32)2, get_params_response2.table_params.split_count);
-        ASSERT_EQ((u32)40, get_params_response2.table_params.binning_sec_level);
-        ASSERT_EQ((u32)3, get_params_response2.cuckoo_params.hash_func_count);
-        ASSERT_EQ((u32)2, get_params_response2.cuckoo_params.hash_func_seed);
-        ASSERT_EQ((u32)1, get_params_response2.cuckoo_params.max_probe);
-        ASSERT_EQ((u64)678910, get_params_response2.ffield_params.characteristic);
-        ASSERT_EQ((u32)8, get_params_response2.ffield_params.degree);
-        ASSERT_EQ((u64)5119, get_params_response2.seal_params.encryption_params.plain_modulus().value());
+        ASSERT_EQ((uint32_t)80, get_params_response2.psiconf_params.item_bit_count);
+        ASSERT_EQ((uint32_t)10, get_params_response2.table_params.log_table_size);
+        ASSERT_EQ((uint32_t)1, get_params_response2.table_params.window_size);
+        ASSERT_EQ((uint32_t)2, get_params_response2.table_params.split_count);
+        ASSERT_EQ((uint32_t)40, get_params_response2.table_params.binning_sec_level);
+        ASSERT_EQ((uint32_t)3, get_params_response2.cuckoo_params.hash_func_count);
+        ASSERT_EQ((uint32_t)2, get_params_response2.cuckoo_params.hash_func_seed);
+        ASSERT_EQ((uint32_t)1, get_params_response2.cuckoo_params.max_probe);
+        ASSERT_EQ((uint64_t)678910, get_params_response2.ffield_params.characteristic);
+        ASSERT_EQ((uint32_t)8, get_params_response2.ffield_params.degree);
+        ASSERT_EQ((uint64_t)5119, get_params_response2.seal_params.encryption_params.plain_modulus().value());
         ASSERT_EQ((size_t)4096, get_params_response2.seal_params.encryption_params.poly_modulus_degree());
         ASSERT_EQ((size_t)3, get_params_response2.seal_params.encryption_params.coeff_modulus().size());
         ASSERT_EQ(
-            (u64)0x0000000FFFFEE001, get_params_response2.seal_params.encryption_params.coeff_modulus()[0].value());
+            (uint64_t)0x0000000FFFFEE001, get_params_response2.seal_params.encryption_params.coeff_modulus()[0].value());
         ASSERT_EQ(
-            (u64)0x0000000FFFFC4001, get_params_response2.seal_params.encryption_params.coeff_modulus()[1].value());
+            (uint64_t)0x0000000FFFFC4001, get_params_response2.seal_params.encryption_params.coeff_modulus()[1].value());
         ASSERT_EQ(
-            (u64)0x0000001FFFFE0001, get_params_response2.seal_params.encryption_params.coeff_modulus()[2].value());
+            (uint64_t)0x0000001FFFFE0001, get_params_response2.seal_params.encryption_params.coeff_modulus()[2].value());
     }
 
     TEST_F(ChannelTests, SendPreprocessResponseTest)
@@ -457,11 +457,11 @@ namespace APSITests
         client_.receive(preprocess_response);
 
         ASSERT_EQ((size_t)5, preprocess_response.buffer.size());
-        ASSERT_EQ((u8)10, (u8)preprocess_response.buffer[0]);
-        ASSERT_EQ((u8)9, (u8)preprocess_response.buffer[1]);
-        ASSERT_EQ((u8)8, (u8)preprocess_response.buffer[2]);
-        ASSERT_EQ((u8)7, (u8)preprocess_response.buffer[3]);
-        ASSERT_EQ((u8)6, (u8)preprocess_response.buffer[4]);
+        ASSERT_EQ((unsigned char)10, (unsigned char)preprocess_response.buffer[0]);
+        ASSERT_EQ((unsigned char)9, (unsigned char)preprocess_response.buffer[1]);
+        ASSERT_EQ((unsigned char)8, (unsigned char)preprocess_response.buffer[2]);
+        ASSERT_EQ((unsigned char)7, (unsigned char)preprocess_response.buffer[3]);
+        ASSERT_EQ((unsigned char)6, (unsigned char)preprocess_response.buffer[4]);
 
         serverth.join();
     }
@@ -500,7 +500,7 @@ namespace APSITests
         relinkeys.save(ss);
         string relinkeys_str = ss.str();
 
-        map<u64, vector<string>> querydata;
+        map<uint64_t, vector<string>> querydata;
 
         // Send empty info, it is ignored
         client_.send_query(relinkeys_str, querydata);
@@ -508,7 +508,7 @@ namespace APSITests
         SenderResponseQuery query_response;
         client_.receive(query_response);
 
-        ASSERT_EQ((u64)4, query_response.package_count);
+        ASSERT_EQ((uint64_t)4, query_response.package_count);
 
         ResultPackage pkg;
         client_.receive(pkg);
@@ -565,7 +565,7 @@ namespace APSITests
                 // Preprocessing will multiply two numbers and add them to the result
                 auto preproc_op = dynamic_pointer_cast<SenderOperationPreprocess>(sender_op);
                 preproc_op->buffer.resize(3);
-                preproc_op->buffer[2] = (SEAL_BYTE)((u8)preproc_op->buffer[0] * (u8)preproc_op->buffer[1]);
+                preproc_op->buffer[2] = (SEAL_BYTE)((unsigned char)preproc_op->buffer[0] * (unsigned char)preproc_op->buffer[1]);
 
                 sender.send_preprocess_response(preproc_op->client_id, preproc_op->buffer);
             }
@@ -580,10 +580,10 @@ namespace APSITests
 
                     recv.connect("tcp://localhost:5552");
 
-                    u8 a = static_cast<u8>(idx) * 2;
-                    u8 b = a + 1;
+                    unsigned char a = static_cast<unsigned char>(idx) * 2;
+                    unsigned char b = a + 1;
 
-                    for (u32 i = 0; i < 5; i++)
+                    for (uint32_t i = 0; i < 5; i++)
                     {
                         vector<SEAL_BYTE> buffer = CreateByteVector(a, b);
 
@@ -593,7 +593,7 @@ namespace APSITests
                         recv.receive(preproc);
 
                         ASSERT_EQ((size_t)3, preproc.buffer.size());
-                        ASSERT_EQ((u8)(a * b), (u8)preproc.buffer[2]);
+                        ASSERT_EQ((unsigned char)(a * b), (unsigned char)preproc.buffer[2]);
                     }
                 },
                 i);

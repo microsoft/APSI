@@ -49,30 +49,30 @@ namespace apsi
             Loads the input data into sender's database, and precomputes all necessary components for the PSI protocol,
             including symmetric polynomials, batching, etc.
             */
-            void load_db(int thread_count, const std::vector<Item> &data, MatrixView<u8> vals = {});
+            void load_db(int thread_count, const std::vector<Item> &data, MatrixView<unsigned char> vals = {});
 
             /**
             Sets the sender's database by hashing the data items with all hash functions.
             */
             void set_data(gsl::span<const Item> keys, int thread_count);
-            void set_data(gsl::span<const Item> keys, MatrixView<u8> values, int thread_count);
+            void set_data(gsl::span<const Item> keys, MatrixView<unsigned char> values, int thread_count);
 
             /**
             Adds the data items to sender's database.
             */
             void add_data(gsl::span<const Item> keys, int thread_count);
-            void add_data(gsl::span<const Item> keys, MatrixView<u8> values, int thread_count);
+            void add_data(gsl::span<const Item> keys, MatrixView<unsigned char> values, int thread_count);
 
             /**
              No hash version of add data, specific for one query
             */
-            void add_data_no_hash(gsl::span<const Item> data, MatrixView<u8> values);
+            void add_data_no_hash(gsl::span<const Item> data, MatrixView<unsigned char> values);
 
             /**
             Handles the work of one thread for adding items to sender's database
             */
             void add_data_worker(
-                int thread_idx, int thread_count, gsl::span<const Item> data, MatrixView<u8> values,
+                int thread_idx, int thread_count, gsl::span<const Item> data, MatrixView<unsigned char> values,
                 std::vector<int> &loads);
 
             /**
@@ -90,12 +90,12 @@ namespace apsi
 
             void batched_interpolate_polys(SenderThreadContext &th_context, int start_block, int end_block);
 
-            DBBlock &get_block(int batch, int split)
+            DBBlock &get_block(std::size_t batch, std::size_t split)
             {
                 return *db_blocks_(batch, split);
             }
 
-            u64 get_block_count() const
+            std::uint64_t get_block_count() const
             {
                 return db_blocks_.size();
             }

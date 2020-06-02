@@ -28,8 +28,8 @@ namespace apsi
 
             std::vector<std::vector<FFieldArray>> div_diff_temp;
             std::vector<FFieldArray> coeff_temp, x_temp, y_temp;
-            std::unordered_set<u64> key_set;
-            std::vector<u64> temp_vec;
+            std::unordered_set<std::uint64_t> key_set;
+            std::vector<std::uint64_t> temp_vec;
         }; // struct DBInterpolationCache
 
         /**
@@ -39,8 +39,8 @@ namespace apsi
         {
             struct Position
             {
-                i64 batch_offset;
-                i64 split_offset = -1;
+                std::int64_t batch_offset;
+                std::int64_t split_offset = -1;
 
                 bool is_initialized() const
                 {
@@ -48,7 +48,7 @@ namespace apsi
                 }
             }; // struct Position
 
-            void init(i64 batch_idx, i64 split_idx, i64 value_byte_length, i64 batch_size, i64 items_per_split)
+            void init(std::int64_t batch_idx, std::int64_t split_idx, std::int64_t value_byte_length, std::int64_t batch_size, std::int64_t items_per_split)
             {
                 label_data_.resize(static_cast<size_t>(batch_size * items_per_split * value_byte_length));
                 key_data_.resize(static_cast<size_t>(batch_size * items_per_split));
@@ -60,21 +60,21 @@ namespace apsi
                 items_per_split_ = items_per_split;
             }
 
-            std::vector<u8> label_data_;
+            std::vector<unsigned char> label_data_;
             std::vector<Item> key_data_;
 
             std::unique_ptr<std::atomic_bool[]> has_item_;
             // the index of this region
-            i64 batch_idx_, split_idx_;
+            std::int64_t batch_idx_, split_idx_;
 
             // the number of bytes that each label is
-            i64 value_byte_length_;
+            std::int64_t value_byte_length_;
 
             // the number of cuckoo slots that this regions spans.
-            i64 items_per_batch_;
+            std::int64_t items_per_batch_;
 
             // the number of items that are in a split.
-            i64 items_per_split_;
+            std::int64_t items_per_split_;
 
             gsl::span<seal::Plaintext> batch_random_symm_poly_;
 
@@ -118,7 +118,7 @@ namespace apsi
                 return key_data_[static_cast<size_t>(pos.batch_offset * items_per_split_ + pos.split_offset)];
             }
 
-            u8 *get_label(const Position &pos)
+            unsigned char *get_label(const Position &pos)
             {
 #ifndef NDEBUG
                 check(pos);
@@ -128,16 +128,16 @@ namespace apsi
                     (pos.batch_offset * items_per_split_ + pos.split_offset) * value_byte_length_)];
             }
 
-            u64 get_key_u64(const Position &pos)
+            std::uint64_t get_key_uint64(const Position &pos)
             {
                 auto &i = get_key(pos);
-                return *(u64 *)&i;
+                return *(std::uint64_t *)&i;
             }
 
-            u64 get_label_u64(const Position &pos)
+            std::uint64_t get_label_uint64(const Position &pos)
             {
                 auto l = get_label(pos);
-                u64 r = 0;
+                std::uint64_t r = 0;
                 memcpy(&r, l, static_cast<size_t>(value_byte_length_));
                 return r;
             }

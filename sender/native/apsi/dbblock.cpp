@@ -77,8 +77,8 @@ namespace apsi
         void DBBlock::symmetric_polys(
             SenderThreadContext &th_context, int encoding_bit_length, const FFieldElt &neg_null_element)
         {
-            i64 split_size = items_per_split_;
-            i64 batch_size = items_per_batch_;
+            int64_t split_size = items_per_split_;
+            int64_t batch_size = items_per_batch_;
             auto num_rows = batch_size;
             auto field = neg_null_element.field();
 
@@ -118,7 +118,7 @@ namespace apsi
                         symm_block_ptr, symm_block_ptr + d, temp1->data(), symm_block_ptr - d,
                         [&ch](auto a, auto b) { return util::multiply_uint_mod(a, b, ch); });
 
-                    for (i64 k = pos.split_offset + 1; k < split_size; k++, symm_block_ptr += d)
+                    for (int64_t k = pos.split_offset + 1; k < split_size; k++, symm_block_ptr += d)
                     {
                         transform(
                             temp1->data(), temp1->data() + d, symm_block_ptr + d, temp2.data(),
@@ -154,12 +154,12 @@ namespace apsi
                     {
                         auto &key_item = get_key(pos);
 
-                        temp.encode(gsl::span<u64>{ key_item.get_value() }, params.label_bit_count());
+                        temp.encode(gsl::span<uint64_t>{ key_item.get_value() }, params.label_bit_count());
                         x.set(size, temp);
 
                         auto src = get_label(pos);
                         temp.encode(
-                            gsl::span<u8>{ src, static_cast<size_t>(value_byte_length_) }, params.label_bit_count());
+                            gsl::span<unsigned char>{ src, static_cast<size_t>(value_byte_length_) }, params.label_bit_count());
                         y.set(size, temp);
 
                         ++size;
@@ -187,7 +187,7 @@ namespace apsi
 
                     if (cache.key_set.find(cache.temp_vec[0]) == cache.key_set.end())
                     {
-                        temp.encode(gsl::span<u64>{ cache.temp_vec }, params.label_bit_count());
+                        temp.encode(gsl::span<uint64_t>{ cache.temp_vec }, params.label_bit_count());
 
                         x.set(size, temp);
                         y.set(size, temp);
@@ -212,9 +212,9 @@ namespace apsi
             for (int s = 0; s < items_per_split_; s++)
             {
                 // Transpose the coeffs into temp_array
-                for (i64 b = 0; b < items_per_batch_; b++)
+                for (int64_t b = 0; b < items_per_batch_; b++)
                 {
-                    for (u64 c = 0; c < degree; c++)
+                    for (uint64_t c = 0; c < degree; c++)
                     {
                         // Set FROM cache.coeff_temp[b] location s TO temp_array location b
                         temp_array.set(b, s, cache.coeff_temp[static_cast<size_t>(b)]);
@@ -233,7 +233,7 @@ namespace apsi
                     if (has_item(temppos) && split_idx_ == 1)
                     {
                         Log::debug("real item at batch offset %i and split offset %i", j, s);
-                        Log::debug("label for this item is 0x%llx", get_label_u64(temppos));
+                        Log::debug("label for this item is 0x%llx", get_label_uint64_t(temppos));
                     }
                 }
 #endif
@@ -248,14 +248,14 @@ namespace apsi
             x_temp.reserve(items_per_batch);
             y_temp.reserve(items_per_batch);
 
-            for (u64 i = 0; i < items_per_batch; ++i)
+            for (uint64_t i = 0; i < items_per_batch; ++i)
             {
                 coeff_temp.emplace_back(items_per_split, field);
                 x_temp.emplace_back(items_per_split, field);
                 y_temp.emplace_back(items_per_split, field);
             }
 
-            temp_vec.resize((value_byte_count + sizeof(u64)) / sizeof(u64), 0);
+            temp_vec.resize((value_byte_count + sizeof(uint64_t)) / sizeof(uint64_t), 0);
             key_set.reserve(items_per_split);
         }
     } // namespace sender

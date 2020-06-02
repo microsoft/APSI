@@ -12,14 +12,14 @@ using namespace apsi;
 
 namespace
 {
-    u8 get_bit(vector<u8> &vec, size_t position)
+    unsigned char get_bit(vector<unsigned char> &vec, size_t position)
     {
         if (position >= (vec.size() * 8))
             throw out_of_range("position");
 
         size_t byte_idx = position >> 3;
         size_t bit_idx = position & size_t(0x7);
-        u8 mask = static_cast<u8>(0x1 << bit_idx);
+        unsigned char mask = static_cast<unsigned char>(0x1 << bit_idx);
         if (0 == (vec[byte_idx] & mask))
             return 0;
 
@@ -34,7 +34,7 @@ namespace APSITests
         int trials = 1000;
         size_t size = 10;
 
-        std::vector<u8> src(size), dest(size);
+        std::vector<unsigned char> src(size), dest(size);
         for (int t = 6; t < trials; ++t)
         {
             random_device rd;
@@ -56,7 +56,7 @@ namespace APSITests
 
             for (size_t i = 0; i < destOffset; ++i)
             {
-                ASSERT_EQ((u8)(destVal & 1), get_bit(dest, dst_idx));
+                ASSERT_EQ((unsigned char)(destVal & 1), get_bit(dest, dst_idx));
                 dst_idx++;
             }
 
@@ -70,7 +70,7 @@ namespace APSITests
             size_t rem = size * 8 - destOffset - bitLength;
             for (size_t i = 0; i < rem; ++i)
             {
-                ASSERT_EQ((u8)(destVal & 1), get_bit(dest, dst_idx));
+                ASSERT_EQ((unsigned char)(destVal & 1), get_bit(dest, dst_idx));
                 dst_idx++;
             }
         }

@@ -39,7 +39,7 @@ using namespace apsi::oprf;
 
 
 void run_sender_dispatcher(const CLP& cmd);
-bool initialize_db(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels);
+bool initialize_db(const CLP& cmd, vector<Item>& items, Matrix<unsigned char>& labels);
 
 
 int main(int argc, char *argv[])
@@ -100,7 +100,7 @@ void run_sender_dispatcher(const CLP& cmd)
     Log::info("Preparing sender DB");
 
     vector<Item> items;
-    Matrix<u8> labels;
+    Matrix<unsigned char> labels;
 
     shared_ptr<OPRFKey> oprf_key;
 
@@ -116,10 +116,10 @@ void run_sender_dispatcher(const CLP& cmd)
 
 
     auto coeffmod = params.seal_params().encryption_params.coeff_modulus();
-    size_t bits = 0; 
+    size_t bits = 0;
     for (size_t i = 0; i < coeffmod.size(); i++)
-        bits += coeffmod[i].bit_count(); 
-    Log::debug("coeff modulus size = %i ", bits); 
+        bits += coeffmod[i].bit_count();
+    Log::debug("coeff modulus size = %i ", bits);
 
     Log::info("OPRF for input items");
     STOPWATCH(sender_stop_watch, "Sender::OPRF");
@@ -146,7 +146,7 @@ void run_sender_dispatcher(const CLP& cmd)
     dispatcher.run(stop, cmd.net_port(), oprf_key, sender_db);
 }
 
-bool initialize_db(const CLP& cmd, vector<Item>& items, Matrix<u8>& labels)
+bool initialize_db(const CLP& cmd, vector<Item>& items, Matrix<unsigned char>& labels)
 {
     auto label_bit_length  = cmd.use_labels() ? cmd.item_bit_length() : 0;
     auto label_byte_length = (label_bit_length + 7) / 8;

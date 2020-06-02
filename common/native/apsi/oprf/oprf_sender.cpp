@@ -58,8 +58,8 @@ namespace apsi
 
             size_t query_count = static_cast<size_t>(oprf_queries.size()) / oprf_query_size;
 
-            auto oprf_in_ptr = reinterpret_cast<const u8 *>(oprf_queries.data());
-            auto oprf_out_ptr = reinterpret_cast<u8 *>(oprf_responses.data());
+            auto oprf_in_ptr = reinterpret_cast<const unsigned char *>(oprf_queries.data());
+            auto oprf_out_ptr = reinterpret_cast<unsigned char *>(oprf_responses.data());
 
             for (size_t i = 0; i < query_count; i++)
             {
@@ -135,13 +135,13 @@ namespace apsi
             for (size_t i = threadidx; i < oprf_items.size(); i += threads)
             {
                 // Create an elliptic curve point from the item
-                ECPoint ecpt({ reinterpret_cast<const u8 *>(oprf_items[i].data()), oprf_item_size });
+                ECPoint ecpt({ reinterpret_cast<const unsigned char *>(oprf_items[i].data()), oprf_item_size });
 
                 // Multiply with key
                 ecpt.scalar_multiply(oprf_key.key_span());
 
                 // Extract the hash
-                ecpt.extract_hash({ reinterpret_cast<u8 *>(oprf_hashes[i].data()), ECPoint::hash_size });
+                ecpt.extract_hash({ reinterpret_cast<unsigned char *>(oprf_hashes[i].data()), ECPoint::hash_size });
             }
         }
 
@@ -152,14 +152,14 @@ namespace apsi
             for (size_t i = threadidx; i < oprf_items.size(); i += threads)
             {
                 // Create an elliptic curve point from the item
-                ECPoint ecpt({ reinterpret_cast<u8 *>(oprf_items[i].data()), oprf_item_size });
+                ECPoint ecpt({ reinterpret_cast<unsigned char *>(oprf_items[i].data()), oprf_item_size });
 
                 // Multiply with key
                 ecpt.scalar_multiply(oprf_key.key_span());
 
                 // Extract the hash inplace
                 oprf_items[i] = oprf_item_type();
-                ecpt.extract_hash({ reinterpret_cast<u8 *>(oprf_items[i].data()), ECPoint::hash_size });
+                ecpt.extract_hash({ reinterpret_cast<unsigned char *>(oprf_items[i].data()), ECPoint::hash_size });
             }
         }
     } // namespace oprf

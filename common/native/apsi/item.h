@@ -24,9 +24,9 @@ namespace apsi
         Item(const Item &) = default;
 
         /**
-        Constructs an item by hahsing the u64 array and using 'item_bit_count_' bits of the hash.
+        Constructs an item by hahsing the std::uint64_t array and using 'item_bit_count_' bits of the hash.
         */
-        Item(u64 *pointer);
+        Item(std::uint64_t *pointer);
 
         /**
         Constructs an item by hashing the string and using 'item_bit_count_' bits of the hash.
@@ -34,9 +34,9 @@ namespace apsi
         Item(const std::string &str);
 
         /**
-        Constructs a short item (without hashing) by using 'item_bit_count_' bits of the specified u64 value.
+        Constructs a short item (without hashing) by using 'item_bit_count_' bits of the specified std::uint64_t value.
         */
-        Item(u64 item);
+        Item(std::uint64_t item);
 
         Item(const kuku::item_type &item);
 
@@ -54,7 +54,7 @@ namespace apsi
 
         Item &operator=(const std::string &assign);
 
-        Item &operator=(u64 assign);
+        Item &operator=(std::uint64_t assign);
 
         Item &operator=(const Item &assign);
 
@@ -65,22 +65,22 @@ namespace apsi
             return value_ == other.value_;
         }
 
-        u64 &operator[](size_t i)
+        std::uint64_t &operator[](size_t i)
         {
             return value_[i];
         }
 
-        const u64 &operator[](std::size_t i) const
+        const std::uint64_t &operator[](std::size_t i) const
         {
             return value_[i];
         }
 
-        u64 *data()
+        std::uint64_t *data()
         {
             return value_.data();
         }
 
-        const u64 *data() const
+        const std::uint64_t *data() const
         {
             return value_.data();
         }
@@ -105,7 +105,7 @@ namespace apsi
         The parser supports only base 10 and base 16 strings.
         When parsing a base 16 string, do _not_ include a preceding '0x'.
         */
-        void parse(const std::string &input, u32 base);
+        void parse(const std::string &input, std::uint32_t base);
 
         /**
         Parse the current item from a string.
@@ -116,9 +116,9 @@ namespace apsi
         void parse(const std::string &input);
 
     private:
-        std::array<u64, 2> value_;
+        std::array<std::uint64_t, 2> value_;
 
-        u32 muladd(u32 item[4], u32 mul, u32 add);
+        std::uint32_t muladd(std::uint32_t item[4], std::uint32_t mul, std::uint32_t add);
 
     public:
         static constexpr std::size_t item_byte_count = sizeof(value_);

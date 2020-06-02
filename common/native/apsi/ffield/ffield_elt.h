@@ -18,13 +18,13 @@ namespace apsi
         // Copies bitLength bits from src starting at the bit index by bitOffset.
         // Bits are written to dest starting at the first bit. All other bits in
         // dest are unchanged, e.g. the bit indexed by [bitLength, bitLength + 1, ...]
-        void copy_with_bit_offset(gsl::span<const u8> src, size_t bitOffset, size_t bitLength, gsl::span<u8> dest);
+        void copy_with_bit_offset(gsl::span<const unsigned char> src, size_t bitOffset, size_t bitLength, gsl::span<unsigned char> dest);
 
         // Copies bitLength bits from src starting at the bit index by srcBitOffset.
         // Bits are written to dest starting at the destBitOffset bit. All other bits in
         // dest are unchanged, e.g. the bit indexed by [0,1,...,destBitOffset - 1], [destBitOffset + bitLength, ...]
         void copy_with_bit_offset(
-            gsl::span<const u8> src, size_t srcBitOffset, size_t destBitOffset, size_t bitLength, gsl::span<u8> dest);
+            gsl::span<const unsigned char> src, size_t srcBitOffset, size_t destBitOffset, size_t bitLength, gsl::span<unsigned char> dest);
     } // namespace details
 
     class FFieldElt
@@ -155,7 +155,7 @@ namespace apsi
             neg(*this);
         }
 
-        inline void pow(FFieldElt &out, u64 e) const
+        inline void pow(FFieldElt &out, std::uint64_t e) const
         {
             const seal::Modulus &ch = field_.ch_;
             std::transform(elt_.cbegin(), elt_.cend(), out.elt_.begin(), [ch, e](auto a) {
@@ -212,7 +212,7 @@ namespace apsi
             return result;
         }
 
-        inline FFieldElt operator^(u64 e) const
+        inline FFieldElt operator^(std::uint64_t e) const
         {
             FFieldElt result(field_);
             pow(result, e);
@@ -239,7 +239,7 @@ namespace apsi
             div(*this, in);
         }
 
-        inline void operator^=(u64 e)
+        inline void operator^=(std::uint64_t e)
         {
             pow(*this, e);
         }
@@ -272,7 +272,7 @@ namespace apsi
         template <typename T>
         typename std::enable_if<std::is_pod<T>::value>::type encode(gsl::span<T> value, std::size_t bit_length)
         {
-            gsl::span<const u8> v2(reinterpret_cast<u8 *>(value.data()), value.size() * sizeof(T));
+            gsl::span<const unsigned char> v2(reinterpret_cast<unsigned char *>(value.data()), value.size() * sizeof(T));
 
             // Should minus 1 to avoid wrapping around p
             std::size_t split_length = static_cast<std::size_t>(field_.ch_.bit_count() - 1);
@@ -282,7 +282,7 @@ namespace apsi
 
             static_assert(std::is_pod<_ffield_elt_coeff_t>::value, "must be pod type");
 
-            if (field_.d_ < static_cast<u64>(split_index_bound))
+            if (field_.d_ < static_cast<std::uint64_t>(split_index_bound))
             {
                 throw std::invalid_argument("bit_length too large for extension field");
             }
@@ -292,7 +292,7 @@ namespace apsi
             {
                 auto size = std::min<std::size_t>(split_length, bit_length);
                 details::copy_with_bit_offset(
-                    v2, offset, size, { reinterpret_cast<u8 *>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) });
+                    v2, offset, size, { reinterpret_cast<unsigned char *>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) });
 
                 offset += split_length;
                 bit_length -= split_length;
@@ -302,7 +302,7 @@ namespace apsi
         template <typename T>
         typename std::enable_if<std::is_pod<T>::value>::type decode(gsl::span<T> value, std::size_t bit_length)
         {
-            gsl::span<u8> v2(reinterpret_cast<u8 *>(value.data()), value.size() * sizeof(T));
+            gsl::span<unsigned char> v2(reinterpret_cast<unsigned char *>(value.data()), value.size() * sizeof(T));
 
             // Should minus 1 to avoid wrapping around p
             std::size_t split_length = static_cast<std::size_t>(field_.ch_.bit_count() - 1);
@@ -310,7 +310,7 @@ namespace apsi
             // How many coefficients do we need in the FFieldElt
             std::size_t split_index_bound = (bit_length + split_length - 1) / split_length;
 #ifndef NDEBUG
-            if (static_cast<u64>(split_index_bound) > field_.d_)
+            if (static_cast<std::uint64_t>(split_index_bound) > field_.d_)
             {
                 throw std::invalid_argument("too many bits required");
             }
@@ -322,7 +322,7 @@ namespace apsi
             {
                 std::size_t size = std::min<std::size_t>(split_length, bit_length);
                 details::copy_with_bit_offset(
-                    { reinterpret_cast<u8 *>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) }, 0, offset, size, v2);
+                    { reinterpret_cast<unsigned char *>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) }, 0, offset, size, v2);
 
                 offset += split_length;
                 bit_length -= split_length;

@@ -82,7 +82,7 @@ namespace apsi
              * Send a request for a Query response to Sender
              */
             virtual void send_query(
-                const std::string &relin_keys, const std::map<u64, std::vector<std::string>> &query) = 0;
+                const std::string &relin_keys, const std::map<std::uint64_t, std::vector<std::string>> &query) = 0;
 
             /**
             Send a response to a Query request
@@ -98,7 +98,7 @@ namespace apsi
             /**
              * Get the amount of data that has been sent through the channel
              */
-            u64 get_total_data_sent() const
+            std::uint64_t get_total_data_sent() const
             {
                 return bytes_sent_;
             }
@@ -106,14 +106,14 @@ namespace apsi
             /**
              * Get the amount of data that has been received through the channel
              */
-            u64 get_total_data_received() const
+            std::uint64_t get_total_data_received() const
             {
                 return bytes_received_;
             }
 
         protected:
-            u64 bytes_sent_;
-            u64 bytes_received_;
+            std::uint64_t bytes_sent_;
+            std::uint64_t bytes_received_;
         }; // class Channel
     }      // namespace network
 } // namespace apsi

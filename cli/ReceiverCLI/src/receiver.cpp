@@ -40,7 +40,7 @@ using namespace seal;
 
 
 void remote_query(const CLP& cmd);
-void print_intersection_results(pair<vector<bool>, Matrix<u8>>& intersection);
+void print_intersection_results(pair<vector<bool>, Matrix<unsigned char>>& intersection);
 void print_timing_info();
 void print_transmitted_data(Channel& channel);
 string get_conn_addr(const CLP& cmd);
@@ -95,7 +95,7 @@ void remote_query(const CLP& cmd)
     Receiver receiver(cmd.threads());
 
     vector<Item> items;
-    Matrix<u8> labels;
+    Matrix<unsigned char> labels;
     int intersection_size = initialize_query(cmd, items);
     if (-1 == intersection_size)
     {
@@ -111,7 +111,7 @@ void remote_query(const CLP& cmd)
     print_transmitted_data(channel);
 }
 
-string print_hex(gsl::span<u8> s)
+string print_hex(gsl::span<unsigned char> s)
 {
     stringstream ss;
     ss << "{ ";
@@ -123,7 +123,7 @@ string print_hex(gsl::span<u8> s)
     return ss.str();
 }
 
-void print_intersection_results(pair<vector<bool>, Matrix<u8>>& intersection)
+void print_intersection_results(pair<vector<bool>, Matrix<unsigned char>>& intersection)
 {
     for (size_t i = 0; i < intersection.first.size(); i++)
     {
@@ -211,7 +211,7 @@ int initialize_query(const CLP& cmd, vector<Item>& items)
     // Read items that should exist from file
     try
     {
-        Matrix<u8> unused;
+        Matrix<unsigned char> unused;
         CSVReader reader(cmd.query_file());
         reader.read(items, unused, /* label_byte_count */ 0);
     }

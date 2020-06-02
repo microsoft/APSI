@@ -65,7 +65,7 @@ APSIEXPORT bool APSICALL ReceiverIsConnected()
     return rec_channel_->is_connected();
 }
 
-APSIEXPORT bool APSICALL ReceiverQuery(int length, u64apsi *items, int *result, u64apsi *labels)
+APSIEXPORT bool APSICALL ReceiverQuery(int length, uint64_tapsi *items, int *result, uint64_tapsi *labels)
 {
     if (nullptr == items)
         return false;
@@ -96,7 +96,7 @@ APSIEXPORT bool APSICALL ReceiverQuery(int length, u64apsi *items, int *result, 
 
         if (receiver_->get_params().use_labels())
         {
-            memcpy(&labels[i], qresult.second[i].data(), sizeof(u64));
+            memcpy(&labels[i], qresult.second[i].data(), sizeof(uint64_t));
         }
     }
 

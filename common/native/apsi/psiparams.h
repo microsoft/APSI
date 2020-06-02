@@ -27,11 +27,11 @@ namespace apsi
         */
         struct PSIConfParams
         {
-            u64 sender_size;
-            u64 sender_bin_size;
-            u32 item_bit_count;                  // <=max_item_bit_count=128, reserve extra bits for Kuku
-            u32 item_bit_length_used_after_oprf; // the number of bits we take after oprf
-            u32 num_chunks;                      // the number of chunks to split each item into
+            std::uint64_t sender_size;
+            std::uint64_t sender_bin_size;
+            std::uint32_t item_bit_count;                  // <=max_item_bit_count=128, reserve extra bits for Kuku
+            std::uint32_t item_bit_length_used_after_oprf; // the number of bits we take after oprf
+            std::uint32_t num_chunks;                      // the number of chunks to split each item into
             bool use_labels;
             bool use_fast_membership; // faster configuration assuming query is always one item
         };                            // struct PSIConfParams
@@ -41,27 +41,27 @@ namespace apsi
             return psiconf_params_;
         }
 
-        inline u64 sender_size() const
+        inline std::uint64_t sender_size() const
         {
             return psiconf_params_.sender_size;
         }
 
-        inline u64 sender_bin_size() const
+        inline std::uint64_t sender_bin_size() const
         {
             return psiconf_params_.sender_bin_size;
         }
 
-        inline u32 item_bit_count() const
+        inline std::uint32_t item_bit_count() const
         {
             return psiconf_params_.item_bit_count;
         }
 
-        inline u32 item_bit_length_used_after_oprf() const
+        inline std::uint32_t item_bit_length_used_after_oprf() const
         {
             return psiconf_params_.item_bit_length_used_after_oprf;
         }
 
-        inline u32 num_chunks() const
+        inline std::uint32_t num_chunks() const
         {
             return psiconf_params_.num_chunks;
         }
@@ -81,11 +81,11 @@ namespace apsi
         */
         struct TableParams
         {
-            u32 log_table_size;
-            u32 window_size;
-            u32 split_count;
-            u32 split_size;
-            u32 binning_sec_level;
+            std::uint32_t log_table_size;
+            std::uint32_t window_size;
+            std::uint32_t split_count;
+            std::uint32_t split_size;
+            std::uint32_t binning_sec_level;
             bool dynamic_split_count; // TODO: Do not use bool for "*count".
         };                            // struct TableParams
 
@@ -94,27 +94,27 @@ namespace apsi
             return table_params_;
         }
 
-        inline u32 log_table_size() const
+        inline std::uint32_t log_table_size() const
         {
             return table_params_.log_table_size;
         }
 
-        inline u32 window_size() const
+        inline std::uint32_t window_size() const
         {
             return table_params_.window_size;
         }
 
-        inline u32 split_count() const
+        inline std::uint32_t split_count() const
         {
             return table_params_.split_count;
         }
 
-        inline u32 split_size() const
+        inline std::uint32_t split_size() const
         {
             return table_params_.split_size;
         }
 
-        inline u32 binning_sec_level() const
+        inline std::uint32_t binning_sec_level() const
         {
             return table_params_.binning_sec_level;
         }
@@ -132,9 +132,9 @@ namespace apsi
             // A larger hash_func_count leads to worse performance.
             // Kuku upperbounds hash_func_count, e.g. if item_bit_count = 120 then hash_func_count < 64.
             // Typically, 3 is enough.
-            u32 hash_func_count;
-            u32 hash_func_seed;
-            u32 max_probe;
+            std::uint32_t hash_func_count;
+            std::uint32_t hash_func_seed;
+            std::uint32_t max_probe;
         }; // struct CuckooParams
 
         const CuckooParams &cuckoo_params() const
@@ -142,17 +142,17 @@ namespace apsi
             return cuckoo_params_;
         }
 
-        inline u32 hash_func_count() const
+        inline std::uint32_t hash_func_count() const
         {
             return cuckoo_params_.hash_func_count;
         }
 
-        inline u32 hash_func_seed() const
+        inline std::uint32_t hash_func_seed() const
         {
             return cuckoo_params_.hash_func_seed;
         }
 
-        inline u32 max_probe() const
+        inline std::uint32_t max_probe() const
         {
             return cuckoo_params_.max_probe;
         }
@@ -163,7 +163,7 @@ namespace apsi
         struct SEALParams
         {
             seal::EncryptionParameters encryption_params{ seal::scheme_type::BFV };
-            u32 max_supported_degree;
+            std::uint32_t max_supported_degree;
         }; // struct SEALParams
 
         const SEALParams &seal_params() const
@@ -176,7 +176,7 @@ namespace apsi
             return seal_params_.encryption_params;
         }
 
-        inline u32 max_supported_degree() const
+        inline std::uint32_t max_supported_degree() const
         {
             return seal_params_.max_supported_degree;
         }
@@ -186,8 +186,8 @@ namespace apsi
         */
         struct FFieldParams
         {
-            u64 characteristic;
-            u32 degree;
+            std::uint64_t characteristic;
+            std::uint32_t degree;
         }; // struct FFieldParams
 
         const FFieldParams &ffield_params() const
@@ -195,12 +195,12 @@ namespace apsi
             return ffield_params_;
         }
 
-        inline u64 ffield_characteristic() const
+        inline std::uint64_t ffield_characteristic() const
         {
             return ffield_params_.characteristic;
         }
 
-        inline u32 ffield_degree() const
+        inline std::uint32_t ffield_degree() const
         {
             return ffield_params_.degree;
         }
@@ -208,13 +208,13 @@ namespace apsi
         /**
         Manual setters.
         */
-        void set_sender_bin_size(u64 size)
+        void set_sender_bin_size(std::uint64_t size)
         {
             logging::Log::debug("Manually setting sender bin size to be %i", size);
             psiconf_params_.sender_bin_size = size;
         }
 
-        void set_split_count(u32 count)
+        void set_split_count(std::uint32_t count)
         {
             logging::Log::debug("Manually setting split count to be %i", count);
             table_params_.split_count = count;
@@ -223,28 +223,28 @@ namespace apsi
         /**
         Other getters.
         */
-        inline u32 table_size() const
+        inline std::uint32_t table_size() const
         {
             return 1 << table_params_.log_table_size;
         }
 
-        inline u32 batch_size() const
+        inline std::uint32_t batch_size() const
         {
-            return static_cast<u32>(encryption_params().poly_modulus_degree() / ffield_degree());
+            return static_cast<std::uint32_t>(encryption_params().poly_modulus_degree() / ffield_degree());
         }
 
-        inline u32 batch_count() const
+        inline std::uint32_t batch_count() const
         {
-            u32 batch = batch_size();
+            std::uint32_t batch = batch_size();
             return (table_size() + batch - 1) / batch;
         }
 
-        inline u32 label_bit_count() const
+        inline std::uint32_t label_bit_count() const
         {
             return psiconf_params_.use_labels ? psiconf_params_.item_bit_count : 0;
         }
 
-        inline u32 label_byte_count() const
+        inline std::uint32_t label_byte_count() const
         {
             return psiconf_params_.use_labels ? (psiconf_params_.item_bit_count + 7) / 8 : 0;
         }
@@ -308,9 +308,9 @@ namespace apsi
                 throw std::invalid_argument("Sender bin size must be a multiple of number of splits.");
             }
             if ((item_bit_count() + 63) / 64 !=
-                (item_bit_count() + static_cast<u32>(floor(log2(hash_func_count()))) + 1 + 1 + 63) / 64)
+                (item_bit_count() + static_cast<std::uint32_t>(floor(log2(hash_func_count()))) + 1 + 1 + 63) / 64)
             {
-                throw std::invalid_argument("Invalid for cuckoo: null bit and location index overflow to new u64.");
+                throw std::invalid_argument("Invalid for cuckoo: null bit and location index overflow to new std::uint64_t.");
             }
             if (item_bit_count() > max_item_bit_count)
             {
@@ -322,8 +322,8 @@ namespace apsi
                 logging::Log::warning("Item bit count is close to its upper limit. Several bits should be reserved for "
                                       "appropriate Cuckoo hashing.");
             }
-            u64 supported_bitcount =
-                static_cast<u64>(ffield_degree()) * static_cast<u64>(seal_params_.encryption_params.plain_modulus().bit_count() - 1);
+            std::uint64_t supported_bitcount =
+                static_cast<std::uint64_t>(ffield_degree()) * static_cast<std::uint64_t>(seal_params_.encryption_params.plain_modulus().bit_count() - 1);
             if (item_bit_length_used_after_oprf() > supported_bitcount)
             {
                 logging::Log::warning(

@@ -60,12 +60,12 @@ namespace APSITests
         apsi::MatrixView mv(array, 3, 3);
 
         apsi::MatrixView<int> mv2;
-        ASSERT_EQ((apsi::u64)0, mv2.rows());
-        ASSERT_EQ((apsi::u64)0, mv2.columns());
+        ASSERT_EQ((uint64_t)0, mv2.rows());
+        ASSERT_EQ((uint64_t)0, mv2.columns());
 
         mv2 = mv;
-        ASSERT_EQ((apsi::u64)3, mv2.rows());
-        ASSERT_EQ((apsi::u64)3, mv2.columns());
+        ASSERT_EQ((uint64_t)3, mv2.rows());
+        ASSERT_EQ((uint64_t)3, mv2.columns());
         ASSERT_EQ(3, *mv2(2, 0));
     }
 
@@ -106,7 +106,7 @@ namespace APSITests
 
         // The view _can_ have a smaller size than the actual data.
         ASSERT_EQ(4, mv[1][1]);
-        ASSERT_EQ((apsi::u64)4, mv.size());
+        ASSERT_EQ((uint64_t)4, mv.size());
     }
 
     TEST(MatrixViewTests, ResizeTest)
@@ -135,8 +135,8 @@ namespace APSITests
         apsi::MatrixView mv(array, 5, 2);
         apsi::MatrixView mv2(array, 5, 1);
 
-        apsi::u64 sum = 0;
-        apsi::u64 sum2 = 0;
+        uint64_t sum = 0;
+        uint64_t sum2 = 0;
 
         for (auto &elem : mv)
         {
@@ -148,8 +148,8 @@ namespace APSITests
             sum2 += elem;
         }
 
-        ASSERT_EQ((apsi::u64)55, sum);
-        ASSERT_EQ((apsi::u64)15, sum2);
+        ASSERT_EQ((uint64_t)55, sum);
+        ASSERT_EQ((uint64_t)15, sum2);
     }
 
     TEST(MatrixTests, ResizeTest)
@@ -163,14 +163,14 @@ namespace APSITests
             }
         }
 
-        ASSERT_EQ((apsi::u64)25, m.capacity_test());
+        ASSERT_EQ((uint64_t)25, m.capacity_test());
 
         m.resize(10, 10);
 
-        ASSERT_EQ((apsi::u64)10, m.rows());
-        ASSERT_EQ((apsi::u64)10, m.columns());
-        ASSERT_EQ((apsi::u64)100, m.size());
-        ASSERT_EQ((apsi::u64)100, m.capacity_test());
+        ASSERT_EQ((uint64_t)10, m.rows());
+        ASSERT_EQ((uint64_t)10, m.columns());
+        ASSERT_EQ((uint64_t)100, m.size());
+        ASSERT_EQ((uint64_t)100, m.capacity_test());
 
         // Data should still be there, but in their new positions
         ASSERT_EQ(25, *m(2, 4));
@@ -181,6 +181,6 @@ namespace APSITests
         m.resize(2, 2);
 
         ASSERT_EQ(4, *m(1, 1));
-        ASSERT_EQ((apsi::u64)100, m.capacity_test());
+        ASSERT_EQ((uint64_t)100, m.capacity_test());
     }
 } // namespace APSITests

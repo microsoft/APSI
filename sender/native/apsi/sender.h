@@ -61,17 +61,17 @@ namespace apsi
             };
 
             int max_power, window;
-            int max_degree_supported; // maximum degree supported.
-            int given_digits;         // how many digits are given.
+            std::uint64_t max_degree_supported; // maximum degree supported.
+            std::uint64_t given_digits;         // how many digits are given.
             std::vector<int> base_powers;
             std::vector<Node> nodes;
 
-            WindowingDag(int max_power, int window, int max_degree_supported, int given_digits)
+            WindowingDag(int max_power, int window, std::uint64_t max_degree_supported, std::uint64_t given_digits)
                 : max_power(max_power), window(window), max_degree_supported(max_degree_supported),
                   given_digits(given_digits)
             {
-                int base = 1 << window;
-                u64 actual_power = tools::maximal_power(max_degree_supported, given_digits, base);
+                std::uint64_t base = std::uint64_t(1) << window;
+                std::uint64_t actual_power = tools::maximal_power(max_degree_supported, given_digits, base);
 
                 logging::Log::debug("actual power supported = %i", actual_power);
                 if (static_cast<int>(actual_power) < max_power)
@@ -82,9 +82,9 @@ namespace apsi
                 compute_dag();
             }
 
-            u64 pow(u64 base, u64 e);
-            u64 optimal_split(std::size_t x, int base, std::vector<int> &degrees);
-            std::vector<u64> conversion_to_digits(u64 input, int base);
+            std::uint64_t pow(std::uint64_t base, std::uint64_t e);
+            std::uint64_t optimal_split(std::size_t x, int base, std::vector<int> &degrees);
+            std::vector<std::uint64_t> conversion_to_digits(std::uint64_t input, int base);
             void compute_dag();
         }; // struct WindowingDag
 
@@ -112,7 +112,7 @@ namespace apsi
             Generate a response to a query
             */
             void query(
-                const std::string &relin_keys, const std::map<u64, std::vector<std::string>> query,
+                const std::string &relin_keys, const std::map<std::uint64_t, std::vector<std::string>> query,
                 const std::vector<seal::SEAL_BYTE> &client_id, network::Channel &channel);
 
             /**

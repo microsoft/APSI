@@ -83,7 +83,7 @@ namespace apsi
              * Send a request for a Query response to Sender
              */
             virtual void send_query(
-                const std::string &relin_keys, const std::map<u64, std::vector<std::string>> &query);
+                const std::string &relin_keys, const std::map<std::uint64_t, std::vector<std::string>> &query);
 
             /**
             Send a response to a Query request

@@ -20,17 +20,17 @@ namespace apsi
             return field_.ch_;
         }
 
-        inline u64 d() const
+        inline std::uint64_t d() const
         {
             return field_.d_;
         }
 
-        inline u64 n() const
+        inline std::uint64_t n() const
         {
             return n_;
         }
 
-        inline u64 m() const
+        inline std::uint64_t m() const
         {
             return m_;
         }
@@ -40,7 +40,7 @@ namespace apsi
             return log_n_;
         }
 
-        inline u64 slot_count() const
+        inline std::uint64_t slot_count() const
         {
             return slot_count_;
         }
@@ -61,9 +61,9 @@ namespace apsi
     private:
         std::unique_ptr<seal::BatchEncoder> encoder_;
         FField field_;
-        const u64 n_;
+        const std::uint64_t n_;
         const int log_n_;
-        const u64 m_;
-        const u64 slot_count_;
+        const std::uint64_t m_;
+        const std::uint64_t slot_count_;
     }; // class FFieldBatchEncoder
 } // namespace apsi

@@ -27,7 +27,7 @@ namespace apsi
 
         const PSIParams build_psi_params(
             const CLP& cmd,
-            const u64 sender_set_size)
+            const uint64_t sender_set_size)
         {
             // General PSI parameters
             PSIParams::PSIConfParams psiconf_params;

@@ -36,10 +36,10 @@ namespace APSITests
     }
 
     // return poly(x)
-    u64 u64_poly_eval(const vector<u64> &poly, const u64 &x, const seal::Modulus &mod)
+    uint64_t uint64_t_poly_eval(const vector<uint64_t> &poly, const uint64_t &x, const seal::Modulus &mod)
     {
         // cout << "f(" << x << ") = ";
-        u64 result = 0, xx = 1;
+        uint64_t result = 0, xx = 1;
 
         for (size_t i = 0; i < poly.size(); ++i)
         {
@@ -60,7 +60,7 @@ namespace APSITests
 
         int degree = 2;
         auto plain_modulus = context->first_context_data()->parms().plain_modulus();
-        u64 numPoints = min<u64>(3, plain_modulus.value() / degree);
+        uint64_t numPoints = min<uint64_t>(3, plain_modulus.value() / degree);
         int numTrials = 10;
 
         FField field(parms.plain_modulus(), degree);
@@ -81,7 +81,7 @@ namespace APSITests
         ffield_newton_interpolate_poly(points, values, result);
 
         // Check the result: interpolating (x,x) should result in polynomial coeffs (0,1,0,...,0)
-        // vector<u64> tempresult(points.size());
+        // vector<uint64_t> tempresult(points.size());
         for (int k = 0; k < degree; k++)
         {
             for (size_t j = 0; j < points.size(); ++j)
@@ -112,7 +112,7 @@ namespace APSITests
         ffield_newton_interpolate_poly(points, values, result);
 
         // Check the result: interpolating (x,0) should result in zero polynomial.
-        // vector<u64> tempresult(points.size());
+        // vector<uint64_t> tempresult(points.size());
         for (int k = 0; k < degree; k++)
         {
             for (size_t j = 0; j < points.size(); ++j)
@@ -129,7 +129,7 @@ namespace APSITests
     {
         int degree = 2;
         seal::Modulus plain_modulus(40961);
-        u64 numPoints = min<u64>(3, plain_modulus.value() / degree);
+        uint64_t numPoints = min<uint64_t>(3, plain_modulus.value() / degree);
         int numTrials = 10;
 
         FField field(plain_modulus, degree);
@@ -154,7 +154,7 @@ namespace APSITests
             ffield_newton_interpolate_poly(points, values, result);
 
             // Check the result
-            vector<u64> tempresult(points.size());
+            vector<uint64_t> tempresult(points.size());
             for (int k = 0; k < degree; k++)
             {
                 for (size_t j = 0; j < points.size(); ++j)
@@ -163,10 +163,10 @@ namespace APSITests
                 }
                 for (size_t j = 0; j < points.size(); ++j)
                 {
-                    u64 x = points.get_coeff_of(j, k);
-                    u64 y = values.get_coeff_of(j, k);
+                    uint64_t x = points.get_coeff_of(j, k);
+                    uint64_t y = values.get_coeff_of(j, k);
 
-                    auto yy = u64_poly_eval(tempresult, x, plain_modulus);
+                    auto yy = uint64_t_poly_eval(tempresult, x, plain_modulus);
                     if (yy != y)
                     {
                         cout << " poly(x[" << i << "]) = " << yy << "  != \n"

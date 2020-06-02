@@ -53,7 +53,7 @@ namespace apsi
             inline void clear()
             {
                 oprf_key_ =
-                    seal::IntArray<u8>(oprf_key_size, seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true));
+                    seal::IntArray<unsigned char>(oprf_key_size, seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true));
             }
 
             inline oprf_key_span_const_type key_span() const noexcept
@@ -64,7 +64,7 @@ namespace apsi
         private:
             std::shared_ptr<seal::UniformRandomGeneratorFactory> random_{ nullptr };
 
-            seal::IntArray<u8> oprf_key_{ oprf_key_size,
+            seal::IntArray<unsigned char> oprf_key_{ oprf_key_size,
                                           seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true) };
         }; // class OPRFKey
 

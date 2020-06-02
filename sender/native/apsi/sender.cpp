@@ -37,7 +37,7 @@ namespace apsi
         {}
 
         void Sender::query(
-            const string &relin_keys, const map<u64, vector<string>> query, const vector<SEAL_BYTE> &client_id,
+            const string &relin_keys, const map<uint64_t, vector<string>> query, const vector<SEAL_BYTE> &client_id,
             Channel &channel)
         {
             if (!sender_db_)
@@ -96,8 +96,7 @@ namespace apsi
             STOPWATCH(sender_stop_watch, "Sender::respond");
 
             auto batch_count = params_.batch_count();
-            int split_size_plus_one = params_.split_size() + 1;
-            int total_blocks = params_.split_count() * batch_count;
+            uint32_t total_blocks = params_.split_count() * batch_count;
 
             // Make the ciphertext non-transparent
             powers[0][0].resize(2);
@@ -124,7 +123,7 @@ namespace apsi
 
             std::vector<WindowingDag::State> states;
             states.reserve(batch_count);
-            for (u64 i = 0; i < batch_count; i++)
+            for (uint64_t i = 0; i < batch_count; i++)
             {
                 states.emplace_back(dag);
             }
@@ -164,7 +163,7 @@ namespace apsi
             Ciphertext tmp(local_pool);
             Ciphertext compressedResult(seal_context_, local_pool);
 
-            u64 batch_start = thread_index * batch_count / total_threads;
+            uint64_t batch_start = thread_index * batch_count / total_threads;
             auto thread_idx = std::this_thread::get_id();
 
             for (int batch = static_cast<int>(batch_start), loop_idx = 0ul; loop_idx < batch_count; ++loop_idx)
@@ -192,7 +191,7 @@ namespace apsi
             // copy in eval->add(...)
             array<Ciphertext, 2> runningResults{ local_pool, local_pool }, label_results{ local_pool, local_pool };
 
-            u64 processed_blocks = 0;
+            uint64_t processed_blocks = 0;
             Evaluator &evaluator = *session_context.evaluator();
             for (int block_idx = start_block; block_idx < end_block; block_idx++)
             {
@@ -204,7 +203,7 @@ namespace apsi
                 // split_size_plus_one]);
 
                 // Iterate over the coeffs multiplying them with the query powers  and summing the results
-                u8 currResult = 0, curr_label = 0;
+                unsigned char currResult = 0, curr_label = 0;
 
                 // TODO: optimize this to allow low degree poly? need to take into account noise levels.
 
@@ -215,7 +214,7 @@ namespace apsi
                 evaluator.multiply_plain(
                     powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
 
-                for (u32 s = 1; s < params_.split_size(); s++)
+                for (uint32_t s = 1; s < params_.split_size(); s++)
                 {
                     // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call
                     // multiply_plain_ntt
@@ -407,15 +406,15 @@ namespace apsi
             }
         }
 
-        u64 WindowingDag::pow(u64 base, u64 e)
+        uint64_t WindowingDag::pow(uint64_t base, uint64_t e)
         {
-            u64 r = 1;
+            uint64_t r = 1;
             while (e--)
                 r *= base;
             return r;
         }
 
-        u64 WindowingDag::optimal_split(size_t x, int base, vector<int> &degrees)
+        uint64_t WindowingDag::optimal_split(size_t x, int base, vector<int> &degrees)
         {
             int opt_deg = degrees[x];
             int opt_split = 0;
@@ -440,9 +439,9 @@ namespace apsi
             return opt_split;
         }
 
-        vector<u64> WindowingDag::conversion_to_digits(u64 input, int base)
+        vector<uint64_t> WindowingDag::conversion_to_digits(uint64_t input, int base)
         {
-            vector<u64> result;
+            vector<uint64_t> result;
             while (input > 0)
             {
                 result.push_back(input % base);

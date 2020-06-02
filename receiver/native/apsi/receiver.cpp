@@ -87,7 +87,7 @@ namespace apsi
             Log::info("Receiver initialized");
         }
 
-        map<u64, vector<string>> &Receiver::query(vector<Item> &items)
+        map<uint64_t, vector<string>> &Receiver::query(vector<Item> &items)
         {
             STOPWATCH(recv_stop_watch, "Receiver::query");
             Log::info("Receiver starting query");
@@ -104,9 +104,9 @@ namespace apsi
             return ciphertexts;
         }
 
-        pair<vector<bool>, Matrix<u8>> Receiver::decrypt_result(vector<Item> &items, Channel &chl)
+        pair<vector<bool>, Matrix<unsigned char>> Receiver::decrypt_result(vector<Item> &items, Channel &chl)
         {
-            pair<vector<bool>, Matrix<u8>> empty_result;
+            pair<vector<bool>, Matrix<unsigned char>> empty_result;
 
             if (nullptr == preprocess_result_)
             {
@@ -147,7 +147,7 @@ namespace apsi
             return intersection;
         }
 
-        pair<vector<bool>, Matrix<u8>> Receiver::query(vector<Item> &items, Channel &chl)
+        pair<vector<bool>, Matrix<unsigned char>> Receiver::query(vector<Item> &items, Channel &chl)
         {
             STOPWATCH(recv_stop_watch, "Receiver::query_full");
             Log::info("Receiver starting full query");
@@ -256,7 +256,7 @@ namespace apsi
             Log::info("Handshake done");
         }
 
-        pair<map<u64, vector<string>>, unique_ptr<KukuTable>> Receiver::preprocess(vector<Item> &items)
+        pair<map<uint64_t, vector<string>>, unique_ptr<KukuTable>> Receiver::preprocess(vector<Item> &items)
         {
             STOPWATCH(recv_stop_watch, "Receiver::preprocess");
             Log::info("Receiver preprocess start");
@@ -265,8 +265,8 @@ namespace apsi
             unique_ptr<KukuTable> cuckoo;
             unique_ptr<FFieldArray> ffield_items;
 
-            u32 padded_cuckoo_capacity =
-                static_cast<u32>(((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
+            uint32_t padded_cuckoo_capacity =
+                static_cast<uint32_t>(((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
 
             ffield_items = make_unique<FFieldArray>(padded_cuckoo_capacity, *field_);
 
@@ -288,10 +288,10 @@ namespace apsi
                 }
             }
 
-            map<u64, FFieldArray> powers;
+            map<uint64_t, FFieldArray> powers;
             generate_powers(*ffield_items, powers);
 
-            map<u64, vector<string>> ciphers;
+            map<uint64_t, vector<string>> ciphers;
             encrypt(powers, ciphers);
 
             Log::info("Receiver preprocess end");
@@ -384,18 +384,18 @@ namespace apsi
             }
         }
 
-        void Receiver::generate_powers(const FFieldArray &ffield_items, map<u64, FFieldArray> &result)
+        void Receiver::generate_powers(const FFieldArray &ffield_items, map<uint64_t, FFieldArray> &result)
         {
-            u64 split_size =
+            uint64_t split_size =
                 (get_params().sender_bin_size() + get_params().split_count() - 1) / get_params().split_count();
-            u32 window_size = get_params().window_size();
-            u32 radix = 1 << window_size;
+            uint32_t window_size = get_params().window_size();
+            uint32_t radix = 1 << window_size;
 
             // todo: this bound needs to be re-visited.
             int max_supported_degree = get_params().max_supported_degree();
 
             // find the bound by enumerating
-            i64 bound = split_size;
+            int64_t bound = split_size;
             while (bound > 0 && tools::maximal_power(max_supported_degree, bound, radix) >= split_size)
             {
                 bound--;
@@ -407,12 +407,12 @@ namespace apsi
                 bound);
 
             FFieldArray current_power = ffield_items;
-            for (u64 j = 0; j < static_cast<u64>(bound); j++)
+            for (uint64_t j = 0; j < static_cast<uint64_t>(bound); j++)
             {
                 result.emplace(1ULL << (window_size * j), current_power);
-                for (u32 i = 2; i < radix; i++)
+                for (uint32_t i = 2; i < radix; i++)
                 {
-                    if (i * (1ULL << (window_size * j)) > static_cast<u64>(split_size))
+                    if (i * (1ULL << (window_size * j)) > static_cast<uint64_t>(split_size))
                     {
                         return;
                     }
@@ -420,14 +420,14 @@ namespace apsi
                         i * (1ULL << (window_size * j)),
                         result.at((i - 1) * (1ULL << (window_size * j))) * current_power);
                 }
-                for (u32 k = 0; k < window_size; k++)
+                for (uint32_t k = 0; k < window_size; k++)
                 {
                     current_power.sq();
                 }
             }
         }
 
-        void Receiver::encrypt(map<u64, FFieldArray> &input, map<u64, vector<string>> &destination)
+        void Receiver::encrypt(map<uint64_t, FFieldArray> &input, map<uint64_t, vector<string>> &destination)
         {
             size_t count = 0;
             destination.clear();
@@ -443,7 +443,7 @@ namespace apsi
         {
             int batch_size = slot_count_,
                 num_of_batches = static_cast<int>((input.size() + batch_size - 1) / batch_size);
-            vector<u64> integer_batch(batch_size, 0);
+            vector<uint64_t> integer_batch(batch_size, 0);
             destination.clear();
             destination.reserve(num_of_batches);
 
@@ -480,11 +480,11 @@ namespace apsi
             }
         }
 
-        std::pair<std::vector<bool>, Matrix<u8>> Receiver::stream_decrypt(
+        std::pair<std::vector<bool>, Matrix<unsigned char>> Receiver::stream_decrypt(
             Channel &channel, const std::vector<int> &table_to_input_map, std::vector<Item> &items)
         {
             STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt");
-            std::pair<std::vector<bool>, Matrix<u8>> ret;
+            std::pair<std::vector<bool>, Matrix<unsigned char>> ret;
             auto &ret_bools = ret.first;
             auto &ret_labels = ret.second;
 
@@ -525,7 +525,7 @@ namespace apsi
 
         void Receiver::stream_decrypt_worker(
             int thread_idx, int batch_size, int num_threads, int block_count, Channel &channel,
-            const vector<int> &table_to_input_map, vector<bool> &ret_bools, Matrix<u8> &ret_labels)
+            const vector<int> &table_to_input_map, vector<bool> &ret_bools, Matrix<unsigned char> &ret_labels)
         {
             STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt_worker");
             MemoryPoolHandle local_pool(MemoryPoolHandle::New());
@@ -534,12 +534,12 @@ namespace apsi
             unique_ptr<FFieldArray> batch = make_unique<FFieldArray>(batch_encoder_->create_array());
 
             bool first = true;
-            u64 processed_count = 0;
+            uint64_t processed_count = 0;
 
-            for (u64 i = thread_idx; i < static_cast<u64>(block_count); i += num_threads)
+            for (uint64_t i = thread_idx; i < static_cast<uint64_t>(block_count); i += num_threads)
             {
                 bool has_result = false;
-                std::vector<u8> has_label(batch_size);
+                std::vector<unsigned char> has_label(batch_size);
 
                 ResultPackage pkg;
                 {
@@ -597,7 +597,7 @@ namespace apsi
                     decryptor_->decrypt(tmp, p);
 
                     // make sure its the right size. decrypt will shorted when there are zero coeffs at the top.
-                    p.resize(static_cast<i32>(batch_encoder_->n()));
+                    p.resize(static_cast<int32_t>(batch_encoder_->n()));
 
                     batch_encoder_->decompose(p, *batch);
 

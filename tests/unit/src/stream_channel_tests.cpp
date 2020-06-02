@@ -82,7 +82,7 @@ namespace APSITests
         ASSERT_EQ(60, gpr.psiconf_params.item_bit_count);
         ASSERT_EQ(false, gpr.psiconf_params.use_labels);
         ASSERT_EQ(false, gpr.psiconf_params.use_fast_membership);
-        ASSERT_EQ((u64)12345, gpr.psiconf_params.sender_size);
+        ASSERT_EQ((uint64_t)12345, gpr.psiconf_params.sender_size);
         ASSERT_EQ(90, gpr.psiconf_params.item_bit_length_used_after_oprf);
         ASSERT_EQ(45, gpr.psiconf_params.num_chunks);
         ASSERT_EQ(128, gpr.psiconf_params.sender_bin_size);
@@ -98,11 +98,11 @@ namespace APSITests
         ASSERT_EQ(2, gpr.cuckoo_params.hash_func_seed);
         ASSERT_EQ(1, gpr.cuckoo_params.max_probe);
 
-        ASSERT_EQ((u64)678910, gpr.ffield_params.characteristic);
+        ASSERT_EQ((uint64_t)678910, gpr.ffield_params.characteristic);
         ASSERT_EQ(8, gpr.ffield_params.degree);
 
         ASSERT_EQ(20, gpr.seal_params.max_supported_degree);
-        ASSERT_EQ((u64)5119, gpr.seal_params.encryption_params.plain_modulus().value());
+        ASSERT_EQ((uint64_t)5119, gpr.seal_params.encryption_params.plain_modulus().value());
         ASSERT_EQ((size_t)4096, gpr.seal_params.encryption_params.poly_modulus_degree());
         ASSERT_EQ((size_t)3, gpr.seal_params.encryption_params.coeff_modulus().size());
     }
@@ -130,11 +130,11 @@ namespace APSITests
         ASSERT_TRUE(nullptr != preprocess_op);
 
         ASSERT_EQ((size_t)5, preprocess_op->buffer.size());
-        ASSERT_EQ((u8)10, (u8)preprocess_op->buffer[0]);
-        ASSERT_EQ((u8)20, (u8)preprocess_op->buffer[1]);
-        ASSERT_EQ((u8)30, (u8)preprocess_op->buffer[2]);
-        ASSERT_EQ((u8)40, (u8)preprocess_op->buffer[3]);
-        ASSERT_EQ((u8)50, (u8)preprocess_op->buffer[4]);
+        ASSERT_EQ((unsigned char)10, (unsigned char)preprocess_op->buffer[0]);
+        ASSERT_EQ((unsigned char)20, (unsigned char)preprocess_op->buffer[1]);
+        ASSERT_EQ((unsigned char)30, (unsigned char)preprocess_op->buffer[2]);
+        ASSERT_EQ((unsigned char)40, (unsigned char)preprocess_op->buffer[3]);
+        ASSERT_EQ((unsigned char)50, (unsigned char)preprocess_op->buffer[4]);
     }
 
     TEST_F(StreamChannelTests, SendPreprocessResponseTest)
@@ -155,21 +155,21 @@ namespace APSITests
         receiverchannel.receive(pr);
 
         ASSERT_EQ((size_t)15, pr.buffer.size());
-        ASSERT_EQ((u8)100, (u8)pr.buffer[0]);
-        ASSERT_EQ((u8)95, (u8)pr.buffer[1]);
-        ASSERT_EQ((u8)80, (u8)pr.buffer[2]);
-        ASSERT_EQ((u8)75, (u8)pr.buffer[3]);
-        ASSERT_EQ((u8)60, (u8)pr.buffer[4]);
-        ASSERT_EQ((u8)55, (u8)pr.buffer[5]);
-        ASSERT_EQ((u8)40, (u8)pr.buffer[6]);
-        ASSERT_EQ((u8)35, (u8)pr.buffer[7]);
-        ASSERT_EQ((u8)20, (u8)pr.buffer[8]);
-        ASSERT_EQ((u8)15, (u8)pr.buffer[9]);
-        ASSERT_EQ((u8)10, (u8)pr.buffer[10]);
-        ASSERT_EQ((u8)4, (u8)pr.buffer[11]);
-        ASSERT_EQ((u8)3, (u8)pr.buffer[12]);
-        ASSERT_EQ((u8)2, (u8)pr.buffer[13]);
-        ASSERT_EQ((u8)1, (u8)pr.buffer[14]);
+        ASSERT_EQ((unsigned char)100, (unsigned char)pr.buffer[0]);
+        ASSERT_EQ((unsigned char)95, (unsigned char)pr.buffer[1]);
+        ASSERT_EQ((unsigned char)80, (unsigned char)pr.buffer[2]);
+        ASSERT_EQ((unsigned char)75, (unsigned char)pr.buffer[3]);
+        ASSERT_EQ((unsigned char)60, (unsigned char)pr.buffer[4]);
+        ASSERT_EQ((unsigned char)55, (unsigned char)pr.buffer[5]);
+        ASSERT_EQ((unsigned char)40, (unsigned char)pr.buffer[6]);
+        ASSERT_EQ((unsigned char)35, (unsigned char)pr.buffer[7]);
+        ASSERT_EQ((unsigned char)20, (unsigned char)pr.buffer[8]);
+        ASSERT_EQ((unsigned char)15, (unsigned char)pr.buffer[9]);
+        ASSERT_EQ((unsigned char)10, (unsigned char)pr.buffer[10]);
+        ASSERT_EQ((unsigned char)4, (unsigned char)pr.buffer[11]);
+        ASSERT_EQ((unsigned char)3, (unsigned char)pr.buffer[12]);
+        ASSERT_EQ((unsigned char)2, (unsigned char)pr.buffer[13]);
+        ASSERT_EQ((unsigned char)1, (unsigned char)pr.buffer[14]);
     }
 
     TEST_F(StreamChannelTests, SendQueryTest)
@@ -198,7 +198,7 @@ namespace APSITests
         string ct_str = ss.str();
         ASSERT_EQ(ct_str.length(), 105);
 
-        map<u64, vector<string>> query;
+        map<uint64_t, vector<string>> query;
 
         vector<string> vec;
         vec.push_back(ct_str);
@@ -240,7 +240,7 @@ namespace APSITests
         SenderResponseQuery rq;
         receiverchannel.receive(rq);
 
-        ASSERT_EQ((u64)50, rq.package_count);
+        ASSERT_EQ((uint64_t)50, rq.package_count);
     }
 
     TEST_F(StreamChannelTests, SendPackageTest)
