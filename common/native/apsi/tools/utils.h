@@ -16,7 +16,7 @@ namespace apsi
         /**
         Find optimal split
         */
-        u64 optimal_split(const u64 x, const int base);
+        u64 optimal_split(const u64 x, const u64 base);
 
         /**
         Given the supported degree and bound on powers, find the maximal represented power.
@@ -27,7 +27,7 @@ namespace apsi
         /**
         Convert the given input to digits
         */
-        std::vector<u64> conversion_to_digits(const u64 input, const int base);
+        std::vector<u64> conversion_to_digits(const u64 input, const u64 base);
 
         /**
         Split the given string

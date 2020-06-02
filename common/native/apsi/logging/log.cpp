@@ -211,7 +211,7 @@ namespace apsi
 
         void Log::format_msg(string &msg, const char *format, va_list ap)
         {
-            int length = vsnprintf(msgBuffer, MSG_BUFFER_LEN, format, ap);
+            size_t length = static_cast<size_t>(vsnprintf(msgBuffer, MSG_BUFFER_LEN, format, ap));
             msg = string(msgBuffer, length);
         }
     } // namespace logging

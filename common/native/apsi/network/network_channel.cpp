@@ -442,14 +442,14 @@ namespace apsi
             bytes_sent_ += pkg.size();
         }
 
-        void NetworkChannel::get_buffer(vector<SEAL_BYTE> &buff, const message_t &msg, int part_start) const
+        void NetworkChannel::get_buffer(vector<SEAL_BYTE> &buff, const message_t &msg, size_t part_start) const
         {
             // Need to have size
             if (msg.parts() < static_cast<size_t>(part_start) + 1)
                 throw runtime_error("Should have size at least");
 
             u64 size;
-            get_part(size, msg, /* part */ part_start);
+            get_part(size, msg, part_start);
 
             // If the vector is not empty, we need the part with the data
             if (size > 0 && msg.parts() < static_cast<size_t>(part_start) + 2)

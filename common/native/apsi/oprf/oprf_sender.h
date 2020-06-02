@@ -87,11 +87,11 @@ namespace apsi
 
         private:
             static void compute_hashes_worker(
-                const int threadidx, const int threads, gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items,
+                const std::size_t threadidx, const std::size_t threads, gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items,
                 const OPRFKey &oprf_key, gsl::span<oprf_hash_type, gsl::dynamic_extent> oprf_hashes);
 
             static void compute_hashes_inplace_worker(
-                const int threadidx, const int threads, gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items,
+                const std::size_t threadidx, const std::size_t threads, gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items,
                 const OPRFKey &oprf_key);
         }; // class OPRFSender
     }      // namespace oprf

@@ -91,19 +91,15 @@ namespace apsi
             // Write zero item everywhere
             fill(oprf_hashes.begin(), oprf_hashes.end(), oprf_hash_type());
 
-            int thread_count = threads;
-            if (thread_count < 1)
-            {
-                thread_count = thread::hardware_concurrency();
-            }
+            size_t thread_count = threads < 1 ? static_cast<size_t>(thread::hardware_concurrency()) : static_cast<size_t>(threads);
 
             vector<thread> thrds(thread_count);
 
             for (size_t t = 0; t < thrds.size(); t++)
             {
                 thrds[t] = thread(
-                    [&](int idx) { compute_hashes_worker(idx, thread_count, oprf_items, oprf_key, oprf_hashes); },
-                    static_cast<int>(t));
+                    [&](size_t idx) { compute_hashes_worker(idx, thread_count, oprf_items, oprf_key, oprf_hashes); },
+                    t);
             }
 
             for (auto &t : thrds)
@@ -115,19 +111,15 @@ namespace apsi
         void OPRFSender::ComputeHashes(
             gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items, const OPRFKey &oprf_key, const int threads)
         {
-            int thread_count = threads;
-            if (thread_count < 1)
-            {
-                thread_count = thread::hardware_concurrency();
-            }
+            size_t thread_count = threads < 1 ? static_cast<size_t>(thread::hardware_concurrency()) : static_cast<size_t>(threads);
 
             vector<thread> thrds(thread_count);
 
             for (size_t t = 0; t < thrds.size(); t++)
             {
                 thrds[t] = thread(
-                    [&](int idx) { compute_hashes_inplace_worker(idx, thread_count, oprf_items, oprf_key); },
-                    static_cast<int>(t));
+                    [&](size_t idx) { compute_hashes_inplace_worker(idx, thread_count, oprf_items, oprf_key); },
+                    t);
             }
 
             for (auto &t : thrds)
@@ -137,10 +129,10 @@ namespace apsi
         }
 
         void OPRFSender::compute_hashes_worker(
-            const int threadidx, const int threads, gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items,
+            const size_t threadidx, const size_t threads, gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items,
             const OPRFKey &oprf_key, gsl::span<oprf_hash_type, gsl::dynamic_extent> oprf_hashes)
         {
-            for (ptrdiff_t i = threadidx; i < oprf_items.size(); i += threads)
+            for (size_t i = threadidx; i < oprf_items.size(); i += threads)
             {
                 // Create an elliptic curve point from the item
                 ECPoint ecpt({ reinterpret_cast<const u8 *>(oprf_items[i].data()), oprf_item_size });
@@ -154,10 +146,10 @@ namespace apsi
         }
 
         void OPRFSender::compute_hashes_inplace_worker(
-            const int threadidx, const int threads, gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items,
+            const size_t threadidx, const size_t threads, gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items,
             const OPRFKey &oprf_key)
         {
-            for (ptrdiff_t i = threadidx; i < oprf_items.size(); i += threads)
+            for (size_t i = threadidx; i < oprf_items.size(); i += threads)
             {
                 // Create an elliptic curve point from the item
                 ECPoint ecpt({ reinterpret_cast<u8 *>(oprf_items[i].data()), oprf_item_size });

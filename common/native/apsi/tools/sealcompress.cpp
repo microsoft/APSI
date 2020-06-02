@@ -52,7 +52,7 @@ namespace apsi
 
         size_t coeff_count = parms.poly_modulus_degree();
         int compr_coeff_bit_count = parms.plain_modulus().bit_count() + util::get_significant_bit_count(coeff_count);
-        int compr_coeff_byte_count = util::divide_round_up(compr_coeff_bit_count, util::bits_per_byte);
+        size_t compr_coeff_byte_count = static_cast<size_t>(util::divide_round_up(compr_coeff_bit_count, util::bits_per_byte));
         int coeff_mod_bit_count = parms.coeff_modulus()[0].bit_count();
         if (compr_coeff_bit_count >= coeff_mod_bit_count)
         {
@@ -64,10 +64,10 @@ namespace apsi
         stream.write(reinterpret_cast<const char *>(&encrypted.parms_id()), sizeof(parms_id_type));
 
         // Create compressed polynomials
-        size_t compr_data_byte_count = compr_coeff_byte_count * encrypted_size * coeff_count;
-        size_t compr_data_uint64_count =
-            util::divide_round_up(compr_data_byte_count, static_cast<size_t>(util::bytes_per_uint64));
-        auto compr_poly(util::allocate_zero_uint(compr_data_uint64_count, pool_));
+        int compr_data_byte_count = static_cast<int>(compr_coeff_byte_count * encrypted_size * coeff_count);
+        int compr_data_uint64_count =
+            util::divide_round_up(compr_data_byte_count, util::bytes_per_uint64);
+        auto compr_poly(util::allocate_zero_uint(static_cast<size_t>(compr_data_uint64_count), pool_));
 
         char *compr_poly_writer_head = reinterpret_cast<char *>(compr_poly.get());
         const u64 *encrypted_coeff_ptr = encrypted.data();
@@ -83,13 +83,13 @@ namespace apsi
             u64 shifted_coeff = *encrypted_coeff_ptr << bit_shift;
             memcpy(
                 compr_poly_writer_head,
-                reinterpret_cast<char *>(&shifted_coeff) + util::bytes_per_uint64 - compr_coeff_byte_count,
+                reinterpret_cast<char *>(&shifted_coeff) + static_cast<size_t>(util::bytes_per_uint64) - compr_coeff_byte_count,
                 compr_coeff_byte_count);
             compr_poly_writer_head += compr_coeff_byte_count;
         }
 
         // Write to stream
-        stream.write(reinterpret_cast<const char *>(compr_poly.get()), compr_data_byte_count);
+        stream.write(reinterpret_cast<const char *>(compr_poly.get()), static_cast<streamsize>(compr_data_byte_count));
     }
 
     void CiphertextCompressor::compressed_load(istream &stream, Ciphertext &destination)
@@ -126,7 +126,7 @@ namespace apsi
 
         size_t coeff_count = parms.poly_modulus_degree();
         int compr_coeff_bit_count = parms.plain_modulus().bit_count() + util::get_significant_bit_count(coeff_count);
-        int compr_coeff_byte_count = util::divide_round_up(compr_coeff_bit_count, util::bits_per_byte);
+        size_t compr_coeff_byte_count = static_cast<size_t>(util::divide_round_up(compr_coeff_bit_count, util::bits_per_byte));
         int coeff_mod_bit_count = parms.coeff_modulus()[0].bit_count();
         if (compr_coeff_bit_count >= coeff_mod_bit_count)
         {
@@ -145,10 +145,10 @@ namespace apsi
         }
 
         // Create compressed polynomials
-        size_t compr_data_byte_count = compr_coeff_byte_count * encrypted_size * coeff_count;
-        size_t compr_data_uint64_count =
-            util::divide_round_up(compr_data_byte_count, static_cast<size_t>(util::bytes_per_uint64));
-        auto compr_poly(util::allocate_zero_uint(compr_data_uint64_count, pool_));
+        int compr_data_byte_count = static_cast<int>(compr_coeff_byte_count * encrypted_size * coeff_count);
+        int compr_data_uint64_count =
+            util::divide_round_up(compr_data_byte_count, util::bytes_per_uint64);
+        auto compr_poly(util::allocate_zero_uint(static_cast<size_t>(compr_data_uint64_count), pool_));
 
         // Read data
         stream.read(reinterpret_cast<char *>(compr_poly.get()), compr_data_byte_count);
@@ -163,7 +163,7 @@ namespace apsi
             u64 shifted_coeff = 0;
             memcpy(reinterpret_cast<char *>(&shifted_coeff), compr_poly_reader_head, compr_coeff_byte_count);
             *destination_coeff_ptr =
-                shifted_coeff << (util::bits_per_byte * (util::bytes_per_uint64 - compr_coeff_byte_count) - bit_shift);
+                shifted_coeff << (util::bits_per_byte * (util::bytes_per_uint64 - static_cast<int>(compr_coeff_byte_count)) - bit_shift);
             compr_poly_reader_head += compr_coeff_byte_count;
         }
     }

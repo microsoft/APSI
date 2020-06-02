@@ -73,16 +73,16 @@ namespace apsi
         return *this;
     }
 
-    FFieldElt Item::to_ffield_element(FField ffield, int bit_length)
+    FFieldElt Item::to_ffield_element(FField ffield, size_t bit_length)
     {
         FFieldElt ring_item(ffield);
         to_ffield_element(ring_item, bit_length);
         return ring_item;
     }
 
-    u64 item_part(const array<u64, 2> &value_, u32 i, u32 split_length)
+    u64 item_part(const array<u64, 2> &value_, size_t i, size_t split_length)
     {
-        int i1 = (i * split_length) >> 6, i2 = ((i + 1) * split_length) >> 6,
+        size_t i1 = (i * split_length) >> 6, i2 = ((i + 1) * split_length) >> 6,
             j1 = (i * split_length) & 0x3F,       // mod 64
             j2 = ((i + 1) * split_length) & 0x3F; // mod 64
 #ifdef _DEBUG
@@ -92,7 +92,7 @@ namespace apsi
         }
 #endif
         u64 mask = (1ULL << split_length) - 1;
-        if ((i1 == i2) || (i2 == static_cast<int>(value_.size())))
+        if ((i1 == i2) || (i2 == value_.size()))
         {
             return (value_[i1] >> j1) & mask;
         }
@@ -102,20 +102,20 @@ namespace apsi
         }
     }
 
-    void Item::to_ffield_element(FFieldElt &ring_item, int bit_length)
+    void Item::to_ffield_element(FFieldElt &ring_item, size_t bit_length)
     {
         auto ffield = ring_item.field();
 
         // Should minus 1 to avoid wrapping around p
         // Hao: why?
-        int split_length = ffield.ch().bit_count() - 1;
+        size_t split_length = static_cast<size_t>(ffield.ch().bit_count()) - 1;
 
         // How many coefficients do we need in the FFieldElement
-        int split_index_bound = (bit_length + split_length - 1) / split_length;
+        size_t split_index_bound = (bit_length + split_length - 1) / split_length;
 
-        for (int j = 0; static_cast<u64>(j) < ffield.d() && j < split_index_bound; j++)
+        for (size_t j = 0; j < static_cast<size_t>(ffield.d()) && j < split_index_bound; j++)
         {
-            auto coeff = item_part(value_, j, split_length);
+            u64 coeff = item_part(value_, j, split_length);
             ring_item.set_coeff(j, coeff);
         }
     }
@@ -130,7 +130,7 @@ namespace apsi
         stream.read(reinterpret_cast<char *>(&value_), sizeof(value_));
     }
 
-    void Item::parse(const string &input, int base)
+    void Item::parse(const string &input, u32 base)
     {
         if (base != 10 && base != 16)
             throw invalid_argument("Only base 10 and 16 is supported.");
@@ -150,7 +150,7 @@ namespace apsi
             if (base == 16 && !util::is_hex_char(chr))
                 break;
 
-            rem = muladd(item, base, util::hex_to_nibble(chr));
+            rem = muladd(item, base, static_cast<u32>(util::hex_to_nibble(chr)));
             if (rem != 0)
             {
                 throw invalid_argument("Input represents more than 128 bits");
@@ -158,7 +158,7 @@ namespace apsi
         }
 
         value_[0] = (static_cast<u64>(item[1]) << 32) + item[0];
-        value_[1] = (static_cast<i64>(item[3]) << 32) + item[2];
+        value_[1] = (static_cast<u64>(item[3]) << 32) + item[2];
     }
 
     void Item::parse(const string &input)
@@ -181,20 +181,20 @@ namespace apsi
         parse(num, base);
     }
 
-    u32 Item::muladd(u32 item[4], int mul, int add)
+    u32 Item::muladd(u32 item[4], u32 mul, u32 add)
     {
         u64 temp = 0;
 
-        temp = static_cast<u64>(item[0]) * mul + add;
+        temp = static_cast<u64>(item[0]) * static_cast<u64>(mul) + static_cast<u64>(add);
         item[0] = static_cast<u32>(temp);
 
-        temp = static_cast<u64>(item[1]) * mul + (temp >> 32);
+        temp = static_cast<u64>(item[1]) * static_cast<u64>(mul) + static_cast<u64>(temp >> 32);
         item[1] = static_cast<u32>(temp);
 
-        temp = static_cast<u64>(item[2]) * mul + (temp >> 32);
+        temp = static_cast<u64>(item[2]) * static_cast<u64>(mul) + static_cast<u64>(temp >> 32);
         item[2] = static_cast<u32>(temp);
 
-        temp = static_cast<u64>(item[3]) * mul + (temp >> 32);
+        temp = static_cast<u64>(item[3]) * static_cast<u64>(mul) + static_cast<u64>(temp >> 32);
         item[3] = static_cast<u32>(temp);
 
         return static_cast<u32>(temp >> 32);

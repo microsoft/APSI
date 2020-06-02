@@ -44,13 +44,13 @@ namespace apsi
         Convert this item into an ffield element. Assuming that this item has been reduced in a hash table,
         we will only use 'reduced_bit_length_' bits of this item.
         */
-        FFieldElt to_ffield_element(FField ffield, int bit_length);
+        FFieldElt to_ffield_element(FField ffield, size_t bit_length);
 
         /**
         Convert this item into the specified ffield element. Assuming that this item has been reduced in a hash table,
         we will only use 'reduced_bit_length_' bits of this item.
         */
-        void to_ffield_element(FFieldElt &ring_item, int bit_length);
+        void to_ffield_element(FFieldElt &ring_item, size_t bit_length);
 
         Item &operator=(const std::string &assign);
 
@@ -105,7 +105,7 @@ namespace apsi
         The parser supports only base 10 and base 16 strings.
         When parsing a base 16 string, do _not_ include a preceding '0x'.
         */
-        void parse(const std::string &input, int base);
+        void parse(const std::string &input, u32 base);
 
         /**
         Parse the current item from a string.
@@ -118,7 +118,7 @@ namespace apsi
     private:
         std::array<u64, 2> value_;
 
-        u32 muladd(u32 item[4], int mul, int add);
+        u32 muladd(u32 item[4], u32 mul, u32 add);
 
     public:
         static constexpr std::size_t item_byte_count = sizeof(value_);

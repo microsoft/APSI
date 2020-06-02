@@ -84,21 +84,21 @@ namespace apsi
             }
         } // namespace
 
-        u64 optimal_split(const u64 x, const int base)
+        u64 optimal_split(const u64 x, const u64 base)
         {
             vector<u64> digits = conversion_to_digits(x, base);
-            int ndigits = static_cast<int>(digits.size());
+            size_t ndigits = digits.size();
             int hammingweight = 0;
-            for (int i = 0; i < ndigits; i++)
+            for (size_t i = 0; i < ndigits; i++)
             {
-                hammingweight += static_cast<int>(digits[i] != 0);
+                hammingweight += static_cast<int>(digits[i] != uint64_t(0));
             }
             int target = hammingweight / 2;
             int now = 0;
             u64 result = 0;
-            for (int i = 0; i < ndigits; i++)
+            for (size_t i = 0; i < ndigits; i++)
             {
-                if (digits[i] != 0)
+                if (digits[i] != uint64_t(0))
                 {
                     now++;
                     result += static_cast<u64>(pow(base, i) * digits[i]);
@@ -131,7 +131,7 @@ namespace apsi
             return u64();
         }
 
-        vector<u64> conversion_to_digits(const u64 input, const int base)
+        vector<u64> conversion_to_digits(const u64 input, const u64 base)
         {
             vector<u64> result;
             u64 number = input;

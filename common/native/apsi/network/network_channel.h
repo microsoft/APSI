@@ -199,7 +199,7 @@ namespace apsi
             /**
             Get buffer from message, located at part_start
             */
-            void get_buffer(std::vector<seal::SEAL_BYTE> &buff, const zmqpp::message_t &msg, int part_start) const;
+            void get_buffer(std::vector<seal::SEAL_BYTE> &buff, const zmqpp::message_t &msg, std::size_t part_start) const;
 
             /**
             Add buffer to the given message
