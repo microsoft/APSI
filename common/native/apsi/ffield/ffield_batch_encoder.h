@@ -9,7 +9,7 @@
 #include "apsi/ffield/ffield_array.h"
 
 namespace apsi
-{// TODO: Use size_t for most of the private data members.
+{ // TODO: Use size_t for most of the private data members.
     class FFieldBatchEncoder
     {
     public:

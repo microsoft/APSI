@@ -94,7 +94,9 @@ namespace apsi
                 FFieldElt *temp1;
 
                 // Set symm_block[pos.batch_offset, split_size] to 1
-                fill_n(th_context.symm_block()(static_cast<size_t>(pos.batch_offset), static_cast<size_t>(split_size)), d, 1);
+                fill_n(
+                    th_context.symm_block()(static_cast<size_t>(pos.batch_offset), static_cast<size_t>(split_size)), d,
+                    1);
 
                 for (size_t i = 0; i < split_size; i++)
                 {
@@ -112,8 +114,8 @@ namespace apsi
                         temp1->neg();
                     }
 
-                    auto symm_block_ptr = th_context.symm_block()(
-                        static_cast<size_t>(pos.batch_offset), pos.split_offset + 1);
+                    auto symm_block_ptr =
+                        th_context.symm_block()(static_cast<size_t>(pos.batch_offset), pos.split_offset + 1);
 
                     transform(
                         symm_block_ptr, symm_block_ptr + d, temp1->data(), symm_block_ptr - d,
@@ -160,7 +162,8 @@ namespace apsi
 
                         auto src = get_label(pos);
                         temp.encode(
-                            gsl::span<unsigned char>{ src, static_cast<size_t>(value_byte_length_) }, params.label_bit_count());
+                            gsl::span<unsigned char>{ src, static_cast<size_t>(value_byte_length_) },
+                            params.label_bit_count());
                         y.set(size, temp);
 
                         ++size;

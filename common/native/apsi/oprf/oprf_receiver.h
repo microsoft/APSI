@@ -80,7 +80,8 @@ namespace apsi
                     {
                         throw std::invalid_argument("index out of bounds");
                     }
-                    return ECPoint::scalar_span_type(factor_data_.span().subspan(index * factor_size, factor_size).data(), factor_size);
+                    return ECPoint::scalar_span_type(
+                        factor_data_.span().subspan(index * factor_size, factor_size).data(), factor_size);
                 }
 
                 auto get_factor(std::size_t index) const -> ECPoint::scalar_span_const_type
@@ -89,11 +90,13 @@ namespace apsi
                     {
                         throw std::invalid_argument("index out of bounds");
                     }
-                    return ECPoint::scalar_span_const_type(factor_data_.span().subspan(index * factor_size, factor_size).data(), factor_size);
+                    return ECPoint::scalar_span_const_type(
+                        factor_data_.span().subspan(index * factor_size, factor_size).data(), factor_size);
                 }
 
             private:
-                seal::IntArray<unsigned char> factor_data_{ seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true) };
+                seal::IntArray<unsigned char> factor_data_{ seal::MemoryManager::GetPool(
+                    seal::mm_prof_opt::FORCE_NEW, true) };
 
                 std::size_t item_count_ = 0;
             };

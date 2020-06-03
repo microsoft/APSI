@@ -91,7 +91,8 @@ namespace apsi
             // Write zero item everywhere
             fill(oprf_hashes.begin(), oprf_hashes.end(), oprf_hash_type());
 
-            size_t thread_count = threads < 1 ? static_cast<size_t>(thread::hardware_concurrency()) : static_cast<size_t>(threads);
+            size_t thread_count =
+                threads < 1 ? static_cast<size_t>(thread::hardware_concurrency()) : static_cast<size_t>(threads);
 
             vector<thread> thrds(thread_count);
 
@@ -111,15 +112,15 @@ namespace apsi
         void OPRFSender::ComputeHashes(
             gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items, const OPRFKey &oprf_key, const int threads)
         {
-            size_t thread_count = threads < 1 ? static_cast<size_t>(thread::hardware_concurrency()) : static_cast<size_t>(threads);
+            size_t thread_count =
+                threads < 1 ? static_cast<size_t>(thread::hardware_concurrency()) : static_cast<size_t>(threads);
 
             vector<thread> thrds(thread_count);
 
             for (size_t t = 0; t < thrds.size(); t++)
             {
                 thrds[t] = thread(
-                    [&](size_t idx) { compute_hashes_inplace_worker(idx, thread_count, oprf_items, oprf_key); },
-                    t);
+                    [&](size_t idx) { compute_hashes_inplace_worker(idx, thread_count, oprf_items, oprf_key); }, t);
             }
 
             for (auto &t : thrds)
@@ -129,8 +130,9 @@ namespace apsi
         }
 
         void OPRFSender::compute_hashes_worker(
-            const size_t threadidx, const size_t threads, gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items,
-            const OPRFKey &oprf_key, gsl::span<oprf_hash_type, gsl::dynamic_extent> oprf_hashes)
+            const size_t threadidx, const size_t threads,
+            gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items, const OPRFKey &oprf_key,
+            gsl::span<oprf_hash_type, gsl::dynamic_extent> oprf_hashes)
         {
             for (size_t i = threadidx; i < oprf_items.size(); i += threads)
             {

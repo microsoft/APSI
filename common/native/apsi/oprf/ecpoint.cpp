@@ -220,8 +220,8 @@ namespace apsi
 
                 // Compute a Blake2b hash of the value
                 blake2b(
-                    reinterpret_cast<unsigned char *>(r), sizeof(f2elm_t), value.data(), static_cast<size_t>(value.size()),
-                    nullptr, 0);
+                    reinterpret_cast<unsigned char *>(r), sizeof(f2elm_t), value.data(),
+                    static_cast<size_t>(value.size()), nullptr, 0);
 
                 // Reduce r
                 mod1271(r[0]);

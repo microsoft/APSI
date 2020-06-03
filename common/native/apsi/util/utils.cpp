@@ -163,7 +163,8 @@ namespace apsi
         }
 
         uint64_t compute_sender_bin_size(
-            uint32_t log_table_size, size_t sender_set_size, size_t hash_func_count, uint32_t binning_sec_level, size_t split_count)
+            uint32_t log_table_size, size_t sender_set_size, size_t hash_func_count, uint32_t binning_sec_level,
+            size_t split_count)
         {
             return round_up_to(
                 get_bin_size(1ull << log_table_size, sender_set_size * hash_func_count, binning_sec_level),

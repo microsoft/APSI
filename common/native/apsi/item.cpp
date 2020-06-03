@@ -54,8 +54,8 @@ namespace apsi
         {
             // Use BLAKE2b as random oracle
             blake2(
-                reinterpret_cast<unsigned char *>(&value_), sizeof(value_), reinterpret_cast<const unsigned char *>(str.data()), str.size(),
-                nullptr, 0);
+                reinterpret_cast<unsigned char *>(&value_), sizeof(value_),
+                reinterpret_cast<const unsigned char *>(str.data()), str.size(), nullptr, 0);
         }
         else
         {

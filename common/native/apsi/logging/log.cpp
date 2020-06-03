@@ -17,24 +17,24 @@
 using namespace std;
 using namespace log4cplus;
 
-#define CheckLogLevel(log_level)                                    \
-    {                                                               \
-        configure_if_needed();                                      \
-        if (Logger::getInstance("APSI").getLogLevel() > log_level)  \
-        {                                                           \
-            return;                                                 \
-        }                                                           \
+#define CheckLogLevel(log_level)                                   \
+    {                                                              \
+        configure_if_needed();                                     \
+        if (Logger::getInstance("APSI").getLogLevel() > log_level) \
+        {                                                          \
+            return;                                                \
+        }                                                          \
     }
 
-#define FormatLogMessage(format, log_level)             \
-    {                                                   \
-        string msg;                                     \
-        va_list ap;                                     \
-        va_start(ap, format);                           \
-        format_msg(msg, format, ap);                    \
-        va_end(ap);                                     \
-        configure_if_needed();                          \
-        Logger::getInstance("APSI").log(log_level, msg);\
+#define FormatLogMessage(format, log_level)              \
+    {                                                    \
+        string msg;                                      \
+        va_list ap;                                      \
+        va_start(ap, format);                            \
+        format_msg(msg, format, ap);                     \
+        va_end(ap);                                      \
+        configure_if_needed();                           \
+        Logger::getInstance("APSI").log(log_level, msg); \
     }
 
 constexpr auto MSG_BUFFER_LEN = 512;

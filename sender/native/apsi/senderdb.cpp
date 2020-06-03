@@ -78,7 +78,9 @@ namespace apsi
             for (auto &plain : batch_random_symm_poly_storage_)
             {
                 // Reserve memory for ciphertext size plaintexts (NTT transformed mod q)
-                plain.reserve(params_.encryption_params().coeff_modulus().size() * params_.encryption_params().poly_modulus_degree());
+                plain.reserve(
+                    params_.encryption_params().coeff_modulus().size() *
+                    params_.encryption_params().poly_modulus_degree());
             }
         }
 
@@ -90,7 +92,9 @@ namespace apsi
                 for (auto &plain : batch_random_symm_poly_storage_)
                 {
                     plain.release();
-                    plain.reserve(params_.encryption_params().coeff_modulus().size() * params_.encryption_params().poly_modulus_degree());
+                    plain.reserve(
+                        params_.encryption_params().coeff_modulus().size() *
+                        params_.encryption_params().poly_modulus_degree());
                 }
             }
 
@@ -132,8 +136,7 @@ namespace apsi
             vector<thread> thrds;
             for (size_t t = 0; t < thread_count; t++)
             {
-                thrds.emplace_back(
-                    [&, t]() { add_data_worker(t, thread_count, data, values, thread_loads[t]); });
+                thrds.emplace_back([&, t]() { add_data_worker(t, thread_count, data, values, thread_loads[t]); });
             }
 
             for (auto &t : thrds)
@@ -156,7 +159,8 @@ namespace apsi
             if (get_params().dynamic_split_count())
             {
                 // making sure maxload is a multiple of split_size
-                size_t new_split_count = (static_cast<size_t>(maxload) + params_.split_size() - 1) / params_.split_size();
+                size_t new_split_count =
+                    (static_cast<size_t>(maxload) + params_.split_size() - 1) / params_.split_size();
                 params_.set_sender_bin_size(new_split_count * params_.split_size());
                 params_.set_split_count(new_split_count);
 
@@ -208,7 +212,8 @@ namespace apsi
 
             if (get_params().dynamic_split_count())
             {
-                size_t new_split_count = (static_cast<size_t>(maxload) + params_.split_size() - 1) / params_.split_size();
+                size_t new_split_count =
+                    (static_cast<size_t>(maxload) + params_.split_size() - 1) / params_.split_size();
                 params_.set_sender_bin_size(new_split_count * params_.split_size());
                 params_.set_split_count(new_split_count);
 
@@ -219,7 +224,9 @@ namespace apsi
             }
         }
 
-        void SenderDB::add_data_worker(size_t thread_idx, size_t thread_count, gsl::span<const Item> data, MatrixView<unsigned char> values, vector<int> &loads)
+        void SenderDB::add_data_worker(
+            size_t thread_idx, size_t thread_count, gsl::span<const Item> data, MatrixView<unsigned char> values,
+            vector<int> &loads)
         {
             STOPWATCH(sender_stop_watch, "SenderDB::add_data_worker");
 
@@ -229,8 +236,7 @@ namespace apsi
             vector<kuku::LocFunc> normal_loc_func;
             for (uint32_t i = 0; i < params_.hash_func_count(); i++)
             {
-                normal_loc_func.emplace_back(
-                    params_.table_size(), kuku::make_item(params_.hash_func_seed() + i, 0));
+                normal_loc_func.emplace_back(params_.table_size(), kuku::make_item(params_.hash_func_seed() + i, 0));
             }
 
             loads.resize(params_.table_size(), 0);
@@ -333,7 +339,8 @@ namespace apsi
             add_data(vector<Item>(1, item), thread_count);
         }
 
-        void SenderDB::batched_randomized_symmetric_polys(SenderThreadContext &context, size_t start_block, size_t end_block)
+        void SenderDB::batched_randomized_symmetric_polys(
+            SenderThreadContext &context, size_t start_block, size_t end_block)
         {
             size_t batch_size = params_.batch_size();
             size_t split_size_plus_one = params_.split_size() + 1;

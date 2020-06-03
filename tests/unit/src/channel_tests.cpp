@@ -261,7 +261,7 @@ namespace APSITests
         svr.send(sender_op->client_id, pkg3);
 
         expected_total += sizeof(int64_t) * 6;
-        expected_total += 25;          // strings
+        expected_total += 25;               // strings
         expected_total += sizeof(uint32_t); // SenderOperationType
         expected_total += sizeof(uint64_t); // size of vector
         ASSERT_EQ(expected_total, svr.get_total_data_sent());
@@ -431,11 +431,14 @@ namespace APSITests
         ASSERT_EQ((size_t)4096, get_params_response2.seal_params.encryption_params.poly_modulus_degree());
         ASSERT_EQ((size_t)3, get_params_response2.seal_params.encryption_params.coeff_modulus().size());
         ASSERT_EQ(
-            (uint64_t)0x0000000FFFFEE001, get_params_response2.seal_params.encryption_params.coeff_modulus()[0].value());
+            (uint64_t)0x0000000FFFFEE001,
+            get_params_response2.seal_params.encryption_params.coeff_modulus()[0].value());
         ASSERT_EQ(
-            (uint64_t)0x0000000FFFFC4001, get_params_response2.seal_params.encryption_params.coeff_modulus()[1].value());
+            (uint64_t)0x0000000FFFFC4001,
+            get_params_response2.seal_params.encryption_params.coeff_modulus()[1].value());
         ASSERT_EQ(
-            (uint64_t)0x0000001FFFFE0001, get_params_response2.seal_params.encryption_params.coeff_modulus()[2].value());
+            (uint64_t)0x0000001FFFFE0001,
+            get_params_response2.seal_params.encryption_params.coeff_modulus()[2].value());
     }
 
     TEST_F(ChannelTests, SendPreprocessResponseTest)
@@ -565,7 +568,8 @@ namespace APSITests
                 // Preprocessing will multiply two numbers and add them to the result
                 auto preproc_op = dynamic_pointer_cast<SenderOperationPreprocess>(sender_op);
                 preproc_op->buffer.resize(3);
-                preproc_op->buffer[2] = (SEAL_BYTE)((unsigned char)preproc_op->buffer[0] * (unsigned char)preproc_op->buffer[1]);
+                preproc_op->buffer[2] =
+                    (SEAL_BYTE)((unsigned char)preproc_op->buffer[0] * (unsigned char)preproc_op->buffer[1]);
 
                 sender.send_preprocess_response(preproc_op->client_id, preproc_op->buffer);
             }

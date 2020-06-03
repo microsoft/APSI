@@ -10,7 +10,8 @@ namespace apsi
 {
     namespace details
     {
-        void copy_with_bit_offset(gsl::span<const unsigned char> src, size_t bitOffset, size_t bitLength, gsl::span<unsigned char> dest)
+        void copy_with_bit_offset(
+            gsl::span<const unsigned char> src, size_t bitOffset, size_t bitLength, gsl::span<unsigned char> dest)
         {
             // the number of bits to shift by to align with dest
             size_t lowOffset = bitOffset & 7;
@@ -36,7 +37,8 @@ namespace apsi
                 while (i < fullByteCount)
                 {
                     unsigned char low = src[wordBegin + 0] >> lowOffset;
-                    unsigned char high = static_cast<unsigned char>(static_cast<uint32_t>(src[wordBegin + 1]) << (8 - lowOffset));
+                    unsigned char high =
+                        static_cast<unsigned char>(static_cast<uint32_t>(src[wordBegin + 1]) << (8 - lowOffset));
                     dest[i] = low | high;
                     wordBegin++;
                     i++;
@@ -88,7 +90,8 @@ namespace apsi
                     // these will become the middle bits of destWord
                     size_t midCount = remBits - lowCount;
                     unsigned char midMask = static_cast<unsigned char>(uint32_t(1) << midCount) - 1;
-                    unsigned char mid = static_cast<unsigned char>(static_cast<uint32_t>(src[wordBegin + 1] & midMask) << lowCount);
+                    unsigned char mid =
+                        static_cast<unsigned char>(static_cast<uint32_t>(src[wordBegin + 1] & midMask) << lowCount);
 
                     // keep the high bits of destWord
                     unsigned char highMask = static_cast<unsigned char>((~uint32_t(0)) << remBits);
@@ -104,14 +107,17 @@ namespace apsi
         // Bits are written to dest starting at the destBitOffset bit. All other bits in
         // dest are unchanged, e.g. the bit indexed by [0,1,...,destBitOffset - 1], [destBitOffset + bitLength, ...]
         void copy_with_bit_offset(
-            gsl::span<const unsigned char> src, size_t srcBitOffset, size_t destBitOffset, size_t bitLength, gsl::span<unsigned char> dest)
+            gsl::span<const unsigned char> src, size_t srcBitOffset, size_t destBitOffset, size_t bitLength,
+            gsl::span<unsigned char> dest)
         {
             size_t destNext = (destBitOffset + 7) >> 3;
             int diff = static_cast<int>(destNext * 8 - destBitOffset);
 
             if (bitLength > static_cast<size_t>(diff))
             {
-                copy_with_bit_offset(src, srcBitOffset + static_cast<size_t>(diff), bitLength - static_cast<size_t>(diff), dest.subspan(destNext));
+                copy_with_bit_offset(
+                    src, srcBitOffset + static_cast<size_t>(diff), bitLength - static_cast<size_t>(diff),
+                    dest.subspan(destNext));
             }
             else
             {

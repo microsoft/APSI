@@ -31,7 +31,8 @@ namespace apsi
         CSVReader::CSVReader() : file_name_("")
         {}
 
-        void CSVReader::read(istream &stream, vector<Item> &items, Matrix<unsigned char> &labels, size_t label_byte_count) const
+        void CSVReader::read(
+            istream &stream, vector<Item> &items, Matrix<unsigned char> &labels, size_t label_byte_count) const
         {
             string line;
             vector<Item> temp_labels;

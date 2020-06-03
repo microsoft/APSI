@@ -24,7 +24,8 @@ namespace apsi
     {
         struct DBInterpolationCache
         {
-            DBInterpolationCache(FField field, std::size_t batch_size, std::size_t items_per_split, std::size_t value_byte_count);
+            DBInterpolationCache(
+                FField field, std::size_t batch_size, std::size_t items_per_split, std::size_t value_byte_count);
 
             std::vector<std::vector<FFieldArray>> div_diff_temp;
             std::vector<FFieldArray> coeff_temp, x_temp, y_temp;
@@ -40,7 +41,8 @@ namespace apsi
             struct Position
             {
                 std::size_t batch_offset;
-                std::size_t split_offset = -std::size_t(1); // TODO: previously this is int type, need a better solution.
+                std::size_t split_offset =
+                    -std::size_t(1); // TODO: previously this is int type, need a better solution.
 
                 bool is_initialized() const
                 {
@@ -48,7 +50,9 @@ namespace apsi
                 }
             }; // struct Position
 
-            void init(std::size_t batch_idx, std::size_t split_idx, std::size_t value_byte_length, std::size_t batch_size, std::size_t items_per_split)
+            void init(
+                std::size_t batch_idx, std::size_t split_idx, std::size_t value_byte_length, std::size_t batch_size,
+                std::size_t items_per_split)
             {
                 label_data_.resize(batch_size * items_per_split * value_byte_length);
                 key_data_.resize(batch_size * items_per_split);

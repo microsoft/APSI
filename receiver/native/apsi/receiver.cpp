@@ -299,7 +299,7 @@ namespace apsi
 
         unique_ptr<KukuTable> Receiver::cuckoo_hashing(const vector<Item> &items)
         {
-            item_type receiver_null_item { 0xFFFFFFFFFFFFFFFFULL, 0xFFFFFFFFFFFFFFFFULL };
+            item_type receiver_null_item{ 0xFFFFFFFFFFFFFFFFULL, 0xFFFFFFFFFFFFFFFFULL };
 
             auto cuckoo = make_unique<KukuTable>(
                 get_params().table_size(),
@@ -312,7 +312,8 @@ namespace apsi
 
             if (get_params().item_bit_count() > static_cast<size_t>(static_cast<uint32_t>(coeff_bit_count) * degree))
             {
-                Log::error("Reduced items too long. Only have %i bits.", static_cast<uint32_t>(coeff_bit_count) * degree);
+                Log::error(
+                    "Reduced items too long. Only have %i bits.", static_cast<uint32_t>(coeff_bit_count) * degree);
                 throw runtime_error("Reduced items too long.");
             }
             else
@@ -576,7 +577,9 @@ namespace apsi
 
                         if (is_zero)
                         {
-                            Log::debug("Found zero at thread_idx: %i, base_idx: %i, k: %i, idx: %i", thread_idx, base_idx, k, idx);
+                            Log::debug(
+                                "Found zero at thread_idx: %i, base_idx: %i, k: %i, idx: %i", thread_idx, base_idx, k,
+                                idx);
                             has_result = true;
                             ret_bools[idx] = true;
                         }

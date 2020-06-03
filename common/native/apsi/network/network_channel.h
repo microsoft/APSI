@@ -199,7 +199,8 @@ namespace apsi
             /**
             Get buffer from message, located at part_start
             */
-            void get_buffer(std::vector<seal::SEAL_BYTE> &buff, const zmqpp::message_t &msg, std::size_t part_start) const;
+            void get_buffer(
+                std::vector<seal::SEAL_BYTE> &buff, const zmqpp::message_t &msg, std::size_t part_start) const;
 
             /**
             Add buffer to the given message
@@ -210,8 +211,7 @@ namespace apsi
             Get a vector of Modulus from message at the given part index.
             When method exits the part index will be pointing to the next part in the message, after the vector.
             */
-            void get_sm_vector(
-                std::vector<seal::Modulus> &smv, const zmqpp::message_t &msg, size_t &part_idx) const;
+            void get_sm_vector(std::vector<seal::Modulus> &smv, const zmqpp::message_t &msg, size_t &part_idx) const;
 
             /**
             Add a vector of Modulus to given message

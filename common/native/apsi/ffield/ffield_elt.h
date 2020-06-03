@@ -18,13 +18,15 @@ namespace apsi
         // Copies bitLength bits from src starting at the bit index by bitOffset.
         // Bits are written to dest starting at the first bit. All other bits in
         // dest are unchanged, e.g. the bit indexed by [bitLength, bitLength + 1, ...]
-        void copy_with_bit_offset(gsl::span<const unsigned char> src, size_t bitOffset, size_t bitLength, gsl::span<unsigned char> dest);
+        void copy_with_bit_offset(
+            gsl::span<const unsigned char> src, size_t bitOffset, size_t bitLength, gsl::span<unsigned char> dest);
 
         // Copies bitLength bits from src starting at the bit index by srcBitOffset.
         // Bits are written to dest starting at the destBitOffset bit. All other bits in
         // dest are unchanged, e.g. the bit indexed by [0,1,...,destBitOffset - 1], [destBitOffset + bitLength, ...]
         void copy_with_bit_offset(
-            gsl::span<const unsigned char> src, size_t srcBitOffset, size_t destBitOffset, size_t bitLength, gsl::span<unsigned char> dest);
+            gsl::span<const unsigned char> src, size_t srcBitOffset, size_t destBitOffset, size_t bitLength,
+            gsl::span<unsigned char> dest);
     } // namespace details
 
     class FFieldElt
@@ -275,7 +277,8 @@ namespace apsi
         template <typename T>
         typename std::enable_if<std::is_pod<T>::value>::type encode(gsl::span<T> value, std::size_t bit_length)
         {
-            gsl::span<const unsigned char> v2(reinterpret_cast<unsigned char *>(value.data()), value.size() * sizeof(T));
+            gsl::span<const unsigned char> v2(
+                reinterpret_cast<unsigned char *>(value.data()), value.size() * sizeof(T));
 
             // Should minus 1 to avoid wrapping around p
             std::size_t split_length = static_cast<std::size_t>(field_.characteristic_.bit_count() - 1);
@@ -295,7 +298,8 @@ namespace apsi
             {
                 auto size = std::min<std::size_t>(split_length, bit_length);
                 details::copy_with_bit_offset(
-                    v2, offset, size, { reinterpret_cast<unsigned char *>(elt_.data() + j), sizeof(FFieldElt::CoeffType) });
+                    v2, offset, size,
+                    { reinterpret_cast<unsigned char *>(elt_.data() + j), sizeof(FFieldElt::CoeffType) });
 
                 offset += split_length;
                 bit_length -= split_length;
@@ -325,7 +329,8 @@ namespace apsi
             {
                 std::size_t size = std::min<std::size_t>(split_length, bit_length);
                 details::copy_with_bit_offset(
-                    { reinterpret_cast<unsigned char *>(elt_.data() + j), sizeof(FFieldElt::CoeffType) }, 0, offset, size, v2);
+                    { reinterpret_cast<unsigned char *>(elt_.data() + j), sizeof(FFieldElt::CoeffType) }, 0, offset,
+                    size, v2);
 
                 offset += split_length;
                 bit_length -= split_length;

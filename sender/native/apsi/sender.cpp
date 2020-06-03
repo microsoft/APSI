@@ -119,7 +119,8 @@ namespace apsi
             // Ceiling of num_of_powers / (base - 1)
             uint32_t given_digits = (static_cast<uint32_t>(num_of_powers) + base - 2) / (base - 1);
 
-            WindowingDag dag(static_cast<uint32_t>(params_.split_size()), params_.window_size(), max_supported_degree, given_digits);
+            WindowingDag dag(
+                static_cast<uint32_t>(params_.split_size()), params_.window_size(), max_supported_degree, given_digits);
 
             std::vector<WindowingDag::State> states;
             states.reserve(batch_count);
@@ -128,7 +129,8 @@ namespace apsi
                 states.emplace_back(dag);
             }
 
-            atomic<int> remaining_batches(seal::util::safe_cast<int>(thread_count_)); // TODO: maybe change remaining_batches_ to size_t
+            atomic<int> remaining_batches(
+                seal::util::safe_cast<int>(thread_count_)); // TODO: maybe change remaining_batches_ to size_t
             promise<void> batches_done_prom;
             auto batches_done_fut = batches_done_prom.get_future().share();
 
@@ -136,7 +138,9 @@ namespace apsi
             for (size_t i = 0; i < thread_count_; i++)
             {
                 thread_pool.emplace_back([&, i]() {
-                    respond_worker(i, batch_count, thread_count_, total_blocks, batches_done_prom, batches_done_fut, powers, session_context, dag, states, remaining_batches, client_id, channel);
+                    respond_worker(
+                        i, batch_count, thread_count_, total_blocks, batches_done_prom, batches_done_fut, powers,
+                        session_context, dag, states, remaining_batches, client_id, channel);
                 });
             }
 
@@ -147,8 +151,8 @@ namespace apsi
         }
 
         void Sender::respond_worker(
-            size_t thread_index, size_t batch_count, size_t total_threads, size_t total_blocks, promise<void> &batches_done_prom,
-            shared_future<void> &batches_done_fut, vector<vector<Ciphertext>> &powers,
+            size_t thread_index, size_t batch_count, size_t total_threads, size_t total_blocks,
+            promise<void> &batches_done_prom, shared_future<void> &batches_done_fut, vector<vector<Ciphertext>> &powers,
             SenderSessionContext &session_context, WindowingDag &dag, vector<WindowingDag::State> &states,
             atomic<int> &remaining_batches, const vector<SEAL_BYTE> &client_id, Channel &channel)
         {
@@ -333,7 +337,8 @@ namespace apsi
             Log::debug("Thread %d sent %d blocks", thread_index, processed_blocks);
         }
 
-        void Sender::compute_batch_powers(vector<Ciphertext> &batch_powers, SenderSessionContext &session_context, const WindowingDag &dag,
+        void Sender::compute_batch_powers(
+            vector<Ciphertext> &batch_powers, SenderSessionContext &session_context, const WindowingDag &dag,
             WindowingDag::State &state, MemoryPoolHandle pool)
         {
             if (batch_powers.size() != params_.split_size() + 1)
@@ -361,7 +366,8 @@ namespace apsi
                 // spin lock on the input nodes
                 for (size_t i = 0; i < 2; i++)
                 {
-                    while (state.nodes[node.inputs[i]] != WindowingDag::NodeState::Done);
+                    while (state.nodes[node.inputs[i]] != WindowingDag::NodeState::Done)
+                        ;
                 }
 
                 evaluator.multiply(
@@ -382,7 +388,8 @@ namespace apsi
             // Iterate until all nodes are computed. We may want to do something smarter here.
             for (size_t i = 0; i < state.nodes.size(); ++i)
             {
-                while (state.nodes[i] != WindowingDag::NodeState::Done);
+                while (state.nodes[i] != WindowingDag::NodeState::Done)
+                    ;
             }
 
             auto end = dag.nodes.size() + batch_powers.size();
@@ -408,7 +415,9 @@ namespace apsi
             uint32_t opt_deg = degrees[x];
             size_t opt_split = 0;
 
-            auto abs_sub = [](uint32_t a, uint32_t b) { return abs(static_cast<int32_t>(a) - static_cast<int32_t>(b)); };
+            auto abs_sub = [](uint32_t a, uint32_t b) {
+                return abs(static_cast<int32_t>(a) - static_cast<int32_t>(b));
+            };
 
             for (size_t i1 = 1; i1 < x; i1++)
             {

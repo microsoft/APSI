@@ -57,8 +57,8 @@ namespace apsi
 
                 // DD[i][j] = numerator / denominator
                 transform(
-                    numerator.data(), numerator.data() + field.degree(), denominator.data(), divided_differences[i].data(j),
-                    [ch](auto a, auto b) {
+                    numerator.data(), numerator.data() + field.degree(), denominator.data(),
+                    divided_differences[i].data(j), [ch](auto a, auto b) {
                         FFieldElt::CoeffType inv;
                         if (!util::try_invert_uint_mod(b, ch, inv))
                         {

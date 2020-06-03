@@ -51,7 +51,8 @@ namespace apsi
 
         size_t coeff_count = parms.poly_modulus_degree();
         int compr_coeff_bit_count = parms.plain_modulus().bit_count() + util::get_significant_bit_count(coeff_count);
-        size_t compr_coeff_byte_count = static_cast<size_t>(util::divide_round_up(compr_coeff_bit_count, util::bits_per_byte));
+        size_t compr_coeff_byte_count =
+            static_cast<size_t>(util::divide_round_up(compr_coeff_bit_count, util::bits_per_byte));
         int coeff_mod_bit_count = parms.coeff_modulus()[0].bit_count();
         if (compr_coeff_bit_count >= coeff_mod_bit_count)
         {
@@ -81,7 +82,8 @@ namespace apsi
             uint64_t shifted_coeff = *encrypted_coeff_ptr << bit_shift;
             memcpy(
                 compr_poly_writer_head,
-                reinterpret_cast<char *>(&shifted_coeff) + static_cast<size_t>(util::bytes_per_uint64) - compr_coeff_byte_count,
+                reinterpret_cast<char *>(&shifted_coeff) + static_cast<size_t>(util::bytes_per_uint64) -
+                    compr_coeff_byte_count,
                 compr_coeff_byte_count);
             compr_poly_writer_head += compr_coeff_byte_count;
         }
@@ -124,7 +126,8 @@ namespace apsi
 
         size_t coeff_count = parms.poly_modulus_degree();
         int compr_coeff_bit_count = parms.plain_modulus().bit_count() + util::get_significant_bit_count(coeff_count);
-        size_t compr_coeff_byte_count = static_cast<size_t>(util::divide_round_up(compr_coeff_bit_count, util::bits_per_byte));
+        size_t compr_coeff_byte_count =
+            static_cast<size_t>(util::divide_round_up(compr_coeff_bit_count, util::bits_per_byte));
         int coeff_mod_bit_count = parms.coeff_modulus()[0].bit_count();
         if (compr_coeff_bit_count >= coeff_mod_bit_count)
         {
@@ -159,8 +162,10 @@ namespace apsi
         {
             uint64_t shifted_coeff = 0;
             memcpy(reinterpret_cast<char *>(&shifted_coeff), compr_poly_reader_head, compr_coeff_byte_count);
-            *destination_coeff_ptr =
-                shifted_coeff << (util::bits_per_byte * (util::bytes_per_uint64 - static_cast<int>(compr_coeff_byte_count)) - bit_shift);
+            *destination_coeff_ptr = shifted_coeff
+                                     << (util::bits_per_byte *
+                                             (util::bytes_per_uint64 - static_cast<int>(compr_coeff_byte_count)) -
+                                         bit_shift);
             compr_poly_reader_head += compr_coeff_byte_count;
         }
     }

@@ -52,8 +52,8 @@ namespace apsi
 
             inline void clear()
             {
-                oprf_key_ =
-                    seal::IntArray<unsigned char>(oprf_key_size, seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true));
+                oprf_key_ = seal::IntArray<unsigned char>(
+                    oprf_key_size, seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true));
             }
 
             inline oprf_key_span_const_type key_span() const noexcept
@@ -65,7 +65,7 @@ namespace apsi
             std::shared_ptr<seal::UniformRandomGeneratorFactory> random_{ nullptr };
 
             seal::IntArray<unsigned char> oprf_key_{ oprf_key_size,
-                                          seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true) };
+                                                     seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true) };
         }; // class OPRFKey
 
         class OPRFSender
@@ -87,12 +87,13 @@ namespace apsi
 
         private:
             static void compute_hashes_worker(
-                const std::size_t threadidx, const std::size_t threads, gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items,
-                const OPRFKey &oprf_key, gsl::span<oprf_hash_type, gsl::dynamic_extent> oprf_hashes);
+                const std::size_t threadidx, const std::size_t threads,
+                gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items, const OPRFKey &oprf_key,
+                gsl::span<oprf_hash_type, gsl::dynamic_extent> oprf_hashes);
 
             static void compute_hashes_inplace_worker(
-                const std::size_t threadidx, const std::size_t threads, gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items,
-                const OPRFKey &oprf_key);
+                const std::size_t threadidx, const std::size_t threads,
+                gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items, const OPRFKey &oprf_key);
         }; // class OPRFSender
     }      // namespace oprf
 } // namespace apsi

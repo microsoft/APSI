@@ -69,7 +69,8 @@ namespace apsi
             items, and the result is a same-size vector of bool values. If an item is in the intersection, the
             corresponding bool value is true on the same position in the result vector
             */
-            std::pair<std::vector<bool>, Matrix<unsigned char>> decrypt_result(std::vector<Item> &items, network::Channel &chl);
+            std::pair<std::vector<bool>, Matrix<unsigned char>> decrypt_result(
+                std::vector<Item> &items, network::Channel &chl);
 
             /**
             Obfuscates the items and initializes the given vector with the buffer that must be sent to the Sender for
@@ -147,7 +148,9 @@ namespace apsi
             batching. For example, if an input vector has size 1024, the slot count is 256, then there are 1024/256 = 4
             ciphertext in the Ciphertext vector.
             */
-            void encrypt(std::map<std::uint64_t, FFieldArray> &input, std::map<std::uint64_t, std::vector<std::string>> &destination);
+            void encrypt(
+                std::map<std::uint64_t, FFieldArray> &input,
+                std::map<std::uint64_t, std::vector<std::string>> &destination);
 
             /**
             Encrypts a vector of elements to a corresponding vector of SEAL Ciphertext, using generalized batching. The
@@ -168,14 +171,16 @@ namespace apsi
             batch_size), which might be larger than table_size.
             */
             std::pair<std::vector<bool>, Matrix<unsigned char>> stream_decrypt(
-                network::Channel &channel, const std::vector<std::size_t> &table_to_input_map, const std::vector<Item> &items);
+                network::Channel &channel, const std::vector<std::size_t> &table_to_input_map,
+                const std::vector<Item> &items);
 
             /**
             Work to be done in a single thread for stream_decrypt
             */
             void stream_decrypt_worker(
-                std::size_t thread_idx, std::size_t batch_size, std::size_t num_threads, std::size_t block_count, network::Channel &channel,
-                const std::vector<std::size_t> &table_to_input_map, std::vector<bool> &ret_bools, Matrix<unsigned char> &ret_labels);
+                std::size_t thread_idx, std::size_t batch_size, std::size_t num_threads, std::size_t block_count,
+                network::Channel &channel, const std::vector<std::size_t> &table_to_input_map,
+                std::vector<bool> &ret_bools, Matrix<unsigned char> &ret_labels);
 
             std::shared_ptr<FField> field() const
             {
@@ -223,7 +228,8 @@ namespace apsi
             std::unique_ptr<CiphertextCompressor> compressor_;
 
             // Preprocess result
-            std::unique_ptr<std::pair<std::map<std::uint64_t, std::vector<std::string>>, std::unique_ptr<kuku::KukuTable>>>
+            std::unique_ptr<
+                std::pair<std::map<std::uint64_t, std::vector<std::string>>, std::unique_ptr<kuku::KukuTable>>>
                 preprocess_result_;
 
             std::string relin_keys_;

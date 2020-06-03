@@ -80,7 +80,7 @@ namespace apsi
 
         private:
             // Initialize to neutral element
-            point_t pt_ = { { {{0}}, {{1}} } }; // { {.x = { 0 }, .y = { 1 } }};
-        }; // class ECPoint
-    } // namespace oprf
+            point_t pt_ = { { { { 0 } }, { { 1 } } } }; // { {.x = { 0 }, .y = { 1 } }};
+        };                                              // class ECPoint
+    }                                                   // namespace oprf
 } // namespace apsi

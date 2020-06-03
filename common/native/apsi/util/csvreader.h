@@ -28,7 +28,9 @@ namespace apsi
             */
             CSVReader(const std::string &file_name);
 
-            void read(std::istream &stream, std::vector<Item> &items, Matrix<unsigned char> &labels, std::size_t label_byte_count) const;
+            void read(
+                std::istream &stream, std::vector<Item> &items, Matrix<unsigned char> &labels,
+                std::size_t label_byte_count) const;
 
             /**
             Read file and put result in given vector. If file contains labels,

@@ -67,12 +67,15 @@ namespace apsi
             std::vector<std::uint32_t> base_powers;
             std::vector<Node> nodes;
 
-            WindowingDag(std::size_t max_power, std::uint32_t window, std::uint32_t max_degree_supported, std::uint32_t given_digits)
+            WindowingDag(
+                std::size_t max_power, std::uint32_t window, std::uint32_t max_degree_supported,
+                std::uint32_t given_digits)
                 : max_power(max_power), window(window), max_degree_supported(max_degree_supported),
                   given_digits(given_digits)
             {
                 std::uint64_t base = std::uint64_t(1) << window;
-                std::uint64_t actual_power = util::maximal_power(static_cast<std::uint64_t>(max_degree_supported), static_cast<std::uint64_t>(given_digits), base);
+                std::uint64_t actual_power = util::maximal_power(
+                    static_cast<std::uint64_t>(max_degree_supported), static_cast<std::uint64_t>(given_digits), base);
 
                 logging::Log::debug("actual power supported = %i", actual_power);
                 if (actual_power < static_cast<uint64_t>(max_power))
@@ -182,7 +185,8 @@ namespace apsi
             of the same power (y^k). The size of the vector is the number of batches.
             @params[out] all_powers All powers computed from the input for the specified batch.
             */
-            void compute_batch_powers(std::vector<seal::Ciphertext> &batch_powers, SenderSessionContext &session_context,
+            void compute_batch_powers(
+                std::vector<seal::Ciphertext> &batch_powers, SenderSessionContext &session_context,
                 const WindowingDag &dag, WindowingDag::State &state, seal::MemoryPoolHandle pool);
 
             PSIParams params_;

@@ -72,8 +72,8 @@ namespace apsi
             Handles the work of one thread for adding items to sender's database
             */
             void add_data_worker(
-                size_t thread_idx, std::size_t thread_count, gsl::span<const Item> data, MatrixView<unsigned char> values,
-                std::vector<int> &loads);
+                size_t thread_idx, std::size_t thread_count, gsl::span<const Item> data,
+                MatrixView<unsigned char> values, std::vector<int> &loads);
 
             /**
             Adds one item to sender's database.
@@ -86,7 +86,8 @@ namespace apsi
 
             @see randomized_symmetric_polys for computing randomized symmetric polynomials.
             */
-            void batched_randomized_symmetric_polys(SenderThreadContext &th_context, size_t start_block, size_t end_block);
+            void batched_randomized_symmetric_polys(
+                SenderThreadContext &th_context, size_t start_block, size_t end_block);
 
             void batched_interpolate_polys(SenderThreadContext &th_context, size_t start_block, size_t end_block);
 

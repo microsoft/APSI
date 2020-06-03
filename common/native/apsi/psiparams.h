@@ -310,7 +310,8 @@ namespace apsi
             if ((item_bit_count() + 63) / 64 !=
                 (item_bit_count() + static_cast<std::uint32_t>(floor(log2(hash_func_count()))) + 1 + 1 + 63) / 64)
             {
-                throw std::invalid_argument("Invalid for cuckoo: null bit and location index overflow to new std::uint64_t.");
+                throw std::invalid_argument(
+                    "Invalid for cuckoo: null bit and location index overflow to new std::uint64_t.");
             }
             if (item_bit_count() > max_item_bit_count)
             {
@@ -323,7 +324,8 @@ namespace apsi
                                       "appropriate Cuckoo hashing.");
             }
             std::uint64_t supported_bitcount =
-                static_cast<std::uint64_t>(ffield_degree()) * static_cast<std::uint64_t>(seal_params_.encryption_params.plain_modulus().bit_count() - 1);
+                static_cast<std::uint64_t>(ffield_degree()) *
+                static_cast<std::uint64_t>(seal_params_.encryption_params.plain_modulus().bit_count() - 1);
             if (item_bit_length_used_after_oprf() > supported_bitcount)
             {
                 logging::Log::warning(

@@ -66,8 +66,7 @@ namespace APSITests
         seal_params.max_supported_degree = 20;
         seal_params.encryption_params.set_plain_modulus(5119);
         seal_params.encryption_params.set_poly_modulus_degree(4096);
-        vector<Modulus> coeff_modulus =
-            CoeffModulus::BFVDefault(seal_params.encryption_params.poly_modulus_degree());
+        vector<Modulus> coeff_modulus = CoeffModulus::BFVDefault(seal_params.encryption_params.poly_modulus_degree());
         seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
 
         PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
