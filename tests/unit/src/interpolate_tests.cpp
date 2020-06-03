@@ -5,8 +5,7 @@
 #include <seal/context.h>
 #include <seal/modulus.h>
 #include <seal/util/mempool.h>
-#include "apsi/apsidefines.h"
-#include "apsi/tools/interpolate.h"
+#include "apsi/util/interpolate.h"
 #include "gtest/gtest.h"
 
 using namespace apsi;

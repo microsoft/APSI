@@ -46,9 +46,6 @@
     <ClCompile Include="apsi\tools\utils.cpp">
       <Filter>Source Files\tools</Filter>
     </ClCompile>
-    <ClCompile Include="apsi\apsidefines.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="apsi\item.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -121,9 +118,6 @@
       <Filter>Header Files\tools</Filter>
     </ClInclude>
     <ClInclude Include="apsi\apsi.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="apsi\apsidefines.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="apsi\item.h">

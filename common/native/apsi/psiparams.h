@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <string>
 #include "apsi/logging/log.h"
-#include "apsi/tools/utils.h"
+#include "apsi/util/utils.h"
 #include "kuku/kuku.h"
 
 namespace apsi
@@ -292,7 +292,7 @@ namespace apsi
                 "running balls in bins analysis with 2^%i bins and %i balls, with stat sec level = %i",
                 table_params_.log_table_size, psiconf_params_.sender_size * cuckoo_params_.hash_func_count,
                 table_params_.binning_sec_level);
-            psiconf_params_.sender_bin_size = tools::compute_sender_bin_size(
+            psiconf_params_.sender_bin_size = util::compute_sender_bin_size(
                 table_params_.log_table_size, psiconf_params_.sender_size, cuckoo_params_.hash_func_count,
                 table_params_.binning_sec_level, table_params_.split_count);
             logging::Log::debug("updated sender bin size to %i.", psiconf_params_.sender_bin_size);

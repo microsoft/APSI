@@ -7,11 +7,11 @@
 #include <seal/plaintext.h>
 #include <string>
 #include <type_traits>
-#include "apsi/tools/stopwatch.h"
+#include "apsi/util/stopwatch.h"
 
 namespace apsi
 {
-    namespace tools
+    namespace util
     {
         /**
         Find optimal split
@@ -55,5 +55,5 @@ namespace apsi
             std::uint32_t log_table_size, std::uint64_t sender_set_size, std::uint32_t hash_func_count, std::uint32_t binning_sec_level, std::uint32_t split_count);
 
         extern Stopwatch sender_stop_watch, recv_stop_watch;
-    } // namespace tools
+    } // namespace util
 } // namespace apsi

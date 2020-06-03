@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "apsi/tools/utils.h"
+#include "apsi/util/utils.h"
 #include <array>
 #include <numeric>
 #include <vector>
@@ -10,7 +10,7 @@ using namespace std;
 
 namespace apsi
 {
-    namespace tools
+    namespace util
     {
         Stopwatch sender_stop_watch;
         Stopwatch recv_stop_watch;
@@ -169,5 +169,5 @@ namespace apsi
                 get_bin_size(1ull << log_table_size, sender_set_size * hash_func_count, binning_sec_level),
                 static_cast<uint64_t>(split_count));
         }
-    } // namespace tools
+    } // namespace util
 } // namespace apsi

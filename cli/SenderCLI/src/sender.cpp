@@ -17,8 +17,8 @@
 #include "apsi/senderdispatcher.h"
 #include "apsi/network/channel.h"
 #include "apsi/logging/log.h"
-#include "apsi/tools/csvreader.h"
-#include "apsi/tools/utils.h"
+#include "apsi/util/csvreader.h"
+#include "apsi/util/utils.h"
 #include "apsi/oprf/oprf_sender.h"
 
 // SEAL
@@ -31,7 +31,7 @@
 using namespace std;
 using namespace seal;
 using namespace apsi;
-using namespace apsi::tools;
+using namespace apsi::util;
 using namespace apsi::sender;
 using namespace apsi::network;
 using namespace apsi::logging;

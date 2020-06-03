@@ -20,5 +20,5 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/stopwatch.h
         ${CMAKE_CURRENT_LIST_DIR}/utils.h
     DESTINATION
-        ${PROJECT_INCLUDES_INSTALL_DIR}/apsi/tools
+        ${PROJECT_INCLUDES_INSTALL_DIR}/apsi/util
 )

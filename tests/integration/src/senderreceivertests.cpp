@@ -11,7 +11,7 @@
 #include "apsi/sender.h"
 #include "apsi/senderdb.h"
 #include "apsi/senderdispatcher.h"
-#include "apsi/tools/utils.h"
+#include "apsi/util/utils.h"
 #include "gtest/gtest.h"
 
 using namespace std;
@@ -19,7 +19,7 @@ using namespace apsi;
 using namespace apsi::receiver;
 using namespace apsi::sender;
 using namespace apsi::network;
-using namespace apsi::tools;
+using namespace apsi::util;
 using namespace apsi::logging;
 using namespace apsi::oprf;
 using namespace seal;

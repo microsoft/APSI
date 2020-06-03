@@ -3,12 +3,12 @@
 
 #include <algorithm>
 #include <thread>
-#include "apsi/tools/stopwatch.h"
+#include "apsi/util/stopwatch.h"
 #include "gtest/gtest.h"
 
 using namespace std;
 using namespace apsi;
-using namespace apsi::tools;
+using namespace apsi::util;
 
 namespace
 {

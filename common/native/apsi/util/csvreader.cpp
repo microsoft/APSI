@@ -21,7 +21,7 @@ using namespace std;
 
 namespace apsi
 {
-    namespace tools
+    namespace util
     {
         CSVReader::CSVReader(const string &file_name) : file_name_(file_name)
         {
@@ -95,5 +95,5 @@ namespace apsi
             if (!filesystem::exists(pth))
                 throw invalid_argument("File name does not exist");
         }
-    } // namespace tools
+    } // namespace util
 } // namespace apsi

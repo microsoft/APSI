@@ -9,7 +9,6 @@
 #include <seal/publickey.h>
 #include <seal/relinkeys.h>
 #include <vector>
-#include "apsi/apsidefines.h"
 
 namespace apsi
 {

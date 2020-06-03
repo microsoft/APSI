@@ -24,7 +24,7 @@
 #include "apsi/psiparams.h"
 #include "apsi/senderdb.h"
 #include "apsi/sendersessioncontext.h"
-#include "apsi/tools/matrixview.h"
+#include "apsi/util/matrixview.h"
 
 // SEAL
 #include <seal/ciphertext.h>
@@ -71,7 +71,7 @@ namespace apsi
                   given_digits(given_digits)
             {
                 std::uint64_t base = std::uint64_t(1) << window;
-                std::uint64_t actual_power = tools::maximal_power(max_degree_supported, given_digits, base);
+                std::uint64_t actual_power = util::maximal_power(max_degree_supported, given_digits, base);
 
                 logging::Log::debug("actual power supported = %i", actual_power);
                 if (static_cast<int>(actual_power) < max_power)

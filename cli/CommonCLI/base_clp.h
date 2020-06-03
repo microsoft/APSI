@@ -6,9 +6,6 @@
 // STD
 #include <string>
 
-// APSI
-#include "apsi/apsidefines.h"
-
 // TCLAP
 #pragma warning(push, 0)
 #include "tclap/CmdLine.h"
@@ -18,7 +15,7 @@ namespace apsi
 {
     /**
     Command line processor based on TCLAP.
-    
+
     This is a base class that contains common arguments.
     */
     class BaseCLP : public TCLAP::CmdLine

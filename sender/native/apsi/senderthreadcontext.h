@@ -14,7 +14,7 @@
 #include "apsi/ffield/ffield_array.h"
 #include "apsi/ffield/ffield_elt.h"
 #include "apsi/psiparams.h"
-#include "apsi/tools/matrixview.h"
+#include "apsi/util/matrixview.h"
 
 // SEAL
 #include <seal/memorymanager.h>

@@ -15,7 +15,7 @@ using namespace seal;
 
 namespace apsi
 {
-    using namespace tools;
+    using namespace util;
     using namespace logging;
 
     namespace sender

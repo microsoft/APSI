@@ -13,7 +13,7 @@
 #include "apsi/oprf/oprf_receiver.h"
 #include "apsi/receiver.h"
 #include "apsi/result_package.h"
-#include "apsi/tools/utils.h"
+#include "apsi/util/utils.h"
 
 // SEAL
 #include <seal/encryptionparams.h>
@@ -28,7 +28,7 @@ using namespace kuku;
 namespace apsi
 {
     using namespace logging;
-    using namespace tools;
+    using namespace util;
     using namespace network;
     using namespace oprf;
 
@@ -301,7 +301,7 @@ namespace apsi
 
         unique_ptr<KukuTable> Receiver::cuckoo_hashing(const vector<Item> &items)
         {
-            auto receiver_null_item = all_one_item;
+            item_type receiver_null_item { 0xFFFFFFFFFFFFFFFFULL, 0xFFFFFFFFFFFFFFFFULL };
 
             auto cuckoo = make_unique<KukuTable>(
                 get_params().table_size(),
@@ -396,7 +396,7 @@ namespace apsi
 
             // find the bound by enumerating
             int64_t bound = split_size;
-            while (bound > 0 && tools::maximal_power(max_supported_degree, bound, radix) >= split_size)
+            while (bound > 0 && util::maximal_power(max_supported_degree, bound, radix) >= split_size)
             {
                 bound--;
             }

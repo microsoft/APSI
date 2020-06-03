@@ -8,17 +8,18 @@
 // APSI
 #include "apsi/dbblock.h"
 #include "apsi/logging/log.h"
-#include "apsi/tools/interpolate.h"
+#include "apsi/util/interpolate.h"
 
 // SEAL
 #include <seal/util/uintarithsmallmod.h>
 
 using namespace std;
 using namespace seal;
+using namespace seal::util;
 
 namespace apsi
 {
-    using namespace tools;
+    using namespace util;
     using namespace logging;
 
     namespace sender
@@ -116,17 +117,17 @@ namespace apsi
 
                     transform(
                         symm_block_ptr, symm_block_ptr + d, temp1->data(), symm_block_ptr - d,
-                        [&ch](auto a, auto b) { return util::multiply_uint_mod(a, b, ch); });
+                        [&ch](auto a, auto b) { return multiply_uint_mod(a, b, ch); });
 
                     for (int64_t k = pos.split_offset + 1; k < split_size; k++, symm_block_ptr += d)
                     {
                         transform(
                             temp1->data(), temp1->data() + d, symm_block_ptr + d, temp2.data(),
-                            [&ch](auto a, auto b) { return util::multiply_uint_mod(a, b, ch); });
+                            [&ch](auto a, auto b) { return multiply_uint_mod(a, b, ch); });
 
                         transform(
                             symm_block_ptr, symm_block_ptr + d, temp2.data(), symm_block_ptr,
-                            [&ch](auto a, auto b) { return util::add_uint64_mod(a, b, ch); });
+                            [&ch](auto a, auto b) { return add_uint64_mod(a, b, ch); });
                     }
                 }
             }

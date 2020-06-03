@@ -2,8 +2,8 @@
 // Licensed under the MIT license.
 
 #include <string>
-#include "apsi/tools/matrix.h"
-#include "apsi/tools/matrixview.h"
+#include "apsi/util/matrix.h"
+#include "apsi/util/matrixview.h"
 #include "gtest/gtest.h"
 
 namespace APSITests

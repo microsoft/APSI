@@ -1,13 +1,14 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "apsi/tools/interpolate.h"
+#include "apsi/util/interpolate.h"
 #include <seal/util/uintarithsmallmod.h>
 #include "apsi/ffield/ffield.h"
 #include "apsi/ffield/ffield_array.h"
 
 using namespace std;
 using namespace seal;
+using namespace seal::util;
 
 namespace apsi
 {

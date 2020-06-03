@@ -14,8 +14,8 @@
 #include "apsi/item.h"
 #include "apsi/network/channel.h"
 #include "apsi/psiparams.h"
-#include "apsi/tools/matrix.h"
-#include "apsi/tools/sealcompress.h"
+#include "apsi/util/matrix.h"
+#include "apsi/util/sealcompress.h"
 
 // Kuku
 #include "kuku/kuku.h"

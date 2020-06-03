@@ -1,14 +1,14 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "apsi/tools/stopwatch.h"
+#include "apsi/util/stopwatch.h"
 #include <sstream>
 
 using namespace std;
 
 namespace apsi
 {
-    namespace tools
+    namespace util
     {
         const Stopwatch::time_unit Stopwatch::start_time(Stopwatch::time_unit::clock::now());
 
@@ -101,5 +101,5 @@ namespace apsi
             Stopwatch::time_unit end = Stopwatch::time_unit::clock::now();
             stopwatch_.add_timespan_event(event_name_, start_, end);
         }
-    } // namespace tools
+    } // namespace util
 } // namespace apsi

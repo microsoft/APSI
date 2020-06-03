@@ -8,12 +8,12 @@
 #include <vector>
 
 // APSI
-#include "apsi/tools/stopwatch.h"
+#include "apsi/util/stopwatch.h"
 
 
 namespace apsi
 {
-    namespace tools
+    namespace util
     {
         /**
         Print a banner with asterisks on top and bottom
@@ -34,5 +34,5 @@ namespace apsi
         Generate timing report for single events
         */
         void generate_event_report(std::vector<std::string>& report, const std::vector<Stopwatch::Timepoint>& timepoints, int max_name_length);
-    } // namespace tools
+    } // namespace util
 } // namespace apsi

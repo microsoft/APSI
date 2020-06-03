@@ -5,7 +5,6 @@
 
 #include <seal/modulus.h>
 #include <vector>
-#include "apsi/apsidefines.h"
 
 namespace apsi
 {

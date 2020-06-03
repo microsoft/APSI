@@ -3,19 +3,17 @@
 
 target_sources(common
     PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/apsidefines.cpp
         ${CMAKE_CURRENT_LIST_DIR}/item.cpp
 )
 
 add_subdirectory(ffield)
 add_subdirectory(logging)
 add_subdirectory(network)
-add_subdirectory(tools)
+add_subdirectory(util)
 add_subdirectory(oprf)
 
 install(
     FILES
-        ${CMAKE_CURRENT_LIST_DIR}/apsidefines.h
         ${CMAKE_CURRENT_LIST_DIR}/apsi.h
         ${CMAKE_CURRENT_LIST_DIR}/item.h
         ${CMAKE_CURRENT_LIST_DIR}/psiparams.h

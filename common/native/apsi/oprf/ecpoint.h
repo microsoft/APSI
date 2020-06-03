@@ -11,7 +11,6 @@
 #include <iostream>
 #include <memory>
 #include <seal/randomgen.h>
-#include "apsi/apsidefines.h"
 
 namespace apsi
 {

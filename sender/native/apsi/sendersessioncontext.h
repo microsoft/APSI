@@ -18,7 +18,7 @@
 
 // APSI
 #include "apsi/ffield/ffield_batch_encoder.h"
-#include "apsi/tools/sealcompress.h"
+#include "apsi/util/sealcompress.h"
 
 namespace apsi
 {

@@ -1,9 +1,8 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "apsi/tools/sealcompress.h"
+#include "apsi/util/sealcompress.h"
 #include <memory>
-#include "apsi/apsidefines.h"
 #include "apsi/logging/log.h"
 
 using namespace std;

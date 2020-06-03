@@ -14,8 +14,8 @@
 #include "apsi/apsi.h"
 #include "apsi/receiver.h"
 #include "apsi/network/receiverchannel.h"
-#include "apsi/tools/utils.h"
-#include "apsi/tools/csvreader.h"
+#include "apsi/util/utils.h"
+#include "apsi/util/csvreader.h"
 #include "apsi/logging/log.h"
 #include "common_utils.h"
 
@@ -32,7 +32,7 @@
 
 using namespace std;
 using namespace apsi;
-using namespace apsi::tools;
+using namespace apsi::util;
 using namespace apsi::receiver;
 using namespace apsi::network;
 using namespace apsi::logging;

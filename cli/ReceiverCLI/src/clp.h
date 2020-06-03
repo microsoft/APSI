@@ -9,9 +9,6 @@
 // Base
 #include "base_clp.h"
 
-// APSI
-#include "apsi/apsidefines.h"
-
 namespace apsi
 {
     /**

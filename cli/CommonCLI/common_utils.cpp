@@ -14,7 +14,7 @@
 // APSI
 #include "base_clp.h"
 #include "apsi/psiparams.h"
-#include "apsi/tools/utils.h"
+#include "apsi/util/utils.h"
 
 
 using namespace std;
@@ -22,7 +22,7 @@ using namespace seal;
 
 namespace apsi
 {
-    namespace tools
+    namespace util
     {
         void print_example_banner(string title)
         {
@@ -106,5 +106,5 @@ namespace apsi
                 report.push_back(ss.str());
             }
         }
-    } // namespace tools
+    } // namespace util
 } // namespace apsi

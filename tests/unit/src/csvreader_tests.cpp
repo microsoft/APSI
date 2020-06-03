@@ -1,13 +1,13 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "apsi/tools/csvreader.h"
+#include "apsi/util/csvreader.h"
 #include "gtest/gtest.h"
 #include "utils.h"
 
 using namespace std;
 using namespace apsi;
-using namespace apsi::tools;
+using namespace apsi::util;
 
 namespace APSITests
 {

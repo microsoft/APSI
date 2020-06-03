@@ -6,11 +6,11 @@
 #include <string>
 #include <vector>
 #include "apsi/item.h"
-#include "apsi/tools/matrix.h"
+#include "apsi/util/matrix.h"
 
 namespace apsi
 {
-    namespace tools
+    namespace util
     {
         /**
         Simple CSV file parser
@@ -42,5 +42,5 @@ namespace apsi
             void process_line(std::string line, std::vector<Item> &items, std::vector<Item> &labels) const;
             void throw_if_file_not_present() const;
         }; // class CSVReader
-    }      // namespace tools
+    }      // namespace util
 } // namespace apsi

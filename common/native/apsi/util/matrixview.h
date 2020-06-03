@@ -2,7 +2,6 @@
 
 #include <gsl/gsl_assert>
 #include <gsl/span>
-#include "apsi/apsidefines.h"
 
 namespace apsi
 {

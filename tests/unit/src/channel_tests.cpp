@@ -16,7 +16,7 @@ using namespace std;
 using namespace seal;
 using namespace apsi;
 using namespace apsi::network;
-using namespace apsi::tools;
+using namespace apsi::util;
 
 namespace
 {

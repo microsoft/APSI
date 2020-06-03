@@ -22,8 +22,8 @@
 #include "apsi/psiparams.h"
 #include "apsi/sendersessioncontext.h"
 #include "apsi/senderthreadcontext.h"
-#include "apsi/tools/matrix.h"
-#include "apsi/tools/matrixview.h"
+#include "apsi/util/matrix.h"
+#include "apsi/util/matrixview.h"
 
 // Kuku
 #include "kuku/kuku.h"

@@ -19,10 +19,10 @@ using namespace seal;
 
 namespace apsi
 {
-    using namespace tools;
+    using namespace util;
     using namespace logging;
 
-    namespace tools
+    namespace util
     {
 
         const PSIParams build_psi_params(
@@ -147,5 +147,5 @@ namespace apsi
 
             return params;
         }
-    } // namespace tools
+    } // namespace util
 } // namespace apsi

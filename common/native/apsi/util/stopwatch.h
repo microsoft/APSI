@@ -11,7 +11,6 @@
 #include <ostream>
 #include <string>
 #include <vector>
-#include "apsi/apsidefines.h"
 
 // Macro Magic to generate unique variable names. This is used for the
 // STOPWATCH macro.
@@ -25,7 +24,7 @@
 
 namespace apsi
 {
-    namespace tools
+    namespace util
     {
         /**
         Class used to time events
@@ -134,5 +133,5 @@ namespace apsi
             std::string event_name_;
             Stopwatch::time_unit start_;
         }; // class StopwatchScope
-    }      // namespace tools
+    }      // namespace util
 } // namespace apsi

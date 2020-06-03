@@ -10,6 +10,7 @@
 
 using namespace std;
 using namespace seal;
+using namespace kuku;
 
 namespace apsi
 {
@@ -36,13 +37,13 @@ namespace apsi
         return *this;
     }
 
-    Item &Item::operator=(const kuku::item_type &assign)
+    Item &Item::operator=(const item_type &assign)
     {
         value_ = assign;
         return *this;
     }
 
-    Item::Item(const kuku::item_type &item)
+    Item::Item(const item_type &item)
     {
         operator=(item);
     }

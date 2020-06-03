@@ -14,7 +14,7 @@
 #include "apsi/network/network_utils.h"
 #include "apsi/result_package.h"
 #include "apsi/sender.h"
-#include "apsi/tools/utils.h"
+#include "apsi/util/utils.h"
 
 // SEAL
 #include <seal/modulus.h>
@@ -26,7 +26,7 @@ using namespace seal;
 namespace apsi
 {
     using namespace logging;
-    using namespace tools;
+    using namespace util;
     using namespace network;
 
     namespace sender

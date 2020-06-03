@@ -2,12 +2,12 @@
 // Licensed under the MIT license.
 
 #include <vector>
-#include "apsi/tools/utils.h"
+#include "apsi/util/utils.h"
 #include "gtest/gtest.h"
 
 using namespace std;
 using namespace apsi;
-using namespace apsi::tools;
+using namespace apsi::util;
 
 namespace APSITests
 {
