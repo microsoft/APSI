@@ -519,7 +519,7 @@ namespace apsi
 
         void NetworkChannel::add_message_type(const SenderOperationType type, message_t &msg) const
         {
-            // Transform to int to have it have a fixed size
+            // Transform to uint32_t to have it have a fixed size
             add_part(static_cast<uint32_t>(type), msg);
         }
 

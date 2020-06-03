@@ -83,16 +83,17 @@ namespace apsi
 
     uint64_t item_part(const array<uint64_t, 2> &value_, size_t i, size_t split_length)
     {
-        size_t i1 = (i * split_length) >> 6, i2 = ((i + 1) * split_length) >> 6,
-            j1 = (i * split_length) & 0x3F,       // mod 64
-            j2 = ((i + 1) * split_length) & 0x3F; // mod 64
+        size_t i1 = (i * split_length) >> 6;
+        size_t i2 = ((i + 1) * split_length) >> 6;
+        size_t j1 = (i * split_length) & 0x3F;
+        size_t j2 = ((i + 1) * split_length) & 0x3F;
 #ifdef _DEBUG
-        if (split_length > 64 || i2 > static_cast<int>(value_.size()))
+        if (split_length > 64 || i2 > value_.size())
         {
             throw invalid_argument("invalid split_length, or index out of range");
         }
 #endif
-        uint64_t mask = (1ULL << split_length) - 1;
+        uint64_t mask = (uint64_t(1) << split_length) - 1;
         if ((i1 == i2) || (i2 == value_.size()))
         {
             return (value_[i1] >> j1) & mask;
@@ -142,7 +143,7 @@ namespace apsi
 
         for (const auto &chr : input)
         {
-            if (iswspace(chr))
+            if (iswspace(static_cast<wint_t>(chr)))
                 continue;
 
             if (base == 10 && !isdigit(chr))
@@ -165,7 +166,7 @@ namespace apsi
     void Item::parse(const string &input)
     {
         string num = input;
-        int base = 10;
+        uint32_t base = 10;
 
         // Trim initial whitespace
         num.erase(num.begin(), find_if(num.begin(), num.end(), [](int ch) { return !isspace(ch); }));

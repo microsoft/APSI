@@ -48,7 +48,7 @@ namespace apsi
             inline void fpsqrt1271(felm_t in, felm_t out)
             {
                 fpsqr1271(in, out);
-                for (int i = 1; i < 125; i++)
+                for (size_t i = 1; i < 125; i++)
                 {
                     fpsqr1271(out, out);
                 }

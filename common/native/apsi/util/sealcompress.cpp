@@ -64,8 +64,7 @@ namespace apsi
 
         // Create compressed polynomials
         int compr_data_byte_count = static_cast<int>(compr_coeff_byte_count * encrypted_size * coeff_count);
-        int compr_data_uint64_count =
-            util::divide_round_up(compr_data_byte_count, util::bytes_per_uint64);
+        int compr_data_uint64_count = util::divide_round_up(compr_data_byte_count, util::bytes_per_uint64);
         auto compr_poly(util::allocate_zero_uint(static_cast<size_t>(compr_data_uint64_count), pool_));
 
         char *compr_poly_writer_head = reinterpret_cast<char *>(compr_poly.get());
@@ -145,8 +144,7 @@ namespace apsi
 
         // Create compressed polynomials
         int compr_data_byte_count = static_cast<int>(compr_coeff_byte_count * encrypted_size * coeff_count);
-        int compr_data_uint64_count =
-            util::divide_round_up(compr_data_byte_count, util::bytes_per_uint64);
+        int compr_data_uint64_count = util::divide_round_up(compr_data_byte_count, util::bytes_per_uint64);
         auto compr_poly(util::allocate_zero_uint(static_cast<size_t>(compr_data_uint64_count), pool_));
 
         // Read data
