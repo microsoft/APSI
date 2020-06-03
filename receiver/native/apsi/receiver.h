@@ -42,9 +42,9 @@ namespace apsi
         class Receiver
         {
         public:
-            Receiver(int thread_count);
+            Receiver(std::size_t thread_count);
 
-            Receiver(const PSIParams &params, int thread_count);
+            Receiver(const PSIParams &params, std::size_t thread_count);
 
             /************************************************************************************************************************************
             Perform a full query.
@@ -126,7 +126,7 @@ namespace apsi
             /**
             Returns a map: table index -> input index.
             */
-            std::vector<int> cuckoo_indices(const std::vector<Item> &items, kuku::KukuTable &cuckoo);
+            std::vector<std::size_t> cuckoo_indices(const std::vector<Item> &items, kuku::KukuTable &cuckoo);
 
             /**
             Encodes items in the cuckoo hashing table into FField elements.
@@ -168,14 +168,14 @@ namespace apsi
             batch_size), which might be larger than table_size.
             */
             std::pair<std::vector<bool>, Matrix<unsigned char>> stream_decrypt(
-                network::Channel &channel, const std::vector<int> &table_to_input_map, std::vector<Item> &items);
+                network::Channel &channel, const std::vector<std::size_t> &table_to_input_map, const std::vector<Item> &items);
 
             /**
             Work to be done in a single thread for stream_decrypt
             */
             void stream_decrypt_worker(
-                int thread_idx, int batch_size, int num_threads, int block_count, network::Channel &channel,
-                const std::vector<int> &table_to_input_map, std::vector<bool> &ret_bools, Matrix<unsigned char> &ret_labels);
+                std::size_t thread_idx, std::size_t batch_size, std::size_t num_threads, std::size_t block_count, network::Channel &channel,
+                const std::vector<std::size_t> &table_to_input_map, std::vector<bool> &ret_bools, Matrix<unsigned char> &ret_labels);
 
             std::shared_ptr<FField> field() const
             {
@@ -203,7 +203,7 @@ namespace apsi
 
             std::shared_ptr<seal::SEALContext> seal_context_;
 
-            std::int32_t thread_count_;
+            std::size_t thread_count_;
 
             std::shared_ptr<FField> field_;
 
@@ -217,7 +217,7 @@ namespace apsi
 
             std::shared_ptr<FFieldBatchEncoder> batch_encoder_;
 
-            std::int32_t slot_count_;
+            std::size_t slot_count_;
 
             // Objects for compressed ciphertexts
             std::unique_ptr<CiphertextCompressor> compressor_;

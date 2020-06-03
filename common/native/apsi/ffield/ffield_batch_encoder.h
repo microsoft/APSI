@@ -9,7 +9,7 @@
 #include "apsi/ffield/ffield_array.h"
 
 namespace apsi
-{
+{// TODO: Use size_t for most of the private data members.
     class FFieldBatchEncoder
     {
     public:
@@ -25,7 +25,7 @@ namespace apsi
             return field_.degree_;
         }
 
-        inline std::uint64_t n() const
+        inline std::size_t n() const
         {
             return n_;
         }
@@ -61,7 +61,7 @@ namespace apsi
     private:
         std::unique_ptr<seal::BatchEncoder> encoder_;
         FField field_;
-        const std::uint64_t n_;
+        const std::size_t n_;
         const int log_n_;
         const std::uint64_t m_;
         const std::uint64_t slot_count_;

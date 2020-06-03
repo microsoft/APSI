@@ -34,18 +34,18 @@ namespace apsi
 
     namespace receiver
     {
-        Receiver::Receiver(int thread_count) : thread_count_(thread_count), field_(nullptr), slot_count_(0)
+        Receiver::Receiver(size_t thread_count) : thread_count_(thread_count), field_(nullptr), slot_count_(0)
         {
-            if (thread_count_ <= 0)
+            if (thread_count_ == 0)
             {
                 throw invalid_argument("thread_count must be positive");
             }
         }
 
-        Receiver::Receiver(const PSIParams &params, int thread_count)
+        Receiver::Receiver(const PSIParams &params, size_t thread_count)
             : params_(make_unique<PSIParams>(params)), thread_count_(thread_count), field_(nullptr), slot_count_(0)
         {
-            if (thread_count_ <= 0)
+            if (thread_count_ == 0)
             {
                 throw invalid_argument("thread_count must be positive");
             }
@@ -59,8 +59,7 @@ namespace apsi
             STOPWATCH(recv_stop_watch, "Receiver::initialize");
             Log::info("Initializing Receiver");
 
-            field_ =
-                make_unique<FField>(Modulus(get_params().ffield_characteristic()), get_params().ffield_degree());
+            field_ = make_unique<FField>(Modulus(get_params().ffield_characteristic()), get_params().ffield_degree());
 
             slot_count_ = get_params().batch_size();
 
@@ -114,10 +113,9 @@ namespace apsi
             }
 
             auto &cuckoo = *(preprocess_result_->second);
-            size_t padded_table_size =
-                static_cast<size_t>(((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
+            size_t padded_table_size = ((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_;
 
-            vector<int> table_to_input_map(padded_table_size, 0);
+            vector<size_t> table_to_input_map(padded_table_size, 0);
             if (items.size() > 1 || (!get_params().use_fast_membership()))
             {
                 table_to_input_map = cuckoo_indices(items, cuckoo);
@@ -312,9 +310,9 @@ namespace apsi
             auto coeff_bit_count = field_->characteristic().bit_count() - 1;
             auto degree = field_ ? field_->degree() : 1;
 
-            if (get_params().item_bit_count() > coeff_bit_count * degree)
+            if (get_params().item_bit_count() > static_cast<size_t>(static_cast<uint32_t>(coeff_bit_count) * degree))
             {
-                Log::error("Reduced items too long. Only have %i bits.", coeff_bit_count * degree);
+                Log::error("Reduced items too long. Only have %i bits.", static_cast<uint32_t>(coeff_bit_count) * degree);
                 throw runtime_error("Reduced items too long.");
             }
             else
@@ -339,13 +337,12 @@ namespace apsi
             return cuckoo;
         }
 
-        vector<int> Receiver::cuckoo_indices(const vector<Item> &items, kuku::KukuTable &cuckoo)
+        vector<size_t> Receiver::cuckoo_indices(const vector<Item> &items, kuku::KukuTable &cuckoo)
         {
             // This is the true size of the table; a multiple of slot_count_
-            size_t padded_cuckoo_capacity =
-                static_cast<size_t>(((cuckoo.table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
+            size_t padded_cuckoo_capacity = ((cuckoo.table_size() + slot_count_ - 1) / slot_count_) * slot_count_;
 
-            vector<int> indices(padded_cuckoo_capacity, -1);
+            vector<size_t> indices(padded_cuckoo_capacity, -size_t(1));
             auto &table = cuckoo.table();
 
             for (size_t i = 0; i < items.size(); i++)
@@ -354,7 +351,7 @@ namespace apsi
                 auto q = cuckoo.query(cuckoo_item);
 
                 Log::debug("cuckoo_indices: Setting indices at location: %i to: %i", q.location(), i);
-                indices[q.location()] = static_cast<int>(i);
+                indices[q.location()] = i;
 
                 if (!are_equal_item(cuckoo_item, table[q.location()]))
                     throw runtime_error("items[i] different from encodings[q.location()]");
@@ -392,10 +389,10 @@ namespace apsi
             uint32_t radix = 1 << window_size;
 
             // todo: this bound needs to be re-visited.
-            int max_supported_degree = get_params().max_supported_degree();
+            uint64_t max_supported_degree = static_cast<uint64_t>(get_params().max_supported_degree());
 
             // find the bound by enumerating
-            int64_t bound = split_size;
+            uint64_t bound = static_cast<uint64_t>(split_size);
             while (bound > 0 && util::maximal_power(max_supported_degree, bound, radix) >= split_size)
             {
                 bound--;
@@ -441,8 +438,8 @@ namespace apsi
 
         void Receiver::encrypt(const FFieldArray &input, vector<string> &destination)
         {
-            int batch_size = slot_count_,
-                num_of_batches = static_cast<int>((input.size() + batch_size - 1) / batch_size);
+            size_t batch_size = slot_count_;
+            size_t num_of_batches = (input.size() + batch_size - 1) / batch_size;
             vector<uint64_t> integer_batch(batch_size, 0);
             destination.clear();
             destination.reserve(num_of_batches);
@@ -451,13 +448,11 @@ namespace apsi
             Plaintext plain(local_pool);
             FFieldArray batch(batch_encoder_->create_array());
 
-            for (int i = 0; i < num_of_batches; i++)
+            for (size_t i = 0; i < num_of_batches; i++)
             {
-                for (int j = 0; j < batch_size; j++)
+                for (size_t j = 0; j < batch_size; j++)
                 {
-                    size_t sti = static_cast<size_t>(i);
-                    size_t stj = static_cast<size_t>(j);
-                    batch.set(stj, sti * batch_size + stj, input);
+                    batch.set(j, i * batch_size + j, input);
                 }
                 batch_encoder_->compose(batch, plain);
 
@@ -481,7 +476,7 @@ namespace apsi
         }
 
         std::pair<std::vector<bool>, Matrix<unsigned char>> Receiver::stream_decrypt(
-            Channel &channel, const std::vector<int> &table_to_input_map, std::vector<Item> &items)
+            Channel &channel, const std::vector<size_t> &table_to_input_map, const std::vector<Item> &items)
         {
             STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt");
             std::pair<std::vector<bool>, Matrix<unsigned char>> ret;
@@ -495,12 +490,14 @@ namespace apsi
                 ret_labels.resize(items.size(), get_params().label_byte_count());
             }
 
-            int num_of_splits = get_params().split_count(), num_of_batches = get_params().batch_count(),
-                block_count = num_of_splits * num_of_batches, batch_size = slot_count_;
+            size_t num_of_splits = get_params().split_count();
+            size_t num_of_batches = get_params().batch_count();
+            size_t block_count = num_of_splits * num_of_batches;
+            size_t batch_size = slot_count_;
 
             Log::info("Receiver batch size = %i", batch_size);
 
-            auto num_threads = thread_count_;
+            size_t num_threads = thread_count_;
             Log::debug(
                 "Decrypting %i blocks(%ib x %is) with %i threads", block_count, num_of_batches, num_of_splits,
                 num_threads);
@@ -509,7 +506,7 @@ namespace apsi
             for (size_t t = 0; t < thrds.size(); ++t)
             {
                 thrds[t] = std::thread(
-                    [&](int idx) {
+                    [&](size_t idx) {
                         stream_decrypt_worker(
                             idx, batch_size, thread_count_, block_count, channel, table_to_input_map, ret_bools,
                             ret_labels);
@@ -524,8 +521,8 @@ namespace apsi
         }
 
         void Receiver::stream_decrypt_worker(
-            int thread_idx, int batch_size, int num_threads, int block_count, Channel &channel,
-            const vector<int> &table_to_input_map, vector<bool> &ret_bools, Matrix<unsigned char> &ret_labels)
+            size_t thread_idx, size_t batch_size, size_t num_threads, size_t block_count, Channel &channel,
+            const vector<size_t> &table_to_input_map, vector<bool> &ret_bools, Matrix<unsigned char> &ret_labels)
         {
             STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt_worker");
             MemoryPoolHandle local_pool(MemoryPoolHandle::New());
@@ -536,7 +533,7 @@ namespace apsi
             bool first = true;
             uint64_t processed_count = 0;
 
-            for (uint64_t i = thread_idx; i < static_cast<uint64_t>(block_count); i += num_threads)
+            for (size_t i = thread_idx; i < block_count; i += num_threads)
             {
                 bool has_result = false;
                 std::vector<unsigned char> has_label(batch_size);
@@ -551,7 +548,7 @@ namespace apsi
                     }
                 }
 
-                int base_idx = static_cast<int>(pkg.batch_idx * batch_size);
+                size_t base_idx = pkg.batch_idx * batch_size;
                 Log::debug("Thread idx: %i, pkg.batch_idx: %i", thread_idx, pkg.batch_idx);
 
                 // recover the sym poly values
@@ -568,10 +565,10 @@ namespace apsi
                 decryptor_->decrypt(tmp, p);
                 batch_encoder_->decompose(p, *batch);
 
-                for (int k = 0; k < batch_size; k++)
+                for (size_t k = 0; k < batch_size; k++)
                 {
-                    auto idx = table_to_input_map[base_idx + k];
-                    if (idx >= 0)
+                    size_t idx = table_to_input_map[base_idx + k];
+                    if (idx != -size_t(1))
                     {
                         auto &is_zero = has_label[k];
 
@@ -579,9 +576,7 @@ namespace apsi
 
                         if (is_zero)
                         {
-                            Log::debug(
-                                "Found zero at thread_idx: %i, base_idx: %i, k: %i, idx: %i", thread_idx, base_idx, k,
-                                idx);
+                            Log::debug("Found zero at thread_idx: %i, base_idx: %i, k: %i, idx: %i", thread_idx, base_idx, k, idx);
                             has_result = true;
                             ret_bools[idx] = true;
                         }
@@ -597,7 +592,7 @@ namespace apsi
                     decryptor_->decrypt(tmp, p);
 
                     // make sure its the right size. decrypt will shorted when there are zero coeffs at the top.
-                    p.resize(static_cast<int32_t>(batch_encoder_->n()));
+                    p.resize(batch_encoder_->n());
 
                     batch_encoder_->decompose(p, *batch);
 
@@ -605,11 +600,11 @@ namespace apsi
                     Log::debug("decrypted label data is zero? %i", batch->is_zero());
                     //}
 
-                    for (int k = 0; k < batch_size; k++)
+                    for (size_t k = 0; k < batch_size; k++)
                     {
                         if (has_label[k])
                         {
-                            auto idx = table_to_input_map[base_idx + k];
+                            size_t idx = table_to_input_map[base_idx + k];
                             Log::debug(
                                 "Found label at thread_idx: %i, base_idx: %i, k: %i, idx: %i", thread_idx, base_idx, k,
                                 idx);
