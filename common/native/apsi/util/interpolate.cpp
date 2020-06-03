@@ -38,7 +38,7 @@ namespace apsi
             divided_differences[i].set(0, i, values);
         }
 
-        const Modulus &ch = field.ch();
+        const Modulus &ch = field.characteristic();
 
         for (size_t j = 1; j < size; j++)
         {
@@ -57,15 +57,15 @@ namespace apsi
 
                 // DD[i][j] = numerator / denominator
                 transform(
-                    numerator.data(), numerator.data() + field.d(), denominator.data(), divided_differences[i].data(j),
+                    numerator.data(), numerator.data() + field.degree(), denominator.data(), divided_differences[i].data(j),
                     [ch](auto a, auto b) {
-                        _ffield_elt_coeff_t inv;
+                        FFieldElt::CoeffType inv;
                         if (!util::try_invert_uint_mod(b, ch, inv))
                         {
                             if (a == 0)
                             {
                                 // could return any element
-                                return _ffield_elt_coeff_t(0);
+                                return FFieldElt::CoeffType(0);
                             }
                             else
                             {

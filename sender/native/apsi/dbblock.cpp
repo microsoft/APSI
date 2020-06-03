@@ -36,21 +36,21 @@ namespace apsi
             }
         }
 
-        DBBlock::Position DBBlock::try_acquire_position_after_oprf(int bin_idx)
+        DBBlock::Position DBBlock::try_acquire_position_after_oprf(size_t bin_idx)
         {
             if (bin_idx >= items_per_batch_)
             {
                 throw runtime_error("bin_idx should be smaller than items_per_batch");
             }
 
-            int idx = 0;
-            auto start = bin_idx * items_per_split_;
+            size_t idx = 0;
+            size_t start = bin_idx * items_per_split_;
 
             // If still failed, try to do linear scan
-            for (int i = 0; i < items_per_split_; ++i)
+            for (size_t i = 0; i < items_per_split_; ++i)
             {
                 bool exp = false;
-                if (has_item_[static_cast<size_t>(start + idx)].compare_exchange_strong(exp, true))
+                if (has_item_[start + idx].compare_exchange_strong(exp, true))
                 {
                     // Great, found an empty location and have marked it as mine
                     return { bin_idx, idx };
@@ -76,15 +76,15 @@ namespace apsi
         }
 
         void DBBlock::symmetric_polys(
-            SenderThreadContext &th_context, int encoding_bit_length, const FFieldElt &neg_null_element)
+            SenderThreadContext &th_context, size_t encoding_bit_length, const FFieldElt &neg_null_element)
         {
-            int64_t split_size = items_per_split_;
-            int64_t batch_size = items_per_batch_;
+            size_t split_size = items_per_split_;
+            size_t batch_size = items_per_batch_;
             auto num_rows = batch_size;
             auto field = neg_null_element.field();
 
-            auto ch = field.ch();
-            auto d = field.d();
+            auto ch = field.characteristic();
+            auto d = field.degree();
 
             Position pos;
             for (pos.batch_offset = 0; pos.batch_offset < num_rows; pos.batch_offset++)
@@ -94,12 +94,12 @@ namespace apsi
                 FFieldElt *temp1;
 
                 // Set symm_block[pos.batch_offset, split_size] to 1
-                fill_n(
-                    th_context.symm_block()(static_cast<size_t>(pos.batch_offset), static_cast<size_t>(split_size)), d,
-                    1);
+                fill_n(th_context.symm_block()(static_cast<size_t>(pos.batch_offset), static_cast<size_t>(split_size)), d, 1);
 
-                for (pos.split_offset = split_size - 1; pos.split_offset >= 0; pos.split_offset--)
+                for (size_t i = 0; i < split_size; i++)
                 {
+                    pos.split_offset = split_size - 1 - i;
+
                     if (!has_item(pos))
                     {
                         temp1 = const_cast<FFieldElt *>(&neg_null_element);
@@ -113,13 +113,13 @@ namespace apsi
                     }
 
                     auto symm_block_ptr = th_context.symm_block()(
-                        static_cast<size_t>(pos.batch_offset), static_cast<size_t>(pos.split_offset + 1));
+                        static_cast<size_t>(pos.batch_offset), pos.split_offset + 1);
 
                     transform(
                         symm_block_ptr, symm_block_ptr + d, temp1->data(), symm_block_ptr - d,
                         [&ch](auto a, auto b) { return multiply_uint_mod(a, b, ch); });
 
-                    for (int64_t k = pos.split_offset + 1; k < split_size; k++, symm_block_ptr += d)
+                    for (size_t k = pos.split_offset + 1; k < split_size; k++, symm_block_ptr += d)
                     {
                         transform(
                             temp1->data(), temp1->data() + d, symm_block_ptr + d, temp2.data(),
@@ -148,7 +148,7 @@ namespace apsi
                 FFieldArray &x = cache.x_temp[static_cast<size_t>(pos.batch_offset)];
                 FFieldArray &y = cache.y_temp[static_cast<size_t>(pos.batch_offset)];
 
-                int size = 0;
+                size_t size = 0;
                 for (pos.split_offset = 0; pos.split_offset < items_per_split_; ++pos.split_offset)
                 {
                     if (has_item(pos))
@@ -167,17 +167,9 @@ namespace apsi
                     }
                 }
 
-                bool empty_row = (size == 0);
-
                 // pad the points to have max degree (split_size)
                 // with (x,x) points where x is unique.
                 cache.key_set.clear();
-
-                for (int i = 0; i < size; ++i)
-                {
-                    auto r = cache.key_set.emplace(x.get_coeff_of(i, 0));
-                }
-
                 cache.temp_vec[0] = 0;
                 while (size != items_per_split_)
                 {
@@ -210,10 +202,10 @@ namespace apsi
             // We assume there are all the same
             auto degree = params.ffield_degree();
             FFieldArray temp_array(batch_encoder->create_array());
-            for (int s = 0; s < items_per_split_; s++)
+            for (size_t s = 0; s < items_per_split_; s++)
             {
                 // Transpose the coeffs into temp_array
-                for (int64_t b = 0; b < items_per_batch_; b++)
+                for (size_t b = 0; b < items_per_batch_; b++)
                 {
                     for (uint64_t c = 0; c < degree; c++)
                     {
@@ -228,7 +220,7 @@ namespace apsi
                 Position temppos;
                 temppos.split_offset = s;
 
-                for (int j = 0; j < items_per_batch_; j++)
+                for (size_t j = 0; j < items_per_batch_; j++)
                 {
                     temppos.batch_offset = j;
                     if (has_item(temppos) && split_idx_ == 1)
@@ -243,13 +235,13 @@ namespace apsi
         }
 
         DBInterpolationCache::DBInterpolationCache(
-            FField field, int items_per_batch, int items_per_split, int value_byte_count)
+            FField field, size_t items_per_batch, size_t items_per_split, size_t value_byte_count)
         {
             coeff_temp.reserve(items_per_batch);
             x_temp.reserve(items_per_batch);
             y_temp.reserve(items_per_batch);
 
-            for (uint64_t i = 0; i < items_per_batch; ++i)
+            for (size_t i = 0; i < items_per_batch; ++i)
             {
                 coeff_temp.emplace_back(items_per_split, field);
                 x_temp.emplace_back(items_per_split, field);

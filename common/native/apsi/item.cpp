@@ -110,12 +110,12 @@ namespace apsi
 
         // Should minus 1 to avoid wrapping around p
         // Hao: why?
-        size_t split_length = static_cast<size_t>(ffield.ch().bit_count()) - 1;
+        size_t split_length = static_cast<size_t>(ffield.characteristic().bit_count()) - 1;
 
         // How many coefficients do we need in the FFieldElement
         size_t split_index_bound = (bit_length + split_length - 1) / split_length;
 
-        for (size_t j = 0; j < static_cast<size_t>(ffield.d()) && j < split_index_bound; j++)
+        for (size_t j = 0; j < static_cast<size_t>(ffield.degree()) && j < split_index_bound; j++)
         {
             uint64_t coeff = item_part(value_, j, split_length);
             ring_item.set_coeff(j, coeff);

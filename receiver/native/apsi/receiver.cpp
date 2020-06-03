@@ -270,7 +270,7 @@ namespace apsi
 
             ffield_items = make_unique<FFieldArray>(padded_cuckoo_capacity, *field_);
 
-            int item_bit_count = get_params().item_bit_length_used_after_oprf();
+            size_t item_bit_count = get_params().item_bit_length_used_after_oprf();
 
             bool fm = get_params().use_fast_membership();
             if (items.size() > 1 || (!fm))
@@ -309,8 +309,8 @@ namespace apsi
                 get_params().hash_func_count(), item_type{ get_params().hash_func_seed(), 0 }, get_params().max_probe(),
                 receiver_null_item);
 
-            auto coeff_bit_count = field_->ch().bit_count() - 1;
-            auto degree = field_ ? field_->d() : 1;
+            auto coeff_bit_count = field_->characteristic().bit_count() - 1;
+            auto degree = field_ ? field_->degree() : 1;
 
             if (get_params().item_bit_count() > coeff_bit_count * degree)
             {
@@ -364,13 +364,13 @@ namespace apsi
 
         void Receiver::ffield_encoding(KukuTable &cuckoo, FFieldArray &ret)
         {
-            int item_bit_count = get_params().item_bit_length_used_after_oprf();
+            size_t item_bit_count = get_params().item_bit_length_used_after_oprf();
             Log::debug("item bit count before decoding: %i", item_bit_count);
 
             // oprf? depends
             auto &encodings = cuckoo.table();
 
-            Log::debug("bit count of ptxt modulus = %i", ret.field().ch().bit_count());
+            Log::debug("bit count of ptxt modulus = %i", ret.field().characteristic().bit_count());
 
             for (size_t i = 0; i < cuckoo.table_size(); i++)
             {

@@ -387,7 +387,7 @@ namespace APSITests
         ASSERT_EQ(true, get_params_response.psiconf_params.use_labels);
         ASSERT_EQ(false, get_params_response.psiconf_params.use_fast_membership);
         ASSERT_EQ((uint32_t)60, get_params_response.psiconf_params.item_bit_count);
-        ASSERT_EQ((uint32_t)120, get_params_response.psiconf_params.item_bit_length_used_after_oprf);
+        ASSERT_EQ(size_t(120), get_params_response.psiconf_params.item_bit_length_used_after_oprf);
         ASSERT_EQ((uint32_t)40, get_params_response.psiconf_params.num_chunks);
         ASSERT_EQ((uint32_t)50, get_params_response.psiconf_params.sender_bin_size);
         ASSERT_EQ((uint32_t)10, get_params_response.table_params.log_table_size);

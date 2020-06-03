@@ -14,10 +14,10 @@ namespace apsi
     FFieldBatchEncoder::FFieldBatchEncoder(shared_ptr<SEALContext> context, FField field)
         : encoder_(make_unique<BatchEncoder>(context)), field_(field),
           n_(context->first_context_data()->parms().poly_modulus_degree()), log_n_(util::get_power_of_two(n_)),
-          m_(2 * n_), slot_count_(n_ / field_.d_)
+          m_(2 * n_), slot_count_(n_ / field_.degree_)
     {
         // Check that degree of extension field is a power of 2 and divides n_
-        if (n_ % field_.d_)
+        if (n_ % field_.degree_)
         {
             throw invalid_argument("field degree must divide poly_modulus_degree");
         }

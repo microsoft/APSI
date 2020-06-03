@@ -24,7 +24,7 @@ namespace apsi
     {
         struct DBInterpolationCache
         {
-            DBInterpolationCache(FField field, int batch_size, int items_per_split, int value_byte_count);
+            DBInterpolationCache(FField field, std::size_t batch_size, std::size_t items_per_split, std::size_t value_byte_count);
 
             std::vector<std::vector<FFieldArray>> div_diff_temp;
             std::vector<FFieldArray> coeff_temp, x_temp, y_temp;
@@ -39,19 +39,19 @@ namespace apsi
         {
             struct Position
             {
-                std::int64_t batch_offset;
-                std::int64_t split_offset = -1;
+                std::size_t batch_offset;
+                std::size_t split_offset = -std::size_t(1); // TODO: previously this is int type, need a better solution.
 
                 bool is_initialized() const
                 {
-                    return split_offset != -1;
+                    return split_offset != -std::size_t(1);
                 }
             }; // struct Position
 
-            void init(std::int64_t batch_idx, std::int64_t split_idx, std::int64_t value_byte_length, std::int64_t batch_size, std::int64_t items_per_split)
+            void init(std::size_t batch_idx, std::size_t split_idx, std::size_t value_byte_length, std::size_t batch_size, std::size_t items_per_split)
             {
-                label_data_.resize(static_cast<size_t>(batch_size * items_per_split * value_byte_length));
-                key_data_.resize(static_cast<size_t>(batch_size * items_per_split));
+                label_data_.resize(batch_size * items_per_split * value_byte_length);
+                key_data_.resize(batch_size * items_per_split);
 
                 batch_idx_ = batch_idx;
                 split_idx_ = split_idx;
@@ -65,16 +65,17 @@ namespace apsi
 
             std::unique_ptr<std::atomic_bool[]> has_item_;
             // the index of this region
-            std::int64_t batch_idx_, split_idx_;
+            std::size_t batch_idx_;
+            std::size_t split_idx_;
 
             // the number of bytes that each label is
-            std::int64_t value_byte_length_;
+            std::size_t value_byte_length_;
 
             // the number of cuckoo slots that this regions spans.
-            std::int64_t items_per_batch_;
+            std::size_t items_per_batch_;
 
             // the number of items that are in a split.
-            std::int64_t items_per_split_;
+            std::size_t items_per_split_;
 
             gsl::span<seal::Plaintext> batch_random_symm_poly_;
 
@@ -90,9 +91,9 @@ namespace apsi
             Output polynomial terms: (1, \sum_i a_i, \sum_{i,j} a_i*a_j, ...).
             */
             void symmetric_polys(
-                SenderThreadContext &th_context, int encoding_bit_length, const FFieldElt &neg_null_element);
+                SenderThreadContext &th_context, std::size_t encoding_bit_length, const FFieldElt &neg_null_element);
 
-            Position try_acquire_position_after_oprf(int bin_idx);
+            Position try_acquire_position_after_oprf(std::size_t bin_idx);
 
             void batch_interpolate(
                 SenderThreadContext &th_context, std::shared_ptr<seal::SEALContext> seal_context,
@@ -115,7 +116,7 @@ namespace apsi
 #ifndef NDEBUG
                 check(pos);
 #endif
-                return key_data_[static_cast<size_t>(pos.batch_offset * items_per_split_ + pos.split_offset)];
+                return key_data_[pos.batch_offset * items_per_split_ + pos.split_offset];
             }
 
             unsigned char *get_label(const Position &pos)
@@ -124,21 +125,20 @@ namespace apsi
                 check(pos);
 #endif
 
-                return &label_data_[static_cast<size_t>(
-                    (pos.batch_offset * items_per_split_ + pos.split_offset) * value_byte_length_)];
+                return &label_data_[(pos.batch_offset * items_per_split_ + pos.split_offset) * value_byte_length_];
             }
 
             std::uint64_t get_key_uint64(const Position &pos)
             {
-                auto &i = get_key(pos);
-                return *(std::uint64_t *)&i;
+                Item &i = get_key(pos);
+                return i[0];
             }
 
             std::uint64_t get_label_uint64(const Position &pos)
             {
-                auto l = get_label(pos);
+                unsigned char *l = get_label(pos);
                 std::uint64_t r = 0;
-                memcpy(&r, l, static_cast<size_t>(value_byte_length_));
+                memcpy(&r, l, value_byte_length_);
                 return r;
             }
 

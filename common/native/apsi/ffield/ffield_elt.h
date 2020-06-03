@@ -33,29 +33,32 @@ namespace apsi
         friend class FFieldBatchEncoder;
 
     public:
-        FFieldElt(FField field, const _ffield_elt_t &elt) : field_(field), elt_(elt)
+        using CoeffType = std::uint64_t;
+        using ElementType = std::vector<CoeffType>;
+
+        FFieldElt(FField field, const ElementType &elt) : field_(field), elt_(elt)
         {}
 
         FFieldElt(FField field) : field_(std::move(field))
         {
-            elt_.resize(static_cast<std::size_t>(field_.d_));
+            elt_.resize(static_cast<std::size_t>(field_.degree_));
         }
 
-        FFieldElt(FField field, const _ffield_elt_coeff_t *value) : field_(field)
+        FFieldElt(FField field, const FFieldElt::CoeffType *value) : field_(field)
         {
-            std::copy_n(value, field_.d_, std::back_inserter(elt_));
+            std::copy_n(value, field_.degree_, std::back_inserter(elt_));
         }
 
-        inline _ffield_elt_coeff_t get_coeff(std::size_t index) const
+        inline FFieldElt::CoeffType get_coeff(std::size_t index) const
         {
             // This function returns 0 when index is beyond the size of the poly,
             // which is critical for correct operation.
-            return (index >= field_.d_) ? 0 : elt_[index];
+            return (index >= field_.degree_) ? 0 : elt_[index];
         }
 
-        inline void set_coeff(std::size_t index, _ffield_elt_coeff_t in)
+        inline void set_coeff(std::size_t index, FFieldElt::CoeffType in)
         {
-            if (index >= field_.d_)
+            if (index >= field_.degree_)
             {
                 throw std::out_of_range("index");
             }
@@ -89,7 +92,7 @@ namespace apsi
 
         inline void add(FFieldElt &out, const FFieldElt &in) const
         {
-            const seal::Modulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.characteristic_;
             std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(), [&ch](auto a, auto b) {
                 return seal::util::add_uint64_mod(a, b, ch);
             });
@@ -97,7 +100,7 @@ namespace apsi
 
         inline void sub(FFieldElt &out, const FFieldElt &in) const
         {
-            const seal::Modulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.characteristic_;
             std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(), [&ch](auto a, auto b) {
                 return seal::util::sub_uint64_mod(a, b, ch);
             });
@@ -105,7 +108,7 @@ namespace apsi
 
         inline void mul(FFieldElt &out, const FFieldElt &in) const
         {
-            const seal::Modulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.characteristic_;
             std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(), [&ch](auto a, auto b) {
                 return seal::util::multiply_uint_mod(a, b, ch);
             });
@@ -113,9 +116,9 @@ namespace apsi
 
         inline void div(FFieldElt &out, const FFieldElt &in) const
         {
-            const seal::Modulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.characteristic_;
             std::transform(elt_.cbegin(), elt_.cend(), in.elt_.cbegin(), out.elt_.begin(), [&ch](auto a, auto b) {
-                _ffield_elt_coeff_t inv;
+                FFieldElt::CoeffType inv;
                 if (!seal::util::try_invert_uint_mod(b, ch, inv))
                 {
                     throw std::logic_error("division by zero");
@@ -126,9 +129,9 @@ namespace apsi
 
         inline void inv(FFieldElt &out) const
         {
-            const seal::Modulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.characteristic_;
             std::transform(elt_.cbegin(), elt_.cend(), out.elt_.begin(), [&ch](auto a) {
-                _ffield_elt_coeff_t inv;
+                FFieldElt::CoeffType inv;
                 if (!seal::util::try_invert_uint_mod(a, ch, inv))
                 {
                     throw std::logic_error("division by zero");
@@ -144,7 +147,7 @@ namespace apsi
 
         inline void neg(FFieldElt &out) const
         {
-            const seal::Modulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.characteristic_;
             std::transform(elt_.cbegin(), elt_.cend(), out.elt_.begin(), [&ch](auto a) {
                 return seal::util::negate_uint_mod(a, ch);
             });
@@ -157,7 +160,7 @@ namespace apsi
 
         inline void pow(FFieldElt &out, std::uint64_t e) const
         {
-            const seal::Modulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.characteristic_;
             std::transform(elt_.cbegin(), elt_.cend(), out.elt_.begin(), [ch, e](auto a) {
                 return seal::util::exponentiate_uint_mod(a, e, ch);
             });
@@ -259,12 +262,12 @@ namespace apsi
             return !operator==(compare);
         }
 
-        inline _ffield_elt_coeff_t *data()
+        inline FFieldElt::CoeffType *data()
         {
             return elt_.data();
         }
 
-        inline const _ffield_elt_coeff_t *data() const
+        inline const FFieldElt::CoeffType *data() const
         {
             return elt_.data();
         }
@@ -275,14 +278,14 @@ namespace apsi
             gsl::span<const unsigned char> v2(reinterpret_cast<unsigned char *>(value.data()), value.size() * sizeof(T));
 
             // Should minus 1 to avoid wrapping around p
-            std::size_t split_length = static_cast<std::size_t>(field_.ch_.bit_count() - 1);
+            std::size_t split_length = static_cast<std::size_t>(field_.characteristic_.bit_count() - 1);
 
             // How many coefficients do we need
             std::size_t split_index_bound = (bit_length + split_length - 1) / split_length;
 
-            static_assert(std::is_pod<_ffield_elt_coeff_t>::value, "must be pod type");
+            static_assert(std::is_pod<FFieldElt::CoeffType>::value, "must be pod type");
 
-            if (field_.d_ < static_cast<std::uint64_t>(split_index_bound))
+            if (field_.degree_ < static_cast<std::uint64_t>(split_index_bound))
             {
                 throw std::invalid_argument("bit_length too large for extension field");
             }
@@ -292,7 +295,7 @@ namespace apsi
             {
                 auto size = std::min<std::size_t>(split_length, bit_length);
                 details::copy_with_bit_offset(
-                    v2, offset, size, { reinterpret_cast<unsigned char *>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) });
+                    v2, offset, size, { reinterpret_cast<unsigned char *>(elt_.data() + j), sizeof(FFieldElt::CoeffType) });
 
                 offset += split_length;
                 bit_length -= split_length;
@@ -305,24 +308,24 @@ namespace apsi
             gsl::span<unsigned char> v2(reinterpret_cast<unsigned char *>(value.data()), value.size() * sizeof(T));
 
             // Should minus 1 to avoid wrapping around p
-            std::size_t split_length = static_cast<std::size_t>(field_.ch_.bit_count() - 1);
+            std::size_t split_length = static_cast<std::size_t>(field_.characteristic_.bit_count() - 1);
 
             // How many coefficients do we need in the FFieldElt
             std::size_t split_index_bound = (bit_length + split_length - 1) / split_length;
 #ifndef NDEBUG
-            if (static_cast<std::uint64_t>(split_index_bound) > field_.d_)
+            if (static_cast<std::uint64_t>(split_index_bound) > field_.degree_)
             {
                 throw std::invalid_argument("too many bits required");
             }
 #endif
-            static_assert(std::is_pod<_ffield_elt_coeff_t>::value, "must be pod type");
+            static_assert(std::is_pod<FFieldElt::CoeffType>::value, "must be pod type");
 
             std::size_t offset = 0;
             for (std::size_t j = 0; j < split_index_bound; j++)
             {
                 std::size_t size = std::min<std::size_t>(split_length, bit_length);
                 details::copy_with_bit_offset(
-                    { reinterpret_cast<unsigned char *>(elt_.data() + j), sizeof(_ffield_elt_coeff_t) }, 0, offset, size, v2);
+                    { reinterpret_cast<unsigned char *>(elt_.data() + j), sizeof(FFieldElt::CoeffType) }, 0, offset, size, v2);
 
                 offset += split_length;
                 bit_length -= split_length;
@@ -331,17 +334,17 @@ namespace apsi
 
     private:
         FField field_;
-        _ffield_elt_t elt_;
+        ElementType elt_;
     }; // class FFieldElt
 
     // Easy printing
     inline std::ostream &operator<<(std::ostream &os, const FFieldElt &in)
     {
-        for (std::size_t i = 0; i < in.field().d() - 1; i++)
+        for (std::size_t i = 0; i < in.field().degree() - 1; i++)
         {
             os << in.data()[i] << " ";
         }
-        os << in.data()[in.field().d()];
+        os << in.data()[in.field().degree()];
         return os;
     }
 } // namespace apsi

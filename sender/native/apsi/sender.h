@@ -47,7 +47,7 @@ namespace apsi
 
             struct State
             {
-                std::unique_ptr<std::atomic<int>> next_node;
+                std::unique_ptr<std::atomic<std::size_t>> next_node;
                 std::unique_ptr<std::atomic<NodeState>[]> node_state_storage;
                 gsl::span<std::atomic<NodeState>> nodes;
 
@@ -56,25 +56,26 @@ namespace apsi
 
             struct Node
             {
-                std::array<int, 2> inputs;
-                int output = 0;
+                std::array<std::size_t, 2> inputs;
+                std::size_t output = 0;
             };
 
-            int max_power, window;
-            std::uint64_t max_degree_supported; // maximum degree supported.
-            std::uint64_t given_digits;         // how many digits are given.
-            std::vector<int> base_powers;
+            std::size_t max_power;
+            std::uint32_t window;
+            std::uint32_t max_degree_supported; // maximum degree supported.
+            std::uint32_t given_digits;         // how many digits are given.
+            std::vector<std::uint32_t> base_powers;
             std::vector<Node> nodes;
 
-            WindowingDag(int max_power, int window, std::uint64_t max_degree_supported, std::uint64_t given_digits)
+            WindowingDag(std::size_t max_power, std::uint32_t window, std::uint32_t max_degree_supported, std::uint32_t given_digits)
                 : max_power(max_power), window(window), max_degree_supported(max_degree_supported),
                   given_digits(given_digits)
             {
                 std::uint64_t base = std::uint64_t(1) << window;
-                std::uint64_t actual_power = util::maximal_power(max_degree_supported, given_digits, base);
+                std::uint64_t actual_power = util::maximal_power(static_cast<std::uint64_t>(max_degree_supported), static_cast<std::uint64_t>(given_digits), base);
 
                 logging::Log::debug("actual power supported = %i", actual_power);
-                if (static_cast<int>(actual_power) < max_power)
+                if (actual_power < static_cast<uint64_t>(max_power))
                 {
                     throw std::invalid_argument("does not support such max_power");
                 }
@@ -83,15 +84,15 @@ namespace apsi
             }
 
             std::uint64_t pow(std::uint64_t base, std::uint64_t e);
-            std::uint64_t optimal_split(std::size_t x, int base, std::vector<int> &degrees);
-            std::vector<std::uint64_t> conversion_to_digits(std::uint64_t input, int base);
+            std::size_t optimal_split(std::size_t x, std::vector<std::uint32_t> &degrees);
+            std::vector<std::uint64_t> conversion_to_digits(std::uint64_t input, std::uint32_t base);
             void compute_dag();
         }; // struct WindowingDag
 
         class Sender
         {
         public:
-            Sender(const PSIParams &params, int thread_count);
+            Sender(const PSIParams &params, std::size_t thread_count);
 
             /**
             Clears data in sender's database.
@@ -165,7 +166,7 @@ namespace apsi
             Method that handles the work of a single thread that computes the response to a query.
             */
             void respond_worker(
-                int thread_index, int batch_count, int total_threads, int total_blocks,
+                std::size_t thread_index, std::size_t batch_count, std::size_t total_threads, std::size_t total_blocks,
                 std::promise<void> &batches_done_prom, std::shared_future<void> &batches_done_fut,
                 std::vector<std::vector<seal::Ciphertext>> &powers, SenderSessionContext &session_context,
                 WindowingDag &dag, std::vector<WindowingDag::State> &states, std::atomic<int> &remaining_batches,
@@ -181,13 +182,12 @@ namespace apsi
             of the same power (y^k). The size of the vector is the number of batches.
             @params[out] all_powers All powers computed from the input for the specified batch.
             */
-            void compute_batch_powers(
-                int batch, std::vector<seal::Ciphertext> &batch_powers, SenderSessionContext &session_context,
+            void compute_batch_powers(std::vector<seal::Ciphertext> &batch_powers, SenderSessionContext &session_context,
                 const WindowingDag &dag, WindowingDag::State &state, seal::MemoryPoolHandle pool);
 
             PSIParams params_;
 
-            int thread_count_;
+            std::size_t thread_count_;
 
             std::shared_ptr<seal::SEALContext> seal_context_;
 

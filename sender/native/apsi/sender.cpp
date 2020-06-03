@@ -31,7 +31,7 @@ namespace apsi
 
     namespace sender
     {
-        Sender::Sender(const PSIParams &params, int thread_count)
+        Sender::Sender(const PSIParams &params, size_t thread_count)
             : params_(params), thread_count_(thread_count),
               seal_context_(SEALContext::Create(params_.encryption_params()))
         {}
@@ -95,8 +95,8 @@ namespace apsi
         {
             STOPWATCH(sender_stop_watch, "Sender::respond");
 
-            auto batch_count = params_.batch_count();
-            uint32_t total_blocks = params_.split_count() * batch_count;
+            size_t batch_count = params_.batch_count();
+            size_t total_blocks = params_.split_count() * batch_count;
 
             // Make the ciphertext non-transparent
             powers[0][0].resize(2);
@@ -112,14 +112,14 @@ namespace apsi
                 powers[i][0] = powers[0][0];
             }
 
-            int max_supported_degree = params_.max_supported_degree();
-            int window_size = get_params().window_size();
-            int base = 1 << window_size;
+            uint32_t max_supported_degree = params_.max_supported_degree();
+            size_t window_size = get_params().window_size();
+            uint32_t base = uint32_t(1) << window_size;
 
             // Ceiling of num_of_powers / (base - 1)
-            int given_digits = (num_of_powers + base - 2) / (base - 1);
+            uint32_t given_digits = (static_cast<uint32_t>(num_of_powers) + base - 2) / (base - 1);
 
-            WindowingDag dag(params_.split_size(), params_.window_size(), max_supported_degree, given_digits);
+            WindowingDag dag(static_cast<uint32_t>(params_.split_size()), params_.window_size(), max_supported_degree, given_digits);
 
             std::vector<WindowingDag::State> states;
             states.reserve(batch_count);
@@ -128,7 +128,7 @@ namespace apsi
                 states.emplace_back(dag);
             }
 
-            atomic<int> remaining_batches(thread_count_);
+            atomic<int> remaining_batches(seal::util::safe_cast<int>(thread_count_)); // TODO: maybe change remaining_batches_ to size_t
             promise<void> batches_done_prom;
             auto batches_done_fut = batches_done_prom.get_future().share();
 
@@ -136,10 +136,7 @@ namespace apsi
             for (size_t i = 0; i < thread_count_; i++)
             {
                 thread_pool.emplace_back([&, i]() {
-                    respond_worker(
-                        static_cast<int>(i), batch_count, static_cast<int>(thread_count_), total_blocks,
-                        batches_done_prom, batches_done_fut, powers, session_context, dag, states, remaining_batches,
-                        client_id, channel);
+                    respond_worker(i, batch_count, thread_count_, total_blocks, batches_done_prom, batches_done_fut, powers, session_context, dag, states, remaining_batches, client_id, channel);
                 });
             }
 
@@ -150,7 +147,7 @@ namespace apsi
         }
 
         void Sender::respond_worker(
-            int thread_index, int batch_count, int total_threads, int total_blocks, promise<void> &batches_done_prom,
+            size_t thread_index, size_t batch_count, size_t total_threads, size_t total_blocks, promise<void> &batches_done_prom,
             shared_future<void> &batches_done_fut, vector<vector<Ciphertext>> &powers,
             SenderSessionContext &session_context, WindowingDag &dag, vector<WindowingDag::State> &states,
             atomic<int> &remaining_batches, const vector<SEAL_BYTE> &client_id, Channel &channel)
@@ -163,13 +160,11 @@ namespace apsi
             Ciphertext tmp(local_pool);
             Ciphertext compressedResult(seal_context_, local_pool);
 
-            uint64_t batch_start = thread_index * batch_count / total_threads;
-            auto thread_idx = std::this_thread::get_id();
+            size_t batch_start = thread_index * batch_count / total_threads;
 
-            for (int batch = static_cast<int>(batch_start), loop_idx = 0ul; loop_idx < batch_count; ++loop_idx)
+            for (size_t batch = batch_start, loop_idx = size_t(0); loop_idx < batch_count; ++loop_idx)
             {
-                compute_batch_powers(
-                    static_cast<int>(batch), powers[batch], session_context, dag, states[batch], local_pool);
+                compute_batch_powers(powers[batch], session_context, dag, states[batch], local_pool);
                 batch = (batch + 1) % batch_count;
             }
 
@@ -183,19 +178,19 @@ namespace apsi
                 batches_done_fut.get();
             }
 
-            int start_block = thread_index * total_blocks / thread_count_;
-            int end_block = (thread_index + 1) * total_blocks / thread_count_;
+            size_t start_block = thread_index * total_blocks / thread_count_;
+            size_t end_block = (thread_index + 1) * total_blocks / thread_count_;
 
             // Constuct two ciphertexts to store the result. One keeps track of the current result,
             // one is used as a temp. Their roles switch each iteration. Saved needing to make a
             // copy in eval->add(...)
             array<Ciphertext, 2> runningResults{ local_pool, local_pool }, label_results{ local_pool, local_pool };
 
-            uint64_t processed_blocks = 0;
+            size_t processed_blocks = 0;
             Evaluator &evaluator = *session_context.evaluator();
-            for (int block_idx = start_block; block_idx < end_block; block_idx++)
+            for (size_t block_idx = start_block; block_idx < end_block; block_idx++)
             {
-                int batch = block_idx / params_.split_count(), split = block_idx % params_.split_count();
+                size_t batch = block_idx / params_.split_count(), split = block_idx % params_.split_count();
                 auto &block = sender_db_->get_block(batch, split);
 
                 // Get the pointer to the first poly of this batch.
@@ -214,7 +209,7 @@ namespace apsi
                 evaluator.multiply_plain(
                     powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
 
-                for (uint32_t s = 1; s < params_.split_size(); s++)
+                for (size_t s = 1; s < params_.split_size(); s++)
                 {
                     // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call
                     // multiply_plain_ntt
@@ -224,8 +219,7 @@ namespace apsi
                 }
 
                 // Handle the case for s = params_.split_size();
-                int s = params_.split_size();
-                tmp = powers[batch][s];
+                tmp = powers[batch][params_.split_size()];
                 evaluator.add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
                 currResult ^= 1;
 
@@ -339,19 +333,16 @@ namespace apsi
             Log::debug("Thread %d sent %d blocks", thread_index, processed_blocks);
         }
 
-        void Sender::compute_batch_powers(
-            int batch, vector<Ciphertext> &batch_powers, SenderSessionContext &session_context, const WindowingDag &dag,
+        void Sender::compute_batch_powers(vector<Ciphertext> &batch_powers, SenderSessionContext &session_context, const WindowingDag &dag,
             WindowingDag::State &state, MemoryPoolHandle pool)
         {
-            auto thrdIdx = std::this_thread::get_id();
-
             if (batch_powers.size() != params_.split_size() + 1)
             {
                 std::cout << batch_powers.size() << " != " << params_.split_size() + 1 << std::endl;
                 throw std::runtime_error("");
             }
 
-            size_t idx = (*state.next_node)++;
+            size_t idx = static_cast<size_t>((*state.next_node)++);
             Evaluator &evaluator = *session_context.evaluator();
             while (idx < dag.nodes.size())
             {
@@ -370,8 +361,7 @@ namespace apsi
                 // spin lock on the input nodes
                 for (size_t i = 0; i < 2; i++)
                 {
-                    while (state.nodes[node.inputs[i]] != WindowingDag::NodeState::Done)
-                        ;
+                    while (state.nodes[node.inputs[i]] != WindowingDag::NodeState::Done);
                 }
 
                 evaluator.multiply(
@@ -390,10 +380,9 @@ namespace apsi
             }
 
             // Iterate until all nodes are computed. We may want to do something smarter here.
-            for (int i = 0; i < state.nodes.size(); ++i)
+            for (size_t i = 0; i < state.nodes.size(); ++i)
             {
-                while (state.nodes[i] != WindowingDag::NodeState::Done)
-                    ;
+                while (state.nodes[i] != WindowingDag::NodeState::Done);
             }
 
             auto end = dag.nodes.size() + batch_powers.size();
@@ -414,23 +403,25 @@ namespace apsi
             return r;
         }
 
-        uint64_t WindowingDag::optimal_split(size_t x, int base, vector<int> &degrees)
+        size_t WindowingDag::optimal_split(size_t x, vector<uint32_t> &degrees)
         {
-            int opt_deg = degrees[x];
-            int opt_split = 0;
+            uint32_t opt_deg = degrees[x];
+            size_t opt_split = 0;
+
+            auto abs_sub = [](uint32_t a, uint32_t b) { return abs(static_cast<int32_t>(a) - static_cast<int32_t>(b)); };
 
             for (size_t i1 = 1; i1 < x; i1++)
             {
                 if (degrees[i1] + degrees[x - i1] < opt_deg)
                 {
-                    opt_split = static_cast<int>(i1);
+                    opt_split = i1;
                     opt_deg = degrees[i1] + degrees[x - i1];
                 }
                 else if (
                     degrees[i1] + degrees[x - i1] == opt_deg &&
-                    abs(degrees[i1] - degrees[x - i1]) < abs(degrees[opt_split] - degrees[x - opt_split]))
+                    abs_sub(degrees[i1], degrees[x - i1]) < abs_sub(degrees[opt_split], degrees[x - opt_split]))
                 {
-                    opt_split = static_cast<int>(i1);
+                    opt_split = i1;
                 }
             }
 
@@ -439,7 +430,7 @@ namespace apsi
             return opt_split;
         }
 
-        vector<uint64_t> WindowingDag::conversion_to_digits(uint64_t input, int base)
+        vector<uint64_t> WindowingDag::conversion_to_digits(uint64_t input, uint32_t base)
         {
             vector<uint64_t> result;
             while (input > 0)
@@ -452,18 +443,18 @@ namespace apsi
 
         void WindowingDag::compute_dag()
         {
-            vector<int> degree(max_power + 1, numeric_limits<int>::max());
-            vector<int> splits(max_power + 1);
+            vector<uint32_t> degree(max_power + 1, numeric_limits<uint32_t>::max());
+            vector<size_t> splits(max_power + 1);
             vector<int> items_per(max_power, 0);
 
             Log::debug("Computing windowing dag: max power = %i", max_power);
 
             // initialize the degree array.
             // given digits...
-            int base = (1 << window);
-            for (int i = 0; i < given_digits; i++)
+            uint32_t base = uint32_t(1) << window;
+            for (uint32_t i = 0; i < given_digits; i++)
             {
-                for (int j = 1; j < base; j++)
+                for (uint32_t j = 1; j < base; j++)
                 {
                     if (pow(base, i) * j < degree.size())
                     {
@@ -474,10 +465,10 @@ namespace apsi
 
             degree[0] = 0;
 
-            for (int i = 1; i <= max_power; i++)
+            for (size_t i = 1; i <= max_power; i++)
             {
-                int i1 = static_cast<int>(optimal_split(i, 1 << window, degree));
-                int i2 = i - i1;
+                size_t i1 = optimal_split(i, degree);
+                size_t i2 = seal::util::sub_safe(i, i1);
                 splits[i] = i1;
 
                 if (i1 == 0 || i2 == 0)
@@ -488,7 +479,7 @@ namespace apsi
                 else
                 {
                     degree[i] = degree[i1] + degree[i2];
-                    ++items_per[degree[i]];
+                    ++items_per[static_cast<size_t>(degree[i])];
                 }
                 Log::debug("degree[%i] = %i", i, degree[i]);
                 Log::debug("splits[%i] = %i", i, splits[i]);
@@ -501,30 +492,28 @@ namespace apsi
                 throw invalid_argument("degree too large");
             }
 
-            for (int i = 3; i < max_power && items_per[i]; i++)
+            for (size_t i = 3; i < max_power && items_per[i]; i++)
             {
                 items_per[i] += items_per[i - 1];
             }
 
-            for (int i = 0; i < max_power; i++)
+            for (size_t i = 0; i < max_power; i++)
             {
                 Log::debug("items_per[%i] = %i", i, items_per[i]);
             }
 
             // size = how many powers we still need to generate.
-            int size = static_cast<int>(max_power - base_powers.size());
+            size_t size = max_power - base_powers.size();
             nodes.resize(size);
 
-            for (int i = 1; i <= max_power; i++)
+            for (size_t i = 1; i <= max_power; i++)
             {
-                int i1 = splits[i];
-                int i2 = i - i1;
+                size_t i1 = splits[i];
+                size_t i2 = seal::util::sub_safe(i, i1);
 
                 if (i1 && i2) // if encryption(y^i) is not given
                 {
-                    auto d = degree[i] - 1;
-
-                    auto idx = items_per[d]++;
+                    auto idx = static_cast<size_t>(items_per[static_cast<size_t>(degree[i]) - 1]++);
                     if (nodes[idx].output)
                     {
                         throw std::runtime_error("");
@@ -538,7 +527,7 @@ namespace apsi
 
         WindowingDag::State::State(WindowingDag &dag)
         {
-            next_node = make_unique<std::atomic<int>>();
+            next_node = make_unique<std::atomic<size_t>>();
             *next_node = 0;
             node_state_storage = make_unique<std::atomic<NodeState>[]>(dag.max_power + 1);
             nodes = { node_state_storage.get(), static_cast<size_t>(dag.max_power + 1) };

@@ -26,24 +26,24 @@ using namespace seal;
 
 namespace
 {
-    std::pair<vector<Item>, vector<int>> rand_subset(const vector<Item> &items, int size)
+    std::pair<vector<Item>, vector<size_t>> rand_subset(const vector<Item> &items, size_t size)
     {
         random_device rd;
 
-        set<int> ss;
+        set<size_t> ss;
         while (ss.size() != size)
         {
-            ss.emplace(static_cast<int>(rd() % items.size()));
+            ss.emplace(static_cast<size_t>(rd() % items.size()));
         }
         auto ssIter = ss.begin();
 
         vector<Item> ret(size);
-        for (int i = 0; i < size; i++)
+        for (size_t i = 0; i < size; i++)
         {
             ret[i] = items[*ssIter++];
         }
         auto iter = ss.begin();
-        vector<int> s(size);
+        vector<size_t> s(size);
         for (size_t i = 0; i < static_cast<size_t>(size); ++i)
         {
             s[i] = *iter++;
@@ -52,20 +52,19 @@ namespace
     }
 
     void verify_intersection_results(
-        vector<Item> &client_items, int intersection_size, pair<vector<bool>, Matrix<unsigned char>> &intersection,
-        bool compare_labels, vector<int> &label_idx, Matrix<unsigned char> &labels)
+        vector<Item> &client_items, size_t intersection_size, pair<vector<bool>, Matrix<unsigned char>> &intersection,
+        bool compare_labels, vector<size_t> &label_idx, Matrix<unsigned char> &labels)
     {
-        bool correct = true;
         for (size_t i = 0; i < client_items.size(); i++)
         {
-            if (i < static_cast<size_t>(intersection_size))
+            if (i < intersection_size)
             {
                 // Item should be in intersection
                 ASSERT_EQ(true, (bool)intersection.first[i]);
 
                 if (compare_labels)
                 {
-                    auto idx = label_idx[i];
+                    size_t idx = label_idx[i];
                     int lblcmp = memcmp(intersection.second[i].data(), labels[idx].data(), labels[idx].size());
 
                     // Label is not the expected value
@@ -98,8 +97,8 @@ namespace
         Receiver &receiver = *receiver_ptr;
 
         auto label_bit_length = params.label_bit_count();
-        auto receiverActualSize = 20;
-        auto intersectionSize = 10;
+        size_t receiverActualSize = 20;
+        size_t intersectionSize = 10;
 
         if (params.use_fast_membership())
         {
@@ -127,7 +126,7 @@ namespace
         auto &c1 = cc1.first;
 
         c1.reserve(receiverActualSize);
-        for (int i = 0; i < (receiverActualSize - intersectionSize); ++i)
+        for (size_t i = 0; i < seal::util::sub_safe(receiverActualSize, intersectionSize); ++i)
             c1.emplace_back(i + s1.size());
 
         shared_ptr<OPRFKey> oprf_key;
@@ -198,46 +197,6 @@ namespace
 
         PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
         return params;
-    }
-
-    void initialize_db(vector<Item> &items, Matrix<unsigned char> &labels, size_t item_count, size_t label_byte_count)
-    {
-        items.resize(item_count);
-        labels.resize(item_count, label_byte_count);
-
-        for (size_t i = 0; i < items.size(); i++)
-        {
-            items[i] = i;
-
-            if (label_byte_count > 0)
-            {
-                memset(labels[i].data(), 0, labels[i].size());
-
-                labels[i][0] = static_cast<unsigned char>(i);
-                labels[i][1] = static_cast<unsigned char>(i >> 8);
-            }
-        }
-    }
-
-    void initialize_query(std::vector<apsi::Item> &items, size_t item_count)
-    {
-        items.resize(20);
-
-        std::random_device rd;
-        std::mt19937 gen(rd());
-        std::uniform_int_distribution<> dis(0, 20);
-
-        // Elements that should be in the query
-        for (int i = 0; i < 10; i++)
-        {
-            items[i] = dis(gen);
-        }
-
-        // Elements that should not be in the query
-        for (int i = 10; i < 20; i++)
-        {
-            items[i] = (item_count + i);
-        }
     }
 } // namespace
 

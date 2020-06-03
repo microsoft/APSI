@@ -55,6 +55,8 @@
     "span": "cpp",
     "string_span": "cpp",
     "bitset": "cpp",
-    "regex": "cpp"
+    "regex": "cpp",
+    "numeric": "cpp",
+    "complex": "cpp"
   }
 }

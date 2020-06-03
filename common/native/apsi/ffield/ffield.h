@@ -8,10 +8,6 @@
 
 namespace apsi
 {
-    using _ch_t = seal::Modulus;
-    using _ffield_elt_coeff_t = std::uint64_t;
-    using _ffield_elt_t = std::vector<_ffield_elt_coeff_t>;
-
     class FFieldElt;
 
     class FField
@@ -21,22 +17,24 @@ namespace apsi
         friend class FFieldBatchEncoder;
 
     public:
-        FField(_ch_t ch, std::uint64_t d) : ch_(ch), d_(d)
+        using CharacteristicType = seal::Modulus;
+
+        FField(CharacteristicType ch, std::uint32_t d) : characteristic_(ch), degree_(d)
         {}
 
-        inline const _ch_t &ch() const
+        inline const CharacteristicType &characteristic() const
         {
-            return ch_;
+            return characteristic_;
         }
 
-        inline std::uint64_t d() const
+        inline std::uint32_t degree() const
         {
-            return d_;
+            return degree_;
         }
 
         inline bool operator==(const FField &compare) const
         {
-            return (this == &compare) || ((ch_ == compare.ch_) && (d_ == compare.d_));
+            return (this == &compare) || ((characteristic_ == compare.characteristic_) && (degree_ == compare.degree_));
         }
 
         inline bool operator!=(const FField &compare) const
@@ -49,7 +47,7 @@ namespace apsi
         FFieldElt one();
 
     private:
-        _ch_t ch_;
-        std::uint64_t d_;
+        CharacteristicType characteristic_;
+        std::uint32_t degree_;
     }; // class FField
 } // namespace apsi

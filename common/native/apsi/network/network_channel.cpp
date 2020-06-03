@@ -141,19 +141,19 @@ namespace apsi
             size_t idx = 1;
 
             // PSIConfParams
-            response.psiconf_params.sender_size = msg.get<uint64_t>(idx++);
-            response.psiconf_params.sender_bin_size = msg.get<uint64_t>(idx++);
-            response.psiconf_params.item_bit_count = msg.get<uint32_t>(idx++);
-            response.psiconf_params.item_bit_length_used_after_oprf = msg.get<uint32_t>(idx++);
-            response.psiconf_params.num_chunks = msg.get<uint32_t>(idx++);
+            response.psiconf_params.sender_size = msg.get<size_t>(idx++);
+            response.psiconf_params.sender_bin_size = msg.get<size_t>(idx++);
+            response.psiconf_params.item_bit_count = msg.get<size_t>(idx++);
+            response.psiconf_params.item_bit_length_used_after_oprf = msg.get<size_t>(idx++);
+            response.psiconf_params.num_chunks = msg.get<size_t>(idx++);
             response.psiconf_params.use_labels = msg.get<bool>(idx++);
             response.psiconf_params.use_fast_membership = msg.get<bool>(idx++);
 
             // TableParams
             response.table_params.log_table_size = msg.get<uint32_t>(idx++);
             response.table_params.window_size = msg.get<uint32_t>(idx++);
-            response.table_params.split_count = msg.get<uint32_t>(idx++);
-            response.table_params.split_size = msg.get<uint32_t>(idx++);
+            response.table_params.split_count = msg.get<size_t>(idx++);
+            response.table_params.split_size = msg.get<size_t>(idx++);
             response.table_params.binning_sec_level = msg.get<uint32_t>(idx++);
             response.table_params.dynamic_split_count = msg.get<bool>(idx++);
 
@@ -248,8 +248,8 @@ namespace apsi
                 ;
             }
 
-            pkg.split_idx = msg.get<int64_t>(/* part */ 0);
-            pkg.batch_idx = msg.get<int64_t>(/* part */ 1);
+            pkg.split_idx = msg.get<size_t>(/* part */ 0);
+            pkg.batch_idx = msg.get<size_t>(/* part */ 1);
             pkg.data = msg.get(/* part */ 2);
             pkg.label_data = msg.get(/* part */ 3);
 

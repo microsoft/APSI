@@ -18,7 +18,7 @@ namespace apsi
         FFieldArray(std::size_t size, FField field) : size_(size), field_(field)
         {
             // Initialize array
-            array_.resize(static_cast<std::size_t>(field_.d_ * size_), 0);
+            array_.resize(static_cast<std::size_t>(field_.degree_ * size_), 0);
         }
 
         FFieldArray(const FFieldArray &copy) = default;
@@ -39,14 +39,14 @@ namespace apsi
             return { field_, data(index) };
         }
 
-        inline _ffield_elt_coeff_t get_coeff_of(std::size_t index, std::size_t coeff) const
+        inline FFieldElt::CoeffType get_coeff_of(std::size_t index, std::size_t coeff) const
         {
 #ifdef APSI_DEBUG
             if (index >= size_)
             {
                 throw std::out_of_range("index");
             }
-            if (coeff >= field_.d_)
+            if (coeff >= field_.degree_)
             {
                 throw std::out_of_range("coeff");
             }
@@ -66,7 +66,7 @@ namespace apsi
                 throw std::invalid_argument("field mismatch");
             }
 #endif
-            std::copy_n(in.data(), field_.d_, data(index));
+            std::copy_n(in.data(), field_.degree_, data(index));
         }
 
         inline void set(std::size_t dest_index, std::size_t src_index, const FFieldArray &in)
@@ -88,14 +88,14 @@ namespace apsi
             std::copy(in.data(src_index), in.data(src_index + 1), data(dest_index));
         }
 
-        inline void set_coeff_of(std::size_t index, std::size_t coeff, _ffield_elt_coeff_t value)
+        inline void set_coeff_of(std::size_t index, std::size_t coeff, FFieldElt::CoeffType value)
         {
 #ifdef APSI_DEBUG
             if (index >= size_)
             {
                 throw std::out_of_range("index");
             }
-            if (coeff >= field_.d_)
+            if (coeff >= field_.degree_)
             {
                 throw std::out_of_range("coeff");
             }
@@ -111,7 +111,7 @@ namespace apsi
                 throw std::out_of_range("index");
             }
 #endif
-            std::fill_n(data(index), field_.d_, 0);
+            std::fill_n(data(index), field_.degree_, 0);
         }
 
         inline bool is_zero() const
@@ -171,7 +171,7 @@ namespace apsi
                 throw std::invalid_argument("field mismatch");
             }
 #endif
-            const seal::Modulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.characteristic_;
             std::transform(
                 array_.cbegin(), array_.cend(), in.array_.cbegin(), out.array_.begin(),
                 [&ch](auto a, auto b) { return seal::util::add_uint64_mod(a, b, ch); });
@@ -189,7 +189,7 @@ namespace apsi
                 throw std::invalid_argument("field mismatch");
             }
 #endif
-            const seal::Modulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.characteristic_;
             std::transform(
                 array_.cbegin(), array_.cend(), in.array_.cbegin(), out.array_.begin(),
                 [&ch](auto a, auto b) { return seal::util::sub_uint64_mod(a, b, ch); });
@@ -207,7 +207,7 @@ namespace apsi
                 throw std::invalid_argument("field mismatch");
             }
 #endif
-            const seal::Modulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.characteristic_;
             std::transform(
                 array_.cbegin(), array_.cend(), in.array_.cbegin(), out.array_.begin(),
                 [&ch](auto a, auto b) { return seal::util::multiply_uint_mod(a, b, ch); });
@@ -225,10 +225,10 @@ namespace apsi
                 throw std::invalid_argument("field mismatch");
             }
 #endif
-            const seal::Modulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.characteristic_;
             std::transform(
                 array_.cbegin(), array_.cend(), in.array_.cbegin(), out.array_.begin(), [&ch](auto a, auto b) {
-                    _ffield_elt_coeff_t inv;
+                    FFieldElt::CoeffType inv;
                     if (!seal::util::try_invert_uint_mod(b, ch, inv))
                     {
                         throw std::logic_error("division by zero");
@@ -249,9 +249,9 @@ namespace apsi
                 throw std::invalid_argument("field mismatch");
             }
 #endif
-            const seal::Modulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.characteristic_;
             std::transform(array_.cbegin(), array_.cend(), out.array_.begin(), [&ch](auto a) {
-                _ffield_elt_coeff_t inv;
+                FFieldElt::CoeffType inv;
                 if (!seal::util::try_invert_uint_mod(a, ch, inv))
                 {
                     throw std::logic_error("division by zero");
@@ -277,7 +277,7 @@ namespace apsi
                 throw std::invalid_argument("field mismatch");
             }
 #endif
-            const seal::Modulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.characteristic_;
             std::transform(array_.cbegin(), array_.cend(), out.array_.begin(), [&ch](auto a) {
                 return seal::util::negate_uint_mod(a, ch);
             });
@@ -300,7 +300,7 @@ namespace apsi
                 throw std::invalid_argument("field mismatch");
             }
 #endif
-            const seal::Modulus &ch = field_.ch_;
+            const seal::Modulus &ch = field_.characteristic_;
             std::transform(array_.cbegin(), array_.cend(), out.array_.begin(), [&ch](auto a) {
                 return seal::util::multiply_uint_mod(a, a, ch);
             });
@@ -381,29 +381,29 @@ namespace apsi
             return !operator==(compare);
         }
 
-        inline _ffield_elt_coeff_t *data()
+        inline FFieldElt::CoeffType *data()
         {
             return array_.data();
         }
 
-        inline const _ffield_elt_coeff_t *data() const
+        inline const FFieldElt::CoeffType *data() const
         {
             return array_.data();
         }
 
-        inline _ffield_elt_coeff_t *data(std::size_t index)
+        inline FFieldElt::CoeffType *data(std::size_t index)
         {
-            return array_.data() + index * field_.d_;
+            return array_.data() + index * field_.degree_;
         }
 
-        inline const _ffield_elt_coeff_t *data(std::size_t index) const
+        inline const FFieldElt::CoeffType *data(std::size_t index) const
         {
-            return array_.data() + index * field_.d_;
+            return array_.data() + index * field_.degree_;
         }
 
     private:
         std::size_t size_;
         FField field_;
-        std::vector<_ffield_elt_coeff_t> array_;
+        std::vector<FFieldElt::CoeffType> array_;
     }; // class FFieldArray
 } // namespace apsi

@@ -49,19 +49,19 @@ namespace apsi
             Loads the input data into sender's database, and precomputes all necessary components for the PSI protocol,
             including symmetric polynomials, batching, etc.
             */
-            void load_db(int thread_count, const std::vector<Item> &data, MatrixView<unsigned char> vals = {});
+            void load_db(std::size_t thread_count, const std::vector<Item> &data, MatrixView<unsigned char> vals = {});
 
             /**
             Sets the sender's database by hashing the data items with all hash functions.
             */
-            void set_data(gsl::span<const Item> keys, int thread_count);
-            void set_data(gsl::span<const Item> keys, MatrixView<unsigned char> values, int thread_count);
+            void set_data(gsl::span<const Item> keys, std::size_t thread_count);
+            void set_data(gsl::span<const Item> keys, MatrixView<unsigned char> values, std::size_t thread_count);
 
             /**
             Adds the data items to sender's database.
             */
-            void add_data(gsl::span<const Item> keys, int thread_count);
-            void add_data(gsl::span<const Item> keys, MatrixView<unsigned char> values, int thread_count);
+            void add_data(gsl::span<const Item> keys, std::size_t thread_count);
+            void add_data(gsl::span<const Item> keys, MatrixView<unsigned char> values, std::size_t thread_count);
 
             /**
              No hash version of add data, specific for one query
@@ -72,13 +72,13 @@ namespace apsi
             Handles the work of one thread for adding items to sender's database
             */
             void add_data_worker(
-                int thread_idx, int thread_count, gsl::span<const Item> data, MatrixView<unsigned char> values,
+                size_t thread_idx, std::size_t thread_count, gsl::span<const Item> data, MatrixView<unsigned char> values,
                 std::vector<int> &loads);
 
             /**
             Adds one item to sender's database.
             */
-            void add_data(const Item &item, int thread_count);
+            void add_data(const Item &item, std::size_t thread_count);
 
             /**
             Batches the randomized symmetric polynomials for the specified split and the specified batch in sender's
@@ -86,16 +86,16 @@ namespace apsi
 
             @see randomized_symmetric_polys for computing randomized symmetric polynomials.
             */
-            void batched_randomized_symmetric_polys(SenderThreadContext &th_context, int start_block, int end_block);
+            void batched_randomized_symmetric_polys(SenderThreadContext &th_context, size_t start_block, size_t end_block);
 
-            void batched_interpolate_polys(SenderThreadContext &th_context, int start_block, int end_block);
+            void batched_interpolate_polys(SenderThreadContext &th_context, size_t start_block, size_t end_block);
 
             DBBlock &get_block(std::size_t batch, std::size_t split)
             {
                 return *db_blocks_(batch, split);
             }
 
-            std::uint64_t get_block_count() const
+            std::size_t get_block_count() const
             {
                 return db_blocks_.size();
             }
@@ -110,7 +110,7 @@ namespace apsi
             FField field_;
             FFieldElt null_element_;
             FFieldElt neg_null_element_;
-            int encoding_bit_length_;
+            std::size_t encoding_bit_length_;
 
             /*
             Size m vector, where m is the table size. Each value is an incremental counter for the
@@ -150,12 +150,12 @@ namespace apsi
             Precomputes all necessary components for the PSI protocol, including symmetric polynomials, batching, etc.
             This function is expensive and can be called after sender finishes adding items to the database.
             */
-            void offline_compute(int thread_count);
+            void offline_compute(std::size_t thread_count);
 
             /**
             Handles work for offline_compute for a single thread.
             */
-            void offline_compute_work(SenderThreadContext &th_context, int total_thread_count);
+            void offline_compute_work(SenderThreadContext &th_context, size_t total_thread_count);
 
             /**
             Report progress of the offline_compute operation.

@@ -15,14 +15,14 @@ namespace apsi
     public:
         FFieldBatchEncoder(std::shared_ptr<seal::SEALContext> context, FField field);
 
-        inline seal::Modulus ch() const
+        inline seal::Modulus characteristic() const
         {
-            return field_.ch_;
+            return field_.characteristic_;
         }
 
-        inline std::uint64_t d() const
+        inline std::uint64_t degree() const
         {
-            return field_.d_;
+            return field_.degree_;
         }
 
         inline std::uint64_t n() const

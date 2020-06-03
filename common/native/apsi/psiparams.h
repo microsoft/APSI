@@ -27,11 +27,11 @@ namespace apsi
         */
         struct PSIConfParams
         {
-            std::uint64_t sender_size;
-            std::uint64_t sender_bin_size;
-            std::uint32_t item_bit_count;                  // <=max_item_bit_count=128, reserve extra bits for Kuku
-            std::uint32_t item_bit_length_used_after_oprf; // the number of bits we take after oprf
-            std::uint32_t num_chunks;                      // the number of chunks to split each item into
+            std::size_t sender_size;
+            std::size_t sender_bin_size;
+            std::size_t item_bit_count;                  // <=max_item_bit_count=128, reserve extra bits for Kuku
+            std::size_t item_bit_length_used_after_oprf; // the number of bits we take after oprf
+            std::size_t num_chunks;                      // the number of chunks to split each item into
             bool use_labels;
             bool use_fast_membership; // faster configuration assuming query is always one item
         };                            // struct PSIConfParams
@@ -41,27 +41,27 @@ namespace apsi
             return psiconf_params_;
         }
 
-        inline std::uint64_t sender_size() const
+        inline std::size_t sender_size() const
         {
             return psiconf_params_.sender_size;
         }
 
-        inline std::uint64_t sender_bin_size() const
+        inline std::size_t sender_bin_size() const
         {
             return psiconf_params_.sender_bin_size;
         }
 
-        inline std::uint32_t item_bit_count() const
+        inline std::size_t item_bit_count() const
         {
             return psiconf_params_.item_bit_count;
         }
 
-        inline std::uint32_t item_bit_length_used_after_oprf() const
+        inline std::size_t item_bit_length_used_after_oprf() const
         {
             return psiconf_params_.item_bit_length_used_after_oprf;
         }
 
-        inline std::uint32_t num_chunks() const
+        inline std::size_t num_chunks() const
         {
             return psiconf_params_.num_chunks;
         }
@@ -83,8 +83,8 @@ namespace apsi
         {
             std::uint32_t log_table_size;
             std::uint32_t window_size;
-            std::uint32_t split_count;
-            std::uint32_t split_size;
+            std::size_t split_count;
+            std::size_t split_size;
             std::uint32_t binning_sec_level;
             bool dynamic_split_count; // TODO: Do not use bool for "*count".
         };                            // struct TableParams
@@ -104,12 +104,12 @@ namespace apsi
             return table_params_.window_size;
         }
 
-        inline std::uint32_t split_count() const
+        inline std::size_t split_count() const
         {
             return table_params_.split_count;
         }
 
-        inline std::uint32_t split_size() const
+        inline std::size_t split_size() const
         {
             return table_params_.split_size;
         }
@@ -208,13 +208,13 @@ namespace apsi
         /**
         Manual setters.
         */
-        void set_sender_bin_size(std::uint64_t size)
+        void set_sender_bin_size(std::size_t size)
         {
             logging::Log::debug("Manually setting sender bin size to be %i", size);
             psiconf_params_.sender_bin_size = size;
         }
 
-        void set_split_count(std::uint32_t count)
+        void set_split_count(std::size_t count)
         {
             logging::Log::debug("Manually setting split count to be %i", count);
             table_params_.split_count = count;
@@ -223,28 +223,28 @@ namespace apsi
         /**
         Other getters.
         */
-        inline std::uint32_t table_size() const
+        inline std::size_t table_size() const
         {
             return 1 << table_params_.log_table_size;
         }
 
-        inline std::uint32_t batch_size() const
+        inline std::size_t batch_size() const
         {
-            return static_cast<std::uint32_t>(encryption_params().poly_modulus_degree() / ffield_degree());
+            return encryption_params().poly_modulus_degree() / ffield_degree();
         }
 
-        inline std::uint32_t batch_count() const
+        inline std::size_t batch_count() const
         {
-            std::uint32_t batch = batch_size();
+            std::size_t batch = batch_size();
             return (table_size() + batch - 1) / batch;
         }
 
-        inline std::uint32_t label_bit_count() const
+        inline std::size_t label_bit_count() const
         {
             return psiconf_params_.use_labels ? psiconf_params_.item_bit_count : 0;
         }
 
-        inline std::uint32_t label_byte_count() const
+        inline std::size_t label_byte_count() const
         {
             return psiconf_params_.use_labels ? (psiconf_params_.item_bit_count + 7) / 8 : 0;
         }

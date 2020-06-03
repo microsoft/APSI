@@ -61,13 +61,13 @@ namespace apsi
                     symm_block_vec_ = std::make_unique<FFieldArray>(total_size, field);
 
                     // Create matrix view
-                    symm_block_ = MatrixView<_ffield_elt_coeff_t>(
+                    symm_block_ = MatrixView<FFieldElt::CoeffType>(
                         symm_block_vec_->data(), params.batch_size(), params.split_size() + 1,
-                        static_cast<size_t>(field.d()));
+                        static_cast<size_t>(field.degree()));
                 }
             }
 
-            inline MatrixView<_ffield_elt_coeff_t> symm_block()
+            inline MatrixView<FFieldElt::CoeffType> symm_block()
             {
                 return symm_block_;
             }
@@ -118,13 +118,14 @@ namespace apsi
             }
 
         private:
+            // TODO: consider using size_t, especially for total_*_polys_.
             int id_;
 
             seal::MemoryPoolHandle pool_;
 
             std::unique_ptr<FFieldArray> symm_block_vec_ = nullptr;
 
-            MatrixView<_ffield_elt_coeff_t> symm_block_;
+            MatrixView<FFieldElt::CoeffType> symm_block_;
 
             std::atomic<int> randomized_polys_processed_;
             std::atomic<int> interpolate_polys_processed_;

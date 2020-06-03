@@ -30,8 +30,8 @@ namespace apsi
 
             // Set null value for sender: 1111...1110 (128 bits)
             // Receiver's null value comes from the Cuckoo class: 1111...1111
-            sender_null_item_[0] = ~1;
-            sender_null_item_[1] = ~0;
+            sender_null_item_[0] = ~uint64_t(1);
+            sender_null_item_[1] = ~uint64_t(0);
 
             // What is the actual length of strings stored in the hash table
             encoding_bit_length_ = params.item_bit_length_used_after_oprf();
@@ -41,8 +41,8 @@ namespace apsi
             null_element_ = sender_null_item_.to_ffield_element(field_, encoding_bit_length_);
             neg_null_element_ = -null_element_;
 
-            int batch_size = params_.batch_size();
-            int split_size = params_.split_size();
+            size_t batch_size = params_.batch_size();
+            size_t split_size = params_.split_size();
 
             // debugging
             uint64_t num_ctxts = params_.batch_count() * params_.sender_bin_size();
@@ -52,7 +52,7 @@ namespace apsi
             Log::debug("split size = %i", split_size);
             Log::debug("number of ciphertexts in senderdb = %i", num_ctxts);
             Log::debug("number of hash functions = %i", params_.hash_func_count());
-            uint32_t byte_length = round_up_to(params_.label_bit_count(), 8u) / 8;
+            size_t byte_length = round_up_to(params_.label_bit_count(), size_t(8)) / 8;
             uint64_t nb = params_.batch_count();
 
             // here, need to make split count larger to fit
@@ -78,9 +78,7 @@ namespace apsi
             for (auto &plain : batch_random_symm_poly_storage_)
             {
                 // Reserve memory for ciphertext size plaintexts (NTT transformed mod q)
-                plain.reserve(static_cast<int>(
-                    params_.encryption_params().coeff_modulus().size() *
-                    params_.encryption_params().poly_modulus_degree()));
+                plain.reserve(params_.encryption_params().coeff_modulus().size() * params_.encryption_params().poly_modulus_degree());
             }
         }
 
@@ -92,9 +90,7 @@ namespace apsi
                 for (auto &plain : batch_random_symm_poly_storage_)
                 {
                     plain.release();
-                    plain.reserve(static_cast<int>(
-                        params_.encryption_params().coeff_modulus().size() *
-                        params_.encryption_params().poly_modulus_degree()));
+                    plain.reserve(params_.encryption_params().coeff_modulus().size() * params_.encryption_params().poly_modulus_degree());
                 }
             }
 
@@ -102,12 +98,12 @@ namespace apsi
                 block.clear();
         }
 
-        void SenderDB::set_data(gsl::span<const Item> data, int thread_count)
+        void SenderDB::set_data(gsl::span<const Item> data, size_t thread_count)
         {
             set_data(data, {}, thread_count);
         }
 
-        void SenderDB::set_data(gsl::span<const Item> data, MatrixView<unsigned char> vals, int thread_count)
+        void SenderDB::set_data(gsl::span<const Item> data, MatrixView<unsigned char> vals, size_t thread_count)
         {
             STOPWATCH(sender_stop_watch, "SenderDB::set_data");
             clear_db();
@@ -124,7 +120,7 @@ namespace apsi
             }
         }
 
-        void SenderDB::add_data(gsl::span<const Item> data, MatrixView<unsigned char> values, int thread_count)
+        void SenderDB::add_data(gsl::span<const Item> data, MatrixView<unsigned char> values, size_t thread_count)
         {
             STOPWATCH(sender_stop_watch, "SenderDB::add_data");
 
@@ -134,10 +130,10 @@ namespace apsi
             // Divide the work across threads
             vector<vector<int>> thread_loads(thread_count);
             vector<thread> thrds;
-            for (int t = 0; t < thread_count; t++)
+            for (size_t t = 0; t < thread_count; t++)
             {
                 thrds.emplace_back(
-                    [&, t]() { add_data_worker(static_cast<int>(t), thread_count, data, values, thread_loads[t]); });
+                    [&, t]() { add_data_worker(t, thread_count, data, values, thread_loads[t]); });
             }
 
             for (auto &t : thrds)
@@ -149,7 +145,7 @@ namespace apsi
             int maxload = 0;
             for (uint32_t i = 0; i < params_.table_size(); i++)
             {
-                for (int t = 1; t < thread_count; t++)
+                for (size_t t = 1; t < thread_count; t++)
                 {
                     thread_loads[0][i] += thread_loads[t][i];
                 }
@@ -160,9 +156,8 @@ namespace apsi
             if (get_params().dynamic_split_count())
             {
                 // making sure maxload is a multiple of split_size
-                uint32_t new_split_count = (maxload + params_.split_size() - 1) / params_.split_size();
-                maxload = new_split_count * params_.split_size();
-                params_.set_sender_bin_size(maxload);
+                size_t new_split_count = (static_cast<size_t>(maxload) + params_.split_size() - 1) / params_.split_size();
+                params_.set_sender_bin_size(new_split_count * params_.split_size());
                 params_.set_split_count(new_split_count);
 
                 // resize the matrix of blocks.
@@ -180,7 +175,7 @@ namespace apsi
             uint64_t end = data.size();
 
             vector<int> loads(params_.table_size(), 0);
-            uint64_t maxload = 0;
+            int maxload = 0;
 
             for (size_t i = static_cast<size_t>(start); i < end; i++)
             {
@@ -213,10 +208,9 @@ namespace apsi
 
             if (get_params().dynamic_split_count())
             {
-                uint64_t new_split_count = (maxload + params_.split_size() - 1) / params_.split_size();
-                maxload = new_split_count * params_.split_size();
-                params_.set_sender_bin_size(maxload);
-                params_.set_split_count(static_cast<uint32_t>(new_split_count));
+                size_t new_split_count = (static_cast<size_t>(maxload) + params_.split_size() - 1) / params_.split_size();
+                params_.set_sender_bin_size(new_split_count * params_.split_size());
+                params_.set_split_count(new_split_count);
 
                 // resize the matrix of blocks.
                 db_blocks_.resize(params_.batch_count(), static_cast<size_t>(new_split_count));
@@ -225,13 +219,12 @@ namespace apsi
             }
         }
 
-        void SenderDB::add_data_worker(
-            int thread_idx, int thread_count, gsl::span<const Item> data, MatrixView<unsigned char> values, vector<int> &loads)
+        void SenderDB::add_data_worker(size_t thread_idx, size_t thread_count, gsl::span<const Item> data, MatrixView<unsigned char> values, vector<int> &loads)
         {
             STOPWATCH(sender_stop_watch, "SenderDB::add_data_worker");
 
-            uint64_t start = thread_idx * data.size() / thread_count;
-            uint64_t end = (thread_idx + 1) * data.size() / thread_count;
+            size_t start = thread_idx * data.size() / thread_count;
+            size_t end = (thread_idx + 1) * data.size() / thread_count;
 
             vector<kuku::LocFunc> normal_loc_func;
             for (uint32_t i = 0; i < params_.hash_func_count(); i++)
@@ -241,9 +234,9 @@ namespace apsi
             }
 
             loads.resize(params_.table_size(), 0);
-            uint64_t maxload = 0;
+            int maxload = 0;
 
-            for (size_t i = static_cast<size_t>(start); i < end; i++)
+            for (size_t i = start; i < end; i++)
             {
                 vector<uint64_t> locs(params_.hash_func_count());
                 vector<Item> keys(params_.hash_func_count());
@@ -310,21 +303,20 @@ namespace apsi
             Log::debug("max load for thread %i = %i", thread_idx, maxload);
         }
 
-        void SenderDB::add_data(gsl::span<const Item> data, int thread_count)
+        void SenderDB::add_data(gsl::span<const Item> data, size_t thread_count)
         {
             add_data(data, {}, thread_count);
         }
 
         pair<DBBlock *, DBBlock::Position> SenderDB::acquire_db_position_after_oprf(size_t cuckoo_loc)
         {
-            auto batch_idx = cuckoo_loc / params_.batch_size();
-            auto batch_offset = cuckoo_loc % params_.batch_size();
+            size_t batch_idx = cuckoo_loc / params_.batch_size();
+            size_t batch_offset = cuckoo_loc % params_.batch_size();
 
-            auto s_idx = 0;
+            size_t s_idx = 0;
             for (size_t i = 0; i < db_blocks_.stride(); ++i)
             {
-                auto pos =
-                    db_blocks_(batch_idx, s_idx)->try_acquire_position_after_oprf(static_cast<int>(batch_offset));
+                DBBlock::Position pos = db_blocks_(batch_idx, s_idx)->try_acquire_position_after_oprf(batch_offset);
                 if (pos.is_initialized())
                 {
                     return { db_blocks_(batch_idx, s_idx), pos };
@@ -336,47 +328,47 @@ namespace apsi
             throw runtime_error("simple hashing failed due to bin overflow");
         }
 
-        void SenderDB::add_data(const Item &item, int thread_count)
+        void SenderDB::add_data(const Item &item, size_t thread_count)
         {
             add_data(vector<Item>(1, item), thread_count);
         }
 
-        void SenderDB::batched_randomized_symmetric_polys(SenderThreadContext &context, int start_block, int end_block)
+        void SenderDB::batched_randomized_symmetric_polys(SenderThreadContext &context, size_t start_block, size_t end_block)
         {
-            int table_size = params_.table_size(), batch_size = params_.batch_size(),
-                split_size_plus_one = params_.split_size() + 1;
+            size_t batch_size = params_.batch_size();
+            size_t split_size_plus_one = params_.split_size() + 1;
 
             FFieldArray batch_vector(batch_size, *session_context_.ffield());
             vector<uint64_t> integer_batch_vector(batch_size);
 
             // Data in batch-split table is stored in "batch-major order"
             auto indexer = [splitStep = params_.batch_count() * split_size_plus_one,
-                            batchStep = split_size_plus_one](int splitIdx, int batchIdx) {
+                            batchStep = split_size_plus_one](size_t splitIdx, size_t batchIdx) {
                 return splitIdx * splitStep + batchIdx * batchStep;
             };
 
             MemoryPoolHandle local_pool = context.pool();
 
-            for (int next_block = start_block; next_block < end_block; next_block++)
+            for (size_t next_block = start_block; next_block < end_block; next_block++)
             {
-                int split = next_block / params_.batch_count();
-                int batch = next_block % params_.batch_count();
+                size_t split = next_block / params_.batch_count();
+                size_t batch = next_block % params_.batch_count();
 
-                int batch_start = batch * batch_size, batch_end = batch_start + batch_size;
+                size_t batch_start = batch * batch_size, batch_end = batch_start + batch_size;
 
                 auto &block = db_blocks_.data()[next_block];
                 block.symmetric_polys(context, encoding_bit_length_, neg_null_element_);
                 block.batch_random_symm_poly_ = { &batch_random_symm_poly_storage_[indexer(split, batch)],
                                                   static_cast<size_t>(split_size_plus_one) };
 
-                for (int i = 0; i < split_size_plus_one; i++)
+                for (size_t i = 0; i < split_size_plus_one; i++)
                 {
                     Plaintext &poly = block.batch_random_symm_poly_[i];
 
                     // This branch works even if FField is an integer field, but it is slower than normal batching.
-                    for (int k = 0; batch_start + k < batch_end; k++)
+                    for (size_t k = 0; batch_start + k < batch_end; k++)
                     {
-                        copy_n(context.symm_block()(k, i), batch_vector.field().d(), batch_vector.data(k));
+                        copy_n(context.symm_block()(k, i), batch_vector.field().degree(), batch_vector.data(k));
                     }
                     session_context_.encoder()->compose(batch_vector, poly);
                     if (!is_valid_for(poly, session_context_.seal_context()))
@@ -406,7 +398,7 @@ namespace apsi
             }
         }
 
-        void SenderDB::batched_interpolate_polys(SenderThreadContext &th_context, int start_block, int end_block)
+        void SenderDB::batched_interpolate_polys(SenderThreadContext &th_context, size_t start_block, size_t end_block)
         {
             auto &mod = params_.encryption_params().plain_modulus();
 
@@ -414,14 +406,14 @@ namespace apsi
                 *session_context_.ffield(), params_.batch_size(), params_.split_size(), params_.label_byte_count());
 
             // Minus 1 to be safe.
-            auto coeffBitCount = seal::util::get_significant_bit_count(mod.value()) - 1;
+            size_t coeffBitCount = static_cast<size_t>(seal::util::get_significant_bit_count(mod.value()) - 1);
 
-            if (params_.label_bit_count() >= coeffBitCount * session_context_.encoder()->d())
+            if (params_.label_bit_count() >= coeffBitCount * session_context_.encoder()->degree())
             {
                 throw runtime_error("labels are too large for ffield");
             }
 
-            for (int bIdx = start_block; bIdx < end_block; bIdx++)
+            for (size_t bIdx = start_block; bIdx < end_block; bIdx++)
             {
                 auto &block = *db_blocks_(bIdx);
                 block.batch_interpolate(
@@ -431,7 +423,7 @@ namespace apsi
             }
         }
 
-        void SenderDB::load_db(int thread_count, const vector<Item> &data, MatrixView<unsigned char> vals)
+        void SenderDB::load_db(size_t thread_count, const vector<Item> &data, MatrixView<unsigned char> vals)
         {
             set_data(data, vals, thread_count);
 
@@ -439,7 +431,7 @@ namespace apsi
             offline_compute(thread_count);
         }
 
-        void SenderDB::offline_compute(int thread_count)
+        void SenderDB::offline_compute(size_t thread_count)
         {
             STOPWATCH(sender_stop_watch, "SenderDB::offline_compute");
             Log::info("Offline compute started");
@@ -452,10 +444,10 @@ namespace apsi
 
             // Set local ffields for multi-threaded efficient use of memory pools.
             vector<thread> thrds;
-            for (int i = 0; i < thread_count; i++)
+            for (size_t i = 0; i < thread_count; i++)
             {
                 thrds.emplace_back([&, i]() {
-                    thread_contexts[i].set_id(i);
+                    thread_contexts[i].set_id(seal::util::safe_cast<int>(i));
                     thread_contexts[i].set_pool(MemoryManager::GetPool(mm_prof_opt::FORCE_NEW));
 
                     // Allocate memory for repeated use from the given memory pool.
@@ -475,7 +467,7 @@ namespace apsi
                 ctx.clear_processed_counts();
             }
 
-            for (int i = 0; i < thread_count; i++)
+            for (size_t i = 0; i < thread_count; i++)
             {
                 thrds.emplace_back([&, i]() { offline_compute_work(thread_contexts[i], thread_count); });
             }
@@ -495,21 +487,21 @@ namespace apsi
             Log::info("Offline compute finished.");
         }
 
-        void SenderDB::offline_compute_work(SenderThreadContext &th_context, int total_thread_count)
+        void SenderDB::offline_compute_work(SenderThreadContext &th_context, size_t total_thread_count)
         {
             STOPWATCH(sender_stop_watch, "SenderDB::offline_compute_work");
 
-            int thread_context_idx = th_context.id();
-            int start_block = static_cast<int>(thread_context_idx * get_block_count() / total_thread_count);
-            int end_block = static_cast<int>((thread_context_idx + 1) * get_block_count() / total_thread_count);
+            size_t thread_context_idx = static_cast<size_t>(th_context.id());
+            size_t start_block = thread_context_idx * get_block_count() / total_thread_count;
+            size_t end_block = (thread_context_idx + 1) * get_block_count() / total_thread_count;
 
-            int blocks_to_process = end_block - start_block;
+            size_t blocks_to_process = end_block - start_block;
             Log::debug("Thread %i processing %i blocks.", thread_context_idx, blocks_to_process);
 
-            th_context.set_total_randomized_polys(blocks_to_process);
+            th_context.set_total_randomized_polys(static_cast<int>(blocks_to_process));
             if (params_.use_labels())
             {
-                th_context.set_total_interpolate_polys(blocks_to_process);
+                th_context.set_total_interpolate_polys(static_cast<int>(blocks_to_process));
             }
 
             STOPWATCH(sender_stop_watch, "SenderDB::offline_compute_work::calc_symmpoly");
@@ -525,12 +517,12 @@ namespace apsi
         void SenderDB::report_offline_compute_progress(
             vector<SenderThreadContext> &thread_contexts, atomic<bool> &work_finished)
         {
-            int thread_count = static_cast<int>(thread_contexts.size());
+            size_t thread_count = thread_contexts.size();
             int progress = 0;
             while (!work_finished)
             {
                 float threads_progress = 0.0f;
-                for (int i = 0; i < thread_count; i++)
+                for (size_t i = 0; i < thread_count; i++)
                 {
                     threads_progress += thread_contexts[i].get_progress();
                 }

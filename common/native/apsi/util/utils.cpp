@@ -17,7 +17,7 @@ namespace apsi
 
         namespace
         {
-            double get_bin_overflow_prob(uint64_t num_bins, uint64_t num_balls, uint64_t bin_size, double epsilon = 0.0001)
+            double get_bin_overflow_prob(size_t num_bins, size_t num_balls, size_t bin_size, double epsilon = 0.0001)
             {
                 if (num_balls <= bin_size)
                 {
@@ -50,16 +50,16 @@ namespace apsi
                 return max<double>(0, static_cast<double>(-sec));
             }
 
-            uint64_t get_bin_size(uint64_t num_bins, uint64_t num_balls, uint64_t stat_sec_param)
+            size_t get_bin_size(size_t num_bins, size_t num_balls, uint32_t stat_sec_param)
             {
-                auto B = max<uint64_t>(1, num_balls / num_bins);
+                size_t B = max<size_t>(size_t(1), num_balls / num_bins);
                 double currentProb = get_bin_overflow_prob(num_bins, num_balls, B);
                 uint64_t step = 1;
                 bool doubling = true;
 
                 while (currentProb < static_cast<double>(stat_sec_param) || step > 1)
                 {
-                    if (stat_sec_param > currentProb)
+                    if (static_cast<double>(stat_sec_param) > currentProb)
                     {
                         if (doubling)
                         {
@@ -163,7 +163,7 @@ namespace apsi
         }
 
         uint64_t compute_sender_bin_size(
-            uint32_t log_table_size, uint64_t sender_set_size, uint32_t hash_func_count, uint32_t binning_sec_level, uint32_t split_count)
+            uint32_t log_table_size, size_t sender_set_size, size_t hash_func_count, uint32_t binning_sec_level, size_t split_count)
         {
             return round_up_to(
                 get_bin_size(1ull << log_table_size, sender_set_size * hash_func_count, binning_sec_level),

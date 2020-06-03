@@ -83,7 +83,7 @@ namespace APSITests
         ASSERT_EQ(false, gpr.psiconf_params.use_labels);
         ASSERT_EQ(false, gpr.psiconf_params.use_fast_membership);
         ASSERT_EQ((uint64_t)12345, gpr.psiconf_params.sender_size);
-        ASSERT_EQ(90, gpr.psiconf_params.item_bit_length_used_after_oprf);
+        ASSERT_EQ(size_t(90), gpr.psiconf_params.item_bit_length_used_after_oprf);
         ASSERT_EQ(45, gpr.psiconf_params.num_chunks);
         ASSERT_EQ(128, gpr.psiconf_params.sender_bin_size);
 
