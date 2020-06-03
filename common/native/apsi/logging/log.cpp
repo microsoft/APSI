@@ -1,7 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "log.h"
+#include "apsi/logging/log.h"
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
