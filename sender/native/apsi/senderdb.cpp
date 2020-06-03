@@ -156,7 +156,7 @@ namespace apsi
             }
             Log::debug("Original max load =  %i", maxload);
 
-            if (get_params().dynamic_split_count())
+            if (get_params().use_dynamic_split_count())
             {
                 // making sure maxload is a multiple of split_size
                 size_t new_split_count =
@@ -210,7 +210,7 @@ namespace apsi
             // debugging: print the bin load
             Log::debug("Original max load = %i", maxload);
 
-            if (get_params().dynamic_split_count())
+            if (get_params().use_dynamic_split_count())
             {
                 size_t new_split_count =
                     (static_cast<size_t>(maxload) + params_.split_size() - 1) / params_.split_size();

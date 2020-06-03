@@ -91,7 +91,7 @@ namespace APSITests
         ASSERT_EQ(2, gpr.table_params.split_count);
         ASSERT_EQ(35, gpr.table_params.split_size);
         ASSERT_EQ(40, gpr.table_params.binning_sec_level);
-        ASSERT_TRUE(gpr.table_params.dynamic_split_count);
+        ASSERT_TRUE(gpr.table_params.use_dynamic_split_count);
 
         ASSERT_EQ(3, gpr.cuckoo_params.hash_func_count);
         ASSERT_EQ(2, gpr.cuckoo_params.hash_func_seed);

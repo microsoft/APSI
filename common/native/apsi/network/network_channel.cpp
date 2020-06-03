@@ -155,7 +155,7 @@ namespace apsi
             response.table_params.split_count = msg.get<size_t>(idx++);
             response.table_params.split_size = msg.get<size_t>(idx++);
             response.table_params.binning_sec_level = msg.get<uint32_t>(idx++);
-            response.table_params.dynamic_split_count = msg.get<bool>(idx++);
+            response.table_params.use_dynamic_split_count = msg.get<bool>(idx++);
 
             // CuckooParams
             response.cuckoo_params.hash_func_count = msg.get<uint32_t>(idx++);
@@ -297,7 +297,7 @@ namespace apsi
             msg.add(params.split_count());
             msg.add(params.split_size());
             msg.add(params.binning_sec_level());
-            msg.add(params.dynamic_split_count());
+            msg.add(params.use_dynamic_split_count());
 
             // CuckooParams
             msg.add(params.hash_func_count());

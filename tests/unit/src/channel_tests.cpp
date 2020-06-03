@@ -395,7 +395,7 @@ namespace APSITests
         ASSERT_EQ((uint32_t)2, get_params_response.table_params.split_count);
         ASSERT_EQ((uint32_t)10, get_params_response.table_params.split_size);
         ASSERT_EQ((uint32_t)40, get_params_response.table_params.binning_sec_level);
-        ASSERT_FALSE(get_params_response.table_params.dynamic_split_count);
+        ASSERT_FALSE(get_params_response.table_params.use_dynamic_split_count);
         ASSERT_EQ((uint32_t)3, get_params_response.cuckoo_params.hash_func_count);
         ASSERT_EQ((uint32_t)2, get_params_response.cuckoo_params.hash_func_seed);
         ASSERT_EQ((uint32_t)1, get_params_response.cuckoo_params.max_probe);

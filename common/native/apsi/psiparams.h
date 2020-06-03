@@ -29,12 +29,16 @@ namespace apsi
         {
             std::size_t sender_size;
             std::size_t sender_bin_size;
-            std::size_t item_bit_count;                  // <=max_item_bit_count=128, reserve extra bits for Kuku
-            std::size_t item_bit_length_used_after_oprf; // the number of bits we take after oprf
-            std::size_t num_chunks;                      // the number of chunks to split each item into
+            // <= max_item_bit_count = 128, reserve extra bits for Kuku
+            std::size_t item_bit_count;
+            // the number of bits we take after oprf
+            std::size_t item_bit_length_used_after_oprf;
+            // the number of chunks to split each item into
+            std::size_t num_chunks;
             bool use_labels;
-            bool use_fast_membership; // faster configuration assuming query is always one item
-        };                            // struct PSIConfParams
+            // faster configuration, assuming query is always one item
+            bool use_fast_membership;
+        }; // struct PSIConfParams
 
         const PSIConfParams &psiconf_params() const
         {
@@ -86,8 +90,8 @@ namespace apsi
             std::size_t split_count;
             std::size_t split_size;
             std::uint32_t binning_sec_level;
-            bool dynamic_split_count; // TODO: Do not use bool for "*count".
-        };                            // struct TableParams
+            bool use_dynamic_split_count;
+        }; // struct TableParams
 
         const TableParams &table_params() const
         {
@@ -119,9 +123,9 @@ namespace apsi
             return table_params_.binning_sec_level;
         }
 
-        inline bool dynamic_split_count() const
+        inline bool use_dynamic_split_count() const
         {
-            return table_params_.dynamic_split_count;
+            return table_params_.use_dynamic_split_count;
         }
 
         /**

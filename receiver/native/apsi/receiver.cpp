@@ -227,7 +227,7 @@ namespace apsi
                 sender_params.table_params.log_table_size, sender_params.table_params.split_count,
                 sender_params.table_params.split_size, sender_params.table_params.binning_sec_level,
                 sender_params.table_params.window_size,
-                sender_params.table_params.dynamic_split_count ? "true" : "false");
+                sender_params.table_params.use_dynamic_split_count ? "true" : "false");
             Log::debug(
                 "hash func count: %i, hash func seed: %i, max probe: %i", sender_params.cuckoo_params.hash_func_count,
                 sender_params.cuckoo_params.hash_func_seed, sender_params.cuckoo_params.max_probe);

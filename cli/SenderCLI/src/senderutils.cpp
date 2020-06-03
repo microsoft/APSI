@@ -89,7 +89,7 @@ namespace apsi
                 table_params.window_size = cmd.window_size();
 
                 // By default split_count will be adjusted after setting data
-                table_params.dynamic_split_count = true;
+                table_params.use_dynamic_split_count = true;
             }
 
             PSIParams::SEALParams seal_params;
