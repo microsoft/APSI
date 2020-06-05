@@ -56,7 +56,7 @@ namespace apsi
                     return { bin_idx, idx };
                 }
 
-                idx = (idx + 1) % items_per_split_;
+                idx = (idx + 1) % items_per_split_; // TODO: This is mod reduction not necessary.
             }
 
             return {};
