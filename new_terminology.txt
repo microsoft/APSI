@@ -1,0 +1,92 @@
+Step 1
+======
+The receiver, Alice, encodes all the items of her set into an open-addressed hash table with capacity r. Let k denote the number of items that can fit in a single SEAL batched Plaintext, and define n = r/k to be the number of Plaintexts necessary to represent the entire hash table. Alice then serializes her hash table into n many plaintexts and encrypts them. These encrypted chunks of the hash table are calls **ItemBundles**. The ItemBundles are ordered, and their order matters. The number an ItemBundle has in the sequence is called its **bundle index**. The below graphic represents ItemBundle with bundle indices 1 through n.
+
+
+                                   Receiver's Query (encrypted)
+                                   ----------------------------
+
+       ItemBundle 1                ItemBundle 2                        ItemBundle n
++-----------------------+  +--------------------------+       +---------------------------+
+| Item 1 | ... | Item k |  | Item k+1 | ... | Item 2k |  ...  | Item r-k+1 | ... | Item r |
++-----------------------+  +--------------------------+       +---------------------------+
+
+
+
+Step 2
+======
+The sender, Bob, prepares his database. He uses the same hash function family as Alice to construct his hash table of capacity r. Instead of holding single elements, though, Bob's hash table has Bins (aka "chaining"). In labeled PSI, each Bin contains pairs of the form (Item, Label). Another property of Bob's hash table has the property that, for all j, Alice's Item j is guaranteed to appear in Bob's Bin j. Finally, Bob's table is split in the same way as Alice's. We call Bob's chunks **BinBundles**. Each BinBundle has k Bins, just as each ItemBundle has k items.
+
+Here's a graphical example. I indicates "Item", "L" indicates "Label". The vertical components of a BinBundle column represent the elements of a single Bin.
+
+                                            Senders's DB
+                                            ------------
+
+           BinBundle 1                      BinBundle 2                         BinBundle n
++-----------------------------+  +-----------------------------+     +-----------------------------+
+| (I,L) | (I,L) |     | (I,L) |  | (I,L) | (I,L) |     | (I,L) |     | (I,L) | (I,L) |     | (I,L) |
+| (I,L) | (I,L) | ... | (I,L) |  | (I,L) | (I,L) |     | (I,L) | ... | (I,L) |       | ... | (I,L) |
+|       | (I,L) |     | (I,L) |  | (I,L) | (I,L) |     | (I,L) |     | (I,L) |       |     |       |
+|       | (I,L) |     |       |  | (I,L) | (I,L) | ... | (I,L) |     +-----------------------------+
++-----------------------------+  |       | (I,L) |     | (I,L) |
+                                 |       |       |     | (I,L) |
+                                 |       |       |     | (I,L) |
+                                 +-----------------------------+
+
+Bob has some leeway here. If he wants to trade communication cost for quicker intersection speed, he can break up his large BinBundles into smaller BinBundles. For example, BinBundle 2 above is pretty big, so Bob might split it into 2 BinBundles at bundle index 2:
+
+                                            Senders's DB
+                                            ------------
+
+           BinBundle 1                     BinBundle 2a                        BinBundle n
++-----------------------------+  +-----------------------------+     +-----------------------------+
+| (I,L) | (I,L) |     | (I,L) |  | (I,L) | (I,L) |     | (I,L) |     | (I,L) | (I,L) |     | (I,L) |
+| (I,L) | (I,L) | ... | (I,L) |  | (I,L) | (I,L) | ... | (I,L) | ... | (I,L) |       | ... | (I,L) |
+|       | (I,L) |     | (I,L) |  | (I,L) | (I,L) |     | (I,L) |     | (I,L) |       |     |       |
+|       | (I,L) |     |       |  +-----------------------------+     +-----------------------------+
++-----------------------------+
+                                           BinBundle 2b
+                                 +-----------------------------+
+                                 | (I,L) | (I,L) |     | (I,L) |
+                                 |       | (I,L) | ... | (I,L) |
+                                 |       |       |     | (I,L) |
+                                 |       |       |     | (I,L) |
+                                 +-----------------------------+
+
+Step 3
+======
+Finally, Bob needs to compute the intersection between his set and Alice's. Since every Item in the bundle at index j is guaranteed to occur in a BinBundle at index j, it suffices to do the intersections on an index-by-index basis. In other words, you do intersections along the columns above. Here's the pseudocode:
+
+    Algorithm Intersect
+
+    Given:
+        item_bundles - Alice's array of (encrypted) ItemBundles,
+                       indexed by bundle index
+        bin_bundles  - Bob's array of sets of BinBundles,
+                       indexed by bundle index
+    Returns:
+        intersections - An array of sets of intersections of the bundles,
+                        indexed by bundle index
+
+    Code:
+        let result = []
+        for bundle_idx in 0..n:
+            let ib = item_bundles[bundle_idx]
+            let bbs = bin_bundles[bundle_idx]
+
+            // Recall that each bundle_idx might hold multiple BinBundles.
+            // Compute the intersection on all of them
+            let intersections_at_this_idx = {}
+            for bb in bbs:
+                let ix = bb.intersect(ib)
+                intersections_at_this_idx.add(ix)
+
+            // Now add this set of intersections to the result array
+            result.push(intersections_at_this_idx)
+
+        return result
+
+
+And that's it! Bob sends result back to Alice and Alice decrypts it to find her (labeled) intersection.
+
+The details of the intersect method have been abstracted away here. Please see [SOME OTHER DOC] to understand how that works.

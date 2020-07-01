@@ -12,102 +12,157 @@ using namespace seal::util;
 
 namespace apsi
 {
-    void ffield_newton_interpolate_poly(const FFieldArray &points, const FFieldArray &values, FFieldArray &result)
+    /**
+    Multiplies the given polynomial P with the monomial x - a, where a is given. Polynomial coefficients are expected
+    to be in degree-ascending order, i.e., polyn[0] is the constant term.
+    */
+    void polyn_mul_monic_monomial_inplace(std::vector<uint64_t> &polyn, uint64_t a, const seal::Modulus &mod)
     {
+        // Do the multiplication coefficient-wise. If P = [c₀, ..., cᵣ], then
+        // P' = (x-a)*P
+        //    = x*P - a*P
+        //    =   [   0,   c₀,   c₁, ..., cᵣ₋₁, cᵣ]
+        //      - [a*c₀, a*c₁, a*c₂, ..., a*cᵣ,  0]
+        //
+        // In other words, polyn'[i] = polyn[i-1] - a*polyn[i]
+
+        // Extend the vector, since every multiplication introduces a new nonzero coefficient
+        polyn.push_back(0);
+
+        uint64_t neg_a = negate_uint_mod(a, mod);
+        // We don't have to make an intermediate copy of the coefficients if we proceed from right to left
+        for (size_t i = polyn.size()-1; i > 0; i--)
+        {
+            // Let cᵢ = cᵢ₋₁ - a*cᵢ
+            polyn[i] = multiply_add_uint_mod(polyn[i-1], neg_a, polyn[i], mod);
+        }
+
+        // Do the new c₀ manually, since it doesn't fit the above formula (i-1 goes out of bounds)
+        polyn[0] = multiply_uint_mod(polyn[0], neg_a, mod);
+    }
+
+    /**
+    Returns the Newton interpolation of the given points and values. Specifically, this function returns the
+    coefficients of a polynomial P in degree-ascending, where P(pointᵢ) valueᵢ for all i.
+    */
+    const std::vector<uint64_t> newton_interpolate_polyn(
+        const std::vector<uint64_t> &points,
+        const std::vector<uint64_t> &values,
+        const seal::Modulus &mod
+    ) {
 #ifdef APSI_DEBUG
-        if (points.size() != values.size() || result.size() != points.size())
+        if (points.size() != values.size())
         {
             throw invalid_argument("incompatible array sizes");
         }
-        if (points.field() != values.field() || result.field() != points.field())
-        {
-            throw invalid_argument("incompatible fields");
-        }
 #endif
         auto size = points.size();
-        auto field = points.field();
 
-        FFieldElt numerator(field);
-        FFieldElt denominator(field);
-
-        vector<FFieldArray> divided_differences;
+        vector<vector<uint64_t> > divided_differences;
         divided_differences.reserve(size);
         for (size_t i = 0; i < size; i++)
         {
-            divided_differences.emplace_back(size - i, field);
-            divided_differences[i].set(0, i, values);
+            divided_differences.push_back( std::vector{values[i]} );
         }
 
-        const Modulus &ch = field.characteristic();
+        /**
+         Make a table of divided differences so that DD[i][j] is [yᵢ, yᵢ₊₁, ..., yᵢ₊ⱼ]
+         Here's an example:
 
+                 | j=0 |    j=1   |         j=2         |    ...
+             ----------------------------------------------
+                 |     |          |  y₂ - y₁   y₁ - y₀  |
+                 |     |  y₁ - y₀ |  ------- - -------  |
+             i=0 |  y₀ |  ------- |  x₂ - x₁   x₁ - x₀  |    ...
+                 |     |  x₁ - x₀ | ------------------- |
+                 |     |          |       x₂ - x₀       |
+             ----------------------------------------------
+                 |     |          |  y₃ - y₂   y₂ - y₁  |
+                 |     |  y₂ - y₁ |  ------- - -------  |
+             i=1 |  y₁ |  ------- |  x₃ - x₂   x₂ - x₁  |    ...
+                 |     |  x₂ - x₁ | ------------------- |
+                 |     |          |       x₃ - x₁       |
+             ----------------------------------------------
+             ... | ... |    ...   |         ...         |
+        */
         for (size_t j = 1; j < size; j++)
         {
             for (size_t i = 0; i < size - j; i++)
             {
                 // numerator = DD[i + 1][j - 1] - DD[i][j - 1]
-                transform(
-                    divided_differences[i + 1].data(j - 1), divided_differences[i + 1].data(j),
-                    divided_differences[i].data(j - 1), numerator.data(),
-                    [ch](auto a, auto b) { return util::sub_uint64_mod(a, b, ch); });
+                uint64_t numerator = sub_uint64_mod(
+                    divided_differences[i + 1][j - 1],
+                    divided_differences[i][j - 1],
+                    mod
+                );
 
                 // denominator = points[i + j] - points[i]
-                transform(
-                    points.data(i + j), points.data(i + j + 1), points.data(i), denominator.data(),
-                    [ch](auto a, auto b) { return util::sub_uint64_mod(a, b, ch); });
+                uint64_t denominator = sub_uint64_mod(points[i + j], points[i], mod);
 
                 // DD[i][j] = numerator / denominator
-                transform(
-                    numerator.data(), numerator.data() + field.degree(), denominator.data(),
-                    divided_differences[i].data(j), [ch](auto a, auto b) {
-                        FFieldElt::CoeffType inv;
-                        if (!util::try_invert_uint_mod(b, ch, inv))
-                        {
-                            if (a == 0)
-                            {
-                                // could return any element
-                                return FFieldElt::CoeffType(0);
-                            }
-                            else
-                            {
-                                throw logic_error("division by zero");
-                            }
-                        }
-                        return util::multiply_uint_mod(a, inv, ch);
-                    });
+                uint64_t inv_denominator;
+                if (!try_invert_uint_mod(denominator, mod, inv_denominator))
+                {
+                    throw logic_error("division by zero");
+                }
+                divided_differences[i][j] = multiply_uint_mod(numerator, inv_denominator, mod);
             }
         }
 
-        // Horner's method
-        // We reuse numerator
+        /**
+        The Newton interpolation polynomial is
+          [y₀] + [y₀, y₁](x-x₀) + [y₀, y₁, y₂](x-x₀)(x-x₁) + ... + [y₀, y₁, ..., yᵣ](x-x₀)(x-x₁)...(x-xᵣ)
+          = [y₀] +
+            (x-x₀) * ([y₀, y₁] + ...
+              (x-xᵣ₋₃) * ([y₀, y₁, ..., yᵣ₋₂] +
+                (x-xᵣ₋₂) * (
+                  [y₀, y₁, ..., yᵣ₋₁]
+                  + (x-xᵣ₋₁) * [y₀, y₁, ..., yᵣ]
+                )
+              )
+            ...)
+        We use Horner's method, i.e., we start with the innermost term and repeatedly add-and-multiply
+        */
 
-        // result[0] = DD[0][size-1];
-        result.set(0, size - 1, divided_differences[0]);
-        for (size_t i = 1; i < size; i++)
+        // Start with P = 0
+        std::vector<uint64_t> result;
+        result.reserve(size+1);
+        result.push_back(0);
+
+        // Do Horner's method for all inner terms
+        for (size_t i = size-1; i > 0; i--)
         {
-            for (size_t j = 0; j < i; j++)
-            {
-                // result[i - j] = result[i - j - 1]
-                result.set(i - j, i - j - 1, result);
-            }
-
-            result.set_zero(0);
-
-            for (size_t j = 0; j < i; j++)
-            {
-                // numerator = points[size - 1 - i] * result[j + 1]
-                transform(
-                    points.data(size - 1 - i), points.data(size - i), result.data(j + 1), numerator.data(),
-                    [ch](auto a, auto b) { return util::multiply_uint_mod(a, b, ch); });
-
-                // result[j] -= numerator
-                transform(result.data(j), result.data(j + 1), numerator.data(), result.data(j), [ch](auto a, auto b) {
-                    return util::sub_uint64_mod(a, b, ch);
-                });
-            }
-
-            transform(
-                result.data(), result.data(1), divided_differences[0].data(size - 1 - i), result.data(),
-                [ch](auto a, auto b) { return util::add_uint64_mod(a, b, ch); });
+            // P += [y₀, ..., yᵢ]
+            result[0] = add_uint64_mod(result[0], divided_differences[0][i], mod);
+            // P *= (x - xᵢ₋₁)
+            polyn_mul_monic_monomial_inplace(result, points[i-1], mod);
         }
+
+        // Add the last constant term [y₀]
+        result[0] = add_uint64_mod(result[0], divided_differences[0][0], mod);
+
+        return result;
+    }
+
+
+    /**
+    Given a set of distinct field elements a₁, ..., aₛ, returns the coefficients of the unique monic polynoimial P with
+    roots a₁, ..., aₛ. Concretely, P = (x-a₁)*...*(x-aₛ).
+    The returned coefficients are in degree-ascending order. That is, polyn[0] is the constant term.
+    */
+    const std::vector<uint64_t> polyn_with_roots(std::vector<uint64_t> &roots, const seal::Modulus &mod)
+    {
+        // Start with P = 1 = 1 + 0x + 0x^2 + ...
+        std::vector<uint64_t> polyn;
+        polyn.reserve(roots.size()+1);
+        polyn.push_back(1);
+
+        // For every root a, let P *= (x - a)
+        for (const uint64_t &root : roots)
+        {
+            polyn_mul_monic_monomial_inplace(polyn, root, mod);
+        }
+
+        return polyn;
     }
 } // namespace apsi

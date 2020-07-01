@@ -22,131 +22,122 @@ namespace apsi
 {
     namespace sender
     {
-        struct DBInterpolationCache
+
+        struct monostate {};
+
+        // A cache of all the polynomial computations on a single bin
+        struct BinPolynCache
         {
-            DBInterpolationCache(
-                FField field, std::size_t batch_size, std::size_t items_per_split, std::size_t value_byte_count);
-
-            std::vector<std::vector<FFieldArray>> div_diff_temp;
-            std::vector<FFieldArray> coeff_temp, x_temp, y_temp;
-            std::unordered_set<std::uint64_t> key_set;
-            std::vector<std::uint64_t> temp_vec;
-        }; // struct DBInterpolationCache
-
-        /**
-        Represents a specific batch/split and stores the associated data.
-        */
-        struct DBBlock
-        {
-            struct Position
-            {
-                std::size_t batch_offset;
-                std::size_t split_offset =
-                    -std::size_t(1); // TODO: previously this is int type, need a better solution.
-
-                bool is_initialized() const
-                {
-                    return split_offset != -std::size_t(1);
-                }
-            }; // struct Position
-
-            void init(
-                std::size_t batch_idx, std::size_t split_idx, std::size_t value_byte_length, std::size_t batch_size,
-                std::size_t items_per_split)
-            {
-                label_data_.resize(batch_size * items_per_split * value_byte_length);
-                key_data_.resize(batch_size * items_per_split);
-
-                batch_idx_ = batch_idx;
-                split_idx_ = split_idx;
-                value_byte_length_ = value_byte_length;
-                items_per_batch_ = batch_size;
-                items_per_split_ = items_per_split;
-            }
-
-            std::vector<unsigned char> label_data_;
-            std::vector<Item> key_data_;
-
-            std::unique_ptr<std::atomic_bool[]> has_item_;
-            // the index of this region
-            std::size_t batch_idx_;
-            std::size_t split_idx_;
-
-            // the number of bytes that each label is
-            std::size_t value_byte_length_;
-
-            // the number of cuckoo slots that this regions spans.
-            std::size_t items_per_batch_;
-
-            // the number of items that are in a split.
-            std::size_t items_per_split_;
-
-            gsl::span<seal::Plaintext> batch_random_symm_poly_;
-
-            std::vector<seal::Plaintext> batched_label_coeffs_;
-
-            std::vector<FFieldArray> debug_label_coeffs_;
-            std::vector<FFieldArray> debug_sym_block_;
+            /** The highest-degree divided differences computed so far. For unlabeled PSI, this is empty
+            NOTE: This is not enabled yet. Caching the divided differences would allow us to add items to a BinBundle
+            without having to recalculate the whole polynomial
+            */
+            //std::vector<uint64_t> divided_diffs;
 
             /**
-            Computes the symmetric polynomials for the specified split and the specified batch in sender's database.
-            One symmetric polynomial is computed for one sub-bin (because a bin is separated into splits).
-            Input sub-bin: (a_1, a_2, ..., a_n)
-            Output polynomial terms: (1, \sum_i a_i, \sum_{i,j} a_i*a_j, ...).
+            For unlabeled PSI, this is the unique monic polynomial whose roots are precisely the items in the bin. For
+            labeled PSI, this the Newton intepolation polynomial whose value at each item in the bin equals the item's
+            corresponding label.
             */
-            void symmetric_polys(
-                SenderThreadContext &th_context, std::size_t encoding_bit_length, const FFieldElt &neg_null_element);
+            std::vector<uint64_t> interpolation_polyn_coeffs;
+        }; // struct BinPolynCache
 
-            Position try_acquire_position_after_oprf(std::size_t bin_idx);
+        // A cache of all the polynomial and plaintext computations on a single BinBundle
+        struct BinBundleCache
+        {
+            /**
+            Cached polynomial computations for each bin
+            */
+            std::vector<BinPolynCache> bin_polyns_;
 
-            void batch_interpolate(
-                SenderThreadContext &th_context, std::shared_ptr<seal::SEALContext> seal_context,
-                const std::unique_ptr<seal::Evaluator> &evaluator,
-                const std::unique_ptr<FFieldBatchEncoder> &batch_encoder, DBInterpolationCache &cache,
-                const PSIParams &params);
+            /**
+            The interpolation polynomial represented as batched plaintexts. The length of this vector is the degree of
+            the highest-degree polynomial in polyn_cache_, i.e., the size of the largest bin.
+            */
+            std::vector<seal::Plaintext> plaintext_polyn_coeffs_;
+        }; // struct BinBundleCache
 
-            void check(const Position &pos);
+        /**
+        Represents a specific batch/split and stores the associated data. The type parameter L represents the label
+        type. This is either a field element (in the case of labeled PSI), or an element of the unit type (in the case
+        of unlabeled PSI)
+        */
+        template<typename L>
+        class BinBundle
+        {
+        private:
 
-            bool has_item(const Position &pos)
-            {
-#ifndef NDEBUG
-                check(pos);
-#endif
-                return has_item_.get()[pos.batch_offset * items_per_split_ + pos.split_offset];
-            }
+            /**
+            The bins of the BinBundle.Each bin is a key-value store, where the keys are (chunks of the OPRF'd) DB
+            items and the labels are either field elements or empty (a unit type).
+            */
+            std::vector<std::map<uint64_t, L>> bins_;
 
-            Item &get_key(const Position &pos)
-            {
-#ifndef NDEBUG
-                check(pos);
-#endif
-                return key_data_[pos.batch_offset * items_per_split_ + pos.split_offset];
-            }
+            /**
+            A cache of all the computations we can do on the bins. This is empty by default
+            */
+            BinBundleCache cache_;
 
-            unsigned char *get_label(const Position &pos)
-            {
-#ifndef NDEBUG
-                check(pos);
-#endif
+            /**
+            This is true iff cache_ needs to be regenerated
+            */
+            bool cache_invalid_;
 
-                return &label_data_[(pos.batch_offset * items_per_split_ + pos.split_offset) * value_byte_length_];
-            }
+            /**
+            The modulus that defines our field
+            */
+            seal::Modulus mod_;
 
-            std::uint64_t get_key_uint64(const Position &pos)
-            {
-                Item &i = get_key(pos);
-                return i[0];
-            }
+            /**
+            Stuff we need to make Plaintexts
+            */
+            std::shared_ptr<seal::SEALContext> seal_ctx_;
+            std::shared_ptr<seal::Evaluator> evaluator_;
+            std::shared_ptr<seal::BatchEncoder> batch_encoder_;
 
-            std::uint64_t get_label_uint64(const Position &pos)
-            {
-                unsigned char *l = get_label(pos);
-                std::uint64_t r = 0;
-                memcpy(&r, l, value_byte_length_);
-                return r;
-            }
+            /**
+            Computes the appropriate polynomial for each bin. Stores the result in cache_.
+            For unlabeled PSI, this is the unique monic polynomial whose roots are precisely the items in the bin.
+            For labeled PSI, this the Newton inteprolation polynomial whose value at each item in the bin equals the
+            item's corresponding label.
+            */
+            void regen_polyns();
 
+            /**
+            Computes and caches the bin's polynomial coeffs in Plaintexts
+            */
+            void regen_plaintexts();
+
+        public:
+
+            BinBundle(
+                size_t num_bins,
+                std::shared_ptr<seal::SEALContext> seal_ctx,
+                std::shared_ptr<seal::Evaluator> evaluator,
+                std::shared_ptr<seal::BatchEncoder> batch_encoder,
+                const seal::Modulus mod
+            );
+
+            /**
+            Clears the contents of the BinBundle and wipes out the cache
+            */
             void clear();
-        }; // struct DBBlock
-    }      // namespace sender
+
+            /**
+            Wipes out the cache of the BinBundle
+            */
+            void clear_cache();
+
+            /**
+            Generates and caches the polynomials and plaintexts that represent the BinBundle
+            */
+            void regen_cache();
+
+            /**
+            Returns the number of elements in the specified bin
+            */
+            //std::size_t bin_size(std::size_t bin_idx);
+
+        }; // class BinBundle
+    } // namespace sender
 } // namespace apsi
