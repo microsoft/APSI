@@ -3,8 +3,6 @@
 
 #include "apsi/util/interpolate.h"
 #include <seal/util/uintarithsmallmod.h>
-#include "apsi/ffield/ffield.h"
-#include "apsi/ffield/ffield_array.h"
 
 using namespace std;
 using namespace seal;
@@ -16,17 +14,19 @@ namespace apsi
     Multiplies the given polynomial P with the monomial x - a, where a is given. Polynomial coefficients are expected
     to be in degree-ascending order, i.e., polyn[0] is the constant term.
     */
-    void polyn_mul_monic_monomial_inplace(std::vector<uint64_t> &polyn, uint64_t a, const seal::Modulus &mod)
+    void polyn_mul_monic_monomial_inplace(vector<uint64_t> &polyn, uint64_t a, const seal::Modulus &mod)
     {
-        // Do the multiplication coefficient-wise. If P = [c₀, ..., cᵣ], then
-        // P' = (x-a)*P
-        //    = x*P - a*P
-        //    =   [   0,   c₀,   c₁, ..., cᵣ₋₁, cᵣ]
-        //      - [a*c₀, a*c₁, a*c₂, ..., a*cᵣ,  0]
-        //
-        // In other words, polyn'[i] = polyn[i-1] - a*polyn[i]
+        /**
+        Do the multiplication coefficient-wise. If P = [c₀, ..., cᵣ], then
+        P' = (x-a)*P
+           = x*P - a*P
+           =   [   0,   c₀,   c₁, ..., cᵣ₋₁, cᵣ]
+             - [a*c₀, a*c₁, a*c₂, ..., a*cᵣ,  0]
 
-        // Extend the vector, since every multiplication introduces a new nonzero coefficient
+        In other words, polyn'[i] = polyn[i-1] - a*polyn[i]
+
+        Extend the vector, since every multiplication introduces a new nonzero coefficient
+        */
         polyn.push_back(0);
 
         uint64_t neg_a = negate_uint_mod(a, mod);
@@ -45,15 +45,35 @@ namespace apsi
     Returns the Newton interpolation of the given points and values. Specifically, this function returns the
     coefficients of a polynomial P in degree-ascending, where P(pointᵢ) valueᵢ for all i.
     */
-    const std::vector<uint64_t> newton_interpolate_polyn(
-        const std::vector<uint64_t> &points,
-        const std::vector<uint64_t> &values,
+    const vector<uint64_t> newton_interpolate_polyn(
+        const vector<uint64_t> &points,
+        const vector<uint64_t> &values,
         const seal::Modulus &mod
     ) {
 #ifdef APSI_DEBUG
         if (points.size() != values.size())
         {
             throw invalid_argument("incompatible array sizes");
+        }
+
+        /**
+        Sanity check. Nobody should be using this function with all-0 labels. The Newton polynomial for all-0 points is
+        the 0 polynomial, and that's almost certainly not the desired output.
+        */
+        bool all_zeros = true;
+        for (val : values)
+        {
+            if (val != 0)
+            {
+                all_zeros = false;
+            }
+        }
+
+        if (all_zeros)
+        {
+            throw invalid_argument(
+                "Newton polynomial of all zeros is the zero polynomial. You probably mean to use polyn_with_roots"
+            );
         }
 #endif
         auto size = points.size();
@@ -62,7 +82,7 @@ namespace apsi
         divided_differences.reserve(size);
         for (size_t i = 0; i < size; i++)
         {
-            divided_differences.push_back( std::vector{values[i]} );
+            divided_differences.push_back( vector{values[i]} );
         }
 
         /**
@@ -103,7 +123,7 @@ namespace apsi
                 uint64_t inv_denominator;
                 if (!try_invert_uint_mod(denominator, mod, inv_denominator))
                 {
-                    throw logic_error("division by zero");
+                    throw logic_error("tried to interpolate with repeated values");
                 }
                 divided_differences[i][j] = multiply_uint_mod(numerator, inv_denominator, mod);
             }
@@ -125,7 +145,7 @@ namespace apsi
         */
 
         // Start with P = 0
-        std::vector<uint64_t> result;
+        vector<uint64_t> result;
         result.reserve(size+1);
         result.push_back(0);
 
@@ -150,10 +170,10 @@ namespace apsi
     roots a₁, ..., aₛ. Concretely, P = (x-a₁)*...*(x-aₛ).
     The returned coefficients are in degree-ascending order. That is, polyn[0] is the constant term.
     */
-    const std::vector<uint64_t> polyn_with_roots(std::vector<uint64_t> &roots, const seal::Modulus &mod)
+    const vector<uint64_t> polyn_with_roots(vector<uint64_t> &roots, const seal::Modulus &mod)
     {
         // Start with P = 1 = 1 + 0x + 0x^2 + ...
-        std::vector<uint64_t> polyn;
+        vector<uint64_t> polyn;
         polyn.reserve(roots.size()+1);
         polyn.push_back(1);
 

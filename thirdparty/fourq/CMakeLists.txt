@@ -10,7 +10,7 @@ ExternalProject_Add(EP_FOURQ
     TMP_DIR             ${CMAKE_CURRENT_LIST_DIR}/tmp
     STAMP_DIR           ${CMAKE_CURRENT_LIST_DIR}/stamp
     SOURCE_DIR          ${CMAKE_CURRENT_LIST_DIR}/src
-    GIT_REPOSITORY      git@github.com:kiromaru/FourQlib.git
+    GIT_REPOSITORY      https://github.com/kiromaru/FourQlib.git
     CONFIGURE_COMMAND   ""
     BUILD_IN_SOURCE     TRUE
     BUILD_COMMAND       make -C FourQ_64bit_and_portable/ static

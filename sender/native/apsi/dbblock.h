@@ -25,6 +25,9 @@ namespace apsi
 
         struct monostate {};
 
+        // An element of a field with prime modulus < 2⁶⁴
+        typedef felt_t uint64_t;
+
         // A cache of all the polynomial computations on a single bin
         struct BinPolynCache
         {
@@ -32,14 +35,14 @@ namespace apsi
             NOTE: This is not enabled yet. Caching the divided differences would allow us to add items to a BinBundle
             without having to recalculate the whole polynomial
             */
-            //std::vector<uint64_t> divided_diffs;
+            //std::vector<felt_t> divided_diffs;
 
             /**
             For unlabeled PSI, this is the unique monic polynomial whose roots are precisely the items in the bin. For
             labeled PSI, this the Newton intepolation polynomial whose value at each item in the bin equals the item's
             corresponding label.
             */
-            std::vector<uint64_t> interpolation_polyn_coeffs;
+            std::vector<felt_t> interpolation_polyn_coeffs;
         }; // struct BinPolynCache
 
         // A cache of all the polynomial and plaintext computations on a single BinBundle
@@ -71,7 +74,7 @@ namespace apsi
             The bins of the BinBundle.Each bin is a key-value store, where the keys are (chunks of the OPRF'd) DB
             items and the labels are either field elements or empty (a unit type).
             */
-            std::vector<std::map<uint64_t, L>> bins_;
+            std::vector<std::map<felt_t, L>> bins_;
 
             /**
             A cache of all the computations we can do on the bins. This is empty by default
@@ -115,8 +118,15 @@ namespace apsi
                 std::shared_ptr<seal::SEALContext> seal_ctx,
                 std::shared_ptr<seal::Evaluator> evaluator,
                 std::shared_ptr<seal::BatchEncoder> batch_encoder,
-                const seal::Modulus mod
+                seal::Modulus mod
             );
+
+            /**
+            Inserts item-label pairs into sequential bins, beginning at start_bin_idx.
+            Returns true on success. Returns false if any pair failed insertion. If false, no modification is made to
+            the BinBundle.
+            */
+            bool multi_insert(std::vector<std::pair<felt_t, L>> item_label_pairs, size_t start_bin_idx);
 
             /**
             Clears the contents of the BinBundle and wipes out the cache
@@ -132,11 +142,6 @@ namespace apsi
             Generates and caches the polynomials and plaintexts that represent the BinBundle
             */
             void regen_cache();
-
-            /**
-            Returns the number of elements in the specified bin
-            */
-            //std::size_t bin_size(std::size_t bin_idx);
 
         }; // class BinBundle
     } // namespace sender

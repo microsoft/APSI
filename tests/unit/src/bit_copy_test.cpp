@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <random>
 #include <vector>
-#include "apsi/ffield/ffield_elt.h"
+#include "apsi/db_encoding.h"
 #include "gtest/gtest.h"
 
 using namespace std;
@@ -29,7 +29,7 @@ namespace
 
 namespace APSITests
 {
-    TEST(BitCopyTests, bit_copy_test)
+    TEST(DbEncodingTests, bit_copy_test)
     {
         int trials = 1000;
         size_t size = 10;
@@ -74,5 +74,35 @@ namespace APSITests
                 dst_idx++;
             }
         }
+    }
+
+    // Tests that encoding bitstring -> field elements -> bitstring is a lossless round trip
+    TEST(DbEncodingTests, encode_decode_correctness)
+    {
+        // Make a SEAL modulus. This defines our field
+        seal::EncryptionParameters parms(seal::scheme_type::BFV);
+        parms.set_poly_modulus_degree(64);
+        parms.set_coeff_modulus(seal::CoeffModulus::BFVDefault(1024));
+        parms.set_plain_modulus(17);
+        auto context = seal::SEALContext::Create(parms);
+        seal::Modulus plain_modulus = context->first_context_data()->parms().plain_modulus();
+
+        // Make a random bitstring
+        random_device rd;
+        // Fill random underlying bytes
+        vector<uint8_t> bytes(9767);
+        std::generate(begin(bytes), end(bytes), rd);
+        // Pick a random bitlen within range, i.e., within 7 bits of the total len
+        std::uniform_int_distribution<int> bitlen_dist(0, 7);
+        size_t bit_len = bytes.size()*8 - bitlen_dist(rd);
+        // Make the Bitstring object
+        Bitstring bitstring(bytes, bit_len);
+
+        // Now do a round trip
+        vector<uint64_t> felts = bits_to_field_elts(bitstring, mod);
+        Bitstring rederived_bitstring = field_elts_to_bits(felts, bit_len, mod);
+
+        // Make sure that the round trip is the identity
+        ASSERT_EQ(bitstring, rederived_bitstring);
     }
 } // namespace APSITests

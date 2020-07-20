@@ -35,6 +35,9 @@ namespace apsi
 {
     namespace sender
     {
+        // An element of a field with prime modulus < 2⁶⁴
+        typedef felt_t uint64_t;
+
         class SenderDB
         {
         public:
@@ -91,14 +94,9 @@ namespace apsi
 
             void batched_interpolate_polys(SenderThreadContext &th_context, size_t start_block, size_t end_block);
 
-            DBBlock &get_block(std::size_t batch, std::size_t split)
-            {
-                return *db_blocks_(batch, split);
-            }
-
             std::size_t get_block_count() const
             {
-                return db_blocks_.size();
+                return bin_bundles_.size();
             }
 
             const PSIParams &get_params() const
@@ -136,14 +134,12 @@ namespace apsi
             /* The FField encoding of the sender null value. */
 
             /*
-            B x m, where B is sender's bin size, m is table size.
-            This is actually a rotated view of the DB. We store it in this
-            view so that multi-threading is more efficient for accessing data,
-            i.e., one thread will take care of several continuous complete rows.
+            All the BinBundles in the DB, indexed by bin index. The set at bin index i contains all the BinBundles with
+            bin index i.
             */
-            Matrix<DBBlock> db_blocks_;
+            std::vector<std::set<BinBundle> > bin_bundles_;
 
-            std::pair<DBBlock *, DBBlock::Position> acquire_db_position_after_oprf(std::size_t cuckoo_loc);
+            std::pair<BinBundle *, BinBundle::Position> acquire_db_position_after_oprf(std::size_t cuckoo_loc);
 
             SenderSessionContext session_context_;
 

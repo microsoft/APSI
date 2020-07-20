@@ -62,13 +62,13 @@ namespace apsi
             params_.set_sender_bin_size(ns * params_.split_size());
 
             // important: here it resizes the db blocks.
-            db_blocks_.resize(static_cast<size_t>(nb), static_cast<size_t>(ns));
+            bin_bundles_.resize(static_cast<size_t>(nb), static_cast<size_t>(ns));
 
             for (uint64_t b_idx = 0; b_idx < nb; b_idx++)
             {
                 for (uint64_t s_idx = 0; s_idx < ns; s_idx++)
                 {
-                    db_blocks_(static_cast<size_t>(b_idx), static_cast<size_t>(s_idx))
+                    bin_bundles_(static_cast<size_t>(b_idx), static_cast<size_t>(s_idx))
                         ->init(b_idx, s_idx, byte_length, batch_size, split_size);
                 }
             }
@@ -98,7 +98,7 @@ namespace apsi
                 }
             }
 
-            for (auto &block : db_blocks_)
+            for (auto &block : bin_bundles_)
                 block.clear();
         }
 
@@ -124,50 +124,115 @@ namespace apsi
             }
         }
 
-        void SenderDB::add_data(gsl::span<const Item> data, MatrixView<unsigned char> values, size_t thread_count)
+        template<>
+        void SenderDB<vector<uint8_t> >::add_data(map<Item, vector<uint8_t> > &data, size_t thread_count)
         {
             STOPWATCH(sender_stop_watch, "SenderDB::add_data");
 
             if (values.stride() != params_.label_byte_count())
                 throw invalid_argument("unexpacted label length");
 
-            // Divide the work across threads
-            vector<vector<int>> thread_loads(thread_count);
-            vector<thread> thrds;
-            for (size_t t = 0; t < thread_count; t++)
+            // Construct the cuckoo hash functions
+            vector<kuku::LocFunc> normal_loc_funcs;
+            for (size_t i = 0; i < params_.hash_func_count(); i++)
             {
-                thrds.emplace_back([&, t]() { add_data_worker(t, thread_count, data, values, thread_loads[t]); });
+                kuku::LocFunc f = kuku::LocFunc(
+                    params_.table_size(),
+                    kuku::make_item(params_.hash_func_seed() + i, 0)
+                );
+                normal_loc_funcs.push_back(f);
             }
 
+            // Calculate the cuckoo indices for each item. Store every pair of (&item-label, cuckoo_idx) in a vector.
+            // Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the work of inserting
+            // the items into BinBundles
+            vector<pair<&pair<Item, vector<uint8_t> >, size_t> > data_with_indices;
+            for (auto &item_label_pair : data)
+            {
+                Item &item = item_label_pair.first;
+                // Collect the cuckoo indices, ignoring duplicates
+                std::set<size_t> cuckoo_indices;
+                for (kuku::LocFunc &hash_func : normal_loc_funcs)
+                {
+                    // The cuckoo index must be aligned to number of bins an item takes up
+                    size_t cuckoo_idx = hash_func(item) * bins_per_item;;
+
+                    // Store the data along with its index
+                    data_with_indices.push_back({ item_label_pair, cuckoo_idx });
+                }
+            }
+
+            // Sort by cuckoo index
+            sort(
+                data_with_indices.begin(),
+                data_with_indices.end(),
+                [](auto &data_with_idx1, auto &data_with_idx2) {
+                    size_t idx1 = data_with_idx1.second;
+                    size_t idx2 = data_with_idx2.second;
+                    return idx1 < idx2;
+                }
+            );
+
+            // Divide the work across threads. Each thread gets its own nonoverlapping range of bundle indices
+            size_t total_insertions = data_with_indices.size();
+            size_t expected_insertions_per_thread = (total_insertions + (thread_count - 1)) / thread_count;
+            size_t bins_per_bundle = params_.batch_size();
+
+            // Contains indices into data_with_indicies. If partitions = {i, j}, then that means
+            // the first partition is data_with_indices[0..i) (i.e., inclusive lower bound, noninclusive upper bound)
+            // the second partition is data_with_indices[i..j)
+            // the third partition is data_with_indices[j..] (i.e., including index j, all the way through the end)
+            vector<size_t> partitions;
+
+            // A simple partitioning algorithm. Two constraints:
+            // 1. We want threads to do roughly the same amount of work. That is, these partitions should be roughly
+            //    equally sized.
+            // 2. A bundle index cannot appear in two partitions. This would cause multiple threads to modify the same
+            //    data structure, which is not safe.
+            //
+            // So the algorithm is, for each partition: put the minimal number of elements in the partition. Then, on
+            // the next bundle index boundary, mark the partition end.
+            size_t insertion_count = 0;
+            int last_bundle_idx = -1;
+            for (size_t i = 0; i < data_with_indices.size(); i++)
+            {
+                auto &data_with_idx = data_with_indices.at(i);
+                size_t cuckoo_idx = data_with_idx.second;
+                size_t bin_idx = cuckoo_idx % bins_per_bundle;;
+                size_t bundle_idx = (cuckoo_idx - bin_idx) / bins_per_bundle;
+
+                insertion_count++;
+
+                // If this partition is big enough and we've hit a BinBundle boundary, break the partition off here
+                if (insertion_count > expected_insertions_per_thread && bundle_idx != last_bundle_idx)
+                    partitions.push_back(i)
+                }
+
+                last_bundle_idx = bundle_idx;
+            }
+
+            // Partition the data and run the threads on the partitions
+            vector<thread> threads;
+            gsl::span data_span(data_with_indices);
+            size_t last_partition_cutoff = 0;
+            for (size_t t = 0; t < thread_count; t++)
+            {
+                // Run a thread on the partition data_with_indices[partitions[t-1]..partitions[t]), where the base case
+                // partitions[-1] = 0;
+                size_t partition_cutoff = partitions[t];
+                size_t partition_size = partitions[t] - last_partition_cutoff;
+                gsl::span<pair<&pair<Item, vector<uint8_t> >, size_t> > partition =
+                    data_span.subspan(partition_cutoff, partition_size);
+
+                threads.emplace_back([&, t]() { add_data_worker(partition); });
+
+                last_partition_cutoff = partition_cutoff;
+            }
+
+            // Wait for the threads to finish
             for (auto &t : thrds)
             {
                 t.join();
-            }
-
-            // aggregate and find the max.
-            int maxload = 0;
-            for (uint32_t i = 0; i < params_.table_size(); i++)
-            {
-                for (size_t t = 1; t < thread_count; t++)
-                {
-                    thread_loads[0][i] += thread_loads[t][i];
-                }
-                maxload = max(maxload, thread_loads[0][i]);
-            }
-            Log::debug("Original max load =  %i", maxload);
-
-            if (get_params().use_dynamic_split_count())
-            {
-                // making sure maxload is a multiple of split_size
-                size_t new_split_count =
-                    (static_cast<size_t>(maxload) + params_.split_size() - 1) / params_.split_size();
-                params_.set_sender_bin_size(new_split_count * params_.split_size());
-                params_.set_split_count(new_split_count);
-
-                // resize the matrix of blocks.
-                db_blocks_.resize(params_.batch_count(), new_split_count);
-
-                Log::debug("New max load, new split count = %i, %i", params_.sender_bin_size(), params_.split_count());
             }
         }
 
@@ -192,7 +257,7 @@ namespace apsi
                 }
 
                 // Lock-free thread-safe bin position search
-                pair<DBBlock *, DBBlock::Position> block_pos;
+                pair<BinBundle *, BinBundle::Position> block_pos;
                 block_pos = acquire_db_position_after_oprf(loc);
 
                 auto &db_block = *block_pos.first;
@@ -218,95 +283,96 @@ namespace apsi
                 params_.set_split_count(new_split_count);
 
                 // resize the matrix of blocks.
-                db_blocks_.resize(params_.batch_count(), static_cast<size_t>(new_split_count));
+                bin_bundles_.resize(params_.batch_count(), static_cast<size_t>(new_split_count));
 
                 Log::debug("New max load, new split count = %i, %i", params_.sender_bin_size(), params_.split_count());
             }
         }
 
-        void SenderDB::add_data_worker(
-            size_t thread_idx, size_t thread_count, gsl::span<const Item> data, MatrixView<unsigned char> values,
-            vector<int> &loads)
-        {
+        /**
+        Inserts the given items and corresponding labels into the database at the given cuckoo indices. Concretely, for
+        every ((item, label), cuckoo_idx) element, the item is inserted into the database at cuckoo_idx and its label is
+        set to label.
+        */
+        template<>
+        void SenderDB<vector<uint8_t> >::add_data_worker(
+            const gsl::span<pair<&pair<Item, vector<uint8_t> >, size_t> > data_with_indices;
+        ) {
             STOPWATCH(sender_stop_watch, "SenderDB::add_data_worker");
 
-            size_t start = thread_idx * data.size() / thread_count;
-            size_t end = (thread_idx + 1) * data.size() / thread_count;
+            const SEAL::Modulus &mod = params_.seal_params_.encryption_params.plain_modulus();
 
-            vector<kuku::LocFunc> normal_loc_func;
-            for (uint32_t i = 0; i < params_.hash_func_count(); i++)
+            // bins_per_item = ⌈item_bit_count / (mod_bitlen - 1)⌉
+            size_t modulus_size = (size_t)mod.bit_count();
+            size_t bins_per_item = (params_.item_bit_count() + (modulus_size-2)) / (modulus_size-1)
+            size_t bins_per_bundle = params_.batch_size();
+
+            // Iteratively insert each item-label pair
+            for (auto &data_with_idx : data_with_indices)
             {
-                normal_loc_func.emplace_back(params_.table_size(), kuku::make_item(params_.hash_func_seed() + i, 0));
-            }
+                Item &item = data_with_idx.first.first;
+                vector<uint8_t> &label = data_with_idx.first.second;
+                size_t cuckoo_idx = data_with_indices.second;
 
-            loads.resize(params_.table_size(), 0);
-            int maxload = 0;
-
-            for (size_t i = start; i < end; i++)
-            {
-                vector<uint64_t> locs(params_.hash_func_count());
-                vector<Item> keys(params_.hash_func_count());
-                vector<bool> skip(params_.hash_func_count());
-
-                // Compute bin locations
-                // Set keys and skip
-                auto cuckoo_item = data[i].get_value();
-
-                // Set keys and skip
-                for (uint32_t j = 0; j < params_.hash_func_count(); j++)
+                // Convert the label to the appropriately sized bitstring
+                Bitstring label_bs(item_label_pair.second, params_.item_bit_count);
+                // Then convert the label from the bitstring to a sequence of field elements
+                vector<felt_t> label = bits_to_field_elts(bs, mod);
+                if (label.size() != 2)
                 {
-                    locs[j] = normal_loc_func[j](cuckoo_item);
-                    keys[j] = data[i];
-                    skip[j] = false;
-
-                    if (j > 0)
-                    { // check if same.
-                        for (uint32_t k = 0; k < j; k++)
-                        {
-                            if (locs[j] == locs[k])
-                            {
-                                skip[j] = true;
-                                break;
-                            }
-                        }
-                    }
+                    throw logic_error("Labels must be precisely 2 field elements wide");
                 }
 
-                // Claim an empty location in each matching bin
-                for (uint32_t j = 0; j < params_.hash_func_count(); j++)
+                // We will compute all the locations that this item gets placed in
+                array<felt_t, 2> item = item_label_pair.first.get_value();
+
+                // Collect the item-label field element pairs
+                vector<pair<felt_t, felt_t> > item_label_felt_pairs;
+                item_label_felt_pairs.push_back({ item[0], label[0] });
+                item_label_felt_pairs.push_back({ item[1], label[1] });
+
+
+                for (size_t &cuckoo_idx : cuckoo_idx_set)
                 {
-                    // debugging
-                    size_t idxlocs = static_cast<size_t>(locs[j]);
-                    loads[idxlocs]++;
-                    if (loads[idxlocs] > maxload)
+                    size_t bin_idx = cuckoo_idx % bins_per_bundle;;
+                    size_t bundle_idx = (cuckoo_idx - bin_idx) / bins_per_bundle;
+
+                    set<BinBundle> &bundle_set = bin_bundles_.at(bundle_idx);
+
+                    // Try to insert these field elements somewhere
+                    bool inserted = false;
+                    for (BinBundle &bundle : bundle_set)
                     {
-                        maxload = loads[idxlocs];
+                        // Do a dry-run insertion and see if the new largest bin size in the range
+                        // exceeds the limit
+                        int new_largest_bin_size = bundle.multi_insert_dry_run(item_label_felt_pairs, bin_idx);
+
+                        // Check if inserting would violate the max bin size constraint
+                        if (new_largest_bin_size > 0 && new_largest_bin_size < PARAMS_MAX_BIN_SIZE)
+                        {
+                            // All good
+                            bundle.multi_insert_for_real(item_label_felt_pairs, bin_idx);
+                            inserted = true;
+                        }
                     }
 
-                    if (skip[j] == false)
+                    // If we had conflicts everywhere, then we need to make a new BinBundle and insert the data there
+                    if (!inserted)
                     {
-                        // Lock-free thread-safe bin position search
-                        pair<DBBlock *, DBBlock::Position> block_pos;
+                        // Make a fresh BinBundle and insert
+                        BinBundle new_bin_bundle(SO, MANY, ARGUMENTS);
+                        int res = new_bin_bundle.multi_insert_for_real(item_label_felt_pairs, bin_idx);
 
-                        // Log::info("find db position with oprf");
-                        block_pos = acquire_db_position_after_oprf(idxlocs);
-
-                        auto &db_block = *block_pos.first;
-                        auto pos = block_pos.second;
-
-                        db_block.get_key(pos) = keys[j];
-
-                        if (params_.use_labels())
+                        // If even that failed, I don't know what could've happened
+                        if (res < 0)
                         {
-                            auto dest = db_block.get_label(pos);
-                            memcpy(dest, values[i].data(), params_.label_byte_count());
+                            throw logic_error("Couldn't insert item into a brand new BinBundle");
                         }
+
+                        bin_bundles.insert(new_bin_bundle);
                     }
                 }
             }
-
-            // debugging: print the bin load
-            Log::debug("max load for thread %i = %i", thread_idx, maxload);
         }
 
         void SenderDB::add_data(gsl::span<const Item> data, size_t thread_count)
@@ -314,18 +380,18 @@ namespace apsi
             add_data(data, {}, thread_count);
         }
 
-        pair<DBBlock *, DBBlock::Position> SenderDB::acquire_db_position_after_oprf(size_t cuckoo_loc)
+        pair<BinBundle *, BinBundle::Position> SenderDB::acquire_db_position_after_oprf(size_t cuckoo_loc)
         {
             size_t batch_idx = cuckoo_loc / params_.batch_size();
             size_t batch_offset = cuckoo_loc % params_.batch_size();
 
             size_t s_idx = 0;
-            for (size_t i = 0; i < db_blocks_.stride(); ++i)
+            for (size_t i = 0; i < bin_bundles_.stride(); ++i)
             {
-                DBBlock::Position pos = db_blocks_(batch_idx, s_idx)->try_acquire_position_after_oprf(batch_offset);
+                BinBundle::Position pos = bin_bundles_(batch_idx, s_idx)->try_acquire_position_after_oprf(batch_offset);
                 if (pos.is_initialized())
                 {
-                    return { db_blocks_(batch_idx, s_idx), pos };
+                    return { bin_bundles_(batch_idx, s_idx), pos };
                 }
                 s_idx++;
             }
@@ -363,7 +429,7 @@ namespace apsi
 
                 size_t batch_start = batch * batch_size, batch_end = batch_start + batch_size;
 
-                auto &block = db_blocks_.data()[next_block];
+                auto &block = bin_bundles_.data()[next_block];
                 block.symmetric_polys(context, encoding_bit_length_, neg_null_element_);
                 block.batch_random_symm_poly_ = { &batch_random_symm_poly_storage_[indexer(split, batch)],
                                                   static_cast<size_t>(split_size_plus_one) };
@@ -422,7 +488,7 @@ namespace apsi
 
             for (size_t bIdx = start_block; bIdx < end_block; bIdx++)
             {
-                auto &block = *db_blocks_(bIdx);
+                auto &block = *bin_bundles_(bIdx);
                 block.batch_interpolate(
                     th_context, session_context_.seal_context(), session_context_.evaluator(),
                     session_context_.encoder(), cache, params_);
