@@ -96,9 +96,6 @@ namespace apsi
                 return compressor_;
             }
 
-            // the plaintext of the receiver's query. Used to debug.
-            std::unique_ptr<FFieldArray> debug_plain_query_;
-
         private:
             std::shared_ptr<seal::SEALContext> seal_context_;
 

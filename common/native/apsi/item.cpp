@@ -1,12 +1,13 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "apsi/item.h"
 #include <cctype>
+#include <stdexcept>
 #include <gsl/span>
 #include <seal/util/blake2.h>
 #include <seal/util/common.h>
 #include <seal/util/uintcore.h>
+#include "apsi/item.h"
 
 using namespace std;
 using namespace seal;
@@ -14,6 +15,28 @@ using namespace kuku;
 
 namespace apsi
 {
+    namespace
+    {
+        uint32_t Item::muladd(uint32_t item[4], uint32_t mul, uint32_t add)
+        {
+            uint64_t temp = 0;
+
+            temp = static_cast<uint64_t>(item[0]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(add);
+            item[0] = static_cast<uint32_t>(temp);
+
+            temp = static_cast<uint64_t>(item[1]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(temp >> 32);
+            item[1] = static_cast<uint32_t>(temp);
+
+            temp = static_cast<uint64_t>(item[2]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(temp >> 32);
+            item[2] = static_cast<uint32_t>(temp);
+
+            temp = static_cast<uint64_t>(item[3]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(temp >> 32);
+            item[3] = static_cast<uint32_t>(temp);
+
+            return static_cast<uint32_t>(temp >> 32);
+        }
+    }
+
     Item::Item(uint64_t *pointer)
     {
         value_[0] = pointer[0];
@@ -122,20 +145,10 @@ namespace apsi
         }
     }
 
-    void Item::save(ostream &stream) const
-    {
-        stream.write(reinterpret_cast<const char *>(&value_), sizeof(value_));
-    }
-
-    void Item::load(istream &stream)
-    {
-        stream.read(reinterpret_cast<char *>(&value_), sizeof(value_));
-    }
-
     void Item::parse(const string &input, uint32_t base)
     {
         if (base != 10 && base != 16)
-            throw invalid_argument("Only base 10 and 16 is supported.");
+            throw invalid_argument("Only base 10 and 16 are supported.");
 
         // Use 32 bit numbers so we can handle overflow easily
         uint32_t item[4] = { 0 };
@@ -181,24 +194,5 @@ namespace apsi
         }
 
         parse(num, base);
-    }
-
-    uint32_t Item::muladd(uint32_t item[4], uint32_t mul, uint32_t add)
-    {
-        uint64_t temp = 0;
-
-        temp = static_cast<uint64_t>(item[0]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(add);
-        item[0] = static_cast<uint32_t>(temp);
-
-        temp = static_cast<uint64_t>(item[1]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(temp >> 32);
-        item[1] = static_cast<uint32_t>(temp);
-
-        temp = static_cast<uint64_t>(item[2]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(temp >> 32);
-        item[2] = static_cast<uint32_t>(temp);
-
-        temp = static_cast<uint64_t>(item[3]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(temp >> 32);
-        item[3] = static_cast<uint32_t>(temp);
-
-        return static_cast<uint32_t>(temp >> 32);
     }
 } // namespace apsi

@@ -45,7 +45,7 @@ namespace apsi
     Returns the Newton interpolation of the given points and values. Specifically, this function returns the
     coefficients of a polynomial P in degree-ascending, where P(pointᵢ) valueᵢ for all i.
     */
-    const vector<uint64_t> newton_interpolate_polyn(
+    vector<uint64_t> newton_interpolate_polyn(
         const vector<uint64_t> &points,
         const vector<uint64_t> &values,
         const seal::Modulus &mod
@@ -170,7 +170,7 @@ namespace apsi
     roots a₁, ..., aₛ. Concretely, P = (x-a₁)*...*(x-aₛ).
     The returned coefficients are in degree-ascending order. That is, polyn[0] is the constant term.
     */
-    const vector<uint64_t> polyn_with_roots(vector<uint64_t> &roots, const seal::Modulus &mod)
+    vector<uint64_t> polyn_with_roots(vector<uint64_t> &roots, const seal::Modulus &mod)
     {
         // Start with P = 1 = 1 + 0x + 0x^2 + ...
         vector<uint64_t> polyn;

@@ -24,7 +24,6 @@ namespace apsi
 
     namespace sender
     {
-
         template<typename L>
         BinBundle<L>::BinBundle(
             size_t num_bins,
@@ -39,8 +38,8 @@ namespace apsi
             batch_encoder_(batch_encoder),
             mod_(mod)
         {
-                bins_.reserve(num_bins);
-                cache_.bin_polyns_.reserve(num_bins);
+            bins_.reserve(num_bins);
+            cache_.bin_polyns_.reserve(num_bins);
         }
 
         /**

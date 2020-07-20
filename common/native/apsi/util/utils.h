@@ -3,9 +3,9 @@
 
 #pragma once
 
-#include <seal/context.h>
-#include <seal/plaintext.h>
 #include <string>
+#include <cstdint>
+#include <vector>
 #include <type_traits>
 #include "apsi/util/stopwatch.h"
 
@@ -47,13 +47,6 @@ namespace apsi
         {
             return ((val + step - 1) / step) * step;
         }
-
-        /**
-        Compute secure Sender bin size
-        */
-        std::uint64_t compute_sender_bin_size(
-            std::uint32_t log_table_size, std::size_t sender_set_size, std::size_t hash_func_count,
-            std::uint32_t binning_sec_level, std::size_t split_count);
 
         extern Stopwatch sender_stop_watch, recv_stop_watch;
     } // namespace util
