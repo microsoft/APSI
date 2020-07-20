@@ -5,9 +5,9 @@
 
 #include <array>
 #include <cstddef>
-#include <kuku/common.h>
-#include <stdexcept>
 #include <string>
+#include <cstdint>
+#include <kuku/common.h>
 #include "apsi/ffield/ffield_elt.h"
 
 namespace apsi
@@ -52,11 +52,11 @@ namespace apsi
         */
         void to_ffield_element(FFieldElt &ring_item, size_t bit_length);
 
+        Item &operator=(const Item &assign) = default;
+
         Item &operator=(const std::string &assign);
 
         Item &operator=(std::uint64_t assign);
-
-        Item &operator=(const Item &assign);
 
         Item &operator=(const kuku::item_type &assign);
 
@@ -85,16 +85,12 @@ namespace apsi
             return value_.data();
         }
 
-        void save(std::ostream &stream) const;
-
-        void load(std::istream &stream);
-
-        auto &get_value()
+        auto &value()
         {
             return value_;
         }
 
-        const auto &get_value() const
+        const auto &value() const
         {
             return value_;
         }
@@ -117,8 +113,6 @@ namespace apsi
 
     private:
         std::array<std::uint64_t, 2> value_;
-
-        std::uint32_t muladd(std::uint32_t item[4], std::uint32_t mul, std::uint32_t add);
 
     public:
         static constexpr std::size_t item_byte_count = sizeof(value_);

@@ -325,7 +325,7 @@ namespace apsi
 
             for (size_t i = 0; i < items.size(); i++)
             {
-                auto cuckoo_item = items[i].get_value();
+                auto cuckoo_item = items[i].value();
                 bool insertionSuccess = cuckoo->insert(cuckoo_item);
                 if (!insertionSuccess)
                 {
@@ -348,7 +348,7 @@ namespace apsi
 
             for (size_t i = 0; i < items.size(); i++)
             {
-                auto cuckoo_item = items[i].get_value();
+                auto cuckoo_item = items[i].value();
                 auto q = cuckoo.query(cuckoo_item);
 
                 Log::debug("cuckoo_indices: Setting indices at location: %i to: %i", q.location(), i);
