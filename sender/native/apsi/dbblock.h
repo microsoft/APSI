@@ -5,13 +5,10 @@
 
 // STD
 #include <memory>
-#include <unordered_set>
 #include <vector>
 
 // APSI
-#include "apsi/ffield/ffield_batch_encoder.h"
 #include "apsi/item.h"
-#include "apsi/senderthreadcontext.h"
 
 // SEAL
 #include "seal/context.h"
@@ -22,7 +19,6 @@ namespace apsi
 {
     namespace sender
     {
-
         struct monostate {};
 
         // An element of a field with prime modulus < 2⁶⁴
@@ -71,7 +67,7 @@ namespace apsi
         private:
 
             /**
-            The bins of the BinBundle.Each bin is a key-value store, where the keys are (chunks of the OPRF'd) DB
+            The bins of the BinBundle. Each bin is a key-value store, where the keys are (chunks of the OPRF'd) DB
             items and the labels are either field elements or empty (a unit type).
             */
             std::vector<std::map<felt_t, L>> bins_;
@@ -112,7 +108,6 @@ namespace apsi
             void regen_plaintexts();
 
         public:
-
             BinBundle(
                 size_t num_bins,
                 std::shared_ptr<seal::SEALContext> seal_ctx,

@@ -331,7 +331,6 @@ namespace apsi
                 item_label_felt_pairs.push_back({ item[0], label[0] });
                 item_label_felt_pairs.push_back({ item[1], label[1] });
 
-
                 for (size_t &cuckoo_idx : cuckoo_idx_set)
                 {
                     size_t bin_idx = cuckoo_idx % bins_per_bundle;;
