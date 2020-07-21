@@ -15,15 +15,10 @@
 
 // APSI
 #include "apsi/dbblock.h"
-#include "apsi/ffield/ffield.h"
-#include "apsi/ffield/ffield_array.h"
-#include "apsi/ffield/ffield_elt.h"
 #include "apsi/item.h"
 #include "apsi/psiparams.h"
 #include "apsi/sendersessioncontext.h"
 #include "apsi/senderthreadcontext.h"
-#include "apsi/util/matrix.h"
-#include "apsi/util/matrixview.h"
 
 // Kuku
 #include "kuku/kuku.h"
@@ -35,69 +30,35 @@ namespace apsi
 {
     namespace sender
     {
-        // An element of a field with prime modulus < 2⁶⁴
-        typedef felt_t uint64_t;
-
-        class SenderDB
+        template<typename L>
+        class LabeledSenderDB
         {
         public:
-            SenderDB(PSIParams params);
+            LabeledSenderDB(PSIParams params);
 
             /**
-            Clears sender's database and set all entries to sender's null item.
+            Clears the database
             */
             void clear_db();
 
             /**
-            Loads the input data into sender's database, and precomputes all necessary components for the PSI protocol,
-            including symmetric polynomials, batching, etc.
+            Clears the database and inserts the given data, using at most thread_count threads
             */
-            void load_db(std::size_t thread_count, const std::vector<Item> &data, MatrixView<unsigned char> vals = {});
+            void set_data(std::map<Item, L> &data, size_t thread_count)
 
             /**
-            Sets the sender's database by hashing the data items with all hash functions.
+            Inserts the given data into the database, using at most thread_count threads
             */
-            void set_data(gsl::span<const Item> keys, std::size_t thread_count);
-            void set_data(gsl::span<const Item> keys, MatrixView<unsigned char> values, std::size_t thread_count);
+            void add_data(std::map<Item, L> &data, size_t thread_count)
 
             /**
-            Adds the data items to sender's database.
-            */
-            void add_data(gsl::span<const Item> keys, std::size_t thread_count);
-            void add_data(gsl::span<const Item> keys, MatrixView<unsigned char> values, std::size_t thread_count);
-
-            /**
-             No hash version of add data, specific for one query
-            */
-            void add_data_no_hash(gsl::span<const Item> data, MatrixView<unsigned char> values);
-
-            /**
-            Handles the work of one thread for adding items to sender's database
+            Inserts the given items and corresponding labels into the database at the given cuckoo indices. Concretely,
+            for every ((item, label), cuckoo_idx) element, the item is inserted into the database at cuckoo_idx and its
+            label is set to label.
             */
             void add_data_worker(
-                size_t thread_idx, std::size_t thread_count, gsl::span<const Item> data,
-                MatrixView<unsigned char> values, std::vector<int> &loads);
-
-            /**
-            Adds one item to sender's database.
-            */
-            void add_data(const Item &item, std::size_t thread_count);
-
-            /**
-            Batches the randomized symmetric polynomials for the specified split and the specified batch in sender's
-            database.
-
-            @see randomized_symmetric_polys for computing randomized symmetric polynomials.
-            */
-            void batched_randomized_symmetric_polys(
-                SenderThreadContext &th_context, size_t start_block, size_t end_block);
-
-            void batched_interpolate_polys(SenderThreadContext &th_context, size_t start_block, size_t end_block);
-
-            std::size_t get_block_count() const
-            {
-                return bin_bundles_.size();
-            }
+                const gsl::span<pair<&pair<Item, vector<uint8_t> >, size_t> > data_with_indices
+            );
 
             const PSIParams &get_params() const
             {
@@ -106,60 +67,15 @@ namespace apsi
 
         private:
             PSIParams params_;
-            FField field_;
-            FFieldElt null_element_;
-            FFieldElt neg_null_element_;
-            std::size_t encoding_bit_length_;
-
-            /*
-            Size m vector, where m is the table size. Each value is an incremental counter for the
-            corresponding bin in shuffle_index_. It points to the next value to be taken from shuffle_index_
-            in the corresponding bin. */
-            std::vector<int> next_locs_;
-
-            /*
-            Batched randomized symmetric polynomial terms.
-            #splits x #batches x (split_size + 1). In fact, B = #splits x split_size. The table is
-            essentially split into '#splits x #batches' blocks. Each block is related with a split
-            and a batch.
-            */
-            std::vector<seal::Plaintext> batch_random_symm_poly_storage_;
-
-            /*
-            Null value for sender: 00..0011..11. The number of 1 is itemL.
-            (Note: Null value for receiver is: 00..0010..00, with 1 on the itemL-th position.)
-            */
-            Item sender_null_item_;
-
-            /* The FField encoding of the sender null value. */
-
-            /*
-            All the BinBundles in the DB, indexed by bin index. The set at bin index i contains all the BinBundles with
-            bin index i.
-            */
-            std::vector<std::set<BinBundle> > bin_bundles_;
-
-            std::pair<BinBundle *, BinBundle::Position> acquire_db_position_after_oprf(std::size_t cuckoo_loc);
-
-            SenderSessionContext session_context_;
 
             /**
-            Precomputes all necessary components for the PSI protocol, including symmetric polynomials, batching, etc.
-            This function is expensive and can be called after sender finishes adding items to the database.
+            All the BinBundles in the DB, indexed by bin index. The vector at bundle index i contains all the BinBundles
+            with bundle index i. The order of the BinBundle within a given bundle index doesn't matter (we could've just
+            as easily used a vector<set<BinBundle>>), but the canonical ordering makes references to specific BinBundles
+            easier.
             */
-            void offline_compute(std::size_t thread_count);
+            std::vector<std::vector<LabeledBinBundle> > bin_bundles_;
 
-            /**
-            Handles work for offline_compute for a single thread.
-            */
-            void offline_compute_work(SenderThreadContext &th_context, size_t total_thread_count);
-
-            /**
-            Report progress of the offline_compute operation.
-            Progress is reported to the Log.
-            */
-            void report_offline_compute_progress(
-                std::vector<SenderThreadContext> &thread_contexts, std::atomic<bool> &work_finished);
-        }; // class SenderDB
-    }      // namespace sender
+        }; // class LabeledSenderDB
+    }  // namespace sender
 } // namespace apsi

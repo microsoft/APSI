@@ -151,11 +151,20 @@ namespace apsi
         }
 
         void Sender::respond_worker(
-            size_t thread_index, size_t batch_count, size_t total_threads, size_t total_blocks,
-            promise<void> &batches_done_prom, shared_future<void> &batches_done_fut, vector<vector<Ciphertext>> &powers,
-            SenderSessionContext &session_context, WindowingDag &dag, vector<WindowingDag::State> &states,
-            atomic<int> &remaining_batches, const vector<SEAL_BYTE> &client_id, Channel &channel)
-        {
+            size_t thread_index,
+            size_t batch_count,
+            size_t total_threads,
+            size_t total_blocks,
+            promise<void> &batches_done_prom,
+            shared_future<void> &batches_done_fut,
+            vector<vector<Ciphertext>> &powers,
+            SenderSessionContext &session_context,
+            WindowingDag &dag,
+            vector<WindowingDag::State> &states,
+            atomic<int> &remaining_batches,
+            const vector<SEAL_BYTE> &client_id,
+            Channel &channel
+        ) {
             STOPWATCH(sender_stop_watch, "Sender::respond_worker");
 
             /* Multiple client sessions can enter this function to compete for thread context resources. */
@@ -338,9 +347,12 @@ namespace apsi
         }
 
         void Sender::compute_batch_powers(
-            vector<Ciphertext> &batch_powers, SenderSessionContext &session_context, const WindowingDag &dag,
-            WindowingDag::State &state, MemoryPoolHandle pool)
-        {
+            vector<Ciphertext> &batch_powers,
+            SenderSessionContext &session_context,
+            const WindowingDag &dag,
+            WindowingDag::State &state,
+            MemoryPoolHandle pool
+        ) {
             if (batch_powers.size() != params_.split_size() + 1)
             {
                 std::cout << batch_powers.size() << " != " << params_.split_size() + 1 << std::endl;

@@ -21,9 +21,6 @@ namespace apsi
     {
         struct monostate {};
 
-        // An element of a field with prime modulus < 2⁶⁴
-        typedef felt_t uint64_t;
-
         // A cache of all the polynomial computations on a single bin
         struct BinPolynCache
         {
@@ -115,6 +112,8 @@ namespace apsi
                 std::shared_ptr<seal::BatchEncoder> batch_encoder,
                 seal::Modulus mod
             );
+
+            ~BinBundle();
 
             /**
             Inserts item-label pairs into sequential bins, beginning at start_bin_idx.

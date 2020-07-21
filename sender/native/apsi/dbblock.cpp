@@ -24,8 +24,7 @@ namespace apsi
 
     namespace sender
     {
-        template<typename L>
-        BinBundle<L>::BinBundle(
+        BinBundle::BinBundle(
             size_t num_bins,
             shared_ptr<seal::SEALContext> seal_ctx,
             shared_ptr<seal::Evaluator> evaluator,
@@ -48,8 +47,7 @@ namespace apsi
         On success, returns the size of the largest bin bins in the modified range, after insertion has taken place
         On failed insertion, returns -1
         */
-        const int multi_insert_dry_run(std::vector<std::pair<felt_t, L>> &item_label_pairs, size_t start_bin_idx)
-        {
+        const int BinBundle::multi_insert_dry_run(vector<pair<felt_t, L>> &item_label_pairs, size_t start_bin_idx) {
             return multi_insert(pairs, start_bin_idx, true);
         }
 
@@ -58,7 +56,7 @@ namespace apsi
         On success, returns the size of the largest bin bins in the modified range, after insertion has taken place
         On failed insertion, returns -1. On failure, no modification is made to the BinBundle.
         */
-        int BinBundle<L>::multi_insert_for_real(std::vector<std::pair<felt_t, L>> item_label_pairs, size_t start_bin_idx)
+        int BinBundle::multi_insert_for_real(vector<pair<felt_t, L>> item_label_pairs, size_t start_bin_idx)
         {
             return multi_insert(pairs, start_bin_idx, false);
         }
@@ -69,11 +67,7 @@ namespace apsi
         On success, returns the size of the largest bin bins in the modified range, after insertion has taken place
         On failed insertion, returns -1. On failure, no modification is made to the BinBundle.
         */
-        int BinBundle<L>::multi_insert(
-            std::vector<std::pair<felt_t, L>> item_label_pairs,
-            size_t start_bin_idx,
-            bool dry_run
-        ) {
+        int BinBundle::multi_insert(vector<pair<felt_t, L>> item_label_pairs, size_t start_bin_idx, bool dry_run) {
             // For each key, check that we can insert into the corresponding bin. If the answer is "no" at any point,
             // return false.
             size_t curr_bin_idx = start_bin_idx;
