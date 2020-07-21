@@ -12,6 +12,9 @@
 
 namespace apsi
 {
+    // An element of a field with prime modulus < 2⁶⁴
+    using felt_t = std::uint64_t;
+
     class Item
     {
     public:
@@ -24,9 +27,9 @@ namespace apsi
         Item(const Item &) = default;
 
         /**
-        Constructs an item by hahsing the std::uint64_t array and using 'item_bit_count_' bits of the hash.
+        Constructs an item by hashing the felt_t array and using 'item_bit_count_' bits of the hash.
         */
-        Item(std::uint64_t *pointer);
+        Item(felt_t *pointer);
 
         /**
         Constructs an item by hashing the string and using 'item_bit_count_' bits of the hash.
@@ -34,9 +37,9 @@ namespace apsi
         Item(const std::string &str);
 
         /**
-        Constructs a short item (without hashing) by using 'item_bit_count_' bits of the specified std::uint64_t value.
+        Constructs a short item (without hashing) by using 'item_bit_count_' bits of the specified felt_t value.
         */
-        Item(std::uint64_t item);
+        Item(felt_t item);
 
         Item(const kuku::item_type &item);
 
@@ -56,7 +59,7 @@ namespace apsi
 
         Item &operator=(const std::string &assign);
 
-        Item &operator=(std::uint64_t assign);
+        Item &operator=(felt_t assign);
 
         Item &operator=(const kuku::item_type &assign);
 
@@ -65,22 +68,22 @@ namespace apsi
             return value_ == other.value_;
         }
 
-        std::uint64_t &operator[](size_t i)
+        felt_t &operator[](size_t i)
         {
             return value_[i];
         }
 
-        const std::uint64_t &operator[](std::size_t i) const
+        const felt_t &operator[](std::size_t i) const
         {
             return value_[i];
         }
 
-        std::uint64_t *data()
+        felt_t *data()
         {
             return value_.data();
         }
 
-        const std::uint64_t *data() const
+        const felt_t *data() const
         {
             return value_.data();
         }
@@ -112,7 +115,7 @@ namespace apsi
         void parse(const std::string &input);
 
     private:
-        std::array<std::uint64_t, 2> value_;
+        std::array<felt_t, 2> value_;
 
     public:
         static constexpr std::size_t item_byte_count = sizeof(value_);

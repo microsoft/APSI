@@ -46,12 +46,6 @@ namespace apsi
                 relin_keys_ = relin_keys;
             }
 
-            void set_ffield(FField field)
-            {
-                field_ = std::make_unique<FField>(field);
-                encoder_ = std::make_unique<FFieldBatchEncoder>(seal_context_, *field_);
-            }
-
             /**
             This function is only for testing purpose. Sender should not have the secret key.
             */
@@ -110,10 +104,6 @@ namespace apsi
             std::unique_ptr<seal::Decryptor> decryptor_;
 
             std::unique_ptr<seal::Evaluator> evaluator_;
-
-            std::unique_ptr<FField> field_;
-
-            std::unique_ptr<FFieldBatchEncoder> encoder_;
 
             std::unique_ptr<CiphertextCompressor> compressor_;
         };
