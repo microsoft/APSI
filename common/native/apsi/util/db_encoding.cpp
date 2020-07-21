@@ -1,3 +1,5 @@
+#include "apsi/util/db_encoding.h"
+
 using namespace std;
 using namespace seal;
 using namespace seal::util;

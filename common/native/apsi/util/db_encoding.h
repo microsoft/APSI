@@ -3,16 +3,18 @@
 
 #pragma once
 
+#include <utility>
+#include <cstdint>
+#include <cstddef>
+#include <stdexcept>
+#include <vector>
 #include <gsl/span>
 #include <seal/plaintext.h>
-#include <utility>
-#include <vector>
-#include "apsi/ffield/ffield_array.h"
 
 namespace apsi
 {
     // An element of a field with prime modulus < 2⁶⁴
-    typedef felt_t uint64_t;
+    using felt_t = std::uint64_t;
 
     /**
     Represents a bitstring, i.e., a string of bytes that tells you how many bits it's supposed to be interpreted as.
@@ -21,28 +23,28 @@ namespace apsi
     class Bitstring
     {
     private:
-        std::vector<uint8_t> data_;
-        size_t bit_len_;
+        std::vector<std::uint8_t> data_;
+        std::size_t bit_len_;
 
     public:
 
-        Bitstring(std::vector<uint8_t> &&data, size_t bit_len)
+        Bitstring(std::vector<std::uint8_t> &&data, std::size_t bit_len)
         {
             // Sanity check: bitlen cannot be 0
             if (bit_len == 0)
             {
-                throw logic_error("Given bitlen is 0");
+                throw std::logic_error("Given bitlen is 0");
             }
             // Sanity check: bitlen cannot exceed underlying data len
             if (data.len()*8 < bit_len)
             {
-                throw logic_error("Given bitlen exceeds the data length!");
+                throw std::logic_error("Given bitlen exceeds the data length!");
             }
             // Sanity check: bitlen should not be more than 7 bits from the total length. If you want that, use a
             // smaller vector
             if (bit_len <= (data.len()-1)*8)
             {
-                throw logic_error("Given bitlen is at least a whole byte less than the underlying data len");
+                throw std::logic_error("Given bitlen is at least a whole byte less than the underlying data len");
             }
 
             // Now move
@@ -55,12 +57,12 @@ namespace apsi
             return (lhs.bit_len_ == rhs.bit_len_) && (lhs.data_ == rhs.data_);
         }
 
-        size_t bit_len()
+        std::size_t bit_len()
         {
             return bit_len_;
         }
 
-        gsl::span<uint8_t> data()
+        gsl::span<std::uint8_t> data()
         {
             return gsl::span(data_.data(), data_.size());
         }

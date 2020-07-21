@@ -37,7 +37,7 @@ namespace apsi
         {}
 
         void Sender::query(
-            const string &relin_keys, const map<uint64_t, vector<string>> query, const vector<SEAL_BYTE> &client_id,
+            const string &relin_keys, const map<uint64_t, vector<string>> &query, const vector<SEAL_BYTE> &client_id,
             Channel &channel)
         {
             if (!sender_db_)
@@ -48,20 +48,18 @@ namespace apsi
             STOPWATCH(sender_stop_watch, "Sender::query");
             Log::info("Start processing query");
 
-            // Load the relinearization keys from string
-            RelinKeys rlk;
-            get_relin_keys(seal_context_, rlk, relin_keys);
-
             // Create the session context
             SenderSessionContext session_context(seal_context_);
-            session_context.set_relin_keys(rlk);
-            session_context.set_ffield({ params_.ffield_characteristic(), params_.ffield_degree() });
+
+            // Load the relinearization keys from string
+            get_relin_keys(seal_context_, rlk, session_context.relin_keys());
 
             /* Receive client's query data. */
             int num_of_powers = static_cast<int>(query.size());
             Log::debug("Number of powers: %i", num_of_powers);
             Log::debug("Current batch count: %i", params_.batch_count());
 
+            // For each BinBundle index, we have a vector of powers of the query
             vector<vector<Ciphertext>> powers(params_.batch_count());
             auto split_size_plus_one = params_.split_size() + 1;
 
@@ -98,10 +96,13 @@ namespace apsi
             size_t batch_count = params_.batch_count();
             size_t total_blocks = params_.split_count() * batch_count;
 
-            // Make the ciphertext non-transparent
+            // powers[i][0] is supposed to be an encryption of 1 for each i; however, we don't have
+            // the public key available. We will create instead a dummy encryption of zero by reserving
+            // appropriate memory and adding some noise to it, and then add a plaintext 1 to it.
             powers[0][0].resize(2);
             for (size_t i = 0; i < powers[0][0].coeff_modulus_size(); i++)
             {
+                // Add some noise to the ciphertext to make it non-transparent
                 powers[0][0].data(1)[i * powers[0][0].poly_modulus_degree()] = 1;
             }
 
@@ -109,18 +110,19 @@ namespace apsi
             session_context.evaluator()->add_plain_inplace(powers[0][0], Plaintext("1"));
             for (size_t i = 1; i < powers.size(); i++)
             {
+                // Replicate for each BinBundle index
                 powers[i][0] = powers[0][0];
             }
 
-            uint32_t max_supported_degree = params_.max_supported_degree();
+            // Obtain the windowing information
             size_t window_size = get_params().window_size();
             uint32_t base = uint32_t(1) << window_size;
 
             // Ceiling of num_of_powers / (base - 1)
             uint32_t given_digits = (static_cast<uint32_t>(num_of_powers) + base - 2) / (base - 1);
 
-            WindowingDag dag(
-                static_cast<uint32_t>(params_.split_size()), params_.window_size(), max_supported_degree, given_digits);
+            // Prepare the windowing information
+            WindowingDag dag(static_cast<uint32_t>(params_.split_size()), params_.window_size(), given_digits);
 
             std::vector<WindowingDag::State> states;
             states.reserve(batch_count);
@@ -129,8 +131,7 @@ namespace apsi
                 states.emplace_back(dag);
             }
 
-            atomic<int> remaining_batches(
-                seal::util::safe_cast<int>(thread_count_)); // TODO: maybe change remaining_batches_ to size_t
+            atomic<size_t> remaining_batches(thread_count_);
             promise<void> batches_done_prom;
             auto batches_done_fut = batches_done_prom.get_future().share();
 
@@ -154,7 +155,7 @@ namespace apsi
             size_t thread_index, size_t batch_count, size_t total_threads, size_t total_blocks,
             promise<void> &batches_done_prom, shared_future<void> &batches_done_fut, vector<vector<Ciphertext>> &powers,
             SenderSessionContext &session_context, WindowingDag &dag, vector<WindowingDag::State> &states,
-            atomic<int> &remaining_batches, const vector<SEAL_BYTE> &client_id, Channel &channel)
+            atomic<size_t> &remaining_batches, const vector<SEAL_BYTE> &client_id, Channel &channel)
         {
             STOPWATCH(sender_stop_watch, "Sender::respond_worker");
 
@@ -459,7 +460,7 @@ namespace apsi
             Log::debug("Computing windowing dag: max power = %i", max_power);
 
             // initialize the degree array.
-            // given digits...
+            degree[0] = 0;
             uint32_t base = uint32_t(1) << window;
             for (uint32_t i = 0; i < given_digits; i++)
             {
@@ -472,12 +473,10 @@ namespace apsi
                 }
             }
 
-            degree[0] = 0;
-
             for (size_t i = 1; i <= max_power; i++)
             {
                 size_t i1 = optimal_split(i, degree);
-                size_t i2 = seal::util::sub_safe(i, i1);
+                size_t i2 = util::sub_safe(i, i1);
                 splits[i] = i1;
 
                 if (i1 == 0 || i2 == 0)
@@ -492,13 +491,6 @@ namespace apsi
                 }
                 Log::debug("degree[%i] = %i", i, degree[i]);
                 Log::debug("splits[%i] = %i", i, splits[i]);
-            }
-
-            // Validate the we did not exceed maximal supported degree.
-            if (*std::max_element(degree.begin(), degree.end()) > max_degree_supported)
-            {
-                Log::error("Degree exceeds maximal supported");
-                throw invalid_argument("degree too large");
             }
 
             for (size_t i = 3; i < max_power && items_per[i]; i++)
@@ -518,7 +510,7 @@ namespace apsi
             for (size_t i = 1; i <= max_power; i++)
             {
                 size_t i1 = splits[i];
-                size_t i2 = seal::util::sub_safe(i, i1);
+                size_t i2 = util::sub_safe(i, i1);
 
                 if (i1 && i2) // if encryption(y^i) is not given
                 {

@@ -14,17 +14,6 @@ namespace apsi
     namespace util
     {
         /**
-        Find optimal split
-        */
-        std::uint64_t optimal_split(const std::uint64_t x, const std::uint64_t base);
-
-        /**
-        Given the supported degree and bound on powers, find the maximal represented power.
-        i.e., we are given y^((b**i)*j) for i = 1,2,..., bound and j = 1,2,...,b-1.
-        */
-        std::uint64_t maximal_power(const std::uint64_t degree, const std::uint64_t bound, const std::uint64_t base);
-
-        /**
         Convert the given input to digits
         */
         std::vector<std::uint64_t> conversion_to_digits(const std::uint64_t input, const std::uint64_t base);

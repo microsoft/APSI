@@ -18,7 +18,6 @@
 #include <gsl/span>
 
 // APSI
-#include "apsi/ffield/ffield.h"
 #include "apsi/item.h"
 #include "apsi/network/channel.h"
 #include "apsi/psiparams.h"
@@ -62,27 +61,14 @@ namespace apsi
 
             std::size_t max_power;
             std::uint32_t window;
-            std::uint32_t max_degree_supported; // maximum degree supported.
-            std::uint32_t given_digits;         // how many digits are given.
+            std::uint32_t given_digits;
             std::vector<std::uint32_t> base_powers;
             std::vector<Node> nodes;
 
             WindowingDag(
-                std::size_t max_power, std::uint32_t window, std::uint32_t max_degree_supported,
-                std::uint32_t given_digits)
-                : max_power(max_power), window(window), max_degree_supported(max_degree_supported),
-                  given_digits(given_digits)
+                std::size_t max_power, std::uint32_t window, std::uint32_t given_digits)
+                : max_power(max_power), window(window), given_digits(given_digits)
             {
-                std::uint64_t base = std::uint64_t(1) << window;
-                std::uint64_t actual_power = util::maximal_power(
-                    static_cast<std::uint64_t>(max_degree_supported), static_cast<std::uint64_t>(given_digits), base);
-
-                logging::Log::debug("actual power supported = %i", actual_power);
-                if (actual_power < static_cast<uint64_t>(max_power))
-                {
-                    throw std::invalid_argument("does not support such max_power");
-                }
-
                 compute_dag();
             }
 
@@ -116,7 +102,7 @@ namespace apsi
             Generate a response to a query
             */
             void query(
-                const std::string &relin_keys, const std::map<std::uint64_t, std::vector<std::string>> query,
+                const std::string &relin_keys, const std::map<std::uint64_t, std::vector<std::string>> &query,
                 const std::vector<seal::SEAL_BYTE> &client_id, network::Channel &channel);
 
             /**
@@ -172,7 +158,7 @@ namespace apsi
                 std::size_t thread_index, std::size_t batch_count, std::size_t total_threads, std::size_t total_blocks,
                 std::promise<void> &batches_done_prom, std::shared_future<void> &batches_done_fut,
                 std::vector<std::vector<seal::Ciphertext>> &powers, SenderSessionContext &session_context,
-                WindowingDag &dag, std::vector<WindowingDag::State> &states, std::atomic<int> &remaining_batches,
+                WindowingDag &dag, std::vector<WindowingDag::State> &states, std::atomic<std::size_t> &remaining_batches,
                 const std::vector<seal::SEAL_BYTE> &client_id, network::Channel &channel);
 
             /**
