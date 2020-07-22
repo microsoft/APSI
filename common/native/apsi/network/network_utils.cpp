@@ -30,19 +30,25 @@ namespace apsi
         str = ss.str();
     }
 
-    void get_public_key(shared_ptr<SEALContext> context, PublicKey &pub_key, const string &str)
+    void get_public_key(const shared_ptr<SEALContext> &context, PublicKey &public_key, const string &str)
     {
         stringstream ss(str);
-        pub_key.load(context, ss);
+        public_key.load(context, ss);
     }
 
-    void get_relin_keys(shared_ptr<SEALContext> context, RelinKeys &relin_keys, const string &str)
+    void get_secret_key(const shared_ptr<SEALContext> &context, SecretKey &secret_key, const string &str)
+    {
+        stringstream ss(str);
+        secret_key.load(context, ss);
+    }
+
+    void get_relin_keys(const shared_ptr<SEALContext> &context, RelinKeys &relin_keys, const string &str)
     {
         stringstream ss(str);
         relin_keys.load(context, ss);
     }
 
-    void get_ciphertext(shared_ptr<SEALContext> context, Ciphertext &ciphertext, const string &str)
+    void get_ciphertext(const shared_ptr<SEALContext> &context, Ciphertext &ciphertext, const string &str)
     {
         stringstream ss(str);
         ciphertext.load(context, ss);

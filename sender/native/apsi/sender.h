@@ -13,6 +13,7 @@
 #include <memory>
 #include <mutex>
 #include <vector>
+#include <string>
 
 // GSL
 #include <gsl/span>

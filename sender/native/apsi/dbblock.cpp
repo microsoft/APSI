@@ -3,7 +3,7 @@
 
 // STD
 #include <algorithm>
-#include <memory>
+#include <utility>
 
 // APSI
 #include "apsi/dbblock.h"
@@ -47,7 +47,7 @@ namespace apsi
         On success, returns the size of the largest bin bins in the modified range, after insertion has taken place
         On failed insertion, returns -1
         */
-        const int BinBundle::multi_insert_dry_run(vector<pair<felt_t, L>> &item_label_pairs, size_t start_bin_idx) {
+        int BinBundle::multi_insert_dry_run(vector<pair<felt_t, L>> &item_label_pairs, size_t start_bin_idx) {
             return multi_insert(pairs, start_bin_idx, true);
         }
 
@@ -170,7 +170,7 @@ namespace apsi
                 BinPolynCache bpc = BinPolynCache {
                     .interpolation_polyn_coeffs = polyn_coeffs,
                 };
-                cache_.bin_polyns_.push_back(bpc);
+                cache_.bin_polyns_.emplace_back(move(bpc));
             }
         }
 
@@ -257,7 +257,7 @@ namespace apsi
                 evaluator_->transform_to_ntt_inplace(pt, seal_ctx_->first_parms_id());
 
                 // Push the new Plaintext to the cache
-                cache_.plaintext_polyn_coeffs_.push_back(pt);
+                cache_.plaintext_polyn_coeffs_.emplace_back(move(pt));
             }
         }
     } // namespace sender

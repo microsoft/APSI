@@ -6,6 +6,7 @@
 // STD
 #include <memory>
 #include <vector>
+#include <cstddef>
 
 // APSI
 #include "apsi/item.h"
@@ -14,6 +15,7 @@
 #include "seal/context.h"
 #include "seal/evaluator.h"
 #include "seal/plaintext.h"
+#include "seal/batchencoder.h"
 
 namespace apsi
 {
@@ -106,7 +108,7 @@ namespace apsi
 
         public:
             BinBundle(
-                size_t num_bins,
+                std::size_t num_bins,
                 std::shared_ptr<seal::SEALContext> seal_ctx,
                 std::shared_ptr<seal::Evaluator> evaluator,
                 std::shared_ptr<seal::BatchEncoder> batch_encoder,
@@ -120,7 +122,7 @@ namespace apsi
             Returns true on success. Returns false if any pair failed insertion. If false, no modification is made to
             the BinBundle.
             */
-            bool multi_insert(std::vector<std::pair<felt_t, L>> item_label_pairs, size_t start_bin_idx);
+            bool multi_insert(std::vector<std::pair<felt_t, L>> item_label_pairs, std::size_t start_bin_idx);
 
             /**
             Clears the contents of the BinBundle and wipes out the cache

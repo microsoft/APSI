@@ -2,10 +2,7 @@
 // Licensed under the MIT license.
 
 // STD
-#include <array>
 #include <chrono>
-#include <climits>
-#include <future>
 #include <numeric>
 #include <thread>
 
@@ -48,11 +45,9 @@ namespace apsi
             STOPWATCH(sender_stop_watch, "Sender::query");
             Log::info("Start processing query");
 
-            // Create the session context
+            // Create the session context; we don't have to re-create the SEALContext every time
             SenderSessionContext session_context(seal_context_);
-
-            // Load the relinearization keys from string
-            get_relin_keys(seal_context_, rlk, session_context.relin_keys());
+            session_context.set_evaluator(relin_keys);
 
             /* Receive client's query data. */
             int num_of_powers = static_cast<int>(query.size());
@@ -63,6 +58,7 @@ namespace apsi
             vector<vector<Ciphertext>> powers(params_.batch_count());
             auto split_size_plus_one = params_.split_size() + 1;
 
+            // Initialize the powers matrix
             for (size_t i = 0; i < powers.size(); ++i)
             {
                 powers[i].reserve(split_size_plus_one);
@@ -72,6 +68,7 @@ namespace apsi
                 }
             }
 
+            // Load inputs provided in the query
             for (const auto &q : query)
             {
                 size_t power = static_cast<size_t>(q.first);
@@ -124,6 +121,8 @@ namespace apsi
             // Prepare the windowing information
             WindowingDag dag(static_cast<uint32_t>(params_.split_size()), params_.window_size(), given_digits);
 
+            // Create a state per each BinBundle index; this contains information about whether the
+            // powers for that BinBundle index have been computed
             std::vector<WindowingDag::State> states;
             states.reserve(batch_count);
             for (uint64_t i = 0; i < batch_count; i++)
@@ -131,8 +130,13 @@ namespace apsi
                 states.emplace_back(dag);
             }
 
+            // How many batches do we still need to compute the powers for
             atomic<size_t> remaining_batches(thread_count_);
+
+            // A promise to signal the worker threads when all batches have been processed
             promise<void> batches_done_prom;
+
+            // Get a shared future to be given to all worker threads so they know when all batches are done
             auto batches_done_fut = batches_done_prom.get_future().share();
 
             vector<thread> thread_pool;
@@ -171,176 +175,162 @@ namespace apsi
             /* Multiple client sessions can enter this function to compete for thread context resources. */
             auto local_pool = MemoryManager::GetPool(mm_prof_opt::FORCE_NEW);
 
-            Ciphertext tmp(local_pool);
-            Ciphertext compressedResult(seal_context_, local_pool);
+            Ciphertext compressed_result(seal_context_, local_pool);
 
+            // The BinBundle indices are split evenly between the different threads
             size_t batch_start = thread_index * batch_count / total_threads;
-
-            for (size_t batch = batch_start, loop_idx = size_t(0); loop_idx < batch_count; ++loop_idx)
+            for (size_t batch = batch_start, loop_idx = 0; loop_idx < batch_count; ++loop_idx)
             {
                 compute_batch_powers(powers[batch], session_context, dag, states[batch], local_pool);
+
+                // TODO: WHY???
                 batch = (batch + 1) % batch_count;
             }
 
+            // We are done processing this batch so atomically decrease the counter
             auto count = remaining_batches--;
             if (count == 1)
             {
+                // All batches done! Ready to move on to the next phase
                 batches_done_prom.set_value();
             }
             else
             {
+                // Block until all BinBundle indices have been processed
                 batches_done_fut.get();
             }
 
+            // Divide the blocks for processing
             size_t start_block = thread_index * total_blocks / thread_count_;
             size_t end_block = (thread_index + 1) * total_blocks / thread_count_;
 
-            // Constuct two ciphertexts to store the result. One keeps track of the current result,
+            // Construct two ciphertexts to store the result. One keeps track of the current result,
             // one is used as a temp. Their roles switch each iteration. Saved needing to make a
-            // copy in eval->add(...)
-            array<Ciphertext, 2> runningResults{ local_pool, local_pool }, label_results{ local_pool, local_pool };
+            // copy in evaluator->add(...)
+            array<Ciphertext, 2> running_results{ local_pool, local_pool }, label_results{ local_pool, local_pool };
+
+            Evaluator &evaluator = *session_context.evaluator();
 
             size_t processed_blocks = 0;
-            Evaluator &evaluator = *session_context.evaluator();
             for (size_t block_idx = start_block; block_idx < end_block; block_idx++)
             {
+                // Find the batch index for the block currently processed
                 size_t batch = block_idx / params_.split_count(), split = block_idx % params_.split_count();
                 auto &block = sender_db_->get_block(batch, split);
 
-                // Get the pointer to the first poly of this batch.
-                // Plaintext* sender_coeffs(&sender_db_.batch_random_symm_polys()[split * splitStep + batch *
-                // split_size_plus_one]);
+                // Iterate over the coeffs multiplying them with the query powers and summing the results
+                unsigned char curr_result = 0, curr_label = 0;
 
-                // Iterate over the coeffs multiplying them with the query powers  and summing the results
-                unsigned char currResult = 0, curr_label = 0;
-
-                // TODO: optimize this to allow low degree poly? need to take into account noise levels.
-
-                // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
-                // Observe that the first call to mult is always multiplying coeff[0] by 1....
-                // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
-
+                // Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
+                // Note that powers[batch][0] is really just a dummy encryption of 1
                 evaluator.multiply_plain(
-                    powers[batch][0], block.batch_random_symm_poly_[0], runningResults[currResult]);
+                    powers[batch][0], block.batch_random_symm_poly_[0], running_results[curr_result]);
 
+                Ciphertext temp(local_pool);
                 for (size_t s = 1; s < params_.split_size(); s++)
                 {
-                    // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call
-                    // multiply_plain_ntt
-                    evaluator.multiply_plain(powers[batch][s], block.batch_random_symm_poly_[s], tmp);
-                    evaluator.add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
-                    currResult ^= 1;
+                    // Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
+                    evaluator.multiply_plain(powers[batch][s], block.batch_random_symm_poly_[s], temp);
+
+                    evaluator.add(temp, running_results[curr_result], running_results[curr_result ^ 1]);
+                    curr_result ^= 1;
                 }
 
-                // Handle the case for s = params_.split_size();
-                tmp = powers[batch][params_.split_size()];
-                evaluator.add(tmp, runningResults[currResult], runningResults[currResult ^ 1]);
-                currResult ^= 1;
+                // Handle the case for s = params_.split_size(); this is the highest degree component where
+                // the corresponding plaintext would be 1. Instead of an unnecessary multiplication, we simply
+                // add the leading power of the query to the result.
+                evaluator.add(
+                        powers[batch][params_.split_size()],
+                        running_results[curr_result],
+                        running_results[curr_result ^ 1]);
+                curr_result ^= 1;
 
                 if (params_.use_labels())
                 {
-                    if (block.batched_label_coeffs_.size() > 1)
+                    // Do we have any label polynomial coefficients?
+                    if (block.batched_label_coeffs_.size())
                     {
                         STOPWATCH(sender_stop_watch, "Sender::respond_worker::online_interpolate");
 
-                        // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
-                        // Observe that the first call to mult is always multiplying coeff[0] by 1....
-
-                        // TODO: edge case where all block.batched_label_coeffs_[s] are zero.
-
-                        // label_result = coeff[0] * x^0 = coeff[0];
+                        // First find the lowest-degree label coefficient that is non-zero
                         size_t s = 0;
                         while (s < block.batched_label_coeffs_.size() && block.batched_label_coeffs_[s].is_zero())
+                        {
                             ++s;
+                        }
 
-                        // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call
-                        // multiply_plain_ntt
-
+                        // Compute dot product of the label polynomial coefficients with the query powers
                         if (s < block.batched_label_coeffs_.size())
                         {
+                            // Multiply and write to label_results. Here we process only the lowest-degree product.
+                            // Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
                             evaluator.multiply_plain(
                                 powers[batch][s], block.batched_label_coeffs_[s], label_results[curr_label]);
                         }
-                        else
+                        else // if s equals the number of label coefficients, i.e., if all coefficients were zero
                         {
+                            // Write a zero as the label result
                             session_context.encryptor_->encrypt_zero(label_results[curr_label]);
                             evaluator.transform_to_ntt_inplace(label_results[curr_label]);
-                            // just set it to be an encryption of zero.
-                            // encryptor_->encrypt;
                         }
 
+                        // Compute products and aggregate the rest of the coefficients
                         while (++s < block.batched_label_coeffs_.size())
                         {
                             // label_result += coeff[s] * x^s;
                             if (block.batched_label_coeffs_[s].is_zero() == false)
                             {
-                                // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call
-                                // multiply_plain_ntt
-                                evaluator.multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], tmp);
-                                evaluator.add(tmp, label_results[curr_label], label_results[curr_label ^ 1]);
+                                // Process only products where the label coefficient is non-zero to avoid
+                                // transparent ciphertexts
+                                evaluator.multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], temp);
+                                evaluator.add(temp, label_results[curr_label], label_results[curr_label ^ 1]);
                                 curr_label ^= 1;
                             }
                         }
                     }
-                    else if (block.batched_label_coeffs_.size() && !block.batched_label_coeffs_[0].is_zero())
-                    {
-                        // only reachable if user calls PSIParams.set_use_low_degree_poly(true);
-
-                        // TODO: This can be optimized to reduce the number of multiply_plain_ntt by 1.
-                        // Observe that the first call to mult is always multiplying coeff[0] by 1....
-
-                        // TODO: edge case where block.batched_label_coeffs_[0] is zero.
-
-                        // IMPORTANT: Both inputs are in NTT transformed form so internally SEAL will call
-                        // multiply_plain_ntt
-                        evaluator.multiply_plain(
-                            powers[batch][0], block.batched_label_coeffs_[0], label_results[curr_label]);
-                    }
                     else
                     {
-                        // only reachable if user calls PSIParams.set_use_low_degree_poly(true);
-                        // doesn't matter what we set... this will due.
+                        // No label polynomial coefficients are present
                         label_results[curr_label] = powers[batch][0];
                     }
 
-                    // TODO: We need to randomize the result. This is fine for now.
-                    evaluator.add(runningResults[currResult], label_results[curr_label], label_results[curr_label ^ 1]);
+                    // Randomize the result by adding the matching result
+                    evaluator.add(running_results[curr_result], label_results[curr_label], label_results[curr_label ^ 1]);
                     curr_label ^= 1;
 
+                    // Transform label result back from NTT form
                     evaluator.transform_from_ntt_inplace(label_results[curr_label]);
                 }
 
-                // Transform back from ntt form.
-                evaluator.transform_from_ntt_inplace(runningResults[currResult]);
-
-                // Send the result over the network if needed.
-
-                // First compress
-                CiphertextCompressor &compressor = *session_context.compressor();
-                compressor.mod_switch(runningResults[currResult], compressedResult);
+                // Transform matching result back from NTT form
+                evaluator.transform_from_ntt_inplace(running_results[curr_result]);
 
                 // Send the compressed result
                 ResultPackage pkg;
-                pkg.split_idx = split;
-                pkg.batch_idx = batch;
+                pkg.bundle_idx = batch;
 
-                {
-                    stringstream ss;
-                    compressor.compressed_save(compressedResult, ss);
-                    pkg.data = ss.str();
-                }
+                // Modulus switch to the lowest level before saving
+                CiphertextCompressor &compressor = *session_context.compressor();
+                compressor.mod_switch(running_results[curr_result], compressed_result);
+
+                stringstream ss;
+                compressor.compressed_save(compressed_result, ss);
+                pkg.data = ss.str();
+                ss.seekp(0, ios::beg);
 
                 if (params_.use_labels())
                 {
-                    // Compress label
-                    compressor.mod_switch(label_results[curr_label], compressedResult);
+                    // Modulus switch label to the lowest level before saving
+                    compressor.mod_switch(label_results[curr_label], compressed_result);
 
-                    stringstream ss;
-                    compressor.compressed_save(compressedResult, ss);
+                    compressor.compressed_save(compressed_result, ss);
                     pkg.label_data = ss.str();
                 }
 
+                // Start sending on the channel
                 channel.send(client_id, pkg);
+
+                // Done with this block; atomically increase processed_blocks
                 processed_blocks++;
             }
 
