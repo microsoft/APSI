@@ -2,10 +2,7 @@
 // Licensed under the MIT license.
 
 // STD
-#include <array>
 #include <chrono>
-#include <climits>
-#include <future>
 #include <numeric>
 #include <thread>
 
@@ -48,11 +45,9 @@ namespace apsi
             STOPWATCH(sender_stop_watch, "Sender::query");
             Log::info("Start processing query");
 
-            // Create the session context
+            // Create the session context; we don't have to re-create the SEALContext every time
             SenderSessionContext session_context(seal_context_);
-
-            // Load the relinearization keys from string
-            get_relin_keys(seal_context_, rlk, session_context.relin_keys());
+            session_context.set_evaluator(relin_keys);
 
             /* Receive client's query data. */
             int num_of_powers = static_cast<int>(query.size());

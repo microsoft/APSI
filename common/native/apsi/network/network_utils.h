@@ -29,19 +29,24 @@ namespace apsi
     /**
     Get public key from a string
     */
-    void get_public_key(std::shared_ptr<seal::SEALContext> context, seal::PublicKey &pub_key, const std::string &str);
+    void get_public_key(const std::shared_ptr<seal::SEALContext> &context, seal::PublicKey &public_key, const std::string &str);
+
+    /**
+    Get secret key from a string
+    */
+    void get_secret_key(const std::shared_ptr<seal::SEALContext> &context, seal::SecretKey &secret_key, const std::string &str);
 
     /**
     Get Relinearization keys from a string
     */
     void get_relin_keys(
-        std::shared_ptr<seal::SEALContext> context, seal::RelinKeys &relin_keys, const std::string &str);
+        const std::shared_ptr<seal::SEALContext> &context, seal::RelinKeys &relin_keys, const std::string &str);
 
     /**
     Get Ciphertext from a string
     */
     void get_ciphertext(
-        std::shared_ptr<seal::SEALContext> context, seal::Ciphertext &ciphertext, const std::string &str);
+        const std::shared_ptr<seal::SEALContext> &context, seal::Ciphertext &ciphertext, const std::string &str);
 
     /**
     Get Modulus from a string
