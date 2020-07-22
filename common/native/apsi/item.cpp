@@ -145,6 +145,15 @@ namespace apsi
         }
     }
 
+    /**
+    Returns the BitstringView representing this Item's data
+    */
+    BitstringView to_bitstring()
+    {
+        gsl::span bytestring_view(reinterpret_cast<uint8_t*>(data()), value_.size()*8);
+        return BitStringView(bytestring_view, ITEM_BIT_LENGTH_HERE);
+    }
+
     void Item::parse(const string &input, uint32_t base)
     {
         if (base != 10 && base != 16)

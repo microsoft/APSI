@@ -168,8 +168,8 @@ namespace apsi
         every ((item, label), cuckoo_idx) element, the item is inserted into the database at cuckoo_idx and its label is
         set to label.
         */
-        template<>
-        void LabeledSenderDB<vector<uint8_t> >::add_data_worker(
+        template<typename L>
+        void SenderDB<L>::add_data_worker(
             const gsl::span<pair<&pair<Item, vector<uint8_t> >, size_t> > data_with_indices;
         ) {
             STOPWATCH(sender_stop_watch, "LabeledSenderDB::add_data_worker");

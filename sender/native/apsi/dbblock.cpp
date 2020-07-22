@@ -24,7 +24,8 @@ namespace apsi
 
     namespace sender
     {
-        BinBundle::BinBundle(
+        template<typename L>
+        BinBundle<L>::BinBundle(
             size_t num_bins,
             shared_ptr<seal::SEALContext> seal_ctx,
             shared_ptr<seal::Evaluator> evaluator,
@@ -47,7 +48,11 @@ namespace apsi
         On success, returns the size of the largest bin bins in the modified range, after insertion has taken place
         On failed insertion, returns -1
         */
-        int BinBundle::multi_insert_dry_run(vector<pair<felt_t, L>> &item_label_pairs, size_t start_bin_idx) {
+        template<typename L>
+        int BinBundle<L>::multi_insert_dry_run(
+            vector<pair<felt_t, L>> &item_label_pairs,
+            size_t start_bin_idx
+        ) {
             return multi_insert(pairs, start_bin_idx, true);
         }
 
@@ -56,8 +61,11 @@ namespace apsi
         On success, returns the size of the largest bin bins in the modified range, after insertion has taken place
         On failed insertion, returns -1. On failure, no modification is made to the BinBundle.
         */
-        int BinBundle::multi_insert_for_real(vector<pair<felt_t, L>> item_label_pairs, size_t start_bin_idx)
-        {
+        template<typename L>
+        int BinBundle<L>::multi_insert_for_real(
+            vector<pair<felt_t, L>> item_label_pairs,
+            size_t start_bin_idx
+        ) {
             return multi_insert(pairs, start_bin_idx, false);
         }
 
@@ -67,7 +75,12 @@ namespace apsi
         On success, returns the size of the largest bin bins in the modified range, after insertion has taken place
         On failed insertion, returns -1. On failure, no modification is made to the BinBundle.
         */
-        int BinBundle::multi_insert(vector<pair<felt_t, L>> item_label_pairs, size_t start_bin_idx, bool dry_run) {
+        template<typename L>
+        int BinBundle<L>::multi_insert(
+            vector<pair<felt_t, L>> item_label_pairs,
+            size_t start_bin_idx,
+            bool dry_run
+        ) {
             // For each key, check that we can insert into the corresponding bin. If the answer is "no" at any point,
             // return false.
             size_t curr_bin_idx = start_bin_idx;
@@ -141,75 +154,6 @@ namespace apsi
             cache_invalid_ = false;
         }
 
-
-        /**
-        For each bin, compute from scratch the unique monic polynomial whose roots are precisely the elements of the
-        bin
-        */
-        template<>
-        void BinBundle<monostate>::regen_polyns()
-        {
-            // We're recomputing everything, so wipe out the cache
-            clear_cache();
-
-            // For each bin, construct a polynomial
-            for (size_t i = 0; i < bins_.size(); i++)
-            {
-                // In the unlabeled PSI case, the bin is a key-value map where the values are empty. The keys are the
-                // roots of the polynomial we're making.
-                const map<felt_t, monostate> &bin = bins_.at(i);
-
-                // Collect the roots
-                vector<felt_t> roots(bin.size());
-                for (auto &kv : bin) {
-                    roots.push_back(kv.first);
-                }
-
-                // Compute the polynomial and save to cache
-                vector<felt_t> polyn_coeffs = polyn_with_roots(roots, mod_);
-                BinPolynCache bpc = BinPolynCache {
-                    .interpolation_polyn_coeffs = polyn_coeffs,
-                };
-                cache_.bin_polyns_.emplace_back(move(bpc));
-            }
-        }
-
-        // Compute the Newton interpolation polynomial from scratch
-        template<>
-        void BinBundle<felt_t>::regen_polyns()
-        {
-            // We're recomputing everything, so wipe out the cache
-            clear_cache();
-
-
-            // For each bin, construct a polynomial
-            for (size_t i = 0; i < bins_.size(); i++)
-            {
-                // Each bin is a map from points to values. We split these up and use them for interpolation.
-                map<felt_t, felt_t> &bin = bins_.at(i);
-
-                // Collect the items and labels into different vectors
-                vector<felt_t> points;
-                vector<felt_t> values;
-                points.reserve(bin.size());
-                values.reserve(bin.size());
-
-                // pv is (point, value)
-                for (const auto &pv : bin)
-                {
-                    points.push_back(pv.first);
-                    values.push_back(pv.second);
-                }
-
-                // Put the Newton interpolation polynomial in the cache
-                vector<felt_t> interp_polyn = newton_interpolate_polyn(points, values, mod_);
-                BinPolynCache bpc = BinPolynCache {
-                    .interpolation_polyn_coeffs = interp_polyn,
-                };
-                cache_.bin_polyns_.push_back(bpc);
-            }
-        }
-
         /**
         Computes and caches the bin's polynomial coeffs in Plaintexts. Plaintext i in the cache stores all the i-th
         degree coefficients of this BinBundle's interpolation polynomials.
@@ -257,7 +201,74 @@ namespace apsi
                 evaluator_->transform_to_ntt_inplace(pt, seal_ctx_->first_parms_id());
 
                 // Push the new Plaintext to the cache
-                cache_.plaintext_polyn_coeffs_.emplace_back(move(pt));
+                cache_.plaintext_polyn_coeffs_.emplace_back(pt);
+            }
+        }
+
+        /**
+        For each bin, compute from scratch the unique monic polynomial whose roots are precisely the elements of the bin
+        */
+        void UnlabeledBinBundle::regen_polyns()
+        {
+            // We're recomputing everything, so wipe out the cache
+            clear_cache();
+
+            // For each bin, construct a polynomial
+            for (size_t i = 0; i < bins_.size(); i++)
+            {
+                // In the unlabeled PSI case, the bin is a key-value map where the values are empty. The keys are the
+                // roots of the polynomial we're making.
+                const map<felt_t, monostate> &bin = bins_.at(i);
+
+                // Collect the roots
+                vector<felt_t> roots(bin.size());
+                for (auto &kv : bin) {
+                    roots.push_back(kv.first);
+                }
+
+                // Compute the polynomial and save to cache
+                vector<felt_t> polyn_coeffs = polyn_with_roots(roots, mod_);
+                BinPolynCache bpc = BinPolynCache {
+                    .interpolation_polyn_coeffs = polyn_coeffs,
+                };
+                cache_.bin_polyns_.emplace_back(move(bpc));
+            }
+        }
+
+        /**
+        Compute the Newton interpolation polynomial from scratch
+        */
+        void LabeledBinBundle::regen_polyns()
+        {
+            // We're recomputing everything, so wipe out the cache
+            clear_cache();
+
+
+            // For each bin, construct a polynomial
+            for (size_t i = 0; i < bins_.size(); i++)
+            {
+                // Each bin is a map from points to values. We split these up and use them for interpolation.
+                map<felt_t, felt_t> &bin = bins_.at(i);
+
+                // Collect the items and labels into different vectors
+                vector<felt_t> points;
+                vector<felt_t> values;
+                points.reserve(bin.size());
+                values.reserve(bin.size());
+
+                // pv is (point, value)
+                for (const auto &pv : bin)
+                {
+                    points.push_back(pv.first);
+                    values.push_back(pv.second);
+                }
+
+                // Put the Newton interpolation polynomial in the cache
+                vector<felt_t> interp_polyn = newton_interpolate_polyn(points, values, mod_);
+                BinPolynCache bpc = BinPolynCache {
+                    .interpolation_polyn_coeffs = interp_polyn,
+                };
+                cache_.bin_polyns_.push_back(bpc);
             }
         }
     } // namespace sender

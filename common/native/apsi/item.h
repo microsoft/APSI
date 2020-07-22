@@ -12,8 +12,13 @@
 
 namespace apsi
 {
+    //TODO: Put these typedefs in a more appropriate location
+
     // An element of a field with prime modulus < 2⁶⁴
     using felt_t = std::uint64_t;
+
+    // The unit type
+    struct monostate {};
 
     class Item
     {
@@ -27,9 +32,9 @@ namespace apsi
         Item(const Item &) = default;
 
         /**
-        Constructs an item by hashing the felt_t array and using 'item_bit_count_' bits of the hash.
+        Constructs an item by hashing the uint64_t array and using 'item_bit_count_' bits of the hash.
         */
-        Item(felt_t *pointer);
+        Item(uint64_t *pointer);
 
         /**
         Constructs an item by hashing the string and using 'item_bit_count_' bits of the hash.
@@ -37,9 +42,9 @@ namespace apsi
         Item(const std::string &str);
 
         /**
-        Constructs a short item (without hashing) by using 'item_bit_count_' bits of the specified felt_t value.
+        Constructs a short item (without hashing) by using 'item_bit_count_' bits of the specified uint64_t value.
         */
-        Item(felt_t item);
+        Item(uint64_t item);
 
         Item(const kuku::item_type &item);
 
@@ -55,11 +60,16 @@ namespace apsi
         */
         void to_ffield_element(FFieldElt &ring_item, size_t bit_length);
 
+        /**
+        Returns the BitstringView representing this Item's data
+        */
+        BitstringView to_bitstring();
+
         Item &operator=(const Item &assign) = default;
 
         Item &operator=(const std::string &assign);
 
-        Item &operator=(felt_t assign);
+        Item &operator=(uint64_t assign);
 
         Item &operator=(const kuku::item_type &assign);
 
@@ -68,22 +78,22 @@ namespace apsi
             return value_ == other.value_;
         }
 
-        felt_t &operator[](size_t i)
+        uint64_t &operator[](size_t i)
         {
             return value_[i];
         }
 
-        const felt_t &operator[](std::size_t i) const
+        const uint64_t &operator[](std::size_t i) const
         {
             return value_[i];
         }
 
-        felt_t *data()
+        uint64_t *data()
         {
             return value_.data();
         }
 
-        const felt_t *data() const
+        const uint64_t *data() const
         {
             return value_.data();
         }
@@ -115,7 +125,7 @@ namespace apsi
         void parse(const std::string &input);
 
     private:
-        std::array<felt_t, 2> value_;
+        std::array<uint64_t, 2> value_;
 
     public:
         static constexpr std::size_t item_byte_count = sizeof(value_);

@@ -30,11 +30,14 @@ namespace apsi
 {
     namespace sender
     {
+        // Labels are always the size of items, i.e., 120 bits long
+        using FullWidthLabel = Item;
+
         template<typename L>
-        class LabeledSenderDB
+        class SenderDB
         {
         public:
-            LabeledSenderDB(PSIParams params);
+            SenderDB(PSIParams params);
 
             /**
             Clears the database
@@ -44,21 +47,19 @@ namespace apsi
             /**
             Clears the database and inserts the given data, using at most thread_count threads
             */
-            void set_data(std::map<Item, L> &data, size_t thread_count)
+            virtual void set_data(std::map<Item, FullWidthLabel> &data, size_t thread_count) = 0;
+            virtual void set_data(std::map<Item, monostate> &data, size_t thread_count) = 0;
 
             /**
             Inserts the given data into the database, using at most thread_count threads
             */
-            void add_data(std::map<Item, L> &data, size_t thread_count)
+            virtual void add_data(std::map<Item, FullWidthLabel> &data, size_t thread_count) = 0;
+            virtual void add_data(std::map<Item, monostate> &data, size_t thread_count) = 0;
 
             /**
-            Inserts the given items and corresponding labels into the database at the given cuckoo indices. Concretely,
-            for every ((item, label), cuckoo_idx) element, the item is inserted into the database at cuckoo_idx and its
-            label is set to label.
+            Returns the whole DB cache. The value at index i is the set of caches of BinBundles at bundle index i.
             */
-            void add_data_worker(
-                const gsl::span<pair<&pair<Item, vector<uint8_t> >, size_t> > data_with_indices
-            );
+            std::vector<std::vector<&BinBundleCache> > get_cache();
 
             const PSIParams &get_params() const
             {
@@ -66,6 +67,18 @@ namespace apsi
             }
 
         private:
+            /**
+            Inserts the given items and corresponding labels into the database at the given cuckoo indices. Concretely,
+            for every ((item, label), cuckoo_idx) element, the item is inserted into the database at cuckoo_idx and its
+            label is set to label.
+            */
+            void add_data_worker(
+                const gsl::span<pair<&pair<felt_t, L>, size_t> > data_with_indices
+            );
+
+            /**
+            This defines our SEAL context, base field, item size, etc.
+            */
             PSIParams params_;
 
             /**
@@ -74,8 +87,35 @@ namespace apsi
             as easily used a vector<set<BinBundle>>), but the canonical ordering makes references to specific BinBundles
             easier.
             */
-            std::vector<std::vector<LabeledBinBundle> > bin_bundles_;
+            std::vector<std::vector<BinBundle<L> > > bin_bundles_;
+        }; // class SenderDB
 
+        class LabeledSenderDB: SenderDB<felt_t> {
+            /**
+            Clears the database and inserts the given data, using at most thread_count threads
+            */
+            void set_data(std::map<Item, FullWidthLabel> &data, size_t thread_count);
+            void set_data(std::map<Item, monostate> &data, size_t thread_count);
+
+            /**
+            Inserts the given data into the database, using at most thread_count threads
+            */
+            void add_data(std::map<Item, FullWidthLabel> &data, size_t thread_count);
+            void add_data(std::map<Item, monostate> &data, size_t thread_count);
         }; // class LabeledSenderDB
+
+        class UnabeledSenderDB: SenderDB<monostate> {
+            /**
+            Clears the database and inserts the given data, using at most thread_count threads
+            */
+            void set_data(std::map<Item, FullWidthLabel> &data, size_t thread_count);
+            void set_data(std::map<Item, monostate> &data, size_t thread_count);
+
+            /**
+            Inserts the given data into the database, using at most thread_count threads
+            */
+            void add_data(std::map<Item, FullWidthLabel> &data, size_t thread_count);
+            void add_data(std::map<Item, monostate> &data, size_t thread_count);
+        }; // class UnlabeledSenderDB
     }  // namespace sender
 } // namespace apsi

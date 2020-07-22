@@ -21,8 +21,6 @@ namespace apsi
 {
     namespace sender
     {
-        struct monostate {};
-
         // A cache of all the polynomial computations on a single bin
         struct BinPolynCache
         {
@@ -99,7 +97,7 @@ namespace apsi
             For labeled PSI, this the Newton inteprolation polynomial whose value at each item in the bin equals the
             item's corresponding label.
             */
-            void regen_polyns();
+            virtual void regen_polyns() = 0;
 
             /**
             Computes and caches the bin's polynomial coeffs in Plaintexts
@@ -115,14 +113,40 @@ namespace apsi
                 seal::Modulus mod
             );
 
-            ~BinBundle();
+            /**
+            Does a dry-run insertion of item-label pairs into sequential bins, beginning at start_bin_idx. This does not
+            mutate the BinBundle.
+            On success, returns the size of the largest bin bins in the modified range, after insertion has taken place
+            On failed insertion, returns -1
+            */
+            int multi_insert_dry_run(
+                vector<pair<felt_t, L>> &item_label_pairs,
+                size_t start_bin_idx
+            ) const;
 
             /**
-            Inserts item-label pairs into sequential bins, beginning at start_bin_idx.
-            Returns true on success. Returns false if any pair failed insertion. If false, no modification is made to
-            the BinBundle.
+            Inserts item-label pairs into sequential bins, beginning at start_bin_idx
+            On success, returns the size of the largest bin bins in the modified range, after insertion has taken place
+            On failed insertion, returns -1. On failure, no modification is made to the BinBundle.
             */
-            bool multi_insert(std::vector<std::pair<felt_t, L>> item_label_pairs, std::size_t start_bin_idx);
+            template<typename L>
+            int multi_insert_for_real(
+                vector<pair<felt_t, L>> item_label_pairs,
+                size_t start_bin_idx
+            );
+
+            /**
+            Inserts item-label pairs into sequential bins, beginning at start_bin_idx. If dry_run is specified, no
+            change is made to the BinBundle. On success, returns the size of the largest bin bins in the modified range,
+            after insertion has taken place On failed insertion, returns -1. On failure, no modification is made to the
+            BinBundle.
+            */
+            template<typename L>
+            int BinBundle<L>::multi_insert(
+                vector<pair<felt_t, L>> item_label_pairs,
+                size_t start_bin_idx,
+                bool dry_run
+            );
 
             /**
             Clears the contents of the BinBundle and wipes out the cache
@@ -140,5 +164,29 @@ namespace apsi
             void regen_cache();
 
         }; // class BinBundle
+
+        // A LabeledBinBundle is a BinBundle<L> where L (the label type) is felt_t
+        class LabeledBinBundle: public BinBundle<felt_t>
+        {
+        private:
+            /**
+            Computes the appropriate polynomial for each bin. Stores the result in cache_. For labeled PSI, this the
+            Newton inteprolation polynomial whose value at each item in the bin equals the item's corresponding label.
+            */
+            void regen_polyns();
+        }
+
+        /**
+        An UnlabeledBinBundle is a BinBundle<L> where L (the label type) is the unit type
+        */
+        class UnlabeledBinBundle: public BinBundle<monostate>
+        {
+        private:
+            /**
+            Computes the appropriate polynomial for each bin. Stores the result in cache_. For unlabeled PSI, this is
+            the unique monic polynomial whose roots are precisely the items in the bin.
+            */
+            void regen_polyns();
+        }
     } // namespace sender
 } // namespace apsi
