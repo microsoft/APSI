@@ -248,7 +248,7 @@ namespace apsi
                 ;
             }
 
-            pkg.bin_bundle_index = msg.get<size_t>(/* part */ 1);
+            pkg.bundle_idx = msg.get<size_t>(/* part */ 1);
             pkg.data = msg.get(/* part */ 2);
             pkg.label_data = msg.get(/* part */ 3);
 
@@ -431,7 +431,7 @@ namespace apsi
 
             add_client_id(msg, client_id);
 
-            msg.add(pkg.bin_bundle_index);
+            msg.add(pkg.bundle_idx);
             msg.add(pkg.data);
             msg.add(pkg.label_data);
 

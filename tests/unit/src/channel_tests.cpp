@@ -516,25 +516,25 @@ namespace APSITests
         ResultPackage pkg;
         client_.receive(pkg);
 
-        ASSERT_EQ(2, pkg.bin_bundle_index);
+        ASSERT_EQ(2, pkg.bundle_idx);
         ASSERT_TRUE(pkg.data == "hello");
         ASSERT_TRUE(pkg.label_data == "world");
 
         client_.receive(pkg);
 
-        ASSERT_EQ(4, pkg.bin_bundle_index);
+        ASSERT_EQ(4, pkg.bundle_idx);
         ASSERT_TRUE(pkg.data == "one");
         ASSERT_TRUE(pkg.label_data == "two");
 
         client_.receive(pkg);
 
-        ASSERT_EQ(10, pkg.bin_bundle_index);
+        ASSERT_EQ(10, pkg.bundle_idx);
         ASSERT_TRUE(pkg.data == "");
         ASSERT_TRUE(pkg.label_data == "non empty");
 
         client_.receive(pkg);
 
-        ASSERT_EQ(20, pkg.bin_bundle_index);
+        ASSERT_EQ(20, pkg.bundle_idx);
         ASSERT_TRUE(pkg.data == "data");
         ASSERT_TRUE(pkg.label_data == "");
 
@@ -616,14 +616,14 @@ namespace APSITests
             ASSERT_EQ(SOP_get_parameters, sender_op->type);
 
             ResultPackage pkg;
-            pkg.bin_bundle_index = 2;
+            pkg.bundle_idx = 2;
             pkg.data = "This is data";
             pkg.label_data = "Not label data";
 
             server_.send(sender_op->client_id, pkg);
 
             ResultPackage pkg2;
-            pkg2.bin_bundle_index = 4;
+            pkg2.bundle_idx = 4;
             pkg2.data = "small data";
             pkg2.label_data = "";
 
@@ -635,14 +635,14 @@ namespace APSITests
         ResultPackage result;
         client_.receive(result);
 
-        ASSERT_EQ(2, result.bin_bundle_index);
+        ASSERT_EQ(2, result.bundle_idx);
         ASSERT_TRUE(result.data == "This is data");
         ASSERT_TRUE(result.label_data == "Not label data");
 
         ResultPackage result2;
         client_.receive(result2);
 
-        ASSERT_EQ(4, result2.bin_bundle_index);
+        ASSERT_EQ(4, result2.bundle_idx);
         ASSERT_TRUE(result2.data == "small data");
         ASSERT_TRUE(result2.label_data.empty());
 

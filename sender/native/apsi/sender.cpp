@@ -307,7 +307,7 @@ namespace apsi
 
                 // Send the compressed result
                 ResultPackage pkg;
-                pkg.bin_bundle_index = batch;
+                pkg.bundle_idx = batch;
 
                 // Modulus switch to the lowest level before saving
                 CiphertextCompressor &compressor = *session_context.compressor();

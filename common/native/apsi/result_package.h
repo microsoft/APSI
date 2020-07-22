@@ -13,7 +13,7 @@ namespace apsi
      */
     struct ResultPackage
     {
-        std::size_t bin_bundle_index;
+        std::size_t bundle_idx;
         std::string data;
         std::string label_data;
 

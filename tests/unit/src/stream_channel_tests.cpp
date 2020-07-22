@@ -251,20 +251,20 @@ namespace APSITests
 
         ResultPackage pkg;
 
-        pkg.bin_bundle_index = 1;
+        pkg.bundle_idx = 1;
         pkg.data = "One";
         pkg.label_data = "Two";
 
         vector<SEAL_BYTE> client_id;
         senderchannel.send(client_id, pkg);
 
-        pkg.bin_bundle_index = 3;
+        pkg.bundle_idx = 3;
         pkg.data = "Three";
         pkg.label_data = "Four";
 
         senderchannel.send(client_id, pkg);
 
-        pkg.bin_bundle_index = 5;
+        pkg.bundle_idx = 5;
         pkg.data = "Five";
         pkg.label_data = "Six";
 
@@ -274,19 +274,19 @@ namespace APSITests
         ResultPackage received;
         receiverchannel.receive(received);
 
-        ASSERT_EQ(1, received.bin_bundle_index);
+        ASSERT_EQ(1, received.bundle_idx);
         ASSERT_TRUE(received.data == "One");
         ASSERT_TRUE(received.label_data == "Two");
 
         receiverchannel.receive(received);
 
-        ASSERT_EQ(3, received.bin_bundle_index);
+        ASSERT_EQ(3, received.bundle_idx);
         ASSERT_TRUE(received.data == "Three");
         ASSERT_TRUE(received.label_data == "Four");
 
         receiverchannel.receive(received);
 
-        ASSERT_EQ(5, received.bin_bundle_index);
+        ASSERT_EQ(5, received.bundle_idx);
         ASSERT_TRUE(received.data == "Five");
         ASSERT_TRUE(received.label_data == "Six");
     }
