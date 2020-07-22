@@ -549,8 +549,8 @@ namespace apsi
                     }
                 }
 
-                size_t base_idx = pkg.batch_idx * batch_size;
-                Log::debug("Thread idx: %i, pkg.batch_idx: %i", thread_idx, pkg.batch_idx);
+                size_t base_idx = pkg.bin_bundle_index * batch_size;
+                Log::debug("Thread idx: %i, pkg.batch_idx: %i", thread_idx, pkg.bin_bundle_index);
 
                 // recover the sym poly values
                 has_result = false;

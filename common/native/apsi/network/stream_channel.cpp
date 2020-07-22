@@ -232,8 +232,7 @@ namespace apsi
         {
             unique_lock<mutex> rec_lock(*receive_mutex_);
 
-            istream_.read(reinterpret_cast<char *>(&pkg.batch_idx), sizeof(int64_t));
-            istream_.read(reinterpret_cast<char *>(&pkg.split_idx), sizeof(int64_t));
+            istream_.read(reinterpret_cast<char *>(&pkg.bin_bundle_index), sizeof(int64_t));
 
             read_string(pkg.data);
             read_string(pkg.label_data);
@@ -248,8 +247,7 @@ namespace apsi
             unique_lock<mutex> snd_lock(*send_mutex_);
 
             // client_id is ignored
-            ostream_.write(reinterpret_cast<const char *>(&pkg.batch_idx), sizeof(int64_t));
-            ostream_.write(reinterpret_cast<const char *>(&pkg.split_idx), sizeof(int64_t));
+            ostream_.write(reinterpret_cast<const char *>(&pkg.bin_bundle_index), sizeof(int64_t));
 
             write_string(pkg.data);
             write_string(pkg.label_data);
