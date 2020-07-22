@@ -31,12 +31,53 @@ namespace apsi
             //std::vector<felt_t> divided_diffs;
 
             /**
-            For unlabeled PSI, this is the unique monic polynomial whose roots are precisely the items in the bin. For
-            labeled PSI, this the Newton intepolation polynomial whose value at each item in the bin equals the item's
-            corresponding label.
+            The Newton intepolation polynomial whose value at each item in the bin equals the item's corresponding
+            label.
             */
             std::vector<felt_t> interpolation_polyn_coeffs;
+
+            /**
+            The "matching polynomial", i.e., unique monic polynomial whose roots are precisely the items in the
+            bin
+            */
+            std::vector<felt_t> matching_polyn_coeffs;
         }; // struct BinPolynCache
+
+        /**
+        A bunch of polynomials represented using a sequence of batched SEAL Plaintexts.
+
+        Example: Suppose we have 3 polynomials,
+
+            3x⁵ + 7x⁴ +  x³ + 9x² + 4x + 2
+                        8x³ + 5x² +    + 1
+                  9x⁴ + 2x³ +     +  x + 8
+
+        To represent them as a BatchedPlaintextPolyn, we would make a plaintext for every column of coefficients.
+        Plaintext #i holds all the coefficients of degree i. So then the plaintexts P₀, ..., P₅ would be
+
+            |P₅|P₄|P₃|P₂|P₁|P₀|
+            |--|--|--|--|--|--|
+            | 3| 7| 1| 9| 4| 2|
+            | 0| 0| 8| 5| 0| 1|
+            | 0| 9| 2| 0| 1| 8|
+        */
+        class BatchedPlaintextPolyn
+        {
+        private:
+            /**
+            A sequence of coefficients represented as batched plaintexts. The length of this vector is the degree of the
+            highest-degree polynomial in the sequence.
+            */
+            std::vector<seal::Plaintext> batched_coeffs_;
+
+        public:
+            /**
+            Evaluates the polynomial on the given ciphertext. We don't compute the powers of the input ciphertext C
+            ourselves. Instead we assume they've been precomputed and accept the powers: (C, C², C³, ...) as input.
+            The number of powers provided MUST be equal to plaintext_polyn_coeffs_.size()-1.
+            */
+            seal::Ciphertext eval(const vector<Ciphertext> &ciphertext_powers);
+        }
 
         // A cache of all the polynomial and plaintext computations on a single BinBundle
         struct BinBundleCache

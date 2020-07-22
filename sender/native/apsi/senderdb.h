@@ -30,7 +30,7 @@ namespace apsi
 {
     namespace sender
     {
-        // Labels are always the size of items, i.e., 120 bits long
+        // Labels are always the size of items, i.e., ITEM_BIT_LEN bits long
         using FullWidthLabel = Item;
 
         template<typename L>

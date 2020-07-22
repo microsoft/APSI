@@ -4,8 +4,8 @@
 #include <cctype>
 #include <stdexcept>
 #include <gsl/span>
-#include <seal/util/blake2.h>
 #include <seal/util/common.h>
+#include <seal/util/db_encoding.h>
 #include <seal/util/uintcore.h>
 #include "apsi/item.h"
 
@@ -71,78 +71,11 @@ namespace apsi
         operator=(item);
     }
 
-    Item &Item::operator=(const string &str)
-    {
-        if (str.size() > sizeof(value_))
-        {
-            // Use BLAKE2b as random oracle
-            blake2(
-                reinterpret_cast<unsigned char *>(&value_), sizeof(value_),
-                reinterpret_cast<const unsigned char *>(str.data()), str.size(), nullptr, 0);
-        }
-        else
-        {
-            value_[0] = 0;
-            value_[1] = 0;
-            memcpy(value_.data(), str.data(), str.size());
-        }
-
-        return *this;
-    }
-
     Item &Item::operator=(const Item &assign)
     {
         for (size_t i = 0; i < value_.size(); i++)
             value_[i] = assign.value_[i];
         return *this;
-    }
-
-    FFieldElt Item::to_ffield_element(FField ffield, size_t bit_length)
-    {
-        FFieldElt ring_item(ffield);
-        to_ffield_element(ring_item, bit_length);
-        return ring_item;
-    }
-
-    uint64_t item_part(const array<uint64_t, 2> &value_, size_t i, size_t split_length)
-    {
-        size_t i1 = (i * split_length) >> 6;
-        size_t i2 = ((i + 1) * split_length) >> 6;
-        size_t j1 = (i * split_length) & 0x3F;
-        size_t j2 = ((i + 1) * split_length) & 0x3F;
-#ifdef _DEBUG
-        if (split_length > 64 || i2 > value_.size())
-        {
-            throw invalid_argument("invalid split_length, or index out of range");
-        }
-#endif
-        uint64_t mask = (uint64_t(1) << split_length) - 1;
-        if ((i1 == i2) || (i2 == value_.size()))
-        {
-            return (value_[i1] >> j1) & mask;
-        }
-        else
-        {
-            return ((value_[i1] >> j1) & mask) | ((value_[i2] << (64 - j2)) & mask);
-        }
-    }
-
-    void Item::to_ffield_element(FFieldElt &ring_item, size_t bit_length)
-    {
-        auto ffield = ring_item.field();
-
-        // Should minus 1 to avoid wrapping around p
-        // Hao: why?
-        size_t split_length = static_cast<size_t>(ffield.characteristic().bit_count()) - 1;
-
-        // How many coefficients do we need in the FFieldElement
-        size_t split_index_bound = (bit_length + split_length - 1) / split_length;
-
-        for (size_t j = 0; j < static_cast<size_t>(ffield.degree()) && j < split_index_bound; j++)
-        {
-            uint64_t coeff = item_part(value_, j, split_length);
-            ring_item.set_coeff(j, coeff);
-        }
     }
 
     /**
@@ -151,7 +84,7 @@ namespace apsi
     BitstringView to_bitstring()
     {
         gsl::span bytestring_view(reinterpret_cast<uint8_t*>(data()), value_.size()*8);
-        return BitStringView(bytestring_view, ITEM_BIT_LENGTH_HERE);
+        return BitStringView(bytestring_view, ITEM_BIT_LEN);
     }
 
     void Item::parse(const string &input, uint32_t base)

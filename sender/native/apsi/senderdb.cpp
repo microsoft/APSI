@@ -210,7 +210,7 @@ namespace apsi
                 set<pair<size_t, size_t> > updated_bin_bundles;
                 for (size_t &cuckoo_idx : cuckoo_idx_set)
                 {
-                    size_t bin_idx = cuckoo_idx % bins_per_bundle;;
+                    size_t bin_idx = cuckoo_idx % bins_per_bundle;
                     size_t bundle_idx = (cuckoo_idx - bin_idx) / bins_per_bundle;
 
                     vector<BinBundle> &bundle_set = bin_bundles_.at(bundle_idx);

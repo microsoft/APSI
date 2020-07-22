@@ -29,15 +29,9 @@ namespace apsi
         {
             std::size_t sender_size;
             std::size_t sender_bin_size;
-            // <= max_item_bit_count = 128, reserve extra bits for Kuku
-            std::size_t item_bit_count;
-            // the number of bits we take after oprf
-            std::size_t item_bit_length_used_after_oprf;
             // the number of chunks to split each item into
             std::size_t num_chunks;
             bool use_labels;
-            // faster configuration, assuming query is always one item
-            bool use_fast_membership;
         }; // struct PSIConfParams
 
         const PSIConfParams &psiconf_params() const
@@ -55,16 +49,6 @@ namespace apsi
             return psiconf_params_.sender_bin_size;
         }
 
-        inline std::size_t item_bit_count() const
-        {
-            return psiconf_params_.item_bit_count;
-        }
-
-        inline std::size_t item_bit_length_used_after_oprf() const
-        {
-            return psiconf_params_.item_bit_length_used_after_oprf;
-        }
-
         inline std::size_t num_chunks() const
         {
             return psiconf_params_.num_chunks;
@@ -73,11 +57,6 @@ namespace apsi
         inline bool use_labels() const
         {
             return psiconf_params_.use_labels;
-        }
-
-        inline bool use_fast_membership() const
-        {
-            return psiconf_params_.use_fast_membership;
         }
 
         /**
@@ -243,23 +222,6 @@ namespace apsi
             return (table_size() + batch - 1) / batch;
         }
 
-        inline std::size_t label_bit_count() const
-        {
-            return psiconf_params_.use_labels ? psiconf_params_.item_bit_count : 0;
-        }
-
-        inline std::size_t label_byte_count() const
-        {
-            return psiconf_params_.use_labels ? (psiconf_params_.item_bit_count + 7) / 8 : 0;
-        }
-
-        // assuming one query.
-        inline double log_fp_rate() const
-        {
-            return static_cast<double>(ffield_degree()) * log2(split_size()) + log2(split_count()) -
-                   item_bit_length_used_after_oprf();
-        }
-
         PSIParams(
             const PSIConfParams &psi_params, const TableParams &table_params, const CuckooParams &cuckoo_params,
             const SEALParams &seal_params, const FFieldParams &ffield_params)
@@ -279,9 +241,6 @@ namespace apsi
 
             validate();
         }
-
-        // Constants
-        constexpr static int max_item_bit_count = 128;
 
     private:
         PSIConfParams psiconf_params_;
@@ -310,31 +269,6 @@ namespace apsi
             if (sender_bin_size() % split_count() != 0)
             {
                 throw std::invalid_argument("Sender bin size must be a multiple of number of splits.");
-            }
-            if ((item_bit_count() + 63) / 64 !=
-                (item_bit_count() + static_cast<std::uint32_t>(floor(log2(hash_func_count()))) + 1 + 1 + 63) / 64)
-            {
-                throw std::invalid_argument(
-                    "Invalid for cuckoo: null bit and location index overflow to new std::uint64_t.");
-            }
-            if (item_bit_count() > max_item_bit_count)
-            {
-                throw std::invalid_argument("Item bit count cannot exceed max.");
-            }
-            if (item_bit_count() > (max_item_bit_count - 8))
-            {
-                // Not an error, but a warning.
-                logging::Log::warning("Item bit count is close to its upper limit. Several bits should be reserved for "
-                                      "appropriate Cuckoo hashing.");
-            }
-            std::uint64_t supported_bitcount =
-                static_cast<std::uint64_t>(ffield_degree()) *
-                static_cast<std::uint64_t>(seal_params_.encryption_params.plain_modulus().bit_count() - 1);
-            if (item_bit_length_used_after_oprf() > supported_bitcount)
-            {
-                logging::Log::warning(
-                    "item bit count (%i) is too large to fit in slots (%i bits). ", item_bit_length_used_after_oprf(),
-                    supported_bitcount);
             }
         }
     }; // class PSIParams
