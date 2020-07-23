@@ -181,7 +181,10 @@ namespace apsi
             size_t bins_per_item = (params_.item_bit_count() + (modulus_size-2)) / (modulus_size-1)
             size_t bins_per_bundle = params_.batch_size();
 
-            // Iteratively insert each item-label pair
+            // Keep track of all the bundle indices that we touch
+            set<size_t> bundle_indices;
+
+            // Iteratively insert each item-label pair at the given cuckoo index
             for (auto &data_with_idx : data_with_indices)
             {
                 Item &item = data_with_idx.first.first;
@@ -205,66 +208,64 @@ namespace apsi
                 item_label_felt_pairs.push_back({ item[0], label[0] });
                 item_label_felt_pairs.push_back({ item[1], label[1] });
 
-                // This vector stores (bundle_idx, bundle_in_set) to keep track of which bundles were modified in
-                // bin_bundles_
-                set<pair<size_t, size_t> > updated_bin_bundles;
-                for (size_t &cuckoo_idx : cuckoo_idx_set)
+                // Get the bundle bundle at the bundle index of the given item
+                size_t bin_idx = cuckoo_idx % bins_per_bundle;
+                size_t bundle_idx = (cuckoo_idx - bin_idx) / bins_per_bundle;
+                vector<BinBundle> &bundle_set = bin_bundles_.at(bundle_idx);
+
+                // Mark the bundle index for later
+                bundle_indices.insert(bundle_idx);
+
+                // Try to insert these field elements in an existing BinBundle at this bundle index. Keep track of
+                // whether or not we succeed.
+                bool inserted = false;
+                for (size_t i = 0; i < bundle_set.size(); i++)
                 {
-                    size_t bin_idx = cuckoo_idx % bins_per_bundle;
-                    size_t bundle_idx = (cuckoo_idx - bin_idx) / bins_per_bundle;
+                    BinBundle &bundle = bundle_set.at(i);
+                    // Do a dry-run insertion and see if the new largest bin size in the range
+                    // exceeds the limit
+                    int new_largest_bin_size = bundle.multi_insert_dry_run(item_label_felt_pairs, bin_idx);
 
-                    vector<BinBundle> &bundle_set = bin_bundles_.at(bundle_idx);
-
-                    // Try to insert these field elements somewhere. Keep track of which bundle at this bundle index
-                    // they were inserted into
-                    int modified_at = -1;
-                    for (size_t i = 0; i < bundle_set.size(); i++)
+                    // Check if inserting would violate the max bin size constraint
+                    if (new_largest_bin_size > 0 && new_largest_bin_size < PARAMS_MAX_BIN_SIZE)
                     {
-                        BinBundle &bundle = bundle_set.at(i);
-                        // Do a dry-run insertion and see if the new largest bin size in the range
-                        // exceeds the limit
-                        int new_largest_bin_size = bundle.multi_insert_dry_run(item_label_felt_pairs, bin_idx);
-
-                        // Check if inserting would violate the max bin size constraint
-                        if (new_largest_bin_size > 0 && new_largest_bin_size < PARAMS_MAX_BIN_SIZE)
-                        {
-                            // All good
-                            bundle.multi_insert_for_real(item_label_felt_pairs, bin_idx);
-                            modified_at = i;
-                        }
+                        // All good
+                        bundle.multi_insert_for_real(item_label_felt_pairs, bin_idx);
+                        inserted = true;
+                        break;
                     }
-
-                    // If we had conflicts everywhere, then we need to make a new BinBundle and insert the data there
-                    if (modified_at < 0)
-                    {
-                        // Make a fresh BinBundle and insert
-                        BinBundle new_bin_bundle(SO, MANY, ARGUMENTS);
-                        int res = new_bin_bundle.multi_insert_for_real(item_label_felt_pairs, bin_idx);
-
-                        // If even that failed, I don't know what could've happened
-                        if (res < 0)
-                        {
-                            throw logic_error("Couldn't insert item into a brand new BinBundle");
-                        }
-
-                        // Push a new BinBundle to the set of BinBundles at this bundle index
-                        bin_bundles.push_back(new_bin_bundle);
-                        modified_at = bundle_set.size()-1;
-                    }
-
-                    // Save the position of the BinBundle that was modified
-                    updated_bin_bundles.insert({ bundle_idx, (size_t)modified_at });
                 }
 
-                // Regenerate the caches of all the modified BinBundles
-                for (auto pos : updated_bin_bundles)
+                // If we had conflicts everywhere, then we need to make a new BinBundle and insert the data there
+                if (!inserted)
                 {
-                    size_t bundle_idx = pos.first;
-                    // This is the bundle in this bundle idx that was modified
-                    size_t sub_bundle_idx = pos.second;
+                    // Make a fresh BinBundle and insert
+                    BinBundle new_bin_bundle(SO, MANY, ARGUMENTS);
+                    int res = new_bin_bundle.multi_insert_for_real(item_label_felt_pairs, bin_idx);
 
-                    BinBundle &bundle = bin_bundles_.at(bundle_idx).at(sub_bundle_idx);
-                    bundle.regen_cache();
+                    // If even that failed, I don't know what could've happened
+                    if (res < 0)
+                    {
+                        throw logic_error("Couldn't insert item into a brand new BinBundle");
+                    }
+
+                    // Push a new BinBundle to the set of BinBundles at this bundle index
+                    bin_bundles.push_back(new_bin_bundle);
+                }
+
+                // Now it's time to regenerate the caches of all the modified BinBundles. We'll just go through all the
+                // bundle indices we touched and lazily regenerate the caches of all the BinBundles at those indices.
+                for (size_t &bundle_idx : bundle_indices)
+                {
+                    // Get the set of BinBundles at this bundle index
+                    set<BinBundle> &bundle_set = bin_bundles_.at(bundle_idx);
+
+                    // Regenerate the cache of every BinBundle in the set
+                    for (BinBundle &bundle : bundle_set)
+                    {
+                        // Don't worry, this doesn't do anything unless the BinBundle was actually modified
+                        bundle.regen_cache();
+                    }
                 }
             }
         }

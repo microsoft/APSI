@@ -367,15 +367,20 @@ namespace apsi
         }
 
         /**
-        Generates and caches the polynomials and plaintexts that represent the BinBundle
+        Generates and caches the polynomials and plaintexts that represent the BinBundle. This will only do
+        recomputation if the cache is invalid.
         */
         template<typename L>
         void BinBundle<L>::regen_cache()
         {
-            clear_cache();
-            regen_polyns();
-            regen_plaintexts();
-            cache_invalid_ = false;
+            // Only recompute the cache if it needs to be recomputed
+            if (cache_invalid_)
+            {
+                clear_cache();
+                regen_polyns();
+                regen_plaintexts();
+                cache_invalid_ = false;
+            }
         }
 
         /**
