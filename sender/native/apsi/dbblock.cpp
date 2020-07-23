@@ -11,6 +11,9 @@
 #include "apsi/util/interpolate.h"
 
 // SEAL
+#include <seal/util/defines.h>
+#include <seal/util/iterator.h>
+#include <seal/util/uintcore.h>
 #include <seal/util/uintarithsmallmod.h>
 
 using namespace std;
@@ -24,6 +27,83 @@ namespace apsi
 
     namespace sender
     {
+        Ciphertext BatchedPlaintextPolyn::eval(
+            const vector<Ciphertext> &ciphertext_powers, const SenderSessionContext &session_context)
+        {
+#ifdef SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT
+            static_assert(false,
+                "SEAL must be built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF"); 
+#endif
+#ifdef APSI_DEBUG
+            if (ciphertext_powers.empty())
+            {
+                throw invalid_argument("no ciphertext powers given");
+            }
+            if (batched_coeffs_.size() > ciphertext_powers.size())
+            {
+                throw invalid_argument("not enough ciphertext powers available");
+            }
+#endif
+            const SEALContext &seal_context = *session_context.seal_context();
+            Evaluator &evaluator = *session_context.evaluator();
+
+            // Lowest degree terms are stored in the lowest index positions in vectors.
+            // Specifically, ciphertext_powers[0] is a dummy encryption of 1 (in each slot),
+            // and batched_coeffs_.back() is a plaintext encoding 1 (the polynomial is monic),
+            // although this isn't strictly speaking necessary. The other plaintexts can be
+            // identically zero. To avoid having to check them, we SEAL should be built with
+            // SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF. Both ciphertext_powers and the
+            // batched_coeffs_ are assumed to be in NTT form. The return value is not in NTT
+            // form.
+            Ciphertext temp, result;
+            evaluator.multiply_plain(ciphertext_powers[0], batched_coeffs_[0], result);
+            for (size_t i = 1; i < batched_coeffs_.size(); i++)
+            {
+                evaluator.multiply_plain(ciphertext_powers[i], batched_coeffs_[i], temp);
+                evaluator.add_inplace(result, temp);
+            }
+
+            // Transform back from NTT form
+            evaluator.transform_from_ntt_inplace(result);
+
+            // Make the result as small as possible by modulus switching
+            while (result.parms_id() != seal_context.last_parms_id())
+            {
+                evaluator.mod_switch_to_next_inplace(result);
+            }
+
+            // If the last parameter set has only one prime, we can compress the result
+            // further by setting low-order bits to zero. This effectively increases the
+            // noise, but that doesn't matter as long as we don't use all noise budget.
+            const EncryptionParameters &parms = seal_context.last_context_data()->parms();
+            if (parms.coeff_modulus().size() == 1)
+            {
+                // The number of data bits we need to have left in each ciphertext coefficient
+                int compr_coeff_bit_count = parms.plain_modulus().bit_count() +
+                    util::get_significant_bit_count(parms.poly_modulus_degree());
+
+                int coeff_mod_bit_count = parms.coeff_modulus()[0].bit_count();
+
+                // The number of bits to set to zero
+                int irrelevant_bit_count = coeff_mod_bit_count - compr_coeff_bit_count;
+
+                // Can compression achieve anything?
+                if (irrelevant_bit_count > 0)
+                {
+                    // Mask for zeroing out the irrelevant bits
+                    uint64_t mask = ~((uint64_t(1) << irrelevant_bit_count) - 1);
+                    SEAL_ITERATE(iter(result), result.size(), [&](auto I) {
+                        // We only have a single RNS component so dereference once more
+                        SEAL_ITERATE(*I, result.poly_modulus_degree(), [&](auto J) {
+                            J &= mask;
+                        });
+                    });
+                }
+            }
+
+            return result;
+        }
+
         template<typename L>
         BinBundle<L>::BinBundle(
             size_t num_bins,
@@ -167,7 +247,7 @@ namespace apsi
             size_t max_deg = 0;
             for (BinPolynCache &bpc : cache_.bin_polyns_)
             {
-                size_t deg = bpc.interpolation_polyn_coeffs.size() - 1;
+                size_t deg = bpc.label_polyn_coeffs.size() - 1;
                 if (deg > max_deg)
                 {
                     max_deg = deg;
@@ -182,7 +262,7 @@ namespace apsi
                 coeffs_of_deg_i.reserve(num_bins);
                 for (auto &bpc : cache_.bin_polyns_)
                 {
-                    vector<felt_t> &p = bpc.interpolation_polyn_coeffs;
+                    vector<felt_t> &p = bpc.label_polyn_coeffs;
 
                     // Get the coefficient if it's set. Otherwise it's zero
                     felt_t coeff = 0;
@@ -229,7 +309,7 @@ namespace apsi
                 // Compute the polynomial and save to cache
                 vector<felt_t> polyn_coeffs = polyn_with_roots(roots, mod_);
                 BinPolynCache bpc = BinPolynCache {
-                    .interpolation_polyn_coeffs = polyn_coeffs,
+                    .label_polyn_coeffs = polyn_coeffs,
                 };
                 cache_.bin_polyns_.emplace_back(move(bpc));
             }
@@ -266,7 +346,7 @@ namespace apsi
                 // Put the Newton interpolation polynomial in the cache
                 vector<felt_t> interp_polyn = newton_interpolate_polyn(points, values, mod_);
                 BinPolynCache bpc = BinPolynCache {
-                    .interpolation_polyn_coeffs = interp_polyn,
+                    .label_polyn_coeffs = interp_polyn,
                 };
                 cache_.bin_polyns_.push_back(bpc);
             }
