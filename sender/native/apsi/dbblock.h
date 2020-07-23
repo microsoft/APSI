@@ -10,6 +10,7 @@
 
 // APSI
 #include "apsi/item.h"
+#include "apsi/sendersessioncontext.h" 
 
 // SEAL
 #include "seal/context.h"
@@ -34,7 +35,7 @@ namespace apsi
             The Newton intepolation polynomial whose value at each item in the bin equals the item's corresponding
             label.
             */
-            std::vector<felt_t> interpolation_polyn_coeffs;
+            std::vector<felt_t> label_polyn_coeffs;
 
             /**
             The "matching polynomial", i.e., unique monic polynomial whose roots are precisely the items in the
@@ -76,22 +77,30 @@ namespace apsi
             ourselves. Instead we assume they've been precomputed and accept the powers: (C, C², C³, ...) as input.
             The number of powers provided MUST be equal to plaintext_polyn_coeffs_.size()-1.
             */
-            seal::Ciphertext eval(const vector<Ciphertext> &ciphertext_powers);
-        }
+            seal::Ciphertext eval(
+                const std::vector<seal::Ciphertext> &ciphertext_powers,
+                const SenderSessionContext &session_context);
+        };
 
         // A cache of all the polynomial and plaintext computations on a single BinBundle
         struct BinBundleCache
         {
             /**
-            Cached polynomial computations for each bin
+            Cached polynomial computations for each bin before batching
             */
             std::vector<BinPolynCache> bin_polyns_;
+
+            /**
+            The matching polynomial represented as batched plaintexts. The length of this vector is the degree of
+            the highest-degree polynomial in polyn_cache_, i.e., the size of the largest bin.
+            */
+            BatchedPlaintextPolyn matching_polyn_;
 
             /**
             The interpolation polynomial represented as batched plaintexts. The length of this vector is the degree of
             the highest-degree polynomial in polyn_cache_, i.e., the size of the largest bin.
             */
-            std::vector<seal::Plaintext> plaintext_polyn_coeffs_;
+            BatchedPlaintextPolyn label_polyn_;
         }; // struct BinBundleCache
 
         /**

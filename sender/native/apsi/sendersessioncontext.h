@@ -57,32 +57,32 @@ namespace apsi
                 decryptor_ = std::make_shared<seal::Decryptor>(seal_context_, sk);
             }
 
-            const std::shared_ptr<seal::SEALContext> &seal_context()
+            const std::shared_ptr<seal::SEALContext> &seal_context() const
             {
                 return seal_context_;
             }
 
-            const std::shared_ptr<seal::BatchEncoder> &encoder()
+            const std::shared_ptr<seal::BatchEncoder> &encoder() const
             {
                 return encoder_;
             }
 
-            const std::shared_ptr<seal::Encryptor> &encryptor()
+            const std::shared_ptr<seal::Encryptor> &encryptor() const
             {
                 return encryptor_;
             }
 
-            const std::shared_ptr<seal::Decryptor> &decryptor()
+            const std::shared_ptr<seal::Decryptor> &decryptor() const
             {
                 return decryptor_;
             }
 
-            const std::shared_ptr<seal::Evaluator> &evaluator()
+            const std::shared_ptr<seal::Evaluator> &evaluator() const
             {
                 return evaluator_;
             }
 
-            const std::shared_ptr<CiphertextCompressor> &compressor()
+            const std::shared_ptr<CiphertextCompressor> &compressor() const
             {
                 return compressor_;
             }

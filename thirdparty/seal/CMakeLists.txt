@@ -15,7 +15,7 @@ ExternalProject_Add(EP_SEAL
     GIT_REPOSITORY      https://github.com/microsoft/SEAL.git
     GIT_TAG             ${PROJECT_VERSION}
     GIT_CONFIG          advice.detachedHead=false
-    CMAKE_ARGS          -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF
+    CMAKE_ARGS          -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DSEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF
     CONFIGURE_COMMAND   ""
     BUILD_COMMAND       ""
     INSTALL_COMMAND     ""
