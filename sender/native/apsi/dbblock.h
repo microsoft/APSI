@@ -73,9 +73,7 @@ namespace apsi
             ourselves. Instead we assume they've been precomputed and accept the powers: (C, C², C³, ...) as input.
             The number of powers provided MUST be equal to plaintext_polyn_coeffs_.size()-1.
             */
-            seal::Ciphertext eval(
-                const std::vector<seal::Ciphertext> &ciphertext_powers,
-                const SenderSessionContext &session_context) const;
+            seal::Ciphertext eval(const std::vector<seal::Ciphertext> &ciphertext_powers) const;
 
             /**
             Returns whether this polynomial has size zero.

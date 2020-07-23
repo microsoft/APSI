@@ -9,13 +9,10 @@
 #include <utility>
 
 // APSI
-#include "apsi/ffield/ffield_array.h"
-#include "apsi/ffield/ffield_batch_encoder.h"
 #include "apsi/item.h"
 #include "apsi/network/channel.h"
 #include "apsi/psiparams.h"
 #include "apsi/util/matrix.h"
-#include "apsi/util/sealcompress.h"
 
 // Kuku
 #include "kuku/kuku.h"
@@ -223,9 +220,6 @@ namespace apsi
             std::shared_ptr<FFieldBatchEncoder> batch_encoder_;
 
             std::size_t slot_count_;
-
-            // Objects for compressed ciphertexts
-            std::unique_ptr<CiphertextCompressor> compressor_;
 
             // Preprocess result
             std::unique_ptr<

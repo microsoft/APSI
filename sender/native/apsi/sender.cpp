@@ -60,15 +60,16 @@ namespace apsi
             Log::debug("Number of powers: %i", num_of_powers);
             Log::debug("Current batch count: %i", params_.batch_count());
 
-            // For each bundle index, we have a vector of powers of the query
+            // For each bundle index, we have a vector of powers of the query. We need powers all
+            // the way to split_size; however, we don't store the zeroth power.
             vector<vector<Ciphertext>> powers(params_.batch_count());
-            auto split_size_plus_one = params_.split_size() + 1;
+            size_t split_size = params_.split_size();
 
             // Initialize the powers matrix
-            for (size_t i = 0; i < powers.size(); ++i)
+            for (size_t i = 0; i < powers.size(); i++)
             {
-                powers[i].reserve(split_size_plus_one);
-                for (size_t j = 0; j < split_size_plus_one; ++j)
+                powers[i].reserve(split_size);
+                for (size_t j = 0; j < split_size; j++)
                 {
                     powers[i].emplace_back(seal_context_);
                 }
@@ -78,32 +79,15 @@ namespace apsi
             for (const auto &q : query)
             {
                 size_t power = static_cast<size_t>(q.first);
-                for (size_t i = 0; i < powers.size(); i++)
+                for (size_t bundle_idx = 0; bundle_idx < powers.size(); bundle_idx++)
                 {
-                    get_ciphertext(seal_context_, powers[i][power], q.second[i]);
+                    // Load input^power to powers[bundle_idx][power-1]
+                    get_ciphertext(seal_context_, powers[bundle_idx][power - 1], q.second[bundle_idx]);
                 }
             }
 
             size_t batch_count = params_.batch_count();
             size_t total_blocks = params_.split_count() * batch_count;
-
-            // powers[i][0] is supposed to be an encryption of 1 for each i; however, we don't have
-            // the public key available. We will create instead a dummy encryption of zero by reserving
-            // appropriate memory and adding some noise to it, and then add a plaintext 1 to it.
-            powers[0][0].resize(2);
-            for (size_t i = 0; i < powers[0][0].coeff_modulus_size(); i++)
-            {
-                // Add some noise to the ciphertext to make it non-transparent
-                powers[0][0].data(1)[i * powers[0][0].poly_modulus_degree()] = 1;
-            }
-
-            // Create a dummy encryption of 1 and duplicate to all batches
-            session_context.evaluator()->add_plain_inplace(powers[0][0], Plaintext("1"));
-            for (size_t i = 1; i < powers.size(); i++)
-            {
-                // Replicate for each bundle index
-                powers[i][0] = powers[0][0];
-            }
 
             // Obtain the windowing information
             size_t window_size = get_params().window_size();
@@ -163,33 +147,33 @@ namespace apsi
             size_t bundle_idx_end = bundle_idx_bounds.second;
 
             // Compute the powers for each bundle index and loop over the BinBundles
-            for (size_t i = bundle_idx_start; i < bundle_idx_end; i++)
+            for (size_t bundle_idx = bundle_idx_start; bundle_idx < bundle_idx_end; bundle_idx++)
             {
-                compute_batch_powers(powers[i], session_context, dag, states[i]);
+                compute_batch_powers(powers[bundle_idx], session_context, dag, states[bundle_idx]);
 
                 // Next, iterate over each bundle with this bundle index
-                size_t num_bundles = sender_db_->get_cache()[i].size();
+                size_t num_bundles = sender_db_->get_cache()[bundle_idx].size();
 
                 // When using C++17 this function may be multi-threaded in the future
                 // with C++ execution policies
-                seal_for_each_n(sender_db_->get_cache()[i].begin(), num_bundles, [&](auto &cache) {
+                seal_for_each_n(sender_db_->get_cache()[bundle_idx].begin(), num_bundles, [&](auto &cache) {
                     // Package for the result data
                     ResultPackage pkg;
-                    pkg.bundle_idx = i;
+                    pkg.bundle_idx = bundle_idx;
 
                     stringstream ss;
 
                     // Compute the matching result and save immediately to stream
-                    cache.batched_matching_polyn.eval(powers[i], session_context).save(ss);
+                    cache.batched_matching_polyn.eval(powers[bundle_idx]).save(ss);
 
                     // Copy the data to the package and reset the stream write head
                     pkg.data = ss.str();
                     ss.seekp(0, ios::beg);
 
-                    if (cache.label_polyn)
+                    if (cache.batched_interp_polyn)
                     {
                         // Compute the label result and save immediately to stream
-                        cache.batched_interp_polyn.eval(powers[i], session_context).save(ss);
+                        cache.batched_interp_polyn.eval(powers[bundle_idx]).save(ss);
                         pkg.label_data = ss.str();
                     }
 

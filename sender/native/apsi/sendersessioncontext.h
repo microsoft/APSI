@@ -33,7 +33,6 @@ namespace apsi
                 std::shared_ptr<seal::SEALContext> context) : seal_context_(std::move(context))
             {
                 encoder_ = std::make_shared<seal::BatchEncoder>(seal_context_);
-                compressor_ = std::make_shared<CiphertextCompressor>(seal_context_);
             }
 
             void set_evaluator(const std::string &relin_keys)
@@ -82,11 +81,6 @@ namespace apsi
                 return evaluator_;
             }
 
-            const std::shared_ptr<CiphertextCompressor> &compressor() const
-            {
-                return compressor_;
-            }
-
         private:
             std::shared_ptr<seal::SEALContext> seal_context_;
 
@@ -99,8 +93,6 @@ namespace apsi
             std::shared_ptr<seal::Evaluator> evaluator_;
 
             std::shared_ptr<seal::BatchEncoder> encoder_;
-
-            std::shared_ptr<CiphertextCompressor> compressor_;
         };
     } // namespace sender
 } // namespace apsi
