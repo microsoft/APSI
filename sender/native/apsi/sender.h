@@ -13,6 +13,7 @@
 #include <memory>
 #include <mutex>
 #include <vector>
+#include <utility>
 #include <string>
 
 // GSL
@@ -94,9 +95,7 @@ namespace apsi
 
             inline void set_db(std::shared_ptr<SenderDB> sender_db)
             {
-                sender_db_ = sender_db;
-                params_.set_split_count(sender_db_->get_params().split_count());
-                params_.set_sender_bin_size(sender_db_->get_params().sender_bin_size());
+                sender_db_ = std::move(sender_db);
             }
 
             /**
@@ -140,26 +139,12 @@ namespace apsi
             }
 
             /**
-            Responds to a query from the receiver. Input is a map of powers of receiver's items, from k to y^k, where k
-            is an exponent, y is an item in receiver's cuckoo hashing table.
-
-            Returns (#splits x #batches) ciphertexts, each of which is a result of the compute_dot_product function.
-
-            @see compute_dot_product for an explanation of the result.
-            */
-            void respond(
-                std::vector<std::vector<seal::Ciphertext>> &query, int num_of_powers,
-                SenderSessionContext &session_context, const std::vector<seal::SEAL_BYTE> &client_id,
-                network::Channel &channel);
-
-            /**
             Method that handles the work of a single thread that computes the response to a query.
             */
-            void respond_worker(
-                std::size_t thread_index, std::size_t batch_count, std::size_t total_threads, std::size_t total_blocks,
-                std::promise<void> &batches_done_prom, std::shared_future<void> &batches_done_fut,
-                std::vector<std::vector<seal::Ciphertext>> &powers, SenderSessionContext &session_context,
-                WindowingDag &dag, std::vector<WindowingDag::State> &states, std::atomic<std::size_t> &remaining_batches,
+            void query_worker(
+                std::pair<std::size_t, std::size_t> bundle_idx_bounds,
+                std::vector<std::vector<seal::Ciphertext>> &powers, const SenderSessionContext &session_context,
+                WindowingDag &dag, std::vector<WindowingDag::State> &states,
                 const std::vector<seal::SEAL_BYTE> &client_id, network::Channel &channel);
 
             /**
@@ -174,7 +159,7 @@ namespace apsi
             */
             void compute_batch_powers(
                 std::vector<seal::Ciphertext> &batch_powers, SenderSessionContext &session_context,
-                const WindowingDag &dag, WindowingDag::State &state, seal::MemoryPoolHandle pool);
+                const WindowingDag &dag, WindowingDag::State &state);
 
             PSIParams params_;
 

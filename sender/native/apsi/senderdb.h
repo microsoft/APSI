@@ -59,7 +59,7 @@ namespace apsi
             /**
             Returns the whole DB cache. The value at index i is the set of caches of BinBundles at bundle index i.
             */
-            std::vector<std::vector<&BinBundleCache> > get_cache();
+            std::vector<std::vector<BinBundleCache> > &get_cache();
 
             const PSIParams &get_params() const
             {

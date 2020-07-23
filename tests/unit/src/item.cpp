@@ -11,7 +11,7 @@ using namespace apsi;
 
 namespace APSITests
 {
-    TEST(ItemTests, constructor_test)
+    TEST(ItemTests, Constructor)
     {
         // Zero item test
         Item item;
@@ -20,7 +20,7 @@ namespace APSITests
         ASSERT_EQ(0ul, item[1]);
     }
 
-    TEST(ItemTests, parse_test)
+    TEST(ItemTests, Parse)
     {
         // 128 bit string
         string input = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF";
@@ -79,7 +79,7 @@ namespace APSITests
         ASSERT_EQ((uint64_t)0x80, item[1]);
     }
 
-    TEST(ItemTests, parse_empty_test)
+    TEST(ItemTests, ParseEmpty)
     {
         string input = "";
         Item item;
@@ -90,7 +90,7 @@ namespace APSITests
         ASSERT_EQ((uint64_t)0, item[1]);
     }
 
-    TEST(ItemTests, parse_diff_base_test)
+    TEST(ItemTests, ParseDiffBase)
     {
         Item item;
 
@@ -101,7 +101,7 @@ namespace APSITests
         ASSERT_ANY_THROW(item.parse("1010101010", /* base */ 2));
     }
 
-    TEST(ItemTests, parse_non_regular_string_test)
+    TEST(ItemTests, ParseNonRegularString)
     {
         Item item;
 
@@ -123,7 +123,7 @@ namespace APSITests
         ASSERT_EQ((uint64_t)0x800000000000, item[1]);
     }
 
-    TEST(ItemTests, parse_auto_detect_hex_test)
+    TEST(ItemTests, ParseAutoDetectHex)
     {
         Item item;
 

@@ -28,7 +28,8 @@ namespace apsi
     namespace sender
     {
         Ciphertext BatchedPlaintextPolyn::eval(
-            const vector<Ciphertext> &ciphertext_powers, const SenderSessionContext &session_context)
+            const vector<Ciphertext> &ciphertext_powers,
+            const SenderSessionContext &session_context) const
         {
 #ifdef SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT
             static_assert(false,

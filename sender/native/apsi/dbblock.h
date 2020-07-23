@@ -79,7 +79,15 @@ namespace apsi
             */
             seal::Ciphertext eval(
                 const std::vector<seal::Ciphertext> &ciphertext_powers,
-                const SenderSessionContext &session_context);
+                const SenderSessionContext &session_context) const;
+
+            /**
+            Returns whether this polynomial has size zero.
+            */
+            explicit operator bool() const noexcept
+            {
+                return batched_coeffs_.size();
+            }
         };
 
         // A cache of all the polynomial and plaintext computations on a single BinBundle
@@ -88,19 +96,19 @@ namespace apsi
             /**
             Cached polynomial computations for each bin before batching
             */
-            std::vector<BinPolynCache> bin_polyns_;
+            std::vector<BinPolynCache> bin_polyns;
 
             /**
             The matching polynomial represented as batched plaintexts. The length of this vector is the degree of
             the highest-degree polynomial in polyn_cache_, i.e., the size of the largest bin.
             */
-            BatchedPlaintextPolyn matching_polyn_;
+            BatchedPlaintextPolyn matching_polyn;
 
             /**
             The interpolation polynomial represented as batched plaintexts. The length of this vector is the degree of
             the highest-degree polynomial in polyn_cache_, i.e., the size of the largest bin.
             */
-            BatchedPlaintextPolyn label_polyn_;
+            BatchedPlaintextPolyn label_polyn;
         }; // struct BinBundleCache
 
         /**

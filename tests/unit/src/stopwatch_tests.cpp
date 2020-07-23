@@ -22,7 +22,7 @@ namespace
 
 namespace APSITests
 {
-    TEST(StopwatchTests, single_event_test)
+    TEST(StopwatchTests, SingleEvent)
     {
         Stopwatch sw;
 
@@ -49,7 +49,7 @@ namespace APSITests
         ASSERT_TRUE(diff >= 50);
     }
 
-    TEST(StopwatchTests, single_event_multithreading_test)
+    TEST(StopwatchTests, SingleEventMultithreading)
     {
         Stopwatch sw;
 
@@ -84,7 +84,7 @@ namespace APSITests
         ASSERT_EQ((size_t)120, tps.size());
     }
 
-    TEST(StopwatchTests, stopwatch_block_test)
+    TEST(StopwatchTests, StopwatchBlock)
     {
         Stopwatch sw;
 
@@ -145,7 +145,7 @@ namespace APSITests
         ASSERT_EQ(1, timesp->event_count);
     }
 
-    TEST(StopwatchTests, stopwatch_multithreading_test)
+    TEST(StopwatchTests, StopwatchMultithreading)
     {
         Stopwatch sw;
 

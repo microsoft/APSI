@@ -116,9 +116,9 @@ namespace apsi
             int last_bundle_idx = -1;
             for (size_t i = 0; i < data_with_indices.size(); i++)
             {
-                auto &data_with_idx = data_with_indices.at(i);
+                auto &data_with_idx = data_with_indices[i];
                 size_t cuckoo_idx = data_with_idx.second;
-                size_t bin_idx = cuckoo_idx % bins_per_bundle;;
+                size_t bin_idx = cuckoo_idx % bins_per_bundle;
                 size_t bundle_idx = (cuckoo_idx - bin_idx) / bins_per_bundle;
 
                 insertion_count++;
@@ -157,7 +157,7 @@ namespace apsi
             }
 
             // Wait for the threads to finish
-            for (auto &t : thrds)
+            for (auto &t : threads)
             {
                 t.join();
             }
