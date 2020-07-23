@@ -82,12 +82,10 @@ namespace apsi
             PSIParams params_;
 
             /**
-            All the BinBundles in the DB, indexed by bin index. The vector at bundle index i contains all the BinBundles
-            with bundle index i. The order of the BinBundle within a given bundle index doesn't matter (we could've just
-            as easily used a vector<set<BinBundle>>), but the canonical ordering makes references to specific BinBundles
-            easier.
+            All the BinBundles in the DB, indexed by bin index. The set at bundle index i contains all the BinBundles
+            with bundle index i
             */
-            std::vector<std::vector<BinBundle<L> > > bin_bundles_;
+            std::vector<std::set<BinBundle<L> > > bin_bundles_;
         }; // class SenderDB
 
         class LabeledSenderDB: SenderDB<felt_t> {

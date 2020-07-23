@@ -180,7 +180,7 @@ namespace apsi
                     stringstream ss;
 
                     // Compute the matching result and save immediately to stream
-                    cache.matching_polyn.eval(powers[i], session_context).save(ss);
+                    cache.batched_matching_polyn.eval(powers[i], session_context).save(ss);
 
                     // Copy the data to the package and reset the stream write head
                     pkg.data = ss.str();
@@ -189,7 +189,7 @@ namespace apsi
                     if (cache.label_polyn)
                     {
                         // Compute the label result and save immediately to stream
-                        cache.label_polyn.eval(powers[i], session_context).save(ss);
+                        cache.batched_interp_polyn.eval(powers[i], session_context).save(ss);
                         pkg.label_data = ss.str();
                     }
 

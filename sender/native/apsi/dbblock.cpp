@@ -27,6 +27,11 @@ namespace apsi
 
     namespace sender
     {
+        /**
+        Evaluates the polynomial on the given ciphertext. We don't compute the powers of the input ciphertext C
+        ourselves. Instead we assume they've been precomputed and accept the powers: (C, C², C³, ...) as input. The
+        number of powers provided MUST be equal to plaintext_polyn_coeffs_.size()-1.
+        */
         Ciphertext BatchedPlaintextPolyn::eval(
             const vector<Ciphertext> &ciphertext_powers,
             const SenderSessionContext &session_context) const
@@ -103,6 +108,100 @@ namespace apsi
             }
 
             return result;
+
+        /**
+        Helper function. Computes the "matching" polynomial of a bin, i.e., the unique monic polynomial whose roots are
+        precisely the items of the bin. Stores the results in cache_.felt_matching_polyns.
+        */
+        template<typename L>
+        FEltPolyn compute_matching_polyn(map<felt_t, L> &bin, Modulus &mod)
+        {
+            // Collect the roots
+            vector<felt_t> roots(bin.size());
+            for (auto &kv : bin) {
+                roots.push_back(kv.first);
+            }
+
+            // Compute the polynomial
+            FEltPolyn p = polyn_with_roots(roots, mod);
+
+            return p
+        }
+
+        /**
+        Helper function. Computes the Newton interpolation polynomial of a bin
+        */
+        FEltPolyn compute_newton_polyn(map<felt_t, felt_t> &bin, Modulus &mod)
+        {
+            // Collect the items and labels into different vectors
+            vector<felt_t> points;
+            vector<felt_t> values;
+            points.reserve(bin.size());
+            values.reserve(bin.size());
+
+            // pv is (point, value)
+            for (const auto &pv : bin)
+            {
+                points.push_back(pv.first);
+                values.push_back(pv.second);
+            }
+
+            // Compute the Newton interpolation polynomial
+            FEltPolyn p = newton_interpolate_polyn(points, values, mod);
+
+            return p;
+        }
+
+        /**
+        Constructs a batched Plaintext polynomial from a list of polynomials. Takes an evaluator and batch encoder to do
+        encoding and NTT ops.
+        */
+        BatchedPlaintextPolyn::BatchedPlaintextPolyn(
+            std::vector<FEltPolyn> &polyns,
+            std::shared_ptr<seal::Evaluator> evaluator,
+            std::shared_ptr<seal::BatchEncoder> batch_encoder
+        ) {
+            // Find the highest degree polynomial in the list. The max degree determines how many Plaintexts we
+            // need to make
+            size_t max_deg = 0;
+            for (FEltPolyn &p : polyns)
+            {
+                // Degree = number of coefficients - 1
+                size_t deg = p.size() - 1;
+                if (deg > max_deg)
+                {
+                    max_deg = deg;
+                }
+            }
+
+            // Now make the Plaintexts. We let Plaintext i contain all bin coefficients of degree i.
+            size_t num_polyns = polyns.size();
+            for (size_t i = 0; i < max_deg + 1; i++)
+            {
+                // Go through all the bins, collecting the coefficients at degree i
+                vector<felt_t> coeffs_of_deg_i;
+                coeffs_of_deg_i.reserve(num_polyns);
+                for (FEltPolyn &p : polyns)
+                {
+                    // Get the coefficient if it's set. Otherwise it's zero
+                    felt_t coeff = 0;
+                    if (i < p.size())
+                    {
+                        coeff = p[i];
+                    }
+
+                    coeffs_of_deg_i.push_back(coeff);
+                }
+
+                // Now let pt be the Plaintext consisting of all those degree i coefficients
+                Plaintext pt;
+                batch_encoder_->encode(coeffs_of_deg_i, pt);
+                // Convert to NTT form so our intersection computations later are fast
+                evaluator_->transform_to_ntt_inplace(pt, seal_ctx_->first_parms_id());
+
+                // Push the new Plaintext to the cache
+                cache_.plaintext_polyn_coeffs_.emplace_back(pt);
+            }
         }
 
         template<typename L>
@@ -120,7 +219,26 @@ namespace apsi
             mod_(mod)
         {
             bins_.reserve(num_bins);
-            cache_.bin_polyns_.reserve(num_bins);
+            cache_.felt_matching_polyns.reserve(num_bins);
+        }
+
+        /**
+        Batches this BinBundle's polynomials into SEAL Plaintexts. Resulting values are stored in cache_.
+        */
+        template<typename L>
+        void BinBundle<L>::regen_plaintexts()
+        {
+            // Compute and cache the batched "matching" polynomials. They're computed in both labeled and unlabeled PSI.
+            BatchedPlaintextPolyn p(cache_.felt_matching_polyns);
+            cache_.batched_matching_polyn = p;
+
+            // Compute and cache the batched Newton interpolation polynomials iff they exist. They're only computed for
+            // labeled PSI.
+            if (cache.felt_interp_polyns.size() > 0)
+            {
+                BatchedPlaintextPolyn p(cache_.felt_interp_polyns);
+                cache_.batched_interp_polyn = p;
+            }
         }
 
         /**
@@ -194,6 +312,9 @@ namespace apsi
                 if (!dry_run)
                 {
                     curr_bin.insert(pair);
+
+                    // Indicate that the polynomials need to be recomputed
+                    cache_invalid_ = true;
                 }
 
                 curr_bin_idx++;
@@ -218,138 +339,89 @@ namespace apsi
         template<typename L>
         void BinBundle<L>::clear_cache()
         {
-            cache_.bin_polyns_.clear();
-            cache_.plaintext_polyn_coeffs_.clear();
+            cache_.felt_matching_polyns.clear();
+            cache_.felt_interp_polyns.clear();
             cache_invalid_ = true;
         }
 
         /**
-        Generates and caches the polynomials and plaintexts that represent the BinBundle
+        Returns whether this BinBundle's cache needs to be recomputed
+        */
+        template<typename L>
+        bool BinBundle<L>::cache_invalid()
+        {
+            return cache_invalid_;
+        }
+
+        /**
+        Gets an immutable reference to this BinBundle's cache. This will throw an exception if the cache is invalid.
+        Check the cache before you wreck the cache.
+        */
+        const BinBundleCache& get_cache()
+        {
+            if (cach_invalid_)
+            {
+                throw logic_error("Tried to retrieve stale cache");
+            }
+
+            return cache_;
+        }
+
+        /**
+        Generates and caches the polynomials and plaintexts that represent the BinBundle. This will only do
+        recomputation if the cache is invalid.
         */
         template<typename L>
         void BinBundle<L>::regen_cache()
         {
-            clear_cache();
-            regen_polyns();
-            regen_plaintexts();
-            cache_invalid_ = false;
-        }
-
-        /**
-        Computes and caches the bin's polynomial coeffs in Plaintexts. Plaintext i in the cache stores all the i-th
-        degree coefficients of this BinBundle's interpolation polynomials.
-        */
-        template<typename L>
-        void BinBundle<L>::regen_plaintexts()
-        {
-            // Find the highest degree polynomial in this BinBundle. The max degree determines how many Plaintexts we
-            // need to make
-            size_t num_bins = bins_.size();
-            size_t max_deg = 0;
-            for (BinPolynCache &bpc : cache_.bin_polyns_)
+            // Only recompute the cache if it needs to be recomputed
+            if (cache_invalid_)
             {
-                size_t deg = bpc.label_polyn_coeffs.size() - 1;
-                if (deg > max_deg)
-                {
-                    max_deg = deg;
-                }
-            }
-
-            // Now make the Plaintexts. We let Plaintext i contain all bin coefficients of degree i.
-            for (size_t i = 0; i < max_deg + 1; i++)
-            {
-                // Go through all the bins, collecting the coefficients at degree i
-                vector<felt_t> coeffs_of_deg_i;
-                coeffs_of_deg_i.reserve(num_bins);
-                for (auto &bpc : cache_.bin_polyns_)
-                {
-                    vector<felt_t> &p = bpc.label_polyn_coeffs;
-
-                    // Get the coefficient if it's set. Otherwise it's zero
-                    felt_t coeff = 0;
-                    if (i < p.size())
-                    {
-                        coeff = p[i];
-                    }
-
-                    coeffs_of_deg_i.push_back(coeff);
-                }
-
-                // Now let pt be the Plaintext consisting of all those degree i coefficients
-                Plaintext pt;
-                batch_encoder_->encode(coeffs_of_deg_i, pt);
-                // Convert to NTT form so our intersection computations later are fast
-                evaluator_->transform_to_ntt_inplace(pt, seal_ctx_->first_parms_id());
-
-                // Push the new Plaintext to the cache
-                cache_.plaintext_polyn_coeffs_.emplace_back(pt);
+                clear_cache();
+                regen_polyns();
+                regen_plaintexts();
+                cache_invalid_ = false;
             }
         }
 
         /**
-        For each bin, compute from scratch the unique monic polynomial whose roots are precisely the elements of the bin
+        Computes and caches the appropriate polynomials of each bin. For unlabeled PSI, this is just the "matching"
+        polynomial. Resulting values are stored in cache_.
         */
         void UnlabeledBinBundle::regen_polyns()
         {
-            // We're recomputing everything, so wipe out the cache
-            clear_cache();
+            // Clear the cache before we push to it
+            cache_.felt_matching_polyns.clear();
 
-            // For each bin, construct a polynomial
-            for (size_t i = 0; i < bins_.size(); i++)
+            // For each bin in the bundle, compute and cache the corresponding "matching" polynomial
+            for (map<felt_t, monostate> &bin : bins_)
             {
-                // In the unlabeled PSI case, the bin is a key-value map where the values are empty. The keys are the
-                // roots of the polynomial we're making.
-                const map<felt_t, monostate> &bin = bins_.at(i);
-
-                // Collect the roots
-                vector<felt_t> roots(bin.size());
-                for (auto &kv : bin) {
-                    roots.push_back(kv.first);
-                }
-
-                // Compute the polynomial and save to cache
-                vector<felt_t> polyn_coeffs = polyn_with_roots(roots, mod_);
-                BinPolynCache bpc = BinPolynCache {
-                    .label_polyn_coeffs = polyn_coeffs,
-                };
-                cache_.bin_polyns_.emplace_back(move(bpc));
+                // Compute and cache the matching polynomial
+                FEltPolyn p = compute_matching_polyn(bin, mod_);
+                cache_.felt_matching_polyns.emplace_back(p);
             }
         }
 
         /**
-        Compute the Newton interpolation polynomial from scratch
+        Computes and caches the appropriate polynomials of each bin. For labeled PSI, this is the "matching" polynomial
+        and the Newton interpolation polynomial. Resulting values are stored in cache_.
         */
         void LabeledBinBundle::regen_polyns()
         {
-            // We're recomputing everything, so wipe out the cache
-            clear_cache();
+            // Clear the cache before we push to it
+            cache_.felt_matching_polyns.clear();
+            cache_.felt_interp_polyns.clear();
 
-
-            // For each bin, construct a polynomial
-            for (size_t i = 0; i < bins_.size(); i++)
+            // For each bin in the bundle, compute and cache the corresponding "matching" and Newton polynomials
+            for (map<felt_t, monostate> &bin : bins_)
             {
-                // Each bin is a map from points to values. We split these up and use them for interpolation.
-                map<felt_t, felt_t> &bin = bins_.at(i);
+                // Compute and cache the matching polynomial
+                FEltPolyn p = compute_matching_polyn(bin, mod_);
+                cache_.felt_matching_polyns.emplace_back(p);
 
-                // Collect the items and labels into different vectors
-                vector<felt_t> points;
-                vector<felt_t> values;
-                points.reserve(bin.size());
-                values.reserve(bin.size());
-
-                // pv is (point, value)
-                for (const auto &pv : bin)
-                {
-                    points.push_back(pv.first);
-                    values.push_back(pv.second);
-                }
-
-                // Put the Newton interpolation polynomial in the cache
-                vector<felt_t> interp_polyn = newton_interpolate_polyn(points, values, mod_);
-                BinPolynCache bpc = BinPolynCache {
-                    .label_polyn_coeffs = interp_polyn,
-                };
-                cache_.bin_polyns_.push_back(bpc);
+                // Compute and cache the Newton polynomial
+                FEltPolyn p = compute_newton_polyn(bin, mod_);
+                cache_.felt_interp_polyns.emplace_back(p);
             }
         }
     } // namespace sender

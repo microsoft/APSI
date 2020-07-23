@@ -22,27 +22,11 @@ namespace apsi
 {
     namespace sender
     {
-        // A cache of all the polynomial computations on a single bin
-        struct BinPolynCache
-        {
-            /** The highest-degree divided differences computed so far. For unlabeled PSI, this is empty
-            NOTE: This is not enabled yet. Caching the divided differences would allow us to add items to a BinBundle
-            without having to recalculate the whole polynomial
-            */
-            //std::vector<felt_t> divided_diffs;
-
-            /**
-            The Newton intepolation polynomial whose value at each item in the bin equals the item's corresponding
-            label.
-            */
-            std::vector<felt_t> label_polyn_coeffs;
-
-            /**
-            The "matching polynomial", i.e., unique monic polynomial whose roots are precisely the items in the
-            bin
-            */
-            std::vector<felt_t> matching_polyn_coeffs;
-        }; // struct BinPolynCache
+        /**
+        Represents a polynomial with coefficients that are field elements. Coefficients are stored in degree-increasing
+        order, so, for example, the constant term is at index 0.
+        */
+        using FEltPolyn = std::vector<felt_t>;
 
         /**
         A bunch of polynomials represented using a sequence of batched SEAL Plaintexts.
@@ -53,8 +37,9 @@ namespace apsi
                         8x³ + 5x² +    + 1
                   9x⁴ + 2x³ +     +  x + 8
 
-        To represent them as a BatchedPlaintextPolyn, we would make a plaintext for every column of coefficients.
-        Plaintext #i holds all the coefficients of degree i. So then the plaintexts P₀, ..., P₅ would be
+        To represent them as a BatchedPlaintextPolyn, we would make a Plaintext for every column of coefficients.
+        Suppose each Plaintext has 3 slots. Let Plaintext #i holds all the coefficients of degree i. So then the
+        plaintexts P₀, ..., P₅ would be
 
             |P₅|P₄|P₃|P₂|P₁|P₀|
             |--|--|--|--|--|--|
@@ -72,6 +57,17 @@ namespace apsi
             std::vector<seal::Plaintext> batched_coeffs_;
 
         public:
+
+            /**
+            Constructs a batched Plaintext polynomial from a list of polynomials. Takes an evaluator and batch encoder
+            to do encoding and NTT ops.
+            */
+            BatchedPlaintextPolyn(
+                std::vector<FEltPolyn> polyns,
+                std::shared_ptr<seal::Evaluator> evaluator,
+                std::shared_ptr<seal::BatchEncoder> batch_encoder
+            );
+
             /**
             Evaluates the polynomial on the given ciphertext. We don't compute the powers of the input ciphertext C
             ourselves. Instead we assume they've been precomputed and accept the powers: (C, C², C³, ...) as input.
@@ -94,21 +90,27 @@ namespace apsi
         struct BinBundleCache
         {
             /**
-            Cached polynomial computations for each bin before batching
+            For each bin, stores the "matching polynomial", i.e., unique monic polynomial whose roots are precisely the
+            items in the bin
             */
-            std::vector<BinPolynCache> bin_polyns;
+            std::vector<FEltPolyn> felt_matching_polyns;
 
             /**
-            The matching polynomial represented as batched plaintexts. The length of this vector is the degree of
-            the highest-degree polynomial in polyn_cache_, i.e., the size of the largest bin.
+            For each bin, stores the Newton intepolation polynomial whose value at each item in the bin equals the
+            item's corresponding label. Note that this field is empty when doing unlabeled PSI.
             */
-            BatchedPlaintextPolyn matching_polyn;
+            std::vector<FEltPolyn> felt_interp_polyns;
 
             /**
-            The interpolation polynomial represented as batched plaintexts. The length of this vector is the degree of
-            the highest-degree polynomial in polyn_cache_, i.e., the size of the largest bin.
+            Cached seal::Plaintext representation of the "matching" polynomial of this BinBundle
             */
-            BatchedPlaintextPolyn label_polyn;
+            BatchedPlaintextPolyn batched_matching_polyn;
+
+            /**
+            Cached seal::Plaintext representation of the interpolation polynomial of this BinBundle. Note that this
+            field is empty when doing unlabeled PSI.
+            */
+            BatchedPlaintextPolyn batched_interp_polyn;
         }; // struct BinBundleCache
 
         /**
@@ -150,15 +152,14 @@ namespace apsi
             std::shared_ptr<seal::BatchEncoder> batch_encoder_;
 
             /**
-            Computes the appropriate polynomial for each bin. Stores the result in cache_.
-            For unlabeled PSI, this is the unique monic polynomial whose roots are precisely the items in the bin.
-            For labeled PSI, this the Newton inteprolation polynomial whose value at each item in the bin equals the
-            item's corresponding label.
+            Computes and caches the appropriate polynomials of each bin. For unlabeled PSI, this is just the "matching"
+            polynomial. For labeled PSI, this is the "matching" polynomial and the Newton interpolation polynomial.
+            Resulting values are stored in cache_.
             */
-            virtual void regen_polyns() = 0;
+            virtual void regen_polyns();
 
             /**
-            Computes and caches the bin's polynomial coeffs in Plaintexts
+            Batches this BinBundle's polynomials into SEAL Plaintexts. Resulting values are stored in cache_.
             */
             void regen_plaintexts();
 
@@ -217,22 +218,22 @@ namespace apsi
             void clear_cache();
 
             /**
-            Generates and caches the polynomials and plaintexts that represent the BinBundle
+            Returns whether this BinBundle's cache needs to be recomputed
+            */
+            bool cache_invalid();
+
+            /**
+            Gets an immutable reference to this BinBundle's cache. This will throw an exception if the cache is invalid.
+            Check the cache before you wreck the cache.
+            */
+            const BinBundleCache& get_cache();
+
+            /**
+            Generates and caches all the polynomials and plaintexts that this BinBundle requires
             */
             void regen_cache();
 
         }; // class BinBundle
-
-        // A LabeledBinBundle is a BinBundle<L> where L (the label type) is felt_t
-        class LabeledBinBundle: public BinBundle<felt_t>
-        {
-        private:
-            /**
-            Computes the appropriate polynomial for each bin. Stores the result in cache_. For labeled PSI, this the
-            Newton inteprolation polynomial whose value at each item in the bin equals the item's corresponding label.
-            */
-            void regen_polyns();
-        }
 
         /**
         An UnlabeledBinBundle is a BinBundle<L> where L (the label type) is the unit type
@@ -241,10 +242,22 @@ namespace apsi
         {
         private:
             /**
-            Computes the appropriate polynomial for each bin. Stores the result in cache_. For unlabeled PSI, this is
-            the unique monic polynomial whose roots are precisely the items in the bin.
+            Computes and caches the appropriate polynomials of each bin. For unlabeled PSI, this is just the "matching"
+            polynomial. Resulting values are stored in cache_.
             */
             void regen_polyns();
         }
+
+        // A LabeledBinBundle is a BinBundle<L> where L (the label type) is felt_t
+        class LabeledBinBundle: public BinBundle<felt_t>
+        {
+        private:
+            /**
+            Computes and caches the appropriate polynomials of each bin. For labeled PSI, this is the "matching"
+            polynomial and the Newton interpolation polynomial. Resulting values are stored in cache_.
+            */
+            void regen_polyns();
+        }
+
     } // namespace sender
 } // namespace apsi
