@@ -269,5 +269,20 @@ namespace apsi
                 }
             }
         }
+
+        template<typename L>
+        set<const BinBundleCache&> SenderDB<L>::get_cache(std::size_t bundle_idx)
+        {
+            if (bundle_idx >= bin_bundles_.size())
+            {
+                throw out_of_range("bundle_idx is out of range");
+            }
+
+            set<BinBundleCache&> result;
+            for (const auto &bundle : bin_bundles_[bundle_idx])
+            {
+                result.insert(bundle.get_cache());
+            }
+        }
     } // namespace sender
 } // namespace apsi

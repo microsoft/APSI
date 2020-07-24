@@ -76,11 +76,11 @@ namespace apsi
             seal::Ciphertext eval(const std::vector<seal::Ciphertext> &ciphertext_powers) const;
 
             /**
-            Returns whether this polynomial has size zero.
+            Returns whether this polynomial has size at least 2. This is necessary for the eval function to work.
             */
             explicit operator bool() const noexcept
             {
-                return batched_coeffs_.size();
+                return batched_coeffs_.size() >= 2;
             }
         };
 

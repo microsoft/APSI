@@ -152,11 +152,12 @@ namespace apsi
                 compute_batch_powers(powers[bundle_idx], session_context, dag, states[bundle_idx]);
 
                 // Next, iterate over each bundle with this bundle index
-                size_t num_bundles = sender_db_->get_cache()[bundle_idx].size();
+                auto bundle_caches = sender_db_->get_cache(bundle_idx).size();
+                size_t bundle_count = bundle_caches.size();
 
                 // When using C++17 this function may be multi-threaded in the future
                 // with C++ execution policies
-                seal_for_each_n(sender_db_->get_cache()[bundle_idx].begin(), num_bundles, [&](auto &cache) {
+                seal_for_each_n(bundle_caches.begin(), bundle_count, [&](auto &cache) {
                     // Package for the result data
                     ResultPackage pkg;
                     pkg.bundle_idx = bundle_idx;

@@ -38,22 +38,18 @@ namespace apsi
             static_assert(false,
                 "SEAL must be built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF"); 
 #endif
-#ifdef APSI_DEBUG
-            if (ciphertext_powers.empty())
-            {
-                throw invalid_argument("no ciphertext powers given");
-            }
-            if (batched_coeffs_.size() > ciphertext_powers.size())
-            {
-                throw invalid_argument("not enough ciphertext powers available");
-            }
-#endif
             // We have no way of producing fresh ciphertexts in the Sender class, so we
             // can't tolerate a situation where the polynomial evaluation results in just
             // a plaintext batched_coeffs_[0]. The query must be used.
             if (batched_coeffs_.size() < 2)
             {
                 throw logic_error("cannot evaluate a constant polynomial");
+            }
+
+            // We need to have enough ciphertext powers
+            if (batched_coeffs_.size() > ciphertext_powers.size())
+            {
+                throw invalid_argument("not enough ciphertext powers available");
             }
 
             const SEALContext &seal_context = *session_context_.seal_context();
@@ -114,7 +110,7 @@ namespace apsi
                     uint64_t mask = ~((uint64_t(1) << irrelevant_bit_count) - 1);
                     SEAL_ITERATE(iter(result), result.size(), [&](auto I) {
                         // We only have a single RNS component so dereference once more
-                        SEAL_ITERATE(*I, result.poly_modulus_degree(), [&](auto J) {
+                        SEAL_ITERATE(*I, parms.poly_modulus_degree(), [&](auto J) {
                             J &= mask;
                         });
                     });
@@ -371,7 +367,8 @@ namespace apsi
         Gets an immutable reference to this BinBundle's cache. This will throw an exception if the cache is invalid.
         Check the cache before you wreck the cache.
         */
-        const BinBundleCache& get_cache()
+        template<typename L>
+        const BinBundleCache &BinBundle<L>::get_cache()
         {
             if (cach_invalid_)
             {
