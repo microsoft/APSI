@@ -59,13 +59,12 @@ namespace apsi
         public:
 
             /**
-            Constructs a batched Plaintext polynomial from a list of polynomials. Takes an evaluator and batch encoder
-            to do encoding and NTT ops.
+            Constructs a batched Plaintext polynomial from a list of polynomials. Takes SEAL context stuff to do
+            encoding and NTT ops.
             */
             BatchedPlaintextPolyn(
                 std::vector<FEltPolyn> polyns,
-                std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<seal::BatchEncoder> batch_encoder
+                SenderSessionContext session_context_
             );
 
             /**
@@ -145,9 +144,12 @@ namespace apsi
             /**
             Stuff we need to make Plaintexts
             */
-            std::shared_ptr<seal::SEALContext> seal_ctx_;
-            std::shared_ptr<seal::Evaluator> evaluator_;
-            std::shared_ptr<seal::BatchEncoder> batch_encoder_;
+            SenderSessionContext session_context_;
+
+            /**
+            Returns the modulus that defines the finite field that we're working in
+            */
+            seal::Modulus field_mod();
 
             /**
             Computes and caches the appropriate polynomials of each bin. For unlabeled PSI, this is just the "matching"
@@ -164,10 +166,7 @@ namespace apsi
         public:
             BinBundle(
                 std::size_t num_bins,
-                std::shared_ptr<seal::SEALContext> seal_ctx,
-                std::shared_ptr<seal::Evaluator> evaluator,
-                std::shared_ptr<seal::BatchEncoder> batch_encoder,
-                seal::Modulus mod
+                SenderSessionContext session_context
             );
 
             /**
