@@ -29,7 +29,7 @@ namespace
 
 namespace APSITests
 {
-    TEST(DbEncodingTests, bit_copy_test)
+    TEST(DbEncodingTests, BitCopy)
     {
         int trials = 1000;
         size_t size = 10;
@@ -77,7 +77,7 @@ namespace APSITests
     }
 
     // Tests that encoding bitstring -> field elements -> bitstring is a lossless round trip
-    TEST(DbEncodingTests, encode_decode_correctness)
+    TEST(DbEncodingTests, EncodeDecodeCorrectness)
     {
         // Make a SEAL modulus. This defines our field
         seal::EncryptionParameters parms(seal::scheme_type::BFV);

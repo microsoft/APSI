@@ -16,6 +16,7 @@
 // SEAL
 #include <seal/modulus.h>
 #include <seal/util/common.h>
+#include <seal/util/iterator.h>
 
 using namespace std;
 using namespace seal;
@@ -31,7 +32,12 @@ namespace apsi
         Sender::Sender(const PSIParams &params, size_t thread_count)
             : params_(params), thread_count_(thread_count),
               seal_context_(SEALContext::Create(params_.encryption_params()))
-        {}
+        {
+            if (thread_count < 1)
+            {
+                throw invalid_argument("thread_count must be at least 1");
+            }
+        }
 
         void Sender::query(
             const string &relin_keys, const map<uint64_t, vector<string>> &query, const vector<SEAL_BYTE> &client_id,
@@ -54,15 +60,16 @@ namespace apsi
             Log::debug("Number of powers: %i", num_of_powers);
             Log::debug("Current batch count: %i", params_.batch_count());
 
-            // For each BinBundle index, we have a vector of powers of the query
+            // For each bundle index, we have a vector of powers of the query. We need powers all
+            // the way to split_size; however, we don't store the zeroth power.
             vector<vector<Ciphertext>> powers(params_.batch_count());
-            auto split_size_plus_one = params_.split_size() + 1;
+            size_t split_size = params_.split_size();
 
             // Initialize the powers matrix
-            for (size_t i = 0; i < powers.size(); ++i)
+            for (size_t i = 0; i < powers.size(); i++)
             {
-                powers[i].reserve(split_size_plus_one);
-                for (size_t j = 0; j < split_size_plus_one; ++j)
+                powers[i].reserve(split_size);
+                for (size_t j = 0; j < split_size; j++)
                 {
                     powers[i].emplace_back(seal_context_);
                 }
@@ -72,44 +79,15 @@ namespace apsi
             for (const auto &q : query)
             {
                 size_t power = static_cast<size_t>(q.first);
-                for (size_t i = 0; i < powers.size(); i++)
+                for (size_t bundle_idx = 0; bundle_idx < powers.size(); bundle_idx++)
                 {
-                    get_ciphertext(seal_context_, powers[i][power], q.second[i]);
+                    // Load input^power to powers[bundle_idx][power-1]
+                    get_ciphertext(seal_context_, powers[bundle_idx][power - 1], q.second[bundle_idx]);
                 }
             }
 
-            /* Answer the query. */
-            respond(powers, num_of_powers, session_context, client_id, channel);
-
-            Log::info("Finished processing query");
-        }
-
-        void Sender::respond(
-            vector<vector<Ciphertext>> &powers, int num_of_powers, SenderSessionContext &session_context,
-            const vector<SEAL_BYTE> &client_id, Channel &channel)
-        {
-            STOPWATCH(sender_stop_watch, "Sender::respond");
-
             size_t batch_count = params_.batch_count();
             size_t total_blocks = params_.split_count() * batch_count;
-
-            // powers[i][0] is supposed to be an encryption of 1 for each i; however, we don't have
-            // the public key available. We will create instead a dummy encryption of zero by reserving
-            // appropriate memory and adding some noise to it, and then add a plaintext 1 to it.
-            powers[0][0].resize(2);
-            for (size_t i = 0; i < powers[0][0].coeff_modulus_size(); i++)
-            {
-                // Add some noise to the ciphertext to make it non-transparent
-                powers[0][0].data(1)[i * powers[0][0].poly_modulus_degree()] = 1;
-            }
-
-            // Create a dummy encryption of 1 and duplicate to all batches
-            session_context.evaluator()->add_plain_inplace(powers[0][0], Plaintext("1"));
-            for (size_t i = 1; i < powers.size(); i++)
-            {
-                // Replicate for each BinBundle index
-                powers[i][0] = powers[0][0];
-            }
 
             // Obtain the windowing information
             size_t window_size = get_params().window_size();
@@ -121,8 +99,8 @@ namespace apsi
             // Prepare the windowing information
             WindowingDag dag(static_cast<uint32_t>(params_.split_size()), params_.window_size(), given_digits);
 
-            // Create a state per each BinBundle index; this contains information about whether the
-            // powers for that BinBundle index have been computed
+            // Create a state per each bundle index; this contains information about whether the
+            // powers for that bundle index have been computed
             std::vector<WindowingDag::State> states;
             states.reserve(batch_count);
             for (uint64_t i = 0; i < batch_count; i++)
@@ -130,220 +108,88 @@ namespace apsi
                 states.emplace_back(dag);
             }
 
-            // How many batches do we still need to compute the powers for
-            atomic<size_t> remaining_batches(thread_count_);
+            // Partition the data and run the threads on the partitions. The i-th thread will process
+            // bundle indices partitions[i] up to but not including partitions[i+1].
+            auto partitions = partition_evenly(params_.batch_count(), thread_count_);
 
-            // A promise to signal the worker threads when all batches have been processed
-            promise<void> batches_done_prom;
-
-            // Get a shared future to be given to all worker threads so they know when all batches are done
-            auto batches_done_fut = batches_done_prom.get_future().share();
-
-            vector<thread> thread_pool;
-            for (size_t i = 0; i < thread_count_; i++)
+            // Launch threads, but not more than necessary
+            vector<thread> threads;
+            for (size_t t = 0; t < partitions.size(); t++)
             {
-                thread_pool.emplace_back([&, i]() {
-                    respond_worker(
-                        i, batch_count, thread_count_, total_blocks, batches_done_prom, batches_done_fut, powers,
-                        session_context, dag, states, remaining_batches, client_id, channel);
+                threads.emplace_back([&, t]() {
+                    query_worker(
+                        partitions[t], powers,
+                        session_context, dag, states, client_id, channel);
                 });
             }
 
-            for (size_t i = 0; i < thread_pool.size(); i++)
+            // Wait for the threads to finish
+            for (auto &t : threads)
             {
-                thread_pool[i].join();
+                t.join();
             }
+
+            Log::info("Finished processing query");
         }
 
-        void Sender::respond_worker(
-            size_t thread_index,
-            size_t batch_count,
-            size_t total_threads,
-            size_t total_blocks,
-            promise<void> &batches_done_prom,
-            shared_future<void> &batches_done_fut,
+        void Sender::query_worker(
+            pair<size_t, size_t> bundle_idx_bounds,
             vector<vector<Ciphertext>> &powers,
-            SenderSessionContext &session_context,
+            const SenderSessionContext &session_context,
             WindowingDag &dag,
             vector<WindowingDag::State> &states,
-            atomic<int> &remaining_batches,
             const vector<SEAL_BYTE> &client_id,
-            Channel &channel
-        ) {
-            STOPWATCH(sender_stop_watch, "Sender::respond_worker");
+            Channel &channel)
+        {
+            STOPWATCH(sender_stop_watch, "Sender::query_worker");
 
-            /* Multiple client sessions can enter this function to compete for thread context resources. */
-            auto local_pool = MemoryManager::GetPool(mm_prof_opt::FORCE_NEW);
+            size_t bundle_idx_start = bundle_idx_bounds.first;
+            size_t bundle_idx_end = bundle_idx_bounds.second;
 
-            Ciphertext compressed_result(seal_context_, local_pool);
-
-            // The BinBundle indices are split evenly between the different threads
-            size_t batch_start = thread_index * batch_count / total_threads;
-            for (size_t batch = batch_start, loop_idx = 0; loop_idx < batch_count; ++loop_idx)
+            // Compute the powers for each bundle index and loop over the BinBundles
+            for (size_t bundle_idx = bundle_idx_start; bundle_idx < bundle_idx_end; bundle_idx++)
             {
-                compute_batch_powers(powers[batch], session_context, dag, states[batch], local_pool);
+                compute_batch_powers(powers[bundle_idx], session_context, dag, states[bundle_idx]);
 
-                // TODO: WHY???
-                batch = (batch + 1) % batch_count;
-            }
+                // Next, iterate over each bundle with this bundle index
+                auto bundle_caches = sender_db_->get_cache(bundle_idx).size();
+                size_t bundle_count = bundle_caches.size();
 
-            // We are done processing this batch so atomically decrease the counter
-            auto count = remaining_batches--;
-            if (count == 1)
-            {
-                // All batches done! Ready to move on to the next phase
-                batches_done_prom.set_value();
-            }
-            else
-            {
-                // Block until all BinBundle indices have been processed
-                batches_done_fut.get();
-            }
+                // When using C++17 this function may be multi-threaded in the future
+                // with C++ execution policies
+                seal_for_each_n(bundle_caches.begin(), bundle_count, [&](auto &cache) {
+                    // Package for the result data
+                    ResultPackage pkg;
+                    pkg.bundle_idx = bundle_idx;
 
-            // Divide the blocks for processing
-            size_t start_block = thread_index * total_blocks / thread_count_;
-            size_t end_block = (thread_index + 1) * total_blocks / thread_count_;
+                    stringstream ss;
 
-            // Construct two ciphertexts to store the result. One keeps track of the current result,
-            // one is used as a temp. Their roles switch each iteration. Saved needing to make a
-            // copy in evaluator->add(...)
-            array<Ciphertext, 2> running_results{ local_pool, local_pool }, label_results{ local_pool, local_pool };
+                    // Compute the matching result and save immediately to stream
+                    cache.batched_matching_polyn.eval(powers[bundle_idx]).save(ss);
 
-            Evaluator &evaluator = *session_context.evaluator();
+                    // Copy the data to the package and reset the stream write head
+                    pkg.data = ss.str();
+                    ss.seekp(0, ios::beg);
 
-            size_t processed_blocks = 0;
-            for (size_t block_idx = start_block; block_idx < end_block; block_idx++)
-            {
-                // Find the batch index for the block currently processed
-                size_t batch = block_idx / params_.split_count(), split = block_idx % params_.split_count();
-                auto &block = sender_db_->get_block(batch, split);
-
-                // Iterate over the coeffs multiplying them with the query powers and summing the results
-                unsigned char curr_result = 0, curr_label = 0;
-
-                // Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
-                // Note that powers[batch][0] is really just a dummy encryption of 1
-                evaluator.multiply_plain(
-                    powers[batch][0], block.batch_random_symm_poly_[0], running_results[curr_result]);
-
-                Ciphertext temp(local_pool);
-                for (size_t s = 1; s < params_.split_size(); s++)
-                {
-                    // Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
-                    evaluator.multiply_plain(powers[batch][s], block.batch_random_symm_poly_[s], temp);
-
-                    evaluator.add(temp, running_results[curr_result], running_results[curr_result ^ 1]);
-                    curr_result ^= 1;
-                }
-
-                // Handle the case for s = params_.split_size(); this is the highest degree component where
-                // the corresponding plaintext would be 1. Instead of an unnecessary multiplication, we simply
-                // add the leading power of the query to the result.
-                evaluator.add(
-                        powers[batch][params_.split_size()],
-                        running_results[curr_result],
-                        running_results[curr_result ^ 1]);
-                curr_result ^= 1;
-
-                if (params_.use_labels())
-                {
-                    // Do we have any label polynomial coefficients?
-                    if (block.batched_label_coeffs_.size())
+                    if (cache.batched_interp_polyn)
                     {
-                        STOPWATCH(sender_stop_watch, "Sender::respond_worker::online_interpolate");
-
-                        // First find the lowest-degree label coefficient that is non-zero
-                        size_t s = 0;
-                        while (s < block.batched_label_coeffs_.size() && block.batched_label_coeffs_[s].is_zero())
-                        {
-                            ++s;
-                        }
-
-                        // Compute dot product of the label polynomial coefficients with the query powers
-                        if (s < block.batched_label_coeffs_.size())
-                        {
-                            // Multiply and write to label_results. Here we process only the lowest-degree product.
-                            // Both inputs are in NTT transformed form so internally SEAL will call multiply_plain_ntt
-                            evaluator.multiply_plain(
-                                powers[batch][s], block.batched_label_coeffs_[s], label_results[curr_label]);
-                        }
-                        else // if s equals the number of label coefficients, i.e., if all coefficients were zero
-                        {
-                            // Write a zero as the label result
-                            session_context.encryptor_->encrypt_zero(label_results[curr_label]);
-                            evaluator.transform_to_ntt_inplace(label_results[curr_label]);
-                        }
-
-                        // Compute products and aggregate the rest of the coefficients
-                        while (++s < block.batched_label_coeffs_.size())
-                        {
-                            // label_result += coeff[s] * x^s;
-                            if (block.batched_label_coeffs_[s].is_zero() == false)
-                            {
-                                // Process only products where the label coefficient is non-zero to avoid
-                                // transparent ciphertexts
-                                evaluator.multiply_plain(powers[batch][s], block.batched_label_coeffs_[s], temp);
-                                evaluator.add(temp, label_results[curr_label], label_results[curr_label ^ 1]);
-                                curr_label ^= 1;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // No label polynomial coefficients are present
-                        label_results[curr_label] = powers[batch][0];
+                        // Compute the label result and save immediately to stream
+                        cache.batched_interp_polyn.eval(powers[bundle_idx]).save(ss);
+                        pkg.label_data = ss.str();
                     }
 
-                    // Randomize the result by adding the matching result
-                    evaluator.add(running_results[curr_result], label_results[curr_label], label_results[curr_label ^ 1]);
-                    curr_label ^= 1;
-
-                    // Transform label result back from NTT form
-                    evaluator.transform_from_ntt_inplace(label_results[curr_label]);
-                }
-
-                // Transform matching result back from NTT form
-                evaluator.transform_from_ntt_inplace(running_results[curr_result]);
-
-                // Send the compressed result
-                ResultPackage pkg;
-                pkg.bundle_idx = batch;
-
-                // Modulus switch to the lowest level before saving
-                CiphertextCompressor &compressor = *session_context.compressor();
-                compressor.mod_switch(running_results[curr_result], compressed_result);
-
-                stringstream ss;
-                compressor.compressed_save(compressed_result, ss);
-                pkg.data = ss.str();
-                ss.seekp(0, ios::beg);
-
-                if (params_.use_labels())
-                {
-                    // Modulus switch label to the lowest level before saving
-                    compressor.mod_switch(label_results[curr_label], compressed_result);
-
-                    compressor.compressed_save(compressed_result, ss);
-                    pkg.label_data = ss.str();
-                }
-
-                // Start sending on the channel
-                channel.send(client_id, pkg);
-
-                // Done with this block; atomically increase processed_blocks
-                processed_blocks++;
+                    // Start sending on the channel
+                    channel.send(client_id, pkg);
+                });
             }
-
-            Log::debug("Thread %d sent %d blocks", thread_index, processed_blocks);
         }
 
         void Sender::compute_batch_powers(
             vector<Ciphertext> &batch_powers,
             SenderSessionContext &session_context,
             const WindowingDag &dag,
-            WindowingDag::State &state,
-            MemoryPoolHandle pool
-        ) {
+            WindowingDag::State &state)
+        {
             if (batch_powers.size() != params_.split_size() + 1)
             {
                 std::cout << batch_powers.size() << " != " << params_.split_size() + 1 << std::endl;
@@ -374,8 +220,8 @@ namespace apsi
                 }
 
                 evaluator.multiply(
-                    batch_powers[node.inputs[0]], batch_powers[node.inputs[1]], batch_powers[node.output], pool);
-                evaluator.relinearize_inplace(batch_powers[node.output], session_context.relin_keys_, pool);
+                    batch_powers[node.inputs[0]], batch_powers[node.inputs[1]], batch_powers[node.output]);
+                evaluator.relinearize_inplace(batch_powers[node.output], session_context.relin_keys_);
 
                 // a simple write should be sufficient but lets be safe
                 exp = WindowingDag::NodeState::Pending;

@@ -9,6 +9,7 @@
 #include <memory>
 #include <utility>
 #include <vector>
+#include <set>
 
 // GSL
 #include <gsl/span>
@@ -57,9 +58,10 @@ namespace apsi
             virtual void add_data(std::map<Item, monostate> &data, size_t thread_count) = 0;
 
             /**
-            Returns the whole DB cache. The value at index i is the set of caches of BinBundles at bundle index i.
+            Returns a set of DB cache references corresponding to the bundles at the given
+            bundle index.
             */
-            std::vector<std::vector<&BinBundleCache> > get_cache();
+            std::set<BinBundleCache&> get_cache(std::size_t bundle_idx);
 
             const PSIParams &get_params() const
             {

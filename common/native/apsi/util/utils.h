@@ -5,8 +5,10 @@
 
 #include <string>
 #include <cstdint>
+#include <cstddef>
 #include <vector>
 #include <type_traits>
+#include <utility>
 #include "apsi/util/stopwatch.h"
 
 namespace apsi
@@ -36,6 +38,16 @@ namespace apsi
         {
             return ((val + step - 1) / step) * step;
         }
+
+        /**
+        Partitions count many points into partition_count many disjoint parts as equally as
+        possible. If count or partition_count is zero, the result is empty. If partition_count
+        if larger than count, only count many partitions will be returned, each of size 1.
+        The return value is a vector of pairs of points, where each pair contains the start
+        and one-past-end points for the partition.
+        */
+        auto partition_evenly(std::size_t count, std::size_t partition_count)
+            -> std::vector<std::pair<std::size_t, std::size_t>>;
 
         extern Stopwatch sender_stop_watch, recv_stop_watch;
     } // namespace util

@@ -72,10 +72,6 @@ namespace apsi
             encryptor_ = make_unique<Encryptor>(seal_context_, public_key_, secret_key_);
             decryptor_ = make_unique<Decryptor>(seal_context_, secret_key_);
 
-            // Initializing tools for dealing with compressed ciphertexts
-            compressor_ =
-                make_unique<CiphertextCompressor>(seal_context_, MemoryManager::GetPool(mm_prof_opt::FORCE_NEW));
-
             stringstream relin_keys_ss;
             Serializable<RelinKeys> relin_keys = generator.relin_keys();
             relin_keys.save(relin_keys_ss, compr_mode_type::deflate);
@@ -554,9 +550,8 @@ namespace apsi
 
                 // recover the sym poly values
                 has_result = false;
-                stringstream ss(pkg.data);
 
-                compressor_->compressed_load(ss, tmp);
+                get_ciphertext(seal_context_, tmp, pkg.data);
                 if (first && thread_idx == 0)
                 {
                     first = false;
@@ -588,10 +583,7 @@ namespace apsi
 
                 if (has_result && get_params().use_labels())
                 {
-                    std::stringstream ss(pkg.label_data);
-
-                    compressor_->compressed_load(ss, tmp);
-
+                    get_ciphertext(seal_context_, tmp, pkg.label_data);
                     decryptor_->decrypt(tmp, p);
 
                     // make sure its the right size. decrypt will shorted when there are zero coeffs at the top.

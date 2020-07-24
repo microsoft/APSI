@@ -32,41 +32,52 @@ namespace apsi
         ourselves. Instead we assume they've been precomputed and accept the powers: (C, C², C³, ...) as input. The
         number of powers provided MUST be equal to plaintext_polyn_coeffs_.size()-1.
         */
-        Ciphertext BatchedPlaintextPolyn::eval(
-            const vector<Ciphertext> &ciphertext_powers, const SenderSessionContext &session_context)
+        Ciphertext BatchedPlaintextPolyn::eval(const vector<Ciphertext> &ciphertext_powers) const
         {
 #ifdef SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT
             static_assert(false,
                 "SEAL must be built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF"); 
 #endif
-#ifdef APSI_DEBUG
-            if (ciphertext_powers.empty())
+            // We have no way of producing fresh ciphertexts in the Sender class, so we
+            // can't tolerate a situation where the polynomial evaluation results in just
+            // a plaintext batched_coeffs_[0]. The query must be used.
+            if (batched_coeffs_.size() < 2)
             {
-                throw invalid_argument("no ciphertext powers given");
+                throw logic_error("cannot evaluate a constant polynomial");
             }
+
+            // We need to have enough ciphertext powers
             if (batched_coeffs_.size() > ciphertext_powers.size())
             {
                 throw invalid_argument("not enough ciphertext powers available");
             }
-#endif
-            const SEALContext &seal_context = *session_context.seal_context();
-            Evaluator &evaluator = *session_context.evaluator();
+
+            const SEALContext &seal_context = *session_context_.seal_context();
+            Evaluator &evaluator = *session_context_.evaluator();
 
             // Lowest degree terms are stored in the lowest index positions in vectors.
-            // Specifically, ciphertext_powers[0] is a dummy encryption of 1 (in each slot),
-            // and batched_coeffs_.back() is a plaintext encoding 1 (the polynomial is monic),
-            // although this isn't strictly speaking necessary. The other plaintexts can be
-            // identically zero. To avoid having to check them, we SEAL should be built with
-            // SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF. Both ciphertext_powers and the
-            // batched_coeffs_ are assumed to be in NTT form. The return value is not in NTT
-            // form.
-            Ciphertext temp, result;
-            evaluator.multiply_plain(ciphertext_powers[0], batched_coeffs_[0], result);
-            for (size_t i = 1; i < batched_coeffs_.size(); i++)
+            // Specifically, ciphertext_powers[0] is the first power of the ciphertext data,
+            // but batched_coeffs_[0] is the constant coefficient. Hence, we need to shift
+            // the ciphertext_powers index by one to match the batched_coeffs index, and
+            // finally add the batched_coeffs_[0] plaintext to the output.
+            //
+            // This function only works when batched_coeffs_ has size at least 2, because
+            // otherwise there is no way to produce a ciphertext for the result at all.
+            // Because the plaintexts in batched_coeffs_ can be identically zero, SEAL should
+            // be built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF.
+            //
+            // Both ciphertext_powers and the batched_coeffs_ are assumed to be in NTT form.
+            // The return value is not in NTT form.
+            Ciphertext result, temp;
+            evaluator.multiply_plain(ciphertext_powers[0], batched_coeffs_[1], result);
+            for (size_t deg = 2; deg < batched_coeffs_.size(); deg++)
             {
-                evaluator.multiply_plain(ciphertext_powers[i], batched_coeffs_[i], temp);
+                evaluator.multiply_plain(ciphertext_powers[deg], batched_coeffs_[deg], temp);
                 evaluator.add_inplace(result, temp);
             }
+
+            // Finally add the constant coefficients batched_coeffs_[0]
+            evaluator.add_plain_inplace(result, batched_coeffs_[0]);
 
             // Transform back from NTT form
             evaluator.transform_from_ntt_inplace(result);
@@ -99,7 +110,7 @@ namespace apsi
                     uint64_t mask = ~((uint64_t(1) << irrelevant_bit_count) - 1);
                     SEAL_ITERATE(iter(result), result.size(), [&](auto I) {
                         // We only have a single RNS component so dereference once more
-                        SEAL_ITERATE(*I, result.poly_modulus_degree(), [&](auto J) {
+                        SEAL_ITERATE(*I, parms.poly_modulus_degree(), [&](auto J) {
                             J &= mask;
                         });
                     });
@@ -356,7 +367,8 @@ namespace apsi
         Gets an immutable reference to this BinBundle's cache. This will throw an exception if the cache is invalid.
         Check the cache before you wreck the cache.
         */
-        const BinBundleCache& get_cache()
+        template<typename L>
+        const BinBundleCache &BinBundle<L>::get_cache()
         {
             if (cach_invalid_)
             {
