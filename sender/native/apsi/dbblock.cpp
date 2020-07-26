@@ -217,19 +217,24 @@ namespace apsi
         template<typename L>
         BinBundle<L>::BinBundle(
             size_t num_bins,
-            shared_ptr<seal::SEALContext> seal_ctx,
-            shared_ptr<seal::Evaluator> evaluator,
-            shared_ptr<seal::BatchEncoder> batch_encoder,
-            seal::Modulus mod
+            SenderSessionContext session_context
         ) :
             cache_invalid_(true),
-            seal_ctx_(seal_ctx),
-            evaluator_(evaluator),
-            batch_encoder_(batch_encoder),
-            mod_(mod)
+            session_context_(session_context)
         {
             bins_.reserve(num_bins);
             cache_.felt_matching_polyns.reserve(num_bins);
+        }
+
+        /**
+        Returns the modulus that defines the finite field that we're working in
+        */
+        template<typename L>
+        Modulus BinBundle<L>::field_mod()
+        {
+            // Forgive me
+            ContextData &context_data = session_context_.seal_context()->first_context_data();
+            return context_data.parms().plain_modulus();
         }
 
         /**
@@ -401,6 +406,9 @@ namespace apsi
         */
         void UnlabeledBinBundle::regen_polyns()
         {
+            // Get the field modulus. We need this for polynomial calculations
+            Modulus mod = field_mod();
+
             // Clear the cache before we push to it
             cache_.felt_matching_polyns.clear();
 
@@ -408,7 +416,7 @@ namespace apsi
             for (map<felt_t, monostate> &bin : bins_)
             {
                 // Compute and cache the matching polynomial
-                FEltPolyn p = compute_matching_polyn(bin, mod_);
+                FEltPolyn p = compute_matching_polyn(bin, mod);
                 cache_.felt_matching_polyns.emplace_back(p);
             }
         }
@@ -419,6 +427,9 @@ namespace apsi
         */
         void LabeledBinBundle::regen_polyns()
         {
+            // Get the field modulus. We need this for polynomial calculations
+            Modulus mod = field_mod();
+
             // Clear the cache before we push to it
             cache_.felt_matching_polyns.clear();
             cache_.felt_interp_polyns.clear();
@@ -427,11 +438,11 @@ namespace apsi
             for (map<felt_t, monostate> &bin : bins_)
             {
                 // Compute and cache the matching polynomial
-                FEltPolyn p = compute_matching_polyn(bin, mod_);
+                FEltPolyn p = compute_matching_polyn(bin, mod);
                 cache_.felt_matching_polyns.emplace_back(p);
 
                 // Compute and cache the Newton polynomial
-                FEltPolyn p = compute_newton_polyn(bin, mod_);
+                FEltPolyn p = compute_newton_polyn(bin, mod);
                 cache_.felt_interp_polyns.emplace_back(p);
             }
         }

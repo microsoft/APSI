@@ -35,6 +35,10 @@ namespace apsi
         // Labels are always the size of items, i.e., ITEM_BIT_LEN bits long
         using FullWidthLabel = Item;
 
+        // A representation of item-label as a sequence of felt_t pairs, or item-unit as a sequence of pairs where the
+        // first element is felt_t and the second is monostate
+        using AlgItemLabel<L> = std::vector<std::pair<felt_t, L> >;
+
         template<typename L>
         class SenderDB
         {

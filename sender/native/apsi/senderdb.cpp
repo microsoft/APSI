@@ -45,10 +45,125 @@ namespace apsi
             add_data(data, thread_count);
         }
 
+        template<typename L>
+        Modulus BinBundle<L>::field_mod()
+        {
+            // Forgive me
+            ContextData &context_data = session_context_.seal_context()->first_context_data();
+            return context_data.parms().plain_modulus();
+        }
+
+        AlgItemLabel<felt_t> algebraize_item_label(Item &item, FullWidthLabel &label)
+        {
+            Modulus mod = field_mod();
+
+            // Convert the item from to a sequence of field elements. This is the "algebraic item".
+            vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(), mod);
+
+            // Convert the label from to a sequence of field elements. This is the "algebraic label".
+            vector<felt_t> alg_label = bits_to_field_elts(label.to_bitstring(), mod);
+
+            // The number of field elements necessary to represent both these values MUST be the same
+            if (alg_item.size() != alg_label.size())
+            {
+                throw logic_error("Items must take up as many slots as labels");
+            }
+
+            // Convert pair of vector to vector of pairs
+            AlgItemLabel<felt_t> ret;
+            for (size_t i = 0; i < alg_item.size(); i++)
+            {
+                ret.emplace_back({ alg_item[i], alg_label[i] });
+            }
+
+            return ret;
+        }
+
+        AlgItemLabel<monostate> algebraize_item(Item &item)
+        {
+            Modulus mod = field_mod();
+
+            // Convert the item from to a sequence of field elements. This is the "algebraic item".
+            vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(), mod);
+
+            // Convert vector to vector of pairs where the second element of each pair is monostate
+            AlgItemLabel<monostate> ret;
+            for (size_t i = 0; i < alg_item.size(); i++)
+            {
+                ret.emplace_back({ alg_item[i], monostate{} });
+            }
+
+            return ret;
+        }
+
+        vector<pair<AlgItemLabel<felt_t>, size_t> > preprocess_labeled_data(
+            const std::map<Item, FullWidthLabel> &data,
+            const vector<kuku::LocFunc> &cuckoo_funcs
+        ) {
+            // bins_per_item = ⌈item_bit_count / (mod_bitlen - 1)⌉
+            size_t modulus_size = (size_t)field_mod().bit_count();
+            size_t bins_per_item = (params_.item_bit_count() + (modulus_size-2)) / (modulus_size-1);
+
+            // Calculate the cuckoo indices for each item. Store every pair of (&item-label, cuckoo_idx) in a vector.
+            // Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the work of inserting
+            // the items into BinBundles
+            vector<pair<AlgItemLabel<felt_t>, size_t> > data_with_indices;
+            for (auto &item_label_pair : data)
+            {
+                // Serialize the data into field elements
+                Item &item = item_label_pair.first;
+                FullWidthLabel &label = item_label_pair.second;
+                AlgItemLabel<felt_t> alg_item_label = algebraize_item_label(item, label);
+
+                // Collect the cuckoo indices, ignoring duplicates
+                std::set<size_t> cuckoo_indices;
+                for (kuku::LocFunc &hash_func : normal_loc_funcs)
+                {
+                    // The cuckoo index must be aligned to number of bins an item takes up
+                    size_t cuckoo_idx = hash_func(item) * bins_per_item;
+
+                    // Store the data along with its index
+                    data_with_indices.push_back({ alg_item_label, cuckoo_idx });
+                }
+            }
+        }
+
+        vector<pair<AlgItemLabel<monostate>, size_t> > preprocess_unlabeled_data(
+            const std::map<Item, monostate> &data,
+            const vector<kuku::LocFunc> &cuckoo_funcs
+        ) {
+            // bins_per_item = ⌈item_bit_count / (mod_bitlen - 1)⌉
+            size_t modulus_size = (size_t)field_mod().bit_count();
+            size_t bins_per_item = (params_.item_bit_count() + (modulus_size-2)) / (modulus_size-1);
+
+            // Calculate the cuckoo indices for each item. Store every pair of (&item-label, cuckoo_idx) in a vector.
+            // Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the work of inserting
+            // the items into BinBundles
+            vector<pair<AlgItemLabel<felt_t>, size_t> > data_with_indices;
+            for (auto &item_label_pair : data)
+            {
+                // Serialize the data into field elements
+                Item &item = item_label_pair.first;
+                AlgItemLabel<monostate> alg_item = algebraize_item(item);
+
+                // Collect the cuckoo indices, ignoring duplicates
+                std::set<size_t> cuckoo_indices;
+                for (kuku::LocFunc &hash_func : normal_loc_funcs)
+                {
+                    // The cuckoo index must be aligned to number of bins an item takes up
+                    size_t cuckoo_idx = hash_func(item) * bins_per_item;
+
+                    // Store the data along with its index
+                    data_with_indices.push_back({ alg_item, cuckoo_idx });
+                }
+            }
+        }
+
         /**
         Inserts the given data into the database, using at most thread_count threads
         */
-        void LabeledSenderDB<vector<uint8_t> >::add_data(map<Item, vector<uint8_t> > &data, size_t thread_count)
+        template<typename L>
+        void add_data(std::map<Item, FullWidthLabel> &data, size_t thread_count)
         {
             // Lock the database for writing
             auto lock = db_lock_.acquire_write();
@@ -57,6 +172,12 @@ namespace apsi
 
             if (values.stride() != params_.label_byte_count())
                 throw invalid_argument("unexpacted label length");
+
+
+            const SEAL::Modulus &mod = params_.seal_params_.encryption_params.plain_modulus();
+            // bins_per_item = ⌈item_bit_count / (mod_bitlen - 1)⌉
+            size_t modulus_size = (size_t)mod.bit_count();
+            size_t bins_per_item = (params_.item_bit_count() + (modulus_size-2)) / (modulus_size-1);
 
             // Construct the cuckoo hash functions
             vector<kuku::LocFunc> normal_loc_funcs;
@@ -69,24 +190,8 @@ namespace apsi
                 normal_loc_funcs.push_back(f);
             }
 
-            // Calculate the cuckoo indices for each item. Store every pair of (&item-label, cuckoo_idx) in a vector.
-            // Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the work of inserting
-            // the items into BinBundles
-            vector<pair<&pair<Item, vector<uint8_t> >, size_t> > data_with_indices;
-            for (auto &item_label_pair : data)
-            {
-                Item &item = item_label_pair.first;
-                // Collect the cuckoo indices, ignoring duplicates
-                std::set<size_t> cuckoo_indices;
-                for (kuku::LocFunc &hash_func : normal_loc_funcs)
-                {
-                    // The cuckoo index must be aligned to number of bins an item takes up
-                    size_t cuckoo_idx = hash_func(item) * bins_per_item;;
-
-                    // Store the data along with its index
-                    data_with_indices.push_back({ item_label_pair, cuckoo_idx });
-                }
-            }
+            vector<pair<AlgItemLabel<felt_t>, size_t> > data_with_indices
+                = preprocess_labeled_data(data, normal_loc_funcs);
 
             // Sort by cuckoo index
             sort(
@@ -176,7 +281,7 @@ namespace apsi
         */
         template<typename L>
         void SenderDB<L>::add_data_worker(
-            const gsl::span<pair<&pair<Item, vector<uint8_t> >, size_t> > data_with_indices;
+            const gsl::span<pair<&pair<felt_t, L>, size_t> > data_with_indices;
         ) {
             STOPWATCH(sender_stop_watch, "LabeledSenderDB::add_data_worker");
 
@@ -184,7 +289,7 @@ namespace apsi
 
             // bins_per_item = ⌈item_bit_count / (mod_bitlen - 1)⌉
             size_t modulus_size = (size_t)mod.bit_count();
-            size_t bins_per_item = (params_.item_bit_count() + (modulus_size-2)) / (modulus_size-1)
+            size_t bins_per_item = (params_.item_bit_count() + (modulus_size-2)) / (modulus_size-1);
             size_t bins_per_bundle = params_.batch_size();
 
             // Keep track of all the bundle indices that we touch
@@ -246,7 +351,7 @@ namespace apsi
                 if (!inserted)
                 {
                     // Make a fresh BinBundle and insert
-                    BinBundle new_bin_bundle(SO, MANY, ARGUMENTS);
+                    BinBundle new_bin_bundle(bins_per_bundle, session_context_);
                     int res = new_bin_bundle.multi_insert_for_real(item_label_felt_pairs, bin_idx);
 
                     // If even that failed, I don't know what could've happened
