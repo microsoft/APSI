@@ -5,6 +5,7 @@
 #include <iostream>
 #include <map>
 #include <sstream>
+#include <stdexcept>
 
 // APSI
 #include "apsi/logging/log.h"
@@ -34,20 +35,20 @@ namespace apsi
 
     namespace receiver
     {
-        Receiver::Receiver(size_t thread_count) : thread_count_(thread_count), field_(nullptr), slot_count_(0)
+        Receiver::Receiver(size_t thread_count) : thread_count_(thread_count)
         {
-            if (thread_count_ == 0)
+            if (thread_count < 1)
             {
-                throw invalid_argument("thread_count must be positive");
+                throw invalid_argument("thread_count must be at least 1");
             }
         }
 
         Receiver::Receiver(const PSIParams &params, size_t thread_count)
-            : params_(make_unique<PSIParams>(params)), thread_count_(thread_count), field_(nullptr), slot_count_(0)
+            : params_(make_unique<PSIParams>(params)), thread_count_(thread_count)
         {
-            if (thread_count_ == 0)
+            if (thread_count < 1)
             {
-                throw invalid_argument("thread_count must be positive");
+                throw invalid_argument("thread_count must be at least 1");
             }
 
             // We have params, so initialize
@@ -59,14 +60,9 @@ namespace apsi
             STOPWATCH(recv_stop_watch, "Receiver::initialize");
             Log::info("Initializing Receiver");
 
-            field_ = make_unique<FField>(Modulus(get_params().ffield_characteristic()), get_params().ffield_degree());
-
-            slot_count_ = get_params().batch_size();
-
             seal_context_ = SEALContext::Create(get_params().encryption_params());
             KeyGenerator generator(seal_context_);
 
-            public_key_ = generator.public_key();
             secret_key_ = generator.secret_key();
 
             encryptor_ = make_unique<Encryptor>(seal_context_, public_key_, secret_key_);

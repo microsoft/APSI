@@ -6,7 +6,7 @@
 #include <utility>
 
 // APSI
-#include "apsi/dbblock.h"
+#include "apsi/binbundle.h"
 #include "apsi/logging/log.h"
 #include "apsi/util/interpolate.h"
 
@@ -52,8 +52,8 @@ namespace apsi
                 throw invalid_argument("not enough ciphertext powers available");
             }
 
-            const SEALContext &seal_context = *session_context_.seal_context();
-            Evaluator &evaluator = *session_context_.evaluator();
+            const SEALContext &seal_context = *crypto_context_.seal_context();
+            Evaluator &evaluator = *crypto_context_.evaluator();
 
             // Lowest degree terms are stored in the lowest index positions in vectors.
             // Specifically, ciphertext_powers[0] is the first power of the ciphertext data,
@@ -217,10 +217,10 @@ namespace apsi
         template<typename L>
         BinBundle<L>::BinBundle(
             size_t num_bins,
-            SenderSessionContext session_context
+            CryptoContext crypto_context
         ) :
             cache_invalid_(true),
-            session_context_(session_context)
+            crypto_context_(crypto_context)
         {
             bins_.reserve(num_bins);
             cache_.felt_matching_polyns.reserve(num_bins);
@@ -233,7 +233,7 @@ namespace apsi
         Modulus BinBundle<L>::field_mod()
         {
             // Forgive me
-            ContextData &context_data = session_context_.seal_context()->first_context_data();
+            ContextData &context_data = crypto_context_.seal_context()->first_context_data();
             return context_data.parms().plain_modulus();
         }
 

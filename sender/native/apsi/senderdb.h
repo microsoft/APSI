@@ -15,7 +15,7 @@
 #include <gsl/span>
 
 // APSI
-#include "apsi/dbblock.h"
+#include "apsi/binbundle.h"
 #include "apsi/item.h"
 #include "apsi/psiparams.h"
 #include "apsi/sendersessioncontext.h"

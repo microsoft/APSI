@@ -56,8 +56,8 @@ namespace apsi
             Log::info("Start processing query");
 
             // Create the session context; we don't have to re-create the SEALContext every time
-            SenderSessionContext session_context(seal_context_);
-            session_context.set_evaluator(relin_keys);
+            CryptoContext crypto_context(seal_context_);
+            crypto_context.set_evaluator(relin_keys);
 
             /* Receive client's query data. */
             int num_of_powers = static_cast<int>(query.size());
@@ -123,7 +123,7 @@ namespace apsi
                 threads.emplace_back([&, t]() {
                     query_worker(
                         partitions[t], powers,
-                        session_context, dag, states, client_id, channel);
+                        crypto_context, dag, states, client_id, channel);
                 });
             }
 
@@ -139,7 +139,7 @@ namespace apsi
         void Sender::query_worker(
             pair<size_t, size_t> bundle_idx_bounds,
             vector<vector<Ciphertext>> &powers,
-            const SenderSessionContext &session_context,
+            const CryptoContext &crypto_context,
             WindowingDag &dag,
             vector<WindowingDag::State> &states,
             const vector<SEAL_BYTE> &client_id,
@@ -154,7 +154,7 @@ namespace apsi
             for (size_t bundle_idx = bundle_idx_start; bundle_idx < bundle_idx_end; bundle_idx++)
             {
                 // Compute all powers of the query
-                compute_batch_powers(powers[bundle_idx], session_context, dag, states[bundle_idx]);
+                compute_batch_powers(powers[bundle_idx], crypto_context, dag, states[bundle_idx]);
 
                 // Lock the database from modifications
                 auto lock = sender_db_->get_reader_lock();
@@ -194,7 +194,7 @@ namespace apsi
 
         void Sender::compute_batch_powers(
             vector<Ciphertext> &batch_powers,
-            SenderSessionContext &session_context,
+            CryptoContext &crypto_context,
             const WindowingDag &dag,
             WindowingDag::State &state)
         {
@@ -205,7 +205,7 @@ namespace apsi
             }
 
             size_t idx = static_cast<size_t>((*state.next_node)++);
-            Evaluator &evaluator = *session_context.evaluator();
+            Evaluator &evaluator = *crypto_context.evaluator();
             while (idx < dag.nodes.size())
             {
                 auto &node = dag.nodes[idx];
@@ -229,7 +229,7 @@ namespace apsi
 
                 evaluator.multiply(
                     batch_powers[node.inputs[0]], batch_powers[node.inputs[1]], batch_powers[node.output]);
-                evaluator.relinearize_inplace(batch_powers[node.output], session_context.relin_keys_);
+                evaluator.relinearize_inplace(batch_powers[node.output], crypto_context.relin_keys_);
 
                 // a simple write should be sufficient but lets be safe
                 exp = WindowingDag::NodeState::Pending;

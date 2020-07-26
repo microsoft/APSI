@@ -123,7 +123,7 @@ namespace apsi
             */
             void query_worker(
                 std::pair<std::size_t, std::size_t> bundle_idx_bounds,
-                std::vector<std::vector<seal::Ciphertext>> &powers, const SenderSessionContext &session_context,
+                std::vector<std::vector<seal::Ciphertext>> &powers, const CryptoContext &crypto_context,
                 WindowingDag &dag, std::vector<WindowingDag::State> &states,
                 const std::vector<seal::SEAL_BYTE> &client_id, network::Channel &channel);
 
@@ -138,7 +138,7 @@ namespace apsi
             @params[out] all_powers All powers computed from the input for the specified batch.
             */
             void compute_batch_powers(
-                std::vector<seal::Ciphertext> &batch_powers, SenderSessionContext &session_context,
+                std::vector<seal::Ciphertext> &batch_powers, CryptoContext &crypto_context,
                 const WindowingDag &dag, WindowingDag::State &state);
 
             PSIParams params_;

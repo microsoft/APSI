@@ -6,7 +6,6 @@
 // STD
 #include <memory>
 #include <string>
-#include <unordered_map>
 
 // SEAL
 #include "seal/context.h"
@@ -19,17 +18,16 @@
 #include "seal/evaluator.h"
 
 // APSI
-#include "apsi/util/sealcompress.h"
 #include "apsi/network/network_utils.h"
 
 namespace apsi
 {
     namespace sender
     {
-        class SenderSessionContext
+        class CryptoContext
         {
         public:
-            SenderSessionContext(
+            CryptoContext(
                 std::shared_ptr<seal::SEALContext> context) : seal_context_(std::move(context))
             {
                 encoder_ = std::make_shared<seal::BatchEncoder>(seal_context_);

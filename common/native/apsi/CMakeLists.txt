@@ -6,7 +6,6 @@ target_sources(common
         ${CMAKE_CURRENT_LIST_DIR}/item.cpp
 )
 
-add_subdirectory(ffield)
 add_subdirectory(logging)
 add_subdirectory(network)
 add_subdirectory(util)
@@ -15,6 +14,7 @@ add_subdirectory(oprf)
 install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/apsi.h
+        ${CMAKE_CURRENT_LIST_DIR}/cryptocontext.h
         ${CMAKE_CURRENT_LIST_DIR}/item.h
         ${CMAKE_CURRENT_LIST_DIR}/psiparams.h
         ${CMAKE_CURRENT_LIST_DIR}/result_package.h
