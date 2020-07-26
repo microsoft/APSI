@@ -43,6 +43,10 @@ namespace apsi
             const string &relin_keys, const map<uint64_t, vector<string>> &query, const vector<SEAL_BYTE> &client_id,
             Channel &channel)
         {
+            // Acquire a read lock on the database
+            auto lock = sender_db_lock_.acquire_read();
+
+            // Check that the database is set
             if (!sender_db_)
             {
                 throw logic_error("SenderDB is not set");
@@ -149,7 +153,11 @@ namespace apsi
             // Compute the powers for each bundle index and loop over the BinBundles
             for (size_t bundle_idx = bundle_idx_start; bundle_idx < bundle_idx_end; bundle_idx++)
             {
+                // Compute all powers of the query
                 compute_batch_powers(powers[bundle_idx], session_context, dag, states[bundle_idx]);
+
+                // Lock the database from modifications
+                auto lock = sender_db_->get_reader_lock();
 
                 // Next, iterate over each bundle with this bundle index
                 auto bundle_caches = sender_db_->get_cache(bundle_idx).size();

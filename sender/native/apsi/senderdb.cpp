@@ -31,6 +31,9 @@ namespace apsi
 
         void LabeledSenderDB::clear_db()
         {
+            // Lock the database for writing
+            auto lock = db_lock_.acquire_write();
+
             bin_bundles_.clear();
         }
 
@@ -47,6 +50,9 @@ namespace apsi
         */
         void LabeledSenderDB<vector<uint8_t> >::add_data(map<Item, vector<uint8_t> > &data, size_t thread_count)
         {
+            // Lock the database for writing
+            auto lock = db_lock_.acquire_write();
+
             STOPWATCH(sender_stop_watch, "LabeledSenderDB::add_data");
 
             if (values.stride() != params_.label_byte_count())
