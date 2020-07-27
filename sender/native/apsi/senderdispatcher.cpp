@@ -13,7 +13,6 @@
 #include "apsi/senderdispatcher.h"
 
 // SEAL
-#include "seal/publickey.h"
 #include "seal/relinkeys.h"
 
 using namespace std;
@@ -69,9 +68,9 @@ namespace apsi
                     dispatch_get_parameters(sender_op, channel);
                     break;
 
-                case SOP_preprocess:
-                    Log::info("Received Preprocess request");
-                    dispatch_preprocess(sender_op, channel);
+                case SOP_oprf:
+                    Log::info("Received OPRF request");
+                    dispatch_oprf(sender_op, channel);
                     break;
 
                 case SOP_query:
@@ -93,13 +92,13 @@ namespace apsi
             channel.send_get_parameters_response(sender_op->client_id, sender_->get_params());
         }
 
-        void SenderDispatcher::dispatch_preprocess(shared_ptr<SenderOperation> sender_op, Channel &channel)
+        void SenderDispatcher::dispatch_oprf(shared_ptr<SenderOperation> sender_op, Channel &channel)
         {
-            auto preprocess_op = dynamic_pointer_cast<SenderOperationPreprocess>(sender_op);
+            auto oprf_op = dynamic_pointer_cast<SenderOperationOPRF>(sender_op);
 
-            vector<SEAL_BYTE> result(preprocess_op->buffer.size());
-            OPRFSender::ProcessQueries(preprocess_op->buffer, *oprf_key_, result);
-            channel.send_preprocess_response(sender_op->client_id, result);
+            vector<SEAL_BYTE> result(oprf_op->data.size());
+            OPRFSender::ProcessQueries(oprf_op->data, *oprf_key_, result);
+            channel.send_oprf_response(sender_op->client_id, result);
         }
 
         void SenderDispatcher::dispatch_query(shared_ptr<SenderOperation> sender_op, Channel &channel)

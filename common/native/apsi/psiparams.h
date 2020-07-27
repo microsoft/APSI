@@ -159,50 +159,6 @@ namespace apsi
             return seal_params_.encryption_params;
         }
 
-        inline std::uint32_t max_supported_degree() const
-        {
-            return seal_params_.max_supported_degree;
-        }
-
-        /**
-        Extension field parameters and getters.
-        */
-        struct FFieldParams
-        {
-            std::uint64_t characteristic;
-            std::uint32_t degree;
-        }; // struct FFieldParams
-
-        const FFieldParams &ffield_params() const
-        {
-            return ffield_params_;
-        }
-
-        inline std::uint64_t ffield_characteristic() const
-        {
-            return ffield_params_.characteristic;
-        }
-
-        inline std::uint32_t ffield_degree() const
-        {
-            return ffield_params_.degree;
-        }
-
-        /**
-        Manual setters.
-        */
-        void set_sender_bin_size(std::size_t size)
-        {
-            logging::Log::debug("Manually setting sender bin size to be %i", size);
-            psiconf_params_.sender_bin_size = size;
-        }
-
-        void set_split_count(std::size_t count)
-        {
-            logging::Log::debug("Manually setting split count to be %i", count);
-            table_params_.split_count = count;
-        }
-
         /**
         Other getters.
         */

@@ -86,7 +86,7 @@ namespace apsi
                 for (size_t bundle_idx = 0; bundle_idx < powers.size(); bundle_idx++)
                 {
                     // Load input^power to powers[bundle_idx][power-1]
-                    get_ciphertext(seal_context_, powers[bundle_idx][power - 1], q.second[bundle_idx]);
+                    from_string(seal_context_, q.second[bundle_idx], powers[bundle_idx][power - 1]);
                 }
             }
 
@@ -170,20 +170,13 @@ namespace apsi
                     ResultPackage pkg;
                     pkg.bundle_idx = bundle_idx;
 
-                    stringstream ss;
-
-                    // Compute the matching result and save immediately to stream
-                    cache.batched_matching_polyn.eval(powers[bundle_idx]).save(ss);
-
-                    // Copy the data to the package and reset the stream write head
-                    pkg.data = ss.str();
-                    ss.seekp(0, ios::beg);
+                    // Compute the matching result, convert to a string, and write to pkg
+                    pkg.data = to_string(cache.batched_matching_polyn.eval(powers[bundle_idx]));
 
                     if (cache.batched_interp_polyn)
                     {
-                        // Compute the label result and save immediately to stream
-                        cache.batched_interp_polyn.eval(powers[bundle_idx]).save(ss);
-                        pkg.label_data = ss.str();
+                        // Compute the label result, convert to a string, and write to pkg
+                        pkg.label_data = to_string(cache.batched_interp_polyn.eval(powers[bundle_idx]));
                     }
 
                     // Start sending on the channel

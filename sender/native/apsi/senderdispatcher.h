@@ -47,9 +47,9 @@ namespace apsi
                 std::shared_ptr<network::SenderOperation> sender_op, network::Channel &channel);
 
             /**
-            Dispatch a Preprocess request to the Sender.
+            Dispatch an OPRF query request to the Sender.
             */
-            void dispatch_preprocess(std::shared_ptr<network::SenderOperation> sender_op, network::Channel &channel);
+            void dispatch_oprf(std::shared_ptr<network::SenderOperation> sender_op, network::Channel &channel);
 
             /**
             Dispatch a Query request to the Sender.

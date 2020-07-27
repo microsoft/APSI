@@ -10,13 +10,7 @@
 
 // APSI
 #include "apsi/item.h"
-#include "apsi/sendersessioncontext.h" 
-
-// SEAL
-#include "seal/context.h"
-#include "seal/evaluator.h"
-#include "seal/plaintext.h"
-#include "seal/batchencoder.h"
+#include "apsi/cryptocontext.h" 
 
 namespace apsi
 {

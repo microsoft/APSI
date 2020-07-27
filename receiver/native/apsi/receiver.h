@@ -13,18 +13,13 @@
 #include "apsi/network/channel.h"
 #include "apsi/psiparams.h"
 #include "apsi/util/db_encoding.h"
+#include "apsi/cryptocontext.h"
 
 // Kuku
-#include "kuku/kuku.h"
+#include <kuku/kuku.h>
 
 // SEAL
-#include "seal/batchencoder.h"
-#include "seal/biguint.h"
-#include "seal/context.h"
-#include "seal/decryptor.h"
-#include "seal/encryptor.h"
-#include "seal/relinkeys.h"
-#include "seal/secretkey.h"
+#include <seal/util/defines.h>
 
 namespace apsi
 {
@@ -54,6 +49,11 @@ namespace apsi
             Generates a new set of keys to use for queries.
             */
             void reset_keys();
+
+            bool is_initialized() const
+            {
+                return params_ && crypto_context_;
+            }
 
             /************************************************************************************************************************************
             Perform a full query.
@@ -85,13 +85,13 @@ namespace apsi
             Obfuscates the items and initializes the given vector with the buffer that must be sent to the Sender for
             OPRF processing.
             */
-            void obfuscate_items(std::vector<Item> &items, std::vector<seal::SEAL_BYTE> &items_buffer);
+            void obfuscate_items(const std::vector<Item> &items, std::vector<seal::SEAL_BYTE> &items_buffer);
 
             /**
             Process obfuscated items received from Sender.
             Remove the Receiver obfuscation so only the Sender obfuscation remains.
             */
-            void deobfuscate_items(std::vector<Item> &items, std::vector<seal::SEAL_BYTE> &items_buffer);
+            void deobfuscate_items(const std::vector<seal::SEAL_BYTE> &items_buffer, std::vector<Item> &items);
 
             /**
             Perform a handshake between the Sender and this Receiver.
@@ -99,27 +99,6 @@ namespace apsi
             A handshake needs to be performed before any full query call. Otherwise, default parameters will be used.
             */
             void handshake(network::Channel &channel);
-
-            /**
-            Get current configuration parameters
-            */
-            const PSIParams &get_params() const
-            {
-                if (nullptr == params_.get())
-                {
-                    throw new std::logic_error("PSIParams have not been initialized");
-                }
-
-                return *params_.get();
-            }
-
-            /**
-            Get the relinearization keys
-            */
-            const std::string &relin_keys() const
-            {
-                return relin_keys_;
-            }
 
         private:
             /**
@@ -206,15 +185,24 @@ namespace apsi
                 //return secret_key_;
             //}
 
+            // Data for a currently executing query 
+            std::unique_ptr<
+                std::pair<std::map<std::uint64_t, std::vector<std::string>>, std::unique_ptr<kuku::KukuTable>>>
+                query_data_;
+
             void initialize();
 
             std::size_t thread_count_;
 
             std::unique_ptr<PSIParams> params_;
 
-            std::shared_ptr<seal::SEALContext> seal_context_;
+            std::unique_ptr<CryptoContext> crypto_context_;
 
-            seal::SecretKey secret_key_;
+            std::string relin_keys_;
+
+            std::unique_ptr<oprf::OPRFReceiver> oprf_receiver_;
+
+            //seal::SecretKey secret_key_;
 
             //std::unique_ptr<seal::Encryptor> encryptor_;
 
@@ -224,14 +212,6 @@ namespace apsi
 
             //std::size_t slot_count_;
 
-            // Preprocess result
-            std::unique_ptr<
-                std::pair<std::map<std::uint64_t, std::vector<std::string>>, std::unique_ptr<kuku::KukuTable>>>
-                preprocess_result_;
-
-            std::string relin_keys_;
-
-            std::shared_ptr<oprf::OPRFReceiver> oprf_receiver_;
         }; // class Receiver
     }      // namespace receiver
 } // namespace apsi
