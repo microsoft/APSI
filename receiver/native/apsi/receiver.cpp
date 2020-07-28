@@ -55,25 +55,43 @@ namespace apsi
             initialize();
         }
 
+        void Receiver::reset_keys()
+        {
+            if (!is_initialized())
+            {
+                throw logic_error("receiver is uninitialized");
+            }
+
+            // Generate new keys
+            KeyGenerator generator(crypto_context_->seal_context());
+
+            // Set the symmetric key, encryptor, and decryptor
+            crypto_context_->set_secret(generator.secret_key());
+
+            // Create Serializable<RelinKeys> and write them directory to a stream
+            stringstream relin_keys_ss;
+            Serializable<RelinKeys> relin_keys(generator.relin_keys());
+            relin_keys.save(relin_keys_ss, compr_mode_type::deflate);
+
+            // Save the relinearization keys string
+            relin_keys_ = relin_keys_ss.str();
+        }
+
         void Receiver::initialize()
         {
             STOPWATCH(recv_stop_watch, "Receiver::initialize");
             Log::info("Initializing Receiver");
 
-            seal_context_ = SEALContext::Create(get_params().encryption_params());
-            KeyGenerator generator(seal_context_);
+            if (!params_)
+            {
+                throw logic_error("parameters are not set");
+            }
 
-            secret_key_ = generator.secret_key();
+            // Initialize the CryptoContext with a new SEALContext
+            crypto_context_ = make_unique<CryptoContext>(SEALContext::Create(params_.encryption_params()));
 
-            encryptor_ = make_unique<Encryptor>(seal_context_, public_key_, secret_key_);
-            decryptor_ = make_unique<Decryptor>(seal_context_, secret_key_);
-
-            stringstream relin_keys_ss;
-            Serializable<RelinKeys> relin_keys = generator.relin_keys();
-            relin_keys.save(relin_keys_ss, compr_mode_type::deflate);
-            relin_keys_ = relin_keys_ss.str();
-
-            batch_encoder_ = make_shared<FFieldBatchEncoder>(seal_context_, *field_);
+            // Create new keys
+            reset_keys();
 
             Log::info("Receiver initialized");
         }
@@ -83,9 +101,9 @@ namespace apsi
             STOPWATCH(recv_stop_watch, "Receiver::query");
             Log::info("Receiver starting query");
 
-            if (nullptr == params_)
+            if (!is_initialized())
             {
-                throw runtime_error("No parameters have been configured.");
+                throw logic_error("receiver is uninitialized");
             }
 
             preprocess_result_ =
@@ -158,7 +176,7 @@ namespace apsi
                 SenderResponsePreprocess preprocess_resp;
                 chl.receive(preprocess_resp);
 
-                deobfuscate_items(items, preprocess_resp.buffer);
+                deobfuscate_items(preprocess_resp.buffer, items);
             }
 
             // Then get encrypted query
@@ -171,19 +189,20 @@ namespace apsi
             return decrypt_result(items, chl);
         }
 
-        void Receiver::obfuscate_items(std::vector<Item> &items, std::vector<SEAL_BYTE> &items_buffer)
+        void Receiver::obfuscate_items(const std::vector<Item> &items, std::vector<SEAL_BYTE> &items_buffer)
         {
             Log::info("Obfuscating items");
 
             items_buffer.resize(items.size() * oprf_query_size);
-            oprf_receiver_ = make_shared<OPRFReceiver>(items, items_buffer);
+            oprf_receiver_ = make_unique<OPRFReceiver>(items, items_buffer);
         }
 
-        void Receiver::deobfuscate_items(std::vector<Item> &items, std::vector<SEAL_BYTE> &items_buffer)
+        void Receiver::deobfuscate_items(const std::vector<SEAL_BYTE> &items_buffer, std::vector<Item> &items)
         {
             Log::info("Deobfuscating items");
 
             oprf_receiver_->process_responses(items_buffer, items);
+            oprf_receiver_.reset();
         }
 
         void Receiver::handshake(Channel &chl)

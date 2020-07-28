@@ -1,203 +1,216 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "stream_channel.h"
-#include "network_utils.h"
+// STD
+#include <utility>
+#include <cstddef>
+
+// APSI
+#include "apsi/network/stream_channel.h"
+#include "apsi/network/network_utils.h"
+
+// SEAL
+#include <seal/util/common.h>
 
 using namespace std;
 using namespace seal;
+using namespace seal::util;
 
 namespace apsi
 {
     namespace network
     {
-        StreamChannel::StreamChannel(istream &istream, ostream &ostream)
-            : istream_(istream), ostream_(ostream), receive_mutex_(make_unique<mutex>()),
-              send_mutex_(make_unique<mutex>())
-        {}
-
-        StreamChannel::~StreamChannel()
-        {}
-
         bool StreamChannel::receive(shared_ptr<SenderOperation> &sender_op)
         {
-            // Get the type
-            SenderOperationType type = read_operation_type();
+            lock_guard<mutex> lock(receive_mutex_);
 
+            // Get the SOP type
+            SenderOperationType type = read_sop_type();
+
+            bool ret = false;
             switch (type)
             {
-            case SOP_get_parameters:
-                sender_op = decode_get_parameters();
+            case SenderOperationType::SOP_PARMS:
+                sender_op = decode_parms_request();
+                ret = true;
                 break;
 
-            case SOP_preprocess:
-                sender_op = decode_preprocess();
+            case SenderOperationType::SOP_OPRF:
+                sender_op = decode_oprf_request();
+                ret = true;
                 break;
 
-            case SOP_query:
-                sender_op = decode_query();
+            case SenderOperationType::SOP_QUERY:
+                sender_op = decode_query_request();
+                ret = true;
                 break;
-
-            default:
-                throw runtime_error("Invalid SenderOperationType");
             }
 
-            bytes_received_ += sizeof(SenderOperationType);
-
-            return true;
+            return ret;
         }
 
-        bool StreamChannel::receive(SenderResponseGetParameters &response)
+        bool StreamChannel::receive(SenderResponseParms &response)
         {
-            // First part is message type
-            SenderOperationType senderOpType = read_operation_type();
+            lock_guard<mutex> lock(receive_mutex_);
 
-            if (senderOpType != SOP_get_parameters)
+            // Get the SOP type; this should be SOP_PARMS
+            SenderOperationType type = read_sop_type();
+
+            if (type != SenderOperationType::SOP_PARMS)
+            {
+                // Expected SOP_PARMS; something is wrong
                 return false;
+            }
 
             // PSIConfParams
-            istream_.read(reinterpret_cast<char *>(&response.psiconf_params), sizeof(PSIParams::PSIConfParams));
-
-            // TableParams
-            istream_.read(reinterpret_cast<char *>(&response.table_params), sizeof(PSIParams::TableParams));
-
-            // CuckooParams
-            istream_.read(reinterpret_cast<char *>(&response.cuckoo_params), sizeof(PSIParams::CuckooParams));
-
-            // SEALParams
-            response.seal_params.encryption_params.load(istream_);
-            istream_.read(reinterpret_cast<char *>(&response.seal_params.max_supported_degree), sizeof(uint32_t));
-
-            // FFieldParams
-            istream_.read(reinterpret_cast<char *>(&response.ffield_params), sizeof(PSIParams::FFieldParams));
-
+            in_.read(reinterpret_cast<char *>(&response.psiconf_params), sizeof(PSIParams::PSIConfParams));
             bytes_received_ += sizeof(PSIParams::PSIConfParams);
-            bytes_received_ += sizeof(PSIParams::TableParams);
-            bytes_received_ += sizeof(PSIParams::CuckooParams);
-            bytes_received_ += sizeof(PSIParams::SEALParams);
-            bytes_received_ += sizeof(PSIParams::FFieldParams);
-
-            return true;
-        }
-
-        void StreamChannel::send_get_parameters()
-        {
-            // We only need the type.
-            write_operation_type(SOP_get_parameters);
-        }
-
-        void StreamChannel::send_get_parameters_response(const vector<SEAL_BYTE> &client_id, const PSIParams &params)
-        {
-            // client_id is unused for StreamChannel.
-            write_operation_type(SOP_get_parameters);
-
-            // PSIConfParams
-            const PSIParams::PSIConfParams &psiconfparams = params.psiconf_params();
-            ostream_.write(reinterpret_cast<const char *>(&psiconfparams), sizeof(PSIParams::PSIConfParams));
 
             // TableParams
-            const PSIParams::TableParams &tableparams = params.table_params();
-            ostream_.write(reinterpret_cast<const char *>(&tableparams), sizeof(PSIParams::TableParams));
+            in_.read(reinterpret_cast<char *>(&response.table_params), sizeof(PSIParams::TableParams));
+            bytes_received_ += sizeof(PSIParams::TableParams);
 
             // CuckooParams
-            const PSIParams::CuckooParams &cuckooparams = params.cuckoo_params();
-            ostream_.write(reinterpret_cast<const char *>(&cuckooparams), sizeof(PSIParams::CuckooParams));
+            in_.read(reinterpret_cast<char *>(&response.cuckoo_params), sizeof(PSIParams::CuckooParams));
+            bytes_received_ += sizeof(PSIParams::CuckooParams);
 
             // SEALParams
-            uint32_t maxsd = params.max_supported_degree();
-            params.seal_params().encryption_params.save(ostream_);
-            ostream_.write(reinterpret_cast<const char *>(&maxsd), sizeof(uint32_t));
-
-            // FFieldParams
-            const PSIParams::FFieldParams &ffieldparams = params.ffield_params();
-            ostream_.write(reinterpret_cast<const char *>(&ffieldparams), sizeof(PSIParams::FFieldParams));
-
-            bytes_sent_ += sizeof(PSIParams::PSIConfParams);
-            bytes_sent_ += sizeof(PSIParams::TableParams);
-            bytes_sent_ += sizeof(PSIParams::CuckooParams);
-            bytes_sent_ += sizeof(PSIParams::SEALParams);
-            bytes_sent_ += sizeof(PSIParams::FFieldParams);
-        }
-
-        bool StreamChannel::receive(SenderResponsePreprocess &response)
-        {
-            // First part is message type
-            SenderOperationType type = read_operation_type();
-
-            if (type != SOP_preprocess)
-                return false;
-
-            // Size of buffer
-            streamsize size;
-            istream_.read(reinterpret_cast<char *>(&size), sizeof(streamsize));
-
-            // Actual buffer
-            response.buffer.resize(static_cast<size_t>(size));
-            istream_.read(reinterpret_cast<char *>(response.buffer.data()), size);
-
-            bytes_received_ += sizeof(streamsize);
-            bytes_received_ += static_cast<uint64_t>(size);
+            bytes_received_ += static_cast<uint64_t>(response.seal_params.encryption_params.load(in_));
 
             return true;
         }
 
-        void StreamChannel::send_preprocess(const vector<SEAL_BYTE> &buffer)
+        void StreamChannel::send_parms_request()
         {
-            // Type
-            write_operation_type(SOP_preprocess);
+            lock_guard<mutex> lock(send_mutex_);
 
-            // Size of buffer
-            streamsize size = static_cast<streamsize>(buffer.size());
-            ostream_.write(reinterpret_cast<const char *>(&size), sizeof(streamsize));
-
-            // Actual buffer
-            ostream_.write(reinterpret_cast<const char *>(buffer.data()), size);
-
-            bytes_sent_ += sizeof(streamsize);
-            bytes_sent_ += static_cast<uint64_t>(size);
+            // Only need to write the operation type for a parameter request
+            write_sop_type(SenderOperationType::SOP_PARMS);
         }
 
-        void StreamChannel::send_preprocess_response(
-            const vector<SEAL_BYTE> &client_id, const vector<SEAL_BYTE> &buffer)
+        void StreamChannel::send_parms_response(const vector<SEAL_BYTE> &client_id, const PSIParams &params)
         {
-            // client_id is ignored
+            lock_guard<mutex> lock(send_mutex_);
 
-            // Type
-            write_operation_type(SOP_preprocess);
+            // client_id is unused for StreamChannel
+
+            write_sop_type(SenderOperationType::SOP_PARMS);
+
+            // PSIConfParams
+            const PSIParams::PSIConfParams &psiconf_params = params.psiconf_params();
+            out_.write(reinterpret_cast<const char *>(&psiconf_params), sizeof(PSIParams::PSIConfParams));
+            bytes_sent_ += sizeof(PSIParams::PSIConfParams);
+
+            // TableParams
+            const PSIParams::TableParams &table_params = params.table_params();
+            out_.write(reinterpret_cast<const char *>(&table_params), sizeof(PSIParams::TableParams));
+            bytes_sent_ += sizeof(PSIParams::TableParams);
+
+            // CuckooParams
+            const PSIParams::CuckooParams &cuckoo_params = params.cuckoo_params();
+            out_.write(reinterpret_cast<const char *>(&cuckoo_params), sizeof(PSIParams::CuckooParams));
+            bytes_sent_ += sizeof(PSIParams::CuckooParams);
+
+            // SEALParams
+            bytes_sent_ += static_cast<uint64_t>(
+                params.seal_params().encryption_params.save(out_, compr_mode_type::deflate));
+        }
+
+        bool StreamChannel::receive(SenderResponseOPRF &response)
+        {
+            lock_guard<mutex> lock(receive_mutex_);
+
+            // Get the SOP type; this should be SOP_OPRF
+            SenderOperationType type = read_sop_type();
+
+            if (type != SenderOperationType::SOP_OPRF)
+            {
+                // Expected SOP_OPRF; something is wrong
+                return false;
+            }
+
+            // Read size of data 
+            uint64_t size;
+            in_.read(reinterpret_cast<char *>(&size), sizeof(uint64_t));
+            bytes_received_ += sizeof(uint64_t);
+
+            // Read the data itself
+            response.data.resize(size);
+            in_.read(reinterpret_cast<char *>(response.data.data()), safe_cast<streamsize>(size));
+            bytes_received_ += size;
+
+            return true;
+        }
+
+        void StreamChannel::send_oprf_request(const vector<SEAL_BYTE> &data)
+        {
+            lock_guard<mutex> lock(send_mutex_);
+
+            write_sop_type(SenderOperationType::SOP_OPRF);
+
+            // Write size of data
+            uint64_t size = data.size();
+            out_.write(reinterpret_cast<const char *>(&size), sizeof(uint64_t));
+            bytes_sent_ += sizeof(uint64_t);
+
+            // Write the data itself
+            out_.write(reinterpret_cast<const char *>(data.data()), safe_cast<streamsize>(size));
+            bytes_sent_ += size;
+        }
+
+        void StreamChannel::send_oprf_response(
+            const vector<SEAL_BYTE> &client_id, const vector<SEAL_BYTE> &data)
+        {
+            lock_guard<mutex> lock(send_mutex_);
+
+            // client_id is unused for StreamChannel
+
+            write_sop_type(SenderOperationType::SOP_OPRF);
 
             // Size of buffer
-            streamsize size = static_cast<streamsize>(buffer.size());
-            ostream_.write(reinterpret_cast<const char *>(&size), sizeof(streamsize));
+            uint64_t size = data.size();
+            out_.write(reinterpret_cast<const char *>(&size), sizeof(uint64_t));
+            bytes_sent_ += sizeof(uint64_t);
 
             // Actual buffer
-            ostream_.write(reinterpret_cast<const char *>(buffer.data()), size);
-
-            bytes_sent_ += sizeof(streamsize);
+            out_.write(reinterpret_cast<const char *>(data.data()), safe_cast<streamsize>(size));
             bytes_sent_ += static_cast<uint64_t>(size);
         }
 
         bool StreamChannel::receive(SenderResponseQuery &response)
         {
-            SenderOperationType type = read_operation_type();
+            lock_guard<mutex> lock(receive_mutex_);
 
-            if (type != SOP_query)
+            // Get the SOP type; this should be SOP_QUERY
+            SenderOperationType type = read_sop_type();
+
+            if (type != SenderOperationType::SOP_QUERY)
+            {
+                // Expected SOP_QUERY; something is wrong
                 return false;
+            }
 
-            // Package count
-            istream_.read(reinterpret_cast<char *>(&response.package_count), sizeof(uint64_t));
+            // The only data in this is the package count
+            in_.read(reinterpret_cast<char *>(&response.package_count), sizeof(uint64_t));
             bytes_received_ += sizeof(uint64_t);
 
             return true;
         }
 
-        void StreamChannel::send_query(const string &relin_keys, const map<uint64_t, vector<string>> &query)
+        void StreamChannel::send_query_request(
+            const string &relin_keys, const map<uint64_t, vector<string>> &query)
         {
-            write_operation_type(SOP_query);
+            lock_guard<mutex> lock(send_mutex_);
 
+            write_sop_type(SenderOperationType::SOP_QUERY);
+
+            // Write the relinearization keys
             write_string(relin_keys);
 
+            // Write the size of the query: this is the number of powers of the query
+            // ciphertext to be sent
             uint64_t size = query.size();
-            ostream_.write(reinterpret_cast<const char *>(&size), sizeof(uint64_t));
+            out_.write(reinterpret_cast<const char *>(&size), sizeof(uint64_t));
             bytes_sent_ += sizeof(uint64_t);
 
             for (const auto &q : query)
@@ -205,146 +218,159 @@ namespace apsi
                 uint64_t power = q.first;
                 size = q.second.size();
 
-                ostream_.write(reinterpret_cast<const char *>(&power), sizeof(uint64_t));
+                // Write the query power (exponent)
+                out_.write(reinterpret_cast<const char *>(&power), sizeof(uint64_t));
                 bytes_sent_ += sizeof(uint64_t);
 
-                ostream_.write(reinterpret_cast<const char *>(&size), sizeof(uint64_t));
+                // Write the number of ciphertexts we have; this is the number of bin
+                // bundle indices
+                out_.write(reinterpret_cast<const char *>(&size), sizeof(uint64_t));
                 bytes_sent_ += sizeof(uint64_t);
 
-                for (const auto &seededcipher : q.second)
+                for (const auto &cipher : q.second)
                 {
-                    write_string(seededcipher);
+                    // Write the ciphertexts
+                    write_string(cipher);
                 }
             }
         }
 
-        void StreamChannel::send_query_response(const vector<SEAL_BYTE> &client_id, const size_t package_count)
+        void StreamChannel::send_query_response(const vector<SEAL_BYTE> &client_id, size_t package_count)
         {
-            // client_id is ignored
-            write_operation_type(SOP_query);
+            lock_guard<mutex> lock(send_mutex_);
+
+            // client_id is unused for StreamChannel
+
+            write_sop_type(SenderOperationType::SOP_QUERY);
 
             uint64_t pkg_count = static_cast<uint64_t>(package_count);
-            ostream_.write(reinterpret_cast<const char *>(&pkg_count), sizeof(uint64_t));
+            out_.write(reinterpret_cast<const char *>(&pkg_count), sizeof(uint64_t));
             bytes_sent_ += sizeof(uint64_t);
         }
 
         bool StreamChannel::receive(apsi::ResultPackage &pkg)
         {
-            unique_lock<mutex> rec_lock(*receive_mutex_);
+            lock_guard<mutex> lock(receive_mutex_);
 
-            istream_.read(reinterpret_cast<char *>(&pkg.bundle_idx), sizeof(int64_t));
+            uint32_t bundle_idx = 0;
+            in_.read(reinterpret_cast<char *>(&bundle_idx), sizeof(uint32_t));
+            bytes_received_ += sizeof(uint32_t);
+            pkg.bundle_idx = safe_cast<size_t>(bundle_idx);
 
             read_string(pkg.data);
             read_string(pkg.label_data);
 
-            bytes_received_ += (sizeof(int64_t) * 2);
-
             return true;
         }
 
-        void StreamChannel::send(const vector<SEAL_BYTE> &client_id, const ResultPackage &pkg)
+        void StreamChannel::send_result_package(const vector<SEAL_BYTE> &client_id, const ResultPackage &pkg)
         {
-            unique_lock<mutex> snd_lock(*send_mutex_);
+            lock_guard<mutex> lock(send_mutex_);
 
-            // client_id is ignored
-            ostream_.write(reinterpret_cast<const char *>(&pkg.bundle_idx), sizeof(int64_t));
+            // client_id is unused for StreamChannel
+
+            uint32_t bundle_idx = safe_cast<uint32_t>(pkg.bundle_idx);
+            out_.write(reinterpret_cast<const char *>(&bundle_idx), sizeof(uint32_t));
+            bytes_sent_ += sizeof(uint32_t);
 
             write_string(pkg.data);
             write_string(pkg.label_data);
-
-            bytes_sent_ += (sizeof(int64_t) * 2);
         }
 
-        void StreamChannel::write_operation_type(const SenderOperationType type)
+        void StreamChannel::write_sop_type(SenderOperationType type)
         {
-            uint32_t sotype = static_cast<uint32_t>(type);
-            ostream_.write(reinterpret_cast<const char *>(&sotype), sizeof(uint32_t));
+            out_.write(reinterpret_cast<const char *>(&type), sizeof(uint32_t));
             bytes_sent_ += sizeof(uint32_t);
         }
 
-        SenderOperationType StreamChannel::read_operation_type()
+        SenderOperationType StreamChannel::read_sop_type()
         {
-            uint32_t type;
-            istream_.read(reinterpret_cast<char *>(&type), sizeof(uint32_t));
-            bytes_received_ += sizeof(uint32_t);
+            SenderOperationType type;
+            in_.read(reinterpret_cast<char *>(&type), sizeof(SenderOperationType));
+            bytes_received_ += sizeof(SenderOperationType);
 
-            return static_cast<SenderOperationType>(type);
+            return type;
         }
 
         void StreamChannel::write_string(const string &str)
         {
-            streamsize size = static_cast<streamsize>(str.length());
-            ostream_.write(reinterpret_cast<const char *>(&size), sizeof(streamsize));
-            ostream_.write(str.data(), size);
+            uint64_t size = str.length();
+            out_.write(reinterpret_cast<const char *>(&size), sizeof(uint64_t));
+            bytes_sent_ += sizeof(uint64_t);
 
-            bytes_sent_ += sizeof(streamsize);
-            bytes_sent_ += static_cast<uint64_t>(size);
+            out_.write(str.data(), safe_cast<streamsize>(size));
+            bytes_sent_ += size;
         }
 
         void StreamChannel::read_string(string &str)
         {
-            streamsize size;
-            istream_.read(reinterpret_cast<char *>(&size), sizeof(streamsize));
+            uint64_t size;
+            in_.read(reinterpret_cast<char *>(&size), sizeof(uint64_t));
+            bytes_received_ += sizeof(uint64_t);
 
             str.resize(static_cast<size_t>(size));
-            istream_.read(&str[0], size);
-
-            bytes_received_ += sizeof(streamsize);
-            bytes_received_ += static_cast<uint64_t>(size);
+            in_.read(str.data(), safe_cast<streamsize>(size));
+            bytes_received_ += size;
         }
 
-        shared_ptr<SenderOperation> StreamChannel::decode_get_parameters()
+        shared_ptr<SenderOperation> StreamChannel::decode_parms_request()
         {
-            // Nothing to decode
-            return make_shared<SenderOperationGetParameters>();
+            // Nothing to decode; return a SenderOperation of the correct type.
+            return make_shared<SenderOperationParms>();
         }
 
-        shared_ptr<SenderOperation> StreamChannel::decode_preprocess()
+        shared_ptr<SenderOperation> StreamChannel::decode_oprf_request()
         {
-            vector<SEAL_BYTE> buffer;
-            streamsize size;
-            istream_.read(reinterpret_cast<char *>(&size), sizeof(streamsize));
+            vector<SEAL_BYTE> data;
+            uint64_t size;
+            in_.read(reinterpret_cast<char *>(&size), sizeof(uint64_t));
+            data.resize(size);
+            in_.read(reinterpret_cast<char *>(data.data()), safe_cast<streamsize>(size));
 
-            buffer.resize(static_cast<size_t>(size));
-            istream_.read(reinterpret_cast<char *>(buffer.data()), size);
-
-            return make_shared<SenderOperationPreprocess>(move(buffer));
+            return make_shared<SenderOperationOPRF>(move(data));
         }
 
-        shared_ptr<SenderOperation> StreamChannel::decode_query()
+        shared_ptr<SenderOperation> StreamChannel::decode_query_request()
         {
+            // First read the relinearization keys
             string relin_keys;
             read_string(relin_keys);
 
-            uint64_t qsize;
-            istream_.read(reinterpret_cast<char *>(&qsize), sizeof(uint64_t));
+            // Next read the number of powers sent in the query
+            uint64_t q_size;
+            in_.read(reinterpret_cast<char *>(&q_size), sizeof(uint64_t));
             bytes_received_ += sizeof(uint64_t);
 
-            map<uint64_t, vector<string>> query;
+            map<uint64_t, vector<string>> data;
 
-            for (uint64_t qidx = 0; qidx < qsize; qidx++)
+            for (uint64_t q_idx = 0; q_idx < q_size; q_idx++)
             {
+                // Which power of the query is this?
                 uint64_t power;
-                uint64_t vecsize;
+                in_.read(reinterpret_cast<char *>(&power), sizeof(uint64_t));
+                bytes_received_ += sizeof(uint64_t);
 
-                istream_.read(reinterpret_cast<char *>(&power), sizeof(uint64_t));
-                istream_.read(reinterpret_cast<char *>(&vecsize), sizeof(uint64_t));
-                bytes_received_ += (sizeof(uint64_t) * 2);
+                // Read the vector size for this power; these should all be there same and
+                // represent the number of bundle indices.
+                uint64_t vec_size;
+                in_.read(reinterpret_cast<char *>(&vec_size), sizeof(uint64_t));
+                bytes_received_ += sizeof(uint64_t);
 
-                vector<string> power_entry;
-                power_entry.reserve(static_cast<size_t>(vecsize));
-
-                for (uint64_t vecidx = 0; vecidx < vecsize; vecidx++)
+                // Read all ciphertexts for this power
+                vector<string> query_power;
+                query_power.reserve(safe_cast<size_t>(vec_size));
+                for (uint64_t vec_idx = 0; vec_idx < vec_size; vec_idx++)
                 {
                     string cipher;
                     read_string(cipher);
-                    power_entry.emplace_back(move(cipher));
+                    query_power.emplace_back(move(cipher));
                 }
 
-                query[power] = power_entry;
+                // Write the ciphertexts for this power into the map
+                data[power] = move(query_power);
             }
 
-            return make_shared<SenderOperationQuery>(relin_keys, move(query));
+            return make_shared<SenderOperationQuery>(move(relin_keys), move(data));
         }
     } // namespace network
 } // namespace apsi

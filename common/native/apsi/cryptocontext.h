@@ -9,10 +9,11 @@
 
 // SEAL
 #include "seal/context.h"
+#include "seal/batchencoder.h"
+#include "seal/keygenerator.h"
 #include "seal/publickey.h"
 #include "seal/secretkey.h"
 #include "seal/relinkeys.h"
-#include "seal/batchencoder.h"
 #include "seal/encryptor.h"
 #include "seal/decryptor.h"
 #include "seal/evaluator.h"
@@ -36,22 +37,28 @@ namespace apsi
             void set_evaluator(const std::string &relin_keys)
             {
                 relin_keys_ = std::make_shared<seal::RelinKeys>();
-                get_relin_keys(seal_context_, *relin_keys_, relin_keys);
+                from_string(seal_context_, relin_keys, *relin_keys_);
                 evaluator_ = std::make_shared<seal::Evaluator>(seal_context_);
             }
 
-            void set_encryptor(const std::string &public_key)
+            void set_evaluator(const seal::RelinKeys &relin_keys)
             {
-                seal::PublicKey pk;
-                get_public_key(seal_context_, pk, public_key);
-                encryptor_ = std::make_shared<seal::Encryptor>(seal_context_, pk);
+                relin_keys_ = std::make_shared<seal::RelinKeys>(relin_keys);
+                evaluator_ = std::make_shared<seal::Evaluator>(seal_context_);
             }
 
-            void set_decryptor(const std::string &secret_key)
+            void set_secret(const std::string &secret_key)
             {
                 seal::SecretKey sk;
-                get_secret_key(seal_context_, sk, secret_key);
+                from_string(seal_context_, secret_key, sk);
+                encryptor_ = std::make_shared<seal::Encryptor>(seal_context_, sk);
                 decryptor_ = std::make_shared<seal::Decryptor>(seal_context_, sk);
+            }
+
+            void set_secret(const seal::SecretKey &secret_key)
+            {
+                encryptor_ = std::make_shared<seal::Encryptor>(seal_context_, secret_key);
+                decryptor_ = std::make_shared<seal::Decryptor>(seal_context_, secret_key);
             }
 
             const std::shared_ptr<seal::SEALContext> &seal_context() const

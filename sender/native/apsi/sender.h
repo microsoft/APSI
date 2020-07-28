@@ -23,13 +23,9 @@
 #include "apsi/network/channel.h"
 #include "apsi/psiparams.h"
 #include "apsi/senderdb.h"
-#include "apsi/sendersessioncontext.h"
+#include "apsi/cryptocontext.h"
 
 // SEAL
-#include <seal/ciphertext.h>
-#include <seal/context.h>
-#include <seal/encryptionparams.h>
-#include <seal/memorymanager.h>
 #include <seal/util/locks.h>
 
 namespace apsi

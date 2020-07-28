@@ -3,6 +3,11 @@
 
 #pragma once
 
+// STD
+#include <string>
+#include <sstream>
+
+// SEAL
 #include <seal/ciphertext.h>
 #include <seal/plaintext.h>
 #include <seal/publickey.h>
@@ -12,44 +17,32 @@
 namespace apsi
 {
     /**
-    Get string for a public key
+    Get string representing a serializable SEAL object.
     */
-    void get_string(std::string &str, const seal::PublicKey &pub_key);
+    template<typename T>
+    std::string to_string(const T &obj)
+    {
+        std::stringstream ss;
+        obj.save(ss, seal::compr_mode_type::deflate);
+        return ss.str();
+    }
 
     /**
-    Get string for a Ciphertext
+    Load a serializable SEAL object from string.
     */
-    void get_string(std::string &str, const seal::Ciphertext &ciphertext);
+    template<typename T>
+    void from_string(const std::shared_ptr<seal::SEALContext> &context, const std::string &str, T &destination)
+    {
+        std::stringstream ss(str);
+        destination.load(context, ss);
+    }
 
     /**
-    Get string for a Modulus
+    Load a serializable SEAL object from string.
     */
-    void get_string(std::string &str, const seal::Modulus &sm);
-
-    /**
-    Get public key from a string
-    */
-    void get_public_key(const std::shared_ptr<seal::SEALContext> &context, seal::PublicKey &public_key, const std::string &str);
-
-    /**
-    Get secret key from a string
-    */
-    void get_secret_key(const std::shared_ptr<seal::SEALContext> &context, seal::SecretKey &secret_key, const std::string &str);
-
-    /**
-    Get Relinearization keys from a string
-    */
-    void get_relin_keys(
-        const std::shared_ptr<seal::SEALContext> &context, seal::RelinKeys &relin_keys, const std::string &str);
-
-    /**
-    Get Ciphertext from a string
-    */
-    void get_ciphertext(
-        const std::shared_ptr<seal::SEALContext> &context, seal::Ciphertext &ciphertext, const std::string &str);
-
-    /**
-    Get Modulus from a string
-    */
-    void get_modulus(seal::Modulus &sm, const std::string &str);
+    void from_string(const std::string &str, seal::Modulus &destination)
+    {
+        std::stringstream ss(str);
+        destination.load(ss);
+    }
 } // namespace apsi

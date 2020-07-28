@@ -18,8 +18,7 @@
 #include "apsi/binbundle.h"
 #include "apsi/item.h"
 #include "apsi/psiparams.h"
-#include "apsi/sendersessioncontext.h"
-#include "apsi/senderthreadcontext.h"
+#include "apsi/cryptocontext.h"
 
 // Kuku
 #include "kuku/kuku.h"

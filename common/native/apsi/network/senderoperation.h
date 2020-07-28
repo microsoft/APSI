@@ -3,109 +3,139 @@
 
 #pragma once
 
-#include <algorithm>
+// STD
+#include <cstdint>
+#include <string>
 #include <map>
-#include <seal/ciphertext.h>
-#include <seal/publickey.h>
-#include <seal/relinkeys.h>
 #include <vector>
+#include <utility>
+
+// SEAL
+#include <seal/util/defines.h>
+
 
 namespace apsi
 {
     namespace network
     {
-        enum SenderOperationType
+        enum class SenderOperationType : std::uint32_t
         {
-            SOP_get_parameters = 1,
-            SOP_preprocess = 2,
-            SOP_query = 3
-        }; // enum SenderOperationType
+            // Receiver sent a request for PSI parameters
+            SOP_PARMS = 1,
+
+            // Receiver sent an OPRF query
+            SOP_OPRF = 2,
+
+            // Receiver sent an encrypted APSI query
+            SOP_QUERY = 3
+        }; // enum class SenderOperationType
 
         /**
-        Generic Sender Operation
+        An abstract base class representing a Sender operation. This class holds two member
+        variables representing the type of the operation and a client ID.
         */
         class SenderOperation
         {
         public:
             SenderOperation() = delete;
+
+            /**
+            Creates a SenderOperation of a given type.
+            */
             SenderOperation(SenderOperationType type) : type(type)
             {}
-            SenderOperation(SenderOperationType type, std::vector<seal::SEAL_BYTE> &&clt_id)
-                : type(type), client_id(clt_id)
+
+            /**
+            Create a SenderOperation of a given type with and given client ID.
+            */
+            SenderOperation(SenderOperationType type, std::vector<seal::SEAL_BYTE> client_id)
+                : type(type), client_id(client_id)
             {}
 
+            /**
+            Destroys the SenderOperation.
+            */
             virtual ~SenderOperation() = default;
 
             /**
-            Operation type
+            Holds the type of this SenderOperation.
             */
             SenderOperationType type;
 
             /**
-            Client ID
+            Holds the client ID of this SenderOperation.
             */
             std::vector<seal::SEAL_BYTE> client_id;
         }; // class SenderOperation
 
         /**
-        Sender Operation: Get Parameters
+        A kind of SenderOperation for representing a parameter request from the receiver.
         */
-        class SenderOperationGetParameters : public SenderOperation
+        class SenderOperationParms : public SenderOperation
         {
         public:
-            SenderOperationGetParameters() : SenderOperation(SOP_get_parameters)
-            {}
-            SenderOperationGetParameters(std::vector<seal::SEAL_BYTE> &&client_id)
-                : SenderOperation(SOP_get_parameters, std::move(client_id))
+            SenderOperationParms() : SenderOperation(SenderOperationType::SOP_PARMS)
             {}
 
-            virtual ~SenderOperationGetParameters() = default;
-        }; // class SenderOperationGetParameters
+            SenderOperationParms(std::vector<seal::SEAL_BYTE> client_id)
+                : SenderOperation(SenderOperationType::SOP_PARMS, std::move(client_id))
+            {}
+
+            virtual ~SenderOperationParms() = default;
+        }; // class SenderOperationParms
 
         /**
-        Sender Operation: Preprocess
+        A kind of SenderOperation for representing an OPRF query from the receiver.
         */
-        class SenderOperationPreprocess : public SenderOperation
+        class SenderOperationOPRF : public SenderOperation
         {
         public:
-            SenderOperationPreprocess() = delete;
-            SenderOperationPreprocess(std::vector<seal::SEAL_BYTE> &&buff)
-                : SenderOperation(SOP_preprocess), buffer(buff)
-            {}
-            SenderOperationPreprocess(std::vector<seal::SEAL_BYTE> &&client_id, std::vector<seal::SEAL_BYTE> &&buff)
-                : SenderOperation(SOP_preprocess, std::move(client_id)), buffer(buff)
+            SenderOperationOPRF(std::vector<seal::SEAL_BYTE> &&data)
+                : SenderOperation(SenderOperationType::SOP_OPRF), data(std::move(data))
             {}
 
-            virtual ~SenderOperationPreprocess() = default;
+            SenderOperationOPRF(std::vector<seal::SEAL_BYTE> client_id, std::vector<seal::SEAL_BYTE> data)
+                : SenderOperation(SenderOperationType::SOP_OPRF, std::move(client_id)), data(std::move(data))
+            {}
+
+            virtual ~SenderOperationOPRF() = default;
 
             /**
-            Items to preprocess
+            Holds the OPRF query data.
             */
-            std::vector<seal::SEAL_BYTE> buffer;
-        }; // class SenderOperationPreprocess
+            std::vector<seal::SEAL_BYTE> data;
+        }; // class SenderOperationOPRF
 
         /**
-        Sender Operation: Query
+        A kind of SenderOperation for representing a PSI or labeled PSI query from the receiver.
         */
         class SenderOperationQuery : public SenderOperation
         {
         public:
-            SenderOperationQuery() = delete;
-            SenderOperationQuery(const std::string &relin, std::map<std::uint64_t, std::vector<std::string>> &&queryp)
-                : SenderOperation(SOP_query), relin_keys(relin), query(std::move(queryp))
+            SenderOperationQuery(std::string relin_keys,
+                std::map<std::uint64_t, std::vector<std::string>> data) :
+                SenderOperation(SenderOperationType::SOP_QUERY),
+                relin_keys(std::move(relin_keys)),
+                data(std::move(data))
             {}
 
             SenderOperationQuery(
-                std::vector<seal::SEAL_BYTE> &&client_id, const std::string &relin,
-                std::map<std::uint64_t, std::vector<std::string>> &&queryp)
-                : SenderOperation(SOP_query, std::move(client_id)), relin_keys(relin), query(std::move(queryp))
+                std::vector<seal::SEAL_BYTE> client_id, std::string relin_keys,
+                std::map<std::uint64_t, std::vector<std::string>> data) :
+                SenderOperation(SenderOperationType::SOP_QUERY, std::move(client_id)),
+                relin_keys(std::move(relin_keys)),
+                data(std::move(data))
             {}
 
             virtual ~SenderOperationQuery() = default;
 
-            // std::string public_key;
             std::string relin_keys;
-            std::map<std::uint64_t, std::vector<std::string>> query;
+
+            /**
+            Holds the encrypted query data. In the map the key labels the power of the query
+            ciphertext and the vector holds the ciphertext strings for different bundle indices.
+            */
+            std::map<std::uint64_t, std::vector<std::string>> data;
         }; // class SenderOperationQuery
     }      // namespace network
 } // namespace apsi

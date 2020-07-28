@@ -3,36 +3,43 @@
 
 #pragma once
 
+// STD
 #include <vector>
+#include <cstdint>
+
+// APSI
 #include "apsi/psiparams.h"
 #include "apsi/result_package.h"
+
+// SEAL
+#include <seal/util/defines.h>
 
 namespace apsi
 {
     namespace network
     {
         /**
-        Response for Get Parameters request
+        Sender's response to a parameter request.
         */
-        struct SenderResponseGetParameters
+        struct SenderResponseParms
         {
             PSIParams::PSIConfParams psiconf_params;
             PSIParams::TableParams table_params;
             PSIParams::CuckooParams cuckoo_params;
             PSIParams::SEALParams seal_params;
-            PSIParams::FFieldParams ffield_params;
-        }; // struct SenderResponseGetParameters
+        }; // struct SenderResponseParms
 
         /**
-        Response for Preprocess request
+        Sender's response to an OPRF query. 
         */
-        struct SenderResponsePreprocess
+        struct SenderResponseOPRF
         {
-            std::vector<seal::SEAL_BYTE> buffer;
-        }; // struct SenderResponsePreprocess
+            std::vector<seal::SEAL_BYTE> data;
+        }; // struct SenderResponseOPRF
 
         /**
-        Response for Query request
+        Sender's response to a PSI or labeled PSI query. We only return the number of packages that
+        the receiver should be expected to receive.
         */
         struct SenderResponseQuery
         {

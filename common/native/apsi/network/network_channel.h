@@ -127,7 +127,7 @@ namespace apsi
             /**
             Send a response to a Query request
             */
-            virtual void send_query_response(const std::vector<seal::SEAL_BYTE> &client_id, const size_t package_count);
+            virtual void send_query_response(const std::vector<seal::SEAL_BYTE> &client_id, std::size_t package_count);
 
             /**
              * Send a ResultPackage structure
