@@ -1,3 +1,10 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license.
+
+// STD
+#include <array>
+
+// APSi
 #include "apsi/util/db_encoding.h"
 
 using namespace std;
@@ -9,7 +16,7 @@ namespace apsi
     /**
     Converts the given bitstring to a sequence of field elements (modulo `mod`)
     */
-    const vector<felt_t> bits_to_field_elts(const Bitstring &bits, const seal::Modulus &mod)
+    vector<felt_t> bits_to_field_elts(const Bitstring &bits, const seal::Modulus &mod)
     {
         // This is the largest n such that 2ⁿ ≤ mod < 2ⁿ⁺¹. We'll pack n bits into each field element.
         size_t bits_per_elt = static_cast<size_t>(mod.bit_count() - 1);
@@ -59,7 +66,7 @@ namespace apsi
     /**
     Converts the given sequence of field elements (modulo `mod`) to a bitstring of length `bit_len`
     */
-    const Bitstring field_elts_to_bits(const vector<felt_t> &felts, size_t bit_len, const seal::Modulus &mod)
+    Bitstring field_elts_to_bits(const vector<felt_t> &felts, size_t bit_len, const seal::Modulus &mod)
     {
         // This is the largest n such that 2ⁿ ≤ mod < 2ⁿ⁺¹. We'll pack n bits into each field element.
         size_t bits_per_elt = static_cast<size_t>(mod.bit_count() - 1);

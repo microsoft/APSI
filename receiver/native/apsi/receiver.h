@@ -12,7 +12,7 @@
 #include "apsi/item.h"
 #include "apsi/network/channel.h"
 #include "apsi/psiparams.h"
-#include "apsi/util/matrix.h"
+#include "apsi/util/db_encoding.h"
 
 // Kuku
 #include "kuku/kuku.h"
@@ -23,7 +23,6 @@
 #include "seal/context.h"
 #include "seal/decryptor.h"
 #include "seal/encryptor.h"
-#include "seal/publickey.h"
 #include "seal/relinkeys.h"
 #include "seal/secretkey.h"
 
@@ -39,9 +38,22 @@ namespace apsi
         class Receiver
         {
         public:
+            /**
+            Constructs a new receiver without parameters specified. In this case the receiver expects to get
+            the parameters from the sender in the beginning of a query.
+            */
             Receiver(std::size_t thread_count);
 
+            /**
+            Constructs a new receiver with parameters specified. In this case the receiver has specified the
+            parameters and expects the sender to use the same set.
+            */
             Receiver(const PSIParams &params, std::size_t thread_count);
+
+            /**
+            Generates a new set of keys to use for queries.
+            */
+            void reset_keys();
 
             /************************************************************************************************************************************
             Perform a full query.
@@ -179,47 +191,38 @@ namespace apsi
                 network::Channel &channel, const std::vector<std::size_t> &table_to_input_map,
                 std::vector<bool> &ret_bools, Matrix<unsigned char> &ret_labels);
 
-            std::shared_ptr<FField> field() const
-            {
-                return field_;
-            }
+            //std::shared_ptr<FField> field() const
+            //{
+                //return field_;
+            //}
 
-            std::shared_ptr<FFieldBatchEncoder> batch_encoder() const
-            {
-                return batch_encoder_;
-            }
+            //const seal::PublicKey &public_key() const
+            //{
+                //return public_key_;
+            //}
 
-            const seal::PublicKey &public_key() const
-            {
-                return public_key_;
-            }
-
-            const seal::SecretKey &secret_key() const
-            {
-                return secret_key_;
-            }
+            //const seal::SecretKey &secret_key() const
+            //{
+                //return secret_key_;
+            //}
 
             void initialize();
+
+            std::size_t thread_count_;
 
             std::unique_ptr<PSIParams> params_;
 
             std::shared_ptr<seal::SEALContext> seal_context_;
 
-            std::size_t thread_count_;
-
-            std::shared_ptr<FField> field_;
-
-            seal::PublicKey public_key_;
-
-            std::unique_ptr<seal::Encryptor> encryptor_;
-
             seal::SecretKey secret_key_;
 
-            std::unique_ptr<seal::Decryptor> decryptor_;
+            //std::unique_ptr<seal::Encryptor> encryptor_;
 
-            std::shared_ptr<FFieldBatchEncoder> batch_encoder_;
+            //std::unique_ptr<seal::Decryptor> decryptor_;
 
-            std::size_t slot_count_;
+            //std::unique_ptr<seal::BatchEncoder> encoder_;
+
+            //std::size_t slot_count_;
 
             // Preprocess result
             std::unique_ptr<

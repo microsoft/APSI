@@ -22,7 +22,7 @@ namespace apsi
     {
         LabeledSenderDB::LabeledSenderDB(PSIParams params) :
             params_(params),
-            session_context_(SEALContext::Create(params.encryption_params()))
+            crypto_context_(SEALContext::Create(params.encryption_params()))
         {
             // What is the actual length of strings stored in the hash table
             encoding_bit_length_ = params.item_bit_length_used_after_oprf();
@@ -31,6 +31,9 @@ namespace apsi
 
         void LabeledSenderDB::clear_db()
         {
+            // Lock the database for writing
+            auto lock = db_lock_.acquire_write();
+
             bin_bundles_.clear();
         }
 
@@ -46,7 +49,7 @@ namespace apsi
         Modulus BinBundle<L>::field_mod()
         {
             // Forgive me
-            ContextData &context_data = session_context_.seal_context()->first_context_data();
+            ContextData &context_data = crypto_context_.seal_context()->first_context_data();
             return context_data.parms().plain_modulus();
         }
 
@@ -93,7 +96,7 @@ namespace apsi
             return ret;
         }
 
-        vector<pair<AlgItemLabel<felt_t>, size_t> >  preprocess_labeled_data(
+        vector<pair<AlgItemLabel<felt_t>, size_t> > preprocess_labeled_data(
             const std::map<Item, FullWidthLabel> &data,
             const vector<kuku::LocFunc> &cuckoo_funcs
         ) {
@@ -125,7 +128,7 @@ namespace apsi
             }
         }
 
-        vector<pair<AlgItemLabel<monostate>, size_t> >  preprocess_unlabeled_data(
+        vector<pair<AlgItemLabel<monostate>, size_t> > preprocess_unlabeled_data(
             const std::map<Item, monostate> &data,
             const vector<kuku::LocFunc> &cuckoo_funcs
         ) {
@@ -162,6 +165,9 @@ namespace apsi
         template<typename L>
         void add_data(std::map<Item, FullWidthLabel> &data, size_t thread_count)
         {
+            // Lock the database for writing
+            auto lock = db_lock_.acquire_write();
+
             STOPWATCH(sender_stop_watch, "LabeledSenderDB::add_data");
 
             if (values.stride() != params_.label_byte_count())
@@ -345,7 +351,7 @@ namespace apsi
                 if (!inserted)
                 {
                     // Make a fresh BinBundle and insert
-                    BinBundle new_bin_bundle(bins_per_bundle, session_context_);
+                    BinBundle new_bin_bundle(bins_per_bundle, crypto_context_);
                     int res = new_bin_bundle.multi_insert_for_real(item_label_felt_pairs, bin_idx);
 
                     // If even that failed, I don't know what could've happened

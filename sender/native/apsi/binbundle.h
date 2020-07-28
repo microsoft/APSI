@@ -64,7 +64,7 @@ namespace apsi
             */
             BatchedPlaintextPolyn(
                 std::vector<FEltPolyn> polyns,
-                SenderSessionContext session_context_
+                CryptoContext crypto_context_
             );
 
             /**
@@ -144,7 +144,7 @@ namespace apsi
             /**
             Stuff we need to make Plaintexts
             */
-            SenderSessionContext session_context_;
+            CryptoContext crypto_context_;
 
             /**
             Returns the modulus that defines the finite field that we're working in
@@ -166,7 +166,7 @@ namespace apsi
         public:
             BinBundle(
                 std::size_t num_bins,
-                SenderSessionContext session_context
+                CryptoContext crypto_context
             );
 
             /**

@@ -15,7 +15,7 @@
 #include <gsl/span>
 
 // APSI
-#include "apsi/dbblock.h"
+#include "apsi/binbundle.h"
 #include "apsi/item.h"
 #include "apsi/psiparams.h"
 #include "apsi/sendersessioncontext.h"
@@ -26,6 +26,7 @@
 
 // SEAL
 #include "seal/plaintext.h"
+#include "seal/util/locks.h"
 
 namespace apsi
 {
@@ -72,6 +73,11 @@ namespace apsi
                 return params_;
             }
 
+            seal::util::ReaderLock get_reader_lock() const
+            {
+                return db_lock_.acquire_read();
+            }
+
         private:
             /**
             Inserts the given items and corresponding labels into the database at the given cuckoo indices. Concretely,
@@ -92,6 +98,11 @@ namespace apsi
             with bundle index i
             */
             std::vector<std::set<BinBundle<L> > > bin_bundles_;
+
+            /**
+            A read-write lock to protect the database from modification while in use.
+            */
+            seal::util::ReaderWriterLocker db_lock_;
         }; // class SenderDB
 
         class LabeledSenderDB: SenderDB<felt_t> {

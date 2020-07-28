@@ -7,7 +7,6 @@
 #include <array>
 #include <atomic>
 #include <deque>
-#include <future>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -25,13 +24,13 @@
 #include "apsi/psiparams.h"
 #include "apsi/senderdb.h"
 #include "apsi/sendersessioncontext.h"
-#include "apsi/util/matrixview.h"
 
 // SEAL
 #include <seal/ciphertext.h>
 #include <seal/context.h>
 #include <seal/encryptionparams.h>
 #include <seal/memorymanager.h>
+#include <seal/util/locks.h>
 
 namespace apsi
 {
@@ -90,60 +89,41 @@ namespace apsi
             */
             inline void clear_db()
             {
+                auto lock = sender_db_lock_.acquire_write();
                 sender_db_.reset();
             }
 
+            /**
+            Sets the database to be used.
+            */
             inline void set_db(std::shared_ptr<SenderDB> sender_db)
             {
+                auto lock = sender_db_lock_.acquire_write();
                 sender_db_ = std::move(sender_db);
             }
 
             /**
-            Generate a response to a query
+            Generate a response to a query.
             */
             void query(
                 const std::string &relin_keys, const std::map<std::uint64_t, std::vector<std::string>> &query,
                 const std::vector<seal::SEAL_BYTE> &client_id, network::Channel &channel);
 
             /**
-            Return a reference to the PSI parameters used by the Sender
+            Return a reference to the PSI parameters used by the Sender.
             */
             const PSIParams &get_params() const
             {
                 return params_;
             }
 
-            /**
-            Return the SEALContext
-            */
-            std::shared_ptr<seal::SEALContext> get_seal_context()
-            {
-                return seal_context_;
-            }
-
         private:
-            /**
-            Adds the data items to sender's database.
-            */
-            inline void add_data(const std::vector<Item> &data)
-            {
-                sender_db_->add_data(data, thread_count_);
-            }
-
-            /**
-            Adds one item to sender's database.
-            */
-            inline void add_data(const Item &item)
-            {
-                sender_db_->add_data(item, thread_count_);
-            }
-
             /**
             Method that handles the work of a single thread that computes the response to a query.
             */
             void query_worker(
                 std::pair<std::size_t, std::size_t> bundle_idx_bounds,
-                std::vector<std::vector<seal::Ciphertext>> &powers, const SenderSessionContext &session_context,
+                std::vector<std::vector<seal::Ciphertext>> &powers, const CryptoContext &crypto_context,
                 WindowingDag &dag, std::vector<WindowingDag::State> &states,
                 const std::vector<seal::SEAL_BYTE> &client_id, network::Channel &channel);
 
@@ -158,7 +138,7 @@ namespace apsi
             @params[out] all_powers All powers computed from the input for the specified batch.
             */
             void compute_batch_powers(
-                std::vector<seal::Ciphertext> &batch_powers, SenderSessionContext &session_context,
+                std::vector<seal::Ciphertext> &batch_powers, CryptoContext &crypto_context,
                 const WindowingDag &dag, WindowingDag::State &state);
 
             PSIParams params_;
@@ -168,6 +148,11 @@ namespace apsi
             std::shared_ptr<seal::SEALContext> seal_context_;
 
             std::shared_ptr<SenderDB> sender_db_;
+
+            /**
+            Read-write lock for controlling access to the database.
+            */
+            seal::util::ReaderWriterLocker sender_db_lock_;
         }; // class Sender
     }      // namespace sender
 } // namespace apsi
