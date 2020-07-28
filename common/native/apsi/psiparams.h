@@ -3,73 +3,45 @@
 
 #pragma once
 
-#include <cmath>
-#include <map>
-#include <numeric>
-#include <seal/biguint.h>
-#include <seal/encryptionparams.h>
+// STD
 #include <stdexcept>
-#include <string>
+#include <cstdint>
+#include <iostream>
+
+// APSI
 #include "apsi/logging/log.h"
 #include "apsi/util/utils.h"
+
+// Kuku
 #include "kuku/kuku.h"
+
+// SEAL
+#include "seal/encryptionparams.h"
+#include "seal/util/common.h"
 
 namespace apsi
 {
     /**
-    Contains a collection of parameters required to configure PSI and dependnecies.
+    Contains a collection of parameters required to configure the protocol.
     */
     class PSIParams
     {
     public:
-        /**
-        PSI configuration parameters and getters.
-        */
-        struct PSIConfParams
-        {
-            std::size_t sender_size;
-            std::size_t sender_bin_size;
-            // the number of chunks to split each item into
-            std::size_t num_chunks;
-            bool use_labels;
-        }; // struct PSIConfParams
+        using SEALParams = seal::EncryptionParameters;
 
-        const PSIConfParams &psiconf_params() const
-        {
-            return psiconf_params_;
-        }
+        constexpr static int item_bit_count = 120;
 
-        inline std::size_t sender_size() const
-        {
-            return psiconf_params_.sender_size;
-        }
-
-        inline std::size_t sender_bin_size() const
-        {
-            return psiconf_params_.sender_bin_size;
-        }
-
-        inline std::size_t num_chunks() const
-        {
-            return psiconf_params_.num_chunks;
-        }
-
-        inline bool use_labels() const
-        {
-            return psiconf_params_.use_labels;
-        }
+        constexpr static int label_bit_count = item_bit_count;
 
         /**
         Table setup parameters and getters.
         */
         struct TableParams
         {
-            std::uint32_t log_table_size;
+            std::uint32_t table_size;
             std::uint32_t window_size;
-            std::size_t split_count;
-            std::size_t split_size;
-            std::uint32_t binning_sec_level;
-            bool use_dynamic_split_count;
+            std::uint32_t split_size;
+            std::uint32_t hash_func_count;
         }; // struct TableParams
 
         const TableParams &table_params() const
@@ -77,155 +49,79 @@ namespace apsi
             return table_params_;
         }
 
-        inline std::uint32_t log_table_size() const
-        {
-            return table_params_.log_table_size;
-        }
-
-        inline std::uint32_t window_size() const
-        {
-            return table_params_.window_size;
-        }
-
-        inline std::size_t split_count() const
-        {
-            return table_params_.split_count;
-        }
-
-        inline std::size_t split_size() const
-        {
-            return table_params_.split_size;
-        }
-
-        inline std::uint32_t binning_sec_level() const
-        {
-            return table_params_.binning_sec_level;
-        }
-
-        inline bool use_dynamic_split_count() const
-        {
-            return table_params_.use_dynamic_split_count;
-        }
-
-        /**
-        Cuckoo hashing parameters for Kuku and getters.
-        */
-        struct CuckooParams
-        {
-            // A larger hash_func_count leads to worse performance.
-            // Kuku upperbounds hash_func_count, e.g. if item_bit_count = 120 then hash_func_count < 64.
-            // Typically, 3 is enough.
-            std::uint32_t hash_func_count;
-            std::uint32_t hash_func_seed;
-            std::uint32_t max_probe;
-        }; // struct CuckooParams
-
-        const CuckooParams &cuckoo_params() const
-        {
-            return cuckoo_params_;
-        }
-
-        inline std::uint32_t hash_func_count() const
-        {
-            return cuckoo_params_.hash_func_count;
-        }
-
-        inline std::uint32_t hash_func_seed() const
-        {
-            return cuckoo_params_.hash_func_seed;
-        }
-
-        inline std::uint32_t max_probe() const
-        {
-            return cuckoo_params_.max_probe;
-        }
-
-        /**
-        Microsoft SEAL parameters and getters.
-        */
-        struct SEALParams
-        {
-            seal::EncryptionParameters encryption_params{ seal::scheme_type::BFV };
-            std::uint32_t max_supported_degree;
-        }; // struct SEALParams
-
         const SEALParams &seal_params() const
         {
             return seal_params_;
         }
 
-        inline const seal::EncryptionParameters &encryption_params() const
+        std::uint32_t num_chunks() const
         {
-            return seal_params_.encryption_params;
+            return num_chunks_;
         }
 
-        /**
-        Other getters.
-        */
-        inline std::size_t table_size() const
+        std::uint32_t bundle_size() const
         {
-            return 1 << table_params_.log_table_size;
+            return bundle_size_;
         }
 
-        inline std::size_t batch_size() const
+        inline std::uint32_t bundle_idx_count() const
         {
-            return encryption_params().poly_modulus_degree() / ffield_degree();
+            return bundle_idx_count_;
         }
 
-        inline std::size_t batch_count() const
+        PSIParams(const TableParams &table_params, const SEALParams &seal_params) :
+            table_params_(table_params), seal_params_(seal_params)
         {
-            std::size_t batch = batch_size();
-            return (table_size() + batch - 1) / batch;
-        }
-
-        PSIParams(
-            const PSIConfParams &psi_params, const TableParams &table_params, const CuckooParams &cuckoo_params,
-            const SEALParams &seal_params, const FFieldParams &ffield_params)
-            : psiconf_params_(psi_params), table_params_(table_params), cuckoo_params_(cuckoo_params),
-              seal_params_(seal_params), ffield_params_(ffield_params)
-        {
-            if (psiconf_params_.sender_bin_size == 0)
+            // Perform a minimal parameter check here to ensure internal constants can be initialized
+            if (seal_params_.plain_modulus().bit_count() < 2)
             {
-                // if bin size is unset.
-                logging::Log::debug("Updating sender bin size");
-                update_sender_bin_size();
+                throw std::invalid_argument("plain_modulus is not large enough");
             }
-            else
+            if (!seal_params_.poly_modulus_degree())
             {
-                logging::Log::debug("Taking sender bin size = %i from command line", psiconf_params_.sender_bin_size);
+                throw std::invalid_argument("poly_modulus_degree is not large enough");
             }
 
-            validate();
+            initialize();
         }
 
     private:
-        PSIConfParams psiconf_params_;
         TableParams table_params_;
-        CuckooParams cuckoo_params_;
-        SEALParams seal_params_;
-        FFieldParams ffield_params_;
 
-        void update_sender_bin_size()
-        {
-            logging::Log::debug(
-                "running balls in bins analysis with 2^%i bins and %i balls, with stat sec level = %i",
-                table_params_.log_table_size, psiconf_params_.sender_size * cuckoo_params_.hash_func_count,
-                table_params_.binning_sec_level);
-            psiconf_params_.sender_bin_size = util::compute_sender_bin_size(
-                table_params_.log_table_size, psiconf_params_.sender_size, cuckoo_params_.hash_func_count,
-                table_params_.binning_sec_level, table_params_.split_count);
-            logging::Log::debug("updated sender bin size to %i.", psiconf_params_.sender_bin_size);
-        }
+        SEALParams seal_params_{ seal::scheme_type::BFV };
 
-        /**
-        Validate parameters
-        */
-        void validate() const
+        std::uint32_t num_chunks_;
+
+        std::uint32_t bundle_size_;
+
+        std::uint32_t bundle_idx_count_;
+
+        bool initialized_ = false;
+
+        void initialize()
         {
-            if (sender_bin_size() % split_count() != 0)
-            {
-                throw std::invalid_argument("Sender bin size must be a multiple of number of splits.");
-            }
+            // How many bits can be use for each item chunk?
+            int bit_count_per_chunk = seal_params_.plain_modulus().bit_count() - 1;
+
+            // How many chunks do we need to hold the entire item?
+            auto temp = static_cast<std::uint32_t>((item_bit_count + bit_count_per_chunk - 1) / bit_count_per_chunk);
+
+            // We still need to round up to the nearest power of two to avoid splitting items across bin bundles
+            int bit_count = seal::util::get_significant_bit_count(temp);
+            bool is_power_of_two = temp & (temp - 1);
+            num_chunks_ = is_power_of_two ? temp : std::uint32_t(1) << bit_count;
+
+            // Next compute the bundle size
+            bundle_size_ = static_cast<std::uint32_t>(seal_params_.poly_modulus_degree() / num_chunks_);
+
+            // Finally compute the number of bundle indices
+            bundle_idx_count_ = (table_params_.table_size + bundle_size_ - 1) / bundle_size_;
+
+            initialized_ = true;
         }
     }; // class PSIParams
+
+    void SaveParams(const PSIParams &params, std::vector<seal::SEAL_BYTE> &out);
+
+    PSIParams LoadParams(const std::vector<seal::SEAL_BYTE> &in);
 } // namespace apsi
