@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <stdexcept>
 #include <vector>
+#include <type_traits>
 
 // GSL
 #include "gsl/span"
@@ -25,28 +26,30 @@ namespace apsi
     /**
     Identical to Bitstring, except the underlying data is not owned
     */
+    template<typename T, typename = std::enable_if_t<std::is_same<seal::SEAL_BYTE, std::remove_cv_t<T>>::value>>
     class BitstringView
     {
     private:
-        gsl::span<seal::SEAL_BYTE> data_;
-        int bit_count_;
+        gsl::span<T> data_;
+
+        std::uint32_t bit_count_;
 
     public:
-        BitstringView(gsl::span<seal::SEAL_BYTE> data, int bit_count)
+        BitstringView(gsl::span<T> data, std::uint32_t bit_count)
         {
             // Sanity check: bit_count cannot be 0
-            if (bit_count <= 0)
+            if (!bit_count)
             {
                 throw std::logic_error("bit_count must be positive");
             }
             // Sanity check: bit_count cannot exceed underlying data length
-            if (data.size() * 8 < static_cast<size_t>(bit_count))
+            if (data.size() * 8 < bit_count)
             {
                 throw std::logic_error("bit_count exceeds the data length");
             }
             // Sanity check: bit_count should not be more than 7 bits from the total length. If you want that, use a
             // smaller vector
-            if (static_cast<size_t>(bit_count) <= (data.size()-1)*8)
+            if (bit_count <= (data.size()-1)*8)
             {
                 throw std::logic_error("bit_count is at least a whole byte less than the underlying data length");
             }
@@ -56,13 +59,13 @@ namespace apsi
             bit_count_ = bit_count;
         }
 
-        inline bool operator==(const BitstringView &rhs)
+        inline bool operator==(const BitstringView<T> &rhs)
         {
             // Check equivalence of pointers
             return (bit_count_ == rhs.bit_count_) && (data_.data() == rhs.data_.data());
         }
 
-        int bit_count() const
+        std::uint32_t bit_count() const
         {
             return bit_count_;
         }
@@ -70,9 +73,9 @@ namespace apsi
         /**
         Returns a reference to the underlying bytes
         */
-        gsl::span<seal::SEAL_BYTE> data()
+        gsl::span<T> data() const
         {
-            return gsl::span(data_.data(), data_.size());
+            return { data_.data(), data_.size() };
         }
     };
 
@@ -84,24 +87,24 @@ namespace apsi
     {
     private:
         std::vector<seal::SEAL_BYTE> data_;
-        int bit_count_;
+        std::uint32_t bit_count_;
 
     public:
-        Bitstring(std::vector<seal::SEAL_BYTE> &&data, int bit_count)
+        Bitstring(std::vector<seal::SEAL_BYTE> &&data, std::uint32_t bit_count)
         {
             // Sanity check: bit_count cannot be 0
-            if (bit_count <= 0)
+            if (!bit_count)
             {
                 throw std::logic_error("bit_count must be positive");
             }
             // Sanity check: bit_count cannot exceed underlying data length
-            if (data.size()*8 < static_cast<size_t>(bit_count))
+            if (data.size()*8 < bit_count)
             {
                 throw std::logic_error("bit_count exceeds the data length");
             }
-            // Sanity check: bit_count should not be more than 7 bits from the total length. If you want that, use a
-            // smaller vector
-            if (static_cast<size_t>(bit_count) <= (data.size()-1)*8)
+            // Sanity check: bit_count should not be more than 7 bits from the total length. If you want that, use
+            // a smaller vector
+            if (bit_count <= (data.size()-1)*8)
             {
                 throw std::logic_error("bit_count is at least a whole byte less than the underlying data length");
             }
@@ -116,7 +119,7 @@ namespace apsi
             return (bit_count_ == rhs.bit_count_) && (data_ == rhs.data_);
         }
 
-        int bit_count()
+        std::uint32_t bit_count() const
         {
             return bit_count_;
         }
@@ -124,9 +127,17 @@ namespace apsi
         /**
         Returns a BitstringView representing the same underlying data
         */
-        BitstringView to_view()
+        BitstringView<seal::SEAL_BYTE> to_view()
         {
-            return BitstringView(data(), bit_count_);
+            return { data(), bit_count_ };
+        }
+
+        /**
+        Returns a BitstringView representing the same underlying data
+        */
+        BitstringView<const seal::SEAL_BYTE> to_view() const
+        {
+            return { data(), bit_count_ };
         }
 
         /**
@@ -134,14 +145,22 @@ namespace apsi
         */
         gsl::span<seal::SEAL_BYTE> data()
         {
-            return gsl::span(data_.data(), data_.size());
+            return { data_.data(), data_.size() };
+        }
+
+        /**
+        Returns a reference to the underlying bytes
+        */
+        gsl::span<const seal::SEAL_BYTE> data() const
+        {
+            return { data_.data(), data_.size() };
         }
     };
 
     /**
     Converts the given bitstring to a sequence of field elements (modulo `mod`)
     */
-    std::vector<felt_t> bits_to_field_elts(const Bitstring &bits, const seal::Modulus &mod);
+    std::vector<felt_t> bits_to_field_elts(const BitstringView<const seal::SEAL_BYTE> &bits, const seal::Modulus &mod);
 
     /**
     Converts the given field elements (modulo `mod`) to a bitstring
