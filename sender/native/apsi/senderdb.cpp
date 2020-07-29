@@ -47,7 +47,7 @@ namespace apsi
         }
 
         template<typename L>
-        Modulus BinBundle<L>::field_mod()
+        Modulus& BinBundle<L>::field_mod()
         {
             // Forgive me
             ContextData &context_data = crypto_context_.seal_context()->first_context_data();
@@ -56,7 +56,7 @@ namespace apsi
 
         AlgItemLabel<felt_t> algebraize_item_label(Item &item, FullWidthLabel &label)
         {
-            Modulus mod = field_mod();
+            Modulus& mod = field_mod();
 
             // Convert the item from to a sequence of field elements. This is the "algebraic item".
             vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(params_.item_bit_count()), mod);
@@ -99,12 +99,9 @@ namespace apsi
 
         vector<pair<AlgItemLabel<felt_t>, size_t> > preprocess_labeled_data(
             const std::map<Item, FullWidthLabel> &data,
+            const size_t bins_per_item,
             const vector<kuku::LocFunc> &cuckoo_funcs
         ) {
-            // bins_per_item = ⌈item_bit_count / (mod_bitlen - 1)⌉
-            size_t modulus_size = (size_t)field_mod().bit_count();
-            size_t bins_per_item = (params_.item_bit_count() + (modulus_size-2)) / (modulus_size-1);
-
             // Calculate the cuckoo indices for each item. Store every pair of (&item-label, cuckoo_idx) in a vector.
             // Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the work of inserting
             // the items into BinBundles
@@ -131,12 +128,9 @@ namespace apsi
 
         vector<pair<AlgItemLabel<monostate>, size_t> > preprocess_unlabeled_data(
             const std::map<Item, monostate> &data,
+            const size_t bins_per_item,
             const vector<kuku::LocFunc> &cuckoo_funcs
         ) {
-            // bins_per_item = ⌈item_bit_count / (mod_bitlen - 1)⌉
-            size_t modulus_size = (size_t)field_mod().bit_count();
-            size_t bins_per_item = (params_.item_bit_count() + (modulus_size-2)) / (modulus_size-1);
-
             // Calculate the cuckoo indices for each item. Store every pair of (&item-label, cuckoo_idx) in a vector.
             // Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the work of inserting
             // the items into BinBundles
@@ -163,7 +157,6 @@ namespace apsi
         /**
         Inserts the given data into the database, using at most thread_count threads
         */
-        template<typename L>
         void add_data(std::map<Item, FullWidthLabel> &data, size_t thread_count)
         {
             // Lock the database for writing
@@ -175,13 +168,9 @@ namespace apsi
                 throw invalid_argument("unexpacted label length");
 
 
-            const SEAL::Modulus &mod = params_.seal_params_.encryption_params.plain_modulus();
-            // bins_per_item = ⌈item_bit_count / (mod_bitlen - 1)⌉
-            size_t modulus_size = (size_t)mod.bit_count();
-            size_t bins_per_item = (params_.item_bit_count() + (modulus_size-2)) / (modulus_size-1);
-
             // Construct the cuckoo hash functions
             vector<kuku::LocFunc> normal_loc_funcs;
+            size_t bins_per_item = params_.bins_per_item();
             for (size_t i = 0; i < params_.hash_func_count(); i++)
             {
                 kuku::LocFunc f = kuku::LocFunc(
@@ -191,80 +180,30 @@ namespace apsi
                 normal_loc_funcs.push_back(f);
             }
 
+            // Break the data down into its field element sequences and cuckoo indices
             vector<pair<AlgItemLabel<felt_t>, size_t> > data_with_indices
                 = preprocess_labeled_data(data, normal_loc_funcs);
 
-            // Sort by cuckoo index
-            sort(
-                data_with_indices.begin(),
-                data_with_indices.end(),
-                [](auto &data_with_idx1, auto &data_with_idx2) {
-                    size_t idx1 = data_with_idx1.second;
-                    size_t idx2 = data_with_idx2.second;
-                    return idx1 < idx2;
-                }
-            );
-
-            // Divide the work across threads. Each thread gets its own nonoverlapping range of bundle indices
-            size_t total_insertions = data_with_indices.size();
-            size_t expected_insertions_per_thread = (total_insertions + (thread_count - 1)) / thread_count;
-            size_t bins_per_bundle = params_.batch_size();
-
-            // Contains indices into data_with_indicies. If partitions = {i, j}, then that means
-            // the first partition is data_with_indices[0..i) (i.e., inclusive lower bound, noninclusive upper bound)
-            // the second partition is data_with_indices[i..j)
-            // the third partition is data_with_indices[j..] (i.e., including index j, all the way through the end)
-            vector<size_t> partitions;
-
-            // A simple partitioning algorithm. Two constraints:
-            // 1. We want threads to do roughly the same amount of work. That is, these partitions should be roughly
-            //    equally sized.
-            // 2. A bundle index cannot appear in two partitions. This would cause multiple threads to modify the same
-            //    data structure, which is not safe.
-            //
-            // So the algorithm is, for each partition: put the minimal number of elements in the partition. Then, on
-            // the next bundle index boundary, mark the partition end.
-            size_t insertion_count = 0;
-            int last_bundle_idx = -1;
-            for (size_t i = 0; i < data_with_indices.size(); i++)
+            // Collect the bundle indices and partition them into thread_count many partitions. By some uniformity
+            // assumption, the number of things to insert per partition should be roughly the same. Note that
+            // the contents of bundle_indices is always sorted (increasing order).
+            set<size_t> bundle_indices;
+            for (auto &data_with_idx : data_with_indices)
             {
-                auto &data_with_idx = data_with_indices[i];
                 size_t cuckoo_idx = data_with_idx.second;
                 size_t bin_idx = cuckoo_idx % bins_per_bundle;
                 size_t bundle_idx = (cuckoo_idx - bin_idx) / bins_per_bundle;
-
-                insertion_count++;
-
-                // If this partition is big enough and we've hit a BinBundle boundary, break the partition off here
-                if (insertion_count > expected_insertions_per_thread && bundle_idx != last_bundle_idx)
-                    partitions.push_back(i)
-                }
-
-                last_bundle_idx = bundle_idx;
+                bundle_indices.push(bundle_idx);
             }
+            // Partition the bundles appropriately
+            vector<pair<size_t, size_t> > partitions = partition_evenly(bundle_indices.size(), thread_count);
 
-            // Sanity check: the number of partitions we made shouldn't be greater than thread_count. This shouldn't
-            // ever happen.
-            if (partitions.size() + 1 > thread_count)
-            {
-                throw logic_error("Somehow made more partitions than thread_count. This is an implementation error.");
-            }
-
-            // Partition the data and run the threads on the partitions
+            // Run the threads on the partitions
             vector<thread> threads;
-            gsl::span data_span(data_with_indices);
             size_t last_partition_cutoff = 0;
-            for (size_t t = 0; t < thread_count; t++)
+            for (auto &partition : partitions)
             {
-                // Run a thread on the partition data_with_indices[partitions[t-1]..partitions[t]), where the base case
-                // partitions[-1] = 0;
-                size_t partition_cutoff = partitions[t];
-                size_t partition_size = partitions[t] - last_partition_cutoff;
-                gsl::span<pair<&pair<Item, vector<uint8_t> >, size_t> > partition =
-                    data_span.subspan(partition_cutoff, partition_size);
-
-                threads.emplace_back([&, t]() { add_data_worker(partition); });
-
+                threads.emplace_back([&, t]() { add_data_worker(data_with_indices, partition); });
                 last_partition_cutoff = partition_cutoff;
             }
 
@@ -276,57 +215,39 @@ namespace apsi
         }
 
         /**
-        Inserts the given items and corresponding labels into the database at the given cuckoo indices. Concretely, for
-        every ((item, label), cuckoo_idx) element, the item is inserted into the database at cuckoo_idx and its label is
-        set to label.
+        Inserts the given items and corresponding labels into bin_bundles at their respective cuckoo indices. It will
+        only insert the data with bundle index in the half-open range range [begin_bundle_idx, end_bundle_idx). If
+        inserting into a BinBundle would make the number of items in a bin larger than bin_size_threshold, this function
+        will create and insert a new BinBundle.
         */
         template<typename L>
-        void SenderDB<L>::add_data_worker(
-            const gsl::span<pair<&pair<felt_t, L>, size_t> > data_with_indices;
+        void add_data_worker(
+            vector<pair<AlgItemLabel<L>, size_t> > &data_with_indices,
+            vector<set<BinBundle<L>> > &bin_bundles,
+            size_t bin_size_threshold,
+            size_t begin_bundle_idx,
+            size_t end_bundle_idx,
         ) {
             STOPWATCH(sender_stop_watch, "LabeledSenderDB::add_data_worker");
-
-            const SEAL::Modulus &mod = params_.seal_params_.encryption_params.plain_modulus();
-
-            // bins_per_item = ⌈item_bit_count / (mod_bitlen - 1)⌉
-            size_t modulus_size = (size_t)mod.bit_count();
-            size_t bins_per_item = (params_.item_bit_count() + (modulus_size-2)) / (modulus_size-1);
-            size_t bins_per_bundle = params_.batch_size();
-
-            // Keep track of all the bundle indices that we touch
-            set<size_t> bundle_indices;
 
             // Iteratively insert each item-label pair at the given cuckoo index
             for (auto &data_with_idx : data_with_indices)
             {
-                Item &item = data_with_idx.first.first;
-                vector<uint8_t> &label = data_with_idx.first.second;
+                auto &data = data_with_idx.first;
+
+                // Get the bundle index
                 size_t cuckoo_idx = data_with_indices.second;
-
-                // Convert the label to the appropriately sized bitstring
-                Bitstring label_bs(item_label_pair.second, params_.item_bit_count);
-                // Then convert the label from the bitstring to a sequence of field elements
-                vector<felt_t> label = bits_to_field_elts(bs, mod);
-                if (label.size() != 2)
-                {
-                    throw logic_error("Labels must be precisely 2 field elements wide");
-                }
-
-                // We will compute all the locations that this item gets placed in
-                array<felt_t, 2> item = item_label_pair.first.get_value();
-
-                // Collect the item-label field element pairs
-                vector<pair<felt_t, felt_t> > item_label_felt_pairs;
-                item_label_felt_pairs.push_back({ item[0], label[0] });
-                item_label_felt_pairs.push_back({ item[1], label[1] });
-
-                // Get the bundle bundle at the bundle index of the given item
                 size_t bin_idx = cuckoo_idx % bins_per_bundle;
                 size_t bundle_idx = (cuckoo_idx - bin_idx) / bins_per_bundle;
-                vector<BinBundle> &bundle_set = bin_bundles_.at(bundle_idx);
 
-                // Mark the bundle index for later
-                bundle_indices.insert(bundle_idx);
+                // If the bundle_idx isn't in the prescribed range, don't try to insert this data
+                if (bundle_idx < begin_bundle_idx || bundle_idx >= end_bundle_idx)
+                {
+                    continue;
+                }
+
+                // Get the bundle set at the given bundle index
+                vector<BinBundle> &bundle_set = bin_bundles_.at(bundle_idx);
 
                 // Try to insert these field elements in an existing BinBundle at this bundle index. Keep track of
                 // whether or not we succeed.
@@ -336,13 +257,13 @@ namespace apsi
                     BinBundle &bundle = bundle_set.at(i);
                     // Do a dry-run insertion and see if the new largest bin size in the range
                     // exceeds the limit
-                    int new_largest_bin_size = bundle.multi_insert_dry_run(item_label_felt_pairs, bin_idx);
+                    int new_largest_bin_size = bundle.multi_insert_dry_run(data, bin_idx);
 
                     // Check if inserting would violate the max bin size constraint
-                    if (new_largest_bin_size > 0 && new_largest_bin_size < PARAMS_MAX_BIN_SIZE)
+                    if (new_largest_bin_size > 0 && new_largest_bin_size < bin_size_threshold)
                     {
                         // All good
-                        bundle.multi_insert_for_real(item_label_felt_pairs, bin_idx);
+                        bundle.multi_insert_for_real(data, bin_idx);
                         inserted = true;
                         break;
                     }
@@ -353,7 +274,7 @@ namespace apsi
                 {
                     // Make a fresh BinBundle and insert
                     BinBundle new_bin_bundle(bins_per_bundle, crypto_context_);
-                    int res = new_bin_bundle.multi_insert_for_real(item_label_felt_pairs, bin_idx);
+                    int res = new_bin_bundle.multi_insert_for_real(data, bin_idx);
 
                     // If even that failed, I don't know what could've happened
                     if (res < 0)

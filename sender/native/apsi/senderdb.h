@@ -37,7 +37,8 @@ namespace apsi
 
         // A representation of item-label as a sequence of felt_t pairs, or item-unit as a sequence of pairs where the
         // first element is felt_t and the second is monostate
-        using AlgItemLabel<L> = std::vector<std::pair<felt_t, L> >;
+        template<typename L>
+        using AlgItemLabel = std::vector<std::pair<felt_t, L> >;
 
         template<typename L>
         class SenderDB
