@@ -11,10 +11,11 @@
 #include <vector>
 
 // GSL
-#include <gsl/span>
+#include "gsl/span"
 
 // SEAL
-#include <seal/plaintext.h>
+#include "seal/util/defines.h"
+#include "seal/plaintext.h"
 
 namespace apsi
 {
@@ -27,50 +28,49 @@ namespace apsi
     class BitstringView
     {
     private:
-        gsl::span<std::uint8_t> data_;
-        std::size_t bit_len_;
+        gsl::span<seal::SEAL_BYTE> data_;
+        int bit_count_;
 
     public:
-
-        BitstringView(gsl::span<std::uint8_t> &&data, std::size_t bit_len)
+        BitstringView(gsl::span<seal::SEAL_BYTE> data, int bit_count)
         {
-            // Sanity check: bitlen cannot be 0
-            if (bit_len == 0)
+            // Sanity check: bit_count cannot be 0
+            if (bit_count <= 0)
             {
-                throw std::logic_error("Given bitlen is 0");
+                throw std::logic_error("bit_count must be positive");
             }
-            // Sanity check: bitlen cannot exceed underlying data len
-            if (data.size()*8 < bit_len)
+            // Sanity check: bit_count cannot exceed underlying data length
+            if (data.size() * 8 < static_cast<size_t>(bit_count))
             {
-                throw std::logic_error("Given bitlen exceeds the data length!");
+                throw std::logic_error("bit_count exceeds the data length");
             }
-            // Sanity check: bitlen should not be more than 7 bits from the total length. If you want that, use a
+            // Sanity check: bit_count should not be more than 7 bits from the total length. If you want that, use a
             // smaller vector
-            if (bit_len <= (data.size()-1)*8)
+            if (static_cast<size_t>(bit_count) <= (data.size()-1)*8)
             {
-                throw std::logic_error("Given bitlen is at least a whole byte less than the underlying data len");
+                throw std::logic_error("bit_count is at least a whole byte less than the underlying data length");
             }
 
             // Now move
             data_ = std::move(data);
-            bit_len_ = bit_len;
+            bit_count_ = bit_count;
         }
 
         inline bool operator==(const BitstringView &rhs)
         {
             // Check equivalence of pointers
-            return (bit_len_ == rhs.bit_len_) && (data_.data() == rhs.data_.data());
+            return (bit_count_ == rhs.bit_count_) && (data_.data() == rhs.data_.data());
         }
 
-        std::size_t bit_len()
+        int bit_count() const
         {
-            return bit_len_;
+            return bit_count_;
         }
 
         /**
         Returns a reference to the underlying bytes
         */
-        gsl::span<std::uint8_t> data()
+        gsl::span<seal::SEAL_BYTE> data()
         {
             return gsl::span(data_.data(), data_.size());
         }
@@ -78,48 +78,47 @@ namespace apsi
 
     /**
     Represents a bitstring, i.e., a string of bytes that tells you how many bits it's supposed to be interpreted as.
-    The stated bitlen must be at most the number of actual underlying bits.
+    The stated bit_count must be at most the number of actual underlying bits.
     */
     class Bitstring
     {
     private:
-        std::vector<std::uint8_t> data_;
-        std::size_t bit_len_;
+        std::vector<seal::SEAL_BYTE> data_;
+        int bit_count_;
 
     public:
-
-        Bitstring(std::vector<std::uint8_t> &&data, std::size_t bit_len)
+        Bitstring(std::vector<seal::SEAL_BYTE> &&data, int bit_count)
         {
-            // Sanity check: bitlen cannot be 0
-            if (bit_len == 0)
+            // Sanity check: bit_count cannot be 0
+            if (bit_count <= 0)
             {
-                throw std::logic_error("Given bitlen is 0");
+                throw std::logic_error("bit_count must be positive");
             }
-            // Sanity check: bitlen cannot exceed underlying data len
-            if (data.size()*8 < bit_len)
+            // Sanity check: bit_count cannot exceed underlying data length
+            if (data.size()*8 < static_cast<size_t>(bit_count))
             {
-                throw std::logic_error("Given bitlen exceeds the data length!");
+                throw std::logic_error("bit_count exceeds the data length");
             }
-            // Sanity check: bitlen should not be more than 7 bits from the total length. If you want that, use a
+            // Sanity check: bit_count should not be more than 7 bits from the total length. If you want that, use a
             // smaller vector
-            if (bit_len <= (data.size()-1)*8)
+            if (static_cast<size_t>(bit_count) <= (data.size()-1)*8)
             {
-                throw std::logic_error("Given bitlen is at least a whole byte less than the underlying data len");
+                throw std::logic_error("bit_count is at least a whole byte less than the underlying data length");
             }
 
             // Now move
             data_ = std::move(data);
-            bit_len_ = bit_len;
+            bit_count_ = bit_count;
         }
 
         inline bool operator==(const Bitstring &rhs)
         {
-            return (bit_len_ == rhs.bit_len_) && (data_ == rhs.data_);
+            return (bit_count_ == rhs.bit_count_) && (data_ == rhs.data_);
         }
 
-        std::size_t bit_len()
+        int bit_count()
         {
-            return bit_len_;
+            return bit_count_;
         }
 
         /**
@@ -127,13 +126,13 @@ namespace apsi
         */
         BitstringView to_view()
         {
-            return BitstringView(data(), bit_len_);
+            return BitstringView(data(), bit_count_);
         }
 
         /**
         Returns a reference to the underlying bytes
         */
-        gsl::span<std::uint8_t> data()
+        gsl::span<seal::SEAL_BYTE> data()
         {
             return gsl::span(data_.data(), data_.size());
         }

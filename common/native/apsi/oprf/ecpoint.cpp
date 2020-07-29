@@ -349,7 +349,8 @@ namespace apsi
 
         void ECPoint::extract_hash(gsl::span<unsigned char, hash_size> out)
         {
-            memcpy(out.data(), pt_->y, hash_size);
+            // Compute a Blake2b hash of the value and expand to hash_size
+            blake2b(out.data(), out.size(), pt_->y, sizeof(f2elm_t), nullptr, 0);
         }
     } // namespace oprf
 } // namespace apsi

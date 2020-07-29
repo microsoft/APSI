@@ -1,6 +1,7 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
+// APSI
 #include "apsi/oprf/oprf_receiver.h"
 
 using namespace std;
@@ -55,8 +56,6 @@ namespace apsi
                 throw invalid_argument("oprf_responses size is incompatible with oprf_hashes size");
             }
 
-            // Write zero item everywhere
-            fill(oprf_hashes.begin(), oprf_hashes.end(), oprf_hash_type());
             auto oprf_in_ptr = reinterpret_cast<const unsigned char *>(oprf_responses.data());
 
             for (size_t i = 0; i < item_count(); i++)
@@ -69,10 +68,6 @@ namespace apsi
                 ecpt.scalar_multiply(inv_factor_data_.get_factor(i));
 
                 // Write the hash to the appropriate item
-                // Warning: the hash has size ECPoint::hash_size == 15! Thus, the
-                // last unsigned char is not touched and must be set to zero separately.
-                // This was already done earlier, but might be a performance issue
-                // in some cases.
                 ecpt.extract_hash({ reinterpret_cast<unsigned char *>(oprf_hashes[i].data()), ECPoint::hash_size });
 
                 // Move forward

@@ -3,24 +3,28 @@
 
 #pragma once
 
+// STD
 #include <array>
 #include <cstddef>
-#include <string>
 #include <cstdint>
-#include <kuku/common.h>
-#include "apsi/ffield/ffield_elt.h"
+#include <string>
+
+// Kuku
+#include "kuku/common.h"
+
+// GSL
+#include "gsl/span"
+
+// SEAL
+#include "seal/util/defines.h"
+
+// APSI
+#include "apsi/util/db_encoding.h"
 
 namespace apsi
 {
-    //TODO: Put these typedefs in a more appropriate location
-
-    // An element of a field with prime modulus < 2⁶⁴
-    using felt_t = std::uint64_t;
-
     // The unit type
     struct monostate {};
-
-    static const size_t ITEM_BITLENGTH = 120;
 
     class Item
     {
@@ -36,7 +40,7 @@ namespace apsi
         /**
         Constructs an item by hashing the uint64_t array and using 'item_bit_count_' bits of the hash.
         */
-        Item(uint64_t *pointer);
+        Item(std::uint64_t *pointer);
 
         /**
         Constructs an item by hashing the string and using 'item_bit_count_' bits of the hash.
@@ -46,20 +50,25 @@ namespace apsi
         /**
         Constructs a short item (without hashing) by using 'item_bit_count_' bits of the specified uint64_t value.
         */
-        Item(uint64_t item);
+        Item(std::uint64_t item);
 
         Item(const kuku::item_type &item);
 
         /**
         Returns the BitstringView representing this Item's data
         */
-        BitstringView to_bitstring();
+        BitstringView to_bitstring(int item_bit_count)
+        {
+            gsl::span<seal::SEAL_BYTE> bytestring_view(reinterpret_cast<seal::SEAL_BYTE*>(data()), 8 * sizeof(Item));
+            return { bytestring_view, item_bit_count };
+        }
+
 
         Item &operator=(const Item &assign) = default;
 
         Item &operator=(const std::string &assign);
 
-        Item &operator=(uint64_t assign);
+        Item &operator=(std::uint64_t assign);
 
         Item &operator=(const kuku::item_type &assign);
 
@@ -68,22 +77,22 @@ namespace apsi
             return value_ == other.value_;
         }
 
-        uint64_t &operator[](size_t i)
+        std::uint64_t &operator[](std::size_t i)
         {
             return value_[i];
         }
 
-        const uint64_t &operator[](std::size_t i) const
+        const std::uint64_t &operator[](std::size_t i) const
         {
             return value_[i];
         }
 
-        uint64_t *data()
+        std::uint64_t *data()
         {
             return value_.data();
         }
 
-        const uint64_t *data() const
+        const std::uint64_t *data() const
         {
             return value_.data();
         }
@@ -115,9 +124,6 @@ namespace apsi
         void parse(const std::string &input);
 
     private:
-        std::array<uint64_t, 2> value_;
-
-    public:
-        static constexpr std::size_t item_byte_count = sizeof(value_);
+        std::array<std::uint64_t, 2> value_;
     }; // class Item
 } // namespace apsi

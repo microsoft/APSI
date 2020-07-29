@@ -9,6 +9,7 @@
 
 // APSI
 #include "apsi/senderdb.h"
+#include "apsi/psiparams.h"
 
 using namespace std;
 using namespace seal;
@@ -58,10 +59,10 @@ namespace apsi
             Modulus& mod = field_mod();
 
             // Convert the item from to a sequence of field elements. This is the "algebraic item".
-            vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(), mod);
+            vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(params_.item_bit_count()), mod);
 
             // Convert the label from to a sequence of field elements. This is the "algebraic label".
-            vector<felt_t> alg_label = bits_to_field_elts(label.to_bitstring(), mod);
+            vector<felt_t> alg_label = bits_to_field_elts(label.to_bitstring(params_.item_bit_count()), mod);
 
             // The number of field elements necessary to represent both these values MUST be the same
             if (alg_item.size() != alg_label.size())
@@ -84,7 +85,7 @@ namespace apsi
             Modulus mod = field_mod();
 
             // Convert the item from to a sequence of field elements. This is the "algebraic item".
-            vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(), mod);
+            vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(params_.item_bit_count()), mod);
 
             // Convert vector to vector of pairs where the second element of each pair is monostate
             AlgItemLabel<monostate> ret;
@@ -303,7 +304,7 @@ namespace apsi
         }
 
         template<typename L>
-        set<const BinBundleCache&> SenderDB<L>::get_cache(std::size_t bundle_idx)
+        set<const BinBundleCache&> SenderDB<L>::get_cache(std::uint32_t bundle_idx)
         {
             if (bundle_idx >= bin_bundles_.size())
             {

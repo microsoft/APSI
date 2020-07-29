@@ -3,10 +3,20 @@
 
 #pragma once
 
+// STD
 #include <algorithm>
-#include <seal/intarray.h>
-#include <seal/memorymanager.h>
 #include <stdexcept>
+#include <memory>
+#include <iostream>
+#include <cstddef>
+
+// SEAL
+#include "seal/util/defines.h"
+#include "seal/intarray.h"
+#include "seal/randomgen.h"
+#include "seal/memorymanager.h"
+
+// APSI
 #include "apsi/oprf/oprf_common.h"
 
 namespace apsi
@@ -83,17 +93,16 @@ namespace apsi
 
             static void ComputeHashes(
                 gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items, const OPRFKey &oprf_key,
-                const int threads = -1);
+                const int threads = -1)
+            {
+                ComputeHashes(oprf_items, oprf_key, oprf_items, threads);
+            }
 
         private:
             static void compute_hashes_worker(
-                const std::size_t threadidx, const std::size_t threads,
+                const std::size_t thread_idx, const std::size_t threads,
                 gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items, const OPRFKey &oprf_key,
                 gsl::span<oprf_hash_type, gsl::dynamic_extent> oprf_hashes);
-
-            static void compute_hashes_inplace_worker(
-                const std::size_t threadidx, const std::size_t threads,
-                gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items, const OPRFKey &oprf_key);
         }; // class OPRFSender
     }      // namespace oprf
 } // namespace apsi

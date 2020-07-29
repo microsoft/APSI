@@ -5,6 +5,7 @@
 
 // STD
 #include <map>
+#include <vector>
 #include <memory>
 #include <utility>
 
@@ -198,7 +199,7 @@ namespace apsi
 
             std::unique_ptr<CryptoContext> crypto_context_;
 
-            std::string relin_keys_;
+            std::vector<seal::SEAL_BYTE> relin_keys_;
 
             std::unique_ptr<oprf::OPRFReceiver> oprf_receiver_;
 

@@ -3,10 +3,17 @@
 
 #pragma once
 
-#include <seal/intarray.h>
-#include <seal/memorymanager.h>
+// STD
 #include <stdexcept>
+#include <cstddef>
+
+// APSI
 #include "apsi/oprf/oprf_common.h"
+
+// SEAL 
+#include "seal/util/defines.h"
+#include "seal/intarray.h"
+#include "seal/memorymanager.h"
 
 namespace apsi
 {
