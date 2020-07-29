@@ -54,9 +54,9 @@ namespace apsi
             return seal_params_;
         }
 
-        std::uint32_t num_chunks() const
+        std::uint32_t bins_per_item() const
         {
-            return num_chunks_;
+            return bins_per_item_;
         }
 
         std::uint32_t bundle_size() const
@@ -90,7 +90,7 @@ namespace apsi
 
         SEALParams seal_params_{ seal::scheme_type::BFV };
 
-        std::uint32_t num_chunks_;
+        std::uint32_t bins_per_item_;
 
         std::uint32_t bundle_size_;
 
@@ -109,10 +109,10 @@ namespace apsi
             // We still need to round up to the nearest power of two to avoid splitting items across bin bundles
             int bit_count = seal::util::get_significant_bit_count(temp);
             bool is_power_of_two = temp & (temp - 1);
-            num_chunks_ = is_power_of_two ? temp : std::uint32_t(1) << bit_count;
+            bins_per_item_ = is_power_of_two ? temp : std::uint32_t(1) << bit_count;
 
             // Next compute the bundle size
-            bundle_size_ = static_cast<std::uint32_t>(seal_params_.poly_modulus_degree() / num_chunks_);
+            bundle_size_ = static_cast<std::uint32_t>(seal_params_.poly_modulus_degree() / bins_per_item_);
 
             // Finally compute the number of bundle indices
             bundle_idx_count_ = (table_params_.table_size + bundle_size_ - 1) / bundle_size_;

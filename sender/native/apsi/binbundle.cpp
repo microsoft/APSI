@@ -230,7 +230,7 @@ namespace apsi
         Returns the modulus that defines the finite field that we're working in
         */
         template<typename L>
-        Modulus BinBundle<L>::field_mod()
+        Modulus& BinBundle<L>::field_mod()
         {
             // Forgive me
             ContextData &context_data = crypto_context_.seal_context()->first_context_data();
@@ -407,7 +407,7 @@ namespace apsi
         void UnlabeledBinBundle::regen_polyns()
         {
             // Get the field modulus. We need this for polynomial calculations
-            Modulus mod = field_mod();
+            Modulus& mod = field_mod();
 
             // Clear the cache before we push to it
             cache_.felt_matching_polyns.clear();
@@ -428,7 +428,7 @@ namespace apsi
         void LabeledBinBundle::regen_polyns()
         {
             // Get the field modulus. We need this for polynomial calculations
-            Modulus mod = field_mod();
+            Modulus& mod = field_mod();
 
             // Clear the cache before we push to it
             cache_.felt_matching_polyns.clear();
