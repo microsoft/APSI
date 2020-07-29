@@ -7,19 +7,23 @@
 #include <thread>
 
 // APSI
+#include "apsi/psiparams.h"
 #include "apsi/logging/log.h"
 #include "apsi/network/network_utils.h"
-#include "apsi/result_package.h"
+#include "apsi/network/result_package.h"
 #include "apsi/sender.h"
 #include "apsi/util/utils.h"
+#include "apsi/cryptocontext.h"
 
 // SEAL
-#include <seal/modulus.h>
-#include <seal/util/common.h>
-#include <seal/util/iterator.h>
+#include "seal/modulus.h"
+#include "seal/util/common.h"
+#include "seal/util/iterator.h"
+#include "seal/evaluator.h"
 
 using namespace std;
 using namespace seal;
+using namespace seal::util;
 
 namespace apsi
 {
@@ -31,7 +35,7 @@ namespace apsi
     {
         Sender::Sender(const PSIParams &params, size_t thread_count)
             : params_(params), thread_count_(thread_count),
-              seal_context_(SEALContext::Create(params_.encryption_params()))
+              seal_context_(SEALContext::Create(params_.seal_params()))
         {
             if (thread_count < 1)
             {
@@ -59,21 +63,23 @@ namespace apsi
             CryptoContext crypto_context(seal_context_);
             crypto_context.set_evaluator(relin_keys);
 
+            uint32_t bundle_idx_count = params_.bundle_idx_count();
+            uint32_t split_size = params_.table_params().split_size;
+
             /* Receive client's query data. */
             int num_of_powers = static_cast<int>(query.size());
             Log::debug("Number of powers: %i", num_of_powers);
-            Log::debug("Current batch count: %i", params_.batch_count());
+            Log::debug("Current bundle index count: %i", bundle_idx_count);
 
             // For each bundle index, we have a vector of powers of the query. We need powers all
             // the way to split_size; however, we don't store the zeroth power.
-            vector<vector<Ciphertext>> powers(params_.batch_count());
-            size_t split_size = params_.split_size();
+            vector<vector<Ciphertext>> powers(bundle_idx_count);
 
             // Initialize the powers matrix
             for (size_t i = 0; i < powers.size(); i++)
             {
                 powers[i].reserve(split_size);
-                for (size_t j = 0; j < split_size; j++)
+                for (uint32_t j = 0; j < split_size; j++)
                 {
                     powers[i].emplace_back(seal_context_);
                 }
@@ -90,31 +96,28 @@ namespace apsi
                 }
             }
 
-            size_t batch_count = params_.batch_count();
-            size_t total_blocks = params_.split_count() * batch_count;
-
             // Obtain the windowing information
-            size_t window_size = get_params().window_size();
+            uint32_t window_size = params_.table_params().window_size;
             uint32_t base = uint32_t(1) << window_size;
 
             // Ceiling of num_of_powers / (base - 1)
             uint32_t given_digits = (static_cast<uint32_t>(num_of_powers) + base - 2) / (base - 1);
 
             // Prepare the windowing information
-            WindowingDag dag(static_cast<uint32_t>(params_.split_size()), params_.window_size(), given_digits);
+            WindowingDag dag(split_size, window_size, given_digits);
 
             // Create a state per each bundle index; this contains information about whether the
             // powers for that bundle index have been computed
             std::vector<WindowingDag::State> states;
-            states.reserve(batch_count);
-            for (uint64_t i = 0; i < batch_count; i++)
+            states.reserve(bundle_idx_count);
+            for (uint32_t i = 0; i < bundle_idx_count; i++)
             {
                 states.emplace_back(dag);
             }
 
             // Partition the data and run the threads on the partitions. The i-th thread will process
             // bundle indices partitions[i] up to but not including partitions[i+1].
-            auto partitions = partition_evenly(params_.batch_count(), thread_count_);
+            auto partitions = partition_evenly(bundle_idx_count, safe_cast<uint32_t>(thread_count_));
 
             // Launch threads, but not more than necessary
             vector<thread> threads;
@@ -137,7 +140,7 @@ namespace apsi
         }
 
         void Sender::query_worker(
-            pair<size_t, size_t> bundle_idx_bounds,
+            pair<uint32_t, uint32_t> bundle_idx_bounds,
             vector<vector<Ciphertext>> &powers,
             const CryptoContext &crypto_context,
             WindowingDag &dag,
@@ -147,11 +150,11 @@ namespace apsi
         {
             STOPWATCH(sender_stop_watch, "Sender::query_worker");
 
-            size_t bundle_idx_start = bundle_idx_bounds.first;
-            size_t bundle_idx_end = bundle_idx_bounds.second;
+            uint32_t bundle_idx_start = bundle_idx_bounds.first;
+            uint32_t bundle_idx_end = bundle_idx_bounds.second;
 
             // Compute the powers for each bundle index and loop over the BinBundles
-            for (size_t bundle_idx = bundle_idx_start; bundle_idx < bundle_idx_end; bundle_idx++)
+            for (uint32_t bundle_idx = bundle_idx_start; bundle_idx < bundle_idx_end; bundle_idx++)
             {
                 // Compute all powers of the query
                 compute_batch_powers(powers[bundle_idx], crypto_context, dag, states[bundle_idx]);
@@ -191,9 +194,12 @@ namespace apsi
             const WindowingDag &dag,
             WindowingDag::State &state)
         {
-            if (batch_powers.size() != params_.split_size() + 1)
+            uint32_t bundle_idx_count = params_.bundle_idx_count();
+            uint32_t split_size = params_.table_params().split_size;
+
+            if (batch_powers.size() != split_size + 1)
             {
-                std::cout << batch_powers.size() << " != " << params_.split_size() + 1 << std::endl;
+                std::cout << batch_powers.size() << " != " << split_size + 1 << std::endl;
                 throw std::runtime_error("");
             }
 

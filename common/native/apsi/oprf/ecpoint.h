@@ -31,8 +31,8 @@ namespace apsi
 
             using input_span_const_type = gsl::span<const unsigned char, gsl::dynamic_extent>;
 
-            // Output hash size is 120 bits
-            static constexpr std::size_t hash_size = 15;
+            // Output hash size is 128 bits
+            static constexpr std::size_t hash_size = 16;
 
             using hash_span_type = gsl::span<unsigned char, hash_size>;
 

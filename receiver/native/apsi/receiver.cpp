@@ -4,7 +4,6 @@
 // STD
 #include <iostream>
 #include <map>
-#include <sstream>
 #include <stdexcept>
 
 // APSI
@@ -68,13 +67,11 @@ namespace apsi
             // Set the symmetric key, encryptor, and decryptor
             crypto_context_->set_secret(generator.secret_key());
 
-            // Create Serializable<RelinKeys> and write them directory to a stream
-            stringstream relin_keys_ss;
+            // Create Serializable<RelinKeys> and write to the relin_keys_ buffer
             Serializable<RelinKeys> relin_keys(generator.relin_keys());
-            relin_keys.save(relin_keys_ss, compr_mode_type::deflate);
-
-            // Save the relinearization keys string
-            relin_keys_ = relin_keys_ss.str();
+            relin_keys_.resize(relin_keys.save_size(compr_mode_type::deflate));
+            auto relin_keys_size = relin_keys.save(relin_keys_.data(), compr_mode_type::deflate);
+            relin_keys_.resize(relin_keys_size);
         }
 
         void Receiver::initialize()

@@ -1,12 +1,19 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
+// STD
 #include <cctype>
 #include <stdexcept>
-#include <gsl/span>
-#include <seal/util/common.h>
-#include <seal/util/db_encoding.h>
-#include <seal/util/uintcore.h>
+
+// GSL
+#include "gsl/span"
+
+// SEAL
+#include "seal/util/common.h"
+#include "seal/util/db_encoding.h"
+#include "seal/util/uintcore.h"
+
+// APSI
 #include "apsi/item.h"
 
 using namespace std;
@@ -76,15 +83,6 @@ namespace apsi
         for (size_t i = 0; i < value_.size(); i++)
             value_[i] = assign.value_[i];
         return *this;
-    }
-
-    /**
-    Returns the BitstringView representing this Item's data
-    */
-    BitstringView to_bitstring()
-    {
-        gsl::span bytestring_view(reinterpret_cast<uint8_t*>(data()), value_.size()*8);
-        return BitStringView(bytestring_view, ITEM_BIT_LEN);
     }
 
     void Item::parse(const string &input, uint32_t base)

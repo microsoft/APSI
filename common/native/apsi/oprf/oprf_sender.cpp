@@ -1,6 +1,10 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
+// STD
+#include <thread>
+
+// APSI
 #include "apsi/oprf/oprf_sender.h"
 
 using namespace std;
@@ -88,39 +92,14 @@ namespace apsi
                 throw invalid_argument("oprf_items size is incompatible with oprf_hashes size");
             }
 
-            // Write zero item everywhere
-            fill(oprf_hashes.begin(), oprf_hashes.end(), oprf_hash_type());
-
             size_t thread_count =
                 threads < 1 ? static_cast<size_t>(thread::hardware_concurrency()) : static_cast<size_t>(threads);
 
-            vector<thread> thrds(thread_count);
-
-            for (size_t t = 0; t < thrds.size(); t++)
+            vector<thread> thrds;
+            for (size_t t = 0; t < thread_count; t++)
             {
-                thrds[t] = thread(
-                    [&](size_t idx) { compute_hashes_worker(idx, thread_count, oprf_items, oprf_key, oprf_hashes); },
-                    t);
-            }
-
-            for (auto &t : thrds)
-            {
-                t.join();
-            }
-        }
-
-        void OPRFSender::ComputeHashes(
-            gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items, const OPRFKey &oprf_key, const int threads)
-        {
-            size_t thread_count =
-                threads < 1 ? static_cast<size_t>(thread::hardware_concurrency()) : static_cast<size_t>(threads);
-
-            vector<thread> thrds(thread_count);
-
-            for (size_t t = 0; t < thrds.size(); t++)
-            {
-                thrds[t] = thread(
-                    [&](size_t idx) { compute_hashes_inplace_worker(idx, thread_count, oprf_items, oprf_key); }, t);
+                thrds.emplace_back([&](size_t idx) {
+                    compute_hashes_worker(idx, thread_count, oprf_items, oprf_key, oprf_hashes); }, t);
             }
 
             for (auto &t : thrds)
@@ -130,11 +109,11 @@ namespace apsi
         }
 
         void OPRFSender::compute_hashes_worker(
-            const size_t threadidx, const size_t threads,
+            const size_t thread_idx, const size_t threads,
             gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items, const OPRFKey &oprf_key,
             gsl::span<oprf_hash_type, gsl::dynamic_extent> oprf_hashes)
         {
-            for (size_t i = threadidx; i < oprf_items.size(); i += threads)
+            for (size_t i = thread_idx; i < oprf_items.size(); i += threads)
             {
                 // Create an elliptic curve point from the item
                 ECPoint ecpt({ reinterpret_cast<const unsigned char *>(oprf_items[i].data()), oprf_item_size });
@@ -144,24 +123,6 @@ namespace apsi
 
                 // Extract the hash
                 ecpt.extract_hash({ reinterpret_cast<unsigned char *>(oprf_hashes[i].data()), ECPoint::hash_size });
-            }
-        }
-
-        void OPRFSender::compute_hashes_inplace_worker(
-            const size_t threadidx, const size_t threads, gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items,
-            const OPRFKey &oprf_key)
-        {
-            for (size_t i = threadidx; i < oprf_items.size(); i += threads)
-            {
-                // Create an elliptic curve point from the item
-                ECPoint ecpt({ reinterpret_cast<unsigned char *>(oprf_items[i].data()), oprf_item_size });
-
-                // Multiply with key
-                ecpt.scalar_multiply(oprf_key.key_span());
-
-                // Extract the hash inplace
-                oprf_items[i] = oprf_item_type();
-                ecpt.extract_hash({ reinterpret_cast<unsigned char *>(oprf_items[i].data()), ECPoint::hash_size });
             }
         }
     } // namespace oprf

@@ -118,7 +118,7 @@ namespace apsi
             Method that handles the work of a single thread that computes the response to a query.
             */
             void query_worker(
-                std::pair<std::size_t, std::size_t> bundle_idx_bounds,
+                std::pair<std::uint32_t, std::uint32_t> bundle_idx_bounds,
                 std::vector<std::vector<seal::Ciphertext>> &powers, const CryptoContext &crypto_context,
                 WindowingDag &dag, std::vector<WindowingDag::State> &states,
                 const std::vector<seal::SEAL_BYTE> &client_id, network::Channel &channel);
