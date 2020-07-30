@@ -23,7 +23,8 @@ namespace apsi
     namespace
     {
         /**
-        Converts each given Item-Label pair into its algebraic form, i.e., a sequence of felt-felt pairs
+        Converts each given Item-Label pair into its algebraic form, i.e., a sequence of felt-felt pairs. Also computes
+        each Item's cuckoo index.
         */
         vector<pair<AlgItemLabel<felt_t>, size_t> > preprocess_labeled_data(
             const std::map<Item, FullWidthLabel> &data,
@@ -32,15 +33,15 @@ namespace apsi
             // Some variables we'll need
             size_t bins_per_item = params.bins_per_item();
             size_t item_bit_count = params.item_bit_count();
-            Modulus &mod = params.seal_params_.plain_modulus();
+            const Modulus &mod = params.seal_params().plain_modulus();
 
             // Construct the cuckoo hash functions
             vector<kuku::LocFunc> normal_loc_funcs;
             for (size_t i = 0; i < params.hash_func_count(); i++)
             {
                 kuku::LocFunc f = kuku::LocFunc(
-                    params_.table_size(),
-                    kuku::make_item(params_.hash_func_seed() + i, 0)
+                    params.table_size(),
+                    kuku::make_item(i, 0)
                 );
                 normal_loc_funcs.push_back(f);
             }
@@ -71,7 +72,8 @@ namespace apsi
         }
 
         /*
-        Converts each given Item into its algebraic form, i.e., a sequence of felt-monostate pairs
+        Converts each given Item into its algebraic form, i.e., a sequence of felt-monostate pairs. Also computes each
+        Item's cuckoo index.
         */
         vector<pair<AlgItemLabel<monostate>, size_t> > preprocess_unlabeled_data(
             const std::map<Item, monostate> &data,
@@ -80,15 +82,15 @@ namespace apsi
             // Some variables we'll need
             size_t bins_per_item = params.bins_per_item();
             size_t item_bit_count = params.item_bit_count();
-            Modulus &mod = params.seal_params_.plain_modulus();
+            const Modulus &mod = params.seal_params().plain_modulus();
 
             // Construct the cuckoo hash functions
             vector<kuku::LocFunc> normal_loc_funcs;
             for (size_t i = 0; i < params.hash_func_count(); i++)
             {
                 kuku::LocFunc f = kuku::LocFunc(
-                    params_.table_size(),
-                    kuku::make_item(params_.hash_func_seed() + i, 0)
+                    params.table_size(),
+                    kuku::make_item(i, 0)
                 );
                 normal_loc_funcs.push_back(f);
             }
@@ -167,7 +169,7 @@ namespace apsi
                 threads.emplace_back([&, t]() {
                     size_t start_idx = partition.first;
                     size_t end_idx = partition.second;
-                    add_data_worker(data_with_indices, bin_bundles_, bins_per_bundle, max_bin_size, start_idx, end_idx);
+                    add_data_worker(data_with_indices, bin_bundles, bins_per_bundle, max_bin_size, start_idx, end_idx);
                 });
             }
 
