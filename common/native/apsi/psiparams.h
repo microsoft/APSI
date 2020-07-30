@@ -4,7 +4,6 @@
 #pragma once
 
 // STD
-#include <stdexcept>
 #include <cstdint>
 #include <iostream>
 
@@ -21,9 +20,9 @@
 
 namespace apsi
 {
-    constexpr static std::int32_t item_bit_count_min = 80;
+    constexpr static std::uint32_t item_bit_count_min = 80;
 
-    constexpr static std::int32_t item_bit_count_max = 128;
+    constexpr static std::uint32_t item_bit_count_max = 128;
 
     /**
     Contains a collection of parameters required to configure the protocol.
@@ -38,14 +37,14 @@ namespace apsi
         */
         struct ItemParams
         {
-            constexpr static std::uint32_t num_chunks_max = 32;
+            constexpr static std::uint32_t felts_per_item_max = 32;
 
-            constexpr static std::uint32_t num_chunks_min = 2;
+            constexpr static std::uint32_t felts_per_item_min = 2;
 
             /**
             Specified how many SEAL batching slots are occupied by an item. This value must be a power of two.
             */
-            std::uint32_t num_chunks;
+            std::uint32_t felts_per_item;
         };
 
         /**
@@ -55,7 +54,7 @@ namespace apsi
         {
             std::uint32_t table_size;
             std::uint32_t window_size;
-            std::uint32_t split_size;
+            std::uint32_t max_items_per_bin;
             std::uint32_t hash_func_count;
         }; // struct TableParams
 
@@ -94,9 +93,9 @@ namespace apsi
             return item_bit_count_;
         }
 
-        std::int32_t item_bit_count_per_chunk() const
+        std::int32_t item_bit_count_per_felt() const
         {
-            return item_bit_count_per_chunk_;
+            return item_bit_count_per_felt_;
         }
 
         PSIParams(const ItemParams &item_params, const TableParams &table_params, const SEALParams &seal_params) :
@@ -116,43 +115,11 @@ namespace apsi
 
         std::uint32_t bundle_idx_count_;
 
-        std::int32_t item_bit_count_;
+        std::uint32_t item_bit_count_;
 
-        std::int32_t item_bit_count_per_chunk_;
+        std::uint32_t item_bit_count_per_felt_;
 
-        void initialize()
-        {
-            // Checking the validity of parameters 
-            if (item_params_.num_chunks < ItemParams::num_chunks_min ||
-                item_params_.num_chunks > ItemParams::num_chunks_max)
-            {
-                throw std::invalid_argument("num_chunks is too large or too small");
-            }
-            if (!item_params_.num_chunks || (item_params_.num_chunks & (item_params_.num_chunks - 1)))
-            {
-                throw std::invalid_argument("num_chunks is not a power of two");
-            }
-            if (!seal_params_.plain_modulus().is_prime() || seal_params_.plain_modulus().value() == 2)
-            {
-                throw std::invalid_argument("plain_modulus is not an odd prime");
-            }
-            if (!seal_params_.poly_modulus_degree() ||
-                (seal_params_.poly_modulus_degree() & (seal_params_.poly_modulus_degree() - 1)))
-            {
-                throw std::invalid_argument("poly_modulus_degree is not a power of two");
-            }
-
-            // Compute the bit-length of an item
-            item_bit_count_per_chunk_ = seal_params_.plain_modulus().bit_count() - 1;
-            item_bit_count_ = item_bit_count_per_chunk_ * static_cast<std::int32_t>(item_params_.num_chunks);
-
-            // Compute how many items fit into a bundle
-            items_per_bundle_ = static_cast<std::uint32_t>(
-                seal_params_.poly_modulus_degree() / item_params_.num_chunks);
-
-            // Finally compute the number of bundle indices
-            bundle_idx_count_ = (table_params_.table_size + items_per_bundle_ - 1) / items_per_bundle_;
-        }
+        void initialize();
     }; // class PSIParams
 
     void SaveParams(const PSIParams &params, std::vector<seal::SEAL_BYTE> &out);
