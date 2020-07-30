@@ -23,6 +23,15 @@ namespace apsi
     // An element of a field with prime modulus < 2⁶⁴
     using felt_t = std::uint64_t;
 
+    // A representation of item-label as a sequence of felt_t pairs, or item-unit as a sequence of pairs where the
+    // first element is felt_t and the second is monostate
+    template<typename L>
+    using AlgItemLabel = std::vector<std::pair<felt_t, L> >;
+
+    // Labels are always the same size as items
+    using FullWidthLabel = Item;
+
+
     /**
     Identical to Bitstring, except the underlying data is not owned
     */
@@ -167,4 +176,17 @@ namespace apsi
     */
     Bitstring field_elts_to_bits(const std::vector<felt_t> &felts, const seal::Modulus &mod);
 
+    /**
+    Converts an item and label into a sequence of (felt_t, felt_t) pairs, where the the first pair value is a chunk of
+    the item, and the second is a chunk of the label. item_bit_count denotes the bit length of the items and labels
+    (they're the same length). mod denotes the modulus of the prime field.
+    */
+    AlgItemLabel<felt_t> algebraize_item_label(Item &item, FullWidthLabel &label, size_t item_bit_count, Modulus& mod);
+
+    /**
+    Converts an item into a sequence of (felt_t, monostate) pairs, where the the first pair value is a chunk of the
+    item, and the second is the unit type. item_bit_count denotes the bit length of the items and labels (they're the
+    same length). mod denotes the modulus of the prime field. mod denotes the modulus of the prime field.
+    */
+    AlgItemLabel<monostate> algebraize_item(Item &item, size_t item_bit_count, Modulus &mod);
 } // namespace apsi

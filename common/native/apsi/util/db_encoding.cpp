@@ -200,14 +200,15 @@ namespace apsi
         array<SEAL_BYTE, 8> write_felt_little_endian(const felt_t num)
         {
             array<SEAL_BYTE, 8> bytes;
-            bytes[0] = static_cast<SEAL_BYTE>(num & 0x00000000000000FFULL);
+
+            bytes[0] = static_cast<SEAL_BYTE>( num & 0x00000000000000FFULL);
             bytes[1] = static_cast<SEAL_BYTE>((num & 0x000000000000FF00ULL) >> 8);
-            bytes[2] = static_cast<SEAL_BYTE>((num & 0x0000000000FF0000ULL) >> 16);
-            bytes[3] = static_cast<SEAL_BYTE>((num & 0x00000000FF000000ULL) >> 24);
-            bytes[4] = static_cast<SEAL_BYTE>((num & 0x000000FF00000000ULL) >> 32);
-            bytes[5] = static_cast<SEAL_BYTE>((num & 0x0000FF0000000000ULL) >> 40);
-            bytes[6] = static_cast<SEAL_BYTE>((num & 0x00FF000000000000ULL) >> 48);
-            bytes[7] = static_cast<SEAL_BYTE>((num & 0xFF00000000000000ULL) >> 56);
+            bytes[2] = static_cast<SEAL_BYTE( (num & 0x0000000000FF0000ULL) >> 16);
+            bytes[3] = static_cast<SEAL_BYTE( (num & 0x00000000FF000000ULL) >> 24);
+            bytes[4] = static_cast<SEAL_BYTE( (num & 0x000000FF00000000ULL) >> 32);
+            bytes[5] = static_cast<SEAL_BYTE( (num & 0x0000FF0000000000ULL) >> 40);
+            bytes[6] = static_cast<SEAL_BYTE( (num & 0x00FF000000000000ULL) >> 48);
+            bytes[7] = static_cast<SEAL_BYTE( (num & 0xFF00000000000000ULL) >> 56);
 
             return bytes;
         }
@@ -311,5 +312,55 @@ namespace apsi
         }
 
         return Bitstring(move(bit_buf), bit_count);
+    }
+
+
+    /**
+    Converts an item and label into a sequence of (felt_t, felt_t) pairs, where the the first pair value is a chunk of
+    the item, and the second is a chunk of the label. item_bit_count denotes the bit length of the items and labels
+    (they're the same length). mod denotes the modulus of the prime field.
+    */
+    AlgItemLabel<felt_t> algebraize_item_label(Item &item, FullWidthLabel &label, size_t item_bit_count, Modulus& mod)
+    {
+        // Convert the item from to a sequence of field elements. This is the "algebraic item".
+        vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(item_bit_count), mod);
+
+        // Convert the label from to a sequence of field elements. This is the "algebraic label".
+        vector<felt_t> alg_label = bits_to_field_elts(label.to_bitstring(item_bit_count), mod);
+
+        // The number of field elements necessary to represent both these values MUST be the same
+        if (alg_item.size() != alg_label.size())
+        {
+            throw logic_error("Items must take up as many slots as labels");
+        }
+
+        // Convert pair of vector to vector of pairs
+        AlgItemLabel<felt_t> ret;
+        for (size_t i = 0; i < alg_item.size(); i++)
+        {
+            ret.emplace_back({ alg_item[i], alg_label[i] });
+        }
+
+        return ret;
+    }
+
+    /**
+    Converts an item into a sequence of (felt_t, monostate) pairs, where the the first pair value is a chunk of the
+    item, and the second is the unit type. item_bit_count denotes the bit length of the items and labels (they're the
+    same length). mod denotes the modulus of the prime field. mod denotes the modulus of the prime field.
+    */
+    AlgItemLabel<monostate> algebraize_item(Item &item, size_t item_bit_count, Modulus &mod)
+    {
+        // Convert the item from to a sequence of field elements. This is the "algebraic item".
+        vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(item_bit_count), mod);
+
+        // Convert vector to vector of pairs where the second element of each pair is monostate
+        AlgItemLabel<monostate> ret;
+        for (size_t i = 0; i < alg_item.size(); i++)
+        {
+            ret.emplace_back({ alg_item[i], monostate{} });
+        }
+
+        return ret;
     }
 }
