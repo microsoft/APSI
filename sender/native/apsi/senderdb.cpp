@@ -8,8 +8,9 @@
 #include <thread>
 
 // APSI
-#include "apsi/senderdb.h"
 #include "apsi/psiparams.h"
+#include "apsi/senderdb.h"
+#include "apsi/util/db_encoding.cpp"
 
 using namespace std;
 using namespace seal;
@@ -19,89 +20,31 @@ namespace apsi
     using namespace util;
     using namespace logging;
 
-    namespace sender
+    namespace
     {
-        LabeledSenderDB::LabeledSenderDB(PSIParams params) :
-            params_(params),
-            crypto_context_(SEALContext::Create(params.encryption_params()))
-        {
-            // What is the actual length of strings stored in the hash table
-            encoding_bit_length_ = params.item_bit_length_used_after_oprf();
-            Log::debug("encoding bit length = %i", encoding_bit_length_);
-        }
-
-        void LabeledSenderDB::clear_db()
-        {
-            // Lock the database for writing
-            auto lock = db_lock_.acquire_write();
-
-            bin_bundles_.clear();
-        }
-
-        template<typename L>
-        void LabeledSenderDB<L>::set_data(map<Item, vector<uint8_t> > &data, size_t thread_count)
-        {
-            STOPWATCH(sender_stop_watch, "LabeledSenderDB::set_data");
-            clear_db();
-            add_data(data, thread_count);
-        }
-
-        template<typename L>
-        Modulus& BinBundle<L>::field_mod()
-        {
-            // Forgive me
-            ContextData &context_data = crypto_context_.seal_context()->first_context_data();
-            return context_data.parms().plain_modulus();
-        }
-
-        AlgItemLabel<felt_t> algebraize_item_label(Item &item, FullWidthLabel &label)
-        {
-            Modulus& mod = field_mod();
-
-            // Convert the item from to a sequence of field elements. This is the "algebraic item".
-            vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(params_.item_bit_count()), mod);
-
-            // Convert the label from to a sequence of field elements. This is the "algebraic label".
-            vector<felt_t> alg_label = bits_to_field_elts(label.to_bitstring(params_.item_bit_count()), mod);
-
-            // The number of field elements necessary to represent both these values MUST be the same
-            if (alg_item.size() != alg_label.size())
-            {
-                throw logic_error("Items must take up as many slots as labels");
-            }
-
-            // Convert pair of vector to vector of pairs
-            AlgItemLabel<felt_t> ret;
-            for (size_t i = 0; i < alg_item.size(); i++)
-            {
-                ret.emplace_back({ alg_item[i], alg_label[i] });
-            }
-
-            return ret;
-        }
-
-        AlgItemLabel<monostate> algebraize_item(Item &item)
-        {
-            Modulus mod = field_mod();
-
-            // Convert the item from to a sequence of field elements. This is the "algebraic item".
-            vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(params_.item_bit_count()), mod);
-
-            // Convert vector to vector of pairs where the second element of each pair is monostate
-            AlgItemLabel<monostate> ret;
-            for (size_t i = 0; i < alg_item.size(); i++)
-            {
-                ret.emplace_back({ alg_item[i], monostate{} });
-            }
-
-            return ret;
-        }
-
+        /**
+        Converts each given Item-Label pair into its algebraic form, i.e., a sequence of felt-felt pairs
+        */
         vector<pair<AlgItemLabel<felt_t>, size_t> > preprocess_labeled_data(
             const std::map<Item, FullWidthLabel> &data,
-            const size_t bins_per_item,
-            const vector<kuku::LocFunc> &cuckoo_funcs
+            PSIParams &params
         ) {
+            // Some variables we'll need
+            size_t bins_per_item = params.bins_per_item();
+            size_t item_bit_count = params.item_bit_count();
+            Modulus &mod = params.seal_params_.plain_modulus();
+
+            // Construct the cuckoo hash functions
+            vector<kuku::LocFunc> normal_loc_funcs;
+            for (size_t i = 0; i < params.hash_func_count(); i++)
+            {
+                kuku::LocFunc f = kuku::LocFunc(
+                    params_.table_size(),
+                    kuku::make_item(params_.hash_func_seed() + i, 0)
+                );
+                normal_loc_funcs.push_back(f);
+            }
+
             // Calculate the cuckoo indices for each item. Store every pair of (&item-label, cuckoo_idx) in a vector.
             // Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the work of inserting
             // the items into BinBundles
@@ -111,13 +54,14 @@ namespace apsi
                 // Serialize the data into field elements
                 Item &item = item_label_pair.first;
                 FullWidthLabel &label = item_label_pair.second;
-                AlgItemLabel<felt_t> alg_item_label = algebraize_item_label(item, label);
+                AlgItemLabel<felt_t> alg_item_label = algebraize_item_label(item, label, item_bit_count, mod);
 
                 // Collect the cuckoo indices, ignoring duplicates
                 std::set<size_t> cuckoo_indices;
                 for (kuku::LocFunc &hash_func : normal_loc_funcs)
                 {
-                    // The cuckoo index must be aligned to number of bins an item takes up
+                    // The current hash value is an index into a table of Items. In reality our BinBundles are tables of
+                    // bins, which contain chunks of items. How many chunks? bins_per_item many chunks
                     size_t cuckoo_idx = hash_func(item) * bins_per_item;
 
                     // Store the data along with its index
@@ -126,11 +70,29 @@ namespace apsi
             }
         }
 
+        /*
+        Converts each given Item into its algebraic form, i.e., a sequence of felt-monostate pairs
+        */
         vector<pair<AlgItemLabel<monostate>, size_t> > preprocess_unlabeled_data(
             const std::map<Item, monostate> &data,
-            const size_t bins_per_item,
-            const vector<kuku::LocFunc> &cuckoo_funcs
+            PSIParams &params
         ) {
+            // Some variables we'll need
+            size_t bins_per_item = params.bins_per_item();
+            size_t item_bit_count = params.item_bit_count();
+            Modulus &mod = params.seal_params_.plain_modulus();
+
+            // Construct the cuckoo hash functions
+            vector<kuku::LocFunc> normal_loc_funcs;
+            for (size_t i = 0; i < params.hash_func_count(); i++)
+            {
+                kuku::LocFunc f = kuku::LocFunc(
+                    params_.table_size(),
+                    kuku::make_item(params_.hash_func_seed() + i, 0)
+                );
+                normal_loc_funcs.push_back(f);
+            }
+
             // Calculate the cuckoo indices for each item. Store every pair of (&item-label, cuckoo_idx) in a vector.
             // Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the work of inserting
             // the items into BinBundles
@@ -139,13 +101,14 @@ namespace apsi
             {
                 // Serialize the data into field elements
                 Item &item = item_label_pair.first;
-                AlgItemLabel<monostate> alg_item = algebraize_item(item);
+                AlgItemLabel<monostate> alg_item = algebraize_item(item, item_bit_count, mod);
 
                 // Collect the cuckoo indices, ignoring duplicates
                 std::set<size_t> cuckoo_indices;
                 for (kuku::LocFunc &hash_func : normal_loc_funcs)
                 {
-                    // The cuckoo index must be aligned to number of bins an item takes up
+                    // The current hash value is an index into a table of Items. In reality our BinBundles are tables of
+                    // bins, which contain chunks of items. How many chunks? bins_per_item many chunks
                     size_t cuckoo_idx = hash_func(item) * bins_per_item;
 
                     // Store the data along with its index
@@ -155,34 +118,32 @@ namespace apsi
         }
 
         /**
-        Inserts the given data into the database, using at most thread_count threads
+        Returns the bundle idx that the given cuckoo idx belongs to
         */
-        void add_data(std::map<Item, FullWidthLabel> &data, size_t thread_count)
+        size_t cuckoo_idx_to_bundle_idx(size_t cuckoo_idx, size_t bins_per_bundle)
         {
-            // Lock the database for writing
-            auto lock = db_lock_.acquire_write();
+            // Recall that bin indices are relative to the bundle index. That is, the first bin index of a bundle at
+            // bundle index 5 is 0. A cuckoo index is similar, except it is not relative to the bundle index. It just
+            // keeps counting past bundle boundaries. So in order to get the bin index from the cuckoo index, just
+            // compute cuckoo_idx (mod bins_per_bundle).
+            size_t bin_idx = cuckoo_idx % bins_per_bundle;
+            // Now compute which bundle index this cuckoo index belongs to
+            size_t bundle_idx = (cuckoo_idx - bin_idx) / bins_per_bundle;
 
-            STOPWATCH(sender_stop_watch, "LabeledSenderDB::add_data");
+            return bundle_idx;
+        }
 
-            if (values.stride() != params_.label_byte_count())
-                throw invalid_argument("unexpacted label length");
-
-
-            // Construct the cuckoo hash functions
-            vector<kuku::LocFunc> normal_loc_funcs;
-            size_t bins_per_item = params_.bins_per_item();
-            for (size_t i = 0; i < params_.hash_func_count(); i++)
-            {
-                kuku::LocFunc f = kuku::LocFunc(
-                    params_.table_size(),
-                    kuku::make_item(params_.hash_func_seed() + i, 0)
-                );
-                normal_loc_funcs.push_back(f);
-            }
-
-            // Break the data down into its field element sequences and cuckoo indices
-            vector<pair<AlgItemLabel<felt_t>, size_t> > data_with_indices
-                = preprocess_labeled_data(data, normal_loc_funcs);
+        /**
+        Takes algebraized data to be inserted, splits it up, and distributes it so that thread_count many threads can
+        all insert in parallel
+        */
+        template<L>
+        void dispatch_add_data(
+            vector<pair<AlgItemLabel<L>, size_t > > &data_with_indices
+            vector<set<BinBundle<L>> > &bin_bundles,
+            uint32_t bins_per_bundle,
+            size_t thread_count
+        ) {
 
             // Collect the bundle indices and partition them into thread_count many partitions. By some uniformity
             // assumption, the number of things to insert per partition should be roughly the same. Note that
@@ -191,20 +152,23 @@ namespace apsi
             for (auto &data_with_idx : data_with_indices)
             {
                 size_t cuckoo_idx = data_with_idx.second;
-                size_t bin_idx = cuckoo_idx % bins_per_bundle;
-                size_t bundle_idx = (cuckoo_idx - bin_idx) / bins_per_bundle;
-                bundle_indices.push(bundle_idx);
+                size_t bundle_idx = cuckoo_idx_to_bundle_idx(cuckoo_idx, bins_per_bundle);
+                bundle_indices.insert(bundle_idx);
             }
-            // Partition the bundles appropriately
+
+            // Partition the bundle indices appropriately
             vector<pair<size_t, size_t> > partitions = partition_evenly(bundle_indices.size(), thread_count);
 
             // Run the threads on the partitions
             vector<thread> threads;
-            size_t last_partition_cutoff = 0;
+            uint32_t max_bin_size = params_.table_params().max_bin_size;
             for (auto &partition : partitions)
             {
-                threads.emplace_back([&, t]() { add_data_worker(data_with_indices, partition); });
-                last_partition_cutoff = partition_cutoff;
+                threads.emplace_back([&, t]() {
+                    size_t start_idx = partition.first;
+                    size_t end_idx = partition.second;
+                    add_data_worker(data_with_indices, bin_bundles_, bins_per_bundle, max_bin_size, start_idx, end_idx);
+                });
             }
 
             // Wait for the threads to finish
@@ -217,14 +181,15 @@ namespace apsi
         /**
         Inserts the given items and corresponding labels into bin_bundles at their respective cuckoo indices. It will
         only insert the data with bundle index in the half-open range range [begin_bundle_idx, end_bundle_idx). If
-        inserting into a BinBundle would make the number of items in a bin larger than bin_size_threshold, this function
+        inserting into a BinBundle would make the number of items in a bin larger than max_bin_size, this function
         will create and insert a new BinBundle.
         */
         template<typename L>
         void add_data_worker(
             vector<pair<AlgItemLabel<L>, size_t> > &data_with_indices,
             vector<set<BinBundle<L>> > &bin_bundles,
-            size_t bin_size_threshold,
+            uint32_t bins_per_bundle,
+            size_t max_bin_size,
             size_t begin_bundle_idx,
             size_t end_bundle_idx,
         ) {
@@ -237,8 +202,7 @@ namespace apsi
 
                 // Get the bundle index
                 size_t cuckoo_idx = data_with_indices.second;
-                size_t bin_idx = cuckoo_idx % bins_per_bundle;
-                size_t bundle_idx = (cuckoo_idx - bin_idx) / bins_per_bundle;
+                size_t bundle_idx = cuckoo_idx_to_bundle_idx(cuckoo_idx, bins_per_bundle);
 
                 // If the bundle_idx isn't in the prescribed range, don't try to insert this data
                 if (bundle_idx < begin_bundle_idx || bundle_idx >= end_bundle_idx)
@@ -260,7 +224,7 @@ namespace apsi
                     int new_largest_bin_size = bundle.multi_insert_dry_run(data, bin_idx);
 
                     // Check if inserting would violate the max bin size constraint
-                    if (new_largest_bin_size > 0 && new_largest_bin_size < bin_size_threshold)
+                    if (new_largest_bin_size > 0 && new_largest_bin_size < max_bin_size)
                     {
                         // All good
                         bundle.multi_insert_for_real(data, bin_idx);
@@ -301,6 +265,132 @@ namespace apsi
                     }
                 }
             }
+        }
+    }
+
+    namespace sender
+    {
+        LabeledSenderDB::LabeledSenderDB(PSIParams params) :
+            params_(params),
+            crypto_context_(SEALContext::Create(params.encryption_params()))
+        {
+            // What is the actual length of strings stored in the hash table
+            encoding_bit_length_ = params.item_bit_length_used_after_oprf();
+            Log::debug("encoding bit length = %i", encoding_bit_length_);
+        }
+
+        /**
+        Clears the database
+        */
+        void LabeledSenderDB::clear_db()
+        {
+            // Lock the database for writing
+            auto lock = db_lock_.acquire_write();
+
+            bin_bundles_.clear();
+        }
+
+        template<typename L>
+        void LabeledSenderDB<L>::set_data(map<Item, vector<uint8_t> > &data, size_t thread_count)
+        {
+            STOPWATCH(sender_stop_watch, "LabeledSenderDB::set_data");
+            clear_db();
+            add_data(data, thread_count);
+        }
+
+        template<typename L>
+        Modulus& BinBundle<L>::field_mod()
+        {
+            return params_.seal_params().plain_modulus();
+        }
+
+        /**
+        Inserts the given data into the database, using at most thread_count threads
+        */
+        void LabeledSenderDB::add_data(std::map<Item, FullWidthLabel> &data, size_t thread_count)
+        {
+            STOPWATCH(sender_stop_watch, "LabeledSenderDB::add_data");
+
+            // Lock the database for writing
+            auto lock = db_lock_.acquire_write();
+
+            // Break the data down into its field element representation. Also compute the items' cuckoo indices.
+            vector<pair<AlgItemLabel<felt_t>, size_t> > data_with_indices
+                = preprocess_labeled_data(data, params_);
+
+            // Dispatch the insertion
+            uint32_t bins_per_bundle = params_.bins_per_bundle();
+            dispatch_add_data(data_with_indices, bin_bundles_, bins_per_bundle);
+        }
+
+        /**
+        Throws an error. This should never ever be called. The only reason this exists is because SenderDB is an
+        interface that needs to support both labeled and unlabeled insertion. A LabeledSenderDB does not do unlabeled
+        insertion. If you can think of a better way to structure this, keep it to yourself.
+        */
+        void LabeledSenderDB::add_data(std::map<Item, FullWidthLabel> &data, size_t thread_count)
+        {
+            throw logic_error("Cannot do unlabeled insertion on a LabeledSenderDB");
+        }
+
+        /**
+        Inserts the given data into the database, using at most thread_count threads
+        */
+        void UnlabeledSenderDB::add_data(std::map<Item, monostate> &data, size_t thread_count)
+        {
+            STOPWATCH(sender_stop_watch, "LabeledSenderDB::add_data");
+
+            // Lock the database for writing
+            auto lock = db_lock_.acquire_write();
+
+            // Break the data down into its field element representation. Also compute the items' cuckoo indices.
+            vector<pair<AlgItemLabel<felt_t>, size_t> > data_with_indices
+                = preprocess_unlabeled_data(data, params_);
+
+            // Dispatch the insertion
+            uint32_t bins_per_bundle = params_.bins_per_bundle();
+            dispatch_add_data(data_with_indices, bin_bundles_, bins_per_bundle);
+        }
+
+        /**
+        Throws an error. This should never ever be called. The only reason this exists is because SenderDB is an
+        interface that needs to support both labeled and unlabeled insertion. An UnlabeledSenderDB does not do labeled
+        insertion. If you can think of a better way to structure this, keep it to yourself.
+        */
+        void UnlabeledSenderDB::add_data(std::map<Item, FullWidthLabel> &data, size_t thread_count)
+        {
+            throw logic_error("Cannot do labeled insertion on an UnlabeledSenderDB");
+        }
+
+
+        /**
+        Clears the database and inserts the given data, using at most thread_count threads
+        */
+        void LabeledSenderDB::set_data(std::map<Item, FullWidthLabel> &data, size_t thread_count) {
+            clear_db();
+            add_data(data, thread_count);
+        }
+
+        /**
+        This does not and should not work. See LabeledSenderDB::add_data
+        */
+        void LabeledSenderDB::set_data(std::map<Item, monostate> &data, size_t thread_count) {
+            throw logic_error("Cannot do unlabeled insertion on a LabeledSenderDB");
+        }
+
+        /**
+        Clears the database and inserts the given data, using at most thread_count threads
+        */
+        void UnlabeledSenderDB::set_data(std::map<Item, monostate> &data, size_t thread_count) {
+            clear_db();
+            add_data(data, thread_count);
+        }
+
+        /**
+        This does not and should not work. See UnlabeledSenderDB::add_data
+        */
+        void UnlabeledSenderDB::set_data(std::map<Item, FullWidthLabel> &data, size_t thread_count) {
+            throw logic_error("Cannot do labeled insertion on an UnlabeledSenderDB");
         }
 
         template<typename L>
