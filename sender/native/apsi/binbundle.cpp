@@ -30,7 +30,7 @@ namespace apsi
         /**
         Evaluates the polynomial on the given ciphertext. We don't compute the powers of the input ciphertext C
         ourselves. Instead we assume they've been precomputed and accept the powers: (C, C², C³, ...) as input. The
-        number of powers provided MUST be equal to plaintext_polyn_coeffs_.size()-1.
+        number of powers provided MUST be at least plaintext_polyn_coeffs_.size()-1.
         */
         Ciphertext BatchedPlaintextPolyn::eval(const vector<Ciphertext> &ciphertext_powers) const
         {
