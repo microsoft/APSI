@@ -29,13 +29,13 @@ namespace apsi
         void SenderDispatcher::run(
             const atomic<bool> &stop, int port, shared_ptr<const OPRFKey> oprf_key, shared_ptr<SenderDB> sender_db)
         {
-            SenderChannel channel;
+            SenderChannel chl;
 
             stringstream ss;
             ss << "tcp://*:" << port;
 
             Log::info("Sender binding to address: %s", ss.str().c_str());
-            channel.bind(ss.str());
+            chl.bind(ss.str());
 
             oprf_key_ = move(oprf_key);
             sender_->set_db(move(sender_db));
@@ -46,7 +46,7 @@ namespace apsi
             while (!stop)
             {
                 unique_ptr<SenderOperation> sop;
-                if (!(sop = channel.receive_operation()))
+                if (!(sop = chl.receive_operation()))
                 {
                     if (!logged_waiting)
                     {
@@ -64,17 +64,17 @@ namespace apsi
                 {
                 case SenderOperationType::SOP_PARMS:
                     Log::info("Received parameter request");
-                    dispatch_parms(move(sop), channel);
+                    dispatch_parms(move(sop), chl);
                     break;
 
                 case SenderOperationType::SOP_OPRF:
                     Log::info("Received OPRF query");
-                    dispatch_oprf(move(sop), channel);
+                    dispatch_oprf(move(sop), chl);
                     break;
 
                 case SenderOperationType::SOP_QUERY:
                     Log::info("Received query");
-                    dispatch_query(move(sop), channel);
+                    dispatch_query(move(sop), chl);
                     break;
 
                 default:
@@ -86,16 +86,16 @@ namespace apsi
             }
         }
 
-        void SenderDispatcher::dispatch_parms(unique_ptr<SenderOperation> sop, Channel &channel)
+        void SenderDispatcher::dispatch_parms(unique_ptr<SenderOperation> sop, Channel &chl)
         {
             unique_ptr<SenderOperationResponse> response(make_unique<SenderOperationResponseParms>(
                 sender_->get_params(), move(sop->client_id)));
-            channel.send(move(response));
+            chl.send(move(response));
         }
 
-        void SenderDispatcher::dispatch_oprf(unique_ptr<SenderOperationOPRF> sop, Channel &channel)
+        void SenderDispatcher::dispatch_oprf(unique_ptr<SenderOperation> sop, Channel &chl)
         {
-            SenderOperationOPRF *sop_oprf = dynamic_cast<SenderOperationOPRF*>(sop.get());
+            auto sop_oprf = dynamic_cast<SenderOperationOPRF*>(sop.get());
 
             // OPRF response it the same size as the OPRF query 
             vector<SEAL_BYTE> oprf_response(sop_oprf->data.size());
@@ -103,26 +103,26 @@ namespace apsi
 
             unique_ptr<SenderOperationResponse> response(make_unique<SenderOperationResponseOPRF>(
                 move(oprf_response), move(sop->client_id)));
-            channel.send(move(response));
+            chl.send(move(response));
         }
 
-        void SenderDispatcher::dispatch_query(unique_ptr<SenderOperation> sop, Channel &channel)
+        void SenderDispatcher::dispatch_query(unique_ptr<SenderOperation> sop, Channel &chl)
         {
             // Acquire read locks on SenderDB and Sender
-            auto sender_db_lock = sender_db_->get_reader_lock();
             auto sender_lock = sender_->get_reader_lock();
+            auto sender_db_lock = sender_db_->get_reader_lock();
 
-            SenderOperationQuery *sop_query = dynamic_cast<SenderOperationQuery*>(sop.get());
+            auto sop_query = dynamic_cast<SenderOperationQuery*>(sop.get());
 
             // The query response only tells how many ResultPackages to expect
             uint32_t package_count = safe_cast<uint32_t>(sender_db_->bin_bundle_count());
 
             unique_ptr<SenderOperationResponse> response(make_unique<SenderOperationResponseQuery>(
                 package_count, sop->client_id));
-            channel.send(move(response));
+            chl.send(move(response));
 
             // Query will send result to client in a stream of ResultPackages
-            sender_->query(move(sop_query->relin_keys), move(sop_query->data), move(sop_query->client_id), channel);
+            sender_->query(move(sop_query->relin_keys), move(sop_query->data), move(sop_query->client_id), chl);
         }
     } // namespace sender
 } // namespace apsi
