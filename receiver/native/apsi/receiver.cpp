@@ -209,7 +209,8 @@ namespace apsi
             vector<MatchRecord> mrs(items.size());
 
             // Get the number of ResultPackages we expect to receive
-            atomic<uint32_t> package_count = dynamic_cast<SenderOperationResponseQuery*>(response.get())->package_count;
+            auto query_response = dynamic_cast<SenderOperationResponseQuery*>(response.get());
+            atomic<uint32_t> package_count = query_response->package_count;
 
             // Launch threads to receive ResultPackages and decrypt results
             std::vector<std::thread> threads;
@@ -250,26 +251,23 @@ namespace apsi
                 size_t felts_per_item = safe_cast<size_t>(params_->item_params().felts_per_item);
                 size_t bundle_start = safe_cast<size_t>(mul_safe(plain_rp.bundle_idx, params_->items_per_bundle()));
                 SEAL_ITERATE(iter(plain_rp_iter, size_t(0)), params_->items_per_bundle(), [&](auto I) {
-                    bool match = true;
-                    for (size_t felt_idx = 0; felt_idx < felts_per_item; felt_idx++)
+                    // Compute the cuckoo table index for this item 
+                    size_t table_idx = add_safe(get<1>(I), bundle_start);
+
+                    // Next find the corresponding index in the input items vector
+                    auto item_idx_iter = table_idx_to_item_idx.find(table_idx);
+
+                    if (item_idx_iter == table_idx_to_item_idx.cend())
                     {
-                        match = match && (get<0>(I)[felt_idx] == 0);
+                        // If this table_idx doesn't match any item_idx; ignore the result no matter what it is
+                        return;
                     }
+
+                    // Find felts_per_item consequtive zeros
+                    bool match = all_of(get<0>(I), get<0>(I) + felts_per_item, [](auto felt) { return felt == 0; });
 
                     if (match)
                     {
-                        // If there was a match, compute the index in the cuckoo table
-                        size_t table_idx = add_safe(get<1>(I), bundle_start);
-
-                        // Next find the corresponding index in the input items vector
-                        auto item_idx_iter = table_idx_to_item_idx.find(table_idx);
-
-                        if (item_idx_iter == table_idx_to_item_idx.cend())
-                        {
-                            // If this table_idx doesn't match any item_idx, then something is seriously wrong
-                            throw runtime_error("found match in a location where no item was inserted");
-                        }
-
                         size_t item_idx = item_idx_iter->second;
                         if (mrs[item_idx])
                         {
@@ -282,28 +280,26 @@ namespace apsi
                         mr.found = true;
 
                         // Next, extract the label result(s), if any
-                        unique_ptr<Bitstring> label = nullptr;
-                        for (auto &label_parts : plain_rp.label_result)
+                        if (!plain_rp.label_result.empty())
                         {
-                            size_t label_offset = mul_safe(get<1>(I), felts_per_item);
-                            gsl::span<uint64_t> label_part_data(
-                                label_parts.data() + label_offset, params_->item_params().felts_per_item);
-                            Bitstring label_part =
-                                field_elts_to_bits(label_part_data, params_->seal_params().plain_modulus());
+                            // Collect the entire label into this vector
+                            vector<felt_t> label_as_felts;
 
-                            // Append to label, or create a fresh label from this part
-                            if (!label)
+                            for (auto &label_parts : plain_rp.label_result)
                             {
-                                label = make_unique<Bitstring>(move(label_part));
+                                size_t label_offset = mul_safe(get<1>(I), felts_per_item);
+                                gsl::span<felt_t> label_part(
+                                    label_parts.data() + label_offset, params_->item_params().felts_per_item);
+                                copy_n(label_part.begin(), label_part.end(), back_inserter(label_as_felts));
                             }
-                            else
-                            {
-                                label->append(label_part);
-                            }
+
+                            // Create the label
+                            unique_ptr<Bitstring> label = make_unique<Bitstring>(
+                                field_elts_to_bits(label_as_felts, params_->seal_params().plain_modulus()));
+
+                            // Set the label
+                            mr.label.set(move(label));
                         }
-
-                        // Set the label
-                        mr.label.set(move(label));
 
                         // We are done with the MatchRecord, so add it to the mrs vector
                         mrs[item_idx] = move(mr);

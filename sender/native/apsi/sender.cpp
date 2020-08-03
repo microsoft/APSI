@@ -48,8 +48,8 @@ namespace apsi
             vector<SEAL_BYTE> client_id, Channel &channel)
         {
             // Acquire read locks on SenderDB and Sender
-            auto sender_db_lock = sender_db_->get_reader_lock();
             auto sender_lock = get_reader_lock();
+            auto sender_db_lock = sender_db_->get_reader_lock();
 
             // Check that the database is set
             if (!sender_db_)
@@ -180,12 +180,12 @@ namespace apsi
                     pkg.bundle_idx = bundle_idx;
 
                     // Compute the matching result and move to pkg
-                    pkg.psi_result = move(cache.batched_matching_polyn.eval(powers[bundle_idx]));
+                    pkg.psi_result = move(cache.batched_matching_polyn.eval(all_powers[bundle_idx]));
 
                     if (cache.batched_interp_polyn)
                     {
                         // Compute the label result and move to pkg
-                        pkg.label_result.emplace_back(cache.batched_interp_polyn.eval(powers[bundle_idx]));
+                        pkg.label_result.emplace_back(cache.batched_interp_polyn.eval(all_powers[bundle_idx]));
                     }
 
                     // Start sending on the channel

@@ -4,11 +4,11 @@
 #pragma once
 
 // STD
-#include <utility>
 #include <cstdint>
 #include <cstddef>
 #include <stdexcept>
 #include <vector>
+#include <utility>
 #include <type_traits>
 #include <cstring>
 #include <algorithm>
@@ -20,6 +20,9 @@
 #include "seal/util/defines.h"
 #include "seal/util/common.h"
 #include "seal/plaintext.h"
+
+// APSI
+#include "apsi/item.h"
 
 namespace apsi
 {
@@ -33,7 +36,6 @@ namespace apsi
 
     // Labels are always the same size as items
     using FullWidthLabel = Item;
-
 
     /**
     Identical to Bitstring, except the underlying data is not owned.
@@ -166,54 +168,6 @@ namespace apsi
         gsl::span<const seal::SEAL_BYTE> data() const
         {
             return { data_.data(), data_.size() };
-        }
-
-        /**
-        Appends another Bitstring or BitstringView to this one.
-        */
-        template<typename T>
-        void append(const BitstringView<T> &other)
-        {
-            if (!(bit_count_ & 0x7))
-            {
-                // Easy case where the current bit-count is a multiple of 8 so we can just append the bytes
-                data_.resize(seal::util::add_safe(other.data().size(), data_.size()));
-                std::memcpy(data_.data() + (bit_count_ >> 3), other.data().data(), other.data().size());
-                bit_count_ += other.bit_count();
-            }
-            else
-            {
-                // This Bitstring is not at a byte boundary; we need to shift-copy the new data
-                data_.resize(seal::util::add_safe(other.data().size(), data_.size()));
-
-                std::uint32_t neg_shift_amount = bit_count_ & 0x7;
-                std::uint32_t shift_amount = std::uint32_t(8) - neg_shift_amount;
-
-                seal::SEAL_BYTE shift_reg{ 0 };
-                seal::SEAL_BYTE shift_reg_mask = static_cast<seal::SEAL_BYTE>((1 << neg_shift_amount) - 1);
-
-                std::transform(other.data().rbegin(), other.data().rend(), data_.rbegin(), [&](auto cur_byte) {
-                    seal::SEAL_BYTE ret = (cur_byte >> shift_amount) | shift_reg;
-                    shift_reg = (cur_byte & shift_reg_mask) << shift_amount;
-                    return ret;
-                });
-
-                bit_count_ += other.bit_count();
-
-                // We might have ended up in a situation where the data has an extra empty byte
-                if (bit_count_ <= (data_.size() - 1) * 8)
-                {
-                    data_.resize(data_.size() - 1);
-                }
-            }
-        }
-
-        /**
-        Appends another Bitstring or BitstringView to this one.
-        */
-        void append(const Bitstring &other)
-        {
-            append(other.to_view());
         }
     };
 

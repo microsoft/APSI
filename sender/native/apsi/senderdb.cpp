@@ -365,7 +365,6 @@ namespace apsi
             throw logic_error("Cannot do labeled insertion on an UnlabeledSenderDB");
         }
 
-
         /**
         Clears the database and inserts the given data, using at most thread_count threads
         */
