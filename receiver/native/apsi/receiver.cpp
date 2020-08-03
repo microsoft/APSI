@@ -3,26 +3,31 @@
 
 // STD
 #include <iostream>
-#include <map>
 #include <stdexcept>
+#include <sstream>
+#include <algorithm>
 
 // APSI
 #include "apsi/logging/log.h"
 #include "apsi/network/channel.h"
-#include "apsi/network/network_utils.h"
+#include "apsi/network/result_package.h"
 #include "apsi/oprf/oprf_receiver.h"
 #include "apsi/receiver.h"
-#include "apsi/result_package.h"
 #include "apsi/util/utils.h"
 
 // SEAL
-#include <seal/encryptionparams.h>
-#include <seal/keygenerator.h>
-#include <seal/util/common.h>
-#include <seal/util/uintcore.h>
+#include "seal/util/defines.h"
+#include "seal/encryptionparams.h"
+#include "seal/context.h"
+#include "seal/keygenerator.h"
+#include "seal/plaintext.h"
+#include "seal/ciphertext.h"
+#include "seal/util/iterator.h"
+#include "seal/util/common.h"
 
 using namespace std;
 using namespace seal;
+using namespace seal::util;
 using namespace kuku;
 
 namespace apsi
@@ -67,11 +72,9 @@ namespace apsi
             // Set the symmetric key, encryptor, and decryptor
             crypto_context_->set_secret(generator.secret_key());
 
-            // Create Serializable<RelinKeys> and write to the relin_keys_ buffer
+            // Create Serializable<RelinKeys> and move to relin_keys_ for storage
             Serializable<RelinKeys> relin_keys(generator.relin_keys());
-            relin_keys_.resize(relin_keys.save_size(compr_mode_type::deflate));
-            auto relin_keys_size = relin_keys.save(relin_keys_.data(), compr_mode_type::deflate);
-            relin_keys_.resize(relin_keys_size);
+            relin_keys_.set(move(relin_keys));
         }
 
         void Receiver::initialize()
@@ -85,29 +88,12 @@ namespace apsi
             }
 
             // Initialize the CryptoContext with a new SEALContext
-            crypto_context_ = make_unique<CryptoContext>(SEALContext::Create(params_.encryption_params()));
+            crypto_context_ = make_unique<CryptoContext>(SEALContext::Create(params_->seal_params()));
 
             // Create new keys
             reset_keys();
 
             Log::info("Receiver initialized");
-        }
-
-        map<uint64_t, vector<string>> &Receiver::query(vector<Item> &items)
-        {
-            STOPWATCH(recv_stop_watch, "Receiver::query");
-            Log::info("Receiver starting query");
-
-            if (!is_initialized())
-            {
-                throw logic_error("receiver is uninitialized");
-            }
-
-            preprocess_result_ =
-                make_unique<pair<map<uint64_t, vector<string>>, unique_ptr<KukuTable>>>(preprocess(items));
-            auto &ciphertexts = preprocess_result_->first;
-
-            return ciphertexts;
         }
 
         pair<vector<bool>, Matrix<unsigned char>> Receiver::decrypt_result(vector<Item> &items, Channel &chl)
@@ -152,54 +138,200 @@ namespace apsi
             return intersection;
         }
 
-        pair<vector<bool>, Matrix<unsigned char>> Receiver::query(vector<Item> &items, Channel &chl)
+        SenderOperationQuery Receiver::create_query(
+            const vector<Item> &items, unordered_map<size_t, size_t> &table_idx_to_item_idx)
         {
-            STOPWATCH(recv_stop_watch, "Receiver::query_full");
-            Log::info("Receiver starting full query");
+            STOPWATCH(recv_stop_watch, "Receiver::query");
+            Log::info("Receiver starting query");
 
-            // OPRF
-            // This block is used so the Receiver::OPRF stopwatch measures only OPRF, and nothing else
+            if (!is_initialized())
+            {
+                throw logic_error("receiver is uninitialized");
+            }
+
+            table_idx_to_item_idx.clear();
+
+            // TOODOOO
+            preprocess_result_ =
+                make_unique<pair<map<uint64_t, vector<string>>, unique_ptr<KukuTable>>>(preprocess(items));
+            auto &ciphertexts = preprocess_result_->first;
+
+            return ciphertexts;
+        }
+
+        vector<MatchRecord> Receiver::query(const vector<Item> &items, Channel &chl)
+        {
+            STOPWATCH(recv_stop_watch, "Receiver::Query");
+            Log::info("Receiver starting query");
+
+            // This will contain the result of the OPRF query
+            vector<Item> oprf_items;
+
+            // First run an OPRF query 
             {
                 STOPWATCH(recv_stop_watch, "Receiver::OPRF");
                 Log::info("OPRF processing");
 
-                vector<SEAL_BYTE> items_buffer;
-                obfuscate_items(items, items_buffer);
+                // Send OPRF query to Sender
+                vector<SEAL_BYTE> oprf_query_data = obfuscate_items(items);
+                chl.send(make_unique<SenderOperationOPRF>(move(oprf_query_data)));
 
-                // Send obfuscated buffer to Sender
-                chl.send_preprocess(items_buffer);
+                unique_ptr<SenderOperationResponse> response;
+                {
+                    STOPWATCH(recv_stop_watch, "Receiver::OPRF::wait_response");
 
-                // Get response and remove our obfuscation
-                SenderResponsePreprocess preprocess_resp;
-                chl.receive(preprocess_resp);
+                    // Wait for a valid message of the correct type
+                    while (!(response = chl.receive_response(SenderOperationType::SOP_OPRF)));
+                }
 
-                deobfuscate_items(preprocess_resp.buffer, items);
+                // Extract the OPRF response
+                auto &oprf_response = dynamic_cast<SenderOperationResponseOPRF*>(response.get())->data;
+                oprf_items = deobfuscate_items(oprf_response);
             }
 
-            // Then get encrypted query
-            auto &encrypted_query = query(items);
+            // This vector maps the cuckoo table index to the index of the item in the items vector
+            unordered_map<size_t, size_t> table_idx_to_item_idx;
 
-            // Send encrypted query
-            chl.send_query(relin_keys_, encrypted_query);
+            // Create the SenderOperationQuery and send it on the channel
+            auto sop_query = create_query(items, table_idx_to_item_idx);
+            chl.send(make_unique<SenderOperation>(move(sop_query)));
 
-            // Decrypt result
-            return decrypt_result(items, chl);
+            // Wait for query response
+            unique_ptr<SenderOperationResponse> response;
+            {
+                STOPWATCH(recv_stop_watch, "Receiver::Query::wait_response");
+
+                // Wait for a valid message of the correct type
+                while (!(response = chl.receive_response(SenderOperationType::SOP_QUERY)));
+            }
+
+            // Set up the result
+            vector<MatchRecord> mrs(items.size());
+
+            // Get the number of ResultPackages we expect to receive
+            atomic<uint32_t> package_count = dynamic_cast<SenderOperationResponseQuery*>(response.get())->package_count;
+
+            // Launch threads to receive ResultPackages and decrypt results
+            std::vector<std::thread> threads;
+            for (size_t t = 0; t < thread_count_; t++)
+            {
+                threads.emplace_back([&, t]() {
+                    result_package_worker(package_count, mrs, table_idx_to_item_idx, chl);
+                });
+            }
+
+            for (auto &t : threads)
+            {
+                t.join();
+            }
         }
 
-        void Receiver::obfuscate_items(const std::vector<Item> &items, std::vector<SEAL_BYTE> &items_buffer)
+        void Receiver::result_package_worker(
+            atomic<uint32_t> &package_count,
+            vector<MatchRecord> &mrs,
+            const unordered_map<size_t, size_t> &table_idx_to_item_idx,
+            Channel &chl) const
+        {
+            STOPWATCH(recv_stop_watch, "Receiver::result_package_worker");
+
+            while (package_count--)
+            {
+                unique_ptr<ResultPackage> rp;
+
+                // Wait for a valid ResultPackage or until package_count has reached zero
+                while (!(rp = chl.receive_result_package(crypto_context_->seal_context())));
+
+                // Decrypt and decode the result; the result vector will have full batch size
+                PlainResultPackage plain_rp = rp->extract(crypto_context_->seal_context());
+
+                // Iterate over the decoded data to find consequtive zeros indicating a match
+                StrideIter<const uint64_t *> plain_rp_iter(
+                    plain_rp.psi_result.data(), params_->item_params().felts_per_item);
+                size_t felts_per_item = safe_cast<size_t>(params_->item_params().felts_per_item);
+                size_t bundle_start = safe_cast<size_t>(mul_safe(plain_rp.bundle_idx, params_->items_per_bundle()));
+                SEAL_ITERATE(iter(plain_rp_iter, size_t(0)), params_->items_per_bundle(), [&](auto I) {
+                    bool match = true;
+                    for (size_t felt_idx = 0; felt_idx < felts_per_item; felt_idx++)
+                    {
+                        match = match && (get<0>(I)[felt_idx] == 0);
+                    }
+
+                    if (match)
+                    {
+                        // If there was a match, compute the index in the cuckoo table
+                        size_t table_idx = add_safe(get<1>(I), bundle_start);
+
+                        // Next find the corresponding index in the input items vector
+                        auto item_idx_iter = table_idx_to_item_idx.find(table_idx);
+
+                        if (item_idx_iter == table_idx_to_item_idx.cend())
+                        {
+                            // If this table_idx doesn't match any item_idx, then something is seriously wrong
+                            throw runtime_error("found match in a location where no item was inserted");
+                        }
+
+                        size_t item_idx = item_idx_iter->second;
+                        if (mrs[item_idx])
+                        {
+                            // If a positive MatchRecord is already present, then something is seriously wrong
+                            throw runtime_error("found a pre-existing positive match in the location for this match");
+                        }
+
+                        // Create a new MatchRecord
+                        MatchRecord mr;
+                        mr.found = true;
+
+                        // Next, extract the label result(s), if any
+                        unique_ptr<Bitstring> label = nullptr;
+                        for (auto &label_parts : plain_rp.label_result)
+                        {
+                            size_t label_offset = mul_safe(get<1>(I), felts_per_item);
+                            gsl::span<uint64_t> label_part_data(
+                                label_parts.data() + label_offset, params_->item_params().felts_per_item);
+                            Bitstring label_part =
+                                field_elts_to_bits(label_part_data, params_->seal_params().plain_modulus());
+
+                            // Append to label, or create a fresh label from this part
+                            if (!label)
+                            {
+                                label = make_unique<Bitstring>(move(label_part));
+                            }
+                            else
+                            {
+                                label->append(label_part);
+                            }
+                        }
+
+                        // Set the label
+                        mr.label.set(move(label));
+
+                        // We are done with the MatchRecord, so add it to the mrs vector
+                        mrs[item_idx] = move(mr);
+                    }
+                });
+            }
+        }
+
+        vector<SEAL_BYTE> Receiver::obfuscate_items(const vector<Item> &items)
         {
             Log::info("Obfuscating items");
 
-            items_buffer.resize(items.size() * oprf_query_size);
-            oprf_receiver_ = make_unique<OPRFReceiver>(items, items_buffer);
+            vector<SEAL_BYTE> oprf_query;
+            oprf_query.resize(items.size() * oprf_query_size);
+            oprf_receiver_ = make_unique<OPRFReceiver>(items, oprf_query);
+
+            return oprf_query;
         }
 
-        void Receiver::deobfuscate_items(const std::vector<SEAL_BYTE> &items_buffer, std::vector<Item> &items)
+        vector<Item> Receiver::deobfuscate_items(const vector<SEAL_BYTE> &oprf_response)
         {
             Log::info("Deobfuscating items");
 
-            oprf_receiver_->process_responses(items_buffer, items);
+            vector<Item> items;
+            oprf_receiver_->process_responses(oprf_response, items);
             oprf_receiver_.reset();
+
+            return items;
         }
 
         void Receiver::handshake(Channel &chl)
@@ -207,54 +339,22 @@ namespace apsi
             STOPWATCH(recv_stop_watch, "Receiver::handshake");
             Log::info("Initial handshake");
 
-            SenderResponseGetParameters sender_params;
-            chl.send_get_parameters();
+            // Send a parameter request
+            chl.send(make_unique<SenderOperationParms>());
 
+            unique_ptr<SenderOperationResponse> response;
             {
                 STOPWATCH(recv_stop_watch, "Receiver::handshake::wait_response");
-                chl.receive(sender_params);
+
+                // Wait for a valid message of the correct type
+                while (!(response = chl.receive_response(SenderOperationType::SOP_PARMS)));
             }
 
-            // Set parameters from Sender.
-            params_ = make_unique<PSIParams>(
-                sender_params.psiconf_params, sender_params.table_params, sender_params.cuckoo_params,
-                sender_params.seal_params, sender_params.ffield_params);
+            // Extract the parameters
+            params_ = move(dynamic_cast<SenderOperationResponseParms*>(response.get())->params);
 
             Log::debug("Received parameters from Sender:");
-            Log::debug(
-                "item bit count: %i, sender size: %lli, sender bin size: %lli, use labels: %s, use fast membership: "
-                "%s, num chunks: %i",
-                sender_params.psiconf_params.item_bit_count, sender_params.psiconf_params.sender_size,
-                sender_params.psiconf_params.sender_bin_size,
-                sender_params.psiconf_params.use_labels ? "true" : "false",
-                sender_params.psiconf_params.use_fast_membership ? "true" : "false",
-                sender_params.psiconf_params.num_chunks);
-            Log::debug(
-                "log table size: %i, split count: %i, split size: %i, binning sec level: %i, window size: %i, dynamic "
-                "split count: %s",
-                sender_params.table_params.log_table_size, sender_params.table_params.split_count,
-                sender_params.table_params.split_size, sender_params.table_params.binning_sec_level,
-                sender_params.table_params.window_size,
-                sender_params.table_params.use_dynamic_split_count ? "true" : "false");
-            Log::debug(
-                "hash func count: %i, hash func seed: %i, max probe: %i", sender_params.cuckoo_params.hash_func_count,
-                sender_params.cuckoo_params.hash_func_seed, sender_params.cuckoo_params.max_probe);
-            Log::debug(
-                "poly modulus degree: %i, plain modulus: 0x%llx, max supported degree: %i",
-                sender_params.seal_params.encryption_params.poly_modulus_degree(),
-                sender_params.seal_params.encryption_params.plain_modulus().value(),
-                sender_params.seal_params.max_supported_degree);
-            Log::debug(
-                "coeff modulus: %i elements", sender_params.seal_params.encryption_params.coeff_modulus().size());
-            for (size_t i = 0; i < sender_params.seal_params.encryption_params.coeff_modulus().size(); i++)
-            {
-                Log::debug(
-                    "Coeff modulus %i: 0x%llx", i,
-                    sender_params.seal_params.encryption_params.coeff_modulus()[i].value());
-            }
-            Log::debug(
-                "ffield characteristic: 0x%llx, ffield degree: %i", sender_params.ffield_params.characteristic,
-                sender_params.ffield_params.degree);
+            Log::debug(params_.to_string());
 
             // Once we have parameters, initialize Receiver
             initialize();
@@ -527,104 +627,6 @@ namespace apsi
                 thrd.join();
 
             return ret;
-        }
-
-        void Receiver::stream_decrypt_worker(
-            size_t thread_idx, size_t batch_size, size_t num_threads, size_t block_count, Channel &channel,
-            const vector<size_t> &table_to_input_map, vector<bool> &ret_bools, Matrix<unsigned char> &ret_labels)
-        {
-            STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt_worker");
-            MemoryPoolHandle local_pool(MemoryPoolHandle::New());
-            Plaintext p(local_pool);
-            Ciphertext tmp(seal_context_, local_pool);
-            unique_ptr<FFieldArray> batch = make_unique<FFieldArray>(batch_encoder_->create_array());
-
-            bool first = true;
-            uint64_t processed_count = 0;
-
-            for (size_t i = thread_idx; i < block_count; i += num_threads)
-            {
-                bool has_result = false;
-                std::vector<unsigned char> has_label(batch_size);
-
-                ResultPackage pkg;
-                {
-                    STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt_worker_wait");
-                    if (!channel.receive(pkg))
-                    {
-                        Log::error("Could not receive Result package");
-                        return;
-                    }
-                }
-
-                size_t base_idx = pkg.bundle_idx * batch_size;
-                Log::debug("Thread idx: %i, pkg.batch_idx: %i", thread_idx, pkg.bundle_idx);
-
-                // recover the sym poly values
-                has_result = false;
-
-                get_ciphertext(seal_context_, tmp, pkg.data);
-                if (first && thread_idx == 0)
-                {
-                    first = false;
-                    Log::info("Noise budget: %i bits", decryptor_->invariant_noise_budget(tmp));
-                }
-
-                decryptor_->decrypt(tmp, p);
-                batch_encoder_->decompose(p, *batch);
-
-                for (size_t k = 0; k < batch_size; k++)
-                {
-                    size_t idx = table_to_input_map[base_idx + k];
-                    if (idx != -size_t(1))
-                    {
-                        auto &is_zero = has_label[k];
-
-                        is_zero = batch->is_zero(k);
-
-                        if (is_zero)
-                        {
-                            Log::debug(
-                                "Found zero at thread_idx: %i, base_idx: %i, k: %i, idx: %i", thread_idx, base_idx, k,
-                                idx);
-                            has_result = true;
-                            ret_bools[idx] = true;
-                        }
-                    }
-                }
-
-                if (has_result && get_params().use_labels())
-                {
-                    get_ciphertext(seal_context_, tmp, pkg.label_data);
-                    decryptor_->decrypt(tmp, p);
-
-                    // make sure its the right size. decrypt will shorted when there are zero coeffs at the top.
-                    p.resize(batch_encoder_->n());
-
-                    batch_encoder_->decompose(p, *batch);
-
-                    // if (batch->is_zero()) {
-                    Log::debug("decrypted label data is zero? %i", batch->is_zero());
-                    //}
-
-                    for (size_t k = 0; k < batch_size; k++)
-                    {
-                        if (has_label[k])
-                        {
-                            size_t idx = table_to_input_map[base_idx + k];
-                            Log::debug(
-                                "Found label at thread_idx: %i, base_idx: %i, k: %i, idx: %i", thread_idx, base_idx, k,
-                                idx);
-
-                            batch->get(k).decode(ret_labels[idx], get_params().label_bit_count());
-                        }
-                    }
-                }
-
-                processed_count++;
-            }
-
-            Log::debug("Thread %d processed %d blocks.", thread_idx, processed_count);
         }
     } // namespace receiver
 } // namespace apsi

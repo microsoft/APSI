@@ -3,11 +3,18 @@
 
 // STD
 #include <sstream>
+#include <cstddef>
+#include <cstring>
 
 // APSI
 #include "apsi/util/utils.h"
 
+// SEAL
+#include "seal/util/common.h"
+
 using namespace std;
+using namespace seal;
+using namespace seal::util;
 
 namespace apsi
 {
@@ -45,6 +52,45 @@ namespace apsi
             vector<string> elems;
             split(s, delim, elems);
             return elems;
+        }
+
+        void read_from_stream(istream &in, uint32_t byte_count, vector<SEAL_BYTE> &destination)
+        {
+            // Initial number of bytes to read
+            const size_t first_to_read = 1024;
+
+            // How many bytes we read in this round
+            size_t to_read = min(static_cast<size_t>(byte_count), first_to_read); 
+
+            while (byte_count)
+            {
+                size_t old_size = destination.size();
+
+                // Save the old size and resize by adding to_read many bytes to vector
+                destination.resize(add_safe(old_size, to_read));
+
+                // Write some data into the vector
+                in.read(reinterpret_cast<char*>(destination.data() + old_size), to_read);
+
+                // Decrement byte_count and increase to_read for next round
+                byte_count -= to_read;
+
+                // Set to_read for next round exactly to right size so we don't read too much
+                to_read = min(2 * to_read, static_cast<size_t>(byte_count));
+            }
+        }
+
+        vector<SEAL_BYTE> read_from_stream(istream &in)
+        {
+            uint32_t size = 0;
+            in.read(reinterpret_cast<char *>(&size), sizeof(uint32_t));
+
+            vector<SEAL_BYTE> result(sizeof(uint32_t));
+            memcpy(result.data(), &size, sizeof(uint32_t));
+
+            read_from_stream(in, size, result);
+
+            return result;
         }
     } // namespace util
 } // namespace apsi

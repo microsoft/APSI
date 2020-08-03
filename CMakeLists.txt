@@ -467,6 +467,108 @@ if(ZeroMQpp_ROOT)
 endif()
 find_package(ZeroMQpp MODULE REQUIRED)
 
+# FlatBuffers 
+# Download and configure
+if(NOT MSVC)
+    message(STATUS "Setting up flatbuffers ...")
+    if(NOT CMAKE_TOOLCHAIN_FILE)
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+            OUTPUT_QUIET
+            RESULT_VARIABLE result
+            WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+    else()
+        create_cache_entries(${THIRDPARTY_DIR}/flatbuffers)
+        if(EXISTS ${THIRDPARTY_DIR}/flatbuffers/build/CMakeCache.txt)
+            # Force regenerating make files. When cross compiling we might be
+            # compiling more than one platform at a time.
+            file(REMOVE ${THIRDPARTY_DIR}/flatbuffers/build/CMakeCache.txt)
+        endif()
+        execute_process(
+            COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" . -Ccache_init.txt
+            OUTPUT_QUIET
+            RESULT_VARIABLE result
+            WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+    endif()
+    if(result)
+        message(FATAL_ERROR "Failed to download flatbuffers (${result})")
+    endif()
+
+    set(FLATBUFFERS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(FLATBUFFERS_BUILD_FLATC ON CACHE BOOL "" FORCE)
+    set(FLATBUFFERS_INSTALL OFF CACHE BOOL "" FORCE)
+endif()
+
+# Build
+if(NOT MSVC)
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} --build .
+        OUTPUT_QUIET
+        RESULT_VARIABLE result
+        WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+    if(result)
+        message(FATAL_ERROR "Failed to build flatbuffers (${result})`")
+    endif()
+
+    # flatc executable
+    set(FLATBUFFERS_FLATC_PATH "build/flatc")
+
+    execute_process(
+        COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi" "${APSI_SOURCE_DIR}/common/native/apsi/psiparams.fbs"
+        #OUTPUT_QUIET
+        RESULT_VARIABLE result
+        WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+    if(result)
+        message(FATAL_ERROR "flatc failed (${result})")
+    endif()
+
+    execute_process(
+        COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/sop.fbs"
+        #OUTPUT_QUIET
+        RESULT_VARIABLE result
+        WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+    if(result)
+        message(FATAL_ERROR "flatc failed (${result})")
+    endif()
+
+    execute_process(
+        COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/sop_header.fbs"
+        #OUTPUT_QUIET
+        RESULT_VARIABLE result
+        WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+    if(result)
+        message(FATAL_ERROR "flatc failed (${result})")
+    endif()
+
+    execute_process(
+        COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/sop_response.fbs"
+        #OUTPUT_QUIET
+        RESULT_VARIABLE result
+        WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+    if(result)
+        message(FATAL_ERROR "flatc failed (${result})")
+    endif()
+
+    execute_process(
+        COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/result_package.fbs"
+        #OUTPUT_QUIET
+        RESULT_VARIABLE result
+        WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+    if(result)
+        message(FATAL_ERROR "flatc failed (${result})")
+    endif()
+endif()
+
+# Set up the targets
+if(NOT MSVC)
+    add_subdirectory(
+        ${THIRDPARTY_DIR}/flatbuffers/src
+        EXCLUDE_FROM_ALL)
+    list(APPEND FLATBUFFERS_INCLUDE_DIRS ${THIRDPARTY_DIR}/flatbuffers/src/include)
+    set_target_properties(${flatbuffers} PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${FLATBUFFERS_INCLUDE_DIRS}")
+endif()
+
 ###########################
 # APSI common C++ library #
 ###########################
@@ -490,7 +592,8 @@ target_link_libraries(common PUBLIC
     ZeroMQ::ZeroMQ
     ZeroMQpp::ZeroMQpp
     fourq
-    log4cplus)
+    log4cplus
+    flatbuffers)
 if (NOT APPLE)
     target_link_libraries(common PUBLIC stdc++fs)
 endif()

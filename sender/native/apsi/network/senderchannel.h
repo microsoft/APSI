@@ -11,7 +11,7 @@ namespace apsi
     namespace network
     {
         /**
-        Represents a network channel for a Sender.
+        Represents a network channel for a sender.
         */
         class SenderChannel : public NetworkChannel
         {
@@ -20,13 +20,12 @@ namespace apsi
 
         protected:
             /**
-            The only difference from a Receiver is the socket type.
+            The only difference from a receiver is the socket type.
             */
             virtual zmqpp::socket_type get_socket_type();
 
             /**
-            The Sender needs to set a couple of socket options to ensure
-            messages are not dropped.
+            The sender needs to set a couple of socket options to ensure messages are not dropped.
             */
             virtual void set_socket_options(zmqpp::socket_t *socket);
         };

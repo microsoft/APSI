@@ -9,11 +9,11 @@
 // APSI
 #include "apsi/psiparams.h"
 #include "apsi/logging/log.h"
-#include "apsi/network/network_utils.h"
 #include "apsi/network/result_package.h"
 #include "apsi/sender.h"
 #include "apsi/util/utils.h"
 #include "apsi/cryptocontext.h"
+#include "apsi/sealobject.h"
 
 // SEAL
 #include "seal/modulus.h"
@@ -43,12 +43,12 @@ namespace apsi
             }
         }
 
-        void Sender::query(
-            const string &relin_keys, const map<uint64_t, vector<string>> &query, const vector<SEAL_BYTE> &client_id,
-            Channel &channel)
+        void Sender::query(RelinKeys relin_keys, map<uint64_t, vector<SEALObject<Ciphertext>>> query,
+            vector<SEAL_BYTE> client_id, Channel &channel)
         {
-            // Acquire a read lock on the database
-            auto lock = sender_db_lock_.acquire_read();
+            // Acquire read locks on SenderDB and Sender
+            auto sender_db_lock = sender_db_->get_reader_lock();
+            auto sender_lock = get_reader_lock();
 
             // Check that the database is set
             if (!sender_db_)
@@ -61,10 +61,10 @@ namespace apsi
 
             // Create the session context; we don't have to re-create the SEALContext every time
             CryptoContext crypto_context(seal_context_);
-            crypto_context.set_evaluator(relin_keys);
+            crypto_context.set_evaluator(move(relin_keys));
 
             uint32_t bundle_idx_count = params_.bundle_idx_count();
-            uint32_t split_size = params_.table_params().split_size;
+            uint32_t max_items_per_bin = params_.table_params().max_items_per_bin;
 
             /* Receive client's query data. */
             int num_of_powers = static_cast<int>(query.size());
@@ -78,21 +78,21 @@ namespace apsi
             // Initialize the powers matrix
             for (size_t i = 0; i < powers.size(); i++)
             {
-                powers[i].reserve(split_size);
-                for (uint32_t j = 0; j < split_size; j++)
+                powers[i].reserve(max_items_per_bin);
+                for (uint32_t j = 0; j < max_items_per_bin; j++)
                 {
                     powers[i].emplace_back(seal_context_);
                 }
             }
 
             // Load inputs provided in the query
-            for (const auto &q : query)
+            for (auto &q : query)
             {
                 size_t power = static_cast<size_t>(q.first);
                 for (size_t bundle_idx = 0; bundle_idx < powers.size(); bundle_idx++)
                 {
-                    // Load input^power to powers[bundle_idx][power-1]
-                    from_string(seal_context_, q.second[bundle_idx], powers[bundle_idx][power - 1]);
+                    // Move input^power to powers[bundle_idx][power-1]
+                    powers[bundle_idx][power - 1] = move(q.second[bundle_idx].extract_local());
                 }
             }
 
@@ -104,7 +104,7 @@ namespace apsi
             uint32_t given_digits = (static_cast<uint32_t>(num_of_powers) + base - 2) / (base - 1);
 
             // Prepare the windowing information
-            WindowingDag dag(split_size, window_size, given_digits);
+            WindowingDag dag(max_items_per_bin, window_size, given_digits);
 
             // Create a state per each bundle index; this contains information about whether the
             // powers for that bundle index have been computed
@@ -159,9 +159,6 @@ namespace apsi
                 // Compute all powers of the query
                 compute_batch_powers(powers[bundle_idx], crypto_context, dag, states[bundle_idx]);
 
-                // Lock the database from modifications
-                auto lock = sender_db_->get_reader_lock();
-
                 // Next, iterate over each bundle with this bundle index
                 auto bundle_caches = sender_db_->get_cache(bundle_idx).size();
                 size_t bundle_count = bundle_caches.size();
@@ -171,35 +168,37 @@ namespace apsi
                 seal_for_each_n(bundle_caches.begin(), bundle_count, [&](auto &cache) {
                     // Package for the result data
                     ResultPackage pkg;
+
+                    pkg.client_id = client_id;
                     pkg.bundle_idx = bundle_idx;
 
-                    // Compute the matching result, convert to a string, and write to pkg
-                    pkg.data = to_string(cache.batched_matching_polyn.eval(powers[bundle_idx]));
+                    // Compute the matching result and move to pkg
+                    pkg.psi_result = move(cache.batched_matching_polyn.eval(powers[bundle_idx]));
 
                     if (cache.batched_interp_polyn)
                     {
-                        // Compute the label result, convert to a string, and write to pkg
-                        pkg.label_data = to_string(cache.batched_interp_polyn.eval(powers[bundle_idx]));
+                        // Compute the label result and move to pkg
+                        pkg.label_result.emplace_back(cache.batched_interp_polyn.eval(powers[bundle_idx]));
                     }
 
                     // Start sending on the channel
-                    channel.send(client_id, pkg);
+                    channel.send(pkg);
                 });
             }
         }
 
         void Sender::compute_batch_powers(
             vector<Ciphertext> &batch_powers,
-            CryptoContext &crypto_context,
+            const CryptoContext &crypto_context,
             const WindowingDag &dag,
             WindowingDag::State &state)
         {
             uint32_t bundle_idx_count = params_.bundle_idx_count();
-            uint32_t split_size = params_.table_params().split_size;
+            uint32_t max_items_per_bin = params_.table_params().max_items_per_bin;
 
-            if (batch_powers.size() != split_size + 1)
+            if (batch_powers.size() != max_items_per_bin + 1)
             {
-                std::cout << batch_powers.size() << " != " << split_size + 1 << std::endl;
+                std::cout << batch_powers.size() << " != " << max_items_per_bin + 1 << std::endl;
                 throw std::runtime_error("");
             }
 
@@ -228,7 +227,7 @@ namespace apsi
 
                 evaluator.multiply(
                     batch_powers[node.inputs[0]], batch_powers[node.inputs[1]], batch_powers[node.output]);
-                evaluator.relinearize_inplace(batch_powers[node.output], crypto_context.relin_keys_);
+                evaluator.relinearize_inplace(batch_powers[node.output], *crypto_context.relin_keys());
 
                 // a simple write should be sufficient but lets be safe
                 exp = WindowingDag::NodeState::Pending;

@@ -16,7 +16,7 @@
 #include <string>
 
 // GSL
-#include <gsl/span>
+#include "gsl/span"
 
 // APSI
 #include "apsi/item.h"
@@ -24,9 +24,13 @@
 #include "apsi/psiparams.h"
 #include "apsi/senderdb.h"
 #include "apsi/cryptocontext.h"
+#include "apsi/sealobject.h"
 
 // SEAL
-#include <seal/util/locks.h>
+#include "seal/util/defines.h"
+#include "seal/util/locks.h"
+#include "seal/relinkeys.h"
+#include "seal/ciphertext.h"
 
 namespace apsi
 {
@@ -102,15 +106,28 @@ namespace apsi
             Generate a response to a query.
             */
             void query(
-                const std::string &relin_keys, const std::map<std::uint64_t, std::vector<std::string>> &query,
-                const std::vector<seal::SEAL_BYTE> &client_id, network::Channel &channel);
+                seal::RelinKeys relin_keys, std::map<std::uint64_t, std::vector<SEALObject<seal::Ciphertext>>> query,
+                std::vector<seal::SEAL_BYTE> client_id, network::Channel &channel);
 
             /**
-            Return a reference to the PSI parameters used by the Sender.
+            Return the PSI parameters.
             */
             const PSIParams &get_params() const
             {
                 return params_;
+            }
+
+            /**
+            Return the SEALContext.
+            */
+            std::shared_ptr<seal::SEALContext> get_seal_context() const
+            {
+                return seal_context_;
+            }
+
+            seal::util::ReaderLock get_reader_lock() const
+            {
+                return sender_db_lock_.acquire_read();
             }
 
         private:
@@ -134,7 +151,7 @@ namespace apsi
             @params[out] all_powers All powers computed from the input for the specified batch.
             */
             void compute_batch_powers(
-                std::vector<seal::Ciphertext> &batch_powers, CryptoContext &crypto_context,
+                std::vector<seal::Ciphertext> &batch_powers, const CryptoContext &crypto_context,
                 const WindowingDag &dag, WindowingDag::State &state);
 
             PSIParams params_;
@@ -148,7 +165,7 @@ namespace apsi
             /**
             Read-write lock for controlling access to the database.
             */
-            seal::util::ReaderWriterLocker sender_db_lock_;
+            mutable seal::util::ReaderWriterLocker sender_db_lock_;
         }; // class Sender
     }      // namespace sender
 } // namespace apsi

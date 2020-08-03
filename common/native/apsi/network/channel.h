@@ -8,15 +8,20 @@
 #include <cstdint>
 #include <cstddef>
 #include <memory>
+#include <vector>
+#include <map>
+#include <tuple>
 
 // APSI
-#include "apsi/network/senderoperation.h"
-#include "apsi/network/senderoperationresponse.h"
+#include "apsi/network/sender_operation.h"
+#include "apsi/network/sender_operation_response.h"
+#include "apsi/network/result_package.h"
+
+// SEAL
+#include "seal/util/defines.h"
 
 namespace apsi
 {
-    struct ResultPackage;
-
     namespace network
     {
         /**
@@ -38,72 +43,41 @@ namespace apsi
             {}
 
             /**
+            Send a SenderOperation to a sender.
+            */
+            virtual void send(std::unique_ptr<SenderOperation> sop) = 0;
+
+            /**
             Receive a SenderOperation from a receiver.
             */
-            virtual bool receive(std::shared_ptr<SenderOperation> &sender_op) = 0;
+            virtual std::unique_ptr<SenderOperation> receive_operation(
+                std::shared_ptr<seal::SEALContext> context,
+                SenderOperationType expected = SenderOperationType::SOP_UNKNOWN) = 0;
 
             /**
-            Receive a parameter request response from a sender.
+            Send a SenderOperationResponse to a receiver.
             */
-            virtual bool receive(apsi::network::SenderResponseParms &response) = 0;
+            virtual void send(std::unique_ptr<SenderOperationResponse> sop_response) = 0;
 
             /**
-            Receive an OPRF query response from a sender. 
+            Receive a SenderOperationResponse from a sender.
             */
-            virtual bool receive(apsi::network::SenderResponseOPRF &response) = 0;
+            virtual std::unique_ptr<SenderOperationResponse> receive_response(
+                SenderOperationType expected = SenderOperationType::SOP_UNKNOWN) = 0;
 
             /**
-            Receive a PSI or labeled PSI query response from sender.
+            Send a ResultPackage to a receiver.
             */
-            virtual bool receive(apsi::network::SenderResponseQuery &response) = 0;
+            virtual void send(const ResultPackage &rp) = 0;
 
             /**
-            Receive a ResultPackage.
+            Receive a ResultPackage from a sender.
             */
-            virtual bool receive(apsi::ResultPackage &pkg) = 0;
+            virtual std::unique_ptr<ResultPackage> receive_result_package(
+                std::shared_ptr<seal::SEALContext> context) = 0;
 
             /**
-            Send a parameter request to sender.
-            */
-            virtual void send_parms_request() = 0;
-
-            /**
-            Send a response to a parameter request to receiver.
-            */
-            virtual void send_parms_response(
-                const std::vector<seal::SEAL_BYTE> &client_id, const PSIParams &params) = 0;
-
-            /**
-            Send an OPRF query to sender.
-            */
-            virtual void send_oprf_request(const std::vector<seal::SEAL_BYTE> &data) = 0;
-
-            /**
-            Send a response to an OPRF query to receiver.
-            */
-            virtual void send_oprf_response(
-                const std::vector<seal::SEAL_BYTE> &client_id, const std::vector<seal::SEAL_BYTE> &data) = 0;
-
-            /**
-            Send a PSI or labeled PSI query to sender.
-            */
-            virtual void send_query_request(
-                const std::string &relin_keys, const std::map<std::uint64_t, std::vector<std::string>> &data) = 0;
-
-            /**
-            Send a response to an OPRF query to receiver.
-            */
-            virtual void send_query_response(
-                const std::vector<seal::SEAL_BYTE> &client_id, std::size_t package_count) = 0;
-
-            /**
-            Send a ResultPackage.
-            */
-            virtual void send_result_package(
-                const std::vector<seal::SEAL_BYTE> &client_id, const ResultPackage &pkg) = 0;
-
-            /**
-            Get the amount of data that has been sent through the channel
+            Get the amount of data that has been sent through the channel.
             */
             std::uint64_t bytes_sent() const
             {
@@ -111,7 +85,7 @@ namespace apsi
             }
 
             /**
-            Get the amount of data that has been received through the channel
+            Get the amount of data that has been received through the channel.
             */
             std::uint64_t bytes_received() const
             {

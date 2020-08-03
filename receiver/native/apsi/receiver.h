@@ -6,8 +6,12 @@
 // STD
 #include <map>
 #include <vector>
+#include <unordered_map>
 #include <memory>
 #include <utility>
+#include <mutex>
+#include <atomic>
+#include <type_traits>
 
 // APSI
 #include "apsi/item.h"
@@ -15,12 +19,15 @@
 #include "apsi/psiparams.h"
 #include "apsi/util/db_encoding.h"
 #include "apsi/cryptocontext.h"
+#include "apsi/sealobject.h"
+#include "apsi/network/result_package.h"
 
 // Kuku
-#include <kuku/kuku.h>
+#include "kuku/kuku.h"
 
 // SEAL
-#include <seal/util/defines.h>
+#include "seal/util/defines.h"
+#include "gsl/span"
 
 namespace apsi
 {
@@ -31,6 +38,55 @@ namespace apsi
 
     namespace receiver
     {
+        class LabelData
+        {
+        public:
+            LabelData() = default;
+
+            LabelData(std::unique_ptr<Bitstring> label) : label_(std::move(label))
+            {}
+
+            void set(std::unique_ptr<Bitstring> label)
+            {
+                label_ = std::move(label);
+            }
+
+            template<typename T, typename = std::enable_if_t<std::is_standard_layout<T>::value>>
+            gsl::span<std::add_const_t<T>> get_as() const
+            {
+                return { reinterpret_cast<std::add_const_t<T>*>(label_->data().data(), 
+                    label_->data().size() / sizeof(T)) };
+            }
+
+            template<typename CharT = char>
+            std::basic_string<CharT> to_string() const
+            {
+                auto string_data = get_as<CharT>();
+                return { string_data.data(), string_data.size() };
+            }
+
+            explicit operator bool() const noexcept
+            {
+                return !label_;
+            }
+
+        private:
+            std::unique_ptr<Bitstring> label_;
+        };
+
+        class MatchRecord 
+        {
+        public:
+            bool found = false;
+
+            LabelData label;
+
+            explicit operator bool() const noexcept
+            {
+                return found;
+            }
+        };
+
         class Receiver
         {
         public:
@@ -61,7 +117,7 @@ namespace apsi
             The query is a vector of items, and the result is a same-size vector of bool values. If an item is in the
             intersection, the corresponding bool value is true on the same position in the result vector.
             *************************************************************************************************************************************/
-            std::pair<std::vector<bool>, Matrix<unsigned char>> query(std::vector<Item> &items, network::Channel &chl);
+            void /*std::pair<std::vector<bool>, Matrix<unsigned char>> */ query(const std::vector<Item> &items, network::Channel &chl);
 
             /************************************************************************************************************************************
             The following methods are the individual parts that when put together form a full Query to a Sender.
@@ -72,7 +128,9 @@ namespace apsi
             of items, and the result is a same-size vector of bool values. If an item is in the intersection, the
             corresponding bool value is true on the same position in the result vector .
             */
-            std::map<std::uint64_t, std::vector<std::string>> &query(std::vector<Item> &items);
+            network::SenderOperationQuery create_query(
+                const std::vector<Item> &items,
+                std::unordered_map<std::size_t, std::size_t> &table_idx_to_item_idx);
 
             /**
             Decrypt the result of a query to a remote sender and get the intersection result. The query is a vector of
@@ -86,13 +144,13 @@ namespace apsi
             Obfuscates the items and initializes the given vector with the buffer that must be sent to the Sender for
             OPRF processing.
             */
-            void obfuscate_items(const std::vector<Item> &items, std::vector<seal::SEAL_BYTE> &items_buffer);
+            std::vector<seal::SEAL_BYTE> obfuscate_items(const std::vector<Item> &items);
 
             /**
             Process obfuscated items received from Sender.
             Remove the Receiver obfuscation so only the Sender obfuscation remains.
             */
-            void deobfuscate_items(const std::vector<seal::SEAL_BYTE> &items_buffer, std::vector<Item> &items);
+            std::vector<Item> deobfuscate_items(const std::vector<seal::SEAL_BYTE> &oprf_response);
 
             /**
             Perform a handshake between the Sender and this Receiver.
@@ -166,10 +224,11 @@ namespace apsi
             /**
             Work to be done in a single thread for stream_decrypt
             */
-            void stream_decrypt_worker(
-                std::size_t thread_idx, std::size_t batch_size, std::size_t num_threads, std::size_t block_count,
-                network::Channel &channel, const std::vector<std::size_t> &table_to_input_map,
-                std::vector<bool> &ret_bools, Matrix<unsigned char> &ret_labels);
+            void result_package_worker(
+                std::atomic<std::uint32_t> &package_count,
+                std::vector<MatchRecord> &mrs,
+                const std::unordered_map<std::size_t, std::size_t> &table_idx_to_item_idx,
+                network::Channel &chl) const;
 
             //std::shared_ptr<FField> field() const
             //{
@@ -199,7 +258,7 @@ namespace apsi
 
             std::unique_ptr<CryptoContext> crypto_context_;
 
-            std::vector<seal::SEAL_BYTE> relin_keys_;
+            SEALObject<seal::RelinKeys> relin_keys_;
 
             std::unique_ptr<oprf::OPRFReceiver> oprf_receiver_;
 

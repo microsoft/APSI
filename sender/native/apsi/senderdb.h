@@ -13,7 +13,7 @@
 #include <set>
 
 // GSL
-#include <gsl/span>
+#include "gsl/span"
 
 // APSI
 #include "apsi/binbundle.h"
@@ -74,6 +74,11 @@ namespace apsi
                 return params_;
             }
 
+            /**
+            Returns the total number of bin bundles.
+            */
+            std::size_t bin_bundle_count() const;
+
             seal::util::ReaderLock get_reader_lock() const
             {
                 return db_lock_.acquire_read();
@@ -104,7 +109,7 @@ namespace apsi
             /**
             A read-write lock to protect the database from modification while in use.
             */
-            seal::util::ReaderWriterLocker db_lock_;
+            mutable seal::util::ReaderWriterLocker db_lock_;
         }; // class SenderDB
 
         class LabeledSenderDB : public SenderDB<felt_t> {

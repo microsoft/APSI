@@ -1,0 +1,13 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license.
+
+namespace apsi.network.fbs;
+
+enum SenderOperationType:uint32 { SOP_UNKNOWN = 0, SOP_PARMS = 1, SOP_OPRF = 2, SOP_QUERY = 3 }
+
+table SenderOperationHeader {
+    type:SenderOperationType = SOP_UNKNOWN;
+    client_id:[ubyte];
+}
+
+root_type SenderOperationHeader;

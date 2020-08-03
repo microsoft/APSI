@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <numeric>
 
 // APSI
 #include "apsi/senderdb.h"
@@ -21,6 +22,16 @@ namespace apsi
 
     namespace sender
     {
+        std::size_t SenderDB::bin_bundle_count() const
+        {
+            // Lock the database for reading 
+            auto lock = db_lock_.acquire_read();
+
+            // Compute the total number of bin bundles
+            return accumulate(bin_bundles_.cbegin(), bin_bundles_.cend(), size_t(0),
+                [&](auto &a, auto &b) { return a + b.size(); });
+        }
+
         LabeledSenderDB::LabeledSenderDB(PSIParams params) :
             params_(params),
             crypto_context_(SEALContext::Create(params.encryption_params()))
