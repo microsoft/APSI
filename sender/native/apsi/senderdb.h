@@ -32,15 +32,6 @@ namespace apsi
 {
     namespace sender
     {
-        // Labels are always the size of items, i.e., ITEM_BIT_LEN bits long
-        using FullWidthLabel = Item;
-
-        // A representation of item-label as a sequence of felt_t pairs, or item-unit as a sequence of pairs where the
-        // first element is felt_t and the second is monostate
-        template<typename L>
-        using AlgItemLabel = std::vector<std::pair<felt_t, L> >;
-
-        template<typename L>
         class SenderDB
         {
         public:
@@ -52,13 +43,15 @@ namespace apsi
             void clear_db();
 
             /**
-            Clears the database and inserts the given data, using at most thread_count threads
+            Clears the database and inserts the given data, using at most thread_count threads. Only one of these is
+            defined for a given child of SenderDB, corresponding to whether it is labeled or unlabeled.
             */
             virtual void set_data(std::map<Item, FullWidthLabel> &data, std::size_t thread_count) = 0;
             virtual void set_data(std::map<Item, monostate> &data, std::size_t thread_count) = 0;
 
             /**
-            Inserts the given data into the database, using at most thread_count threads
+            Inserts the given data into the database, using at most thread_count threads. Only one of these is defined
+            for a given child of SenderDB, corresponding to whether it is labeled or unlabeled.
             */
             virtual void add_data(std::map<Item, FullWidthLabel> &data, std::size_t thread_count) = 0;
             virtual void add_data(std::map<Item, monostate> &data, std::size_t thread_count) = 0;
@@ -85,14 +78,6 @@ namespace apsi
             }
 
         protected:
-            /**
-            Inserts the given items and corresponding labels into the database at the given cuckoo indices. Concretely,
-            for every ((item, label), cuckoo_idx) element, the item is inserted into the database at cuckoo_idx and its
-            label is set to label.
-            */
-            void add_data_worker(
-                const gsl::span<pair<&pair<felt_t, L>, std::size_t> > data_with_indices
-            );
 
             /**
             This defines our SEAL context, base field, item size, etc.
@@ -112,7 +97,8 @@ namespace apsi
             mutable seal::util::ReaderWriterLocker db_lock_;
         }; // class SenderDB
 
-        class LabeledSenderDB : public SenderDB<felt_t> {
+        class LabeledSenderDB : public SenderDB
+        {
             /**
             Clears the database and inserts the given data, using at most thread_count threads
             */
@@ -126,7 +112,8 @@ namespace apsi
             void add_data(std::map<Item, monostate> &data, std::size_t thread_count);
         }; // class LabeledSenderDB
 
-        class UnabeledSenderDB : public SenderDB<monostate> {
+        class UnabeledSenderDB : public SenderDB
+        {
             /**
             Clears the database and inserts the given data, using at most thread_count threads
             */

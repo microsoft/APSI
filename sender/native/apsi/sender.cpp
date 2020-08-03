@@ -33,6 +33,7 @@ namespace apsi
 
     namespace sender
     {
+
         Sender::Sender(const PSIParams &params, size_t thread_count)
             : params_(params), thread_count_(thread_count),
               seal_context_(SEALContext::Create(params_.seal_params()))
@@ -71,28 +72,33 @@ namespace apsi
             Log::debug("Number of powers: %i", num_of_powers);
             Log::debug("Current bundle index count: %i", bundle_idx_count);
 
-            // For each bundle index, we have a vector of powers of the query. We need powers all
-            // the way to split_size; however, we don't store the zeroth power.
-            vector<vector<Ciphertext>> powers(bundle_idx_count);
+            // The number of powers necessary to compute PSI is equal to the largest number of elements inside any bin
+            // under this bundle index. Globally, this is at most max_items_per_bin.
+            size_t max_exponent = max_items_per_bin;
 
-            // Initialize the powers matrix
-            for (size_t i = 0; i < powers.size(); i++)
+            // For each bundle index i, we need a vector of powers of the query Qᵢ. We need powers all
+            // the way up to Qᵢ^max_items_per_bin (maybe less if the BinBundles aren't as full as expected). We don't
+            // store the zeroth power.
+            vector<CiphertextPowers> all_powers(bundle_idx_count);
+
+            // Initialize powers
+            for (CiphertextPowers &powers : all_powers)
             {
-                powers[i].reserve(max_items_per_bin);
-                for (uint32_t j = 0; j < max_items_per_bin; j++)
-                {
-                    powers[i].emplace_back(seal_context_);
-                }
+                powers.reserve(max_exponent);
             }
 
-            // Load inputs provided in the query
+            // Load inputs provided in the query. These are the precomputed powers we will use for windowing.
             for (auto &q : query)
             {
-                size_t power = static_cast<size_t>(q.first);
-                for (size_t bundle_idx = 0; bundle_idx < powers.size(); bundle_idx++)
+                // The exponent of all the query powers we're about to iterate through
+                size_t exponent = static_cast<size_t>(q.first);
+
+                // Load Qᵢᵉ for all bundle indices i, where e is the exponent specified above
+                for (size_t bundle_idx = 0; bundle_idx < all_powers.size(); bundle_idx++)
                 {
-                    // Move input^power to powers[bundle_idx][power-1]
-                    powers[bundle_idx][power - 1] = move(q.second[bundle_idx].extract_local());
+                    // Load input^power to all_powers[bundle_idx][exponent-1]. The -1 is because we don't store
+                    // the zeroth exponent
+                    all_powers[bundle_idx][exponent - 1] = move(q.second[bundle_idx].extract_local());
                 }
             }
 
@@ -104,7 +110,7 @@ namespace apsi
             uint32_t given_digits = (static_cast<uint32_t>(num_of_powers) + base - 2) / (base - 1);
 
             // Prepare the windowing information
-            WindowingDag dag(max_items_per_bin, window_size, given_digits);
+            WindowingDag dag(max_exponent, window_size, given_digits);
 
             // Create a state per each bundle index; this contains information about whether the
             // powers for that bundle index have been computed
@@ -115,8 +121,8 @@ namespace apsi
                 states.emplace_back(dag);
             }
 
-            // Partition the data and run the threads on the partitions. The i-th thread will process
-            // bundle indices partitions[i] up to but not including partitions[i+1].
+            // Partition the data and run the threads on the partitions. The i-th thread will compute query powers at
+            // bundle indices starting at partitions[i], up to but not including partitions[i+1].
             auto partitions = partition_evenly(bundle_idx_count, safe_cast<uint32_t>(thread_count_));
 
             // Launch threads, but not more than necessary
@@ -125,7 +131,7 @@ namespace apsi
             {
                 threads.emplace_back([&, t]() {
                     query_worker(
-                        partitions[t], powers,
+                        partitions[t], all_powers,
                         crypto_context, dag, states, client_id, channel);
                 });
             }
@@ -141,7 +147,7 @@ namespace apsi
 
         void Sender::query_worker(
             pair<uint32_t, uint32_t> bundle_idx_bounds,
-            vector<vector<Ciphertext>> &powers,
+            vector<CiphertextPowers> &all_powers,
             const CryptoContext &crypto_context,
             WindowingDag &dag,
             vector<WindowingDag::State> &states,
@@ -157,7 +163,8 @@ namespace apsi
             for (uint32_t bundle_idx = bundle_idx_start; bundle_idx < bundle_idx_end; bundle_idx++)
             {
                 // Compute all powers of the query
-                compute_batch_powers(powers[bundle_idx], crypto_context, dag, states[bundle_idx]);
+                CiphertextPowers &powers_at_this_bundle_idx = all_powers[bundle_idx];
+                compute_powers(powers_at_this_bundle_idx, crypto_context, dag, states[bundle_idx]);
 
                 // Next, iterate over each bundle with this bundle index
                 auto bundle_caches = sender_db_->get_cache(bundle_idx).size();
@@ -187,81 +194,100 @@ namespace apsi
             }
         }
 
-        void Sender::compute_batch_powers(
-            vector<Ciphertext> &batch_powers,
-            const CryptoContext &crypto_context,
+        /**
+        Fills out the list of ciphertext powers, give some precomputed powers and a DAG describing how to construct the
+        rest of the powers
+        */
+        void Sender::compute_powers(
+            CiphertextPowers &powers,
+            CryptoContext &crypto_context,
             const WindowingDag &dag,
-            WindowingDag::State &state)
-        {
+            WindowingDag::State &state
+        ) {
+            // The number of powers necessary to compute PSI is equal to the largest number of elements inside any bin
+            // under this bundle index. Globally, this is at most max_items_per_bin.
+            uint32_t max_exponent = params_.table_params().max_items_per_bin;
             uint32_t bundle_idx_count = params_.bundle_idx_count();
-            uint32_t max_items_per_bin = params_.table_params().max_items_per_bin;
 
-            if (batch_powers.size() != max_items_per_bin + 1)
+            if (powers.size() != max_exponent)
             {
-                std::cout << batch_powers.size() << " != " << max_items_per_bin + 1 << std::endl;
-                throw std::runtime_error("");
+                throw std::runtime_error("Need room to compute max_exponent many ciphertext powers");
             }
 
-            size_t idx = static_cast<size_t>((*state.next_node)++);
-            Evaluator &evaluator = *crypto_context.evaluator();
-            while (idx < dag.nodes.size())
+            Evaluator &evaluator = crypto_context.evaluator();
+
+            // Traverse each node of the DAG, building up products. That is, we calculate node.input[0]*node.input[1].
+            // I know infinilooping is a bad pattern but the condition we're looping on is an atomic fetch_add, which
+            // makese things harder. The top of this loop handles the break condition.
+            while (true)
             {
-                auto &node = dag.nodes[idx];
+                // Atomically get the next_node counter (this tells us where to start working) and increment it
+                size_t node_idx = static_cast<size_t>(state.next_node.fetch_add(1));
+                // If we've traversed the whole DAG, we're done
+                if (node_idx >= dag.nodes.size())
+                {
+                    break;
+                }
+
+                auto &node = dag.nodes[node_idx];
                 auto &node_state = state.nodes[node.output];
 
-                // a simple write should be sufficient but lets be safe
-                auto exp = WindowingDag::NodeState::Ready;
-                bool r = node_state.compare_exchange_strong(exp, WindowingDag::NodeState::Pending);
-                if (r == false)
+                // Atomically transition this node from Ready to Pending. This makes sure we're the only one who's
+                // writing to it. The _strong specifier here means that this doesn't fail spuriously, i.e., if the
+                // return value is false, it means that the comparison failed and someone else has begun working on this
+                // node. If this happens, just move along to the next node.
+                bool r = node_state.compare_exchange_strong(
+                    WindowingDag::NodeState::Ready,
+                    WindowingDag::NodeState::Pending
+                );
+                if (!r)
                 {
-                    std::cout << int(exp) << std::endl;
-                    throw std::runtime_error("");
+                    continue;
                 }
 
-                // spin lock on the input nodes
+                // We need to multiply the two input nodes. Wait for them to be computed (their values might depend on
+                // values lower on the DAG)
                 for (size_t i = 0; i < 2; i++)
                 {
-                    while (state.nodes[node.inputs[i]] != WindowingDag::NodeState::Done)
-                        ;
+                    // Loop until the input is computed
+                    while (state.nodes[node.inputs[i]] != WindowingDag::NodeState::Done) {}
                 }
 
-                evaluator.multiply(
-                    batch_powers[node.inputs[0]], batch_powers[node.inputs[1]], batch_powers[node.output]);
-                evaluator.relinearize_inplace(batch_powers[node.output], *crypto_context.relin_keys());
+                // Multiply the inputs together
+                Ciphertext &input0 = powers[node.inputs[0]];
+                Ciphertext &input1 = powers[node.inputs[1]];
+                Ciphertext &output = powers[node.output];
+                evaluator.multiply(input0, input1, output);
 
-                // a simple write should be sufficient but lets be safe
-                exp = WindowingDag::NodeState::Pending;
-                r = node_state.compare_exchange_strong(exp, WindowingDag::NodeState::Done);
-                if (r == false)
+                // Relinearize and convert to NTT form
+                evaluator.relinearize_inplace(output, crypto_context.relin_keys_);
+                evaluator.transform_to_ntt_inplace(powers[i]);
+
+                // Atomically transition this node from Pending to Done. Since we already "claimed" this node by marking
+                // it Pending, this MUST still be Pending. If it's not, someone stole our work against our wishes. This
+                // should never happen.
+                bool r = node_state.compare_exchange_strong(
+                    WindowingDag::NodeState::Pending,
+                    WindowingDag::NodeState::Done
+                );
+                if (!r)
                 {
-                    throw std::runtime_error("");
+                    throw std::runtime_error("FATAL: A node's work was stolen from it. This should never happen.");
                 }
-
-                idx = (*state.next_node)++;
-            }
-
-            // Iterate until all nodes are computed. We may want to do something smarter here.
-            for (size_t i = 0; i < state.nodes.size(); ++i)
-            {
-                while (state.nodes[i] != WindowingDag::NodeState::Done)
-                    ;
-            }
-
-            auto end = dag.nodes.size() + batch_powers.size();
-            while (idx < end)
-            {
-                auto i = idx - dag.nodes.size();
-
-                evaluator.transform_to_ntt_inplace(batch_powers[i]);
-                idx = (*state.next_node)++;
             }
         }
 
-        uint64_t WindowingDag::pow(uint64_t base, uint64_t e)
+        /**
+        Computes base^exp. Does not check for overflow
+        */
+        uint64_t WindowingDag::pow(uint64_t base, uint64_t exp)
         {
             uint64_t r = 1;
-            while (e--)
+            while (exp > 0)
+            {
                 r *= base;
+                exp--;
+            }
             return r;
         }
 
@@ -294,56 +320,45 @@ namespace apsi
             return opt_split;
         }
 
-        vector<uint64_t> WindowingDag::conversion_to_digits(uint64_t input, uint32_t base)
-        {
-            vector<uint64_t> result;
-            while (input > 0)
-            {
-                result.push_back(input % base);
-                input /= base;
-            }
-            return result;
-        }
-
         void WindowingDag::compute_dag()
         {
-            vector<uint32_t> degree(max_power + 1, numeric_limits<uint32_t>::max());
+            vector<uint32_t> degrees(max_power + 1, numeric_limits<uint32_t>::max());
             vector<size_t> splits(max_power + 1);
             vector<int> items_per(max_power, 0);
 
             Log::debug("Computing windowing dag: max power = %i", max_power);
 
-            // initialize the degree array.
-            degree[0] = 0;
+            // initialize the degrees array.
+            degrees[0] = 0;
             uint32_t base = uint32_t(1) << window;
             for (uint32_t i = 0; i < given_digits; i++)
             {
                 for (uint32_t j = 1; j < base; j++)
                 {
-                    if (pow(base, i) * j < degree.size())
+                    if (pow(base, i) * j < degrees.size())
                     {
-                        degree[static_cast<size_t>(pow(base, i) * j)] = 1;
+                        degrees[static_cast<size_t>(pow(base, i) * j)] = 1;
                     }
                 }
             }
 
             for (size_t i = 1; i <= max_power; i++)
             {
-                size_t i1 = optimal_split(i, degree);
+                size_t i1 = optimal_split(i, degrees);
                 size_t i2 = util::sub_safe(i, i1);
                 splits[i] = i1;
 
                 if (i1 == 0 || i2 == 0)
                 {
                     base_powers.emplace_back(i);
-                    degree[i] = 1;
+                    degrees[i] = 1;
                 }
                 else
                 {
-                    degree[i] = degree[i1] + degree[i2];
-                    ++items_per[static_cast<size_t>(degree[i])];
+                    degrees[i] = degrees[i1] + degrees[i2];
+                    ++items_per[static_cast<size_t>(degrees[i])];
                 }
-                Log::debug("degree[%i] = %i", i, degree[i]);
+                Log::debug("degrees[%i] = %i", i, degrees[i]);
                 Log::debug("splits[%i] = %i", i, splits[i]);
             }
 
@@ -368,7 +383,7 @@ namespace apsi
 
                 if (i1 && i2) // if encryption(y^i) is not given
                 {
-                    auto idx = static_cast<size_t>(items_per[static_cast<size_t>(degree[i]) - 1]++);
+                    auto idx = static_cast<size_t>(items_per[static_cast<size_t>(degrees[i]) - 1]++);
                     if (nodes[idx].output)
                     {
                         throw std::runtime_error("");

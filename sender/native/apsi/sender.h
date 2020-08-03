@@ -36,6 +36,11 @@ namespace apsi
 {
     namespace sender
     {
+
+        // An alieas to denote the powers of a ciphertext. For a ciphertext C, this holds C, C², C³, etc. It does not
+        // hold C⁰.
+        using CiphertextPowers = vector<seal::Ciphertext>;
+
         struct WindowingDag
         {
             enum class NodeState
@@ -47,6 +52,8 @@ namespace apsi
 
             struct State
             {
+                // The counter used to keep track of which nodes need to get compute (meaning the product of their input
+                // has to be calculated)
                 std::unique_ptr<std::atomic<std::size_t>> next_node;
                 std::unique_ptr<std::atomic<NodeState>[]> node_state_storage;
                 gsl::span<std::atomic<NodeState>> nodes;
