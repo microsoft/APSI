@@ -257,7 +257,7 @@ namespace apsi
             auto relin_keys_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(temp.data()), size);
             query_request.add_relin_keys(relin_keys_data);
 
-            // This is a little tricky; each QueryRequestPart consists of a power and a vector of Ciphertexts. For
+            // This is a little tricky; each QueryRequestPart consists of an exponent and a vector of Ciphertexts. For
             // convenience, we create vectors in immediately-invoked lambdas and pass them to the CreateVector function.
             // In the outer lambda, we populate a vector of QueryRequestParts, creating a new builder class for each of
             // them. In the inner lambda we build the QueryRequestPart data by creating multiple Ciphertexts.
@@ -266,11 +266,11 @@ namespace apsi
                 vector<flatbuffers::Offset<fbs::QueryRequestPart>> ret;
                 for (const auto &q : data)
                 {
-                    // For each power, create a QueryRequestPart with a builder instance
+                    // For each exponent, create a QueryRequestPart with a builder instance
                     fbs::QueryRequestPartBuilder query_req_part_builder(fbs_builder);
 
-                    // First add the power
-                    query_req_part_builder.add_power(q.first);
+                    // First add the exponent
+                    query_req_part_builder.add_exponent(q.first);
 
                     // Then add a vector of Ciphertexts
                     auto cts = fbs_builder.CreateVector([&]() {
@@ -389,8 +389,8 @@ namespace apsi
             auto &query = *req.query();
             for (const auto &query_part : query)
             {
-                uint32_t power = query_part->power();
-                if (data.count(power))
+                uint32_t exponent = query_part->exponent();
+                if (data.count(exponent))
                 {
                     throw runtime_error("invalid query data");
                 }
@@ -424,7 +424,7 @@ namespace apsi
                     cts_vec.emplace_back(move(temp));
                 }
 
-                data.emplace(power, move(cts_vec));
+                data.emplace(exponent, move(cts_vec));
             }
 
             return in_data.size();

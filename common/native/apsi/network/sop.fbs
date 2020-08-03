@@ -15,7 +15,7 @@ table Ciphertext {
 }
 
 table QueryRequestPart {
-    power:uint32;
+    exponent:uint32;
     cts:[Ciphertext] (required);
 }
 

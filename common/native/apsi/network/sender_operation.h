@@ -177,7 +177,7 @@ namespace apsi
             SEALObject<seal::RelinKeys> relin_keys;
 
             /**
-            Holds the encrypted query data. In the map the key labels the power of the query
+            Holds the encrypted query data. In the map the key labels the exponent of the query
             ciphertext and the vector holds the ciphertext data for different bundle indices.
             */
             std::map<std::uint64_t, std::vector<SEALObject<seal::Ciphertext>>> data;
