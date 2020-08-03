@@ -6,43 +6,23 @@
 // STD
 #include <string>
 #include <cstdint>
-#include <cstddef>
 #include <vector>
 #include <type_traits>
 #include <utility>
 #include <stdexcept>
 #include <algorithm>
+#include <iostream>
 
 // APSI
 #include "apsi/util/stopwatch.h"
+
+// SEAL
+#include "seal/util/defines.h"
 
 namespace apsi
 {
     namespace util
     {
-        /**
-        Truncates a 64-bit value to a given number of (low-order) bits.
-        */
-        std::uint64_t truncate(std::uint64_t value, int bit_count)
-        {
-#ifdef APSI_DEBUG
-            if (bit_count < 0 || bit_count > 64)
-            {
-                throw std::invalid_argument("bit_count is out of bounds");
-            }
-#endif
-            if (bit_count == 0)
-            {
-                return 0;
-            }
-            else if (bit_count == 64)
-            {
-                return value;
-            }
-
-            return ((std::uint64_t(1) << bit_count) - 1) & value;
-        }
-
         /**
         Convert the given input to digits
         */
@@ -106,6 +86,18 @@ namespace apsi
 
             return partitions;
         }
+
+        /**
+        This function reads a given number of bytes from a stream in small parts, writing the result to the end of
+        a given vector. This can avoid issues where a large number of bytes is requested incorrectly to be read from
+        a stream, causing a larger than necessary memory allocation.
+        */
+        void read_from_stream(std::istream &in, std::uint32_t byte_count, std::vector<seal::SEAL_BYTE> &destination);
+
+        /**
+        This function reads a size-prefixed number of bytes from a stream and returns the result in a vector.
+        */
+        std::vector<seal::SEAL_BYTE> read_from_stream(std::istream &in);
 
         extern Stopwatch sender_stop_watch, recv_stop_watch;
     } // namespace util

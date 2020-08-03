@@ -3,8 +3,16 @@
 
 #pragma once
 
+// STD
 #include <mutex>
+#include <memory>
+#include <type_traits>
+
+// APSI
 #include "apsi/network/channel.h"
+#include "apsi/network/sender_operation.h"
+#include "apsi/network/sender_operation_response.h"
+#include "apsi/network/result_package.h"
 
 namespace zmqpp
 {
@@ -22,117 +30,80 @@ namespace apsi
     namespace network
     {
         /**
-         * Communication channel between Sender and Receiver through a Network channel.
-         *
-         * All receives are synchrounous, except for receiving a SenderOperation.
-         * All sends are asynchrounous.
-         */
+        Communication channel between Sender and Receiver through a Network channel. All receives are synchronous,
+        except for receiving a SenderOperation. All sends are asynchrounous.
+        */
         class NetworkChannel : public Channel
         {
         public:
-            /**
-             * Create an instance of a NetworkChannel
-             */
             NetworkChannel();
 
-            /**
-             * Destroy an instance of a Channel
-             */
             virtual ~NetworkChannel();
 
             /**
-             * Bind the channel to the given connection point.
-             */
+            Bind the channel to the given connection point.
+            */
             void bind(const std::string &connection_point);
 
             /**
-             * Connect the channel to the given connection point
-             */
+            Connect the channel to the given connection point.
+            */
             void connect(const std::string &connection_point);
 
             /**
-             * Disconnect from the connection point
-             */
+            Disconnect from the connection point.
+            */
             void disconnect();
 
             /**
-             * Indicates whether the channel is connected to the network.
-             */
+            Returns whether the channel is in a connected state.
+            */
             bool is_connected() const
             {
                 return !end_point_.empty();
             }
 
             /**
-             * Receive a Sender Operation.
-             */
-            virtual bool receive(std::shared_ptr<SenderOperation> &sender_op);
-
-            /**
-             * Receive a Sender Operation.
-             *
-             * This call does not block if wait_for_message is false, if there
-             * is no operation pending it will immediately return false.
-             */
-            bool receive(std::shared_ptr<SenderOperation> &sender_op, bool wait_for_message);
-
-            /**
-             * Receive Get Parameters response from Sender
-             */
-            virtual bool receive(apsi::network::SenderResponseGetParameters &response);
-
-            /**
-             * Receive item preprocessing response from Sender
-             */
-            virtual bool receive(apsi::network::SenderResponsePreprocess &response);
-
-            /**
-             * Receive Query response from Sender
-             */
-            virtual bool receive(apsi::network::SenderResponseQuery &response);
-
-            /**
-            Receive a ResultPackage structure
+            Send a SenderOperation to a sender.
             */
-            virtual bool receive(apsi::ResultPackage &pkg);
+            virtual void send(std::unique_ptr<SenderOperation> sop) override;
 
             /**
-            Send a request to Get Parameters from Sender
+            Receive a SenderOperation from a receiver.
             */
-            virtual void send_get_parameters();
+            virtual std::unique_ptr<SenderOperation> receive_operation(
+                std::shared_ptr<seal::SEALContext> context,
+                SenderOperationType expected = SenderOperationType::SOP_UNKNOWN) override;
 
             /**
-            Send a response to a request to Get Parameters
+            Receive a SenderOperation from a receiver. This call does not block if wait_for_message is false. If there
+            is no operation pending, it will immediately return nullptr.
             */
-            virtual void send_get_parameters_response(
-                const std::vector<seal::SEAL_BYTE> &client_id, const PSIParams &params);
+            std::unique_ptr<SenderOperation> receive_operation(
+                std::shared_ptr<seal::SEALContext> context, bool wait_for_message,
+                SenderOperationType expected = SenderOperationType::SOP_UNKNOWN);
 
             /**
-            Send a request to Preprocess items on Sender
+            Send a SenderOperationResponse to a receiver.
             */
-            virtual void send_preprocess(const std::vector<seal::SEAL_BYTE> &buffer);
+            virtual void send(std::unique_ptr<SenderOperationResponse> sop_response) override;
 
             /**
-             * Send a response to a request to Preprocess items
-             */
-            virtual void send_preprocess_response(
-                const std::vector<seal::SEAL_BYTE> &client_id, const std::vector<seal::SEAL_BYTE> &buffer);
-
-            /**
-             * Send a request for a Query response to Sender
-             */
-            virtual void send_query(
-                const std::string &relin_keys, const std::map<std::uint64_t, std::vector<std::string>> &query);
-
-            /**
-            Send a response to a Query request
+            Receive a SenderOperationResponse from a sender.
             */
-            virtual void send_query_response(const std::vector<seal::SEAL_BYTE> &client_id, std::size_t package_count);
+            virtual std::unique_ptr<SenderOperationResponse> receive_response(
+                SenderOperationType expected = SenderOperationType::SOP_UNKNOWN) override;
 
             /**
-             * Send a ResultPackage structure
-             */
-            virtual void send(const std::vector<seal::SEAL_BYTE> &client_id, const ResultPackage &pkg);
+            Send a ResultPackage to a receiver.
+            */
+            virtual void send(const ResultPackage &rp) override;
+
+            /**
+            Receive a ResultPackage from a sender.
+            */
+            virtual std::unique_ptr<ResultPackage> receive_result_package(
+                std::shared_ptr<seal::SEALContext> context) override;
 
         protected:
             /**
@@ -147,95 +118,24 @@ namespace apsi
 
         private:
             std::unique_ptr<zmqpp::socket_t> socket_;
+
             std::string end_point_;
 
-            std::unique_ptr<std::mutex> receive_mutex_;
-            std::unique_ptr<std::mutex> send_mutex_;
+            std::mutex receive_mutex_;
+
+            std::mutex send_mutex_;
 
             std::unique_ptr<zmqpp::context_t> context_;
 
+            std::unique_ptr<zmqpp::socket_t> &get_socket();
+
             void throw_if_not_connected() const;
+
             void throw_if_connected() const;
 
             bool receive_message(zmqpp::message_t &msg, bool wait_for_message = true);
+
             void send_message(zmqpp::message_t &msg);
-
-            /**
-            Decode a Get Parameters message
-            */
-            std::shared_ptr<SenderOperation> decode_get_parameters(const zmqpp::message_t &msg);
-
-            /**
-            Decode a Preprocess message
-            */
-            std::shared_ptr<SenderOperation> decode_preprocess(const zmqpp::message_t &msg);
-
-            /**
-            Decode a Query message
-            */
-            std::shared_ptr<SenderOperation> decode_query(const zmqpp::message_t &msg);
-
-            /**
-            Add message type to message
-            */
-            void add_message_type(const SenderOperationType type, zmqpp::message_t &msg) const;
-
-            /**
-            Get message type from message.
-            Message type is always part 0.
-            */
-            SenderOperationType get_message_type(const zmqpp::message_t &msg, const size_t part = 1) const;
-
-            /**
-            Extract client ID from a message
-            */
-            void extract_client_id(const zmqpp::message_t &msg, std::vector<seal::SEAL_BYTE> &id) const;
-
-            /**
-            Add client ID to message
-            */
-            void add_client_id(zmqpp::message_t &msg, const std::vector<seal::SEAL_BYTE> &id) const;
-
-            /**
-            Get buffer from message, located at part_start
-            */
-            void get_buffer(
-                std::vector<seal::SEAL_BYTE> &buff, const zmqpp::message_t &msg, std::size_t part_start) const;
-
-            /**
-            Add buffer to the given message
-            */
-            void add_buffer(const std::vector<seal::SEAL_BYTE> &buff, zmqpp::message_t &msg) const;
-
-            /**
-            Get a vector of Modulus from message at the given part index.
-            When method exits the part index will be pointing to the next part in the message, after the vector.
-            */
-            void get_sm_vector(std::vector<seal::Modulus> &smv, const zmqpp::message_t &msg, size_t &part_idx) const;
-
-            /**
-            Add a vector of Modulus to given message
-            */
-            void add_sm_vector(const std::vector<seal::Modulus> &smv, zmqpp::message_t &msg) const;
-
-            /**
-            Get a part from a message
-            */
-            template <typename T>
-            typename std::enable_if<std::is_pod<T>::value, void>::type get_part(
-                T &data, const zmqpp::message_t &msg, const size_t part) const;
-
-            /**
-            Add a part to a message
-            */
-            template <typename T>
-            typename std::enable_if<std::is_pod<T>::value, void>::type add_part(
-                const T &data, zmqpp::message_t &msg) const;
-
-            /**
-            Get socket
-            */
-            std::unique_ptr<zmqpp::socket_t> &get_socket();
         }; // class NetworkChannel
     }      // namespace network
 } // namespace apsi

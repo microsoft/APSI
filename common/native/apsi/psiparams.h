@@ -5,7 +5,9 @@
 
 // STD
 #include <cstdint>
+#include <utility>
 #include <iostream>
+#include <string>
 
 // APSI
 #include "apsi/logging/log.h"
@@ -20,10 +22,6 @@
 
 namespace apsi
 {
-    constexpr static std::uint32_t item_bit_count_min = 80;
-
-    constexpr static std::uint32_t item_bit_count_max = 128;
-
     /**
     Contains a collection of parameters required to configure the protocol.
     */
@@ -31,6 +29,10 @@ namespace apsi
     {
     public:
         using SEALParams = seal::EncryptionParameters;
+
+        constexpr static std::uint32_t item_bit_count_min = 80;
+
+        constexpr static std::uint32_t item_bit_count_max = 128;
 
         /**
         Parameters describing the item and label properties.
@@ -104,6 +106,8 @@ namespace apsi
             initialize();
         }
 
+        std::string to_string() const;
+
     private:
         const ItemParams item_params_;
 
@@ -122,7 +126,13 @@ namespace apsi
         void initialize();
     }; // class PSIParams
 
-    void SaveParams(const PSIParams &params, std::vector<seal::SEAL_BYTE> &out);
+    /**
+    Writes the PSIParams to a stream.
+    */
+    std::size_t SaveParams(const PSIParams &params, std::ostream &out);
 
-    PSIParams LoadParams(const std::vector<seal::SEAL_BYTE> &in);
+    /**
+    Reads the PSIParams from a stream.
+    */
+    std::pair<PSIParams, std::size_t> LoadParams(std::istream &in);
 } // namespace apsi

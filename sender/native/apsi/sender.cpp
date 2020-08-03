@@ -9,11 +9,11 @@
 // APSI
 #include "apsi/psiparams.h"
 #include "apsi/logging/log.h"
-#include "apsi/network/network_utils.h"
 #include "apsi/network/result_package.h"
 #include "apsi/sender.h"
 #include "apsi/util/utils.h"
 #include "apsi/cryptocontext.h"
+#include "apsi/sealobject.h"
 
 // SEAL
 #include "seal/modulus.h"
@@ -44,12 +44,12 @@ namespace apsi
             }
         }
 
-        void Sender::query(
-            const string &relin_keys, const map<uint64_t, vector<string>> &query, const vector<SEAL_BYTE> &client_id,
-            Channel &channel)
+        void Sender::query(RelinKeys relin_keys, map<uint64_t, vector<SEALObject<Ciphertext>>> query,
+            vector<SEAL_BYTE> client_id, Channel &channel)
         {
-            // Acquire a read lock on the database
-            auto lock = sender_db_lock_.acquire_read();
+            // Acquire read locks on SenderDB and Sender
+            auto sender_db_lock = sender_db_->get_reader_lock();
+            auto sender_lock = get_reader_lock();
 
             // Check that the database is set
             if (!sender_db_)
@@ -62,7 +62,7 @@ namespace apsi
 
             // Create the session context; we don't have to re-create the SEALContext every time
             CryptoContext crypto_context(seal_context_);
-            crypto_context.set_evaluator(relin_keys);
+            crypto_context.set_evaluator(move(relin_keys));
 
             uint32_t bundle_idx_count = params_.bundle_idx_count();
             uint32_t max_items_per_bin = params_.table_params().max_items_per_bin;
@@ -88,7 +88,7 @@ namespace apsi
             }
 
             // Load inputs provided in the query. These are the precomputed powers we will use for windowing.
-            for (const auto &q : query)
+            for (auto &q : query)
             {
                 // The exponent of all the query powers we're about to iterate through
                 size_t exponent = static_cast<size_t>(q.first);
@@ -96,9 +96,9 @@ namespace apsi
                 // Load Qᵢᵉ for all bundle indices i, where e is the exponent specified above
                 for (size_t bundle_idx = 0; bundle_idx < all_powers.size(); bundle_idx++)
                 {
-                    // Load input^power to all_powers[bundle_idx][exponent-1]. The -1 is because we don't store the zeroth
-                    // exponent
-                    from_string(seal_context_, q.second[bundle_idx], all_powers[bundle_idx][exponent - 1]);
+                    // Load input^power to all_powers[bundle_idx][exponent-1]. The -1 is because we don't store
+                    // the zeroth exponent
+                    all_powers[bundle_idx][exponent - 1] = move(q.second[bundle_idx].extract_local());
                 }
             }
 
@@ -166,9 +166,6 @@ namespace apsi
                 CiphertextPowers &powers_at_this_bundle_idx = all_powers[bundle_idx];
                 compute_powers(powers_at_this_bundle_idx, crypto_context, dag, states[bundle_idx]);
 
-                // Lock the database from modifications
-                auto lock = sender_db_->get_reader_lock();
-
                 // Next, iterate over each bundle with this bundle index
                 auto bundle_caches = sender_db_->get_cache(bundle_idx).size();
                 size_t bundle_count = bundle_caches.size();
@@ -178,19 +175,21 @@ namespace apsi
                 seal_for_each_n(bundle_caches.begin(), bundle_count, [&](auto &cache) {
                     // Package for the result data
                     ResultPackage pkg;
+
+                    pkg.client_id = client_id;
                     pkg.bundle_idx = bundle_idx;
 
-                    // Compute the matching result, convert to a string, and write to pkg
-                    pkg.data = to_string(cache.batched_matching_polyn.eval(powers[bundle_idx]));
+                    // Compute the matching result and move to pkg
+                    pkg.psi_result = move(cache.batched_matching_polyn.eval(powers[bundle_idx]));
 
                     if (cache.batched_interp_polyn)
                     {
-                        // Compute the label result, convert to a string, and write to pkg
-                        pkg.label_data = to_string(cache.batched_interp_polyn.eval(powers[bundle_idx]));
+                        // Compute the label result and move to pkg
+                        pkg.label_result.emplace_back(cache.batched_interp_polyn.eval(powers[bundle_idx]));
                     }
 
                     // Start sending on the channel
-                    channel.send(client_id, pkg);
+                    channel.send(pkg);
                 });
             }
         }

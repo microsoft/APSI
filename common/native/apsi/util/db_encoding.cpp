@@ -267,7 +267,7 @@ namespace apsi
     /**
     Converts the given sequence of field elements (modulo `mod`) to a bitstring of length `bit_count`
     */
-    Bitstring field_elts_to_bits(const vector<felt_t> &felts, uint32_t bit_count, const Modulus &mod)
+    Bitstring field_elts_to_bits(gsl::span<const felt_t> felts, uint32_t bit_count, const Modulus &mod)
     {
         // This is the largest n such that 2ⁿ ≤ mod < 2ⁿ⁺¹. We'll pack n bits into each field element.
         uint32_t bits_per_elt = static_cast<uint32_t>(mod.bit_count() - 1);
@@ -288,7 +288,7 @@ namespace apsi
 
         // The bitstring buffer. This will be part of the return value. The number of bytes is ⌈bit_count / 8⌉
         vector<SEAL_BYTE> bit_buf((bit_count + 7) / 8);
-        gsl::span bit_buf_view = { bit_buf.data(), bit_buf.size() };
+        gsl::span<SEAL_BYTE> bit_buf_view(bit_buf.data(), bit_buf.size());
 
         uint32_t num_uncopied_bits = bit_count;
         uint32_t dst_offset = 0;
@@ -304,7 +304,7 @@ namespace apsi
                 0,          // src_offset
                 dst_offset,
                 copy_size,
-                bit_buf_view,
+                bit_buf_view
             );
 
             dst_offset += copy_size;

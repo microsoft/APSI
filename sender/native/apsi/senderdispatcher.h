@@ -9,7 +9,7 @@
 
 // APSI
 #include "apsi/network/channel.h"
-#include "apsi/network/senderoperation.h"
+#include "apsi/network/sender_operation.h"
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/sender.h"
 #include "apsi/senderdb.h"
@@ -25,6 +25,7 @@ namespace apsi
         {
         public:
             SenderDispatcher() = delete;
+
             SenderDispatcher(std::shared_ptr<sender::Sender> sender) : sender_(sender)
             {}
 
@@ -37,24 +38,25 @@ namespace apsi
 
         private:
             std::shared_ptr<sender::Sender> sender_;
+
             std::shared_ptr<const oprf::OPRFKey> oprf_key_;
+
             std::shared_ptr<SenderDB> sender_db_;
 
             /**
             Dispatch a Get Parameters request to the Sender.
             */
-            void dispatch_get_parameters(
-                std::shared_ptr<network::SenderOperation> sender_op, network::Channel &channel);
+            void dispatch_parms(std::unique_ptr<network::SenderOperation> sop, network::Channel &channel);
 
             /**
             Dispatch an OPRF query request to the Sender.
             */
-            void dispatch_oprf(std::shared_ptr<network::SenderOperation> sender_op, network::Channel &channel);
+            void dispatch_oprf(std::unique_ptr<network::SenderOperation> sop, network::Channel &channel);
 
             /**
             Dispatch a Query request to the Sender.
             */
-            void dispatch_query(std::shared_ptr<network::SenderOperation> sender_op, network::Channel &channel);
+            void dispatch_query(std::unique_ptr<network::SenderOperation> sop, network::Channel &channel);
         }; // class SenderDispatcher
     }      // namespace sender
 } // namespace apsi

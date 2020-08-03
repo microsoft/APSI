@@ -1,10 +1,20 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "apsi/network/network_channel.h"
+// STD
+#include <utility>
+#include <cstddef>
+#include <stdexcept>
 #include <sstream>
-#include "apsi/network/network_utils.h"
-#include "apsi/result_package.h"
+
+// APSI
+#include "apsi/network/network_channel.h"
+#include "apsi/network/sop_header_generated.h"
+#include "apsi/network/sop_generated.h"
+#include "apsi/network/result_package_generated.h"
+
+// SEAL
+#include "seal/util/streambuf.h"
 
 // ZeroMQ
 #pragma warning(push, 0)
@@ -13,15 +23,45 @@
 
 using namespace std;
 using namespace seal;
+using namespace seal::util;
 using namespace zmqpp;
 
 namespace apsi
 {
     namespace network
     {
+        namespace
+        {
+            template<typename T>
+            size_t load_from_string(string data, T &obj)
+            {
+                ArrayGetBuffer agbuf(
+                    reinterpret_cast<const char *>(data.data()), static_cast<streamsize>(data.size()));
+                istream stream(&agbuf);
+                return obj.load(stream);
+            }
+
+            template<typename T>
+            size_t load_from_string(string data, shared_ptr<SEALContext> context, T &obj)
+            {
+                ArrayGetBuffer agbuf(
+                    reinterpret_cast<const char *>(data.data()), static_cast<streamsize>(data.size()));
+                istream stream(&agbuf);
+                return obj.load(stream, move(context));
+            }
+
+            template<typename T>
+            size_t save_to_message(const T &obj, message_t &msg)
+            {
+                stringstream ss;
+                size_t size = obj.save(ss);
+                msg.add(ss.str());
+                return size;
+            }
+        }
+
         NetworkChannel::NetworkChannel()
-            : end_point_(""), receive_mutex_(make_unique<mutex>()), send_mutex_(make_unique<mutex>()),
-              context_(make_unique<context_t>())
+            : end_point_(""), context_(make_unique<context_t>())
         {}
 
         NetworkChannel::~NetworkChannel()
@@ -53,29 +93,59 @@ namespace apsi
             throw_if_not_connected();
 
             get_socket()->close();
-            if (nullptr != context_)
+            if (context_)
             {
                 context_->terminate();
             }
 
             end_point_ = "";
-            socket_ = nullptr;
-            context_ = nullptr;
+            socket_.reset();
+            context_.reset();
         }
 
         void NetworkChannel::throw_if_not_connected() const
         {
             if (!is_connected())
-                throw runtime_error("Socket is not connected yet.");
+            {
+                throw runtime_error("socket is not connected");
+            }
         }
 
         void NetworkChannel::throw_if_connected() const
         {
             if (is_connected())
-                throw runtime_error("Socket is already connected");
+            {
+                throw runtime_error("socket is already connected");
+            }
         }
 
-        bool NetworkChannel::receive(shared_ptr<SenderOperation> &sender_op, bool wait_for_message)
+        void NetworkChannel::send(unique_ptr<SenderOperation> sop)
+        {
+            throw_if_not_connected();
+
+            // Need to have the SenderOperation package
+            if (!sop)
+            {
+                throw invalid_argument("operation data is missing");
+            }
+
+            // Construct the header
+            SenderOperationHeader sop_header;
+            sop_header.type = sop->type();
+            sop_header.client_id = sop->client_id;
+
+            size_t bytes_sent = 0;
+
+            message_t msg;
+            bytes_sent += save_to_message(sop_header, msg);
+            bytes_sent += save_to_message(*sop, msg);
+
+            send_message(msg);
+            bytes_sent_ += bytes_sent;
+        }
+
+        unique_ptr<SenderOperation> NetworkChannel::receive_operation(
+            shared_ptr<SEALContext> context, bool wait_for_message, SenderOperationType expected)
         {
             throw_if_not_connected();
 
@@ -83,566 +153,253 @@ namespace apsi
             if (!receive_message(msg, wait_for_message))
             {
                 // No message yet.
-                return false;
+                return nullptr;
             }
 
-            // Should have ID and type.
-            if (msg.parts() < 2)
-                throw runtime_error("Not enough parts in message");
-
-            SenderOperationType type = get_message_type(msg);
-
-            switch (type)
+            // Should have SenderOperationHeader and SenderOperation.
+            if (msg.parts() != 2)
             {
-            case SOP_get_parameters:
-                sender_op = decode_get_parameters(msg);
-                break;
-
-            case SOP_preprocess:
-                sender_op = decode_preprocess(msg);
-                break;
-
-            case SOP_query:
-                sender_op = decode_query(msg);
-                break;
-
-            default:
-                throw runtime_error("Invalid Sender Operation type");
+                throw runtime_error("invalid message received");
             }
 
-            bytes_received_ += sizeof(SenderOperationType);
-
-            return true;
-        }
-
-        bool NetworkChannel::receive(shared_ptr<SenderOperation> &sender_op)
-        {
-            return receive(sender_op, /* wait_for_message */ false);
-        }
-
-        bool NetworkChannel::receive(SenderResponseGetParameters &response)
-        {
-            throw_if_not_connected();
-
-            message_t msg;
-            receive_message(msg);
-
-            // We should have at least 18 parts
-            if (msg.parts() < 18)
-                return false;
-
-            // First part is message type
-            SenderOperationType type = get_message_type(msg, /* part */ 0);
-
-            if (type != SOP_get_parameters)
-                return false;
-
-            // Parameters start from second part
-            size_t idx = 1;
-
-            // PSIConfParams
-            response.psiconf_params.sender_size = msg.get<size_t>(idx++);
-            response.psiconf_params.sender_bin_size = msg.get<size_t>(idx++);
-            response.psiconf_params.item_bit_count = msg.get<size_t>(idx++);
-            response.psiconf_params.item_bit_length_used_after_oprf = msg.get<size_t>(idx++);
-            response.psiconf_params.num_chunks = msg.get<size_t>(idx++);
-            response.psiconf_params.use_labels = msg.get<bool>(idx++);
-            response.psiconf_params.use_fast_membership = msg.get<bool>(idx++);
-
-            // TableParams
-            response.table_params.log_table_size = msg.get<uint32_t>(idx++);
-            response.table_params.window_size = msg.get<uint32_t>(idx++);
-            response.table_params.split_count = msg.get<size_t>(idx++);
-            response.table_params.split_size = msg.get<size_t>(idx++);
-            response.table_params.binning_sec_level = msg.get<uint32_t>(idx++);
-            response.table_params.use_dynamic_split_count = msg.get<bool>(idx++);
-
-            // CuckooParams
-            response.cuckoo_params.hash_func_count = msg.get<uint32_t>(idx++);
-            response.cuckoo_params.hash_func_seed = msg.get<uint32_t>(idx++);
-            response.cuckoo_params.max_probe = msg.get<uint32_t>(idx++);
-
-            // SEALParams
-            uint64_t poly_modulus_degree = msg.get<uint64_t>(idx++);
-            response.seal_params.encryption_params.set_poly_modulus_degree(static_cast<size_t>(poly_modulus_degree));
-
-            vector<Modulus> coeff_modulus;
-            get_sm_vector(coeff_modulus, msg, idx);
-            response.seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
-
-            response.seal_params.encryption_params.set_plain_modulus(msg.get<uint64_t>(idx++));
-            response.seal_params.max_supported_degree = msg.get<uint32_t>(idx++);
-
-            // FFieldParams
-            response.ffield_params.characteristic = msg.get<uint64_t>(idx++);
-            response.ffield_params.degree = msg.get<uint32_t>(idx++);
-
-            bytes_received_ += sizeof(SenderOperationType);
-            bytes_received_ += sizeof(PSIParams::PSIConfParams);
-            bytes_received_ += sizeof(PSIParams::TableParams);
-            bytes_received_ += sizeof(PSIParams::CuckooParams);
-            bytes_received_ += sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t); // sizeof(PSIParams::SEALParams);
-            bytes_received_ += sizeof(PSIParams::FFieldParams);
-
-            return true;
-        }
-
-        bool NetworkChannel::receive(SenderResponsePreprocess &response)
-        {
-            throw_if_not_connected();
-
-            message_t msg;
-            receive_message(msg);
-
-            // We should have 3 parts
-            if (msg.parts() != 3)
-                return false;
-
-            SenderOperationType type = get_message_type(msg, /* part */ 0);
-            if (type != SOP_preprocess)
-                return false;
-
-            // Buffer starts at part 1
-            get_buffer(response.buffer, msg, /* part_start */ 1);
-
-            bytes_received_ += sizeof(SenderOperationType);
-            bytes_received_ += response.buffer.size();
-
-            return true;
-        }
-
-        bool NetworkChannel::receive(SenderResponseQuery &response)
-        {
-            throw_if_not_connected();
-
-            message_t msg;
-            receive_message(msg);
-
-            // We should have at least 2 parts
-            if (msg.parts() < 2)
-                return false;
-
-            SenderOperationType type = get_message_type(msg, /* part */ 0);
-            if (type != SOP_query)
-                return false;
-
-            // Number of result packages
-            response.package_count = msg.get<uint64_t>(/* part */ 1);
-
-            bytes_received_ += sizeof(uint32_t); // SenderOperationType
-            bytes_received_ += sizeof(uint64_t);
-
-            return true;
-        }
-
-        bool NetworkChannel::receive(ResultPackage &pkg)
-        {
-            throw_if_not_connected();
-
-            message_t msg;
-            receive_message(msg);
-
-            if (msg.parts() != 4)
+            // First part is the SenderOperationHeader
+            SenderOperationHeader sop_header;
+            try
             {
-                return false;
-                ;
+                bytes_received_ += load_from_string(msg.get(0), sop_header);
+            }
+            catch (const runtime_error &ex)
+            {
+                // Invalid header
+                return nullptr;
             }
 
-            pkg.bundle_idx = msg.get<size_t>(/* part */ 1);
-            pkg.data = msg.get(/* part */ 2);
-            pkg.label_data = msg.get(/* part */ 3);
+            if (expected != SenderOperationType::SOP_UNKNOWN && expected != sop_header.type)
+            {
+                // Unexpected operation
+                return nullptr;
+            }
 
-            bytes_received_ += pkg.size();
+            // Return value
+            unique_ptr<SenderOperation> sop = nullptr;
 
-            return true;
+            try
+            {
+                switch (static_cast<SenderOperationType>(sop_header.type))
+                {
+                    case SenderOperationType::SOP_PARMS:
+                        sop = make_unique<SenderOperationParms>();
+                        bytes_received_ += load_from_string(msg.get(1), *sop);
+                        break;
+                    case SenderOperationType::SOP_OPRF:
+                        sop = make_unique<SenderOperationOPRF>();
+                        bytes_received_ += load_from_string(msg.get(1), *sop);
+                        break;
+                    case SenderOperationType::SOP_QUERY:
+                        sop = make_unique<SenderOperationQuery>();
+                        bytes_received_ += load_from_string(msg.get(1), move(context), *sop);
+                        break;
+                    default:
+                        // Invalid operation
+                        return nullptr;
+                }
+            }
+            catch (const invalid_argument &ex)
+            {
+                // Invalid SEALContext
+                return nullptr;
+            }
+            catch (const runtime_error &ex)
+            {
+                // Invalid operation data
+                return nullptr;
+            }
+
+            // Check whether the client IDs match
+            if (sop_header.client_id != sop->client_id)
+            {
+                // Client ID mismatch
+                return nullptr;
+            }
+
+            // Loaded successfully
+            return sop;
         }
 
-        void NetworkChannel::send_get_parameters()
+        unique_ptr<SenderOperation> NetworkChannel::receive_operation(
+            shared_ptr<SEALContext> context, SenderOperationType expected)
+        {
+            return receive_operation(move(context), /* wait_for_message */ false, expected);
+        }
+
+        void NetworkChannel::send(unique_ptr<SenderOperationResponse> sop_response)
         {
             throw_if_not_connected();
 
-            message_t msg;
-            SenderOperationType type = SOP_get_parameters;
-            add_message_type(type, msg);
+            // Need to have the SenderOperationResponse package
+            if (!sop_response)
+            {
+                throw invalid_argument("response data is missing");
+            }
 
-            // that's it!
-            send_message(msg);
-
-            bytes_sent_ += sizeof(SenderOperationType);
-        }
-
-        void NetworkChannel::send_get_parameters_response(const vector<SEAL_BYTE> &client_id, const PSIParams &params)
-        {
-            throw_if_not_connected();
-
-            message_t msg;
-
-            SenderOperationType type = SOP_get_parameters;
-            add_client_id(msg, client_id);
-            add_message_type(type, msg);
-
-            // PSIConfParams
-            msg.add(params.sender_size());
-            msg.add(params.sender_bin_size());
-            msg.add(params.item_bit_count());
-            msg.add(params.item_bit_length_used_after_oprf());
-            msg.add(params.num_chunks());
-            msg.add(params.use_labels());
-            msg.add(params.use_fast_membership());
-
-            // TableParams
-            msg.add(params.log_table_size());
-            msg.add(params.window_size());
-            msg.add(params.split_count());
-            msg.add(params.split_size());
-            msg.add(params.binning_sec_level());
-            msg.add(params.use_dynamic_split_count());
-
-            // CuckooParams
-            msg.add(params.hash_func_count());
-            msg.add(params.hash_func_seed());
-            msg.add(params.max_probe());
-
-            // SEALParams
-            uint64_t poly_modulus_degree = static_cast<uint64_t>(params.encryption_params().poly_modulus_degree());
-            msg.add(poly_modulus_degree);
-            add_sm_vector(params.encryption_params().coeff_modulus(), msg);
-            msg.add(params.encryption_params().plain_modulus().value());
-            msg.add(params.max_supported_degree());
-
-            // FFieldParams
-            msg.add(params.ffield_characteristic());
-            msg.add(params.ffield_degree());
-
-            send_message(msg);
-
-            bytes_sent_ += sizeof(uint32_t); // SenderOperationType
-            bytes_sent_ += sizeof(PSIParams::PSIConfParams);
-            bytes_sent_ += sizeof(PSIParams::TableParams);
-            bytes_sent_ += sizeof(PSIParams::CuckooParams);
-            bytes_sent_ += sizeof(uint64_t) + sizeof(uint64_t) + sizeof(uint32_t); // sizeof(PSIParams::SEALParams);
-            bytes_sent_ += sizeof(PSIParams::FFieldParams);
-        }
-
-        void NetworkChannel::send_preprocess(const vector<SEAL_BYTE> &buffer)
-        {
-            throw_if_not_connected();
-
-            message_t msg;
-            SenderOperationType type = SOP_preprocess;
-
-            add_message_type(type, msg);
-            add_buffer(buffer, msg);
-
-            send_message(msg);
-
-            bytes_sent_ += sizeof(uint32_t);
-            bytes_sent_ += buffer.size();
-        }
-
-        void NetworkChannel::send_preprocess_response(
-            const vector<SEAL_BYTE> &client_id, const vector<SEAL_BYTE> &buffer)
-        {
-            throw_if_not_connected();
-
-            message_t msg;
-            SenderOperationType type = SOP_preprocess;
-
-            add_client_id(msg, client_id);
-            add_message_type(type, msg);
-            add_buffer(buffer, msg);
-
-            send_message(msg);
-
-            bytes_sent_ += sizeof(uint32_t);
-            bytes_sent_ += buffer.size();
-        }
-
-        void NetworkChannel::send_query(const string &relin_keys, const map<uint64_t, vector<string>> &query)
-        {
-            throw_if_not_connected();
+            // Construct the header
+            SenderOperationHeader sop_header;
+            sop_header.type = sop_response->type();
+            sop_header.client_id = sop_response->client_id;
 
             size_t bytes_sent = 0;
 
             message_t msg;
-            SenderOperationType type = SOP_query;
-            add_message_type(type, msg);
-            bytes_sent += sizeof(uint32_t);
-
-            msg.add(relin_keys);
-            bytes_sent += relin_keys.length();
-
-            logging::Log::debug("send_query: relin key length = %i bytes ", relin_keys.length());
-
-            uint64_t query_size = static_cast<uint64_t>(query.size());
-            add_part(query_size, msg);
-            bytes_sent += sizeof(uint64_t);
-
-            uint64_t sofar = bytes_sent_;
-
-            for (const auto &q : query)
-            {
-                add_part(q.first, msg);
-                bytes_sent += sizeof(uint64_t);
-
-                uint64_t num_elems = static_cast<uint64_t>(q.second.size());
-                add_part(num_elems, msg);
-                bytes_sent += sizeof(uint64_t);
-
-                for (const auto &seededctxt : q.second)
-                {
-                    msg.add(seededctxt);
-                    bytes_sent += seededctxt.length();
-                }
-            }
-
-            logging::Log::debug("send_query: ciphertext lengths = %i bytes ", bytes_sent_ - sofar);
+            bytes_sent += save_to_message(sop_header, msg);
+            bytes_sent += save_to_message(*sop_response, msg);
 
             send_message(msg);
             bytes_sent_ += bytes_sent;
         }
 
-        void NetworkChannel::send_query_response(const vector<SEAL_BYTE> &client_id, const size_t package_count)
+        unique_ptr<SenderOperationResponse> NetworkChannel::receive_response(SenderOperationType expected)
         {
             throw_if_not_connected();
 
             message_t msg;
-            SenderOperationType type = SOP_query;
-            add_client_id(msg, client_id);
-
-            add_message_type(type, msg);
-            uint64_t pkg_count = static_cast<uint64_t>(package_count);
-            msg.add(pkg_count);
-
-            send_message(msg);
-
-            // Message type
-            bytes_sent_ += sizeof(uint32_t);
-
-            // Package count
-            bytes_sent_ += sizeof(uint64_t);
-        }
-
-        void NetworkChannel::send(const vector<SEAL_BYTE> &client_id, const ResultPackage &pkg)
-        {
-            throw_if_not_connected();
-
-            message_t msg;
-
-            add_client_id(msg, client_id);
-
-            msg.add(pkg.bundle_idx);
-            msg.add(pkg.data);
-            msg.add(pkg.label_data);
-
-            send_message(msg);
-
-            bytes_sent_ += pkg.size();
-        }
-
-        void NetworkChannel::get_buffer(vector<SEAL_BYTE> &buff, const message_t &msg, size_t part_start) const
-        {
-            // Need to have size
-            if (msg.parts() < static_cast<size_t>(part_start) + 1)
-                throw runtime_error("Should have size at least");
-
-            uint64_t size;
-            get_part(size, msg, part_start);
-
-            // If the vector is not empty, we need the part with the data
-            if (size > 0 && msg.parts() < static_cast<size_t>(part_start) + 2)
-                throw runtime_error("Should have size and data.");
-
-            buff.resize(static_cast<size_t>(size));
-
-            if (size > 0)
+            if (!receive_message(msg))
             {
-                // Verify the actual data is the size we expect
-                if (msg.size(/* part */ static_cast<size_t>(part_start) + 1) < size)
-                    throw runtime_error("Second Part has less data than expected");
-
-                memcpy(
-                    buff.data(), msg.raw_data(/* part */ static_cast<size_t>(part_start) + 1),
-                    static_cast<size_t>(size));
+                // No message yet.
+                return nullptr;
             }
-        }
 
-        void NetworkChannel::add_buffer(const vector<SEAL_BYTE> &buff, message_t &msg) const
-        {
-            // First part is size
-            uint64_t size = static_cast<uint64_t>(buff.size());
-            add_part(size, msg);
-
-            if (buff.size() > 0)
+            // Should have SenderOperationHeader and SenderOperationResponse.
+            if (msg.parts() != 2)
             {
-                // Second part is raw data
-                msg.add_raw(buff.data(), buff.size());
+                throw runtime_error("invalid message received");
             }
-        }
 
-        void NetworkChannel::get_sm_vector(vector<Modulus> &smv, const message_t &msg, size_t &part_idx) const
-        {
-            // Need to have size
-            if (msg.parts() < (part_idx + 1))
-                throw runtime_error("Should have size at least");
-
-            uint64_t size;
-            get_part(size, msg, /* part */ part_idx++);
-
-            if (msg.parts() < (part_idx + size))
-                throw runtime_error("Insufficient parts for Modulus vector");
-
-            smv.resize(static_cast<size_t>(size));
-            for (size_t sm_idx = 0; sm_idx < size; sm_idx++)
+            // First part is the SenderOperationHeader
+            SenderOperationHeader sop_header;
+            try
             {
-                string str = msg.get(part_idx++);
-                get_modulus(smv[sm_idx], str);
+                bytes_received_ += load_from_string(msg.get(0), sop_header);
             }
-        }
-
-        void NetworkChannel::add_sm_vector(const vector<Modulus> &smv, message_t &msg) const
-        {
-            // First part is size
-            uint64_t size = static_cast<uint64_t>(smv.size());
-            add_part(size, msg);
-
-            for (const Modulus &sm : smv)
+            catch (const runtime_error &ex)
             {
-                // Add each element as a string
-                string str;
-                get_string(str, sm);
-                msg.add(str);
+                // Invalid header
+                return nullptr;
             }
-        }
 
-        void NetworkChannel::add_message_type(const SenderOperationType type, message_t &msg) const
-        {
-            // Transform to uint32_t to have it have a fixed size
-            add_part(static_cast<uint32_t>(type), msg);
-        }
-
-        SenderOperationType NetworkChannel::get_message_type(const message_t &msg, const size_t part) const
-        {
-            // We should have at least the parts we want to get
-            if (msg.parts() < (part + 1))
-                throw invalid_argument("Message should have at least type");
-
-            // Get message type
-            uint32_t msg_type;
-            get_part(msg_type, msg, /* part */ part);
-            SenderOperationType type = static_cast<SenderOperationType>(msg_type);
-            return type;
-        }
-
-        void NetworkChannel::extract_client_id(const message_t &msg, vector<SEAL_BYTE> &id) const
-        {
-            // ID should always be part 0
-            size_t id_size = msg.size(/* part */ 0);
-            id.resize(id_size);
-            memcpy(id.data(), msg.raw_data(/* part */ 0), id_size);
-        }
-
-        void NetworkChannel::add_client_id(message_t &msg, const vector<SEAL_BYTE> &id) const
-        {
-            msg.add_raw(id.data(), id.size());
-        }
-
-        shared_ptr<SenderOperation> NetworkChannel::decode_get_parameters(const message_t &msg)
-        {
-            vector<SEAL_BYTE> client_id;
-            extract_client_id(msg, client_id);
-
-            // Nothing in the message to decode.
-            return make_shared<SenderOperationGetParameters>(move(client_id));
-        }
-
-        shared_ptr<SenderOperation> NetworkChannel::decode_preprocess(const message_t &msg)
-        {
-            vector<SEAL_BYTE> client_id;
-            extract_client_id(msg, client_id);
-
-            vector<SEAL_BYTE> buffer;
-            get_buffer(buffer, msg, /* part_start */ 2);
-
-            bytes_received_ += buffer.size();
-
-            return make_shared<SenderOperationPreprocess>(move(client_id), move(buffer));
-        }
-
-        shared_ptr<SenderOperation> NetworkChannel::decode_query(const message_t &msg)
-        {
-            vector<SEAL_BYTE> client_id;
-            extract_client_id(msg, client_id);
-
-            string relin_keys;
-            map<uint64_t, vector<string>> query;
-
-            size_t msg_idx = 2;
-
-            msg.get(relin_keys, /* part */ msg_idx++);
-            bytes_received_ += relin_keys.length();
-
-            uint64_t query_count;
-            get_part(query_count, msg, /* part */ msg_idx++);
-            bytes_received_ += sizeof(uint64_t);
-
-            for (uint64_t i = 0; i < query_count; i++)
+            if (expected != SenderOperationType::SOP_UNKNOWN && expected != sop_header.type)
             {
-                uint64_t power;
-                get_part(power, msg, msg_idx++);
-                bytes_received_ += sizeof(uint64_t);
+                // Unexpected operation
+                return nullptr;
+            }
 
-                uint64_t num_elems;
-                get_part(num_elems, msg, msg_idx++);
-                bytes_received_ += sizeof(uint64_t);
+            // Return value
+            unique_ptr<SenderOperationResponse> sop_response = nullptr;
 
-                vector<string> powers(static_cast<size_t>(num_elems));
-
-                for (size_t j = 0; j < num_elems; j++)
+            try
+            {
+                switch (static_cast<SenderOperationType>(sop_header.type))
                 {
-                    msg.get(powers[j], msg_idx++);
-                    bytes_received_ += powers[j].length();
+                    case SenderOperationType::SOP_PARMS:
+                        sop_response = make_unique<SenderOperationResponseParms>();
+                        bytes_received_ += load_from_string(msg.get(1), *sop_response);
+                        break;
+                    case SenderOperationType::SOP_OPRF:
+                        sop_response = make_unique<SenderOperationResponseOPRF>();
+                        bytes_received_ += load_from_string(msg.get(1), *sop_response);
+                        break;
+                    case SenderOperationType::SOP_QUERY:
+                        sop_response = make_unique<SenderOperationResponseQuery>();
+                        bytes_received_ += load_from_string(msg.get(1), *sop_response);
+                        break;
+                    default:
+                        // Invalid operation
+                        return nullptr;
                 }
-
-                query.insert_or_assign(power, powers);
+            }
+            catch (const runtime_error &ex)
+            {
+                // Invalid operation data
+                return nullptr;
             }
 
-            return make_shared<SenderOperationQuery>(move(client_id), relin_keys, move(query));
+            // Check whether the client IDs match
+            if (sop_header.client_id != sop_response->client_id)
+            {
+                // Client ID mismatch
+                return nullptr;
+            }
+
+            // Loaded successfully
+            return sop_response;
+        }
+
+        void NetworkChannel::send(const ResultPackage &rp)
+        {
+            throw_if_not_connected();
+
+            message_t msg;
+            size_t bytes_sent = save_to_message(rp, msg);
+
+            send_message(msg);
+            bytes_sent_ += bytes_sent;
+        }
+
+        unique_ptr<ResultPackage> NetworkChannel::receive_result_package(shared_ptr<SEALContext> context)
+        {
+            throw_if_not_connected();
+
+            message_t msg;
+            if (!receive_message(msg))
+            {
+                // No message yet.
+                return nullptr;
+            }
+
+            // Should have only one part: ResultPackage.
+            if (msg.parts() != 1)
+            {
+                throw runtime_error("invalid message received");
+            }
+
+            // Return value
+            unique_ptr<ResultPackage> rp(make_unique<ResultPackage>());
+
+            try
+            {
+                bytes_received_ += load_from_string(msg.get(0), move(context), *rp);
+            }
+            catch (const runtime_error &ex)
+            {
+                // Invalid result package data
+                return nullptr;
+            }
+
+            // Loaded successfully
+            return rp;
         }
 
         bool NetworkChannel::receive_message(message_t &msg, bool wait_for_message)
         {
-            unique_lock<mutex> rec_lock(*receive_mutex_);
-            bool received = get_socket()->receive(msg, !wait_for_message);
+            lock_guard<mutex> lock(receive_mutex_);
 
+            bool received = get_socket()->receive(msg, !wait_for_message);
             if (!received && wait_for_message)
-                throw runtime_error("Failed to receive message");
+            {
+                throw runtime_error("failed to receive message");
+            }
 
             return received;
         }
 
         void NetworkChannel::send_message(message_t &msg)
         {
-            unique_lock<mutex> snd_lock(*send_mutex_);
+            lock_guard<mutex> lock(send_mutex_);
+
             bool sent = get_socket()->send(msg);
-
             if (!sent)
-                throw runtime_error("Failed to send message");
-        }
-
-        template <typename T>
-        typename enable_if<is_pod<T>::value, void>::type NetworkChannel::get_part(
-            T &data, const message_t &msg, const size_t part) const
-        {
-            const T *presult;
-            msg.get(&presult, part);
-            memcpy(&data, presult, sizeof(T));
-        }
-
-        template <typename T>
-        typename enable_if<is_pod<T>::value, void>::type NetworkChannel::add_part(const T &data, message_t &msg) const
-        {
-            msg.add_raw(&data, sizeof(T));
+            {
+                throw runtime_error("failed to send message");
+            }
         }
 
         unique_ptr<socket_t> &NetworkChannel::get_socket()

@@ -6,6 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <numeric>
 
 // APSI
 #include "apsi/psiparams.h"
@@ -408,6 +409,16 @@ namespace apsi
             {
                 result.insert(bundle.get_cache());
             }
+        }
+
+        std::size_t SenderDB::bin_bundle_count() const
+        {
+            // Lock the database for reading 
+            auto lock = db_lock_.acquire_read();
+
+            // Compute the total number of bin bundles
+            return accumulate(bin_bundles_.cbegin(), bin_bundles_.cend(), size_t(0),
+                [&](auto &a, auto &b) { return a + b.size(); });
         }
     } // namespace sender
 } // namespace apsi

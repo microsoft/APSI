@@ -4,6 +4,7 @@
 target_sources(common
     PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/item.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/psiparams.cpp
 )
 
 add_subdirectory(logging)
@@ -17,7 +18,7 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/cryptocontext.h
         ${CMAKE_CURRENT_LIST_DIR}/item.h
         ${CMAKE_CURRENT_LIST_DIR}/psiparams.h
-        ${CMAKE_CURRENT_LIST_DIR}/result_package.h
+        ${CMAKE_CURRENT_LIST_DIR}/sealobject.h
     DESTINATION
         ${PROJECT_INCLUDES_INSTALL_DIR}/apsi
 )

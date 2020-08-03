@@ -1,0 +1,17 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license.
+
+namespace apsi.network.fbs;
+
+table Ciphertext {
+    data:[ubyte] (required);
+}
+
+table ResultPackage {
+    client_id:[ubyte];
+    bundle_idx:uint32;
+    psi_result:Ciphertext;
+    label_result:[Ciphertext];
+}
+
+root_type ResultPackage;

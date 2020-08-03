@@ -3,24 +3,62 @@
 
 #pragma once
 
-#include <string>
+// STD
+#include <cstdint>
+#include <cstddef>
+#include <vector>
+#include <iostream>
+#include <memory>
+
+// SEAL
+#include "seal/util/defines.h"
+#include "seal/context.h"
+#include "seal/ciphertext.h"
+
+// APSI
+#include "apsi/cryptocontext.h"
 
 namespace apsi
 {
-    /**
-     * Structure used to communicate results between Sender
-     * and Receiver
-     */
-    struct ResultPackage
+    namespace network
     {
-        std::size_t bundle_idx;
-        std::string data;
-        std::string label_data;
-
-        // Calculate size of data in the structure
-        std::uint64_t size() const
+        /**
+        Stores a decrypted and decoded PSI response and optionally a labeled PSI response.
+        */
+        struct PlainResultPackage
         {
-            return sizeof(std::size_t) + data.length() + label_data.length();
-        }
-    }; // struct ResultPackage
+            std::uint32_t bundle_idx;
+
+            std::vector<std::uint64_t> psi_result;
+
+            std::vector<std::vector<std::uint64_t>> label_result;
+        };
+
+        /**
+        Stores a PSI response and optionally labeled PSI response ciphertexts.
+        */
+        class ResultPackage
+        {
+        public:
+            /**
+            Writes the ResultPackage to a stream.
+            */
+            std::size_t save(std::ostream &out) const;
+
+            /**
+            Reads the ResultPackage from a stream.
+            */
+            std::size_t load(std::istream &in, std::shared_ptr<seal::SEALContext> context);
+
+            PlainResultPackage extract(const CryptoContext &crypto_context);
+
+            std::uint32_t bundle_idx;
+
+            seal::Ciphertext psi_result;
+
+            std::vector<seal::Ciphertext> label_result;
+
+            std::vector<seal::SEAL_BYTE> client_id;
+        }; // struct ResultPackage
+    }
 } // namespace apsi
