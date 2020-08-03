@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 // STD
+#include <cmath>
 #include <chrono>
 #include <numeric>
 #include <thread>
@@ -218,7 +219,7 @@ namespace apsi
 
             // Traverse each node of the DAG, building up products. That is, we calculate node.input[0]*node.input[1].
             // I know infinilooping is a bad pattern but the condition we're looping on is an atomic fetch_add, which
-            // makese things harder. The top of this loop handles the break condition.
+            // makes things harder. The top of this loop handles the break condition.
             while (true)
             {
                 // Atomically get the next_node counter (this tells us where to start working) and increment it
@@ -230,15 +231,15 @@ namespace apsi
                 }
 
                 auto &node = dag.nodes[node_idx];
-                auto &node_state = state.nodes[node.output];
+                auto &output_node_state = state.node_states.at(node.output);
 
-                // Atomically transition this node from Ready to Pending. This makes sure we're the only one who's
-                // writing to it. The _strong specifier here means that this doesn't fail spuriously, i.e., if the
+                // Atomically transition this node from Uncomputed to Computing. This makes sure we're the only one
+                // who's writing to it. The _strong specifier here means that this doesn't fail spuriously, i.e., if the
                 // return value is false, it means that the comparison failed and someone else has begun working on this
                 // node. If this happens, just move along to the next node.
-                bool r = node_state.compare_exchange_strong(
-                    WindowingDag::NodeState::Ready,
-                    WindowingDag::NodeState::Pending
+                bool r = output_node_state.compare_exchange_strong(
+                    WindowingDag::NodeState::Uncomputed,
+                    WindowingDag::NodeState::Computing
                 );
                 if (!r)
                 {
@@ -249,8 +250,9 @@ namespace apsi
                 // values lower on the DAG)
                 for (size_t i = 0; i < 2; i++)
                 {
-                    // Loop until the input is computed
-                    while (state.nodes[node.inputs[i]] != WindowingDag::NodeState::Done) {}
+                    // Spin until the input is computed
+                    auto &input_node_state = state.node_states.at(node.inputs[i]);
+                    while (input_node_state != WindowingDag::NodeState::Done) {}
                 }
 
                 // Multiply the inputs together
@@ -263,11 +265,11 @@ namespace apsi
                 evaluator.relinearize_inplace(output, crypto_context.relin_keys_);
                 evaluator.transform_to_ntt_inplace(powers[i]);
 
-                // Atomically transition this node from Pending to Done. Since we already "claimed" this node by marking
-                // it Pending, this MUST still be Pending. If it's not, someone stole our work against our wishes. This
-                // should never happen.
-                bool r = node_state.compare_exchange_strong(
-                    WindowingDag::NodeState::Pending,
+                // Atomically transition this node from Computing to Done. Since we already "claimed" this node by
+                // marking it Computing, this MUST still be Computing. If it's not, someone stole our work against our
+                // wishes. This should never happen.
+                bool r = output_node_state.compare_exchange_strong(
+                    WindowingDag::NodeState::Computing,
                     WindowingDag::NodeState::Done
                 );
                 if (!r)
@@ -291,126 +293,117 @@ namespace apsi
             return r;
         }
 
-        size_t WindowingDag::optimal_split(size_t x, vector<uint32_t> &degrees)
+        /**
+        Returns the Hamming weight of x in the given base, i.e., the number of nonzero digits x has in the given base.
+        The base MUST be a power of 2
+        */
+        size_t hamming_weight(size_t x, uint32_t base)
         {
-            uint32_t opt_deg = degrees[x];
-            size_t opt_split = 0;
+            // This mask is used to get each digits of x in the given base
+            size_t base_bitmask = static_cast<size_t>(base - 1);
+            size_t base_bitlen = static_cast<size_t>(log2(base));
 
-            auto abs_sub = [](uint32_t a, uint32_t b) {
-                return abs(static_cast<int32_t>(a) - static_cast<int32_t>(b));
-            };
+            size_t weight = 0;
 
-            for (size_t i1 = 1; i1 < x; i1++)
+            // Go through all the digits by shifting the bitmask further to the left. Once the bitmask has gone all the
+            // way off the edge, we stop.
+            while (base_bitmask != 0)
             {
-                if (degrees[i1] + degrees[x - i1] < opt_deg)
-                {
-                    opt_split = i1;
-                    opt_deg = degrees[i1] + degrees[x - i1];
-                }
-                else if (
-                    degrees[i1] + degrees[x - i1] == opt_deg &&
-                    abs_sub(degrees[i1], degrees[x - i1]) < abs_sub(degrees[opt_split], degrees[x - opt_split]))
-                {
-                    opt_split = i1;
-                }
-            }
+                // Mask x and see if the current digit is zero
+                bool is_digit_nonzero = (base_bitmask & x) != 0;
+                weight += static_cast<size_t>(is_digit_nonzero);
 
-            degrees[x] = opt_deg;
-
-            return opt_split;
-        }
-
-        void WindowingDag::compute_dag()
-        {
-            vector<uint32_t> degrees(max_power + 1, numeric_limits<uint32_t>::max());
-            vector<size_t> splits(max_power + 1);
-            vector<int> items_per(max_power, 0);
-
-            Log::debug("Computing windowing dag: max power = %i", max_power);
-
-            // initialize the degrees array.
-            degrees[0] = 0;
-            uint32_t base = uint32_t(1) << window;
-            for (uint32_t i = 0; i < given_digits; i++)
-            {
-                for (uint32_t j = 1; j < base; j++)
-                {
-                    if (pow(base, i) * j < degrees.size())
-                    {
-                        degrees[static_cast<size_t>(pow(base, i) * j)] = 1;
-                    }
-                }
-            }
-
-            for (size_t i = 1; i <= max_power; i++)
-            {
-                size_t i1 = optimal_split(i, degrees);
-                size_t i2 = util::sub_safe(i, i1);
-                splits[i] = i1;
-
-                if (i1 == 0 || i2 == 0)
-                {
-                    base_powers.emplace_back(i);
-                    degrees[i] = 1;
-                }
-                else
-                {
-                    degrees[i] = degrees[i1] + degrees[i2];
-                    ++items_per[static_cast<size_t>(degrees[i])];
-                }
-                Log::debug("degrees[%i] = %i", i, degrees[i]);
-                Log::debug("splits[%i] = %i", i, splits[i]);
-            }
-
-            for (size_t i = 3; i < max_power && items_per[i]; i++)
-            {
-                items_per[i] += items_per[i - 1];
-            }
-
-            for (size_t i = 0; i < max_power; i++)
-            {
-                Log::debug("items_per[%i] = %i", i, items_per[i]);
-            }
-
-            // size = how many powers we still need to generate.
-            size_t size = max_power - base_powers.size();
-            nodes.resize(size);
-
-            for (size_t i = 1; i <= max_power; i++)
-            {
-                size_t i1 = splits[i];
-                size_t i2 = util::sub_safe(i, i1);
-
-                if (i1 && i2) // if encryption(y^i) is not given
-                {
-                    auto idx = static_cast<size_t>(items_per[static_cast<size_t>(degrees[i]) - 1]++);
-                    if (nodes[idx].output)
-                    {
-                        throw std::runtime_error("");
-                    }
-
-                    nodes[idx].inputs = { i1, i2 };
-                    nodes[idx].output = i;
-                }
+                // Shift the bitmask up to the next digit
+                base_bitmask <<= base_bitlen;
             }
         }
 
-        WindowingDag::State::State(WindowingDag &dag)
+        /**
+        Given a base and an integer x, returns p,q such that p + q == x, weight(p) + weight(q) = weight(x), and
+        weight(p) is as close to weight(q) as possible. Weight is as defined in the hamming_weight() function. The base
+        MUST be a power of 2.
+        */
+        pair<size_t, size_t> WindowingDag::balanced_integer_partition(size_t x, uint32_t base)
         {
+            size_t x_weight = hamming_weight(x, base);
+
+            // Now we just need to find a partition p,q of x such that weight(p) + weight(q) = weight(x) and the two
+            // weights on the LHS are close to each other. Our strategy, just keep picking digits from x to include in
+            // q. Once q has weight ⌊weight(x)/2⌋, let p := x - q and we're done.
+
+            // This mask is used to get each digits of x in the given base
+            size_t base_bitmask = static_cast<size_t>(base - 1);
+            size_t base_bitlen = static_cast<size_t>(log2(base));
+
+            size_t q = 0;
+            size_t q_weight = 0;
+            while (q_weight < x_weight/2)
+            {
+                // Add a digit to q
+                q |= (x & base_bitmask);
+
+                // That digit might've been 0. If it wasn't, q's hamming weight just increase by 1
+                bool is_digit_nonzero = (base_bitmask & x) != 0;
+                q_weight += static_cast<size_t>(is_digit_nonzero);
+
+                // Shift the bitmask up to the next digit
+                base_bitmask <<= base_bitlen;
+            }
+
+            size_t p = x - q;
+            return {p, q};
+        }
+
+        /**
+        Constructs a directed acyclic graph, where each node has 2 inputs and 1 output. Every node has inputs i,j and
+        output i+j. The largest output size is max_power. The choice of inputs depends on their Hamming weights, which
+        depends on the base specified.
+        This is used to compute powers of a given ciphertext while minimizing circuit depth.  The nodes are sorted in
+        increasing order of Hamming weight of their output.
+        */
+        WindowingDag::WindowingDag(std::size_t max_power, std::uint32_t base)
+        {
+            for (size_t i = 1; i <= max_power; i++)
+            {
+                // Compute a balanced partition of the index i with respect to the given base
+                pair<size_t, size_t> partition = balanced_integer_partition(i, base);
+                size_t i1 = partition.first;
+                size_t i2 = partition.second;
+
+                // You only have to compute a ciphertext power if the power isn't already given, i.e., iff i isn't of
+                // the form x*base^y (for x < base), i.e., iff i isn't just 1 digit wrt the base, i.e., iff i has a
+                // nontrivial partition
+                if (partition.first && partition.second)
+                {
+                    Node node = Node {
+                        .inputs = partition,
+                        .output = i,
+                    };
+                    nodes_.emplace_back(node);
+                }
+            }
+
+            // Sort the DAG in increasing order by Hamming weight
+            sort(nodes_.begin(), nodes_.end(), [](Node &node1, Node &node2) {
+                return hamming_weight(node1.output, base) < hamming_weight(node2.output, base);
+            });
+
+            // Result of computation is now in nodes_
+        }
+
+        /**
+        Constructs the working state of a DAG. This includes the index to the next yet-to-be-computed node
+        */
+        WindowingDag::State::State(WindowingDag &dag) : node_states(dag.max_power + 1)
+        {
+            // Workers start at the beginning of the nodes_ array, since that's where the lowest-weight nodes are
             next_node = make_unique<std::atomic<size_t>>();
             *next_node = 0;
-            node_state_storage = make_unique<std::atomic<NodeState>[]>(dag.max_power + 1);
-            nodes = { node_state_storage.get(), static_cast<size_t>(dag.max_power + 1) };
 
-            for (auto &n : nodes)
+            // Everything is uncomputed at first
+            for (auto &n : node_states)
             {
-                n = NodeState::Ready;
-            }
-
-            nodes[0] = NodeState::Done;
-            for (auto &n : dag.base_powers)
-            {
-                nodes[n] = NodeState::Done;
+                *n = NodeState::Uncomputed;
             }
         }
     } // namespace sender
