@@ -10,11 +10,11 @@
 
 // SEAL
 #include "seal/util/common.h"
-#include "seal/util/db_encoding.h"
 #include "seal/util/uintcore.h"
 
 // APSI
 #include "apsi/item.h"
+#include "apsi/util/db_encoding.h"
 
 using namespace std;
 using namespace seal;
@@ -22,28 +22,6 @@ using namespace kuku;
 
 namespace apsi
 {
-    namespace
-    {
-        uint32_t Item::muladd(uint32_t item[4], uint32_t mul, uint32_t add)
-        {
-            uint64_t temp = 0;
-
-            temp = static_cast<uint64_t>(item[0]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(add);
-            item[0] = static_cast<uint32_t>(temp);
-
-            temp = static_cast<uint64_t>(item[1]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(temp >> 32);
-            item[1] = static_cast<uint32_t>(temp);
-
-            temp = static_cast<uint64_t>(item[2]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(temp >> 32);
-            item[2] = static_cast<uint32_t>(temp);
-
-            temp = static_cast<uint64_t>(item[3]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(temp >> 32);
-            item[3] = static_cast<uint32_t>(temp);
-
-            return static_cast<uint32_t>(temp >> 32);
-        }
-    }
-
     Item::Item(uint64_t *pointer)
     {
         value_[0] = pointer[0];
@@ -78,11 +56,23 @@ namespace apsi
         operator=(item);
     }
 
-    Item &Item::operator=(const Item &assign)
+    uint32_t Item::muladd(uint32_t item[4], uint32_t mul, uint32_t add)
     {
-        for (size_t i = 0; i < value_.size(); i++)
-            value_[i] = assign.value_[i];
-        return *this;
+        uint64_t temp = 0;
+
+        temp = static_cast<uint64_t>(item[0]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(add);
+        item[0] = static_cast<uint32_t>(temp);
+
+        temp = static_cast<uint64_t>(item[1]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(temp >> 32);
+        item[1] = static_cast<uint32_t>(temp);
+
+        temp = static_cast<uint64_t>(item[2]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(temp >> 32);
+        item[2] = static_cast<uint32_t>(temp);
+
+        temp = static_cast<uint64_t>(item[3]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(temp >> 32);
+        item[3] = static_cast<uint32_t>(temp);
+
+        return static_cast<uint32_t>(temp >> 32);
     }
 
     void Item::parse(const string &input, uint32_t base)

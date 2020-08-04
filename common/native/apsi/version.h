@@ -7,7 +7,7 @@
 #include <cstdint>
 
 // APSI
-#include "apsi/common/config.h"
+#include "apsi/config.h"
 
 namespace apsi
 {
