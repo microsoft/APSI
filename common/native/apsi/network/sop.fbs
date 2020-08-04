@@ -28,7 +28,6 @@ union Request { ParmsRequest, OPRFRequest, QueryRequest }
 
 table SenderOperation {
     request:Request (required);
-    client_id:[ubyte];
 }
 
 root_type SenderOperation;

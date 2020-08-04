@@ -45,8 +45,8 @@ namespace apsi
             // Run until stopped
             while (!stop)
             {
-                unique_ptr<SenderOperation> sop;
-                if (!(sop = chl.receive_operation()))
+                unique_ptr<NetworkSenderOperation> sop;
+                if (!(sop = chl.receive_network_operation()))
                 {
                     if (!logged_waiting)
                     {
@@ -60,7 +60,7 @@ namespace apsi
                     continue;
                 }
 
-                switch (sop->type())
+                switch (sop->sop->type())
                 {
                 case SenderOperationType::SOP_PARMS:
                     Log::info("Received parameter request");
@@ -86,43 +86,55 @@ namespace apsi
             }
         }
 
-        void SenderDispatcher::dispatch_parms(unique_ptr<SenderOperation> sop, Channel &chl)
+        void SenderDispatcher::dispatch_parms(unique_ptr<NetworkSenderOperation> sop, Channel &chl)
         {
-            unique_ptr<SenderOperationResponse> response(make_unique<SenderOperationResponseParms>(
-                sender_->get_params(), move(sop->client_id)));
+            auto response = make_unique<NetworkSenderOperationResponse>();
+            response->sop_response = make_unique<SenderOperationResponseParms>(sender_->get_params());
+            response->client_id = move(sop->client_id);
+
             chl.send(move(response));
         }
 
-        void SenderDispatcher::dispatch_oprf(unique_ptr<SenderOperation> sop, Channel &chl)
+        void SenderDispatcher::dispatch_oprf(unique_ptr<NetworkSenderOperation> sop, Channel &chl)
         {
-            auto sop_oprf = dynamic_cast<SenderOperationOPRF*>(sop.get());
+            auto sop_oprf = dynamic_cast<SenderOperationOPRF*>(sop->sop.get());
 
-            // OPRF response it the same size as the OPRF query 
+            // OPRF response has the same size as the OPRF query 
             vector<SEAL_BYTE> oprf_response(sop_oprf->data.size());
             OPRFSender::ProcessQueries(sop_oprf->data, *oprf_key_, oprf_response);
 
-            unique_ptr<SenderOperationResponse> response(make_unique<SenderOperationResponseOPRF>(
-                move(oprf_response), move(sop->client_id)));
+            auto response = make_unique<NetworkSenderOperationResponse>();
+            response->sop_response = make_unique<SenderOperationResponseOPRF>(move(oprf_response));
+            response->client_id = move(sop->client_id);
+
             chl.send(move(response));
         }
 
-        void SenderDispatcher::dispatch_query(unique_ptr<SenderOperation> sop, Channel &chl)
+        void SenderDispatcher::dispatch_query(unique_ptr<NetworkSenderOperation> sop, Channel &chl)
         {
             // Acquire read locks on SenderDB and Sender
             auto sender_lock = sender_->get_reader_lock();
             auto sender_db_lock = sender_db_->get_reader_lock();
 
-            auto sop_query = dynamic_cast<SenderOperationQuery*>(sop.get());
+            auto sop_query = dynamic_cast<SenderOperationQuery*>(sop->sop.get());
 
             // The query response only tells how many ResultPackages to expect
             uint32_t package_count = safe_cast<uint32_t>(sender_db_->bin_bundle_count());
 
-            unique_ptr<SenderOperationResponse> response(make_unique<SenderOperationResponseQuery>(
-                package_count, sop->client_id));
+            auto response = make_unique<NetworkSenderOperationResponse>();
+            response->sop_response = make_unique<SenderOperationResponseQuery>(package_count);
+            response->client_id = sop->client_id;
+
             chl.send(move(response));
 
-            // Query will send result to client in a stream of ResultPackages
-            sender_->query(move(sop_query->relin_keys), move(sop_query->data), move(sop_query->client_id), chl);
+            // Query will send result to client in a stream of ResultPackages.
+            sender_->query(move(sop_query->relin_keys), move(sop_query->data), chl,
+                [client_id](Channel &c, unique_ptr<ResultPackage> rp) {
+                    auto n_rp = make_unique<NetworkResultPackage>();
+                    n_rp->rp = move(rp);
+                    n_rp->client_id = move(client_id);
+                    c.send(move(n_rp));
+                });
         }
     } // namespace sender
 } // namespace apsi

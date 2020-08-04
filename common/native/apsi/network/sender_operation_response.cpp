@@ -23,7 +23,7 @@ namespace apsi
 {
     namespace network
     {
-        size_t SenderOperationResponseParms::save(ostream &out)
+        size_t SenderOperationResponseParms::save(ostream &out) const
         {
             if (!params)
             {
@@ -32,14 +32,6 @@ namespace apsi
 
             flatbuffers::FlatBufferBuilder fbs_builder(128);
             fbs::SenderOperationResponseBuilder sop_response_builder(fbs_builder);
-
-            // Write the client_id if non-empty
-            if (!client_id.empty())
-            {
-                auto cid = fbs_builder.CreateVector(
-                    reinterpret_cast<const uint8_t*>(client_id.data()), client_id.size());
-                sop_response_builder.add_client_id(cid);
-            }
 
             sop_response_builder.add_response_type(fbs::Response_ParmsResponse);
             fbs::ParmsResponseBuilder parms_response(fbs_builder);
@@ -83,18 +75,6 @@ namespace apsi
 
             auto sop_response = fbs::GetSizePrefixedSenderOperationResponse(in_data.data());
 
-            // Read the client_id if set
-            if (sop_response->client_id())
-            {
-                auto &cid = *sop_response->client_id();
-                client_id.resize(cid.size());
-                memcpy(client_id.data(), cid.data(), cid.size());
-            }
-            else
-            {
-                client_id.clear();
-            }
-
             // Need to check that the operation is of the right type
             if (sop_response->response_type() != fbs::Response_ParmsResponse)
             {
@@ -112,7 +92,7 @@ namespace apsi
             return in_data.size();
         }
 
-        size_t SenderOperationResponseOPRF::save(ostream &out)
+        size_t SenderOperationResponseOPRF::save(ostream &out) const
         {
             if (data.empty())
             {
@@ -121,14 +101,6 @@ namespace apsi
 
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
             fbs::SenderOperationResponseBuilder sop_response_builder(fbs_builder);
-
-            // Write the client_id if non-empty
-            if (!client_id.empty())
-            {
-                auto cid = fbs_builder.CreateVector(
-                    reinterpret_cast<const uint8_t*>(client_id.data()), client_id.size());
-                sop_response_builder.add_client_id(cid);
-            }
 
             sop_response_builder.add_response_type(fbs::Response_OPRFResponse);
             fbs::OPRFResponseBuilder oprf_response(fbs_builder);
@@ -166,18 +138,6 @@ namespace apsi
 
             auto sop_response = fbs::GetSizePrefixedSenderOperationResponse(in_data.data());
 
-            // Read the client_id if set
-            if (sop_response->client_id())
-            {
-                auto &cid = *sop_response->client_id();
-                client_id.resize(cid.size());
-                memcpy(client_id.data(), cid.data(), cid.size());
-            }
-            else
-            {
-                client_id.clear();
-            }
-
             // Need to check that the operation is of the right type
             if (sop_response->response_type() != fbs::Response_OPRFResponse)
             {
@@ -192,18 +152,10 @@ namespace apsi
             return in_data.size();
         }
 
-        size_t SenderOperationResponseQuery::save(ostream &out)
+        size_t SenderOperationResponseQuery::save(ostream &out) const
         {
             flatbuffers::FlatBufferBuilder fbs_builder(128);
             fbs::SenderOperationResponseBuilder sop_response_builder(fbs_builder);
-
-            // Write the client_id if non-empty
-            if (!client_id.empty())
-            {
-                auto cid = fbs_builder.CreateVector(
-                    reinterpret_cast<const uint8_t*>(client_id.data()), client_id.size());
-                sop_response_builder.add_client_id(cid);
-            }
 
             sop_response_builder.add_response_type(fbs::Response_QueryResponse);
             auto resp = fbs::CreateQueryResponse(fbs_builder, package_count);
@@ -231,18 +183,6 @@ namespace apsi
             }
 
             auto sop_response = fbs::GetSizePrefixedSenderOperationResponse(in_data.data());
-
-            // Read the client_id if set
-            if (sop_response->client_id())
-            {
-                auto &cid = *sop_response->client_id();
-                client_id.resize(cid.size());
-                memcpy(client_id.data(), cid.data(), cid.size());
-            }
-            else
-            {
-                client_id.clear();
-            }
 
             // Need to check that the operation is of the right type
             if (sop_response->response_type() != fbs::Response_QueryResponse)

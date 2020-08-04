@@ -68,7 +68,7 @@ namespace apsi
             /**
             Send a ResultPackage to a receiver.
             */
-            virtual void send(const ResultPackage &rp) = 0;
+            virtual void send(std::unique_ptr<ResultPackage> rp) = 0;
 
             /**
             Receive a ResultPackage from a sender.

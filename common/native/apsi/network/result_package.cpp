@@ -29,14 +29,6 @@ namespace apsi
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
             fbs::ResultPackageBuilder rp_builder(fbs_builder);
 
-            // Write the client_id if non-empty
-            if (!client_id.empty())
-            {
-                auto cid = fbs_builder.CreateVector(
-                    reinterpret_cast<const uint8_t*>(client_id.data()), client_id.size());
-                rp_builder.add_client_id(cid);
-            }
-
             rp_builder.add_bundle_idx(bundle_idx);
 
             vector<SEAL_BYTE> temp;
@@ -106,18 +98,6 @@ namespace apsi
             }
 
             auto rp = fbs::GetSizePrefixedResultPackage(in_data.data());
-
-            // Read the client_id if set
-            if (rp->client_id())
-            {
-                auto &cid = *rp->client_id();
-                client_id.resize(cid.size());
-                memcpy(client_id.data(), cid.data(), cid.size());
-            }
-            else
-            {
-                client_id.clear();
-            }
 
             bundle_idx = rp->bundle_idx();
 

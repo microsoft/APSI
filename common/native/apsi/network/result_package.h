@@ -57,8 +57,6 @@ namespace apsi
             seal::Ciphertext psi_result;
 
             std::vector<seal::Ciphertext> label_result;
-
-            std::vector<seal::SEAL_BYTE> client_id;
         }; // struct ResultPackage
     }
 } // namespace apsi

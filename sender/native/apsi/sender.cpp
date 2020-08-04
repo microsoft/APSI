@@ -8,13 +8,14 @@
 #include <thread>
 
 // APSI
-#include "apsi/psiparams.h"
-#include "apsi/logging/log.h"
-#include "apsi/network/result_package.h"
 #include "apsi/sender.h"
+#include "apsi/psiparams.h"
+#include "apsi/network/channel.h"
+#include "apsi/network/result_package.h"
+#include "apsi/sealobject.h"
+#include "apsi/logging/log.h"
 #include "apsi/util/utils.h"
 #include "apsi/cryptocontext.h"
-#include "apsi/sealobject.h"
 
 // SEAL
 #include "seal/modulus.h"
@@ -34,7 +35,6 @@ namespace apsi
 
     namespace sender
     {
-
         Sender::Sender(const PSIParams &params, size_t thread_count)
             : params_(params), thread_count_(thread_count),
               seal_context_(SEALContext::Create(params_.seal_params()))
@@ -45,8 +45,11 @@ namespace apsi
             }
         }
 
-        void Sender::query(RelinKeys relin_keys, map<uint64_t, vector<SEALObject<Ciphertext>>> query,
-            vector<SEAL_BYTE> client_id, Channel &channel)
+        void Sender::query(
+            RelinKeys relin_keys,
+            map<uint32_t, vector<SEALObject<Ciphertext>>> query,
+            Channel &chl,
+            function<void(Channel &, unique_ptr<ResultPackage>)> send_fun)
         {
             // Acquire read locks on SenderDB and Sender
             auto sender_lock = get_reader_lock();
@@ -131,9 +134,7 @@ namespace apsi
             for (size_t t = 0; t < partitions.size(); t++)
             {
                 threads.emplace_back([&, t]() {
-                    query_worker(
-                        partitions[t], all_powers,
-                        crypto_context, dag, states, client_id, channel);
+                    query_worker(partitions[t], all_powers, crypto_context, dag, states, chl, send_fun);
                 });
             }
 
@@ -152,8 +153,8 @@ namespace apsi
             const CryptoContext &crypto_context,
             WindowingDag &dag,
             vector<WindowingDag::State> &states,
-            const vector<SEAL_BYTE> &client_id,
-            Channel &channel)
+            Channel &chl,
+            function<void(Channel &, unique_ptr<ResultPackage>)> send_fun)
         {
             STOPWATCH(sender_stop_watch, "Sender::query_worker");
 
@@ -175,22 +176,21 @@ namespace apsi
                 // with C++ execution policies
                 seal_for_each_n(bundle_caches.begin(), bundle_count, [&](auto &cache) {
                     // Package for the result data
-                    ResultPackage pkg;
+                    auto rp = make_unique<ResultPackage>();
 
-                    pkg.client_id = client_id;
-                    pkg.bundle_idx = bundle_idx;
+                    rp->bundle_idx = bundle_idx;
 
-                    // Compute the matching result and move to pkg
-                    pkg.psi_result = move(cache.batched_matching_polyn.eval(all_powers[bundle_idx]));
+                    // Compute the matching result and move to rp
+                    rp->psi_result = move(cache.batched_matching_polyn.eval(all_powers[bundle_idx]));
 
                     if (cache.batched_interp_polyn)
                     {
-                        // Compute the label result and move to pkg
-                        pkg.label_result.emplace_back(cache.batched_interp_polyn.eval(all_powers[bundle_idx]));
+                        // Compute the label result and move to rp
+                        rp->label_result.emplace_back(cache.batched_interp_polyn.eval(all_powers[bundle_idx]));
                     }
 
-                    // Start sending on the channel
-                    channel.send(pkg);
+                    // Start sending on the channel 
+                    send_fun(chl, move(rp));
                 });
             }
         }
