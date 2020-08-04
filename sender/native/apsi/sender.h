@@ -14,6 +14,7 @@
 #include <vector>
 #include <utility>
 #include <string>
+#include <functional>
 
 // GSL
 #include "gsl/span"
@@ -36,10 +37,9 @@ namespace apsi
 {
     namespace sender
     {
-
-        // An alieas to denote the powers of a ciphertext. For a ciphertext C, this holds C, C², C³, etc. It does not
+        // An alias to denote the powers of a ciphertext. For a ciphertext C, this holds C, C², C³, etc. It does not
         // hold C⁰.
-        using CiphertextPowers = vector<seal::Ciphertext>;
+        using CiphertextPowers = std::vector<seal::Ciphertext>;
 
         struct WindowingDag
         {
@@ -113,8 +113,10 @@ namespace apsi
             Generate a response to a query.
             */
             void query(
-                seal::RelinKeys relin_keys, std::map<std::uint64_t, std::vector<SEALObject<seal::Ciphertext>>> query,
-                std::vector<seal::SEAL_BYTE> client_id, network::Channel &channel);
+                seal::RelinKeys relin_keys,
+                std::map<std::uint32_t, std::vector<SEALObject<seal::Ciphertext>>> query,
+                network::Channel &chl,
+                std::function<void(network::Channel &, std::unique_ptr<network::ResultPackage>)> send_fun = BasicSend);
 
             /**
             Return the PSI parameters.
@@ -137,6 +139,11 @@ namespace apsi
                 return sender_db_lock_.acquire_read();
             }
 
+            static void BasicSend(network::Channel &chl, std::unique_ptr<network::ResultPackage> rp)
+            {
+                chl.send(std::move(rp));
+            }
+
         private:
             /**
             Method that handles the work of a single thread that computes the response to a query.
@@ -145,7 +152,8 @@ namespace apsi
                 std::pair<std::uint32_t, std::uint32_t> bundle_idx_bounds,
                 std::vector<std::vector<seal::Ciphertext>> &powers, const CryptoContext &crypto_context,
                 WindowingDag &dag, std::vector<WindowingDag::State> &states,
-                const std::vector<seal::SEAL_BYTE> &client_id, network::Channel &channel);
+                network::Channel &chl,
+                std::function<void(network::Channel &, std::unique_ptr<network::ResultPackage>)> send_fun);
 
             /**
             Constructs all powers of receiver's items for the specified batch, based on the powers sent from the

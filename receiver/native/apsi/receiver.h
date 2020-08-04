@@ -90,6 +90,8 @@ namespace apsi
         class Receiver
         {
         public:
+            static constexpr std::uint64_t cuckoo_table_insert_attempts = 500;
+
             /**
             Constructs a new receiver without parameters specified. In this case the receiver expects to get
             the parameters from the sender in the beginning of a query.
@@ -100,7 +102,7 @@ namespace apsi
             Constructs a new receiver with parameters specified. In this case the receiver has specified the
             parameters and expects the sender to use the same set.
             */
-            Receiver(const PSIParams &params, std::size_t thread_count);
+            Receiver(PSIParams params, std::size_t thread_count);
 
             /**
             Generates a new set of keys to use for queries.
@@ -117,7 +119,7 @@ namespace apsi
             The query is a vector of items, and the result is a same-size vector of bool values. If an item is in the
             intersection, the corresponding bool value is true on the same position in the result vector.
             *************************************************************************************************************************************/
-            void /*std::pair<std::vector<bool>, Matrix<unsigned char>> */ query(const std::vector<Item> &items, network::Channel &chl);
+            std::vector<MatchRecord> query(const std::vector<Item> &items, network::Channel &chl);
 
             /************************************************************************************************************************************
             The following methods are the individual parts that when put together form a full Query to a Sender.
@@ -131,14 +133,6 @@ namespace apsi
             network::SenderOperationQuery create_query(
                 const std::vector<Item> &items,
                 std::unordered_map<std::size_t, std::size_t> &table_idx_to_item_idx);
-
-            /**
-            Decrypt the result of a query to a remote sender and get the intersection result. The query is a vector of
-            items, and the result is a same-size vector of bool values. If an item is in the intersection, the
-            corresponding bool value is true on the same position in the result vector
-            */
-            std::pair<std::vector<bool>, Matrix<unsigned char>> decrypt_result(
-                std::vector<Item> &items, network::Channel &chl);
 
             /**
             Obfuscates the items and initializes the given vector with the buffer that must be sent to the Sender for
@@ -253,6 +247,8 @@ namespace apsi
             void initialize();
 
             std::size_t thread_count_;
+
+            std::uint64_t cuckoo_table_insert_attempts_;
 
             std::unique_ptr<PSIParams> params_;
 

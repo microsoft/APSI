@@ -23,18 +23,13 @@ namespace apsi
 {
     namespace network
     {
-        size_t SenderOperationHeader::save(ostream &out)
+        size_t SenderOperationHeader::save(ostream &out) const
         {
             flatbuffers::FlatBufferBuilder fbs_builder(128);
             fbs::SenderOperationHeaderBuilder sop_header_builder(fbs_builder);
 
-            // Write the client_id if non-empty
-            if (!client_id.empty())
-            {
-                auto cid = fbs_builder.CreateVector(
-                    reinterpret_cast<const uint8_t*>(client_id.data()), client_id.size());
-                sop_header_builder.add_client_id(cid);
-            }
+            // Write the version number
+            sop_header_builder.add_version(version);
 
             // Write the operation type
             sop_header_builder.add_type(static_cast<fbs::SenderOperationType>(type));
@@ -62,17 +57,8 @@ namespace apsi
 
             auto sop_header = fbs::GetSizePrefixedSenderOperationHeader(in_data.data());
 
-            // Read the client_id if set
-            if (sop_header->client_id())
-            {
-                auto &cid = *sop_header->client_id();
-                client_id.resize(cid.size());
-                memcpy(client_id.data(), cid.data(), cid.size());
-            }
-            else
-            {
-                client_id.clear();
-            }
+            // Read the version number
+            version = sop_header->version();
 
             // Read the operation type
             type = static_cast<SenderOperationType>(sop_header->type());
@@ -80,18 +66,10 @@ namespace apsi
             return in_data.size();
         }
 
-        size_t SenderOperationParms::save(ostream &out)
+        size_t SenderOperationParms::save(ostream &out) const
         {
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
             fbs::SenderOperationBuilder sop_builder(fbs_builder);
-
-            // Write the client_id if non-empty
-            if (!client_id.empty())
-            {
-                auto cid = fbs_builder.CreateVector(
-                    reinterpret_cast<const uint8_t*>(client_id.data()), client_id.size());
-                sop_builder.add_client_id(cid);
-            }
 
             sop_builder.add_request_type(fbs::Request_ParmsRequest);
             auto parms_request = fbs::CreateParmsRequest(fbs_builder);
@@ -126,18 +104,6 @@ namespace apsi
 
             auto sop = fbs::GetSizePrefixedSenderOperation(in_data.data());
 
-            // Read the client_id if set
-            if (sop->client_id())
-            {
-                auto &cid = *sop->client_id();
-                client_id.resize(cid.size());
-                memcpy(client_id.data(), cid.data(), cid.size());
-            }
-            else
-            {
-                client_id.clear();
-            }
-
             // Need to check that the operation is of the right type
             if (sop->request_type() != fbs::Request_ParmsRequest)
             {
@@ -147,7 +113,7 @@ namespace apsi
             return in_data.size();
         }
 
-        size_t SenderOperationOPRF::save(ostream &out)
+        size_t SenderOperationOPRF::save(ostream &out) const
         {
             if (data.empty())
             {
@@ -156,14 +122,6 @@ namespace apsi
 
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
             fbs::SenderOperationBuilder sop_builder(fbs_builder);
-
-            // Write the client_id if non-empty
-            if (!client_id.empty())
-            {
-                auto cid = fbs_builder.CreateVector(
-                    reinterpret_cast<const uint8_t*>(client_id.data()), client_id.size());
-                sop_builder.add_client_id(cid);
-            }
 
             sop_builder.add_request_type(fbs::Request_OPRFRequest);
             fbs::OPRFRequestBuilder oprf_request(fbs_builder);
@@ -204,18 +162,6 @@ namespace apsi
 
             auto sop = fbs::GetSizePrefixedSenderOperation(in_data.data());
 
-            // Read the client_id if set
-            if (sop->client_id())
-            {
-                auto &cid = *sop->client_id();
-                client_id.resize(cid.size());
-                memcpy(client_id.data(), cid.data(), cid.size());
-            }
-            else
-            {
-                client_id.clear();
-            }
-
             // Need to check that the operation is of the right type
             if (sop->request_type() != fbs::Request_OPRFRequest)
             {
@@ -230,7 +176,7 @@ namespace apsi
             return in_data.size();
         }
 
-        size_t SenderOperationQuery::save(ostream &out)
+        size_t SenderOperationQuery::save(ostream &out) const
         {
             if (data.empty())
             {
@@ -239,14 +185,6 @@ namespace apsi
 
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
             fbs::SenderOperationBuilder sop_builder(fbs_builder);
-
-            // Write the client_id if non-empty
-            if (!client_id.empty())
-            {
-                auto cid = fbs_builder.CreateVector(
-                    reinterpret_cast<const uint8_t*>(client_id.data()), client_id.size());
-                sop_builder.add_client_id(cid);
-            }
 
             sop_builder.add_request_type(fbs::Request_QueryRequest);
             fbs::QueryRequestBuilder query_request(fbs_builder);
@@ -341,18 +279,6 @@ namespace apsi
             }
 
             auto sop = fbs::GetSizePrefixedSenderOperation(in_data.data());
-
-            // Read the client_id if set
-            if (sop->client_id())
-            {
-                auto &cid = *sop->client_id();
-                client_id.resize(cid.size());
-                memcpy(client_id.data(), cid.data(), cid.size());
-            }
-            else
-            {
-                client_id.clear();
-            }
 
             // Need to check that the operation is of the right type
             if (sop->request_type() != fbs::Request_QueryRequest)

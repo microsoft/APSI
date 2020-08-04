@@ -66,7 +66,7 @@ namespace apsi
             /**
             Send a ResultPackage to a receiver.
             */
-            virtual void send(const ResultPackage &rp) override;
+            virtual void send(std::unique_ptr<ResultPackage> rp) override;
 
             /**
             Receive a ResultPackage from a sender.

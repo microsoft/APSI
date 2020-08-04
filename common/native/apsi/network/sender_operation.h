@@ -15,6 +15,7 @@
 
 // APSI
 #include "apsi/sealobject.h"
+#include "apsi/version.h"
 
 // SEAL
 #include "seal/util/defines.h"
@@ -47,22 +48,18 @@ namespace apsi
 
             std::size_t load(std::istream &in);
 
-            std::vector<seal::SEAL_BYTE> client_id = {};
+            std::uint32_t version = apsi_version;
 
             SenderOperationType type = SenderOperationType::SOP_UNKNOWN;
         };
 
         /**
-        An abstract base class representing a sender operation. This class optionally holds an optional member
-        variable identifying the client (client_id).
+        An abstract base class representing a sender operation.
         */
         class SenderOperation
         {
         public:
             SenderOperation() = default;
-
-            SenderOperation(std::vector<seal::SEAL_BYTE> client_id) : client_id(std::move(client_id))
-            {}
 
             /**
             Destroys the SenderOperation.
@@ -83,8 +80,6 @@ namespace apsi
             Returns the type of the SenderOperation.
             */
             virtual SenderOperationType type() const noexcept = 0;
-
-            std::vector<seal::SEAL_BYTE> client_id;
         }; // class SenderOperation
 
         /**
@@ -93,9 +88,6 @@ namespace apsi
         class SenderOperationParms final : public SenderOperation
         {
         public:
-            SenderOperationParms(std::vector<seal::SEAL_BYTE> client_id) : SenderOperation(std::move(client_id))
-            {}
-
             SenderOperationParms() = default;
 
             ~SenderOperationParms() = default;
@@ -117,10 +109,6 @@ namespace apsi
         {
         public:
             SenderOperationOPRF(std::vector<seal::SEAL_BYTE> data) : data(std::move(data)), SenderOperation()
-            {}
-
-            SenderOperationOPRF(std::vector<seal::SEAL_BYTE> data, std::vector<seal::SEAL_BYTE> client_id) :
-                data(std::move(data)), SenderOperation(std::move(client_id))
             {}
 
             ~SenderOperationOPRF() = default;
@@ -148,19 +136,10 @@ namespace apsi
         public:
             SenderOperationQuery(
                 SEALObject<seal::RelinKeys> relin_keys,
-                std::map<std::uint64_t, std::vector<SEALObject<seal::Ciphertext>>> data) :
+                std::map<std::uint32_t, std::vector<SEALObject<seal::Ciphertext>>> data) :
                 relin_keys(std::move(relin_keys)),
                 data(std::move(data)),
                 SenderOperation()
-            {}
-
-            SenderOperationQuery(
-                SEALObject<seal::RelinKeys> relin_keys,
-                std::map<std::uint64_t, std::vector<SEALObject<seal::Ciphertext>>> data,
-                std::vector<seal::SEAL_BYTE> client_id) :
-                relin_keys(std::move(relin_keys)),
-                data(std::move(data)),
-                SenderOperation(std::move(client_id))
             {}
 
             ~SenderOperationQuery() = default;
@@ -180,7 +159,7 @@ namespace apsi
             Holds the encrypted query data. In the map the key labels the exponent of the query
             ciphertext and the vector holds the ciphertext data for different bundle indices.
             */
-            std::map<std::uint64_t, std::vector<SEALObject<seal::Ciphertext>>> data;
+            std::map<std::uint32_t, std::vector<SEALObject<seal::Ciphertext>>> data;
         }; // class SenderOperationQuery
     }      // namespace network
 } // namespace apsi

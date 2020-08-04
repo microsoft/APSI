@@ -41,16 +41,16 @@ namespace apsi
     {
         Receiver::Receiver(size_t thread_count) : thread_count_(thread_count)
         {
-            if (thread_count < 1)
+            if (thread_count_ < 1)
             {
                 throw invalid_argument("thread_count must be at least 1");
             }
         }
 
-        Receiver::Receiver(const PSIParams &params, size_t thread_count)
-            : params_(make_unique<PSIParams>(params)), thread_count_(thread_count)
+        Receiver::Receiver(PSIParams params, size_t thread_count) :
+            params_(make_unique<PSIParams>(move(params))), thread_count_(thread_count)
         {
-            if (thread_count < 1)
+            if (thread_count_ < 1)
             {
                 throw invalid_argument("thread_count must be at least 1");
             }
@@ -96,53 +96,11 @@ namespace apsi
             Log::info("Receiver initialized");
         }
 
-        pair<vector<bool>, Matrix<unsigned char>> Receiver::decrypt_result(vector<Item> &items, Channel &chl)
-        {
-            pair<vector<bool>, Matrix<unsigned char>> empty_result;
-
-            if (nullptr == preprocess_result_)
-            {
-                return empty_result;
-            }
-
-            auto &cuckoo = *(preprocess_result_->second);
-            size_t padded_table_size = ((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_;
-
-            vector<size_t> table_to_input_map(padded_table_size, 0);
-            if (items.size() > 1 || (!get_params().use_fast_membership()))
-            {
-                table_to_input_map = cuckoo_indices(items, cuckoo);
-            }
-            else
-            {
-                Log::info("Receiver single query table to input map");
-            }
-
-            /* Receive results */
-            SenderResponseQuery query_resp;
-            {
-                STOPWATCH(recv_stop_watch, "Receiver::query::wait_response");
-                if (!chl.receive(query_resp))
-                {
-                    Log::error("Not able to receive query response");
-                    return empty_result;
-                }
-
-                Log::debug("Sender will send %i result packages", query_resp.package_count);
-            }
-
-            auto intersection = stream_decrypt(chl, table_to_input_map, items);
-
-            Log::info("Receiver completed query");
-
-            return intersection;
-        }
-
         SenderOperationQuery Receiver::create_query(
             const vector<Item> &items, unordered_map<size_t, size_t> &table_idx_to_item_idx)
         {
-            STOPWATCH(recv_stop_watch, "Receiver::query");
-            Log::info("Receiver starting query");
+            STOPWATCH(recv_stop_watch, "Receiver::create_query");
+            Log::info("Receiver starting creating query");
 
             if (!is_initialized())
             {
@@ -151,10 +109,56 @@ namespace apsi
 
             table_idx_to_item_idx.clear();
 
-            // TOODOOO
-            preprocess_result_ =
-                make_unique<pair<map<uint64_t, vector<string>>, unique_ptr<KukuTable>>>(preprocess(items));
-            auto &ciphertexts = preprocess_result_->first;
+            // Create the cuckoo table
+            KukuTable cuckoo(
+                params_->table_params().table_size,      // Size of the hash table
+                0,                                       // Not using a stash
+                params_->table_params().hash_func_count, // Number of hash functions
+                { 0, 0 },                                // Hardcoded { 0, 0} as the seed
+                cuckoo_table_insert_attempts,            // The number of insertion attempts 
+                { 0, 0 });                               // The empty element can be set to anything
+
+            // Fill the table
+            for (size_t item_idx = 0; item_idx < items.size(); item_idx++)
+            {
+                auto &item = items[item_idx];
+                if (!cuckoo.insert(items[item_idx].value()))
+                {
+                    // Insertion can fail for two reasons:
+                    //
+                    //     (1) The item was already in the table, in which case the "leftover item" is empty;
+                    //     (2) Cuckoo hashing failed due to too small table or too few hash functions.
+                    //
+                    // In case (1) simply move on to the next item and log this issue. Case (2) is a critical issue
+                    // so we throw and exception.
+                    if (cuckoo.is_empty_item(cuckoo.leftover_item()))
+                    {
+                        Log::info("Skipping repeated insertion of items[" << item_idx << "]: " << item);
+                    }
+                    else
+                    {
+                        stringstream ss;
+                        ss << "Failed to insert items[" << item_idx << "]: " << item << endl;
+                        throw runtime_error(ss.str());
+                    }
+                }
+            }
+
+            // Set up unencrypted query data
+            map<uint32_t, vector<vector<uint64_t>>> raw_query_data;
+
+            // Set up the encrypted data
+            map<uint64_t, vector<SEALObject<Ciphertext>>> data;
+
+            map<uint64_t, FFieldArray> powers;
+            generate_powers(*ffield_items, powers);
+
+            map<uint64_t, vector<string>> ciphers;
+            encrypt(powers, ciphers);
+
+            Log::info("Receiver preprocess end");
+
+            return { move(ciphers), move(cuckoo) };
 
             return ciphertexts;
         }
@@ -225,6 +229,8 @@ namespace apsi
             {
                 t.join();
             }
+
+            return mrs;
         }
 
         void Receiver::result_package_worker(
@@ -578,51 +584,6 @@ namespace apsi
                     }(destination.back())));
 #endif
             }
-        }
-
-        std::pair<std::vector<bool>, Matrix<unsigned char>> Receiver::stream_decrypt(
-            Channel &channel, const std::vector<size_t> &table_to_input_map, const std::vector<Item> &items)
-        {
-            STOPWATCH(recv_stop_watch, "Receiver::stream_decrypt");
-            std::pair<std::vector<bool>, Matrix<unsigned char>> ret;
-            auto &ret_bools = ret.first;
-            auto &ret_labels = ret.second;
-
-            ret_bools.resize(items.size(), false);
-
-            if (get_params().use_labels())
-            {
-                ret_labels.resize(items.size(), get_params().label_byte_count());
-            }
-
-            size_t num_of_splits = get_params().split_count();
-            size_t num_of_batches = get_params().batch_count();
-            size_t block_count = num_of_splits * num_of_batches;
-            size_t batch_size = slot_count_;
-
-            Log::info("Receiver batch size = %i", batch_size);
-
-            size_t num_threads = thread_count_;
-            Log::debug(
-                "Decrypting %i blocks(%ib x %is) with %i threads", block_count, num_of_batches, num_of_splits,
-                num_threads);
-
-            std::vector<std::thread> thrds(num_threads);
-            for (size_t t = 0; t < thrds.size(); ++t)
-            {
-                thrds[t] = std::thread(
-                    [&](size_t idx) {
-                        stream_decrypt_worker(
-                            idx, batch_size, thread_count_, block_count, channel, table_to_input_map, ret_bools,
-                            ret_labels);
-                    },
-                    static_cast<int>(t));
-            }
-
-            for (auto &thrd : thrds)
-                thrd.join();
-
-            return ret;
         }
     } // namespace receiver
 } // namespace apsi

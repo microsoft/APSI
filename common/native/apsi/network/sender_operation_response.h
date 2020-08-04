@@ -20,16 +20,12 @@ namespace apsi
     namespace network
     {
         /**
-        An abstract base class representing a response to a sender operation. This class optionally holds an optional
-        member variable identifying the client (client_id).
+        An abstract base class representing a response to a sender operation.
         */
         class SenderOperationResponse
         {
         public:
             SenderOperationResponse() = default;
-
-            SenderOperationResponse(std::vector<seal::SEAL_BYTE> client_id) : client_id(std::move(client_id))
-            {}
 
             /**
             Destroys the SenderOperationResponse.
@@ -50,8 +46,6 @@ namespace apsi
             Returns the type of the SenderOperation for which this is a response.
             */
             virtual SenderOperationType type() const noexcept = 0;
-
-            std::vector<seal::SEAL_BYTE> client_id;
         }; // class SenderOperationResponse
 
         /**
@@ -62,11 +56,6 @@ namespace apsi
         public:
             SenderOperationResponseParms(PSIParams params) :
                 params(std::make_unique<PSIParams>(std::move(params))), SenderOperationResponse()
-            {}
-
-            SenderOperationResponseParms(PSIParams params, std::vector<seal::SEAL_BYTE> client_id) :
-                params(std::make_unique<PSIParams>(std::move(params))),
-                SenderOperationResponse(std::move(client_id))
             {}
 
             ~SenderOperationResponseParms() = default;
@@ -96,10 +85,6 @@ namespace apsi
                 data(std::move(data)), SenderOperationResponse()
             {}
 
-            SenderOperationResponseOPRF(std::vector<seal::SEAL_BYTE> data, std::vector<seal::SEAL_BYTE> client_id) :
-                data(std::move(data)), SenderOperationResponse(std::move(client_id))
-            {}
-
             ~SenderOperationResponseOPRF() = default;
 
             std::size_t save(std::ostream &out) const override;
@@ -125,10 +110,6 @@ namespace apsi
         public:
             SenderOperationResponseQuery(std::uint32_t package_count) :
                 package_count(package_count), SenderOperationResponse()
-            {}
-
-            SenderOperationResponseQuery(std::uint32_t package_count, std::vector<seal::SEAL_BYTE> client_id) :
-                package_count(package_count), SenderOperationResponse(std::move(client_id))
             {}
 
             ~SenderOperationResponseQuery() = default;

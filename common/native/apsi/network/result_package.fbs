@@ -8,7 +8,6 @@ table Ciphertext {
 }
 
 table ResultPackage {
-    client_id:[ubyte];
     bundle_idx:uint32;
     psi_result:Ciphertext;
     label_result:[Ciphertext];

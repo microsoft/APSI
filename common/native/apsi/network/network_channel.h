@@ -4,6 +4,7 @@
 #pragma once
 
 // STD
+#include <utility>
 #include <mutex>
 #include <memory>
 #include <type_traits>
@@ -29,6 +30,36 @@ namespace apsi
 {
     namespace network
     {
+        /**
+        Encapsulates a SenderOperation and a client identifier used internally by ZeroMQ.
+        */
+        struct NetworkSenderOperation
+        {
+            std::unique_ptr<SenderOperation> sop;
+
+            std::vector<seal::SEAL_BYTE> client_id;
+        };
+
+        /**
+        Encapsulates a SenderOperationResponse and a client identifier used internally by ZeroMQ.
+        */
+        struct NetworkSenderOperationResponse
+        {
+            std::unique_ptr<SenderOperationResponse> sop_response;
+
+            std::vector<seal::SEAL_BYTE> client_id;
+        };
+
+        /**
+        Encapsulates a ResultPackage and a client identifier used internally by ZeroMQ.
+        */
+        struct NetworkResultPackage
+        {
+            std::unique_ptr<ResultPackage> rp;
+
+            std::vector<seal::SEAL_BYTE> client_id;
+        };
+
         /**
         Communication channel between Sender and Receiver through a Network channel. All receives are synchronous,
         except for receiving a SenderOperation. All sends are asynchrounous.
@@ -69,6 +100,21 @@ namespace apsi
             virtual void send(std::unique_ptr<SenderOperation> sop) override;
 
             /**
+            Receive a SenderOperation from a receiver. This call does not block if wait_for_message is false. If there
+            is no operation pending, it will immediately return nullptr.
+            */
+            virtual std::unique_ptr<NetworkSenderOperation> receive_network_operation(
+                std::shared_ptr<seal::SEALContext> context, bool wait_for_message,
+                SenderOperationType expected = SenderOperationType::SOP_UNKNOWN);
+
+            /**
+            Receive a NetworkSenderOperation from a receiver.
+            */
+            virtual std::unique_ptr<NetworkSenderOperation> receive_network_operation(
+                std::shared_ptr<seal::SEALContext> context,
+                SenderOperationType expected = SenderOperationType::SOP_UNKNOWN);
+
+            /**
             Receive a SenderOperation from a receiver.
             */
             virtual std::unique_ptr<SenderOperation> receive_operation(
@@ -76,12 +122,9 @@ namespace apsi
                 SenderOperationType expected = SenderOperationType::SOP_UNKNOWN) override;
 
             /**
-            Receive a SenderOperation from a receiver. This call does not block if wait_for_message is false. If there
-            is no operation pending, it will immediately return nullptr.
+            Send a NetworkSenderOperationResponse to a receiver.
             */
-            std::unique_ptr<SenderOperation> receive_operation(
-                std::shared_ptr<seal::SEALContext> context, bool wait_for_message,
-                SenderOperationType expected = SenderOperationType::SOP_UNKNOWN);
+            virtual void send(std::unique_ptr<NetworkSenderOperationResponse> sop_response);
 
             /**
             Send a SenderOperationResponse to a receiver.
@@ -95,9 +138,14 @@ namespace apsi
                 SenderOperationType expected = SenderOperationType::SOP_UNKNOWN) override;
 
             /**
+            Send a NetworkResultPackage to a receiver.
+            */
+            virtual void send(std::unique_ptr<NetworkResultPackage> rp);
+
+            /**
             Send a ResultPackage to a receiver.
             */
-            virtual void send(const ResultPackage &rp) override;
+            virtual void send(std::unique_ptr<ResultPackage> rp) override;
 
             /**
             Receive a ResultPackage from a sender.

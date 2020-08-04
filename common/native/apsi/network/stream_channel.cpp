@@ -30,7 +30,6 @@ namespace apsi
             // Construct the header
             SenderOperationHeader sop_header;
             sop_header.type = sop->type();
-            sop_header.client_id = sop->client_id;
 
             lock_guard<mutex> lock(send_mutex_);
 
@@ -52,6 +51,12 @@ namespace apsi
             catch (const runtime_error &ex)
             {
                 // Invalid header
+                return nullptr;
+            }
+
+            if (!same_version(sop_header.version))
+            {
+                // Check that the version numbers match exactly
                 return nullptr;
             }
 
@@ -96,13 +101,6 @@ namespace apsi
                 return nullptr;
             }
 
-            // Check whether the client IDs match
-            if (sop_header.client_id != sop->client_id)
-            {
-                // Client ID mismatch
-                return nullptr;
-            }
-
             // Loaded successfully
             return sop;
         }
@@ -118,7 +116,6 @@ namespace apsi
             // Construct the header
             SenderOperationHeader sop_header;
             sop_header.type = sop_response->type();
-            sop_header.client_id = sop_response->client_id;
 
             lock_guard<mutex> lock(send_mutex_);
 
@@ -138,6 +135,12 @@ namespace apsi
             catch (const runtime_error &ex)
             {
                 // Invalid header
+                return nullptr;
+            }
+
+            if (!same_version(sop_header.version))
+            {
+                // Check that the version numbers match exactly
                 return nullptr;
             }
 
@@ -177,22 +180,15 @@ namespace apsi
                 return nullptr;
             }
 
-            // Check whether the client IDs match
-            if (sop_header.client_id != sop_response->client_id)
-            {
-                // Client ID mismatch
-                return nullptr;
-            }
-
             // Loaded successfully
             return sop_response;
         }
 
-        void StreamChannel::send(const ResultPackage &rp)
+        void StreamChannel::send(unique_ptr<ResultPackage> rp)
         {
             lock_guard<mutex> lock(send_mutex_);
 
-            bytes_sent_ += rp.save(out_);
+            bytes_sent_ += rp->save(out_);
         }
 
         unique_ptr<ResultPackage> StreamChannel::receive_result_package(shared_ptr<SEALContext> context)

@@ -2,7 +2,6 @@
 // Licensed under the MIT license.
 
 // STD
-#include <utility>
 #include <cstddef>
 #include <stdexcept>
 #include <sstream>
@@ -57,6 +56,21 @@ namespace apsi
                 size_t size = obj.save(ss);
                 msg.add(ss.str());
                 return size;
+            }
+
+            template<>
+            size_t save_to_message(const vector<SEAL_BYTE> &obj, message_t &msg)
+            {
+                msg.add_raw(obj.data(), obj.size());
+            }
+
+            vector<SEAL_BYTE> get_client_id(const message_t &msg)
+            {
+                vector<SEAL_BYTE> client_id;
+                size_t client_id_size = msg.size(0);
+                client_id.resize(client_id_size);
+                memcpy(client_id.data(), msg.raw_data(0), client_id_size);
+                return client_id;
             }
         }
 
@@ -132,19 +146,19 @@ namespace apsi
             // Construct the header
             SenderOperationHeader sop_header;
             sop_header.type = sop->type();
-            sop_header.client_id = sop->client_id;
 
             size_t bytes_sent = 0;
 
             message_t msg;
+
             bytes_sent += save_to_message(sop_header, msg);
-            bytes_sent += save_to_message(*sop, msg);
+            bytes_sent += save_to_message(sop, msg);
 
             send_message(msg);
             bytes_sent_ += bytes_sent;
         }
 
-        unique_ptr<SenderOperation> NetworkChannel::receive_operation(
+        unique_ptr<NetworkSenderOperation> NetworkChannel::receive_network_operation(
             shared_ptr<SEALContext> context, bool wait_for_message, SenderOperationType expected)
         {
             throw_if_not_connected();
@@ -156,21 +170,30 @@ namespace apsi
                 return nullptr;
             }
 
-            // Should have SenderOperationHeader and SenderOperation.
-            if (msg.parts() != 2)
+            // Should have client_id, SenderOperationHeader, and SenderOperation.
+            if (msg.parts() != 3)
             {
                 throw runtime_error("invalid message received");
             }
 
-            // First part is the SenderOperationHeader
+            // First extract the client_id; this is the first part of the message
+            vector<SEAL_BYTE> client_id = get_client_id(msg);
+
+            // Second part is the SenderOperationHeader
             SenderOperationHeader sop_header;
             try
             {
-                bytes_received_ += load_from_string(msg.get(0), sop_header);
+                bytes_received_ += load_from_string(msg.get(1), sop_header);
             }
             catch (const runtime_error &ex)
             {
                 // Invalid header
+                return nullptr;
+            }
+
+            if (!same_version(sop_header.version))
+            {
+                // Check that the version numbers match exactly
                 return nullptr;
             }
 
@@ -189,15 +212,15 @@ namespace apsi
                 {
                     case SenderOperationType::SOP_PARMS:
                         sop = make_unique<SenderOperationParms>();
-                        bytes_received_ += load_from_string(msg.get(1), *sop);
+                        bytes_received_ += load_from_string(msg.get(2), *sop);
                         break;
                     case SenderOperationType::SOP_OPRF:
                         sop = make_unique<SenderOperationOPRF>();
-                        bytes_received_ += load_from_string(msg.get(1), *sop);
+                        bytes_received_ += load_from_string(msg.get(2), *sop);
                         break;
                     case SenderOperationType::SOP_QUERY:
                         sop = make_unique<SenderOperationQuery>();
-                        bytes_received_ += load_from_string(msg.get(1), move(context), *sop);
+                        bytes_received_ += load_from_string(msg.get(2), move(context), *sop);
                         break;
                     default:
                         // Invalid operation
@@ -215,24 +238,28 @@ namespace apsi
                 return nullptr;
             }
 
-            // Check whether the client IDs match
-            if (sop_header.client_id != sop->client_id)
-            {
-                // Client ID mismatch
-                return nullptr;
-            }
+            // Loaded successfully; set up NetworkSenderOperation package
+            auto n_sop = make_unique<NetworkSenderOperation>();
+            n_sop->client_id = move(client_id);
+            n_sop->sop = move(sop);
 
-            // Loaded successfully
-            return sop;
+            return n_sop;
+        }
+
+        unique_ptr<NetworkSenderOperation> NetworkChannel::receive_network_operation(
+            shared_ptr<SEALContext> context, SenderOperationType expected)
+        {
+            return receive_network_operation(move(context), /* wait_for_message */ false, expected);
         }
 
         unique_ptr<SenderOperation> NetworkChannel::receive_operation(
             shared_ptr<SEALContext> context, SenderOperationType expected)
         {
-            return receive_operation(move(context), /* wait_for_message */ false, expected);
+            // Ignore the client_id
+            return move(receive_network_operation(move(context), expected)->sop);
         }
 
-        void NetworkChannel::send(unique_ptr<SenderOperationResponse> sop_response)
+        void NetworkChannel::send(unique_ptr<NetworkSenderOperationResponse> sop_response)
         {
             throw_if_not_connected();
 
@@ -244,17 +271,29 @@ namespace apsi
 
             // Construct the header
             SenderOperationHeader sop_header;
-            sop_header.type = sop_response->type();
-            sop_header.client_id = sop_response->client_id;
+            sop_header.type = sop_response->sop_response->type();
 
             size_t bytes_sent = 0;
 
             message_t msg;
+
+            // Add the client_id as the first part
+            save_to_message(sop_response->client_id, msg);
+
             bytes_sent += save_to_message(sop_header, msg);
-            bytes_sent += save_to_message(*sop_response, msg);
+            bytes_sent += save_to_message(sop_response->sop_response, msg);
 
             send_message(msg);
             bytes_sent_ += bytes_sent;
+        }
+
+        void NetworkChannel::send(unique_ptr<SenderOperationResponse> sop_response)
+        {
+            // Leave the client_id empty
+            auto n_sop_response = make_unique<NetworkSenderOperationResponse>();
+            n_sop_response->sop_response = move(sop_response);
+
+            send(move(n_sop_response));
         }
 
         unique_ptr<SenderOperationResponse> NetworkChannel::receive_response(SenderOperationType expected)
@@ -283,6 +322,12 @@ namespace apsi
             catch (const runtime_error &ex)
             {
                 // Invalid header
+                return nullptr;
+            }
+
+            if (!same_version(sop_header.version))
+            {
+                // Check that the version numbers match exactly
                 return nullptr;
             }
 
@@ -322,26 +367,32 @@ namespace apsi
                 return nullptr;
             }
 
-            // Check whether the client IDs match
-            if (sop_header.client_id != sop_response->client_id)
-            {
-                // Client ID mismatch
-                return nullptr;
-            }
-
             // Loaded successfully
             return sop_response;
         }
 
-        void NetworkChannel::send(const ResultPackage &rp)
+        void NetworkChannel::send(unique_ptr<NetworkResultPackage> rp)
         {
             throw_if_not_connected();
 
             message_t msg;
-            size_t bytes_sent = save_to_message(rp, msg);
+
+            // Add the client_id as the first part
+            save_to_message(rp->client_id, msg);
+
+            size_t bytes_sent = save_to_message(rp->rp, msg);
 
             send_message(msg);
             bytes_sent_ += bytes_sent;
+        }
+
+        void NetworkChannel::send(unique_ptr<ResultPackage> rp)
+        {
+            // Leave the client_id empty
+            auto n_rp = make_unique<NetworkResultPackage>();
+            n_rp->rp = move(rp);
+
+            send(move(n_rp));
         }
 
         unique_ptr<ResultPackage> NetworkChannel::receive_result_package(shared_ptr<SEALContext> context)
