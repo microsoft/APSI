@@ -67,15 +67,17 @@ namespace apsi
                 std::size_t output = 0;
             };
 
+            /**
+            Stores the actual nodes of the DAG
+            */
             std::vector<Node> nodes_;
-            uint32_t base;
 
             /**
             Constructs a directed acyclic graph, where each node has 2 inputs and 1 output. Every node has inputs i,j
-            and output i+j. The largest output size is max_power. The choice of inputs depends on their Hamming weights,
-            which depends on the base specified.
-            This is used to compute powers of a given ciphertext while minimizing circuit depth.  The nodes are sorted
-            in increasing order of Hamming weight of their output.
+            and output i+j. The largest output is max_power. The choice of inputs depends on their Hamming weights,
+            which depends on the base specified (the base is also known as the window size).
+            This is used to compute powers of a given ciphertext while minimizing circuit depth. The nodes vector is
+            sorted in increasing order of Hamming weight of output.
             */
             WindowingDag(std::size_t max_power, std::uint32_t base);
         }; // struct WindowingDag
@@ -155,11 +157,13 @@ namespace apsi
             are {1, 2, 4, 8}, then this function will compute powers from 0 to 15, by multiplying appropriate powers in
             {1, 2, 4, 8}.
 
+            See comment in sender.cpp for more detail.
+
             @params[in] input Map from exponent (k) to a vector of Ciphertext, each of which encrypts a batch of items
             of the same power (y^k). The size of the vector is the number of batches.
             @params[out] all_powers All powers computed from the input for the specified batch.
             */
-            void compute_batch_powers(
+            void compute_powers(
                 std::vector<seal::Ciphertext> &batch_powers, const CryptoContext &crypto_context,
                 const WindowingDag &dag, WindowingDag::State &state);
 

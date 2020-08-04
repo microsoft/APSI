@@ -33,6 +33,73 @@ namespace apsi
     using namespace util;
     using namespace network;
 
+    namespace
+    {
+        /**
+        Returns the Hamming weight of x in the given base, i.e., the number of nonzero digits x has in the given base.
+        The base MUST be a power of 2
+        */
+        size_t hamming_weight(size_t x, uint32_t base)
+        {
+            // This mask is used to get each digits of x in the given base
+            size_t base_bitmask = static_cast<size_t>(base - 1);
+            size_t base_bitlen = static_cast<size_t>(log2(base));
+
+            size_t weight = 0;
+
+            // Go through all the digits by shifting the bitmask further to the left. Once the bitmask has gone all the
+            // way off the edge, we stop.
+            while (base_bitmask != 0)
+            {
+                // Mask x and see if the current digit is zero
+                bool is_digit_nonzero = (base_bitmask & x) != 0;
+                weight += static_cast<size_t>(is_digit_nonzero);
+
+                // Shift the bitmask up to the next digit
+                base_bitmask <<= base_bitlen;
+            }
+
+            return weight;
+        }
+
+        /**
+        Given a base and an integer x, returns p,q such that p + q == x, weight(p) + weight(q) = weight(x), and
+        weight(p) is as close to weight(q) as possible. Weight is as defined in the hamming_weight() function. The base
+        MUST be a power of 2.
+        */
+        pair<size_t, size_t> balanced_integer_partition(size_t x, uint32_t base)
+        {
+            size_t x_weight = hamming_weight(x, base);
+
+            // Now we just need to find a partition p,q of x such that weight(p) + weight(q) = weight(x) and the two
+            // weights on the LHS are close to each other. Our strategy, just keep picking digits from x to include in
+            // q. Once q has weight ⌊weight(x)/2⌋, let p := x - q and we're done.
+
+            // This mask is used to get each digits of x in the given base
+            size_t base_bitmask = static_cast<size_t>(base - 1);
+            size_t base_bitlen = static_cast<size_t>(log2(base));
+
+            // Loop until q is half the weight of x. Once this is the case, we have uniquely determined a partition.
+            size_t q = 0;
+            size_t q_weight = 0;
+            while (q_weight < x_weight/2)
+            {
+                // Add a digit to q
+                q |= (x & base_bitmask);
+
+                // That digit might've been 0. If it wasn't, q's hamming weight just increase by 1
+                bool is_digit_nonzero = (base_bitmask & x) != 0;
+                q_weight += static_cast<size_t>(is_digit_nonzero);
+
+                // Shift the bitmask up to the next digit
+                base_bitmask <<= base_bitlen;
+            }
+
+            size_t p = x - q;
+            return {p, q};
+        }
+    }
+
     namespace sender
     {
         Sender::Sender(const PSIParams &params, size_t thread_count)
@@ -196,8 +263,13 @@ namespace apsi
         }
 
         /**
-        Fills out the list of ciphertext powers, give some precomputed powers and a DAG describing how to construct the
-        rest of the powers
+        Fills out the list of ciphertext powers (C, C², C³, ...). The given powers vector may uninitialized almost
+        everywhere, but precomputed powers MUST be present at indices of the form x*base^y where base is the window size
+        (the receiver is supposed to send these). The rest of the powers are constructed by multiplying existing powers.
+        The goal is to minimize the circuit depth for these calculations, and so we use some precomputation to guide us.
+        The WindowingDag is a directed acyclic graph, wherein each node has two incoming edges from nodes i₁, i₂ and an
+        outgoing edge to node j = i₁ + i₂. A node tells us to construct Cʲ by multiplying Cⁱ¹ and Cⁱ². So this function
+        just iterates through the DAG and multiplies the things it dictates until the powers vector is full.
         */
         void Sender::compute_powers(
             CiphertextPowers &powers,
@@ -215,7 +287,8 @@ namespace apsi
                 throw std::runtime_error("Need room to compute max_exponent many ciphertext powers");
             }
 
-            Evaluator &evaluator = crypto_context.evaluator();
+            auto &evaluator = crypto_context.evaluator();
+            auto &relin_keys = crypto_context.relin_keys();
 
             // Traverse each node of the DAG, building up products. That is, we calculate node.input[0]*node.input[1].
             // I know infinilooping is a bad pattern but the condition we're looping on is an atomic fetch_add, which
@@ -225,12 +298,12 @@ namespace apsi
                 // Atomically get the next_node counter (this tells us where to start working) and increment it
                 size_t node_idx = static_cast<size_t>(state.next_node.fetch_add(1));
                 // If we've traversed the whole DAG, we're done
-                if (node_idx >= dag.nodes.size())
+                if (node_idx >= dag.nodes_.size())
                 {
                     break;
                 }
 
-                auto &node = dag.nodes[node_idx];
+                auto &node = dag.nodes_[node_idx];
                 auto &output_node_state = state.node_states.at(node.output);
 
                 // Atomically transition this node from Uncomputed to Computing. This makes sure we're the only one
@@ -259,11 +332,11 @@ namespace apsi
                 Ciphertext &input0 = powers[node.inputs[0]];
                 Ciphertext &input1 = powers[node.inputs[1]];
                 Ciphertext &output = powers[node.output];
-                evaluator.multiply(input0, input1, output);
+                evaluator->multiply(input0, input1, output);
 
                 // Relinearize and convert to NTT form
-                evaluator.relinearize_inplace(output, crypto_context.relin_keys_);
-                evaluator.transform_to_ntt_inplace(powers[i]);
+                evaluator->relinearize_inplace(output, relin_keys);
+                evaluator->transform_to_ntt_inplace(output);
 
                 // Atomically transition this node from Computing to Done. Since we already "claimed" this node by
                 // marking it Computing, this MUST still be Computing. If it's not, someone stole our work against our
@@ -280,86 +353,11 @@ namespace apsi
         }
 
         /**
-        Computes base^exp. Does not check for overflow
-        */
-        uint64_t WindowingDag::pow(uint64_t base, uint64_t exp)
-        {
-            uint64_t r = 1;
-            while (exp > 0)
-            {
-                r *= base;
-                exp--;
-            }
-            return r;
-        }
-
-        /**
-        Returns the Hamming weight of x in the given base, i.e., the number of nonzero digits x has in the given base.
-        The base MUST be a power of 2
-        */
-        size_t hamming_weight(size_t x, uint32_t base)
-        {
-            // This mask is used to get each digits of x in the given base
-            size_t base_bitmask = static_cast<size_t>(base - 1);
-            size_t base_bitlen = static_cast<size_t>(log2(base));
-
-            size_t weight = 0;
-
-            // Go through all the digits by shifting the bitmask further to the left. Once the bitmask has gone all the
-            // way off the edge, we stop.
-            while (base_bitmask != 0)
-            {
-                // Mask x and see if the current digit is zero
-                bool is_digit_nonzero = (base_bitmask & x) != 0;
-                weight += static_cast<size_t>(is_digit_nonzero);
-
-                // Shift the bitmask up to the next digit
-                base_bitmask <<= base_bitlen;
-            }
-        }
-
-        /**
-        Given a base and an integer x, returns p,q such that p + q == x, weight(p) + weight(q) = weight(x), and
-        weight(p) is as close to weight(q) as possible. Weight is as defined in the hamming_weight() function. The base
-        MUST be a power of 2.
-        */
-        pair<size_t, size_t> WindowingDag::balanced_integer_partition(size_t x, uint32_t base)
-        {
-            size_t x_weight = hamming_weight(x, base);
-
-            // Now we just need to find a partition p,q of x such that weight(p) + weight(q) = weight(x) and the two
-            // weights on the LHS are close to each other. Our strategy, just keep picking digits from x to include in
-            // q. Once q has weight ⌊weight(x)/2⌋, let p := x - q and we're done.
-
-            // This mask is used to get each digits of x in the given base
-            size_t base_bitmask = static_cast<size_t>(base - 1);
-            size_t base_bitlen = static_cast<size_t>(log2(base));
-
-            size_t q = 0;
-            size_t q_weight = 0;
-            while (q_weight < x_weight/2)
-            {
-                // Add a digit to q
-                q |= (x & base_bitmask);
-
-                // That digit might've been 0. If it wasn't, q's hamming weight just increase by 1
-                bool is_digit_nonzero = (base_bitmask & x) != 0;
-                q_weight += static_cast<size_t>(is_digit_nonzero);
-
-                // Shift the bitmask up to the next digit
-                base_bitmask <<= base_bitlen;
-            }
-
-            size_t p = x - q;
-            return {p, q};
-        }
-
-        /**
         Constructs a directed acyclic graph, where each node has 2 inputs and 1 output. Every node has inputs i,j and
-        output i+j. The largest output size is max_power. The choice of inputs depends on their Hamming weights, which
-        depends on the base specified.
-        This is used to compute powers of a given ciphertext while minimizing circuit depth.  The nodes are sorted in
-        increasing order of Hamming weight of their output.
+        output i+j. The largest output is max_power. The choice of inputs depends on their Hamming weights, which
+        depends on the base specified (the base is also known as the window size).
+        This is used to compute powers of a given ciphertext while minimizing circuit depth. The nodes vector is sorted
+        in increasing order of Hamming weight of output.
         */
         WindowingDag::WindowingDag(std::size_t max_power, std::uint32_t base)
         {
@@ -375,15 +373,12 @@ namespace apsi
                 // nontrivial partition
                 if (partition.first && partition.second)
                 {
-                    Node node = Node {
-                        .inputs = partition,
-                        .output = i,
-                    };
+                    Node node { partition, i, };
                     nodes_.emplace_back(node);
                 }
             }
 
-            // Sort the DAG in increasing order by Hamming weight
+            // Sort the DAG in increasing order by Hamming weight of their output
             sort(nodes_.begin(), nodes_.end(), [](Node &node1, Node &node2) {
                 return hamming_weight(node1.output, base) < hamming_weight(node2.output, base);
             });
