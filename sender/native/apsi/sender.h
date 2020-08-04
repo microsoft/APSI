@@ -45,8 +45,8 @@ namespace apsi
         {
             enum class NodeState
             {
-                Ready = 0,
-                Pending = 1,
+                Uncomputed = 0,
+                Computing = 1,
                 Done = 2
             };
 
@@ -55,8 +55,8 @@ namespace apsi
                 // The counter used to keep track of which nodes need to get compute (meaning the product of their input
                 // has to be calculated)
                 std::unique_ptr<std::atomic<std::size_t>> next_node;
-                std::unique_ptr<std::atomic<NodeState>[]> node_state_storage;
-                gsl::span<std::atomic<NodeState>> nodes;
+                // All the node states
+                std::vector<std::atomic<NodeState> > node_states;
 
                 State(WindowingDag &dag);
             };
@@ -67,23 +67,17 @@ namespace apsi
                 std::size_t output = 0;
             };
 
-            std::size_t max_power;
-            std::uint32_t window;
-            std::uint32_t given_digits;
-            std::vector<std::uint32_t> base_powers;
-            std::vector<Node> nodes;
+            std::vector<Node> nodes_;
+            uint32_t base;
 
-            WindowingDag(
-                std::size_t max_power, std::uint32_t window, std::uint32_t given_digits)
-                : max_power(max_power), window(window), given_digits(given_digits)
-            {
-                compute_dag();
-            }
-
-            std::uint64_t pow(std::uint64_t base, std::uint64_t e);
-            std::size_t optimal_split(std::size_t x, std::vector<std::uint32_t> &degrees);
-            std::vector<std::uint64_t> conversion_to_digits(std::uint64_t input, std::uint32_t base);
-            void compute_dag();
+            /**
+            Constructs a directed acyclic graph, where each node has 2 inputs and 1 output. Every node has inputs i,j
+            and output i+j. The largest output size is max_power. The choice of inputs depends on their Hamming weights,
+            which depends on the base specified.
+            This is used to compute powers of a given ciphertext while minimizing circuit depth.  The nodes are sorted
+            in increasing order of Hamming weight of their output.
+            */
+            WindowingDag(std::size_t max_power, std::uint32_t base);
         }; // struct WindowingDag
 
         class Sender
