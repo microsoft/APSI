@@ -18,6 +18,7 @@
 
 using namespace std;
 using namespace seal;
+using namespace seal::util;
 using namespace kuku;
 
 namespace apsi
@@ -92,10 +93,10 @@ namespace apsi
             if (base == 10 && !isdigit(chr))
                 break;
 
-            if (base == 16 && !util::is_hex_char(chr))
+            if (base == 16 && !is_hex_char(chr))
                 break;
 
-            rem = muladd(item, base, static_cast<uint32_t>(util::hex_to_nibble(chr)));
+            rem = muladd(item, base, static_cast<uint32_t>(hex_to_nibble(chr)));
             if (rem != 0)
             {
                 throw invalid_argument("Input represents more than 128 bits");
