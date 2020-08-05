@@ -320,7 +320,8 @@ namespace apsi
     the item, and the second is a chunk of the label. item_bit_count denotes the bit length of the items and labels
     (they're the same length). mod denotes the modulus of the prime field.
     */
-    AlgItemLabel<felt_t> algebraize_item_label(Item &item, FullWidthLabel &label, size_t item_bit_count, Modulus& mod)
+    AlgItemLabel<felt_t> algebraize_item_label(
+        Item &item, FullWidthLabel &label, size_t item_bit_count, const Modulus &mod)
     {
         // Convert the item from to a sequence of field elements. This is the "algebraic item".
         vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(item_bit_count), mod);
@@ -349,7 +350,7 @@ namespace apsi
     item, and the second is the unit type. item_bit_count denotes the bit length of the items and labels (they're the
     same length). mod denotes the modulus of the prime field. mod denotes the modulus of the prime field.
     */
-    AlgItemLabel<monostate> algebraize_item(Item &item, size_t item_bit_count, Modulus &mod)
+    AlgItemLabel<monostate> algebraize_item(Item &item, size_t item_bit_count, const Modulus &mod)
     {
         // Convert the item from to a sequence of field elements. This is the "algebraic item".
         vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(item_bit_count), mod);

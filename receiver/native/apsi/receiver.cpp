@@ -14,6 +14,7 @@
 #include "apsi/oprf/oprf_receiver.h"
 #include "apsi/receiver.h"
 #include "apsi/util/utils.h"
+#include "apsi/util/db_encoding.h"
 
 // SEAL
 #include "seal/util/defines.h"
@@ -24,6 +25,9 @@
 #include "seal/ciphertext.h"
 #include "seal/util/iterator.h"
 #include "seal/util/common.h"
+
+// GSL
+#include "gsl/span"
 
 using namespace std;
 using namespace seal;
@@ -36,6 +40,77 @@ namespace apsi
     using namespace util;
     using namespace network;
     using namespace oprf;
+
+    namespace
+    {
+        class PlaintextPowers
+        {
+        public:
+            PlaintextPowers(vector<uint64_t> values, const PSIParams &params) : mod_(params.seal_params().plain_modulus())
+            {
+                compute_powers(move(values), params.table_params().window_size, params.table_params().max_items_per_bin);
+            }
+
+            map<uint32_t, SEALObject<Ciphertext>> encrypt(const CryptoContext &crypto_context)
+            {
+                if (!crypto_context.encryptor())
+                {
+                    throw invalid_argument("encryptor is not set in crypto_context");
+                }
+
+                map<uint32_t, SEALObject<Ciphertext>> result;
+                for (auto &p : powers_)
+                {
+                    Plaintext pt;
+                    crypto_context.encoder()->encode(p.second, pt);
+                    result.emplace(make_pair(p.first, crypto_context.encryptor()->encrypt_symmetric(pt)));
+                }
+
+                return result;
+            }
+
+        private:
+            Modulus mod_;
+
+            map<uint32_t, vector<uint64_t>> powers_;
+
+            void square_array(gsl::span<uint64_t> in) const
+            {
+                transform(in.begin(), in.end(), in.begin(),
+                    [this](auto val) { return multiply_uint_mod(val, val, mod_); });
+            }
+
+            void multiply_array(gsl::span<uint64_t> in1, gsl::span<uint64_t> in2, gsl::span<uint64_t> out) const
+            {
+                transform(in1.begin(), in1.end(), in2.begin(), out.begin(),
+                    [this](auto val1, auto val2) { return multiply_uint_mod(val1, val2, mod_); });
+            }
+
+            void compute_powers(vector<uint64_t> values, uint32_t window_size, uint32_t max_exponent)
+            {
+                uint32_t radix = uint32_t(1) << window_size;
+
+                // Loop for as long as 2^(window_size * j) does not exceed max_exponent
+                for (uint32_t j = 0; (uint32_t(1) << (window_size * j)) <= max_exponent; j++)
+                {
+                    powers_[uint32_t(1) << (window_size * j)] = values;
+
+                    // Loop for as long as we are not exceeding the max_exponent
+                    for (uint32_t i = 2; (i < radix) && (i * (uint32_t(1) << (window_size * j)) <= max_exponent); i++)
+                    {
+                        vector<uint64_t> temp(values.size());
+                        multiply_array(powers_[(i - 1) * (uint32_t(1) << (window_size * j))], values, temp);
+                        powers_[i * (uint32_t(1) << (window_size * j))] = move(temp);
+                    }
+
+                    for (uint32_t k = 0; k < window_size; k++)
+                    {
+                        square_array(values);
+                    }
+                }
+            }
+        };
+    }
 
     namespace receiver
     {
@@ -96,7 +171,29 @@ namespace apsi
             Log::info("Receiver initialized");
         }
 
-        SenderOperationQuery Receiver::create_query(
+        vector<SEAL_BYTE> Receiver::obfuscate_items(const vector<Item> &items)
+        {
+            Log::info("Obfuscating items");
+
+            vector<SEAL_BYTE> oprf_query;
+            oprf_query.resize(items.size() * oprf_query_size);
+            oprf_receiver_ = make_unique<OPRFReceiver>(items, oprf_query);
+
+            return oprf_query;
+        }
+
+        vector<Item> Receiver::deobfuscate_items(const vector<SEAL_BYTE> &oprf_response)
+        {
+            Log::info("Deobfuscating items");
+
+            vector<Item> items;
+            oprf_receiver_->process_responses(oprf_response, items);
+            oprf_receiver_.reset();
+
+            return items;
+        }
+
+        unique_ptr<SenderOperation> Receiver::create_query(
             const vector<Item> &items, unordered_map<size_t, size_t> &table_idx_to_item_idx)
         {
             STOPWATCH(recv_stop_watch, "Receiver::create_query");
@@ -145,22 +242,54 @@ namespace apsi
             }
 
             // Set up unencrypted query data
-            map<uint32_t, vector<vector<uint64_t>>> raw_query_data;
+            vector<PlaintextPowers> plain_powers;
+            for (uint32_t bundle_idx = 0; bundle_idx < params_->bundle_idx_count(); bundle_idx++)
+            {
+                // First, find the items for this bundle index
+                gsl::span<const item_type> bundle_items(
+                    cuckoo.table().data() + bundle_idx * params_->items_per_bundle(),
+                    params_->items_per_bundle());
 
-            // Set up the encrypted data
-            map<uint64_t, vector<SEALObject<Ciphertext>>> data;
+                vector<uint64_t> alg_items;
+                for (auto &item : bundle_items)
+                {
+                    // Now set up a BitstringView to this item    
+                    gsl::span<const SEAL_BYTE> item_bytes(
+                        reinterpret_cast<const SEAL_BYTE*>(item.data()), sizeof(item));
+                    BitstringView<const SEAL_BYTE> item_bits(item_bytes, params_->item_bit_count());
 
-            map<uint64_t, FFieldArray> powers;
-            generate_powers(*ffield_items, powers);
+                    // Create an algebraic item by breaking up the item into modulo plain_modulus parts
+                    vector<uint64_t> alg_item = bits_to_field_elts(item_bits, params_->seal_params().plain_modulus());
+                    copy(alg_item.cbegin(), alg_item.cend(), back_inserter(alg_items));
+                }
 
-            map<uint64_t, vector<string>> ciphers;
-            encrypt(powers, ciphers);
+                // Now that we have the algebraized items for this bundle index, we create a PlaintextPowers object that
+                // computes all necessary powers of the algebraized items.
+                plain_powers.emplace_back(move(alg_items), *params_);
+            }
 
-            Log::info("Receiver preprocess end");
+            // The very last thing to do is encrypt the plain_powers and consolidate the matching powers for different
+            // bundle indices
+            map<uint32_t, vector<SEALObject<Ciphertext>>> encrypted_powers;
+            for (auto &plain_power : plain_powers)
+            {
+                // Encrypt the data for this power
+                map<uint32_t, SEALObject<Ciphertext>> encrypted_power(plain_power.encrypt(*crypto_context_));
 
-            return { move(ciphers), move(cuckoo) };
+                // Move the encrypted data to encrypted_powers
+                for (auto &e : encrypted_power)
+                {
+                    encrypted_powers[e.first].emplace_back(move(e.second));
+                }
+            }
 
-            return ciphertexts;
+            // Set up the return value
+            unique_ptr<SenderOperation> sop_query =
+                make_unique<SenderOperationQuery>(relin_keys_, move(encrypted_powers));
+
+            Log::info("Receiver done creating query");
+
+            return sop_query;
         }
 
         vector<MatchRecord> Receiver::query(const vector<Item> &items, Channel &chl)
@@ -198,7 +327,7 @@ namespace apsi
 
             // Create the SenderOperationQuery and send it on the channel
             auto sop_query = create_query(items, table_idx_to_item_idx);
-            chl.send(make_unique<SenderOperation>(move(sop_query)));
+            chl.send(move(sop_query));
 
             // Wait for query response
             unique_ptr<SenderOperationResponse> response;
@@ -311,278 +440,6 @@ namespace apsi
                         mrs[item_idx] = move(mr);
                     }
                 });
-            }
-        }
-
-        vector<SEAL_BYTE> Receiver::obfuscate_items(const vector<Item> &items)
-        {
-            Log::info("Obfuscating items");
-
-            vector<SEAL_BYTE> oprf_query;
-            oprf_query.resize(items.size() * oprf_query_size);
-            oprf_receiver_ = make_unique<OPRFReceiver>(items, oprf_query);
-
-            return oprf_query;
-        }
-
-        vector<Item> Receiver::deobfuscate_items(const vector<SEAL_BYTE> &oprf_response)
-        {
-            Log::info("Deobfuscating items");
-
-            vector<Item> items;
-            oprf_receiver_->process_responses(oprf_response, items);
-            oprf_receiver_.reset();
-
-            return items;
-        }
-
-        void Receiver::handshake(Channel &chl)
-        {
-            STOPWATCH(recv_stop_watch, "Receiver::handshake");
-            Log::info("Initial handshake");
-
-            // Send a parameter request
-            chl.send(make_unique<SenderOperationParms>());
-
-            unique_ptr<SenderOperationResponse> response;
-            {
-                STOPWATCH(recv_stop_watch, "Receiver::handshake::wait_response");
-
-                // Wait for a valid message of the correct type
-                while (!(response = chl.receive_response(SenderOperationType::SOP_PARMS)));
-            }
-
-            // Extract the parameters
-            params_ = move(dynamic_cast<SenderOperationResponseParms*>(response.get())->params);
-
-            Log::debug("Received parameters from Sender:");
-            Log::debug(params_.to_string());
-
-            // Once we have parameters, initialize Receiver
-            initialize();
-
-            Log::info("Handshake done");
-        }
-
-        pair<map<uint64_t, vector<string>>, unique_ptr<KukuTable>> Receiver::preprocess(vector<Item> &items)
-        {
-            STOPWATCH(recv_stop_watch, "Receiver::preprocess");
-            Log::info("Receiver preprocess start");
-
-            // find the item length
-            unique_ptr<KukuTable> cuckoo;
-            unique_ptr<FFieldArray> ffield_items;
-
-            uint32_t padded_cuckoo_capacity =
-                static_cast<uint32_t>(((get_params().table_size() + slot_count_ - 1) / slot_count_) * slot_count_);
-
-            ffield_items = make_unique<FFieldArray>(padded_cuckoo_capacity, *field_);
-
-            size_t item_bit_count = get_params().item_bit_length_used_after_oprf();
-
-            bool fm = get_params().use_fast_membership();
-            if (items.size() > 1 || (!fm))
-            {
-                cuckoo = cuckoo_hashing(items);
-                ffield_encoding(*cuckoo, *ffield_items);
-            }
-            else
-            {
-                // Perform repeated encoding.
-                Log::info("Using repeated encoding for single query");
-                for (size_t i = 0; i < get_params().table_size(); i++)
-                {
-                    ffield_items->set(i, items[0].to_ffield_element(*field_, item_bit_count));
-                }
-            }
-
-            map<uint64_t, FFieldArray> powers;
-            generate_powers(*ffield_items, powers);
-
-            map<uint64_t, vector<string>> ciphers;
-            encrypt(powers, ciphers);
-
-            Log::info("Receiver preprocess end");
-
-            return { move(ciphers), move(cuckoo) };
-        }
-
-        unique_ptr<KukuTable> Receiver::cuckoo_hashing(const vector<Item> &items)
-        {
-            item_type receiver_null_item{ 0xFFFFFFFFFFFFFFFFULL, 0xFFFFFFFFFFFFFFFFULL };
-
-            auto cuckoo = make_unique<KukuTable>(
-                get_params().table_size(),
-                0, // stash size
-                get_params().hash_func_count(), item_type{ get_params().hash_func_seed(), 0 }, get_params().max_probe(),
-                receiver_null_item);
-
-            auto coeff_bit_count = field_->characteristic().bit_count() - 1;
-            auto degree = field_ ? field_->degree() : 1;
-
-            if (get_params().item_bit_count() > static_cast<size_t>(static_cast<uint32_t>(coeff_bit_count) * degree))
-            {
-                Log::error(
-                    "Reduced items too long. Only have %i bits.", static_cast<uint32_t>(coeff_bit_count) * degree);
-                throw runtime_error("Reduced items too long.");
-            }
-            else
-            {
-                Log::debug(
-                    "Using %i out of %ix%i bits of ffield element", get_params().item_bit_count(), coeff_bit_count - 1,
-                    degree);
-            }
-
-            for (size_t i = 0; i < items.size(); i++)
-            {
-                auto cuckoo_item = items[i].value();
-                bool insertionSuccess = cuckoo->insert(cuckoo_item);
-                if (!insertionSuccess)
-                {
-                    string msg = "Cuckoo hashing failed";
-                    Log::error("%s: current element: %i", msg.c_str(), i);
-                    throw logic_error(msg);
-                }
-            }
-
-            return cuckoo;
-        }
-
-        vector<size_t> Receiver::cuckoo_indices(const vector<Item> &items, kuku::KukuTable &cuckoo)
-        {
-            // This is the true size of the table; a multiple of slot_count_
-            size_t padded_cuckoo_capacity = ((cuckoo.table_size() + slot_count_ - 1) / slot_count_) * slot_count_;
-
-            vector<size_t> indices(padded_cuckoo_capacity, -size_t(1));
-            auto &table = cuckoo.table();
-
-            for (size_t i = 0; i < items.size(); i++)
-            {
-                auto cuckoo_item = items[i].value();
-                auto q = cuckoo.query(cuckoo_item);
-
-                Log::debug("cuckoo_indices: Setting indices at location: %i to: %i", q.location(), i);
-                indices[q.location()] = i;
-
-                if (!are_equal_item(cuckoo_item, table[q.location()]))
-                    throw runtime_error("items[i] different from encodings[q.location()]");
-            }
-            return indices;
-        }
-
-        void Receiver::ffield_encoding(KukuTable &cuckoo, FFieldArray &ret)
-        {
-            size_t item_bit_count = get_params().item_bit_length_used_after_oprf();
-            Log::debug("item bit count before decoding: %i", item_bit_count);
-
-            // oprf? depends
-            auto &encodings = cuckoo.table();
-
-            Log::debug("bit count of ptxt modulus = %i", ret.field().characteristic().bit_count());
-
-            for (size_t i = 0; i < cuckoo.table_size(); i++)
-            {
-                ret.set(i, Item(encodings[i]).to_ffield_element(ret.field(), item_bit_count));
-            }
-
-            auto empty_field_item = Item(cuckoo.empty_item()).to_ffield_element(ret.field(), item_bit_count);
-            for (size_t i = cuckoo.table_size(); i < ret.size(); i++)
-            {
-                ret.set(i, empty_field_item);
-            }
-        }
-
-        void Receiver::generate_powers(const FFieldArray &ffield_items, map<uint64_t, FFieldArray> &result)
-        {
-            uint64_t split_size =
-                (get_params().sender_bin_size() + get_params().split_count() - 1) / get_params().split_count();
-            uint32_t window_size = get_params().window_size();
-            uint32_t radix = 1 << window_size;
-
-            // todo: this bound needs to be re-visited.
-            uint64_t max_supported_degree = static_cast<uint64_t>(get_params().max_supported_degree());
-
-            // find the bound by enumerating
-            uint64_t bound = static_cast<uint64_t>(split_size);
-            while (bound > 0 && util::maximal_power(max_supported_degree, bound, radix) >= split_size)
-            {
-                bound--;
-            }
-            bound++;
-
-            Log::debug(
-                "Generate powers: split_size %i, window_size %i, radix %i, bound %i", split_size, window_size, radix,
-                bound);
-
-            FFieldArray current_power = ffield_items;
-            for (uint64_t j = 0; j < static_cast<uint64_t>(bound); j++)
-            {
-                result.emplace(1ULL << (window_size * j), current_power);
-                for (uint32_t i = 2; i < radix; i++)
-                {
-                    if (i * (1ULL << (window_size * j)) > static_cast<uint64_t>(split_size))
-                    {
-                        return;
-                    }
-                    result.emplace(
-                        i * (1ULL << (window_size * j)),
-                        result.at((i - 1) * (1ULL << (window_size * j))) * current_power);
-                }
-                for (uint32_t k = 0; k < window_size; k++)
-                {
-                    current_power.sq();
-                }
-            }
-        }
-
-        void Receiver::encrypt(map<uint64_t, FFieldArray> &input, map<uint64_t, vector<string>> &destination)
-        {
-            size_t count = 0;
-            destination.clear();
-            for (auto it = input.begin(); it != input.end(); it++)
-            {
-                encrypt(it->second, destination[it->first]);
-                count += (it->second.size() + static_cast<size_t>(slot_count_) - 1) / static_cast<size_t>(slot_count_);
-            }
-            Log::debug("Receiver sending %i ciphertexts", count);
-        }
-
-        void Receiver::encrypt(const FFieldArray &input, vector<string> &destination)
-        {
-            size_t batch_size = slot_count_;
-            size_t num_of_batches = (input.size() + batch_size - 1) / batch_size;
-            vector<uint64_t> integer_batch(batch_size, 0);
-            destination.clear();
-            destination.reserve(num_of_batches);
-
-            auto local_pool = MemoryManager::GetPool(mm_prof_opt::FORCE_NEW);
-            Plaintext plain(local_pool);
-            FFieldArray batch(batch_encoder_->create_array());
-
-            for (size_t i = 0; i < num_of_batches; i++)
-            {
-                for (size_t j = 0; j < batch_size; j++)
-                {
-                    batch.set(j, i * batch_size + j, input);
-                }
-                batch_encoder_->compose(batch, plain);
-
-                stringstream ss;
-                Serializable<Ciphertext> ser_cipher = encryptor_->encrypt_symmetric(plain, local_pool);
-                ser_cipher.save(ss, compr_mode_type::deflate);
-                destination.emplace_back(ss.str());
-
-                // note: this is not doing the setting to zero yet.
-#ifdef APSI_DEBUG
-                Log::debug(
-                    "Fresh encryption noise budget = %i",
-                    decryptor_->invariant_noise_budget([this](const string &ct_str) -> Ciphertext {
-                        Ciphertext ct_out;
-                        stringstream ss(ct_str);
-                        ct_out.load(seal_context_, ss);
-                        return ct_out;
-                    }(destination.back())));
-#endif
             }
         }
     } // namespace receiver

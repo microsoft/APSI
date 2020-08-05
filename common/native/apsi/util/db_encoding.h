@@ -184,14 +184,15 @@ namespace apsi
     /**
     Converts an item and label into a sequence of (felt_t, felt_t) pairs, where the the first pair value is a chunk of
     the item, and the second is a chunk of the label. item_bit_count denotes the bit length of the items and labels
-    (they're the same length). mod denotes the modulus of the prime field.
+    (they are the same length). mod denotes the modulus of the prime field.
     */
-    AlgItemLabel<felt_t> algebraize_item_label(Item &item, FullWidthLabel &label, size_t item_bit_count, Modulus& mod);
+    AlgItemLabel<felt_t> algebraize_item_label(
+        Item &item, FullWidthLabel &label, std::size_t item_bit_count, const seal::Modulus &mod);
 
     /**
     Converts an item into a sequence of (felt_t, monostate) pairs, where the the first pair value is a chunk of the
-    item, and the second is the unit type. item_bit_count denotes the bit length of the items and labels (they're the
+    item, and the second is the unit type. item_bit_count denotes the bit length of the items and labels (they are the
     same length). mod denotes the modulus of the prime field. mod denotes the modulus of the prime field.
     */
-    AlgItemLabel<monostate> algebraize_item(Item &item, size_t item_bit_count, Modulus &mod);
+    AlgItemLabel<monostate> algebraize_item(Item &item, std::size_t item_bit_count, const seal::Modulus &mod);
 } // namespace apsi
