@@ -62,6 +62,7 @@ namespace apsi
             size_t save_to_message(const vector<SEAL_BYTE> &obj, message_t &msg)
             {
                 msg.add_raw(obj.data(), obj.size());
+                return obj.size();
             }
 
             vector<SEAL_BYTE> get_client_id(const message_t &msg)
@@ -152,7 +153,7 @@ namespace apsi
             message_t msg;
 
             bytes_sent += save_to_message(sop_header, msg);
-            bytes_sent += save_to_message(sop, msg);
+            bytes_sent += save_to_message(*sop, msg);
 
             send_message(msg);
             bytes_sent_ += bytes_sent;
@@ -281,7 +282,7 @@ namespace apsi
             save_to_message(sop_response->client_id, msg);
 
             bytes_sent += save_to_message(sop_header, msg);
-            bytes_sent += save_to_message(sop_response->sop_response, msg);
+            bytes_sent += save_to_message(*sop_response->sop_response, msg);
 
             send_message(msg);
             bytes_sent_ += bytes_sent;
@@ -380,7 +381,7 @@ namespace apsi
             // Add the client_id as the first part
             save_to_message(rp->client_id, msg);
 
-            size_t bytes_sent = save_to_message(rp->rp, msg);
+            size_t bytes_sent = save_to_message(*rp->rp, msg);
 
             send_message(msg);
             bytes_sent_ += bytes_sent;
