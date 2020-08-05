@@ -1,8 +1,11 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "apsi/util/stopwatch.h"
+// STD
 #include <sstream>
+
+// APSI
+#include "apsi/util/stopwatch.h"
 
 using namespace std;
 

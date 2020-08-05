@@ -3,6 +3,7 @@
 
 #pragma once
 
+// STD
 #include <chrono>
 #include <list>
 #include <map>
@@ -11,6 +12,7 @@
 #include <ostream>
 #include <string>
 #include <vector>
+#include <cstdint>
 
 // Macro Magic to generate unique variable names. This is used for the
 // STOPWATCH macro.
