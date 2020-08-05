@@ -119,14 +119,14 @@ namespace apsi
                 for (size_t i = 0; i < size - j; i++)
                 {
                     // numerator = DD[i + 1][j - 1] - DD[i][j - 1]
-                    uint64_t numerator = sub_uint64_mod(
+                    uint64_t numerator = sub_uint_mod(
                         divided_differences[i + 1][j - 1],
                         divided_differences[i][j - 1],
                         mod
                     );
 
                     // denominator = points[i + j] - points[i]
-                    uint64_t denominator = sub_uint64_mod(points[i + j], points[i], mod);
+                    uint64_t denominator = sub_uint_mod(points[i + j], points[i], mod);
 
                     // DD[i][j] = numerator / denominator
                     uint64_t inv_denominator;
@@ -162,13 +162,13 @@ namespace apsi
             for (size_t i = size-1; i > 0; i--)
             {
                 // P += [y₀, ..., yᵢ]
-                result[0] = add_uint64_mod(result[0], divided_differences[0][i], mod);
+                result[0] = add_uint_mod(result[0], divided_differences[0][i], mod);
                 // P *= (x - xᵢ₋₁)
                 polyn_mul_monic_monomial_inplace(result, points[i-1], mod);
             }
 
             // Add the last constant term [y₀]
-            result[0] = add_uint64_mod(result[0], divided_differences[0][0], mod);
+            result[0] = add_uint_mod(result[0], divided_differences[0][0], mod);
 
             return result;
         }

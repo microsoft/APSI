@@ -54,9 +54,7 @@ namespace apsi
         class SenderOperationResponseParms final : public SenderOperationResponse
         {
         public:
-            SenderOperationResponseParms(PSIParams params) :
-                params(std::make_unique<PSIParams>(std::move(params))), SenderOperationResponse()
-            {}
+            SenderOperationResponseParms() = default;
 
             ~SenderOperationResponseParms() = default;
 
@@ -81,9 +79,7 @@ namespace apsi
         class SenderOperationResponseOPRF final : public SenderOperationResponse
         {
         public:
-            SenderOperationResponseOPRF(std::vector<seal::SEAL_BYTE> data) :
-                data(std::move(data)), SenderOperationResponse()
-            {}
+            SenderOperationResponseOPRF() = default;
 
             ~SenderOperationResponseOPRF() = default;
 
@@ -108,9 +104,7 @@ namespace apsi
         class SenderOperationResponseQuery final : public SenderOperationResponse
         {
         public:
-            SenderOperationResponseQuery(std::uint32_t package_count) :
-                package_count(package_count), SenderOperationResponse()
-            {}
+            SenderOperationResponseQuery() = default;
 
             ~SenderOperationResponseQuery() = default;
 

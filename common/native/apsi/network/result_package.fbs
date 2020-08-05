@@ -1,11 +1,9 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-namespace apsi.network.fbs;
+include "ciphertext.fbs";
 
-table Ciphertext {
-    data:[ubyte] (required);
-}
+namespace apsi.network.fbs;
 
 table ResultPackage {
     bundle_idx:uint32;

@@ -22,6 +22,8 @@ using namespace seal::util;
 
 namespace apsi
 {
+    using namespace logging;
+
     namespace network
     {
         size_t ResultPackage::save(ostream &out) const

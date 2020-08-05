@@ -205,12 +205,12 @@ namespace apsi
 
                 bytes[0] = static_cast<SEAL_BYTE>( num & 0x00000000000000FFULL);
                 bytes[1] = static_cast<SEAL_BYTE>((num & 0x000000000000FF00ULL) >> 8);
-                bytes[2] = static_cast<SEAL_BYTE( (num & 0x0000000000FF0000ULL) >> 16);
-                bytes[3] = static_cast<SEAL_BYTE( (num & 0x00000000FF000000ULL) >> 24);
-                bytes[4] = static_cast<SEAL_BYTE( (num & 0x000000FF00000000ULL) >> 32);
-                bytes[5] = static_cast<SEAL_BYTE( (num & 0x0000FF0000000000ULL) >> 40);
-                bytes[6] = static_cast<SEAL_BYTE( (num & 0x00FF000000000000ULL) >> 48);
-                bytes[7] = static_cast<SEAL_BYTE( (num & 0xFF00000000000000ULL) >> 56);
+                bytes[2] = static_cast<SEAL_BYTE>((num & 0x0000000000FF0000ULL) >> 16);
+                bytes[3] = static_cast<SEAL_BYTE>((num & 0x00000000FF000000ULL) >> 24);
+                bytes[4] = static_cast<SEAL_BYTE>((num & 0x000000FF00000000ULL) >> 32);
+                bytes[5] = static_cast<SEAL_BYTE>((num & 0x0000FF0000000000ULL) >> 40);
+                bytes[6] = static_cast<SEAL_BYTE>((num & 0x00FF000000000000ULL) >> 48);
+                bytes[7] = static_cast<SEAL_BYTE>((num & 0xFF00000000000000ULL) >> 56);
 
                 return bytes;
             }

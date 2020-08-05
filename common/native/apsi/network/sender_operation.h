@@ -108,8 +108,7 @@ namespace apsi
         class SenderOperationOPRF final : public SenderOperation
         {
         public:
-            SenderOperationOPRF(std::vector<seal::SEAL_BYTE> data) : data(std::move(data)), SenderOperation()
-            {}
+            SenderOperationOPRF() = default;
 
             ~SenderOperationOPRF() = default;
 
@@ -134,13 +133,7 @@ namespace apsi
         class SenderOperationQuery final : public SenderOperation
         {
         public:
-            SenderOperationQuery(
-                SEALObject<seal::RelinKeys> relin_keys,
-                std::map<std::uint32_t, std::vector<SEALObject<seal::Ciphertext>>> data) :
-                relin_keys(std::move(relin_keys)),
-                data(std::move(data)),
-                SenderOperation()
-            {}
+            SenderOperationQuery() = default;
 
             ~SenderOperationQuery() = default;
 
