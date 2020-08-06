@@ -301,14 +301,14 @@ namespace apsi
             uint32_t max_num_bits = mul_safe(bits_per_felt, safe_cast<uint32_t>(felts.size()));
             if (bit_count > max_num_bits)
             {
-                throw logic_error("bit_count exceeds the max number of bits the input holds");
+                throw invalid_argument("bit_count exceeds the max number of bits the input holds");
             }
 
             // Sanity check that `bit_count` is within a field element's size from the total number of bits. Using `bit_count`
             // to omit an entire field element is nasty and unnecessary.
             if (bit_count <= max_num_bits - bits_per_felt)
             {
-                throw logic_error("bit_count causes conversion to ignore entire field elements");
+                throw invalid_argument("bit_count causes conversion to ignore entire field elements");
             }
 
             // The bitstring buffer. This will be part of the return value. The number of bytes is ⌈bit_count / 8⌉
@@ -357,7 +357,7 @@ namespace apsi
             // The number of field elements necessary to represent both these values MUST be the same
             if (alg_item.size() != alg_label.size())
             {
-                throw logic_error("items must take up as many slots as labels");
+                throw invalid_argument("items must take up as many slots as labels");
             }
 
             // Convert pair of vector to vector of pairs
