@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <utility>
 
 // Kuku
 #include "kuku/common.h"
@@ -173,24 +174,21 @@ namespace apsi
         Item() : value_({ 0, 0 })
         {}
 
+        Item(std::array<std::uint64_t, 2> value) : value_(std::move(value))
+        {}
+
         Item(const Item &) = default;
 
-        /**
-        Constructs an item by hashing the uint64_t array and using 'item_bit_count_' bits of the hash.
-        */
-        Item(std::uint64_t *pointer);
+        Item(Item &&) = default;
 
-        /**
-        Constructs an item by hashing the string and using 'item_bit_count_' bits of the hash.
-        */
-        Item(const std::string &str);
+        Item &operator =(const Item &item) = default;
 
-        /**
-        Constructs a short item (without hashing) by using 'item_bit_count_' bits of the specified uint64_t value.
-        */
-        Item(std::uint64_t item);
+        Item &operator =(Item &&item) = default;
 
-        Item(const kuku::item_type &item);
+        Item(const std::string &str)
+        {
+            operator =(str);
+        }
 
         /**
         Returns the BitstringView representing this Item's data
@@ -210,14 +208,6 @@ namespace apsi
                 reinterpret_cast<const seal::SEAL_BYTE*>(data()), sizeof(Item));
             return { bytestring_view, item_bit_count };
         }
-
-        Item &operator=(const Item &assign) = default;
-
-        Item &operator=(const std::string &assign);
-
-        Item &operator=(std::uint64_t assign);
-
-        Item &operator=(const kuku::item_type &assign);
 
         bool operator==(const Item &other) const
         {

@@ -23,40 +23,6 @@ using namespace kuku;
 
 namespace apsi
 {
-    Item::Item(uint64_t *pointer)
-    {
-        value_[0] = pointer[0];
-        value_[1] = pointer[1];
-    }
-
-    Item::Item(const string &str)
-    {
-        operator=(str);
-    }
-
-    Item::Item(uint64_t item)
-    {
-        operator=(item);
-    }
-
-    Item &Item::operator=(uint64_t assign)
-    {
-        value_[0] = assign;
-        value_[1] = 0;
-        return *this;
-    }
-
-    Item &Item::operator=(const item_type &assign)
-    {
-        value_ = assign;
-        return *this;
-    }
-
-    Item::Item(const item_type &item)
-    {
-        operator=(item);
-    }
-
     uint32_t Item::muladd(uint32_t item[4], uint32_t mul, uint32_t add)
     {
         uint64_t temp = 0;

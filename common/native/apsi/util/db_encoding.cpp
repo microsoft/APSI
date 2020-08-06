@@ -224,6 +224,11 @@ namespace apsi
         */
         vector<felt_t> bits_to_field_elts(BitstringView<const seal::SEAL_BYTE> bits, const Modulus &mod)
         {
+            if (mod.is_zero())
+            {
+                throw invalid_argument("mod cannot be zero");
+            }
+
             // This is the largest n such that 2ⁿ ≤ mod < 2ⁿ⁺¹. We'll pack n bits into each field element.
             uint32_t bits_per_felt = static_cast<uint32_t>(mod.bit_count() - 1);
 
@@ -280,6 +285,15 @@ namespace apsi
         */
         Bitstring field_elts_to_bits(gsl::span<const felt_t> felts, uint32_t bit_count, const Modulus &mod)
         {
+            if (felts.empty())
+            {
+                throw invalid_argument("felts cannot be empty");
+            }
+            if (mod.is_zero())
+            {
+                throw invalid_argument("mod cannot be zero");
+            }
+
             // This is the largest n such that 2ⁿ ≤ mod < 2ⁿ⁺¹. We'll pack n bits into each field element.
             uint32_t bits_per_felt = static_cast<uint32_t>(mod.bit_count() - 1);
 
@@ -343,7 +357,7 @@ namespace apsi
             // The number of field elements necessary to represent both these values MUST be the same
             if (alg_item.size() != alg_label.size())
             {
-                throw logic_error("Items must take up as many slots as labels");
+                throw logic_error("items must take up as many slots as labels");
             }
 
             // Convert pair of vector to vector of pairs

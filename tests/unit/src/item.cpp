@@ -1,10 +1,13 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "apsi/item.h"
+// STD
 #include <cstdint>
+
+// APSI
+#include "apsi/item.h"
+
 #include "gtest/gtest.h"
-#include "utils.h"
 
 using namespace std;
 using namespace apsi;
