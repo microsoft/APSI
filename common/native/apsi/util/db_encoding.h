@@ -42,12 +42,17 @@ namespace apsi
         /**
         Converts the given bitstring to a sequence of field elements (modulo `mod`).
         */
-        std::vector<felt_t> bits_to_field_elts(const BitstringView<const seal::SEAL_BYTE> &bits, const seal::Modulus &mod);
+        std::vector<felt_t> bits_to_field_elts(BitstringView<const seal::SEAL_BYTE> bits, const seal::Modulus &mod);
+
+        /**
+        Converts the given bitstring to a sequence of field elements (modulo `mod`).
+        */
+        std::vector<felt_t> bits_to_field_elts(BitstringView<seal::SEAL_BYTE> bits, const seal::Modulus &mod);
 
         /**
         Converts the given field elements (modulo `mod`) to a bitstring.
         */
-        Bitstring field_elts_to_bits(gsl::span<const felt_t> felts, const seal::Modulus &mod);
+        Bitstring field_elts_to_bits(gsl::span<const felt_t> felts, std::uint32_t bit_count, const seal::Modulus &mod);
 
         /**
         Converts an item and label into a sequence of (felt_t, felt_t) pairs, where the the first pair value is a chunk of

@@ -3,7 +3,7 @@
 
 target_sources(unit_tests
     PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/bit_copy_test.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/db_encoding.cpp
         ${CMAKE_CURRENT_LIST_DIR}/channel_tests.cpp
         ${CMAKE_CURRENT_LIST_DIR}/csvreader_tests.cpp
         ${CMAKE_CURRENT_LIST_DIR}/interpolate_tests.cpp

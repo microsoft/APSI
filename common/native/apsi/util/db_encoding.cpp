@@ -186,7 +186,7 @@ namespace apsi
             */
             felt_t read_felt_little_endian(const array<SEAL_BYTE, 8> &bytes)
             {
-                felt_t val;
+                felt_t val = 0;
                 val |= static_cast<felt_t>(bytes[0]);
                 val |= static_cast<felt_t>(bytes[1]) << 8;
                 val |= static_cast<felt_t>(bytes[2]) << 16;
@@ -222,7 +222,7 @@ namespace apsi
         /**
         Converts the given bitstring to a sequence of field elements (modulo `mod`)
         */
-        vector<felt_t> bits_to_field_elts(const BitstringView<const seal::SEAL_BYTE> &bits, const Modulus &mod)
+        vector<felt_t> bits_to_field_elts(BitstringView<const seal::SEAL_BYTE> bits, const Modulus &mod)
         {
             // This is the largest n such that 2ⁿ ≤ mod < 2ⁿ⁺¹. We'll pack n bits into each field element.
             uint32_t bits_per_felt = static_cast<uint32_t>(mod.bit_count() - 1);
@@ -245,7 +245,7 @@ namespace apsi
             for (size_t j = 0; j < num_felts; j++)
             {
                 // Make a byte array representing the field element. A felt_t is 8 SEAL_BYTE's
-                array<SEAL_BYTE, 8> dst_felt_repr;
+                array<SEAL_BYTE, 8> dst_felt_repr = {};
                 gsl::span<SEAL_BYTE> dst_felt_repr_view = { dst_felt_repr.data(), 8 };
 
                 // Copy the appropriate number of bits from the current offset to the field element little-endian repr
@@ -268,6 +268,11 @@ namespace apsi
             }
 
             return felts;
+        }
+
+        vector<felt_t> bits_to_field_elts(BitstringView<SEAL_BYTE> bits, const Modulus &mod)
+        {
+            return bits_to_field_elts(BitstringView<const SEAL_BYTE>(bits), mod);
         }
 
         /**
@@ -293,7 +298,7 @@ namespace apsi
             }
 
             // The bitstring buffer. This will be part of the return value. The number of bytes is ⌈bit_count / 8⌉
-            vector<SEAL_BYTE> bit_buf((bit_count + 7) / 8);
+            vector<SEAL_BYTE> bit_buf((bit_count + 7) / 8, SEAL_BYTE(0));
             gsl::span<SEAL_BYTE> bit_buf_view(bit_buf.data(), bit_buf.size());
 
             uint32_t num_uncopied_bits = bit_count;

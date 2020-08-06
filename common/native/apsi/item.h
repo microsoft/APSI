@@ -59,7 +59,14 @@ namespace apsi
             bit_count_ = bit_count;
         }
 
-        inline bool operator==(const BitstringView<T> &rhs)
+        template<typename S>
+        BitstringView(const BitstringView<S> &view)
+        {
+            data_ = static_cast<gsl::span<S>>(view.data());
+            bit_count_ = view.bit_count();
+        }
+
+        inline bool operator==(const BitstringView<T> &rhs) const
         {
             // Check equivalence of pointers
             return (bit_count_ == rhs.bit_count_) && (data_.data() == rhs.data_.data());
@@ -114,7 +121,7 @@ namespace apsi
             bit_count_ = bit_count;
         }
 
-        inline bool operator==(const Bitstring &rhs)
+        inline bool operator==(const Bitstring &rhs) const
         {
             return (bit_count_ == rhs.bit_count_) && (data_ == rhs.data_);
         }
