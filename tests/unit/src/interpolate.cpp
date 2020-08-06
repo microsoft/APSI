@@ -1,179 +1,188 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
+// STD
 #include <random>
-#include <seal/context.h>
-#include <seal/modulus.h>
-#include <seal/util/mempool.h>
+#include <vector>
+#include <cstdint>
+#include <cstddef>
+#include <random>
+#include <numeric>
+
+// APSI
 #include "apsi/util/interpolate.h"
+#include "apsi/config.h"
+
+// SEAL
+#include "seal/context.h"
+#include "seal/modulus.h"
+#include "seal/util/uintarithsmallmod.h"
+
 #include "gtest/gtest.h"
 
-using namespace apsi;
 using namespace std;
+using namespace apsi::util;
+using namespace seal;
+using namespace seal::util;
 
 namespace APSITests
 {
-    string toString(seal::Plaintext &ptxt, size_t coeff_count = 0)
-    {
-        if (coeff_count == 0)
-        {
-            coeff_count = ptxt.coeff_count();
-        }
-
-        stringstream ss;
-        ss << "(";
-        for (size_t j = 0; j < coeff_count; j++)
-        {
-            ss << ptxt.data()[j];
-
-            if (j != coeff_count - 1)
-                ss << ", ";
-        }
-        ss << ")";
-
-        return ss.str();
-    }
-
-    // return poly(x)
     uint64_t uint64_t_poly_eval(const vector<uint64_t> &poly, const uint64_t &x, const seal::Modulus &mod)
     {
         // cout << "f(" << x << ") = ";
-        uint64_t result = 0, xx = 1;
+        uint64_t result = 0, x_pow = 1;
 
+        MultiplyUIntModOperand x_mod_op;
+        x_mod_op.set(x, mod);
         for (size_t i = 0; i < poly.size(); ++i)
         {
-            result = (result + poly[i] * xx) % mod.value();
-            xx = (xx * x) % mod.value();
+            result = add_uint_mod(result, multiply_uint_mod(poly[i], x_pow, mod), mod);
+            x_pow = multiply_uint_mod(x_pow, x_mod_op, mod);
         }
         return result;
     }
 
-    TEST(InterpolateTests, BasicFFieldInterpolate)
+    TEST(InterpolateTests, PolynWithRoots)
     {
-        seal::EncryptionParameters parms(seal::scheme_type::BFV);
-        parms.set_poly_modulus_degree(64);
-        parms.set_coeff_modulus(seal::CoeffModulus::BFVDefault(1024));
-        parms.set_plain_modulus(40961);
+        // Invalid modulus
+        Modulus mod(0);
+        ASSERT_THROW(auto poly = polyn_with_roots({}, mod), invalid_argument);
 
-        auto context = seal::SEALContext::Create(parms);
+        // Empty set of roots produces a constant 1
+        mod = 3;
+        auto poly = polyn_with_roots({}, mod);
+        ASSERT_EQ(1, poly.size());
+        ASSERT_EQ(1, poly[0]);
 
-        int degree = 2;
-        auto plain_modulus = context->first_context_data()->parms().plain_modulus();
-        uint64_t numPoints = min<uint64_t>(3, plain_modulus.value() / degree);
-        int numTrials = 10;
+        // Single root (0)
+        poly = polyn_with_roots({ 0 }, mod);
+        ASSERT_EQ(2, poly.size());
+        ASSERT_EQ(0, poly[0]);
+        ASSERT_EQ(1, poly[1]);
 
-        FField field(parms.plain_modulus(), degree);
-        FFieldArray points(static_cast<size_t>(numPoints), field);
-        FFieldArray values(static_cast<size_t>(numPoints), field);
-        FFieldArray result(static_cast<size_t>(numPoints), field);
+        // Single root (1)
+        poly = polyn_with_roots({ 1 }, mod);
+        ASSERT_EQ(2, poly.size());
+        ASSERT_EQ(2, poly[0]);
+        ASSERT_EQ(1, poly[1]);
 
-        for (size_t j = 0; j < points.size(); j++)
-        {
-            for (int k = 0; k < degree; k++)
-            {
-                // random points
-                points.set_coeff_of(j, k, (j * degree + k) % plain_modulus.value());
-                values.set_coeff_of(j, k, (j * degree + k) % plain_modulus.value());
-            }
-        }
+        // Single root (-1)
+        poly = polyn_with_roots({ 2 }, mod);
+        ASSERT_EQ(2, poly.size());
+        ASSERT_EQ(1, poly[0]);
+        ASSERT_EQ(1, poly[1]);
 
-        ffield_newton_interpolate_poly(points, values, result);
+        // Repeated root (0)
+        poly = polyn_with_roots({ 0, 0 }, mod);
+        ASSERT_EQ(3, poly.size());
+        ASSERT_EQ(0, poly[0]);
+        ASSERT_EQ(0, poly[1]);
+        ASSERT_EQ(1, poly[2]);
 
-        // Check the result: interpolating (x,x) should result in polynomial coeffs (0,1,0,...,0)
-        // vector<uint64_t> tempresult(points.size());
-        for (int k = 0; k < degree; k++)
-        {
-            for (size_t j = 0; j < points.size(); ++j)
-            {
-                if (j != 1 && result.get_coeff_of(j, k) != 0)
-                {
-                    FAIL();
-                }
-                if (j == 1 && result.get_coeff_of(j, k) != 1)
-                {
-                    FAIL();
-                }
-            }
-        }
+        // Repeated root (1)
+        poly = polyn_with_roots({ 1, 1 }, mod);
+        ASSERT_EQ(3, poly.size());
+        ASSERT_EQ(1, poly[0]);
+        ASSERT_EQ(1, poly[1]);
+        ASSERT_EQ(1, poly[2]);
 
-        // Next: interpolate zero
-        for (size_t j = 0; j < points.size(); j++)
-        {
-            for (int k = 0; k < degree; k++)
-            {
-                // random points
-                points.set_coeff_of(j, k, (j * degree + k) % plain_modulus.value());
-                values.set_coeff_of(j, k, 0);
-            }
-        }
+        // Two roots
+        poly = polyn_with_roots({ 0, 1 }, mod);
+        ASSERT_EQ(3, poly.size());
+        ASSERT_EQ(0, poly[0]);
+        ASSERT_EQ(2, poly[1]);
+        ASSERT_EQ(1, poly[2]);
 
-        // interpolate zero poly
-        ffield_newton_interpolate_poly(points, values, result);
+        poly = polyn_with_roots({ 1, 0 }, mod);
+        ASSERT_EQ(3, poly.size());
+        ASSERT_EQ(0, poly[0]);
+        ASSERT_EQ(2, poly[1]);
+        ASSERT_EQ(1, poly[2]);
 
-        // Check the result: interpolating (x,0) should result in zero polynomial.
-        // vector<uint64_t> tempresult(points.size());
-        for (int k = 0; k < degree; k++)
-        {
-            for (size_t j = 0; j < points.size(); ++j)
-            {
-                if (result.get_coeff_of(j, k) != 0)
-                {
-                    FAIL();
-                }
-            }
-        }
+        // Three roots
+        poly = polyn_with_roots({ 0, 1, 2 }, mod);
+        ASSERT_EQ(4, poly.size());
+        ASSERT_EQ(0, poly[0]);
+        ASSERT_EQ(2, poly[1]);
+        ASSERT_EQ(0, poly[2]);
+        ASSERT_EQ(1, poly[3]);
     }
 
-    TEST(InterpolateTests, FFieldInterpolate)
+    TEST(InterpolateTests, NewtonInterpolatePolyn)
     {
-        int degree = 2;
-        seal::Modulus plain_modulus(40961);
-        uint64_t numPoints = min<uint64_t>(3, plain_modulus.value() / degree);
-        int numTrials = 10;
+        Modulus mod(3);
 
-        FField field(plain_modulus, degree);
-        FFieldArray points(static_cast<size_t>(numPoints), field);
-        FFieldArray values(static_cast<size_t>(numPoints), field);
-        FFieldArray result(static_cast<size_t>(numPoints), field);
+        // Invalid number of points/values
+        ASSERT_THROW(auto poly = newton_interpolate_polyn({}, {}, mod), invalid_argument);
+        ASSERT_THROW(auto poly = newton_interpolate_polyn({ 0 }, {}, mod), invalid_argument);
+        ASSERT_THROW(auto poly = newton_interpolate_polyn({ }, { 0 }, mod), invalid_argument);
 
-        random_device rd;
+        // Invalid modulus (not a prime)
+        mod = 0;
+        ASSERT_THROW(auto poly = newton_interpolate_polyn({ 0 }, { 0 }, mod), invalid_argument);
+        mod = 4;
+        ASSERT_THROW(auto poly = newton_interpolate_polyn({ 0 }, { 0 }, mod), invalid_argument);
 
-        for (int i = 0; i < numTrials; ++i)
-        {
-            for (size_t j = 0; j < points.size(); j++)
+        // Reset mod to a valid value
+        mod = 3;
+#ifdef APSI_DEBUG
+        // Should throw an exception in debug mode when all values are zero
+        ASSERT_THROW(auto poly = newton_interpolate_polyn({ 0 }, { 0 }, mod), invalid_argument);
+        ASSERT_THROW(auto poly = newton_interpolate_polyn({ 1 }, { 0 }, mod), invalid_argument);
+        ASSERT_THROW(auto poly = newton_interpolate_polyn({ 1, 2 }, { 0, 0 }, mod), invalid_argument);
+#endif
+        // Compatible repeated roots
+        ASSERT_THROW(auto poly = newton_interpolate_polyn({ 1, 2, 1 }, { 1, 0, 1 }, mod), logic_error);
+
+        // Incompatible repeated roots
+        ASSERT_THROW(auto poly = newton_interpolate_polyn({ 1, 2, 1 }, { 1, 0, 2 }, mod), logic_error);
+
+        // Single interpolation point
+        auto poly = newton_interpolate_polyn({ 0 }, { 1 }, mod);
+        ASSERT_EQ(1, poly.size());
+        ASSERT_EQ(1, poly[0]);
+
+        poly = newton_interpolate_polyn({ 0 }, { 2 }, mod);
+        ASSERT_EQ(1, poly.size());
+        ASSERT_EQ(2, poly[0]);
+
+        // Two interpolation points
+        poly = newton_interpolate_polyn({ 0, 1 }, { 0, 1 }, mod);
+        ASSERT_EQ(2, poly.size());
+        ASSERT_EQ(0, poly[0]);
+        ASSERT_EQ(1, poly[1]);
+
+        poly = newton_interpolate_polyn({ 0, 1 }, { 1, 0 }, mod);
+        ASSERT_EQ(2, poly.size());
+        ASSERT_EQ(1, poly[0]);
+        ASSERT_EQ(2, poly[1]);
+
+        poly = newton_interpolate_polyn({ 0, 1 }, { 1, 2 }, mod);
+        ASSERT_EQ(2, poly.size());
+        ASSERT_EQ(1, poly[0]);
+        ASSERT_EQ(1, poly[1]);
+
+        // Sample random values for each value in [0, mod)
+        auto random_interp = [](Modulus mod) {
+            random_device rd;
+            auto u = uniform_int_distribution<uint64_t>(0, mod.value() - 1);
+            vector<uint64_t> points(mod.value());
+            iota(points.begin(), points.end(), 0);
+            vector<uint64_t> values;
+            generate_n(back_inserter(values), points.size(), [&]() { return u(rd); });
+
+            // Interpolate and check the result
+            auto poly = newton_interpolate_polyn(points, values, mod);
+            ASSERT_EQ(mod.value(), poly.size());
+            for (auto x : points)
             {
-                for (int k = 0; k < degree; k++)
-                {
-                    // random points
-                    points.set_coeff_of(j, k, rd() % plain_modulus.value());
-                    values.set_coeff_of(j, k, (j * degree + k) % plain_modulus.value());
-                }
+                ASSERT_EQ(uint64_t_poly_eval(poly, x, mod), values[x]);
             }
+        };
 
-            ffield_newton_interpolate_poly(points, values, result);
-
-            // Check the result
-            vector<uint64_t> tempresult(points.size());
-            for (int k = 0; k < degree; k++)
-            {
-                for (size_t j = 0; j < points.size(); ++j)
-                {
-                    tempresult[j] = result.get_coeff_of(j, k);
-                }
-                for (size_t j = 0; j < points.size(); ++j)
-                {
-                    uint64_t x = points.get_coeff_of(j, k);
-                    uint64_t y = values.get_coeff_of(j, k);
-
-                    auto yy = uint64_t_poly_eval(tempresult, x, plain_modulus);
-                    if (yy != y)
-                    {
-                        cout << " poly(x[" << i << "]) = " << yy << "  != \n"
-                             << "y[" << i << "] = " << y << endl;
-                        FAIL();
-                    }
-                }
-            }
-        }
+        random_interp(7);
+        random_interp(13);
+        random_interp(23);
+        random_interp(101);
     }
 } // namespace APSITests

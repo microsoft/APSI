@@ -4,9 +4,11 @@
 // STD
 #include <cstddef>
 #include <stdexcept>
+#include <algorithm>
 
 // APSI
 #include "apsi/util/interpolate.h"
+#include "apsi/config.h"
 
 // SEAL
 #include "seal/util/uintarithsmallmod.h"
@@ -23,7 +25,7 @@ namespace apsi
         Multiplies the given polynomial P with the monomial x - a, where a is given. Polynomial coefficients are expected
         to be in degree-ascending order, i.e., polyn[0] is the constant term.
         */
-        void polyn_mul_monic_monomial_inplace(vector<uint64_t> &polyn, uint64_t a, const seal::Modulus &mod)
+        void polyn_mul_monic_monomial_inplace(vector<uint64_t> &polyn, uint64_t a, const Modulus &mod)
         {
             /**
             Do the multiplication coefficient-wise. If P = [c₀, ..., cᵣ], then
@@ -39,11 +41,12 @@ namespace apsi
             polyn.push_back(0);
 
             uint64_t neg_a = negate_uint_mod(a, mod);
+
             // We don't have to make an intermediate copy of the coefficients if we proceed from right to left
-            for (size_t i = polyn.size()-1; i > 0; i--)
+            for (size_t i = polyn.size() - 1; i > 0; i--)
             {
                 // Let cᵢ = cᵢ₋₁ - a*cᵢ
-                polyn[i] = multiply_add_uint_mod(polyn[i-1], neg_a, polyn[i], mod);
+                polyn[i] = multiply_add_uint_mod(polyn[i], neg_a, polyn[i - 1], mod);
             }
 
             // Do the new c₀ manually, since it doesn't fit the above formula (i-1 goes out of bounds)
@@ -51,33 +54,58 @@ namespace apsi
         }
 
         /**
+        Given a set of distinct field elements a₁, ..., aₛ, returns the coefficients of the unique monic polynoimial P with
+        roots a₁, ..., aₛ. Concretely, P = (x-a₁)*...*(x-aₛ).
+        The returned coefficients are in degree-ascending order. That is, polyn[0] is the constant term.
+        */
+        vector<uint64_t> polyn_with_roots(const vector<uint64_t> &roots, const Modulus &mod)
+        {
+            if (mod.is_zero())
+            {
+                throw invalid_argument("mod cannot be zero");
+            }
+
+            // Start with P = 1 = 1 + 0x + 0x^2 + ...
+            vector<uint64_t> polyn;
+            polyn.reserve(roots.size() + 1);
+            polyn.push_back(1);
+
+            // For every root a, let P *= (x - a)
+            for (const uint64_t &root : roots)
+            {
+                polyn_mul_monic_monomial_inplace(polyn, root, mod);
+            }
+
+            return polyn;
+        }
+
+        /**
         Returns the Newton interpolation of the given points and values. Specifically, this function returns the
-        coefficients of a polynomial P in degree-ascending, where P(pointᵢ) valueᵢ for all i.
+        coefficients of a polynomial P in degree-ascending order, where P(pointᵢ) valueᵢ for all i.
         */
         vector<uint64_t> newton_interpolate_polyn(
             const vector<uint64_t> &points,
             const vector<uint64_t> &values,
-            const seal::Modulus &mod
+            const Modulus &mod
         ) {
-#ifdef APSI_DEBUG
+            if (points.empty())
+            {
+                throw invalid_argument("no points to interpolate on");
+            }
             if (points.size() != values.size())
             {
-                throw invalid_argument("incompatible array sizes");
+                throw invalid_argument("number of values does not match the number of interpolation points");
             }
-
+            if (!mod.is_prime())
+            {
+                throw invalid_argument("mod must be prime");
+            }
+#ifdef APSI_DEBUG
             /**
             Sanity check. Nobody should be using this function with all-0 labels. The Newton polynomial for all-0 points is
             the 0 polynomial, and that's almost certainly not the desired output.
             */
-            bool all_zeros = true;
-            for (val : values)
-            {
-                if (val != 0)
-                {
-                    all_zeros = false;
-                }
-            }
-
+            bool all_zeros = all_of(values.cbegin(), values.cend(), [](auto a) { return a == 0; });
             if (all_zeros)
             {
                 throw invalid_argument(
@@ -91,7 +119,10 @@ namespace apsi
             divided_differences.reserve(size);
             for (size_t i = 0; i < size; i++)
             {
-                divided_differences.push_back( vector{values[i]} );
+                vector<uint64_t> inner;
+                inner.reserve(size - i);
+                inner.push_back(values[i]);
+                divided_differences.push_back(move(inner));
             }
 
             /**
@@ -132,9 +163,11 @@ namespace apsi
                     uint64_t inv_denominator;
                     if (!try_invert_uint_mod(denominator, mod, inv_denominator))
                     {
-                        throw logic_error("tried to interpolate with repeated values");
+                        throw logic_error("tried to interpolate at repeated points");
                     }
-                    divided_differences[i][j] = multiply_uint_mod(numerator, inv_denominator, mod);
+
+                    // Push as divided_differences[i][j]
+                    divided_differences[i].push_back(multiply_uint_mod(numerator, inv_denominator, mod));
                 }
             }
 
@@ -171,28 +204,6 @@ namespace apsi
             result[0] = add_uint_mod(result[0], divided_differences[0][0], mod);
 
             return result;
-        }
-
-
-        /**
-        Given a set of distinct field elements a₁, ..., aₛ, returns the coefficients of the unique monic polynoimial P with
-        roots a₁, ..., aₛ. Concretely, P = (x-a₁)*...*(x-aₛ).
-        The returned coefficients are in degree-ascending order. That is, polyn[0] is the constant term.
-        */
-        vector<uint64_t> polyn_with_roots(vector<uint64_t> &roots, const seal::Modulus &mod)
-        {
-            // Start with P = 1 = 1 + 0x + 0x^2 + ...
-            vector<uint64_t> polyn;
-            polyn.reserve(roots.size()+1);
-            polyn.push_back(1);
-
-            // For every root a, let P *= (x - a)
-            for (const uint64_t &root : roots)
-            {
-                polyn_mul_monic_monomial_inplace(polyn, root, mod);
-            }
-
-            return polyn;
         }
     }
 } // namespace apsi
