@@ -106,7 +106,7 @@ namespace apsi
             fbs::OPRFResponseBuilder oprf_response(fbs_builder);
 
             // Set up a vector to hold the response data
-            auto oprf_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(data.data()), data.size());
+            auto oprf_data = fbs_builder.CreateVector(reinterpret_cast<const uint8_t*>(data.data()), data.size());
             oprf_response.add_data(oprf_data);
 
             auto resp = oprf_response.Finish();

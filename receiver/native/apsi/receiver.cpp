@@ -36,7 +36,6 @@ using namespace kuku;
 
 namespace apsi
 {
-    using namespace logging;
     using namespace util;
     using namespace network;
     using namespace oprf;
@@ -155,7 +154,7 @@ namespace apsi
         void Receiver::initialize()
         {
             STOPWATCH(recv_stop_watch, "Receiver::initialize");
-            Log::info("Initializing Receiver");
+            APSI_LOG_INFO("Initializing Receiver");
 
             if (!params_)
             {
@@ -168,12 +167,12 @@ namespace apsi
             // Create new keys
             reset_keys();
 
-            Log::info("Receiver initialized");
+            APSI_LOG_INFO("Receiver initialized");
         }
 
         vector<SEAL_BYTE> Receiver::obfuscate_items(const vector<Item> &items)
         {
-            Log::info("Obfuscating items");
+            APSI_LOG_INFO("Obfuscating items");
 
             vector<SEAL_BYTE> oprf_query;
             oprf_query.resize(items.size() * oprf_query_size);
@@ -184,7 +183,7 @@ namespace apsi
 
         vector<Item> Receiver::deobfuscate_items(const vector<SEAL_BYTE> &oprf_response)
         {
-            Log::info("Deobfuscating items");
+            APSI_LOG_INFO("Deobfuscating items");
 
             vector<Item> items;
             oprf_receiver_->process_responses(oprf_response, items);
@@ -197,7 +196,7 @@ namespace apsi
             const vector<Item> &items, unordered_map<size_t, size_t> &table_idx_to_item_idx)
         {
             STOPWATCH(recv_stop_watch, "Receiver::create_query");
-            Log::info("Receiver starting creating query");
+            APSI_LOG_INFO("Receiver starting creating query");
 
             if (!is_initialized())
             {
@@ -230,7 +229,8 @@ namespace apsi
                     // so we throw and exception.
                     if (cuckoo.is_empty_item(cuckoo.leftover_item()))
                     {
-                        Log::info("Skipping repeated insertion of items[" << item_idx << "]: " << item);
+                        APSI_LOG_INFO(
+                            "Skipping repeated insertion of items[" << item_idx << "]: " << item);
                     }
                     else
                     {
@@ -287,7 +287,7 @@ namespace apsi
             unique_ptr<SenderOperation> sop_query =
                 make_unique<SenderOperationQuery>(relin_keys_, move(encrypted_powers));
 
-            Log::info("Receiver done creating query");
+            APSI_LOG_INFO("Receiver done creating query");
 
             return sop_query;
         }
@@ -295,7 +295,7 @@ namespace apsi
         vector<MatchRecord> Receiver::query(const vector<Item> &items, Channel &chl)
         {
             STOPWATCH(recv_stop_watch, "Receiver::Query");
-            Log::info("Receiver starting query");
+            APSI_LOG_INFO("Receiver starting query");
 
             // This will contain the result of the OPRF query
             vector<Item> oprf_items;
@@ -303,7 +303,7 @@ namespace apsi
             // First run an OPRF query 
             {
                 STOPWATCH(recv_stop_watch, "Receiver::OPRF");
-                Log::info("OPRF processing");
+                APSI_LOG_INFO("OPRF processing");
 
                 // Send OPRF query to Sender
                 vector<SEAL_BYTE> oprf_query_data = obfuscate_items(items);

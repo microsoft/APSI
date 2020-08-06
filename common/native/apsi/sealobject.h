@@ -69,12 +69,12 @@ namespace apsi
 
         bool is_local() const
         {
-            return local_;
+            return !!local_;
         }
 
         bool is_serializable() const
         {
-            return serializable_;
+            return !!serializable_;
         }
 
         void set(T &&value)

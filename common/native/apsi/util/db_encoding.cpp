@@ -5,8 +5,11 @@
 #include <array>
 #include <stdexcept>
 
-// APSi
+// APSI
 #include "apsi/util/db_encoding.h"
+
+// SEAL
+#include "seal/util/common.h"
 
 using namespace std;
 using namespace seal;
@@ -159,7 +162,7 @@ namespace apsi
                     }
                     else
                     {
-                        uint32 low_diff = diff - high_diff;
+                        uint32_t low_diff = diff - high_diff;
 
                         SEAL_BYTE low_mask = static_cast<SEAL_BYTE>((uint32_t(1) << low_diff) - 1);
                         SEAL_BYTE low = src[src_begin] >> src_offset;
@@ -222,11 +225,11 @@ namespace apsi
         vector<felt_t> bits_to_field_elts(const BitstringView<const seal::SEAL_BYTE> &bits, const Modulus &mod)
         {
             // This is the largest n such that 2ⁿ ≤ mod < 2ⁿ⁺¹. We'll pack n bits into each field element.
-            uint32_t bits_per_elt = static_cast<uint32_t>(mod.bit_count() - 1);
+            uint32_t bits_per_felt = static_cast<uint32_t>(mod.bit_count() - 1);
 
             // The number of field elements necessary to represent all the bits:
-            // ⌈bit_count / bits_per_elt⌉ = ⌊(bit_count + bits_per_elt-1) / bits_per_elt⌋
-            uint32_t num_felts = (bits.bit_count() + bits_per_elt - 1) / bits_per_elt;
+            // ⌈bit_count / bits_per_felt⌉ = ⌊(bit_count + bits_per_felt-1) / bits_per_felt⌋
+            uint32_t num_felts = (bits.bit_count() + bits_per_felt - 1) / bits_per_felt;
 
             // The return value
             vector<felt_t> felts;
@@ -235,7 +238,7 @@ namespace apsi
             // The underlying data of the bitstring
             gsl::span<const SEAL_BYTE> src_data = bits.data();
 
-            // Repeatedly convert `bits_per_elt` many bits into a field element (a felt_t), and push that to the return
+            // Repeatedly convert `bits_per_felt` many bits into a field element (a felt_t), and push that to the return
             // vector.
             uint32_t num_uncopied_bits = bits.bit_count();
             uint32_t src_offset = 0;
@@ -246,15 +249,16 @@ namespace apsi
                 gsl::span<SEAL_BYTE> dst_felt_repr_view = { dst_felt_repr.data(), 8 };
 
                 // Copy the appropriate number of bits from the current offset to the field element little-endian repr
-                uint32_t copy_size = min(bits_per_elt, num_uncopied_bits);
+                uint32_t copy_size = min(bits_per_felt, num_uncopied_bits);
                 copy_with_bit_offset(
                     src_data,
                     src_offset,
                     copy_size,
-                    dst_felt_repr_view,
+                    dst_felt_repr_view
                 );
+
                 // Read the little-endian repr into the element
-                felt_t dst_felt = read_felt_little_endian(dst_felt_repr)
+                felt_t dst_felt = read_felt_little_endian(dst_felt_repr);
 
                 // Push the field element
                 felts.push_back(dst_felt);
@@ -272,9 +276,10 @@ namespace apsi
         Bitstring field_elts_to_bits(gsl::span<const felt_t> felts, uint32_t bit_count, const Modulus &mod)
         {
             // This is the largest n such that 2ⁿ ≤ mod < 2ⁿ⁺¹. We'll pack n bits into each field element.
-            uint32_t bits_per_elt = static_cast<uint32_t>(mod.bit_count() - 1);
+            uint32_t bits_per_felt = static_cast<uint32_t>(mod.bit_count() - 1);
 
             // Sanity check that `bit_count` isn't more than the field elements hold
+            uint32_t max_num_bits = mul_safe(bits_per_felt, safe_cast<uint32_t>(felts.size()));
             if (bit_count > max_num_bits)
             {
                 throw logic_error("bit_count exceeds the max number of bits the input holds");
@@ -282,8 +287,7 @@ namespace apsi
 
             // Sanity check that `bit_count` is within a field element's size from the total number of bits. Using `bit_count`
             // to omit an entire field element is nasty and unnecessary.
-            uint32_t max_num_bits = bits_per_elt * felts.size();
-            if (bit_count <= max_num_bits - bits_per_elt)
+            if (bit_count <= max_num_bits - bits_per_felt)
             {
                 throw logic_error("bit_count causes conversion to ignore entire field elements");
             }
@@ -300,7 +304,7 @@ namespace apsi
                 array<SEAL_BYTE, 8> felt_bytes = write_felt_little_endian(felt);
 
                 // Copy part (or the whole) of the field element into the appropriate position of the buffer
-                uint32_t copy_size = min(bits_per_elt, num_uncopied_bits);
+                uint32_t copy_size = min(bits_per_felt, num_uncopied_bits);
                 copy_with_bit_offset(
                     felt_bytes,
                     0,          // src_offset
@@ -341,7 +345,7 @@ namespace apsi
             AlgItemLabel<felt_t> ret;
             for (size_t i = 0; i < alg_item.size(); i++)
             {
-                ret.emplace_back({ alg_item[i], alg_label[i] });
+                ret.emplace_back(make_pair(alg_item[i], alg_label[i]));
             }
 
             return ret;
@@ -361,7 +365,7 @@ namespace apsi
             AlgItemLabel<monostate> ret;
             for (size_t i = 0; i < alg_item.size(); i++)
             {
-                ret.emplace_back({ alg_item[i], monostate{} });
+                ret.emplace_back(make_pair(alg_item[i], monostate{}));
             }
 
             return ret;

@@ -22,8 +22,6 @@ using namespace seal::util;
 
 namespace apsi
 {
-    using namespace logging;
-
     namespace network
     {
         size_t ResultPackage::save(ostream &out) const
@@ -169,29 +167,25 @@ namespace apsi
 
             Plaintext temp;
             crypto_context.decryptor()->decrypt(psi_result, temp);
-            if (LOG_LEVEL_IS_DEBUG)
-            {
-                Log::info(
-                    "PSI result noise budget: %i bits",
-                    crypto_context.decryptor()->invariant_noise_budget(psi_result));
-            }
+            APSI_LOG_DEBUG(
+                "PSI result noise budget: " <<
+                crypto_context.decryptor()->invariant_noise_budget(psi_result) << " bits");
 
             crypto_context.encoder()->decode(temp, plain_rp.psi_result);
 
             for (const auto &ct : label_result)
             {
                 crypto_context.decryptor()->decrypt(ct, temp);
-                if (LOG_LEVEL_IS_DEBUG)
-                {
-                    Log::info(
-                        "Label result noise budget: %i bits",
-                        crypto_context.decryptor()->invariant_noise_budget(ct));
-                }
+                APSI_LOG_DEBUG(
+                    "Label result noise budget: " <<
+                    crypto_context.decryptor()->invariant_noise_budget(ct) << " bits");
 
                 vector<uint64_t> temp_label;
                 crypto_context.encoder()->decode(temp, temp_label);
                 plain_rp.label_result.push_back(move(temp_label));
             }
+
+            return plain_rp;
         }
     }
 }

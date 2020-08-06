@@ -28,13 +28,13 @@ namespace apsi
 {
     namespace util
     {
-        CSVReader::CSVReader(const PSIParams &params, const string &file_name) : file_name_(file_name)
+        CSVReader::CSVReader() : file_name_("")
+        {}
+
+        CSVReader::CSVReader(const string &file_name) : file_name_(file_name)
         {
             throw_if_file_not_present();
         }
-
-        CSVReader::CSVReader(const PSIParams &params) : file_name_("")
-        {}
 
         void CSVReader::read(
             istream &stream, vector<Item> &items, vector<FullWidthLabel> &labels) const
