@@ -67,11 +67,11 @@ endfunction()
 
 # In Debug mode, enable extra compiler flags.
 if(APSI_DEBUG)
-  enable_cxx_compiler_flag_if_supported("-Wall")
-  enable_cxx_compiler_flag_if_supported("-Wextra")
-  enable_cxx_compiler_flag_if_supported("-Wconversion")
-  enable_cxx_compiler_flag_if_supported("-Wshadow")
-  enable_cxx_compiler_flag_if_supported("-pedantic")
+  #enable_cxx_compiler_flag_if_supported("-Wall")
+  #enable_cxx_compiler_flag_if_supported("-Wextra")
+  #enable_cxx_compiler_flag_if_supported("-Wconversion")
+  #enable_cxx_compiler_flag_if_supported("-Wshadow")
+  #enable_cxx_compiler_flag_if_supported("-pedantic")
 endif()
 
 # Required files and directories

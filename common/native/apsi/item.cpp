@@ -23,63 +23,32 @@ using namespace kuku;
 
 namespace apsi
 {
-    Item::Item(uint64_t *pointer)
+    namespace
     {
-        value_[0] = pointer[0];
-        value_[1] = pointer[1];
-    }
+        uint32_t muladd(uint32_t item[4], uint32_t mul, uint32_t add)
+        {
+            uint64_t temp = 0;
 
-    Item::Item(const string &str)
-    {
-        operator=(str);
-    }
+            temp = static_cast<uint64_t>(item[0]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(add);
+            item[0] = static_cast<uint32_t>(temp);
 
-    Item::Item(uint64_t item)
-    {
-        operator=(item);
-    }
+            temp = static_cast<uint64_t>(item[1]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(temp >> 32);
+            item[1] = static_cast<uint32_t>(temp);
 
-    Item &Item::operator=(uint64_t assign)
-    {
-        value_[0] = assign;
-        value_[1] = 0;
-        return *this;
-    }
+            temp = static_cast<uint64_t>(item[2]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(temp >> 32);
+            item[2] = static_cast<uint32_t>(temp);
 
-    Item &Item::operator=(const item_type &assign)
-    {
-        value_ = assign;
-        return *this;
-    }
+            temp = static_cast<uint64_t>(item[3]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(temp >> 32);
+            item[3] = static_cast<uint32_t>(temp);
 
-    Item::Item(const item_type &item)
-    {
-        operator=(item);
-    }
-
-    uint32_t Item::muladd(uint32_t item[4], uint32_t mul, uint32_t add)
-    {
-        uint64_t temp = 0;
-
-        temp = static_cast<uint64_t>(item[0]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(add);
-        item[0] = static_cast<uint32_t>(temp);
-
-        temp = static_cast<uint64_t>(item[1]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(temp >> 32);
-        item[1] = static_cast<uint32_t>(temp);
-
-        temp = static_cast<uint64_t>(item[2]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(temp >> 32);
-        item[2] = static_cast<uint32_t>(temp);
-
-        temp = static_cast<uint64_t>(item[3]) * static_cast<uint64_t>(mul) + static_cast<uint64_t>(temp >> 32);
-        item[3] = static_cast<uint32_t>(temp);
-
-        return static_cast<uint32_t>(temp >> 32);
+            return static_cast<uint32_t>(temp >> 32);
+        }
     }
 
     void Item::parse(const string &input, uint32_t base)
     {
         if (base != 10 && base != 16)
-            throw invalid_argument("Only base 10 and 16 are supported.");
+            throw invalid_argument("only base 10 and 16 are supported.");
 
         // Use 32 bit numbers so we can handle overflow easily
         uint32_t item[4] = { 0 };
@@ -99,7 +68,7 @@ namespace apsi
             rem = muladd(item, base, static_cast<uint32_t>(hex_to_nibble(chr)));
             if (rem != 0)
             {
-                throw invalid_argument("Input represents more than 128 bits");
+                throw invalid_argument("input represents more than 128 bits");
             }
         }
 

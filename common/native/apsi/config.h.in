@@ -10,3 +10,6 @@
 
 // Are we in debug mode?
 #cmakedefine APSI_DEBUG
+
+// Are we using Log4cplus for logging?
+#cmakedefine APSI_USE_LOG4CPLUS

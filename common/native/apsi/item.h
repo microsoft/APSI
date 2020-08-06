@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <utility>
 
 // Kuku
 #include "kuku/common.h"
@@ -40,18 +41,18 @@ namespace apsi
             // Sanity check: bit_count cannot be 0
             if (!bit_count)
             {
-                throw std::logic_error("bit_count must be positive");
+                throw std::invalid_argument("bit_count must be positive");
             }
             // Sanity check: bit_count cannot exceed underlying data length
             if (data.size() * 8 < bit_count)
             {
-                throw std::logic_error("bit_count exceeds the data length");
+                throw std::invalid_argument("bit_count exceeds the data length");
             }
             // Sanity check: bit_count should not be more than 7 bits from the total length. If you want that, use a
             // smaller vector
             if (bit_count <= (data.size() - 1) * 8)
             {
-                throw std::logic_error("bit_count is at least a whole byte less than the underlying data length");
+                throw std::invalid_argument("bit_count is at least a whole byte less than the underlying data length");
             }
 
             // Now move
@@ -59,7 +60,14 @@ namespace apsi
             bit_count_ = bit_count;
         }
 
-        inline bool operator==(const BitstringView<T> &rhs)
+        template<typename S>
+        BitstringView(const BitstringView<S> &view)
+        {
+            data_ = static_cast<gsl::span<S>>(view.data());
+            bit_count_ = view.bit_count();
+        }
+
+        inline bool operator==(const BitstringView<T> &rhs) const
         {
             // Check equivalence of pointers
             return (bit_count_ == rhs.bit_count_) && (data_.data() == rhs.data_.data());
@@ -95,18 +103,18 @@ namespace apsi
             // Sanity check: bit_count cannot be 0
             if (!bit_count)
             {
-                throw std::logic_error("bit_count must be positive");
+                throw std::invalid_argument("bit_count must be positive");
             }
             // Sanity check: bit_count cannot exceed underlying data length
             if (data.size() * 8 < bit_count)
             {
-                throw std::logic_error("bit_count exceeds the data length");
+                throw std::invalid_argument("bit_count exceeds the data length");
             }
             // Sanity check: bit_count should not be more than 7 bits from the total length. If you want that, use
             // a smaller vector
             if (bit_count <= (data.size() - 1) * 8)
             {
-                throw std::logic_error("bit_count is at least a whole byte less than the underlying data length");
+                throw std::invalid_argument("bit_count is at least a whole byte less than the underlying data length");
             }
 
             // Now move
@@ -114,7 +122,7 @@ namespace apsi
             bit_count_ = bit_count;
         }
 
-        inline bool operator==(const Bitstring &rhs)
+        inline bool operator==(const Bitstring &rhs) const
         {
             return (bit_count_ == rhs.bit_count_) && (data_ == rhs.data_);
         }
@@ -166,24 +174,21 @@ namespace apsi
         Item() : value_({ 0, 0 })
         {}
 
+        Item(std::array<std::uint64_t, 2> value) : value_(std::move(value))
+        {}
+
         Item(const Item &) = default;
 
-        /**
-        Constructs an item by hashing the uint64_t array and using 'item_bit_count_' bits of the hash.
-        */
-        Item(std::uint64_t *pointer);
+        Item(Item &&) = default;
 
-        /**
-        Constructs an item by hashing the string and using 'item_bit_count_' bits of the hash.
-        */
-        Item(const std::string &str);
+        Item &operator =(const Item &item) = default;
 
-        /**
-        Constructs a short item (without hashing) by using 'item_bit_count_' bits of the specified uint64_t value.
-        */
-        Item(std::uint64_t item);
+        Item &operator =(Item &&item) = default;
 
-        Item(const kuku::item_type &item);
+        Item(const std::string &str)
+        {
+            operator =(str);
+        }
 
         /**
         Returns the BitstringView representing this Item's data
@@ -204,27 +209,14 @@ namespace apsi
             return { bytestring_view, item_bit_count };
         }
 
-        Item &operator=(const Item &assign) = default;
-
-        Item &operator=(const std::string &assign);
-
-        Item &operator=(std::uint64_t assign);
-
-        Item &operator=(const kuku::item_type &assign);
-
         bool operator==(const Item &other) const
         {
             return value_ == other.value_;
         }
 
-        std::uint64_t &operator[](std::size_t i)
+        std::uint64_t &operator[](std::size_t word_index)
         {
-            return value_[i];
-        }
-
-        const std::uint64_t &operator[](std::size_t i) const
-        {
-            return value_[i];
+            return value_[word_index];
         }
 
         std::uint64_t *data()
@@ -247,20 +239,14 @@ namespace apsi
             return value_;
         }
 
-        uint32_t muladd(uint32_t item[4], uint32_t mul, uint32_t add);
-
         /**
-        Parse the current item from a string.
-
-        The parser supports only base 10 and base 16 strings.
-        When parsing a base 16 string, do _not_ include a preceding '0x'.
+        Parses the current item from a string. The parser supports only base 10 and base 16 strings. When parsing a base
+        16 string, do _not_ include a preceding '0x'.
         */
         void parse(const std::string &input, std::uint32_t base);
 
         /**
-        Parse the current item from a string.
-
-        If the string starts with '0x', it will be considered hexadecimal.
+        Parses the current item from a string. If the string starts with '0x', it will be considered hexadecimal.
         Otherwise it will be considered base 10.
         */
         void parse(const std::string &input);
