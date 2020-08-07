@@ -24,22 +24,22 @@ namespace apsi
     namespace util
     {
         /**
-        Convert the given input to digits
+        Convert the given input to digits.
         */
         std::vector<std::uint64_t> conversion_to_digits(const std::uint64_t input, const std::uint64_t base);
 
         /**
-        Split the given string
+        Split the given string.
         */
         void split(const std::string &s, const char delim, std::vector<std::string> &elems);
 
         /**
-        Split the given string
+        Split the given string.
         */
         std::vector<std::string> split(const std::string &s, const char delim);
 
         /**
-        Round up the given value using the given step
+        Round up the given value using the given step.
         */
         template <typename T>
         typename std::enable_if<std::is_pod<T>::value, T>::type round_up_to(const T val, const T step)
@@ -65,7 +65,7 @@ namespace apsi
             partition_count = std::min(count, partition_count);
 
             std::vector<std::pair<T, T>> partitions;
-            partitions.reserve(min(count, partition_count) + 1);
+            partitions.reserve(std::min(count, partition_count) + 1);
 
             // May be zero
             T per_partition = count / partition_count;
@@ -99,6 +99,9 @@ namespace apsi
         */
         std::vector<seal::SEAL_BYTE> read_from_stream(std::istream &in);
 
-        extern Stopwatch sender_stop_watch, recv_stop_watch;
+        /**
+        Global Stopwatch objects for sender and receiver to use.
+        */
+        extern Stopwatch sender_stopwatch, recv_stopwatch;
     } // namespace util
 } // namespace apsi

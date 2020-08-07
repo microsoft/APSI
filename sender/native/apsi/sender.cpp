@@ -128,7 +128,7 @@ namespace apsi
                 throw logic_error("SenderDB is not set");
             }
 
-            STOPWATCH(sender_stop_watch, "Sender::query");
+            STOPWATCH(sender_stopwatch, "Sender::query");
             Log::info("Start processing query");
 
             // Create the session context; we don't have to re-create the SEALContext every time
@@ -223,7 +223,7 @@ namespace apsi
             Channel &chl,
             function<void(Channel &, unique_ptr<ResultPackage>)> send_fun)
         {
-            STOPWATCH(sender_stop_watch, "Sender::query_worker");
+            STOPWATCH(sender_stopwatch, "Sender::query_worker");
 
             uint32_t bundle_idx_start = bundle_idx_bounds.first;
             uint32_t bundle_idx_end = bundle_idx_bounds.second;

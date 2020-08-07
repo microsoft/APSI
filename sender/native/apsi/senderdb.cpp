@@ -198,7 +198,7 @@ namespace apsi
                 size_t begin_bundle_idx,
                 size_t end_bundle_idx,
             ) {
-                STOPWATCH(sender_stop_watch, "LabeledSenderDB::add_data_worker");
+                STOPWATCH(sender_stopwatch, "LabeledSenderDB::add_data_worker");
 
                 // Iteratively insert each item-label pair at the given cuckoo index
                 for (auto &data_with_idx : data_with_indices)
@@ -304,7 +304,7 @@ namespace apsi
         */
         void LabeledSenderDB::add_data(const std::map<Item, FullWidthLabel> &data, size_t thread_count)
         {
-            STOPWATCH(sender_stop_watch, "LabeledSenderDB::add_data");
+            STOPWATCH(sender_stopwatch, "LabeledSenderDB::add_data");
 
             // Lock the database for writing
             auto lock = db_lock_.acquire_write();
@@ -333,7 +333,7 @@ namespace apsi
         */
         void UnlabeledSenderDB::add_data(const std::map<Item, monostate> &data, size_t thread_count)
         {
-            STOPWATCH(sender_stop_watch, "LabeledSenderDB::add_data");
+            STOPWATCH(sender_stopwatch, "LabeledSenderDB::add_data");
 
             // Lock the database for writing
             auto lock = db_lock_.acquire_write();

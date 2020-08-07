@@ -153,7 +153,7 @@ namespace apsi
 
         void Receiver::initialize()
         {
-            STOPWATCH(recv_stop_watch, "Receiver::initialize");
+            STOPWATCH(recv_stopwatch, "Receiver::initialize");
             APSI_LOG_INFO("Initializing Receiver");
 
             if (!params_)
@@ -195,7 +195,7 @@ namespace apsi
         unique_ptr<SenderOperation> Receiver::create_query(
             const vector<Item> &items, unordered_map<size_t, size_t> &table_idx_to_item_idx)
         {
-            STOPWATCH(recv_stop_watch, "Receiver::create_query");
+            STOPWATCH(recv_stopwatch, "Receiver::create_query");
             APSI_LOG_INFO("Receiver starting creating query");
 
             if (!is_initialized())
@@ -294,7 +294,7 @@ namespace apsi
 
         vector<MatchRecord> Receiver::query(const vector<Item> &items, Channel &chl)
         {
-            STOPWATCH(recv_stop_watch, "Receiver::Query");
+            STOPWATCH(recv_stopwatch, "Receiver::Query");
             APSI_LOG_INFO("Receiver starting query");
 
             // This will contain the result of the OPRF query
@@ -302,7 +302,7 @@ namespace apsi
 
             // First run an OPRF query 
             {
-                STOPWATCH(recv_stop_watch, "Receiver::OPRF");
+                STOPWATCH(recv_stopwatch, "Receiver::OPRF");
                 APSI_LOG_INFO("OPRF processing");
 
                 // Send OPRF query to Sender
@@ -311,7 +311,7 @@ namespace apsi
 
                 unique_ptr<SenderOperationResponse> response;
                 {
-                    STOPWATCH(recv_stop_watch, "Receiver::OPRF::wait_response");
+                    STOPWATCH(recv_stopwatch, "Receiver::OPRF::wait_response");
 
                     // Wait for a valid message of the correct type
                     while (!(response = chl.receive_response(SenderOperationType::SOP_OPRF)));
@@ -332,7 +332,7 @@ namespace apsi
             // Wait for query response
             unique_ptr<SenderOperationResponse> response;
             {
-                STOPWATCH(recv_stop_watch, "Receiver::Query::wait_response");
+                STOPWATCH(recv_stopwatch, "Receiver::Query::wait_response");
 
                 // Wait for a valid message of the correct type
                 while (!(response = chl.receive_response(SenderOperationType::SOP_QUERY)));
@@ -368,7 +368,7 @@ namespace apsi
             const unordered_map<size_t, size_t> &table_idx_to_item_idx,
             Channel &chl) const
         {
-            STOPWATCH(recv_stop_watch, "Receiver::result_package_worker");
+            STOPWATCH(recv_stopwatch, "Receiver::result_package_worker");
 
             while (package_count--)
             {

@@ -188,7 +188,7 @@ void print_timing_info(Stopwatch& stopwatch, const string& caption)
 
 void print_timing_info()
 {
-    print_timing_info(recv_stop_watch, "Timing events for Receiver");
+    print_timing_info(recv_stopwatch, "Timing events for Receiver");
 }
 
 void print_transmitted_data(Channel& channel)
