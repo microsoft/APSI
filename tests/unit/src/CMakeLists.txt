@@ -8,7 +8,7 @@ target_sources(unit_tests
         ${CMAKE_CURRENT_LIST_DIR}/csvreader.cpp
         ${CMAKE_CURRENT_LIST_DIR}/interpolate.cpp
         ${CMAKE_CURRENT_LIST_DIR}/item.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/oprf_tests.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/oprf.cpp
         ${CMAKE_CURRENT_LIST_DIR}/stopwatch.cpp
         ${CMAKE_CURRENT_LIST_DIR}/stream_channel.cpp
         ${CMAKE_CURRENT_LIST_DIR}/unit_tests_runner.cpp
