@@ -88,13 +88,9 @@ namespace apsi
         class SenderOperationParms final : public SenderOperation
         {
         public:
-            SenderOperationParms() = default;
-
-            ~SenderOperationParms() = default;
-
             std::size_t save(std::ostream &out) const override;
 
-            std::size_t load(std::istream &in, std::shared_ptr<seal::SEALContext> context) override;
+            std::size_t load(std::istream &in, std::shared_ptr<seal::SEALContext> context = nullptr) override;
 
             SenderOperationType type() const noexcept override
             {
@@ -108,13 +104,9 @@ namespace apsi
         class SenderOperationOPRF final : public SenderOperation
         {
         public:
-            SenderOperationOPRF() = default;
-
-            ~SenderOperationOPRF() = default;
-
             std::size_t save(std::ostream &out) const override;
 
-            std::size_t load(std::istream &in, std::shared_ptr<seal::SEALContext> context) override;
+            std::size_t load(std::istream &in, std::shared_ptr<seal::SEALContext> context = nullptr) override;
 
             SenderOperationType type() const noexcept override
             {
@@ -133,10 +125,6 @@ namespace apsi
         class SenderOperationQuery final : public SenderOperation
         {
         public:
-            SenderOperationQuery() = default;
-
-            ~SenderOperationQuery() = default;
-
             std::size_t save(std::ostream &out) const override;
 
             std::size_t load(std::istream &in, std::shared_ptr<seal::SEALContext> context) override;

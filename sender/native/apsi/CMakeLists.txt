@@ -9,8 +9,6 @@ target_sources(sender
         ${CMAKE_CURRENT_LIST_DIR}/senderdispatcher.cpp
 )
 
-add_subdirectory(network)
-
 install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/binbundle.h

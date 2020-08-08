@@ -37,41 +37,41 @@ namespace apsi
             /**
             Destroy an instance of a StreamChannel.
             */
-            virtual ~StreamChannel()
+            ~StreamChannel()
             {}
 
             /**
             Send a SenderOperation to the sender.
             */
-            virtual void send(std::unique_ptr<SenderOperation> sop) override;
+            void send(std::unique_ptr<SenderOperation> sop) override;
 
             /**
             Receive a SenderOperation from a receiver.
             */
-            virtual std::unique_ptr<SenderOperation> receive_operation(
+            std::unique_ptr<SenderOperation> receive_operation(
                 std::shared_ptr<seal::SEALContext> context,
                 SenderOperationType expected = SenderOperationType::SOP_UNKNOWN) override;
 
             /**
             Send a SenderOperationResponse to the receiver.
             */
-            virtual void send(std::unique_ptr<SenderOperationResponse> sop_response) override;
+            void send(std::unique_ptr<SenderOperationResponse> sop_response) override;
 
             /**
             Receive a SenderOperationResponse from a sender.
             */
-            virtual std::unique_ptr<SenderOperationResponse> receive_response(
+            std::unique_ptr<SenderOperationResponse> receive_response(
                 SenderOperationType expected = SenderOperationType::SOP_UNKNOWN) override;
 
             /**
             Send a ResultPackage to a receiver.
             */
-            virtual void send(std::unique_ptr<ResultPackage> rp) override;
+            void send(std::unique_ptr<ResultPackage> rp) override;
 
             /**
             Receive a ResultPackage from a sender.
             */
-            virtual std::unique_ptr<ResultPackage> receive_result_package(
+            std::unique_ptr<ResultPackage> receive_result_package(
                 std::shared_ptr<seal::SEALContext> context) override;
 
         protected:

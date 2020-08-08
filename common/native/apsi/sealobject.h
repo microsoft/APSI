@@ -28,6 +28,10 @@ namespace apsi
     class SEALObject
     {
     public:
+        using SerializableType = typename seal::Serializable<T>;
+
+        using LocalType = T;
+
         SEALObject() = default;
 
         SEALObject(SEALObject &&source) = default;
@@ -40,16 +44,17 @@ namespace apsi
             serializable_.reset();
             if (assign.is_local() && !assign.is_serializable())
             {
-                local_ = std::make_unique<T>(*assign.local_);
+                local_ = std::make_unique<LocalType>(*assign.local_);
             }
             else if (!assign.is_local() && assign.is_serializable())
             {
-                serializable_ = std::make_unique<seal::Serializable<T>>(*assign.serializable_);
+                serializable_ = std::make_unique<SerializableType>(*assign.serializable_);
             }
             else if (assign.is_local() && assign.is_serializable())
             {
                 throw std::invalid_argument("source is in an invalid state");
             }
+            return *this;
         }
 
         SEALObject(const SEALObject &source)
@@ -57,12 +62,12 @@ namespace apsi
             operator =(source);
         }
 
-        SEALObject(typename seal::Serializable<T> obj)
+        SEALObject(SerializableType obj)
         {
             set(std::move(obj));
         }
 
-        SEALObject(T obj)
+        SEALObject(LocalType obj)
         {
             set(std::move(obj));
         }
@@ -77,48 +82,48 @@ namespace apsi
             return !!serializable_;
         }
 
-        void set(T &&value)
+        void set(LocalType &&value)
         {
             serializable_.reset();
-            local_ = std::make_unique<T>(std::move(value));
+            local_ = std::make_unique<LocalType>(std::move(value));
         }
 
-        void set(const T &value)
+        void set(const LocalType &value)
         {
             serializable_.reset();
-            local_ = std::make_unique<T>(value);
+            local_ = std::make_unique<LocalType>(value);
         }
 
-        void set(seal::Serializable<T> &&value)
+        void set(SerializableType &&value)
         {
             local_.reset();
-            serializable_ = std::make_unique<T>(std::move(value));
+            serializable_ = std::make_unique<SerializableType>(std::move(value));
         }
 
-        void set(const seal::Serializable<T> &value)
+        void set(const SerializableType &value)
         {
             local_.reset();
-            serializable_ = std::make_unique<T>(value);
+            serializable_ = std::make_unique<LocalType>(value);
         }
 
-        seal::Serializable<T> extract_serializable()
+        SerializableType extract_serializable()
         {
             if (!is_serializable())
             {
                 throw std::logic_error("no serializable object to extract");
             }
-            auto ptr = std::make_unique<seal::Serializable<T>>();
+            auto ptr = std::make_unique<SerializableType>();
             std::swap(ptr, local_);
             return std::move(*ptr);
         }
 
-        T extract_local()
+        LocalType extract_local()
         {
             if (!is_local())
             {
                 throw std::logic_error("no local object to extract");
             }
-            auto ptr = std::make_unique<T>();
+            auto ptr = std::make_unique<LocalType>();
             std::swap(ptr, local_);
             return std::move(*ptr);
         }
@@ -151,13 +156,13 @@ namespace apsi
 
         std::size_t load(std::shared_ptr<seal::SEALContext> context, const seal::SEAL_BYTE *in, std::size_t size)
         {
-            set(T());
+            set(LocalType());
             return seal::util::safe_cast<std::size_t>(local_->load(std::move(context), in, size));
         }
 
     private:
-        std::unique_ptr<typename seal::Serializable<T>> serializable_ = nullptr;
+        std::unique_ptr<SerializableType> serializable_ = nullptr;
 
-        std::unique_ptr<T> local_ = nullptr;
+        std::unique_ptr<LocalType> local_ = nullptr;
     };
 }

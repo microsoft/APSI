@@ -464,5 +464,27 @@ namespace apsi
 
             return socket_;
         }
+
+        socket_type ReceiverChannel::get_socket_type()
+        {
+            return socket_type::dealer;
+        }
+
+        void ReceiverChannel::set_socket_options(socket_t *socket)
+        {
+            // Ensure messages are not dropped
+            socket->set(socket_option::receive_high_water_mark, 70000);
+        }
+
+        socket_type SenderChannel::get_socket_type()
+        {
+            return socket_type::router;
+        }
+
+        void SenderChannel::set_socket_options(socket_t *socket)
+        {
+            // Ensure messages are not dropped
+            socket->set(socket_option::send_high_water_mark, 70000);
+        }
     } // namespace network
 } // namespace apsi
