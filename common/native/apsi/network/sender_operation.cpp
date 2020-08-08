@@ -26,14 +26,10 @@ namespace apsi
         size_t SenderOperationHeader::save(ostream &out) const
         {
             flatbuffers::FlatBufferBuilder fbs_builder(128);
+
             fbs::SenderOperationHeaderBuilder sop_header_builder(fbs_builder);
-
-            // Write the version number
             sop_header_builder.add_version(version);
-
-            // Write the operation type
             sop_header_builder.add_type(static_cast<fbs::SenderOperationType>(type));
-
             auto sop_header = sop_header_builder.Finish();
             fbs_builder.FinishSizePrefixed(sop_header);
 
@@ -69,12 +65,12 @@ namespace apsi
         size_t SenderOperationParms::save(ostream &out) const
         {
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
-            fbs::SenderOperationBuilder sop_builder(fbs_builder);
 
-            sop_builder.add_request_type(fbs::Request_ParmsRequest);
             auto parms_request = fbs::CreateParmsRequest(fbs_builder);
-            sop_builder.add_request(parms_request.Union());
 
+            fbs::SenderOperationBuilder sop_builder(fbs_builder);
+            sop_builder.add_request_type(fbs::Request_ParmsRequest);
+            sop_builder.add_request(parms_request.Union());
             auto sop = sop_builder.Finish();
             fbs_builder.FinishSizePrefixed(sop);
 
@@ -121,15 +117,15 @@ namespace apsi
             }
 
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
-            fbs::SenderOperationBuilder sop_builder(fbs_builder);
 
-            sop_builder.add_request_type(fbs::Request_OPRFRequest);
             fbs::OPRFRequestBuilder oprf_request(fbs_builder);
             auto oprf_data = fbs_builder.CreateVector(reinterpret_cast<const uint8_t*>(data.data()), data.size());
             oprf_request.add_data(oprf_data);
             auto req = oprf_request.Finish();
-            sop_builder.add_request(req.Union());
 
+            fbs::SenderOperationBuilder sop_builder(fbs_builder);
+            sop_builder.add_request_type(fbs::Request_OPRFRequest);
+            sop_builder.add_request(req.Union());
             auto sop = sop_builder.Finish();
             fbs_builder.FinishSizePrefixed(sop);
 
@@ -184,16 +180,11 @@ namespace apsi
             }
 
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
-            fbs::SenderOperationBuilder sop_builder(fbs_builder);
-
-            sop_builder.add_request_type(fbs::Request_QueryRequest);
-            fbs::QueryRequestBuilder query_request(fbs_builder);
 
             vector<SEAL_BYTE> temp;
             temp.resize(relin_keys.save_size(compr_mode_type::deflate));
             auto size = relin_keys.save(temp.data(), temp.size(), compr_mode_type::deflate);
             auto relin_keys_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(temp.data()), size);
-            query_request.add_relin_keys(relin_keys_data);
 
             // This is a little tricky; each QueryRequestPart consists of an exponent and a vector of Ciphertexts. For
             // convenience, we create vectors in immediately-invoked lambdas and pass them to the CreateVector function.
@@ -236,14 +227,14 @@ namespace apsi
                 return ret;
             }());
 
-            // Add the QueryRequestParts to QueryRequest
+            fbs::QueryRequestBuilder query_request(fbs_builder);
+            query_request.add_relin_keys(relin_keys_data);
             query_request.add_query(query_request_parts);
-
-            // Finish the QueryRequest and add to SenderOperation
             auto req = query_request.Finish();
-            sop_builder.add_request(req.Union());
 
-            // Finish everything 
+            fbs::SenderOperationBuilder sop_builder(fbs_builder);
+            sop_builder.add_request_type(fbs::Request_QueryRequest);
+            sop_builder.add_request(req.Union());
             auto sop = sop_builder.Finish();
             fbs_builder.FinishSizePrefixed(sop);
 

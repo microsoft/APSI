@@ -31,10 +31,6 @@ namespace apsi
             }
 
             flatbuffers::FlatBufferBuilder fbs_builder(128);
-            fbs::SenderOperationResponseBuilder sop_response_builder(fbs_builder);
-
-            sop_response_builder.add_response_type(fbs::Response_ParmsResponse);
-            fbs::ParmsResponseBuilder parms_response(fbs_builder);
 
             // Save the parameters into a temporary string
             stringstream ss;
@@ -44,11 +40,12 @@ namespace apsi
             // Set up a vector to hold the parameter data
             auto params_data = fbs_builder.CreateVector(
                 reinterpret_cast<uint8_t*>(params_str.data()), params_str.size());
-            parms_response.add_data(params_data);
 
-            auto resp = parms_response.Finish();
+            auto resp = fbs::CreateParmsResponse(fbs_builder, params_data);
+
+            fbs::SenderOperationResponseBuilder sop_response_builder(fbs_builder);
+            sop_response_builder.add_response_type(fbs::Response_ParmsResponse);
             sop_response_builder.add_response(resp.Union());
-
             auto sop_response = sop_response_builder.Finish();
             fbs_builder.FinishSizePrefixed(sop_response);
 
@@ -100,18 +97,14 @@ namespace apsi
             }
 
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
-            fbs::SenderOperationResponseBuilder sop_response_builder(fbs_builder);
-
-            sop_response_builder.add_response_type(fbs::Response_OPRFResponse);
-            fbs::OPRFResponseBuilder oprf_response(fbs_builder);
 
             // Set up a vector to hold the response data
             auto oprf_data = fbs_builder.CreateVector(reinterpret_cast<const uint8_t*>(data.data()), data.size());
-            oprf_response.add_data(oprf_data);
+            auto resp = fbs::CreateOPRFResponse(fbs_builder, oprf_data);
 
-            auto resp = oprf_response.Finish();
+            fbs::SenderOperationResponseBuilder sop_response_builder(fbs_builder);
+            sop_response_builder.add_response_type(fbs::Response_OPRFResponse);
             sop_response_builder.add_response(resp.Union());
-
             auto sop_response = sop_response_builder.Finish();
             fbs_builder.FinishSizePrefixed(sop_response);
 
@@ -155,12 +148,12 @@ namespace apsi
         size_t SenderOperationResponseQuery::save(ostream &out) const
         {
             flatbuffers::FlatBufferBuilder fbs_builder(128);
-            fbs::SenderOperationResponseBuilder sop_response_builder(fbs_builder);
 
-            sop_response_builder.add_response_type(fbs::Response_QueryResponse);
             auto resp = fbs::CreateQueryResponse(fbs_builder, package_count);
-            sop_response_builder.add_response(resp.Union());
 
+            fbs::SenderOperationResponseBuilder sop_response_builder(fbs_builder);
+            sop_response_builder.add_response_type(fbs::Response_QueryResponse);
+            sop_response_builder.add_response(resp.Union());
             auto sop_response = sop_response_builder.Finish();
             fbs_builder.FinishSizePrefixed(sop_response);
 
