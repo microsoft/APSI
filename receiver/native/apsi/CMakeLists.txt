@@ -6,8 +6,6 @@ target_sources(receiver
         ${CMAKE_CURRENT_LIST_DIR}/receiver.cpp
 )
 
-add_subdirectory(network)
-
 install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/receiver.h

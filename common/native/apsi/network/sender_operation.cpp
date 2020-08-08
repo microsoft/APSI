@@ -118,10 +118,8 @@ namespace apsi
 
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
-            fbs::OPRFRequestBuilder oprf_request(fbs_builder);
             auto oprf_data = fbs_builder.CreateVector(reinterpret_cast<const uint8_t*>(data.data()), data.size());
-            oprf_request.add_data(oprf_data);
-            auto req = oprf_request.Finish();
+            auto req = fbs::CreateOPRFRequest(fbs_builder, oprf_data);
 
             fbs::SenderOperationBuilder sop_builder(fbs_builder);
             sop_builder.add_request_type(fbs::Request_OPRFRequest);
@@ -195,13 +193,7 @@ namespace apsi
                 vector<flatbuffers::Offset<fbs::QueryRequestPart>> ret;
                 for (const auto &q : data)
                 {
-                    // For each exponent, create a QueryRequestPart with a builder instance
-                    fbs::QueryRequestPartBuilder query_req_part_builder(fbs_builder);
-
-                    // First add the exponent
-                    query_req_part_builder.add_exponent(q.first);
-
-                    // Then add a vector of Ciphertexts
+                    // Then the vector of Ciphertexts
                     auto cts = fbs_builder.CreateVector([&]() {
                         // The Ciphertext vector is populated with an immediately-invoked lambda
                         vector<flatbuffers::Offset<fbs::Ciphertext>> ret_inner;
@@ -218,19 +210,14 @@ namespace apsi
                         return ret_inner;
                     }());
 
-                    // Add the Ciphertexts to the QueryRequestPart
-                    query_req_part_builder.add_cts(cts);
-                    
-                    // Finish the QueryRequestPart and add to QueryRequestPart vector
-                    ret.push_back(query_req_part_builder.Finish());
+                    // For each exponent, create a QueryRequestPart
+                    auto query_req_part = fbs::CreateQueryRequestPart(fbs_builder, q.first, cts);
+                    ret.push_back(query_req_part);
                 }
                 return ret;
             }());
 
-            fbs::QueryRequestBuilder query_request(fbs_builder);
-            query_request.add_relin_keys(relin_keys_data);
-            query_request.add_query(query_request_parts);
-            auto req = query_request.Finish();
+            auto req = fbs::CreateQueryRequest(fbs_builder, relin_keys_data, query_request_parts);
 
             fbs::SenderOperationBuilder sop_builder(fbs_builder);
             sop_builder.add_request_type(fbs::Request_QueryRequest);

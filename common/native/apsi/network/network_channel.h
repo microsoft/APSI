@@ -97,7 +97,7 @@ namespace apsi
             /**
             Send a SenderOperation to a sender.
             */
-            virtual void send(std::unique_ptr<SenderOperation> sop) override;
+            void send(std::unique_ptr<SenderOperation> sop) override;
 
             /**
             Receive a SenderOperation from a receiver. This call does not block if wait_for_message is false. If there
@@ -117,7 +117,7 @@ namespace apsi
             /**
             Receive a SenderOperation from a receiver.
             */
-            virtual std::unique_ptr<SenderOperation> receive_operation(
+            std::unique_ptr<SenderOperation> receive_operation(
                 std::shared_ptr<seal::SEALContext> context,
                 SenderOperationType expected = SenderOperationType::SOP_UNKNOWN) override;
 
@@ -129,12 +129,12 @@ namespace apsi
             /**
             Send a SenderOperationResponse to a receiver.
             */
-            virtual void send(std::unique_ptr<SenderOperationResponse> sop_response) override;
+            void send(std::unique_ptr<SenderOperationResponse> sop_response) override;
 
             /**
             Receive a SenderOperationResponse from a sender.
             */
-            virtual std::unique_ptr<SenderOperationResponse> receive_response(
+            std::unique_ptr<SenderOperationResponse> receive_response(
                 SenderOperationType expected = SenderOperationType::SOP_UNKNOWN) override;
 
             /**
@@ -145,12 +145,12 @@ namespace apsi
             /**
             Send a ResultPackage to a receiver.
             */
-            virtual void send(std::unique_ptr<ResultPackage> rp) override;
+            void send(std::unique_ptr<ResultPackage> rp) override;
 
             /**
             Receive a ResultPackage from a sender.
             */
-            virtual std::unique_ptr<ResultPackage> receive_result_package(
+            std::unique_ptr<ResultPackage> receive_result_package(
                 std::shared_ptr<seal::SEALContext> context) override;
 
         protected:
@@ -185,5 +185,53 @@ namespace apsi
 
             void send_message(zmqpp::message_t &msg);
         }; // class NetworkChannel
+
+        /**
+        Represents a network channel for a sender.
+        */
+        class SenderChannel : public NetworkChannel
+        {
+        public:
+            SenderChannel() = default;
+
+            ~SenderChannel()
+            {
+            }
+
+        protected:
+            /**
+            The only difference from a receiver is the socket type.
+            */
+            zmqpp::socket_type get_socket_type() override;
+
+            /**
+            The sender needs to set a couple of socket options to ensure messages are not dropped.
+            */
+            void set_socket_options(zmqpp::socket_t *socket) override;
+        };
+
+        /**
+        Represents a network channel for a receiver.
+        */
+        class ReceiverChannel : public NetworkChannel
+        {
+        public:
+            ReceiverChannel() = default;
+
+            ~ReceiverChannel()
+            {
+            }
+
+        protected:
+            /**
+            The only difference from a sender is the socket type.
+            */
+            zmqpp::socket_type get_socket_type() override;
+
+            /**
+            The receiver needs to set a couple of socket options to ensure messages are not dropped.
+            */
+            void set_socket_options(zmqpp::socket_t *socket) override;
+        };
     }      // namespace network
 } // namespace apsi
