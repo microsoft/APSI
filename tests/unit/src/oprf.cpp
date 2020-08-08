@@ -1,14 +1,20 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
+// STD
 #include <algorithm>
 #include <array>
 #include <memory>
-#include <seal/randomgen.h>
+
+// APSI
 #include "apsi/oprf/oprf_receiver.h"
 #include "apsi/oprf/oprf_sender.h"
+#include "apsi/util/utils.h"
+
+// SEAL
+#include "seal/randomgen.h"
+
 #include "gtest/gtest.h"
-#include "utils.h"
 
 using namespace std;
 using namespace seal;
@@ -70,7 +76,7 @@ namespace APSITests
         for (auto i = 0; i < item_count; i++)
         {
             Item it;
-            rng->generate(Item::item_byte_count, reinterpret_cast<SEAL_BYTE *>(it.data()));
+            rng->generate(sizeof(Item), reinterpret_cast<SEAL_BYTE *>(it.data()));
             items.emplace_back(move(it));
         }
 
@@ -106,7 +112,7 @@ namespace APSITests
         for (auto i = 0; i < item_count; i++)
         {
             Item it;
-            rng->generate(Item::item_byte_count, reinterpret_cast<SEAL_BYTE *>(it.data()));
+            rng->generate(sizeof(Item), reinterpret_cast<SEAL_BYTE *>(it.data()));
             items.emplace_back(move(it));
         }
 

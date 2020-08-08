@@ -63,11 +63,11 @@ void sigint_handler(int param)
 
     vector<string> timing_report;
     vector<Stopwatch::TimespanSummary> timings;
-    sender_stop_watch.get_timespans(timings);
+    sender_stopwatch.get_timespans(timings);
 
     if (timings.size() > 0)
     {
-        generate_timespan_report(timing_report, timings, sender_stop_watch.get_max_timespan_event_name_length());
+        generate_timespan_report(timing_report, timings, sender_stopwatch.get_max_timespan_event_name_length());
 
         Log::info("Timespan event information");
         for (const auto& timing : timing_report)
@@ -77,11 +77,11 @@ void sigint_handler(int param)
     }
 
     vector<Stopwatch::Timepoint> timepoints;
-    sender_stop_watch.get_events(timepoints);
+    sender_stopwatch.get_events(timepoints);
 
     if (timepoints.size() > 0)
     {
-        generate_event_report(timing_report, timepoints, sender_stop_watch.get_max_event_name_length());
+        generate_event_report(timing_report, timepoints, sender_stopwatch.get_max_event_name_length());
 
         Log::info("Single event information");
         for (const auto& timing : timing_report)
@@ -122,7 +122,7 @@ void run_sender_dispatcher(const CLP& cmd)
     Log::debug("coeff modulus size = %i ", bits);
 
     Log::info("OPRF for input items");
-    STOPWATCH(sender_stop_watch, "Sender::OPRF");
+    STOPWATCH(sender_stopwatch, "Sender::OPRF");
 
     shared_ptr<UniformRandomGeneratorFactory> rng_factory(make_shared<BlakePRNGFactory>());
     oprf_key = make_shared<OPRFKey>(rng_factory);

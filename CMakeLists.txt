@@ -330,7 +330,7 @@ if(NOT MSVC)
     add_library(fourq UNKNOWN IMPORTED)
     set_target_properties(fourq PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES ${THIRDPARTY_DIR}//fourq/src/FourQ_64bit_and_portable
-        IMPORTED_LOCATION ${THIRDPARTY_DIR}//fourq/src/FourQ_64bit_and_portable/libFourQ.a)
+        IMPORTED_LOCATION ${THIRDPARTY_DIR}/fourq/src/FourQ_64bit_and_portable/libFourQ.a)
 endif()
 
 # Log4cplus

@@ -27,38 +27,34 @@ namespace apsi
         size_t ResultPackage::save(ostream &out) const
         {
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
-            fbs::ResultPackageBuilder rp_builder(fbs_builder);
-
-            rp_builder.add_bundle_idx(bundle_idx);
 
             vector<SEAL_BYTE> temp;
             temp.resize(psi_result.save_size(compr_mode_type::deflate));
             auto size = psi_result.save(temp.data(), temp.size(), compr_mode_type::deflate);
             auto psi_ct_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(temp.data()), size);
             auto psi_ct = fbs::CreateCiphertext(fbs_builder, psi_ct_data);
-            rp_builder.add_psi_result(psi_ct);
 
             // There may or may not be label data
-            if (label_result.size())
-            {
-                auto label_cts = fbs_builder.CreateVector([&]() {
-                    // The Ciphertext vector is populated with an immediately-invoked lambda
-                    vector<flatbuffers::Offset<fbs::Ciphertext>> ret;
-                    for (const auto &label_ct : label_result)
-                    {
-                        // Save each seal::Ciphertext
-                        temp.resize(label_ct.save_size(compr_mode_type::deflate));
-                        size = label_ct.save(temp.data(), temp.size(), compr_mode_type::deflate);
-                        auto label_ct_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(temp.data()), size);
+            auto label_cts = fbs_builder.CreateVector([&]() {
+                // The Ciphertext vector is populated with an immediately-invoked lambda
+                vector<flatbuffers::Offset<fbs::Ciphertext>> ret;
+                for (const auto &label_ct : label_result)
+                {
+                    // Save each seal::Ciphertext
+                    temp.resize(label_ct.save_size(compr_mode_type::deflate));
+                    size = label_ct.save(temp.data(), temp.size(), compr_mode_type::deflate);
+                    auto label_ct_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(temp.data()), size);
 
-                        // Add to the Ciphertext vector
-                        ret.push_back(fbs::CreateCiphertext(fbs_builder, label_ct_data));
-                    }
-                    return ret;
-                }());
-                rp_builder.add_label_result(label_cts);
-            }
+                    // Add to the Ciphertext vector
+                    ret.push_back(fbs::CreateCiphertext(fbs_builder, label_ct_data));
+                }
+                return ret;
+            }());
 
+            fbs::ResultPackageBuilder rp_builder(fbs_builder);
+            rp_builder.add_bundle_idx(bundle_idx);
+            rp_builder.add_psi_result(psi_ct);
+            rp_builder.add_label_result(label_cts);
             auto rp = rp_builder.Finish();
             fbs_builder.FinishSizePrefixed(rp);
 

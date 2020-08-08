@@ -5,4 +5,3 @@
 
 #include "item.h"
 #include "psiparams.h"
-#include "util/sealcompress.h"
