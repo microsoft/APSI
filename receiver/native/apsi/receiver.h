@@ -15,13 +15,14 @@
 #include <type_traits>
 
 // APSI
+#include "apsi/cryptocontext.h"
 #include "apsi/item.h"
 #include "apsi/network/channel.h"
-#include "apsi/psiparams.h"
-#include "apsi/util/db_encoding.h"
-#include "apsi/cryptocontext.h"
-#include "apsi/sealobject.h"
 #include "apsi/network/result_package.h"
+#include "apsi/oprf/oprf_receiver.h"
+#include "apsi/psiparams.h"
+#include "apsi/sealobject.h"
+#include "apsi/util/db_encoding.h"
 
 // SEAL
 #include "seal/util/defines.h"
@@ -29,11 +30,6 @@
 
 namespace apsi
 {
-    namespace oprf
-    {
-        class OPRFReceiver;
-    }
-
     namespace receiver
     {
         class LabelData

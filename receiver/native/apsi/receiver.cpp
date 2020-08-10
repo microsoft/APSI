@@ -10,11 +10,8 @@
 // APSI
 #include "apsi/logging/log.h"
 #include "apsi/network/channel.h"
-#include "apsi/network/result_package.h"
-#include "apsi/oprf/oprf_receiver.h"
 #include "apsi/receiver.h"
 #include "apsi/util/utils.h"
-#include "apsi/util/db_encoding.h"
 
 // SEAL
 #include "seal/util/defines.h"
