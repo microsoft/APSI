@@ -1,11 +1,18 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-#include "apsi/oprf/ecpoint.h"
-#include <FourQ_internal.h>
+// STD
 #include <algorithm>
 #include <functional>
-#include <seal/util/blake2.h>
+
+// APSI
+#include "apsi/oprf/ecpoint.h"
+
+// FourQ
+#include "FourQ_internal.h"
+
+// SEAL
+#include "seal/util/blake2.h"
 
 using namespace std;
 using namespace seal;

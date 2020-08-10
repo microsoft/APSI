@@ -162,6 +162,10 @@ namespace apsi
 
             Ciphertext psi_result_ct = psi_result.extract_local();
             Plaintext psi_result_pt;
+            if (!crypto_context.decryptor())
+            {
+                throw runtime_error("decryptor is not configured in CryptoContext");
+            }
             crypto_context.decryptor()->decrypt(psi_result_ct, psi_result_pt);
             APSI_LOG_DEBUG(
                 "PSI result noise budget: " <<

@@ -3,14 +3,21 @@
 
 #pragma once
 
-#include <FourQ.h>
+// STD
 #include <array>
 #include <cstddef>
 #include <cstring>
-#include <gsl/span>
 #include <iostream>
 #include <memory>
-#include <seal/randomgen.h>
+
+// GSL
+#include "gsl/span"
+
+// SEAL
+#include "seal/randomgen.h"
+
+// FourQ
+#include "FourQ.h"
 
 namespace apsi
 {
@@ -29,7 +36,7 @@ namespace apsi
             using scalar_span_type = gsl::span<unsigned char, order_size>;
             using scalar_span_const_type = gsl::span<const unsigned char, order_size>;
 
-            using input_span_const_type = gsl::span<const unsigned char, gsl::dynamic_extent>;
+            using input_span_const_type = gsl::span<const unsigned char>;
 
             // Output hash size is 128 bits
             static constexpr std::size_t hash_size = 16;

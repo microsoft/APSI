@@ -5,6 +5,8 @@
 #include <cstddef>
 #include <stdexcept>
 #include <sstream>
+#include <algorithm>
+#include <iterator>
 
 // APSI
 #include "apsi/network/network_channel.h"
@@ -69,8 +71,7 @@ namespace apsi
             {
                 vector<SEAL_BYTE> client_id;
                 size_t client_id_size = msg.size(0);
-                client_id.resize(client_id_size);
-                memcpy(client_id.data(), msg.raw_data(0), client_id_size);
+                copy_n(reinterpret_cast<const SEAL_BYTE*>(msg.raw_data(0)), client_id_size, back_inserter(client_id));
                 return client_id;
             }
         }

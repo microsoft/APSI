@@ -84,15 +84,15 @@ namespace apsi
             OPRFSender() = delete;
 
             static void ProcessQueries(
-                gsl::span<const seal::SEAL_BYTE, gsl::dynamic_extent> oprf_queries, const OPRFKey &oprf_key,
-                gsl::span<seal::SEAL_BYTE, gsl::dynamic_extent> oprf_responses);
+                gsl::span<const seal::SEAL_BYTE> oprf_queries, const OPRFKey &oprf_key,
+                gsl::span<seal::SEAL_BYTE> oprf_responses);
 
             static void ComputeHashes(
-                gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items, const OPRFKey &oprf_key,
-                gsl::span<oprf_hash_type, gsl::dynamic_extent> oprf_hashes, const int threads = -1);
+                gsl::span<const oprf_item_type> oprf_items, const OPRFKey &oprf_key,
+                gsl::span<oprf_hash_type> oprf_hashes, const int threads = -1);
 
             static void ComputeHashes(
-                gsl::span<oprf_item_type, gsl::dynamic_extent> oprf_items, const OPRFKey &oprf_key,
+                gsl::span<oprf_item_type> oprf_items, const OPRFKey &oprf_key,
                 const int threads = -1)
             {
                 ComputeHashes(oprf_items, oprf_key, oprf_items, threads);
@@ -101,8 +101,8 @@ namespace apsi
         private:
             static void compute_hashes_worker(
                 const std::size_t thread_idx, const std::size_t threads,
-                gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items, const OPRFKey &oprf_key,
-                gsl::span<oprf_hash_type, gsl::dynamic_extent> oprf_hashes);
+                gsl::span<const oprf_item_type> oprf_items, const OPRFKey &oprf_key,
+                gsl::span<oprf_hash_type> oprf_hashes);
         }; // class OPRFSender
     }      // namespace oprf
 } // namespace apsi
