@@ -147,7 +147,8 @@ namespace APSITests
             clt.send(move(sop));
 
             auto sop_query = make_unique<SenderOperationQuery>();
-            sop_query->relin_keys = *get_context()->relin_keys();
+            auto relin_keys = get_context()->relin_keys();
+            sop_query->relin_keys = *relin_keys;
             sop_query->data[0].push_back(get_context()->encryptor()->encrypt_zero_symmetric());
             sop_query->data[123].push_back(get_context()->encryptor()->encrypt_zero_symmetric());
             sop = move(sop_query);
