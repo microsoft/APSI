@@ -4,7 +4,7 @@
 target_sources(unit_tests
     PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/db_encoding.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/channel.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/network_channel.cpp
         ${CMAKE_CURRENT_LIST_DIR}/csvreader.cpp
         ${CMAKE_CURRENT_LIST_DIR}/interpolate.cpp
         ${CMAKE_CURRENT_LIST_DIR}/item.cpp

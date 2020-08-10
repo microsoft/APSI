@@ -4,7 +4,7 @@
 namespace apsi.network.fbs;
 
 table Ciphertext {
-    data:[ubyte] (required);
+    data:[ubyte];
 }
 
 root_type Ciphertext;

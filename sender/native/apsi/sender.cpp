@@ -129,7 +129,7 @@ namespace apsi
             }
 
             STOPWATCH(sender_stopwatch, "Sender::query");
-            Log::info("Start processing query");
+            APSI_LOG_INFO("Start processing query");
 
             // Create the session context; we don't have to re-create the SEALContext every time
             CryptoContext crypto_context(seal_context_);
@@ -140,8 +140,8 @@ namespace apsi
 
             /* Receive client's query data. */
             int num_of_powers = static_cast<int>(query.size());
-            Log::debug("Number of powers: %i", num_of_powers);
-            Log::debug("Current bundle index count: %i", bundle_idx_count);
+            APSI_LOG_DEBUG("Number of powers: " << num_of_powers);
+            APSI_LOG_DEBUG("Current bundle index count: " << bundle_idx_count);
 
             // The number of powers necessary to compute PSI is equal to the largest number of elements inside any bin
             // under this bundle index. Globally, this is at most max_items_per_bin.

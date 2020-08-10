@@ -7,7 +7,7 @@
 
 // APSI
 #include "apsi/senderdispatcher.h"
-#include "apsi/network/senderchannel.h"
+#include "apsi/network/network_channel.h"
 #include "apsi/logging/log.h"
 #include "apsi/oprf/oprf_sender.h"
 
@@ -34,7 +34,7 @@ namespace apsi
             stringstream ss;
             ss << "tcp://*:" << port;
 
-            Log::info("Sender binding to address: %s", ss.str().c_str());
+            APSI_LOG_INFO("Sender binding to address: " << ss.str());
             chl.bind(ss.str());
 
             oprf_key_ = move(oprf_key);
@@ -53,7 +53,7 @@ namespace apsi
                         // We want to log 'Waiting' only once, even if we have to wait
                         // for several sleeps. And only once after processing a request as well.
                         logged_waiting = true;
-                        Log::info("Waiting for request.");
+                        APSI_LOG_INFO("Waiting for request.");
                     }
 
                     this_thread::sleep_for(50ms);
@@ -63,17 +63,17 @@ namespace apsi
                 switch (sop->sop->type())
                 {
                 case SenderOperationType::SOP_PARMS:
-                    Log::info("Received parameter request");
+                    APSI_LOG_INFO("Received parameter request");
                     dispatch_parms(move(sop), chl);
                     break;
 
                 case SenderOperationType::SOP_OPRF:
-                    Log::info("Received OPRF query");
+                    APSI_LOG_INFO("Received OPRF query");
                     dispatch_oprf(move(sop), chl);
                     break;
 
                 case SenderOperationType::SOP_QUERY:
-                    Log::info("Received query");
+                    APSI_LOG_INFO("Received query");
                     dispatch_query(move(sop), chl);
                     break;
 

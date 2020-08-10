@@ -2,7 +2,6 @@
 // Licensed under the MIT license.
 
 // STD
-#include <cstring>
 #include <sstream>
 #include <stdexcept>
 
@@ -81,7 +80,7 @@ namespace apsi
             }
 
             // Clear the current data
-            psi_result.release();
+            psi_result.clear();
             label_result.clear();
 
             vector<SEAL_BYTE> in_data(util::read_from_stream(in));
@@ -161,25 +160,31 @@ namespace apsi
 
             plain_rp.bundle_idx = bundle_idx;
 
-            Plaintext temp;
-            crypto_context.decryptor()->decrypt(psi_result, temp);
+            Ciphertext psi_result_ct = psi_result.extract_local();
+            Plaintext psi_result_pt;
+            crypto_context.decryptor()->decrypt(psi_result_ct, psi_result_pt);
             APSI_LOG_DEBUG(
                 "PSI result noise budget: " <<
-                crypto_context.decryptor()->invariant_noise_budget(psi_result) << " bits");
+                crypto_context.decryptor()->invariant_noise_budget(psi_result_ct) << " bits");
 
-            crypto_context.encoder()->decode(temp, plain_rp.psi_result);
+            crypto_context.encoder()->decode(psi_result_pt, plain_rp.psi_result);
 
-            for (const auto &ct : label_result)
+            for (auto &ct : label_result)
             {
-                crypto_context.decryptor()->decrypt(ct, temp);
+                Ciphertext label_result_ct = ct.extract_local();
+                Plaintext label_result_pt;
+                crypto_context.decryptor()->decrypt(label_result_ct, label_result_pt);
                 APSI_LOG_DEBUG(
                     "Label result noise budget: " <<
-                    crypto_context.decryptor()->invariant_noise_budget(ct) << " bits");
+                    crypto_context.decryptor()->invariant_noise_budget(label_result_ct) << " bits");
 
-                vector<uint64_t> temp_label;
-                crypto_context.encoder()->decode(temp, temp_label);
-                plain_rp.label_result.push_back(move(temp_label));
+                vector<uint64_t> label_result_data;
+                crypto_context.encoder()->decode(label_result_pt, label_result_data);
+                plain_rp.label_result.push_back(move(label_result_data));
             }
+
+            // Clear the label data
+            label_result.clear();
 
             return plain_rp;
         }

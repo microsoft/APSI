@@ -68,6 +68,8 @@ namespace APSITests
         ASSERT_TRUE(sop.data.empty());
 
         stringstream ss;
+
+        // Save with no data
         size_t out_size = sop.save(ss);
         SenderOperationOPRF sop2;
         size_t in_size = sop2.load(ss, nullptr);
@@ -116,6 +118,7 @@ namespace APSITests
         KeyGenerator keygen(context);
 
         // A local (invalid/empty) relin_keys object
+        // For the query we allow an empty data field
         sop.relin_keys.set(RelinKeys());
         ASSERT_FALSE(sop.relin_keys.is_serializable());
         ASSERT_TRUE(sop.relin_keys.is_local());

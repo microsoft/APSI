@@ -2,9 +2,10 @@
 // Licensed under the MIT license.
 
 // STD
-#include <cstring>
+#include <iterator>
 #include <sstream>
 #include <stdexcept>
+#include <algorithm>
 
 // APSI
 #include "apsi/network/sender_operation.h"
@@ -111,11 +112,6 @@ namespace apsi
 
         size_t SenderOperationOPRF::save(ostream &out) const
         {
-            if (data.empty())
-            {
-                logic_error("OPRF request data is not set");
-            }
-
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
             auto oprf_data = fbs_builder.CreateVector(reinterpret_cast<const uint8_t*>(data.data()), data.size());
@@ -164,19 +160,14 @@ namespace apsi
 
             // Load the OPRF request
             const auto &oprf_data = *sop->request_as_OPRFRequest()->data();
-            data.resize(oprf_data.size());
-            memcpy(data.data(), oprf_data.data(), oprf_data.size());
+            transform(oprf_data.begin(), oprf_data.end(), back_inserter(data),
+                [](auto a) { return static_cast<SEAL_BYTE>(a); });
 
             return in_data.size();
         }
 
         size_t SenderOperationQuery::save(ostream &out) const
         {
-            if (data.empty())
-            {
-                logic_error("query data is not set");
-            }
-
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
             vector<SEAL_BYTE> temp;

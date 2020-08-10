@@ -4,11 +4,11 @@
 namespace apsi.network.fbs;
 
 table ParmsResponse {
-    data:[ubyte] (required);
+    data:[ubyte];
 }
 
 table OPRFResponse {
-    data:[ubyte] (required);
+    data:[ubyte];
 }
 
 table QueryResponse {
