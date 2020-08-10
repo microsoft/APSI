@@ -17,6 +17,7 @@
 
 // APSI
 #include "apsi/cryptocontext.h"
+#include "apsi/sealobject.h"
 
 namespace apsi
 {
@@ -54,9 +55,9 @@ namespace apsi
 
             std::uint32_t bundle_idx;
 
-            seal::Ciphertext psi_result;
+            SEALObject<seal::Ciphertext> psi_result;
 
-            std::vector<seal::Ciphertext> label_result;
+            std::vector<SEALObject<seal::Ciphertext>> label_result;
         }; // struct ResultPackage
     }
 } // namespace apsi

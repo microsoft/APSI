@@ -64,12 +64,42 @@ namespace apsi
 
         SEALObject(SerializableType obj)
         {
-            set(std::move(obj));
+            operator =(std::move(obj));
         }
 
         SEALObject(LocalType obj)
         {
+            operator =(std::move(obj));
+        }
+
+        SEALObject &operator =(const LocalType &obj)
+        {
+            set(obj);
+            return *this;
+        }
+
+        SEALObject &operator =(const SerializableType &obj)
+        {
+            set(obj);
+            return *this;
+        }
+
+        SEALObject &operator =(LocalType &&obj)
+        {
             set(std::move(obj));
+            return *this;
+        }
+
+        SEALObject &operator =(SerializableType &&obj)
+        {
+            set(std::move(obj));
+            return *this;
+        }
+
+        void clear()
+        {
+            serializable_.reset();
+            local_.reset();
         }
 
         bool is_local() const
@@ -103,7 +133,7 @@ namespace apsi
         void set(const SerializableType &value)
         {
             local_.reset();
-            serializable_ = std::make_unique<LocalType>(value);
+            serializable_ = std::make_unique<SerializableType>(value);
         }
 
         SerializableType extract_serializable()
@@ -112,9 +142,9 @@ namespace apsi
             {
                 throw std::logic_error("no serializable object to extract");
             }
-            auto ptr = std::make_unique<SerializableType>();
-            std::swap(ptr, local_);
-            return std::move(*ptr);
+            SerializableType result = std::move(*serializable_);
+            serializable_.reset();
+            return std::move(result);
         }
 
         LocalType extract_local()
@@ -123,9 +153,9 @@ namespace apsi
             {
                 throw std::logic_error("no local object to extract");
             }
-            auto ptr = std::make_unique<LocalType>();
-            std::swap(ptr, local_);
-            return std::move(*ptr);
+            LocalType result = std::move(*local_);
+            local_.reset();
+            return std::move(result);
         }
 
         std::size_t save(seal::SEAL_BYTE *out, std::size_t size, seal::compr_mode_type compr_mode) const

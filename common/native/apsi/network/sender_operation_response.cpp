@@ -2,7 +2,8 @@
 // Licensed under the MIT license.
 
 // STD
-#include <cstring>
+#include <algorithm>
+#include <iterator>
 #include <sstream>
 #include <stdexcept>
 
@@ -27,7 +28,7 @@ namespace apsi
         {
             if (!params)
             {
-                logic_error("parameters are not set");
+                throw logic_error("parameters are not set");
             }
 
             flatbuffers::FlatBufferBuilder fbs_builder(128);
@@ -91,11 +92,6 @@ namespace apsi
 
         size_t SenderOperationResponseOPRF::save(ostream &out) const
         {
-            if (data.empty())
-            {
-                logic_error("OPRF response data is not set");
-            }
-
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
             // Set up a vector to hold the response data
@@ -139,8 +135,8 @@ namespace apsi
 
             // Load the OPRF response 
             const auto &oprf_data = *sop_response->response_as_OPRFResponse()->data();
-            data.resize(oprf_data.size());
-            memcpy(data.data(), oprf_data.data(), oprf_data.size());
+            transform(oprf_data.begin(), oprf_data.end(), back_inserter(data),
+                [](auto a) { return static_cast<SEAL_BYTE>(a); });
 
             return in_data.size();
         }

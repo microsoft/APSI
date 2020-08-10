@@ -250,7 +250,7 @@ namespace apsi
         unique_ptr<NetworkSenderOperation> NetworkChannel::receive_network_operation(
             shared_ptr<SEALContext> context, SenderOperationType expected)
         {
-            return receive_network_operation(move(context), /* wait_for_message */ false, expected);
+            return receive_network_operation(move(context), false, expected);
         }
 
         unique_ptr<SenderOperation> NetworkChannel::receive_operation(

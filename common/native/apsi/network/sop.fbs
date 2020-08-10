@@ -9,17 +9,17 @@ table ParmsRequest {
 }
 
 table OPRFRequest {
-    data:[ubyte] (required);
+    data:[ubyte];
 }
 
 table QueryRequestPart {
     exponent:uint32;
-    cts:[Ciphertext] (required);
+    cts:[Ciphertext];
 }
 
 table QueryRequest {
-    relin_keys:[ubyte] (required);
-    query:[QueryRequestPart] (required);
+    relin_keys:[ubyte];
+    query:[QueryRequestPart];
 }
 
 union Request { ParmsRequest, OPRFRequest, QueryRequest }
