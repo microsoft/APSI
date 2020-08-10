@@ -24,9 +24,11 @@
 #include "apsi/sealobject.h"
 #include "apsi/util/db_encoding.h"
 
+// GSL
+#include "gsl/span"
+
 // SEAL
 #include "seal/util/defines.h"
-#include "gsl/span"
 
 namespace apsi
 {

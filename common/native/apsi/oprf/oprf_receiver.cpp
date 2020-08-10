@@ -11,8 +11,8 @@ namespace apsi
     namespace oprf
     {
         void OPRFReceiver::process_items(
-            gsl::span<const oprf_item_type, gsl::dynamic_extent> oprf_items,
-            gsl::span<seal::SEAL_BYTE, gsl::dynamic_extent> oprf_queries)
+            gsl::span<const oprf_item_type> oprf_items,
+            gsl::span<seal::SEAL_BYTE> oprf_queries)
         {
             if (static_cast<size_t>(oprf_queries.size()) != static_cast<size_t>(oprf_items.size()) * oprf_query_size)
             {
@@ -44,8 +44,8 @@ namespace apsi
         }
 
         void OPRFReceiver::process_responses(
-            gsl::span<const seal::SEAL_BYTE, gsl::dynamic_extent> oprf_responses,
-            gsl::span<oprf_hash_type, gsl::dynamic_extent> oprf_hashes) const
+            gsl::span<const seal::SEAL_BYTE> oprf_responses,
+            gsl::span<oprf_hash_type> oprf_hashes) const
         {
             if (static_cast<size_t>(oprf_hashes.size()) != item_count())
             {

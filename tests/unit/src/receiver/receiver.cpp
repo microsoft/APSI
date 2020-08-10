@@ -204,7 +204,7 @@ namespace APSITests
         atomic<bool> stop_token_ = false;
     };
 
-    TEST(ReceiverTests, Constructor)
+    TEST_F(ReceiverTests, Constructor)
     {
         // Parameterless constructors
         ASSERT_NO_THROW(auto recv = Receiver(1));

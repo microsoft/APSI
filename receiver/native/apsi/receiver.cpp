@@ -23,9 +23,6 @@
 #include "seal/util/iterator.h"
 #include "seal/util/common.h"
 
-// GSL
-#include "gsl/span"
-
 using namespace std;
 using namespace seal;
 using namespace seal::util;
@@ -377,7 +374,7 @@ namespace apsi
                 while (!(rp = chl.receive_result_package(crypto_context_->seal_context())));
 
                 // Decrypt and decode the result; the result vector will have full batch size
-                PlainResultPackage plain_rp = rp->extract(crypto_context_->seal_context());
+                PlainResultPackage plain_rp = rp->extract(*crypto_context_);
 
                 // Iterate over the decoded data to find consequtive zeros indicating a match
                 StrideIter<const uint64_t *> plain_rp_iter(
