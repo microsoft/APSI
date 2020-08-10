@@ -633,19 +633,19 @@ endif()
 # APSI sender C++ library #
 ###########################
 
-add_library(sender STATIC)
-add_subdirectory(sender/native/apsi)
-set_target_properties(sender PROPERTIES OUTPUT_NAME apsi_sender)
-apsi_set_version(sender)
-apsi_set_soversion(sender)
-apsi_set_language(sender)
-target_link_libraries(sender PUBLIC common)
-target_include_directories(sender PUBLIC
-    $<BUILD_INTERFACE:${APSI_SOURCE_DIR}/sender/native>
-    $<BUILD_INTERFACE:${APSI_SOURCE_DIR}/common/native>
-    $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
-apsi_link_threads(sender)
-apsi_install_target(sender APSITargets)
+#add_library(sender STATIC)
+#add_subdirectory(sender/native/apsi)
+#set_target_properties(sender PROPERTIES OUTPUT_NAME apsi_sender)
+#apsi_set_version(sender)
+#apsi_set_soversion(sender)
+#apsi_set_language(sender)
+#target_link_libraries(sender PUBLIC common)
+#target_include_directories(sender PUBLIC
+    #$<BUILD_INTERFACE:${APSI_SOURCE_DIR}/sender/native>
+    #$<BUILD_INTERFACE:${APSI_SOURCE_DIR}/common/native>
+    #$<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
+#apsi_link_threads(sender)
+#apsi_install_target(sender APSITargets)
 
 #############################
 # APSI receiver C++ library #

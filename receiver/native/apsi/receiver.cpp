@@ -230,12 +230,12 @@ namespace apsi
                     if (cuckoo.is_empty_item(cuckoo.leftover_item()))
                     {
                         APSI_LOG_INFO(
-                            "Skipping repeated insertion of items[" << item_idx << "]: " << item);
+                            "Skipping repeated insertion of items[" << item_idx << "]: " << item.to_string());
                     }
                     else
                     {
                         stringstream ss;
-                        ss << "Failed to insert items[" << item_idx << "]: " << item << endl;
+                        ss << "Failed to insert items[" << item_idx << "]: " << item.to_string() << endl;
                         throw runtime_error(ss.str());
                     }
                 }
@@ -284,8 +284,9 @@ namespace apsi
             }
 
             // Set up the return value
-            unique_ptr<SenderOperation> sop_query =
-                make_unique<SenderOperationQuery>(relin_keys_, move(encrypted_powers));
+            auto sop_query = make_unique<SenderOperationQuery>();
+            sop_query->relin_keys = relin_keys_;
+            sop_query->data = move(encrypted_powers);
 
             APSI_LOG_INFO("Receiver done creating query");
 
@@ -306,8 +307,9 @@ namespace apsi
                 APSI_LOG_INFO("OPRF processing");
 
                 // Send OPRF query to Sender
-                vector<SEAL_BYTE> oprf_query_data = obfuscate_items(items);
-                chl.send(make_unique<SenderOperationOPRF>(move(oprf_query_data)));
+                auto sop_oprf = make_unique<SenderOperationOPRF>();
+                sop_oprf->data = move(obfuscate_items(items));
+                chl.send(move(sop_oprf));
 
                 unique_ptr<SenderOperationResponse> response;
                 {
@@ -374,7 +376,7 @@ namespace apsi
             {
                 unique_ptr<ResultPackage> rp;
 
-                // Wait for a valid ResultPackage or until package_count has reached zero
+                // Wait for a valid ResultPackage
                 while (!(rp = chl.receive_result_package(crypto_context_->seal_context())));
 
                 // Decrypt and decode the result; the result vector will have full batch size
@@ -425,12 +427,14 @@ namespace apsi
                                 size_t label_offset = mul_safe(get<1>(I), felts_per_item);
                                 gsl::span<felt_t> label_part(
                                     label_parts.data() + label_offset, params_->item_params().felts_per_item);
-                                copy_n(label_part.begin(), label_part.end(), back_inserter(label_as_felts));
+                                copy(label_part.begin(), label_part.end(), back_inserter(label_as_felts));
                             }
 
                             // Create the label
-                            unique_ptr<Bitstring> label = make_unique<Bitstring>(
-                                field_elts_to_bits(label_as_felts, params_->seal_params().plain_modulus()));
+                            auto label = make_unique<Bitstring>(field_elts_to_bits(
+                                label_as_felts,
+                                params_->item_bit_count(),
+                                params_->seal_params().plain_modulus()));
 
                             // Set the label
                             mr.label.set(move(label));

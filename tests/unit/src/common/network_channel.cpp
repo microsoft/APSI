@@ -19,7 +19,6 @@
 using namespace std;
 using namespace seal;
 using namespace apsi;
-using namespace apsi::util;
 using namespace apsi::network;
 
 namespace APSITests
@@ -63,6 +62,7 @@ namespace APSITests
                 context = make_shared<CryptoContext>(SEALContext::Create(get_params()->seal_params()));
                 KeyGenerator keygen(context->seal_context());
                 context->set_secret(keygen.secret_key());
+                context->set_evaluator(keygen.relin_keys_local());
             }
 
             return context;
@@ -146,12 +146,8 @@ namespace APSITests
             // Send an OPRF operation with some dummy data
             clt.send(move(sop));
 
-            // Set up keys for encryption and relinearization so we can construct a query operation
-            KeyGenerator keygen(get_context()->seal_context());
-            get_context()->set_secret(keygen.secret_key());
-
             auto sop_query = make_unique<SenderOperationQuery>();
-            sop_query->relin_keys = keygen.relin_keys();
+            sop_query->relin_keys = *get_context()->relin_keys();
             sop_query->data[0].push_back(get_context()->encryptor()->encrypt_zero_symmetric());
             sop_query->data[123].push_back(get_context()->encryptor()->encrypt_zero_symmetric());
             sop = move(sop_query);
