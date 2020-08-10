@@ -235,7 +235,7 @@ namespace apsi
                     else
                     {
                         stringstream ss;
-                        ss << "Failed to insert items[" << item_idx << "]: " << item << endl;
+                        ss << "Failed to insert items[" << item_idx << "]: " << item.to_string() << endl;
                         throw runtime_error(ss.str());
                     }
                 }
@@ -374,7 +374,7 @@ namespace apsi
             {
                 unique_ptr<ResultPackage> rp;
 
-                // Wait for a valid ResultPackage or until package_count has reached zero
+                // Wait for a valid ResultPackage
                 while (!(rp = chl.receive_result_package(crypto_context_->seal_context())));
 
                 // Decrypt and decode the result; the result vector will have full batch size
@@ -429,8 +429,10 @@ namespace apsi
                             }
 
                             // Create the label
-                            unique_ptr<Bitstring> label = make_unique<Bitstring>(
-                                field_elts_to_bits(label_as_felts, params_->seal_params().plain_modulus()));
+                            auto label = make_unique<Bitstring>(field_elts_to_bits(
+                                label_as_felts,
+                                params_->item_bit_count(),
+                                params_->seal_params().plain_modulus()));
 
                             // Set the label
                             mr.label.set(move(label));

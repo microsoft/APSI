@@ -7,6 +7,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <sstream>
 #include <string>
 #include <utility>
 
@@ -237,6 +238,19 @@ namespace apsi
         const auto &value() const
         {
             return value_;
+        }
+
+        std::string to_string(std::uint32_t item_bit_count = 8 * sizeof(Item)) const
+        {
+            auto bsv = to_bitstring(item_bit_count);
+            std::stringstream ss;
+            ss << "[ ";
+            for (auto a : bsv.data())
+            {
+                ss << static_cast<uint32_t>(a) << " ";
+            }
+            ss << "]";
+            return ss.str();
         }
 
         /**
