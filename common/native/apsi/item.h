@@ -19,6 +19,7 @@
 
 // SEAL
 #include "seal/util/defines.h"
+#include "seal/util/blake2.h"
 
 namespace apsi
 {
@@ -186,9 +187,20 @@ namespace apsi
 
         Item &operator =(Item &&item) = default;
 
-        Item(const std::string &str)
+        template<typename CharT>
+        Item(const std::basic_string<CharT> &str)
         {
-            operator =(str);
+            operator =<CharT>(str);
+        }
+
+        /**
+        Hash a given string of arbitrary length into an Item.
+        */
+        template<typename CharT>
+        Item &operator =(const std::basic_string<CharT> &str)
+        {
+            blake2b(value_.data(), sizeof(value_), str.data(), str.size() * sizeof(CharT), nullptr, 0);
+            return *this;
         }
 
         /**
@@ -252,18 +264,6 @@ namespace apsi
             ss << "]";
             return ss.str();
         }
-
-        /**
-        Parses the current item from a string. The parser supports only base 10 and base 16 strings. When parsing a base
-        16 string, do _not_ include a preceding '0x'.
-        */
-        void parse(const std::string &input, std::uint32_t base);
-
-        /**
-        Parses the current item from a string. If the string starts with '0x', it will be considered hexadecimal.
-        Otherwise it will be considered base 10.
-        */
-        void parse(const std::string &input);
 
     private:
         std::array<std::uint64_t, 2> value_;

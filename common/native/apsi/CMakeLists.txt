@@ -3,7 +3,6 @@
 
 target_sources(common
     PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/item.cpp
         ${CMAKE_CURRENT_LIST_DIR}/psiparams.cpp
 )
 

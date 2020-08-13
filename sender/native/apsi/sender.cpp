@@ -185,7 +185,7 @@ namespace apsi
 
             // Create a state per each bundle index; this contains information about whether the
             // powers for that bundle index have been computed
-            std::vector<WindowingDag::State> states;
+            vector<WindowingDag::State> states;
             states.reserve(bundle_idx_count);
             for (uint32_t i = 0; i < bundle_idx_count; i++)
             {
@@ -284,7 +284,7 @@ namespace apsi
 
             if (powers.size() != max_exponent)
             {
-                throw std::runtime_error("Need room to compute max_exponent many ciphertext powers");
+                throw runtime_error("Need room to compute max_exponent many ciphertext powers");
             }
 
             auto &evaluator = crypto_context.evaluator();
@@ -347,7 +347,7 @@ namespace apsi
                 );
                 if (!r)
                 {
-                    throw std::runtime_error("FATAL: A node's work was stolen from it. This should never happen.");
+                    throw runtime_error("FATAL: A node's work was stolen from it. This should never happen.");
                 }
             }
         }
@@ -359,7 +359,7 @@ namespace apsi
         This is used to compute powers of a given ciphertext while minimizing circuit depth. The nodes vector is sorted
         in increasing order of Hamming weight of output.
         */
-        WindowingDag::WindowingDag(std::size_t max_power, std::uint32_t base)
+        WindowingDag::WindowingDag(size_t max_power, uint32_t base)
         {
             for (size_t i = 1; i <= max_power; i++)
             {
@@ -392,7 +392,7 @@ namespace apsi
         WindowingDag::State::State(WindowingDag &dag) : node_states(dag.max_power + 1)
         {
             // Workers start at the beginning of the nodes_ array, since that's where the lowest-weight nodes are
-            next_node = make_unique<std::atomic<size_t>>();
+            next_node = make_unique<atomic<size_t>>();
             *next_node = 0;
 
             // Everything is uncomputed at first

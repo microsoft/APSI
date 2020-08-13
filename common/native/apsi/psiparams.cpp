@@ -169,19 +169,18 @@ namespace apsi
     string PSIParams::to_string() const
     {
         stringstream ss;
-        ss << "item_params.felts_per_item: " << item_params_.felts_per_item << endl;
-        ss << "table_params.table_size: " << table_params_.table_size << endl;
-        ss << "table_params.window_size: " << table_params_.window_size << endl;
-        ss << "table_params.max_items_per_bin: " << table_params_.max_items_per_bin << endl;
-        ss << "table_params.hash_func_count: " << table_params_.hash_func_count << endl;
-        ss << "seal_params.poly_modulus_degree: " << seal_params_.poly_modulus_degree() << endl;
-        ss << "seal_params.coeff_modulus: [ " << endl;
+        ss << "item_params.felts_per_item: " << item_params_.felts_per_item
+            << "; table_params.table_size: " << table_params_.table_size
+            << "; table_params.window_size: " << table_params_.window_size
+            << "; table_params.max_items_per_bin: " << table_params_.max_items_per_bin
+            << "; table_params.hash_func_count: " << table_params_.hash_func_count
+            << "; seal_params.poly_modulus_degree: " << seal_params_.poly_modulus_degree()
+            << "; seal_params.coeff_modulus: [ ";
         for (auto &mod : seal_params_.coeff_modulus())
         {
-            ss << mod.bit_count();
+            ss << mod.bit_count() << " ";
         }
-        ss << " ]" << endl;
-        ss << "seal_params.plain_modulus: " << seal_params_.plain_modulus().value() << endl;
+        ss << "]; seal_params.plain_modulus: " << seal_params_.plain_modulus().value();
 
         return ss.str();
     }

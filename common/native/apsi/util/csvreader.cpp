@@ -71,17 +71,13 @@ namespace apsi
                 return;
             }
 
-            Item item;
-            item.parse(token);
-            items.push_back(move(item));
+            items.emplace_back(token);
 
             // Second is the label, if present
             token.clear();
             getline(ss, token);
 
-            FullWidthLabel label;
-            label.parse(token);
-            labels.push_back(move(label));
+            labels.emplace_back(token);
         }
 
         void CSVReader::throw_if_file_not_present() const
