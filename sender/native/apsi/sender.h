@@ -165,7 +165,7 @@ namespace apsi
             */
             void compute_powers(
                 CiphertextPowers &powers,
-                CryptoContext &crypto_context,
+                const CryptoContext &crypto_context,
                 const WindowingDag &dag,
                 WindowingDag::State &state
             );

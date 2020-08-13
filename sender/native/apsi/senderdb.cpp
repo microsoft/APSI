@@ -391,7 +391,7 @@ namespace apsi
         Returns a set of DB cache references corresponding to the bundles at the given bundle index.
         */
         template<typename L>
-        set<const BinBundleCache&> SenderDB<L>::get_cache(std::uint32_t bundle_idx)
+        set<reference_wrapper<const BinBundleCache> > get_cache(uint32_t bundle_idx)
         {
             if (bundle_idx >= bin_bundles_.size())
             {

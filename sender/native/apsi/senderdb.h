@@ -61,7 +61,7 @@ namespace apsi
             Returns a set of DB cache references corresponding to the bundles at the given
             bundle index.
             */
-            std::set<const BinBundleCache&> get_cache(std::uint32_t bundle_idx);
+            std::set<std::reference_wrapper<const BinBundleCache> > get_cache(std::uint32_t bundle_idx);
 
             const PSIParams &get_params() const
             {
