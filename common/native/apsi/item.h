@@ -196,6 +196,10 @@ namespace apsi
         template<typename CharT>
         Item &operator =(const std::basic_string<CharT> &str)
         {
+            if (str.empty())
+            {
+                throw std::invalid_argument("str cannot be empty");
+            }
             blake2b(value_.data(), sizeof(value_), str.data(), str.size() * sizeof(CharT), nullptr, 0);
             return *this;
         }
