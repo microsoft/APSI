@@ -83,6 +83,9 @@ namespace APSITests
             {
                 client_.connect("tcp://localhost:5555");
             }
+
+            // Set up the context ahead of time
+            (void)get_context();
         }
 
         ~NetworkChannelTests()

@@ -72,6 +72,10 @@ namespace APSITests
     protected:
         ReceiverTests()
         {
+            //logging::Log::set_console_disabled(true);
+            //logging::Log::set_log_level(logging::Log::Level::level_debug);
+            //logging::Log::set_log_file("out.log");
+
             if (!server_.is_connected())
             {
                 server_.bind("tcp://*:5555");

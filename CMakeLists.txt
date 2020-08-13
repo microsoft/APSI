@@ -45,6 +45,10 @@ message(STATUS "APSI debug mode: ${APSI_DEBUG}")
 set(APSI_BUILD_TESTS_OPTION_STR "Build C++ tests for Microsoft SEAL")
 option(APSI_BUILD_TESTS ${APSI_BUILD_TESTS_OPTION_STR} OFF)
 
+# [Option] APSI_USE_LOG4CPLUS
+set(APSI_USE_LOG4CPLUS_OPTION_STR "Use Log4cplus to enable logging")
+option(APSI_USE_LOG4CPLUS ${APSI_USE_LOG4CPLUS_OPTION_STR} OFF)
+
 # Always build position-independent-code
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -335,7 +339,7 @@ endif()
 
 # Log4cplus
 # Download and configure
-if(NOT MSVC)
+if(NOT MSVC AND APSI_USE_LOG4CPLUS)
     message(STATUS "Setting up log4cplus ...")
     if(NOT CMAKE_TOOLCHAIN_FILE)
         execute_process(

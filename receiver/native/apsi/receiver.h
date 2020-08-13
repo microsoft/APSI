@@ -125,13 +125,17 @@ namespace apsi
             Obfuscates the items and initializes the given vector with the buffer that must be sent to a sender for
             sender-side obfuscation (OPRF).
             */
-            std::vector<seal::SEAL_BYTE> obfuscate_items(const std::vector<Item> &items);
+            std::vector<seal::SEAL_BYTE> obfuscate_items(
+                const std::vector<Item> &items,
+                std::unique_ptr<oprf::OPRFReceiver> &oprf_receiver);
 
             /**
             Removes receiver-side obfuscation from items received after an OPRF query from a sender so that only the
             sender's obfuscation (OPRF) remains.
             */
-            std::vector<Item> deobfuscate_items(const std::vector<seal::SEAL_BYTE> &oprf_response);
+            std::vector<Item> deobfuscate_items(
+                const std::vector<seal::SEAL_BYTE> &oprf_response,
+                std::unique_ptr<oprf::OPRFReceiver> &oprf_receiver);
 
             std::unique_ptr<network::SenderOperation> create_query(
                 const std::vector<Item> &items,
@@ -149,13 +153,11 @@ namespace apsi
 
             std::uint64_t cuckoo_table_insert_attempts_;
 
-            std::unique_ptr<PSIParams> params_;
+            PSIParams params_;
 
             std::shared_ptr<CryptoContext> crypto_context_;
 
             SEALObject<seal::RelinKeys> relin_keys_;
-
-            std::unique_ptr<oprf::OPRFReceiver> oprf_receiver_;
         }; // class Receiver
     }      // namespace receiver
 } // namespace apsi

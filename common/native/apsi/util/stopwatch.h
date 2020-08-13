@@ -14,8 +14,7 @@
 #include <vector>
 #include <cstdint>
 
-// Macro Magic to generate unique variable names. This is used for the
-// STOPWATCH macro.
+// Macro Magic to generate unique variable names. This is used for the STOPWATCH macro.
 #define PP_CAT_II(p, res) res
 #define PP_CAT_I(a, b) PP_CAT_II(~, a##b)
 #define PP_CAT(a, b) PP_CAT_I(a, b)
