@@ -164,8 +164,11 @@ namespace apsi
             @params[out] all_powers All powers computed from the input for the specified batch.
             */
             void compute_powers(
-                std::vector<seal::Ciphertext> &batch_powers, const CryptoContext &crypto_context,
-                const WindowingDag &dag, WindowingDag::State &state);
+                CiphertextPowers &powers,
+                CryptoContext &crypto_context,
+                const WindowingDag &dag,
+                WindowingDag::State &state
+            );
 
             PSIParams params_;
 

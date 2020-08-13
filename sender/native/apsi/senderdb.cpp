@@ -387,6 +387,9 @@ namespace apsi
             throw logic_error("Cannot do labeled insertion on an UnlabeledSenderDB");
         }
 
+        /**
+        Returns a set of DB cache references corresponding to the bundles at the given bundle index.
+        */
         template<typename L>
         set<const BinBundleCache&> SenderDB<L>::get_cache(std::uint32_t bundle_idx)
         {
@@ -395,11 +398,13 @@ namespace apsi
                 throw out_of_range("bundle_idx is out of range");
             }
 
-            set<BinBundleCache&> result;
+            set<const BinBundleCache&> result;
             for (const auto &bundle : bin_bundles_[bundle_idx])
             {
                 result.insert(bundle.get_cache());
             }
+
+            return result;
         }
 
         std::size_t SenderDB::bin_bundle_count() const
