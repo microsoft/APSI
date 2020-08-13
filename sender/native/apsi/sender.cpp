@@ -233,7 +233,7 @@ namespace apsi
                 compute_powers(powers_at_this_bundle_idx, crypto_context, dag, states[bundle_idx]);
 
                 // Next, iterate over each bundle with this bundle index
-                auto bundle_caches = sender_db_->get_cache(bundle_idx);
+                auto bundle_caches = sender_db_->get_cache_at(bundle_idx);
                 size_t bundle_count = bundle_caches.size();
 
                 // When using C++17 this function may be multi-threaded in the future
