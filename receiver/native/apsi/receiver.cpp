@@ -107,14 +107,6 @@ namespace apsi
 
     namespace receiver
     {
-        Receiver::Receiver(size_t thread_count) : thread_count_(thread_count)
-        {
-            if (thread_count_ < 1)
-            {
-                throw invalid_argument("thread_count must be at least 1");
-            }
-        }
-
         Receiver::Receiver(PSIParams params, size_t thread_count) :
             params_(make_unique<PSIParams>(move(params))), thread_count_(thread_count)
         {
@@ -123,17 +115,11 @@ namespace apsi
                 throw invalid_argument("thread_count must be at least 1");
             }
 
-            // We have params, so initialize
             initialize();
         }
 
         void Receiver::reset_keys()
         {
-            if (!is_initialized())
-            {
-                throw logic_error("receiver is uninitialized");
-            }
-
             // Generate new keys
             KeyGenerator generator(crypto_context_->seal_context());
 
@@ -150,18 +136,36 @@ namespace apsi
             STOPWATCH(recv_stopwatch, "Receiver::initialize");
             APSI_LOG_INFO("Initializing Receiver");
 
-            if (!params_)
-            {
-                throw logic_error("parameters are not set");
-            }
-
             // Initialize the CryptoContext with a new SEALContext
-            crypto_context_ = make_unique<CryptoContext>(SEALContext::Create(params_->seal_params()));
+            crypto_context_ = make_shared<CryptoContext>(SEALContext::Create(params_->seal_params()));
 
             // Create new keys
             reset_keys();
 
             APSI_LOG_INFO("Receiver initialized");
+        }
+
+        PSIParams Receiver::request_params(Channel &chl)
+        {
+            STOPWATCH(recv_stopwatch, "Receiver::Parms");
+            APSI_LOG_INFO("Requesting parameters");
+
+            // Send parameter request to Sender
+            auto sop_parms = make_unique<SenderOperationParms>();
+            chl.send(move(sop_parms));
+
+            unique_ptr<SenderOperationResponse> response;
+            {
+                STOPWATCH(recv_stopwatch, "Receiver::Parms::wait_response");
+
+                // Wait for a valid message of the correct type
+                while (!(response = chl.receive_response(SenderOperationType::SOP_PARMS)));
+            }
+
+            // Return the PSIParams
+            auto parms_response = dynamic_cast<SenderOperationResponseParms*>(response.get());
+            PSIParams parms = *parms_response->params;
+            return parms;
         }
 
         vector<SEAL_BYTE> Receiver::obfuscate_items(const vector<Item> &items)
@@ -179,7 +183,7 @@ namespace apsi
         {
             APSI_LOG_INFO("Deobfuscating items");
 
-            vector<Item> items;
+            vector<Item> items(oprf_receiver_->item_count());
             oprf_receiver_->process_responses(oprf_response, items);
             oprf_receiver_.reset();
 
@@ -191,11 +195,6 @@ namespace apsi
         {
             STOPWATCH(recv_stopwatch, "Receiver::create_query");
             APSI_LOG_INFO("Receiver starting creating query");
-
-            if (!is_initialized())
-            {
-                throw logic_error("receiver is uninitialized");
-            }
 
             table_idx_to_item_idx.clear();
 
@@ -233,6 +232,13 @@ namespace apsi
                         throw runtime_error(ss.str());
                     }
                 }
+            }
+
+            // Once the table is filled, fill the table_idx_to_item_idx map
+            for (size_t item_idx = 0; item_idx < items.size(); item_idx++)
+            {
+                auto item_loc = cuckoo.query(items[item_idx].value());
+                table_idx_to_item_idx[item_loc.location()] = item_idx;
             }
 
             // Set up unencrypted query data
@@ -339,7 +345,7 @@ namespace apsi
 
             // Get the number of ResultPackages we expect to receive
             auto query_response = dynamic_cast<SenderOperationResponseQuery*>(response.get());
-            atomic<uint32_t> package_count = query_response->package_count;
+            atomic<int32_t> package_count = safe_cast<int32_t>(query_response->package_count);
 
             // Launch threads to receive ResultPackages and decrypt results
             std::vector<std::thread> threads;
@@ -359,15 +365,21 @@ namespace apsi
         }
 
         void Receiver::result_package_worker(
-            atomic<uint32_t> &package_count,
+            atomic<int32_t> &package_count,
             vector<MatchRecord> &mrs,
             const unordered_map<size_t, size_t> &table_idx_to_item_idx,
             Channel &chl) const
         {
             STOPWATCH(recv_stopwatch, "Receiver::result_package_worker");
 
-            while (package_count--)
+            while (true)
             {
+                package_count--;
+                if (package_count < 0)
+                {
+                    return;
+                }
+
                 unique_ptr<ResultPackage> rp;
 
                 // Wait for a valid ResultPackage
@@ -388,54 +400,52 @@ namespace apsi
                     // Next find the corresponding index in the input items vector
                     auto item_idx_iter = table_idx_to_item_idx.find(table_idx);
 
-                    if (item_idx_iter == table_idx_to_item_idx.cend())
+                    // If this table_idx doesn't match any item_idx; ignore the result no matter what it is
+                    if (item_idx_iter != table_idx_to_item_idx.cend())
                     {
-                        // If this table_idx doesn't match any item_idx; ignore the result no matter what it is
-                        return;
-                    }
+                        // Find felts_per_item consequtive zeros
+                        bool match = all_of(get<0>(I), get<0>(I) + felts_per_item, [](auto felt) { return felt == 0; });
 
-                    // Find felts_per_item consequtive zeros
-                    bool match = all_of(get<0>(I), get<0>(I) + felts_per_item, [](auto felt) { return felt == 0; });
-
-                    if (match)
-                    {
-                        size_t item_idx = item_idx_iter->second;
-                        if (mrs[item_idx])
+                        if (match)
                         {
-                            // If a positive MatchRecord is already present, then something is seriously wrong
-                            throw runtime_error("found a pre-existing positive match in the location for this match");
-                        }
-
-                        // Create a new MatchRecord
-                        MatchRecord mr;
-                        mr.found = true;
-
-                        // Next, extract the label result(s), if any
-                        if (!plain_rp.label_result.empty())
-                        {
-                            // Collect the entire label into this vector
-                            vector<felt_t> label_as_felts;
-
-                            for (auto &label_parts : plain_rp.label_result)
+                            size_t item_idx = item_idx_iter->second;
+                            if (mrs[item_idx])
                             {
-                                size_t label_offset = mul_safe(get<1>(I), felts_per_item);
-                                gsl::span<felt_t> label_part(
-                                    label_parts.data() + label_offset, params_->item_params().felts_per_item);
-                                copy(label_part.begin(), label_part.end(), back_inserter(label_as_felts));
+                                // If a positive MatchRecord is already present, then something is seriously wrong
+                                throw runtime_error("found a pre-existing positive match in the location for this match");
                             }
 
-                            // Create the label
-                            auto label = make_unique<Bitstring>(field_elts_to_bits(
-                                label_as_felts,
-                                params_->item_bit_count(),
-                                params_->seal_params().plain_modulus()));
+                            // Create a new MatchRecord
+                            MatchRecord mr;
+                            mr.found = true;
 
-                            // Set the label
-                            mr.label.set(move(label));
+                            // Next, extract the label result(s), if any
+                            if (!plain_rp.label_result.empty())
+                            {
+                                // Collect the entire label into this vector
+                                vector<felt_t> label_as_felts;
+
+                                for (auto &label_parts : plain_rp.label_result)
+                                {
+                                    size_t label_offset = mul_safe(get<1>(I), felts_per_item);
+                                    gsl::span<felt_t> label_part(
+                                        label_parts.data() + label_offset, params_->item_params().felts_per_item);
+                                    copy(label_part.begin(), label_part.end(), back_inserter(label_as_felts));
+                                }
+
+                                // Create the label
+                                auto label = make_unique<Bitstring>(field_elts_to_bits(
+                                    label_as_felts,
+                                    params_->item_bit_count(),
+                                    params_->seal_params().plain_modulus()));
+
+                                // Set the label
+                                mr.label.set(move(label));
+                            }
+
+                            // We are done with the MatchRecord, so add it to the mrs vector
+                            mrs[item_idx] = move(mr);
                         }
-
-                        // We are done with the MatchRecord, so add it to the mrs vector
-                        mrs[item_idx] = move(mr);
                     }
                 });
             }

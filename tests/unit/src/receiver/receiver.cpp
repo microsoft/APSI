@@ -7,6 +7,7 @@
 #include <atomic>
 #include <thread>
 #include <utility>
+#include <algorithm>
 
 // APSI
 #include "apsi/receiver.h"
@@ -19,6 +20,7 @@ using namespace apsi;
 using namespace apsi::network;
 using namespace apsi::receiver;
 using namespace seal;
+using namespace kuku;
 
 namespace APSITests
 {
@@ -59,9 +61,6 @@ namespace APSITests
             if (!context)
             {
                 context = make_shared<CryptoContext>(SEALContext::Create(get_params()->seal_params()));
-                KeyGenerator keygen(context->seal_context());
-                context->set_secret(keygen.secret_key());
-                context->set_evaluator(keygen.relin_keys_local());
             }
 
             return context;
@@ -84,9 +83,9 @@ namespace APSITests
             }
         }
 
-        void start_listen()
+        void start_listen(bool labels = false)
         {
-            th_ = thread([this]() {
+            th_ = thread([this](bool labels) {
                 // Run until stopped
                 while (!stop_token_)
                 {
@@ -108,7 +107,7 @@ namespace APSITests
                         break;
 
                     case SenderOperationType::SOP_QUERY:
-                        dispatch_query(move(sop));
+                        dispatch_query(move(sop), labels);
                         break;
 
                     default:
@@ -116,7 +115,7 @@ namespace APSITests
                         throw runtime_error("invalid operation");
                     }
                 }
-            });
+            }, labels);
         }
 
         void dispatch_parms(unique_ptr<NetworkSenderOperation> sop)
@@ -145,12 +144,12 @@ namespace APSITests
             server_.send(move(response));
         }
 
-        void dispatch_query(unique_ptr<NetworkSenderOperation> sop)
+        void dispatch_query(unique_ptr<NetworkSenderOperation> sop, bool labels)
         {
             auto sop_query = dynamic_cast<SenderOperationQuery*>(sop->sop.get());
 
-            // We'll return 3 packages for no particular reason
-            uint32_t package_count = 3; 
+            // We'll return 1 package
+            uint32_t package_count = 1; 
 
             auto response_query = make_unique<SenderOperationResponseQuery>();
             response_query->package_count = package_count;
@@ -161,20 +160,56 @@ namespace APSITests
             server_.send(move(response));
 
             // Query will send result to client in a stream of ResultPackages
-            auto send_nrp = [&](uint32_t bundle_idx) {
+            auto send_nrp = [&](Ciphertext ct, uint32_t bundle_idx) {
                 auto rp = make_unique<ResultPackage>();
-                rp->bundle_idx = 0;
-                rp->psi_result = get_context()->encryptor()->encrypt_zero_symmetric();
+                rp->bundle_idx = bundle_idx;
+
+                // Add label to result if requested
+                if (labels)
+                {
+                    Ciphertext label_ct = ct;
+
+                    // Every other byte will be 1 and every other 0 due to plain_modulus giving 16-bit encodings per
+                    // field element
+                    Plaintext label_tweak("1");
+                    get_context()->evaluator()->add_plain_inplace(label_ct, label_tweak);
+                    rp->label_result.push_back(label_ct);
+                }
+
+                // Always add PSI result
+                rp->psi_result = move(ct);
+
                 auto nrp = make_unique<NetworkResultPackage>();
                 nrp->rp = move(rp);
                 nrp->client_id = sop->client_id;
                 server_.send(move(nrp));
             };
 
-            // Send the first one with bundle_idx 0, second with 1, and third again with 0
-            send_nrp(0);
-            send_nrp(1);
-            send_nrp(0);
+            KukuTable table(
+                get_params()->table_params().table_size,
+                0,
+                get_params()->table_params().hash_func_count,
+                make_zero_item(),
+                500,
+                make_zero_item());
+
+            auto locs = table.all_locations(make_item(1, 0));
+            vector<uint64_t> rp_vec(get_context()->encoder()->slot_count(), 1);
+            for (auto loc : locs)
+            {
+                uint32_t bundle_idx = loc / get_params()->items_per_bundle();
+                uint32_t bundle_offset = loc - bundle_idx * get_params()->items_per_bundle();
+                fill_n(
+                    rp_vec.begin() + bundle_offset * get_params()->item_params().felts_per_item,
+                    get_params()->item_params().felts_per_item, 0);
+            }
+
+            Plaintext rp_pt;
+            get_context()->encoder()->encode(rp_vec, rp_pt);
+            Ciphertext rp_ct;
+            get_context()->encryptor()->encrypt_symmetric(rp_pt, rp_ct);
+
+            send_nrp(move(rp_ct), 0);
         }
 
         void stop_listen()
@@ -206,14 +241,9 @@ namespace APSITests
 
     TEST_F(ReceiverTests, Constructor)
     {
-        // Parameterless constructors
-        ASSERT_NO_THROW(auto recv = Receiver(1));
-        ASSERT_NO_THROW(auto recv = Receiver(2));
-
         // Cannot specify zero threads
-        ASSERT_THROW(auto recv = Receiver(0), invalid_argument);
+        ASSERT_THROW(auto recv = Receiver(*get_params(), 0), invalid_argument);
 
-        // Parametered constructors
         ASSERT_NO_THROW(auto recv = Receiver(*get_params(), 1));
         ASSERT_NO_THROW(auto recv = Receiver(*get_params(), 2));
     }
@@ -222,11 +252,208 @@ namespace APSITests
     {
         start_listen();
 
-        Receiver recv(*get_params(), 1);
-        ASSERT_TRUE(recv.is_initialized());
+        // First query for the parameters
+        PSIParams params = Receiver::request_params(client_);
 
+        Receiver recv(params, 1);
+
+        // Give the sender the secret key so they can fake responses
+        get_context()->set_secret(*recv.crypto_context()->secret_key());
+
+        // Empty query; empty response
         vector<Item> items;
-        recv.query(items, client_);
+        auto result = recv.query(items, client_);
+        ASSERT_TRUE(result.empty());
+
+        // Cannot query the empty item
+        items.push_back(make_zero_item());
+        ASSERT_THROW(result = recv.query(items, client_), invalid_argument);
+
+        // Query a single non-empty item
+        items[0][0] = 1;
+        result = recv.query(items, client_);
+        ASSERT_EQ(1, result.size());
+        ASSERT_TRUE(result[0].found);
+        ASSERT_FALSE(result[0].label);
+
+        // Query a single non-empty item
+        items[0][0] = 2;
+        result = recv.query(items, client_);
+        ASSERT_EQ(1, result.size());
+        ASSERT_FALSE(result[0].found);
+        ASSERT_FALSE(result[0].label);
+
+        // Query two items
+        items.push_back(make_zero_item());
+        items[0][0] = 1;
+        items[1][0] = 2;
+        result = recv.query(items, client_);
+        ASSERT_EQ(2, result.size());
+        ASSERT_TRUE(result[0].found);
+        ASSERT_FALSE(result[1].found);
+        ASSERT_FALSE(result[0].label);
+        ASSERT_FALSE(result[1].label);
+
+        stop_listen();
+    }
+
+    TEST_F(ReceiverTests, MultiThread)
+    {
+        start_listen();
+
+        // First query for the parameters
+        PSIParams params = Receiver::request_params(client_);
+
+        Receiver recv(params, 2);
+
+        // Give the sender the secret key so they can fake responses
+        get_context()->set_secret(*recv.crypto_context()->secret_key());
+
+        // Empty query; empty response
+        vector<Item> items;
+        auto result = recv.query(items, client_);
+        ASSERT_TRUE(result.empty());
+
+        // Cannot query the empty item
+        items.push_back(make_zero_item());
+        ASSERT_THROW(result = recv.query(items, client_), invalid_argument);
+
+        // Query a single non-empty item
+        items[0][0] = 1;
+        result = recv.query(items, client_);
+        ASSERT_EQ(1, result.size());
+        ASSERT_TRUE(result[0].found);
+        ASSERT_FALSE(result[0].label);
+
+        // Query a single non-empty item
+        items[0][0] = 2;
+        result = recv.query(items, client_);
+        ASSERT_EQ(1, result.size());
+        ASSERT_FALSE(result[0].found);
+        ASSERT_FALSE(result[0].label);
+
+        // Query two items
+        items.push_back(make_zero_item());
+        items[0][0] = 1;
+        items[1][0] = 2;
+        result = recv.query(items, client_);
+        ASSERT_EQ(2, result.size());
+        ASSERT_TRUE(result[0].found);
+        ASSERT_FALSE(result[1].found);
+        ASSERT_FALSE(result[0].label);
+        ASSERT_FALSE(result[1].label);
+
+        stop_listen();
+    }
+
+    TEST_F(ReceiverTests, SingleThreadLabels)
+    {
+        start_listen(/* labels */ true);
+
+        // First query for the parameters
+        PSIParams params = Receiver::request_params(client_);
+
+        Receiver recv(params, 1);
+
+        // Give the sender the secret key so they can fake responses
+        get_context()->set_secret(*recv.crypto_context()->secret_key());
+        get_context()->set_evaluator();
+
+        // Empty query; empty response
+        vector<Item> items;
+        auto result = recv.query(items, client_);
+        ASSERT_TRUE(result.empty());
+
+        // Cannot query the empty item
+        items.push_back(make_zero_item());
+        ASSERT_THROW(result = recv.query(items, client_), invalid_argument);
+
+        // Query a single non-empty item
+        items[0][0] = 1;
+        result = recv.query(items, client_);
+        ASSERT_EQ(1, result.size());
+        ASSERT_TRUE(result[0].found);
+        ASSERT_TRUE(result[0].label);
+
+        auto label = result[0].label.get_as<uint16_t>();
+        all_of(label.begin(), label.end(), [](auto a) { return a == 1; });
+
+        // Query a single non-empty item
+        items[0][0] = 2;
+        result = recv.query(items, client_);
+        ASSERT_EQ(1, result.size());
+        ASSERT_FALSE(result[0].found);
+        ASSERT_FALSE(result[0].label);
+
+        // Query two items
+        items.push_back(make_zero_item());
+        items[0][0] = 1;
+        items[1][0] = 2;
+        result = recv.query(items, client_);
+        ASSERT_EQ(2, result.size());
+        ASSERT_TRUE(result[0].found);
+        ASSERT_TRUE(result[0].label);
+        ASSERT_FALSE(result[1].found);
+        ASSERT_FALSE(result[1].label);
+
+        label = result[0].label.get_as<uint16_t>();
+        all_of(label.begin(), label.end(), [](auto a) { return a == 1; });
+
+        stop_listen();
+    }
+
+    TEST_F(ReceiverTests, MultiThreadLabels)
+    {
+        start_listen(/* labels */ true);
+
+        // First query for the parameters
+        PSIParams params = Receiver::request_params(client_);
+
+        Receiver recv(params, 2);
+
+        // Give the sender the secret key so they can fake responses
+        get_context()->set_secret(*recv.crypto_context()->secret_key());
+        get_context()->set_evaluator();
+
+        // Empty query; empty response
+        vector<Item> items;
+        auto result = recv.query(items, client_);
+        ASSERT_TRUE(result.empty());
+
+        // Cannot query the empty item
+        items.push_back(make_zero_item());
+        ASSERT_THROW(result = recv.query(items, client_), invalid_argument);
+
+        // Query a single non-empty item
+        items[0][0] = 1;
+        result = recv.query(items, client_);
+        ASSERT_EQ(1, result.size());
+        ASSERT_TRUE(result[0].found);
+        ASSERT_TRUE(result[0].label);
+
+        auto label = result[0].label.get_as<uint16_t>();
+        all_of(label.begin(), label.end(), [](auto a) { return a == 1; });
+
+        // Query a single non-empty item
+        items[0][0] = 2;
+        result = recv.query(items, client_);
+        ASSERT_EQ(1, result.size());
+        ASSERT_FALSE(result[0].found);
+        ASSERT_FALSE(result[0].label);
+
+        // Query two items
+        items.push_back(make_zero_item());
+        items[0][0] = 1;
+        items[1][0] = 2;
+        result = recv.query(items, client_);
+        ASSERT_EQ(2, result.size());
+        ASSERT_TRUE(result[0].found);
+        ASSERT_FALSE(result[1].found);
+        ASSERT_TRUE(result[0].label);
+        ASSERT_FALSE(result[1].label);
+
+        label = result[0].label.get_as<uint16_t>();
+        all_of(label.begin(), label.end(), [](auto a) { return a == 1; });
 
         stop_listen();
     }

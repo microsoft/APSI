@@ -50,8 +50,8 @@ namespace apsi
             template<typename T, typename = std::enable_if_t<std::is_standard_layout<T>::value>>
             gsl::span<std::add_const_t<T>> get_as() const
             {
-                return { reinterpret_cast<std::add_const_t<T>*>(label_->data().data(), 
-                    label_->data().size() / sizeof(T)) };
+                return { reinterpret_cast<std::add_const_t<T>*>(label_->data().data()), 
+                    label_->data().size() / sizeof(T) };
             }
 
             template<typename CharT = char>
@@ -63,11 +63,11 @@ namespace apsi
 
             explicit operator bool() const noexcept
             {
-                return !label_;
+                return !!label_;
             }
 
         private:
-            std::unique_ptr<Bitstring> label_;
+            std::unique_ptr<Bitstring> label_ = nullptr;
         };
 
         class MatchRecord 
@@ -89,12 +89,6 @@ namespace apsi
             static constexpr std::uint64_t cuckoo_table_insert_attempts = 500;
 
             /**
-            Constructs a new receiver without parameters specified. In this case the receiver expects to get the
-            parameters from a sender in the beginning of a query.
-            */
-            Receiver(std::size_t thread_count);
-
-            /**
             Constructs a new receiver with parameters specified. In this case the receiver has specified the parameters
             and expects the sender to use the same set.
             */
@@ -105,10 +99,18 @@ namespace apsi
             */
             void reset_keys();
 
-            bool is_initialized() const
+            /**
+            Returns the current CryptoContext.
+            */
+            std::shared_ptr<const CryptoContext> crypto_context() const
             {
-                return params_ && crypto_context_;
+                return crypto_context_;
             }
+
+            /**
+            Performs a parameter request and returns the receiver parameters.
+            */
+            static PSIParams request_params(network::Channel &chl);
 
             /**
             Performs a PSI or labeled PSI (depending on the sender) query. The query is a vector of items, and the
@@ -136,7 +138,7 @@ namespace apsi
                 std::unordered_map<std::size_t, std::size_t> &table_idx_to_item_idx);
 
             void result_package_worker(
-                std::atomic<std::uint32_t> &package_count,
+                std::atomic<std::int32_t> &package_count,
                 std::vector<MatchRecord> &mrs,
                 const std::unordered_map<std::size_t, std::size_t> &table_idx_to_item_idx,
                 network::Channel &chl) const;
@@ -149,7 +151,7 @@ namespace apsi
 
             std::unique_ptr<PSIParams> params_;
 
-            std::unique_ptr<CryptoContext> crypto_context_;
+            std::shared_ptr<CryptoContext> crypto_context_;
 
             SEALObject<seal::RelinKeys> relin_keys_;
 
