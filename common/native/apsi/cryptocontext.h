@@ -30,6 +30,12 @@ namespace apsi
             encoder_ = std::make_shared<seal::BatchEncoder>(seal_context_);
         }
 
+        void set_evaluator()
+        {
+            relin_keys_.reset();
+            evaluator_ = std::make_shared<seal::Evaluator>(seal_context_);
+        }
+
         void set_evaluator(seal::RelinKeys relin_keys)
         {
             relin_keys_ = std::make_shared<seal::RelinKeys>(std::move(relin_keys));
@@ -38,8 +44,22 @@ namespace apsi
 
         void set_secret(seal::SecretKey secret_key)
         {
-            encryptor_ = std::make_shared<seal::Encryptor>(seal_context_, secret_key);
-            decryptor_ = std::make_shared<seal::Decryptor>(seal_context_, secret_key);
+            secret_key_ = std::make_shared<seal::SecretKey>(secret_key);
+            encryptor_ = std::make_shared<seal::Encryptor>(seal_context_, *secret_key_);
+            decryptor_ = std::make_shared<seal::Decryptor>(seal_context_, *secret_key_);
+        }
+
+        void clear_secret()
+        {
+            secret_key_.reset();
+            encryptor_.reset();
+            decryptor_.reset();
+        }
+
+        void clear_evaluator()
+        {
+            relin_keys_.reset();
+            evaluator_.reset();
         }
 
         const std::shared_ptr<seal::SEALContext> &seal_context() const
@@ -55,6 +75,11 @@ namespace apsi
         const std::shared_ptr<seal::BatchEncoder> &encoder() const
         {
             return encoder_;
+        }
+
+        const std::shared_ptr<seal::SecretKey> &secret_key() const
+        {
+            return secret_key_;
         }
 
         const std::shared_ptr<seal::Encryptor> &encryptor() const
@@ -76,6 +101,8 @@ namespace apsi
         std::shared_ptr<seal::SEALContext> seal_context_;
 
         std::shared_ptr<seal::RelinKeys> relin_keys_;
+
+        std::shared_ptr<seal::SecretKey> secret_key_;
 
         std::shared_ptr<seal::Encryptor> encryptor_;
 
