@@ -177,11 +177,8 @@ namespace apsi
             uint32_t window_size = params_.table_params().window_size;
             uint32_t base = uint32_t(1) << window_size;
 
-            // Ceiling of num_of_powers / (base - 1)
-            uint32_t given_digits = (static_cast<uint32_t>(num_of_powers) + base - 2) / (base - 1);
-
             // Prepare the windowing information
-            WindowingDag dag(max_exponent, window_size, given_digits);
+            WindowingDag dag(max_exponent, base);
 
             // Create a state per each bundle index; this contains information about whether the
             // powers for that bundle index have been computed
@@ -211,7 +208,7 @@ namespace apsi
                 t.join();
             }
 
-            Log::info("Finished processing query");
+            APSI_LOG_INFO("Finished processing query");
         }
 
         void Sender::query_worker(
@@ -236,7 +233,7 @@ namespace apsi
                 compute_powers(powers_at_this_bundle_idx, crypto_context, dag, states[bundle_idx]);
 
                 // Next, iterate over each bundle with this bundle index
-                auto bundle_caches = sender_db_->get_cache(bundle_idx).size();
+                auto bundle_caches = sender_db_->get_cache(bundle_idx);
                 size_t bundle_count = bundle_caches.size();
 
                 // When using C++17 this function may be multi-threaded in the future
@@ -273,7 +270,7 @@ namespace apsi
         */
         void Sender::compute_powers(
             CiphertextPowers &powers,
-            CryptoContext &crypto_context,
+            const CryptoContext &crypto_context,
             const WindowingDag &dag,
             WindowingDag::State &state
         ) {
@@ -296,7 +293,7 @@ namespace apsi
             while (true)
             {
                 // Atomically get the next_node counter (this tells us where to start working) and increment it
-                size_t node_idx = static_cast<size_t>(state.next_node.fetch_add(1));
+                size_t node_idx = static_cast<size_t>(state.next_node->fetch_add(1));
                 // If we've traversed the whole DAG, we're done
                 if (node_idx >= dag.nodes_.size())
                 {

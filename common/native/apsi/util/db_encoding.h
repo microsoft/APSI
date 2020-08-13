@@ -31,6 +31,9 @@ namespace apsi
         // An element of a field with prime modulus < 2⁶⁴
         using felt_t = std::uint64_t;
 
+        // The unit type
+        struct monostate {};
+
         // A representation of item-label as a sequence of felt_t pairs, or item-unit as a sequence of pairs where the
         // first element is felt_t and the second is monostate
         template<typename L>

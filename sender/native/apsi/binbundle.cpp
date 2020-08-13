@@ -11,10 +11,10 @@
 #include "apsi/util/interpolate.h"
 
 // SEAL
-#include <seal/util/defines.h>
-#include <seal/util/iterator.h>
-#include <seal/util/uintcore.h>
-#include <seal/util/uintarithsmallmod.h>
+#include "seal/util/defines.h"
+#include "seal/util/iterator.h"
+#include "seal/util/uintcore.h"
+#include "seal/util/uintarithsmallmod.h"
 
 using namespace std;
 using namespace seal;
@@ -96,7 +96,7 @@ namespace apsi
             {
                 // The number of data bits we need to have left in each ciphertext coefficient
                 int compr_coeff_bit_count = parms.plain_modulus().bit_count() +
-                    util::get_significant_bit_count(parms.poly_modulus_degree());
+                    seal::util::get_significant_bit_count(parms.poly_modulus_degree());
 
                 int coeff_mod_bit_count = parms.coeff_modulus()[0].bit_count();
 
@@ -118,13 +118,14 @@ namespace apsi
             }
 
             return result;
+        }
 
         /**
         Helper function. Computes the "matching" polynomial of a bin, i.e., the unique monic polynomial whose roots are
         precisely the items of the bin. Stores the results in cache_.felt_matching_polyns.
         */
         template<typename L>
-        FEltPolyn compute_matching_polyn(map<felt_t, L> &bin, Modulus &mod)
+        FEltPolyn compute_matching_polyn(const map<felt_t, L> &bin, const Modulus &mod)
         {
             // Collect the roots
             vector<felt_t> roots(bin.size());
@@ -135,13 +136,13 @@ namespace apsi
             // Compute the polynomial
             FEltPolyn p = polyn_with_roots(roots, mod);
 
-            return p
+            return p;
         }
 
         /**
         Helper function. Computes the Newton interpolation polynomial of a bin
         */
-        FEltPolyn compute_newton_polyn(map<felt_t, felt_t> &bin, Modulus &mod)
+        FEltPolyn compute_newton_polyn(const map<felt_t, felt_t> &bin, const Modulus &mod)
         {
             // Collect the items and labels into different vectors
             vector<felt_t> points;
@@ -167,10 +168,11 @@ namespace apsi
         encoding and NTT ops.
         */
         BatchedPlaintextPolyn::BatchedPlaintextPolyn(
-            std::vector<FEltPolyn> &polyns,
-            std::shared_ptr<seal::Evaluator> evaluator,
-            std::shared_ptr<seal::BatchEncoder> batch_encoder
-        ) {
+            vector<FEltPolyn> &polyns,
+            CryptoContext crypto_context
+        )
+        : crypto_context_(crypto_context)
+        {
             // Find the highest degree polynomial in the list. The max degree determines how many Plaintexts we
             // need to make
             size_t max_deg = 0;
@@ -205,12 +207,15 @@ namespace apsi
 
                 // Now let pt be the Plaintext consisting of all those degree i coefficients
                 Plaintext pt;
-                batch_encoder_->encode(coeffs_of_deg_i, pt);
+                crypto_context_.encoder()->encode(coeffs_of_deg_i, pt);
                 // Convert to NTT form so our intersection computations later are fast
-                evaluator_->transform_to_ntt_inplace(pt, seal_ctx_->first_parms_id());
+                crypto_context_.evaluator()->transform_to_ntt_inplace(
+                        pt,
+                        crypto_context_.seal_context()->first_parms_id()
+                );
 
-                // Push the new Plaintext to the cache
-                cache_.plaintext_polyn_coeffs_.emplace_back(pt);
+                // Push the new Plaintext
+                batched_coeffs_.emplace_back(pt);
             }
         }
 
@@ -230,11 +235,11 @@ namespace apsi
         Returns the modulus that defines the finite field that we're working in
         */
         template<typename L>
-        Modulus& BinBundle<L>::field_mod()
+        const Modulus& BinBundle<L>::field_mod()
         {
             // Forgive me
-            ContextData &context_data = crypto_context_.seal_context()->first_context_data();
-            return context_data.parms().plain_modulus();
+            const auto &context_data = crypto_context_.seal_context()->first_context_data();
+            return context_data->parms().plain_modulus();
         }
 
         /**
@@ -249,7 +254,7 @@ namespace apsi
 
             // Compute and cache the batched Newton interpolation polynomials iff they exist. They're only computed for
             // labeled PSI.
-            if (cache.felt_interp_polyns.size() > 0)
+            if (cache_.felt_interp_polyns.size() > 0)
             {
                 BatchedPlaintextPolyn p(cache_.felt_interp_polyns);
                 cache_.batched_interp_polyn = p;
@@ -266,8 +271,8 @@ namespace apsi
         int BinBundle<L>::multi_insert_dry_run(
             vector<pair<felt_t, L>> &item_label_pairs,
             size_t start_bin_idx
-        ) {
-            return multi_insert(pairs, start_bin_idx, true);
+        ) const {
+            return multi_insert(item_label_pairs, start_bin_idx, true);
         }
 
         /**
@@ -277,10 +282,10 @@ namespace apsi
         */
         template<typename L>
         int BinBundle<L>::multi_insert_for_real(
-            vector<pair<felt_t, L>> item_label_pairs,
+            vector<pair<felt_t, L>> &item_label_pairs,
             size_t start_bin_idx
         ) {
-            return multi_insert(pairs, start_bin_idx, false);
+            return multi_insert(item_label_pairs, start_bin_idx, false);
         }
 
         /**
@@ -291,7 +296,7 @@ namespace apsi
         */
         template<typename L>
         int BinBundle<L>::multi_insert(
-            vector<pair<felt_t, L>> item_label_pairs,
+            vector<pair<felt_t, L>> &item_label_pairs,
             size_t start_bin_idx,
             bool dry_run
         ) {
@@ -312,7 +317,7 @@ namespace apsi
 
             // If we're here, that means we can insert in all bins
             size_t max_bin_size = 0;
-            size_t curr_bin_idx = start_bin_idx;
+            curr_bin_idx = start_bin_idx;
             for (auto &pair : item_label_pairs)
             {
                 map<felt_t, L> curr_bin = &bins_.at(curr_bin_idx);
@@ -375,7 +380,7 @@ namespace apsi
         template<typename L>
         const BinBundleCache &BinBundle<L>::get_cache()
         {
-            if (cach_invalid_)
+            if (cache_invalid_)
             {
                 throw logic_error("Tried to retrieve stale cache");
             }
@@ -407,7 +412,7 @@ namespace apsi
         void UnlabeledBinBundle::regen_polyns()
         {
             // Get the field modulus. We need this for polynomial calculations
-            Modulus& mod = field_mod();
+            const Modulus& mod = field_mod();
 
             // Clear the cache before we push to it
             cache_.felt_matching_polyns.clear();
@@ -428,21 +433,21 @@ namespace apsi
         void LabeledBinBundle::regen_polyns()
         {
             // Get the field modulus. We need this for polynomial calculations
-            Modulus& mod = field_mod();
+            const Modulus& mod = field_mod();
 
             // Clear the cache before we push to it
             cache_.felt_matching_polyns.clear();
             cache_.felt_interp_polyns.clear();
 
             // For each bin in the bundle, compute and cache the corresponding "matching" and Newton polynomials
-            for (map<felt_t, monostate> &bin : bins_)
+            for (map<felt_t, felt_t> &bin : bins_)
             {
                 // Compute and cache the matching polynomial
                 FEltPolyn p = compute_matching_polyn(bin, mod);
                 cache_.felt_matching_polyns.emplace_back(p);
 
                 // Compute and cache the Newton polynomial
-                FEltPolyn p = compute_newton_polyn(bin, mod);
+                p = compute_newton_polyn(bin, mod);
                 cache_.felt_interp_polyns.emplace_back(p);
             }
         }

@@ -10,7 +10,10 @@
 
 // APSI
 #include "apsi/item.h"
-#include "apsi/cryptocontext.h" 
+#include "apsi/cryptocontext.h"
+#include "apsi/util/db_encoding.h"
+
+using namespace apsi::util;
 
 namespace apsi
 {
@@ -50,15 +53,20 @@ namespace apsi
             */
             std::vector<seal::Plaintext> batched_coeffs_;
 
+            /**
+            We need this to compute eval()
+            */
+            CryptoContext crypto_context_;
+
         public:
 
             /**
-            Constructs a batched Plaintext polynomial from a list of polynomials. Takes SEAL context stuff to do
-            encoding and NTT ops.
+            Constructs a batched Plaintext polynomial from a list of polynomials. Takes an evaluator and batch encoder
+            to do encoding and NTT ops.
             */
             BatchedPlaintextPolyn(
-                std::vector<FEltPolyn> polyns,
-                CryptoContext crypto_context_
+                std::vector<FEltPolyn> &polyns,
+                CryptoContext crypto_context
             );
 
             /**
@@ -115,17 +123,6 @@ namespace apsi
         private:
 
             /**
-            The bins of the BinBundle. Each bin is a key-value store, where the keys are (chunks of the OPRF'd) DB
-            items and the labels are either field elements or empty (a unit type).
-            */
-            std::vector<std::map<felt_t, L>> bins_;
-
-            /**
-            A cache of all the computations we can do on the bins. This is empty by default
-            */
-            BinBundleCache cache_;
-
-            /**
             This is true iff cache_ needs to be regenerated
             */
             bool cache_invalid_;
@@ -136,14 +133,9 @@ namespace apsi
             seal::Modulus mod_;
 
             /**
-            Stuff we need to make Plaintexts
+            We need this to make Plaintexts
             */
             CryptoContext crypto_context_;
-
-            /**
-            Returns the modulus that defines the finite field that we're working in
-            */
-            seal::Modulus field_mod();
 
             /**
             Computes and caches the appropriate polynomials of each bin. For unlabeled PSI, this is just the "matching"
@@ -156,6 +148,24 @@ namespace apsi
             Batches this BinBundle's polynomials into SEAL Plaintexts. Resulting values are stored in cache_.
             */
             void regen_plaintexts();
+
+        protected:
+
+            /**
+            The bins of the BinBundle. Each bin is a key-value store, where the keys are (chunks of the OPRF'd) DB
+            items and the labels are either field elements or empty (a unit type).
+            */
+            std::vector<std::map<felt_t, L> > bins_;
+
+            /**
+            A cache of all the computations we can do on the bins. This is empty by default
+            */
+            BinBundleCache cache_;
+
+            /**
+            Returns the modulus that defines the finite field that we're working in
+            */
+            const seal::Modulus& field_mod();
 
         public:
             BinBundle(
@@ -170,7 +180,7 @@ namespace apsi
             On failed insertion, returns -1
             */
             int multi_insert_dry_run(
-                vector<pair<felt_t, L>> &item_label_pairs,
+                std::vector<std::pair<felt_t, L> > &item_label_pairs,
                 size_t start_bin_idx
             ) const;
 
@@ -179,9 +189,8 @@ namespace apsi
             On success, returns the size of the largest bin bins in the modified range, after insertion has taken place
             On failed insertion, returns -1. On failure, no modification is made to the BinBundle.
             */
-            template<typename L>
             int multi_insert_for_real(
-                vector<pair<felt_t, L>> item_label_pairs,
+                std::vector<std::pair<felt_t, L> > &item_label_pairs,
                 size_t start_bin_idx
             );
 
@@ -191,9 +200,8 @@ namespace apsi
             after insertion has taken place On failed insertion, returns -1. On failure, no modification is made to the
             BinBundle.
             */
-            template<typename L>
-            int BinBundle<L>::multi_insert(
-                vector<pair<felt_t, L>> item_label_pairs,
+            int multi_insert(
+                std::vector<std::pair<felt_t, L> > &item_label_pairs,
                 size_t start_bin_idx,
                 bool dry_run
             );
@@ -237,7 +245,7 @@ namespace apsi
             polynomial. Resulting values are stored in cache_.
             */
             void regen_polyns();
-        }
+        }; // class UnlabeledBinBundle
 
         // A LabeledBinBundle is a BinBundle<L> where L (the label type) is felt_t
         class LabeledBinBundle: public BinBundle<felt_t>
@@ -248,7 +256,7 @@ namespace apsi
             polynomial and the Newton interpolation polynomial. Resulting values are stored in cache_.
             */
             void regen_polyns();
-        }
+        }; // class LabeledBinBundle
 
     } // namespace sender
 } // namespace apsi

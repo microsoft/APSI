@@ -61,7 +61,7 @@ namespace apsi
             Returns a set of DB cache references corresponding to the bundles at the given
             bundle index.
             */
-            std::set<BinBundleCache&> get_cache(std::uint32_t bundle_idx);
+            std::set<const BinBundleCache&> get_cache(std::uint32_t bundle_idx);
 
             const PSIParams &get_params() const
             {
@@ -85,12 +85,6 @@ namespace apsi
             */
             PSIParams params_;
 
-            /**
-            All the BinBundles in the DB, indexed by bin index. The set at bundle index i contains all the BinBundles
-            with bundle index i
-            */
-            std::vector<std::set<BinBundle<L> > > bin_bundles_;
-
         private:
             /**
             A read-write lock to protect the database from modification while in use.
@@ -101,31 +95,43 @@ namespace apsi
         class LabeledSenderDB : public SenderDB
         {
             /**
+            All the BinBundles in the DB, indexed by bin index. The set at bundle index i contains all the BinBundles
+            with bundle index i
+            */
+            std::vector<std::set<BinBundle<felt_t> > > bin_bundles_;
+
+            /**
             Clears the database and inserts the given data, using at most thread_count threads
             */
-            void set_data(const std::map<Item, util::FullWidthLabel> &data, std::size_t thread_count);
-            void set_data(const std::map<Item, util::monostate> &data, std::size_t thread_count);
+            void set_data(const std::map<Item, FullWidthLabel> &data, std::size_t thread_count);
+            void set_data(const std::map<Item, monostate> &data, std::size_t thread_count);
 
             /**
             Inserts the given data into the database, using at most thread_count threads
             */
-            void add_data(const std::map<Item, util::FullWidthLabel> &data, std::size_t thread_count);
-            void add_data(const std::map<Item, util::monostate> &data, std::size_t thread_count);
+            void add_data(const std::map<Item, FullWidthLabel> &data, std::size_t thread_count);
+            void add_data(const std::map<Item, monostate> &data, std::size_t thread_count);
         }; // class LabeledSenderDB
 
         class UnabeledSenderDB : public SenderDB
         {
             /**
+            All the BinBundles in the DB, indexed by bin index. The set at bundle index i contains all the BinBundles
+            with bundle index i
+            */
+            std::vector<std::set<BinBundle<monostate> > > bin_bundles_;
+
+            /**
             Clears the database and inserts the given data, using at most thread_count threads
             */
-            void set_data(const std::map<Item, util::FullWidthLabel> &data, std::size_t thread_count);
-            void set_data(const std::map<Item, util::monostate> &data, std::size_t thread_count);
+            void set_data(const std::map<Item, FullWidthLabel> &data, std::size_t thread_count);
+            void set_data(const std::map<Item, monostate> &data, std::size_t thread_count);
 
             /**
             Inserts the given data into the database, using at most thread_count threads
             */
-            void add_data(const std::map<Item, util::FullWidthLabel> &data, std::size_t thread_count);
-            void add_data(const std::map<Item, util::monostate> &data, std::size_t thread_count);
+            void add_data(const std::map<Item, FullWidthLabel> &data, std::size_t thread_count);
+            void add_data(const std::map<Item, monostate> &data, std::size_t thread_count);
         }; // class UnlabeledSenderDB
     }  // namespace sender
 } // namespace apsi

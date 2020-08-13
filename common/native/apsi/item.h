@@ -23,9 +23,6 @@
 
 namespace apsi
 {
-    // The unit type
-    struct monostate {};
-
     /**
     Identical to Bitstring, except the underlying data is not owned.
     */
