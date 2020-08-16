@@ -85,7 +85,7 @@ namespace apsi
         class Sender
         {
         public:
-            Sender(const PSIParams &params, std::size_t thread_count);
+            Sender(const PSIParams &params, std::size_t thread_count = 0);
 
             /**
             Clears data in sender's database.
@@ -165,7 +165,7 @@ namespace apsi
             */
             void compute_powers(
                 CiphertextPowers &powers,
-                CryptoContext &crypto_context,
+                const CryptoContext &crypto_context,
                 const WindowingDag &dag,
                 WindowingDag::State &state
             );

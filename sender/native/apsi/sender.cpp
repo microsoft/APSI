@@ -102,14 +102,10 @@ namespace apsi
 
     namespace sender
     {
-        Sender::Sender(const PSIParams &params, size_t thread_count)
-            : params_(params), thread_count_(thread_count),
-              seal_context_(SEALContext::Create(params_.seal_params()))
+        Sender::Sender(const PSIParams &params, size_t thread_count) :
+            params_(params), seal_context_(SEALContext::Create(params_.seal_params()))
         {
-            if (thread_count < 1)
-            {
-                throw invalid_argument("thread_count must be at least 1");
-            }
+            thread_count_ = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
         }
 
         void Sender::query(

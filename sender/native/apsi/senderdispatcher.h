@@ -8,7 +8,7 @@
 #include <memory>
 
 // APSI
-#include "apsi/network/channel.h"
+#include "apsi/network/network_channel.h"
 #include "apsi/network/sender_operation.h"
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/sender.h"
@@ -46,17 +46,17 @@ namespace apsi
             /**
             Dispatch a Get Parameters request to the Sender.
             */
-            void dispatch_parms(std::unique_ptr<network::SenderOperation> sop, network::Channel &channel);
+            void dispatch_parms(std::unique_ptr<network::NetworkSenderOperation> sop, network::SenderChannel &channel);
 
             /**
             Dispatch an OPRF query request to the Sender.
             */
-            void dispatch_oprf(std::unique_ptr<network::SenderOperation> sop, network::Channel &channel);
+            void dispatch_oprf(std::unique_ptr<network::NetworkSenderOperation> sop, network::SenderChannel &channel);
 
             /**
             Dispatch a Query request to the Sender.
             */
-            void dispatch_query(std::unique_ptr<network::SenderOperation> sop, network::Channel &channel);
+            void dispatch_query(std::unique_ptr<network::NetworkSenderOperation> sop, network::SenderChannel &channel);
         }; // class SenderDispatcher
     }      // namespace sender
 } // namespace apsi

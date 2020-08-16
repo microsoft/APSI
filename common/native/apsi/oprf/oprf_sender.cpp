@@ -6,11 +6,14 @@
 
 // APSI
 #include "apsi/oprf/oprf_sender.h"
+#include "apsi/util/utils.h"
 
 using namespace std;
 
 namespace apsi
 {
+    using namespace util;
+
     namespace oprf
     {
         void OPRFKey::save(ostream &stream) const
@@ -85,21 +88,23 @@ namespace apsi
 
         void OPRFSender::ComputeHashes(
             gsl::span<const oprf_item_type> oprf_items, const OPRFKey &oprf_key,
-            gsl::span<oprf_hash_type> oprf_hashes, const int threads)
+            gsl::span<oprf_hash_type> oprf_hashes, size_t thread_count)
         {
             if (oprf_items.size() != oprf_hashes.size())
             {
                 throw invalid_argument("oprf_items size is incompatible with oprf_hashes size");
             }
 
-            size_t thread_count =
-                threads < 1 ? static_cast<size_t>(thread::hardware_concurrency()) : static_cast<size_t>(threads);
+            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
+
+            // Partition the work evenly across all threads
+            vector<pair<size_t, size_t>> work_partitions = partition_evenly(oprf_items.size(), thread_count);
 
             vector<thread> thrds;
             for (size_t t = 0; t < thread_count; t++)
             {
-                thrds.emplace_back([&](size_t idx) {
-                    compute_hashes_worker(idx, thread_count, oprf_items, oprf_key, oprf_hashes); }, t);
+                thrds.emplace_back([&](pair<size_t, size_t> partition) {
+                    compute_hashes_worker(partition, oprf_items, oprf_key, oprf_hashes); }, work_partitions[t]);
             }
 
             for (auto &t : thrds)
@@ -109,11 +114,12 @@ namespace apsi
         }
 
         void OPRFSender::compute_hashes_worker(
-            const size_t thread_idx, const size_t threads,
-            gsl::span<const oprf_item_type> oprf_items, const OPRFKey &oprf_key,
+            pair<size_t, size_t> partition,
+            gsl::span<const oprf_item_type> oprf_items,
+            const OPRFKey &oprf_key,
             gsl::span<oprf_hash_type> oprf_hashes)
         {
-            for (size_t i = thread_idx; i < oprf_items.size(); i += threads)
+            for (size_t i = partition.first; i < partition.second; i++)
             {
                 // Create an elliptic curve point from the item
                 ECPoint ecpt({ reinterpret_cast<const unsigned char *>(oprf_items[i].data()), oprf_item_size });

@@ -83,7 +83,7 @@ namespace APSITests
         // Create random key
         OPRFKey oprf_key(rng_factory);
 
-        vector<Item> out_items(item_count);
+        vector<HashedItem> out_items(item_count);
         OPRFSender::ComputeHashes(items, oprf_key, out_items);
 
         vector<SEAL_BYTE> query(item_count * oprf_query_size);
@@ -92,49 +92,13 @@ namespace APSITests
         vector<SEAL_BYTE> responses(item_count * oprf_response_size);
         OPRFSender::ProcessQueries(query, oprf_key, responses);
 
-        vector<Item> receiver_hashes(item_count);
+        vector<HashedItem> receiver_hashes(item_count);
         receiver.process_responses(responses, receiver_hashes);
 
         for (auto i = 0; i < item_count; i++)
         {
             ASSERT_EQ(out_items[i][0], receiver_hashes[i][0]);
             ASSERT_EQ(out_items[i][1], receiver_hashes[i][1]);
-        }
-    }
-
-    TEST(OPRFTests, OPRFInplaceOperation)
-    {
-        int item_count = 100;
-        vector<Item> items;
-
-        shared_ptr<UniformRandomGeneratorFactory> rng_factory(make_shared<BlakePRNGFactory>());
-        auto rng = rng_factory->create();
-        for (auto i = 0; i < item_count; i++)
-        {
-            Item it;
-            rng->generate(sizeof(Item), reinterpret_cast<SEAL_BYTE *>(it.data()));
-            items.emplace_back(move(it));
-        }
-
-        // Create random key
-        OPRFKey oprf_key(rng_factory);
-
-        vector<Item> original_items(items);
-        OPRFSender::ComputeHashes(items, oprf_key);
-
-        vector<SEAL_BYTE> query(item_count * oprf_query_size);
-        OPRFReceiver receiver(original_items, query);
-
-        vector<SEAL_BYTE> responses(item_count * oprf_response_size);
-        OPRFSender::ProcessQueries(query, oprf_key, responses);
-
-        vector<Item> receiver_hashes(item_count);
-        receiver.process_responses(responses, receiver_hashes);
-
-        for (auto i = 0; i < item_count; i++)
-        {
-            ASSERT_EQ(items[i][0], receiver_hashes[i][0]);
-            ASSERT_EQ(items[i][1], receiver_hashes[i][1]);
         }
     }
 } // namespace APSITests
