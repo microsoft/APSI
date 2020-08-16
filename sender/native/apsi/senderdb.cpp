@@ -157,6 +157,7 @@ namespace apsi
                 uint32_t max_bin_size,
                 size_t thread_count
             ) {
+                thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
 
                 // Collect the bundle indices and partition them into thread_count many partitions. By some uniformity
                 // assumption, the number of things to insert per partition should be roughly the same. Note that
@@ -371,6 +372,8 @@ namespace apsi
         */
         void LabeledSenderDB::add_data(const std::map<HashedItem, FullWidthLabel> &data, size_t thread_count)
         {
+            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
+
             STOPWATCH(sender_stopwatch, "LabeledSenderDB::add_data");
 
             // Lock the database for writing
@@ -401,6 +404,8 @@ namespace apsi
         */
         void UnlabeledSenderDB::add_data(const std::map<HashedItem, monostate> &data, size_t thread_count)
         {
+            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
+
             STOPWATCH(sender_stopwatch, "LabeledSenderDB::add_data");
 
             // Lock the database for writing
