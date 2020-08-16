@@ -26,7 +26,7 @@ namespace apsi
     namespace sender
     {
         void SenderDispatcher::run(
-            const atomic<bool> &stop, int port, shared_ptr<const OPRFKey> oprf_key, shared_ptr<SenderDB> sender_db)
+            const atomic<bool> &stop, int port, shared_ptr<const OPRFKey> oprf_key)
         {
             SenderChannel chl;
 
@@ -37,7 +37,6 @@ namespace apsi
             chl.bind(ss.str());
 
             oprf_key_ = move(oprf_key);
-            sender_->set_db(move(sender_db));
 
             bool logged_waiting = false;
 
