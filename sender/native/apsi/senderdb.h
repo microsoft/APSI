@@ -36,12 +36,15 @@ namespace apsi
         class SenderDB
         {
         public:
-            SenderDB(PSIParams params);
+            SenderDB(PSIParams params) :
+                params_(params),
+                crypto_context_(seal::SEALContext::Create(params.seal_params()))
+            {}
 
             /**
             Clears the database
             */
-            void clear_db();
+            virtual void clear_db() = 0;
 
             /**
             Clears the database and inserts the given data, using at most thread_count threads. Only one of these is
@@ -61,7 +64,7 @@ namespace apsi
             Returns a set of DB cache references corresponding to the bundles at the given
             bundle index.
             */
-            std::set<const BinBundleCache&> get_cache(std::uint32_t bundle_idx);
+            virtual std::set<std::reference_wrapper<const BinBundleCache> > get_cache_at(std::uint32_t bundle_idx) = 0;
 
             const PSIParams &get_params() const
             {
@@ -71,14 +74,18 @@ namespace apsi
             /**
             Returns the total number of bin bundles.
             */
-            std::size_t bin_bundle_count() const;
+            virtual std::size_t bin_bundle_count() = 0;
 
-            seal::util::ReaderLock get_reader_lock() const
+            seal::util::ReaderLock get_reader_lock()
             {
                 return db_lock_.acquire_read();
             }
 
         protected:
+            /**
+            Necessary for evaluating polynomials of Plaintexts
+            */
+            CryptoContext crypto_context_;
 
             /**
             This defines our SEAL context, base field, item size, etc.
@@ -94,11 +101,25 @@ namespace apsi
 
         class LabeledSenderDB : public SenderDB
         {
+            // Inherit SenderDB constructor
+            using SenderDB::SenderDB;
+
             /**
             All the BinBundles in the DB, indexed by bin index. The set at bundle index i contains all the BinBundles
             with bundle index i
             */
             std::vector<std::set<BinBundle<felt_t> > > bin_bundles_;
+
+            /**
+            Returns the total number of bin bundles.
+            */
+            std::size_t bin_bundle_count();
+
+            /**
+            Returns a set of DB cache references corresponding to the bundles at the given
+            bundle index.
+            */
+            std::set<std::reference_wrapper<const BinBundleCache> > get_cache_at(std::uint32_t bundle_idx);
 
             /**
             Clears the database and inserts the given data, using at most thread_count threads
@@ -113,13 +134,27 @@ namespace apsi
             void add_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count);
         }; // class LabeledSenderDB
 
-        class UnabeledSenderDB : public SenderDB
+        class UnlabeledSenderDB : public SenderDB
         {
+            // Inherit SenderDB constructor
+            using SenderDB::SenderDB;
+
             /**
             All the BinBundles in the DB, indexed by bin index. The set at bundle index i contains all the BinBundles
             with bundle index i
             */
             std::vector<std::set<BinBundle<monostate> > > bin_bundles_;
+
+            /**
+            Returns the total number of bin bundles.
+            */
+            std::size_t bin_bundle_count();
+
+            /**
+            Returns a set of DB cache references corresponding to the bundles at the given
+            bundle index.
+            */
+            std::set<std::reference_wrapper<const BinBundleCache> > get_cache_at(std::uint32_t bundle_idx);
 
             /**
             Clears the database and inserts the given data, using at most thread_count threads

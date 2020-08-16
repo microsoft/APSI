@@ -229,7 +229,7 @@ namespace apsi
                 compute_powers(powers_at_this_bundle_idx, crypto_context, dag, states[bundle_idx]);
 
                 // Next, iterate over each bundle with this bundle index
-                auto bundle_caches = sender_db_->get_cache(bundle_idx);
+                auto bundle_caches = sender_db_->get_cache_at(bundle_idx);
                 size_t bundle_count = bundle_caches.size();
 
                 // When using C++17 this function may be multi-threaded in the future
@@ -241,12 +241,14 @@ namespace apsi
                     rp->bundle_idx = bundle_idx;
 
                     // Compute the matching result and move to rp
-                    rp->psi_result = move(cache.batched_matching_polyn.eval(all_powers[bundle_idx]));
+                    const BatchedPlaintextPolyn &matching_polyn = cache.get().batched_matching_polyn;
+                    rp->psi_result = move(matching_polyn.eval(all_powers[bundle_idx]));
 
-                    if (cache.batched_interp_polyn)
+                    const BatchedPlaintextPolyn &interp_polyn = cache.get().batched_interp_polyn;
+                    if (interp_polyn)
                     {
                         // Compute the label result and move to rp
-                        rp->label_result.emplace_back(cache.batched_interp_polyn.eval(all_powers[bundle_idx]));
+                        rp->label_result.emplace_back(interp_polyn.eval(all_powers[bundle_idx]));
                     }
 
                     // Start sending on the channel 
@@ -303,8 +305,9 @@ namespace apsi
                 // who's writing to it. The _strong specifier here means that this doesn't fail spuriously, i.e., if the
                 // return value is false, it means that the comparison failed and someone else has begun working on this
                 // node. If this happens, just move along to the next node.
+                auto uncomputed = WindowingDag::NodeState::Uncomputed;
                 bool r = output_node_state.compare_exchange_strong(
-                    WindowingDag::NodeState::Uncomputed,
+                    uncomputed,
                     WindowingDag::NodeState::Computing
                 );
                 if (!r)
@@ -328,17 +331,18 @@ namespace apsi
                 evaluator->multiply(input0, input1, output);
 
                 // Relinearize and convert to NTT form
-                evaluator->relinearize_inplace(output, relin_keys);
+                evaluator->relinearize_inplace(output, *relin_keys);
                 evaluator->transform_to_ntt_inplace(output);
 
                 // Atomically transition this node from Computing to Done. Since we already "claimed" this node by
                 // marking it Computing, this MUST still be Computing. If it's not, someone stole our work against our
                 // wishes. This should never happen.
-                bool r = output_node_state.compare_exchange_strong(
-                    WindowingDag::NodeState::Computing,
+                auto computing = WindowingDag::NodeState::Computing;
+                bool s = output_node_state.compare_exchange_strong(
+                    computing,
                     WindowingDag::NodeState::Done
                 );
-                if (!r)
+                if (!s)
                 {
                     throw runtime_error("FATAL: A node's work was stolen from it. This should never happen.");
                 }
@@ -364,15 +368,15 @@ namespace apsi
                 // You only have to compute a ciphertext power if the power isn't already given, i.e., iff i isn't of
                 // the form x*base^y (for x < base), i.e., iff i isn't just 1 digit wrt the base, i.e., iff i has a
                 // nontrivial partition
-                if (partition.first && partition.second)
+                if (i1 && i2)
                 {
-                    Node node { partition, i, };
+                    Node node { { i1, i2 }, i, };
                     nodes_.emplace_back(node);
                 }
             }
 
             // Sort the DAG in increasing order by Hamming weight of their output
-            sort(nodes_.begin(), nodes_.end(), [](Node &node1, Node &node2) {
+            sort(nodes_.begin(), nodes_.end(), [base](const Node &node1, const Node &node2) -> bool {
                 return hamming_weight(node1.output, base) < hamming_weight(node2.output, base);
             });
 
@@ -382,7 +386,7 @@ namespace apsi
         /**
         Constructs the working state of a DAG. This includes the index to the next yet-to-be-computed node
         */
-        WindowingDag::State::State(WindowingDag &dag) : node_states(dag.max_power + 1)
+        WindowingDag::State::State(WindowingDag &dag)
         {
             // Workers start at the beginning of the nodes_ array, since that's where the lowest-weight nodes are
             next_node = make_unique<atomic<size_t>>();
@@ -391,7 +395,7 @@ namespace apsi
             // Everything is uncomputed at first
             for (auto &n : node_states)
             {
-                *n = NodeState::Uncomputed;
+                n.store(NodeState::Uncomputed);
             }
         }
     } // namespace sender
