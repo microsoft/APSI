@@ -112,7 +112,8 @@ namespace apsi
                 seal::RelinKeys relin_keys,
                 std::map<std::uint32_t, std::vector<SEALObject<seal::Ciphertext>>> query,
                 network::Channel &chl,
-                std::function<void(network::Channel &, std::unique_ptr<network::ResultPackage>)> send_fun = BasicSend);
+                std::function<void(network::Channel &, std::unique_ptr<network::ResultPackage>)> send_fun = BasicSend)
+                const;
 
             /**
             Return the PSI parameters.
@@ -149,7 +150,7 @@ namespace apsi
                 std::vector<std::vector<seal::Ciphertext>> &powers, const CryptoContext &crypto_context,
                 WindowingDag &dag, std::vector<WindowingDag::State> &states,
                 network::Channel &chl,
-                std::function<void(network::Channel &, std::unique_ptr<network::ResultPackage>)> send_fun);
+                std::function<void(network::Channel &, std::unique_ptr<network::ResultPackage>)> send_fun) const;
 
             /**
             Constructs all powers of receiver's items for the specified batch, based on the powers sent from the
@@ -168,7 +169,7 @@ namespace apsi
                 const CryptoContext &crypto_context,
                 const WindowingDag &dag,
                 WindowingDag::State &state
-            );
+            ) const;
 
             PSIParams params_;
 

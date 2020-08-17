@@ -27,7 +27,8 @@ namespace apsi
         public:
             SenderDispatcher() = delete;
 
-            SenderDispatcher(std::shared_ptr<sender::Sender> sender) : sender_(std::move(sender))
+            SenderDispatcher(std::shared_ptr<sender::SenderDB> sender_db, std::size_t thread_count) :
+                sender_db_(std::move(sender_db)), thread_count_(thread_count)
             {}
 
             /**
@@ -37,7 +38,9 @@ namespace apsi
                 const std::atomic<bool> &stop, int port, std::shared_ptr<const oprf::OPRFKey> oprf_key);
 
         private:
-            std::shared_ptr<sender::Sender> sender_;
+            std::shared_ptr<sender::SenderDB> sender_db_;
+
+            std::size_t thread_count_;
 
             std::shared_ptr<const oprf::OPRFKey> oprf_key_;
 
@@ -54,7 +57,10 @@ namespace apsi
             /**
             Dispatch a Query request to the Sender.
             */
-            void dispatch_query(std::unique_ptr<network::NetworkSenderOperation> sop, network::SenderChannel &channel);
+            void dispatch_query(
+                const Sender &sender,
+                std::unique_ptr<network::NetworkSenderOperation> sop,
+                network::SenderChannel &channel);
         }; // class SenderDispatcher
     }      // namespace sender
 } // namespace apsi
