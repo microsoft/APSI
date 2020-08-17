@@ -89,7 +89,7 @@ namespace apsi
         friend class Receiver;
 
         public:
-            Query create_copy() const
+            Query deep_copy() const
             {
                 Query result;
                 result.item_count_ = item_count_;
@@ -100,8 +100,12 @@ namespace apsi
                 sop_query->data = this_query->data;
                 result.sop_ = std::move(sop_query);
 
-                return result;
+                return std::move(result);
             }
+
+            Query(Query &&source) = default;
+
+            Query &operator =(Query &&source) = default;
 
             const network::SenderOperationQuery &data() const
             {
@@ -177,9 +181,10 @@ namespace apsi
             Performs a PSI or labeled PSI (depending on the sender) query. The query is a vector of items, and the
             result is a same-size vector of MatchRecord objects. If an item is in the intersection, the corresponding
             MatchRecord indicates it in the `found` field, and the `label` field may contain the corresponding label if 
-            a sender included it.
+            a sender included it. The query is left in an unusable state and a deep copy must explicitly be made if the
+            query is to be used again.
             */
-            std::vector<MatchRecord> request_query(const Query &query, network::Channel &chl);
+            std::vector<MatchRecord> request_query(Query &&query, network::Channel &chl);
 
         private:
             /**

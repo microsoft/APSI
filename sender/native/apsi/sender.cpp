@@ -112,7 +112,7 @@ namespace apsi
             RelinKeys relin_keys,
             map<uint32_t, vector<SEALObject<Ciphertext>>> query,
             Channel &chl,
-            function<void(Channel &, unique_ptr<ResultPackage>)> send_fun)
+            function<void(Channel &, unique_ptr<ResultPackage>)> send_fun) const
         {
             // Acquire read locks on SenderDB and Sender
             auto sender_lock = get_reader_lock();
@@ -214,7 +214,7 @@ namespace apsi
             WindowingDag &dag,
             vector<WindowingDag::State> &states,
             Channel &chl,
-            function<void(Channel &, unique_ptr<ResultPackage>)> send_fun)
+            function<void(Channel &, unique_ptr<ResultPackage>)> send_fun) const
         {
             STOPWATCH(sender_stopwatch, "Sender::query_worker");
 
@@ -270,8 +270,8 @@ namespace apsi
             CiphertextPowers &powers,
             const CryptoContext &crypto_context,
             const WindowingDag &dag,
-            WindowingDag::State &state
-        ) {
+            WindowingDag::State &state) const
+        {
             // The number of powers necessary to compute PSI is equal to the largest number of elements inside any bin
             // under this bundle index. Globally, this is at most max_items_per_bin.
             uint32_t max_exponent = params_.table_params().max_items_per_bin;
