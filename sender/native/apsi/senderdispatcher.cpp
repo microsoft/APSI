@@ -38,13 +38,16 @@ namespace apsi
 
             oprf_key_ = move(oprf_key);
 
+            // Setting up the Sender object
+            Sender sender(sender_db_->get_params(), thread_count_);
+
             bool logged_waiting = false;
 
             // Run until stopped
             while (!stop)
             {
                 unique_ptr<NetworkSenderOperation> sop;
-                if (!(sop = chl.receive_network_operation(sender_->get_seal_context())))
+                if (!(sop = chl.receive_network_operation(sender.get_seal_context())))
                 {
                     if (!logged_waiting)
                     {
@@ -71,9 +74,11 @@ namespace apsi
                     break;
 
                 case SenderOperationType::SOP_QUERY:
-                    APSI_LOG_INFO("Received query");
-                    dispatch_query(move(sop), chl);
-                    break;
+                    {
+                        APSI_LOG_INFO("Received query");
+                        dispatch_query(sender, move(sop), chl);
+                        break;
+                    }
 
                 default:
                     // We should never reach this point
@@ -87,7 +92,7 @@ namespace apsi
         void SenderDispatcher::dispatch_parms(unique_ptr<NetworkSenderOperation> sop, SenderChannel &chl)
         {
             auto response_parms = make_unique<SenderOperationResponseParms>();
-            response_parms->params = make_unique<PSIParams>(sender_->get_params());
+            response_parms->params = make_unique<PSIParams>(sender_db_->get_params());
             auto response = make_unique<NetworkSenderOperationResponse>();
             response->sop_response = move(response_parms);
             response->client_id = move(sop->client_id);
@@ -112,10 +117,12 @@ namespace apsi
             chl.send(move(response));
         }
 
-        void SenderDispatcher::dispatch_query(unique_ptr<NetworkSenderOperation> sop, SenderChannel &chl)
+        void SenderDispatcher::dispatch_query(
+            const Sender &sender,
+            unique_ptr<NetworkSenderOperation> sop,
+            SenderChannel &chl)
         {
-            // Acquire read locks on SenderDB and Sender
-            auto sender_lock = sender_->get_reader_lock();
+            // Acquire read lock on SenderDB
             auto sender_db_lock = sender_db_->get_reader_lock();
 
             auto sop_query = dynamic_cast<SenderOperationQuery*>(sop->sop.get());
@@ -132,7 +139,7 @@ namespace apsi
             chl.send(move(response));
 
             // Query will send result to client in a stream of ResultPackages
-            sender_->query(sop_query->relin_keys.extract_local(), move(sop_query->data), chl,
+            sender.query(sop_query->relin_keys.extract_local(), move(sop_query->data), chl,
                 [&response](Channel &c, unique_ptr<ResultPackage> rp) {
                     auto nrp = make_unique<NetworkResultPackage>();
                     nrp->rp = move(rp);

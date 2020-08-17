@@ -374,13 +374,12 @@ namespace apsi
             return query;
         }
 
-        vector<MatchRecord> Receiver::request_query(const Query &query, Channel &chl)
+        vector<MatchRecord> Receiver::request_query(Query &&query, Channel &chl)
         {
             APSI_LOG_INFO("Starting query for " << query.item_count_ << " items");
             STOPWATCH(recv_stopwatch, "Receiver::query");
 
-            auto query_copy = query.create_copy();
-            chl.send(move(query_copy.sop_));
+            chl.send(move(query.sop_));
             APSI_LOG_DEBUG("Query request sent");
 
             // Wait for query response
@@ -394,7 +393,7 @@ namespace apsi
             APSI_LOG_DEBUG("Query response received");
 
             // Set up the result
-            vector<MatchRecord> mrs(query_copy.item_count_);
+            vector<MatchRecord> mrs(query.item_count_);
 
             // Get the number of ResultPackages we expect to receive
             auto query_response = dynamic_cast<SenderOperationResponseQuery*>(response.get());
@@ -407,7 +406,7 @@ namespace apsi
             for (size_t t = 0; t < thread_count_; t++)
             {
                 threads.emplace_back([&, t]() {
-                    result_package_worker(package_count, mrs, query_copy.table_idx_to_item_idx_, chl);
+                    result_package_worker(package_count, mrs, query.table_idx_to_item_idx_, chl);
                 });
             }
 
