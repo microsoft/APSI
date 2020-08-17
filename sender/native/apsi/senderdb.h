@@ -50,15 +50,15 @@ namespace apsi
             Clears the database and inserts the given data, using at most thread_count threads. Only one of these is
             defined for a given child of SenderDB, corresponding to whether it is labeled or unlabeled.
             */
-            virtual void set_data(const std::map<Item, util::FullWidthLabel> &data, std::size_t thread_count) = 0;
-            virtual void set_data(const std::map<Item, monostate> &data, std::size_t thread_count) = 0;
+            virtual void set_data(const std::map<HashedItem, util::FullWidthLabel> &data, std::size_t thread_count) = 0;
+            virtual void set_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count) = 0;
 
             /**
             Inserts the given data into the database, using at most thread_count threads. Only one of these is defined
             for a given child of SenderDB, corresponding to whether it is labeled or unlabeled.
             */
-            virtual void add_data(const std::map<Item, util::FullWidthLabel> &data, std::size_t thread_count) = 0;
-            virtual void add_data(const std::map<Item, monostate> &data, std::size_t thread_count) = 0;
+            virtual void add_data(const std::map<HashedItem, util::FullWidthLabel> &data, std::size_t thread_count) = 0;
+            virtual void add_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count) = 0;
 
             /**
             Returns a set of DB cache references corresponding to the bundles at the given
@@ -124,17 +124,17 @@ namespace apsi
             /**
             Clears the database and inserts the given data, using at most thread_count threads
             */
-            void set_data(const std::map<Item, FullWidthLabel> &data, std::size_t thread_count);
-            void set_data(const std::map<Item, monostate> &data, std::size_t thread_count);
+            void set_data(const std::map<HashedItem, FullWidthLabel> &data, std::size_t thread_count = 0);
+            void set_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count = 0);
 
             /**
             Inserts the given data into the database, using at most thread_count threads
             */
-            void add_data(const std::map<Item, FullWidthLabel> &data, std::size_t thread_count);
-            void add_data(const std::map<Item, monostate> &data, std::size_t thread_count);
+            void add_data(const std::map<HashedItem, FullWidthLabel> &data, std::size_t thread_count = 0);
+            void add_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count = 0);
         }; // class LabeledSenderDB
 
-        class UnabeledSenderDB : public SenderDB
+        class UnlabeledSenderDB : public SenderDB
         {
             // Inherit SenderDB constructor
             using SenderDB::SenderDB;
@@ -159,14 +159,14 @@ namespace apsi
             /**
             Clears the database and inserts the given data, using at most thread_count threads
             */
-            void set_data(const std::map<Item, FullWidthLabel> &data, std::size_t thread_count);
-            void set_data(const std::map<Item, monostate> &data, std::size_t thread_count);
+            void set_data(const std::map<HashedItem, FullWidthLabel> &data, std::size_t thread_count = 0);
+            void set_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count = 0);
 
             /**
             Inserts the given data into the database, using at most thread_count threads
             */
-            void add_data(const std::map<Item, FullWidthLabel> &data, std::size_t thread_count);
-            void add_data(const std::map<Item, monostate> &data, std::size_t thread_count);
+            void add_data(const std::map<HashedItem, FullWidthLabel> &data, std::size_t thread_count = 0);
+            void add_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count = 0);
         }; // class UnlabeledSenderDB
     }  // namespace sender
 } // namespace apsi

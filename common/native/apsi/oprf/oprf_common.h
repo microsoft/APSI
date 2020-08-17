@@ -12,7 +12,7 @@ namespace apsi
     namespace oprf
     {
         using oprf_item_type = Item;
-        using oprf_hash_type = oprf_item_type;
+        using oprf_hash_type = HashedItem;
         using oprf_key_type = ECPoint::scalar_type;
         using oprf_key_const_type = const ECPoint::scalar_type;
         using oprf_key_span_type = ECPoint::scalar_span_type;

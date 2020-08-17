@@ -1,17 +1,23 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
+// STD
 #include <cstdint>
 #include <memory>
 #include <random>
+#include <vector>
+#include <algorithm>
+
+// APSI
 #include "apsi/logging/log.h"
-#include "apsi/network/receiverchannel.h"
+#include "apsi/network/network_channel.h"
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/receiver.h"
 #include "apsi/sender.h"
 #include "apsi/senderdb.h"
 #include "apsi/senderdispatcher.h"
 #include "apsi/util/utils.h"
+
 #include "gtest/gtest.h"
 
 using namespace std;
@@ -26,7 +32,7 @@ using namespace seal;
 
 namespace
 {
-    std::pair<vector<Item>, vector<size_t>> rand_subset(const vector<Item> &items, size_t size)
+    map<size_t, Item> rand_subset(const vector<Item> &items, size_t size)
     {
         random_device rd;
 
@@ -35,212 +41,172 @@ namespace
         {
             ss.emplace(static_cast<size_t>(rd() % items.size()));
         }
-        auto ssIter = ss.begin();
 
-        vector<Item> ret(size);
-        for (size_t i = 0; i < size; i++)
+        map<size_t, Item> items_subset;
+        for (auto idx : ss)
         {
-            ret[i] = items[*ssIter++];
+            items_subset[idx] = items[idx];
         }
-        auto iter = ss.begin();
-        vector<size_t> s(size);
-        for (size_t i = 0; i < static_cast<size_t>(size); ++i)
-        {
-            s[i] = *iter++;
-        }
-        return { ret, s };
+
+        return items_subset;
     }
 
-    void verify_intersection_results(
-        vector<Item> &client_items, size_t intersection_size, pair<vector<bool>, Matrix<unsigned char>> &intersection,
-        bool compare_labels, vector<size_t> &label_idx, Matrix<unsigned char> &labels)
+    void verify_psi_results(
+        const vector<MatchRecord> &query_result, const map<size_t, Item> &query_subset)
     {
-        for (size_t i = 0; i < client_items.size(); i++)
+        // Count matches
+        size_t match_count = accumulate(query_result.cbegin(), query_result.cend(), size_t(0),
+            [](auto sum, auto &curr) { return sum + !!curr; });
+        ASSERT_EQ(query_subset.size(), match_count);
+
+        // Check that all items in the query subset were found
+        for (auto query_item : query_subset)
         {
-            if (i < intersection_size)
-            {
-                // Item should be in intersection
-                ASSERT_EQ(true, (bool)intersection.first[i]);
-
-                if (compare_labels)
-                {
-                    size_t idx = label_idx[i];
-                    int lblcmp = memcmp(intersection.second[i].data(), labels[idx].data(), labels[idx].size());
-
-                    // Label is not the expected value
-                    ASSERT_EQ(0, lblcmp);
-                }
-            }
-            else
-            {
-                // Item should not be in intersection
-                ASSERT_EQ(false, (bool)intersection.first[i]);
-            }
+            ASSERT_TRUE(query_result[query_item.first].found);
         }
     }
 
-    void RunTest(size_t senderActualSize, PSIParams &params)
+    void verify_labeled_psi_results(
+        const vector<MatchRecord> &query_result, const map<size_t, Item> &query_subset,
+        const vector<FullWidthLabel> &total_label_set)
     {
-        // Connect the network
-        ReceiverChannel recvChl;
+        verify_psi_results(query_result, query_subset);
 
-        string conn_addr = "tcp://localhost:5550";
-        recvChl.connect(conn_addr);
-
-        uint32_t numThreads = thread::hardware_concurrency();
-
-        unique_ptr<Receiver> receiver_ptr;
-
-        auto f = std::async([&]() { receiver_ptr = make_unique<Receiver>(numThreads); });
-        shared_ptr<Sender> sender = make_shared<Sender>(params, numThreads);
-        f.get();
-        Receiver &receiver = *receiver_ptr;
-
-        auto label_bit_length = params.label_bit_count();
-        size_t receiverActualSize = 20;
-        size_t intersectionSize = 10;
-
-        if (params.use_fast_membership())
+        // Check that all labels in the query subset match
+        for (auto query_item : query_subset)
         {
-            // Only one match
-            receiverActualSize = 1;
-            intersectionSize = 1;
+            auto result_label = query_result[query_item.first].label.get_as<uint64_t>();
+            auto reference_label = gsl::span<const uint64_t>(
+                total_label_set[query_item.first].data(),
+                sizeof(FullWidthLabel)/sizeof(uint64_t));
+            ASSERT_TRUE(equal(reference_label.cbegin(), reference_label.cend(), result_label.cbegin()));
+        }
+    }
+
+    void RunTest(size_t sender_size, size_t client_size, const PSIParams &params)
+    {
+        size_t num_threads = 1;
+
+        vector<Item> sender_items;
+        for (size_t i = 0; i < sender_size; i++)
+        {
+            sender_items.emplace_back(i + 1, 0);
         }
 
-        auto s1 = vector<Item>(senderActualSize);
-        Matrix<unsigned char> labels(senderActualSize, params.label_byte_count());
-        for (size_t i = 0; i < s1.size(); i++)
+        auto oprf_key = make_shared<OPRFKey>();
+        vector<HashedItem> hashed_sender_items;
+        OPRFSender::ComputeHashes(sender_items, *oprf_key, hashed_sender_items, num_threads);
+
+        map<HashedItem, monostate> sender_db_data;
+        for (auto item : hashed_sender_items)
         {
-            s1[i] = i;
-
-            if (label_bit_length)
-            {
-                memset(labels[i].data(), 0, labels[i].size());
-
-                labels[i][0] = static_cast<unsigned char>(i);
-                labels[i][1] = static_cast<unsigned char>(i >> 8);
-            }
+            sender_db_data[item] = monostate{};
         }
 
-        auto cc1 = rand_subset(s1, intersectionSize);
-        auto &c1 = cc1.first;
-
-        c1.reserve(receiverActualSize);
-        for (size_t i = 0; i < seal::util::sub_safe(receiverActualSize, intersectionSize); ++i)
-            c1.emplace_back(i + s1.size());
-
-        shared_ptr<OPRFKey> oprf_key;
-
-        shared_ptr<UniformRandomGeneratorFactory> rng_factory(make_shared<BlakePRNGFactory>());
-        oprf_key = make_shared<OPRFKey>(rng_factory);
-
-        OPRFSender::ComputeHashes(s1, *oprf_key);
-
-        shared_ptr<SenderDB> sender_db = make_shared<SenderDB>(params);
-        sender_db->load_db(numThreads, s1, labels);
+        auto sender_db = make_shared<UnlabeledSenderDB>(params);
+        sender_db->apsi::sender::SenderDB::add_data(sender_db_data, num_threads);
+        shared_ptr<Sender> sender = make_shared<Sender>(params, num_threads);
+        sender->set_db(sender_db);
 
         atomic<bool> stop_sender = false;
 
-        auto thrd = thread([&]() {
+        auto sender_th = thread([&]() {
             SenderDispatcher dispatcher(sender);
-            dispatcher.run(stop_sender, /* port */ 5550, oprf_key, sender_db);
+            dispatcher.run(stop_sender, 5550, oprf_key);
         });
 
-        receiver.handshake(recvChl);
-        auto intersection = receiver.query(c1, recvChl);
-        stop_sender = true;
-        thrd.join();
+        // Connect the network
+        ReceiverChannel recv_chl;
 
-        // Done with everything. Print the results!
-        verify_intersection_results(c1, intersectionSize, intersection, label_bit_length > 0, cc1.second, labels);
+        string conn_addr = "tcp://localhost:5550";
+        recv_chl.connect(conn_addr);
+
+        Receiver receiver(params, num_threads);
+        auto recv_items = rand_subset(sender_items, client_size);
+        vector<Item> recv_items_vec;
+        for (auto item : recv_items)
+        {
+            recv_items_vec.push_back(item.second);
+        }
+
+        auto hashed_recv_items = receiver.request_oprf(recv_items_vec, recv_chl);
+        auto query = receiver.create_query(hashed_recv_items);
+        auto query_result = receiver.request_query(query, recv_chl);
+
+        stop_sender = true;
+        sender_th.join();
+
+        verify_psi_results(query_result, recv_items);
     }
 
-    PSIParams create_params(size_t sender_set_size, bool use_labels, bool fast_membership)
+    PSIParams create_params()
     {
-        Log::set_log_level(Log::Level::level_error);
+        //logging::Log::set_console_disabled(true);
+        //logging::Log::set_log_level(logging::Log::Level::level_debug);
+        //logging::Log::set_log_file("out.log");
 
-        PSIParams::PSIConfParams psiconf_params;
-        psiconf_params.item_bit_count = 60;
-        psiconf_params.sender_size = sender_set_size;
-        psiconf_params.use_labels = use_labels;
-        psiconf_params.use_fast_membership = fast_membership;
-
-        // TODO: Remove sender_bin_size so this is not needed
-        psiconf_params.sender_bin_size = 2 * sender_set_size / (1 << 9) + 100;
-
-        psiconf_params.num_chunks = 1;
-        psiconf_params.item_bit_length_used_after_oprf = 120;
-
-        PSIParams::CuckooParams cuckoo_params;
-        cuckoo_params.hash_func_count = 2;
-        cuckoo_params.hash_func_seed = 0;
-        cuckoo_params.max_probe = 100;
+        PSIParams::ItemParams item_params;
+        item_params.felts_per_item = 8;
 
         PSIParams::TableParams table_params;
-        table_params.binning_sec_level = 40;
-        table_params.log_table_size = 9;
-        table_params.split_count = 1;
-        table_params.split_size = 16;
-        table_params.window_size = 2;
+        table_params.hash_func_count = 3;
+        table_params.max_items_per_bin = 16;
+        table_params.window_size = 1;
+        table_params.table_size = 4096;
 
-        PSIParams::SEALParams seal_params;
-        seal_params.encryption_params.set_poly_modulus_degree(4096);
-        seal_params.max_supported_degree = 2;
+        PSIParams::SEALParams seal_params(scheme_type::BFV);
+        seal_params.set_poly_modulus_degree(8192);
+        seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(8192));
+        seal_params.set_plain_modulus(65537);
 
-        vector<Modulus> coeff_modulus = CoeffModulus::Create(4096, { 49, 40, 20 });
-        seal_params.encryption_params.set_coeff_modulus(coeff_modulus);
-        seal_params.encryption_params.set_plain_modulus(40961);
-
-        PSIParams::FFieldParams ffield_params;
-        ffield_params.characteristic = seal_params.encryption_params.plain_modulus().value();
-        ffield_params.degree = 8;
-
-        PSIParams params(psiconf_params, table_params, cuckoo_params, seal_params, ffield_params);
-        return params;
+        return { item_params, table_params, seal_params };
     }
 } // namespace
 
 namespace APSITests
 {
-    TEST(SenderReceiverTests, LabelsSmallTest)
+    TEST(SenderReceiverTests, UnlabeledEmptyTest)
     {
-        size_t senderActualSize = 100;
-        PSIParams params = create_params(senderActualSize, /* use_labels */ true, /* fast_membership */ false);
-        RunTest(senderActualSize, params);
+        size_t sender_size = 0;
+        PSIParams params = create_params();
+        RunTest(sender_size, 0, params);
     }
 
-    TEST(SenderReceiverTests, NoLabels64KTest)
+    TEST(SenderReceiverTests, UnlabeledSingleTest)
     {
-        size_t senderActualSize = 65536;
-        PSIParams params = create_params(senderActualSize, /* use_label */ false, /* fast_membership */ false);
-        RunTest(senderActualSize, params);
+        size_t sender_size = 1;
+        PSIParams params = create_params();
+        RunTest(sender_size, 0, params);
+        RunTest(sender_size, 1, params);
     }
 
-    TEST(SenderReceiverTests, DISABLED_LabelsTest)
+    TEST(SenderReceiverTests, UnlabeledSmallTest)
     {
-        size_t senderActualSize = 2000;
-        PSIParams params = create_params(senderActualSize, /* use_labels */ true, /* fast_membership */ false);
-        RunTest(senderActualSize, params);
+        size_t sender_size = 10;
+        PSIParams params = create_params();
+        RunTest(sender_size, 0, params);
+        RunTest(sender_size, 1, params);
+        RunTest(sender_size, 5, params);
+        RunTest(sender_size, 10, params);
     }
 
-    TEST(SenderReceiverTests, NoLabels3KTest)
+    TEST(SenderReceiverTests, UnlabeledMediumTest)
     {
-        size_t senderActualSize = 3000;
-        PSIParams params = create_params(senderActualSize, /* use_labels */ false, /* fast_membership */ false);
-        RunTest(senderActualSize, params);
+        size_t sender_size = 500;
+        PSIParams params = create_params();
+        RunTest(sender_size, 0, params);
+        RunTest(sender_size, 1, params);
+        RunTest(sender_size, 50, params);
+        RunTest(sender_size, 100, params);
     }
 
-    TEST(SenderReceiverTests, NoLabelsFastMembershipTest)
+    TEST(SenderReceiverTests, UnlabeledLargeTest)
     {
-        size_t senderActualSize = 3000;
-        PSIParams params = create_params(senderActualSize, /* use_labels */ false, /* fast_membership */ true);
-        RunTest(senderActualSize, params);
-    }
-
-    TEST(SenderReceiverTests, DISABLED_LabelsFastMembership)
-    {
-        size_t senderActualSize = 3000;
-        PSIParams params = create_params(senderActualSize, /* use_labels */ true, /* fast_membership */ true);
-        RunTest(senderActualSize, params);
+        size_t sender_size = 4000;
+        PSIParams params = create_params();
+        RunTest(sender_size, 0, params);
+        RunTest(sender_size, 1, params);
+        RunTest(sender_size, 500, params);
+        RunTest(sender_size, 1000, params);
     }
 } // namespace APSITests

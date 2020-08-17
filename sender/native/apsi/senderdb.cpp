@@ -30,7 +30,7 @@ namespace apsi
             each Item's cuckoo index.
             */
             vector<pair<AlgItemLabel<felt_t>, size_t> > preprocess_labeled_data(
-                const std::map<Item, FullWidthLabel> &data,
+                const std::map<HashedItem, FullWidthLabel> &data,
                 PSIParams &params
             ) {
                 // Some variables we'll need
@@ -56,7 +56,7 @@ namespace apsi
                 for (auto &item_label_pair : data)
                 {
                     // Serialize the data into field elements
-                    const Item &item = item_label_pair.first;
+                    const HashedItem &item = item_label_pair.first;
                     const FullWidthLabel &label = item_label_pair.second;
                     AlgItemLabel<felt_t> alg_item_label = algebraize_item_label(item, label, item_bit_count, mod);
 
@@ -157,6 +157,7 @@ namespace apsi
                 uint32_t max_bin_size,
                 size_t thread_count
             ) {
+                thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
 
                 // Collect the bundle indices and partition them into thread_count many partitions. By some uniformity
                 // assumption, the number of things to insert per partition should be roughly the same. Note that
@@ -369,8 +370,10 @@ namespace apsi
         /**
         Inserts the given data into the database, using at most thread_count threads
         */
-        void LabeledSenderDB::add_data(const std::map<Item, FullWidthLabel> &data, size_t thread_count)
+        void LabeledSenderDB::add_data(const std::map<HashedItem, FullWidthLabel> &data, size_t thread_count)
         {
+            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
+
             STOPWATCH(sender_stopwatch, "LabeledSenderDB::add_data");
 
             // Lock the database for writing
@@ -391,7 +394,7 @@ namespace apsi
         interface that needs to support both labeled and unlabeled insertion. A LabeledSenderDB does not do unlabeled
         insertion. If you can think of a better way to structure this, keep it to yourself.
         */
-        void LabeledSenderDB::add_data(const std::map<Item, FullWidthLabel> &data, size_t thread_count)
+        void LabeledSenderDB::add_data(const std::map<HashedItem, FullWidthLabel> &data, size_t thread_count)
         {
             throw logic_error("Cannot do unlabeled insertion on a LabeledSenderDB");
         }
@@ -399,8 +402,10 @@ namespace apsi
         /**
         Inserts the given data into the database, using at most thread_count threads
         */
-        void UnlabeledSenderDB::add_data(const std::map<Item, monostate> &data, size_t thread_count)
+        void UnlabeledSenderDB::add_data(const std::map<HashedItem, monostate> &data, size_t thread_count)
         {
+            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
+
             STOPWATCH(sender_stopwatch, "LabeledSenderDB::add_data");
 
             // Lock the database for writing
@@ -420,7 +425,7 @@ namespace apsi
         interface that needs to support both labeled and unlabeled insertion. An UnlabeledSenderDB does not do labeled
         insertion. If you can think of a better way to structure this, keep it to yourself.
         */
-        void UnlabeledSenderDB::add_data(const std::map<Item, FullWidthLabel> &data, size_t thread_count)
+        void UnlabeledSenderDB::add_data(const std::map<HashedItem, FullWidthLabel> &data, size_t thread_count)
         {
             throw logic_error("Cannot do labeled insertion on an UnlabeledSenderDB");
         }
@@ -428,7 +433,7 @@ namespace apsi
         /**
         Clears the database and inserts the given data, using at most thread_count threads
         */
-        void LabeledSenderDB::set_data(const std::map<Item, FullWidthLabel> &data, size_t thread_count) {
+        void LabeledSenderDB::set_data(const std::map<HashedItem, FullWidthLabel> &data, size_t thread_count) {
             clear_db();
             add_data(data, thread_count);
         }
@@ -436,14 +441,14 @@ namespace apsi
         /**
         This does not and should not work. See LabeledSenderDB::add_data
         */
-        void LabeledSenderDB::set_data(const std::map<Item, monostate> &data, size_t thread_count) {
+        void LabeledSenderDB::set_data(const std::map<HashedItem, monostate> &data, size_t thread_count) {
             throw logic_error("Cannot do unlabeled insertion on a LabeledSenderDB");
         }
 
         /**
         Clears the database and inserts the given data, using at most thread_count threads
         */
-        void UnlabeledSenderDB::set_data(const std::map<Item, monostate> &data, size_t thread_count) {
+        void UnlabeledSenderDB::set_data(const std::map<HashedItem, monostate> &data, size_t thread_count) {
             clear_db();
             add_data(data, thread_count);
         }
@@ -451,7 +456,7 @@ namespace apsi
         /**
         This does not and should not work. See UnlabeledSenderDB::add_data
         */
-        void UnlabeledSenderDB::set_data(const std::map<Item, FullWidthLabel> &data, size_t thread_count)
+        void UnlabeledSenderDB::set_data(const std::map<HashedItem, FullWidthLabel> &data, size_t thread_count)
         {
             throw logic_error("Cannot do labeled insertion on an UnlabeledSenderDB");
         }

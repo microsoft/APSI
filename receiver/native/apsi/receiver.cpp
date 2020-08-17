@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <sstream>
 #include <algorithm>
+#include <thread>
 
 // APSI
 #include "apsi/logging/log.h"
@@ -119,13 +120,9 @@ namespace apsi
 
     namespace receiver
     {
-        Receiver::Receiver(PSIParams params, size_t thread_count) :
-            params_(move(params)), thread_count_(thread_count)
+        Receiver::Receiver(PSIParams params, size_t thread_count) : params_(move(params))
         {
-            if (thread_count_ < 1)
-            {
-                throw invalid_argument("thread_count must be at least 1");
-            }
+            thread_count_ = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
 
             initialize();
         }
@@ -202,40 +199,73 @@ namespace apsi
             return oprf_query;
         }
 
-        vector<Item> Receiver::deobfuscate_items(
+        vector<HashedItem> Receiver::deobfuscate_items(
             const vector<SEAL_BYTE> &oprf_response,
             unique_ptr<OPRFReceiver> &oprf_receiver)
         {
             APSI_LOG_INFO("Deobfuscating items");
             STOPWATCH(recv_stopwatch, "Receiver::deobfuscate_items");
 
-            vector<Item> items(oprf_receiver->item_count());
+            vector<HashedItem> items(oprf_receiver->item_count());
             oprf_receiver->process_responses(oprf_response, items);
             oprf_receiver.reset();
 
             return items;
         }
 
-        unique_ptr<SenderOperation> Receiver::create_query(
-            const vector<Item> &items, unordered_map<size_t, size_t> &table_idx_to_item_idx)
+        vector<HashedItem> Receiver::request_oprf(const vector<Item> &items, Channel &chl)
         {
-            STOPWATCH(recv_stopwatch, "Receiver::query::create_query");
+            APSI_LOG_INFO("Starting OPRF request for " << items.size() << " items");
+            STOPWATCH(recv_stopwatch, "Receiver::oprf");
 
-            table_idx_to_item_idx.clear();
+            unique_ptr<OPRFReceiver> oprf_receiver = nullptr;
+
+            // Send OPRF query to Sender
+            auto sop_oprf = make_unique<SenderOperationOPRF>();
+            sop_oprf->data = move(obfuscate_items(items, oprf_receiver));
+            APSI_LOG_DEBUG("OPRF request created");
+            chl.send(move(sop_oprf));
+            APSI_LOG_DEBUG("OPRF request sent");
+
+            unique_ptr<SenderOperationResponse> response;
+            {
+                STOPWATCH(recv_stopwatch, "Receiver::oprf::wait_response");
+
+                // Wait for a valid message of the correct type
+                APSI_LOG_DEBUG("Waiting for OPRF response");
+                while (!(response = chl.receive_response(SenderOperationType::SOP_OPRF)));
+            }
+            APSI_LOG_DEBUG("OPRF response received");
+
+            // Extract the OPRF response
+            auto &oprf_response = dynamic_cast<SenderOperationResponseOPRF*>(response.get())->data;
+            vector<HashedItem> oprf_items = deobfuscate_items(oprf_response, oprf_receiver);
+            APSI_LOG_INFO("Finished OPRF request");
+
+            return oprf_items;
+        }
+
+        Query Receiver::create_query(const vector<HashedItem> &items)
+        {
+            APSI_LOG_INFO("Creating encrypted query");
+            STOPWATCH(recv_stopwatch, "Receiver::create_query");
+
+            Query query;
+            query.item_count_ = items.size();
 
             // Create the cuckoo table
             KukuTable cuckoo(
                 params_.table_params().table_size,      // Size of the hash table
                 0,                                       // Not using a stash
                 params_.table_params().hash_func_count, // Number of hash functions
-                { 0, 0 },                                // Hardcoded { 0, 0} as the seed
+                { 0, 0 },                                // Hardcoded { 0, 0 } as the seed
                 cuckoo_table_insert_attempts,            // The number of insertion attempts 
                 { 0, 0 });                               // The empty element can be set to anything
 
             // Hash the data into a cuckoo hash table
             // cuckoo_hashing
             {
-                STOPWATCH(recv_stopwatch, "Receiver::query::create_query::cuckoo_hashing");
+                STOPWATCH(recv_stopwatch, "Receiver::create_query::cuckoo_hashing");
                 APSI_LOG_DEBUG("Inserting " << items.size()
                     << " items into cuckoo table of size " << cuckoo.table_size()
                     << " with " << cuckoo.loc_func_count() << " hash functions");
@@ -272,7 +302,7 @@ namespace apsi
             for (size_t item_idx = 0; item_idx < items.size(); item_idx++)
             {
                 auto item_loc = cuckoo.query(items[item_idx].value());
-                table_idx_to_item_idx[item_loc.location()] = item_idx;
+                query.table_idx_to_item_idx_[item_loc.location()] = item_idx;
             }
 
             // Set up unencrypted query data
@@ -280,7 +310,7 @@ namespace apsi
 
             // prepate_data
             {
-                STOPWATCH(recv_stopwatch, "Receiver::query::create_query::prepare_data");
+                STOPWATCH(recv_stopwatch, "Receiver::create_query::prepare_data");
                 for (uint32_t bundle_idx = 0; bundle_idx < params_.bundle_idx_count(); bundle_idx++)
                 {
                     APSI_LOG_DEBUG("Preparing data for bundle index "
@@ -316,7 +346,7 @@ namespace apsi
 
             // encrypt_data
             {
-                STOPWATCH(recv_stopwatch, "Receiver::query::create_query::encrypt_data");
+                STOPWATCH(recv_stopwatch, "Receiver::create_query::encrypt_data");
                 for (uint32_t bundle_idx = 0; bundle_idx < params_.bundle_idx_count(); bundle_idx++)
                 {
                     APSI_LOG_DEBUG("Encoding and encrypting data for bundle index "
@@ -337,56 +367,20 @@ namespace apsi
             auto sop_query = make_unique<SenderOperationQuery>();
             sop_query->relin_keys = relin_keys_;
             sop_query->data = move(encrypted_powers);
+            query.sop_ = move(sop_query);
 
-            return sop_query;
-        }
-
-        vector<MatchRecord> Receiver::query(const vector<Item> &items, Channel &chl)
-        {
-            APSI_LOG_INFO("Starting query for " << items.size() << " items");
-            STOPWATCH(recv_stopwatch, "Receiver::query");
-
-            // This will contain the result of the OPRF query
-            vector<Item> oprf_items;
-
-            // First run an OPRF query 
-            {
-                STOPWATCH(recv_stopwatch, "Receiver::query::oprf");
-
-                unique_ptr<OPRFReceiver> oprf_receiver = nullptr;
-
-                // Send OPRF query to Sender
-                auto sop_oprf = make_unique<SenderOperationOPRF>();
-                sop_oprf->data = move(obfuscate_items(items, oprf_receiver));
-                APSI_LOG_DEBUG("OPRF request created");
-                chl.send(move(sop_oprf));
-                APSI_LOG_DEBUG("OPRF request sent");
-
-                unique_ptr<SenderOperationResponse> response;
-                {
-                    STOPWATCH(recv_stopwatch, "Receiver::query::oprf::wait_response");
-
-                    // Wait for a valid message of the correct type
-                    APSI_LOG_DEBUG("Waiting for OPRF response");
-                    while (!(response = chl.receive_response(SenderOperationType::SOP_OPRF)));
-                }
-                APSI_LOG_DEBUG("OPRF response received");
-
-                // Extract the OPRF response
-                auto &oprf_response = dynamic_cast<SenderOperationResponseOPRF*>(response.get())->data;
-                oprf_items = deobfuscate_items(oprf_response, oprf_receiver);
-                APSI_LOG_INFO("Finished requesting OPRF hashes");
-            }
-
-            // This vector maps the cuckoo table index to the index of the item in the items vector
-            unordered_map<size_t, size_t> table_idx_to_item_idx;
-
-            // Create the SenderOperationQuery and send it on the channel
-            APSI_LOG_INFO("Creating encrypted query");
-            auto sop_query = create_query(items, table_idx_to_item_idx);
             APSI_LOG_INFO("Finished creating encrypted query");
 
-            chl.send(move(sop_query));
+            return query;
+        }
+
+        vector<MatchRecord> Receiver::request_query(const Query &query, Channel &chl)
+        {
+            APSI_LOG_INFO("Starting query for " << query.item_count_ << " items");
+            STOPWATCH(recv_stopwatch, "Receiver::query");
+
+            auto query_copy = query.create_copy();
+            chl.send(move(query_copy.sop_));
             APSI_LOG_DEBUG("Query request sent");
 
             // Wait for query response
@@ -400,7 +394,7 @@ namespace apsi
             APSI_LOG_DEBUG("Query response received");
 
             // Set up the result
-            vector<MatchRecord> mrs(items.size());
+            vector<MatchRecord> mrs(query_copy.item_count_);
 
             // Get the number of ResultPackages we expect to receive
             auto query_response = dynamic_cast<SenderOperationResponseQuery*>(response.get());
@@ -413,7 +407,7 @@ namespace apsi
             for (size_t t = 0; t < thread_count_; t++)
             {
                 threads.emplace_back([&, t]() {
-                    result_package_worker(package_count, mrs, table_idx_to_item_idx, chl);
+                    result_package_worker(package_count, mrs, query_copy.table_idx_to_item_idx_, chl);
                 });
             }
 

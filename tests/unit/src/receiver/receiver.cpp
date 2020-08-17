@@ -87,7 +87,7 @@ namespace APSITests
             }
         }
 
-        void start_listen(bool labels = false)
+        void start_sender(bool labels = false)
         {
             th_ = thread([this](bool labels) {
                 // Run until stopped
@@ -216,7 +216,7 @@ namespace APSITests
             send_nrp(move(rp_ct), 0);
         }
 
-        void stop_listen()
+        void stop_sender()
         {
             stop_token_ = true;
             if (th_.joinable())
@@ -227,7 +227,7 @@ namespace APSITests
 
         ~ReceiverTests()
         {
-            stop_listen();
+            stop_sender();
 
             // Do not disconnect, as the Constructor / Destructor is called for every test.
             // if (client_.is_connected())
@@ -245,136 +245,179 @@ namespace APSITests
 
     TEST_F(ReceiverTests, Constructor)
     {
-        // Cannot specify zero threads
-        ASSERT_THROW(auto recv = Receiver(*get_params(), 0), invalid_argument);
-
+        ASSERT_NO_THROW(auto recv = Receiver(*get_params(), 0));
         ASSERT_NO_THROW(auto recv = Receiver(*get_params(), 1));
         ASSERT_NO_THROW(auto recv = Receiver(*get_params(), 2));
     }
 
+    TEST_F(ReceiverTests, RequestParams)
+    {
+        start_sender();
+
+        PSIParams params = Receiver::request_params(client_);
+        ASSERT_EQ(get_params()->to_string(), params.to_string());
+
+        stop_sender();
+    }
+
+    TEST_F(ReceiverTests, RequestOPRF)
+    {
+        start_sender();
+
+        vector<Item> items;
+        Receiver recv(*get_params());
+        auto hashed_items = recv.request_oprf(items, client_);
+        ASSERT_TRUE(hashed_items.empty());
+
+        // A single item
+        items.push_back(make_item(0, 0));
+        hashed_items = recv.request_oprf(items, client_);
+        ASSERT_EQ(1, hashed_items.size());
+        ASSERT_NE(hashed_items[0][0], items[0][0]);
+        ASSERT_NE(hashed_items[0][1], items[0][1]);
+
+        // Same item repeating
+        items.push_back(make_item(0, 0));
+        hashed_items = recv.request_oprf(items, client_);
+        ASSERT_EQ(2, hashed_items.size());
+        ASSERT_EQ(hashed_items[0][0], hashed_items[1][0]);
+        ASSERT_EQ(hashed_items[0][1], hashed_items[1][1]);
+
+        // Two different items
+        items[1][0] = 1;
+        hashed_items = recv.request_oprf(items, client_);
+        ASSERT_EQ(2, hashed_items.size());
+        ASSERT_NE(hashed_items[0][0], hashed_items[1][0]);
+        ASSERT_NE(hashed_items[0][1], hashed_items[1][1]);
+
+        stop_sender();
+    }
+
     TEST_F(ReceiverTests, SingleThread)
     {
-        start_listen();
+        start_sender();
 
-        // First query for the parameters
-        PSIParams params = Receiver::request_params(client_);
-
-        Receiver recv(params, 1);
+        Receiver recv(*get_params(), 1);
 
         // Give the sender the secret key so they can fake responses
         get_context()->set_secret(*recv.crypto_context()->secret_key());
 
         // Empty query; empty response
-        vector<Item> items;
-        auto result = recv.query(items, client_);
+        vector<HashedItem> items;
+        auto query = recv.create_query(items);
+        auto result = recv.request_query(query, client_);
+
         ASSERT_TRUE(result.empty());
 
         // Cannot query the empty item
-        items.push_back(make_zero_item());
-        ASSERT_THROW(result = recv.query(items, client_), invalid_argument);
+        items.push_back(HashedItem{make_zero_item()});
+        ASSERT_THROW(query = recv.create_query(items), invalid_argument);
 
         // Query a single non-empty item
         items[0][0] = 1;
-        result = recv.query(items, client_);
+        query = recv.create_query(items);
+        result = recv.request_query(query, client_);
         ASSERT_EQ(1, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_FALSE(result[0].label);
 
         // Query a single non-empty item
         items[0][0] = 2;
-        result = recv.query(items, client_);
+        query = recv.create_query(items);
+        result = recv.request_query(query, client_);
         ASSERT_EQ(1, result.size());
         ASSERT_FALSE(result[0].found);
         ASSERT_FALSE(result[0].label);
 
         // Query two items
-        items.push_back(make_zero_item());
+        items.push_back(HashedItem{make_zero_item()});
         items[0][0] = 1;
         items[1][0] = 2;
-        result = recv.query(items, client_);
+        query = recv.create_query(items);
+        result = recv.request_query(query, client_);
         ASSERT_EQ(2, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_FALSE(result[1].found);
         ASSERT_FALSE(result[0].label);
         ASSERT_FALSE(result[1].label);
 
-        stop_listen();
+        stop_sender();
     }
 
     TEST_F(ReceiverTests, MultiThread)
     {
-        start_listen();
+        start_sender();
 
-        // First query for the parameters
-        PSIParams params = Receiver::request_params(client_);
-
-        Receiver recv(params, 2);
+        Receiver recv(*get_params(), 2);
 
         // Give the sender the secret key so they can fake responses
         get_context()->set_secret(*recv.crypto_context()->secret_key());
 
         // Empty query; empty response
-        vector<Item> items;
-        auto result = recv.query(items, client_);
+        vector<HashedItem> items;
+        auto query = recv.create_query(items);
+        auto result = recv.request_query(query, client_);
         ASSERT_TRUE(result.empty());
 
         // Cannot query the empty item
-        items.push_back(make_zero_item());
-        ASSERT_THROW(result = recv.query(items, client_), invalid_argument);
+        items.push_back(HashedItem{make_zero_item()});
+        ASSERT_THROW(query = recv.create_query(items), invalid_argument);
 
         // Query a single non-empty item
         items[0][0] = 1;
-        result = recv.query(items, client_);
+        query = recv.create_query(items);
+        result = recv.request_query(query, client_);
         ASSERT_EQ(1, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_FALSE(result[0].label);
 
         // Query a single non-empty item
         items[0][0] = 2;
-        result = recv.query(items, client_);
+        query = recv.create_query(items);
+        result = recv.request_query(query, client_);
         ASSERT_EQ(1, result.size());
         ASSERT_FALSE(result[0].found);
         ASSERT_FALSE(result[0].label);
 
         // Query two items
-        items.push_back(make_zero_item());
+        items.push_back(HashedItem{make_zero_item()});
         items[0][0] = 1;
         items[1][0] = 2;
-        result = recv.query(items, client_);
+        query = recv.create_query(items);
+        result = recv.request_query(query, client_);
         ASSERT_EQ(2, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_FALSE(result[1].found);
         ASSERT_FALSE(result[0].label);
         ASSERT_FALSE(result[1].label);
 
-        stop_listen();
+        stop_sender();
     }
 
     TEST_F(ReceiverTests, SingleThreadLabels)
     {
-        start_listen(/* labels */ true);
+        start_sender(/* labels */ true);
 
-        // First query for the parameters
-        PSIParams params = Receiver::request_params(client_);
-
-        Receiver recv(params, 1);
+        Receiver recv(*get_params(), 1);
 
         // Give the sender the secret key so they can fake responses
         get_context()->set_secret(*recv.crypto_context()->secret_key());
         get_context()->set_evaluator();
 
         // Empty query; empty response
-        vector<Item> items;
-        auto result = recv.query(items, client_);
+        vector<HashedItem> items;
+        auto query = recv.create_query(items);
+        auto result = recv.request_query(query, client_);
         ASSERT_TRUE(result.empty());
 
         // Cannot query the empty item
-        items.push_back(make_zero_item());
-        ASSERT_THROW(result = recv.query(items, client_), invalid_argument);
+        items.push_back(HashedItem{make_zero_item()});
+        ASSERT_THROW(query = recv.create_query(items), invalid_argument);
 
         // Query a single non-empty item
         items[0][0] = 1;
-        result = recv.query(items, client_);
+        query = recv.create_query(items);
+        result = recv.request_query(query, client_);
         ASSERT_EQ(1, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_TRUE(result[0].label);
@@ -384,16 +427,18 @@ namespace APSITests
 
         // Query a single non-empty item
         items[0][0] = 2;
-        result = recv.query(items, client_);
+        query = recv.create_query(items);
+        result = recv.request_query(query, client_);
         ASSERT_EQ(1, result.size());
         ASSERT_FALSE(result[0].found);
         ASSERT_FALSE(result[0].label);
 
         // Query two items
-        items.push_back(make_zero_item());
+        items.push_back(HashedItem{make_zero_item()});
         items[0][0] = 1;
         items[1][0] = 2;
-        result = recv.query(items, client_);
+        query = recv.create_query(items);
+        result = recv.request_query(query, client_);
         ASSERT_EQ(2, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_TRUE(result[0].label);
@@ -403,34 +448,33 @@ namespace APSITests
         label = result[0].label.get_as<uint16_t>();
         all_of(label.begin(), label.end(), [](auto a) { return a == 1; });
 
-        stop_listen();
+        stop_sender();
     }
 
     TEST_F(ReceiverTests, MultiThreadLabels)
     {
-        start_listen(/* labels */ true);
+        start_sender(/* labels */ true);
 
-        // First query for the parameters
-        PSIParams params = Receiver::request_params(client_);
-
-        Receiver recv(params, 2);
+        Receiver recv(*get_params(), 2);
 
         // Give the sender the secret key so they can fake responses
         get_context()->set_secret(*recv.crypto_context()->secret_key());
         get_context()->set_evaluator();
 
         // Empty query; empty response
-        vector<Item> items;
-        auto result = recv.query(items, client_);
+        vector<HashedItem> items;
+        auto query = recv.create_query(items);
+        auto result = recv.request_query(query, client_);
         ASSERT_TRUE(result.empty());
 
         // Cannot query the empty item
-        items.push_back(make_zero_item());
-        ASSERT_THROW(result = recv.query(items, client_), invalid_argument);
+        items.push_back(HashedItem{make_zero_item()});
+        ASSERT_THROW(query = recv.create_query(items), invalid_argument);
 
         // Query a single non-empty item
         items[0][0] = 1;
-        result = recv.query(items, client_);
+        query = recv.create_query(items);
+        result = recv.request_query(query, client_);
         ASSERT_EQ(1, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_TRUE(result[0].label);
@@ -440,16 +484,18 @@ namespace APSITests
 
         // Query a single non-empty item
         items[0][0] = 2;
-        result = recv.query(items, client_);
+        query = recv.create_query(items);
+        result = recv.request_query(query, client_);
         ASSERT_EQ(1, result.size());
         ASSERT_FALSE(result[0].found);
         ASSERT_FALSE(result[0].label);
 
         // Query two items
-        items.push_back(make_zero_item());
+        items.push_back(HashedItem{make_zero_item()});
         items[0][0] = 1;
         items[1][0] = 2;
-        result = recv.query(items, client_);
+        query = recv.create_query(items);
+        result = recv.request_query(query, client_);
         ASSERT_EQ(2, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_FALSE(result[1].found);
@@ -459,6 +505,6 @@ namespace APSITests
         label = result[0].label.get_as<uint16_t>();
         all_of(label.begin(), label.end(), [](auto a) { return a == 1; });
 
-        stop_listen();
+        stop_sender();
     }
 }

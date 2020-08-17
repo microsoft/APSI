@@ -7,7 +7,6 @@
 
 // APSI
 #include "apsi/senderdispatcher.h"
-#include "apsi/network/network_channel.h"
 #include "apsi/logging/log.h"
 #include "apsi/oprf/oprf_sender.h"
 
@@ -27,7 +26,7 @@ namespace apsi
     namespace sender
     {
         void SenderDispatcher::run(
-            const atomic<bool> &stop, int port, shared_ptr<const OPRFKey> oprf_key, shared_ptr<SenderDB> sender_db)
+            const atomic<bool> &stop, int port, shared_ptr<const OPRFKey> oprf_key)
         {
             SenderChannel chl;
 
@@ -38,7 +37,6 @@ namespace apsi
             chl.bind(ss.str());
 
             oprf_key_ = move(oprf_key);
-            sender_->set_db(move(sender_db));
 
             bool logged_waiting = false;
 
@@ -86,7 +84,7 @@ namespace apsi
             }
         }
 
-        void SenderDispatcher::dispatch_parms(unique_ptr<NetworkSenderOperation> sop, Channel &chl)
+        void SenderDispatcher::dispatch_parms(unique_ptr<NetworkSenderOperation> sop, SenderChannel &chl)
         {
             auto response_parms = make_unique<SenderOperationResponseParms>();
             response_parms->params = make_unique<PSIParams>(sender_->get_params());
@@ -97,7 +95,7 @@ namespace apsi
             chl.send(move(response));
         }
 
-        void SenderDispatcher::dispatch_oprf(unique_ptr<NetworkSenderOperation> sop, Channel &chl)
+        void SenderDispatcher::dispatch_oprf(unique_ptr<NetworkSenderOperation> sop, SenderChannel &chl)
         {
             auto sop_oprf = dynamic_cast<SenderOperationOPRF*>(sop->sop.get());
 
@@ -114,7 +112,7 @@ namespace apsi
             chl.send(move(response));
         }
 
-        void SenderDispatcher::dispatch_query(unique_ptr<NetworkSenderOperation> sop, Channel &chl)
+        void SenderDispatcher::dispatch_query(unique_ptr<NetworkSenderOperation> sop, SenderChannel &chl)
         {
             // Acquire read locks on SenderDB and Sender
             auto sender_lock = sender_->get_reader_lock();
@@ -134,12 +132,14 @@ namespace apsi
             chl.send(move(response));
 
             // Query will send result to client in a stream of ResultPackages
-            sender_->query(move(sop_query->relin_keys), move(sop_query->data), chl,
-                [client_id](Channel &c, unique_ptr<ResultPackage> rp) {
+            sender_->query(sop_query->relin_keys.extract_local(), move(sop_query->data), chl,
+                [&response](Channel &c, unique_ptr<ResultPackage> rp) {
                     auto nrp = make_unique<NetworkResultPackage>();
                     nrp->rp = move(rp);
-                    nrp->client_id = move(client_id);
-                    c.send(move(nrp));
+                    nrp->client_id = move(response->client_id);
+
+                    // We know for sure that the channel is a SenderChannel so use static_cast
+                    static_cast<SenderChannel&>(c).send(move(nrp));
                 });
         }
     } // namespace sender

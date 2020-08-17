@@ -5,10 +5,11 @@
 
 // STD
 #include <algorithm>
-#include <stdexcept>
-#include <memory>
-#include <iostream>
 #include <cstddef>
+#include <iostream>
+#include <memory>
+#include <stdexcept>
+#include <utility>
 
 // SEAL
 #include "seal/util/defines.h"
@@ -89,18 +90,11 @@ namespace apsi
 
             static void ComputeHashes(
                 gsl::span<const oprf_item_type> oprf_items, const OPRFKey &oprf_key,
-                gsl::span<oprf_hash_type> oprf_hashes, const int threads = -1);
-
-            static void ComputeHashes(
-                gsl::span<oprf_item_type> oprf_items, const OPRFKey &oprf_key,
-                const int threads = -1)
-            {
-                ComputeHashes(oprf_items, oprf_key, oprf_items, threads);
-            }
+                gsl::span<oprf_hash_type> oprf_hashes, std::size_t thread_count = 0);
 
         private:
             static void compute_hashes_worker(
-                const std::size_t thread_idx, const std::size_t threads,
+                std::pair<std::size_t, std::size_t> partition,
                 gsl::span<const oprf_item_type> oprf_items, const OPRFKey &oprf_key,
                 gsl::span<oprf_hash_type> oprf_hashes);
         }; // class OPRFSender

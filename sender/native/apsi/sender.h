@@ -85,7 +85,7 @@ namespace apsi
         class Sender
         {
         public:
-            Sender(const PSIParams &params, std::size_t thread_count);
+            Sender(const PSIParams &params, std::size_t thread_count = 0);
 
             /**
             Clears data in sender's database.

@@ -13,6 +13,7 @@
 #include <utility>
 #include <atomic>
 #include <type_traits>
+#include <stdexcept>
 
 // APSI
 #include "apsi/cryptocontext.h"
@@ -83,6 +84,56 @@ namespace apsi
             }
         };
 
+        class Query
+        {
+        friend class Receiver;
+
+        public:
+            Query create_copy() const
+            {
+                Query result;
+                result.item_count_ = item_count_;
+                result.table_idx_to_item_idx_ = table_idx_to_item_idx_;
+                auto sop_query = std::make_unique<network::SenderOperationQuery>();
+                auto this_query = dynamic_cast<const network::SenderOperationQuery*>(sop_.get());
+                sop_query->relin_keys = this_query->relin_keys;
+                sop_query->data = this_query->data;
+                result.sop_ = std::move(sop_query);
+
+                return result;
+            }
+
+            const network::SenderOperationQuery &data() const
+            {
+                const network::SenderOperationQuery *sop_query
+                    = dynamic_cast<const network::SenderOperationQuery*>(sop_.get());
+                if (!sop_query)
+                {
+                    throw std::logic_error("query data is invalid");
+                }
+                return *sop_query;
+            }
+
+            const std::unordered_map<std::size_t, std::size_t> &table_idx_to_item_idx() const
+            {
+                return table_idx_to_item_idx_;
+            }
+
+            const std::size_t item_count() const
+            {
+                return item_count_;
+            }
+
+        private:
+            Query() = default;
+
+            std::unique_ptr<network::SenderOperation> sop_ = nullptr;
+
+            std::unordered_map<std::size_t, std::size_t> table_idx_to_item_idx_;
+
+            std::size_t item_count_ = 0;
+        };
+
         class Receiver
         {
         public:
@@ -92,7 +143,7 @@ namespace apsi
             Constructs a new receiver with parameters specified. In this case the receiver has specified the parameters
             and expects the sender to use the same set.
             */
-            Receiver(PSIParams params, std::size_t thread_count);
+            Receiver(PSIParams params, std::size_t thread_count = 0);
 
             /**
             Generates a new set of keys to use for queries.
@@ -113,12 +164,22 @@ namespace apsi
             static PSIParams request_params(network::Channel &chl);
 
             /**
+            Performs an OPRF query and returns a vector of hashed items.
+            */
+            std::vector<HashedItem> request_oprf(const std::vector<Item> &items, network::Channel &chl);
+
+            /**
+            Creates a query.
+            */
+            Query create_query(const std::vector<HashedItem> &items);
+
+            /**
             Performs a PSI or labeled PSI (depending on the sender) query. The query is a vector of items, and the
             result is a same-size vector of MatchRecord objects. If an item is in the intersection, the corresponding
             MatchRecord indicates it in the `found` field, and the `label` field may contain the corresponding label if 
             a sender included it.
             */
-            std::vector<MatchRecord> query(const std::vector<Item> &items, network::Channel &chl);
+            std::vector<MatchRecord> request_query(const Query &query, network::Channel &chl);
 
         private:
             /**
@@ -133,13 +194,9 @@ namespace apsi
             Removes receiver-side obfuscation from items received after an OPRF query from a sender so that only the
             sender's obfuscation (OPRF) remains.
             */
-            std::vector<Item> deobfuscate_items(
+            std::vector<HashedItem> deobfuscate_items(
                 const std::vector<seal::SEAL_BYTE> &oprf_response,
                 std::unique_ptr<oprf::OPRFReceiver> &oprf_receiver);
-
-            std::unique_ptr<network::SenderOperation> create_query(
-                const std::vector<Item> &items,
-                std::unordered_map<std::size_t, std::size_t> &table_idx_to_item_idx);
 
             void result_package_worker(
                 std::atomic<std::int32_t> &package_count,
@@ -150,8 +207,6 @@ namespace apsi
             void initialize();
 
             std::size_t thread_count_;
-
-            std::uint64_t cuckoo_table_insert_attempts_;
 
             PSIParams params_;
 

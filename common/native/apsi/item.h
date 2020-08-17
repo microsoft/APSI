@@ -269,4 +269,10 @@ namespace apsi
     private:
         std::array<std::uint64_t, 2> value_;
     }; // class Item
+
+    /**
+    Represents an Item that has been hashed with an OPRF.
+    */
+    class HashedItem : public Item 
+    {};
 } // namespace apsi
