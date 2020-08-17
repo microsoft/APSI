@@ -378,7 +378,7 @@ namespace apsi
         Check the cache before you wreck the cache.
         */
         template<typename L>
-        const BinBundleCache &BinBundle<L>::get_cache()
+        const BinBundleCache &BinBundle<L>::get_cache() const
         {
             if (cache_invalid_)
             {

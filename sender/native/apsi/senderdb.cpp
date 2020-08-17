@@ -81,7 +81,7 @@ namespace apsi
             Item's cuckoo index.
             */
             vector<pair<AlgItemLabel<monostate>, size_t> > preprocess_unlabeled_data(
-                const std::map<Item, monostate> &data,
+                const std::map<HashedItem, monostate> &data,
                 PSIParams &params
             ) {
                 // Some variables we'll need
@@ -145,13 +145,110 @@ namespace apsi
             }
 
             /**
+            Inserts the given items and corresponding labels into bin_bundles at their respective cuckoo indices. It will
+            only insert the data with bundle index in the half-open range range [begin_bundle_idx, end_bundle_idx). If
+            inserting into a BinBundle would make the number of items in a bin larger than max_bin_size, this function
+            will create and insert a new BinBundle.
+            */
+            template<typename L>
+            void add_data_worker(
+                vector<pair<AlgItemLabel<L>, size_t> > &data_with_indices,
+                vector<vector<BinBundle<L> > > &bin_bundles,
+                CryptoContext &crypto_context,
+                uint32_t bins_per_bundle,
+                size_t max_bin_size,
+                size_t begin_bundle_idx,
+                size_t end_bundle_idx
+            ) {
+                STOPWATCH(sender_stopwatch, "LabeledSenderDB::add_data_worker");
+
+                // Keep track of the bundle indices we look at. These will be the ones whose cache we have to regen.
+                vector<size_t> bundle_indices;
+
+                // Iteratively insert each item-label pair at the given cuckoo index
+                for (auto &data_with_idx : data_with_indices)
+                {
+                    auto &data = data_with_idx.first;
+
+                    // Get the bundle index
+                    size_t cuckoo_idx = data_with_idx.second;
+                    size_t bin_idx, bundle_idx;
+                    tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
+
+                    // Mark the bundle index for cache regen later
+                    bundle_indices.push_back(bundle_idx);
+
+                    // If the bundle_idx isn't in the prescribed range, don't try to insert this data
+                    if (bundle_idx < begin_bundle_idx || bundle_idx >= end_bundle_idx)
+                    {
+                        continue;
+                    }
+
+                    // Get the bundle set at the given bundle index
+                    vector<BinBundle<L> > &bundle_set = bin_bundles.at(bundle_idx);
+
+                    // Try to insert these field elements in an existing BinBundle at this bundle index. Keep track of
+                    // whether or not we succeed.
+                    bool inserted = false;
+                    for (BinBundle<L> &bundle : bundle_set)
+                    {
+                        // Do a dry-run insertion and see if the new largest bin size in the range
+                        // exceeds the limit
+                        int new_largest_bin_size = bundle.multi_insert_dry_run(data, bin_idx);
+
+                        // Check if inserting would violate the max bin size constraint
+                        if (new_largest_bin_size > 0 && new_largest_bin_size < max_bin_size)
+                        {
+                            // All good
+                            bundle.multi_insert_for_real(data, bin_idx);
+                            inserted = true;
+                            break;
+                        }
+                    }
+
+                    // If we had conflicts everywhere, then we need to make a new BinBundle and insert the data there
+                    if (!inserted)
+                    {
+                        // Make a fresh BinBundle and insert
+                        BinBundle<L> new_bin_bundle(bins_per_bundle, crypto_context);
+                        int res = new_bin_bundle.multi_insert_for_real(data, bin_idx);
+
+                        // If even that failed, I don't know what could've happened
+                        if (res < 0)
+                        {
+                            throw logic_error("Couldn't insert item into a brand new BinBundle");
+                        }
+
+                        // Push a new BinBundle to the set of BinBundles at this bundle index
+                        bundle_set.emplace_back(new_bin_bundle);
+                    }
+                }
+
+                // Now it's time to regenerate the caches of all the modified BinBundles. We'll just go through all the
+                // bundle indices we touched and lazily regenerate the caches of all the BinBundles at those indices.
+                for (size_t &bundle_idx : bundle_indices)
+                {
+                    // Get the set of BinBundles at this bundle index
+                    vector<BinBundle<L> > &bundle_set = bin_bundles.at(bundle_idx);
+
+                    // Regenerate the cache of every BinBundle in the set
+                    for (BinBundle<L> &bundle : bundle_set)
+                    {
+                        // Don't worry, this doesn't do anything unless the BinBundle was actually modified
+                        bundle.regen_cache();
+                    }
+                }
+            }
+
+
+            /**
             Takes algebraized data to be inserted, splits it up, and distributes it so that thread_count many threads can
             all insert in parallel
             */
             template<typename L>
             void dispatch_add_data(
                 vector<pair<AlgItemLabel<L>, size_t > > &data_with_indices,
-                vector<set<BinBundle<L>> > &bin_bundles,
+                vector<vector<BinBundle<L> > > &bin_bundles,
                 CryptoContext &crypto_context,
                 uint32_t bins_per_bundle,
                 uint32_t max_bin_size,
@@ -181,7 +278,15 @@ namespace apsi
                     threads.emplace_back([&, bins_per_bundle, max_bin_size]() {
                         size_t start_idx = partition.first;
                         size_t end_idx = partition.second;
-                        add_data_worker(data_with_indices, bin_bundles, crypto_context, bins_per_bundle, max_bin_size, start_idx, end_idx);
+                        add_data_worker(
+                            data_with_indices,
+                            bin_bundles,
+                            crypto_context,
+                            bins_per_bundle,
+                            max_bin_size,
+                            start_idx,
+                            end_idx
+                        );
                     });
                 }
 
@@ -193,113 +298,15 @@ namespace apsi
             }
 
             /**
-            Inserts the given items and corresponding labels into bin_bundles at their respective cuckoo indices. It will
-            only insert the data with bundle index in the half-open range range [begin_bundle_idx, end_bundle_idx). If
-            inserting into a BinBundle would make the number of items in a bin larger than max_bin_size, this function
-            will create and insert a new BinBundle.
-            */
-            template<typename L>
-            void add_data_worker(
-                vector<pair<AlgItemLabel<L>, size_t> > &data_with_indices,
-                vector<set<BinBundle<L>> > &bin_bundles,
-                CryptoContext &crypto_context,
-                uint32_t bins_per_bundle,
-                size_t max_bin_size,
-                size_t begin_bundle_idx,
-                size_t end_bundle_idx
-            ) {
-                STOPWATCH(sender_stopwatch, "LabeledSenderDB::add_data_worker");
-
-                // Keep track of the bundle indices we look at. These will be the ones whose cache we have to regen.
-                vector<size_t> bundle_indices;
-
-                // Iteratively insert each item-label pair at the given cuckoo index
-                for (auto &data_with_idx : data_with_indices)
-                {
-                    auto &data = data_with_idx.first;
-
-                    // Get the bundle index
-                    size_t cuckoo_idx = data_with_indices.second;
-                    size_t bin_idx, bundle_idx;
-                    tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
-
-                    // Mark the bundle index for cache regen later
-                    bundle_indices.push_back(bundle_idx);
-
-                    // If the bundle_idx isn't in the prescribed range, don't try to insert this data
-                    if (bundle_idx < begin_bundle_idx || bundle_idx >= end_bundle_idx)
-                    {
-                        continue;
-                    }
-
-                    // Get the bundle set at the given bundle index
-                    vector<BinBundle<L> > &bundle_set = bin_bundles.at(bundle_idx);
-
-                    // Try to insert these field elements in an existing BinBundle at this bundle index. Keep track of
-                    // whether or not we succeed.
-                    bool inserted = false;
-                    for (size_t i = 0; i < bundle_set.size(); i++)
-                    {
-                        BinBundle<L> &bundle = bundle_set.at(i);
-                        // Do a dry-run insertion and see if the new largest bin size in the range
-                        // exceeds the limit
-                        int new_largest_bin_size = bundle.multi_insert_dry_run(data, bin_idx);
-
-                        // Check if inserting would violate the max bin size constraint
-                        if (new_largest_bin_size > 0 && new_largest_bin_size < max_bin_size)
-                        {
-                            // All good
-                            bundle.multi_insert_for_real(data, bin_idx);
-                            inserted = true;
-                            break;
-                        }
-                    }
-
-                    // If we had conflicts everywhere, then we need to make a new BinBundle and insert the data there
-                    if (!inserted)
-                    {
-                        // Make a fresh BinBundle and insert
-                        BinBundle<L> new_bin_bundle(bins_per_bundle, crypto_context);
-                        int res = new_bin_bundle.multi_insert_for_real(data, bin_idx);
-
-                        // If even that failed, I don't know what could've happened
-                        if (res < 0)
-                        {
-                            throw logic_error("Couldn't insert item into a brand new BinBundle");
-                        }
-
-                        // Push a new BinBundle to the set of BinBundles at this bundle index
-                        bin_bundles.push_back(new_bin_bundle);
-                    }
-                }
-
-                // Now it's time to regenerate the caches of all the modified BinBundles. We'll just go through all the
-                // bundle indices we touched and lazily regenerate the caches of all the BinBundles at those indices.
-                for (size_t &bundle_idx : bundle_indices)
-                {
-                    // Get the set of BinBundles at this bundle index
-                    set<BinBundle<L> > &bundle_set = bin_bundles.at(bundle_idx);
-
-                    // Regenerate the cache of every BinBundle in the set
-                    for (BinBundle<L> &bundle : bundle_set)
-                    {
-                        // Don't worry, this doesn't do anything unless the BinBundle was actually modified
-                        bundle.regen_cache();
-                    }
-                }
-            }
-
-
-            /**
             Returns a set of DB cache references corresponding to the bundles in the given set
             */
             template<typename L>
-            set<reference_wrapper<const BinBundleCache> > collect_caches(set<BinBundle<L> > &bin_bundles)
+            vector<reference_wrapper<const BinBundleCache> > collect_caches(vector<BinBundle<L> > &bin_bundles)
             {
-                set<reference_wrapper<const BinBundleCache> > result;
+                vector<reference_wrapper<const BinBundleCache> > result;
                 for (const auto &bundle : bin_bundles)
                 {
-                    result.insert(bundle.get_cache());
+                    result.emplace_back(cref(bundle.get_cache()));
                 }
 
                 return result;
@@ -307,20 +314,26 @@ namespace apsi
 
         }
 
+        /**
+        Returns the total number of bin bundles.
+        */
         size_t LabeledSenderDB::bin_bundle_count()
         {
-            // Lock the database for reading 
-            auto lock = SenderDB::get_reader_lock();
+            // Lock the database for reading
+            auto lock = get_reader_lock();
 
             // Compute the total number of bin bundles
             return accumulate(bin_bundles_.cbegin(), bin_bundles_.cend(), size_t(0),
                 [&](auto &a, auto &b) { return a + b.size(); });
         }
 
+        /**
+        Returns the total number of bin bundles.
+        */
         size_t UnlabeledSenderDB::bin_bundle_count()
         {
-            // Lock the database for reading 
-            auto lock = SenderDB::get_reader_lock();
+            // Lock the database for reading
+            auto lock = get_reader_lock();
 
             // Compute the total number of bin bundles
             return accumulate(bin_bundles_.cbegin(), bin_bundles_.cend(), size_t(0),
@@ -352,19 +365,17 @@ namespace apsi
         /**
         Returns a set of DB cache references corresponding to the bundles at the given bundle index.
         */
-        template<typename L>
-        set<reference_wrapper<const BinBundleCache> > LabeledSenderDB::get_cache_at(uint32_t bundle_idx)
+        vector<reference_wrapper<const BinBundleCache> > LabeledSenderDB::get_cache_at(uint32_t bundle_idx)
         {
-            return collect_caches(bin_bundles.at((size_t)bundle_idx));
+            return collect_caches(bin_bundles_.at((size_t)bundle_idx));
         }
 
         /**
         Returns a set of DB cache references corresponding to the bundles at the given bundle index.
         */
-        template<typename L>
-        set<reference_wrapper<const BinBundleCache> > UnlabeledSenderDB::get_cache_at(uint32_t bundle_idx)
+        vector<reference_wrapper<const BinBundleCache> > UnlabeledSenderDB::get_cache_at(uint32_t bundle_idx)
         {
-            return collect_caches(bin_bundles.at((size_t)bundle_idx));
+            return collect_caches(bin_bundles_.at((size_t)bundle_idx));
         }
 
         /**
@@ -385,8 +396,15 @@ namespace apsi
 
             // Dispatch the insertion
             uint32_t bins_per_bundle = params_.bins_per_bundle();
-            uint32_t max_bin_xize = params_.table_params().max_items_per_bin;
-            dispatch_add_data(data_with_indices, bin_bundles_, crypto_context_, bins_per_bundle, max_bin_size);
+            uint32_t max_bin_size = params_.table_params().max_items_per_bin;
+            dispatch_add_data(
+                data_with_indices,
+                bin_bundles_,
+                crypto_context_,
+                bins_per_bundle,
+                max_bin_size,
+                thread_count
+            );
         }
 
         /**
@@ -394,7 +412,7 @@ namespace apsi
         interface that needs to support both labeled and unlabeled insertion. A LabeledSenderDB does not do unlabeled
         insertion. If you can think of a better way to structure this, keep it to yourself.
         */
-        void LabeledSenderDB::add_data(const std::map<HashedItem, FullWidthLabel> &data, size_t thread_count)
+        void LabeledSenderDB::add_data(const std::map<HashedItem, monostate> &data, size_t thread_count)
         {
             throw logic_error("Cannot do unlabeled insertion on a LabeledSenderDB");
         }
@@ -412,12 +430,20 @@ namespace apsi
             auto lock = db_lock_.acquire_write();
 
             // Break the data down into its field element representation. Also compute the items' cuckoo indices.
-            vector<pair<AlgItemLabel<felt_t>, size_t> > data_with_indices
+            vector<pair<AlgItemLabel<monostate>, size_t> > data_with_indices
                 = preprocess_unlabeled_data(data, params_);
 
             // Dispatch the insertion
             uint32_t bins_per_bundle = params_.bins_per_bundle();
-            dispatch_add_data(data_with_indices, bin_bundles_, bins_per_bundle);
+            uint32_t max_bin_size = params_.table_params().max_items_per_bin;
+            dispatch_add_data(
+                data_with_indices,
+                bin_bundles_,
+                crypto_context_,
+                bins_per_bundle,
+                max_bin_size,
+                thread_count
+            );
         }
 
         /**

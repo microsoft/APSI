@@ -62,9 +62,9 @@ namespace apsi
 
             /**
             Returns a set of DB cache references corresponding to the bundles at the given
-            bundle index.
+            bundle index. This returns a vector but order doesn't matter.
             */
-            virtual std::set<std::reference_wrapper<const BinBundleCache> > get_cache_at(std::uint32_t bundle_idx) = 0;
+            virtual std::vector<std::reference_wrapper<const BinBundleCache> > get_cache_at(std::uint32_t bundle_idx) = 0;
 
             const PSIParams &get_params() const
             {
@@ -92,7 +92,6 @@ namespace apsi
             */
             PSIParams params_;
 
-        private:
             /**
             A read-write lock to protect the database from modification while in use.
             */
@@ -105,33 +104,38 @@ namespace apsi
             using SenderDB::SenderDB;
 
             /**
-            All the BinBundles in the DB, indexed by bin index. The set at bundle index i contains all the BinBundles
-            with bundle index i
+            All the BinBundles in the DB, indexed by bin index. The set (represented by a vector internally) at bundle
+            index i contains all the BinBundles with bundle index i
             */
-            std::vector<std::set<BinBundle<felt_t> > > bin_bundles_;
+            std::vector<std::vector<BinBundle<felt_t> > > bin_bundles_;
+
+            /**
+            Clears the database
+            */
+            void clear_db() override;
 
             /**
             Returns the total number of bin bundles.
             */
-            std::size_t bin_bundle_count();
+            std::size_t bin_bundle_count() override;
 
             /**
             Returns a set of DB cache references corresponding to the bundles at the given
-            bundle index.
+            bundle index. This returns a vector but order doesn't matter.
             */
-            std::set<std::reference_wrapper<const BinBundleCache> > get_cache_at(std::uint32_t bundle_idx);
+            std::vector<std::reference_wrapper<const BinBundleCache> > get_cache_at(std::uint32_t bundle_idx) override;
 
             /**
             Clears the database and inserts the given data, using at most thread_count threads
             */
-            void set_data(const std::map<HashedItem, FullWidthLabel> &data, std::size_t thread_count = 0);
-            void set_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count = 0);
+            void set_data(const std::map<HashedItem, FullWidthLabel> &data, std::size_t thread_count = 0) override;
+            void set_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count = 0) override;
 
             /**
             Inserts the given data into the database, using at most thread_count threads
             */
-            void add_data(const std::map<HashedItem, FullWidthLabel> &data, std::size_t thread_count = 0);
-            void add_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count = 0);
+            void add_data(const std::map<HashedItem, FullWidthLabel> &data, std::size_t thread_count = 0) override;
+            void add_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count = 0) override;
         }; // class LabeledSenderDB
 
         class UnlabeledSenderDB : public SenderDB
@@ -140,33 +144,38 @@ namespace apsi
             using SenderDB::SenderDB;
 
             /**
-            All the BinBundles in the DB, indexed by bin index. The set at bundle index i contains all the BinBundles
-            with bundle index i
+            All the BinBundles in the DB, indexed by bin index. The set (represented by a vector internally) at bundle
+            index i contains all the BinBundles with bundle index i
             */
-            std::vector<std::set<BinBundle<monostate> > > bin_bundles_;
+            std::vector<std::vector<BinBundle<monostate> > > bin_bundles_;
+
+            /**
+            Clears the database
+            */
+            void clear_db() override;
 
             /**
             Returns the total number of bin bundles.
             */
-            std::size_t bin_bundle_count();
+            std::size_t bin_bundle_count() override;
 
             /**
             Returns a set of DB cache references corresponding to the bundles at the given
-            bundle index.
+            bundle index. This returns a vector but order doesn't matter.
             */
-            std::set<std::reference_wrapper<const BinBundleCache> > get_cache_at(std::uint32_t bundle_idx);
+            std::vector<std::reference_wrapper<const BinBundleCache> > get_cache_at(std::uint32_t bundle_idx) override;
 
             /**
             Clears the database and inserts the given data, using at most thread_count threads
             */
-            void set_data(const std::map<HashedItem, FullWidthLabel> &data, std::size_t thread_count = 0);
-            void set_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count = 0);
+            void set_data(const std::map<HashedItem, FullWidthLabel> &data, std::size_t thread_count = 0) override;
+            void set_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count = 0) override;
 
             /**
             Inserts the given data into the database, using at most thread_count threads
             */
-            void add_data(const std::map<HashedItem, FullWidthLabel> &data, std::size_t thread_count = 0);
-            void add_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count = 0);
+            void add_data(const std::map<HashedItem, FullWidthLabel> &data, std::size_t thread_count = 0) override;
+            void add_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count = 0) override;
         }; // class UnlabeledSenderDB
     }  // namespace sender
 } // namespace apsi

@@ -225,7 +225,7 @@ namespace apsi
             Gets an immutable reference to this BinBundle's cache. This will throw an exception if the cache is invalid.
             Check the cache before you wreck the cache.
             */
-            const BinBundleCache& get_cache();
+            const BinBundleCache& get_cache() const;
 
             /**
             Generates and caches all the polynomials and plaintexts that this BinBundle requires
