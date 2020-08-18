@@ -13,6 +13,12 @@
 #include "apsi/cryptocontext.h"
 #include "apsi/util/db_encoding.h"
 
+// SEAL
+#include "seal/util/defines.h"
+#include "seal/util/iterator.h"
+#include "seal/util/uintcore.h"
+#include "seal/util/uintarithsmallmod.h"
+
 using namespace apsi::util;
 
 namespace apsi
@@ -69,6 +75,13 @@ namespace apsi
             );
 
             /**
+            Constructs an uninitialized Plaintext polynomial using the given crypto context
+            */
+            BatchedPlaintextPolyn(CryptoContext crypto_context) :
+                crypto_context_(std::move(crypto_context))
+            {}
+
+            /**
             Evaluates the polynomial on the given ciphertext. We don't compute the powers of the input ciphertext C
             ourselves. Instead we assume they've been precomputed and accept the powers: (C, C², C³, ...) as input.
             The number of powers provided MUST be equal to plaintext_polyn_coeffs_.size()-1.
@@ -87,28 +100,33 @@ namespace apsi
         // A cache of all the polynomial and plaintext computations on a single BinBundle
         struct BinBundleCache
         {
-            /**
-            For each bin, stores the "matching polynomial", i.e., unique monic polynomial whose roots are precisely the
-            items in the bin
-            */
-            std::vector<FEltPolyn> felt_matching_polyns;
+                BinBundleCache(CryptoContext &crypto_context) :
+                    batched_matching_polyn(crypto_context),
+                    batched_interp_polyn(crypto_context)
+                {}
 
-            /**
-            For each bin, stores the Newton intepolation polynomial whose value at each item in the bin equals the
-            item's corresponding label. Note that this field is empty when doing unlabeled PSI.
-            */
-            std::vector<FEltPolyn> felt_interp_polyns;
+                /**
+                For each bin, stores the "matching polynomial", i.e., unique monic polynomial whose roots are precisely
+                the items in the bin
+                */
+                std::vector<FEltPolyn> felt_matching_polyns;
 
-            /**
-            Cached seal::Plaintext representation of the "matching" polynomial of this BinBundle
-            */
-            BatchedPlaintextPolyn batched_matching_polyn;
+                /**
+                For each bin, stores the Newton intepolation polynomial whose value at each item in the bin equals the
+                item's corresponding label. Note that this field is empty when doing unlabeled PSI.
+                */
+                std::vector<FEltPolyn> felt_interp_polyns;
 
-            /**
-            Cached seal::Plaintext representation of the interpolation polynomial of this BinBundle. Note that this
-            field is empty when doing unlabeled PSI.
-            */
-            BatchedPlaintextPolyn batched_interp_polyn;
+                /**
+                Cached seal::Plaintext representation of the "matching" polynomial of this BinBundle
+                */
+                BatchedPlaintextPolyn batched_matching_polyn;
+
+                /**
+                Cached seal::Plaintext representation of the interpolation polynomial of this BinBundle. Note that this
+                field is empty when doing unlabeled PSI.
+                */
+                BatchedPlaintextPolyn batched_interp_polyn;
         }; // struct BinBundleCache
 
         /**
@@ -167,7 +185,7 @@ namespace apsi
         public:
             BinBundle(
                 std::size_t num_bins,
-                CryptoContext crypto_context
+                CryptoContext &crypto_context
             );
 
             /**
@@ -179,7 +197,7 @@ namespace apsi
             int multi_insert_dry_run(
                 std::vector<std::pair<felt_t, L> > &item_label_pairs,
                 size_t start_bin_idx
-            ) const;
+            );
 
             /**
             Inserts item-label pairs into sequential bins, beginning at start_bin_idx
@@ -228,32 +246,6 @@ namespace apsi
             Generates and caches all the polynomials and plaintexts that this BinBundle requires
             */
             void regen_cache();
-
         }; // class BinBundle
-
-        /**
-        An UnlabeledBinBundle is a BinBundle<L> where L (the label type) is the unit type
-        */
-        class UnlabeledBinBundle: public BinBundle<monostate>
-        {
-        private:
-            /**
-            Computes and caches the appropriate polynomials of each bin. For unlabeled PSI, this is just the "matching"
-            polynomial. Resulting values are stored in cache_.
-            */
-            void regen_polyns();
-        }; // class UnlabeledBinBundle
-
-        // A LabeledBinBundle is a BinBundle<L> where L (the label type) is felt_t
-        class LabeledBinBundle: public BinBundle<felt_t>
-        {
-        private:
-            /**
-            Computes and caches the appropriate polynomials of each bin. For labeled PSI, this is the "matching"
-            polynomial and the Newton interpolation polynomial. Resulting values are stored in cache_.
-            */
-            void regen_polyns();
-        }; // class LabeledBinBundle
-
     } // namespace sender
 } // namespace apsi

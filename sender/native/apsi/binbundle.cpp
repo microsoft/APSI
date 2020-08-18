@@ -1,6 +1,3 @@
-// Copyright (c) Microsoft Corporation. All rights reserved.
-// Licensed under the MIT license.
-
 // STD
 #include <algorithm>
 #include <utility>
@@ -10,18 +7,12 @@
 #include "apsi/logging/log.h"
 #include "apsi/util/interpolate.h"
 
-// SEAL
-#include "seal/util/defines.h"
-#include "seal/util/iterator.h"
-#include "seal/util/uintcore.h"
-#include "seal/util/uintarithsmallmod.h"
-
-using namespace std;
-using namespace seal;
-using namespace seal::util;
-
 namespace apsi
 {
+
+    using namespace std;
+    using namespace seal;
+    using namespace seal::util;
     using namespace util;
     using namespace logging;
 
@@ -221,9 +212,10 @@ namespace apsi
         template<typename L>
         BinBundle<L>::BinBundle(
             size_t num_bins,
-            CryptoContext crypto_context
+            CryptoContext &crypto_context
         ) :
             cache_invalid_(true),
+            cache_(crypto_context),
             crypto_context_(crypto_context)
         {
             bins_.reserve(num_bins);
@@ -270,7 +262,7 @@ namespace apsi
         int BinBundle<L>::multi_insert_dry_run(
             vector<pair<felt_t, L>> &item_label_pairs,
             size_t start_bin_idx
-        ) const {
+        ) {
             return multi_insert(item_label_pairs, start_bin_idx, true);
         }
 
@@ -304,7 +296,7 @@ namespace apsi
             size_t curr_bin_idx = start_bin_idx;
             for (auto &pair : item_label_pairs)
             {
-                map<felt_t, L> curr_bin = &bins_.at(curr_bin_idx);
+                map<felt_t, L> &curr_bin = bins_.at(curr_bin_idx);
                 // Check if the key is already in the current bin. If so, that's an inserstion error
                 if (curr_bin.find(pair.first) == curr_bin.end())
                 {
@@ -319,7 +311,7 @@ namespace apsi
             curr_bin_idx = start_bin_idx;
             for (auto &pair : item_label_pairs)
             {
-                map<felt_t, L> curr_bin = &bins_.at(curr_bin_idx);
+                map<felt_t, L> &curr_bin = bins_.at(curr_bin_idx);
 
                 // Compare the would-be bin size here to the running max
                 if (max_bin_size < curr_bin.size() + 1)
@@ -408,7 +400,8 @@ namespace apsi
         Computes and caches the appropriate polynomials of each bin. For unlabeled PSI, this is just the "matching"
         polynomial. Resulting values are stored in cache_.
         */
-        void UnlabeledBinBundle::regen_polyns()
+        template<>
+        void BinBundle<monostate>::regen_polyns()
         {
             // Get the field modulus. We need this for polynomial calculations
             const Modulus& mod = field_mod();
@@ -429,7 +422,8 @@ namespace apsi
         Computes and caches the appropriate polynomials of each bin. For labeled PSI, this is the "matching" polynomial
         and the Newton interpolation polynomial. Resulting values are stored in cache_.
         */
-        void LabeledBinBundle::regen_polyns()
+        template<>
+        void BinBundle<felt_t>::regen_polyns()
         {
             // Get the field modulus. We need this for polynomial calculations
             const Modulus& mod = field_mod();
@@ -450,5 +444,11 @@ namespace apsi
                 cache_.felt_interp_polyns.emplace_back(p);
             }
         }
+
+        // BinBundle will only ever be used with these two label types. Ordinarily we'd have to put method definitions
+        // of a template class with the .h file, but if we monomorphize here, we don't have to do that.
+        template class BinBundle<monostate>;
+        template class BinBundle<felt_t>;
+
     } // namespace sender
 } // namespace apsi
