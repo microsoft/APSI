@@ -79,7 +79,7 @@ namespace
             auto reference_label = gsl::span<const uint64_t>(
                 total_label_set[query_item.first].data(),
                 sizeof(FullWidthLabel)/sizeof(uint64_t));
-            ASSERT_TRUE(equal(reference_label.cbegin(), reference_label.cend(), result_label.cbegin()));
+            ASSERT_TRUE(equal(reference_label.begin(), reference_label.end(), result_label.begin()));
         }
     }
 
@@ -90,28 +90,26 @@ namespace
         vector<Item> sender_items;
         for (size_t i = 0; i < sender_size; i++)
         {
-            sender_items.emplace_back(i + 1, 0);
+            sender_items.emplace_back(kuku::make_item(i + 1, 0));
         }
 
         auto oprf_key = make_shared<OPRFKey>();
         vector<HashedItem> hashed_sender_items;
         OPRFSender::ComputeHashes(sender_items, *oprf_key, hashed_sender_items, num_threads);
 
-        map<HashedItem, monostate> sender_db_data;
+        unordered_map<HashedItem, monostate> sender_db_data;
         for (auto item : hashed_sender_items)
         {
             sender_db_data[item] = monostate{};
         }
 
         auto sender_db = make_shared<UnlabeledSenderDB>(params);
-        sender_db->apsi::sender::SenderDB::add_data(sender_db_data, num_threads);
-        shared_ptr<Sender> sender = make_shared<Sender>(params, num_threads);
-        sender->set_db(sender_db);
+        sender_db->set_data(sender_db_data, num_threads);
 
         atomic<bool> stop_sender = false;
 
         auto sender_th = thread([&]() {
-            SenderDispatcher dispatcher(sender);
+            SenderDispatcher dispatcher(sender_db, num_threads);
             dispatcher.run(stop_sender, 5550, oprf_key);
         });
 
@@ -131,7 +129,7 @@ namespace
 
         auto hashed_recv_items = receiver.request_oprf(recv_items_vec, recv_chl);
         auto query = receiver.create_query(hashed_recv_items);
-        auto query_result = receiver.request_query(query, recv_chl);
+        auto query_result = receiver.request_query(move(query), recv_chl);
 
         stop_sender = true;
         sender_th.join();

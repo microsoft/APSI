@@ -6,6 +6,7 @@
 #include <chrono>
 #include <numeric>
 #include <thread>
+#include <future>
 
 // APSI
 #include "apsi/sender.h"
@@ -31,6 +32,7 @@ namespace apsi
 {
     using namespace logging;
     using namespace util;
+    using namespace oprf;
     using namespace network;
 
     namespace
@@ -102,40 +104,136 @@ namespace apsi
 
     namespace sender
     {
-        Sender::Sender(const PSIParams &params, size_t thread_count) :
-            params_(params), seal_context_(SEALContext::Create(params_.seal_params()))
+        ParmsRequest::ParmsRequest(unique_ptr<SenderOperation> sop)
         {
-            thread_count_ = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
+            if (!sop)
+            {
+                throw invalid_argument("operation cannot be null");
+            }
+            if (sop->type() != SenderOperationType::SOP_PARMS)
+            {
+                throw invalid_argument("operation is not a parameter request");
+            }
         }
 
-        void Sender::query(
-            RelinKeys relin_keys,
-            map<uint32_t, vector<SEALObject<Ciphertext>>> query,
-            Channel &chl,
-            function<void(Channel &, unique_ptr<ResultPackage>)> send_fun) const
+        OPRFRequest::OPRFRequest(unique_ptr<SenderOperation> sop)
         {
-            // Acquire read locks on SenderDB and Sender
-            auto sender_lock = get_reader_lock();
-            auto sender_db_lock = sender_db_->get_reader_lock();
+            if (!sop)
+            {
+                throw invalid_argument("operation cannot be null");
+            }
+            if (sop->type() != SenderOperationType::SOP_OPRF)
+            {
+                throw invalid_argument("operation is not an OPRF request");
+            }
 
+            auto sop_oprf = dynamic_cast<SenderOperationOPRF*>(sop.get());
+            data_ = move(sop_oprf->data);
+        }
+
+        QueryRequest::QueryRequest(unique_ptr<SenderOperation> sop)
+        {
+            if (!sop)
+            {
+                throw invalid_argument("operation cannot be null");
+            }
+            if (sop->type() != SenderOperationType::SOP_QUERY)
+            {
+                throw invalid_argument("operation is not a query request");
+            }
+
+            auto sop_query = dynamic_cast<SenderOperationQuery*>(sop.get());
+            relin_keys_ = sop_query->relin_keys.extract_local();
+            data_ = move(sop_query->data);
+        }
+
+        void Sender::RunParms(
+            ParmsRequest &&parms_request,
+            shared_ptr<SenderDB> sender_db,
+            network::Channel &chl,
+            function<void(Channel &, unique_ptr<SenderOperationResponse>)> send_fun)
+        {
             // Check that the database is set
-            if (!sender_db_)
+            if (!sender_db)
             {
                 throw logic_error("SenderDB is not set");
             }
 
-            STOPWATCH(sender_stopwatch, "Sender::query");
-            APSI_LOG_INFO("Start processing query");
+            STOPWATCH(sender_stopwatch, "Sender::RunParms");
+            APSI_LOG_INFO("Start processing parameter request");
 
-            // Create the session context; we don't have to re-create the SEALContext every time
-            CryptoContext crypto_context(seal_context_);
-            crypto_context.set_evaluator(move(relin_keys));
+            auto response_parms = make_unique<SenderOperationResponseParms>();
+            response_parms->params = make_unique<PSIParams>(sender_db->get_params());
 
-            uint32_t bundle_idx_count = params_.bundle_idx_count();
-            uint32_t max_items_per_bin = params_.table_params().max_items_per_bin;
+            send_fun(chl, move(response_parms));
+        }
+
+        void Sender::RunOPRF(
+            OPRFRequest &&oprf_request,
+            const OPRFKey &key,
+            shared_ptr<SenderDB> sender_db,
+            network::Channel &chl,
+            function<void(Channel &, unique_ptr<SenderOperationResponse>)> send_fun)
+        {
+            // Check that the database is set
+            if (!sender_db)
+            {
+                throw logic_error("SenderDB is not set");
+            }
+
+            STOPWATCH(sender_stopwatch, "Sender::RunOPRF");
+            APSI_LOG_INFO("Start processing OPRF request");
+
+            // OPRF response has the same size as the OPRF query 
+            vector<SEAL_BYTE> oprf_result(oprf_request.data_.size());
+            OPRFSender::ProcessQueries(oprf_request.data_, key, oprf_result);
+
+            auto response_oprf = make_unique<SenderOperationResponseOPRF>();
+            response_oprf->data = move(oprf_result);
+
+            send_fun(chl, move(response_oprf));
+        }
+
+        void Sender::RunQuery(
+            QueryRequest &&query_request,
+            shared_ptr<SenderDB> sender_db,
+            Channel &chl,
+            size_t thread_count,
+            function<void(Channel &, unique_ptr<SenderOperationResponse>)> send_fun,
+            function<void(Channel &, unique_ptr<ResultPackage>)> send_rp_fun)
+        {
+            // Check that the database is set
+            if (!sender_db)
+            {
+                throw logic_error("SenderDB is not set");
+            }
+
+            // Acquire read lock on SenderDB
+            auto sender_db_lock = sender_db->get_reader_lock();
+
+            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
+
+            STOPWATCH(sender_stopwatch, "Sender::RunQuery");
+            APSI_LOG_INFO("Start processing query request");
+
+            // The query response only tells how many ResultPackages to expect; send this first
+            uint32_t package_count = safe_cast<uint32_t>(sender_db->bin_bundle_count());
+            auto response_query = make_unique<SenderOperationResponseQuery>();
+            response_query->package_count = package_count;
+            send_fun(chl, move(response_query));
+
+            // Copy over the CryptoContext from SenderDB; set the Evaluator for this local instance
+            CryptoContext crypto_context(sender_db->get_context());
+            crypto_context.set_evaluator(move(query_request.relin_keys_));
+
+            // Get the PSIParams
+            PSIParams params(sender_db->get_params());
+
+            uint32_t bundle_idx_count = params.bundle_idx_count();
+            uint32_t max_items_per_bin = params.table_params().max_items_per_bin;
 
             /* Receive client's query data. */
-            int num_of_powers = static_cast<int>(query.size());
+            int num_of_powers = static_cast<int>(query_request.data_.size());
             APSI_LOG_DEBUG("Number of powers: " << num_of_powers);
             APSI_LOG_DEBUG("Current bundle index count: " << bundle_idx_count);
 
@@ -155,7 +253,7 @@ namespace apsi
             }
 
             // Load inputs provided in the query. These are the precomputed powers we will use for windowing.
-            for (auto &q : query)
+            for (auto &q : query_request.data_)
             {
                 // The exponent of all the query powers we're about to iterate through
                 size_t exponent = static_cast<size_t>(q.first);
@@ -170,7 +268,7 @@ namespace apsi
             }
 
             // Obtain the windowing information
-            uint32_t window_size = params_.table_params().window_size;
+            uint32_t window_size = params.table_params().window_size;
             uint32_t base = uint32_t(1) << window_size;
 
             // Prepare the windowing information
@@ -187,14 +285,14 @@ namespace apsi
 
             // Partition the data and run the threads on the partitions. The i-th thread will compute query powers at
             // bundle indices starting at partitions[i], up to but not including partitions[i+1].
-            auto partitions = partition_evenly(bundle_idx_count, safe_cast<uint32_t>(thread_count_));
+            auto partitions = partition_evenly(bundle_idx_count, safe_cast<uint32_t>(thread_count));
 
             // Launch threads, but not more than necessary
             vector<thread> threads;
             for (size_t t = 0; t < partitions.size(); t++)
             {
                 threads.emplace_back([&, t]() {
-                    query_worker(partitions[t], all_powers, crypto_context, dag, states, chl, send_fun);
+                    QueryWorker(sender_db, partitions[t], all_powers, dag, states, chl, send_rp_fun);
                 });
             }
 
@@ -207,16 +305,16 @@ namespace apsi
             APSI_LOG_INFO("Finished processing query");
         }
 
-        void Sender::query_worker(
+        void Sender::QueryWorker(
+            const shared_ptr<SenderDB> &sender_db,
             pair<uint32_t, uint32_t> bundle_idx_bounds,
             vector<CiphertextPowers> &all_powers,
-            const CryptoContext &crypto_context,
             WindowingDag &dag,
             vector<WindowingDag::State> &states,
             Channel &chl,
-            function<void(Channel &, unique_ptr<ResultPackage>)> send_fun) const
+            function<void(Channel &, unique_ptr<ResultPackage>)> send_rp_fun)
         {
-            STOPWATCH(sender_stopwatch, "Sender::query_worker");
+            STOPWATCH(sender_stopwatch, "Sender::RunQuery::QueryWorker");
 
             uint32_t bundle_idx_start = bundle_idx_bounds.first;
             uint32_t bundle_idx_end = bundle_idx_bounds.second;
@@ -226,10 +324,14 @@ namespace apsi
             {
                 // Compute all powers of the query
                 CiphertextPowers &powers_at_this_bundle_idx = all_powers[bundle_idx];
-                compute_powers(powers_at_this_bundle_idx, crypto_context, dag, states[bundle_idx]);
+                ComputePowers(
+                    sender_db,
+                    powers_at_this_bundle_idx,
+                    dag,
+                    states[bundle_idx]);
 
                 // Next, iterate over each bundle with this bundle index
-                auto bundle_caches = sender_db_->get_cache_at(bundle_idx);
+                auto bundle_caches = sender_db->get_cache_at(bundle_idx);
                 size_t bundle_count = bundle_caches.size();
 
                 // When using C++17 this function may be multi-threaded in the future
@@ -252,7 +354,7 @@ namespace apsi
                     }
 
                     // Start sending on the channel 
-                    send_fun(chl, move(rp));
+                    send_rp_fun(chl, move(rp));
                 });
             }
         }
@@ -266,16 +368,19 @@ namespace apsi
         outgoing edge to node j = i₁ + i₂. A node tells us to construct Cʲ by multiplying Cⁱ¹ and Cⁱ². So this function
         just iterates through the DAG and multiplies the things it dictates until the powers vector is full.
         */
-        void Sender::compute_powers(
+        void Sender::ComputePowers(
+            const shared_ptr<SenderDB> &sender_db,
             CiphertextPowers &powers,
-            const CryptoContext &crypto_context,
             const WindowingDag &dag,
-            WindowingDag::State &state) const
+            WindowingDag::State &state)
         {
+            CryptoContext crypto_context(sender_db->get_context());
+            const PSIParams &params(sender_db->get_params());
+
             // The number of powers necessary to compute PSI is equal to the largest number of elements inside any bin
             // under this bundle index. Globally, this is at most max_items_per_bin.
-            uint32_t max_exponent = params_.table_params().max_items_per_bin;
-            uint32_t bundle_idx_count = params_.bundle_idx_count();
+            uint32_t max_exponent = params.table_params().max_items_per_bin;
+            uint32_t bundle_idx_count = params.bundle_idx_count();
 
             if (powers.size() != max_exponent)
             {

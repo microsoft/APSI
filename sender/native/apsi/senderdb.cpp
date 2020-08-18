@@ -2,11 +2,8 @@
 // Licensed under the MIT license.
 
 // STD
-#include <deque>
 #include <memory>
-#include <mutex>
 #include <thread>
-#include <numeric>
 
 // APSI
 #include "apsi/psiparams.h"
@@ -26,11 +23,11 @@ namespace apsi
         namespace
         {
             /**
-            Converts each given Item-Label pair into its algebraic form, i.e., a sequence of felt-felt pairs. Also computes
-            each Item's cuckoo index.
+            Converts each given Item-Label pair into its algebraic form, i.e., a sequence of felt-felt pairs. Also
+            computes each Item's cuckoo index.
             */
             vector<pair<AlgItemLabel<felt_t>, size_t> > preprocess_labeled_data(
-                const std::map<HashedItem, FullWidthLabel> &data,
+                const unordered_map<HashedItem, FullWidthLabel> &data,
                 PSIParams &params
             ) {
                 // Some variables we'll need
@@ -49,9 +46,9 @@ namespace apsi
                     normal_loc_funcs.push_back(f);
                 }
 
-                // Calculate the cuckoo indices for each item. Store every pair of (&item-label, cuckoo_idx) in a vector.
-                // Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the work of inserting
-                // the items into BinBundles
+                // Calculate the cuckoo indices for each item. Store every pair of (&item-label, cuckoo_idx) in
+                // a vector. Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the
+                // work of inserting the items into BinBundles
                 vector<pair<AlgItemLabel<felt_t>, size_t> > data_with_indices;
                 for (auto &item_label_pair : data)
                 {
@@ -61,11 +58,11 @@ namespace apsi
                     AlgItemLabel<felt_t> alg_item_label = algebraize_item_label(item, label, item_bit_count, mod);
 
                     // Collect the cuckoo indices, ignoring duplicates
-                    std::set<size_t> cuckoo_indices;
+                    set<size_t> cuckoo_indices;
                     for (kuku::LocFunc &hash_func : normal_loc_funcs)
                     {
-                        // The current hash value is an index into a table of Items. In reality our BinBundles are tables of
-                        // bins, which contain chunks of items. How many chunks? bins_per_item many chunks
+                        // The current hash value is an index into a table of Items. In reality our BinBundles are
+                        // tables of bins, which contain chunks of items. How many chunks? bins_per_item many chunks
                         size_t cuckoo_idx = hash_func(item.value()) * bins_per_item;
 
                         // Store the data along with its index
@@ -76,12 +73,12 @@ namespace apsi
                 return data_with_indices;
             }
 
-            /*
-            Converts each given Item into its algebraic form, i.e., a sequence of felt-monostate pairs. Also computes each
-            Item's cuckoo index.
+            /**
+            Converts each given Item into its algebraic form, i.e., a sequence of felt-monostate pairs. Also computes
+            each Item's cuckoo index.
             */
             vector<pair<AlgItemLabel<monostate>, size_t> > preprocess_unlabeled_data(
-                const std::map<HashedItem, monostate> &data,
+                const unordered_map<HashedItem, monostate> &data,
                 PSIParams &params
             ) {
                 // Some variables we'll need
@@ -101,9 +98,9 @@ namespace apsi
                     normal_loc_funcs.push_back(f);
                 }
 
-                // Calculate the cuckoo indices for each item. Store every pair of (&item-label, cuckoo_idx) in a vector.
-                // Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the work of inserting
-                // the items into BinBundles
+                // Calculate the cuckoo indices for each item. Store every pair of (&item-label, cuckoo_idx) in
+                // a vector. Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the
+                // work of inserting the items into BinBundles
                 vector<pair<AlgItemLabel<monostate>, size_t> > data_with_indices;
                 for (auto &item_label_pair : data)
                 {
@@ -112,7 +109,7 @@ namespace apsi
                     AlgItemLabel<monostate> alg_item = algebraize_item(item, item_bit_count, mod);
 
                     // Collect the cuckoo indices, ignoring duplicates
-                    std::set<size_t> cuckoo_indices;
+                    set<size_t> cuckoo_indices;
                     for (kuku::LocFunc &hash_func : normal_loc_funcs)
                     {
                         // The current hash value is an index into a table of Items. In reality our BinBundles are
@@ -120,7 +117,7 @@ namespace apsi
                         size_t cuckoo_idx = hash_func(item.value()) * bins_per_item;
 
                         // Store the data along with its index
-                        std::pair<AlgItemLabel<monostate>, size_t> data_with_idx = { alg_item, cuckoo_idx };
+                        pair<AlgItemLabel<monostate>, size_t> data_with_idx = { alg_item, cuckoo_idx };
                         data_with_indices.push_back(data_with_idx);
                     }
                 }
@@ -381,7 +378,7 @@ namespace apsi
         /**
         Inserts the given data into the database, using at most thread_count threads
         */
-        void LabeledSenderDB::add_data(const std::map<HashedItem, FullWidthLabel> &data, size_t thread_count)
+        void LabeledSenderDB::add_data(const unordered_map<HashedItem, FullWidthLabel> &data, size_t thread_count)
         {
             thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
 
@@ -412,7 +409,7 @@ namespace apsi
         interface that needs to support both labeled and unlabeled insertion. A LabeledSenderDB does not do unlabeled
         insertion. If you can think of a better way to structure this, keep it to yourself.
         */
-        void LabeledSenderDB::add_data(const std::map<HashedItem, monostate> &data, size_t thread_count)
+        void LabeledSenderDB::add_data(const unordered_map<HashedItem, monostate> &data, size_t thread_count)
         {
             throw logic_error("Cannot do unlabeled insertion on a LabeledSenderDB");
         }
@@ -420,7 +417,7 @@ namespace apsi
         /**
         Inserts the given data into the database, using at most thread_count threads
         */
-        void UnlabeledSenderDB::add_data(const std::map<HashedItem, monostate> &data, size_t thread_count)
+        void UnlabeledSenderDB::add_data(const unordered_map<HashedItem, monostate> &data, size_t thread_count)
         {
             thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
 
@@ -451,7 +448,7 @@ namespace apsi
         interface that needs to support both labeled and unlabeled insertion. An UnlabeledSenderDB does not do labeled
         insertion. If you can think of a better way to structure this, keep it to yourself.
         */
-        void UnlabeledSenderDB::add_data(const std::map<HashedItem, FullWidthLabel> &data, size_t thread_count)
+        void UnlabeledSenderDB::add_data(const unordered_map<HashedItem, FullWidthLabel> &data, size_t thread_count)
         {
             throw logic_error("Cannot do labeled insertion on an UnlabeledSenderDB");
         }
@@ -459,7 +456,7 @@ namespace apsi
         /**
         Clears the database and inserts the given data, using at most thread_count threads
         */
-        void LabeledSenderDB::set_data(const std::map<HashedItem, FullWidthLabel> &data, size_t thread_count) {
+        void LabeledSenderDB::set_data(const unordered_map<HashedItem, FullWidthLabel> &data, size_t thread_count) {
             clear_db();
             add_data(data, thread_count);
         }
@@ -467,14 +464,14 @@ namespace apsi
         /**
         This does not and should not work. See LabeledSenderDB::add_data
         */
-        void LabeledSenderDB::set_data(const std::map<HashedItem, monostate> &data, size_t thread_count) {
+        void LabeledSenderDB::set_data(const unordered_map<HashedItem, monostate> &data, size_t thread_count) {
             throw logic_error("Cannot do unlabeled insertion on a LabeledSenderDB");
         }
 
         /**
         Clears the database and inserts the given data, using at most thread_count threads
         */
-        void UnlabeledSenderDB::set_data(const std::map<HashedItem, monostate> &data, size_t thread_count) {
+        void UnlabeledSenderDB::set_data(const unordered_map<HashedItem, monostate> &data, size_t thread_count) {
             clear_db();
             add_data(data, thread_count);
         }
@@ -482,7 +479,7 @@ namespace apsi
         /**
         This does not and should not work. See UnlabeledSenderDB::add_data
         */
-        void UnlabeledSenderDB::set_data(const std::map<HashedItem, FullWidthLabel> &data, size_t thread_count)
+        void UnlabeledSenderDB::set_data(const unordered_map<HashedItem, FullWidthLabel> &data, size_t thread_count)
         {
             throw logic_error("Cannot do labeled insertion on an UnlabeledSenderDB");
         }

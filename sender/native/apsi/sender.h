@@ -6,37 +6,107 @@
 // STD
 #include <array>
 #include <atomic>
-#include <deque>
-#include <iostream>
-#include <map>
-#include <memory>
-#include <mutex>
-#include <vector>
-#include <utility>
-#include <string>
+#include <cstddef>
+#include <cstdint>
 #include <functional>
-
-// GSL
-#include "gsl/span"
+#include <iostream>
+#include <unordered_map>
+#include <memory>
+#include <utility>
+#include <vector>
 
 // APSI
+#include "apsi/cryptocontext.h"
 #include "apsi/item.h"
 #include "apsi/network/channel.h"
+#include "apsi/network/sender_operation.h"
+#include "apsi/oprf/oprf_sender.h"
 #include "apsi/psiparams.h"
-#include "apsi/senderdb.h"
-#include "apsi/cryptocontext.h"
 #include "apsi/sealobject.h"
+#include "apsi/senderdb.h"
 
 // SEAL
-#include "seal/util/defines.h"
-#include "seal/util/locks.h"
 #include "seal/relinkeys.h"
 #include "seal/ciphertext.h"
+#include "seal/util/defines.h"
 
 namespace apsi
 {
     namespace sender
     {
+        class ParmsRequest
+        {
+        friend class Sender;
+
+        public:
+            ParmsRequest(std::unique_ptr<network::SenderOperation> sop);
+
+            ParmsRequest deep_copy() const
+            {
+                // No data to copy
+                return ParmsRequest();
+            }
+
+            ParmsRequest(ParmsRequest &&source) = default;
+
+            ParmsRequest &operator =(ParmsRequest &&source) = default;
+
+        private:
+            ParmsRequest() = default;
+        };
+
+        class OPRFRequest
+        {
+        friend class Sender;
+
+        public:
+            OPRFRequest(std::unique_ptr<network::SenderOperation> sop);
+
+            OPRFRequest deep_copy() const
+            {
+                OPRFRequest result;
+                result.data_ = data_;
+                return std::move(result);
+            }
+
+            OPRFRequest(OPRFRequest &&source) = default;
+
+            OPRFRequest &operator =(OPRFRequest &&source) = default;
+
+        private:
+            OPRFRequest() = default;
+
+            std::vector<seal::SEAL_BYTE> data_;
+        };
+
+        class QueryRequest
+        {
+        friend class Sender;
+
+        public:
+            QueryRequest(std::unique_ptr<network::SenderOperation> sop);
+
+            QueryRequest deep_copy() const
+            {
+                QueryRequest result;
+                result.relin_keys_ = relin_keys_;
+                result.data_ = data_;
+
+                return std::move(result);
+            }
+
+            QueryRequest(QueryRequest &&source) = default;
+
+            QueryRequest &operator =(QueryRequest &&source) = default;
+
+        private:
+            QueryRequest() = default;
+
+            seal::RelinKeys relin_keys_;
+
+            std::unordered_map<std::uint32_t, std::vector<SEALObject<seal::Ciphertext>>> data_;
+        };
+
         // An alias to denote the powers of a ciphertext. For a ciphertext C, this holds C, C², C³, etc. It does not
         // hold C⁰.
         using CiphertextPowers = std::vector<seal::Ciphertext>;
@@ -85,72 +155,59 @@ namespace apsi
         class Sender
         {
         public:
-            Sender(const PSIParams &params, std::size_t thread_count = 0);
+            Sender() = delete;
 
             /**
-            Clears data in sender's database.
+            Generate and send a response to a parameter request.
             */
-            inline void clear_db()
-            {
-                auto lock = sender_db_lock_.acquire_write();
-                sender_db_.reset();
-            }
-
-            /**
-            Sets the database to be used.
-            */
-            inline void set_db(std::shared_ptr<SenderDB> sender_db)
-            {
-                auto lock = sender_db_lock_.acquire_write();
-                sender_db_ = std::move(sender_db);
-            }
-
-            /**
-            Generate a response to a query.
-            */
-            void query(
-                seal::RelinKeys relin_keys,
-                std::map<std::uint32_t, std::vector<SEALObject<seal::Ciphertext>>> query,
+            static void RunParms(
+                ParmsRequest &&parms_request,
+                std::shared_ptr<SenderDB> sender_db,
                 network::Channel &chl,
-                std::function<void(network::Channel &, std::unique_ptr<network::ResultPackage>)> send_fun = BasicSend)
-                const;
+                std::function<void(network::Channel &, std::unique_ptr<network::SenderOperationResponse>)> send_fun
+                    = BasicSend<network::SenderOperationResponse>);
 
             /**
-            Return the PSI parameters.
+            Generate and send a response to an OPRF request.
             */
-            const PSIParams &get_params() const
-            {
-                return params_;
-            }
+            static void RunOPRF(
+                OPRFRequest &&oprf_request,
+                const oprf::OPRFKey &key,
+                std::shared_ptr<SenderDB> sender_db,
+                network::Channel &chl,
+                std::function<void(network::Channel &, std::unique_ptr<network::SenderOperationResponse>)> send_fun
+                    = BasicSend<network::SenderOperationResponse>);
 
             /**
-            Return the SEALContext.
+            Generate and send a response to a query.
             */
-            std::shared_ptr<seal::SEALContext> get_seal_context() const
-            {
-                return seal_context_;
-            }
-
-            seal::util::ReaderLock get_reader_lock() const
-            {
-                return sender_db_lock_.acquire_read();
-            }
-
-            static void BasicSend(network::Channel &chl, std::unique_ptr<network::ResultPackage> rp)
-            {
-                chl.send(std::move(rp));
-            }
+            static void RunQuery(
+                QueryRequest &&query_request,
+                std::shared_ptr<SenderDB> sender_db,
+                network::Channel &chl,
+                std::size_t thread_count = 0,
+                std::function<void(network::Channel &, std::unique_ptr<network::SenderOperationResponse>)> send_fun
+                    = BasicSend<network::SenderOperationResponse>,
+                std::function<void(network::Channel &, std::unique_ptr<network::ResultPackage>)> send_rp_fun
+                    = BasicSend<network::ResultPackage>);
 
         private:
+            template<typename T>
+            static void BasicSend(network::Channel &chl, std::unique_ptr<T> pkg)
+            {
+                chl.send(std::move(pkg));
+            }
+
             /**
             Method that handles the work of a single thread that computes the response to a query.
             */
-            void query_worker(
+            static void QueryWorker(
+                const std::shared_ptr<SenderDB> &sender_db,
                 std::pair<std::uint32_t, std::uint32_t> bundle_idx_bounds,
-                std::vector<std::vector<seal::Ciphertext>> &powers, const CryptoContext &crypto_context,
+                std::vector<std::vector<seal::Ciphertext>> &powers,
                 WindowingDag &dag, std::vector<WindowingDag::State> &states,
                 network::Channel &chl,
-                std::function<void(network::Channel &, std::unique_ptr<network::ResultPackage>)> send_fun) const;
+                std::function<void(network::Channel &, std::unique_ptr<network::ResultPackage>)> send_rp_fun);
 
             /**
             Constructs all powers of receiver's items for the specified batch, based on the powers sent from the
@@ -164,25 +221,11 @@ namespace apsi
             of the same power (y^k). The size of the vector is the number of batches.
             @params[out] all_powers All powers computed from the input for the specified batch.
             */
-            void compute_powers(
+            static void ComputePowers(
+                const std::shared_ptr<SenderDB> &sender_db,
                 CiphertextPowers &powers,
-                const CryptoContext &crypto_context,
                 const WindowingDag &dag,
-                WindowingDag::State &state
-            ) const;
-
-            PSIParams params_;
-
-            std::size_t thread_count_;
-
-            std::shared_ptr<seal::SEALContext> seal_context_;
-
-            std::shared_ptr<SenderDB> sender_db_;
-
-            /**
-            Read-write lock for controlling access to the database.
-            */
-            mutable seal::util::ReaderWriterLocker sender_db_lock_;
+                WindowingDag::State &state);
         }; // class Sender
     }      // namespace sender
 } // namespace apsi

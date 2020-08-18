@@ -10,7 +10,7 @@
 #include <memory>
 #include <utility>
 #include <vector>
-#include <set>
+#include <unordered_map>
 
 // GSL
 #include "gsl/span"
@@ -50,25 +50,39 @@ namespace apsi
             Clears the database and inserts the given data, using at most thread_count threads. Only one of these is
             defined for a given child of SenderDB, corresponding to whether it is labeled or unlabeled.
             */
-            virtual void set_data(const std::map<HashedItem, util::FullWidthLabel> &data, std::size_t thread_count) = 0;
-            virtual void set_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count) = 0;
+            virtual void set_data(
+                const std::unordered_map<HashedItem, util::FullWidthLabel> &data,
+                std::size_t thread_count) = 0;
+            virtual void set_data(
+                const std::unordered_map<HashedItem, monostate> &data,
+                std::size_t thread_count) = 0;
 
             /**
             Inserts the given data into the database, using at most thread_count threads. Only one of these is defined
             for a given child of SenderDB, corresponding to whether it is labeled or unlabeled.
             */
-            virtual void add_data(const std::map<HashedItem, util::FullWidthLabel> &data, std::size_t thread_count) = 0;
-            virtual void add_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count) = 0;
+            virtual void add_data(
+                const std::unordered_map<HashedItem, util::FullWidthLabel> &data,
+                std::size_t thread_count) = 0;
+            virtual void add_data(
+                const std::unordered_map<HashedItem, monostate> &data,
+                std::size_t thread_count) = 0;
 
             /**
             Returns a set of DB cache references corresponding to the bundles at the given
             bundle index. This returns a vector but order doesn't matter.
             */
-            virtual std::vector<std::reference_wrapper<const BinBundleCache> > get_cache_at(std::uint32_t bundle_idx) = 0;
+            virtual auto get_cache_at(std::uint32_t bundle_idx)
+                -> std::vector<std::reference_wrapper<const BinBundleCache> > = 0;
 
             const PSIParams &get_params() const
             {
                 return params_;
+            }
+
+            CryptoContext get_context() const
+            {
+                return crypto_context_;
             }
 
             /**
@@ -100,6 +114,7 @@ namespace apsi
 
         class LabeledSenderDB : public SenderDB
         {
+        private:
             // Inherit SenderDB constructor
             using SenderDB::SenderDB;
 
@@ -109,6 +124,7 @@ namespace apsi
             */
             std::vector<std::vector<BinBundle<felt_t> > > bin_bundles_;
 
+        public:
             /**
             Clears the database
             */
@@ -123,23 +139,33 @@ namespace apsi
             Returns a set of DB cache references corresponding to the bundles at the given
             bundle index. This returns a vector but order doesn't matter.
             */
-            std::vector<std::reference_wrapper<const BinBundleCache> > get_cache_at(std::uint32_t bundle_idx) override;
+            auto get_cache_at(std::uint32_t bundle_idx)
+                -> std::vector<std::reference_wrapper<const BinBundleCache> > override;
 
             /**
             Clears the database and inserts the given data, using at most thread_count threads
             */
-            void set_data(const std::map<HashedItem, FullWidthLabel> &data, std::size_t thread_count = 0) override;
-            void set_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count = 0) override;
+            void set_data(
+                const std::unordered_map<HashedItem, FullWidthLabel> &data,
+                std::size_t thread_count = 0) override;
+            void set_data(
+                const std::unordered_map<HashedItem, monostate> &data,
+                std::size_t thread_count = 0) override;
 
             /**
             Inserts the given data into the database, using at most thread_count threads
             */
-            void add_data(const std::map<HashedItem, FullWidthLabel> &data, std::size_t thread_count = 0) override;
-            void add_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count = 0) override;
+            void add_data(
+                const std::unordered_map<HashedItem, FullWidthLabel> &data,
+                std::size_t thread_count = 0) override;
+            void add_data(
+                const std::unordered_map<HashedItem, monostate> &data,
+                std::size_t thread_count = 0) override;
         }; // class LabeledSenderDB
 
         class UnlabeledSenderDB : public SenderDB
         {
+        private:
             // Inherit SenderDB constructor
             using SenderDB::SenderDB;
 
@@ -149,6 +175,7 @@ namespace apsi
             */
             std::vector<std::vector<BinBundle<monostate> > > bin_bundles_;
 
+        public:
             /**
             Clears the database
             */
@@ -163,19 +190,28 @@ namespace apsi
             Returns a set of DB cache references corresponding to the bundles at the given
             bundle index. This returns a vector but order doesn't matter.
             */
-            std::vector<std::reference_wrapper<const BinBundleCache> > get_cache_at(std::uint32_t bundle_idx) override;
+            auto get_cache_at(std::uint32_t bundle_idx)
+                -> std::vector<std::reference_wrapper<const BinBundleCache> > override;
 
             /**
             Clears the database and inserts the given data, using at most thread_count threads
             */
-            void set_data(const std::map<HashedItem, FullWidthLabel> &data, std::size_t thread_count = 0) override;
-            void set_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count = 0) override;
+            void set_data(
+                const std::unordered_map<HashedItem, FullWidthLabel> &data,
+                std::size_t thread_count = 0) override;
+            void set_data(
+                const std::unordered_map<HashedItem, monostate> &data,
+                std::size_t thread_count = 0) override;
 
             /**
             Inserts the given data into the database, using at most thread_count threads
             */
-            void add_data(const std::map<HashedItem, FullWidthLabel> &data, std::size_t thread_count = 0) override;
-            void add_data(const std::map<HashedItem, monostate> &data, std::size_t thread_count = 0) override;
+            void add_data(
+                const std::unordered_map<HashedItem, FullWidthLabel> &data,
+                std::size_t thread_count = 0) override;
+            void add_data(
+                const std::unordered_map<HashedItem, monostate> &data,
+                std::size_t thread_count = 0) override;
         }; // class UnlabeledSenderDB
     }  // namespace sender
 } // namespace apsi

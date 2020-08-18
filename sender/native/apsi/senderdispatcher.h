@@ -27,9 +27,7 @@ namespace apsi
         public:
             SenderDispatcher() = delete;
 
-            SenderDispatcher(std::shared_ptr<sender::SenderDB> sender_db, std::size_t thread_count) :
-                sender_db_(std::move(sender_db)), thread_count_(thread_count)
-            {}
+            SenderDispatcher(std::shared_ptr<sender::SenderDB> sender_db, std::size_t thread_count = 0);
 
             /**
             Run the dispatcher on the given port.
@@ -57,10 +55,7 @@ namespace apsi
             /**
             Dispatch a Query request to the Sender.
             */
-            void dispatch_query(
-                const Sender &sender,
-                std::unique_ptr<network::NetworkSenderOperation> sop,
-                network::SenderChannel &channel);
+            void dispatch_query(std::unique_ptr<network::NetworkSenderOperation> sop, network::SenderChannel &channel);
         }; // class SenderDispatcher
     }      // namespace sender
 } // namespace apsi
