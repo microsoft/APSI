@@ -233,6 +233,11 @@ namespace apsi
             return value_[word_index];
         }
 
+        const std::uint64_t &operator[](std::size_t word_index) const
+        {
+            return value_[word_index];
+        }
+
         std::uint64_t *data()
         {
             return value_.data();
@@ -276,3 +281,31 @@ namespace apsi
     class HashedItem : public Item 
     {};
 } // namespace apsi
+
+/**
+Specializes the std::hash template for Item and HashedItem.
+*/
+namespace std
+{
+    template <>
+    struct hash<apsi::Item>
+    {
+        std::size_t operator()(const apsi::Item &item) const
+        {
+            std::uint64_t result = 17;
+            result = 31 * result + item[0];
+            result = 31 * result + item[1];
+            return static_cast<std::size_t>(result);
+        }
+    };
+
+    template <>
+    struct hash<apsi::HashedItem>
+    {
+        std::size_t operator()(const apsi::HashedItem &item) const
+        {
+            return hash<apsi::Item>()(item);
+        }
+    };
+} // namespace std
+

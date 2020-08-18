@@ -4,6 +4,7 @@
 // STD
 #include <cstdint>
 #include <cstddef>
+#include <thread>
 
 // APSI
 #include "apsi/senderdispatcher.h"
@@ -25,6 +26,16 @@ namespace apsi
 
     namespace sender
     {
+        SenderDispatcher::SenderDispatcher(shared_ptr<SenderDB> sender_db, size_t thread_count) :
+            sender_db_(std::move(sender_db))
+        {
+            if (!sender_db)
+            {
+                throw invalid_argument("sender_db is not set");
+            }
+            thread_count_ = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
+        }
+
         void SenderDispatcher::run(
             const atomic<bool> &stop, int port, shared_ptr<const OPRFKey> oprf_key)
         {
@@ -38,16 +49,14 @@ namespace apsi
 
             oprf_key_ = move(oprf_key);
 
-            // Setting up the Sender object
-            Sender sender(sender_db_->get_params(), thread_count_);
-
-            bool logged_waiting = false;
+            auto seal_context = sender_db_->get_context().seal_context();
 
             // Run until stopped
+            bool logged_waiting = false;
             while (!stop)
             {
                 unique_ptr<NetworkSenderOperation> sop;
-                if (!(sop = chl.receive_network_operation(sender.get_seal_context())))
+                if (!(sop = chl.receive_network_operation(seal_context)))
                 {
                     if (!logged_waiting)
                     {
@@ -76,7 +85,7 @@ namespace apsi
                 case SenderOperationType::SOP_QUERY:
                     {
                         APSI_LOG_INFO("Received query");
-                        dispatch_query(sender, move(sop), chl);
+                        dispatch_query(move(sop), chl);
                         break;
                     }
 
@@ -91,59 +100,57 @@ namespace apsi
 
         void SenderDispatcher::dispatch_parms(unique_ptr<NetworkSenderOperation> sop, SenderChannel &chl)
         {
-            auto response_parms = make_unique<SenderOperationResponseParms>();
-            response_parms->params = make_unique<PSIParams>(sender_db_->get_params());
-            auto response = make_unique<NetworkSenderOperationResponse>();
-            response->sop_response = move(response_parms);
-            response->client_id = move(sop->client_id);
+            // Extract the parameter request
+            ParmsRequest parms_request(move(sop->sop));
 
-            chl.send(move(response));
+            Sender::RunParms(move(parms_request), sender_db_, chl,
+                [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
+                    auto nsop_response = make_unique<NetworkSenderOperationResponse>();
+                    nsop_response->sop_response = move(sop_response);
+                    nsop_response->client_id = move(sop->client_id);
+
+                    // We know for sure that the channel is a SenderChannel so use static_cast
+                    static_cast<SenderChannel&>(c).send(move(nsop_response));
+                });
         }
 
         void SenderDispatcher::dispatch_oprf(unique_ptr<NetworkSenderOperation> sop, SenderChannel &chl)
         {
-            auto sop_oprf = dynamic_cast<SenderOperationOPRF*>(sop->sop.get());
+            // Extract the OPRF request
+            OPRFRequest oprf_request(move(sop->sop));
 
-            // OPRF response has the same size as the OPRF query 
-            vector<SEAL_BYTE> oprf_response(sop_oprf->data.size());
-            OPRFSender::ProcessQueries(sop_oprf->data, *oprf_key_, oprf_response);
+            Sender::RunOPRF(move(oprf_request), *oprf_key_, sender_db_, chl,
+                [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
+                    auto nsop_response = make_unique<NetworkSenderOperationResponse>();
+                    nsop_response->sop_response = move(sop_response);
+                    nsop_response->client_id = move(sop->client_id);
 
-            auto response_oprf = make_unique<SenderOperationResponseOPRF>();
-            response_oprf->data = move(oprf_response);
-            auto response = make_unique<NetworkSenderOperationResponse>();
-            response->sop_response = move(response_oprf);
-            response->client_id = move(sop->client_id);
-
-            chl.send(move(response));
+                    // We know for sure that the channel is a SenderChannel so use static_cast
+                    static_cast<SenderChannel&>(c).send(move(nsop_response));
+                });
         }
 
-        void SenderDispatcher::dispatch_query(
-            const Sender &sender,
-            unique_ptr<NetworkSenderOperation> sop,
-            SenderChannel &chl)
+        void SenderDispatcher::dispatch_query(unique_ptr<NetworkSenderOperation> sop, SenderChannel &chl)
         {
-            // Acquire read lock on SenderDB
-            auto sender_db_lock = sender_db_->get_reader_lock();
-
-            auto sop_query = dynamic_cast<SenderOperationQuery*>(sop->sop.get());
-
-            // The query response only tells how many ResultPackages to expect
-            uint32_t package_count = safe_cast<uint32_t>(sender_db_->bin_bundle_count());
-
-            auto response_query = make_unique<SenderOperationResponseQuery>();
-            response_query->package_count = package_count;
-            auto response = make_unique<NetworkSenderOperationResponse>();
-            response->sop_response = move(response_query);
-            response->client_id = sop->client_id;
-
-            chl.send(move(response));
+            // Create the QueryRequest object
+            QueryRequest query_request(move(sop->sop));
 
             // Query will send result to client in a stream of ResultPackages
-            sender.query(sop_query->relin_keys.extract_local(), move(sop_query->data), chl,
-                [&response](Channel &c, unique_ptr<ResultPackage> rp) {
+            Sender::RunQuery(move(query_request), sender_db_, chl, thread_count_,
+                // Lambda function for sending the query response
+                [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
+                    auto nsop_response = make_unique<NetworkSenderOperationResponse>();
+                    nsop_response->sop_response = move(sop_response);
+                    nsop_response->client_id = sop->client_id;
+
+                    // We know for sure that the channel is a SenderChannel so use static_cast
+                    static_cast<SenderChannel&>(c).send(move(nsop_response));
+                },
+                // Lambda function for sending the ResultPackages
+                [&sop](Channel &c, unique_ptr<ResultPackage> rp) {
                     auto nrp = make_unique<NetworkResultPackage>();
                     nrp->rp = move(rp);
-                    nrp->client_id = move(response->client_id);
+                    nrp->client_id = sop->client_id;
 
                     // We know for sure that the channel is a SenderChannel so use static_cast
                     static_cast<SenderChannel&>(c).send(move(nrp));

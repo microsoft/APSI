@@ -45,14 +45,14 @@ namespace apsi
                 compute_powers(move(values), params.table_params().window_size, params.table_params().max_items_per_bin);
             }
 
-            map<uint32_t, SEALObject<Ciphertext>> encrypt(const CryptoContext &crypto_context)
+            unordered_map<uint32_t, SEALObject<Ciphertext>> encrypt(const CryptoContext &crypto_context)
             {
                 if (!crypto_context.encryptor())
                 {
                     throw invalid_argument("encryptor is not set in crypto_context");
                 }
 
-                map<uint32_t, SEALObject<Ciphertext>> result;
+                unordered_map<uint32_t, SEALObject<Ciphertext>> result;
                 for (auto &p : powers_)
                 {
                     Plaintext pt;
@@ -66,7 +66,7 @@ namespace apsi
         private:
             Modulus mod_;
 
-            map<uint32_t, vector<uint64_t>> powers_;
+            unordered_map<uint32_t, vector<uint64_t>> powers_;
 
             void square_array(gsl::span<uint64_t> in) const
             {
@@ -342,7 +342,7 @@ namespace apsi
 
             // The very last thing to do is encrypt the plain_powers and consolidate the matching powers for different
             // bundle indices
-            map<uint32_t, vector<SEALObject<Ciphertext>>> encrypted_powers;
+            unordered_map<uint32_t, vector<SEALObject<Ciphertext>>> encrypted_powers;
 
             // encrypt_data
             {

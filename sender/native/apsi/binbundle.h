@@ -59,7 +59,6 @@ namespace apsi
             CryptoContext crypto_context_;
 
         public:
-
             /**
             Constructs a batched Plaintext polynomial from a list of polynomials. Takes an evaluator and batch encoder
             to do encoding and NTT ops.
@@ -121,7 +120,6 @@ namespace apsi
         class BinBundle
         {
         private:
-
             /**
             This is true iff cache_ needs to be regenerated
             */
@@ -142,7 +140,7 @@ namespace apsi
             polynomial. For labeled PSI, this is the "matching" polynomial and the Newton interpolation polynomial.
             Resulting values are stored in cache_.
             */
-            virtual void regen_polyns();
+            void regen_polyns();
 
             /**
             Batches this BinBundle's polynomials into SEAL Plaintexts. Resulting values are stored in cache_.
@@ -150,7 +148,6 @@ namespace apsi
             void regen_plaintexts();
 
         protected:
-
             /**
             The bins of the BinBundle. Each bin is a key-value store, where the keys are (chunks of the OPRF'd) DB
             items and the labels are either field elements or empty (a unit type).

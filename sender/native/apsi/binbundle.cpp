@@ -170,8 +170,7 @@ namespace apsi
         BatchedPlaintextPolyn::BatchedPlaintextPolyn(
             vector<FEltPolyn> &polyns,
             CryptoContext crypto_context
-        )
-        : crypto_context_(crypto_context)
+        ) : crypto_context_(move(crypto_context))
         {
             // Find the highest degree polynomial in the list. The max degree determines how many Plaintexts we
             // need to make
@@ -249,14 +248,14 @@ namespace apsi
         void BinBundle<L>::regen_plaintexts()
         {
             // Compute and cache the batched "matching" polynomials. They're computed in both labeled and unlabeled PSI.
-            BatchedPlaintextPolyn p(cache_.felt_matching_polyns);
+            BatchedPlaintextPolyn p(cache_.felt_matching_polyns, crypto_context_);
             cache_.batched_matching_polyn = p;
 
             // Compute and cache the batched Newton interpolation polynomials iff they exist. They're only computed for
             // labeled PSI.
             if (cache_.felt_interp_polyns.size() > 0)
             {
-                BatchedPlaintextPolyn p(cache_.felt_interp_polyns);
+                BatchedPlaintextPolyn p(cache_.felt_interp_polyns, crypto_context_);
                 cache_.batched_interp_polyn = p;
             }
         }
