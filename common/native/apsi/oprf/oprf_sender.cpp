@@ -98,13 +98,13 @@ namespace apsi
             thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
 
             // Partition the work evenly across all threads
-            vector<pair<size_t, size_t>> work_partitions = partition_evenly(oprf_items.size(), thread_count);
+            vector<pair<size_t, size_t>> partitions = partition_evenly(oprf_items.size(), thread_count);
 
             vector<thread> thrds;
-            for (size_t t = 0; t < thread_count; t++)
+            for (size_t t = 0; t < partitions.size(); t++)
             {
                 thrds.emplace_back([&](pair<size_t, size_t> partition) {
-                    compute_hashes_worker(partition, oprf_items, oprf_key, oprf_hashes); }, work_partitions[t]);
+                    compute_hashes_worker(partition, oprf_items, oprf_key, oprf_hashes); }, partitions[t]);
             }
 
             for (auto &t : thrds)

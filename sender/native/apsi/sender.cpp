@@ -249,7 +249,7 @@ namespace apsi
             // Initialize powers
             for (CiphertextPowers &powers : all_powers)
             {
-                powers.reserve(max_exponent);
+                powers.resize(max_exponent);
             }
 
             // Load inputs provided in the query. These are the precomputed powers we will use for windowing.
@@ -360,7 +360,7 @@ namespace apsi
         }
 
         /**
-        Fills out the list of ciphertext powers (C, C², C³, ...). The given powers vector may uninitialized almost
+        Fills out the list of ciphertext powers (C, C², C³, ...). The given powers vector may be uninitialized almost
         everywhere, but precomputed powers MUST be present at indices of the form x*base^y where base is the window size
         (the receiver is supposed to send these). The rest of the powers are constructed by multiplying existing powers.
         The goal is to minimize the circuit depth for these calculations, and so we use some precomputation to guide us.
@@ -398,13 +398,13 @@ namespace apsi
                 // Atomically get the next_node counter (this tells us where to start working) and increment it
                 size_t node_idx = static_cast<size_t>(state.next_node->fetch_add(1));
                 // If we've traversed the whole DAG, we're done
-                if (node_idx >= dag.nodes_.size())
+                if (node_idx >= dag.nodes.size())
                 {
                     break;
                 }
 
-                auto &node = dag.nodes_[node_idx];
-                auto &output_node_state = state.node_states.at(node.output);
+                auto &node = dag.nodes[node_idx];
+                auto &output_node_state = state.node_states[node.output];
 
                 // Atomically transition this node from Uncomputed to Computing. This makes sure we're the only one
                 // who's writing to it. The _strong specifier here means that this doesn't fail spuriously, i.e., if the
@@ -425,7 +425,7 @@ namespace apsi
                 for (size_t i = 0; i < 2; i++)
                 {
                     // Spin until the input is computed
-                    auto &input_node_state = state.node_states.at(node.inputs[i]);
+                    auto &input_node_state = state.node_states[node.inputs[i]];
                     while (input_node_state != WindowingDag::NodeState::Done) {}
                 }
 
@@ -476,12 +476,12 @@ namespace apsi
                 if (i1 && i2)
                 {
                     Node node { { i1, i2 }, i, };
-                    nodes_.emplace_back(node);
+                    nodes.emplace_back(node);
                 }
             }
 
             // Sort the DAG in increasing order by Hamming weight of their output
-            sort(nodes_.begin(), nodes_.end(), [base](const Node &node1, const Node &node2) -> bool {
+            sort(nodes.begin(), nodes.end(), [base](const Node &node1, const Node &node2) -> bool {
                 return hamming_weight(node1.output, base) < hamming_weight(node2.output, base);
             });
 
@@ -498,9 +498,11 @@ namespace apsi
             *next_node = 0;
 
             // Everything is uncomputed at first
-            for (auto &n : node_states)
+            size_t node_count = dag.nodes.size();
+            node_states.reset(new atomic<NodeState>[node_count]);
+            for (size_t i = 0; i < node_count; i++)
             {
-                n.store(NodeState::Uncomputed);
+                node_states[i].store(NodeState::Uncomputed);
             }
         }
     } // namespace sender

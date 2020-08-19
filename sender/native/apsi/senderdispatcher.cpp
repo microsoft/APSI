@@ -29,7 +29,7 @@ namespace apsi
         SenderDispatcher::SenderDispatcher(shared_ptr<SenderDB> sender_db, size_t thread_count) :
             sender_db_(std::move(sender_db))
         {
-            if (!sender_db)
+            if (!sender_db_)
             {
                 throw invalid_argument("sender_db is not set");
             }

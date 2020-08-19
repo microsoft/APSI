@@ -126,7 +126,7 @@ namespace apsi
                 // has to be calculated)
                 std::unique_ptr<std::atomic<std::size_t>> next_node;
                 // All the node states
-                std::vector<std::atomic<NodeState> > node_states;
+                std::unique_ptr<std::atomic<NodeState>[]> node_states;
 
                 State(WindowingDag &dag);
             };
@@ -140,7 +140,7 @@ namespace apsi
             /**
             Stores the actual nodes of the DAG
             */
-            std::vector<Node> nodes_;
+            std::vector<Node> nodes;
 
             /**
             Constructs a directed acyclic graph, where each node has 2 inputs and 1 output. Every node has inputs i,j
