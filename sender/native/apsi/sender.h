@@ -140,16 +140,26 @@ namespace apsi
             /**
             Stores the actual nodes of the DAG
             */
-            std::vector<Node> nodes;
+            std::vector<Node> nodes_;
+
+            /**
+            The windowing base
+            */
+            std::uint32_t base_;
+
+            /**
+            The largest ciphertext exponent we need to calculate
+            */
+            std::size_t max_exponent_;
 
             /**
             Constructs a directed acyclic graph, where each node has 2 inputs and 1 output. Every node has inputs i,j
-            and output i+j. The largest output is max_power. The choice of inputs depends on their Hamming weights,
-            which depends on the base specified (the base is also known as the window size).
-            This is used to compute powers of a given ciphertext while minimizing circuit depth. The nodes vector is
-            sorted in increasing order of Hamming weight of output.
+            and output i+j. The largest power has exponent max_exponent. The choice of inputs depends on their Hamming
+            weights, which depends on the base specified (the base is also known as the window size, and MUST be a power
+            of 2). This is used to compute powers of a given ciphertext while minimizing circuit depth. The nodes vector
+            is sorted in increasing order of Hamming weight of output.
             */
-            WindowingDag(std::size_t max_power, std::uint32_t base);
+            WindowingDag(std::size_t max_exponent, std::uint32_t base);
         }; // struct WindowingDag
 
         class Sender

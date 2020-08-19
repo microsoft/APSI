@@ -398,12 +398,12 @@ namespace apsi
                 // Atomically get the next_node counter (this tells us where to start working) and increment it
                 size_t node_idx = static_cast<size_t>(state.next_node->fetch_add(1));
                 // If we've traversed the whole DAG, we're done
-                if (node_idx >= dag.nodes.size())
+                if (node_idx >= dag.nodes_.size())
                 {
                     break;
                 }
 
-                auto &node = dag.nodes[node_idx];
+                auto &node = dag.nodes_[node_idx];
                 auto &output_node_state = state.node_states[node.output];
 
                 // Atomically transition this node from Uncomputed to Computing. This makes sure we're the only one
@@ -456,14 +456,14 @@ namespace apsi
 
         /**
         Constructs a directed acyclic graph, where each node has 2 inputs and 1 output. Every node has inputs i,j and
-        output i+j. The largest output is max_power. The choice of inputs depends on their Hamming weights, which
-        depends on the base specified (the base is also known as the window size).
-        This is used to compute powers of a given ciphertext while minimizing circuit depth. The nodes vector is sorted
-        in increasing order of Hamming weight of output.
+        output i+j. The largest power has exponent max_exponent. The choice of inputs depends on their Hamming weights,
+        which depends on the base specified (the base is also known as the window size, and MUST be a power of 2). This
+        is used to compute powers of a given ciphertext while minimizing circuit depth. The nodes vector is sorted in
+        increasing order of Hamming weight of output.
         */
-        WindowingDag::WindowingDag(size_t max_power, uint32_t base)
+        WindowingDag::WindowingDag(size_t max_exponent, uint32_t base) : max_exponent_(max_exponent), base_(base)
         {
-            for (size_t i = 1; i <= max_power; i++)
+            for (size_t i = 1; i <= max_exponent; i++)
             {
                 // Compute a balanced partition of the index i with respect to the given base
                 pair<size_t, size_t> partition = balanced_integer_partition(i, base);
@@ -476,12 +476,12 @@ namespace apsi
                 if (i1 && i2)
                 {
                     Node node { { i1, i2 }, i, };
-                    nodes.emplace_back(node);
+                    nodes_.emplace_back(node);
                 }
             }
 
             // Sort the DAG in increasing order by Hamming weight of their output
-            sort(nodes.begin(), nodes.end(), [base](const Node &node1, const Node &node2) -> bool {
+            sort(nodes_.begin(), nodes_.end(), [base](const Node &node1, const Node &node2) -> bool {
                 return hamming_weight(node1.output, base) < hamming_weight(node2.output, base);
             });
 
@@ -497,12 +497,35 @@ namespace apsi
             next_node = make_unique<atomic<size_t>>();
             *next_node = 0;
 
-            // Everything is uncomputed at first
-            size_t node_count = dag.nodes.size();
-            node_states.reset(new atomic<NodeState>[node_count]);
-            for (size_t i = 0; i < node_count; i++)
+            // Everything (except the given powers) is uncomputed at first
+            size_t max_exponent = dag.max_exponent_;
+            node_states.reset(new atomic<NodeState>[max_exponent]);
+            for (size_t i = 0; i < max_exponent; i++)
             {
                 node_states[i].store(NodeState::Uncomputed);
+            }
+
+            // Mark the given powers as computed (since they were precomputed by receiver). These are the powers of the
+            // form C^r where r is x*base^y and 1 <= x < base.
+            size_t x = 1;
+            size_t y = 0;
+            size_t given_power;
+            size_t base = dag.base_;
+            size_t base_bitlen = static_cast<size_t>(log2(base));
+            while (given_power < max_exponent)
+            {
+                // The given power has exponent x*base^y, where base is a power of 2
+                given_power = x * (base << (base_bitlen * y));
+
+                // Set the given power to "computed"
+                node_states[given_power].store(NodeState::Done);
+
+                // Get the next (x,y). Remember 1 <= x < base. To get in that range, we take it mod (base-1) and add 1.
+                x = (x % (base - 1)) + 1;
+                // If x wrapped back around to 1, increment the power
+                if (x == 1) {
+                    y++;
+                }
             }
         }
     } // namespace sender
