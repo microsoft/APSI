@@ -78,12 +78,12 @@ namespace APSITests
 
             if (!server_.is_connected())
             {
-                server_.bind("tcp://*:5555");
+                server_.bind("tcp://*:5556");
             }
 
             if (!client_.is_connected())
             {
-                client_.connect("tcp://localhost:5555");
+                client_.connect("tcp://localhost:5556");
             }
         }
 
