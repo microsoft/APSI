@@ -518,6 +518,15 @@ if(NOT MSVC)
     set(FLATBUFFERS_FLATC_PATH "build/flatc")
 
     execute_process(
+        COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi/util" "${APSI_SOURCE_DIR}/common/native/apsi/util/powers.fbs"
+        #OUTPUT_QUIET
+        RESULT_VARIABLE result
+        WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+    if(result)
+        message(FATAL_ERROR "flatc failed (${result})")
+    endif()
+
+    execute_process(
         COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi" "${APSI_SOURCE_DIR}/common/native/apsi/psiparams.fbs"
         #OUTPUT_QUIET
         RESULT_VARIABLE result

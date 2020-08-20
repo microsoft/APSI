@@ -6,6 +6,7 @@ target_sources(common
         ${CMAKE_CURRENT_LIST_DIR}/csvreader.cpp
         ${CMAKE_CURRENT_LIST_DIR}/interpolate.cpp
         ${CMAKE_CURRENT_LIST_DIR}/db_encoding.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/powers.cpp
         ${CMAKE_CURRENT_LIST_DIR}/stopwatch.cpp
         ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
 )
@@ -15,6 +16,7 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/csvreader.h
         ${CMAKE_CURRENT_LIST_DIR}/interpolate.h
         ${CMAKE_CURRENT_LIST_DIR}/db_encoding.h
+        ${CMAKE_CURRENT_LIST_DIR}/powers.h
         ${CMAKE_CURRENT_LIST_DIR}/stopwatch.h
         ${CMAKE_CURRENT_LIST_DIR}/utils.h
     DESTINATION

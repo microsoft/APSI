@@ -98,10 +98,5 @@ namespace apsi
         This function reads a size-prefixed number of bytes from a stream and returns the result in a vector.
         */
         std::vector<seal::SEAL_BYTE> read_from_stream(std::istream &in);
-
-        /**
-        Global Stopwatch objects for sender and receiver to use.
-        */
-        extern Stopwatch sender_stopwatch, recv_stopwatch;
     } // namespace util
 } // namespace apsi

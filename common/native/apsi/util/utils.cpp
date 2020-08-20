@@ -20,9 +20,6 @@ namespace apsi
 {
     namespace util
     {
-        Stopwatch sender_stopwatch;
-        Stopwatch recv_stopwatch;
-
         vector<uint64_t> conversion_to_digits(const uint64_t input, const uint64_t base)
         {
             vector<uint64_t> result;

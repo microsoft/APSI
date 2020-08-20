@@ -1,0 +1,20 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license.
+
+namespace apsi.util.fbs;
+
+struct Node {
+    power:uint32;
+    depth:uint32;
+    first_parent:uint32;
+    second_parent:uint32;
+}
+
+table PowersDag {
+    up_to_power:uint32;
+    depth:uint32;
+    source_count:uint32;
+    nodes:[Node] (required);
+}
+
+root_type PowersDag;
