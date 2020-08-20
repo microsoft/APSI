@@ -37,6 +37,20 @@ namespace apsi
 
     namespace
     {
+
+        /**
+        Computes base ^ exp in the naive way. Will silently overflow.
+        */
+        uint64_t pow(uint64_t base, uint64_t e)
+        {
+            uint64_t r = 1;
+            for (; e > 0; e--)
+            {
+                r *= base;
+            }
+            return r;
+        }
+
         /**
         Returns the Hamming weight of x in the given base, i.e., the number of nonzero digits x has in the given base.
         The base MUST be a power of 2
@@ -249,7 +263,9 @@ namespace apsi
             // Initialize powers
             for (CiphertextPowers &powers : all_powers)
             {
-                powers.resize(max_exponent);
+                // The + 1 is because we index by power. The 0th power is a dummy value. I promise this makes things
+                // easier to read.
+                powers.resize(max_exponent + 1);
             }
 
             // Load inputs provided in the query. These are the precomputed powers we will use for windowing.
@@ -261,9 +277,9 @@ namespace apsi
                 // Load Qᵢᵉ for all bundle indices i, where e is the exponent specified above
                 for (size_t bundle_idx = 0; bundle_idx < all_powers.size(); bundle_idx++)
                 {
-                    // Load input^power to all_powers[bundle_idx][exponent-1]. The -1 is because we don't store
-                    // the zeroth exponent
-                    all_powers[bundle_idx][exponent - 1] = move(q.second[bundle_idx].extract_local());
+                    // Load input^power to all_powers[bundle_idx][exponent]
+                    cout << "Setting all_powers[" << bundle_idx << "][" << exponent << "]" << endl;
+                    all_powers[bundle_idx][exponent] = move(q.second[bundle_idx].extract_local());
                 }
             }
 
@@ -382,7 +398,8 @@ namespace apsi
             uint32_t max_exponent = params.table_params().max_items_per_bin;
             uint32_t bundle_idx_count = params.bundle_idx_count();
 
-            if (powers.size() != max_exponent)
+            // The +1 is because the 0th index holds a dummy value
+            if (powers.size() != (max_exponent+1))
             {
                 throw runtime_error("Need room to compute max_exponent many ciphertext powers");
             }
@@ -397,6 +414,7 @@ namespace apsi
             {
                 // Atomically get the next_node counter (this tells us where to start working) and increment it
                 size_t node_idx = static_cast<size_t>(state.next_node->fetch_add(1));
+                cout << "node_idx == " << node_idx << endl;
                 // If we've traversed the whole DAG, we're done
                 if (node_idx >= dag.nodes_.size())
                 {
@@ -430,9 +448,11 @@ namespace apsi
                 }
 
                 // Multiply the inputs together
+                cout << "Collecting ciphertexts" << endl;
                 Ciphertext &input0 = powers[node.inputs[0]];
                 Ciphertext &input1 = powers[node.inputs[1]];
                 Ciphertext &output = powers[node.output];
+                cout << "Evaluating input" << node.inputs[0] << " * input" << node.inputs[1] << endl;
                 evaluator->multiply(input0, input1, output);
 
                 // Relinearize and convert to NTT form
@@ -507,15 +527,14 @@ namespace apsi
 
             // Mark the given powers as computed (since they were precomputed by receiver). These are the powers of the
             // form C^r where r is x*base^y and 1 <= x < base.
-            size_t x = 1;
-            size_t y = 0;
+            uint64_t x = 1;
+            uint64_t y = 0;
             size_t given_power;
             size_t base = dag.base_;
-            size_t base_bitlen = static_cast<size_t>(log2(base));
             while (given_power < max_exponent)
             {
                 // The given power has exponent x*base^y, where base is a power of 2
-                given_power = x * (base << (base_bitlen * y));
+                given_power = static_cast<size_t>(x * pow(base, y));
 
                 // Set the given power to "computed"
                 node_states[given_power].store(NodeState::Done);
