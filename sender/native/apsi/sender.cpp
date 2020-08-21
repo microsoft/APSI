@@ -308,7 +308,7 @@ namespace apsi
             for (size_t t = 0; t < partitions.size(); t++)
             {
                 threads.emplace_back([&, t]() {
-                    QueryWorker(sender_db, partitions[t], all_powers, dag, states, chl, send_rp_fun);
+                    QueryWorker(sender_db, crypto_context, partitions[t], all_powers, dag, states, chl, send_rp_fun);
                 });
             }
 
@@ -323,6 +323,7 @@ namespace apsi
 
         void Sender::QueryWorker(
             const shared_ptr<SenderDB> &sender_db,
+            CryptoContext crypto_context,
             pair<uint32_t, uint32_t> bundle_idx_bounds,
             vector<CiphertextPowers> &all_powers,
             WindowingDag &dag,
@@ -342,6 +343,7 @@ namespace apsi
                 CiphertextPowers &powers_at_this_bundle_idx = all_powers[bundle_idx];
                 ComputePowers(
                     sender_db,
+                    crypto_context,
                     powers_at_this_bundle_idx,
                     dag,
                     states[bundle_idx]);
@@ -386,11 +388,11 @@ namespace apsi
         */
         void Sender::ComputePowers(
             const shared_ptr<SenderDB> &sender_db,
+            CryptoContext &crypto_context,
             CiphertextPowers &powers,
             const WindowingDag &dag,
             WindowingDag::State &state)
         {
-            CryptoContext crypto_context(sender_db->get_context());
             const PSIParams &params(sender_db->get_params());
 
             // The number of powers necessary to compute PSI is equal to the largest number of elements inside any bin

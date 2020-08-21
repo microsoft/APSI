@@ -39,7 +39,10 @@ namespace apsi
             SenderDB(PSIParams params) :
                 params_(params),
                 crypto_context_(seal::SEALContext::Create(params.seal_params()))
-            {}
+            {
+                // Make sure the evaluator is set. This will be used for BatchedPlaintextPolyn::eval.
+                crypto_context_.set_evaluator();
+            }
 
             /**
             Clears the database
