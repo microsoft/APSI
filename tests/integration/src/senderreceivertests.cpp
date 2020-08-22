@@ -85,6 +85,8 @@ namespace
 
     void RunTest(size_t sender_size, size_t client_size, const PSIParams &params)
     {
+        logging::Log::set_log_level(logging::Log::Level::level_all);
+        logging::Log::set_console_disabled(false);
         size_t num_threads = 1;
 
         vector<Item> sender_items;
@@ -106,12 +108,16 @@ namespace
         auto sender_db = make_shared<UnlabeledSenderDB>(params);
         sender_db->set_data(sender_db_data, num_threads);
 
+        cout << "Created sender DB" << endl;
+
         atomic<bool> stop_sender = false;
 
         auto sender_th = thread([&]() {
             SenderDispatcher dispatcher(sender_db, num_threads);
             dispatcher.run(stop_sender, 5550, oprf_key);
         });
+
+        cout << "Dispatched" << endl;
 
         // Connect the network
         ReceiverChannel recv_chl;
@@ -127,13 +133,17 @@ namespace
             recv_items_vec.push_back(item.second);
         }
 
+        cout << "Created receiver items" << endl;
+
         auto hashed_recv_items = receiver.request_oprf(recv_items_vec, recv_chl);
         auto query = receiver.create_query(hashed_recv_items);
         auto query_result = receiver.request_query(move(query), recv_chl);
 
         stop_sender = true;
+        cout << "Joining" << endl;
         sender_th.join();
 
+        cout << "Verifying" << endl;
         verify_psi_results(query_result, recv_items);
     }
 

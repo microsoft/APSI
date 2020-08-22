@@ -107,8 +107,8 @@ namespace apsi
             std::unordered_map<std::uint32_t, std::vector<SEALObject<seal::Ciphertext>>> data_;
         };
 
-        // An alias to denote the powers of a ciphertext. For a ciphertext C, this holds C, C², C³, etc. It does not
-        // hold C⁰.
+        // An alias to denote the powers of a receiver's ciphertext. At index i, holds Cⁱ, where C is the ciphertext..
+        // The 0th index is always a dummy value.
         using CiphertextPowers = std::vector<seal::Ciphertext>;
 
         struct WindowingDag
@@ -213,6 +213,7 @@ namespace apsi
             */
             static void QueryWorker(
                 const std::shared_ptr<SenderDB> &sender_db,
+                CryptoContext crypto_context,
                 std::pair<std::uint32_t, std::uint32_t> bundle_idx_bounds,
                 std::vector<std::vector<seal::Ciphertext>> &powers,
                 WindowingDag &dag, std::vector<WindowingDag::State> &states,
@@ -233,6 +234,7 @@ namespace apsi
             */
             static void ComputePowers(
                 const std::shared_ptr<SenderDB> &sender_db,
+                CryptoContext &crypto_context,
                 CiphertextPowers &powers,
                 const WindowingDag &dag,
                 WindowingDag::State &state);

@@ -393,7 +393,7 @@ if(NOT MSVC AND APSI_USE_LOG4CPLUS)
 endif()
 
 # Build
-if(NOT MSVC)
+if(NOT MSVC AND APSI_USE_LOG4CPLUS)
     execute_process(
         COMMAND ${CMAKE_COMMAND} --build .
         OUTPUT_QUIET
@@ -405,7 +405,7 @@ if(NOT MSVC)
 endif()
 
 # Set up the targets
-if(NOT MSVC)
+if(NOT MSVC AND APSI_USE_LOG4CPLUS)
     add_subdirectory(
         ${THIRDPARTY_DIR}/log4cplus/src
         EXCLUDE_FROM_ALL)
@@ -639,7 +639,9 @@ apsi_install_target(common APSITargets)
 
 if(NOT MSVC)
     apsi_combine_archives(common seal)
-    apsi_combine_archives(common log4cplus)
+    if (APSI_USE_LOG4CPLUS)
+        apsi_combine_archives(common log4cplus)
+    endif()
 endif()
 
 #############################
