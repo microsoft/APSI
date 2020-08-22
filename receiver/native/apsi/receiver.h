@@ -23,6 +23,7 @@
 #include "apsi/psiparams.h"
 #include "apsi/sealobject.h"
 #include "apsi/util/db_encoding.h"
+#include "apsi/util/powers.h"
 
 // GSL
 #include "gsl/span"
@@ -215,6 +216,8 @@ namespace apsi
             PSIParams params_;
 
             std::shared_ptr<CryptoContext> crypto_context_;
+
+            util::PowersDag pd_;
 
             SEALObject<seal::RelinKeys> relin_keys_;
         }; // class Receiver

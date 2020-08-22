@@ -55,10 +55,17 @@ namespace apsi
         struct TableParams
         {
             std::uint32_t table_size;
-            std::uint32_t window_size;
             std::uint32_t max_items_per_bin;
             std::uint32_t hash_func_count;
         }; // struct TableParams
+
+        /**
+        Query parameters.
+        */
+        struct QueryParams
+        {
+            std::uint32_t query_powers_count;
+        };
 
         const ItemParams &item_params() const
         {
@@ -68,6 +75,11 @@ namespace apsi
         const TableParams &table_params() const
         {
             return table_params_;
+        }
+
+        const QueryParams &query_params() const
+        {
+            return query_params_;
         }
 
         const SEALParams &seal_params() const
@@ -100,8 +112,15 @@ namespace apsi
             return item_bit_count_per_felt_;
         }
 
-        PSIParams(const ItemParams &item_params, const TableParams &table_params, const SEALParams &seal_params) :
-            item_params_(item_params), table_params_(table_params), seal_params_(seal_params)
+        PSIParams(
+            const ItemParams &item_params,
+            const TableParams &table_params,
+            const QueryParams &query_params,
+            const SEALParams &seal_params) :
+            item_params_(item_params),
+            table_params_(table_params),
+            query_params_(query_params),
+            seal_params_(seal_params)
         {
             initialize();
         }
@@ -112,6 +131,8 @@ namespace apsi
         const ItemParams item_params_;
 
         const TableParams table_params_;
+
+        const QueryParams query_params_;
 
         const SEALParams seal_params_{ seal::scheme_type::BFV };
 

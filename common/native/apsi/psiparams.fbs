@@ -9,9 +9,12 @@ struct ItemParams {
 
 struct TableParams {
     table_size:uint32;
-    window_size:uint32;
     max_items_per_bin:uint32;
     hash_func_count:uint32;
+}
+
+struct QueryParams {
+    query_powers_count:uint32;
 }
 
 table SEALParams {
@@ -21,6 +24,7 @@ table SEALParams {
 table PSIParams {
     item_params:ItemParams;
     table_params:TableParams;
+    query_params:QueryParams;
     seal_params:SEALParams (required);
 }
 

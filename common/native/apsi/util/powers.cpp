@@ -173,13 +173,7 @@ namespace apsi
             return ss.str();
         }
 
-        bool PowersDag::validate()
-        {
-            // TO DO
-            return true;
-        }
-
-        size_t PowersDag::save(ostream &out)
+        size_t PowersDag::save(ostream &out) const
         {
             if (!configured())
             {
@@ -194,7 +188,6 @@ namespace apsi
                 {
                     temp.emplace_back(
                         node.second.power,
-                        node.second.depth,
                         node.second.parents.first ? node.second.parents.first->power : 0,
                         node.second.parents.second ? node.second.parents.second->power : 0);
                 }
@@ -221,7 +214,7 @@ namespace apsi
             bool safe = fbs::VerifySizePrefixedPowersDagBuffer(verifier);
             if (!safe)
             {
-                throw runtime_error("failed to load PowersDag: invalid buffer");
+                throw runtime_error("invalid buffer");
             }
 
             auto pd = fbs::GetSizePrefixedPowersDag(in_data.data());
@@ -231,21 +224,74 @@ namespace apsi
             depth_ = pd->depth();
             source_count_ = pd->source_count();
 
-            // Required field
+            // Check that the size equals up_to_power_
             auto &nodes = *pd->nodes();
-            for (auto node : nodes)
+            if (nodes.size() != up_to_power_)
             {
-                // The parents will still need to be written in
-                nodes_[node->power()] = PowersNode{ node->power(), node->depth() };
+                reset();
+                throw runtime_error("incorrect number of nodes");
             }
+
+            uint32_t source_count = 0;
             for (auto node : nodes)
             {
-                // Set the parents
+                // Check that either both parents are non-null (non-zero) and less than the current power, or they are
+                // both zero, in which case this is a source node.
+                if (!node->first_parent() ^ !node->second_parent())
+                {
+                    reset();
+                    throw runtime_error("invalid node");
+                }
+                if (node->first_parent() >= node->power() || node->second_parent() >= node->power())
+                {
+                    reset();
+                    throw runtime_error("invalid node");
+                }
+
+                // Increase source_count if this is a source node
+                source_count += !node->first_parent() && !node->second_parent();
+
+                // Add the node but don't add parents yet; set depth to zero initially
+                nodes_[node->power()] = PowersNode{ node->power(), 0 };
+            }
+
+            // Check that the computed source count matches the source_count field
+            if (source_count != source_count_)
+            {
+                reset();
+                throw runtime_error("incorrect source count");
+            }
+
+            // Set the parents
+            for (auto node : nodes)
+            {
                 nodes_[node->power()].parents = make_pair(
-                    &nodes_[node->first_parent()],
-                    &nodes_[node->second_parent()]
+                    node->first_parent() ? &nodes_[node->first_parent()] : nullptr,
+                    node->second_parent() ? &nodes_[node->second_parent()] : nullptr
                 );
             }
+
+            // Compute the depths for all nodes
+            uint32_t depth = 0;
+            for (std::uint32_t power = 1; power <= up_to_power_; power++)
+            {
+                auto &node = nodes_.at(power);
+                if (!node.is_source())
+                {
+                    node.depth = max(node.parents.first->depth, node.parents.second->depth) + 1;
+                    depth = max(depth, node.depth);
+                }
+            }
+
+            // Mismatch with the depth field
+            if (depth != depth_)
+            {
+                reset();
+                throw runtime_error("incorrect depth");
+            }
+
+            // Set the configured_ state; everything is good
+            configured_ = true;
 
             return in_data.size();
         }

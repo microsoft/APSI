@@ -5,7 +5,6 @@ namespace apsi.util.fbs;
 
 struct Node {
     power:uint32;
-    depth:uint32;
     first_parent:uint32;
     second_parent:uint32;
 }

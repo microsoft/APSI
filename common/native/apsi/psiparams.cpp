@@ -37,6 +37,10 @@ namespace apsi
         {
             throw invalid_argument("felts_per_item is not a power of two");
         }
+        if (!query_params_.query_powers_count || query_params_.query_powers_count > table_params_.max_items_per_bin)
+        {
+            throw invalid_argument("query_power_count is too large or too small");
+        }
         if (!seal_params_.plain_modulus().is_prime() || seal_params_.plain_modulus().value() == 2)
         {
             throw invalid_argument("plain_modulus is not an odd prime");
@@ -75,12 +79,6 @@ namespace apsi
 
         // Compute the number of bundle indices; this is now guaranteed to be greater than zero
         bundle_idx_count_ = (table_params_.table_size + items_per_bundle_ - 1) / items_per_bundle_;
-
-        // window_size must be at least 1
-        if (!table_params_.window_size)
-        {
-            throw invalid_argument("window_size must be at least 1");
-        }
     }
 
     size_t SaveParams(const PSIParams &params, ostream &out)
@@ -91,9 +89,10 @@ namespace apsi
 
         fbs::TableParams table_params(
             params.table_params().table_size,
-            params.table_params().window_size,
             params.table_params().max_items_per_bin,
             params.table_params().hash_func_count);
+
+        fbs::QueryParams query_params(params.query_params().query_powers_count);
 
         vector<SEAL_BYTE> temp;
         temp.resize(params.seal_params().save_size(compr_mode_type::deflate));
@@ -104,6 +103,7 @@ namespace apsi
         fbs::PSIParamsBuilder psi_params_builder(fbs_builder);
         psi_params_builder.add_item_params(&item_params);
         psi_params_builder.add_table_params(&table_params);
+        psi_params_builder.add_query_params(&query_params);
         psi_params_builder.add_seal_params(seal_params);
         auto psi_params = psi_params_builder.Finish();
         fbs_builder.FinishSizePrefixed(psi_params);
@@ -133,9 +133,11 @@ namespace apsi
 
         PSIParams::TableParams table_params;
         table_params.table_size = psi_params->table_params()->table_size();
-        table_params.window_size = psi_params->table_params()->window_size();
         table_params.max_items_per_bin = psi_params->table_params()->max_items_per_bin();
         table_params.hash_func_count = psi_params->table_params()->hash_func_count();
+
+        PSIParams::QueryParams query_params;
+        query_params.query_powers_count = psi_params->query_params()->query_powers_count();
 
         EncryptionParameters seal_params;
         auto &seal_params_data = *psi_params->seal_params()->data();
@@ -163,7 +165,9 @@ namespace apsi
             throw runtime_error("failed to load parameters: invalid scheme type");
         }
 
-        return make_pair(PSIParams(item_params, table_params, seal_params), in_data.size());
+        return make_pair(
+            PSIParams(item_params, table_params, query_params, seal_params),
+            in_data.size());
     }
 
     string PSIParams::to_string() const
@@ -171,9 +175,9 @@ namespace apsi
         stringstream ss;
         ss << "item_params.felts_per_item: " << item_params_.felts_per_item
             << "; table_params.table_size: " << table_params_.table_size
-            << "; table_params.window_size: " << table_params_.window_size
             << "; table_params.max_items_per_bin: " << table_params_.max_items_per_bin
             << "; table_params.hash_func_count: " << table_params_.hash_func_count
+            << "; query_params,query_powers_count: " << query_params_.query_powers_count
             << "; seal_params.poly_modulus_degree: " << seal_params_.poly_modulus_degree()
             << "; seal_params.coeff_modulus: [ ";
         for (auto &mod : seal_params_.coeff_modulus())

@@ -545,7 +545,7 @@ if(NOT MSVC)
     endif()
 
     execute_process(
-        COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/sop.fbs"
+        COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp --keep-prefix --include-prefix "apsi/network/" -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/sop.fbs"
         #OUTPUT_QUIET
         RESULT_VARIABLE result
         WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)

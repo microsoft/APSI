@@ -184,7 +184,7 @@ namespace apsi
             /**
             Writes the PowersDag to a stream.
             */
-            std::size_t save(std::ostream &out);
+            std::size_t save(std::ostream &out) const;
 
             /**
             Reads the PowersDag from a stream.
@@ -192,8 +192,6 @@ namespace apsi
             std::size_t load(std::istream &in);
 
         private:
-            bool validate();
-
             static constexpr std::uint32_t attempts_ = 1000;
 
             std::unordered_map<std::uint32_t, PowersNode> nodes_;
