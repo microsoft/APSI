@@ -129,57 +129,6 @@ namespace apsi
         // The 0th index is always a dummy value.
         using CiphertextPowers = std::vector<seal::Ciphertext>;
 
-        struct WindowingDag
-        {
-            enum class NodeState
-            {
-                Uncomputed = 0,
-                Computing = 1,
-                Done = 2
-            };
-
-            struct State
-            {
-                // The counter used to keep track of which nodes need to get compute (meaning the product of their input
-                // has to be calculated)
-                std::unique_ptr<std::atomic<std::size_t>> next_node;
-                // All the node states
-                std::unique_ptr<std::atomic<NodeState>[]> node_states;
-
-                State(WindowingDag &dag);
-            };
-
-            struct Node
-            {
-                std::array<std::size_t, 2> inputs;
-                std::size_t output = 0;
-            };
-
-            /**
-            Stores the actual nodes of the DAG
-            */
-            std::vector<Node> nodes_;
-
-            /**
-            The windowing base
-            */
-            std::uint32_t base_;
-
-            /**
-            The largest ciphertext exponent we need to calculate
-            */
-            std::size_t max_exponent_;
-
-            /**
-            Constructs a directed acyclic graph, where each node has 2 inputs and 1 output. Every node has inputs i,j
-            and output i+j. The largest power has exponent max_exponent. The choice of inputs depends on their Hamming
-            weights, which depends on the base specified (the base is also known as the window size, and MUST be a power
-            of 2). This is used to compute powers of a given ciphertext while minimizing circuit depth. The nodes vector
-            is sorted in increasing order of Hamming weight of output.
-            */
-            WindowingDag(std::size_t max_exponent, std::uint32_t base);
-        }; // struct WindowingDag
-
         class Sender
         {
         public:
@@ -235,25 +184,6 @@ namespace apsi
                 const PowersDag &pd,
                 network::Channel &chl,
                 std::function<void(network::Channel &, std::unique_ptr<network::ResultPackage>)> send_rp_fun);
-
-            /**
-            Constructs all powers of receiver's items for the specified batch, based on the powers sent from the
-            receiver. For example, if the desired highest exponent (determined by PSIParams) is 15, the input exponents
-            are {1, 2, 4, 8}, then this function will compute powers from 0 to 15, by multiplying appropriate powers in
-            {1, 2, 4, 8}.
-
-            See comment in sender.cpp for more detail.
-
-            @params[in] input Map from exponent (k) to a vector of Ciphertext, each of which encrypts a batch of items
-            of the same power (y^k). The size of the vector is the number of batches.
-            @params[out] all_powers All powers computed from the input for the specified batch.
-            */
-            static void ComputePowers(
-                const std::shared_ptr<SenderDB> &sender_db,
-                CryptoContext &crypto_context,
-                CiphertextPowers &powers,
-                const WindowingDag &dag,
-                WindowingDag::State &state);
         }; // class Sender
     }      // namespace sender
 } // namespace apsi
