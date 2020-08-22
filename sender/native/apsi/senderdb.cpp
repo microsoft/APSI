@@ -4,6 +4,8 @@
 // STD
 #include <memory>
 #include <thread>
+#include <iterator>
+#include <algorithm>
 
 // APSI
 #include "apsi/psiparams.h"
@@ -154,9 +156,8 @@ namespace apsi
                 CryptoContext &crypto_context,
                 uint32_t bins_per_bundle,
                 size_t max_bin_size,
-                size_t begin_bundle_idx,
-                size_t end_bundle_idx
-            ) {
+                pair<vector<size_t>::const_iterator, vector<size_t>::const_iterator> work_range)
+            {
                 STOPWATCH(sender_stopwatch, "LabeledSenderDB::add_data_worker");
 
                 // Keep track of the bundle indices we look at. These will be the ones whose cache we have to regen.
@@ -172,14 +173,16 @@ namespace apsi
                     size_t bin_idx, bundle_idx;
                     tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
 
-                    // Mark the bundle index for cache regen later
-                    bundle_indices.push_back(bundle_idx);
-
                     // If the bundle_idx isn't in the prescribed range, don't try to insert this data
-                    if (bundle_idx < begin_bundle_idx || bundle_idx >= end_bundle_idx)
+                    auto where = find(work_range.first, work_range.second, bundle_idx);
+                    if (where == work_range.second)
                     {
+                        // Dealing with this bundle index is not our job
                         continue;
                     }
+
+                    // We are inserting an item so mark the bundle index for cache regen
+                    bundle_indices.push_back(bundle_idx);
 
                     // Get the bundle set at the given bundle index
                     vector<BinBundle<L> > &bundle_set = bin_bundles.at(bundle_idx);
@@ -217,7 +220,7 @@ namespace apsi
                         }
 
                         // Push a new BinBundle to the set of BinBundles at this bundle index
-                        bundle_set.emplace_back(new_bin_bundle);
+                        bundle_set.emplace_back(move(new_bin_bundle));
                     }
                 }
 
@@ -237,7 +240,6 @@ namespace apsi
                 }
             }
 
-
             /**
             Takes algebraized data to be inserted, splits it up, and distributes it so that thread_count many threads can
             all insert in parallel
@@ -256,14 +258,19 @@ namespace apsi
                 // Collect the bundle indices and partition them into thread_count many partitions. By some uniformity
                 // assumption, the number of things to insert per partition should be roughly the same. Note that
                 // the contents of bundle_indices is always sorted (increasing order).
-                set<size_t> bundle_indices;
+                set<size_t> bundle_indices_set;
                 for (auto &data_with_idx : data_with_indices)
                 {
                     size_t cuckoo_idx = data_with_idx.second;
                     size_t bin_idx, bundle_idx;
                     tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
-                    bundle_indices.insert(bundle_idx);
+                    bundle_indices_set.insert(bundle_idx);
                 }
+
+                // Copy the set of indices into a vector of indices
+                vector<size_t> bundle_indices;
+                bundle_indices.reserve(bundle_indices_set.size());
+                copy(bundle_indices_set.begin(), bundle_indices_set.end(), back_inserter(bundle_indices));
 
                 // Partition the bundle indices appropriately
                 vector<pair<size_t, size_t> > partitions = partition_evenly(bundle_indices.size(), thread_count);
@@ -272,17 +279,16 @@ namespace apsi
                 vector<thread> threads;
                 for (auto &partition : partitions)
                 {
-                    threads.emplace_back([&, bins_per_bundle, max_bin_size]() {
-                        size_t start_idx = partition.first;
-                        size_t end_idx = partition.second;
+                    threads.emplace_back([&]() {
                         add_data_worker(
                             data_with_indices,
                             bin_bundles,
                             crypto_context,
                             bins_per_bundle,
                             max_bin_size,
-                            start_idx,
-                            end_idx
+                            make_pair(
+                                bundle_indices.cbegin() + partition.first,
+                                bundle_indices.cbegin() + partition.second)
                         );
                     });
                 }
@@ -308,7 +314,6 @@ namespace apsi
 
                 return result;
             }
-
         }
 
         /**
@@ -346,6 +351,7 @@ namespace apsi
             auto lock = db_lock_.acquire_write();
 
             bin_bundles_.clear();
+            bin_bundles_.resize(params_.bundle_idx_count());
         }
 
         /**
@@ -357,6 +363,7 @@ namespace apsi
             auto lock = db_lock_.acquire_write();
 
             bin_bundles_.clear();
+            bin_bundles_.resize(params_.bundle_idx_count());
         }
 
         /**
@@ -364,7 +371,7 @@ namespace apsi
         */
         vector<reference_wrapper<const BinBundleCache> > LabeledSenderDB::get_cache_at(uint32_t bundle_idx)
         {
-            return collect_caches(bin_bundles_.at((size_t)bundle_idx));
+            return collect_caches(bin_bundles_.at(safe_cast<size_t>(bundle_idx)));
         }
 
         /**
@@ -372,7 +379,7 @@ namespace apsi
         */
         vector<reference_wrapper<const BinBundleCache> > UnlabeledSenderDB::get_cache_at(uint32_t bundle_idx)
         {
-            return collect_caches(bin_bundles_.at((size_t)bundle_idx));
+            return collect_caches(bin_bundles_.at(safe_cast<size_t>(bundle_idx)));
         }
 
         /**

@@ -21,6 +21,7 @@
 #include "apsi/network/channel.h"
 #include "apsi/network/sender_operation.h"
 #include "apsi/oprf/oprf_sender.h"
+#include "apsi/powers.h"
 #include "apsi/psiparams.h"
 #include "apsi/sealobject.h"
 #include "apsi/senderdb.h"
@@ -47,7 +48,11 @@ namespace apsi
                 return ParmsRequest();
             }
 
+            ParmsRequest(const ParmsRequest &source) = delete;
+
             ParmsRequest(ParmsRequest &&source) = default;
+
+            ParmsRequest &operator =(const ParmsRequest &source) = delete;
 
             ParmsRequest &operator =(ParmsRequest &&source) = default;
 
@@ -69,7 +74,11 @@ namespace apsi
                 return std::move(result);
             }
 
+            OPRFRequest(const OPRFRequest &source) = delete;
+
             OPRFRequest(OPRFRequest &&source) = default;
+
+            OPRFRequest &operator =(const OPRFRequest &source) = delete;
 
             OPRFRequest &operator =(OPRFRequest &&source) = default;
 
@@ -84,18 +93,23 @@ namespace apsi
         friend class Sender;
 
         public:
-            QueryRequest(std::unique_ptr<network::SenderOperation> sop);
+            QueryRequest(std::unique_ptr<network::SenderOperation> sop, std::shared_ptr<SenderDB> sender_db);
 
             QueryRequest deep_copy() const
             {
                 QueryRequest result;
                 result.relin_keys_ = relin_keys_;
                 result.data_ = data_;
+                result.sender_db_ = sender_db_;
 
                 return std::move(result);
             }
 
+            QueryRequest(const QueryRequest &source) = delete;
+
             QueryRequest(QueryRequest &&source) = default;
+
+            QueryRequest &operator =(const QueryRequest &source) = delete;
 
             QueryRequest &operator =(QueryRequest &&source) = default;
 
@@ -104,7 +118,11 @@ namespace apsi
 
             seal::RelinKeys relin_keys_;
 
-            std::unordered_map<std::uint32_t, std::vector<SEALObject<seal::Ciphertext>>> data_;
+            std::unordered_map<std::uint32_t, std::vector<seal::Ciphertext>> data_;
+
+            PowersDag pd_;
+
+            std::shared_ptr<SenderDB> sender_db_;
         };
 
         // An alias to denote the powers of a receiver's ciphertext. At index i, holds Cⁱ, where C is the ciphertext..
@@ -183,7 +201,6 @@ namespace apsi
             static void RunOPRF(
                 OPRFRequest &&oprf_request,
                 const oprf::OPRFKey &key,
-                std::shared_ptr<SenderDB> sender_db,
                 network::Channel &chl,
                 std::function<void(network::Channel &, std::unique_ptr<network::SenderOperationResponse>)> send_fun
                     = BasicSend<network::SenderOperationResponse>);
@@ -193,7 +210,6 @@ namespace apsi
             */
             static void RunQuery(
                 QueryRequest &&query_request,
-                std::shared_ptr<SenderDB> sender_db,
                 network::Channel &chl,
                 std::size_t thread_count = 0,
                 std::function<void(network::Channel &, std::unique_ptr<network::SenderOperationResponse>)> send_fun
@@ -216,7 +232,7 @@ namespace apsi
                 CryptoContext crypto_context,
                 std::pair<std::uint32_t, std::uint32_t> bundle_idx_bounds,
                 std::vector<std::vector<seal::Ciphertext>> &powers,
-                WindowingDag &dag, std::vector<WindowingDag::State> &states,
+                const PowersDag &pd,
                 network::Channel &chl,
                 std::function<void(network::Channel &, std::unique_ptr<network::ResultPackage>)> send_rp_fun);
 

@@ -118,9 +118,6 @@ namespace apsi
         class LabeledSenderDB : public SenderDB
         {
         private:
-            // Inherit SenderDB constructor
-            using SenderDB::SenderDB;
-
             /**
             All the BinBundles in the DB, indexed by bin index. The set (represented by a vector internally) at bundle
             index i contains all the BinBundles with bundle index i
@@ -128,6 +125,14 @@ namespace apsi
             std::vector<std::vector<BinBundle<felt_t> > > bin_bundles_;
 
         public:
+            /**
+            Creates a new LabeledSenderDB.
+            */
+            LabeledSenderDB(PSIParams params) : SenderDB(std::move(params))
+            {
+                clear_db();
+            }
+
             /**
             Clears the database
             */
@@ -169,9 +174,6 @@ namespace apsi
         class UnlabeledSenderDB : public SenderDB
         {
         private:
-            // Inherit SenderDB constructor
-            using SenderDB::SenderDB;
-
             /**
             All the BinBundles in the DB, indexed by bin index. The set (represented by a vector internally) at bundle
             index i contains all the BinBundles with bundle index i
@@ -179,6 +181,14 @@ namespace apsi
             std::vector<std::vector<BinBundle<monostate> > > bin_bundles_;
 
         public:
+            /**
+            Creates a new UnlabeledSenderDB.
+            */
+            UnlabeledSenderDB(PSIParams params) : SenderDB(std::move(params))
+            {
+                clear_db();
+            }
+
             /**
             Clears the database
             */

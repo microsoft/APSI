@@ -12,7 +12,6 @@
 #include "apsi/logging/log.h"
 #include "apsi/network/channel.h"
 #include "apsi/receiver.h"
-#include "apsi/util/powers.h"
 #include "apsi/util/utils.h"
 
 // SEAL
@@ -89,7 +88,7 @@ namespace apsi
                     throw invalid_argument("exponent cannot be zero");
                 }
 
-                vector<uint64_t> result(values);
+                vector<uint64_t> result(values.size(), 1);
                 while (exponent)
                 {
                     if (exponent & 1)
@@ -163,6 +162,7 @@ namespace apsi
 
             // Set up the PowersDag
             pd_ = optimal_powers(params_.table_params().max_items_per_bin, params_.query_params().query_powers_count);
+            APSI_LOG_INFO("Found a powers configuration with depth: " << pd_.depth());
 
             // Create new keys
             reset_keys();
@@ -376,6 +376,7 @@ namespace apsi
             auto sop_query = make_unique<SenderOperationQuery>();
             sop_query->relin_keys = relin_keys_;
             sop_query->data = move(encrypted_powers);
+            sop_query->pd = pd_;
             query.sop_ = move(sop_query);
 
             APSI_LOG_INFO("Finished creating encrypted query");

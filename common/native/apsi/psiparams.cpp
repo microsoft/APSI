@@ -177,7 +177,7 @@ namespace apsi
             << "; table_params.table_size: " << table_params_.table_size
             << "; table_params.max_items_per_bin: " << table_params_.max_items_per_bin
             << "; table_params.hash_func_count: " << table_params_.hash_func_count
-            << "; query_params,query_powers_count: " << query_params_.query_powers_count
+            << "; query_params.query_powers_count: " << query_params_.query_powers_count
             << "; seal_params.poly_modulus_degree: " << seal_params_.poly_modulus_degree()
             << "; seal_params.coeff_modulus: [ ";
         for (auto &mod : seal_params_.coeff_modulus())

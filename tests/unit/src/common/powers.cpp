@@ -9,40 +9,39 @@
 #include <set>
 
 // APSI
-#include "apsi/util/powers.h"
+#include "apsi/powers.h"
 
 #include "gtest/gtest.h"
 
 using namespace std;
 using namespace apsi;
-using namespace apsi::util;
 
 namespace APSITests
 {
     TEST(PowersTests, PowersDagConfigure)
     {
         PowersDag pd;
-        ASSERT_FALSE(pd.configured());
+        ASSERT_FALSE(pd.is_configured());
 
         // Bad configuration
         ASSERT_FALSE(pd.configure(0, 0, 0));
-        ASSERT_FALSE(pd.configured());
+        ASSERT_FALSE(pd.is_configured());
 
         // Bad configuration
         ASSERT_FALSE(pd.configure(0, 0, 1));
-        ASSERT_FALSE(pd.configured());
+        ASSERT_FALSE(pd.is_configured());
 
         // Bad configuration
         ASSERT_FALSE(pd.configure(0, 1, 1));
-        ASSERT_FALSE(pd.configured());
+        ASSERT_FALSE(pd.is_configured());
 
         // Bad configuration
         ASSERT_FALSE(pd.configure(1, 0, 0));
-        ASSERT_FALSE(pd.configured());
+        ASSERT_FALSE(pd.is_configured());
 
         // Good configuration; required depth is 0
         ASSERT_TRUE(pd.configure(1, 0, 1));
-        ASSERT_TRUE(pd.configured());
+        ASSERT_TRUE(pd.is_configured());
 
         // Check for member variables
         ASSERT_EQ(0, pd.depth());
@@ -51,7 +50,7 @@ namespace APSITests
 
         // Bad configuration; required depth is 0
         ASSERT_FALSE(pd.configure(2, 0, 1));
-        ASSERT_FALSE(pd.configured());
+        ASSERT_FALSE(pd.is_configured());
 
         // Check for member variables
         ASSERT_THROW(pd.depth(), logic_error);
@@ -60,11 +59,11 @@ namespace APSITests
 
         // Bad configuration
         ASSERT_FALSE(pd.configure(1, 1, 0));
-        ASSERT_FALSE(pd.configured());
+        ASSERT_FALSE(pd.is_configured());
 
         // Good configuration
         ASSERT_TRUE(pd.configure(1, 1, 1));
-        ASSERT_TRUE(pd.configured());
+        ASSERT_TRUE(pd.is_configured());
 
         // Check for member variables
         ASSERT_EQ(0, pd.depth());
@@ -73,22 +72,22 @@ namespace APSITests
 
         // Clear data
         pd.reset();
-        ASSERT_FALSE(pd.configured());
+        ASSERT_FALSE(pd.is_configured());
 
         // Bad configuration
         ASSERT_FALSE(pd.configure(20, 2, 2));
-        ASSERT_FALSE(pd.configured());
+        ASSERT_FALSE(pd.is_configured());
 
         // Good configuration
         ASSERT_TRUE(pd.configure(20, 3, 2));
-        ASSERT_TRUE(pd.configured());
+        ASSERT_TRUE(pd.is_configured());
         ASSERT_EQ(3, pd.depth());
         ASSERT_EQ(2, pd.source_count());
         ASSERT_EQ(20, pd.up_to_power());
 
         // Good configuration
         ASSERT_TRUE(pd.configure(20, 2, 3));
-        ASSERT_TRUE(pd.configured());
+        ASSERT_TRUE(pd.is_configured());
         ASSERT_EQ(2, pd.depth());
         ASSERT_EQ(3, pd.source_count());
         ASSERT_EQ(20, pd.up_to_power());

@@ -16,7 +16,7 @@
 // APSI
 #include "apsi/sealobject.h"
 #include "apsi/version.h"
-#include "apsi/util/powers.h"
+#include "apsi/powers.h"
 
 // SEAL
 #include "seal/util/defines.h"
@@ -146,7 +146,7 @@ namespace apsi
             /**
             Holds the execution graph for computing all powers from what is sent in the data field.
             */
-            util::PowersDag pd;
+            PowersDag pd;
         }; // class SenderOperationQuery
     }      // namespace network
 } // namespace apsi

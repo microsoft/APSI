@@ -23,6 +23,7 @@
 #include "seal/util/common.h"
 #include "seal/util/iterator.h"
 #include "seal/evaluator.h"
+#include "seal/valcheck.h"
 
 using namespace std;
 using namespace seal;
@@ -145,7 +146,7 @@ namespace apsi
             data_ = move(sop_oprf->data);
         }
 
-        QueryRequest::QueryRequest(unique_ptr<SenderOperation> sop)
+        QueryRequest::QueryRequest(unique_ptr<SenderOperation> sop, shared_ptr<SenderDB> sender_db)
         {
             if (!sop)
             {
@@ -155,10 +156,75 @@ namespace apsi
             {
                 throw invalid_argument("operation is not a query request");
             }
+            if (!sender_db)
+            {
+                throw invalid_argument("sender_db cannot be null");
+            }
+
+            // Move over the SenderDB
+            sender_db_ = move(sender_db);
 
             auto sop_query = dynamic_cast<SenderOperationQuery*>(sop.get());
+
+            // Extract and validate relinearization keys 
             relin_keys_ = sop_query->relin_keys.extract_local();
-            data_ = move(sop_query->data);
+            if (!is_valid_for(relin_keys_, sender_db_->get_context().seal_context()))
+            {
+                throw invalid_argument("relinearization keys are invalid");
+            }
+
+            // Extract and validate query ciphertexts
+            for (auto &q : sop_query->data)
+            {
+                vector<Ciphertext> cts;
+                for (auto &ct : q.second)
+                {
+                    cts.push_back(ct.extract_local());
+                    if (!is_valid_for(cts.back(), sender_db_->get_context().seal_context()))
+                    {
+                        throw invalid_argument("query ciphertext is invalid");
+                    }
+                }
+                data_[q.first] = move(cts);
+            }
+
+            // Extract the PowersDag
+            pd_ = move(sop_query->pd);
+
+            // Get the PSIParams
+            PSIParams params(sender_db_->get_params());
+
+            uint32_t bundle_idx_count = params.bundle_idx_count();
+            uint32_t max_items_per_bin = params.table_params().max_items_per_bin;
+            uint32_t query_powers_count = params.query_params().query_powers_count;
+
+            // Check that the PowersDag is valid and matches the PSIParams
+            if (!pd_.is_configured() ||
+                pd_.up_to_power() != max_items_per_bin ||
+                pd_.source_count() != query_powers_count)
+            {
+                throw invalid_argument("PowersDag is invalid");
+            }
+
+            // Check that the query data size matches the PSIParams
+            if (data_.size() != query_powers_count)
+            {
+                throw invalid_argument("number of ciphertext powers does not match the parameters");
+            }
+            auto query_powers = pd_.source_nodes();
+            for (auto &q : data_)
+            {
+                // Check that powers in the query data match source nodes in the PowersDag
+                if (q.second.size() != bundle_idx_count)
+                {
+                    throw invalid_argument("number of ciphertexts does not match the parameters");
+                }
+                auto where = find_if(query_powers.cbegin(), query_powers.cend(), [&q](auto n) { return n.power == q.first; });
+                if (where == query_powers.cend())
+                {
+                    throw invalid_argument("query ciphertext data does not match the PowersDag");
+                }
+            }
         }
 
         void Sender::RunParms(
@@ -185,16 +251,9 @@ namespace apsi
         void Sender::RunOPRF(
             OPRFRequest &&oprf_request,
             const OPRFKey &key,
-            shared_ptr<SenderDB> sender_db,
             network::Channel &chl,
             function<void(Channel &, unique_ptr<SenderOperationResponse>)> send_fun)
         {
-            // Check that the database is set
-            if (!sender_db)
-            {
-                throw logic_error("SenderDB is not set");
-            }
-
             STOPWATCH(sender_stopwatch, "Sender::RunOPRF");
             APSI_LOG_INFO("Start processing OPRF request");
 
@@ -210,31 +269,20 @@ namespace apsi
 
         void Sender::RunQuery(
             QueryRequest &&query_request,
-            shared_ptr<SenderDB> sender_db,
             Channel &chl,
             size_t thread_count,
             function<void(Channel &, unique_ptr<SenderOperationResponse>)> send_fun,
             function<void(Channel &, unique_ptr<ResultPackage>)> send_rp_fun)
         {
-            // Check that the database is set
-            if (!sender_db)
-            {
-                throw logic_error("SenderDB is not set");
-            }
-
-            // Acquire read lock on SenderDB
-            auto sender_db_lock = sender_db->get_reader_lock();
-
             thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
 
             STOPWATCH(sender_stopwatch, "Sender::RunQuery");
             APSI_LOG_INFO("Start processing query request");
 
-            // The query response only tells how many ResultPackages to expect; send this first
-            uint32_t package_count = safe_cast<uint32_t>(sender_db->bin_bundle_count());
-            auto response_query = make_unique<SenderOperationResponseQuery>();
-            response_query->package_count = package_count;
-            send_fun(chl, move(response_query));
+            auto sender_db = move(query_request.sender_db_);
+
+            // Acquire read lock on SenderDB
+            auto sender_db_lock = sender_db->get_reader_lock();
 
             // Copy over the CryptoContext from SenderDB; set the Evaluator for this local instance
             CryptoContext crypto_context(sender_db->get_context());
@@ -245,15 +293,16 @@ namespace apsi
 
             uint32_t bundle_idx_count = params.bundle_idx_count();
             uint32_t max_items_per_bin = params.table_params().max_items_per_bin;
+            uint32_t query_powers_count = params.query_params().query_powers_count;
 
-            /* Receive client's query data. */
-            int num_of_powers = static_cast<int>(query_request.data_.size());
-            APSI_LOG_DEBUG("Number of powers: " << num_of_powers);
-            APSI_LOG_DEBUG("Current bundle index count: " << bundle_idx_count);
+            // Extract the PowersDag
+            PowersDag pd = move(query_request.pd_);
 
-            // The number of powers necessary to compute PSI is equal to the largest number of elements inside any bin
-            // under this bundle index. Globally, this is at most max_items_per_bin.
-            size_t max_exponent = max_items_per_bin;
+            // The query response only tells how many ResultPackages to expect; send this first
+            uint32_t package_count = safe_cast<uint32_t>(sender_db->bin_bundle_count());
+            auto response_query = make_unique<SenderOperationResponseQuery>();
+            response_query->package_count = package_count;
+            send_fun(chl, move(response_query));
 
             // For each bundle index i, we need a vector of powers of the query Qᵢ. We need powers all
             // the way up to Qᵢ^max_items_per_bin (maybe less if the BinBundles aren't as full as expected). We don't
@@ -265,10 +314,10 @@ namespace apsi
             {
                 // The + 1 is because we index by power. The 0th power is a dummy value. I promise this makes things
                 // easier to read.
-                powers.resize(max_exponent + 1);
+                powers.resize(max_items_per_bin + 1);
             }
 
-            // Load inputs provided in the query. These are the precomputed powers we will use for windowing.
+            // Load inputs provided in the query
             for (auto &q : query_request.data_)
             {
                 // The exponent of all the query powers we're about to iterate through
@@ -278,25 +327,8 @@ namespace apsi
                 for (size_t bundle_idx = 0; bundle_idx < all_powers.size(); bundle_idx++)
                 {
                     // Load input^power to all_powers[bundle_idx][exponent]
-                    cout << "Setting all_powers[" << bundle_idx << "][" << exponent << "]" << endl;
-                    all_powers[bundle_idx][exponent] = move(q.second[bundle_idx].extract_local());
+                    all_powers[bundle_idx][exponent] = move(q.second[bundle_idx]);
                 }
-            }
-
-            // Obtain the windowing information
-            uint32_t window_size = params.table_params().window_size;
-            uint32_t base = uint32_t(1) << window_size;
-
-            // Prepare the windowing information
-            WindowingDag dag(max_exponent, base);
-
-            // Create a state per each bundle index; this contains information about whether the
-            // powers for that bundle index have been computed
-            vector<WindowingDag::State> states;
-            states.reserve(bundle_idx_count);
-            for (uint32_t i = 0; i < bundle_idx_count; i++)
-            {
-                states.emplace_back(dag);
             }
 
             // Partition the data and run the threads on the partitions. The i-th thread will compute query powers at
@@ -308,7 +340,7 @@ namespace apsi
             for (size_t t = 0; t < partitions.size(); t++)
             {
                 threads.emplace_back([&, t]() {
-                    QueryWorker(sender_db, crypto_context, partitions[t], all_powers, dag, states, chl, send_rp_fun);
+                    QueryWorker(sender_db, crypto_context, partitions[t], all_powers, pd, chl, send_rp_fun);
                 });
             }
 
@@ -326,8 +358,7 @@ namespace apsi
             CryptoContext crypto_context,
             pair<uint32_t, uint32_t> bundle_idx_bounds,
             vector<CiphertextPowers> &all_powers,
-            WindowingDag &dag,
-            vector<WindowingDag::State> &states,
+            const PowersDag &pd,
             Channel &chl,
             function<void(Channel &, unique_ptr<ResultPackage>)> send_rp_fun)
         {
@@ -337,16 +368,32 @@ namespace apsi
             uint32_t bundle_idx_end = bundle_idx_bounds.second;
 
             // Compute the powers for each bundle index and loop over the BinBundles
+            Evaluator &evaluator = *crypto_context.evaluator();
+            RelinKeys &relin_keys = *crypto_context.relin_keys();
             for (uint32_t bundle_idx = bundle_idx_start; bundle_idx < bundle_idx_end; bundle_idx++)
             {
                 // Compute all powers of the query
                 CiphertextPowers &powers_at_this_bundle_idx = all_powers[bundle_idx];
-                ComputePowers(
-                    sender_db,
-                    crypto_context,
-                    powers_at_this_bundle_idx,
-                    dag,
-                    states[bundle_idx]);
+                pd.apply([&](const PowersDag::PowersNode &node) {
+                    if (!node.is_source())
+                    {
+                        auto parents = node.parents;
+                        Ciphertext prod;
+                        evaluator.multiply(
+                            powers_at_this_bundle_idx[parents.first],
+                            powers_at_this_bundle_idx[parents.second],
+                            prod);
+                        evaluator.relinearize_inplace(prod, relin_keys);
+                        powers_at_this_bundle_idx[node.power] = move(prod);
+                    }
+                });
+
+                // Transform the powers to NTT form
+                // When using C++17 this function may be multi-threaded in the future
+                // with C++ execution policies
+                seal_for_each_n(powers_at_this_bundle_idx.begin() + 1, powers_at_this_bundle_idx.size() - 1, [&](auto &ct) {
+                    evaluator.transform_to_ntt_inplace(ct);
+                });
 
                 // Next, iterate over each bundle with this bundle index
                 auto bundle_caches = sender_db->get_cache_at(bundle_idx);
@@ -416,7 +463,6 @@ namespace apsi
             {
                 // Atomically get the next_node counter (this tells us where to start working) and increment it
                 size_t node_idx = static_cast<size_t>(state.next_node->fetch_add(1));
-                cout << "node_idx == " << node_idx << endl;
                 // If we've traversed the whole DAG, we're done
                 if (node_idx >= dag.nodes_.size())
                 {
@@ -450,11 +496,9 @@ namespace apsi
                 }
 
                 // Multiply the inputs together
-                cout << "Collecting ciphertexts" << endl;
                 Ciphertext &input0 = powers[node.inputs[0]];
                 Ciphertext &input1 = powers[node.inputs[1]];
                 Ciphertext &output = powers[node.output];
-                cout << "Evaluating input" << node.inputs[0] << " * input" << node.inputs[1] << endl;
                 evaluator->multiply(input0, input1, output);
 
                 // Relinearize and convert to NTT form
