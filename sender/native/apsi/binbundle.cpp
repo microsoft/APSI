@@ -37,7 +37,7 @@ namespace apsi
                 throw logic_error("cannot evaluate a constant polynomial");
             }
 
-            // We need to have enough ciphertext powers
+            // We need to have enough ciphertext powers to evaluate this polynomial
             if (batched_coeffs_.size() > ciphertext_powers.size())
             {
                 throw invalid_argument("not enough ciphertext powers available");
@@ -117,15 +117,14 @@ namespace apsi
         FEltPolyn compute_matching_polyn(const map<felt_t, L> &bin, const Modulus &mod)
         {
             // Collect the roots
-            vector<felt_t> roots(bin.size());
+            vector<felt_t> roots;
+            roots.reserve(bin.size());
             for (auto &kv : bin) {
                 roots.push_back(kv.first);
             }
 
-            // Compute the polynomial
-            FEltPolyn p = polyn_with_roots(roots, mod);
-
-            return p;
+            // Compute and return the polynomial
+            return polyn_with_roots(roots, mod);
         }
 
         /**
@@ -146,10 +145,8 @@ namespace apsi
                 values.push_back(pv.second);
             }
 
-            // Compute the Newton interpolation polynomial
-            FEltPolyn p = newton_interpolate_polyn(points, values, mod);
-
-            return p;
+            // Compute and return the Newton interpolation polynomial
+            return newton_interpolate_polyn(points, values, mod);
         }
 
         /**
@@ -442,11 +439,11 @@ namespace apsi
             {
                 // Compute and cache the matching polynomial
                 FEltPolyn p = compute_matching_polyn(bin, mod);
-                cache_.felt_matching_polyns.emplace_back(p);
+                cache_.felt_matching_polyns.emplace_back(move(p));
 
                 // Compute and cache the Newton polynomial
                 p = compute_newton_polyn(bin, mod);
-                cache_.felt_interp_polyns.emplace_back(p);
+                cache_.felt_interp_polyns.emplace_back(move(p));
             }
         }
 
