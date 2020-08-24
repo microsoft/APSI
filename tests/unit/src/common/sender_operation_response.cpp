@@ -36,7 +36,9 @@ namespace APSITests
         table_params.hash_func_count = 3;
         table_params.max_items_per_bin = 16;
         table_params.table_size = 256;
-        table_params.window_size = 1;
+
+        PSIParams::QueryParams query_params;
+        query_params.query_powers_count = 3;
 
         size_t pmd = 1024;
         PSIParams::SEALParams seal_params(scheme_type::BFV);
@@ -44,7 +46,8 @@ namespace APSITests
         seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(pmd));
         seal_params.set_plain_modulus(65537);
 
-        sopr.params = make_unique<PSIParams>(item_params, table_params, seal_params);
+        sopr.params = make_unique<PSIParams>(
+            item_params, table_params, query_params, seal_params);
         auto out_size = sopr.save(ss);
 
         SenderOperationResponseParms sopr2;
@@ -58,7 +61,7 @@ namespace APSITests
         ASSERT_EQ(sopr.params->table_params().hash_func_count, sopr2.params->table_params().hash_func_count);
         ASSERT_EQ(sopr.params->table_params().max_items_per_bin, sopr2.params->table_params().max_items_per_bin);
         ASSERT_EQ(sopr.params->table_params().table_size, sopr2.params->table_params().table_size);
-        ASSERT_EQ(sopr.params->table_params().window_size, sopr2.params->table_params().window_size);
+        ASSERT_EQ(sopr.params->query_params().query_powers_count, sopr2.params->query_params().query_powers_count);
         ASSERT_EQ(sopr.params->seal_params(), sopr2.params->seal_params());
     }
 

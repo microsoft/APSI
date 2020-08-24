@@ -208,7 +208,13 @@ namespace apsi
                 return ret;
             }());
 
-            auto req = fbs::CreateQueryRequest(fbs_builder, relin_keys_data, query_request_parts);
+            // Save the PowersDag
+            stringstream ss;
+            size_t pd_size = pd.save(ss);
+            string pd_str = ss.str();
+            auto pd_data = fbs_builder.CreateVector(reinterpret_cast<const uint8_t*>(pd_str.data()), pd_str.length());
+
+            auto req = fbs::CreateQueryRequest(fbs_builder, relin_keys_data, query_request_parts, pd_data);
 
             fbs::SenderOperationBuilder sop_builder(fbs_builder);
             sop_builder.add_request_type(fbs::Request_QueryRequest);
@@ -281,7 +287,7 @@ namespace apsi
             }
 
             // Load the query data
-            auto &query = *req.query();
+            const auto &query = *req.query();
             for (const auto &query_part : query)
             {
                 uint32_t exponent = query_part->exponent();
@@ -320,6 +326,24 @@ namespace apsi
                 }
 
                 data.emplace(exponent, move(cts_vec));
+            }
+
+            // Load the PowersDag
+            const auto &pd_data = *req.pd();
+            ArrayGetBuffer agbuf(
+                reinterpret_cast<const char *>(pd_data.data()),
+                static_cast<streamsize>(pd_data.size()));
+            istream pd_stream(&agbuf);
+            try
+            {
+                pd.load(pd_stream);
+            }
+            catch (const runtime_error &ex)
+            {
+                stringstream ss;
+                ss << "failed to load PowersDag: ";
+                ss << ex.what();
+                throw runtime_error(ss.str());
             }
 
             return in_data.size();

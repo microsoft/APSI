@@ -3,6 +3,7 @@
 
 target_sources(common
     PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/powers.cpp
         ${CMAKE_CURRENT_LIST_DIR}/psiparams.cpp
 )
 
@@ -20,6 +21,7 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/config.h
         ${CMAKE_CURRENT_LIST_DIR}/cryptocontext.h
         ${CMAKE_CURRENT_LIST_DIR}/item.h
+        ${CMAKE_CURRENT_LIST_DIR}/powers.h
         ${CMAKE_CURRENT_LIST_DIR}/psiparams.h
         ${CMAKE_CURRENT_LIST_DIR}/sealobject.h
         ${CMAKE_CURRENT_LIST_DIR}/version.h

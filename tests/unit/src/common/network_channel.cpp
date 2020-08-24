@@ -12,6 +12,7 @@
 
 // APSI
 #include "apsi/network/network_channel.h"
+#include "apsi/powers.h"
 #include "apsi/util/utils.h"
 
 #include "gtest/gtest.h"
@@ -40,7 +41,9 @@ namespace APSITests
                 table_params.hash_func_count = 3;
                 table_params.max_items_per_bin = 16;
                 table_params.table_size = 512;
-                table_params.window_size = 1;
+
+                PSIParams::QueryParams query_params;
+                query_params.query_powers_count = 3;
 
                 size_t pmd = 4096;
                 PSIParams::SEALParams seal_params(scheme_type::BFV);
@@ -48,7 +51,8 @@ namespace APSITests
                 seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(pmd));
                 seal_params.set_plain_modulus(65537);
 
-                params = make_shared<PSIParams>(item_params, table_params, seal_params);
+                params = make_shared<PSIParams>(
+                    item_params, table_params, query_params, seal_params);
             }
 
             return params;
@@ -154,6 +158,7 @@ namespace APSITests
             sop_query->relin_keys = *relin_keys;
             sop_query->data[0].push_back(get_context()->encryptor()->encrypt_zero_symmetric());
             sop_query->data[123].push_back(get_context()->encryptor()->encrypt_zero_symmetric());
+            sop_query->pd = optimal_powers(10, 2);
             sop = move(sop_query);
 
             // Send a query operation with some dummy data
@@ -241,6 +246,10 @@ namespace APSITests
         ASSERT_FALSE(sop_query->data.at(123).empty());
         ASSERT_EQ(1, sop_query->data[123].size());
         auto query_ct123 = sop_query->data[123][0].extract_local();
+
+        ASSERT_TRUE(sop_query->pd.is_configured());
+        ASSERT_EQ(10, sop_query->pd.up_to_power());
+        ASSERT_EQ(2, sop_query->pd.source_count());
 
         // Create a parms response
         auto rsop_parms = make_unique<SenderOperationResponseParms>();

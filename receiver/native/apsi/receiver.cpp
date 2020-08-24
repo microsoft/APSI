@@ -40,9 +40,10 @@ namespace apsi
         class PlaintextPowers
         {
         public:
-            PlaintextPowers(vector<uint64_t> values, const PSIParams &params) : mod_(params.seal_params().plain_modulus())
+            PlaintextPowers(vector<uint64_t> values, const PSIParams &params, const PowersDag &pd) :
+                mod_(params.seal_params().plain_modulus())
             {
-                compute_powers(move(values), params.table_params().window_size, params.table_params().max_items_per_bin);
+                compute_powers(move(values), pd);
             }
 
             unordered_map<uint32_t, SEALObject<Ciphertext>> encrypt(const CryptoContext &crypto_context)
@@ -80,30 +81,34 @@ namespace apsi
                     [this](auto val1, auto val2) { return multiply_uint_mod(val1, val2, mod_); });
             }
 
-            void compute_powers(vector<uint64_t> values, uint32_t window_size, uint32_t max_exponent)
+            vector<uint64_t> exponentiate_array(vector<uint64_t> values, uint32_t exponent)
             {
-                APSI_LOG_DEBUG("Computing plaintext powers for exponent " << max_exponent
-                    << " using window size " << window_size);
-
-                uint32_t radix = uint32_t(1) << window_size;
-
-                // Loop for as long as 2^(window_size * j) does not exceed max_exponent
-                for (uint32_t j = 0; (uint32_t(1) << (window_size * j)) <= max_exponent; j++)
+                if (!exponent)
                 {
-                    powers_[uint32_t(1) << (window_size * j)] = values;
+                    throw invalid_argument("exponent cannot be zero");
+                }
 
-                    // Loop for as long as we are not exceeding the max_exponent
-                    for (uint32_t i = 2; (i < radix) && (i * (uint32_t(1) << (window_size * j)) <= max_exponent); i++)
+                vector<uint64_t> result(values.size(), 1);
+                while (exponent)
+                {
+                    if (exponent & 1)
                     {
-                        vector<uint64_t> temp(values.size());
-                        multiply_array(powers_[(i - 1) * (uint32_t(1) << (window_size * j))], values, temp);
-                        powers_[i * (uint32_t(1) << (window_size * j))] = move(temp);
+                        multiply_array(values, result, result);
                     }
+                    square_array(values);
+                    exponent >>= 1;
+                }
 
-                    for (uint32_t k = 0; k < window_size; k++)
-                    {
-                        square_array(values);
-                    }
+                return result;
+            }
+
+            void compute_powers(vector<uint64_t> values, const PowersDag &pd)
+            {
+                auto source_powers = pd.source_nodes();
+
+                for (auto &s : source_powers)
+                {
+                    powers_[s.power] = exponentiate_array(values, s.power);
                 }
 
                 APSI_LOG_DEBUG("Plaintext powers computed:" << [&]() {
@@ -154,6 +159,10 @@ namespace apsi
 
             // Initialize the CryptoContext with a new SEALContext
             crypto_context_ = make_shared<CryptoContext>(SEALContext::Create(params_.seal_params()));
+
+            // Set up the PowersDag
+            pd_ = optimal_powers(params_.table_params().max_items_per_bin, params_.query_params().query_powers_count);
+            APSI_LOG_INFO("Found a powers configuration with depth: " << pd_.depth());
 
             // Create new keys
             reset_keys();
@@ -336,7 +345,7 @@ namespace apsi
 
                     // Now that we have the algebraized items for this bundle index, we create a PlaintextPowers object that
                     // computes all necessary powers of the algebraized items.
-                    plain_powers.emplace_back(move(alg_items), params_);
+                    plain_powers.emplace_back(move(alg_items), params_, pd_);
                 }
             }
 
@@ -367,6 +376,7 @@ namespace apsi
             auto sop_query = make_unique<SenderOperationQuery>();
             sop_query->relin_keys = relin_keys_;
             sop_query->data = move(encrypted_powers);
+            sop_query->pd = pd_;
             query.sop_ = move(sop_query);
 
             APSI_LOG_INFO("Finished creating encrypted query");

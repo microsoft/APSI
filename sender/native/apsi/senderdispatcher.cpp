@@ -119,7 +119,7 @@ namespace apsi
             // Extract the OPRF request
             OPRFRequest oprf_request(move(sop->sop));
 
-            Sender::RunOPRF(move(oprf_request), *oprf_key_, sender_db_, chl,
+            Sender::RunOPRF(move(oprf_request), *oprf_key_, chl,
                 [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
                     auto nsop_response = make_unique<NetworkSenderOperationResponse>();
                     nsop_response->sop_response = move(sop_response);
@@ -133,10 +133,10 @@ namespace apsi
         void SenderDispatcher::dispatch_query(unique_ptr<NetworkSenderOperation> sop, SenderChannel &chl)
         {
             // Create the QueryRequest object
-            QueryRequest query_request(move(sop->sop));
+            QueryRequest query_request(move(sop->sop), sender_db_);
 
             // Query will send result to client in a stream of ResultPackages
-            Sender::RunQuery(move(query_request), sender_db_, chl, thread_count_,
+            Sender::RunQuery(move(query_request), chl, thread_count_,
                 // Lambda function for sending the query response
                 [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
                     auto nsop_response = make_unique<NetworkSenderOperationResponse>();

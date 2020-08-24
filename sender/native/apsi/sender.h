@@ -21,6 +21,7 @@
 #include "apsi/network/channel.h"
 #include "apsi/network/sender_operation.h"
 #include "apsi/oprf/oprf_sender.h"
+#include "apsi/powers.h"
 #include "apsi/psiparams.h"
 #include "apsi/sealobject.h"
 #include "apsi/senderdb.h"
@@ -47,7 +48,11 @@ namespace apsi
                 return ParmsRequest();
             }
 
+            ParmsRequest(const ParmsRequest &source) = delete;
+
             ParmsRequest(ParmsRequest &&source) = default;
+
+            ParmsRequest &operator =(const ParmsRequest &source) = delete;
 
             ParmsRequest &operator =(ParmsRequest &&source) = default;
 
@@ -69,7 +74,11 @@ namespace apsi
                 return std::move(result);
             }
 
+            OPRFRequest(const OPRFRequest &source) = delete;
+
             OPRFRequest(OPRFRequest &&source) = default;
+
+            OPRFRequest &operator =(const OPRFRequest &source) = delete;
 
             OPRFRequest &operator =(OPRFRequest &&source) = default;
 
@@ -84,18 +93,23 @@ namespace apsi
         friend class Sender;
 
         public:
-            QueryRequest(std::unique_ptr<network::SenderOperation> sop);
+            QueryRequest(std::unique_ptr<network::SenderOperation> sop, std::shared_ptr<SenderDB> sender_db);
 
             QueryRequest deep_copy() const
             {
                 QueryRequest result;
                 result.relin_keys_ = relin_keys_;
                 result.data_ = data_;
+                result.sender_db_ = sender_db_;
 
                 return std::move(result);
             }
 
+            QueryRequest(const QueryRequest &source) = delete;
+
             QueryRequest(QueryRequest &&source) = default;
+
+            QueryRequest &operator =(const QueryRequest &source) = delete;
 
             QueryRequest &operator =(QueryRequest &&source) = default;
 
@@ -104,63 +118,16 @@ namespace apsi
 
             seal::RelinKeys relin_keys_;
 
-            std::unordered_map<std::uint32_t, std::vector<SEALObject<seal::Ciphertext>>> data_;
+            std::unordered_map<std::uint32_t, std::vector<seal::Ciphertext>> data_;
+
+            PowersDag pd_;
+
+            std::shared_ptr<SenderDB> sender_db_;
         };
 
         // An alias to denote the powers of a receiver's ciphertext. At index i, holds Cⁱ, where C is the ciphertext..
         // The 0th index is always a dummy value.
         using CiphertextPowers = std::vector<seal::Ciphertext>;
-
-        struct WindowingDag
-        {
-            enum class NodeState
-            {
-                Uncomputed = 0,
-                Computing = 1,
-                Done = 2
-            };
-
-            struct State
-            {
-                // The counter used to keep track of which nodes need to get compute (meaning the product of their input
-                // has to be calculated)
-                std::unique_ptr<std::atomic<std::size_t>> next_node;
-                // All the node states
-                std::unique_ptr<std::atomic<NodeState>[]> node_states;
-
-                State(WindowingDag &dag);
-            };
-
-            struct Node
-            {
-                std::array<std::size_t, 2> inputs;
-                std::size_t output = 0;
-            };
-
-            /**
-            Stores the actual nodes of the DAG
-            */
-            std::vector<Node> nodes_;
-
-            /**
-            The windowing base
-            */
-            std::uint32_t base_;
-
-            /**
-            The largest ciphertext exponent we need to calculate
-            */
-            std::size_t max_exponent_;
-
-            /**
-            Constructs a directed acyclic graph, where each node has 2 inputs and 1 output. Every node has inputs i,j
-            and output i+j. The largest power has exponent max_exponent. The choice of inputs depends on their Hamming
-            weights, which depends on the base specified (the base is also known as the window size, and MUST be a power
-            of 2). This is used to compute powers of a given ciphertext while minimizing circuit depth. The nodes vector
-            is sorted in increasing order of Hamming weight of output.
-            */
-            WindowingDag(std::size_t max_exponent, std::uint32_t base);
-        }; // struct WindowingDag
 
         class Sender
         {
@@ -183,7 +150,6 @@ namespace apsi
             static void RunOPRF(
                 OPRFRequest &&oprf_request,
                 const oprf::OPRFKey &key,
-                std::shared_ptr<SenderDB> sender_db,
                 network::Channel &chl,
                 std::function<void(network::Channel &, std::unique_ptr<network::SenderOperationResponse>)> send_fun
                     = BasicSend<network::SenderOperationResponse>);
@@ -193,7 +159,6 @@ namespace apsi
             */
             static void RunQuery(
                 QueryRequest &&query_request,
-                std::shared_ptr<SenderDB> sender_db,
                 network::Channel &chl,
                 std::size_t thread_count = 0,
                 std::function<void(network::Channel &, std::unique_ptr<network::SenderOperationResponse>)> send_fun
@@ -216,28 +181,9 @@ namespace apsi
                 CryptoContext crypto_context,
                 std::pair<std::uint32_t, std::uint32_t> bundle_idx_bounds,
                 std::vector<std::vector<seal::Ciphertext>> &powers,
-                WindowingDag &dag, std::vector<WindowingDag::State> &states,
+                const PowersDag &pd,
                 network::Channel &chl,
                 std::function<void(network::Channel &, std::unique_ptr<network::ResultPackage>)> send_rp_fun);
-
-            /**
-            Constructs all powers of receiver's items for the specified batch, based on the powers sent from the
-            receiver. For example, if the desired highest exponent (determined by PSIParams) is 15, the input exponents
-            are {1, 2, 4, 8}, then this function will compute powers from 0 to 15, by multiplying appropriate powers in
-            {1, 2, 4, 8}.
-
-            See comment in sender.cpp for more detail.
-
-            @params[in] input Map from exponent (k) to a vector of Ciphertext, each of which encrypts a batch of items
-            of the same power (y^k). The size of the vector is the number of batches.
-            @params[out] all_powers All powers computed from the input for the specified batch.
-            */
-            static void ComputePowers(
-                const std::shared_ptr<SenderDB> &sender_db,
-                CryptoContext &crypto_context,
-                CiphertextPowers &powers,
-                const WindowingDag &dag,
-                WindowingDag::State &state);
         }; // class Sender
     }      // namespace sender
 } // namespace apsi

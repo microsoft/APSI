@@ -20,6 +20,7 @@
 #include "apsi/network/channel.h"
 #include "apsi/network/result_package.h"
 #include "apsi/oprf/oprf_receiver.h"
+#include "apsi/powers.h"
 #include "apsi/psiparams.h"
 #include "apsi/sealobject.h"
 #include "apsi/util/db_encoding.h"
@@ -104,7 +105,11 @@ namespace apsi
 
             Query(Query &&source) = default;
 
+            Query(const Query &source) = delete;
+
             Query &operator =(Query &&source) = default;
+
+            Query &operator =(const Query &source) = delete;
 
             const network::SenderOperationQuery &data() const
             {
@@ -215,6 +220,8 @@ namespace apsi
             PSIParams params_;
 
             std::shared_ptr<CryptoContext> crypto_context_;
+
+            PowersDag pd_;
 
             SEALObject<seal::RelinKeys> relin_keys_;
         }; // class Receiver

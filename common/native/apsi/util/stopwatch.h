@@ -134,5 +134,10 @@ namespace apsi
             std::string event_name_;
             Stopwatch::time_unit start_;
         }; // class StopwatchScope
+
+        /**
+        Global Stopwatch objects for sender and receiver to use.
+        */
+        extern Stopwatch sender_stopwatch, recv_stopwatch;
     }      // namespace util
 } // namespace apsi

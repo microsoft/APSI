@@ -52,32 +52,30 @@ namespace
     }
 
     void verify_psi_results(
-        const vector<MatchRecord> &query_result, const map<size_t, Item> &query_subset)
+        const vector<MatchRecord> &query_result, const vector<Item> &query_subset)
     {
+        ASSERT_EQ(query_subset.size(), query_result.size());
+
         // Count matches
         size_t match_count = accumulate(query_result.cbegin(), query_result.cend(), size_t(0),
             [](auto sum, auto &curr) { return sum + !!curr; });
-        ASSERT_EQ(query_subset.size(), match_count);
 
-        // Check that all items in the query subset were found
-        for (auto query_item : query_subset)
-        {
-            ASSERT_TRUE(query_result[query_item.first].found);
-        }
+        // All items were found
+        ASSERT_EQ(query_subset.size(), match_count);
     }
 
     void verify_labeled_psi_results(
-        const vector<MatchRecord> &query_result, const map<size_t, Item> &query_subset,
+        const vector<MatchRecord> &query_result, const vector<Item> &query_subset,
         const vector<FullWidthLabel> &total_label_set)
     {
         verify_psi_results(query_result, query_subset);
 
         // Check that all labels in the query subset match
-        for (auto query_item : query_subset)
+        for (size_t idx = 0; idx < query_result.size(); idx++)
         {
-            auto result_label = query_result[query_item.first].label.get_as<uint64_t>();
+            auto result_label = query_result[idx].label.get_as<uint64_t>();
             auto reference_label = gsl::span<const uint64_t>(
-                total_label_set[query_item.first].data(),
+                total_label_set[idx].data(),
                 sizeof(FullWidthLabel)/sizeof(uint64_t));
             ASSERT_TRUE(equal(reference_label.begin(), reference_label.end(), result_label.begin()));
         }
@@ -96,7 +94,7 @@ namespace
         }
 
         auto oprf_key = make_shared<OPRFKey>();
-        vector<HashedItem> hashed_sender_items;
+        vector<HashedItem> hashed_sender_items(sender_items.size());
         OPRFSender::ComputeHashes(sender_items, *oprf_key, hashed_sender_items, num_threads);
 
         unordered_map<HashedItem, monostate> sender_db_data;
@@ -108,16 +106,12 @@ namespace
         auto sender_db = make_shared<UnlabeledSenderDB>(params);
         sender_db->set_data(sender_db_data, num_threads);
 
-        cout << "Created sender DB" << endl;
-
         atomic<bool> stop_sender = false;
 
         auto sender_th = thread([&]() {
             SenderDispatcher dispatcher(sender_db, num_threads);
             dispatcher.run(stop_sender, 5550, oprf_key);
         });
-
-        cout << "Dispatched" << endl;
 
         // Connect the network
         ReceiverChannel recv_chl;
@@ -133,18 +127,14 @@ namespace
             recv_items_vec.push_back(item.second);
         }
 
-        cout << "Created receiver items" << endl;
-
         auto hashed_recv_items = receiver.request_oprf(recv_items_vec, recv_chl);
         auto query = receiver.create_query(hashed_recv_items);
         auto query_result = receiver.request_query(move(query), recv_chl);
 
         stop_sender = true;
-        cout << "Joining" << endl;
         sender_th.join();
 
-        cout << "Verifying" << endl;
-        verify_psi_results(query_result, recv_items);
+        verify_psi_results(query_result, recv_items_vec);
     }
 
     PSIParams create_params()
@@ -159,15 +149,17 @@ namespace
         PSIParams::TableParams table_params;
         table_params.hash_func_count = 3;
         table_params.max_items_per_bin = 16;
-        table_params.window_size = 1;
         table_params.table_size = 4096;
+
+        PSIParams::QueryParams query_params;
+        query_params.query_powers_count = 3;
 
         PSIParams::SEALParams seal_params(scheme_type::BFV);
         seal_params.set_poly_modulus_degree(8192);
         seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(8192));
         seal_params.set_plain_modulus(65537);
 
-        return { item_params, table_params, seal_params };
+        return { item_params, table_params, query_params, seal_params };
     }
 } // namespace
 

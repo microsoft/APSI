@@ -35,7 +35,7 @@ namespace apsi
 
             // Save the parameters into a temporary string
             stringstream ss;
-            auto size = SaveParams(*params, ss);
+            SaveParams(*params, ss);
             string params_str = ss.str();
 
             // Set up a vector to hold the parameter data

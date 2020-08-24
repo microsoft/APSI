@@ -37,7 +37,7 @@ namespace apsi
                 throw logic_error("cannot evaluate a constant polynomial");
             }
 
-            // We need to have enough ciphertext powers
+            // We need to have enough ciphertext powers to evaluate this polynomial
             if (batched_coeffs_.size() > ciphertext_powers.size())
             {
                 throw invalid_argument("not enough ciphertext powers available");
@@ -47,10 +47,8 @@ namespace apsi
             Evaluator &evaluator = *crypto_context_.evaluator();
 
             // Lowest degree terms are stored in the lowest index positions in vectors.
-            // Specifically, ciphertext_powers[0] is the first power of the ciphertext data,
-            // but batched_coeffs_[0] is the constant coefficient. Hence, we need to shift
-            // the ciphertext_powers index by one to match the batched_coeffs index, and
-            // finally add the batched_coeffs_[0] plaintext to the output.
+            // Specifically, ciphertext_powers[1] is the first power of the ciphertext data,
+            // but batched_coeffs_[0] is the constant coefficient.
             //
             // This function only works when batched_coeffs_ has size at least 2, because
             // otherwise there is no way to produce a ciphertext for the result at all.
@@ -60,18 +58,18 @@ namespace apsi
             // Both ciphertext_powers and the batched_coeffs_ are assumed to be in NTT form.
             // The return value is not in NTT form.
             Ciphertext result, temp;
-            evaluator.multiply_plain(ciphertext_powers[0], batched_coeffs_[1], result);
+            evaluator.multiply_plain(ciphertext_powers[1], batched_coeffs_[1], result);
             for (size_t deg = 2; deg < batched_coeffs_.size(); deg++)
             {
                 evaluator.multiply_plain(ciphertext_powers[deg], batched_coeffs_[deg], temp);
                 evaluator.add_inplace(result, temp);
             }
 
+            // Need to transform back from NTT form so we can do final addition of batched_coeffs_[0]
+            evaluator.transform_from_ntt_inplace(result);
+
             // Finally add the constant coefficients batched_coeffs_[0]
             evaluator.add_plain_inplace(result, batched_coeffs_[0]);
-
-            // Transform back from NTT form
-            evaluator.transform_from_ntt_inplace(result);
 
             // Make the result as small as possible by modulus switching
             while (result.parms_id() != seal_context.last_parms_id())
@@ -119,15 +117,14 @@ namespace apsi
         FEltPolyn compute_matching_polyn(const map<felt_t, L> &bin, const Modulus &mod)
         {
             // Collect the roots
-            vector<felt_t> roots(bin.size());
+            vector<felt_t> roots;
+            roots.reserve(bin.size());
             for (auto &kv : bin) {
                 roots.push_back(kv.first);
             }
 
-            // Compute the polynomial
-            FEltPolyn p = polyn_with_roots(roots, mod);
-
-            return p;
+            // Compute and return the polynomial
+            return polyn_with_roots(roots, mod);
         }
 
         /**
@@ -148,10 +145,8 @@ namespace apsi
                 values.push_back(pv.second);
             }
 
-            // Compute the Newton interpolation polynomial
-            FEltPolyn p = newton_interpolate_polyn(points, values, mod);
-
-            return p;
+            // Compute and return the Newton interpolation polynomial
+            return newton_interpolate_polyn(points, values, mod);
         }
 
         /**
@@ -198,11 +193,16 @@ namespace apsi
                 // Now let pt be the Plaintext consisting of all those degree i coefficients
                 Plaintext pt;
                 crypto_context_.encoder()->encode(coeffs_of_deg_i, pt);
-                // Convert to NTT form so our intersection computations later are fast
-                crypto_context_.evaluator()->transform_to_ntt_inplace(
+
+                // Convert to NTT form so our intersection computations later are fast. However, we won't convert the
+                // constant coefficient plaintext to NTT form since add_plain cannot be done in NTT form.
+                if (!batched_coeffs_.empty())
+                {
+                    crypto_context_.evaluator()->transform_to_ntt_inplace(
                         pt,
                         crypto_context_.seal_context()->first_parms_id()
-                );
+                    );
+                }
 
                 // Push the new Plaintext
                 batched_coeffs_.emplace_back(pt);
@@ -218,7 +218,7 @@ namespace apsi
             cache_(crypto_context),
             crypto_context_(crypto_context)
         {
-            bins_.reserve(num_bins);
+            bins_.resize(num_bins);
             cache_.felt_matching_polyns.reserve(num_bins);
         }
 
@@ -297,8 +297,8 @@ namespace apsi
             for (auto &pair : item_label_pairs)
             {
                 map<felt_t, L> &curr_bin = bins_.at(curr_bin_idx);
-                // Check if the key is already in the current bin. If so, that's an inserstion error
-                if (curr_bin.find(pair.first) == curr_bin.end())
+                // Check if the key is already in the current bin. If so, that's an insertion error
+                if (curr_bin.find(pair.first) != curr_bin.end())
                 {
                     return -1;
                 }
@@ -340,7 +340,9 @@ namespace apsi
         template<typename L>
         void BinBundle<L>::clear()
         {
+            size_t bins_size = bins_.size();
             bins_.clear();
+            bins_.resize(bins_size);
             clear_cache();
         }
 
@@ -437,11 +439,11 @@ namespace apsi
             {
                 // Compute and cache the matching polynomial
                 FEltPolyn p = compute_matching_polyn(bin, mod);
-                cache_.felt_matching_polyns.emplace_back(p);
+                cache_.felt_matching_polyns.emplace_back(move(p));
 
                 // Compute and cache the Newton polynomial
                 p = compute_newton_polyn(bin, mod);
-                cache_.felt_interp_polyns.emplace_back(p);
+                cache_.felt_interp_polyns.emplace_back(move(p));
             }
         }
 

@@ -38,7 +38,9 @@ namespace APSITests
                 table_params.hash_func_count = 3;
                 table_params.max_items_per_bin = 16;
                 table_params.table_size = 256;
-                table_params.window_size = 1;
+
+                PSIParams::QueryParams query_params;
+                query_params.query_powers_count = 3;
 
                 size_t pmd = 1024;
                 PSIParams::SEALParams seal_params(scheme_type::BFV);
@@ -46,7 +48,8 @@ namespace APSITests
                 seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(pmd));
                 seal_params.set_plain_modulus(65537);
 
-                params = make_shared<PSIParams>(item_params, table_params, seal_params);
+                params = make_shared<PSIParams>(
+                    item_params, table_params, query_params, seal_params);
             }
 
             return params;

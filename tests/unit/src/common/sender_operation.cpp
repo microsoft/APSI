@@ -106,6 +106,7 @@ namespace APSITests
         ASSERT_FALSE(sop.relin_keys.is_local());
         ASSERT_FALSE(sop.relin_keys.is_serializable());
         ASSERT_TRUE(sop.data.empty());
+        ASSERT_FALSE(sop.pd.is_configured());
 
         stringstream ss;
 
@@ -122,6 +123,11 @@ namespace APSITests
         sop.relin_keys.set(RelinKeys());
         ASSERT_FALSE(sop.relin_keys.is_serializable());
         ASSERT_TRUE(sop.relin_keys.is_local());
+
+        // We do need to set up the PowersDag; this cannot be unconfigured
+        sop.pd = optimal_powers(10, 2);
+        ASSERT_TRUE(sop.pd.is_configured());
+
         size_t out_size = sop.save(ss);
         SenderOperationQuery sop2;
 
@@ -143,6 +149,9 @@ namespace APSITests
         ASSERT_FALSE(sop2.relin_keys.is_serializable());
         ASSERT_TRUE(sop2.relin_keys.is_local());
         ASSERT_TRUE(sop2.data.empty());
+        ASSERT_TRUE(sop2.pd.is_configured());
+        ASSERT_EQ(10, sop2.pd.up_to_power());
+        ASSERT_EQ(2, sop2.pd.source_count());
 
         // A serializable (empty) relin_keys object
         sop.relin_keys.set(keygen.relin_keys());

@@ -104,5 +104,8 @@ namespace apsi
             Stopwatch::time_unit end = Stopwatch::time_unit::clock::now();
             stopwatch_.add_timespan_event(event_name_, start_, end);
         }
+
+        Stopwatch sender_stopwatch;
+        Stopwatch recv_stopwatch;
     } // namespace util
 } // namespace apsi
