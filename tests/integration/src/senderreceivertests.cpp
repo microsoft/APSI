@@ -97,14 +97,8 @@ namespace
         vector<HashedItem> hashed_sender_items(sender_items.size());
         OPRFSender::ComputeHashes(sender_items, *oprf_key, hashed_sender_items, num_threads);
 
-        unordered_map<HashedItem, monostate> sender_db_data;
-        for (auto item : hashed_sender_items)
-        {
-            sender_db_data[item] = monostate{};
-        }
-
         auto sender_db = make_shared<UnlabeledSenderDB>(params);
-        sender_db->set_data(sender_db_data, num_threads);
+        sender_db->set_data(hashed_sender_items, num_threads);
 
         atomic<bool> stop_sender = false;
 

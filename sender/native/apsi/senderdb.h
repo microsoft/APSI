@@ -8,9 +8,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <unordered_set>
 #include <utility>
 #include <vector>
-#include <unordered_map>
 
 // GSL
 #include "gsl/span"
@@ -54,22 +54,27 @@ namespace apsi
             defined for a given child of SenderDB, corresponding to whether it is labeled or unlabeled.
             */
             virtual void set_data(
-                const std::unordered_map<HashedItem, util::FullWidthLabel> &data,
-                std::size_t thread_count) = 0;
+                std::vector<std::pair<HashedItem, util::FullWidthLabel> > &data,
+                std::size_t thread_count
+            ) = 0;
             virtual void set_data(
-                const std::unordered_map<HashedItem, monostate> &data,
-                std::size_t thread_count) = 0;
+                const std::vector<HashedItem> &data,
+                std::size_t thread_count
+            ) = 0;
 
             /**
             Inserts the given data into the database, using at most thread_count threads. Only one of these is defined
-            for a given child of SenderDB, corresponding to whether it is labeled or unlabeled.
+            for a given child of SenderDB, corresponding to whether it is labeled or unlabeled. In the labeled case, if
+            an item exists, its label is overwritten with the new label value.
             */
-            virtual void add_data(
-                const std::unordered_map<HashedItem, util::FullWidthLabel> &data,
-                std::size_t thread_count) = 0;
-            virtual void add_data(
-                const std::unordered_map<HashedItem, monostate> &data,
-                std::size_t thread_count) = 0;
+            virtual void insert_data(
+                std::vector<std::pair<HashedItem, util::FullWidthLabel> > &data,
+                std::size_t thread_count
+            ) = 0;
+            virtual void insert_data(
+                const std::vector<HashedItem> &data,
+                std::size_t thread_count
+            ) = 0;
 
             /**
             Returns a set of DB cache references corresponding to the bundles at the given
@@ -88,6 +93,10 @@ namespace apsi
                 return crypto_context_;
             }
 
+            const std::unordered_set<HashedItem>& get_items() {
+                return items_;
+            }
+
             /**
             Returns the total number of bin bundles.
             */
@@ -99,6 +108,12 @@ namespace apsi
             }
 
         protected:
+
+            /**
+            The set of all items that have been inserted into the database
+            */
+            mutable std::unordered_set<HashedItem> items_;
+
             /**
             Necessary for evaluating polynomials of Plaintexts
             */
@@ -151,24 +166,38 @@ namespace apsi
                 -> std::vector<std::reference_wrapper<const BinBundleCache> > override;
 
             /**
-            Clears the database and inserts the given data, using at most thread_count threads
+            Clears the database and inserts the given data, using at most thread_count threads. This will mutate the
+            input vector. Specifically, it will stable-sort the vector into (new entries || overwriting entries).
             */
             void set_data(
-                const std::unordered_map<HashedItem, FullWidthLabel> &data,
-                std::size_t thread_count = 0) override;
-            void set_data(
-                const std::unordered_map<HashedItem, monostate> &data,
-                std::size_t thread_count = 0) override;
+                std::vector<std::pair<HashedItem, FullWidthLabel> > &data,
+                std::size_t thread_count = 0
+            ) override;
 
             /**
-            Inserts the given data into the database, using at most thread_count threads
+            DO NOT USE. Unlabeled insertion on a labeled database does not and should not work.
             */
-            void add_data(
-                const std::unordered_map<HashedItem, FullWidthLabel> &data,
-                std::size_t thread_count = 0) override;
-            void add_data(
-                const std::unordered_map<HashedItem, monostate> &data,
-                std::size_t thread_count = 0) override;
+            void set_data(
+                const std::vector<HashedItem> &data,
+                std::size_t thread_count = 0
+            ) override;
+
+            /**
+            Inserts the given data into the database, using at most thread_count threads. This will mutate the input
+            vector. Specifically, it will stable-sort the vector into (new entries || overwriting entries).
+            */
+            void insert_data(
+                std::vector<std::pair<HashedItem, FullWidthLabel> > &data,
+                std::size_t thread_count = 0
+            ) override;
+
+            /**
+            DO NOT USE. Unlabeled insertion on a labeled database does not and should not work.
+            */
+            void insert_data(
+                const std::vector<HashedItem> &data,
+                std::size_t thread_count = 0
+            ) override;
         }; // class LabeledSenderDB
 
         class UnlabeledSenderDB : public SenderDB
@@ -203,28 +232,39 @@ namespace apsi
             Returns a set of DB cache references corresponding to the bundles at the given
             bundle index. This returns a vector but order doesn't matter.
             */
-            auto get_cache_at(std::uint32_t bundle_idx)
-                -> std::vector<std::reference_wrapper<const BinBundleCache> > override;
+            std::vector<std::reference_wrapper<const BinBundleCache> > get_cache_at(std::uint32_t bundle_idx)  override;
+
+            /**
+            DO NOT USE. Labeled insertion on an unlabeled database does not and should not work.
+            */
+            void set_data(
+                std::vector<std::pair<HashedItem, FullWidthLabel> > &data,
+                std::size_t thread_count = 0
+            ) override;
 
             /**
             Clears the database and inserts the given data, using at most thread_count threads
             */
             void set_data(
-                const std::unordered_map<HashedItem, FullWidthLabel> &data,
-                std::size_t thread_count = 0) override;
-            void set_data(
-                const std::unordered_map<HashedItem, monostate> &data,
-                std::size_t thread_count = 0) override;
+                const std::vector<HashedItem> &data,
+                std::size_t thread_count = 0
+            ) override;
+
+            /**
+            DO NOT USE. Labeled insertion on an unlabeled database does not and should not work.
+            */
+            void insert_data(
+                std::vector<std::pair<HashedItem, FullWidthLabel> > &data,
+                std::size_t thread_count = 0
+            ) override;
 
             /**
             Inserts the given data into the database, using at most thread_count threads
             */
-            void add_data(
-                const std::unordered_map<HashedItem, FullWidthLabel> &data,
-                std::size_t thread_count = 0) override;
-            void add_data(
-                const std::unordered_map<HashedItem, monostate> &data,
-                std::size_t thread_count = 0) override;
+            void insert_data(
+                const std::vector<HashedItem> &data,
+                std::size_t thread_count = 0
+            ) override;
         }; // class UnlabeledSenderDB
     }  // namespace sender
 } // namespace apsi

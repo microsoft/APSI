@@ -222,6 +222,17 @@ namespace apsi
             );
 
             /**
+            Attempts to overwrite the stored items' labels with the given labels. Returns true iff it found a contiguous
+            sequence of given items. If no such sequence was found, this BinBundle is not mutated. This function can be
+            called on a BinBundle<monostate> but it won't do anything except force the cache to get recomputed, so don't
+            bother.
+            */
+            bool try_multi_overwrite(
+                AlgItemLabel<L> &item_label_pairs,
+                size_t start_bin_idx
+            );
+
+            /**
             Clears the contents of the BinBundle and wipes out the cache
             */
             void clear();

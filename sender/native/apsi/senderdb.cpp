@@ -25,11 +25,12 @@ namespace apsi
         namespace
         {
             /**
-            Converts each given Item-Label pair into its algebraic form, i.e., a sequence of felt-felt pairs. Also
-            computes each Item's cuckoo index.
+            Converts each given Item-Label pair in between the given iterators into its algebraic form, i.e., a sequence
+            of felt-felt pairs. Also computes each Item's cuckoo index.
             */
             vector<pair<AlgItemLabel<felt_t>, size_t> > preprocess_labeled_data(
-                const unordered_map<HashedItem, FullWidthLabel> &data,
+                const vector<pair<HashedItem, FullWidthLabel> >::iterator &begin,
+                const vector<pair<HashedItem, FullWidthLabel> >::iterator &end,
                 PSIParams &params
             ) {
                 // Some variables we'll need
@@ -52,8 +53,9 @@ namespace apsi
                 // a vector. Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the
                 // work of inserting the items into BinBundles
                 vector<pair<AlgItemLabel<felt_t>, size_t> > data_with_indices;
-                for (auto &item_label_pair : data)
+                for (auto it = begin; it != end; it++)
                 {
+                    pair<HashedItem, FullWidthLabel> &item_label_pair = *it;
                     // Serialize the data into field elements
                     const HashedItem &item = item_label_pair.first;
                     const FullWidthLabel &label = item_label_pair.second;
@@ -80,7 +82,7 @@ namespace apsi
             each Item's cuckoo index.
             */
             vector<pair<AlgItemLabel<monostate>, size_t> > preprocess_unlabeled_data(
-                const unordered_map<HashedItem, monostate> &data,
+                const vector<HashedItem> &data,
                 PSIParams &params
             ) {
                 // Some variables we'll need
@@ -104,10 +106,9 @@ namespace apsi
                 // a vector. Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the
                 // work of inserting the items into BinBundles
                 vector<pair<AlgItemLabel<monostate>, size_t> > data_with_indices;
-                for (auto &item_label_pair : data)
+                for (const Item &item : data)
                 {
                     // Serialize the data into field elements
-                    const Item &item = item_label_pair.first;
                     AlgItemLabel<monostate> alg_item = algebraize_item(item, item_bit_count, mod);
 
                     // Collect the cuckoo indices, ignoring duplicates
@@ -147,18 +148,20 @@ namespace apsi
             Inserts the given items and corresponding labels into bin_bundles at their respective cuckoo indices. It will
             only insert the data with bundle index in the half-open range range [begin_bundle_idx, end_bundle_idx). If
             inserting into a BinBundle would make the number of items in a bin larger than max_bin_size, this function
-            will create and insert a new BinBundle.
+            will create and insert a new BinBundle. If overwrite is set, this will overwrite the labels if
+            it finds an AlgItemLabel that matches the input perfectly.
             */
             template<typename L>
-            void add_data_worker(
+            void insert_data_worker(
                 vector<pair<AlgItemLabel<L>, size_t> > &data_with_indices,
                 vector<vector<BinBundle<L> > > &bin_bundles,
                 CryptoContext &crypto_context,
                 uint32_t bins_per_bundle,
                 size_t max_bin_size,
+                bool overwrite,
                 pair<vector<size_t>::const_iterator, vector<size_t>::const_iterator> work_range)
             {
-                STOPWATCH(sender_stopwatch, "LabeledSenderDB::add_data_worker");
+                STOPWATCH(sender_stopwatch, "LabeledSenderDB::insert_data_worker");
 
                 // Keep track of the bundle indices we look at. These will be the ones whose cache we have to regen.
                 vector<size_t> bundle_indices;
@@ -187,11 +190,24 @@ namespace apsi
                     // Get the bundle set at the given bundle index
                     vector<BinBundle<L> > &bundle_set = bin_bundles.at(bundle_idx);
 
-                    // Try to insert these field elements in an existing BinBundle at this bundle index. Keep track of
+                    // Try to insert or overwrite these field elements in an existing BinBundle at this bundle index.
+                    // Keep track of
                     // whether or not we succeed.
-                    bool inserted = false;
+                    bool written = false;
                     for (BinBundle<L> &bundle : bundle_set)
                     {
+                        // If we're supposed to overwrite, try to overwrite. One of these BinBundles has to have the
+                        // data we're trying to overwrite.
+                        if (overwrite)
+                        {
+                            // If we successfully overwrote, we're done with this bundle
+                            written = bundle.try_multi_overwrite(data, bin_idx);
+                            if (written)
+                            {
+                                break;
+                            }
+                        }
+
                         // Do a dry-run insertion and see if the new largest bin size in the range
                         // exceeds the limit
                         int new_largest_bin_size = bundle.multi_insert_dry_run(data, bin_idx);
@@ -201,13 +217,20 @@ namespace apsi
                         {
                             // All good
                             bundle.multi_insert_for_real(data, bin_idx);
-                            inserted = true;
+                            written = true;
                             break;
                         }
                     }
 
-                    // If we had conflicts everywhere, then we need to make a new BinBundle and insert the data there
-                    if (!inserted)
+                    // We tried to overwrite an item that doesn't exist. This should never happen
+                    if (overwrite && !written)
+                    {
+                        throw logic_error("Tried to overwrite non-existent item");
+                    }
+
+                    // If we had conflicts everywhere when trying to insert, then we need to make a new BinBundle and
+                    // insert the data there
+                    if (!written)
                     {
                         // Make a fresh BinBundle and insert
                         BinBundle<L> new_bin_bundle(bins_per_bundle, crypto_context);
@@ -241,17 +264,19 @@ namespace apsi
             }
 
             /**
-            Takes algebraized data to be inserted, splits it up, and distributes it so that thread_count many threads can
-            all insert in parallel
+            Takes algebraized data to be inserted, splits it up, and distributes it so that thread_count many threads
+            can all insert in parallel. If overwrite is set, this will overwrite the labels if it finds an
+            AlgItemLabel that matches the input perfectly.
             */
             template<typename L>
-            void dispatch_add_data(
+            void dispatch_insert_data(
                 vector<pair<AlgItemLabel<L>, size_t > > &data_with_indices,
                 vector<vector<BinBundle<L> > > &bin_bundles,
                 CryptoContext &crypto_context,
                 uint32_t bins_per_bundle,
                 uint32_t max_bin_size,
-                size_t thread_count
+                size_t thread_count,
+                bool overwrite
             ) {
                 thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
 
@@ -280,12 +305,13 @@ namespace apsi
                 for (auto &partition : partitions)
                 {
                     threads.emplace_back([&]() {
-                        add_data_worker(
+                        insert_data_worker(
                             data_with_indices,
                             bin_bundles,
                             crypto_context,
                             bins_per_bundle,
                             max_bin_size,
+                            overwrite,
                             make_pair(
                                 bundle_indices.cbegin() + partition.first,
                                 bundle_indices.cbegin() + partition.second)
@@ -347,9 +373,13 @@ namespace apsi
         */
         void LabeledSenderDB::clear_db()
         {
+            // Clear the set of inserted items
+            items_.clear();
+
             // Lock the database for writing
             auto lock = db_lock_.acquire_write();
 
+            // Clear the BinBundles
             bin_bundles_.clear();
             bin_bundles_.resize(params_.bundle_idx_count());
         }
@@ -359,9 +389,13 @@ namespace apsi
         */
         void UnlabeledSenderDB::clear_db()
         {
+            // Clear the set of inserted items
+            items_.clear();
+
             // Lock the database for writing
             auto lock = db_lock_.acquire_write();
 
+            // Clear the BinBundles
             bin_bundles_.clear();
             bin_bundles_.resize(params_.bundle_idx_count());
         }
@@ -383,32 +417,66 @@ namespace apsi
         }
 
         /**
-        Inserts the given data into the database, using at most thread_count threads
+        Inserts the given data into the database, using at most thread_count threads. This will mutate the input vector.
+        Specifically, it will stable-sort the vector into (new entries || overwriting entries).
         */
-        void LabeledSenderDB::add_data(const unordered_map<HashedItem, FullWidthLabel> &data, size_t thread_count)
+        void LabeledSenderDB::insert_data(vector<pair<HashedItem, FullWidthLabel> > &data, size_t thread_count)
         {
             thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
 
-            STOPWATCH(sender_stopwatch, "LabeledSenderDB::add_data");
+            STOPWATCH(sender_stopwatch, "LabeledSenderDB::insert_data");
+
+            // We need to know which items are new and which are old, since we have to tell dispatchinsert_data when to
+            // have an overwrite-on-collision versus add-binbundle-on-collision policy.
+            // Sort so that all the new items are first.
+            auto items_to_overwrite_it = std::stable_partition(
+                data.begin(),
+                data.end(),
+                [&](auto &item_label_pair) {
+                    HashedItem &item = item_label_pair.first;
+                    // This is true iff item is not already in items_, i.e., if this is a new item
+                    return (items_.find(item) == items_.end());
+                }
+            );
 
             // Lock the database for writing
             auto lock = db_lock_.acquire_write();
 
-            // Break the data down into its field element representation. Also compute the items' cuckoo indices.
-            vector<pair<AlgItemLabel<felt_t>, size_t> > data_with_indices
-                = preprocess_labeled_data(data, params_);
+            // Break the new data down into its field element representation. Also compute the items' cuckoo indices.
+            vector<pair<AlgItemLabel<felt_t>, size_t> > new_data_with_indices
+                = preprocess_labeled_data(data.begin(), items_to_overwrite_it, params_);
 
-            // Dispatch the insertion
+            // Now do the same for the data we're going to overwrite
+            vector<pair<AlgItemLabel<felt_t>, size_t> > overwritable_data_with_indices
+                = preprocess_labeled_data(items_to_overwrite_it, data.end(), params_);
+
+            // Dispatch the insertion, first for the new data, then for the data we're gonna overwrite
             uint32_t bins_per_bundle = params_.bins_per_bundle();
             uint32_t max_bin_size = params_.table_params().max_items_per_bin;
-            dispatch_add_data(
-                data_with_indices,
+            dispatch_insert_data(
+                new_data_with_indices,
                 bin_bundles_,
                 crypto_context_,
                 bins_per_bundle,
                 max_bin_size,
-                thread_count
+                thread_count,
+                false /* don't overwrite items */
             );
+            dispatch_insert_data(
+                overwritable_data_with_indices,
+                bin_bundles_,
+                crypto_context_,
+                bins_per_bundle,
+                max_bin_size,
+                thread_count,
+                true /* overwrite items */
+            );
+
+            // Now that everything is inserted, add the new items to the cache of all inserted items
+            for (auto it = data.begin(); it != items_to_overwrite_it; it++)
+            {
+                items_.insert(it->first);
+            }
         }
 
         /**
@@ -416,7 +484,7 @@ namespace apsi
         interface that needs to support both labeled and unlabeled insertion. A LabeledSenderDB does not do unlabeled
         insertion. If you can think of a better way to structure this, keep it to yourself.
         */
-        void LabeledSenderDB::add_data(const unordered_map<HashedItem, monostate> &data, size_t thread_count)
+        void LabeledSenderDB::insert_data(const vector<HashedItem> &data, size_t thread_count)
         {
             throw logic_error("Cannot do unlabeled insertion on a LabeledSenderDB");
         }
@@ -424,11 +492,11 @@ namespace apsi
         /**
         Inserts the given data into the database, using at most thread_count threads
         */
-        void UnlabeledSenderDB::add_data(const unordered_map<HashedItem, monostate> &data, size_t thread_count)
+        void UnlabeledSenderDB::insert_data(const vector<HashedItem> &data, size_t thread_count)
         {
             thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
 
-            STOPWATCH(sender_stopwatch, "LabeledSenderDB::add_data");
+            STOPWATCH(sender_stopwatch, "UnlabeledSenderDB::insert_data");
 
             // Lock the database for writing
             auto lock = db_lock_.acquire_write();
@@ -440,14 +508,19 @@ namespace apsi
             // Dispatch the insertion
             uint32_t bins_per_bundle = params_.bins_per_bundle();
             uint32_t max_bin_size = params_.table_params().max_items_per_bin;
-            dispatch_add_data(
+            dispatch_insert_data(
                 data_with_indices,
                 bin_bundles_,
                 crypto_context_,
                 bins_per_bundle,
                 max_bin_size,
-                thread_count
+                thread_count,
+                false
             );
+
+            // Now that everything is inserted, add the new items to the cache of all inserted items. Some of these may
+            // be repeats but it doesn't matter because set insertion is idempotent.
+            items_.insert(data.begin(), data.end());
         }
 
         /**
@@ -455,7 +528,7 @@ namespace apsi
         interface that needs to support both labeled and unlabeled insertion. An UnlabeledSenderDB does not do labeled
         insertion. If you can think of a better way to structure this, keep it to yourself.
         */
-        void UnlabeledSenderDB::add_data(const unordered_map<HashedItem, FullWidthLabel> &data, size_t thread_count)
+        void UnlabeledSenderDB::insert_data(vector<pair<HashedItem, FullWidthLabel> > &data, size_t thread_count)
         {
             throw logic_error("Cannot do labeled insertion on an UnlabeledSenderDB");
         }
@@ -463,30 +536,30 @@ namespace apsi
         /**
         Clears the database and inserts the given data, using at most thread_count threads
         */
-        void LabeledSenderDB::set_data(const unordered_map<HashedItem, FullWidthLabel> &data, size_t thread_count) {
+        void LabeledSenderDB::set_data(vector<pair<HashedItem, FullWidthLabel> > &data, size_t thread_count) {
             clear_db();
-            add_data(data, thread_count);
+            insert_data(data, thread_count);
         }
 
         /**
-        This does not and should not work. See LabeledSenderDB::add_data
+        This does not and should not work. See LabeledSenderDB::insert_data
         */
-        void LabeledSenderDB::set_data(const unordered_map<HashedItem, monostate> &data, size_t thread_count) {
+        void LabeledSenderDB::set_data(const vector<HashedItem> &data, size_t thread_count) {
             throw logic_error("Cannot do unlabeled insertion on a LabeledSenderDB");
         }
 
         /**
         Clears the database and inserts the given data, using at most thread_count threads
         */
-        void UnlabeledSenderDB::set_data(const unordered_map<HashedItem, monostate> &data, size_t thread_count) {
+        void UnlabeledSenderDB::set_data(const vector<HashedItem> &data, size_t thread_count) {
             clear_db();
-            add_data(data, thread_count);
+            insert_data(data, thread_count);
         }
 
         /**
-        This does not and should not work. See UnlabeledSenderDB::add_data
+        This does not and should not work. See UnlabeledSenderDB::insert_data
         */
-        void UnlabeledSenderDB::set_data(const unordered_map<HashedItem, FullWidthLabel> &data, size_t thread_count)
+        void UnlabeledSenderDB::set_data(vector<pair<HashedItem, FullWidthLabel> > &data, size_t thread_count)
         {
             throw logic_error("Cannot do labeled insertion on an UnlabeledSenderDB");
         }

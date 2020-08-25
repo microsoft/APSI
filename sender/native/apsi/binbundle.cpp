@@ -260,7 +260,7 @@ namespace apsi
         */
         template<typename L>
         int BinBundle<L>::multi_insert_dry_run(
-            vector<pair<felt_t, L>> &item_label_pairs,
+            AlgItemLabel<L> &item_label_pairs,
             size_t start_bin_idx
         ) {
             return multi_insert(item_label_pairs, start_bin_idx, true);
@@ -273,7 +273,7 @@ namespace apsi
         */
         template<typename L>
         int BinBundle<L>::multi_insert_for_real(
-            vector<pair<felt_t, L>> &item_label_pairs,
+            AlgItemLabel<L> &item_label_pairs,
             size_t start_bin_idx
         ) {
             return multi_insert(item_label_pairs, start_bin_idx, false);
@@ -287,7 +287,7 @@ namespace apsi
         */
         template<typename L>
         int BinBundle<L>::multi_insert(
-            vector<pair<felt_t, L>> &item_label_pairs,
+            AlgItemLabel<L> &item_label_pairs,
             size_t start_bin_idx,
             bool dry_run
         ) {
@@ -296,9 +296,10 @@ namespace apsi
             size_t curr_bin_idx = start_bin_idx;
             for (auto &pair : item_label_pairs)
             {
+                auto item_component = pair.first;
                 map<felt_t, L> &curr_bin = bins_.at(curr_bin_idx);
                 // Check if the key is already in the current bin. If so, that's an insertion error
-                if (curr_bin.find(pair.first) != curr_bin.end())
+                if (curr_bin.find(item_component) != curr_bin.end())
                 {
                     return -1;
                 }
@@ -332,6 +333,55 @@ namespace apsi
             }
 
             return max_bin_size;
+        }
+
+
+        /**
+        Attempts to overwrite the stored items' labels with the given labels. Returns true iff it found a contiguous
+        sequence of given items. If no such sequence was found, this BinBundle is not mutated. This function can be
+        called on a BinBundle<monostate> but it won't do anything except force the cache to get recomputed, so don't
+        bother.
+        */
+        template<typename L>
+        bool BinBundle<L>::try_multi_overwrite(
+            AlgItemLabel<L> &item_label_pairs,
+            size_t start_bin_idx
+        ) {
+            // Check that all the item components appear sequentially in this BinBundle
+            size_t curr_bin_idx = start_bin_idx;
+            for (auto &pair : item_label_pairs)
+            {
+                auto &item_component = pair.first;
+                map<felt_t, L> &curr_bin = bins_.at(curr_bin_idx);
+
+                // A non-match was found. This isn't the item we're looking for
+                if (curr_bin.find(item_component) == curr_bin.end())
+                {
+                    return false;
+                }
+
+                curr_bin_idx++;
+            }
+
+            // If we're here, that means we can overwrite the labels
+            size_t max_bin_size = 0;
+            curr_bin_idx = start_bin_idx;
+            for (auto &pair : item_label_pairs)
+            {
+                auto key = pair.first;
+                auto value = pair.second;
+
+                // Overwrite the label in the bin
+                map<felt_t, L> &curr_bin = bins_.at(curr_bin_idx);
+                curr_bin[key] = value;
+
+                // Indicate that the polynomials need to be recomputed
+                cache_invalid_ = true;
+
+                curr_bin_idx++;
+            }
+
+            return true;
         }
 
         /**
