@@ -135,7 +135,7 @@ namespace apsi
         void Receiver::reset_keys()
         {
             // Generate new keys
-            KeyGenerator generator(crypto_context_->seal_context());
+            KeyGenerator generator(*crypto_context_->seal_context());
 
             // Set the symmetric key, encryptor, and decryptor
             crypto_context_->set_secret(generator.secret_key());
@@ -158,7 +158,7 @@ namespace apsi
             STOPWATCH(recv_stopwatch, "Receiver::initialize");
 
             // Initialize the CryptoContext with a new SEALContext
-            crypto_context_ = make_shared<CryptoContext>(SEALContext::Create(params_.seal_params()));
+            crypto_context_ = make_shared<CryptoContext>(params_.seal_params());
 
             // Set up the PowersDag
             pd_ = optimal_powers(params_.table_params().max_items_per_bin, params_.query_params().query_powers_count);

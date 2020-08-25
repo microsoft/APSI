@@ -80,14 +80,15 @@ namespace apsi
                 throw invalid_argument("sender_db cannot be null");
             }
 
+            auto sop_query = dynamic_cast<SenderOperationQuery*>(sop.get());
+
             // Move over the SenderDB
             sender_db_ = move(sender_db);
-
-            auto sop_query = dynamic_cast<SenderOperationQuery*>(sop.get());
+            auto seal_context = sender_db_->get_context().seal_context();
 
             // Extract and validate relinearization keys 
             relin_keys_ = sop_query->relin_keys.extract_local();
-            if (!is_valid_for(relin_keys_, sender_db_->get_context().seal_context()))
+            if (!is_valid_for(relin_keys_, *seal_context))
             {
                 throw invalid_argument("relinearization keys are invalid");
             }
@@ -99,7 +100,7 @@ namespace apsi
                 for (auto &ct : q.second)
                 {
                     cts.push_back(ct.extract_local());
-                    if (!is_valid_for(cts.back(), sender_db_->get_context().seal_context()))
+                    if (!is_valid_for(cts.back(), *seal_context))
                     {
                         throw invalid_argument("query ciphertext is invalid");
                     }
@@ -307,9 +308,15 @@ namespace apsi
                     }
                 });
 
-                // Transform the powers to NTT form
-                // When using C++17 this function may be multi-threaded in the future
-                // with C++ execution policies
+                // Now that all powers of the ciphertext have been computed, we need to transform them to NTT form. This
+                // will substantially improve the polynomial evaluation (below), because the plaintext polynomials are
+                // already in NTT transformed form, and the ciphertexts are used repeatedly for each bin bundle at this
+                // index. This computation is separate from the graph processing above, because the multiplications must
+                // all be done before transforming to NTT form. We omit the first ciphertext in the vector, because it
+                // corresponds to the zeroth power of the query and is included only for convenience of the indexing;
+                // the ciphertext is actually not set or valid for use.
+                //
+                // When using C++17 this function may be multi-threaded in the future with C++ execution policies.
                 seal_for_each_n(powers_at_this_bundle_idx.begin() + 1, powers_at_this_bundle_idx.size() - 1, [&](auto &ct) {
                     evaluator.transform_to_ntt_inplace(ct);
                 });
@@ -318,8 +325,7 @@ namespace apsi
                 auto bundle_caches = sender_db->get_cache_at(bundle_idx);
                 size_t bundle_count = bundle_caches.size();
 
-                // When using C++17 this function may be multi-threaded in the future
-                // with C++ execution policies
+                // When using C++17 this function may be multi-threaded in the future with C++ execution policies
                 seal_for_each_n(bundle_caches.begin(), bundle_count, [&](auto &cache) {
                     // Package for the result data
                     auto rp = make_unique<ResultPackage>();

@@ -8,6 +8,9 @@
 #include <string>
 #include <utility>
 
+// APSI
+#include "apsi/psiparams.h"
+
 // SEAL
 #include "seal/context.h"
 #include "seal/batchencoder.h"
@@ -24,29 +27,29 @@ namespace apsi
     class CryptoContext
     {
     public:
-        CryptoContext(
-            std::shared_ptr<seal::SEALContext> context) : seal_context_(std::move(context))
+        CryptoContext(const seal::EncryptionParameters &parms) :
+            seal_context_(std::make_shared<seal::SEALContext>(parms))
         {
-            encoder_ = std::make_shared<seal::BatchEncoder>(seal_context_);
+            encoder_ = std::make_shared<seal::BatchEncoder>(*seal_context_);
         }
 
         void set_evaluator()
         {
             relin_keys_.reset();
-            evaluator_ = std::make_shared<seal::Evaluator>(seal_context_);
+            evaluator_ = std::make_shared<seal::Evaluator>(*seal_context_);
         }
 
         void set_evaluator(seal::RelinKeys relin_keys)
         {
             relin_keys_ = std::make_shared<seal::RelinKeys>(std::move(relin_keys));
-            evaluator_ = std::make_shared<seal::Evaluator>(seal_context_);
+            evaluator_ = std::make_shared<seal::Evaluator>(*seal_context_);
         }
 
         void set_secret(seal::SecretKey secret_key)
         {
             secret_key_ = std::make_shared<seal::SecretKey>(secret_key);
-            encryptor_ = std::make_shared<seal::Encryptor>(seal_context_, *secret_key_);
-            decryptor_ = std::make_shared<seal::Decryptor>(seal_context_, *secret_key_);
+            encryptor_ = std::make_shared<seal::Encryptor>(*seal_context_, *secret_key_);
+            decryptor_ = std::make_shared<seal::Decryptor>(*seal_context_, *secret_key_);
         }
 
         void clear_secret()

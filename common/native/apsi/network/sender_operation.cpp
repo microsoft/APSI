@@ -301,11 +301,11 @@ namespace apsi
                 cts_vec.reserve(cts.size());
                 for (const auto &ct : cts)
                 {
-                    Ciphertext temp(context);
+                    Ciphertext temp(*context);
                     try
                     {
                         temp.load(
-                            context,
+                            *context,
                             reinterpret_cast<const SEAL_BYTE*>(ct->data()->data()), ct->data()->size());
                     }
                     catch (const logic_error &ex)
