@@ -127,11 +127,11 @@ namespace apsi
                 label_result.reserve(label_cts.size());
                 for (const auto &label_ct : label_cts)
                 {
-                    Ciphertext temp(context);
+                    Ciphertext temp(*context);
                     try
                     {
                         temp.load(
-                            context,
+                            *context,
                             reinterpret_cast<const SEAL_BYTE*>(label_ct->data()->data()), label_ct->data()->size());
                     }
                     catch (const logic_error &ex)

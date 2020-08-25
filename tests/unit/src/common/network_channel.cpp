@@ -63,8 +63,8 @@ namespace APSITests
             static shared_ptr<CryptoContext> context = nullptr;
             if (!context)
             {
-                context = make_shared<CryptoContext>(SEALContext::Create(get_params()->seal_params()));
-                KeyGenerator keygen(context->seal_context());
+                context = make_shared<CryptoContext>(get_params()->seal_params());
+                KeyGenerator keygen(*context->seal_context());
                 context->set_secret(keygen.secret_key());
                 context->set_evaluator(keygen.relin_keys_local());
             }

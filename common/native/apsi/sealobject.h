@@ -187,7 +187,7 @@ namespace apsi
         std::size_t load(std::shared_ptr<seal::SEALContext> context, const seal::SEAL_BYTE *in, std::size_t size)
         {
             set(LocalType());
-            return seal::util::safe_cast<std::size_t>(local_->load(std::move(context), in, size));
+            return seal::util::safe_cast<std::size_t>(local_->load(std::move(*context), in, size));
         }
 
     private:

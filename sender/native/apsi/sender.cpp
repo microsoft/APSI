@@ -80,14 +80,15 @@ namespace apsi
                 throw invalid_argument("sender_db cannot be null");
             }
 
+            auto sop_query = dynamic_cast<SenderOperationQuery*>(sop.get());
+
             // Move over the SenderDB
             sender_db_ = move(sender_db);
-
-            auto sop_query = dynamic_cast<SenderOperationQuery*>(sop.get());
+            auto seal_context = sender_db_->get_context().seal_context();
 
             // Extract and validate relinearization keys 
             relin_keys_ = sop_query->relin_keys.extract_local();
-            if (!is_valid_for(relin_keys_, sender_db_->get_context().seal_context()))
+            if (!is_valid_for(relin_keys_, *seal_context))
             {
                 throw invalid_argument("relinearization keys are invalid");
             }
@@ -99,7 +100,7 @@ namespace apsi
                 for (auto &ct : q.second)
                 {
                     cts.push_back(ct.extract_local());
-                    if (!is_valid_for(cts.back(), sender_db_->get_context().seal_context()))
+                    if (!is_valid_for(cts.back(), *seal_context))
                     {
                         throw invalid_argument("query ciphertext is invalid");
                     }
