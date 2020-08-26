@@ -37,16 +37,14 @@ namespace apsi
                 size_t item_bit_count = params.item_bit_count();
                 const Modulus &mod = params.seal_params().plain_modulus();
 
-                // Construct the cuckoo hash functions
-                vector<kuku::LocFunc> normal_loc_funcs;
-                for (size_t i = 0; i < params.table_params().hash_func_count; i++)
-                {
-                    kuku::LocFunc f = kuku::LocFunc(
-                        params.table_params().table_size,
-                        kuku::make_item(i, 0)
-                    );
-                    normal_loc_funcs.push_back(f);
-                }
+                // Set up a temporary cuckoo table that we can use to extract locations
+                kuku::KukuTable cuckoo(
+                    params.table_params().table_size,      // Size of the hash table
+                    0,                                     // Not using a stash
+                    params.table_params().hash_func_count, // Number of hash functions
+                    { 0, 0 },                              // Hardcoded { 0, 0 } as the seed
+                    1,                                     // The number of insertion attempts (irrelevant here)
+                    { 0, 0 });                             // The empty element (irrelevant here)
 
                 // Calculate the cuckoo indices for each item. Store every pair of (&item-label, cuckoo_idx) in
                 // a vector. Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the
@@ -59,16 +57,16 @@ namespace apsi
                     const FullWidthLabel &label = item_label_pair.second;
                     AlgItemLabel<felt_t> alg_item_label = algebraize_item_label(item, label, item_bit_count, mod);
 
-                    // Collect the cuckoo indices, ignoring duplicates
-                    set<size_t> cuckoo_indices;
-                    for (kuku::LocFunc &hash_func : normal_loc_funcs)
+                    // Get the cuckoo table locations for this item and add to data_with_indices
+                    for (auto location : cuckoo.all_locations(item.value()))
                     {
                         // The current hash value is an index into a table of Items. In reality our BinBundles are
                         // tables of bins, which contain chunks of items. How many chunks? bins_per_item many chunks
-                        size_t cuckoo_idx = hash_func(item.value()) * bins_per_item;
+                        size_t bin_idx = location * bins_per_item;
 
                         // Store the data along with its index
-                        data_with_indices.push_back({ alg_item_label, cuckoo_idx });
+                        pair<AlgItemLabel<felt_t>, size_t> data_with_idx = { alg_item_label, bin_idx };
+                        data_with_indices.push_back(move(data_with_idx));
                     }
                 }
 
@@ -88,17 +86,14 @@ namespace apsi
                 size_t item_bit_count = params.item_bit_count();
                 const Modulus &mod = params.seal_params().plain_modulus();
 
-                // Construct the cuckoo hash functions
-                vector<kuku::LocFunc> normal_loc_funcs;
-                uint32_t table_size = params.table_params().table_size;
-                for (size_t i = 0; i < params.table_params().hash_func_count; i++)
-                {
-                    kuku::LocFunc f = kuku::LocFunc(
-                        table_size,
-                        kuku::make_item(i, 0)
-                    );
-                    normal_loc_funcs.push_back(f);
-                }
+                // Set up a temporary cuckoo table that we can use to extract locations
+                kuku::KukuTable cuckoo(
+                    params.table_params().table_size,      // Size of the hash table
+                    0,                                     // Not using a stash
+                    params.table_params().hash_func_count, // Number of hash functions
+                    { 0, 0 },                              // Hardcoded { 0, 0 } as the seed
+                    1,                                     // The number of insertion attempts (irrelevant here)
+                    { 0, 0 });                             // The empty element (irrelevant here)
 
                 // Calculate the cuckoo indices for each item. Store every pair of (&item-label, cuckoo_idx) in
                 // a vector. Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the
@@ -110,17 +105,16 @@ namespace apsi
                     const Item &item = item_label_pair.first;
                     AlgItemLabel<monostate> alg_item = algebraize_item(item, item_bit_count, mod);
 
-                    // Collect the cuckoo indices, ignoring duplicates
-                    set<size_t> cuckoo_indices;
-                    for (kuku::LocFunc &hash_func : normal_loc_funcs)
+                    // Get the cuckoo table locations for this item and add to data_with_indices
+                    for (auto location : cuckoo.all_locations(item.value()))
                     {
                         // The current hash value is an index into a table of Items. In reality our BinBundles are
                         // tables of bins, which contain chunks of items. How many chunks? bins_per_item many chunks
-                        size_t cuckoo_idx = hash_func(item.value()) * bins_per_item;
+                        size_t bin_idx = location * bins_per_item;
 
                         // Store the data along with its index
-                        pair<AlgItemLabel<monostate>, size_t> data_with_idx = { alg_item, cuckoo_idx };
-                        data_with_indices.push_back(data_with_idx);
+                        pair<AlgItemLabel<monostate>, size_t> data_with_idx = { alg_item, bin_idx };
+                        data_with_indices.push_back(move(data_with_idx));
                     }
                 }
 
