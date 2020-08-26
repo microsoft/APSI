@@ -171,8 +171,8 @@ namespace apsi
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
             vector<SEAL_BYTE> temp;
-            temp.resize(relin_keys.save_size(compr_mode_type::deflate));
-            auto size = relin_keys.save(temp.data(), temp.size(), compr_mode_type::deflate);
+            temp.resize(relin_keys.save_size(compr_mode_type::ZSTD));
+            auto size = relin_keys.save(temp.data(), temp.size(), compr_mode_type::ZSTD);
             auto relin_keys_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(temp.data()), size);
 
             // This is a little tricky; each QueryRequestPart consists of an exponent and a vector of Ciphertexts. For
@@ -191,8 +191,8 @@ namespace apsi
                         for (const auto &ct : q.second)
                         {
                             // Save each SEALObject<seal::Ciphertext>
-                            temp.resize(ct.save_size(compr_mode_type::deflate));
-                            size = ct.save(temp.data(), temp.size(), compr_mode_type::deflate);
+                            temp.resize(ct.save_size(compr_mode_type::ZSTD));
+                            size = ct.save(temp.data(), temp.size(), compr_mode_type::ZSTD);
                             auto ct_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(temp.data()), size);
 
                             // Add to the Ciphertext vector
