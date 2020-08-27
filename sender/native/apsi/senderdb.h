@@ -196,6 +196,8 @@ namespace apsi
                 const std::vector<HashedItem> &data,
                 std::size_t thread_count = 0
             ) override;
+
+            FullWidthLabel get_label(const HashedItem &item) const;
         }; // class LabeledSenderDB
 
         class UnlabeledSenderDB : public SenderDB

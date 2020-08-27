@@ -23,6 +23,51 @@
 
 namespace apsi
 {
+
+    /**
+    TODO: (Michael) These functions are only here because to_bitstring needs to know how to encode an item (which is
+    just array<uint64_t, 2>) into a bitstring. This problem goes away if Items are redefined to be array<seal_byte, 16>.
+    So the TODO is to redefine Item as such, and move these read/write helpers to an empty namespace in db_encoding.cpp
+    where they originated.
+    */
+
+    /**
+    Reads a sequence of 8 bytes as a little-endian encoded uint64_t
+    */
+    static uint64_t read_u64_little_endian(const std::array<seal::seal_byte, 8> &bytes)
+    {
+        uint64_t val = 0;
+        val |= static_cast<uint64_t>(bytes[0]);
+        val |= static_cast<uint64_t>(bytes[1]) << 8;
+        val |= static_cast<uint64_t>(bytes[2]) << 16;
+        val |= static_cast<uint64_t>(bytes[3]) << 24;
+        val |= static_cast<uint64_t>(bytes[4]) << 32;
+        val |= static_cast<uint64_t>(bytes[5]) << 40;
+        val |= static_cast<uint64_t>(bytes[6]) << 48;
+        val |= static_cast<uint64_t>(bytes[7]) << 56;
+
+        return val;
+    }
+
+    /**
+    Writes a uint64_t to a little-endian sequence of 8 bytes
+    */
+    static std::array<seal::seal_byte, 8> write_u64_little_endian(const uint64_t num)
+    {
+        std::array<seal::seal_byte, 8> bytes;
+
+        bytes[0] = static_cast<seal::seal_byte>( num & 0x00000000000000FFULL);
+        bytes[1] = static_cast<seal::seal_byte>((num & 0x000000000000FF00ULL) >> 8);
+        bytes[2] = static_cast<seal::seal_byte>((num & 0x0000000000FF0000ULL) >> 16);
+        bytes[3] = static_cast<seal::seal_byte>((num & 0x00000000FF000000ULL) >> 24);
+        bytes[4] = static_cast<seal::seal_byte>((num & 0x000000FF00000000ULL) >> 32);
+        bytes[5] = static_cast<seal::seal_byte>((num & 0x0000FF0000000000ULL) >> 40);
+        bytes[6] = static_cast<seal::seal_byte>((num & 0x00FF000000000000ULL) >> 48);
+        bytes[7] = static_cast<seal::seal_byte>((num & 0xFF00000000000000ULL) >> 56);
+
+        return bytes;
+    }
+
     /**
     Identical to Bitstring, except the underlying data is not owned.
     */
@@ -176,6 +221,58 @@ namespace apsi
         Item(std::array<std::uint64_t, 2> value) : value_(std::move(value))
         {}
 
+        /**
+        Constructs an Item from a BitstringView. This throws an invalid_argument if the bitstring doesn't fit into an array<uint64_t, 2>.
+        */
+        template<typename T>
+        Item(BitstringView<T> &bitstring)
+        {
+            gsl::span<seal::seal_byte> bitstring_bytes = bitstring.data();
+
+            // Collect two 8-byte arrays of data. If there's more than that, throw an error
+            auto bitstring_it = bitstring_bytes.begin();
+
+            // Collect the first 8 bytes
+            size_t i = 0;
+            std::array<seal::seal_byte, 8> first_word_buf;
+            for (; bitstring_it != bitstring_bytes.end(); bitstring_it++)
+            {
+                // Once we've copied 8 bytes, read it to a uint64_t
+                if (i == 8)
+                {
+                    break;
+                }
+
+                first_word_buf[i] = *bitstring_it;
+                i++;
+            }
+            uint64_t first_word = read_u64_little_endian(first_word_buf);
+
+            // Collect the next 8 bytes
+            i = 0;
+            std::array<seal::seal_byte, 8> second_word_buf;
+            for (; bitstring_it != bitstring_bytes.end(); bitstring_it++)
+            {
+                // Once we've copied 8 bytes, read it to a uint64_t
+                if (i == 8)
+                {
+                    break;
+                }
+
+                second_word_buf[i] = *bitstring_it;
+                i++;
+            }
+            uint64_t second_word = read_u64_little_endian(second_word_buf);
+
+            // There should be no data left. If there is, that's an error.
+            if (bitstring_it != bitstring_bytes.end())
+            {
+                throw std::invalid_argument("bitstring is too long to fit into an Item");
+            }
+
+            value_ = { first_word, second_word };
+        }
+
         Item(const Item &) = default;
 
         Item(Item &&) = default;
@@ -205,22 +302,24 @@ namespace apsi
         }
 
         /**
-        Returns the BitstringView representing this Item's data
+        Returns the Bitstring representing this Item's data, encoded in little-endian
         */
-        BitstringView<seal::seal_byte> to_bitstring(std::uint32_t item_bit_count)
+        Bitstring to_bitstring(std::uint32_t item_bit_count) const
         {
-            gsl::span<seal::seal_byte> bytestring_view(reinterpret_cast<seal::seal_byte*>(data()), sizeof(Item));
-            return { bytestring_view, item_bit_count };
-        }
+            // 2x uint64_t is 16x seal_byte
+            std::vector<seal::seal_byte> bytes;
+            bytes.reserve(16);
 
-        /**
-        Returns the BitstringView representing this Item's data
-        */
-        BitstringView<const seal::seal_byte> to_bitstring(std::uint32_t item_bit_count) const
-        {
-            gsl::span<const seal::seal_byte> bytestring_view(
-                reinterpret_cast<const seal::seal_byte*>(data()), sizeof(Item));
-            return { bytestring_view, item_bit_count };
+            for (uint64_t word : value_)
+            {
+                std::array<seal::seal_byte, 8> serialized_word = write_u64_little_endian(word);
+                for (seal::seal_byte byte : serialized_word)
+                {
+                    bytes.push_back(byte);
+                }
+            }
+
+            return Bitstring(std::move(bytes), item_bit_count);
         }
 
         bool operator==(const Item &other) const
@@ -278,7 +377,7 @@ namespace apsi
     /**
     Represents an Item that has been hashed with an OPRF.
     */
-    class HashedItem : public Item 
+    class HashedItem : public Item
     {};
 } // namespace apsi
 

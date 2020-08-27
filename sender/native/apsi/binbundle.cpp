@@ -266,7 +266,7 @@ namespace apsi
         */
         template<typename L>
         int BinBundle<L>::multi_insert_dry_run(
-            AlgItemLabel<L> &item_label_pairs,
+            std::vector<std::pair<felt_t, L> > &item_label_pairs,
             size_t start_bin_idx
         ) {
             return multi_insert(item_label_pairs, start_bin_idx, true);
@@ -279,7 +279,7 @@ namespace apsi
         */
         template<typename L>
         int BinBundle<L>::multi_insert_for_real(
-            AlgItemLabel<L> &item_label_pairs,
+            std::vector<std::pair<felt_t, L> > &item_label_pairs,
             size_t start_bin_idx
         ) {
             return multi_insert(item_label_pairs, start_bin_idx, false);
@@ -293,7 +293,7 @@ namespace apsi
         */
         template<typename L>
         int BinBundle<L>::multi_insert(
-            AlgItemLabel<L> &item_label_pairs,
+            std::vector<std::pair<felt_t, L> > &item_label_pairs,
             size_t start_bin_idx,
             bool dry_run
         ) {
@@ -350,7 +350,7 @@ namespace apsi
         */
         template<typename L>
         bool BinBundle<L>::try_multi_overwrite(
-            AlgItemLabel<L> &item_label_pairs,
+            std::vector<std::pair<felt_t, L> > &item_label_pairs,
             size_t start_bin_idx
         ) {
             // Check that all the item components appear sequentially in this BinBundle
@@ -387,6 +387,43 @@ namespace apsi
                 curr_bin_idx++;
             }
 
+            return true;
+        }
+
+        /**
+        Sets the given labels to the set of labels associated with the sequence of items in this BinBundle, starting at
+        start_idx. If any item is not present in its respective bin, this returns false and clears the given labels
+        vector. Returns true on success.
+        */
+        template<typename L>
+        bool BinBundle<L>::try_get_multi_label(const vector<felt_t> &items, vector<L> labels, size_t start_bin_idx) const
+        {
+            // Clear the return vector. We'll push to it as we collect labels
+            labels.clear();
+
+            // Go through all the items. If the item appears, add its label to labels. If any item doesn't appear, we
+            // scrap the whole computation and return false.
+            size_t curr_bin_idx = start_bin_idx;
+            for (auto &item : items)
+            {
+                const map<felt_t, L> &curr_bin = bins_.at(curr_bin_idx);
+                const auto &label_it = curr_bin.find(item);
+
+                // One of the items isn't there. No label to fetch. Clear the vector and return early.
+                if (label_it == curr_bin.end())
+                {
+                    labels.clear();
+                    return false;
+                } else
+                {
+                    // Found the label, put it in the return vector. *label_it is a key-value pair.
+                    labels.emplace_back(label_it->second);
+                }
+
+                curr_bin_idx++;
+            }
+
+            // Success. We found all the items
             return true;
         }
 

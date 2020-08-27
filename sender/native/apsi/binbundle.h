@@ -9,7 +9,6 @@
 #include <cstddef>
 
 // APSI
-#include "apsi/item.h"
 #include "apsi/cryptocontext.h"
 #include "apsi/util/db_encoding.h"
 
@@ -228,9 +227,20 @@ namespace apsi
             bother.
             */
             bool try_multi_overwrite(
-                AlgItemLabel<L> &item_label_pairs,
+                std::vector<std::pair<felt_t, L> > &item_label_pairs,
                 size_t start_bin_idx
             );
+
+            /**
+            Sets the given labels to the set of labels associated with the sequence of items in this BinBundle, starting at
+            start_idx. If any item is not present in its respective bin, this returns false and clears the given labels
+            vector. Returns true on success.
+            */
+            bool try_get_multi_label(
+                const std::vector<felt_t> &items,
+                std::vector<L> labels,
+                size_t start_bin_idx
+            ) const;
 
             /**
             Clears the contents of the BinBundle and wipes out the cache

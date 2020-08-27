@@ -81,7 +81,7 @@ namespace apsi
             */
             vector<pair<AlgItemLabel<monostate>, size_t> > preprocess_unlabeled_data(
                 const vector<HashedItem> &data,
-                PSIParams &params
+                const PSIParams &params
             ) {
                 // Some variables we'll need
                 size_t bins_per_item = params.item_params().felts_per_item;
@@ -556,6 +556,68 @@ namespace apsi
         void UnlabeledSenderDB::set_data(vector<pair<HashedItem, FullWidthLabel> > &data, size_t thread_count)
         {
             throw logic_error("Cannot do labeled insertion on an UnlabeledSenderDB");
+        }
+
+
+        /**
+        Returns the label associated to the given item in the database. Throws std::out_of_range if the item does not
+        appear in the database.
+        */
+        FullWidthLabel LabeledSenderDB::get_label(const HashedItem &item) const
+        {
+            // Check if this item is in the DB. If not, throw an exception
+            if (items_.count(item) == 0)
+            {
+                throw std::out_of_range("no such item in SenderDB");
+            }
+
+            uint32_t bins_per_bundle = params_.bins_per_bundle();
+
+            // Preprocess a vector of 1 element. This algebraizes the item and gives back its field element
+            // representation as well as its cuckoo hash.
+            AlgItemLabel<monostate> algebraized_item_label;
+            size_t cuckoo_idx, bin_idx, bundle_idx;
+            tie(algebraized_item_label, cuckoo_idx) = preprocess_unlabeled_data({ item }, params_)[0];
+
+            // Convert the vector [(felt, ()), (felt, ()), ..., ] to [felt, felt, felt, ...]
+            vector<felt_t> algebraized_item;
+            algebraized_item.reserve(algebraized_item_label.size());
+            for (auto &item_label : algebraized_item_label)
+            {
+                algebraized_item.push_back(item_label.first);
+            }
+
+            // Now figure out where to look to get the label
+            tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
+
+            // Retrieve the algebraic labels from one of the BinBundles at this index
+            const vector<BinBundle<felt_t> > &bundle_set = bin_bundles_.at(bundle_idx);
+            vector<felt_t> alg_labels;
+            bool got_labels = false;
+            for (const BinBundle<felt_t> &bundle : bundle_set)
+            {
+                // Try to retrieve the contiguous labels from this BinBundle
+                if (bundle.try_get_multi_label(algebraized_item, alg_labels, bin_idx))
+                {
+                    got_labels = true;
+                    break;
+                }
+            }
+
+            // It shouldn't be possible to have items in your set but be unable to retrieve the associated label. Throw
+            // an exception.
+            if (!got_labels)
+            {
+                throw logic_error("Item is in set but labels don't exist in any BinBundle");
+            }
+
+            // All good. Now just reconstruct the big label from its split-up parts and return it
+            size_t item_bit_count = params_.item_bit_count();
+            const Modulus &mod = params_.seal_params().plain_modulus();
+
+            // We can use dealgebraize_item because Items and Labels are the same size
+            FullWidthLabel label = dealgebraize_item(alg_labels, item_bit_count, mod);
+            return label;
         }
     } // namespace sender
 } // namespace apsi

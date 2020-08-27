@@ -180,43 +180,6 @@ namespace apsi
                     }
                 }
             }
-
-            /**
-            Reads a sequence of 8 bytes as a little-endian encoded felt_t
-            */
-            felt_t read_felt_little_endian(const array<seal_byte, 8> &bytes)
-            {
-                felt_t val = 0;
-                val |= static_cast<felt_t>(bytes[0]);
-                val |= static_cast<felt_t>(bytes[1]) << 8;
-                val |= static_cast<felt_t>(bytes[2]) << 16;
-                val |= static_cast<felt_t>(bytes[3]) << 24;
-                val |= static_cast<felt_t>(bytes[4]) << 32;
-                val |= static_cast<felt_t>(bytes[5]) << 40;
-                val |= static_cast<felt_t>(bytes[6]) << 48;
-                val |= static_cast<felt_t>(bytes[7]) << 56;
-
-                return val;
-            }
-
-            /**
-            Writes a felt_t to a little-endian sequence of 8 bytes
-            */
-            array<seal_byte, 8> write_felt_little_endian(const felt_t num)
-            {
-                array<seal_byte, 8> bytes;
-
-                bytes[0] = static_cast<seal_byte>( num & 0x00000000000000FFULL);
-                bytes[1] = static_cast<seal_byte>((num & 0x000000000000FF00ULL) >> 8);
-                bytes[2] = static_cast<seal_byte>((num & 0x0000000000FF0000ULL) >> 16);
-                bytes[3] = static_cast<seal_byte>((num & 0x00000000FF000000ULL) >> 24);
-                bytes[4] = static_cast<seal_byte>((num & 0x000000FF00000000ULL) >> 32);
-                bytes[5] = static_cast<seal_byte>((num & 0x0000FF0000000000ULL) >> 40);
-                bytes[6] = static_cast<seal_byte>((num & 0x00FF000000000000ULL) >> 48);
-                bytes[7] = static_cast<seal_byte>((num & 0xFF00000000000000ULL) >> 56);
-
-                return bytes;
-            }
         }
 
         /**
@@ -263,7 +226,7 @@ namespace apsi
                 );
 
                 // Read the little-endian repr into the element
-                felt_t dst_felt = read_felt_little_endian(dst_felt_repr);
+                felt_t dst_felt = read_u64_little_endian(dst_felt_repr);
 
                 // Push the field element
                 felts.push_back(dst_felt);
@@ -320,7 +283,7 @@ namespace apsi
             for (const felt_t &felt : felts)
             {
                 // Serialize the field element
-                array<seal_byte, 8> felt_bytes = write_felt_little_endian(felt);
+                array<seal_byte, 8> felt_bytes = write_u64_little_endian(felt);
 
                 // Copy part (or the whole) of the field element into the appropriate position of the buffer
                 uint32_t copy_size = min(bits_per_felt, num_uncopied_bits);
@@ -349,10 +312,10 @@ namespace apsi
             const Item &item, const FullWidthLabel &label, size_t item_bit_count, const Modulus &mod)
         {
             // Convert the item from to a sequence of field elements. This is the "algebraic item".
-            vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(item_bit_count), mod);
+            vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(item_bit_count).to_view(), mod);
 
             // Convert the label from to a sequence of field elements. This is the "algebraic label".
-            vector<felt_t> alg_label = bits_to_field_elts(label.to_bitstring(item_bit_count), mod);
+            vector<felt_t> alg_label = bits_to_field_elts(label.to_bitstring(item_bit_count).to_view(), mod);
 
             // The number of field elements necessary to represent both these values MUST be the same
             if (alg_item.size() != alg_label.size())
@@ -378,7 +341,7 @@ namespace apsi
         AlgItemLabel<monostate> algebraize_item(const Item &item, size_t item_bit_count, const Modulus &mod)
         {
             // Convert the item from to a sequence of field elements. This is the "algebraic item".
-            vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(item_bit_count), mod);
+            vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(item_bit_count).to_view(), mod);
 
             // Convert vector to vector of pairs where the second element of each pair is monostate
             AlgItemLabel<monostate> ret;
@@ -388,6 +351,18 @@ namespace apsi
             }
 
             return ret;
+        }
+
+
+        /**
+        Converts a sequence of field elements into an Item. This will throw an invalid_argument if too many field
+        elements are given, i.e., if modulus_bitlen * num_elements > 128.
+        */
+        Item dealgebraize_item(vector<felt_t> &item, std::size_t item_bit_count, const seal::Modulus &mod)
+        {
+            Bitstring bits = field_elts_to_bits(item, item_bit_count, mod);
+            BitstringView<seal_byte> view = bits.to_view();
+            return Item(view);
         }
     }
 }
