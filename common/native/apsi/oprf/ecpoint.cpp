@@ -249,7 +249,7 @@ namespace apsi
             {
                 rand_uint64_t = [&rg]() {
                     uint64_t res;
-                    rg->generate(sizeof(res), reinterpret_cast<SEAL_BYTE *>(&res));
+                    rg->generate(sizeof(res), reinterpret_cast<seal_byte *>(&res));
                     return res;
                 };
             }

@@ -158,7 +158,7 @@ namespace apsi
             return std::move(result);
         }
 
-        std::size_t save(seal::SEAL_BYTE *out, std::size_t size, seal::compr_mode_type compr_mode) const
+        std::size_t save(seal::seal_byte *out, std::size_t size, seal::compr_mode_type compr_mode) const
         {
             if (is_local() && !is_serializable())
             {
@@ -184,7 +184,7 @@ namespace apsi
             throw std::invalid_argument("object is in an invalid state");
         }
 
-        std::size_t load(std::shared_ptr<seal::SEALContext> context, const seal::SEAL_BYTE *in, std::size_t size)
+        std::size_t load(std::shared_ptr<seal::SEALContext> context, const seal::seal_byte *in, std::size_t size)
         {
             set(LocalType());
             return seal::util::safe_cast<std::size_t>(local_->load(std::move(*context), in, size));

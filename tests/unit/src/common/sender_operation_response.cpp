@@ -82,7 +82,7 @@ namespace APSITests
         ASSERT_EQ(SenderOperationType::SOP_OPRF, sopr2.type());
         ASSERT_TRUE(sopr2.data.empty());
 
-        sopr.data.push_back(SEAL_BYTE(0xAB));
+        sopr.data.push_back(seal_byte(0xAB));
         out_size = sopr.save(ss);
         in_size = sopr2.load(ss);
 
@@ -91,7 +91,7 @@ namespace APSITests
         ASSERT_EQ(1, sopr2.data.size());
         ASSERT_EQ(static_cast<char>(0xAB), static_cast<char>(sopr2.data[0]));
 
-        sopr.data.push_back(SEAL_BYTE(0xCD));
+        sopr.data.push_back(seal_byte(0xCD));
         out_size = sopr.save(ss);
         in_size = sopr2.load(ss);
 

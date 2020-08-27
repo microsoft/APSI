@@ -51,7 +51,7 @@ namespace apsi
             return elems;
         }
 
-        void read_from_stream(istream &in, uint32_t byte_count, vector<SEAL_BYTE> &destination)
+        void read_from_stream(istream &in, uint32_t byte_count, vector<seal_byte> &destination)
         {
             // Initial number of bytes to read
             const size_t first_to_read = 1024;
@@ -77,12 +77,12 @@ namespace apsi
             }
         }
 
-        vector<SEAL_BYTE> read_from_stream(istream &in)
+        vector<seal_byte> read_from_stream(istream &in)
         {
             uint32_t size = 0;
             in.read(reinterpret_cast<char *>(&size), sizeof(uint32_t));
 
-            vector<SEAL_BYTE> result(sizeof(uint32_t));
+            vector<seal_byte> result(sizeof(uint32_t));
             memcpy(result.data(), &size, sizeof(uint32_t));
 
             read_from_stream(in, size, result);

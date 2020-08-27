@@ -94,7 +94,7 @@ namespace apsi
 
         fbs::QueryParams query_params(params.query_params().query_powers_count);
 
-        vector<SEAL_BYTE> temp;
+        vector<seal_byte> temp;
         temp.resize(params.seal_params().save_size(compr_mode_type::ZSTD));
         auto size = params.seal_params().save(temp.data(), temp.size(), compr_mode_type::ZSTD);
         auto seal_params_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(temp.data()), size);
@@ -117,7 +117,7 @@ namespace apsi
 
     pair<PSIParams, size_t> LoadParams(istream &in)
     {
-        vector<SEAL_BYTE> in_data(util::read_from_stream(in));
+        vector<seal_byte> in_data(util::read_from_stream(in));
 
         auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
         bool safe = fbs::VerifySizePrefixedPSIParamsBuffer(verifier);
@@ -143,7 +143,7 @@ namespace apsi
         auto &seal_params_data = *psi_params->seal_params()->data();
         try
         {
-            seal_params.load(reinterpret_cast<const SEAL_BYTE *>(seal_params_data.data()), seal_params_data.size());
+            seal_params.load(reinterpret_cast<const seal_byte *>(seal_params_data.data()), seal_params_data.size());
         }
         catch (const logic_error &ex)
         {

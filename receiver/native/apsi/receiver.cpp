@@ -196,12 +196,12 @@ namespace apsi
             return parms;
         }
 
-        vector<SEAL_BYTE> Receiver::obfuscate_items(const vector<Item> &items, unique_ptr<OPRFReceiver> &oprf_receiver)
+        vector<seal_byte> Receiver::obfuscate_items(const vector<Item> &items, unique_ptr<OPRFReceiver> &oprf_receiver)
         {
             APSI_LOG_INFO("Obfuscating items");
             STOPWATCH(recv_stopwatch, "Receiver::obfuscate_items");
 
-            vector<SEAL_BYTE> oprf_query;
+            vector<seal_byte> oprf_query;
             oprf_query.resize(items.size() * oprf_query_size);
             oprf_receiver = make_unique<OPRFReceiver>(items, oprf_query);
 
@@ -209,7 +209,7 @@ namespace apsi
         }
 
         vector<HashedItem> Receiver::deobfuscate_items(
-            const vector<SEAL_BYTE> &oprf_response,
+            const vector<seal_byte> &oprf_response,
             unique_ptr<OPRFReceiver> &oprf_receiver)
         {
             APSI_LOG_INFO("Deobfuscating items");
@@ -334,9 +334,9 @@ namespace apsi
                     for (auto &item : bundle_items)
                     {
                         // Now set up a BitstringView to this item    
-                        gsl::span<const SEAL_BYTE> item_bytes(
-                            reinterpret_cast<const SEAL_BYTE*>(item.data()), sizeof(item));
-                        BitstringView<const SEAL_BYTE> item_bits(item_bytes, params_.item_bit_count());
+                        gsl::span<const seal_byte> item_bytes(
+                            reinterpret_cast<const seal_byte*>(item.data()), sizeof(item));
+                        BitstringView<const seal_byte> item_bits(item_bytes, params_.item_bit_count());
 
                         // Create an algebraic item by breaking up the item into modulo plain_modulus parts
                         vector<uint64_t> alg_item = bits_to_field_elts(item_bits, params_.seal_params().plain_modulus());

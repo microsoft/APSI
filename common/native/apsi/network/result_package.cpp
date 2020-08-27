@@ -28,7 +28,7 @@ namespace apsi
         {
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
-            vector<SEAL_BYTE> temp;
+            vector<seal_byte> temp;
             temp.resize(psi_result.save_size(compr_mode_type::ZSTD));
             auto size = psi_result.save(temp.data(), temp.size(), compr_mode_type::ZSTD);
             auto psi_ct_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(temp.data()), size);
@@ -84,7 +84,7 @@ namespace apsi
             psi_result.clear();
             label_result.clear();
 
-            vector<SEAL_BYTE> in_data(util::read_from_stream(in));
+            vector<seal_byte> in_data(util::read_from_stream(in));
 
             auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedResultPackageBuffer(verifier);
@@ -103,7 +103,7 @@ namespace apsi
             {
                 psi_result.load(
                     context,
-                    reinterpret_cast<const SEAL_BYTE*>(psi_ct.data()->data()), psi_ct.data()->size());
+                    reinterpret_cast<const seal_byte*>(psi_ct.data()->data()), psi_ct.data()->size());
             }
             catch (const logic_error &ex)
             {
@@ -132,7 +132,7 @@ namespace apsi
                     {
                         temp.load(
                             *context,
-                            reinterpret_cast<const SEAL_BYTE*>(label_ct->data()->data()), label_ct->data()->size());
+                            reinterpret_cast<const seal_byte*>(label_ct->data()->data()), label_ct->data()->size());
                     }
                     catch (const logic_error &ex)
                     {

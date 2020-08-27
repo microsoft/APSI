@@ -26,7 +26,7 @@ namespace apsi
     /**
     Identical to Bitstring, except the underlying data is not owned.
     */
-    template<typename T, typename = std::enable_if_t<std::is_same<seal::SEAL_BYTE, std::remove_cv_t<T>>::value>>
+    template<typename T, typename = std::enable_if_t<std::is_same<seal::seal_byte, std::remove_cv_t<T>>::value>>
     class BitstringView
     {
     private:
@@ -93,11 +93,11 @@ namespace apsi
     class Bitstring
     {
     private:
-        std::vector<seal::SEAL_BYTE> data_;
+        std::vector<seal::seal_byte> data_;
         std::uint32_t bit_count_;
 
     public:
-        Bitstring(std::vector<seal::SEAL_BYTE> &&data, std::uint32_t bit_count)
+        Bitstring(std::vector<seal::seal_byte> &&data, std::uint32_t bit_count)
         {
             // Sanity check: bit_count cannot be 0
             if (!bit_count)
@@ -134,7 +134,7 @@ namespace apsi
         /**
         Returns a BitstringView representing the same underlying data.
         */
-        BitstringView<seal::SEAL_BYTE> to_view()
+        BitstringView<seal::seal_byte> to_view()
         {
             return { data(), bit_count_ };
         }
@@ -142,7 +142,7 @@ namespace apsi
         /**
         Returns a BitstringView representing the same underlying data.
         */
-        BitstringView<const seal::SEAL_BYTE> to_view() const
+        BitstringView<const seal::seal_byte> to_view() const
         {
             return { data(), bit_count_ };
         }
@@ -150,7 +150,7 @@ namespace apsi
         /**
         Returns a reference to the underlying bytes.
         */
-        gsl::span<seal::SEAL_BYTE> data()
+        gsl::span<seal::seal_byte> data()
         {
             return { data_.data(), data_.size() };
         }
@@ -158,7 +158,7 @@ namespace apsi
         /**
         Returns a reference to the underlying bytes.
         */
-        gsl::span<const seal::SEAL_BYTE> data() const
+        gsl::span<const seal::seal_byte> data() const
         {
             return { data_.data(), data_.size() };
         }
@@ -207,19 +207,19 @@ namespace apsi
         /**
         Returns the BitstringView representing this Item's data
         */
-        BitstringView<seal::SEAL_BYTE> to_bitstring(std::uint32_t item_bit_count)
+        BitstringView<seal::seal_byte> to_bitstring(std::uint32_t item_bit_count)
         {
-            gsl::span<seal::SEAL_BYTE> bytestring_view(reinterpret_cast<seal::SEAL_BYTE*>(data()), sizeof(Item));
+            gsl::span<seal::seal_byte> bytestring_view(reinterpret_cast<seal::seal_byte*>(data()), sizeof(Item));
             return { bytestring_view, item_bit_count };
         }
 
         /**
         Returns the BitstringView representing this Item's data
         */
-        BitstringView<const seal::SEAL_BYTE> to_bitstring(std::uint32_t item_bit_count) const
+        BitstringView<const seal::seal_byte> to_bitstring(std::uint32_t item_bit_count) const
         {
-            gsl::span<const seal::SEAL_BYTE> bytestring_view(
-                reinterpret_cast<const seal::SEAL_BYTE*>(data()), sizeof(Item));
+            gsl::span<const seal::seal_byte> bytestring_view(
+                reinterpret_cast<const seal::seal_byte*>(data()), sizeof(Item));
             return { bytestring_view, item_bit_count };
         }
 

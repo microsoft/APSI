@@ -85,8 +85,8 @@ namespace apsi
             OPRFSender() = delete;
 
             static void ProcessQueries(
-                gsl::span<const seal::SEAL_BYTE> oprf_queries, const OPRFKey &oprf_key,
-                gsl::span<seal::SEAL_BYTE> oprf_responses);
+                gsl::span<const seal::seal_byte> oprf_queries, const OPRFKey &oprf_key,
+                gsl::span<seal::seal_byte> oprf_responses);
 
             static void ComputeHashes(
                 gsl::span<const oprf_item_type> oprf_items, const OPRFKey &oprf_key,

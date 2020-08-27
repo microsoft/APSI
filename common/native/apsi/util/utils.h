@@ -92,11 +92,11 @@ namespace apsi
         a given vector. This can avoid issues where a large number of bytes is requested incorrectly to be read from
         a stream, causing a larger than necessary memory allocation.
         */
-        void read_from_stream(std::istream &in, std::uint32_t byte_count, std::vector<seal::SEAL_BYTE> &destination);
+        void read_from_stream(std::istream &in, std::uint32_t byte_count, std::vector<seal::seal_byte> &destination);
 
         /**
         This function reads a size-prefixed number of bytes from a stream and returns the result in a vector.
         */
-        std::vector<seal::SEAL_BYTE> read_from_stream(std::istream &in);
+        std::vector<seal::seal_byte> read_from_stream(std::istream &in);
     } // namespace util
 } // namespace apsi
