@@ -76,7 +76,7 @@ namespace APSITests
         for (auto i = 0; i < item_count; i++)
         {
             Item it;
-            rng->generate(sizeof(Item), reinterpret_cast<SEAL_BYTE *>(it.data()));
+            rng->generate(sizeof(Item), reinterpret_cast<seal_byte *>(it.data()));
             items.emplace_back(move(it));
         }
 
@@ -86,10 +86,10 @@ namespace APSITests
         vector<HashedItem> out_items(item_count);
         OPRFSender::ComputeHashes(items, oprf_key, out_items);
 
-        vector<SEAL_BYTE> query(item_count * oprf_query_size);
+        vector<seal_byte> query(item_count * oprf_query_size);
         OPRFReceiver receiver(items, query);
 
-        vector<SEAL_BYTE> responses(item_count * oprf_response_size);
+        vector<seal_byte> responses(item_count * oprf_response_size);
         OPRFSender::ProcessQueries(query, oprf_key, responses);
 
         vector<HashedItem> receiver_hashes(item_count);

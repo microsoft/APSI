@@ -224,7 +224,7 @@ namespace apsi
     {
         reset();
 
-        vector<SEAL_BYTE> in_data(read_from_stream(in));
+        vector<seal_byte> in_data(read_from_stream(in));
 
         auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
         bool safe = fbs::VerifySizePrefixedPowersDagBuffer(verifier);

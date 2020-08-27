@@ -62,7 +62,7 @@ namespace apsi
             // Release the current parameters
             params.reset();
 
-            vector<SEAL_BYTE> in_data(util::read_from_stream(in));
+            vector<seal_byte> in_data(util::read_from_stream(in));
 
             auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationResponseBuffer(verifier);
@@ -116,7 +116,7 @@ namespace apsi
             // Clear the current data
             data.clear();
 
-            vector<SEAL_BYTE> in_data(util::read_from_stream(in));
+            vector<seal_byte> in_data(util::read_from_stream(in));
 
             auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationResponseBuffer(verifier);
@@ -136,7 +136,7 @@ namespace apsi
             // Load the OPRF response 
             const auto &oprf_data = *sop_response->response_as_OPRFResponse()->data();
             transform(oprf_data.begin(), oprf_data.end(), back_inserter(data),
-                [](auto a) { return static_cast<SEAL_BYTE>(a); });
+                [](auto a) { return static_cast<seal_byte>(a); });
 
             return in_data.size();
         }
@@ -162,7 +162,7 @@ namespace apsi
 
         size_t SenderOperationResponseQuery::load(istream &in)
         {
-            vector<SEAL_BYTE> in_data(util::read_from_stream(in));
+            vector<seal_byte> in_data(util::read_from_stream(in));
 
             auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationResponseBuffer(verifier);

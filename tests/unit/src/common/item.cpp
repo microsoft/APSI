@@ -22,51 +22,51 @@ namespace APSITests
 {
     TEST(BitstringViewTests, Basics)
     {
-        array<SEAL_BYTE, 8> data = {};
+        array<seal_byte, 8> data = {};
         for (size_t i = 0; i < data.size(); i++)
         {
-            data[i] = static_cast<SEAL_BYTE>(i);
+            data[i] = static_cast<seal_byte>(i);
         }
 
         // BitstringView to a single byte
-        SEAL_BYTE sb{ 0xA5 };
-        BitstringView<SEAL_BYTE> bsv(gsl::span<SEAL_BYTE>(&sb, 1), 1);
+        seal_byte sb{ 0xA5 };
+        BitstringView<seal_byte> bsv(gsl::span<seal_byte>(&sb, 1), 1);
         ASSERT_EQ(bsv.bit_count(), 1);
         ASSERT_EQ(bsv.data().size(), 1);
         ASSERT_EQ(static_cast<char>(sb), static_cast<char>(bsv.data()[0]));
 
         // Use all bits in the buffer
-        bsv = BitstringView<SEAL_BYTE>(data, 64);
+        bsv = BitstringView<seal_byte>(data, 64);
         ASSERT_EQ(bsv.bit_count(), 64);
         ASSERT_EQ(bsv.data().size(), 8);
         ASSERT_EQ(data.data(), bsv.data().data());
 
         // Use as few bits as possible but same number of bytes as buffer
-        bsv = BitstringView<SEAL_BYTE>(data, 57);
+        bsv = BitstringView<seal_byte>(data, 57);
         ASSERT_EQ(bsv.bit_count(), 57);
         ASSERT_EQ(bsv.data().size(), 8);
         ASSERT_EQ(data.data(), bsv.data().data());
 
         // Corner-cases
-        ASSERT_THROW(BitstringView<SEAL_BYTE> bsv(data, 0), invalid_argument);
-        ASSERT_THROW(BitstringView<SEAL_BYTE> bsv(data, 65), invalid_argument);
-        ASSERT_THROW(BitstringView<SEAL_BYTE> bsv(data, 56), invalid_argument);
+        ASSERT_THROW(BitstringView<seal_byte> bsv(data, 0), invalid_argument);
+        ASSERT_THROW(BitstringView<seal_byte> bsv(data, 65), invalid_argument);
+        ASSERT_THROW(BitstringView<seal_byte> bsv(data, 56), invalid_argument);
     }
 
     TEST(BitstringTests, Basics)
     {
         auto get_data = []() {
-            vector<SEAL_BYTE> data(8, SEAL_BYTE(0));
+            vector<seal_byte> data(8, seal_byte(0));
             for (size_t i = 0; i < data.size(); i++)
             {
-                data[i] = static_cast<SEAL_BYTE>(i);
+                data[i] = static_cast<seal_byte>(i);
             }
             return data;
         };
 
         auto get_single_byte = []() {
-            vector<SEAL_BYTE> single_byte;
-            single_byte.push_back(SEAL_BYTE(0xA5));
+            vector<seal_byte> single_byte;
+            single_byte.push_back(seal_byte(0xA5));
             return single_byte;
         };
 

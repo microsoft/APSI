@@ -85,7 +85,7 @@ namespace apsi
         private:
             OPRFRequest() = default;
 
-            std::vector<seal::SEAL_BYTE> data_;
+            std::vector<seal::seal_byte> data_;
         };
 
         class QueryRequest

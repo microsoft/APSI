@@ -178,7 +178,7 @@ namespace apsi
             APSI_LOG_INFO("Start processing OPRF request");
 
             // OPRF response has the same size as the OPRF query 
-            vector<SEAL_BYTE> oprf_result(oprf_request.data_.size());
+            vector<seal_byte> oprf_result(oprf_request.data_.size());
             OPRFSender::ProcessQueries(oprf_request.data_, key, oprf_result);
 
             auto response_oprf = make_unique<SenderOperationResponseOPRF>();
