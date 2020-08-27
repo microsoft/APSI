@@ -36,9 +36,7 @@ namespace apsi
         class SenderDB
         {
         public:
-            SenderDB(PSIParams params) :
-                params_(params),
-                crypto_context_(seal::SEALContext::Create(params.seal_params()))
+            SenderDB(PSIParams params) : params_(params), crypto_context_(params_.seal_params())
             {
                 // Make sure the evaluator is set. This will be used for BatchedPlaintextPolyn::eval.
                 crypto_context_.set_evaluator();
@@ -115,14 +113,14 @@ namespace apsi
             mutable std::unordered_set<HashedItem> items_;
 
             /**
-            Necessary for evaluating polynomials of Plaintexts
-            */
-            CryptoContext crypto_context_;
-
-            /**
             This defines our SEAL context, base field, item size, etc.
             */
             PSIParams params_;
+
+            /**
+            Necessary for evaluating polynomials of Plaintexts
+            */
+            CryptoContext crypto_context_;
 
             /**
             A read-write lock to protect the database from modification while in use.

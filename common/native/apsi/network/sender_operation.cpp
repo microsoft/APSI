@@ -43,7 +43,7 @@ namespace apsi
 
         size_t SenderOperationHeader::load(istream &in)
         {
-            vector<SEAL_BYTE> in_data(util::read_from_stream(in));
+            vector<seal_byte> in_data(util::read_from_stream(in));
 
             auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationHeaderBuffer(verifier);
@@ -90,7 +90,7 @@ namespace apsi
                 throw invalid_argument("context must be null");
             }
 
-            vector<SEAL_BYTE> in_data(util::read_from_stream(in));
+            vector<seal_byte> in_data(util::read_from_stream(in));
 
             auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationBuffer(verifier);
@@ -141,7 +141,7 @@ namespace apsi
             // Clear the current data
             data.clear();
 
-            vector<SEAL_BYTE> in_data(util::read_from_stream(in));
+            vector<seal_byte> in_data(util::read_from_stream(in));
 
             auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationBuffer(verifier);
@@ -161,7 +161,7 @@ namespace apsi
             // Load the OPRF request
             const auto &oprf_data = *sop->request_as_OPRFRequest()->data();
             transform(oprf_data.begin(), oprf_data.end(), back_inserter(data),
-                [](auto a) { return static_cast<SEAL_BYTE>(a); });
+                [](auto a) { return static_cast<seal_byte>(a); });
 
             return in_data.size();
         }
@@ -170,9 +170,9 @@ namespace apsi
         {
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
-            vector<SEAL_BYTE> temp;
-            temp.resize(relin_keys.save_size(compr_mode_type::deflate));
-            auto size = relin_keys.save(temp.data(), temp.size(), compr_mode_type::deflate);
+            vector<seal_byte> temp;
+            temp.resize(relin_keys.save_size(compr_mode_type::ZSTD));
+            auto size = relin_keys.save(temp.data(), temp.size(), compr_mode_type::ZSTD);
             auto relin_keys_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(temp.data()), size);
 
             // This is a little tricky; each QueryRequestPart consists of an exponent and a vector of Ciphertexts. For
@@ -191,8 +191,8 @@ namespace apsi
                         for (const auto &ct : q.second)
                         {
                             // Save each SEALObject<seal::Ciphertext>
-                            temp.resize(ct.save_size(compr_mode_type::deflate));
-                            size = ct.save(temp.data(), temp.size(), compr_mode_type::deflate);
+                            temp.resize(ct.save_size(compr_mode_type::ZSTD));
+                            size = ct.save(temp.data(), temp.size(), compr_mode_type::ZSTD);
                             auto ct_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(temp.data()), size);
 
                             // Add to the Ciphertext vector
@@ -244,7 +244,7 @@ namespace apsi
             // Clear the current data
             data.clear();
 
-            vector<SEAL_BYTE> in_data(util::read_from_stream(in));
+            vector<seal_byte> in_data(util::read_from_stream(in));
 
             auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationBuffer(verifier);
@@ -269,7 +269,7 @@ namespace apsi
             {
                 relin_keys.load(
                     context,
-                    reinterpret_cast<const SEAL_BYTE*>(relin_keys_data.data()), relin_keys_data.size());
+                    reinterpret_cast<const seal_byte*>(relin_keys_data.data()), relin_keys_data.size());
             }
             catch (const logic_error &ex)
             {
@@ -301,12 +301,12 @@ namespace apsi
                 cts_vec.reserve(cts.size());
                 for (const auto &ct : cts)
                 {
-                    Ciphertext temp(context);
+                    Ciphertext temp(*context);
                     try
                     {
                         temp.load(
-                            context,
-                            reinterpret_cast<const SEAL_BYTE*>(ct->data()->data()), ct->data()->size());
+                            *context,
+                            reinterpret_cast<const seal_byte*>(ct->data()->data()), ct->data()->size());
                     }
                     catch (const logic_error &ex)
                     {

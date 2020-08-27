@@ -61,17 +61,17 @@ namespace apsi
             }
 
             template<>
-            size_t save_to_message(const vector<SEAL_BYTE> &obj, message_t &msg)
+            size_t save_to_message(const vector<seal_byte> &obj, message_t &msg)
             {
                 msg.add_raw(obj.data(), obj.size());
                 return obj.size();
             }
 
-            vector<SEAL_BYTE> get_client_id(const message_t &msg)
+            vector<seal_byte> get_client_id(const message_t &msg)
             {
-                vector<SEAL_BYTE> client_id;
+                vector<seal_byte> client_id;
                 size_t client_id_size = msg.size(0);
-                copy_n(reinterpret_cast<const SEAL_BYTE*>(msg.raw_data(0)), client_id_size, back_inserter(client_id));
+                copy_n(reinterpret_cast<const seal_byte*>(msg.raw_data(0)), client_id_size, back_inserter(client_id));
                 return client_id;
             }
         }
@@ -179,7 +179,7 @@ namespace apsi
             }
 
             // First extract the client_id; this is the first part of the message
-            vector<SEAL_BYTE> client_id = get_client_id(msg);
+            vector<seal_byte> client_id = get_client_id(msg);
 
             // Second part is the SenderOperationHeader
             SenderOperationHeader sop_header;

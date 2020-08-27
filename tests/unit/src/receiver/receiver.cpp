@@ -62,7 +62,7 @@ namespace APSITests
             static shared_ptr<CryptoContext> context = nullptr;
             if (!context)
             {
-                context = make_shared<CryptoContext>(SEALContext::Create(get_params()->seal_params()));
+                context = make_shared<CryptoContext>(get_params()->seal_params());
             }
 
             return context;

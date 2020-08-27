@@ -63,8 +63,8 @@ namespace APSITests
             static shared_ptr<CryptoContext> context = nullptr;
             if (!context)
             {
-                context = make_shared<CryptoContext>(SEALContext::Create(get_params()->seal_params()));
-                KeyGenerator keygen(context->seal_context());
+                context = make_shared<CryptoContext>(get_params()->seal_params());
+                KeyGenerator keygen(*context->seal_context());
                 context->set_secret(keygen.secret_key());
                 context->set_evaluator(keygen.relin_keys_local());
             }
@@ -140,10 +140,10 @@ namespace APSITests
             clt.send(move(sop));
 
             // Fill a data buffer
-            vector<SEAL_BYTE> oprf_data(256);
+            vector<seal_byte> oprf_data(256);
             for (size_t i = 0; i < oprf_data.size(); i++)
             {
-                oprf_data[i] = static_cast<SEAL_BYTE>(i);
+                oprf_data[i] = static_cast<seal_byte>(i);
             }
 
             auto sop_oprf = make_unique<SenderOperationOPRF>();
@@ -355,10 +355,10 @@ namespace APSITests
 
                     for (uint32_t i = 0; i < 5; i++)
                     {
-                        vector<SEAL_BYTE> oprf_data(256);
+                        vector<seal_byte> oprf_data(256);
                         for (size_t i = 0; i < oprf_data.size(); i++)
                         {
-                            oprf_data[i] = static_cast<SEAL_BYTE>(i);
+                            oprf_data[i] = static_cast<seal_byte>(i);
                         }
 
                         auto sop_oprf = make_unique<SenderOperationOPRF>();

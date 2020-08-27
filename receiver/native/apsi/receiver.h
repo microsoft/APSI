@@ -195,7 +195,7 @@ namespace apsi
             Obfuscates the items and initializes the given vector with the buffer that must be sent to a sender for
             sender-side obfuscation (OPRF).
             */
-            std::vector<seal::SEAL_BYTE> obfuscate_items(
+            std::vector<seal::seal_byte> obfuscate_items(
                 const std::vector<Item> &items,
                 std::unique_ptr<oprf::OPRFReceiver> &oprf_receiver);
 
@@ -204,7 +204,7 @@ namespace apsi
             sender's obfuscation (OPRF) remains.
             */
             std::vector<HashedItem> deobfuscate_items(
-                const std::vector<seal::SEAL_BYTE> &oprf_response,
+                const std::vector<seal::seal_byte> &oprf_response,
                 std::unique_ptr<oprf::OPRFReceiver> &oprf_receiver);
 
             void result_package_worker(

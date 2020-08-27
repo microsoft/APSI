@@ -22,10 +22,10 @@ namespace apsi
         namespace
         {
             void copy_with_bit_offset(
-                gsl::span<const SEAL_BYTE> src,
+                gsl::span<const seal_byte> src,
                 uint32_t bit_offset,
                 uint32_t bit_count,
-                gsl::span<SEAL_BYTE> dest
+                gsl::span<seal_byte> dest
             ) {
                 // the number of bits to shift by to align with dest
                 uint32_t low_offset = bit_offset & 7;
@@ -50,9 +50,9 @@ namespace apsi
                     uint32_t i = 0;
                     while (i < full_byte_count)
                     {
-                        SEAL_BYTE low = src[word_begin + 0] >> low_offset;
-                        SEAL_BYTE high =
-                            static_cast<SEAL_BYTE>(static_cast<uint32_t>(src[word_begin + 1]) << (8 - low_offset));
+                        seal_byte low = src[word_begin + 0] >> low_offset;
+                        seal_byte high =
+                            static_cast<seal_byte>(static_cast<uint32_t>(src[word_begin + 1]) << (8 - low_offset));
                         dest[i] = low | high;
                         word_begin++;
                         i++;
@@ -72,22 +72,22 @@ namespace apsi
                 // if needed there are some remaining bits.
                 if (rem_bits)
                 {
-                    SEAL_BYTE &dest_word = dest[full_byte_count];
+                    seal_byte &dest_word = dest[full_byte_count];
 
-                    // we now populate the last SEAL_BYTE of dest. Branch on
-                    // if the src bits are contained in a single SEAL_BYTE or
+                    // we now populate the last seal_byte of dest. Branch on
+                    // if the src bits are contained in a single seal_byte or
                     // in two bytes.
                     bool one_word_src = low_offset + rem_bits <= 8;
                     if (one_word_src)
                     {
                         // case 1: all the remaining bits live in src[word_begin]
-                        SEAL_BYTE mask = static_cast<SEAL_BYTE>((uint32_t(1) << rem_bits) - 1);
+                        seal_byte mask = static_cast<seal_byte>((uint32_t(1) << rem_bits) - 1);
 
-                        SEAL_BYTE low = src[word_begin];
+                        seal_byte low = src[word_begin];
                         low = low >> low_offset;
                         low = low & mask;
 
-                        SEAL_BYTE high = dest_word;
+                        seal_byte high = dest_word;
                         high = high & (~mask);
 
                         dest_word = low | high;
@@ -97,19 +97,19 @@ namespace apsi
                         // extract the top bits out of src[word_begin].
                         // these will become the bottom bits of dest_word
                         uint32_t low_count = 8 - low_offset;
-                        SEAL_BYTE low_mask = static_cast<SEAL_BYTE>((uint32_t(1) << low_count) - 1);
-                        SEAL_BYTE low = (src[word_begin] >> low_offset) & low_mask;
+                        seal_byte low_mask = static_cast<seal_byte>((uint32_t(1) << low_count) - 1);
+                        seal_byte low = (src[word_begin] >> low_offset) & low_mask;
 
                         // extract the bottom bits out of src[word_begin + 1].
                         // these will become the middle bits of dest_word
                         uint32_t mid_count = rem_bits - low_count;
-                        SEAL_BYTE mid_mask = static_cast<SEAL_BYTE>((uint32_t(1) << mid_count) - 1);
-                        SEAL_BYTE mid =
-                            static_cast<SEAL_BYTE>(static_cast<uint32_t>(src[word_begin + 1] & mid_mask) << low_count);
+                        seal_byte mid_mask = static_cast<seal_byte>((uint32_t(1) << mid_count) - 1);
+                        seal_byte mid =
+                            static_cast<seal_byte>(static_cast<uint32_t>(src[word_begin + 1] & mid_mask) << low_count);
 
                         // keep the high bits of dest_word
-                        SEAL_BYTE high_mask = static_cast<SEAL_BYTE>((~uint32_t(0)) << rem_bits);
-                        SEAL_BYTE high = dest_word & high_mask;
+                        seal_byte high_mask = static_cast<seal_byte>((~uint32_t(0)) << rem_bits);
+                        seal_byte high = dest_word & high_mask;
 
                         // for everythign together;
                         dest_word = low | mid | high;
@@ -121,11 +121,11 @@ namespace apsi
             // Bits are written to dest starting at the dest_bit_offset bit. All other bits in
             // dest are unchanged, e.g. the bit indexed by [0,1,...,dest_bit_offset - 1], [dest_bit_offset + bit_count, ...]
             void copy_with_bit_offset(
-                gsl::span<const SEAL_BYTE> src,
+                gsl::span<const seal_byte> src,
                 uint32_t src_bit_offset,
                 uint32_t dest_bit_offset,
                 uint32_t bit_count,
-                gsl::span<SEAL_BYTE> dest
+                gsl::span<seal_byte> dest
             ) {
                 uint32_t dest_next = (dest_bit_offset + 7) >> 3;
                 uint32_t diff = dest_next * 8 - dest_bit_offset;
@@ -148,15 +148,15 @@ namespace apsi
                     uint32_t dest_offset = dest_bit_offset & 7;
                     uint32_t src_offset = src_bit_offset & 7;
                     uint32_t high_diff = src_offset + diff - 8;
-                    SEAL_BYTE &dest_val = dest[dest_begin];
+                    seal_byte &dest_val = dest[dest_begin];
 
                     if (high_diff <= 0)
                     {
-                        SEAL_BYTE mask = static_cast<SEAL_BYTE>((uint32_t(1) << diff) - 1);
-                        SEAL_BYTE mid = (src[src_begin] >> src_offset) & mask;
+                        seal_byte mask = static_cast<seal_byte>((uint32_t(1) << diff) - 1);
+                        seal_byte mid = (src[src_begin] >> src_offset) & mask;
 
-                        mask = ~static_cast<SEAL_BYTE>(static_cast<uint32_t>(mask) << dest_offset);
-                        mid = static_cast<SEAL_BYTE>(static_cast<uint32_t>(mid) << dest_offset);
+                        mask = ~static_cast<seal_byte>(static_cast<uint32_t>(mask) << dest_offset);
+                        mid = static_cast<seal_byte>(static_cast<uint32_t>(mid) << dest_offset);
 
                         dest_val = (dest_val & mask) | mid;
                     }
@@ -164,17 +164,17 @@ namespace apsi
                     {
                         uint32_t low_diff = diff - high_diff;
 
-                        SEAL_BYTE low_mask = static_cast<SEAL_BYTE>((uint32_t(1) << low_diff) - 1);
-                        SEAL_BYTE low = src[src_begin] >> src_offset;
+                        seal_byte low_mask = static_cast<seal_byte>((uint32_t(1) << low_diff) - 1);
+                        seal_byte low = src[src_begin] >> src_offset;
                         low &= low_mask;
 
-                        SEAL_BYTE high_mask = static_cast<SEAL_BYTE>((uint32_t(1) << high_diff) - 1);
-                        SEAL_BYTE high = src[src_begin + 1] & high_mask;
+                        seal_byte high_mask = static_cast<seal_byte>((uint32_t(1) << high_diff) - 1);
+                        seal_byte high = src[src_begin + 1] & high_mask;
 
                         low <<= dest_offset;
                         high <<= (dest_offset + low_diff);
 
-                        SEAL_BYTE mask = ~static_cast<SEAL_BYTE>(((uint32_t(1) << diff) - 1) << dest_offset);
+                        seal_byte mask = ~static_cast<seal_byte>(((uint32_t(1) << diff) - 1) << dest_offset);
 
                         dest_val = (dest_val & mask) | low | high;
                     }
@@ -184,7 +184,7 @@ namespace apsi
             /**
             Reads a sequence of 8 bytes as a little-endian encoded felt_t
             */
-            felt_t read_felt_little_endian(const array<SEAL_BYTE, 8> &bytes)
+            felt_t read_felt_little_endian(const array<seal_byte, 8> &bytes)
             {
                 felt_t val = 0;
                 val |= static_cast<felt_t>(bytes[0]);
@@ -202,18 +202,18 @@ namespace apsi
             /**
             Writes a felt_t to a little-endian sequence of 8 bytes
             */
-            array<SEAL_BYTE, 8> write_felt_little_endian(const felt_t num)
+            array<seal_byte, 8> write_felt_little_endian(const felt_t num)
             {
-                array<SEAL_BYTE, 8> bytes;
+                array<seal_byte, 8> bytes;
 
-                bytes[0] = static_cast<SEAL_BYTE>( num & 0x00000000000000FFULL);
-                bytes[1] = static_cast<SEAL_BYTE>((num & 0x000000000000FF00ULL) >> 8);
-                bytes[2] = static_cast<SEAL_BYTE>((num & 0x0000000000FF0000ULL) >> 16);
-                bytes[3] = static_cast<SEAL_BYTE>((num & 0x00000000FF000000ULL) >> 24);
-                bytes[4] = static_cast<SEAL_BYTE>((num & 0x000000FF00000000ULL) >> 32);
-                bytes[5] = static_cast<SEAL_BYTE>((num & 0x0000FF0000000000ULL) >> 40);
-                bytes[6] = static_cast<SEAL_BYTE>((num & 0x00FF000000000000ULL) >> 48);
-                bytes[7] = static_cast<SEAL_BYTE>((num & 0xFF00000000000000ULL) >> 56);
+                bytes[0] = static_cast<seal_byte>( num & 0x00000000000000FFULL);
+                bytes[1] = static_cast<seal_byte>((num & 0x000000000000FF00ULL) >> 8);
+                bytes[2] = static_cast<seal_byte>((num & 0x0000000000FF0000ULL) >> 16);
+                bytes[3] = static_cast<seal_byte>((num & 0x00000000FF000000ULL) >> 24);
+                bytes[4] = static_cast<seal_byte>((num & 0x000000FF00000000ULL) >> 32);
+                bytes[5] = static_cast<seal_byte>((num & 0x0000FF0000000000ULL) >> 40);
+                bytes[6] = static_cast<seal_byte>((num & 0x00FF000000000000ULL) >> 48);
+                bytes[7] = static_cast<seal_byte>((num & 0xFF00000000000000ULL) >> 56);
 
                 return bytes;
             }
@@ -222,7 +222,7 @@ namespace apsi
         /**
         Converts the given bitstring to a sequence of field elements (modulo `mod`)
         */
-        vector<felt_t> bits_to_field_elts(BitstringView<const seal::SEAL_BYTE> bits, const Modulus &mod)
+        vector<felt_t> bits_to_field_elts(BitstringView<const seal::seal_byte> bits, const Modulus &mod)
         {
             if (mod.is_zero())
             {
@@ -241,7 +241,7 @@ namespace apsi
             felts.reserve(num_felts);
 
             // The underlying data of the bitstring
-            gsl::span<const SEAL_BYTE> src_data = bits.data();
+            gsl::span<const seal_byte> src_data = bits.data();
 
             // Repeatedly convert `bits_per_felt` many bits into a field element (a felt_t), and push that to the return
             // vector.
@@ -249,9 +249,9 @@ namespace apsi
             uint32_t src_offset = 0;
             for (size_t j = 0; j < num_felts; j++)
             {
-                // Make a byte array representing the field element. A felt_t is 8 SEAL_BYTE's
-                array<SEAL_BYTE, 8> dst_felt_repr = {};
-                gsl::span<SEAL_BYTE> dst_felt_repr_view = { dst_felt_repr.data(), 8 };
+                // Make a byte array representing the field element. A felt_t is 8 seal_byte's
+                array<seal_byte, 8> dst_felt_repr = {};
+                gsl::span<seal_byte> dst_felt_repr_view = { dst_felt_repr.data(), 8 };
 
                 // Copy the appropriate number of bits from the current offset to the field element little-endian repr
                 uint32_t copy_size = min(bits_per_felt, num_uncopied_bits);
@@ -275,9 +275,9 @@ namespace apsi
             return felts;
         }
 
-        vector<felt_t> bits_to_field_elts(BitstringView<SEAL_BYTE> bits, const Modulus &mod)
+        vector<felt_t> bits_to_field_elts(BitstringView<seal_byte> bits, const Modulus &mod)
         {
-            return bits_to_field_elts(BitstringView<const SEAL_BYTE>(bits), mod);
+            return bits_to_field_elts(BitstringView<const seal_byte>(bits), mod);
         }
 
         /**
@@ -312,15 +312,15 @@ namespace apsi
             }
 
             // The bitstring buffer. This will be part of the return value. The number of bytes is ⌈bit_count / 8⌉
-            vector<SEAL_BYTE> bit_buf((bit_count + 7) / 8, SEAL_BYTE(0));
-            gsl::span<SEAL_BYTE> bit_buf_view(bit_buf.data(), bit_buf.size());
+            vector<seal_byte> bit_buf((bit_count + 7) / 8, seal_byte(0));
+            gsl::span<seal_byte> bit_buf_view(bit_buf.data(), bit_buf.size());
 
             uint32_t num_uncopied_bits = bit_count;
             uint32_t dst_offset = 0;
             for (const felt_t &felt : felts)
             {
                 // Serialize the field element
-                array<SEAL_BYTE, 8> felt_bytes = write_felt_little_endian(felt);
+                array<seal_byte, 8> felt_bytes = write_felt_little_endian(felt);
 
                 // Copy part (or the whole) of the field element into the appropriate position of the buffer
                 uint32_t copy_size = min(bits_per_felt, num_uncopied_bits);

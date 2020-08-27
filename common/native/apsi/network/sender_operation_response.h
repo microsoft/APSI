@@ -95,7 +95,7 @@ namespace apsi
             /**
             Holds the OPRF query data.
             */
-            std::vector<seal::SEAL_BYTE> data;
+            std::vector<seal::seal_byte> data;
         }; // class SenderOperationResponseOPRF
 
         /**

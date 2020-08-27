@@ -1,3 +1,0 @@
-#!/bin/sh
-
-g++ -O0 -ggdb -std=c++17 -o test -D__LINUX__ -D_AMD64_ -I../../../../common/native -I../../../../thirdparty/kuku/src/src -I../../../../thirdparty/seal/src/native/src -I../../../../thirdparty/seal/src/thirdparty/msgsl/src/include -I../../../../thirdparty/fourq/src/FourQ_64bit_and_portable csvreader.cpp db_encoding.cpp interpolate.cpp item.cpp oprf.cpp powers.cpp psiparams.cpp stopwatch.cpp utils.cpp sender_operation.cpp sender_operation_response.cpp result_package.cpp network_channel.cpp stream_channel.cpp ../unit_tests_runner.cpp -L../../../../lib -L../../../../thirdparty/fourq/src/FourQ_64bit_and_portable -L../../../../thirdparty/kuku/src/lib -lapsi_common-1.0 -lflatbuffers -llog4cplus -lseal-3.5 -lFourQ -lzmqpp -lzmq -lgtest -lkuku-2.0 -pthread

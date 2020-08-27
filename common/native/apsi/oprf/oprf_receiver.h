@@ -31,7 +31,7 @@ namespace apsi
 
             OPRFReceiver(
                 gsl::span<const oprf_item_type> oprf_items,
-                gsl::span<seal::SEAL_BYTE> oprf_queries)
+                gsl::span<seal::seal_byte> oprf_queries)
             {
                 process_items(oprf_items, oprf_queries);
             }
@@ -42,13 +42,13 @@ namespace apsi
             }
 
             void process_responses(
-                gsl::span<const seal::SEAL_BYTE> oprf_responses,
+                gsl::span<const seal::seal_byte> oprf_responses,
                 gsl::span<oprf_hash_type> oprf_hashes) const;
 
         private:
             void process_items(
                 gsl::span<const oprf_item_type> oprf_items,
-                gsl::span<seal::SEAL_BYTE> oprf_queries);
+                gsl::span<seal::seal_byte> oprf_queries);
 
             // For decrypting OPRF response
             class FactorData

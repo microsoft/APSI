@@ -51,8 +51,8 @@ namespace apsi
         }
 
         void OPRFSender::ProcessQueries(
-            gsl::span<const seal::SEAL_BYTE> oprf_queries, const OPRFKey &oprf_key,
-            gsl::span<seal::SEAL_BYTE> oprf_responses)
+            gsl::span<const seal::seal_byte> oprf_queries, const OPRFKey &oprf_key,
+            gsl::span<seal::seal_byte> oprf_responses)
         {
             if (oprf_queries.size() != oprf_responses.size())
             {

@@ -194,9 +194,15 @@ namespace apsi
                 Plaintext pt;
                 crypto_context_.encoder()->encode(coeffs_of_deg_i, pt);
 
-                // Convert to NTT form so our intersection computations later are fast. However, we won't convert the
-                // constant coefficient plaintext to NTT form since add_plain cannot be done in NTT form.
-                if (!batched_coeffs_.empty())
+                // When evaluating the match and interpolation polynomials on encrypted query data, we multiply each
+                // power of the encrypted query with a plaintext (pt here) corresponding to the polynomial coefficient,
+                // and add the results together. Finally, the constant coefficients (i == 0 here) is added to the sum.
+                // In SEAL the fastest way to the multiplications is by having both the plaintexts and the ciphertexts
+                // be in NTT transformed form. However, SEAL does not support plaintext-ciphertext addition in NTT
+                // transformed form, so before the final addition we need to transform the result back from NTT form and
+                // add the constant coefficient. Therefore, we need to transform all plaintext polynomials here to NTT
+                // form except the one corresponding to the constant coefficient.
+                if (i != 0)
                 {
                     crypto_context_.evaluator()->transform_to_ntt_inplace(
                         pt,

@@ -33,34 +33,49 @@ namespace apsi
             return false;
         }
 
-        // Initialize the first power; parents left null
+        // Initialize the first power; parents are left to zero, because the first power must always be a source node.
         nodes_[1] = PowersNode{/* power */ 1, /* depth */ 0};
 
+        // We try to find a valid configuration attempts_ many times before giving up
         for (uint32_t att = 0; att < attempts_; att++)
         {
+            // Keep track of the total number of source nodes and the largest encountered depth
             uint32_t source_count = 1;
             uint32_t required_depth = 0;
 
+            // In order, handle second, third, fourth, etc. powers
             for (uint32_t curr_power = 2; curr_power <= up_to_power; curr_power++)
             {
-                // With some probability add a new node; also if we have enough source node budget available to add
-                // the rest of the nodes, then do that.
+                // The idea of the algorithm is to add a new source node with some small probability. Otherwise, we look
+                // for a depth-optimal way of reaching this node from the nodes we have already available.
+                //
+                // If we have enough source node budget available to add the rest of the nodes, then we do that. This
+                // makes the optimal_powers function work correctly when a lot of source nodes are requested.
                 double dice = rnd_(mt_);
                 if (dice > 0.9 || up_to_power - curr_power + 1 <= source_count_bound - source_count)
                 {
+                    // In this case we have decided to add a new source node
                     source_count++;
                     nodes_[curr_power] = PowersNode{ curr_power, 0 };
                     continue;
                 }
 
-                // Find the optimal degree; initialize with worst possible case
+                // We decided to obtain this node from two nodes of lower power. We need to first find a depth-optimal
+                // way to split the current power into a sum of two smaller powers.
                 uint32_t optimal_depth = curr_power - 1;
                 uint32_t optimal_s1 = curr_power - 1;
                 uint32_t optimal_s2 = 1;
+
+                // Loop over possible values for the first parent
                 for (uint32_t s1 = 1; s1 < curr_power; s1++)
                 {
+                    // Second parent is fully determined
                     uint32_t s2 = curr_power - s1;
+
+                    // Compute the depth for this choice of parents for the current power
                     uint32_t depth = max(nodes_.at(s1).depth, nodes_.at(s2).depth) + 1;
+
+                    // Is this choice for the parents better than any we saw before?
                     if (depth < optimal_depth)
                     {
                         optimal_depth = depth;
@@ -69,15 +84,19 @@ namespace apsi
                     }
                 }
 
-                // Now add data for the new node
+                // We have found an optimal way to obtain the current power from two lower powers. Now add data for the
+                // new node.
                 nodes_[curr_power] = PowersNode{
                     curr_power,
                     optimal_depth,
                     make_pair(optimal_s1, optimal_s2) };
 
+                // The maximal required depth is updated according to the depth of the newly added node.
                 required_depth = max(required_depth, optimal_depth);
             }
 
+            // If we are within bounds for the source node count or the maximal depth, return. This may not be the best
+            // possible configuration, of course.
             if (source_count <= source_count_bound && required_depth <= depth_bound)
             {
                 // Found a good configuration
@@ -155,7 +174,7 @@ namespace apsi
             uint32_t power = node.second.power;
             ss << "\t" << power << ";" << endl;
 
-            // Add the two parent edges if they exist
+            // Add the two parent edges if they are non-zero
             auto p1 = node.second.parents.first;
             auto p2 = node.second.parents.second;
             if (p1)
@@ -205,7 +224,7 @@ namespace apsi
     {
         reset();
 
-        vector<SEAL_BYTE> in_data(read_from_stream(in));
+        vector<seal_byte> in_data(read_from_stream(in));
 
         auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
         bool safe = fbs::VerifySizePrefixedPowersDagBuffer(verifier);
@@ -232,8 +251,8 @@ namespace apsi
         uint32_t source_count = 0;
         for (auto node : nodes)
         {
-            // Check that either both parents are non-null (non-zero) and less than the current power, or they are
-            // both zero, in which case this is a source node.
+            // Check that either both parents are non-zero and less than the current power, or they are both zero, in
+            // which case this is a source node.
             if (!node->first_parent() ^ !node->second_parent())
             {
                 reset();
@@ -303,6 +322,8 @@ namespace apsi
 
         PowersDag pd;
         uint32_t depth_bound = 0;
+
+        // This loop always terminates at latest when depth_bound equals up_to_power - 1
         while (
             !pd.configure(up_to_power, depth_bound++, source_count) ||
                 pd.source_count() < source_count);

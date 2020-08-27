@@ -37,7 +37,7 @@ namespace apsi
         {
             std::unique_ptr<SenderOperation> sop;
 
-            std::vector<seal::SEAL_BYTE> client_id;
+            std::vector<seal::seal_byte> client_id;
         };
 
         /**
@@ -47,7 +47,7 @@ namespace apsi
         {
             std::unique_ptr<SenderOperationResponse> sop_response;
 
-            std::vector<seal::SEAL_BYTE> client_id;
+            std::vector<seal::seal_byte> client_id;
         };
 
         /**
@@ -57,7 +57,7 @@ namespace apsi
         {
             std::unique_ptr<ResultPackage> rp;
 
-            std::vector<seal::SEAL_BYTE> client_id;
+            std::vector<seal::seal_byte> client_id;
         };
 
         /**
