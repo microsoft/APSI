@@ -56,7 +56,7 @@ namespace apsi
                 std::size_t thread_count
             ) = 0;
             virtual void set_data(
-                const std::vector<HashedItem> &data,
+                std::vector<HashedItem> &data,
                 std::size_t thread_count
             ) = 0;
 
@@ -65,12 +65,12 @@ namespace apsi
             for a given child of SenderDB, corresponding to whether it is labeled or unlabeled. In the labeled case, if
             an item exists, its label is overwritten with the new label value.
             */
-            virtual void insert_data(
+            virtual void insert_or_assign(
                 std::vector<std::pair<HashedItem, util::FullWidthLabel> > &data,
                 std::size_t thread_count
             ) = 0;
-            virtual void insert_data(
-                const std::vector<HashedItem> &data,
+            virtual void insert_or_assign(
+                std::vector<HashedItem> &data,
                 std::size_t thread_count
             ) = 0;
 
@@ -176,7 +176,7 @@ namespace apsi
             DO NOT USE. Unlabeled insertion on a labeled database does not and should not work.
             */
             void set_data(
-                const std::vector<HashedItem> &data,
+                std::vector<HashedItem> &data,
                 std::size_t thread_count = 0
             ) override;
 
@@ -184,7 +184,7 @@ namespace apsi
             Inserts the given data into the database, using at most thread_count threads. This will mutate the input
             vector. Specifically, it will stable-sort the vector into (new entries || overwriting entries).
             */
-            void insert_data(
+            void insert_or_assign(
                 std::vector<std::pair<HashedItem, FullWidthLabel> > &data,
                 std::size_t thread_count = 0
             ) override;
@@ -192,8 +192,8 @@ namespace apsi
             /**
             DO NOT USE. Unlabeled insertion on a labeled database does not and should not work.
             */
-            void insert_data(
-                const std::vector<HashedItem> &data,
+            void insert_or_assign(
+                std::vector<HashedItem> &data,
                 std::size_t thread_count = 0
             ) override;
 
@@ -246,23 +246,24 @@ namespace apsi
             Clears the database and inserts the given data, using at most thread_count threads
             */
             void set_data(
-                const std::vector<HashedItem> &data,
+                std::vector<HashedItem> &data,
                 std::size_t thread_count = 0
             ) override;
 
             /**
             DO NOT USE. Labeled insertion on an unlabeled database does not and should not work.
             */
-            void insert_data(
+            void insert_or_assign(
                 std::vector<std::pair<HashedItem, FullWidthLabel> > &data,
                 std::size_t thread_count = 0
             ) override;
 
             /**
-            Inserts the given data into the database, using at most thread_count threads
+        Inserts the given data into the database, using at most thread_count threads. This will mutate the input vector.
+        Specifically, it will stable-sort the vector into (new entries || overwriting entries).
             */
-            void insert_data(
-                const std::vector<HashedItem> &data,
+            void insert_or_assign(
+                std::vector<HashedItem> &data,
                 std::size_t thread_count = 0
             ) override;
         }; // class UnlabeledSenderDB
