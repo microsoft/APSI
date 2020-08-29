@@ -11,7 +11,7 @@
 
 // APSI
 #include "apsi/receiver.h"
-#include "apsi/network/network_channel.h"
+#include "apsi/network/zmq/network_channel.h"
 
 #include "gtest/gtest.h"
 

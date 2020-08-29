@@ -6,16 +6,17 @@ target_sources(sender
         ${CMAKE_CURRENT_LIST_DIR}/binbundle.cpp
         ${CMAKE_CURRENT_LIST_DIR}/sender.cpp
         ${CMAKE_CURRENT_LIST_DIR}/senderdb.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/senderdispatcher.cpp
 )
+
+if(APSI_USE_ZMQ)
+    add_subdirectory(zmq)
+endif()
 
 install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/binbundle.h
         ${CMAKE_CURRENT_LIST_DIR}/sender.h
         ${CMAKE_CURRENT_LIST_DIR}/senderdb.h
-        ${CMAKE_CURRENT_LIST_DIR}/senderdispatcher.h
-        ${CMAKE_CURRENT_LIST_DIR}/senderthreadcontext.h
     DESTINATION
         ${PROJECT_INCLUDES_INSTALL_DIR}/apsi
 )

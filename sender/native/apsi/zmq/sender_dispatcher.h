@@ -9,7 +9,7 @@
 #include <utility>
 
 // APSI
-#include "apsi/network/network_channel.h"
+#include "apsi/network/zmq/network_channel.h"
 #include "apsi/network/sender_operation.h"
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/sender.h"
@@ -27,7 +27,7 @@ namespace apsi
         public:
             SenderDispatcher() = delete;
 
-            SenderDispatcher(std::shared_ptr<sender::SenderDB> sender_db, std::size_t thread_count = 0);
+            SenderDispatcher(std::shared_ptr<SenderDB> sender_db, std::size_t thread_count = 0);
 
             /**
             Run the dispatcher on the given port.

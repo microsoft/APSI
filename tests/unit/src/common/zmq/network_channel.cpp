@@ -11,7 +11,7 @@
 #include "seal/publickey.h"
 
 // APSI
-#include "apsi/network/network_channel.h"
+#include "apsi/network/zmq/network_channel.h"
 #include "apsi/powers.h"
 #include "apsi/util/utils.h"
 

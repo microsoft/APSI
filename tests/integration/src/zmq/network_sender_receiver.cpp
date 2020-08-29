@@ -10,12 +10,12 @@
 
 // APSI
 #include "apsi/logging/log.h"
-#include "apsi/network/network_channel.h"
+#include "apsi/network/zmq/network_channel.h"
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/receiver.h"
 #include "apsi/sender.h"
 #include "apsi/senderdb.h"
-#include "apsi/senderdispatcher.h"
+#include "apsi/zmq/sender_dispatcher.h"
 #include "apsi/util/utils.h"
 
 #include "gtest/gtest.h"

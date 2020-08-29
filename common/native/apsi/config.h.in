@@ -8,8 +8,6 @@
 #define APSI_VERSION_MINOR @APSI_VERSION_MINOR@
 #define APSI_VERSION_PATCH @APSI_VERSION_PATCH@
 
-// Are we in debug mode?
 #cmakedefine APSI_DEBUG
-
-// Are we using Log4cplus for logging?
 #cmakedefine APSI_USE_LOG4CPLUS
+#cmakedefine APSI_USE_ZMQ

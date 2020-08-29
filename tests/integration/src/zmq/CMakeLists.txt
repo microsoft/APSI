@@ -3,9 +3,5 @@
 
 target_sources(integration_tests
     PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/integration_tests_runner.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/network_sender_receiver.cpp
 )
-
-if(APSI_USE_ZMQ)
-    add_subdirectory(zmq)
-endif()

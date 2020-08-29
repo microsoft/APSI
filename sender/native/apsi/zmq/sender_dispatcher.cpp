@@ -7,7 +7,7 @@
 #include <thread>
 
 // APSI
-#include "apsi/senderdispatcher.h"
+#include "apsi/zmq/sender_dispatcher.h"
 #include "apsi/logging/log.h"
 #include "apsi/oprf/oprf_sender.h"
 

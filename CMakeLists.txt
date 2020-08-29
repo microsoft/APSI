@@ -45,6 +45,10 @@ message(STATUS "APSI debug mode: ${APSI_DEBUG}")
 set(APSI_BUILD_TESTS_OPTION_STR "Build C++ tests for Microsoft SEAL")
 option(APSI_BUILD_TESTS ${APSI_BUILD_TESTS_OPTION_STR} OFF)
 
+# [Option] APSI_USE_ZMQ
+set(APSI_USE_ZMQ_OPTION_STR "Use ZeroMQ for networking")
+option(APSI_USE_ZMQ ${APSI_USE_ZMQ_OPTION_STR} OFF)
+
 # [Option] APSI_USE_LOG4CPLUS
 set(APSI_USE_LOG4CPLUS_OPTION_STR "Use Log4cplus to enable logging")
 option(APSI_USE_LOG4CPLUS ${APSI_USE_LOG4CPLUS_OPTION_STR} OFF)
@@ -456,20 +460,22 @@ if(APSI_BUILD_TESTS AND NOT MSVC)
 endif()
 
 # ZeroMQ and ZeroMQpp
-set(ZEROMQ_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQ.cmake)
-set(ZEROMQPP_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQpp.cmake)
-if(ZeroMQ_ROOT)
-    unset(ZEROMQ_INCLUDE_DIR CACHE)
-    unset(ZEROMQ_LIBRARY_DIR CACHE)
-    unset(ZEROMQ_LIBRARY_PATH CACHE)
+if(APSI_USE_ZMQ)
+    set(ZEROMQ_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQ.cmake)
+    set(ZEROMQPP_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQpp.cmake)
+    if(ZeroMQ_ROOT)
+        unset(ZEROMQ_INCLUDE_DIR CACHE)
+        unset(ZEROMQ_LIBRARY_DIR CACHE)
+        unset(ZEROMQ_LIBRARY_PATH CACHE)
+    endif()
+    find_package(ZeroMQ MODULE REQUIRED)
+    if(ZeroMQpp_ROOT)
+        unset(ZEROMQPP_INCLUDE_DIR CACHE)
+        unset(ZEROMQPP_LIBRARY_DIR CACHE)
+        unset(ZEROMQPP_LIBRARY_PATH CACHE)
+    endif()
+    find_package(ZeroMQpp MODULE REQUIRED)
 endif()
-find_package(ZeroMQ MODULE REQUIRED)
-if(ZeroMQpp_ROOT)
-    unset(ZEROMQPP_INCLUDE_DIR CACHE)
-    unset(ZEROMQPP_LIBRARY_DIR CACHE)
-    unset(ZEROMQPP_LIBRARY_PATH CACHE)
-endif()
-find_package(ZeroMQpp MODULE REQUIRED)
 
 # FlatBuffers 
 # Download and configure
@@ -611,14 +617,19 @@ target_include_directories(common PUBLIC
 target_link_libraries(common PUBLIC
     seal
     kuku
-    ZeroMQ::ZeroMQ
-    ZeroMQpp::ZeroMQpp
     fourq
     log4cplus
     flatbuffers)
-if (NOT APPLE)
-    target_link_libraries(common PUBLIC stdc++fs)
+
+if(APSI_USE_ZMQ)
+    target_link_libraries(common PUBLIC
+        ZeroMQ::ZeroMQ
+        ZeroMQpp::ZeroMQpp)
 endif()
+
+#if (NOT APPLE)
+    #target_link_libraries(common PUBLIC stdc++fs)
+#endif()
 
 # Defines
 target_compile_options(common PUBLIC -DHAVE_CONFIG)

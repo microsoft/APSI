@@ -9,7 +9,7 @@
 #include <iterator>
 
 // APSI
-#include "apsi/network/network_channel.h"
+#include "apsi/network/zmq/network_channel.h"
 #include "apsi/network/sop_header_generated.h"
 #include "apsi/network/sop_generated.h"
 #include "apsi/network/result_package_generated.h"

@@ -22,14 +22,10 @@ set(APSICommon_FOUND FALSE)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
 
-# Locate all dependencies before setting up target
-apsi_find_dependency(SEAL 3.4 REQUIRED)
-apsi_find_dependency(Kuku 1.1.1 EXACT REQUIRED)
-apsi_find_dependency(MSGSL REQUIRED)
-apsi_find_dependency(ZeroMQ REQUIRED)
-apsi_find_dependency(ZeroMQpp REQUIRED)
-apsi_find_dependency(FourQ REQUIRED)
-apsi_find_dependency(log4cplus 3.0 REQUIRED)
+if(APSI_USE_ZMQ)
+    apsi_find_dependency(ZeroMQ REQUIRED)
+    apsi_find_dependency(ZeroMQpp REQUIRED)
+endif()
 
 include(${CMAKE_CURRENT_LIST_DIR}/APSICommonTargets.cmake)
 

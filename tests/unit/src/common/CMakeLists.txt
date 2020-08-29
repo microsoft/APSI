@@ -4,7 +4,6 @@
 target_sources(unit_tests
     PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/db_encoding.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/network_channel.cpp
         ${CMAKE_CURRENT_LIST_DIR}/csvreader.cpp
         ${CMAKE_CURRENT_LIST_DIR}/interpolate.cpp
         ${CMAKE_CURRENT_LIST_DIR}/item.cpp
@@ -17,3 +16,7 @@ target_sources(unit_tests
         ${CMAKE_CURRENT_LIST_DIR}/stream_channel.cpp
         ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
 )
+
+if(APSI_USE_ZMQ)
+    add_subdirectory(zmq)
+endif()
