@@ -7,6 +7,7 @@
 #include <numeric>
 #include <thread>
 #include <future>
+#include <sstream>
 
 // APSI
 #include "apsi/sender.h"
@@ -17,6 +18,7 @@
 #include "apsi/logging/log.h"
 #include "apsi/util/utils.h"
 #include "apsi/cryptocontext.h"
+#include "apsi/util/stopwatch.h"
 
 // SEAL
 #include "seal/modulus.h"
@@ -40,6 +42,8 @@ namespace apsi
     {
         ParmsRequest::ParmsRequest(unique_ptr<SenderOperation> sop)
         {
+            STOPWATCH(sender_stopwatch, "ParmsRequest::ParmsRequest");
+
             if (!sop)
             {
                 throw invalid_argument("operation cannot be null");
@@ -52,6 +56,8 @@ namespace apsi
 
         OPRFRequest::OPRFRequest(unique_ptr<SenderOperation> sop)
         {
+            STOPWATCH(sender_stopwatch, "OPRFRequest::OPRFRequest");
+
             if (!sop)
             {
                 throw invalid_argument("operation cannot be null");
@@ -67,6 +73,8 @@ namespace apsi
 
         QueryRequest::QueryRequest(unique_ptr<SenderOperation> sop, shared_ptr<SenderDB> sender_db)
         {
+            STOPWATCH(sender_stopwatch, "QueryRequest::QueryRequest");
+
             if (!sop)
             {
                 throw invalid_argument("operation cannot be null");
@@ -90,18 +98,21 @@ namespace apsi
             relin_keys_ = sop_query->relin_keys.extract_local();
             if (!is_valid_for(relin_keys_, *seal_context))
             {
+                APSI_LOG_ERROR("Extracted relinearization keys are invalid for SEALContext");
                 throw invalid_argument("relinearization keys are invalid");
             }
 
             // Extract and validate query ciphertexts
             for (auto &q : sop_query->data)
             {
+                APSI_LOG_DEBUG("Extracting " << q.second.size() << " ciphertexts for exponent " << q.first);
                 vector<Ciphertext> cts;
                 for (auto &ct : q.second)
                 {
                     cts.push_back(ct.extract_local());
                     if (!is_valid_for(cts.back(), *seal_context))
                     {
+                        APSI_LOG_ERROR("Extracted ciphertext is invalid for SEALContext");
                         throw invalid_argument("query ciphertext is invalid");
                     }
                 }
@@ -119,17 +130,33 @@ namespace apsi
             uint32_t query_powers_count = params.query_params().query_powers_count;
 
             // Check that the PowersDag is valid and matches the PSIParams
-            if (!pd_.is_configured() ||
-                pd_.up_to_power() != max_items_per_bin ||
-                pd_.source_count() != query_powers_count)
+            if (!pd_.is_configured())
             {
-                throw invalid_argument("PowersDag is invalid");
+                APSI_LOG_ERROR("Extracted PowersDag is not configured");
+                throw invalid_argument("PowersDag is not configured");
+            }
+            if (pd_.up_to_power() != max_items_per_bin)
+            {
+                APSI_LOG_ERROR("Extracted PowersDag is incompatible with PSI parameters: "
+                    "up_to_power (" << pd_.up_to_power() << ") does not match max_items_per_bin (" <<
+                    max_items_per_bin << ")");
+                throw invalid_argument("PowersDag is incompatible with PSI parameters");
+            }
+            if (pd_.source_count() != query_powers_count)
+            {
+                APSI_LOG_ERROR("Extracted PowersDag is incompatible with PSI parameters: "
+                    "source_count (" << pd_.source_count() << ") does not match query_power_count (" <<
+                    query_powers_count << ")");
+                throw invalid_argument("PowersDag is incompatible with PSI parameters");
             }
 
             // Check that the query data size matches the PSIParams
             if (data_.size() != query_powers_count)
             {
-                throw invalid_argument("number of ciphertext powers does not match the parameters");
+                APSI_LOG_ERROR("Extracted query data is incompatible with PSI parameters: "
+                    "query contains " << data_.size() << " ciphertext powers which does not match with "
+                    "query_power_count (" << query_powers_count << ")");
+                throw invalid_argument("number of ciphertext powers is incompatible with PSI parameters");
             }
             auto query_powers = pd_.source_nodes();
             for (auto &q : data_)
@@ -137,11 +164,16 @@ namespace apsi
                 // Check that powers in the query data match source nodes in the PowersDag
                 if (q.second.size() != bundle_idx_count)
                 {
-                    throw invalid_argument("number of ciphertexts does not match the parameters");
+                    APSI_LOG_ERROR("Extracted query data is incompatible with PSI parameters: "
+                        "query power " << q.first << " contains " << q.second.size() << " ciphertexts which does not "
+                        "match with bundle_idx_count (" << bundle_idx_count << ")");
+                    throw invalid_argument("number of ciphertexts is incompatible with PSI parameters");
                 }
                 auto where = find_if(query_powers.cbegin(), query_powers.cend(), [&q](auto n) { return n.power == q.first; });
                 if (where == query_powers.cend())
                 {
+                    APSI_LOG_ERROR("Extracted query data is incompatible with PowersDag: "
+                        "query power " << q.first << " does not match with a source node in PowersDag");
                     throw invalid_argument("query ciphertext data does not match the PowersDag");
                 }
             }
@@ -165,7 +197,9 @@ namespace apsi
             auto response_parms = make_unique<SenderOperationResponseParms>();
             response_parms->params = make_unique<PSIParams>(sender_db->get_params());
 
+            APSI_LOG_INFO("Sending parameter request response: " << response_parms->params->to_string());
             send_fun(chl, move(response_parms));
+            APSI_LOG_INFO("Finished processing parameter request");
         }
 
         void Sender::RunOPRF(
@@ -175,7 +209,8 @@ namespace apsi
             function<void(Channel &, unique_ptr<SenderOperationResponse>)> send_fun)
         {
             STOPWATCH(sender_stopwatch, "Sender::RunOPRF");
-            APSI_LOG_INFO("Start processing OPRF request");
+            APSI_LOG_INFO("Start processing OPRF request for "
+                << oprf_request.data_.size() / oprf_query_size << " items");
 
             // OPRF response has the same size as the OPRF query 
             vector<seal_byte> oprf_result(oprf_request.data_.size());
@@ -184,7 +219,9 @@ namespace apsi
             auto response_oprf = make_unique<SenderOperationResponseOPRF>();
             response_oprf->data = move(oprf_result);
 
+            APSI_LOG_INFO("Sending OPRF request response");
             send_fun(chl, move(response_oprf));
+            APSI_LOG_INFO("Finished processing OPRF request");
         }
 
         void Sender::RunQuery(
@@ -196,13 +233,14 @@ namespace apsi
         {
             thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
 
-            STOPWATCH(sender_stopwatch, "Sender::RunQuery");
-            APSI_LOG_INFO("Start processing query request");
-
             auto sender_db = move(query_request.sender_db_);
 
             // Acquire read lock on SenderDB
             auto sender_db_lock = sender_db->get_reader_lock();
+
+            STOPWATCH(sender_stopwatch, "Sender::RunQuery");
+            APSI_LOG_INFO("Start processing query request on database with "
+                << sender_db->get_items().size() << " items");
 
             // Copy over the CryptoContext from SenderDB; set the Evaluator for this local instance
             CryptoContext crypto_context(sender_db->get_context());
@@ -222,7 +260,9 @@ namespace apsi
             uint32_t package_count = safe_cast<uint32_t>(sender_db->bin_bundle_count());
             auto response_query = make_unique<SenderOperationResponseQuery>();
             response_query->package_count = package_count;
+            APSI_LOG_INFO("Sending query request response: expect " << package_count << " packages");
             send_fun(chl, move(response_query));
+            APSI_LOG_INFO("Query request response sent");
 
             // For each bundle index i, we need a vector of powers of the query Qᵢ. We need powers all
             // the way up to Qᵢ^max_items_per_bin (maybe less if the BinBundles aren't as full as expected). We don't
@@ -247,6 +287,8 @@ namespace apsi
                 for (size_t bundle_idx = 0; bundle_idx < all_powers.size(); bundle_idx++)
                 {
                     // Load input^power to all_powers[bundle_idx][exponent]
+                    APSI_LOG_DEBUG("Extracting query ciphertext power " << exponent
+                        << " for bundle index " << bundle_idx);
                     all_powers[bundle_idx][exponent] = move(q.second[bundle_idx]);
                 }
             }
@@ -257,6 +299,7 @@ namespace apsi
 
             // Launch threads, but not more than necessary
             vector<thread> threads;
+            APSI_LOG_INFO("Launching " << partitions.size() << " query worker threads");
             for (size_t t = 0; t < partitions.size(); t++)
             {
                 threads.emplace_back([&, t]() {
@@ -270,7 +313,7 @@ namespace apsi
                 t.join();
             }
 
-            APSI_LOG_INFO("Finished processing query");
+            APSI_LOG_INFO("Finished processing query request");
         }
 
         void Sender::QueryWorker(
@@ -282,10 +325,15 @@ namespace apsi
             Channel &chl,
             function<void(Channel &, unique_ptr<ResultPackage>)> send_rp_fun)
         {
-            STOPWATCH(sender_stopwatch, "Sender::RunQuery::QueryWorker");
+            stringstream sw_ss;
+            sw_ss << "Sender::QueryWorker [" << this_thread::get_id() << "]";
+            STOPWATCH(sender_stopwatch, sw_ss.str());
 
             uint32_t bundle_idx_start = bundle_idx_bounds.first;
             uint32_t bundle_idx_end = bundle_idx_bounds.second;
+
+            APSI_LOG_INFO("Query worker [" << this_thread::get_id() << "]: "
+                "start processing bundle indices [" << bundle_idx_start << ", " << bundle_idx_end << ")");
 
             // Compute the powers for each bundle index and loop over the BinBundles
             Evaluator &evaluator = *crypto_context.evaluator();
@@ -293,6 +341,9 @@ namespace apsi
             for (uint32_t bundle_idx = bundle_idx_start; bundle_idx < bundle_idx_end; bundle_idx++)
             {
                 // Compute all powers of the query
+                APSI_LOG_DEBUG("Query worker [" << this_thread::get_id() << "]: "
+                    "computing all query ciphertext powers for bundle index " << bundle_idx);
+
                 CiphertextPowers &powers_at_this_bundle_idx = all_powers[bundle_idx];
                 pd.apply([&](const PowersDag::PowersNode &node) {
                     if (!node.is_source())
@@ -325,6 +376,9 @@ namespace apsi
                 auto bundle_caches = sender_db->get_cache_at(bundle_idx);
                 size_t bundle_count = bundle_caches.size();
 
+                APSI_LOG_DEBUG("Query worker [" << this_thread::get_id() << "]: "
+                    "start processing " << bundle_count << " bin bundles for bundle index " << bundle_idx);
+
                 // When using C++17 this function may be multi-threaded in the future with C++ execution policies
                 seal_for_each_n(bundle_caches.begin(), bundle_count, [&](auto &cache) {
                     // Package for the result data
@@ -344,9 +398,17 @@ namespace apsi
                     }
 
                     // Start sending on the channel 
+                    APSI_LOG_DEBUG("Query worker [" << this_thread::get_id() << "]: "
+                        "sending result package for bundle index " << bundle_idx);
                     send_rp_fun(chl, move(rp));
                 });
+
+                APSI_LOG_DEBUG("Query worker [" << this_thread::get_id() << "]: "
+                    "finished processing " << bundle_count << " bin bundles for bundle index " << bundle_idx);
             }
+
+            APSI_LOG_INFO("Query worker [" << this_thread::get_id() << "]: "
+                "finished processing bundle indices [" << bundle_idx_start << ", " << bundle_idx_end << ")");
         }
     } // namespace sender
 } // namespace apsi

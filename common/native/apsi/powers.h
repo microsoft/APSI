@@ -172,7 +172,7 @@ namespace apsi
             {
                 Uncomputed = 0,
                 Computing = 1,
-                Done = 2
+                Computed = 2
             };
 
             std::unique_ptr<std::atomic<NodeState>[]> node_states(new std::atomic<NodeState>[up_to_power_]);
@@ -182,7 +182,7 @@ namespace apsi
                 {
                     // Process source nodes right now
                     func(nodes_.at(i + 1));
-                    node_states[i].store(NodeState::Done);
+                    node_states[i].store(NodeState::Computed);
                 }
                 else
                 {
@@ -201,7 +201,7 @@ namespace apsi
                     {
                         // Check if everything is done
                         bool done = std::all_of(node_states.get(), node_states.get() + up_to_power_, [](auto &ns) {
-                            return ns == NodeState::Done;
+                            return ns == NodeState::Computed;
                         });
                         if (done)
                         {
@@ -223,10 +223,10 @@ namespace apsi
                         auto node = nodes_.at(ns + 1);
                         auto p1 = node.parents.first;
                         auto p2 = node.parents.second;
-                        bool p1_done = node_states[p1 - 1] == NodeState::Done;
-                        bool p2_done = node_states[p2 - 1] == NodeState::Done;
+                        bool p1_computed = node_states[p1 - 1] == NodeState::Computed;
+                        bool p2_computed = node_states[p2 - 1] == NodeState::Computed;
 
-                        if (!(p1_done && p2_done))
+                        if (!(p1_computed && p2_computed))
                         {
                             // Parents are not done
                             NodeState state = NodeState::Computing;
@@ -241,7 +241,7 @@ namespace apsi
                         func(nodes_.at(ns + 1));
 
                         state = NodeState::Computing;
-                        node_states[ns].compare_exchange_strong(state, NodeState::Done);
+                        node_states[ns].compare_exchange_strong(state, NodeState::Computed);
 
                         // Move on to the next node
                         ns = (ns + 1) % up_to_power_;

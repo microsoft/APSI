@@ -168,9 +168,9 @@ namespace apsi
                 throw runtime_error("decryptor is not configured in CryptoContext");
             }
             crypto_context.decryptor()->decrypt(psi_result_ct, psi_result_pt);
-            APSI_LOG_DEBUG("PSI result noise budget: "
+            APSI_LOG_DEBUG("Matching result noise budget: "
                 << crypto_context.decryptor()->invariant_noise_budget(psi_result_ct)
-                << " bits (thread " << this_thread::get_id() << ")");
+                << " bits [" << this_thread::get_id() << "]");
 
             crypto_context.encoder()->decode(psi_result_pt, plain_rp.psi_result);
 
@@ -181,7 +181,7 @@ namespace apsi
                 crypto_context.decryptor()->decrypt(label_result_ct, label_result_pt);
                 APSI_LOG_DEBUG("Label result noise budget: "
                     << crypto_context.decryptor()->invariant_noise_budget(label_result_ct)
-                    << " bits (thread " << this_thread::get_id() << ")");
+                    << " bits [" << this_thread::get_id() << "]");
 
                 vector<uint64_t> label_result_data;
                 crypto_context.encoder()->decode(label_result_pt, label_result_data);

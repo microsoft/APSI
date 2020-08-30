@@ -44,7 +44,7 @@ namespace apsi
             stringstream ss;
             ss << "tcp://*:" << port;
 
-            APSI_LOG_INFO("Sender binding to address: " << ss.str());
+            APSI_LOG_INFO("SenderDispatcher listening on port " << port);
             chl.bind(ss.str());
 
             oprf_key_ = move(oprf_key);
@@ -63,7 +63,7 @@ namespace apsi
                         // We want to log 'Waiting' only once, even if we have to wait
                         // for several sleeps. And only once after processing a request as well.
                         logged_waiting = true;
-                        APSI_LOG_INFO("Waiting for request.");
+                        APSI_LOG_INFO("Waiting for request from Receiver");
                     }
 
                     this_thread::sleep_for(50ms);
@@ -100,61 +100,88 @@ namespace apsi
 
         void SenderDispatcher::dispatch_parms(unique_ptr<NetworkSenderOperation> sop, SenderChannel &chl)
         {
-            // Extract the parameter request
-            ParmsRequest parms_request(move(sop->sop));
+            STOPWATCH(sender_stopwatch, "SenderDispatcher::dispatch_params");
+            
+            try
+            {
+                // Extract the parameter request
+                ParmsRequest parms_request(move(sop->sop));
 
-            Sender::RunParms(move(parms_request), sender_db_, chl,
-                [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
-                    auto nsop_response = make_unique<NetworkSenderOperationResponse>();
-                    nsop_response->sop_response = move(sop_response);
-                    nsop_response->client_id = move(sop->client_id);
+                Sender::RunParms(move(parms_request), sender_db_, chl,
+                    [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
+                        auto nsop_response = make_unique<NetworkSenderOperationResponse>();
+                        nsop_response->sop_response = move(sop_response);
+                        nsop_response->client_id = move(sop->client_id);
 
-                    // We know for sure that the channel is a SenderChannel so use static_cast
-                    static_cast<SenderChannel&>(c).send(move(nsop_response));
-                });
+                        // We know for sure that the channel is a SenderChannel so use static_cast
+                        static_cast<SenderChannel&>(c).send(move(nsop_response));
+                    });
+            }
+            catch (const exception &e)
+            {
+                APSI_LOG_ERROR("APSI threw an exception processing parameter request: " << e.what());
+            }
         }
 
         void SenderDispatcher::dispatch_oprf(unique_ptr<NetworkSenderOperation> sop, SenderChannel &chl)
         {
-            // Extract the OPRF request
-            OPRFRequest oprf_request(move(sop->sop));
+            STOPWATCH(sender_stopwatch, "SenderDispatcher::dispatch_oprf");
 
-            Sender::RunOPRF(move(oprf_request), *oprf_key_, chl,
-                [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
-                    auto nsop_response = make_unique<NetworkSenderOperationResponse>();
-                    nsop_response->sop_response = move(sop_response);
-                    nsop_response->client_id = move(sop->client_id);
+            try
+            {
+                // Extract the OPRF request
+                OPRFRequest oprf_request(move(sop->sop));
 
-                    // We know for sure that the channel is a SenderChannel so use static_cast
-                    static_cast<SenderChannel&>(c).send(move(nsop_response));
-                });
+                Sender::RunOPRF(move(oprf_request), *oprf_key_, chl,
+                    [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
+                        auto nsop_response = make_unique<NetworkSenderOperationResponse>();
+                        nsop_response->sop_response = move(sop_response);
+                        nsop_response->client_id = move(sop->client_id);
+
+                        // We know for sure that the channel is a SenderChannel so use static_cast
+                        static_cast<SenderChannel&>(c).send(move(nsop_response));
+                    });
+            }
+            catch (const exception &e)
+            {
+                APSI_LOG_ERROR("APSI threw an exception processing OPRF query: " << e.what());
+            }
         }
 
         void SenderDispatcher::dispatch_query(unique_ptr<NetworkSenderOperation> sop, SenderChannel &chl)
         {
-            // Create the QueryRequest object
-            QueryRequest query_request(move(sop->sop), sender_db_);
+            STOPWATCH(sender_stopwatch, "SenderDispatcher::dispatch_query");
 
-            // Query will send result to client in a stream of ResultPackages
-            Sender::RunQuery(move(query_request), chl, thread_count_,
-                // Lambda function for sending the query response
-                [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
-                    auto nsop_response = make_unique<NetworkSenderOperationResponse>();
-                    nsop_response->sop_response = move(sop_response);
-                    nsop_response->client_id = sop->client_id;
+            try
+            {
+                // Create the QueryRequest object
+                QueryRequest query_request(move(sop->sop), sender_db_);
 
-                    // We know for sure that the channel is a SenderChannel so use static_cast
-                    static_cast<SenderChannel&>(c).send(move(nsop_response));
-                },
-                // Lambda function for sending the ResultPackages
-                [&sop](Channel &c, unique_ptr<ResultPackage> rp) {
-                    auto nrp = make_unique<NetworkResultPackage>();
-                    nrp->rp = move(rp);
-                    nrp->client_id = sop->client_id;
+                // Query will send result to client in a stream of ResultPackages
+                Sender::RunQuery(move(query_request), chl, thread_count_,
+                    // Lambda function for sending the query response
+                    [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
+                        auto nsop_response = make_unique<NetworkSenderOperationResponse>();
+                        nsop_response->sop_response = move(sop_response);
+                        nsop_response->client_id = sop->client_id;
 
-                    // We know for sure that the channel is a SenderChannel so use static_cast
-                    static_cast<SenderChannel&>(c).send(move(nrp));
-                });
+                        // We know for sure that the channel is a SenderChannel so use static_cast
+                        static_cast<SenderChannel&>(c).send(move(nsop_response));
+                    },
+                    // Lambda function for sending the ResultPackages
+                    [&sop](Channel &c, unique_ptr<ResultPackage> rp) {
+                        auto nrp = make_unique<NetworkResultPackage>();
+                        nrp->rp = move(rp);
+                        nrp->client_id = sop->client_id;
+
+                        // We know for sure that the channel is a SenderChannel so use static_cast
+                        static_cast<SenderChannel&>(c).send(move(nrp));
+                    });
+            }
+            catch (const exception &e)
+            {
+                APSI_LOG_ERROR("APSI threw an exception processing query: " << e.what());
+            }
         }
     } // namespace sender
 } // namespace apsi

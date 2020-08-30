@@ -111,12 +111,14 @@ namespace apsi
                     powers_[s.power] = exponentiate_array(values, s.power);
                 }
 
-                APSI_LOG_DEBUG("Plaintext powers computed:" << [&]() {
+                APSI_LOG_DEBUG("Plaintext powers computed: " << [&]() {
                         stringstream ss;
+                        ss << "[";
                         for (auto &a : powers_)
                         {
                             ss << " " << a.first;
                         }
+                        ss << " ]";
                         return ss.str();
                     }());
             }
@@ -322,8 +324,7 @@ namespace apsi
                 STOPWATCH(recv_stopwatch, "Receiver::create_query::prepare_data");
                 for (uint32_t bundle_idx = 0; bundle_idx < params_.bundle_idx_count(); bundle_idx++)
                 {
-                    APSI_LOG_DEBUG("Preparing data for bundle index "
-                        << bundle_idx << " / " << params_.bundle_idx_count() - 1);
+                    APSI_LOG_DEBUG("Preparing data for bundle index " << bundle_idx);
 
                     // First, find the items for this bundle index
                     gsl::span<const item_type> bundle_items(
@@ -358,8 +359,7 @@ namespace apsi
                 STOPWATCH(recv_stopwatch, "Receiver::create_query::encrypt_data");
                 for (uint32_t bundle_idx = 0; bundle_idx < params_.bundle_idx_count(); bundle_idx++)
                 {
-                    APSI_LOG_DEBUG("Encoding and encrypting data for bundle index "
-                        << bundle_idx << " / " << params_.bundle_idx_count() - 1);
+                    APSI_LOG_DEBUG("Encoding and encrypting data for bundle index " << bundle_idx);
 
                     // Encrypt the data for this power
                     auto encrypted_power(plain_powers[bundle_idx].encrypt(*crypto_context_));
@@ -438,8 +438,11 @@ namespace apsi
             const unordered_map<size_t, size_t> &table_idx_to_item_idx,
             Channel &chl) const
         {
-            APSI_LOG_DEBUG("Launched result worker thread " << this_thread::get_id());
-            STOPWATCH(recv_stopwatch, "Receiver::query::result_package_worker");
+            stringstream sw_ss;
+            sw_ss << "Receiver::result_package_worker [" << this_thread::get_id() << "]";
+            STOPWATCH(recv_stopwatch, sw_ss.str());
+
+            APSI_LOG_INFO("Result worker [" << this_thread::get_id() << "]: starting");
 
             while (true)
             {
@@ -447,15 +450,15 @@ namespace apsi
                 package_count--;
                 if (package_count < 0)
                 {
-                    APSI_LOG_DEBUG("Result worker thread " << this_thread::get_id() << " exiting");
+                    APSI_LOG_INFO("Result worker [" << this_thread::get_id() << "]: all packages claimed; exiting");
                     return;
                 }
 
                 // Wait for a valid ResultPackage
                 unique_ptr<ResultPackage> rp;
                 while (!(rp = chl.receive_result_package(crypto_context_->seal_context())));
-                APSI_LOG_DEBUG("Result package received for bundle index " << rp->bundle_idx
-                    << " (thread " << this_thread::get_id() << ")");
+                APSI_LOG_DEBUG("Result worker [" << this_thread::get_id() << "]: "
+                    "result package received for bundle index " << rp->bundle_idx);
 
                 // Decrypt and decode the result; the result vector will have full batch size
                 PlainResultPackage plain_rp = rp->extract(*crypto_context_);
@@ -485,14 +488,14 @@ namespace apsi
                     }
 
                     size_t item_idx = item_idx_iter->second;
-                    APSI_LOG_DEBUG("Match found for items[" << item_idx << "] at cuckoo table index " << table_idx
-                        << " (thread " << this_thread::get_id() << ")");
+                    APSI_LOG_DEBUG("Result worker [" << this_thread::get_id() << "]: "
+                        "match found for items[" << item_idx << "] at cuckoo table index " << table_idx);
                     if (mrs[item_idx])
                     {
                         // If a positive MatchRecord is already present, then something is seriously wrong
-                        APSI_LOG_ERROR("Found a match for cuckoo table index " << table_idx
-                            << " but an existing match for this location was already found before "
-                            << " (thread " << this_thread::get_id() << ")");
+                        APSI_LOG_ERROR("Result worker [" << this_thread::get_id() << "]: "
+                            "found a match for cuckoo table index " << table_idx <<
+                            " but an existing match for this location was already found before");
 
                         throw runtime_error("found a pre-existing positive match in the location for this match");
                     }
@@ -504,9 +507,8 @@ namespace apsi
                     // Next, extract the label result(s), if any
                     if (!plain_rp.label_result.empty())
                     {
-                        APSI_LOG_DEBUG("Found " << plain_rp.label_result.size() << "-part label for "
-                            << "items[" << item_idx << "] "
-                            << "(thread " << this_thread::get_id() << ")");
+                        APSI_LOG_DEBUG("Result worker [" << this_thread::get_id() << "]: "
+                            "found " << plain_rp.label_result.size() << "-part label for items[" << item_idx << "]");
 
                         // Collect the entire label into this vector
                         vector<felt_t> label_as_felts;
@@ -531,9 +533,6 @@ namespace apsi
 
                     // We are done with the MatchRecord, so add it to the mrs vector
                     mrs[item_idx] = move(mr);
-
-                    APSI_LOG_DEBUG("Finished processing result package for bundle index " << rp->bundle_idx
-                        << " (thread " << this_thread::get_id() << ")");
                 });
             }
         }
