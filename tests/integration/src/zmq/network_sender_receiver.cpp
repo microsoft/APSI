@@ -81,11 +81,10 @@ namespace
         }
     }
 
-    void RunTest(size_t sender_size, size_t client_size, const PSIParams &params)
+    void RunTest(size_t sender_size, size_t client_size, const PSIParams &params, size_t num_threads)
     {
         logging::Log::set_log_level(logging::Log::Level::level_all);
         logging::Log::set_console_disabled(false);
-        size_t num_threads = 1;
 
         vector<Item> sender_items;
         for (size_t i = 0; i < sender_size; i++)
@@ -163,44 +162,89 @@ namespace APSITests
     {
         size_t sender_size = 0;
         PSIParams params = create_params();
-        RunTest(sender_size, 0, params);
+        RunTest(sender_size, 0, params, 1);
+    }
+
+    TEST(SenderReceiverTests, UnlabeledEmptyMultiThreadedTest)
+    {
+        size_t sender_size = 0;
+        PSIParams params = create_params();
+        RunTest(sender_size, 0, params, 4);
     }
 
     TEST(SenderReceiverTests, UnlabeledSingleTest)
     {
         size_t sender_size = 1;
         PSIParams params = create_params();
-        RunTest(sender_size, 0, params);
-        RunTest(sender_size, 1, params);
+        RunTest(sender_size, 0, params, 1);
+        RunTest(sender_size, 1, params, 1);
+    }
+
+    TEST(SenderReceiverTests, UnlabeledSingleMultiThreadedTest)
+    {
+        size_t sender_size = 1;
+        PSIParams params = create_params();
+        RunTest(sender_size, 0, params, 4);
+        RunTest(sender_size, 1, params, 4);
     }
 
     TEST(SenderReceiverTests, UnlabeledSmallTest)
     {
         size_t sender_size = 10;
         PSIParams params = create_params();
-        RunTest(sender_size, 0, params);
-        RunTest(sender_size, 1, params);
-        RunTest(sender_size, 5, params);
-        RunTest(sender_size, 10, params);
+        RunTest(sender_size, 0, params, 1);
+        RunTest(sender_size, 1, params, 1);
+        RunTest(sender_size, 5, params, 1);
+        RunTest(sender_size, 10, params, 1);
+    }
+
+    TEST(SenderReceiverTests, UnlabeledSmallMultiThreadedTest)
+    {
+        size_t sender_size = 10;
+        PSIParams params = create_params();
+        RunTest(sender_size, 0, params, 4);
+        RunTest(sender_size, 1, params, 4);
+        RunTest(sender_size, 5, params, 4);
+        RunTest(sender_size, 10, params, 4);
     }
 
     TEST(SenderReceiverTests, UnlabeledMediumTest)
     {
         size_t sender_size = 500;
         PSIParams params = create_params();
-        RunTest(sender_size, 0, params);
-        RunTest(sender_size, 1, params);
-        RunTest(sender_size, 50, params);
-        RunTest(sender_size, 100, params);
+        RunTest(sender_size, 0, params, 1);
+        RunTest(sender_size, 1, params, 1);
+        RunTest(sender_size, 50, params, 1);
+        RunTest(sender_size, 100, params, 1);
+    }
+
+    TEST(SenderReceiverTests, UnlabeledMediumMultiThreadedTest)
+    {
+        size_t sender_size = 500;
+        PSIParams params = create_params();
+        RunTest(sender_size, 0, params, 4);
+        RunTest(sender_size, 1, params, 4);
+        RunTest(sender_size, 50, params, 4);
+        RunTest(sender_size, 100, params, 4);
     }
 
     TEST(SenderReceiverTests, UnlabeledLargeTest)
     {
         size_t sender_size = 4000;
         PSIParams params = create_params();
-        RunTest(sender_size, 0, params);
-        RunTest(sender_size, 1, params);
-        RunTest(sender_size, 500, params);
-        RunTest(sender_size, 1000, params);
+        RunTest(sender_size, 0, params, 1);
+        RunTest(sender_size, 1, params, 1);
+        RunTest(sender_size, 500, params, 1);
+        RunTest(sender_size, 1000, params, 1);
+    }
+
+    TEST(SenderReceiverTests, UnlabeledLargeMultiThreadedTest)
+    {
+        size_t sender_size = 4000;
+        PSIParams params = create_params();
+        RunTest(sender_size, 0, params, 4);
+        RunTest(sender_size, 1, params, 4);
+        RunTest(sender_size, 500, params, 4);
+        RunTest(sender_size, 1000, params, 4);
     }
 } // namespace APSITests
