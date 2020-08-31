@@ -43,74 +43,94 @@ namespace apsi
             }
 
             /**
-            Clears the database
+            Clears the database.
             */
             virtual void clear_db() = 0;
 
             /**
-            Clears the database and inserts the given data, using at most thread_count threads. Only one of these is
-            defined for a given child of SenderDB, corresponding to whether it is labeled or unlabeled.
+            Clears the database and inserts the given data, using at most thread_count threads. This function can be
+            used only on a LabeledSenderDB instance.
             */
             virtual void set_data(
                 std::vector<std::pair<HashedItem, util::FullWidthLabel> > &data,
                 std::size_t thread_count
             ) = 0;
+
+            /**
+            Clears the database and inserts the given data, using at most thread_count threads. This function can be
+            used only on an UnlabeledSenderDB instance.
+            */
             virtual void set_data(
                 std::vector<HashedItem> &data,
                 std::size_t thread_count
             ) = 0;
 
             /**
-            Inserts the given data into the database, using at most thread_count threads. Only one of these is defined
-            for a given child of SenderDB, corresponding to whether it is labeled or unlabeled. In the labeled case, if
-            an item exists, its label is overwritten with the new label value.
+            Inserts the given data into the database, using at most thread_count threads. This function can be used only
+            on a LabeledSenderDB instance. If an item already exists, its label is overwritten with the new label.
             */
             virtual void insert_or_assign(
                 std::vector<std::pair<HashedItem, util::FullWidthLabel> > &data,
                 std::size_t thread_count
             ) = 0;
+
+            /**
+            Inserts the given data into the database, using at most thread_count threads. This function can be used only
+            on an UnlabeledSenderDB instance.
+            */
             virtual void insert_or_assign(
                 std::vector<HashedItem> &data,
                 std::size_t thread_count
             ) = 0;
 
             /**
-            Returns a set of DB cache references corresponding to the bundles at the given
-            bundle index. This returns a vector but order doesn't matter.
+            Returns a set of cache references corresponding to the bundles at the given bundle index. Even though this
+            function returns a vector, the order has no significance.
             */
             virtual auto get_cache_at(std::uint32_t bundle_idx)
                 -> std::vector<std::reference_wrapper<const BinBundleCache> > = 0;
 
+            /**
+            Returns a reference to the PSI parameters for this SenderDB.
+            */
             const PSIParams &get_params() const
             {
                 return params_;
             }
 
-            CryptoContext get_context() const
+            /**
+            Returns a reference to the CryptoContext for this SenderDB.
+            */
+            const CryptoContext &get_context() const
             {
                 return crypto_context_;
             }
 
-            const std::unordered_set<HashedItem>& get_items() {
+            /**
+            Returns a reference to a set of items already existing in the SenderDB.
+            */
+            const std::unordered_set<HashedItem> &get_items() {
                 return items_;
             }
 
             /**
             Returns the total number of bin bundles.
             */
-            virtual std::size_t bin_bundle_count() = 0;
+            virtual std::size_t get_bin_bundle_count() = 0;
 
+            /**
+            Obtains a scoped lock preventing the SenderDB from being changed.
+            */
             seal::util::ReaderLock get_reader_lock()
             {
                 return db_lock_.acquire_read();
             }
 
         protected:
-
             /**
             The set of all items that have been inserted into the database
             */
-            mutable std::unordered_set<HashedItem> items_;
+            std::unordered_set<HashedItem> items_;
 
             /**
             This defines our SEAL context, base field, item size, etc.
@@ -118,7 +138,7 @@ namespace apsi
             PSIParams params_;
 
             /**
-            Necessary for evaluating polynomials of Plaintexts
+            Necessary for evaluating polynomials of Plaintexts.
             */
             CryptoContext crypto_context_;
 
@@ -133,7 +153,7 @@ namespace apsi
         private:
             /**
             All the BinBundles in the DB, indexed by bin index. The set (represented by a vector internally) at bundle
-            index i contains all the BinBundles with bundle index i
+            index i contains all the BinBundles with bundle index i.
             */
             std::vector<std::vector<BinBundle<felt_t> > > bin_bundles_;
 
@@ -147,14 +167,14 @@ namespace apsi
             }
 
             /**
-            Clears the database
+            Clears the database.
             */
             void clear_db() override;
 
             /**
             Returns the total number of bin bundles.
             */
-            std::size_t bin_bundle_count() override;
+            std::size_t get_bin_bundle_count() override;
 
             /**
             Returns a set of DB cache references corresponding to the bundles at the given
@@ -197,6 +217,10 @@ namespace apsi
                 std::size_t thread_count = 0
             ) override;
 
+            /**
+            Returns the label associated to the given item in the database. Throws an exception if the item does not
+            appear in the database.
+            */
             FullWidthLabel get_label(const HashedItem &item) const;
         }; // class LabeledSenderDB
 
@@ -205,7 +229,7 @@ namespace apsi
         private:
             /**
             All the BinBundles in the DB, indexed by bin index. The set (represented by a vector internally) at bundle
-            index i contains all the BinBundles with bundle index i
+            index i contains all the BinBundles with bundle index i.
             */
             std::vector<std::vector<BinBundle<monostate> > > bin_bundles_;
 
@@ -219,14 +243,14 @@ namespace apsi
             }
 
             /**
-            Clears the database
+            Clears the database.
             */
             void clear_db() override;
 
             /**
             Returns the total number of bin bundles.
             */
-            std::size_t bin_bundle_count() override;
+            std::size_t get_bin_bundle_count() override;
 
             /**
             Returns a set of DB cache references corresponding to the bundles at the given
@@ -243,7 +267,7 @@ namespace apsi
             ) override;
 
             /**
-            Clears the database and inserts the given data, using at most thread_count threads
+            Clears the database and inserts the given data using at most thread_count threads.
             */
             void set_data(
                 std::vector<HashedItem> &data,
@@ -259,8 +283,8 @@ namespace apsi
             ) override;
 
             /**
-        Inserts the given data into the database, using at most thread_count threads. This will mutate the input vector.
-        Specifically, it will stable-sort the vector into (new entries || overwriting entries).
+            Inserts the given data into the database, using at most thread_count threads. This will mutate the input
+            vector. Specifically, it will stable-sort the vector into (new entries || overwriting entries).
             */
             void insert_or_assign(
                 std::vector<HashedItem> &data,

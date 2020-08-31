@@ -25,31 +25,55 @@ namespace apsi
         namespace
         {
             /**
+            Creates and returns the vector of hash functions similarly to how Kuku 2.0 sets them internally.
+            */
+            vector<kuku::LocFunc> hash_functions(const PSIParams &params)
+            {
+                vector<kuku::LocFunc> result;
+                for (uint32_t i = 0; i < params.table_params().hash_func_count; i++)
+                {
+                    result.emplace_back(params.table_params().table_size, kuku::make_item(i, 0));
+                }
+
+                return result;
+            }
+
+            /**
+            Computes all cuckoo hash table locations for a given item.
+            */
+            unordered_set<kuku::location_type> all_locations(
+                const vector<kuku::LocFunc> &hash_funcs,
+                const HashedItem &item
+            ) {
+                unordered_set<kuku::location_type> result;
+                for (auto &hf : hash_funcs)
+                {
+                    result.emplace(hf(item.value()));
+                }
+
+                return result;
+            }
+
+            /**
             Converts each given Item-Label pair in between the given iterators into its algebraic form, i.e., a sequence
             of felt-felt pairs. Also computes each Item's cuckoo index.
             */
             vector<pair<AlgItemLabel<felt_t>, size_t> > preprocess_labeled_data(
                 const vector<pair<HashedItem, FullWidthLabel> >::iterator begin,
                 const vector<pair<HashedItem, FullWidthLabel> >::iterator end,
-                PSIParams &params
+                const PSIParams &params
             ) {
                 // Some variables we'll need
                 size_t bins_per_item = params.item_params().felts_per_item;
                 size_t item_bit_count = params.item_bit_count();
                 const Modulus &mod = params.seal_params().plain_modulus();
 
-                // Set up a temporary cuckoo table that we can use to extract locations
-                kuku::KukuTable cuckoo(
-                    params.table_params().table_size,      // Size of the hash table
-                    0,                                     // Not using a stash
-                    params.table_params().hash_func_count, // Number of hash functions
-                    { 0, 0 },                              // Hardcoded { 0, 0 } as the seed
-                    1,                                     // The number of insertion attempts (irrelevant here)
-                    { 0, 0 });                             // The empty element (irrelevant here)
+                // Set up Kuku hash functions
+                auto hash_funcs = hash_functions(params);
 
-                // Calculate the cuckoo indices for each item. Store every pair of (&item-label, cuckoo_idx) in
-                // a vector. Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the
-                // work of inserting the items into BinBundles
+                // Calculate the cuckoo indices for each item. Store every pair of (item-label, cuckoo_idx) in a vector.
+                // Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the work of
+                // inserting the items into BinBundles.
                 vector<pair<AlgItemLabel<felt_t>, size_t> > data_with_indices;
                 for (auto it = begin; it != end; it++)
                 {
@@ -60,7 +84,7 @@ namespace apsi
                     AlgItemLabel<felt_t> alg_item_label = algebraize_item_label(item, label, item_bit_count, mod);
 
                     // Get the cuckoo table locations for this item and add to data_with_indices
-                    for (auto location : cuckoo.all_locations(item.value()))
+                    for (auto location : all_locations(hash_funcs, item))
                     {
                         // The current hash value is an index into a table of Items. In reality our BinBundles are
                         // tables of bins, which contain chunks of items. How many chunks? bins_per_item many chunks
@@ -89,18 +113,12 @@ namespace apsi
                 size_t item_bit_count = params.item_bit_count();
                 const Modulus &mod = params.seal_params().plain_modulus();
 
-                // Set up a temporary cuckoo table that we can use to extract locations
-                kuku::KukuTable cuckoo(
-                    params.table_params().table_size,      // Size of the hash table
-                    0,                                     // Not using a stash
-                    params.table_params().hash_func_count, // Number of hash functions
-                    { 0, 0 },                              // Hardcoded { 0, 0 } as the seed
-                    1,                                     // The number of insertion attempts (irrelevant here)
-                    { 0, 0 });                             // The empty element (irrelevant here)
+                // Set up Kuku hash functions
+                auto hash_funcs = hash_functions(params);
 
-                // Calculate the cuckoo indices for each item. Store every pair of (&item-label, cuckoo_idx) in
-                // a vector. Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the
-                // work of inserting the items into BinBundles
+                // Calculate the cuckoo indices for each item. Store every pair of (item-label, cuckoo_idx) in a vector.
+                // Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the work of
+                // inserting the items into BinBundles.
                 vector<pair<AlgItemLabel<monostate>, size_t> > data_with_indices;
                 for (auto it = begin; it != end; it++)
                 {
@@ -110,7 +128,7 @@ namespace apsi
                     AlgItemLabel<monostate> alg_item = algebraize_item(item, item_bit_count, mod);
 
                     // Get the cuckoo table locations for this item and add to data_with_indices
-                    for (auto location : cuckoo.all_locations(item.value()))
+                    for (auto location : all_locations(hash_funcs, item))
                     {
                         // The current hash value is an index into a table of Items. In reality our BinBundles are
                         // tables of bins, which contain chunks of items. How many chunks? bins_per_item many chunks
@@ -135,28 +153,29 @@ namespace apsi
                 // keeps counting past bundle boundaries. So in order to get the bin index from the cuckoo index, just
                 // compute cuckoo_idx (mod bins_per_bundle).
                 size_t bin_idx = cuckoo_idx % bins_per_bundle;
-                // Now compute which bundle index this cuckoo index belongs to
+
+                // Compute which bundle index this cuckoo index belongs to
                 size_t bundle_idx = (cuckoo_idx - bin_idx) / bins_per_bundle;
 
                 return { bin_idx, bundle_idx };
             }
 
             /**
-            Inserts the given items and corresponding labels into bin_bundles at their respective cuckoo indices. It will
-            only insert the data with bundle index in the half-open range range [begin_bundle_idx, end_bundle_idx). If
+            Inserts the given items and corresponding labels into bin_bundles at their respective cuckoo indices. It
+            will only insert the data with bundle index in the half-open range range indicated by work_range. If
             inserting into a BinBundle would make the number of items in a bin larger than max_bin_size, this function
-            will create and insert a new BinBundle. If overwrite is set, this will overwrite the labels if
-            it finds an AlgItemLabel that matches the input perfectly.
+            will create and insert a new BinBundle. If overwrite is set, this will overwrite the labels if it finds an
+            AlgItemLabel that matches the input perfectly.
             */
             template<typename L>
             void insert_or_assign_worker(
                 vector<pair<AlgItemLabel<L>, size_t> > &data_with_indices,
                 vector<vector<BinBundle<L> > > &bin_bundles,
                 CryptoContext &crypto_context,
+                pair<vector<size_t>::const_iterator, vector<size_t>::const_iterator> work_range,
                 uint32_t bins_per_bundle,
                 size_t max_bin_size,
-                bool overwrite,
-                pair<vector<size_t>::const_iterator, vector<size_t>::const_iterator> work_range)
+                bool overwrite)
             {
                 STOPWATCH(sender_stopwatch, "LabeledSenderDB::insert_or_assign_worker");
 
@@ -262,8 +281,8 @@ namespace apsi
 
             /**
             Takes algebraized data to be inserted, splits it up, and distributes it so that thread_count many threads
-            can all insert in parallel. If overwrite is set, this will overwrite the labels if it finds an
-            AlgItemLabel that matches the input perfectly.
+            can all insert in parallel. If overwrite is set, this will overwrite the labels if it finds an AlgItemLabel
+            that matches the input perfectly.
             */
             template<typename L>
             void dispatch_insert_or_assign(
@@ -306,12 +325,12 @@ namespace apsi
                             data_with_indices,
                             bin_bundles,
                             crypto_context,
-                            bins_per_bundle,
-                            max_bin_size,
-                            overwrite,
                             make_pair(
                                 bundle_indices.cbegin() + partition.first,
-                                bundle_indices.cbegin() + partition.second)
+                                bundle_indices.cbegin() + partition.second),
+                            bins_per_bundle,
+                            max_bin_size,
+                            overwrite
                         );
                     });
                 }
@@ -342,7 +361,7 @@ namespace apsi
         /**
         Returns the total number of bin bundles.
         */
-        size_t LabeledSenderDB::bin_bundle_count()
+        size_t LabeledSenderDB::get_bin_bundle_count()
         {
             // Lock the database for reading
             auto lock = get_reader_lock();
@@ -355,7 +374,7 @@ namespace apsi
         /**
         Returns the total number of bin bundles.
         */
-        size_t UnlabeledSenderDB::bin_bundle_count()
+        size_t UnlabeledSenderDB::get_bin_bundle_count()
         {
             // Lock the database for reading
             auto lock = get_reader_lock();
@@ -370,11 +389,11 @@ namespace apsi
         */
         void LabeledSenderDB::clear_db()
         {
-            // Clear the set of inserted items
-            items_.clear();
-
             // Lock the database for writing
             auto lock = db_lock_.acquire_write();
+
+            // Clear the set of inserted items
+            items_.clear();
 
             // Clear the BinBundles
             bin_bundles_.clear();
@@ -386,11 +405,11 @@ namespace apsi
         */
         void UnlabeledSenderDB::clear_db()
         {
-            // Clear the set of inserted items
-            items_.clear();
-
             // Lock the database for writing
             auto lock = db_lock_.acquire_write();
+
+            // Clear the set of inserted items
+            items_.clear();
 
             // Clear the BinBundles
             bin_bundles_.clear();
@@ -423,10 +442,10 @@ namespace apsi
 
             STOPWATCH(sender_stopwatch, "LabeledSenderDB::insert_or_assign");
 
-            // We need to know which items are new and which are old, since we have to tell dispatchinsert_or_assign when to
-            // have an overwrite-on-collision versus add-binbundle-on-collision policy.
-            // Sort so that all the new items are first.
-            auto items_to_overwrite_it = std::stable_partition(
+            // We need to know which items are new and which are old, since we have to tell dispatch_insert_or_assign
+            // when to have an overwrite-on-collision versus add-binbundle-on-collision policy. Sort so that all the new
+            // items are first.
+            auto items_to_overwrite_it = stable_partition(
                 data.begin(),
                 data.end(),
                 [&](auto &item_label_pair) {
@@ -450,6 +469,7 @@ namespace apsi
             // Dispatch the insertion, first for the new data, then for the data we're gonna overwrite
             uint32_t bins_per_bundle = params_.bins_per_bundle();
             uint32_t max_bin_size = params_.table_params().max_items_per_bin;
+
             dispatch_insert_or_assign(
                 new_data_with_indices,
                 bin_bundles_,
@@ -459,6 +479,7 @@ namespace apsi
                 thread_count,
                 false /* don't overwrite items */
             );
+
             dispatch_insert_or_assign(
                 overwritable_data_with_indices,
                 bin_bundles_,
@@ -477,9 +498,8 @@ namespace apsi
         }
 
         /**
-        Throws an error. This should never ever be called. The only reason this exists is because SenderDB is an
-        interface that needs to support both labeled and unlabeled insertion. A LabeledSenderDB does not do unlabeled
-        insertion. If you can think of a better way to structure this, keep it to yourself.
+        Throws an error. This should never be called. The only reason this exists is because SenderDB is an interface
+        that needs to support both labeled and unlabeled insertion. A LabeledSenderDB does not do unlabeled insertion.
         */
         void LabeledSenderDB::insert_or_assign(vector<HashedItem> &data, size_t thread_count)
         {
@@ -501,7 +521,7 @@ namespace apsi
 
             // We do not insert duplicate items. Sort the vector so that all the new items appear at the front, then
             // insert just the front part.
-            auto duplicate_items_it = std::stable_partition(
+            auto duplicate_items_it = stable_partition(
                 data.begin(),
                 data.end(),
                 [&](auto &item) {
@@ -518,6 +538,7 @@ namespace apsi
             // Dispatch the insertion
             uint32_t bins_per_bundle = params_.bins_per_bundle();
             uint32_t max_bin_size = params_.table_params().max_items_per_bin;
+
             dispatch_insert_or_assign(
                 data_with_indices,
                 bin_bundles_,
@@ -534,9 +555,8 @@ namespace apsi
         }
 
         /**
-        Throws an error. This should never ever be called. The only reason this exists is because SenderDB is an
-        interface that needs to support both labeled and unlabeled insertion. An UnlabeledSenderDB does not do labeled
-        insertion. If you can think of a better way to structure this, keep it to yourself.
+        Throws an error. This should never be called. The only reason this exists is because SenderDB is an interface
+        that needs to support both labeled and unlabeled insertion. An UnlabeledSenderDB does not do labeled insertion.
         */
         void UnlabeledSenderDB::insert_or_assign(vector<pair<HashedItem, FullWidthLabel> > &data, size_t thread_count)
         {
@@ -574,17 +594,16 @@ namespace apsi
             throw logic_error("Cannot do labeled insertion on an UnlabeledSenderDB");
         }
 
-
         /**
-        Returns the label associated to the given item in the database. Throws std::out_of_range if the item does not
-        appear in the database.
+        Returns the label associated to the given item in the database. Throws logic_error if the item does not appear
+        in the database.
         */
         FullWidthLabel LabeledSenderDB::get_label(const HashedItem &item) const
         {
             // Check if this item is in the DB. If not, throw an exception
             if (items_.count(item) == 0)
             {
-                throw std::out_of_range("no such item in SenderDB");
+                throw logic_error("item was not found in SenderDB");
             }
 
             uint32_t bins_per_bundle = params_.bins_per_bundle();
@@ -592,7 +611,7 @@ namespace apsi
             // Preprocess a vector of 1 element. This algebraizes the item and gives back its field element
             // representation as well as its cuckoo hash.
             AlgItemLabel<monostate> algebraized_item_label;
-            size_t cuckoo_idx, bin_idx, bundle_idx;
+            size_t cuckoo_idx;
             vector<HashedItem> item_singleton{ item };
             tie(algebraized_item_label, cuckoo_idx) = preprocess_unlabeled_data(
                 item_singleton.begin(),
@@ -609,6 +628,7 @@ namespace apsi
             }
 
             // Now figure out where to look to get the label
+            size_t bin_idx, bundle_idx;
             tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
 
             // Retrieve the algebraic labels from one of the BinBundles at this index
@@ -618,7 +638,7 @@ namespace apsi
             for (const BinBundle<felt_t> &bundle : bundle_set)
             {
                 // Try to retrieve the contiguous labels from this BinBundle
-                if (bundle.try_get_multi_label(algebraized_item, alg_labels, bin_idx))
+                if (bundle.try_get_multi_label(algebraized_item, bin_idx, alg_labels))
                 {
                     got_labels = true;
                     break;
@@ -626,19 +646,18 @@ namespace apsi
             }
 
             // It shouldn't be possible to have items in your set but be unable to retrieve the associated label. Throw
-            // an exception.
+            // an exception because something is terribly wrong.
             if (!got_labels)
             {
-                throw logic_error("Item is in set but labels don't exist in any BinBundle");
+                throw logic_error("item is in set but labels could not be found in any BinBundle");
             }
 
             // All good. Now just reconstruct the big label from its split-up parts and return it
             size_t item_bit_count = params_.item_bit_count();
             const Modulus &mod = params_.seal_params().plain_modulus();
 
-            // We can use dealgebraize_item because Items and Labels are the same size
-            FullWidthLabel label = dealgebraize_item(alg_labels, item_bit_count, mod);
-            return label;
+            // We can use dealgebraize_item because items and labels are the same size
+            return dealgebraize_item(alg_labels, item_bit_count, mod);
         }
     } // namespace sender
 } // namespace apsi

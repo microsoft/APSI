@@ -358,7 +358,7 @@ namespace apsi
         Converts a sequence of field elements into an Item. This will throw an invalid_argument if too many field
         elements are given, i.e., if modulus_bitlen * num_elements > 128.
         */
-        Item dealgebraize_item(vector<felt_t> &item, std::size_t item_bit_count, const seal::Modulus &mod)
+        Item dealgebraize_item(vector<felt_t> &item, size_t item_bit_count, const Modulus &mod)
         {
             Bitstring bits = field_elts_to_bits(item, item_bit_count, mod);
             BitstringView<seal_byte> view = bits.to_view();

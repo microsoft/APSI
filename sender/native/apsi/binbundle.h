@@ -238,8 +238,8 @@ namespace apsi
             */
             bool try_get_multi_label(
                 const std::vector<felt_t> &items,
-                std::vector<L> labels,
-                size_t start_bin_idx
+                size_t start_bin_idx,
+                std::vector<L> labels
             ) const;
 
             /**

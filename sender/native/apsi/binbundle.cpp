@@ -396,7 +396,7 @@ namespace apsi
         vector. Returns true on success.
         */
         template<typename L>
-        bool BinBundle<L>::try_get_multi_label(const vector<felt_t> &items, vector<L> labels, size_t start_bin_idx) const
+        bool BinBundle<L>::try_get_multi_label(const vector<felt_t> &items, size_t start_bin_idx, vector<L> labels) const
         {
             // Clear the return vector. We'll push to it as we collect labels
             labels.clear();

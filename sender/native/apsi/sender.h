@@ -179,7 +179,7 @@ namespace apsi
             static void QueryWorker(
                 const std::shared_ptr<SenderDB> &sender_db,
                 CryptoContext crypto_context,
-                std::pair<std::uint32_t, std::uint32_t> bundle_idx_bounds,
+                std::pair<std::uint32_t, std::uint32_t> work_range,
                 std::vector<std::vector<seal::Ciphertext>> &powers,
                 const PowersDag &pd,
                 network::Channel &chl,

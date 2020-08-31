@@ -257,7 +257,7 @@ namespace apsi
             PowersDag pd = move(query_request.pd_);
 
             // The query response only tells how many ResultPackages to expect; send this first
-            uint32_t package_count = safe_cast<uint32_t>(sender_db->bin_bundle_count());
+            uint32_t package_count = safe_cast<uint32_t>(sender_db->get_bin_bundle_count());
             auto response_query = make_unique<SenderOperationResponseQuery>();
             response_query->package_count = package_count;
             APSI_LOG_INFO("Sending query request response: expect " << package_count << " packages");
@@ -319,7 +319,7 @@ namespace apsi
         void Sender::QueryWorker(
             const shared_ptr<SenderDB> &sender_db,
             CryptoContext crypto_context,
-            pair<uint32_t, uint32_t> bundle_idx_bounds,
+            pair<uint32_t, uint32_t> work_range,
             vector<CiphertextPowers> &all_powers,
             const PowersDag &pd,
             Channel &chl,
@@ -329,8 +329,8 @@ namespace apsi
             sw_ss << "Sender::QueryWorker [" << this_thread::get_id() << "]";
             STOPWATCH(sender_stopwatch, sw_ss.str());
 
-            uint32_t bundle_idx_start = bundle_idx_bounds.first;
-            uint32_t bundle_idx_end = bundle_idx_bounds.second;
+            uint32_t bundle_idx_start = work_range.first;
+            uint32_t bundle_idx_end = work_range.second;
 
             APSI_LOG_INFO("Query worker [" << this_thread::get_id() << "]: "
                 "start processing bundle indices [" << bundle_idx_start << ", " << bundle_idx_end << ")");
