@@ -309,7 +309,7 @@ namespace apsi
         (they're the same length). mod denotes the modulus of the prime field.
         */
         AlgItemLabel<felt_t> algebraize_item_label(
-            const Item &item, const FullWidthLabel &label, size_t item_bit_count, const Modulus &mod)
+            const HashedItem &item, const FullWidthLabel &label, size_t item_bit_count, const Modulus &mod)
         {
             // Convert the item from to a sequence of field elements. This is the "algebraic item".
             vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(item_bit_count).to_view(), mod);
@@ -338,7 +338,7 @@ namespace apsi
         item, and the second is the unit type. item_bit_count denotes the bit length of the items and labels (they're the
         same length). mod denotes the modulus of the prime field. mod denotes the modulus of the prime field.
         */
-        AlgItemLabel<monostate> algebraize_item(const Item &item, size_t item_bit_count, const Modulus &mod)
+        AlgItemLabel<monostate> algebraize_item(const HashedItem &item, size_t item_bit_count, const Modulus &mod)
         {
             // Convert the item from to a sequence of field elements. This is the "algebraic item".
             vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(item_bit_count).to_view(), mod);
@@ -358,11 +358,11 @@ namespace apsi
         Converts a sequence of field elements into an Item. This will throw an invalid_argument if too many field
         elements are given, i.e., if modulus_bitlen * num_elements > 128.
         */
-        Item dealgebraize_item(vector<felt_t> &item, size_t item_bit_count, const Modulus &mod)
+        HashedItem dealgebraize_item(const vector<felt_t> &item, size_t item_bit_count, const Modulus &mod)
         {
             Bitstring bits = field_elts_to_bits(item, item_bit_count, mod);
             BitstringView<seal_byte> view = bits.to_view();
-            return Item(view);
+            return view;
         }
     }
 }

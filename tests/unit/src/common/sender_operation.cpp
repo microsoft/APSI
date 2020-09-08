@@ -111,7 +111,7 @@ namespace APSITests
         stringstream ss;
 
         // Set up the SEAL objects
-        EncryptionParameters parms(scheme_type::BFV);
+        EncryptionParameters parms(scheme_type::bfv);
         parms.set_poly_modulus_degree(4096);
         parms.set_coeff_modulus(CoeffModulus::BFVDefault(4096));
         parms.set_plain_modulus(17);

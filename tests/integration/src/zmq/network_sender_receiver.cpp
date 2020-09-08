@@ -32,7 +32,7 @@ using namespace seal;
 
 namespace
 {
-    map<size_t, Item> rand_subset(const vector<Item> &items, size_t size)
+    map<size_t, Item> rand_subset(const unordered_set<Item> &items, size_t size)
     {
         random_device rd;
 
@@ -42,10 +42,11 @@ namespace
             ss.emplace(static_cast<size_t>(rd() % items.size()));
         }
 
+        vector<Item> items_vec(items.begin(), items.end());
         map<size_t, Item> items_subset;
         for (auto idx : ss)
         {
-            items_subset[idx] = items[idx];
+            items_subset[idx] = items_vec[idx];
         }
 
         return items_subset;
@@ -86,15 +87,14 @@ namespace
         logging::Log::set_log_level(logging::Log::Level::level_all);
         logging::Log::set_console_disabled(false);
 
-        vector<Item> sender_items;
+        unordered_set<Item> sender_items;
         for (size_t i = 0; i < sender_size; i++)
         {
-            sender_items.emplace_back(kuku::make_item(i + 1, 0));
+            sender_items.emplace(kuku::make_item(i + 1, 0));
         }
 
         auto oprf_key = make_shared<OPRFKey>();
-        vector<HashedItem> hashed_sender_items(sender_items.size());
-        OPRFSender::ComputeHashes(sender_items, *oprf_key, hashed_sender_items, num_threads);
+        auto hashed_sender_items = OPRFSender::ComputeHashes(sender_items, *oprf_key);
 
         auto sender_db = make_shared<UnlabeledSenderDB>(params);
         sender_db->set_data(hashed_sender_items, num_threads);
@@ -147,7 +147,7 @@ namespace
         PSIParams::QueryParams query_params;
         query_params.query_powers_count = 3;
 
-        PSIParams::SEALParams seal_params(scheme_type::BFV);
+        PSIParams::SEALParams seal_params(scheme_type::bfv);
         seal_params.set_poly_modulus_degree(8192);
         seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(8192));
         seal_params.set_plain_modulus(65537);

@@ -340,6 +340,15 @@ namespace apsi
             RelinKeys &relin_keys = *crypto_context.relin_keys();
             for (uint32_t bundle_idx = bundle_idx_start; bundle_idx < bundle_idx_end; bundle_idx++)
             {
+                auto bundle_caches = sender_db->get_cache_at(bundle_idx);
+                size_t bundle_count = bundle_caches.size();
+                if (!bundle_count)
+                {
+                    APSI_LOG_DEBUG("Query worker [" << this_thread::get_id() << "]: "
+                        "no bin bundles found at bundle index " << bundle_idx);
+                    continue;
+                }
+
                 // Compute all powers of the query
                 APSI_LOG_DEBUG("Query worker [" << this_thread::get_id() << "]: "
                     "computing all query ciphertext powers for bundle index " << bundle_idx);
@@ -373,9 +382,6 @@ namespace apsi
                 });
 
                 // Next, iterate over each bundle with this bundle index
-                auto bundle_caches = sender_db->get_cache_at(bundle_idx);
-                size_t bundle_count = bundle_caches.size();
-
                 APSI_LOG_DEBUG("Query worker [" << this_thread::get_id() << "]: "
                     "start processing " << bundle_count << " bin bundles for bundle index " << bundle_idx);
 

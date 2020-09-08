@@ -86,50 +86,57 @@ namespace apsi
             }
         }
 
-        void OPRFSender::ComputeHashes(
-            gsl::span<const oprf_item_type> oprf_items, const OPRFKey &oprf_key,
-            gsl::span<oprf_hash_type> oprf_hashes, size_t thread_count)
+        unordered_set<oprf_hash_type> OPRFSender::ComputeHashes(
+            const unordered_set<oprf_item_type> &oprf_items,
+            const OPRFKey &oprf_key)
         {
-            if (oprf_items.size() != oprf_hashes.size())
-            {
-                throw invalid_argument("oprf_items size is incompatible with oprf_hashes size");
-            }
+            unordered_set<oprf_hash_type> oprf_hashes;
 
-            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
-
-            // Partition the work evenly across all threads
-            vector<pair<size_t, size_t>> partitions = partition_evenly(oprf_items.size(), thread_count);
-
-            vector<thread> thrds;
-            for (size_t t = 0; t < partitions.size(); t++)
-            {
-                thrds.emplace_back([&](pair<size_t, size_t> partition) {
-                    compute_hashes_worker(partition, oprf_items, oprf_key, oprf_hashes); }, partitions[t]);
-            }
-
-            for (auto &t : thrds)
-            {
-                t.join();
-            }
-        }
-
-        void OPRFSender::compute_hashes_worker(
-            pair<size_t, size_t> partition,
-            gsl::span<const oprf_item_type> oprf_items,
-            const OPRFKey &oprf_key,
-            gsl::span<oprf_hash_type> oprf_hashes)
-        {
-            for (size_t i = partition.first; i < partition.second; i++)
+            for (auto &item : oprf_items)
             {
                 // Create an elliptic curve point from the item
-                ECPoint ecpt({ reinterpret_cast<const unsigned char *>(oprf_items[i].data()), oprf_item_size });
+                ECPoint ecpt({ reinterpret_cast<const unsigned char *>(item.data()), oprf_item_size });
 
                 // Multiply with key
                 ecpt.scalar_multiply(oprf_key.key_span());
 
                 // Extract the hash
-                ecpt.extract_hash({ reinterpret_cast<unsigned char *>(oprf_hashes[i].data()), ECPoint::hash_size });
+                oprf_hash_type hash;
+                ecpt.extract_hash({ reinterpret_cast<unsigned char *>(hash.data()), ECPoint::hash_size });
+
+                // Add to result
+                oprf_hashes.insert(move(hash));
             }
+
+            return oprf_hashes;
+        }
+
+        static unordered_map<oprf_hash_type, FullWidthLabel> ComputeHashes(
+            const unordered_map<oprf_item_type, FullWidthLabel> &oprf_item_labels,
+            const OPRFKey &oprf_key)
+        {
+            unordered_map<oprf_hash_type, FullWidthLabel> oprf_hashes;
+
+            for (auto &item_label_pair : oprf_item_labels)
+            {
+                // Create an elliptic curve point from the item
+                ECPoint ecpt({ reinterpret_cast<const unsigned char *>(item_label_pair.first.data()), oprf_item_size });
+
+                // Multiply with key
+                ecpt.scalar_multiply(oprf_key.key_span());
+
+                // Extract the hash
+                pair<oprf_hash_type, FullWidthLabel> hash;
+                ecpt.extract_hash({ reinterpret_cast<unsigned char *>(hash.first.data()), ECPoint::hash_size });
+
+                // Copy the label
+                hash.second = item_label_pair.second;
+
+                // Add to result
+                oprf_hashes.insert(move(hash));
+            }
+
+            return oprf_hashes;
         }
     } // namespace oprf
 } // namespace apsi

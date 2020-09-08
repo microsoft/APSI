@@ -63,7 +63,7 @@ namespace apsi
         (they are the same length). mod denotes the modulus of the prime field.
         */
         AlgItemLabel<felt_t> algebraize_item_label(
-            const Item &item,
+            const HashedItem &item,
             const FullWidthLabel &label,
             std::size_t item_bit_count,
             const seal::Modulus &mod
@@ -74,12 +74,18 @@ namespace apsi
         item, and the second is the unit type. item_bit_count denotes the bit length of the items and labels (they are the
         same length). mod denotes the modulus of the prime field. mod denotes the modulus of the prime field.
         */
-        AlgItemLabel<monostate> algebraize_item(Item &item, std::size_t item_bit_count, const seal::Modulus &mod);
+        AlgItemLabel<monostate> algebraize_item(
+            const HashedItem &item,
+            std::size_t item_bit_count,
+            const seal::Modulus &mod);
 
         /**
         Converts a sequence of field elements into an Item. This will throw an invalid_argument if too many field
         elements are given, i.e., if modulus_bitlen * num_elements > 128.
         */
-        Item dealgebraize_item(std::vector<felt_t> &item, std::size_t item_bit_count, const seal::Modulus &mod);
+        HashedItem dealgebraize_item(
+            const std::vector<felt_t> &item,
+            std::size_t item_bit_count,
+            const seal::Modulus &mod);
     }
 } // namespace apsi

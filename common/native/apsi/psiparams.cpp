@@ -95,8 +95,8 @@ namespace apsi
         fbs::QueryParams query_params(params.query_params().query_powers_count);
 
         vector<seal_byte> temp;
-        temp.resize(params.seal_params().save_size(compr_mode_type::ZSTD));
-        auto size = params.seal_params().save(temp.data(), temp.size(), compr_mode_type::ZSTD);
+        temp.resize(params.seal_params().save_size(compr_mode_type::zstd));
+        auto size = params.seal_params().save(temp.data(), temp.size(), compr_mode_type::zstd);
         auto seal_params_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(temp.data()), size);
         auto seal_params = fbs::CreateSEALParams(fbs_builder, seal_params_data);
 
@@ -160,7 +160,7 @@ namespace apsi
             throw runtime_error(ss.str());
         }
 
-        if (seal_params.scheme() != scheme_type::BFV)
+        if (seal_params.scheme() != scheme_type::bfv)
         {
             throw runtime_error("failed to load parameters: invalid scheme type");
         }

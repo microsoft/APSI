@@ -69,7 +69,7 @@ namespace APSITests
     TEST(OPRFTests, OPRFOperation)
     {
         int item_count = 100;
-        vector<Item> items;
+        unordered_set<Item> items;
 
         shared_ptr<UniformRandomGeneratorFactory> rng_factory(make_shared<BlakePRNGFactory>());
         auto rng = rng_factory->create();
@@ -77,14 +77,13 @@ namespace APSITests
         {
             Item it;
             rng->generate(sizeof(Item), reinterpret_cast<seal_byte *>(it.data()));
-            items.emplace_back(move(it));
+            items.insert(move(it));
         }
 
         // Create random key
         OPRFKey oprf_key(rng_factory);
 
-        vector<HashedItem> out_items(item_count);
-        OPRFSender::ComputeHashes(items, oprf_key, out_items);
+        unordered_set<HashedItem> out_items = OPRFSender::ComputeHashes(items, oprf_key);
 
         vector<seal_byte> query(item_count * oprf_query_size);
         OPRFReceiver receiver(items, query);
@@ -95,10 +94,9 @@ namespace APSITests
         vector<HashedItem> receiver_hashes(item_count);
         receiver.process_responses(responses, receiver_hashes);
 
-        for (auto i = 0; i < item_count; i++)
+        for (auto &recv_hash : receiver_hashes)
         {
-            ASSERT_EQ(out_items[i][0], receiver_hashes[i][0]);
-            ASSERT_EQ(out_items[i][1], receiver_hashes[i][1]);
+            ASSERT_TRUE(out_items.find(recv_hash) != out_items.end());
         }
     }
 } // namespace APSITests

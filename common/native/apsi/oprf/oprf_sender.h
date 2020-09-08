@@ -10,6 +10,8 @@
 #include <memory>
 #include <stdexcept>
 #include <utility>
+#include <unordered_set>
+#include <unordered_map>
 
 // SEAL
 #include "seal/util/defines.h"
@@ -19,6 +21,7 @@
 
 // APSI
 #include "apsi/oprf/oprf_common.h"
+#include "apsi/util/db_encoding.h"
 
 namespace apsi
 {
@@ -88,15 +91,13 @@ namespace apsi
                 gsl::span<const seal::seal_byte> oprf_queries, const OPRFKey &oprf_key,
                 gsl::span<seal::seal_byte> oprf_responses);
 
-            static void ComputeHashes(
-                gsl::span<const oprf_item_type> oprf_items, const OPRFKey &oprf_key,
-                gsl::span<oprf_hash_type> oprf_hashes, std::size_t thread_count = 0);
+            static std::unordered_set<oprf_hash_type> ComputeHashes(
+                const std::unordered_set<oprf_item_type> &oprf_items,
+                const OPRFKey &oprf_key);
 
-        private:
-            static void compute_hashes_worker(
-                std::pair<std::size_t, std::size_t> partition,
-                gsl::span<const oprf_item_type> oprf_items, const OPRFKey &oprf_key,
-                gsl::span<oprf_hash_type> oprf_hashes);
+            static std::unordered_map<oprf_hash_type, util::FullWidthLabel> ComputeHashes(
+                const std::unordered_map<oprf_item_type, util::FullWidthLabel> &oprf_item_labels,
+                const OPRFKey &oprf_key);
         }; // class OPRFSender
     }      // namespace oprf
 } // namespace apsi

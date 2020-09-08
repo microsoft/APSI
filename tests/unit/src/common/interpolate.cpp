@@ -112,8 +112,9 @@ namespace APSITests
     {
         Modulus mod(3);
 
+        ASSERT_TRUE(newton_interpolate_polyn({}, {}, mod).empty());
+
         // Invalid number of points/values
-        ASSERT_THROW(auto poly = newton_interpolate_polyn({}, {}, mod), invalid_argument);
         ASSERT_THROW(auto poly = newton_interpolate_polyn({ 0 }, {}, mod), invalid_argument);
         ASSERT_THROW(auto poly = newton_interpolate_polyn({ }, { 0 }, mod), invalid_argument);
 
@@ -125,12 +126,7 @@ namespace APSITests
 
         // Reset mod to a valid value
         mod = 3;
-#ifdef APSI_DEBUG
-        // Should throw an exception in debug mode when all values are zero
-        ASSERT_THROW(auto poly = newton_interpolate_polyn({ 0 }, { 0 }, mod), invalid_argument);
-        ASSERT_THROW(auto poly = newton_interpolate_polyn({ 1 }, { 0 }, mod), invalid_argument);
-        ASSERT_THROW(auto poly = newton_interpolate_polyn({ 1, 2 }, { 0, 0 }, mod), invalid_argument);
-#endif
+
         // Compatible repeated roots
         ASSERT_THROW(auto poly = newton_interpolate_polyn({ 1, 2, 1 }, { 1, 0, 1 }, mod), logic_error);
 

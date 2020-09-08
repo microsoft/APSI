@@ -88,10 +88,6 @@ namespace apsi
             const vector<uint64_t> &values,
             const Modulus &mod
         ) {
-            if (points.empty())
-            {
-                throw invalid_argument("no points to interpolate on");
-            }
             if (points.size() != values.size())
             {
                 throw invalid_argument("number of values does not match the number of interpolation points");
@@ -100,19 +96,13 @@ namespace apsi
             {
                 throw invalid_argument("mod must be prime");
             }
-#ifdef APSI_DEBUG
-            /**
-            Sanity check. Nobody should be using this function with all-0 labels. The Newton polynomial for all-0 points is
-            the 0 polynomial, and that's almost certainly not the desired output.
-            */
+
             bool all_zeros = all_of(values.cbegin(), values.cend(), [](auto a) { return a == 0; });
             if (all_zeros)
             {
-                throw invalid_argument(
-                    "Newton polynomial of all zeros is the zero polynomial. You probably mean to use polyn_with_roots"
-                );
+                return {};
             }
-#endif
+
             auto size = points.size();
 
             vector<vector<uint64_t> > divided_differences;

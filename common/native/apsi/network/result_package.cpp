@@ -29,8 +29,8 @@ namespace apsi
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
             vector<seal_byte> temp;
-            temp.resize(psi_result.save_size(compr_mode_type::ZSTD));
-            auto size = psi_result.save(temp.data(), temp.size(), compr_mode_type::ZSTD);
+            temp.resize(psi_result.save_size(compr_mode_type::zstd));
+            auto size = psi_result.save(temp.data(), temp.size(), compr_mode_type::zstd);
             auto psi_ct_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(temp.data()), size);
             auto psi_ct = fbs::CreateCiphertext(fbs_builder, psi_ct_data);
 
@@ -41,8 +41,8 @@ namespace apsi
                 for (const auto &label_ct : label_result)
                 {
                     // Save each seal::Ciphertext
-                    temp.resize(label_ct.save_size(compr_mode_type::ZSTD));
-                    size = label_ct.save(temp.data(), temp.size(), compr_mode_type::ZSTD);
+                    temp.resize(label_ct.save_size(compr_mode_type::zstd));
+                    size = label_ct.save(temp.data(), temp.size(), compr_mode_type::zstd);
                     auto label_ct_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(temp.data()), size);
 
                     // Add to the Ciphertext vector

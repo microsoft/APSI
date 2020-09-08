@@ -23,7 +23,6 @@
 
 namespace apsi
 {
-
     /**
     TODO: (Michael) These functions are only here because to_bitstring needs to know how to encode an item (which is
     just array<uint64_t, 2>) into a bitstring. This problem goes away if Items are redefined to be array<seal_byte, 16>.
@@ -218,7 +217,10 @@ namespace apsi
         Item() : value_({ 0, 0 })
         {}
 
-        Item(std::array<std::uint64_t, 2> value) : value_(std::move(value))
+        Item(std::array<std::uint64_t, 2> value) : value_(value)
+        {}
+
+        Item(std::uint64_t lw, std::uint64_t hw) : Item(std::array<std::uint64_t, 2>{ lw, hw })
         {}
 
         /**
@@ -378,14 +380,17 @@ namespace apsi
     Represents an Item that has been hashed with an OPRF.
     */
     class HashedItem : public Item
-    {};
+    {
+    public:
+        using Item::Item;
+    };
 } // namespace apsi
 
-/**
-Specializes the std::hash template for Item and HashedItem.
-*/
 namespace std
 {
+    /**
+    Specializes the std::hash template for Item and HashedItem.
+    */
     template <>
     struct hash<apsi::Item>
     {

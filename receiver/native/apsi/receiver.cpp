@@ -469,6 +469,13 @@ namespace apsi
                 size_t felts_per_item = safe_cast<size_t>(params_.item_params().felts_per_item);
                 size_t bundle_start = safe_cast<size_t>(mul_safe(plain_rp.bundle_idx, params_.items_per_bundle()));
                 SEAL_ITERATE(iter(plain_rp_iter, size_t(0)), params_.items_per_bundle(), [&](auto I) {
+                    // Find felts_per_item consecutive zeros
+                    bool match = all_of(get<0>(I), get<0>(I) + felts_per_item, [](auto felt) { return felt == 0; });
+                    if (!match)
+                    {
+                        return;
+                    }
+
                     // Compute the cuckoo table index for this item 
                     size_t table_idx = add_safe(get<1>(I), bundle_start);
 
@@ -477,12 +484,6 @@ namespace apsi
 
                     // If this table_idx doesn't match any item_idx, ignore the result no matter what it is
                     if (item_idx_iter == table_idx_to_item_idx.cend())
-                    {
-                        return;
-                    }
-                    // Find felts_per_item consecutive zeros
-                    bool match = all_of(get<0>(I), get<0>(I) + felts_per_item, [](auto felt) { return felt == 0; });
-                    if (!match)
                     {
                         return;
                     }

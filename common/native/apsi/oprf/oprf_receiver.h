@@ -6,6 +6,8 @@
 // STD
 #include <stdexcept>
 #include <cstddef>
+#include <unordered_set>
+#include <vector>
 
 // APSI
 #include "apsi/oprf/oprf_common.h"
@@ -34,6 +36,14 @@ namespace apsi
                 gsl::span<seal::seal_byte> oprf_queries)
             {
                 process_items(oprf_items, oprf_queries);
+            }
+
+            OPRFReceiver(
+                const std::unordered_set<oprf_item_type> &oprf_items,
+                gsl::span<seal::seal_byte> oprf_queries)
+            {
+                std::vector oprf_items_vec(oprf_items.begin(), oprf_items.end());
+                process_items(oprf_items_vec, oprf_queries);
             }
 
             inline std::size_t item_count() const noexcept

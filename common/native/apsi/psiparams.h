@@ -134,7 +134,7 @@ namespace apsi
 
         const QueryParams query_params_;
 
-        const SEALParams seal_params_{ seal::scheme_type::BFV };
+        const SEALParams seal_params_{ seal::scheme_type::bfv };
 
         std::uint32_t items_per_bundle_;
 

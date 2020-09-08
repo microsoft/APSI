@@ -69,7 +69,7 @@ namespace apsi
             to do encoding and NTT ops.
             */
             BatchedPlaintextPolyn(
-                std::vector<FEltPolyn> &polyns,
+                const std::vector<FEltPolyn> &polyns,
                 CryptoContext crypto_context
             );
 
@@ -88,18 +88,18 @@ namespace apsi
             seal::Ciphertext eval(const std::vector<seal::Ciphertext> &ciphertext_powers) const;
 
             /**
-            Returns whether this polynomial has size at least 2. This is necessary for the eval function to work.
+            Returns whether this polynomial has non-zero size.
             */
             explicit operator bool() const noexcept
             {
-                return batched_coeffs_.size() >= 2;
+                return batched_coeffs_.size();
             }
         };
 
         // A cache of all the polynomial and plaintext computations on a single BinBundle
         struct BinBundleCache
         {
-                BinBundleCache(CryptoContext &crypto_context) :
+                BinBundleCache(const CryptoContext &crypto_context) :
                     batched_matching_polyn(crypto_context),
                     batched_interp_polyn(crypto_context)
                 {}
@@ -129,9 +129,9 @@ namespace apsi
         }; // struct BinBundleCache
 
         /**
-        Represents a specific batch/split and stores the associated data. The type parameter L represents the label
-        type. This is either a field element (in the case of labeled PSI), or an element of the unit type (in the case
-        of unlabeled PSI)
+        Represents a specific bin bundle and stores the associated data. The type parameter L represents the label type.
+        This is either a field element (in the case of labeled PSI), or an element of the unit type (in the case of
+        unlabeled PSI).
         */
         template<typename L>
         class BinBundle
@@ -172,51 +172,47 @@ namespace apsi
             std::vector<std::map<felt_t, L> > bins_;
 
             /**
-            A cache of all the computations we can do on the bins. This is empty by default
+            A cache of all the computations we can do on the bins. This is empty by default.
             */
             BinBundleCache cache_;
 
             /**
             Returns the modulus that defines the finite field that we're working in
             */
-            const seal::Modulus& field_mod();
+            const seal::Modulus &field_mod();
 
         public:
-            BinBundle(
-                std::size_t num_bins,
-                CryptoContext &crypto_context
-            );
+            BinBundle(const CryptoContext &crypto_context);
 
             /**
             Does a dry-run insertion of item-label pairs into sequential bins, beginning at start_bin_idx. This does not
-            mutate the BinBundle.
-            On success, returns the size of the largest bin bins in the modified range, after insertion has taken place
-            On failed insertion, returns -1
+            mutate the BinBundle. On success, returns the size of the largest bin bins in the modified range, after
+            insertion has taken place. On failed insertion, returns -1.
             */
             int multi_insert_dry_run(
-                std::vector<std::pair<felt_t, L> > &item_label_pairs,
-                size_t start_bin_idx
+                const std::vector<std::pair<felt_t, L> > &item_label_pairs,
+                std::size_t start_bin_idx
             );
 
             /**
-            Inserts item-label pairs into sequential bins, beginning at start_bin_idx
-            On success, returns the size of the largest bin bins in the modified range, after insertion has taken place
-            On failed insertion, returns -1. On failure, no modification is made to the BinBundle.
+            Inserts item-label pairs into sequential bins, beginning at start_bin_idx. On success, returns the size of
+            the largest bin bins in the modified range, after insertion has taken place. On failed insertion, returns
+            -1. On failure, no modification is made to the BinBundle.
             */
             int multi_insert_for_real(
-                std::vector<std::pair<felt_t, L> > &item_label_pairs,
-                size_t start_bin_idx
+                const std::vector<std::pair<felt_t, L> > &item_label_pairs,
+                std::size_t start_bin_idx
             );
 
             /**
             Inserts item-label pairs into sequential bins, beginning at start_bin_idx. If dry_run is specified, no
             change is made to the BinBundle. On success, returns the size of the largest bin bins in the modified range,
-            after insertion has taken place On failed insertion, returns -1. On failure, no modification is made to the
+            after insertion has taken place. On failed insertion, returns -1. On failure, no modification is made to the
             BinBundle.
             */
             int multi_insert(
-                std::vector<std::pair<felt_t, L> > &item_label_pairs,
-                size_t start_bin_idx,
+                const std::vector<std::pair<felt_t, L> > &item_label_pairs,
+                std::size_t start_bin_idx,
                 bool dry_run
             );
 
@@ -227,19 +223,28 @@ namespace apsi
             bother.
             */
             bool try_multi_overwrite(
-                std::vector<std::pair<felt_t, L> > &item_label_pairs,
-                size_t start_bin_idx
+                const std::vector<std::pair<felt_t, L> > &item_label_pairs,
+                std::size_t start_bin_idx
             );
 
             /**
-            Sets the given labels to the set of labels associated with the sequence of items in this BinBundle, starting at
-            start_idx. If any item is not present in its respective bin, this returns false and clears the given labels
-            vector. Returns true on success.
+            Attempts to remove the stored items and labels. Returns true iff it found a contiguous sequence of given
+            items and the data was successfully removed. If no such sequence was found, this BinBundle is not mutated.
+            */
+            bool try_multi_remove(
+                const std::vector<felt_t> &items,
+                std::size_t start_bin_idx
+            );
+
+            /**
+            Sets the given labels to the set of labels associated with the sequence of items in this BinBundle, starting
+            at start_idx. If any item is not present in its respective bin, this returns false and clears the given
+            labels vector. Returns true on success.
             */
             bool try_get_multi_label(
                 const std::vector<felt_t> &items,
-                size_t start_bin_idx,
-                std::vector<L> labels
+                std::size_t start_bin_idx,
+                std::vector<L> &labels
             ) const;
 
             /**
@@ -255,18 +260,23 @@ namespace apsi
             /**
             Returns whether this BinBundle's cache needs to be recomputed
             */
-            bool cache_invalid();
+            bool cache_invalid() const;
 
             /**
-            Gets an immutable reference to this BinBundle's cache. This will throw an exception if the cache is invalid.
+            Gets a constant reference to this BinBundle's cache. This will throw an exception if the cache is invalid.
             Check the cache before you wreck the cache.
             */
-            const BinBundleCache& get_cache() const;
+            const BinBundleCache &get_cache() const;
 
             /**
             Generates and caches all the polynomials and plaintexts that this BinBundle requires
             */
             void regen_cache();
+
+            /**
+            Returns whether this BinBundle is empty.
+            */
+            bool empty() const;
         }; // class BinBundle
     } // namespace sender
 } // namespace apsi
