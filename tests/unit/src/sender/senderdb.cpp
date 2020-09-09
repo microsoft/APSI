@@ -313,4 +313,70 @@ namespace APSITests
         ASSERT_TRUE(sender_db.get_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
     }
+
+    TEST(SenderDBTests, Remove)
+    {
+        auto params = get_params();
+        UnlabeledSenderDB sender_db(*params);
+
+        // Insert a single item
+        sender_db.insert_or_assign(HashedItem(0, 0));
+        ASSERT_EQ(1, sender_db.get_items().size());
+        ASSERT_EQ(1, sender_db.get_bin_bundle_count());
+        ASSERT_FALSE(sender_db.get_items().find({ 0, 0 }) == sender_db.get_items().end());
+
+        // Try remove item that doesn't exist
+        ASSERT_THROW(sender_db.remove(HashedItem(1, 0)), invalid_argument);
+
+        // Remove inserted item
+        sender_db.remove(HashedItem(0, 0));
+        ASSERT_EQ(0, sender_db.get_items().size());
+        ASSERT_EQ(0, sender_db.get_bin_bundle_count());
+        ASSERT_TRUE(sender_db.get_items().find({ 0, 0 }) == sender_db.get_items().end());
+
+        // Now insert until we have 5 BinBundles
+        uint64_t val = 0;
+        while (sender_db.get_bin_bundle_count() < 5)
+        {
+            sender_db.insert_or_assign(HashedItem(val, ~val));
+            val++;
+        }
+
+        // Check that everything was found
+        ASSERT_EQ(val, sender_db.get_items().size());
+        ASSERT_EQ(5, sender_db.get_bin_bundle_count());
+
+        // Now remove the first one; we should immediately drop to 4 BinBundles 
+        val--;
+        sender_db.remove(HashedItem(val, ~val));
+        ASSERT_EQ(val, sender_db.get_items().size());
+        ASSERT_EQ(4, sender_db.get_bin_bundle_count());
+
+        // Remove all inserted items, one-by-one
+        while (val > 0)
+        {
+            val--;
+            sender_db.remove(HashedItem(val, ~val));
+        }
+
+        // No BinBundles should be left at this time
+        ASSERT_TRUE(sender_db.get_items().empty());
+        ASSERT_EQ(0, sender_db.get_bin_bundle_count());
+
+        // Again insert until we have 5 BinBundles
+        val = 0;
+        while (sender_db.get_bin_bundle_count() < 5)
+        {
+            sender_db.insert_or_assign(HashedItem(val, ~val));
+            val++;
+        }
+
+        // Now remove all
+        unordered_set<HashedItem> items = sender_db.get_items();
+        sender_db.remove(items);
+
+        // No BinBundles should be left at this time
+        ASSERT_TRUE(sender_db.get_items().empty());
+        ASSERT_EQ(0, sender_db.get_bin_bundle_count());
+    }
 }

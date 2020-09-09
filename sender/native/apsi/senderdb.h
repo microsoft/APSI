@@ -98,6 +98,21 @@ namespace apsi
             ) = 0;
 
             /**
+            Removes the given data from the database, using at most thread_count threads.
+            */
+            virtual void remove(
+                const std::unordered_set<HashedItem> &data,
+                std::size_t thread_count
+            ) = 0;
+
+            /**
+            Removes the given data from the database, using at most thread_count threads.
+            */
+            virtual void remove(
+                const HashedItem &data
+            ) = 0;
+
+            /**
             Returns a set of cache references corresponding to the bundles at the given bundle index. Even though this
             function returns a vector, the order has no significance.
             */
@@ -254,6 +269,26 @@ namespace apsi
             }
 
             /**
+            Removes the given data from the database, using at most thread_count threads.
+            */
+            void remove(
+                const std::unordered_set<HashedItem> &data,
+                std::size_t thread_count
+            ) override;
+
+            /**
+            Removes the given data from the database, using at most thread_count threads.
+            */
+            void remove(
+                const HashedItem &data
+            ) override
+            {
+                std::unordered_set<HashedItem> data_set;
+                data_set.emplace(data);
+                remove(data_set, 1);
+            }
+
+            /**
             Returns the label associated to the given item in the database. Throws std::invalid_argument if the item
             does not appear in the database.
             */
@@ -348,6 +383,26 @@ namespace apsi
                 std::unordered_set<HashedItem> data_set;
                 data_set.emplace(data);
                 insert_or_assign(data_set, 1);
+            }
+
+            /**
+            Removes the given data from the database, using at most thread_count threads.
+            */
+            void remove(
+                const std::unordered_set<HashedItem> &data,
+                std::size_t thread_count = 0
+            ) override;
+
+            /**
+            Removes the given data from the database, using at most thread_count threads.
+            */
+            void remove(
+                const HashedItem &data
+            ) override
+            {
+                std::unordered_set<HashedItem> data_set;
+                data_set.emplace(data);
+                remove(data_set, 1);
             }
         }; // class UnlabeledSenderDB
     }  // namespace sender

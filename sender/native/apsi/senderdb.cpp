@@ -108,6 +108,21 @@ namespace apsi
             }
 
             /**
+            Converts given Item-Label pair into its algebraic form, i.e., a sequence of felt-felt pairs. Also computes
+            the Item's cuckoo index.
+            */
+            vector<pair<AlgItemLabel<felt_t>, size_t>> preprocess_unlabeled_data(
+                const pair<HashedItem, FullWidthLabel> &item_label,
+                const PSIParams &params
+            ) {
+                unordered_map<HashedItem, FullWidthLabel> item_label_singleton{ item_label };
+                return preprocess_labeled_data(
+                    item_label_singleton.begin(),
+                    item_label_singleton.end(),
+                    params);
+            }
+
+            /**
             Converts each given Item into its algebraic form, i.e., a sequence of felt-monostate pairs. Also computes
             each Item's cuckoo index.
             */
@@ -149,6 +164,21 @@ namespace apsi
                 }
 
                 return data_with_indices;
+            }
+
+            /**
+            Converts given Item into its algebraic form, i.e., a sequence of felt-monostate pairs. Also computes the
+            Item's cuckoo index.
+            */
+            vector<pair<AlgItemLabel<monostate>, size_t>> preprocess_unlabeled_data(
+                const HashedItem &item,
+                const PSIParams &params
+            ) {
+                unordered_set<HashedItem> item_singleton{ item };
+                return preprocess_unlabeled_data(
+                    item_singleton.begin(),
+                    item_singleton.end(),
+                    params);
             }
 
             /**
@@ -301,8 +331,6 @@ namespace apsi
                 size_t thread_count,
                 bool overwrite
             ) {
-                thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
-
                 // Collect the bundle indices and partition them into thread_count many partitions. By some uniformity
                 // assumption, the number of things to insert per partition should be roughly the same. Note that
                 // the contents of bundle_indices is always sorted (increasing order).
@@ -338,6 +366,148 @@ namespace apsi
                             bins_per_bundle,
                             max_bin_size,
                             overwrite
+                        );
+                    });
+                }
+
+                // Wait for the threads to finish
+                for (auto &t : threads)
+                {
+                    t.join();
+                }
+            }
+
+            /**
+            Removes the given items and corresponding labels from bin_bundles at their respective cuckoo indices.
+            */
+            template<typename L>
+            void remove_worker(
+                const vector<pair<AlgItemLabel<monostate>, size_t> > &data_with_indices,
+                vector<vector<BinBundle<L> > > &bin_bundles,
+                CryptoContext &crypto_context,
+                pair<vector<size_t>::const_iterator, vector<size_t>::const_iterator> work_range,
+                uint32_t bins_per_bundle)
+            {
+                STOPWATCH(sender_stopwatch, "LabeledSenderDB::remove_worker");
+
+                // Keep track of the bundle indices we look at. These will be the ones whose cache we have to regen.
+                unordered_set<size_t> bundle_indices;
+
+                // Iteratively remove each item-label pair at the given cuckoo index
+                for (auto &data_with_idx : data_with_indices)
+                {
+                    // Convert the vector [(felt, ()), (felt, ()), ..., ] to [felt, felt, felt, ...]
+                    vector<felt_t> algebraized_item;
+                    algebraized_item.reserve(data_with_idx.first.size());
+                    for (auto &item_label : data_with_idx.first)
+                    {
+                        algebraized_item.push_back(item_label.first);
+                    }
+
+                    // Get the bundle index
+                    size_t cuckoo_idx = data_with_idx.second;
+                    size_t bin_idx, bundle_idx;
+                    tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
+
+                    // If the bundle_idx isn't in the prescribed range, don't try to remove this data
+                    auto where = find(work_range.first, work_range.second, bundle_idx);
+                    if (where == work_range.second)
+                    {
+                        // Dealing with this bundle index is not our job
+                        continue;
+                    }
+
+                    // We are removing an item so mark the bundle index for cache regen
+                    bundle_indices.insert(bundle_idx);
+
+                    // Get the bundle set at the given bundle index
+                    vector<BinBundle<L> > &bundle_set = bin_bundles.at(bundle_idx);
+
+                    // Try to remove these field elements from an existing BinBundle at this bundle index. Keep track
+                    // of whether or not we succeed.
+                    bool removed = false;
+                    for (BinBundle<L> &bundle : bundle_set)
+                    {
+                        // If we successfully removed, we're done with this bundle
+                        removed = bundle.try_multi_remove(algebraized_item, bin_idx);
+                        if (removed)
+                        {
+                            break;
+                        }
+                    }
+
+                    // We may have produced some empty BinBundles so just remove them all
+                    auto rem_it = remove_if(bundle_set.begin(), bundle_set.end(), [](auto it) { return it.empty(); });
+                    bundle_set.erase(rem_it, bundle_set.end());
+
+                    // We tried to remove an item that doesn't exist. This should never happen
+                    if (!removed)
+                    {
+                        throw logic_error("failed to remove item");
+                    }
+                }
+
+                // Now it's time to regenerate the caches of all the modified BinBundles. We'll just go through all the
+                // bundle indices we touched and lazily regenerate the caches of all the BinBundles at those indices.
+                for (const size_t &bundle_idx : bundle_indices)
+                {
+                    // Get the set of BinBundles at this bundle index
+                    vector<BinBundle<L> > &bundle_set = bin_bundles.at(bundle_idx);
+
+                    // Regenerate the cache of every BinBundle in the set
+                    for (BinBundle<L> &bundle : bundle_set)
+                    {
+                        // Don't worry, this doesn't do anything unless the BinBundle was actually modified
+                        bundle.regen_cache();
+                    }
+                }
+            }
+
+            /**
+            Takes algebraized data to be removed, splits it up, and distributes it so that thread_count many threads
+            can all remove in parallel.
+            */
+            template <typename L>
+            void dispatch_remove(
+                const vector<pair<AlgItemLabel<monostate>, size_t >> &data_with_indices,
+                vector<vector<BinBundle<L> > > &bin_bundles,
+                CryptoContext &crypto_context,
+                uint32_t bins_per_bundle,
+                size_t thread_count
+            ) {
+                // Collect the bundle indices and partition them into thread_count many partitions. By some uniformity
+                // assumption, the number of things to remove per partition should be roughly the same. Note that the
+                // contents of bundle_indices is always sorted (increasing order).
+                set<size_t> bundle_indices_set;
+                for (auto &data_with_idx : data_with_indices)
+                {
+                    size_t cuckoo_idx = data_with_idx.second;
+                    size_t bin_idx, bundle_idx;
+                    tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
+                    bundle_indices_set.insert(bundle_idx);
+                }
+
+                // Copy the set of indices into a vector of indices
+                vector<size_t> bundle_indices;
+                bundle_indices.reserve(bundle_indices_set.size());
+                copy(bundle_indices_set.begin(), bundle_indices_set.end(), back_inserter(bundle_indices));
+
+                // Partition the bundle indices appropriately
+                vector<pair<size_t, size_t> > partitions = partition_evenly(bundle_indices.size(), thread_count);
+
+                // Run the threads on the partitions
+                vector<thread> threads;
+                for (auto &partition : partitions)
+                {
+                    threads.emplace_back([&, partition]() {
+                        remove_worker(
+                            data_with_indices,
+                            bin_bundles,
+                            crypto_context,
+                            make_pair(
+                                bundle_indices.cbegin() + partition.first,
+                                bundle_indices.cbegin() + partition.second),
+                            bins_per_bundle
                         );
                     });
                 }
@@ -448,6 +618,9 @@ namespace apsi
 
             STOPWATCH(sender_stopwatch, "LabeledSenderDB::insert_or_assign");
 
+            // Lock the database for writing
+            auto lock = db_lock_.acquire_write();
+
             // We need to know which items are new and which are old, since we have to tell dispatch_insert_or_assign
             // when to have an overwrite-on-collision versus add-binbundle-on-collision policy.
             unordered_map<HashedItem, FullWidthLabel> new_data, existing_data;
@@ -466,9 +639,6 @@ namespace apsi
                     existing_data.emplace(move(item_label_pair));
                 }
             }
-
-            // Lock the database for writing
-            auto lock = db_lock_.acquire_write();
 
             // Break the new data down into its field element representation. Also compute the items' cuckoo indices.
             vector<pair<AlgItemLabel<felt_t>, size_t> > new_data_with_indices
@@ -541,8 +711,7 @@ namespace apsi
                 }
             }
 
-            // Break the new data down into its field element representation. Also compute the items' cuckoo indices. We
-            // compute items up to duplicate_items_it, which is where the dupes start.
+            // Break the new data down into its field element representation. Also compute the items' cuckoo indices.
             vector<pair<AlgItemLabel<monostate>, size_t> > data_with_indices
                 = preprocess_unlabeled_data(new_data.begin(), new_data.end(), params_);
 
@@ -574,6 +743,100 @@ namespace apsi
             size_t thread_count
         ) {
             throw logic_error("cannot do labeled insertion on an UnlabeledSenderDB");
+        }
+
+        /**
+        Removes the given data from the database, using at most thread_count threads.
+        */
+        void LabeledSenderDB::remove(
+            const unordered_set<HashedItem> &data,
+            size_t thread_count
+        ) {
+            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
+
+            STOPWATCH(sender_stopwatch, "UnlabeledSenderDB::remove");
+
+            // Lock the database for writing
+            auto lock = db_lock_.acquire_write();
+
+            // We need to check that all the items actually are in the database.
+            for (auto item : data)
+            {
+                if (items_.find(item) == items_.end())
+                {
+                    // Item is not in items_; cannot remove it
+                    throw invalid_argument("item to be removed was not found in SenderDB");
+                }
+            }
+
+            // Break the data to be removed down into its field element representation. Also compute the items' cuckoo
+            // indices.
+            vector<pair<AlgItemLabel<monostate>, size_t> > data_with_indices
+                = preprocess_unlabeled_data(data.begin(), data.end(), params_);
+
+            // Dispatch the removal 
+            uint32_t bins_per_bundle = params_.bins_per_bundle();
+
+            dispatch_remove(
+                data_with_indices,
+                bin_bundles_,
+                crypto_context_,
+                bins_per_bundle,
+                thread_count
+            );
+
+            // Now that everything is removed, clear these items from the cache of all inserted items.
+            for (auto &item : data)
+            {
+                items_.erase(item);
+            }
+        }
+
+        /**
+        Removes the given data from the database, using at most thread_count threads.
+        */
+        void UnlabeledSenderDB::remove(
+            const unordered_set<HashedItem> &data,
+            size_t thread_count
+        ) {
+            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
+
+            STOPWATCH(sender_stopwatch, "UnlabeledSenderDB::remove");
+
+            // Lock the database for writing
+            auto lock = db_lock_.acquire_write();
+
+            // We need to check that all the items actually are in the database.
+            for (auto item : data)
+            {
+                if (items_.find(item) == items_.end())
+                {
+                    // Item is not in items_; cannot remove it
+                    throw invalid_argument("item to be removed was not found in SenderDB");
+                }
+            }
+
+            // Break the data to be removed down into its field element representation. Also compute the items' cuckoo
+            // indices.
+            vector<pair<AlgItemLabel<monostate>, size_t> > data_with_indices
+                = preprocess_unlabeled_data(data.begin(), data.end(), params_);
+
+            // Dispatch the removal 
+            uint32_t bins_per_bundle = params_.bins_per_bundle();
+
+            dispatch_remove(
+                data_with_indices,
+                bin_bundles_,
+                crypto_context_,
+                bins_per_bundle,
+                thread_count
+            );
+
+            // Now that everything is removed, clear these items from the cache of all inserted items.
+            for (auto &item : data)
+            {
+                items_.erase(item);
+            }
         }
 
         /**
@@ -611,7 +874,7 @@ namespace apsi
         }
 
         /**
-        Returns the label associated to the given item in the database. Throws std::invalid_argument if the item does
+        Returns the label associated to the given item in the database. Throws invalid_argument if the item does
         not appear in the database.
         */
         FullWidthLabel LabeledSenderDB::get_label(const HashedItem &item) const
@@ -624,16 +887,12 @@ namespace apsi
 
             uint32_t bins_per_bundle = params_.bins_per_bundle();
 
-            // Preprocess a vector of 1 element. This algebraizes the item and gives back its field element
-            // representation as well as its cuckoo hash.
+            // Preprocess a single element. This algebraizes the item and gives back its field element representation
+            // as well as its cuckoo hash. We only read one of the locations because the labels are the same in each
+            // location.
             AlgItemLabel<monostate> algebraized_item_label;
             size_t cuckoo_idx;
-            unordered_set<HashedItem> item_singleton{ item };
-            tie(algebraized_item_label, cuckoo_idx) = preprocess_unlabeled_data(
-                item_singleton.begin(),
-                item_singleton.end(),
-                params_
-            )[0];
+            tie(algebraized_item_label, cuckoo_idx) = preprocess_unlabeled_data(item, params_)[0];
 
             // Convert the vector [(felt, ()), (felt, ()), ..., ] to [felt, felt, felt, ...]
             vector<felt_t> algebraized_item;
