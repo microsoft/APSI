@@ -111,7 +111,7 @@ namespace apsi
             return oprf_hashes;
         }
 
-        static unordered_map<oprf_hash_type, FullWidthLabel> ComputeHashes(
+        unordered_map<oprf_hash_type, FullWidthLabel> OPRFSender::ComputeHashes(
             const unordered_map<oprf_item_type, FullWidthLabel> &oprf_item_labels,
             const OPRFKey &oprf_key)
         {

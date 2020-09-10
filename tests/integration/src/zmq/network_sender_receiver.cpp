@@ -7,6 +7,10 @@
 #include <random>
 #include <vector>
 #include <algorithm>
+#include <array>
+#include <iterator>
+#include <unordered_set>
+#include <unordered_map>
 
 // APSI
 #include "apsi/logging/log.h"
@@ -32,7 +36,7 @@ using namespace seal;
 
 namespace
 {
-    map<size_t, Item> rand_subset(const unordered_set<Item> &items, size_t size)
+    unordered_set<Item> rand_subset(const unordered_set<Item> &items, size_t size)
     {
         random_device rd;
 
@@ -43,54 +47,112 @@ namespace
         }
 
         vector<Item> items_vec(items.begin(), items.end());
-        map<size_t, Item> items_subset;
+        unordered_set<Item> items_subset;
         for (auto idx : ss)
         {
-            items_subset[idx] = items_vec[idx];
+            items_subset.insert(items_vec[idx]);
         }
 
         return items_subset;
     }
 
-    void verify_psi_results(
-        const vector<MatchRecord> &query_result, const vector<Item> &query_subset)
+    unordered_set<Item> rand_subset(const unordered_map<Item, FullWidthLabel> &items, size_t size)
     {
-        ASSERT_EQ(query_subset.size(), query_result.size());
+        random_device rd;
 
-        // Count matches
-        size_t match_count = accumulate(query_result.cbegin(), query_result.cend(), size_t(0),
-            [](auto sum, auto &curr) { return sum + !!curr; });
+        set<size_t> ss;
+        while (ss.size() != size)
+        {
+            ss.emplace(static_cast<size_t>(rd() % items.size()));
+        }
 
-        // All items were found
-        ASSERT_EQ(query_subset.size(), match_count);
+        vector<Item> items_vec;
+        transform(items.begin(), items.end(), back_inserter(items_vec), [](auto &item) { return item.first; });
+        unordered_set<Item> items_subset;
+        for (auto idx : ss)
+        {
+            items_subset.insert(items_vec[idx]);
+        }
+
+        return items_subset;
     }
 
-    void verify_labeled_psi_results(
-        const vector<MatchRecord> &query_result, const vector<Item> &query_subset,
-        const vector<FullWidthLabel> &total_label_set)
-    {
-        verify_psi_results(query_result, query_subset);
+    void verify_unlabeled_results(
+        const vector<MatchRecord> &query_result,
+        const vector<Item> &query_vec,
+        const unordered_set<Item> &int_items
+    ) {
+        // Count matches
+        size_t match_count = accumulate(query_result.cbegin(), query_result.cend(), size_t(0),
+            [](auto sum, auto &curr) { return sum + curr.found; });
 
-        // Check that all labels in the query subset match
-        for (size_t idx = 0; idx < query_result.size(); idx++)
+        // Check that intersection size is correct
+        ASSERT_EQ(int_items.size(), match_count);
+
+        // Check that every intersection item was actually found
+        for (auto &item : int_items)
         {
-            auto result_label = query_result[idx].label.get_as<uint64_t>();
-            auto reference_label = gsl::span<const uint64_t>(
-                total_label_set[idx].data(),
-                sizeof(FullWidthLabel)/sizeof(uint64_t));
-            ASSERT_TRUE(equal(reference_label.begin(), reference_label.end(), result_label.begin()));
+            auto where = find(query_vec.begin(), query_vec.end(), item);
+            ASSERT_NE(query_vec.end(), where);
+
+            auto idx = distance(query_vec.begin(), where);
+            ASSERT_TRUE(query_result[idx].found);
         }
     }
 
-    void RunTest(size_t sender_size, size_t client_size, const PSIParams &params, size_t num_threads)
+    void verify_labeled_results(
+        const vector<MatchRecord> &query_result,
+        const vector<Item> &query_vec,
+        const unordered_set<Item> &int_items,
+        const unordered_map<Item, FullWidthLabel> &all_item_labels
+    ) {
+        verify_unlabeled_results(query_result, query_vec, int_items);
+
+        // Verify that all labels were received for items that were found
+        for (auto &result : query_result)
+        {
+            if (result.found)
+            {
+                ASSERT_TRUE(result.label);
+
+            }
+        }
+
+        // Check that the labels are correct for items in the intersection
+        for (auto &item : int_items)
+        {
+            auto where = find(query_vec.begin(), query_vec.end(), item);
+            auto idx = distance(query_vec.begin(), where);
+
+            auto reference_label = find_if(
+                all_item_labels.begin(),
+                all_item_labels.end(),
+                [&item](auto &item_label) { return item == item_label.first; });
+            ASSERT_NE(all_item_labels.end(), reference_label);
+
+            array<uint64_t, 2> label;
+            copy_n(query_result[idx].label.get_as<uint64_t>().begin(), 2, label.begin());
+            ASSERT_EQ(reference_label->second.value(), label);
+        }
+    }
+
+    void RunUnlabeledTest(
+        size_t sender_size,
+        size_t client_size,
+        size_t int_size,
+        const PSIParams &params,
+        size_t num_threads)
     {
-        logging::Log::set_log_level(logging::Log::Level::level_all);
         logging::Log::set_console_disabled(false);
+        logging::Log::set_log_level(logging::Log::Level::level_info);
+        //logging::Log::set_log_file("out.log");
+
+        ASSERT_TRUE(int_size <= client_size);
 
         unordered_set<Item> sender_items;
         for (size_t i = 0; i < sender_size; i++)
         {
-            sender_items.emplace(kuku::make_item(i + 1, 0));
+            sender_items.insert({ i + 1, i + 1 });
         }
 
         auto oprf_key = make_shared<OPRFKey>();
@@ -106,36 +168,94 @@ namespace
             dispatcher.run(stop_sender, 5550, oprf_key);
         });
 
-        // Connect the network
         ReceiverChannel recv_chl;
 
         string conn_addr = "tcp://localhost:5550";
         recv_chl.connect(conn_addr);
 
         Receiver receiver(params, num_threads);
-        auto recv_items = rand_subset(sender_items, client_size);
-        vector<Item> recv_items_vec;
-        for (auto item : recv_items)
+        unordered_set<Item> recv_int_items = rand_subset(sender_items, int_size);
+        vector<Item> recv_items;
+        for (auto item : recv_int_items)
         {
-            recv_items_vec.push_back(item.second);
+            recv_items.push_back(item);
+        }
+        for (size_t i = int_size; i < client_size; i++)
+        {
+            recv_items.push_back({ i + 1, ~(i + 1) });
         }
 
-        auto hashed_recv_items = receiver.request_oprf(recv_items_vec, recv_chl);
+        auto hashed_recv_items = receiver.request_oprf(recv_items, recv_chl);
         auto query = receiver.create_query(hashed_recv_items);
         auto query_result = receiver.request_query(move(query), recv_chl);
 
         stop_sender = true;
         sender_th.join();
 
-        verify_psi_results(query_result, recv_items_vec);
+        verify_unlabeled_results(query_result, recv_items, recv_int_items);
+    }
+
+    void RunLabeledTest(
+        size_t sender_size,
+        size_t client_size,
+        size_t int_size,
+        const PSIParams &params,
+        size_t num_threads)
+    {
+        logging::Log::set_console_disabled(false);
+        logging::Log::set_log_level(logging::Log::Level::level_info);
+        //logging::Log::set_log_file("out.log");
+
+        ASSERT_TRUE(int_size <= client_size);
+
+        unordered_map<Item, FullWidthLabel> sender_items;
+        for (size_t i = 0; i < sender_size; i++)
+        {
+            sender_items.insert(make_pair(Item(i + 1, i + 1), FullWidthLabel(~(i + 1), i + 1)));
+        }
+
+        auto oprf_key = make_shared<OPRFKey>();
+        auto hashed_sender_items = OPRFSender::ComputeHashes(sender_items, *oprf_key);
+
+        auto sender_db = make_shared<LabeledSenderDB>(params);
+        sender_db->set_data(hashed_sender_items, num_threads);
+
+        atomic<bool> stop_sender = false;
+
+        auto sender_th = thread([&]() {
+            SenderDispatcher dispatcher(sender_db, num_threads);
+            dispatcher.run(stop_sender, 5550, oprf_key);
+        });
+
+        ReceiverChannel recv_chl;
+
+        string conn_addr = "tcp://localhost:5550";
+        recv_chl.connect(conn_addr);
+
+        Receiver receiver(params, num_threads);
+        unordered_set<Item> recv_int_items = rand_subset(sender_items, int_size);
+        vector<Item> recv_items;
+        for (auto item : recv_int_items)
+        {
+            recv_items.push_back(item);
+        }
+        for (size_t i = int_size; i < client_size; i++)
+        {
+            recv_items.push_back({ i + 1, ~(i + 1) });
+        }
+
+        auto hashed_recv_items = receiver.request_oprf(recv_items, recv_chl);
+        auto query = receiver.create_query(hashed_recv_items);
+        auto query_result = receiver.request_query(move(query), recv_chl);
+
+        stop_sender = true;
+        sender_th.join();
+
+        verify_labeled_results(query_result, recv_items, recv_int_items, sender_items);
     }
 
     PSIParams create_params()
     {
-        //logging::Log::set_console_disabled(true);
-        //logging::Log::set_log_level(logging::Log::Level::level_debug);
-        //logging::Log::set_log_file("out.log");
-
         PSIParams::ItemParams item_params;
         item_params.felts_per_item = 8;
 
@@ -154,6 +274,27 @@ namespace
 
         return { item_params, table_params, query_params, seal_params };
     }
+
+    PSIParams create_huge_params()
+    {
+        PSIParams::ItemParams item_params;
+        item_params.felts_per_item = 8;
+
+        PSIParams::TableParams table_params;
+        table_params.hash_func_count = 4;
+        table_params.max_items_per_bin = 128;
+        table_params.table_size = 65536;
+
+        PSIParams::QueryParams query_params;
+        query_params.query_powers_count = 3;
+
+        PSIParams::SEALParams seal_params(scheme_type::bfv);
+        seal_params.set_poly_modulus_degree(16384);
+        seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(16384));
+        seal_params.set_plain_modulus(65537);
+
+        return { item_params, table_params, query_params, seal_params };
+    }
 } // namespace
 
 namespace APSITests
@@ -162,89 +303,287 @@ namespace APSITests
     {
         size_t sender_size = 0;
         PSIParams params = create_params();
-        RunTest(sender_size, 0, params, 1);
+        RunUnlabeledTest(sender_size, 0, 0, params, 1);
     }
 
     TEST(SenderReceiverTests, UnlabeledEmptyMultiThreadedTest)
     {
         size_t sender_size = 0;
         PSIParams params = create_params();
-        RunTest(sender_size, 0, params, 4);
+        RunUnlabeledTest(sender_size, 0, 0, params, 4);
     }
 
     TEST(SenderReceiverTests, UnlabeledSingleTest)
     {
         size_t sender_size = 1;
         PSIParams params = create_params();
-        RunTest(sender_size, 0, params, 1);
-        RunTest(sender_size, 1, params, 1);
+        RunUnlabeledTest(sender_size, 0, 0, params, 1);
+        RunUnlabeledTest(sender_size, 1, 0, params, 1);
+        RunUnlabeledTest(sender_size, 1, 1, params, 1);
     }
 
     TEST(SenderReceiverTests, UnlabeledSingleMultiThreadedTest)
     {
         size_t sender_size = 1;
         PSIParams params = create_params();
-        RunTest(sender_size, 0, params, 4);
-        RunTest(sender_size, 1, params, 4);
+        RunUnlabeledTest(sender_size, 0, 0, params, 4);
+        RunUnlabeledTest(sender_size, 1, 0, params, 4);
+        RunUnlabeledTest(sender_size, 1, 1, params, 4);
     }
 
     TEST(SenderReceiverTests, UnlabeledSmallTest)
     {
         size_t sender_size = 10;
         PSIParams params = create_params();
-        RunTest(sender_size, 0, params, 1);
-        RunTest(sender_size, 1, params, 1);
-        RunTest(sender_size, 5, params, 1);
-        RunTest(sender_size, 10, params, 1);
+        RunUnlabeledTest(sender_size, 0, 0, params, 1);
+        RunUnlabeledTest(sender_size, 1, 0, params, 1);
+        RunUnlabeledTest(sender_size, 1, 1, params, 1);
+        RunUnlabeledTest(sender_size, 5, 0, params, 1);
+        RunUnlabeledTest(sender_size, 5, 1, params, 1);
+        RunUnlabeledTest(sender_size, 5, 2, params, 1);
+        RunUnlabeledTest(sender_size, 5, 5, params, 1);
+        RunUnlabeledTest(sender_size, 10, 0, params, 1);
+        RunUnlabeledTest(sender_size, 10, 1, params, 1);
+        RunUnlabeledTest(sender_size, 10, 5, params, 1);
+        RunUnlabeledTest(sender_size, 10, 10, params, 1);
     }
 
     TEST(SenderReceiverTests, UnlabeledSmallMultiThreadedTest)
     {
         size_t sender_size = 10;
         PSIParams params = create_params();
-        RunTest(sender_size, 0, params, 4);
-        RunTest(sender_size, 1, params, 4);
-        RunTest(sender_size, 5, params, 4);
-        RunTest(sender_size, 10, params, 4);
+        RunUnlabeledTest(sender_size, 0, 0, params, 4);
+        RunUnlabeledTest(sender_size, 1, 0, params, 4);
+        RunUnlabeledTest(sender_size, 1, 1, params, 4);
+        RunUnlabeledTest(sender_size, 5, 0, params, 4);
+        RunUnlabeledTest(sender_size, 5, 2, params, 4);
+        RunUnlabeledTest(sender_size, 5, 5, params, 4);
+        RunUnlabeledTest(sender_size, 10, 0, params, 4);
+        RunUnlabeledTest(sender_size, 10, 1, params, 4);
+        RunUnlabeledTest(sender_size, 10, 5, params, 4);
+        RunUnlabeledTest(sender_size, 10, 10, params, 4);
     }
 
     TEST(SenderReceiverTests, UnlabeledMediumTest)
     {
         size_t sender_size = 500;
         PSIParams params = create_params();
-        RunTest(sender_size, 0, params, 1);
-        RunTest(sender_size, 1, params, 1);
-        RunTest(sender_size, 50, params, 1);
-        RunTest(sender_size, 100, params, 1);
+        RunUnlabeledTest(sender_size, 0, 0, params, 1);
+        RunUnlabeledTest(sender_size, 1, 0, params, 1);
+        RunUnlabeledTest(sender_size, 1, 1, params, 1);
+        RunUnlabeledTest(sender_size, 50, 10, params, 1);
+        RunUnlabeledTest(sender_size, 50, 50, params, 1);
+        RunUnlabeledTest(sender_size, 100, 1, params, 1);
+        RunUnlabeledTest(sender_size, 100, 50, params, 1);
+        RunUnlabeledTest(sender_size, 100, 100, params, 1);
     }
 
     TEST(SenderReceiverTests, UnlabeledMediumMultiThreadedTest)
     {
         size_t sender_size = 500;
         PSIParams params = create_params();
-        RunTest(sender_size, 0, params, 4);
-        RunTest(sender_size, 1, params, 4);
-        RunTest(sender_size, 50, params, 4);
-        RunTest(sender_size, 100, params, 4);
+        RunUnlabeledTest(sender_size, 0, 0, params, 4);
+        RunUnlabeledTest(sender_size, 1, 0, params, 4);
+        RunUnlabeledTest(sender_size, 1, 1, params, 4);
+        RunUnlabeledTest(sender_size, 50, 10, params, 4);
+        RunUnlabeledTest(sender_size, 50, 50, params, 4);
+        RunUnlabeledTest(sender_size, 100, 1, params, 4);
+        RunUnlabeledTest(sender_size, 100, 50, params, 4);
+        RunUnlabeledTest(sender_size, 100, 100, params, 4);
     }
 
     TEST(SenderReceiverTests, UnlabeledLargeTest)
     {
         size_t sender_size = 4000;
         PSIParams params = create_params();
-        RunTest(sender_size, 0, params, 1);
-        RunTest(sender_size, 1, params, 1);
-        RunTest(sender_size, 500, params, 1);
-        RunTest(sender_size, 1000, params, 1);
+        RunUnlabeledTest(sender_size, 0, 0, params, 1);
+        RunUnlabeledTest(sender_size, 1, 0, params, 1);
+        RunUnlabeledTest(sender_size, 500, 10, params, 1);
+        RunUnlabeledTest(sender_size, 500, 50, params, 1);
+        RunUnlabeledTest(sender_size, 500, 100, params, 1);
+        RunUnlabeledTest(sender_size, 500, 500, params, 1);
+        RunUnlabeledTest(sender_size, 1000, 0, params, 1);
+        RunUnlabeledTest(sender_size, 1000, 1, params, 1);
+        RunUnlabeledTest(sender_size, 1000, 500, params, 1);
+        RunUnlabeledTest(sender_size, 1000, 999, params, 1);
+        RunUnlabeledTest(sender_size, 1000, 1000, params, 1);
     }
 
     TEST(SenderReceiverTests, UnlabeledLargeMultiThreadedTest)
     {
         size_t sender_size = 4000;
         PSIParams params = create_params();
-        RunTest(sender_size, 0, params, 4);
-        RunTest(sender_size, 1, params, 4);
-        RunTest(sender_size, 500, params, 4);
-        RunTest(sender_size, 1000, params, 4);
+        RunUnlabeledTest(sender_size, 0, 0, params, 4);
+        RunUnlabeledTest(sender_size, 1, 0, params, 4);
+        RunUnlabeledTest(sender_size, 500, 10, params, 4);
+        RunUnlabeledTest(sender_size, 500, 50, params, 4);
+        RunUnlabeledTest(sender_size, 500, 100, params, 4);
+        RunUnlabeledTest(sender_size, 500, 500, params, 4);
+        RunUnlabeledTest(sender_size, 1000, 0, params, 4);
+        RunUnlabeledTest(sender_size, 1000, 1, params, 4);
+        RunUnlabeledTest(sender_size, 1000, 500, params, 4);
+        RunUnlabeledTest(sender_size, 1000, 999, params, 4);
+        RunUnlabeledTest(sender_size, 1000, 1000, params, 4);
     }
+
+    //TEST(SenderReceiverTests, UnlabeledHugeMultiThreadedTest)
+    //{
+        //size_t sender_size = 50000;
+        //PSIParams params = create_huge_params();
+        //RunUnlabeledTest(sender_size, 0, 0, params, 4);
+        //RunUnlabeledTest(sender_size, 1, 0, params, 4);
+        //RunUnlabeledTest(sender_size, 5000, 100, params, 4);
+        //RunUnlabeledTest(sender_size, 5000, 5000, params, 4);
+        //RunUnlabeledTest(sender_size, 10000, 0, params, 4);
+        //RunUnlabeledTest(sender_size, 10000, 5000, params, 4);
+        //RunUnlabeledTest(sender_size, 10000, 10000, params, 4);
+        //RunUnlabeledTest(sender_size, 50000, 50000, params, 4);
+
+        //sender_size = 1'000'000;
+        //RunUnlabeledTest(sender_size, 10000, 10000, params, 4);
+    //}
+
+    TEST(SenderReceiverTests, LabeledEmptyTest)
+    {
+        size_t sender_size = 0;
+        PSIParams params = create_params();
+        RunLabeledTest(sender_size, 0, 0, params, 1);
+    }
+
+    TEST(SenderReceiverTests, LabeledEmptyMultiThreadedTest)
+    {
+        size_t sender_size = 0;
+        PSIParams params = create_params();
+        RunLabeledTest(sender_size, 0, 0, params, 4);
+    }
+
+    TEST(SenderReceiverTests, LabeledSingleTest)
+    {
+        size_t sender_size = 1;
+        PSIParams params = create_params();
+        RunLabeledTest(sender_size, 0, 0, params, 1);
+        RunLabeledTest(sender_size, 1, 0, params, 1);
+        RunLabeledTest(sender_size, 1, 1, params, 1);
+    }
+
+    TEST(SenderReceiverTests, LabeledSingleMultiThreadedTest)
+    {
+        size_t sender_size = 1;
+        PSIParams params = create_params();
+        RunLabeledTest(sender_size, 0, 0, params, 4);
+        RunLabeledTest(sender_size, 1, 0, params, 4);
+        RunLabeledTest(sender_size, 1, 1, params, 4);
+    }
+
+    TEST(SenderReceiverTests, LabeledSmallTest)
+    {
+        size_t sender_size = 10;
+        PSIParams params = create_params();
+        RunLabeledTest(sender_size, 0, 0, params, 1);
+        RunLabeledTest(sender_size, 1, 0, params, 1);
+        RunLabeledTest(sender_size, 1, 1, params, 1);
+        RunLabeledTest(sender_size, 5, 0, params, 1);
+        RunLabeledTest(sender_size, 5, 1, params, 1);
+        RunLabeledTest(sender_size, 5, 2, params, 1);
+        RunLabeledTest(sender_size, 5, 5, params, 1);
+        RunLabeledTest(sender_size, 10, 0, params, 1);
+        RunLabeledTest(sender_size, 10, 1, params, 1);
+        RunLabeledTest(sender_size, 10, 5, params, 1);
+        RunLabeledTest(sender_size, 10, 10, params, 1);
+    }
+
+    TEST(SenderReceiverTests, LabeledSmallMultiThreadedTest)
+    {
+        size_t sender_size = 10;
+        PSIParams params = create_params();
+        RunLabeledTest(sender_size, 0, 0, params, 4);
+        RunLabeledTest(sender_size, 1, 0, params, 4);
+        RunLabeledTest(sender_size, 1, 1, params, 4);
+        RunLabeledTest(sender_size, 5, 0, params, 4);
+        RunLabeledTest(sender_size, 5, 2, params, 4);
+        RunLabeledTest(sender_size, 5, 5, params, 4);
+        RunLabeledTest(sender_size, 10, 0, params, 4);
+        RunLabeledTest(sender_size, 10, 1, params, 4);
+        RunLabeledTest(sender_size, 10, 5, params, 4);
+        RunLabeledTest(sender_size, 10, 10, params, 4);
+    }
+
+    TEST(SenderReceiverTests, LabeledMediumTest)
+    {
+        size_t sender_size = 500;
+        PSIParams params = create_params();
+        RunLabeledTest(sender_size, 0, 0, params, 1);
+        RunLabeledTest(sender_size, 1, 0, params, 1);
+        RunLabeledTest(sender_size, 1, 1, params, 1);
+        RunLabeledTest(sender_size, 50, 10, params, 1);
+        RunLabeledTest(sender_size, 50, 50, params, 1);
+        RunLabeledTest(sender_size, 100, 1, params, 1);
+        RunLabeledTest(sender_size, 100, 50, params, 1);
+        RunLabeledTest(sender_size, 100, 100, params, 1);
+    }
+
+    TEST(SenderReceiverTests, LabeledMediumMultiThreadedTest)
+    {
+        size_t sender_size = 500;
+        PSIParams params = create_params();
+        RunLabeledTest(sender_size, 0, 0, params, 4);
+        RunLabeledTest(sender_size, 1, 0, params, 4);
+        RunLabeledTest(sender_size, 1, 1, params, 4);
+        RunLabeledTest(sender_size, 50, 10, params, 4);
+        RunLabeledTest(sender_size, 50, 50, params, 4);
+        RunLabeledTest(sender_size, 100, 1, params, 4);
+        RunLabeledTest(sender_size, 100, 50, params, 4);
+        RunLabeledTest(sender_size, 100, 100, params, 4);
+    }
+
+    TEST(SenderReceiverTests, LabeledLargeTest)
+    {
+        size_t sender_size = 4000;
+        PSIParams params = create_params();
+        RunLabeledTest(sender_size, 0, 0, params, 1);
+        RunLabeledTest(sender_size, 1, 0, params, 1);
+        RunLabeledTest(sender_size, 500, 10, params, 1);
+        RunLabeledTest(sender_size, 500, 50, params, 1);
+        RunLabeledTest(sender_size, 500, 100, params, 1);
+        RunLabeledTest(sender_size, 500, 500, params, 1);
+        RunLabeledTest(sender_size, 1000, 0, params, 1);
+        RunLabeledTest(sender_size, 1000, 1, params, 1);
+        RunLabeledTest(sender_size, 1000, 500, params, 1);
+        RunLabeledTest(sender_size, 1000, 999, params, 1);
+        RunLabeledTest(sender_size, 1000, 1000, params, 1);
+    }
+
+    TEST(SenderReceiverTests, LabeledLargeMultiThreadedTest)
+    {
+        size_t sender_size = 4000;
+        PSIParams params = create_params();
+        RunLabeledTest(sender_size, 0, 0, params, 4);
+        RunLabeledTest(sender_size, 1, 0, params, 4);
+        RunLabeledTest(sender_size, 500, 10, params, 4);
+        RunLabeledTest(sender_size, 500, 50, params, 4);
+        RunLabeledTest(sender_size, 500, 100, params, 4);
+        RunLabeledTest(sender_size, 500, 500, params, 4);
+        RunLabeledTest(sender_size, 1000, 0, params, 4);
+        RunLabeledTest(sender_size, 1000, 1, params, 4);
+        RunLabeledTest(sender_size, 1000, 500, params, 4);
+        RunLabeledTest(sender_size, 1000, 999, params, 4);
+        RunLabeledTest(sender_size, 1000, 1000, params, 4);
+    }
+
+    //TEST(SenderReceiverTests, LabeledHugeMultiThreadedTest)
+    //{
+        //size_t sender_size = 50000;
+        //PSIParams params = create_huge_params();
+        //RunLabeledTest(sender_size, 0, 0, params, 4);
+        //RunLabeledTest(sender_size, 1, 0, params, 4);
+        //RunLabeledTest(sender_size, 5000, 100, params, 4);
+        //RunLabeledTest(sender_size, 5000, 5000, params, 4);
+        //RunLabeledTest(sender_size, 10000, 0, params, 4);
+        //RunLabeledTest(sender_size, 10000, 5000, params, 4);
+        //RunLabeledTest(sender_size, 10000, 10000, params, 4);
+        //RunLabeledTest(sender_size, 50000, 50000, params, 4);
+
+        //sender_size = 1'000'000;
+        //RunLabeledTest(sender_size, 10000, 10000, params, 4);
+    //}
 } // namespace APSITests
