@@ -138,16 +138,13 @@ namespace
 
     void RunUnlabeledTest(
         size_t sender_size,
-        size_t client_size,
-        size_t int_size,
+        vector<pair<size_t, size_t>> client_total_and_int_sizes,
         const PSIParams &params,
         size_t num_threads)
     {
         logging::Log::set_console_disabled(false);
         logging::Log::set_log_level(logging::Log::Level::level_info);
         //logging::Log::set_log_file("out.log");
-
-        ASSERT_TRUE(int_size <= client_size);
 
         unordered_set<Item> sender_items;
         for (size_t i = 0; i < sender_size; i++)
@@ -174,39 +171,44 @@ namespace
         recv_chl.connect(conn_addr);
 
         Receiver receiver(params, num_threads);
-        unordered_set<Item> recv_int_items = rand_subset(sender_items, int_size);
-        vector<Item> recv_items;
-        for (auto item : recv_int_items)
-        {
-            recv_items.push_back(item);
-        }
-        for (size_t i = int_size; i < client_size; i++)
-        {
-            recv_items.push_back({ i + 1, ~(i + 1) });
-        }
 
-        auto hashed_recv_items = receiver.request_oprf(recv_items, recv_chl);
-        auto query = receiver.create_query(hashed_recv_items);
-        auto query_result = receiver.request_query(move(query), recv_chl);
+        for (auto client_total_and_int_size : client_total_and_int_sizes)
+        {
+            auto client_size = client_total_and_int_size.first;
+            auto int_size = client_total_and_int_size.second;
+            ASSERT_TRUE(int_size <= client_size);
+
+            unordered_set<Item> recv_int_items = rand_subset(sender_items, int_size);
+            vector<Item> recv_items;
+            for (auto item : recv_int_items)
+            {
+                recv_items.push_back(item);
+            }
+            for (size_t i = int_size; i < client_size; i++)
+            {
+                recv_items.push_back({ i + 1, ~(i + 1) });
+            }
+
+            auto hashed_recv_items = receiver.request_oprf(recv_items, recv_chl);
+            auto query = receiver.create_query(hashed_recv_items);
+            auto query_result = receiver.request_query(move(query), recv_chl);
+
+            verify_unlabeled_results(query_result, recv_items, recv_int_items);
+        }
 
         stop_sender = true;
         sender_th.join();
-
-        verify_unlabeled_results(query_result, recv_items, recv_int_items);
     }
 
     void RunLabeledTest(
         size_t sender_size,
-        size_t client_size,
-        size_t int_size,
+        vector<pair<size_t, size_t>> client_total_and_int_sizes,
         const PSIParams &params,
         size_t num_threads)
     {
         logging::Log::set_console_disabled(false);
         logging::Log::set_log_level(logging::Log::Level::level_info);
         //logging::Log::set_log_file("out.log");
-
-        ASSERT_TRUE(int_size <= client_size);
 
         unordered_map<Item, FullWidthLabel> sender_items;
         for (size_t i = 0; i < sender_size; i++)
@@ -233,25 +235,33 @@ namespace
         recv_chl.connect(conn_addr);
 
         Receiver receiver(params, num_threads);
-        unordered_set<Item> recv_int_items = rand_subset(sender_items, int_size);
-        vector<Item> recv_items;
-        for (auto item : recv_int_items)
-        {
-            recv_items.push_back(item);
-        }
-        for (size_t i = int_size; i < client_size; i++)
-        {
-            recv_items.push_back({ i + 1, ~(i + 1) });
-        }
 
-        auto hashed_recv_items = receiver.request_oprf(recv_items, recv_chl);
-        auto query = receiver.create_query(hashed_recv_items);
-        auto query_result = receiver.request_query(move(query), recv_chl);
+        for (auto client_total_and_int_size : client_total_and_int_sizes)
+        {
+            auto client_size = client_total_and_int_size.first;
+            auto int_size = client_total_and_int_size.second;
+            ASSERT_TRUE(int_size <= client_size);
+
+            unordered_set<Item> recv_int_items = rand_subset(sender_items, int_size);
+            vector<Item> recv_items;
+            for (auto item : recv_int_items)
+            {
+                recv_items.push_back(item);
+            }
+            for (size_t i = int_size; i < client_size; i++)
+            {
+                recv_items.push_back({ i + 1, ~(i + 1) });
+            }
+
+            auto hashed_recv_items = receiver.request_oprf(recv_items, recv_chl);
+            auto query = receiver.create_query(hashed_recv_items);
+            auto query_result = receiver.request_query(move(query), recv_chl);
+
+            verify_labeled_results(query_result, recv_items, recv_int_items, sender_items);
+        }
 
         stop_sender = true;
         sender_th.join();
-
-        verify_labeled_results(query_result, recv_items, recv_int_items, sender_items);
     }
 
     PSIParams create_params()
@@ -303,287 +313,193 @@ namespace APSITests
     {
         size_t sender_size = 0;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size, 0, 0, params, 1);
+        RunUnlabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, params, 1);
     }
 
     TEST(SenderReceiverTests, UnlabeledEmptyMultiThreadedTest)
     {
         size_t sender_size = 0;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size, 0, 0, params, 4);
+        RunUnlabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, params, 4);
     }
 
     TEST(SenderReceiverTests, UnlabeledSingleTest)
     {
         size_t sender_size = 1;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size, 0, 0, params, 1);
-        RunUnlabeledTest(sender_size, 1, 0, params, 1);
-        RunUnlabeledTest(sender_size, 1, 1, params, 1);
+        RunUnlabeledTest(sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, params, 1);
     }
 
     TEST(SenderReceiverTests, UnlabeledSingleMultiThreadedTest)
     {
         size_t sender_size = 1;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size, 0, 0, params, 4);
-        RunUnlabeledTest(sender_size, 1, 0, params, 4);
-        RunUnlabeledTest(sender_size, 1, 1, params, 4);
+        RunUnlabeledTest(sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, params, 4);
     }
 
     TEST(SenderReceiverTests, UnlabeledSmallTest)
     {
         size_t sender_size = 10;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size, 0, 0, params, 1);
-        RunUnlabeledTest(sender_size, 1, 0, params, 1);
-        RunUnlabeledTest(sender_size, 1, 1, params, 1);
-        RunUnlabeledTest(sender_size, 5, 0, params, 1);
-        RunUnlabeledTest(sender_size, 5, 1, params, 1);
-        RunUnlabeledTest(sender_size, 5, 2, params, 1);
-        RunUnlabeledTest(sender_size, 5, 5, params, 1);
-        RunUnlabeledTest(sender_size, 10, 0, params, 1);
-        RunUnlabeledTest(sender_size, 10, 1, params, 1);
-        RunUnlabeledTest(sender_size, 10, 5, params, 1);
-        RunUnlabeledTest(sender_size, 10, 10, params, 1);
+        RunUnlabeledTest(sender_size,
+            { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 5, 0 }, { 5, 2 }, { 5, 5 }, { 10, 0 }, { 10, 5 }, { 10, 10 } },
+            params, 1);
     }
 
     TEST(SenderReceiverTests, UnlabeledSmallMultiThreadedTest)
     {
         size_t sender_size = 10;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size, 0, 0, params, 4);
-        RunUnlabeledTest(sender_size, 1, 0, params, 4);
-        RunUnlabeledTest(sender_size, 1, 1, params, 4);
-        RunUnlabeledTest(sender_size, 5, 0, params, 4);
-        RunUnlabeledTest(sender_size, 5, 2, params, 4);
-        RunUnlabeledTest(sender_size, 5, 5, params, 4);
-        RunUnlabeledTest(sender_size, 10, 0, params, 4);
-        RunUnlabeledTest(sender_size, 10, 1, params, 4);
-        RunUnlabeledTest(sender_size, 10, 5, params, 4);
-        RunUnlabeledTest(sender_size, 10, 10, params, 4);
+        RunUnlabeledTest(sender_size,
+            { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 5, 0 }, { 5, 2 }, { 5, 5 }, { 10, 0 }, { 10, 5 }, { 10, 10 } },
+            params, 4);
     }
 
     TEST(SenderReceiverTests, UnlabeledMediumTest)
     {
         size_t sender_size = 500;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size, 0, 0, params, 1);
-        RunUnlabeledTest(sender_size, 1, 0, params, 1);
-        RunUnlabeledTest(sender_size, 1, 1, params, 1);
-        RunUnlabeledTest(sender_size, 50, 10, params, 1);
-        RunUnlabeledTest(sender_size, 50, 50, params, 1);
-        RunUnlabeledTest(sender_size, 100, 1, params, 1);
-        RunUnlabeledTest(sender_size, 100, 50, params, 1);
-        RunUnlabeledTest(sender_size, 100, 100, params, 1);
+        RunUnlabeledTest(sender_size,
+            { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 50, 10 }, { 50, 50 }, { 100, 1 }, { 100, 50 }, { 100, 100 } },
+            params, 1);
     }
 
     TEST(SenderReceiverTests, UnlabeledMediumMultiThreadedTest)
     {
         size_t sender_size = 500;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size, 0, 0, params, 4);
-        RunUnlabeledTest(sender_size, 1, 0, params, 4);
-        RunUnlabeledTest(sender_size, 1, 1, params, 4);
-        RunUnlabeledTest(sender_size, 50, 10, params, 4);
-        RunUnlabeledTest(sender_size, 50, 50, params, 4);
-        RunUnlabeledTest(sender_size, 100, 1, params, 4);
-        RunUnlabeledTest(sender_size, 100, 50, params, 4);
-        RunUnlabeledTest(sender_size, 100, 100, params, 4);
+        RunUnlabeledTest(sender_size,
+            { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 50, 10 }, { 50, 50 }, { 100, 1 }, { 100, 50 }, { 100, 100 } },
+            params, 4);
     }
 
     TEST(SenderReceiverTests, UnlabeledLargeTest)
     {
         size_t sender_size = 4000;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size, 0, 0, params, 1);
-        RunUnlabeledTest(sender_size, 1, 0, params, 1);
-        RunUnlabeledTest(sender_size, 500, 10, params, 1);
-        RunUnlabeledTest(sender_size, 500, 50, params, 1);
-        RunUnlabeledTest(sender_size, 500, 100, params, 1);
-        RunUnlabeledTest(sender_size, 500, 500, params, 1);
-        RunUnlabeledTest(sender_size, 1000, 0, params, 1);
-        RunUnlabeledTest(sender_size, 1000, 1, params, 1);
-        RunUnlabeledTest(sender_size, 1000, 500, params, 1);
-        RunUnlabeledTest(sender_size, 1000, 999, params, 1);
-        RunUnlabeledTest(sender_size, 1000, 1000, params, 1);
+        RunUnlabeledTest(sender_size,
+            { { 0, 0 }, { 1, 0 }, { 500, 10 }, { 500, 50 }, { 500, 500 }, { 1000, 0 }, { 1000, 1 }, { 1000, 500 },
+                { 1000, 999 }, { 1000, 1000 } },
+            params, 1);
     }
 
     TEST(SenderReceiverTests, UnlabeledLargeMultiThreadedTest)
     {
         size_t sender_size = 4000;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size, 0, 0, params, 4);
-        RunUnlabeledTest(sender_size, 1, 0, params, 4);
-        RunUnlabeledTest(sender_size, 500, 10, params, 4);
-        RunUnlabeledTest(sender_size, 500, 50, params, 4);
-        RunUnlabeledTest(sender_size, 500, 100, params, 4);
-        RunUnlabeledTest(sender_size, 500, 500, params, 4);
-        RunUnlabeledTest(sender_size, 1000, 0, params, 4);
-        RunUnlabeledTest(sender_size, 1000, 1, params, 4);
-        RunUnlabeledTest(sender_size, 1000, 500, params, 4);
-        RunUnlabeledTest(sender_size, 1000, 999, params, 4);
-        RunUnlabeledTest(sender_size, 1000, 1000, params, 4);
+        RunUnlabeledTest(sender_size,
+            { { 0, 0 }, { 1, 0 }, { 500, 10 }, { 500, 50 }, { 500, 500 }, { 1000, 0 }, { 1000, 1 }, { 1000, 500 },
+                { 1000, 999 }, { 1000, 1000 } },
+            params, 4);
     }
 
-    //TEST(SenderReceiverTests, UnlabeledHugeMultiThreadedTest)
-    //{
-        //size_t sender_size = 50000;
-        //PSIParams params = create_huge_params();
-        //RunUnlabeledTest(sender_size, 0, 0, params, 4);
-        //RunUnlabeledTest(sender_size, 1, 0, params, 4);
-        //RunUnlabeledTest(sender_size, 5000, 100, params, 4);
-        //RunUnlabeledTest(sender_size, 5000, 5000, params, 4);
-        //RunUnlabeledTest(sender_size, 10000, 0, params, 4);
-        //RunUnlabeledTest(sender_size, 10000, 5000, params, 4);
-        //RunUnlabeledTest(sender_size, 10000, 10000, params, 4);
-        //RunUnlabeledTest(sender_size, 50000, 50000, params, 4);
+    TEST(SenderReceiverTests, UnlabeledHugeMultiThreadedTest)
+    {
+        size_t sender_size = 50000;
+        PSIParams params = create_huge_params();
+        RunUnlabeledTest(sender_size,
+            { { 0, 0 }, { 1, 0 }, { 5000, 100 }, { 5000, 5000 }, { 10000, 0 }, { 10000, 5000 }, { 10000, 10000 },
+                { 50000, 50000 } },
+            params, 4);
 
-        //sender_size = 1'000'000;
-        //RunUnlabeledTest(sender_size, 10000, 10000, params, 4);
-    //}
+        sender_size = 1'000'000;
+        RunUnlabeledTest(sender_size, { { 10000, 10000 } }, params, 4);
+    }
 
     TEST(SenderReceiverTests, LabeledEmptyTest)
     {
         size_t sender_size = 0;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size, 0, 0, params, 1);
+        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, params, 1);
     }
 
     TEST(SenderReceiverTests, LabeledEmptyMultiThreadedTest)
     {
         size_t sender_size = 0;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size, 0, 0, params, 4);
+        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, params, 4);
     }
 
     TEST(SenderReceiverTests, LabeledSingleTest)
     {
         size_t sender_size = 1;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size, 0, 0, params, 1);
-        RunLabeledTest(sender_size, 1, 0, params, 1);
-        RunLabeledTest(sender_size, 1, 1, params, 1);
+        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, params, 1);
     }
 
     TEST(SenderReceiverTests, LabeledSingleMultiThreadedTest)
     {
         size_t sender_size = 1;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size, 0, 0, params, 4);
-        RunLabeledTest(sender_size, 1, 0, params, 4);
-        RunLabeledTest(sender_size, 1, 1, params, 4);
+        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, params, 4);
     }
 
     TEST(SenderReceiverTests, LabeledSmallTest)
     {
         size_t sender_size = 10;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size, 0, 0, params, 1);
-        RunLabeledTest(sender_size, 1, 0, params, 1);
-        RunLabeledTest(sender_size, 1, 1, params, 1);
-        RunLabeledTest(sender_size, 5, 0, params, 1);
-        RunLabeledTest(sender_size, 5, 1, params, 1);
-        RunLabeledTest(sender_size, 5, 2, params, 1);
-        RunLabeledTest(sender_size, 5, 5, params, 1);
-        RunLabeledTest(sender_size, 10, 0, params, 1);
-        RunLabeledTest(sender_size, 10, 1, params, 1);
-        RunLabeledTest(sender_size, 10, 5, params, 1);
-        RunLabeledTest(sender_size, 10, 10, params, 1);
+        RunLabeledTest(sender_size,
+            { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 5, 0 }, { 5, 2 }, { 5, 5 }, { 10, 0 }, { 10, 5 }, { 10, 10 } },
+            params, 1);
     }
 
     TEST(SenderReceiverTests, LabeledSmallMultiThreadedTest)
     {
         size_t sender_size = 10;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size, 0, 0, params, 4);
-        RunLabeledTest(sender_size, 1, 0, params, 4);
-        RunLabeledTest(sender_size, 1, 1, params, 4);
-        RunLabeledTest(sender_size, 5, 0, params, 4);
-        RunLabeledTest(sender_size, 5, 2, params, 4);
-        RunLabeledTest(sender_size, 5, 5, params, 4);
-        RunLabeledTest(sender_size, 10, 0, params, 4);
-        RunLabeledTest(sender_size, 10, 1, params, 4);
-        RunLabeledTest(sender_size, 10, 5, params, 4);
-        RunLabeledTest(sender_size, 10, 10, params, 4);
+        RunLabeledTest(sender_size,
+            { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 5, 0 }, { 5, 2 }, { 5, 5 }, { 10, 0 }, { 10, 5 }, { 10, 10 } },
+            params, 4);
     }
 
     TEST(SenderReceiverTests, LabeledMediumTest)
     {
         size_t sender_size = 500;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size, 0, 0, params, 1);
-        RunLabeledTest(sender_size, 1, 0, params, 1);
-        RunLabeledTest(sender_size, 1, 1, params, 1);
-        RunLabeledTest(sender_size, 50, 10, params, 1);
-        RunLabeledTest(sender_size, 50, 50, params, 1);
-        RunLabeledTest(sender_size, 100, 1, params, 1);
-        RunLabeledTest(sender_size, 100, 50, params, 1);
-        RunLabeledTest(sender_size, 100, 100, params, 1);
+        RunLabeledTest(sender_size,
+            { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 50, 10 }, { 50, 50 }, { 100, 1 }, { 100, 50 }, { 100, 100 } },
+            params, 1);
     }
 
     TEST(SenderReceiverTests, LabeledMediumMultiThreadedTest)
     {
         size_t sender_size = 500;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size, 0, 0, params, 4);
-        RunLabeledTest(sender_size, 1, 0, params, 4);
-        RunLabeledTest(sender_size, 1, 1, params, 4);
-        RunLabeledTest(sender_size, 50, 10, params, 4);
-        RunLabeledTest(sender_size, 50, 50, params, 4);
-        RunLabeledTest(sender_size, 100, 1, params, 4);
-        RunLabeledTest(sender_size, 100, 50, params, 4);
-        RunLabeledTest(sender_size, 100, 100, params, 4);
+        RunLabeledTest(sender_size,
+            { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 50, 10 }, { 50, 50 }, { 100, 1 }, { 100, 50 }, { 100, 100 } },
+            params, 4);
     }
 
     TEST(SenderReceiverTests, LabeledLargeTest)
     {
         size_t sender_size = 4000;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size, 0, 0, params, 1);
-        RunLabeledTest(sender_size, 1, 0, params, 1);
-        RunLabeledTest(sender_size, 500, 10, params, 1);
-        RunLabeledTest(sender_size, 500, 50, params, 1);
-        RunLabeledTest(sender_size, 500, 100, params, 1);
-        RunLabeledTest(sender_size, 500, 500, params, 1);
-        RunLabeledTest(sender_size, 1000, 0, params, 1);
-        RunLabeledTest(sender_size, 1000, 1, params, 1);
-        RunLabeledTest(sender_size, 1000, 500, params, 1);
-        RunLabeledTest(sender_size, 1000, 999, params, 1);
-        RunLabeledTest(sender_size, 1000, 1000, params, 1);
+        RunLabeledTest(sender_size,
+            { { 0, 0 }, { 1, 0 }, { 500, 10 }, { 500, 50 }, { 500, 500 }, { 1000, 0 }, { 1000, 1 }, { 1000, 500 },
+                { 1000, 999 }, { 1000, 1000 } },
+            params, 1);
     }
 
     TEST(SenderReceiverTests, LabeledLargeMultiThreadedTest)
     {
         size_t sender_size = 4000;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size, 0, 0, params, 4);
-        RunLabeledTest(sender_size, 1, 0, params, 4);
-        RunLabeledTest(sender_size, 500, 10, params, 4);
-        RunLabeledTest(sender_size, 500, 50, params, 4);
-        RunLabeledTest(sender_size, 500, 100, params, 4);
-        RunLabeledTest(sender_size, 500, 500, params, 4);
-        RunLabeledTest(sender_size, 1000, 0, params, 4);
-        RunLabeledTest(sender_size, 1000, 1, params, 4);
-        RunLabeledTest(sender_size, 1000, 500, params, 4);
-        RunLabeledTest(sender_size, 1000, 999, params, 4);
-        RunLabeledTest(sender_size, 1000, 1000, params, 4);
+        RunLabeledTest(sender_size,
+            { { 0, 0 }, { 1, 0 }, { 500, 10 }, { 500, 50 }, { 500, 500 }, { 1000, 0 }, { 1000, 1 }, { 1000, 500 },
+                { 1000, 999 }, { 1000, 1000 } },
+            params, 4);
     }
 
-    //TEST(SenderReceiverTests, LabeledHugeMultiThreadedTest)
-    //{
-        //size_t sender_size = 50000;
-        //PSIParams params = create_huge_params();
-        //RunLabeledTest(sender_size, 0, 0, params, 4);
-        //RunLabeledTest(sender_size, 1, 0, params, 4);
-        //RunLabeledTest(sender_size, 5000, 100, params, 4);
-        //RunLabeledTest(sender_size, 5000, 5000, params, 4);
-        //RunLabeledTest(sender_size, 10000, 0, params, 4);
-        //RunLabeledTest(sender_size, 10000, 5000, params, 4);
-        //RunLabeledTest(sender_size, 10000, 10000, params, 4);
-        //RunLabeledTest(sender_size, 50000, 50000, params, 4);
+    TEST(SenderReceiverTests, LabeledHugeMultiThreadedTest)
+    {
+        size_t sender_size = 50000;
+        PSIParams params = create_huge_params();
+        RunLabeledTest(sender_size,
+            { { 0, 0 }, { 1, 0 }, { 5000, 100 }, { 5000, 5000 }, { 10000, 0 }, { 10000, 5000 }, { 10000, 10000 },
+                { 50000, 50000 } },
+            params, 4);
 
-        //sender_size = 1'000'000;
-        //RunLabeledTest(sender_size, 10000, 10000, params, 4);
-    //}
+        sender_size = 1'000'000;
+        RunLabeledTest(sender_size, { { 10000, 10000 } }, params, 4);
+    }
 } // namespace APSITests

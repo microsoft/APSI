@@ -8,6 +8,7 @@
 // APSI
 #include "apsi/senderdb.h"
 #include "apsi/psiparams.h"
+#include "apsi/logging/log.h"
 
 #include "gtest/gtest.h"
 

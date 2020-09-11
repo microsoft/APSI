@@ -119,7 +119,7 @@ namespace apsi
             }
             catch (const exception &e)
             {
-                APSI_LOG_ERROR("APSI threw an exception processing parameter request: " << e.what());
+                APSI_LOG_ERROR("APSI threw an exception while processing parameter request: " << e.what());
             }
         }
 
@@ -144,7 +144,7 @@ namespace apsi
             }
             catch (const exception &e)
             {
-                APSI_LOG_ERROR("APSI threw an exception processing OPRF query: " << e.what());
+                APSI_LOG_ERROR("APSI threw an exception while processing OPRF query: " << e.what());
             }
         }
 
@@ -180,7 +180,7 @@ namespace apsi
             }
             catch (const exception &e)
             {
-                APSI_LOG_ERROR("APSI threw an exception processing query: " << e.what());
+                APSI_LOG_ERROR("APSI threw an exception while processing query: " << e.what());
             }
         }
     } // namespace sender
