@@ -3,7 +3,6 @@
 
 target_sources(common
     PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/csvreader.cpp
         ${CMAKE_CURRENT_LIST_DIR}/interpolate.cpp
         ${CMAKE_CURRENT_LIST_DIR}/db_encoding.cpp
         ${CMAKE_CURRENT_LIST_DIR}/stopwatch.cpp
@@ -12,7 +11,6 @@ target_sources(common
 
 install(
     FILES
-        ${CMAKE_CURRENT_LIST_DIR}/csvreader.h
         ${CMAKE_CURRENT_LIST_DIR}/interpolate.h
         ${CMAKE_CURRENT_LIST_DIR}/db_encoding.h
         ${CMAKE_CURRENT_LIST_DIR}/stopwatch.h

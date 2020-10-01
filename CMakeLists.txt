@@ -20,6 +20,11 @@ if (DEFINED MSVC)
     message(FATAL_ERROR "Please build APSI using the attached Visual Studio solution/project file")
 endif()
 
+# Required includes
+include(CMakeDependentOption)
+include(CheckCXXCompilerFlag)
+include(GNUInstallDirs)
+
 ########################
 # Global configuration #
 ########################
@@ -41,17 +46,27 @@ else()
 endif()
 message(STATUS "APSI debug mode: ${APSI_DEBUG}")
 
+# [Option] APSI_USE_CXX17
+# Should we use C++14 or C++17?
+set(APSI_USE_CXX17_OPTION_STR "Use C++17")
+option(APSI_USE_CXX17 ${APSI_USE_CXX17_OPTION_STR} ON)
+set(SEAL_USE_CXX17 ${APSI_USE_CXX17})
+
 # [Option] APSI_BUILD_TESTS
-set(APSI_BUILD_TESTS_OPTION_STR "Build C++ tests for Microsoft SEAL")
+set(APSI_BUILD_TESTS_OPTION_STR "Build unit and integration tests for APSI")
 option(APSI_BUILD_TESTS ${APSI_BUILD_TESTS_OPTION_STR} OFF)
 
 # [Option] APSI_USE_ZMQ
 set(APSI_USE_ZMQ_OPTION_STR "Use ZeroMQ for networking")
-option(APSI_USE_ZMQ ${APSI_USE_ZMQ_OPTION_STR} OFF)
+option(APSI_USE_ZMQ ${APSI_USE_ZMQ_OPTION_STR} ON)
 
 # [Option] APSI_USE_LOG4CPLUS
 set(APSI_USE_LOG4CPLUS_OPTION_STR "Use Log4cplus to enable logging")
-option(APSI_USE_LOG4CPLUS ${APSI_USE_LOG4CPLUS_OPTION_STR} OFF)
+option(APSI_USE_LOG4CPLUS ${APSI_USE_LOG4CPLUS_OPTION_STR} ON)
+
+# [Option] APSI_BUILD_CLI
+set(APSI_BUILD_CLI_OPTION_STR "Build example command line interface applications")
+cmake_dependent_option(APSI_BUILD_CLI ${APSI_BUILD_CLI_OPTION_STR} ON "APSI_USE_ZMQ;APSI_USE_LOG4CPLUS" OFF)
 
 # Always build position-independent-code
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -60,7 +75,6 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # [Option] CXX compiler flags
 # For easier adding of CXX compiler flags
-include(CheckCXXCompilerFlag)
 function(enable_cxx_compiler_flag_if_supported flag)
     string(FIND "${CMAKE_CXX_FLAGS}" "${flag}" flag_already_set)
     if(flag_already_set EQUAL -1)
@@ -83,7 +97,6 @@ if(APSI_DEBUG)
 endif()
 
 # Required files and directories
-include(GNUInstallDirs)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${APSI_SOURCE_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${APSI_SOURCE_DIR}/lib)
 set(CMAKE_LIBRARY_RUNTIME_DIRECTORY ${APSI_SOURCE_DIR}/bin)
@@ -119,7 +132,11 @@ endif()
 
 # Set the C++ language version
 macro(apsi_set_language target)
-    target_compile_features(${target} PUBLIC cxx_std_14)
+    if(APSI_USE_CXX17)
+        target_compile_features(${target} PUBLIC cxx_std_17)
+    else()
+        target_compile_features(${target} PUBLIC cxx_std_14)
+    endif()
 endmacro()
 
 # Set the VERSION property
@@ -477,6 +494,15 @@ if(APSI_USE_ZMQ)
     find_package(ZeroMQpp MODULE REQUIRED)
 endif()
 
+# CLI requires TCLAP
+if(APSI_BUILD_CLI)
+    set(TCLAP_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindTCLAP.cmake)
+    if(TCLAP_ROOT)
+        unset(TCLAP_INCLUDE_DIR CACHE)
+    endif()
+    find_package(TCLAP MODULE REQUIRED)
+endif()
+
 # FlatBuffers 
 # Download and configure
 if(NOT MSVC)
@@ -627,10 +653,6 @@ if(APSI_USE_ZMQ)
         ZeroMQpp::ZeroMQpp)
 endif()
 
-#if (NOT APPLE)
-    #target_link_libraries(common PUBLIC stdc++fs)
-#endif()
-
 # Defines
 target_compile_options(common PUBLIC -DHAVE_CONFIG)
 target_compile_options(common PUBLIC -DUSE_SECURE_SEED)
@@ -701,9 +723,6 @@ if(APSI_BUILD_TESTS)
     add_executable(unit_tests)
     add_subdirectory(tests/unit/src)
     target_link_libraries(unit_tests common sender receiver gtest)
-    if (NOT APPLE)
-        target_link_libraries(unit_tests stdc++fs)
-    endif()
 endif()
 
 ##########################
@@ -715,7 +734,23 @@ if(APSI_BUILD_TESTS)
     add_executable(integration_tests)
     add_subdirectory(tests/integration/src)
     target_link_libraries(integration_tests common sender receiver gtest)
-    if (NOT APPLE)
-        target_link_libraries(integration_tests stdc++fs)
-    endif()
+endif()
+
+##########################
+# Command Line Interface #
+##########################
+
+if(APSI_BUILD_CLI)
+    add_library(common_cli OBJECT)
+    add_subdirectory(cli/common)
+    target_include_directories(common_cli PUBLIC cli)
+    target_link_libraries(common_cli PUBLIC common TCLAP::TCLAP)
+
+    add_executable(sender_cli)
+    add_subdirectory(cli/sender)
+    target_link_libraries(sender_cli common_cli sender stdc++fs)
+
+    add_executable(receiver_cli)
+    add_subdirectory(cli/receiver)
+    target_link_libraries(receiver_cli common_cli receiver stdc++fs)
 endif()

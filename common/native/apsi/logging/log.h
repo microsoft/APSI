@@ -23,12 +23,12 @@ namespace apsi
             */
             enum class Level : int
             {
-                level_all,
-                level_debug,
-                level_info,
-                level_warning,
-                level_error,
-                level_off
+                all,
+                debug,
+                info,
+                warning,
+                error,
+                off
             };
 
             /**
@@ -75,31 +75,31 @@ namespace apsi
 
 #define APSI_LOG_ALL(msg)                                              \
     do {                                                               \
-        APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::level_all); \
-        APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::level_all);     \
+        APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::all); \
+        APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::all);     \
     } while (0);
 
 #define APSI_LOG_INFO(msg)                                              \
     do {                                                                \
-        APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::level_info); \
-        APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::level_info);     \
+        APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::info); \
+        APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::info);     \
     } while (0);
 
 #define APSI_LOG_DEBUG(msg)                                              \
     do {                                                                 \
-        APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::level_debug); \
-        APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::level_debug);     \
+        APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::debug); \
+        APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::debug);     \
     } while (0);
 
 #define APSI_LOG_WARNING(msg)                                              \
     do {                                                                   \
-        APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::level_warning); \
-        APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::level_warning);     \
+        APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::warning); \
+        APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::warning);     \
     } while (0);
 
 #define APSI_LOG_ERROR(msg)                                              \
     do {                                                                 \
-        APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::level_error); \
-        APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::level_error);     \
+        APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::error); \
+        APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::error);     \
     } while (0);
 

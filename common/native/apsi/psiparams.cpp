@@ -139,7 +139,7 @@ namespace apsi
         PSIParams::QueryParams query_params;
         query_params.query_powers_count = psi_params->query_params()->query_powers_count();
 
-        EncryptionParameters seal_params;
+        PSIParams::SEALParams seal_params;
         auto &seal_params_data = *psi_params->seal_params()->data();
         try
         {

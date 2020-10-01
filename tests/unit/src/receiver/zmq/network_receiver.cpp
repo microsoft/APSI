@@ -46,7 +46,7 @@ namespace APSITests
                 query_params.query_powers_count = 3;
 
                 size_t pmd = 4096;
-                PSIParams::SEALParams seal_params(scheme_type::bfv);
+                PSIParams::SEALParams seal_params;
                 seal_params.set_poly_modulus_degree(pmd);
                 seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(pmd));
                 seal_params.set_plain_modulus(65537);
@@ -75,7 +75,7 @@ namespace APSITests
         ReceiverTests()
         {
             logging::Log::set_console_disabled(true);
-            logging::Log::set_log_level(logging::Log::Level::level_debug);
+            logging::Log::set_log_level(logging::Log::Level::debug);
             logging::Log::set_log_file("out.log");
 
             if (!server_.is_connected())
@@ -256,7 +256,7 @@ namespace APSITests
     {
         start_sender();
 
-        PSIParams params = Receiver::request_params(client_);
+        PSIParams params = Receiver::RequestParams(client_);
         ASSERT_EQ(get_params()->to_string(), params.to_string());
 
         stop_sender();

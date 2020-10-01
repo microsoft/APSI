@@ -143,7 +143,7 @@ namespace
         size_t num_threads)
     {
         logging::Log::set_console_disabled(false);
-        logging::Log::set_log_level(logging::Log::Level::level_info);
+        logging::Log::set_log_level(logging::Log::Level::info);
         //logging::Log::set_log_file("out.log");
 
         unordered_set<Item> sender_items;
@@ -207,7 +207,7 @@ namespace
         size_t num_threads)
     {
         logging::Log::set_console_disabled(false);
-        logging::Log::set_log_level(logging::Log::Level::level_info);
+        logging::Log::set_log_level(logging::Log::Level::info);
         //logging::Log::set_log_file("out.log");
 
         unordered_map<Item, FullWidthLabel> sender_items;
@@ -277,7 +277,7 @@ namespace
         PSIParams::QueryParams query_params;
         query_params.query_powers_count = 3;
 
-        PSIParams::SEALParams seal_params(scheme_type::bfv);
+        PSIParams::SEALParams seal_params;
         seal_params.set_poly_modulus_degree(8192);
         seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(8192));
         seal_params.set_plain_modulus(65537);
@@ -298,7 +298,7 @@ namespace
         PSIParams::QueryParams query_params;
         query_params.query_powers_count = 3;
 
-        PSIParams::SEALParams seal_params(scheme_type::bfv);
+        PSIParams::SEALParams seal_params;
         seal_params.set_poly_modulus_degree(16384);
         seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(16384));
         seal_params.set_plain_modulus(65537);

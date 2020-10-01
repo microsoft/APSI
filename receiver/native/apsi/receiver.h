@@ -169,7 +169,7 @@ namespace apsi
             /**
             Performs a parameter request and returns the receiver parameters.
             */
-            static PSIParams request_params(network::Channel &chl);
+            static PSIParams RequestParams(network::Channel &chl);
 
             /**
             Performs an OPRF query and returns a vector of hashed items.

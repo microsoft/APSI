@@ -609,6 +609,24 @@ namespace apsi
             }
         }
 
+        SenderDB::SenderDB(PSIParams params) : params_(params), crypto_context_(params_.seal_params())
+        {
+            if (!crypto_context_.seal_context()->parameters_set())
+            {
+                APSI_LOG_ERROR("Given SEALParams are invalid: "
+                    << crypto_context_.seal_context()->parameter_error_message());
+                throw logic_error("SEALParams are invalid");
+            }
+            if (!crypto_context_.seal_context()->first_context_data()->qualifiers().using_batching)
+            {
+                APSI_LOG_ERROR("Given SEALParams do not support batching");
+                throw logic_error("given SEALParams do not support batching");
+            }
+
+            // Make sure the evaluator is set. This will be used for BatchedPlaintextPolyn::eval.
+            crypto_context_.set_evaluator();
+        }
+
         /**
         Returns the total number of bin bundles.
         */

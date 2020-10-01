@@ -161,6 +161,17 @@ namespace apsi
 
             // Initialize the CryptoContext with a new SEALContext
             crypto_context_ = make_shared<CryptoContext>(params_.seal_params());
+            if (!crypto_context_->seal_context()->parameters_set())
+            {
+                APSI_LOG_ERROR("Given SEALParams are invalid: "
+                    << crypto_context_->seal_context()->parameter_error_message());
+                throw logic_error("SEALParams are invalid");
+            }
+            if (!crypto_context_->seal_context()->first_context_data()->qualifiers().using_batching)
+            {
+                APSI_LOG_ERROR("Given SEALParams do not support batching");
+                throw logic_error("given SEALParams do not support batching");
+            }
 
             // Set up the PowersDag
             pd_ = optimal_powers(params_.table_params().max_items_per_bin, params_.query_params().query_powers_count);
@@ -170,7 +181,7 @@ namespace apsi
             reset_keys();
         }
 
-        PSIParams Receiver::request_params(Channel &chl)
+        PSIParams Receiver::RequestParams(Channel &chl)
         {
             APSI_LOG_INFO("Requesting parameters from Sender");
             STOPWATCH(recv_stopwatch, "Receiver::request_params");

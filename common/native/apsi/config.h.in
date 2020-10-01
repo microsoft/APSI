@@ -9,5 +9,6 @@
 #define APSI_VERSION_PATCH @APSI_VERSION_PATCH@
 
 #cmakedefine APSI_DEBUG
+#cmakedefine APSI_USE_CXX17
 #cmakedefine APSI_USE_LOG4CPLUS
 #cmakedefine APSI_USE_ZMQ

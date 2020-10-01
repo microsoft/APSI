@@ -61,7 +61,7 @@ namespace apsi
             }
         }
 
-        Log::Level Log::log_level_ = Log::Level::level_off;
+        Log::Level Log::log_level_ = Log::Level::off;
 
         void Log::set_log_level(const string &level)
         {
@@ -69,27 +69,27 @@ namespace apsi
 
             if (level == "all")
             {
-                ll = Log::Level::level_all;
+                ll = Log::Level::all;
             }
             else if (level == "info")
             {
-                ll = Log::Level::level_info;
+                ll = Log::Level::info;
             }
             else if (level == "debug")
             {
-                ll = Log::Level::level_debug;
+                ll = Log::Level::debug;
             }
             else if (level == "warning")
             {
-                ll = Log::Level::level_warning;
+                ll = Log::Level::warning;
             }
             else if (level == "error")
             {
-                ll = Log::Level::level_error;
+                ll = Log::Level::error;
             }
             else if (level == "off")
             {
-                ll = Log::Level::level_off;
+                ll = Log::Level::off;
             }
             else
             {
@@ -169,22 +169,22 @@ namespace apsi
             LogLevel ll;
             switch (msg_level)
             {
-                case Level::level_all:
+                case Level::all:
                     ll = ALL_LOG_LEVEL;
                     break;
-                case Level::level_info:
+                case Level::info:
                     ll = INFO_LOG_LEVEL;
                     break;
-                case Level::level_debug:
+                case Level::debug:
                     ll = DEBUG_LOG_LEVEL;
                     break;
-                case Level::level_warning:
+                case Level::warning:
                     ll = WARN_LOG_LEVEL;
                     break;
-                case Level::level_error:
+                case Level::error:
                     ll = ERROR_LOG_LEVEL;
                     break;
-                case Level::level_off:
+                case Level::off:
                     ll = OFF_LOG_LEVEL;
                     break;
                 default:
@@ -199,22 +199,22 @@ namespace apsi
             LogLevel ll = ALL_LOG_LEVEL;
             switch (level)
             {
-            case Level::level_all:
+            case Level::all:
                 ll = ALL_LOG_LEVEL;
                 break;
-            case Level::level_debug:
+            case Level::debug:
                 ll = DEBUG_LOG_LEVEL;
                 break;
-            case Level::level_info:
+            case Level::info:
                 ll = INFO_LOG_LEVEL;
                 break;
-            case Level::level_warning:
+            case Level::warning:
                 ll = WARN_LOG_LEVEL;
                 break;
-            case Level::level_error:
+            case Level::error:
                 ll = ERROR_LOG_LEVEL;
                 break;
-            case Level::level_off:
+            case Level::off:
                 ll = OFF_LOG_LEVEL;
                 break;
             default:

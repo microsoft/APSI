@@ -34,11 +34,7 @@ namespace apsi
         class SenderDB
         {
         public:
-            SenderDB(PSIParams params) : params_(params), crypto_context_(params_.seal_params())
-            {
-                // Make sure the evaluator is set. This will be used for BatchedPlaintextPolyn::eval.
-                crypto_context_.set_evaluator();
-            }
+            SenderDB(PSIParams params);
 
             /**
             Clears the database.
@@ -51,7 +47,7 @@ namespace apsi
             */
             virtual void set_data(
                 const std::unordered_map<HashedItem, util::FullWidthLabel> &data,
-                std::size_t thread_count
+                std::size_t thread_count = 0
             ) = 0;
 
             /**
@@ -60,7 +56,7 @@ namespace apsi
             */
             virtual void set_data(
                 const std::unordered_set<HashedItem> &data,
-                std::size_t thread_count
+                std::size_t thread_count = 0
             ) = 0;
 
             /**
@@ -69,7 +65,7 @@ namespace apsi
             */
             virtual void insert_or_assign(
                 const std::unordered_map<HashedItem, util::FullWidthLabel> &data,
-                std::size_t thread_count
+                std::size_t thread_count = 0
             ) = 0;
 
             /**
@@ -86,7 +82,7 @@ namespace apsi
             */
             virtual void insert_or_assign(
                 const std::unordered_set<HashedItem> &data,
-                std::size_t thread_count
+                std::size_t thread_count = 0
             ) = 0;
 
             /**
@@ -102,7 +98,7 @@ namespace apsi
             */
             virtual void remove(
                 const std::unordered_set<HashedItem> &data,
-                std::size_t thread_count
+                std::size_t thread_count = 0
             ) = 0;
 
             /**

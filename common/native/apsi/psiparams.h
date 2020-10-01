@@ -28,7 +28,12 @@ namespace apsi
     class PSIParams
     {
     public:
-        using SEALParams = seal::EncryptionParameters;
+        class SEALParams : public seal::EncryptionParameters
+        {
+        public:
+            SEALParams() : seal::EncryptionParameters(seal::scheme_type::bfv)
+            {}
+        };
 
         constexpr static std::uint32_t item_bit_count_min = 80;
 
@@ -55,7 +60,9 @@ namespace apsi
         struct TableParams
         {
             std::uint32_t table_size;
+
             std::uint32_t max_items_per_bin;
+
             std::uint32_t hash_func_count;
         }; // struct TableParams
 
@@ -134,7 +141,7 @@ namespace apsi
 
         const QueryParams query_params_;
 
-        const SEALParams seal_params_{ seal::scheme_type::bfv };
+        const SEALParams seal_params_;
 
         std::uint32_t items_per_bundle_;
 
