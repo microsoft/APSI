@@ -16,9 +16,9 @@ cmake_minimum_required(VERSION 3.12)
 project(APSI VERSION 1.0.0 LANGUAGES CXX C)
 
 # Check operating system: for Windows, use Visual Studio solution/project files.
-if (DEFINED MSVC)
-    message(FATAL_ERROR "Please build APSI using the attached Visual Studio solution/project file")
-endif()
+#if (DEFINED MSVC)
+#    message(FATAL_ERROR "Please build APSI using the attached Visual Studio solution/project file")
+#endif()
 
 # Required includes
 include(CMakeDependentOption)
@@ -227,7 +227,7 @@ set(THIRDPARTY_DIR ${APSI_SOURCE_DIR}/thirdparty)
 # Microsoft SEAL + MSGSL + ZLIB
 # MSGSL and ZLIB should be installed with Microsoft SEAL
 # Download and configure
-if(NOT MSVC)
+#if(NOT MSVC)
     message(STATUS "Setting up Microsoft SEAL ...")
     execute_process(
         COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
@@ -248,10 +248,10 @@ if(NOT MSVC)
     mark_as_advanced(SEAL_USE__SUBBORROW_U64)
     mark_as_advanced(SEAL_USE___BUILTIN_CLZLL)
     mark_as_advanced(SEAL_USE___INT128)
-endif()
+#endif()
 
 # Build
-if(NOT MSVC)
+#if(NOT MSVC)
     execute_process(
         COMMAND ${CMAKE_COMMAND} --build .
         OUTPUT_QUIET
@@ -260,19 +260,19 @@ if(NOT MSVC)
     if(result)
         message(FATAL_ERROR "Failed to build Microsoft SEAL (${result})")
     endif()
-endif()
+#endif()
 
 # Set up the targets
-if(NOT MSVC)
+#if(NOT MSVC)
     add_subdirectory(
         ${THIRDPARTY_DIR}/seal/src
         ${THIRDPARTY_DIR}/seal/build
         EXCLUDE_FROM_ALL)
-endif()
+#endif()
 
 # Microsoft Kuku
 # Download and configure
-if(NOT MSVC)
+#if(NOT MSVC)
     message(STATUS "Setting up Microsoft Kuku ...")
     execute_process(
         COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
@@ -285,10 +285,10 @@ if(NOT MSVC)
     mark_as_advanced(KUKU_BUILD_EXAMPLES)
     mark_as_advanced(KUKU_BUILD_KUKU_C)
     mark_as_advanced(KUKU_BUILD_TESTS)
-endif()
+#endif()
 
 # Build
-if(NOT MSVC)
+#if(NOT MSVC)
     execute_process(
         COMMAND ${CMAKE_COMMAND} --build .
         OUTPUT_QUIET
@@ -297,21 +297,21 @@ if(NOT MSVC)
     if(result)
         message(FATAL_ERROR "Failed to build Microsoft Kuku (${result})")
     endif()
-endif()
+#endif()
 
 # Set up the targets
-if(NOT MSVC)
+#if(NOT MSVC)
     add_subdirectory(
         ${THIRDPARTY_DIR}/kuku/src
         ${THIRDPARTY_DIR}/kuku/build
         EXCLUDE_FROM_ALL)
-endif()
+#endif()
 
 # FourQ
 # This is a fork of https://github.com/microsoft/FourQlib.
 # It is built with Makefile.
 # Download
-if(NOT MSVC)
+#if(NOT MSVC)
     message(STATUS "Setting up FourQ ...")
     if(NOT CMAKE_TOOLCHAIN_FILE)
         execute_process(
@@ -335,10 +335,10 @@ if(NOT MSVC)
     if(result)
         message(FATAL_ERROR "Failed to download FourQ (${result})")
     endif()
-endif()
+#endif()
 
 # Build
-if(NOT MSVC)
+#if(NOT MSVC)
     execute_process(
         COMMAND ${CMAKE_COMMAND} --build .
         OUTPUT_QUIET
@@ -347,20 +347,21 @@ if(NOT MSVC)
     if(result)
         message(FATAL_ERROR "Failed to build FourQ (${result})`")
     endif()
-endif()
+#endif()
 
 # Set up the targets
 # Create imported target for FourQ
-if(NOT MSVC)
+#if(NOT MSVC)
     add_library(fourq UNKNOWN IMPORTED)
     set_target_properties(fourq PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES ${THIRDPARTY_DIR}//fourq/src/FourQ_64bit_and_portable
         IMPORTED_LOCATION ${THIRDPARTY_DIR}/fourq/src/FourQ_64bit_and_portable/libFourQ.a)
-endif()
+#endif()
 
 # Log4cplus
 # Download and configure
-if(NOT MSVC AND APSI_USE_LOG4CPLUS)
+#if(NOT MSVC AND APSI_USE_LOG4CPLUS)
+if(APSI_USE_LOG4CPLUS)
     message(STATUS "Setting up log4cplus ...")
     if(NOT CMAKE_TOOLCHAIN_FILE)
         execute_process(
@@ -414,7 +415,8 @@ if(NOT MSVC AND APSI_USE_LOG4CPLUS)
 endif()
 
 # Build
-if(NOT MSVC AND APSI_USE_LOG4CPLUS)
+#if(NOT MSVC AND APSI_USE_LOG4CPLUS)
+if(APSI_USE_LOG4CPLUS)
     execute_process(
         COMMAND ${CMAKE_COMMAND} --build .
         OUTPUT_QUIET
@@ -426,7 +428,8 @@ if(NOT MSVC AND APSI_USE_LOG4CPLUS)
 endif()
 
 # Set up the targets
-if(NOT MSVC AND APSI_USE_LOG4CPLUS)
+#if(NOT MSVC AND APSI_USE_LOG4CPLUS)
+if(APSI_USE_LOG4CPLUS)
     add_subdirectory(
         ${THIRDPARTY_DIR}/log4cplus/src
         EXCLUDE_FROM_ALL)
@@ -440,7 +443,8 @@ endif()
 # https://github.com/google/googletest/blob/release-1.10.0/googletest/README.md.
 
 # Download and configure
-if(APSI_BUILD_TESTS AND NOT MSVC)
+#if(APSI_BUILD_TESTS AND NOT MSVC)
+if(APSI_BUILD_TESTS)
     message(STATUS "Setting up Google Test ...")
     execute_process(
         COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
@@ -457,7 +461,8 @@ if(APSI_BUILD_TESTS AND NOT MSVC)
 endif()
 
 # Build
-if(APSI_BUILD_TESTS AND NOT MSVC)
+#if(APSI_BUILD_TESTS AND NOT MSVC)
+if(APSI_BUILD_TESTS)
     execute_process(COMMAND ${CMAKE_COMMAND} --build .
         OUTPUT_QUIET
         RESULT_VARIABLE result
@@ -468,7 +473,8 @@ if(APSI_BUILD_TESTS AND NOT MSVC)
 endif()
 
 # Set up the targets
-if(APSI_BUILD_TESTS AND NOT MSVC)
+#if(APSI_BUILD_TESTS AND NOT MSVC)
+if(APSI_BUILD_TESTS)
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
     add_subdirectory(
         ${THIRDPARTY_DIR}/googletest/src
@@ -505,7 +511,7 @@ endif()
 
 # FlatBuffers 
 # Download and configure
-if(NOT MSVC)
+#if(NOT MSVC)
     message(STATUS "Setting up flatbuffers ...")
     if(NOT CMAKE_TOOLCHAIN_FILE)
         execute_process(
@@ -533,10 +539,10 @@ if(NOT MSVC)
     set(FLATBUFFERS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
     set(FLATBUFFERS_BUILD_FLATC ON CACHE BOOL "" FORCE)
     set(FLATBUFFERS_INSTALL OFF CACHE BOOL "" FORCE)
-endif()
+#endif()
 
 # Build
-if(NOT MSVC)
+#if(NOT MSVC)
     execute_process(
         COMMAND ${CMAKE_COMMAND} --build .
         OUTPUT_QUIET
@@ -611,17 +617,17 @@ if(NOT MSVC)
     if(result)
         message(FATAL_ERROR "flatc failed (${result})")
     endif()
-endif()
+#endif()
 
 # Set up the targets
-if(NOT MSVC)
+#if(NOT MSVC)
     add_subdirectory(
         ${THIRDPARTY_DIR}/flatbuffers/src
         EXCLUDE_FROM_ALL)
     list(APPEND FLATBUFFERS_INCLUDE_DIRS ${THIRDPARTY_DIR}/flatbuffers/src/include)
     set_target_properties(${flatbuffers} PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${FLATBUFFERS_INCLUDE_DIRS}")
-endif()
+#endif()
 
 ###########################
 # APSI common C++ library #

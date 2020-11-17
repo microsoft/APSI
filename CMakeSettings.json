@@ -1,0 +1,52 @@
+﻿{
+    "configurations": [
+        {
+            "name": "x64-Debug (default)",
+            "generator": "Ninja",
+            "configurationType": "Debug",
+            "inheritEnvironments": [ "msvc_x64_x64" ],
+            "buildRoot": "${projectDir}\\out\\build\\${name}",
+            "installRoot": "${projectDir}\\out\\install\\${name}",
+            "cmakeCommandArgs": "",
+            "buildCommandArgs": "",
+            "ctestCommandArgs": "",
+            "variables": [
+                {
+                    "name": "APSI_BUILD_TESTS",
+                    "value": "True",
+                    "type": "BOOL"
+                },
+                {
+                    "name": "ZEROMQ_INCLUDE_DIR",
+                    "value": "D:/Progs/Libs/libzmq/include",
+                    "type": "PATH"
+                },
+                {
+                    "name": "ZEROMQ_LIBRARY_PATH",
+                    "value": "D:/Progs/Libs/libzmq/dll/x64/Debug/libzmq.lib",
+                    "type": "FILEPATH"
+                },
+                {
+                    "name": "ZEROMQ_LIBRARY_DIR",
+                    "value": "D:/Progs/Libs/libzmq/x64/Release",
+                    "type": "STRING"
+                },
+                {
+                    "name": "ZEROMQPP_INCLUDE_DIR",
+                    "value": "d:\\Progs\\Libs\\libzmqpp\\include",
+                    "type": "PATH"
+                },
+                {
+                    "name": "ZEROMQPP_LIBRARY_PATH",
+                    "value": "D:/Progs/Libs/libzmqpp/lib/x64/Debug/zmqpp.lib",
+                    "type": "FILEPATH"
+                },
+                {
+                    "name": "TCLAP_INCLUDE_DIR",
+                    "value": "D:/Progs/Libs/tclap-1.2.2/include",
+                    "type": "PATH"
+                }
+            ]
+        }
+    ]
+}
