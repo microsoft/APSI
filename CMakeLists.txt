@@ -251,7 +251,7 @@ mark_as_advanced(SEAL_USE___INT128)
 # Build
 execute_process(
     COMMAND ${CMAKE_COMMAND} --build .
-    OUTPUT_QUIET
+#    OUTPUT_QUIET
     RESULT_VARIABLE result
     WORKING_DIRECTORY ${THIRDPARTY_DIR}/seal)
 if(result)
