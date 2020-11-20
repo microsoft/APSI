@@ -207,276 +207,276 @@ endmacro()
 # External Dependencies #
 #########################
 
-# function(create_cache_entries dir_name)
-#     set(cce_file_name ${dir_name}/cache_init.txt)
-#     file(WRITE  "${cce_file_name}" "set(CMAKE_C_COMPILER \"${CMAKE_C_COMPILER}\" CACHE STRING \"\" FORCE)\n")
-#     file(APPEND "${cce_file_name}" "set(CMAKE_CXX_COMPILER \"${CMAKE_CXX_COMPILER}\" CACHE STRING \"\" FORCE)\n")
-#     file(APPEND "${cce_file_name}" "set(CMAKE_TOOLCHAIN_FILE \"${CMAKE_TOOLCHAIN_FILE}\" CACHE FILEPATH \"\" FORCE)\n")
-#     file(APPEND "${cce_file_name}" "set(ANDROID_ABI ${ANDROID_ABI} CACHE STRING \"\" FORCE)\n")
-#     file(APPEND "${cce_file_name}" "set(ANDROID_NDK \"${ANDROID_NDK}\" CACHE FILEPATH \"\" FORCE)\n")
-#     file(APPEND "${cce_file_name}" "set(ANDROID_PLATFORM ${ANDROID_PLATFORM} CACHE STRING \"\" FORCE)\n")
-#     file(APPEND "${cce_file_name}" "set(CMAKE_ANDROID_ARCH_ABI ${CMAKE_ANDROID_ARCH_ABI} CACHE STRING \"\" FORCE)\n")
-#     file(APPEND "${cce_file_name}" "set(CMAKE_ANDROID_NDK \"${CMAKE_ANDROID_NDK}\" CACHE STRING \"\" FORCE)\n")
-#     file(APPEND "${cce_file_name}" "set(CMAKE_MAKE_PROGRAM \"${CMAKE_MAKE_PROGRAM}\" CACHE STRING \"\" FORCE)\n")
-#     file(APPEND "${cce_file_name}" "set(CMAKE_SYSTEM_NAME ${CMAKE_SYSTEM_NAME} CACHE STRING \"\" FORCE)\n")
-#     file(APPEND "${cce_file_name}" "set(CMAKE_SYSTEM_VERSION ${CMAKE_SYSTEM_VERSION} CACHE STRING \"\" FORCE)\n")
-# endfunction()
-
 set(THIRDPARTY_DIR ${APSI_SOURCE_DIR}/thirdparty)
 
-# Microsoft SEAL + MSGSL + ZLIB
-# MSGSL and ZLIB should be installed with Microsoft SEAL
-# Download and configure
-message(STATUS "Setting up Microsoft SEAL ...")
-execute_process(
-    COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-#    OUTPUT_QUIET
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${THIRDPARTY_DIR}/seal)
-if(result)
-    message(FATAL_ERROR "Failed to download Microsoft SEAL (${result})")
-endif()
-mark_as_advanced(SEAL_BUILD_EXAMPLES)
-mark_as_advanced(SEAL_BUILD_SEAL_C)
-mark_as_advanced(SEAL_BUILD_TESTS)
-mark_as_advanced(SEAL_USE_CXX17)
-mark_as_advanced(SEAL_USE_INTRIN)
-mark_as_advanced(SEAL_USE_MSGSL)
-mark_as_advanced(SEAL_USE_ZLIB)
-mark_as_advanced(SEAL_USE__ADDCARRY_U64)
-mark_as_advanced(SEAL_USE__SUBBORROW_U64)
-mark_as_advanced(SEAL_USE___BUILTIN_CLZLL)
-mark_as_advanced(SEAL_USE___INT128)
+find_package(SEAL 3.6 REQUIRED)
+# # Microsoft SEAL + MSGSL + ZLIB
+# # MSGSL and ZLIB should be installed with Microsoft SEAL
+# # Download and configure
+# message(STATUS "Setting up Microsoft SEAL ...")
+# execute_process(
+#     COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+# #    OUTPUT_QUIET
+#     RESULT_VARIABLE result
+#     WORKING_DIRECTORY ${THIRDPARTY_DIR}/seal)
+# if(result)
+#     message(FATAL_ERROR "Failed to download Microsoft SEAL (${result})")
+# endif()
+# mark_as_advanced(SEAL_BUILD_EXAMPLES)
+# mark_as_advanced(SEAL_BUILD_SEAL_C)
+# mark_as_advanced(SEAL_BUILD_TESTS)
+# mark_as_advanced(SEAL_USE_CXX17)
+# mark_as_advanced(SEAL_USE_INTRIN)
+# mark_as_advanced(SEAL_USE_MSGSL)
+# mark_as_advanced(SEAL_USE_ZLIB)
+# mark_as_advanced(SEAL_USE__ADDCARRY_U64)
+# mark_as_advanced(SEAL_USE__SUBBORROW_U64)
+# mark_as_advanced(SEAL_USE___BUILTIN_CLZLL)
+# mark_as_advanced(SEAL_USE___INT128)
 
-# Build
-execute_process(
-    COMMAND ${CMAKE_COMMAND} --build .
-#    OUTPUT_QUIET
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${THIRDPARTY_DIR}/seal)
-if(result)
-    message(FATAL_ERROR "Failed to build Microsoft SEAL (${result})")
-endif()
+# # Build
+# execute_process(
+#     COMMAND ${CMAKE_COMMAND} --build .
+# #    OUTPUT_QUIET
+#     RESULT_VARIABLE result
+#     WORKING_DIRECTORY ${THIRDPARTY_DIR}/seal)
+# if(result)
+#     message(FATAL_ERROR "Failed to build Microsoft SEAL (${result})")
+# endif()
 
 # Set up the targets
-add_subdirectory(
-    ${THIRDPARTY_DIR}/seal/src
-    ${THIRDPARTY_DIR}/seal/build
-    EXCLUDE_FROM_ALL)
+# add_subdirectory(
+#     ${THIRDPARTY_DIR}/seal/src
+#     ${THIRDPARTY_DIR}/seal/build
+#     EXCLUDE_FROM_ALL)
 
 # Microsoft Kuku
-# Download and configure
-message(STATUS "Setting up Microsoft Kuku ...")
-execute_process(
-    COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-    OUTPUT_QUIET
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${THIRDPARTY_DIR}/kuku)
-if(result)
-    message(FATAL_ERROR "Failed to download Microsoft Kuku (${result})")
-endif()
-mark_as_advanced(KUKU_BUILD_EXAMPLES)
-mark_as_advanced(KUKU_BUILD_KUKU_C)
-mark_as_advanced(KUKU_BUILD_TESTS)
+find_package(Kuku 2.0 REQUIRED)
 
-# Build
-execute_process(
-    COMMAND ${CMAKE_COMMAND} --build .
-    OUTPUT_QUIET
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${THIRDPARTY_DIR}/kuku)
-if(result)
-    message(FATAL_ERROR "Failed to build Microsoft Kuku (${result})")
-endif()
+# # Download and configure
+# message(STATUS "Setting up Microsoft Kuku ...")
+# execute_process(
+#     COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+#     OUTPUT_QUIET
+#     RESULT_VARIABLE result
+#     WORKING_DIRECTORY ${THIRDPARTY_DIR}/kuku)
+# if(result)
+#     message(FATAL_ERROR "Failed to download Microsoft Kuku (${result})")
+# endif()
+# mark_as_advanced(KUKU_BUILD_EXAMPLES)
+# mark_as_advanced(KUKU_BUILD_KUKU_C)
+# mark_as_advanced(KUKU_BUILD_TESTS)
 
-# Set up the targets
-add_subdirectory(
-    ${THIRDPARTY_DIR}/kuku/src
-    ${THIRDPARTY_DIR}/kuku/build
-    EXCLUDE_FROM_ALL)
+# # Build
+# execute_process(
+#     COMMAND ${CMAKE_COMMAND} --build .
+#     OUTPUT_QUIET
+#     RESULT_VARIABLE result
+#     WORKING_DIRECTORY ${THIRDPARTY_DIR}/kuku)
+# if(result)
+#     message(FATAL_ERROR "Failed to build Microsoft Kuku (${result})")
+# endif()
 
-# FourQ
-# This is a fork of https://github.com/microsoft/FourQlib.
-# It is built with Makefile.
-# Download
-message(STATUS "Setting up FourQ ...")
-if(NOT CMAKE_TOOLCHAIN_FILE)
-    execute_process(
-        COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-        OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/fourq)
-else()
-    create_cache_entries(${THIRDPARTY_DIR}/fourq)
-    if(EXISTS ${THIRDPARTY_DIR}/fourq/CMakeCache.txt)
-        # Force regenerating make files. When cross compiling we might be
-        # compiling more than one platform at a time.
-        file(REMOVE ${THIRDPARTY_DIR}/fourq/CMakeCache.txt)
-    endif()
-    execute_process(
-        COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" . -Ccache_init.txt
-        OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/fourq)
-endif()
-if(result)
-    message(FATAL_ERROR "Failed to download FourQ (${result})")
-endif()
+# # Set up the targets
+# add_subdirectory(
+#     ${THIRDPARTY_DIR}/kuku/src
+#     ${THIRDPARTY_DIR}/kuku/build
+#     EXCLUDE_FROM_ALL)
 
-# Build
-execute_process(
-    COMMAND ${CMAKE_COMMAND} --build .
-    OUTPUT_QUIET
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${THIRDPARTY_DIR}/fourq)
-if(result)
-    message(FATAL_ERROR "Failed to build FourQ (${result})`")
-endif()
+# # FourQ
+# # This is a fork of https://github.com/microsoft/FourQlib.
+# # It is built with Makefile.
+# # Download
+# message(STATUS "Setting up FourQ ...")
+# if(NOT CMAKE_TOOLCHAIN_FILE)
+#     execute_process(
+#         COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+#         OUTPUT_QUIET
+#         RESULT_VARIABLE result
+#         WORKING_DIRECTORY ${THIRDPARTY_DIR}/fourq)
+# else()
+#     create_cache_entries(${THIRDPARTY_DIR}/fourq)
+#     if(EXISTS ${THIRDPARTY_DIR}/fourq/CMakeCache.txt)
+#         # Force regenerating make files. When cross compiling we might be
+#         # compiling more than one platform at a time.
+#         file(REMOVE ${THIRDPARTY_DIR}/fourq/CMakeCache.txt)
+#     endif()
+#     execute_process(
+#         COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" . -Ccache_init.txt
+#         OUTPUT_QUIET
+#         RESULT_VARIABLE result
+#         WORKING_DIRECTORY ${THIRDPARTY_DIR}/fourq)
+# endif()
+# if(result)
+#     message(FATAL_ERROR "Failed to download FourQ (${result})")
+# endif()
 
-# Set up the targets
-# Create imported target for FourQ
-add_library(fourq UNKNOWN IMPORTED)
-set_target_properties(fourq PROPERTIES
-    INTERFACE_INCLUDE_DIRECTORIES ${THIRDPARTY_DIR}//fourq/src/FourQ_64bit_and_portable
-    IMPORTED_LOCATION ${THIRDPARTY_DIR}/fourq/src/FourQ_64bit_and_portable/libFourQ.a)
+# # Build
+# execute_process(
+#     COMMAND ${CMAKE_COMMAND} --build .
+#     OUTPUT_QUIET
+#     RESULT_VARIABLE result
+#     WORKING_DIRECTORY ${THIRDPARTY_DIR}/fourq)
+# if(result)
+#     message(FATAL_ERROR "Failed to build FourQ (${result})`")
+# endif()
+
+# # Set up the targets
+# # Create imported target for FourQ
+# add_library(fourq UNKNOWN IMPORTED)
+# set_target_properties(fourq PROPERTIES
+#     INTERFACE_INCLUDE_DIRECTORIES ${THIRDPARTY_DIR}//fourq/src/FourQ_64bit_and_portable
+#     IMPORTED_LOCATION ${THIRDPARTY_DIR}/fourq/src/FourQ_64bit_and_portable/libFourQ.a)
 
 # Log4cplus
-# Download and configure
 if(APSI_USE_LOG4CPLUS)
-    message(STATUS "Setting up log4cplus ...")
-    if(NOT CMAKE_TOOLCHAIN_FILE)
-        execute_process(
-            COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-            OUTPUT_QUIET
-            RESULT_VARIABLE result
-            WORKING_DIRECTORY ${THIRDPARTY_DIR}/log4cplus)
-    else()
-        create_cache_entries(${THIRDPARTY_DIR}/log4cplus)
-        if(EXISTS ${THIRDPARTY_DIR}/log4cplus/CMakeCache.txt)
-            # Force regenerating make files. When cross compiling we might be
-            # compiling more than one platform at a time.
-            file(REMOVE ${THIRDPARTY_DIR}/log4cplus/CMakeCache.txt)
-        endif()
-        execute_process(
-            COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" . -Ccache_init.txt
-            OUTPUT_QUIET
-            RESULT_VARIABLE result
-            WORKING_DIRECTORY ${THIRDPARTY_DIR}/log4cplus)
-    endif()
-    if(result)
-        message(FATAL_ERROR "Failed to download log4cplus (${result})")
-    endif()
-    mark_as_advanced(ENABLE_SYMBOLS_VISIBILITY)
-    mark_as_advanced(LIBADVAPI32)
-    mark_as_advanced(LIBCPOSIX)
-    mark_as_advanced(LIBICONV)
-    mark_as_advanced(LIBKERNEL32)
-    mark_as_advanced(LIBNSL)
-    mark_as_advanced(LIBPOSIX4)
-    mark_as_advanced(LIBRT)
-    mark_as_advanced(LIBSOCKET)
-    mark_as_advanced(LIBWS2_32)
-    set(LOG4CPLUS_BUILD_LOGGINGSERVER OFF CACHE BOOL "" FORCE)
-    mark_as_advanced(LOG4CPLUS_BUILD_LOGGINGSERVER)
-    set(LOG4CPLUS_BUILD_TESTING OFF CACHE BOOL "" FORCE)
-    mark_as_advanced(LOG4CPLUS_BUILD_TESTING)
-    set(LOG4CPLUS_ENABLE_DECORATED_LIBRARY_NAME OFF CACHE BOOL "" FORCE)
-    mark_as_advanced(LOG4CPLUS_ENABLE_DECORATED_LIBRARY_NAME)
-    mark_as_advanced(LOG4CPLUS_QT4)
-    mark_as_advanced(LOG4CPLUS_QT5)
-    mark_as_advanced(LOG4CPLUS_REQUIRE_EXPLICIT_INITIALIZATION)
-    mark_as_advanced(LOG4CPLUS_SINGLE_THREADED)
-    mark_as_advanced(LOG4CPLUS_WORKING_C_LOCALE)
-    mark_as_advanced(LOG4CPLUS_WORKING_LOCALE)
-    mark_as_advanced(UNICODE)
-    mark_as_advanced(WITH_ICONV)
-    set(WITH_UNIT_TESTS OFF CACHE BOOL "" FORCE)
-    mark_as_advanced(WITH_UNIT_TESTS)
-    mark_as_advanced(_WIN32_WINNT)
+    find_package(log4cplus REQUIRED)
 endif()
 
-# Build
-if(APSI_USE_LOG4CPLUS)
-    execute_process(
-        COMMAND ${CMAKE_COMMAND} --build .
-        OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/log4cplus)
-    if(result)
-        message(FATAL_ERROR "Failed to build log4cplus (${result})`")
-    endif()
-endif()
+# # Download and configure
+# if(APSI_USE_LOG4CPLUS)
+#     message(STATUS "Setting up log4cplus ...")
+#     if(NOT CMAKE_TOOLCHAIN_FILE)
+#         execute_process(
+#             COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+#             OUTPUT_QUIET
+#             RESULT_VARIABLE result
+#             WORKING_DIRECTORY ${THIRDPARTY_DIR}/log4cplus)
+#     else()
+#         create_cache_entries(${THIRDPARTY_DIR}/log4cplus)
+#         if(EXISTS ${THIRDPARTY_DIR}/log4cplus/CMakeCache.txt)
+#             # Force regenerating make files. When cross compiling we might be
+#             # compiling more than one platform at a time.
+#             file(REMOVE ${THIRDPARTY_DIR}/log4cplus/CMakeCache.txt)
+#         endif()
+#         execute_process(
+#             COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" . -Ccache_init.txt
+#             OUTPUT_QUIET
+#             RESULT_VARIABLE result
+#             WORKING_DIRECTORY ${THIRDPARTY_DIR}/log4cplus)
+#     endif()
+#     if(result)
+#         message(FATAL_ERROR "Failed to download log4cplus (${result})")
+#     endif()
+#     mark_as_advanced(ENABLE_SYMBOLS_VISIBILITY)
+#     mark_as_advanced(LIBADVAPI32)
+#     mark_as_advanced(LIBCPOSIX)
+#     mark_as_advanced(LIBICONV)
+#     mark_as_advanced(LIBKERNEL32)
+#     mark_as_advanced(LIBNSL)
+#     mark_as_advanced(LIBPOSIX4)
+#     mark_as_advanced(LIBRT)
+#     mark_as_advanced(LIBSOCKET)
+#     mark_as_advanced(LIBWS2_32)
+#     set(LOG4CPLUS_BUILD_LOGGINGSERVER OFF CACHE BOOL "" FORCE)
+#     mark_as_advanced(LOG4CPLUS_BUILD_LOGGINGSERVER)
+#     set(LOG4CPLUS_BUILD_TESTING OFF CACHE BOOL "" FORCE)
+#     mark_as_advanced(LOG4CPLUS_BUILD_TESTING)
+#     set(LOG4CPLUS_ENABLE_DECORATED_LIBRARY_NAME OFF CACHE BOOL "" FORCE)
+#     mark_as_advanced(LOG4CPLUS_ENABLE_DECORATED_LIBRARY_NAME)
+#     mark_as_advanced(LOG4CPLUS_QT4)
+#     mark_as_advanced(LOG4CPLUS_QT5)
+#     mark_as_advanced(LOG4CPLUS_REQUIRE_EXPLICIT_INITIALIZATION)
+#     mark_as_advanced(LOG4CPLUS_SINGLE_THREADED)
+#     mark_as_advanced(LOG4CPLUS_WORKING_C_LOCALE)
+#     mark_as_advanced(LOG4CPLUS_WORKING_LOCALE)
+#     mark_as_advanced(UNICODE)
+#     mark_as_advanced(WITH_ICONV)
+#     set(WITH_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+#     mark_as_advanced(WITH_UNIT_TESTS)
+#     mark_as_advanced(_WIN32_WINNT)
+# endif()
 
-# Set up the targets
-if(APSI_USE_LOG4CPLUS)
-    add_subdirectory(
-        ${THIRDPARTY_DIR}/log4cplus/src
-        EXCLUDE_FROM_ALL)
-    list(APPEND LOG4CPLUS_INCLUDE_DIRS ${THIRDPARTY_DIR}/log4cplus/src/include)
-    set_target_properties(${log4cplus} PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES "${LOG4CPLUS_INCLUDE_DIRS}")
-endif()
+# # Build
+# if(APSI_USE_LOG4CPLUS)
+#     execute_process(
+#         COMMAND ${CMAKE_COMMAND} --build .
+#         OUTPUT_QUIET
+#         RESULT_VARIABLE result
+#         WORKING_DIRECTORY ${THIRDPARTY_DIR}/log4cplus)
+#     if(result)
+#         message(FATAL_ERROR "Failed to build log4cplus (${result})`")
+#     endif()
+# endif()
+
+# # Set up the targets
+# if(APSI_USE_LOG4CPLUS)
+#     add_subdirectory(
+#         ${THIRDPARTY_DIR}/log4cplus/src
+#         EXCLUDE_FROM_ALL)
+#     list(APPEND LOG4CPLUS_INCLUDE_DIRS ${THIRDPARTY_DIR}/log4cplus/src/include)
+#     set_target_properties(${log4cplus} PROPERTIES
+#         INTERFACE_INCLUDE_DIRECTORIES "${LOG4CPLUS_INCLUDE_DIRS}")
+# endif()
 
 # Google Test
 # This follows the example in
 # https://github.com/google/googletest/blob/release-1.10.0/googletest/README.md.
 
 # Download and configure
-if(APSI_BUILD_TESTS)
-    message(STATUS "Setting up Google Test ...")
-    execute_process(
-        COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-        OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/googletest)
-    if(result)
-        message(WARNING "Failed to download Google Test (${result}); disabling `APSI_BUILD_TESTS`")
-    endif()
-    set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
-    mark_as_advanced(BUILD_GMOCK)
-    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-    mark_as_advanced(INSTALL_GTEST)
+if (APSI_BUILD_TESTS)
+    find_package(GTest REQUIRED)
 endif()
+# if(APSI_BUILD_TESTS)
+#     message(STATUS "Setting up Google Test ...")
+#     execute_process(
+#         COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+#         OUTPUT_QUIET
+#         RESULT_VARIABLE result
+#         WORKING_DIRECTORY ${THIRDPARTY_DIR}/googletest)
+#     if(result)
+#         message(WARNING "Failed to download Google Test (${result}); disabling `APSI_BUILD_TESTS`")
+#     endif()
+#     set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
+#     mark_as_advanced(BUILD_GMOCK)
+#     set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
+#     mark_as_advanced(INSTALL_GTEST)
+# endif()
 
-# Build
-if(APSI_BUILD_TESTS)
-    execute_process(COMMAND ${CMAKE_COMMAND} --build .
-        OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/googletest)
-    if(result)
-        message(WARNING "Failed to build Google Test (${result}); disabling `APSI_BUILD_TESTS`")
-    endif()
-endif()
+# # Build
+# if(APSI_BUILD_TESTS)
+#     execute_process(COMMAND ${CMAKE_COMMAND} --build .
+#         OUTPUT_QUIET
+#         RESULT_VARIABLE result
+#         WORKING_DIRECTORY ${THIRDPARTY_DIR}/googletest)
+#     if(result)
+#         message(WARNING "Failed to build Google Test (${result}); disabling `APSI_BUILD_TESTS`")
+#     endif()
+# endif()
 
-# Set up the targets
-if(APSI_BUILD_TESTS)
-    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-    add_subdirectory(
-        ${THIRDPARTY_DIR}/googletest/src
-        ${THIRDPARTY_DIR}/googletest/build
-        EXCLUDE_FROM_ALL)
-endif()
+# # Set up the targets
+# if(APSI_BUILD_TESTS)
+#     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+#     add_subdirectory(
+#         ${THIRDPARTY_DIR}/googletest/src
+#         ${THIRDPARTY_DIR}/googletest/build
+#         EXCLUDE_FROM_ALL)
+# endif()
 
-# ZeroMQ and ZeroMQpp
-if(APSI_USE_ZMQ)
-    set(ZEROMQ_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQ.cmake)
-    set(ZEROMQPP_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQpp.cmake)
-    if(ZeroMQ_ROOT)
-        unset(ZEROMQ_INCLUDE_DIR CACHE)
-        unset(ZEROMQ_LIBRARY_DIR CACHE)
-        unset(ZEROMQ_LIBRARY_PATH CACHE)
-    endif()
-    find_package(ZeroMQ MODULE REQUIRED)
-    if(ZeroMQpp_ROOT)
-        unset(ZEROMQPP_INCLUDE_DIR CACHE)
-        unset(ZEROMQPP_LIBRARY_DIR CACHE)
-        unset(ZEROMQPP_LIBRARY_PATH CACHE)
-    endif()
-    find_package(ZeroMQpp MODULE REQUIRED)
-endif()
+# # ZeroMQ and ZeroMQpp
+# if(APSI_USE_ZMQ)
+#     set(ZEROMQ_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQ.cmake)
+#     set(ZEROMQPP_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQpp.cmake)
+#     if(ZeroMQ_ROOT)
+#         unset(ZEROMQ_INCLUDE_DIR CACHE)
+#         unset(ZEROMQ_LIBRARY_DIR CACHE)
+#         unset(ZEROMQ_LIBRARY_PATH CACHE)
+#     endif()
+#     find_package(ZeroMQ MODULE REQUIRED)
+#     if(ZeroMQpp_ROOT)
+#         unset(ZEROMQPP_INCLUDE_DIR CACHE)
+#         unset(ZEROMQPP_LIBRARY_DIR CACHE)
+#         unset(ZEROMQPP_LIBRARY_PATH CACHE)
+#     endif()
+#     find_package(ZeroMQpp MODULE REQUIRED)
+# endif()
 
 # CLI requires TCLAP
+if (APSI_BUILD_CLI)
+    find_path(TCLAP_INCLUDE_DIRS "tclap/Arg.h")
+    target_include_directories(APSI PRIVATE ${TCLAP_INCLUDE_DIRS})
+endif()
+
 if(APSI_BUILD_CLI)
     set(TCLAP_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindTCLAP.cmake)
     if(TCLAP_ROOT)

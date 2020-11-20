@@ -12,7 +12,7 @@ ExternalProject_Add(EP_SEAL
     DOWNLOAD_DIR        ""
     SOURCE_DIR          ${CMAKE_CURRENT_LIST_DIR}/src
     BINARY_DIR          ${CMAKE_CURRENT_LIST_DIR}/src
-    GIT_REPOSITORY      git@ssh.dev.azure.com:v3/msrcrypto/SEAL/SEAL #https://github.com/microsoft/SEAL.git
+    GIT_REPOSITORY      https://msrcrypto@dev.azure.com/msrcrypto/SEAL/_git/SEAL  #git@ssh.dev.azure.com:v3/msrcrypto/SEAL/SEAL #https://github.com/microsoft/SEAL.git
     #    GIT_TAG             v${PROJECT_VERSION}
     GIT_CONFIG          advice.detachedHead=false
     CMAKE_ARGS          -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DSEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF
