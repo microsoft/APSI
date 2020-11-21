@@ -19,13 +19,13 @@
 
 // ZeroMQ
 #pragma warning(push, 0)
-#include "zmqpp/zmqpp.hpp"
+#include "zmq.hpp"
 #pragma warning(pop)
 
 using namespace std;
 using namespace seal;
 using namespace seal::util;
-using namespace zmqpp;
+using namespace zmq;
 
 namespace apsi
 {
@@ -56,22 +56,22 @@ namespace apsi
             {
                 stringstream ss;
                 size_t size = obj.save(ss);
-                msg.add(ss.str());
+                //msg.add(ss.str());
                 return size;
             }
 
             template<>
             size_t save_to_message(const vector<seal_byte> &obj, message_t &msg)
             {
-                msg.add_raw(obj.data(), obj.size());
+                //msg.add_raw(obj.data(), obj.size());
                 return obj.size();
             }
 
             vector<seal_byte> get_client_id(const message_t &msg)
             {
                 vector<seal_byte> client_id;
-                size_t client_id_size = msg.size(0);
-                copy_n(reinterpret_cast<const seal_byte*>(msg.raw_data(0)), client_id_size, back_inserter(client_id));
+                //size_t client_id_size = msg.size(0);
+                //copy_n(reinterpret_cast<const seal_byte*>(msg.raw_data(0)), client_id_size, back_inserter(client_id));
                 return client_id;
             }
         }
@@ -111,7 +111,8 @@ namespace apsi
             get_socket()->close();
             if (context_)
             {
-                context_->terminate();
+                context_->shutdown();
+                context_->close();
             }
 
             end_point_ = "";
@@ -173,7 +174,7 @@ namespace apsi
             }
 
             // Should have client_id, SenderOperationHeader, and SenderOperation.
-            if (msg.parts() != 3)
+            //if (msg.parts() != 3)
             {
                 throw runtime_error("invalid message received");
             }
@@ -185,7 +186,7 @@ namespace apsi
             SenderOperationHeader sop_header;
             try
             {
-                bytes_received_ += load_from_string(msg.get(1), sop_header);
+                bytes_received_ += load_from_string(/*msg.get(1)*/ "", sop_header);
             }
             catch (const runtime_error &ex)
             {
@@ -214,15 +215,15 @@ namespace apsi
                 {
                     case SenderOperationType::SOP_PARMS:
                         sop = make_unique<SenderOperationParms>();
-                        bytes_received_ += load_from_string(msg.get(2), *sop);
+                        bytes_received_ += load_from_string(/*msg.get(2)*/ "", *sop);
                         break;
                     case SenderOperationType::SOP_OPRF:
                         sop = make_unique<SenderOperationOPRF>();
-                        bytes_received_ += load_from_string(msg.get(2), *sop);
+                        bytes_received_ += load_from_string(/*msg.get(2)*/ "", *sop);
                         break;
                     case SenderOperationType::SOP_QUERY:
                         sop = make_unique<SenderOperationQuery>();
-                        bytes_received_ += load_from_string(msg.get(2), move(context), *sop);
+                        bytes_received_ += load_from_string(/*msg.get(2)*/ "", move(context), *sop);
                         break;
                     default:
                         // Invalid operation
@@ -310,7 +311,7 @@ namespace apsi
             }
 
             // Should have SenderOperationHeader and SenderOperationResponse.
-            if (msg.parts() != 2)
+            //if (msg.parts() != 2)
             {
                 throw runtime_error("invalid message received");
             }
@@ -319,7 +320,7 @@ namespace apsi
             SenderOperationHeader sop_header;
             try
             {
-                bytes_received_ += load_from_string(msg.get(0), sop_header);
+                bytes_received_ += load_from_string(/*msg.get(0)*/ "", sop_header);
             }
             catch (const runtime_error &ex)
             {
@@ -348,15 +349,15 @@ namespace apsi
                 {
                     case SenderOperationType::SOP_PARMS:
                         sop_response = make_unique<SenderOperationResponseParms>();
-                        bytes_received_ += load_from_string(msg.get(1), *sop_response);
+                        bytes_received_ += load_from_string(/*msg.get(1)*/ "", *sop_response);
                         break;
                     case SenderOperationType::SOP_OPRF:
                         sop_response = make_unique<SenderOperationResponseOPRF>();
-                        bytes_received_ += load_from_string(msg.get(1), *sop_response);
+                        bytes_received_ += load_from_string(/*msg.get(1)*/ "", *sop_response);
                         break;
                     case SenderOperationType::SOP_QUERY:
                         sop_response = make_unique<SenderOperationResponseQuery>();
-                        bytes_received_ += load_from_string(msg.get(1), *sop_response);
+                        bytes_received_ += load_from_string(/*msg.get(1)*/ "", *sop_response);
                         break;
                     default:
                         // Invalid operation
@@ -409,7 +410,7 @@ namespace apsi
             }
 
             // Should have only one part: ResultPackage.
-            if (msg.parts() != 1)
+            //if (msg.parts() != 1)
             {
                 throw runtime_error("invalid message received");
             }
@@ -419,7 +420,7 @@ namespace apsi
 
             try
             {
-                bytes_received_ += load_from_string(msg.get(0), move(context), *rp);
+                bytes_received_ += load_from_string(/*msg.get(0)*/ "", move(context), *rp);
             }
             catch (const runtime_error &ex)
             {
@@ -435,7 +436,10 @@ namespace apsi
         {
             lock_guard<mutex> lock(receive_mutex_);
 
-            bool received = get_socket()->receive(msg, !wait_for_message);
+            //bool received = get_socket()->receive(msg, !wait_for_message);
+            recv_flags receive_flags = wait_for_message? recv_flags::none : recv_flags::dontwait;
+            recv_result_t result = get_socket()->recv(msg, receive_flags);
+            bool received = result.has_value();
             if (!received && wait_for_message)
             {
                 throw runtime_error("failed to receive message");
@@ -448,7 +452,8 @@ namespace apsi
         {
             lock_guard<mutex> lock(send_mutex_);
 
-            bool sent = get_socket()->send(msg);
+            send_result_t result = get_socket()->send(msg, send_flags::none);
+            bool sent = result.has_value();
             if (!sent)
             {
                 throw runtime_error("failed to send message");
@@ -466,26 +471,26 @@ namespace apsi
             return socket_;
         }
 
-        socket_type ReceiverChannel::get_socket_type()
+        zmq::socket_type ReceiverChannel::get_socket_type()
         {
-            return socket_type::dealer;
+            return zmq::socket_type::dealer;
         }
 
         void ReceiverChannel::set_socket_options(socket_t *socket)
         {
             // Ensure messages are not dropped
-            socket->set(socket_option::receive_high_water_mark, 70000);
+            socket->set(sockopt::rcvhwm, 70000);
         }
 
-        socket_type SenderChannel::get_socket_type()
+        zmq::socket_type SenderChannel::get_socket_type()
         {
-            return socket_type::router;
+            return zmq::socket_type::router;
         }
 
         void SenderChannel::set_socket_options(socket_t *socket)
         {
             // Ensure messages are not dropped
-            socket->set(socket_option::send_high_water_mark, 70000);
+            socket->set(sockopt::sndhwm, 70000);
         }
     } // namespace network
 } // namespace apsi

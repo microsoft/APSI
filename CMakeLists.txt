@@ -210,6 +210,7 @@ endmacro()
 set(THIRDPARTY_DIR ${APSI_SOURCE_DIR}/thirdparty)
 
 find_package(SEAL 3.6 REQUIRED)
+
 # # Microsoft SEAL + MSGSL + ZLIB
 # # MSGSL and ZLIB should be installed with Microsoft SEAL
 # # Download and configure
@@ -471,62 +472,70 @@ endif()
 #     find_package(ZeroMQpp MODULE REQUIRED)
 # endif()
 
+if(APSI_USE_ZMQ)
+    find_package(ZeroMQ REQUIRED)
+    find_package(cppzmq REQUIRED)
+endif()
+
 # CLI requires TCLAP
 if (APSI_BUILD_CLI)
     find_path(TCLAP_INCLUDE_DIRS "tclap/Arg.h")
-    target_include_directories(APSI PRIVATE ${TCLAP_INCLUDE_DIRS})
 endif()
 
-if(APSI_BUILD_CLI)
-    set(TCLAP_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindTCLAP.cmake)
-    if(TCLAP_ROOT)
-        unset(TCLAP_INCLUDE_DIR CACHE)
-    endif()
-    find_package(TCLAP MODULE REQUIRED)
-endif()
+# if(APSI_BUILD_CLI)
+#     set(TCLAP_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindTCLAP.cmake)
+#     if(TCLAP_ROOT)
+#         unset(TCLAP_INCLUDE_DIR CACHE)
+#     endif()
+#     find_package(TCLAP MODULE REQUIRED)
+# endif()
 
 # FlatBuffers 
 # Download and configure
-message(STATUS "Setting up flatbuffers ...")
-if(NOT CMAKE_TOOLCHAIN_FILE)
-    execute_process(
-        COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-        OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
-else()
-    create_cache_entries(${THIRDPARTY_DIR}/flatbuffers)
-    if(EXISTS ${THIRDPARTY_DIR}/flatbuffers/build/CMakeCache.txt)
-        # Force regenerating make files. When cross compiling we might be
-        # compiling more than one platform at a time.
-        file(REMOVE ${THIRDPARTY_DIR}/flatbuffers/build/CMakeCache.txt)
-    endif()
-    execute_process(
-        COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" . -Ccache_init.txt
-        OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
-endif()
-if(result)
-    message(FATAL_ERROR "Failed to download flatbuffers (${result})")
-endif()
+# message(STATUS "Setting up flatbuffers ...")
+# if(NOT CMAKE_TOOLCHAIN_FILE)
+#     execute_process(
+#         COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+#         OUTPUT_QUIET
+#         RESULT_VARIABLE result
+#         WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+# else()
+#     create_cache_entries(${THIRDPARTY_DIR}/flatbuffers)
+#     if(EXISTS ${THIRDPARTY_DIR}/flatbuffers/build/CMakeCache.txt)
+#         # Force regenerating make files. When cross compiling we might be
+#         # compiling more than one platform at a time.
+#         file(REMOVE ${THIRDPARTY_DIR}/flatbuffers/build/CMakeCache.txt)
+#     endif()
+#     execute_process(
+#         COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" . -Ccache_init.txt
+#         OUTPUT_QUIET
+#         RESULT_VARIABLE result
+#         WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+# endif()
+# if(result)
+#     message(FATAL_ERROR "Failed to download flatbuffers (${result})")
+# endif()
 
-set(FLATBUFFERS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(FLATBUFFERS_BUILD_FLATC ON CACHE BOOL "" FORCE)
-set(FLATBUFFERS_INSTALL OFF CACHE BOOL "" FORCE)
+# set(FLATBUFFERS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+# set(FLATBUFFERS_BUILD_FLATC ON CACHE BOOL "" FORCE)
+# set(FLATBUFFERS_INSTALL OFF CACHE BOOL "" FORCE)
 
-# Build
-execute_process(
-    COMMAND ${CMAKE_COMMAND} --build .
-    OUTPUT_QUIET
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
-if(result)
-    message(FATAL_ERROR "Failed to build flatbuffers (${result})`")
-endif()
+# # Build
+# execute_process(
+#     COMMAND ${CMAKE_COMMAND} --build .
+#     OUTPUT_QUIET
+#     RESULT_VARIABLE result
+#     WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+# if(result)
+#     message(FATAL_ERROR "Failed to build flatbuffers (${result})`")
+# endif()
 
-# flatc executable
-set(FLATBUFFERS_FLATC_PATH "build/flatc")
+# # flatc executable
+# set(FLATBUFFERS_FLATC_PATH "build/flatc")
+
+find_package(Flatbuffers REQUIRED)
+get_target_property(FLATBUFFERS_FLATC_PATH flatbuffers::flatc IMPORTED_LOCATION_RELEASE)
+message(STATUS "flatc path: ${FLATBUFFERS_FLATC_PATH}")
 
 execute_process(
     COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi" "${APSI_SOURCE_DIR}/common/native/apsi/powers.fbs"
@@ -591,13 +600,13 @@ if(result)
     message(FATAL_ERROR "flatc failed (${result})")
 endif()
 
-# Set up the targets
-add_subdirectory(
-    ${THIRDPARTY_DIR}/flatbuffers/src
-    EXCLUDE_FROM_ALL)
-list(APPEND FLATBUFFERS_INCLUDE_DIRS ${THIRDPARTY_DIR}/flatbuffers/src/include)
-set_target_properties(${flatbuffers} PROPERTIES
-    INTERFACE_INCLUDE_DIRECTORIES "${FLATBUFFERS_INCLUDE_DIRS}")
+# # Set up the targets
+# add_subdirectory(
+#     ${THIRDPARTY_DIR}/flatbuffers/src
+#     EXCLUDE_FROM_ALL)
+# list(APPEND FLATBUFFERS_INCLUDE_DIRS ${THIRDPARTY_DIR}/flatbuffers/src/include)
+# set_target_properties(${flatbuffers} PROPERTIES
+#     INTERFACE_INCLUDE_DIRECTORIES "${FLATBUFFERS_INCLUDE_DIRS}")
 
 ###########################
 # APSI common C++ library #
@@ -617,16 +626,19 @@ target_include_directories(common PUBLIC
 
 # Link dependencies
 target_link_libraries(common PUBLIC
-    seal
-    kuku
-    fourq
-    log4cplus
+    SEAL::seal
+    Kuku::kuku
+#    fourq
     flatbuffers)
+
+if (APSI_USE_LOG4CPLUS)
+    target_link_libraries(common PUBLIC log4cplus:log4cplus)
+endif()
 
 if(APSI_USE_ZMQ)
     target_link_libraries(common PUBLIC
-        ZeroMQ::ZeroMQ
-        ZeroMQpp::ZeroMQpp)
+        libzmq-static
+        cppzmq-static)
 endif()
 
 # Defines
@@ -634,12 +646,18 @@ target_compile_options(common PUBLIC -DHAVE_CONFIG)
 target_compile_options(common PUBLIC -DUSE_SECURE_SEED)
 target_compile_options(common PUBLIC -D_AMD64_)
 target_compile_options(common PUBLIC -D_AVX2_)
-if (NOT APPLE)
+target_compile_options(common PUBLIC -DUSE_ENDO=true)
+if (NOT APPLE AND NOT MSVC)
     target_compile_options(common PUBLIC -D_ASM_)
 endif()
-target_compile_options(common PUBLIC -D__LINUX__)
-target_compile_options(common PUBLIC -maes)
-target_compile_options(common PUBLIC -march=native)
+if (MSVC)
+    target_compile_options(common PUBLIC -D__WINDOWS__)
+endif()
+if (NOT MSVC)
+    target_compile_options(common PUBLIC -D__LINUX__)
+    target_compile_options(common PUBLIC -maes)
+    target_compile_options(common PUBLIC -march=native)
+endif()
 
 apsi_set_version(common)
 set_target_properties(common PROPERTIES OUTPUT_NAME apsi_common-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
@@ -720,7 +738,8 @@ if(APSI_BUILD_CLI)
     add_library(common_cli OBJECT)
     add_subdirectory(cli/common)
     target_include_directories(common_cli PUBLIC cli)
-    target_link_libraries(common_cli PUBLIC common TCLAP::TCLAP)
+    target_include_directories(common_cli PUBLIC ${TCLAP_INCLUDE_DIRS})
+    target_link_libraries(common_cli PUBLIC common)
 
     add_executable(sender_cli)
     add_subdirectory(cli/sender)

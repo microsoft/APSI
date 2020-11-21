@@ -15,16 +15,15 @@
 #include "apsi/network/sender_operation_response.h"
 #include "apsi/network/result_package.h"
 
-namespace zmqpp
+namespace zmq
 {
-    class socket;
-    typedef socket socket_t;
+    class socket_t;
+    class message_t;
+    class context_t;
     enum class socket_type;
-    class message;
-    typedef message message_t;
-    class context;
-    typedef context context_t;
-} // namespace zmqpp
+} // namespace zmq
+
+enum class socket_type;
 
 namespace apsi
 {
@@ -157,15 +156,15 @@ namespace apsi
             /**
             Get socket type for this channel.
             */
-            virtual zmqpp::socket_type get_socket_type() = 0;
+            virtual zmq::socket_type get_socket_type() = 0;
 
             /**
             Add any needed options for the socket. Called just after socket creation.
             */
-            virtual void set_socket_options(zmqpp::socket_t *socket) = 0;
+            virtual void set_socket_options(zmq::socket_t *socket) = 0;
 
         private:
-            std::unique_ptr<zmqpp::socket_t> socket_;
+            std::unique_ptr<zmq::socket_t> socket_;
 
             std::string end_point_;
 
@@ -173,17 +172,17 @@ namespace apsi
 
             std::mutex send_mutex_;
 
-            std::unique_ptr<zmqpp::context_t> context_;
+            std::unique_ptr<zmq::context_t> context_;
 
-            std::unique_ptr<zmqpp::socket_t> &get_socket();
+            std::unique_ptr<zmq::socket_t> &get_socket();
 
             void throw_if_not_connected() const;
 
             void throw_if_connected() const;
 
-            bool receive_message(zmqpp::message_t &msg, bool wait_for_message = true);
+            bool receive_message(zmq::message_t &msg, bool wait_for_message = true);
 
-            void send_message(zmqpp::message_t &msg);
+            void send_message(zmq::message_t &msg);
         }; // class NetworkChannel
 
         /**
@@ -202,12 +201,12 @@ namespace apsi
             /**
             The only difference from a receiver is the socket type.
             */
-            zmqpp::socket_type get_socket_type() override;
+            zmq::socket_type get_socket_type() override;
 
             /**
             The sender needs to set a couple of socket options to ensure messages are not dropped.
             */
-            void set_socket_options(zmqpp::socket_t *socket) override;
+            void set_socket_options(zmq::socket_t *socket) override;
         };
 
         /**
@@ -226,12 +225,12 @@ namespace apsi
             /**
             The only difference from a sender is the socket type.
             */
-            zmqpp::socket_type get_socket_type() override;
+            zmq::socket_type get_socket_type() override;
 
             /**
             The receiver needs to set a couple of socket options to ensure messages are not dropped.
             */
-            void set_socket_options(zmqpp::socket_t *socket) override;
+            void set_socket_options(zmq::socket_t *socket) override;
         };
     }      // namespace network
 } // namespace apsi
