@@ -66,7 +66,9 @@ namespace APSITests
                 context = make_shared<CryptoContext>(get_params()->seal_params());
                 KeyGenerator keygen(*context->seal_context());
                 context->set_secret(keygen.secret_key());
-                context->set_evaluator(keygen.relin_keys_local());
+                RelinKeys rlk;
+                keygen.create_relin_keys(rlk);
+                context->set_evaluator(move(rlk));
             }
 
             return context;

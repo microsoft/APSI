@@ -10,6 +10,7 @@
 
 // FourQ
 #include "FourQ_internal.h"
+#include "FourQ_api.h"
 
 // SEAL
 #include "seal/util/blake2.h"
@@ -241,42 +242,31 @@ namespace apsi
 
         void ECPoint::make_random_nonzero_scalar(scalar_span_type out, shared_ptr<UniformRandomGenerator> rg)
         {
-            array<uint64_t, 4> random_data;
-            static_assert(sizeof(random_data) == order_size, "Size of random_data should be the same as order_size");
-
-            function<uint64_t()> rand_uint64_t;
-            if (rg)
-            {
-                rand_uint64_t = [&rg]() {
-                    uint64_t res;
-                    rg->generate(sizeof(res), reinterpret_cast<seal_byte *>(&res));
-                    return res;
-                };
-            }
-            else
-            {
-                rand_uint64_t = random_uint64;
-            }
-
-            auto reduced_rand_uint64_t = [&]() {
-                // Rejection sampling
-                uint64_t ret;
-                do
+            auto rand_scalar = [&rg](scalar_span_type value) {
+                if (rg)
                 {
-                    ret = rand_uint64_t();
-                } while (ret >= (~uint64_t(0) >> 1));
-                return ret;
+                    rg->generate(order_size, reinterpret_cast<seal_byte *>(value.data()));
+                }
+                else
+                {
+                    value[0] = random_uint64();
+                    value[1] = random_uint64();
+                    value[2] = random_uint64();
+                    value[3] = random_uint64();
+                }
+                modulo_order(reinterpret_cast<digit_t *>(value.data()), reinterpret_cast<digit_t *>(value.data()));
+            };
+
+            auto is_zero_scalar = [](scalar_span_type value) -> bool {
+                return !(value[0] | value[1] | value[2] | value[3]);
             };
 
             // Loop until we find a non-zero element
-            while (
-                !((random_data[0] = rand_uint64_t()) | (random_data[1] = reduced_rand_uint64_t()) |
-                  (random_data[2] = rand_uint64_t()) | (random_data[3] = reduced_rand_uint64_t())))
+            do
             {
+                rand_scalar(out);
             }
-
-            // Copy the result to out
-            memcpy(out.data(), random_data.data(), order_size);
+            while (is_zero_scalar(out));
         }
 
         void ECPoint::invert_scalar(scalar_span_const_type in, scalar_span_type out)
@@ -297,6 +287,15 @@ namespace apsi
         bool ECPoint::operator==(const ECPoint &compare)
         {
             return pteq(pt_, compare.pt_);
+        }
+
+        ECPoint &ECPoint::operator=(const ECPoint &assign)
+        {
+            if (&assign != this)
+            {
+                memcpy(pt_, assign.pt_, point_size);
+            }
+            return *this;
         }
 
         void ECPoint::save(ostream &stream)
@@ -341,12 +340,12 @@ namespace apsi
             stream.exceptions(old_ex_mask);
         }
 
-        void ECPoint::save(gsl::span<unsigned char, save_size> out)
+        void ECPoint::save(point_save_span_type out)
         {
             encode(pt_, out.data());
         }
 
-        void ECPoint::load(gsl::span<const unsigned char, save_size> in)
+        void ECPoint::load(point_save_span_const_type in)
         {
             if (decode(in.data(), pt_) != ECCRYPTO_SUCCESS)
             {
@@ -354,7 +353,7 @@ namespace apsi
             }
         }
 
-        void ECPoint::extract_hash(gsl::span<unsigned char, hash_size> out)
+        void ECPoint::extract_hash(hash_span_type out)
         {
             // Compute a Blake2b hash of the value and expand to hash_size
             blake2b(out.data(), out.size(), pt_->y, sizeof(f2elm_t), nullptr, 0);

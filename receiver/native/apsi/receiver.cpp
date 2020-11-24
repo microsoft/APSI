@@ -143,7 +143,7 @@ namespace apsi
             crypto_context_->set_secret(generator.secret_key());
 
             // Create Serializable<RelinKeys> and move to relin_keys_ for storage
-            Serializable<RelinKeys> relin_keys(generator.relin_keys());
+            Serializable<RelinKeys> relin_keys(generator.create_relin_keys());
             relin_keys_.set(move(relin_keys));
         }
 

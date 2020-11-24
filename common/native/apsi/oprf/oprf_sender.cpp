@@ -3,6 +3,7 @@
 
 // STD
 #include <thread>
+#include <algorithm>
 
 // APSI
 #include "apsi/oprf/oprf_sender.h"
@@ -16,6 +17,16 @@ namespace apsi
 
     namespace oprf
     {
+        void OPRFKey::save(oprf_key_span_type oprf_key) const
+        {
+            copy_n(oprf_key_.cbegin(), oprf_key_size, oprf_key.data());
+        }
+
+        void OPRFKey::load(oprf_key_span_const_type oprf_key)
+        {
+            copy_n(oprf_key.data(), oprf_key_size, oprf_key_.begin());
+        }
+
         void OPRFKey::save(ostream &stream) const
         {
             auto old_except_mask = stream.exceptions();
@@ -72,13 +83,13 @@ namespace apsi
             {
                 // Load the point from items_buffer
                 ECPoint ecpt;
-                ecpt.load({ oprf_in_ptr, oprf_query_size });
+                ecpt.load(ECPoint::point_save_span_const_type{ oprf_in_ptr, oprf_query_size });
 
                 // Multiply with key
                 ecpt.scalar_multiply(oprf_key.key_span());
 
                 // Save the result to oprf_responses
-                ecpt.save({ oprf_out_ptr, oprf_response_size });
+                ecpt.save(ECPoint::point_save_span_type{ oprf_out_ptr, oprf_response_size });
 
                 // Move forward
                 advance(oprf_in_ptr, oprf_query_size);
@@ -102,7 +113,7 @@ namespace apsi
 
                 // Extract the hash
                 oprf_hash_type hash;
-                ecpt.extract_hash({ reinterpret_cast<unsigned char *>(hash.data()), ECPoint::hash_size });
+                ecpt.extract_hash(ECPoint::hash_span_type{ reinterpret_cast<unsigned char *>(hash.data()), ECPoint::hash_size });
 
                 // Add to result
                 oprf_hashes.insert(move(hash));
@@ -127,7 +138,7 @@ namespace apsi
 
                 // Extract the hash
                 pair<oprf_hash_type, FullWidthLabel> hash;
-                ecpt.extract_hash({ reinterpret_cast<unsigned char *>(hash.first.data()), ECPoint::hash_size });
+                ecpt.extract_hash(ECPoint::hash_span_type{ reinterpret_cast<unsigned char *>(hash.first.data()), ECPoint::hash_size });
 
                 // Copy the label
                 hash.second = item_label_pair.second;

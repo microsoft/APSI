@@ -138,7 +138,9 @@ namespace APSITests
         ASSERT_THROW(size_t in_size = sop2.load(ss, context), runtime_error);
 
         // A local valid relin_keys object; this time also load works
-        sop.relin_keys.set(keygen.relin_keys_local());
+        RelinKeys rlk;
+        keygen.create_relin_keys(rlk);
+        sop.relin_keys.set(move(rlk));
         ASSERT_FALSE(sop.relin_keys.is_serializable());
         ASSERT_TRUE(sop.relin_keys.is_local());
         out_size = sop.save(ss);
@@ -153,8 +155,8 @@ namespace APSITests
         ASSERT_EQ(10, sop2.pd.up_to_power());
         ASSERT_EQ(2, sop2.pd.source_count());
 
-        // A serializable (empty) relin_keys object
-        sop.relin_keys.set(keygen.relin_keys());
+        // A serializable relin_keys object
+        sop.relin_keys.set(keygen.create_relin_keys());
         ASSERT_TRUE(sop.relin_keys.is_serializable());
         ASSERT_FALSE(sop.relin_keys.is_local());
         out_size = sop.save(ss);
