@@ -14,7 +14,7 @@
 
 // SEAL 
 #include "seal/util/defines.h"
-#include "seal/intarray.h"
+#include "seal/dynarray.h"
 #include "seal/memorymanager.h"
 
 // GSL
@@ -90,7 +90,7 @@ namespace apsi
 
                 inline void clear()
                 {
-                    factor_data_ = { seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true) };
+                    factor_data_ = { seal::MemoryManager::GetPool(seal::mm_prof_opt::mm_force_new, true) };
                     item_count_ = 0;
                 }
 
@@ -115,8 +115,8 @@ namespace apsi
                 }
 
             private:
-                seal::IntArray<unsigned char> factor_data_{ seal::MemoryManager::GetPool(
-                    seal::mm_prof_opt::FORCE_NEW, true) };
+                seal::DynArray<unsigned char> factor_data_{ seal::MemoryManager::GetPool(
+                    seal::mm_prof_opt::mm_force_new, true) };
 
                 std::size_t item_count_ = 0;
             };

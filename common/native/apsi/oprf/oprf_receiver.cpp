@@ -36,7 +36,7 @@ namespace apsi
                 ecpt.scalar_multiply(random_scalar);
 
                 // Save the result to items_buffer
-                ecpt.save({ oprf_out_ptr, oprf_query_size });
+                ecpt.save(gsl::span<unsigned char, ECPoint::save_size>(oprf_out_ptr, oprf_query_size));
 
                 // Move forward
                 advance(oprf_out_ptr, oprf_query_size);
@@ -62,13 +62,13 @@ namespace apsi
             {
                 // Load the point from items_buffer
                 ECPoint ecpt;
-                ecpt.load({ oprf_in_ptr, oprf_response_size });
+                ecpt.load(gsl::span<const unsigned char, ECPoint::save_size>(oprf_in_ptr, oprf_response_size));
 
                 // Multiply with inverse random scalar
                 ecpt.scalar_multiply(inv_factor_data_.get_factor(i));
 
                 // Write the hash to the appropriate item
-                ecpt.extract_hash({ reinterpret_cast<unsigned char *>(oprf_hashes[i].data()), ECPoint::hash_size });
+                ecpt.extract_hash(gsl::span<unsigned char, ECPoint::hash_size>(reinterpret_cast<unsigned char *>(oprf_hashes[i].data()), ECPoint::hash_size));
 
                 // Move forward
                 advance(oprf_in_ptr, oprf_response_size);

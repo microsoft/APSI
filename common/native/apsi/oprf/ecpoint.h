@@ -17,7 +17,7 @@
 #include "seal/randomgen.h"
 
 // FourQ
-#include "FourQ.h"
+#include "apsi/fourq/FourQ.h"
 
 namespace apsi
 {

@@ -628,7 +628,6 @@ target_include_directories(common PUBLIC
 target_link_libraries(common PUBLIC
     SEAL::seal
     Kuku::kuku
-#    fourq
     flatbuffers)
 
 if (APSI_USE_LOG4CPLUS)
@@ -743,9 +742,15 @@ if(APSI_BUILD_CLI)
 
     add_executable(sender_cli)
     add_subdirectory(cli/sender)
-    target_link_libraries(sender_cli common_cli sender stdc++fs)
+    target_link_libraries(sender_cli common_cli sender)
+    if(!MSVC)
+        target_link_libraries(sender_cli PUBLIC stdc++fs)
+    endif()
 
     add_executable(receiver_cli)
     add_subdirectory(cli/receiver)
-    target_link_libraries(receiver_cli common_cli receiver stdc++fs)
+    target_link_libraries(receiver_cli common_cli receiver)
+    if (!MSVC)
+        target_link_libraries(receiver_cli PUBLIC stdc++fs)
+    endif()
 endif()

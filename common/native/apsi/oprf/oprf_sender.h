@@ -15,7 +15,7 @@
 
 // SEAL
 #include "seal/util/defines.h"
-#include "seal/intarray.h"
+#include "seal/dynarray.h"
 #include "seal/randomgen.h"
 #include "seal/memorymanager.h"
 
@@ -46,8 +46,9 @@ namespace apsi
             inline void create()
             {
                 // Create a random key
+                ECPoint::scalar_span_type out( oprf_key_.begin(), oprf_key_size );
                 ECPoint::make_random_nonzero_scalar(
-                    { oprf_key_.begin(), oprf_key_size }, random_ ? random_->create() : nullptr);
+                    out, random_ ? random_->create() : nullptr);
             }
 
             void save(std::ostream &stream) const;
@@ -66,20 +67,21 @@ namespace apsi
 
             inline void clear()
             {
-                oprf_key_ = seal::IntArray<unsigned char>(
-                    oprf_key_size, seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true));
+                oprf_key_ = seal::DynArray<unsigned char>(
+                    oprf_key_size, seal::MemoryManager::GetPool(seal::mm_prof_opt::mm_force_new, true));
             }
 
             inline oprf_key_span_const_type key_span() const noexcept
             {
-                return { oprf_key_.cbegin(), oprf_key_size };
+                oprf_key_span_const_type result( oprf_key_.cbegin(), oprf_key_size );
+                return result;
             }
 
         private:
             std::shared_ptr<seal::UniformRandomGeneratorFactory> random_{ nullptr };
 
-            seal::IntArray<unsigned char> oprf_key_{ oprf_key_size,
-                                                     seal::MemoryManager::GetPool(seal::mm_prof_opt::FORCE_NEW, true) };
+            seal::DynArray<unsigned char> oprf_key_{ oprf_key_size,
+                                                     seal::MemoryManager::GetPool(seal::mm_prof_opt::mm_force_new, true) };
         }; // class OPRFKey
 
         class OPRFSender

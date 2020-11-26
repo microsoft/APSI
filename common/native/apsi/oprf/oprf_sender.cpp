@@ -4,6 +4,9 @@
 // STD
 #include <thread>
 
+// GSL
+#include <gsl/span_ext>
+
 // APSI
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/util/utils.h"
@@ -72,13 +75,13 @@ namespace apsi
             {
                 // Load the point from items_buffer
                 ECPoint ecpt;
-                ecpt.load({ oprf_in_ptr, oprf_query_size });
+                ecpt.load(gsl::span<const unsigned char, ECPoint::save_size>(oprf_in_ptr, oprf_query_size));
 
                 // Multiply with key
                 ecpt.scalar_multiply(oprf_key.key_span());
 
                 // Save the result to oprf_responses
-                ecpt.save({ oprf_out_ptr, oprf_response_size });
+                ecpt.save(gsl::span<unsigned char, ECPoint::save_size>(oprf_out_ptr, oprf_response_size));
 
                 // Move forward
                 advance(oprf_in_ptr, oprf_query_size);
@@ -102,7 +105,7 @@ namespace apsi
 
                 // Extract the hash
                 oprf_hash_type hash;
-                ecpt.extract_hash({ reinterpret_cast<unsigned char *>(hash.data()), ECPoint::hash_size });
+                ecpt.extract_hash(gsl::span<unsigned char, ECPoint::hash_size>(reinterpret_cast<unsigned char*>(hash.data()), ECPoint::hash_size));
 
                 // Add to result
                 oprf_hashes.insert(move(hash));
@@ -127,7 +130,7 @@ namespace apsi
 
                 // Extract the hash
                 pair<oprf_hash_type, FullWidthLabel> hash;
-                ecpt.extract_hash({ reinterpret_cast<unsigned char *>(hash.first.data()), ECPoint::hash_size });
+                ecpt.extract_hash(gsl::span<unsigned char, ECPoint::hash_size>(reinterpret_cast<unsigned char *>(hash.first.data()), ECPoint::hash_size));
 
                 // Copy the label
                 hash.second = item_label_pair.second;

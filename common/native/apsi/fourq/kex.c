@@ -11,7 +11,7 @@
 
 #include "FourQ_internal.h"
 #include "FourQ_params.h"
-#include "../random/random.h"
+#include "random.h"
 #include <string.h>
 
 
