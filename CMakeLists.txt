@@ -628,10 +628,10 @@ target_include_directories(common PUBLIC
 target_link_libraries(common PUBLIC
     SEAL::seal
     Kuku::kuku
-    flatbuffers)
+    flatbuffers::flatbuffers)
 
 if (APSI_USE_LOG4CPLUS)
-    target_link_libraries(common PUBLIC log4cplus:log4cplus)
+    target_link_libraries(common PUBLIC log4cplus::log4cplus)
 endif()
 
 if(APSI_USE_ZMQ)
