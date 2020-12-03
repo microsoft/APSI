@@ -155,7 +155,7 @@ We hash to 128 bits and truncate the hash to a shorter length (large enough to b
 The shortest item length we support (after truncation) is 80 bits, which is still far above the practical sizes of `plain_modulus`.
 
 The second trick is to break up each item into multiple parts and encode them separately into consecutive batching slots.
-Namely, if `plain_modulus` is a `B`-bit prime, then we write only `B-1` bits of an item into a batching slot and the next `B-1` bits into the next slot.
+Namely, if `plain_modulus` is a `K`-bit prime, then we write only `K-1` bits of an item into a batching slot and the next `K-1` bits into the next slot.
 One downside is that a batched plaintext/ciphertext now only holds a fraction of `poly_modulus_degree` items.
 Typically we would use either 4 or 8 slots per item.
 For example, if `plain_modulus` is a 20-bit prime, then 4 slots could encode an item of length 80, and the query ciphertext `Q` (and its powers) can encrypt up to `poly_modulus_degree / 4` of the receiver's items.
@@ -518,15 +518,15 @@ The following arguments specify the sender's behavior and determine the paramete
 |-----------|-------------|
 | `-d` \| `--dbFile` | CSV file describing a look-up table with possibly empty values |
 | `-p` \| `--port` | TCP port to bind to (default is 1212) |
-| `-F` \| `--feltsPerItem` | Number of field elements (i.e., batching slots) to use per item |
+| `-F` \| `--feltsPerItem` | Number of field elements (i.e., batching slots) to use per (hashed) item |
 | `-T` \| `--tableSize` | Size of the cuckoo hash table |
 | `-m` \| `--maxItemsPerBin` | Bound on the bin size for sender's hash tables |
 | `-H` \| `--hashFuncCount` | Number of hash functions to use for cuckoo hashing |
 | `-w` \| `--queryPowerCount` | Number of encrypted powers of the query data to be sent |
 | `-P` \| `--polyModulusDegree` | Microsoft SEAL `poly_modulus_degree` parameter |
-| `-C` \| `--coeffModulusBits` | Bit count for a single Microsoft SEAL `coeff_modulus` prime |
-| `-a` \| `--plainModulusBits` | Bit count for a Microsoft SEAL `plain_modulus` prime (cannot be used with `-A`) |
-| `-A` \| `--plainModulus` | Microsoft SEAL `plain_modulus` prime (cannot be used with `-a`) |
+| `-C` \| `--coeffModulusBits` | Microsoft SEAL `coeff_modulus`'s prime bit count |
+| `-a` \| `--plainModulusBits` | Microsoft SEAL `plain_modulus`'s bit count (cannot be used with `-A`) |
+| `-A` \| `--plainModulus` | Microsoft SEAL `plain_modulus`'s value (cannot be used with `-a`) |
 
 #### `-d` \| `--dbFile`
 
@@ -536,64 +536,67 @@ Thus, no values should be specified on any of the rows unless it is truly necess
 
 #### `-p` \| `--port`
 
-Specified the TCP/IP port the application will bind to.
+Specifies the TCP/IP port that the application will be binded to.
 
 #### `-F` \| `--feltsPerItem`
 
-Specified how many Microsoft SEAL batching slots are used to encode a single item.
-If the `plain_modulus` is a B-bit prime, then each slot encodes B - 1 bits of item data.
+Specifies how many Microsoft SEAL batching slots are used to encode a single item.
+If the `plain_modulus` is a `K`-bit prime, then each slot encodes `K-1` bits of item data.
 For example, if the sender is invoked with `-a 16 -F 8`, then APSI will use 120 = 8 * (16 - 1) bits per item.
 We call this the *item bit count*, and it must be in the range 80 &ndash; 128.
 APSI handles hashing the items to appropriate length, but the user must specify the `-a` and the `-F` values appropriately.
 
-The value for `-F` must be a power of two. Common choices are `4`, `8`, and `16`.
+The value for `-F` must be a power of two.
+Common choices are `4`, `8`, and `16`.
 
 #### `-A` \| `--plainModulus`
 
 Allows the exact value for a Microsoft SEAL `plain_modulus` to be specified.
 Since APSI uses batching, the prime must have a special form (congruent to 1 modulo `2 * poly_modulus_degree`).
 A common and good choice for the `plain_modulus` is the 16-bit Fermat prime 65537.
-In general, however, we recommend the much easier `-a` option instead, which allows specifying the bit count instead and leaves the prime sampling for Microsoft SEAL.
+In general, however, we recommend the much easier `-a` option instead, which allows specifying the bit count instead and leaves the prime generation to Microsoft SEAL.
 
-Smaller values for `plain_modulus` result in less noise growth in homomorphic encryption and in some cases may allow smaller encryption parameters to be used (`poly_modulus_degree` and `coeff_modulus`), resulting in significant speed-ups.
+Smaller values for `plain_modulus` result in less noise growth in homomorphic encryption and in some cases may allow smaller encryption parameters (`poly_modulus_degree` and `coeff_modulus`) to be used, yielding significant speed-ups.
 However, at the same time a smaller value for `plain_modulus` reduces the number of bits of the values that can be encoded into a single batching slot, possibly requiring a larger value for `-F`.
 
 #### `-a` \| `--plainModulusBits`
 
-Instead of specifying the Microsoft SEAL `plain_modulus` prime directly, the `-a` option allows its bit count to be provided and automatically samples an appropriate prime.
+Instead of specifying the Microsoft SEAL `plain_modulus` prime directly, the `-a` option allows its bit count to be provided and automatically generates an appropriate prime.
 
 #### `-T` \| `--tableSize`
 
-The size of the cuckoo hash table the receiver needs to populate.
-This value must be a power of two and must be at least as large as `poly_modulus_degree` divided by the value for `-F` (the number of items encoded into a single Microsoft SEAL plaintext).
+The size of the cuckoo hash table that the receiver needs to populate.
+This value must be a power of two and must be larger or equal to `poly_modulus_degree` divided by the value for `-F` (the number of items encoded into a single Microsoft SEAL plaintext).
 If the value for `-T` is larger than `poly_modulus_degree` divided by the value for `-F`, then APSI will use multiple Microsoft SEAL plaintexts to encode the hash table bins.
 
-A larger value for `-T` allows the receiver to hash more items into a single query. If the query size is very small, it can be beneficial to make the value for `-T` as small as possible, i.e., equal to `poly_modulus_degree` divided by the value for `-F`.
+A larger value for `-T` allows the receiver to hash more items into a single query.
+If the query size is very small, it can be beneficial to make the value for `-T` as small as possible, i.e., equal to `poly_modulus_degree` divided by the value for `-F`.
 
 #### `-H` \| `--hashFuncCount`
 
 The number of hash functions (2 &ndash; 8) used for cuckoo hashing.
 A larger value for `-H` implies denser packing for the receiver's hash table, i.e., they can fit more items into a single query.
-On the other hand, the sender must add its database items into a large hash table using each of the hash functions, so a larger value for `-H` means that the sender's hash table may be much larger, possibly increasing both communication and computation cost.
+On the other hand, the sender must add its database items into a large hash table using each of the hash functions, so a larger value for `-H` means that the sender's hash table may be much larger, possibly increasing both communicational and computational cost.
 
 #### `-P` \| `--polyModulusDegree`
 
 The Microsoft SEAL `poly_modulus_degree` parameter determines how many integers modulo the `plain_modulus` can be batched into a single plaintext object.
-APSI encodes items into multiple Microsoft SEAL batching slots, because the `plain_modulus` value (up to 60 bits) is never large enough to hold an entire item (80 &ndash; 128 bits).
+APSI encodes items into multiple Microsoft SEAL batching slots, because the `plain_modulus` value (up to 60 bits) is never large enough to hold an entire (hashed) item (80 &ndash; 128 bits).
 
-The situation is easiest to understand on the receiver's side.
+The situation is easy to understand on the receiver's side.
 The receiver uses cuckoo hashing to hash its query items into a single hash table of size specified with the `-T` option.
 Suppose the receiver wants to submit 800 items in a batched query.
 Since 800 is about 78% of 1024, using `-T 1024 -H 3` should result in good success probability for cuckoo hashing.
 Suppose also that `-F 8 -a 16` is used, resulting in 120-bit items.
 This means that the hash table will require 8192 = 1024 * 8 batching slots; `-P 8192` is the largest valid option in this case, because the cuckoo hash table cannot be smaller than a single Microsoft SEAL plaintext.
-On the other hand, `-P 4096` can be beneficial if the sender's database is small and `-P 8192` enables unnecessarily much encrypted computing capability.
+On the other hand, `-P 4096` can be beneficial if the sender's database is small, and the extra computing capability enabled by `-P 8192` is unnecessary.
 
 #### `-C` \| `--coeffModulusBits`
 
-The `-C` option can be specified multiple times to provide bit counts for Microsoft SEAL `coeff_modulus` primes.
+The `-C` option specifies the bit count of each prime in Microsoft SEAL `coeff_modulus`.
+It must be specified multiple times &ndash; once per each prime.
 Each provided bit count can be up to 60 (as large as possible should generally be preferred) and the total bit size must not exceed the bounds given in [Encryption Parameters](#encryption-parameters).
-A larger total `coeff_modulus` bit count provides more noise budget for encrypted computing, but has an adverse effect on both communication and computation cost.
+A larger total `coeff_modulus` bit count provides more noise budget for encrypted computing, but has an adverse effect on both communicational and computational cost.
 
 #### -m | --maxItemsPerBin
 
@@ -601,25 +604,23 @@ The value for `-m` specifies how may items can be (horizontally) inserted into e
 Our example in [Practice](#practice) used `-m 2`, but in reality much bigger values should probably be used.
 
 Using a smaller value for `-m` will result in more bin bundles per each bundle index, because fewer items can be inserted into the bin bundles.
-This clearly increases the communication cost, as the result size is proportional to the number of bin bundles.
-A smaller value for `-m` reduces the complexity of the encrypted match computation, allowing possibly smaller encryption parameters to be used.
+This clearly increases the communicational cost, as the result size is proportional to the number of bin bundles.
+A smaller value for `-m` reduces the complexity of the matching computation, allowing possibly smaller encryption parameters to be used.
 Since the bin bundles can also be processed independently in parallel, (more) smaller bin bundles often outperforms (fewer) larger bin bundles.
 
 #### `-w` \| `--queryPowerCount`
 
-Suppose we use `-m 32`. Upon receiving a query ciphertext `Q`, the sender must compute all powers of `Q`, up to `Q^32`.
+Suppose we use `-m 32`.
+Upon receiving a query ciphertext `Q`, the sender must compute all powers of `Q`, up to `Q^32`.
 Homomorphic encryption makes this possible, but the computation can easily have significantly large multiplicative depth, and may require impractically large encryption parameters.
 
 Instead of using very large encryption parameters, the receiver will compute ahead of time certain powers of its query, encrypt those powers, and send them all to the sender, along with instructions for how to multiply the ciphertexts together to obtain all of the required powers.
 Much of this is invisible to the user, and is controlled by the `-w` option, which specifies how many powers will be sent.
-APSI will determine internally exactly which powers it will send.
-For example, using `-w 6` will have twice larger communication cost from receiver to sender, compared to using `-w 3`, whereas the communication cost from sender to receiver is not directly impacted by this choice.
+APSI will determine internally exactly which powers the receiver will send.
+For example, using `-w 6` will have twice larger communicational cost from receiver to sender, compared to using `-w 3`, whereas the communicational cost from sender to receiver is not directly impacted by this choice.
 
 Using a larger value for `-w` results in increased communication and reduced computation.
 In some cases it can allow for smaller encryption parameters to be used.
-
-
-
 
 ## Requirements in order
 
