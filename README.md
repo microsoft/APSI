@@ -92,9 +92,9 @@ In APSI, the user will need to explicitly provide the `coeff_modulus` prime bit 
 The basic idea of APSI is as follows.
 Suppose the sender holds a set `{Y_i}` of items &ndash; each an integer modulo `plain_modulus` &ndash; and the receiver holds a single item `X` &ndash; also an integer modulo `plain_modulus`.
 The receiver can choose a secret key, encrypt `X` to obtain a ciphertext `Q = Enc(X)`, and send it over to the sender.
-The sender can now evaluate the *matching polynomial* `M = (Q-Y_0)*(Q-Y_1)*...*(Q-Y_n)`.
-Here the values `Y_i` are unencrypted data held by the sender, and `Q` is a BFV ciphertext.
-Due to the capabilities of homomorphic encryption, `M` will hold an encryption of `(X-Y_0)*(X-Y_1)*...*(X-Y_n)`, which is zero if `X` exactly matches one of the sender's items, and non-zero otherwise.
+The sender can now evaluate the *matching polynomial* `M(x) = (x-Y_0)*(x-Y_1)*...*(x-Y_n)` at `x=Q`.
+Here the values `Y_i` are unencrypted data held by the sender.
+Due to the capabilities of homomorphic encryption, `M(Q)` will hold an encryption of `(X-Y_0)*(X-Y_1)*...*(X-Y_n)`, which is zero if `X` exactly matches one of the sender's items, and non-zero otherwise.
 The sender, performing the encrypted computation, will not be able to know this result due to the secret key being held only by the receiver.
 
 One problem with the above is that the computation has an enormously high multiplicative depth.
@@ -355,6 +355,58 @@ Bundle index 3  | Bin bundle || Bin bundle || Bin bundle |
 When the sender receives `query-ctxt0`, it must compute the encrypted match for each bin bundle at bundle index 0.
 Similarly, `query-ctxt1` must be matched against each bin bundle at bundle index 1, and so on.
 The number of result ciphertexts obtained by the receiver will be equal to the total number of bin bundles the sender holds; the client cannot know this number in advance.
+
+### Labeled Mode
+
+#### Basic Idea
+
+The labeled mode is not too different, but requires some additional explanation.
+The receiver, addition to learning whether its items are in the sender's set, will learn additional data the sender has associated associated to the item.
+One can think of this as a key-value store with privacy-preserving queries.
+
+To understand how the labeled mode works, recall from [Basic Idea](#basic-idea) how the matching polynomial `M(x)`, when evaluated for the receiver's encrypted item `Q`, outputs either an encryption of zero, or an encryption of a non-zero value.
+In the labeled mode, the sender creates another polynomial `L(x)`, the *label interpolation polynomial*, that has the following property: if `{(Y_i, V_i)}` denotes the sender's item-label pairs, then `L(Y_i) = V_i`.
+Upon receiving `Q`, the sender computes the pair `(M(Q), L(Q))` and returns the pair of ciphertexts to the receiver.
+The receiver decrypts the pair, and checks whether the first value decrypts to zero.
+If it does, the second value decrypts to the corresponding label.
+
+#### Large Labels
+
+One immediate issue is that all encrypted computations happen modulo the `plain_modulus`, but the sender's labels might be much longer than that.
+This was a problem also for the items, and was resolved in [Large Items](#large-items) by hashing the items first to a bounded size (80 &ndash; 128 bits) and then using a sequence of batching slots to encode the items.
+This works to some extent for labels as well.
+Namely, the labels can be broken into parts similarly to the items, and for each part we can form a label interpolation polynomial that outputs that part of the label when evaluated on the corresponding part of the item.
+
+This is not yet a fully satisfactory solution, because our items do not have a fixed size and are fairly short anyway (up to 128 bits).
+Labels that are longer than the items can be broken into multiple parts, each of the length of the item.
+For each part we can construct a separate label interpolation polynomial, evaluate them all on the encrypted query, and return each encrypted result to the receiver.
+The receiver decrypts the results and concatenates them to recover the label for those items that were matched.
+
+#### Label Encryption
+
+There is a serious security issue with the above approach that must be resolved.
+Namely, recall how we used [OPRF](#oprf) to ensure that partial (or full) leakage of the sender's items to the receiver does not create a privacy problem.
+However, if the receiver can guess a part of the sender's OPRF hashed item, it can use it to query for the corresponding part of the label for that item, which is clearly unacceptable since the receiver does not actually know the item.
+
+To solve this issue, the sender uses a symmetric encryption scheme `Enc(-,-)` to encrypt each of its labels using a key derived from the original item &ndash; not the OPRF hashed item.
+In other words, instead of `{(Y_i, V_i)}` it uses `{(Y_i, Enc(HKDF(Y_i), V_i))}` and proceeds as before.
+The receiver benefits nothing from learning parts (or all) of the encrypted label, unless it also knows the original item.
+
+#### Partial Item Collisions
+
+There is one last subtle issue that must be addressed.
+Recall from [Practice](#practice) how the sender constructs a large hash table and breaks it into a jagged array of bin bundles.
+In the labeled mode each bin bundle holds not only the item parts in it, but also the corresponding label parts, and the label interpolation polynomials, as described above.
+
+Now consider what happens when, by pure chance, `item416-part1` and `item12-part1` (as in [Practice](#practice)) are the same.
+If the corresponding label parts `label416-part1` and `label12-part1` are different, it will be impossible to create a label interpolation polynomial `L`.
+
+This issue is resolved by checking, before inserting an item into a bin bundle, that its parts do not already appear in the same locations.
+If any of them does, the item simply cannot be inserted into that bin bundle, and possibly a new bin bundle for the same bundle index must be created.
+
+## Implementation Details
+
+
 
 # Command-Line Interface (CLI)
 
