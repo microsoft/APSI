@@ -86,89 +86,92 @@ In APSI, the user will need to explicitly provide the `coeff_modulus` prime bit 
 
 ### Theory
 
-#### Basic Idea
+#### Naive Idea
 
 The basic idea of APSI is as follows.
 Suppose the sender holds a set `{Y_i}` of items &ndash; each an integer modulo `plain_modulus` &ndash; and the receiver holds a single item `X` &ndash; also an integer modulo `plain_modulus`.
-The receiver can choose a secret key, encrypt `X` to obtain a ciphertext `Q = Enc(X)`, and send it over to the sender.
+The receiver can choose a secret key, encrypts `X` to obtain a ciphertext `Q = Enc(X)`, and sends it over to the sender.
 The sender can now evaluate the *matching polynomial* `M(x) = (x-Y_0)*(x-Y_1)*...*(x-Y_n)` at `x=Q`.
 Here the values `Y_i` are unencrypted data held by the sender.
-Due to the capabilities of homomorphic encryption, `M(Q)` will hold an encryption of `(X-Y_0)*(X-Y_1)*...*(X-Y_n)`, which is zero if `X` exactly matches one of the sender's items, and non-zero otherwise.
-The sender, performing the encrypted computation, will not be able to know this result due to the secret key being held only by the receiver.
+Due to the capabilities of homomorphic encryption, `M(Q)` will hold an encryption of `(X-Y_0)*(X-Y_1)*...*(X-Y_n)` which is zero if `X` matches one of the sender's items and non-zero otherwise.
+The sender who performs computation on `X` &ndash; encrypted data &ndash; will not be able to know this result due to the secret key being held only by the receiver.
 
 One problem with the above is that the computation has an enormously high multiplicative depth.
-It is not uncommon for the sender to have millions, or even hundreds of millions, of items.
+It is not uncommon for the sender to have millions or even hundreds of millions of items.
 This would require a very high initial noise budget and subsequently very large encryption parameters with an impossibly large computational overhead.
 
 #### Lowering the Depth
 
-The first step towards making this naive idea more practical is to figure out ways of lowering the multiplicative depth of the computation.
-First, notice that the sender can simply split up its set into `S` equal size parts, and evaluate the matching polynomial totally independently on each of the parts, producing `S` results `{M_i}`.
-All of these results must be sent back to the receiver, so the sender-to-receiver communication has increased by a factor of `S`. Nevertheless, this turns out to be a really valuable trick in helping reduce the size of the encryption parameters.
+The first step towards making this naive idea practical is to figure out ways of lowering the multiplicative depth of the computation.
+First, notice that the sender can split up its set into `S` equally sized parts and evaluate the matching polynomial independently on each of the parts, producing `S` results `{M_i(Q)}`.
+All of these results must be sent back to the receiver, so the sender-to-receiver communication has increased by a factor of `S`.
+Nevertheless, this turns out to be a really valuable trick in helping reduce the size of the encryption parameters.
 
 The second step is to use batching in Microsoft SEAL.
-Per each of the `S` parts described above, the sender can further split its set into `poly_modulus_degree` many equal size parts, and the receiver can batch-encrypt its item into a single batched query ciphertext `Q`.
+Per each of the `S` parts described above, the sender can further split its set into `poly_modulus_degree` many equally sized parts, and the receiver can batch-encrypt its item into a single batched query ciphertext `Q = Enc({X, X, ...})`.
 Now, the sender can evaluate vectorized versions of the matching polynomials on `Q`, improving the computational complexity by a factor of `poly_modulus_degree` and significantly reducing the multiplicative depth.
 
-The third step to lowering the depth is to have the receiver compute higher powers of its query, encrypt those separately, and send them all to the sender.
-Suppose the matching polynomials the sender hopes to evaluate have degree `d`.
+The third step is to have the receiver compute higher powers of its query, encrypt those separately, and send them all to the sender.
+Suppose the matching polynomials that the sender hopes to evaluate have degree `d`.
 Then, the sender will need ciphertexts encrypting all powers of the receiver's query, up to power `d`.
-This is certainly always possible because, given `Q`, homomorphic encryption allows the sender to compute `Q^2`, ..., `Q^d`, but the computation can have high multiplicative depth even with the improvements described above.
+Although the sender can always compute `Q^2`, ..., `Q^d` from a given `Q`, the computation can have high multiplicative depth even with the improvements described above.
 Instead, suppose the receiver precomputes certain powers of its query, encrypts them, and sends them to the sender in addition to `Q`.
-If the powers are chosen appropriately, the sender can compute all necessary powers of `Q` with a much lower depth circuit.
-The receiver-to-sender communication cost increases by a factor of how many powers were sent, but it is almost always beneficial to use this trick to reduce the multiplicative depth of the matching polynomials, and subsequently the size of the encryption parameters.
+If the powers are chosen appropriately, the sender can compute all remaining necessary powers of `Q` with a much lower depth circuit.
+The receiver-to-sender communication cost increases by a factor of how many powers were sent.
+It is almost always beneficial to use this trick to reduce the multiplicative depth of the matching polynomials, and subsequently the size of the encryption parameters.
 
 #### Cuckoo Hashing
 
 The above techniques scale poorly when the receiver has more items.
-Indeed, it would seem that the query needs to be repeated once per receiver's item, so if the receiver holds 10,000 items, the communication and computation cost would massively increase.
+Indeed, it would seem that the query needs to be repeated once per receiver's item, so if the receiver holds 10,000 items, the communicational and computational cost would massively increase.
 
-Fortunately, there is a well-known technique for fixing this issue.
-We use a hashing technique called cuckoo hashing, as implemented in the [Kuku](https://GitHub.com/Microsoft/Kuku) library. Cuckoo hashing uses multiple hash functions (usually 2 &ndash; 4), to achieve very high packing rates for a hash table with a bin size of 1.
+There is a well-known technique for fixing this issue.
+We use a hashing technique called cuckoo hashing, as implemented in the [Kuku](https://GitHub.com/Microsoft/Kuku) library.
+Cuckoo hashing uses multiple hash functions (usually 2 &ndash; 4) to achieve very high packing rates for a hash table with a bin size of 1.
 Instead of batch-encrypting its single item `X` into a query `Q` by repeating it into each batching slot, the receiver uses cuckoo hashing to insert multiple items `{X_i}` into a hash table of size `poly_modulus_degree` (the batch size) and bin size 1.
 The cuckoo hash table is then encrypted to form a query `Q`, and is sent to the sender.
 
-The sender uses all the different cuckoo hash functions to hash its items into a regular large hash table with arbitrary size bins; notably, it does not use cuckoo hashing.
+The sender uses all the different cuckoo hash functions to hash its items `{Y_i}` into a large hash table with arbitrarily sized bins; notably, it does not use cuckoo hashing.
 In fact, it inserts each item multiple times &ndash; once per each cuckoo hash function.
 This is necessary, because the sender cannot know which of the hash functions the receiver's cuckoo hashing process ended up using for each item.
 If the number of cuckoo hash functions is `H`, then clearly this effectively increases the sender's set size by a factor of `H`.
-After hashing its items the sender breaks down its hash table into parts as described above in [Lowering the Depth](#lowering-the-depth), and upon receiving `Q` proceeds as before.
+After hashing its items the sender breaks down its hash table into parts as described above in [Lowering the Depth](#lowering-the-depth), and proceeds as before upon receiving `Q`.
 
 The benefit is enormous.
 Cuckoo hashing allows dense packing of the receiver's items into a single query `Q`.
-For example, the receiver may be able to fit thousands of query items `{X_i}` into a single query `Q`, and the sender can perform the matching for all of these queries simultaneously at the cost of an increase in the sender's dataset size by a small factor `H`.
+For example, the receiver may be able to fit thousands of query items `{X_i}` into a single query `Q`, and the sender can perform the matching for all of these query items simultaneously, at the cost of increasing the sender's dataset size by a small factor `H`.
 
 #### Large Items
 
 Recall how each item had to be represented as an integer modulo `plain_modulus`.
-Unfortunately, `plain_modulus` is usually around 16 &ndash; 30 bits, and in Microsoft SEAL cannot in any case be larger than 60 bits.
-Larger `plain_modulus` also causes larger noise budget consumption, lowering the encrypted computing capability.
-On the other hand, we may need to be able to support arbitrary length items.
+Unfortunately, `plain_modulus` has usually 16 &ndash; 30 bits and always less than 60 bits in Microsoft SEAL.
+Larger `plain_modulus` also causes larger noise budget consumption, lowering capability of computing on encrypted data.
+On the other hand, we may need to support arbitrary length items.
 For example, an item may be an entire document, an email address, a street address, or a driver's license number.
 Two tricks make this possible.
 
-First, we first apply a hash function to all of items on both the sender's and receiver's side, so that they have a capped standard length.
-We hash to 128 bits and truncate the hash to a shorter length as necessary, still ensuring that the length remains large enough to make collisions unlikely.
+The first trick is to apply a hash function to all items on both the sender's and receiver's side, so that they have a capped standard length.
+We hash to 128 bits and truncate the hash to a shorter length (large enough to be collision-resistant) as necessary.
 The shortest item length we support (after truncation) is 80 bits, which is still far above the practical sizes of `plain_modulus`.
 
 The second trick is to break up each item into multiple parts and encode them separately into consecutive batching slots.
-Namely, if `plain_modulus` is a `B`-bit prime, then we write only `B-1` bits of an item into a batching slot, and the next `B-1` bits into the next slot. One downside of this approach is that now a batched plaintext/ciphertext cannot hold anymore `poly_modulus_degree` items, but rather some fraction of it.
+Namely, if `plain_modulus` is a `B`-bit prime, then we write only `B-1` bits of an item into a batching slot and the next `B-1` bits into the next slot.
+One downside is that a batched plaintext/ciphertext now only holds a fraction of `poly_modulus_degree` items.
 Typically we would use either 4 or 8 slots per item.
 For example, if `plain_modulus` is a 20-bit prime, then 4 slots could encode an item of length 80, and the query ciphertext `Q` (and its powers) can encrypt up to `poly_modulus_degree / 4` of the receiver's items.
-This leads to another issue, where the receiver can now query substantially fewer items than before.
-The solution is to decouple the cuckoo hash table size from the `poly_modulus_degree`, and simply use two or more ciphertexts to encrypt `Q` (and its powers).
+The receiver now queries substantially fewer items than before.
+The solution is to decouple the cuckoo hash table size from the `poly_modulus_degree` and simply use two or more ciphertexts to encrypt `{X_i}` (and their powers).
 
 #### OPRF
 
-Unfortunately, the above approach has two issues:
+Unfortunately, the above approach reveals more than whether there is a match:
 1. It allows the receiver to learn if parts of its query matched;
-2. The result of the matching polynomial reveals &ndash; even when there is no match &ndash; information about the sender's data.
-
-Both issues are significant and unacceptable.
+2. The result of the matching polynomial reveals information about the sender's data, even when there is no match.
+These are significant issues and unacceptable.
 
 The solution is to use an *Oblivious Pseudo-Random Function*, or *OPRF* for short.
 An OPRF can be thought of as a keyed hash function `Hash-OPRF(s, -)` that only the sender knows; here `s` denotes the sender's key.
-However, if the receiver has an item `X`, it can obtain `Hash-OPRF(s, X)` without the sender learning `X`, and without the receiver learning the function `Hash-OPRF(s, -)`.
+Further, the receiver can obtain `Hash-OPRF(s, X)` without learning the function `Hash-OPRF(s, -)` or the key `s`, and without the sender learning `X`.
 
 The way to do this is simple.
 The receiver hashes its item `X` to an elliptic curve point `A` in some cryptographically secure elliptic curve.
@@ -178,10 +181,11 @@ Upon receiving `C`, the receiver computes the inverse `r^(-1)` modulo the order 
 The receiver then extracts the final hash value `Hash-OPRF(s, X)` from this point, for example by hashing its x-coordinate to an appropriate domain.
 
 The sender knows `s`, so it can simply replace its items `{Y_i}` with `{Hash-OPRF(s, Y_i)}`.
-The receiver needs to communicate with the sender to obtain `{Hash-OPRF(s, X_i)}`, and once it has received these values, the protocol can proceed as described above.
+The receiver needs to communicate with the sender to obtain `{Hash-OPRF(s, X_i)}`.
+And once the receiver has received these values, the protocol can proceed as described above.
 With OPRF, the problem of the receiver learning whether parts of its query matched goes away.
 Since all the items are hashed with a hash function known only by the sender, the receiver will benefit nothing from learning parts of the sender's hashed items.
-In fact, the sender's dataset is no longer private information, and could in principle be sent in full to the receiver.
+In fact, the sender's dataset is not private information and could in principle be sent in full to the receiver.
 Homomorphic encryption only protects the receiver's data.
 
 ### Practice
@@ -224,7 +228,7 @@ Receiver's cuckoo hash table
 [ item3-part2   ]
 ```
 
-The sender creates one big hash table, which it then breaks into several independent *bin bundles*.
+The sender creates one big hash table and then breaks it into several independent *bin bundles*.
 The matching polynomials for each bin bundle are evaluated independently on `query-ctxt`; this is the first idea presented in [Lowering the Depth](#lowering-the-depth).
 For simplicity, we ignore the fact that the sender must use all of the cuckoo hash functions to insert each item.
 ```
@@ -263,7 +267,7 @@ Hence, APSI creates *Bin bundle 2* and inserts `item512` into it.
 Next, `item277` is inserted into *Bin bundle 1* since there is still room for it.
 In the end, we may end up with dozens or hundreds of bin bundles, and some of the last bin bundles to be added may be left with many empty locations.
 
-For the matching, the encrypted query `query-ctxt` is matched &ndash; in encrypted form &ndash; against both *Bin bundle 1* and *Bin bundle 2*, producing results `result-ctxt-1` and `result-ctxt-2`, which are sent back to the receiver.
+For the matching, the encrypted query `query-ctxt` is matched &ndash; in encrypted form &ndash; against both *Bin bundle 1* and *Bin bundle 2*, producing results `result-ctxt-1` and `result-ctxt-2` which are sent back to the receiver.
 The receiver decrypts the results and finds a result as follows.
 ```
 Receiver decrypting the result
@@ -288,9 +292,10 @@ Receiver's query vector      Receiver's result vector
 [ item3   ]                  [ match    ]
 [ item401 ]                  [ no-match ]
 ```
-The receiver, in this case, concludes that `item92`, `item14`, and `item3` are all present in the sender's database, whereas the other ones are not.
+The receiver, in this case, concludes that `item92`, `item14`, and `item3` are all present in the sender's database, whereas the other items are not.
 
-A few important details are omitted from the above description. First, the original items on either side are never inserted directly into the APSI protocol, but instead their OPRF hashes are used.
+A few important details are omitted from the description above.
+First, the original items on either side are never inserted directly into the APSI protocol, but instead their OPRF hashes are used.
 
 Second, the sender needs to insert each item multiple times, once using each of the cuckoo hash functions.
 For example, if three cuckoo hash functions are used, the sender would insert, e.g., `Hash1(item92)`, `Hash2(item92)`, and `Hash3(item92)`.
@@ -351,44 +356,44 @@ Bundle index 3  | Bin bundle || Bin bundle || Bin bundle |
                 |            ||            ||            |
                 +------------++------------++------------+
 ```
-When the sender receives `query-ctxt0`, it must compute the encrypted match for each bin bundle at bundle index 0.
+When the sender receives `query-ctxt0`, it must compute the matching for each bin bundle at bundle index 0.
 Similarly, `query-ctxt1` must be matched against each bin bundle at bundle index 1, and so on.
-The number of result ciphertexts obtained by the receiver will be equal to the total number of bin bundles the sender holds; the client cannot know this number in advance.
+The number of result ciphertexts obtained by the receiver will be equal to the total number of bin bundles held by the sender; the client cannot know this number in advance.
 
 ### Labeled Mode
 
 #### Basic Idea
 
-The labeled mode is not too different, but requires some additional explanation.
-The receiver, addition to learning whether its items are in the sender's set, will learn additional data the sender has associated associated to the item.
-One can think of this as a key-value store with privacy-preserving queries.
+The labeled mode is not too different but requires some extra explanation.
+The receiver, in addition to learning whether its query items are in the sender's set, will learn data the sender has associated to these items.
+One can think of this as a key-value store with privacy-preserving querying.
 
-To understand how the labeled mode works, recall from [Basic Idea](#basic-idea) how the matching polynomial `M(x)`, when evaluated for the receiver's encrypted item `Q`, outputs either an encryption of zero, or an encryption of a non-zero value.
-In the labeled mode, the sender creates another polynomial `L(x)`, the *label interpolation polynomial*, that has the following property: if `{(Y_i, V_i)}` denotes the sender's item-label pairs, then `L(Y_i) = V_i`.
-Upon receiving `Q`, the sender computes the pair `(M(Q), L(Q))` and returns the pair of ciphertexts to the receiver.
-The receiver decrypts the pair, and checks whether the first value decrypts to zero.
+To understand how the labeled mode works, recall from [Basic Idea](#basic-idea) how the matching polynomial `M(x)` outputs either an encryption of zero or an encryption of a non-zero value when being evaluated at the receiver's encrypted item `Q`.
+In the labeled mode, the sender creates another polynomial `L(x)`, the *label interpolation polynomial*, that has the following property: if `{(Y_i, V_i)}` denotes the sender's set of item-label pairs, then `L(Y_i) = V_i`.
+Upon receiving `Q`, the sender computes the ciphertext pair `(M(Q), L(Q))` and returns them to the receiver.
+The receiver decrypts the pair and checks whether the first value decrypts to zero.
 If it does, the second value decrypts to the corresponding label.
 
 #### Large Labels
 
 One immediate issue is that all encrypted computations happen modulo the `plain_modulus`, but the sender's labels might be much longer than that.
-This was a problem also for the items, and was resolved in [Large Items](#large-items) by hashing the items first to a bounded size (80 &ndash; 128 bits) and then using a sequence of batching slots to encode the items.
-This works to some extent for labels as well.
-Namely, the labels can be broken into parts similarly to the items, and for each part we can form a label interpolation polynomial that outputs that part of the label when evaluated on the corresponding part of the item.
+This was a problem for the items, and was resolved in [Large Items](#large-items) by hashing the items first to a bounded size (80 &ndash; 128 bits) and then using a sequence of batching slots to encode the items.
+This solution works to some extent for labels as well.
+Namely, the labels can be broken into parts similarly to how the items are, and for each part we can form a label interpolation polynomial that outputs that part of the label when evaluated at the corresponding part of the item.
 
-This is not yet a fully satisfactory solution, because our items do not have a fixed size and are fairly short anyway (up to 128 bits).
-Labels that are longer than the items can be broken into multiple parts, each of the length of the item.
-For each part we can construct a separate label interpolation polynomial, evaluate them all on the encrypted query, and return each encrypted result to the receiver.
+This is not yet a fulfilling solution, because our items do not have a fixed size and are fairly short anyway (up to 128 bits).
+Labels that are longer than the items can be broken into multiple parts each of the length of the item.
+For each part we can construct a separate label interpolation polynomial, evaluate them all at the encrypted query, and return each encrypted result to the receiver.
 The receiver decrypts the results and concatenates them to recover the label for those items that were matched.
 
 #### Label Encryption
 
-There is a serious security issue with the above approach that must be resolved.
-Namely, recall how we used [OPRF](#oprf) to ensure that partial (or full) leakage of the sender's items to the receiver does not create a privacy problem.
+There is a serious issue with the above approach that must be resolved.
+Namely, recall how we used [OPRF](#oprf) to prevent partial (or full) leakage of the sender's items to the receiver.
 However, if the receiver can guess a part of the sender's OPRF hashed item, it can use it to query for the corresponding part of the label for that item, which is clearly unacceptable since the receiver does not actually know the item.
 
 To solve this issue, the sender uses a symmetric encryption scheme `Enc(-,-)` to encrypt each of its labels using a key derived from the original item &ndash; not the OPRF hashed item.
-In other words, instead of `{(Y_i, V_i)}` it uses `{(Y_i, Enc(HKDF(Y_i), V_i))}` and proceeds as before.
+In other words, instead of `{(Y_i, V_i)}` it uses `{(Y_i, Enc(HKDF(Y_i), V_i))}` and proceeds as before; here `HKDF(-)` is a hash-based key deriviation function.
 The receiver benefits nothing from learning parts (or all) of the encrypted label, unless it also knows the original item.
 
 #### Partial Item Collisions
@@ -401,7 +406,7 @@ Now consider what happens when, by pure chance, `item416-part1` and `item12-part
 If the corresponding label parts `label416-part1` and `label12-part1` are different, it will be impossible to create a label interpolation polynomial `L`.
 
 This issue is resolved by checking, before inserting an item into a bin bundle, that its parts do not already appear in the same locations.
-If any of them does, the item simply cannot be inserted into that bin bundle, and possibly a new bin bundle for the same bundle index must be created.
+If any of them does, the item simply cannot be inserted into that bin bundle, and a new bin bundle for the same bundle index must be created.
 
 ## Using APSI
 
