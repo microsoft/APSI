@@ -518,7 +518,7 @@ The following arguments specify the sender's behavior and determine the paramete
 |-----------|-------------|
 | `-d` \| `--dbFile` | CSV file describing a look-up table with possibly empty values |
 | `-p` \| `--port` | TCP port to bind to (default is 1212) |
-| `-F` \| `--feltsPerItem` | Number of field elements to use per item |
+| `-F` \| `--feltsPerItem` | Number of field elements (i.e., batching slots) to use per item |
 | `-T` \| `--tableSize` | Size of the cuckoo hash table |
 | `-m` \| `--maxItemsPerBin` | Bound on the bin size for sender's hash tables |
 | `-H` \| `--hashFuncCount` | Number of hash functions to use for cuckoo hashing |
