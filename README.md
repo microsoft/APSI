@@ -4,7 +4,7 @@
 
 ### (Unlabeled) PSI and Labeled PSI
 
-Private Set Intersection (PSI) referes to a functionality where two parties, each holding a private set of *items*, can check which items they have in common without revealing anything else to each other.
+Private Set Intersection (PSI) refers to a functionality where two parties, each holding a private set of *items*, can check which items they have in common without revealing anything else to each other.
 Upper bounds on the sizes of the sets are assumed to be public information and are not protected.
 
 The APSI (Asymmetric PSI) library provides a PSI functionality for asymmetric set sizes.
