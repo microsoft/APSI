@@ -364,36 +364,36 @@ The number of result ciphertexts obtained by the receiver will be equal to the t
 
 #### Basic Idea
 
-The labeled mode is not too different, but requires some additional explanation.
-The receiver, addition to learning whether its items are in the sender's set, will learn additional data the sender has associated associated to the item.
-One can think of this as a key-value store with privacy-preserving queries.
+The labeled mode is not too different but requires some extra explanation.
+The receiver, in addition to learning whether its query items are in the sender's set, will learn data the sender has associated to these items.
+One can think of this as a key-value store with privacy-preserving querying.
 
-To understand how the labeled mode works, recall from [Basic Idea](#basic-idea) how the matching polynomial `M(x)`, when evaluated for the receiver's encrypted item `Q`, outputs either an encryption of zero, or an encryption of a non-zero value.
-In the labeled mode, the sender creates another polynomial `L(x)`, the *label interpolation polynomial*, that has the following property: if `{(Y_i, V_i)}` denotes the sender's item-label pairs, then `L(Y_i) = V_i`.
-Upon receiving `Q`, the sender computes the pair `(M(Q), L(Q))` and returns the pair of ciphertexts to the receiver.
-The receiver decrypts the pair, and checks whether the first value decrypts to zero.
+To understand how the labeled mode works, recall from [Basic Idea](#basic-idea) how the matching polynomial `M(x)` outputs either an encryption of zero or an encryption of a non-zero value when being evaluated at the receiver's encrypted item `Q`.
+In the labeled mode, the sender creates another polynomial `L(x)`, the *label interpolation polynomial*, that has the following property: if `{(Y_i, V_i)}` denotes the sender's set of item-label pairs, then `L(Y_i) = V_i`.
+Upon receiving `Q`, the sender computes the ciphertext pair `(M(Q), L(Q))` and returns them to the receiver.
+The receiver decrypts the pair and checks whether the first value decrypts to zero.
 If it does, the second value decrypts to the corresponding label.
 
 #### Large Labels
 
 One immediate issue is that all encrypted computations happen modulo the `plain_modulus`, but the sender's labels might be much longer than that.
-This was a problem also for the items, and was resolved in [Large Items](#large-items) by hashing the items first to a bounded size (80 &ndash; 128 bits) and then using a sequence of batching slots to encode the items.
-This works to some extent for labels as well.
-Namely, the labels can be broken into parts similarly to the items, and for each part we can form a label interpolation polynomial that outputs that part of the label when evaluated on the corresponding part of the item.
+This was a problem for the items, and was resolved in [Large Items](#large-items) by hashing the items first to a bounded size (80 &ndash; 128 bits) and then using a sequence of batching slots to encode the items.
+This solution works to some extent for labels as well.
+Namely, the labels can be broken into parts similarly to how the items are, and for each part we can form a label interpolation polynomial that outputs that part of the label when evaluated at the corresponding part of the item.
 
-This is not yet a fully satisfactory solution, because our items do not have a fixed size and are fairly short anyway (up to 128 bits).
-Labels that are longer than the items can be broken into multiple parts, each of the length of the item.
-For each part we can construct a separate label interpolation polynomial, evaluate them all on the encrypted query, and return each encrypted result to the receiver.
+This is not yet a fulfilling solution, because our items do not have a fixed size and are fairly short anyway (up to 128 bits).
+Labels that are longer than the items can be broken into multiple parts each of the length of the item.
+For each part we can construct a separate label interpolation polynomial, evaluate them all at the encrypted query, and return each encrypted result to the receiver.
 The receiver decrypts the results and concatenates them to recover the label for those items that were matched.
 
 #### Label Encryption
 
-There is a serious security issue with the above approach that must be resolved.
-Namely, recall how we used [OPRF](#oprf) to ensure that partial (or full) leakage of the sender's items to the receiver does not create a privacy problem.
+There is a serious issue with the above approach that must be resolved.
+Namely, recall how we used [OPRF](#oprf) to prevent partial (or full) leakage of the sender's items to the receiver.
 However, if the receiver can guess a part of the sender's OPRF hashed item, it can use it to query for the corresponding part of the label for that item, which is clearly unacceptable since the receiver does not actually know the item.
 
 To solve this issue, the sender uses a symmetric encryption scheme `Enc(-,-)` to encrypt each of its labels using a key derived from the original item &ndash; not the OPRF hashed item.
-In other words, instead of `{(Y_i, V_i)}` it uses `{(Y_i, Enc(HKDF(Y_i), V_i))}` and proceeds as before.
+In other words, instead of `{(Y_i, V_i)}` it uses `{(Y_i, Enc(HKDF(Y_i), V_i))}` and proceeds as before; here `HKDF(-)` is a hash-based key deriviation function.
 The receiver benefits nothing from learning parts (or all) of the encrypted label, unless it also knows the original item.
 
 #### Partial Item Collisions
@@ -406,7 +406,7 @@ Now consider what happens when, by pure chance, `item416-part1` and `item12-part
 If the corresponding label parts `label416-part1` and `label12-part1` are different, it will be impossible to create a label interpolation polynomial `L`.
 
 This issue is resolved by checking, before inserting an item into a bin bundle, that its parts do not already appear in the same locations.
-If any of them does, the item simply cannot be inserted into that bin bundle, and possibly a new bin bundle for the same bundle index must be created.
+If any of them does, the item simply cannot be inserted into that bin bundle, and a new bin bundle for the same bundle index must be created.
 
 ## Implementation Details
 
