@@ -8,68 +8,67 @@ Private Set Intersection (PSI) refers to a functionality where two parties, each
 Upper bounds on the sizes of the sets are assumed to be public information and are not protected.
 
 The APSI (Asymmetric PSI) library provides a PSI functionality for asymmetric set sizes.
-For example, in many cases one party may hold a large dataset of millions of records, and the other party wishes to find out whether a single particular record, or a small number of records, appear in the dataset.
-We refer to this as the *unlabeled* APSI mode.
+For example, in many cases one party may hold a large dataset of millions of records, and the other party wishes to find out whether a single particular record or a small number of records appear in the dataset.
+We refer to this as APSI in *unlabeled* mode.
 
-In many cases, however, the querier wishes to also retrieve some information per each record key that matched.
+In many cases, however, the querier wishes to also retrieve some information per each record that matched.
 This can be viewed as a key-value store with a privacy preserving batched query capability.
-We use the terminology *item* and *label* to refer to the key and the value in such a key-value store, and call this the *labeled* APSI mode.
+We use the terminology *item* and *label* to refer to the key and the value in such a key-value store, and call this APSI in  *labeled* mode.
 
-**Note:** Unless labeled mode is actually needed, it will be much more efficient (both communication and computation) to use the unlabeled mode.
+**Note:** Unless labeled mode is actually needed, it will be much more efficient (in both communication and computation) to use the unlabeled mode.
 
 ### Sender and Receiver
 
 We use the terminology *sender* and *receiver* to denote the two parties in the APSI protocol: a sender sends the result to the receiver.
-The most common use-case is one where a server hosts a private look-up table that multiple client can query.
-In this case the server acts as the sender and the clients act as (independent) receivers.
+For example, in a common use case where a server hosts a look-up table that multiple clients can query with encrypted records.
+In this case the server acts as the sender, and the clients act as (independent) receivers.
 
 ## How APSI Works
 
 ### Homomorphic Encryption
 
-APSI uses a relatively new encryption technology called as homomorphic encryption, that allows computations to be performed directly on encrypted data.
-Results of such computations remain encrypted, and can be only decrypted by the owner of the secret key.
+APSI uses a relatively new encryption technology called homomorphic encryption that allows computations to be performed directly on encrypted data.
+Results of such computations remain encrypted and can be only decrypted by the owner of the secret key.
 There are many homomorphic encryption schemes with different properties; APSI uses the BFV encryption scheme implemented in the [Microsoft SEAL](https://GitHub.com/Microsoft/SEAL) library.
 
-#### Computing on Encrypted Data
+#### Computation on Encrypted Data
 
-Microsoft SEAL does not enable arbitrary computation to be done on encrypted data, but only limited depth arithmetic circuits (additions and multiplications modulo a prime number).
-In fact, these computations can be done in a *batched* manner, where a single Microsoft SEAL ciphertext encrypts a large vector of numbers, and computations are done simultaneously and independently on every value in the vector; batching is crucial for APSI to achieve good performance.
+Microsoft SEAL enables computation representable with arithmetic circuits (e.g., additions and multiplications modulo a prime number) with limited depths rather than arbitrary computation on encrypted data.
+These computations can be done in a *batched* manner, where a single Microsoft SEAL ciphertext encrypts a large vector of values, and computations are done simultaneously and independently on every value in the vector; batching is crucial for APSI to achieve good performance.
 
 #### Noise Budget
 
-The amount of encrypted computation that can be done is measured in terms of a so-called *noise budget* that each ciphertext carries.
-A freshly encrypted ciphertext has a certain amount of noise budget, which is then consumed by encrypted computations &ndash; particularly multiplications.
-Once the noise budget is consumed, the ciphertext cannot be decrypted correctly anymore.
-To support computations of larger multiplicative depth it may be necessary to start with a larger initial noise budget, which can be done through appropriate changes to the *encryption parameters*.
+The capacity of computation that can be done on encrypted data is tracked by *noise budget* that each ciphertext carries.
+A freshly encrypted ciphertext has a certain amount of noise budget which is then consumed by computations &ndash; particularly multiplications.
+A ciphertext can no longer be decrypted correctly once its noise budget is fully consumed.
+To support computations of larger multiplicative depths, it is necessary to start with a larger initial noise budget, which can be done through appropriate changes to the *encryption parameters*.
 
 #### Encryption Parameters
 
-Homomorphic encryption schemes, such as BFV, are notoriously difficult to configure for optimal performance.
-APSI requires the user to explicitly provide the Microsoft SEAL encryption parameters, so we need to describe them here briefly.
-For much more details, we refer the reader to the [examples](https://github.com/microsoft/SEAL/tree/main/native/examples) in the Microsoft SEAL repository. There are three important encryption parameters that the user should be familiar with:
-1. `plain_modulus`
-1. `poly_modulus_degree`
-1. `coeff_modulus`
+Homomorphic encryption schemes, such as BFV, are difficult to configure for optimal performance.
+APSI requires the user to explicitly provide the Microsoft SEAL encryption parameters.
+So we need to describe them here briefly.
+For much more details, we refer the reader to the [examples](https://github.com/microsoft/SEAL/tree/main/native/examples) in the Microsoft SEAL repository.
+We describe three important encryption parameters that the user should be familiar with.
 
-We will now describe each in some detail.
+`plain_modulus` is the easiest to understand.
+It must be a prime number congruent to 1 modulo `2 * poly_modulus_degree` and defines the finite field datatype that the BFV scheme encrypts.
+For example, if `plain_modulus` is 65537 &ndash; a 16-bit prime &ndash; then the scheme encrypts integers modulo 65537, and computations on encrypted data preserves integer arithmetic modulo 65537.
+A larger `plain_modulus` leads to faster noise budget consumption.
+It is recommended to design computation with as small a `plaint_modulus` as possible.
 
-The `plain_modulus` is perhaps the easiest to understand.
-It must be a prime number congruent to 1 modulo `2 * poly_modulus_degree`, and defines the finite field datatype that the BFV scheme encrypts.
-For example, if `plain_modulus` is 65537 &ndash; a 16-bit prime &ndash; then the scheme encrypts and operates on integers modulo 65537.
-Unfortunately, `plain_modulus` cannot be increased arbitrarily much, because a larger `plain_modulus` leads to larger noise budget consumption, hence reducing the encrypted computing capability of the scheme unless other steps are taken to subsequently increase it.
+`poly_modulus_degree` is a positive power-of-two integer that determines how many integers modulo `plain_modulus` can be encoded into a single Microsoft SEAL plaintext; typical values are 2048, 4096, 8192, and 16384.
+It is now easy for the reader to appreciate the value of batching: computation of thousands of values can be done at the cost of one computation on encrypted data.
+`poly_modulus_degree` also affects the security level of the encryption scheme: if other parameters remain the same, a bigger `poly_modulus_degree` is more secure.
 
-The `poly_modulus_degree` is a positive power-of-two integer that determines how many integers modulo `plain_modulus` can be encoded into a single Microsoft SEAL plaintext; typical values are 2048, 4096, 8192, and 16384.
-It is now easy for the reader to appreciate the value of batching: thousands of encrypted computations can be done at the cost of one.
-Unfortunately things are not quite this simple, because `poly_modulus_degree` also affects the security level of the encryption scheme: bigger `poly_modulus_degree` is more secure.
-
-Finally, `coeff_modulus` is a set of prime numbers that determine the noise budget of a freshly encrypted ciphertext.
-In Microsoft SEAL the `coeff_modulus` primes are rarely given explicitly &ndash; the library can sample them &ndash; but instead one would merely specify their bit counts.
-In APSI it is necessary to specify at least two `coeff_modulus` primes, but it is beneficial to have as few of them as possible; 2 &ndash; 8 primes is probably reasonable.
+`coeff_modulus` is a set of prime numbers that determine the noise budget of a freshly encrypted ciphertext.
+In Microsoft SEAL the `coeff_modulus` primes are rarely given explicitly by values but instead by bit counts &ndash; the library can create them.
+In APSI it is necessary to specify at least two primes in `coeff_modulus`, but it is beneficial to have as few of them as possible; using 2 &ndash; 8 primes is probably reasonable.
 The individual primes can be up to 60 bits.
 The noise budget depends linearly on the total bit count of the primes.
-Again, things are unfortunately not quite this simple, because the `coeff_modulus` also affects the security level of the encryption scheme: bigger total bit count is less secure.
-Thus, to obtain more encrypted computing capability, i.e., more noise budget, one needs to increase the total bit count of the `coeff_modulus`, but this may be necessary to combine with increasing of the `poly_modulus_degree`, which will subsequently have an impact on the batching capability, so the computation itself may now change.
+`coeff_modulus` also affects the security level of the encryption scheme: if other parameters remain the same, a bigger total bit count is less secure.
+Thus, to obtain more computing capability, i.e., more noise budget, one needs to increase the total bit count of the `coeff_modulus`, and consequently may have to increase `poly_modulus_degree` for security.
+This will subsequently have an impact on the batching capability, so the computation itself may now change.
 
 Fortunately, Microsoft SEAL prevents the user from accidentally setting insecure parameters.
 It checks that, for the given `poly_modulus_degree`, the total `coeff_modulus` bit count does not exceed the following bounds:
