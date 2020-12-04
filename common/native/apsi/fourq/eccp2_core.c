@@ -95,21 +95,21 @@ void fp2mul1271(f2elm_t a, f2elm_t b, f2elm_t c)
 }
 
 
-__inline void fp2add1271(f2elm_t a, f2elm_t b, f2elm_t c)
+void fp2add1271(f2elm_t a, f2elm_t b, f2elm_t c)
 {// GF(p^2) addition, c = a+b in GF((2^127-1)^2)
     fpadd1271(a[0], b[0], c[0]);
     fpadd1271(a[1], b[1], c[1]);
 }
 
 
-__inline void fp2sub1271(f2elm_t a, f2elm_t b, f2elm_t c)
+void fp2sub1271(f2elm_t a, f2elm_t b, f2elm_t c)
 {// GF(p^2) subtraction, c = a-b in GF((2^127-1)^2) 
     fpsub1271(a[0], b[0], c[0]);
     fpsub1271(a[1], b[1], c[1]);
 }
 
 
-static __inline void fp2addsub1271(f2elm_t a, f2elm_t b, f2elm_t c)
+static void fp2addsub1271(f2elm_t a, f2elm_t b, f2elm_t c)
 {// GF(p^2) addition followed by subtraction, c = 2a-b in GF((2^127-1)^2)
     
 #ifdef ASM_SUPPORT
@@ -176,7 +176,7 @@ void eccnorm(point_extproj_t P, point_t Q)
 }
 
 
-__inline void R1_to_R2(point_extproj_t P, point_extproj_precomp_t Q) 
+void R1_to_R2(point_extproj_t P, point_extproj_precomp_t Q) 
 { // Conversion from representation (X,Y,Z,Ta,Tb) to (X+Y,Y-X,2Z,2dT), where T = Ta*Tb
   // Input:  P = (X1,Y1,Z1,Ta,Tb), where T1 = Ta*Tb, corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
   // Output: Q = (X1+Y1,Y1-X1,2Z1,2dT1) corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
@@ -190,7 +190,7 @@ __inline void R1_to_R2(point_extproj_t P, point_extproj_precomp_t Q)
 }
 
 
-__inline void R1_to_R3(point_extproj_t P, point_extproj_precomp_t Q)      
+void R1_to_R3(point_extproj_t P, point_extproj_precomp_t Q)      
 { // Conversion from representation (X,Y,Z,Ta,Tb) to (X+Y,Y-X,Z,T), where T = Ta*Tb 
   // Input:  P = (X1,Y1,Z1,Ta,Tb), where T1 = Ta*Tb, corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
   // Output: Q = (X1+Y1,Y1-X1,Z1,T1) corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates 
@@ -213,7 +213,7 @@ void R2_to_R4(point_extproj_precomp_t P, point_extproj_t Q)
 }
 
 
-__inline void eccdouble(point_extproj_t P)
+void eccdouble(point_extproj_t P)
 { // Point doubling 2P
   // Input: P = (X1:Y1:Z1) in twisted Edwards coordinates
   // Output: 2P = (Xfinal,Yfinal,Zfinal,Tafinal,Tbfinal), where Tfinal = Tafinal*Tbfinal,
@@ -239,7 +239,7 @@ __inline void eccdouble(point_extproj_t P)
 }
 
 
-__inline void eccadd_core(point_extproj_precomp_t P, point_extproj_precomp_t Q, point_extproj_t R)      
+void eccadd_core(point_extproj_precomp_t P, point_extproj_precomp_t Q, point_extproj_t R)      
 { // Basic point addition R = P+Q or R = P+P
   // Inputs: P = (X1+Y1,Y1-X1,2Z1,2dT1) corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
   //         Q = (X2+Y2,Y2-X2,Z2,T2) corresponding to (X2:Y2:Z2:T2) in extended twisted Edwards coordinates    
@@ -265,7 +265,7 @@ __inline void eccadd_core(point_extproj_precomp_t P, point_extproj_precomp_t Q, 
 }
 
 
-__inline void eccadd(point_extproj_precomp_t Q, point_extproj_t P)      
+void eccadd(point_extproj_precomp_t Q, point_extproj_t P)      
 { // Complete point addition P = P+Q or P = P+P
   // Inputs: P = (X1,Y1,Z1,Ta,Tb), where T1 = Ta*Tb, corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
   //         Q = (X2+Y2,Y2-X2,2Z2,2dT2) corresponding to (X2:Y2:Z2:T2) in extended twisted Edwards coordinates   
@@ -282,7 +282,7 @@ __inline void eccadd(point_extproj_precomp_t Q, point_extproj_t P)
 }
 
 
-__inline void point_setup(point_t P, point_extproj_t Q)
+void point_setup(point_t P, point_extproj_t Q)
 { // Point conversion to representation (X,Y,Z,Ta,Tb) 
   // Input: P = (x,y) in affine coordinates
   // Output: P = (X,Y,1,Ta,Tb), where Ta=X, Tb=Y and T=Ta*Tb, corresponding to (X:Y:Z:T) in extended twisted Edwards coordinates
@@ -295,7 +295,7 @@ __inline void point_setup(point_t P, point_extproj_t Q)
 }
 
 
-__inline bool ecc_point_validate(point_extproj_t P)
+bool ecc_point_validate(point_extproj_t P)
 { // Point validation: check if point lies on the curve
   // Input: P = (x,y) in affine coordinates, where x, y in [0, 2^127-1]. 
   // Output: TRUE (1) if point lies on the curve E: -x^2+y^2-1-dx^2*y^2 = 0, FALSE (0) otherwise.
@@ -330,7 +330,7 @@ __inline bool ecc_point_validate(point_extproj_t P)
 }
 
 
-static __inline void R5_to_R1(point_precomp_t P, point_extproj_t Q)      
+static void R5_to_R1(point_precomp_t P, point_extproj_t Q)      
 { // Conversion from representation (x+y,y-x,2dt) to (X,Y,Z,Ta,Tb) 
   // Input:  P = (x1+y1,y1-x1,2dt1) corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates, where Z1=1
   // Output: Q = (x1,y1,z1,x1,y1), where z1=1, corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates 
@@ -345,7 +345,7 @@ static __inline void R5_to_R1(point_precomp_t P, point_extproj_t Q)
 }
 
 
-static __inline void eccmadd(point_precomp_t Q, point_extproj_t P)
+static void eccmadd(point_precomp_t Q, point_extproj_t P)
 { // Mixed point addition P = P+Q or P = P+P
   // Inputs: P = (X1,Y1,Z1,Ta,Tb), where T1 = Ta*Tb, corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
   //         Q = (x2+y2,y2-x2,2dt2) corresponding to (X2:Y2:Z2:T2) in extended twisted Edwards coordinates, where Z2=1  
@@ -498,7 +498,7 @@ void mLSB_set_recode(uint64_t* scalar, unsigned int *digits)
 }
 
 
-static __inline void eccneg_extproj_precomp(point_extproj_precomp_t P, point_extproj_precomp_t Q)
+static void eccneg_extproj_precomp(point_extproj_precomp_t P, point_extproj_precomp_t Q)
 { // Point negation
   // Input : point P in coordinates (X+Y,Y-X,2Z,2dT)
   // Output: point Q = -P = (Y-X,X+Y,2Z,-2dT)
@@ -510,7 +510,7 @@ static __inline void eccneg_extproj_precomp(point_extproj_precomp_t P, point_ext
 }
 
 
-static __inline void eccneg_precomp(point_precomp_t P, point_precomp_t Q)
+static void eccneg_precomp(point_precomp_t P, point_precomp_t Q)
 { // Point negation
   // Input : point P in coordinates (x+y,y-x,2dt)
   // Output: point Q = -P = (y-x,x+y,-2dt)

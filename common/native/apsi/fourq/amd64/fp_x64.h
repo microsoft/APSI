@@ -51,21 +51,21 @@ void mod1271(felm_t a)
 }
 
 
-__inline void fpcopy1271(felm_t a, felm_t c)
+void fpcopy1271(felm_t a, felm_t c)
 { // Copy of a field element, c = a
     c[0] = a[0];
     c[1] = a[1];
 }
 
 
-static __inline void fpzero1271(felm_t a)
+static void fpzero1271(felm_t a)
 { // Zeroing a field element, a = 0
     a[0] = 0;
     a[1] = 0;
 }
 
 
-__inline void fpadd1271(felm_t a, felm_t b, felm_t c)
+void fpadd1271(felm_t a, felm_t b, felm_t c)
 { // Field addition, c = a+b mod (2^127-1)
     
 #if defined(UINT128_SUPPORT)
@@ -89,7 +89,7 @@ __inline void fpadd1271(felm_t a, felm_t b, felm_t c)
 }
 
 
-__inline void fpsub1271(felm_t a, felm_t b, felm_t c)
+void fpsub1271(felm_t a, felm_t b, felm_t c)
 { // Field subtraction, c = a-b mod (2^127-1)
     
 #if defined(UINT128_SUPPORT)
@@ -126,7 +126,7 @@ void fpneg1271(felm_t a)
 }
 
 
-__inline void fpmul1271(felm_t a, felm_t b, felm_t c)
+void fpmul1271(felm_t a, felm_t b, felm_t c)
 { // Field multiplication, c = a*b mod (2^127-1)
     uint128_t tt1, tt2, tt3 = {0};
     
@@ -191,7 +191,7 @@ void fpsqr1271(felm_t a, felm_t c)
 }
 
 
-__inline void fpexp1251(felm_t a, felm_t af)
+void fpexp1251(felm_t a, felm_t af)
 { // Exponentiation over GF(p), af = a^(125-1)
     int i;
     felm_t t1, t2, t3, t4, t5;
@@ -240,7 +240,7 @@ void fpinv1271(felm_t a)
 }
 
 
-static __inline void multiply(const digit_t* a, const digit_t* b, digit_t* c)
+static void multiply(const digit_t* a, const digit_t* b, digit_t* c)
 { // Schoolbook multiprecision multiply, c = a*b   
     unsigned int i, j;
     digit_t u, v, UV[2];
@@ -263,7 +263,7 @@ static __inline void multiply(const digit_t* a, const digit_t* b, digit_t* c)
 }
 
 
-static __inline unsigned char add(const digit_t* a, const digit_t* b, digit_t* c, const unsigned int nwords)
+static unsigned char add(const digit_t* a, const digit_t* b, digit_t* c, const unsigned int nwords)
 { // Multiprecision addition, c = a+b. Returns the carry bit 
     unsigned int i;
     unsigned char carry = 0;

@@ -19,7 +19,7 @@
 #endif
 
 
-static __inline void delay(unsigned int count)
+static void delay(unsigned int count)
 {
 	while (count--) {}
 }

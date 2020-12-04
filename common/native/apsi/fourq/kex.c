@@ -15,7 +15,7 @@
 #include <string.h>
 
 
-static __inline bool is_neutral_point(point_t P)
+static bool is_neutral_point(point_t P)
 { // Is P the neutral point (0,1)?
   // SECURITY NOTE: this function does not run in constant time (input point P is assumed to be public).
   
