@@ -43,7 +43,7 @@ namespace APSITests
 
         // Set up seeded PRNG
         shared_ptr<UniformRandomGeneratorFactory> rg =
-            make_shared<BlakePRNGFactory>(random_seed_type{ 0, 1, 2, 3, 4, 5, 6, 7 });
+            make_shared<Blake2xbPRNGFactory>(prng_seed_type{ 0, 1, 2, 3, 4, 5, 6, 7 });
         OPRFKey oprf_key3(rg);
         auto oprf_key3_span = oprf_key3.key_span();
         OPRFKey oprf_key4(rg);
@@ -71,7 +71,7 @@ namespace APSITests
         int item_count = 100;
         unordered_set<Item> items;
 
-        shared_ptr<UniformRandomGeneratorFactory> rng_factory(make_shared<BlakePRNGFactory>());
+        shared_ptr<UniformRandomGeneratorFactory> rng_factory(make_shared<Blake2xbPRNGFactory>());
         auto rng = rng_factory->create();
         for (auto i = 0; i < item_count; i++)
         {

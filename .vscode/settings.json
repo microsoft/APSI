@@ -60,6 +60,7 @@
     "complex": "cpp",
     "xstring": "cpp",
     "xutility": "cpp",
-    "span_ext": "cpp"
+    "span_ext": "cpp",
+    "xiosbase": "cpp"
   }
 }

@@ -19,47 +19,6 @@ namespace apsi
 {
     namespace util
     {
-        seal_byte operator >>(const seal_byte src, const uint32_t shift)
-        {
-            const std::byte& byte_src = static_cast<const std::byte>(src);
-            return static_cast<seal_byte>(byte_src >> shift);
-        }
-        
-        seal_byte operator |(const seal_byte src, const seal_byte other)
-        {
-            const std::byte& byte_src = static_cast<const std::byte>(src);
-            const std::byte& byte_other = static_cast<const std::byte>(other);
-            return static_cast<seal_byte>(byte_src | byte_other);
-        }
-
-        seal_byte operator &(const seal_byte src, const seal_byte other)
-        {
-            const std::byte& byte_src = static_cast<const std::byte>(src);
-            const std::byte& byte_other = static_cast<const std::byte>(other);
-            return static_cast<seal_byte>(byte_src & byte_other);
-        }
-
-        seal_byte& operator &=(seal_byte& src, const seal_byte other)
-        {
-            std::byte byte_src = static_cast<std::byte>(src);
-            const std::byte& byte_other = static_cast<const std::byte>(other);
-            src = static_cast<seal_byte>(byte_src &= byte_other);
-            return src;
-        }
-
-        seal_byte& operator <<=(seal_byte& src, const uint32_t shift)
-        {
-            std::byte byte_src = static_cast<std::byte>(src);
-            src = static_cast<seal_byte>(byte_src <<= shift);
-            return src;
-        }
-
-        seal_byte operator ~(const seal_byte src)
-        {
-            const std::byte& byte_src = static_cast<const std::byte>(src);
-            return static_cast<seal_byte>(~byte_src);
-        }
-
         namespace
         {
             void copy_with_bit_offset(
@@ -404,6 +363,47 @@ namespace apsi
             Bitstring bits = field_elts_to_bits(item, item_bit_count, mod);
             BitstringView<seal_byte> view = bits.to_view();
             return view;
+        }
+
+        seal::seal_byte operator >>(const seal::seal_byte src, const uint32_t shift)
+        {
+            const std::byte& byte_src = static_cast<const std::byte>(src);
+            return static_cast<seal::seal_byte>(byte_src >> shift);
+        }
+        
+        seal::seal_byte operator |(const seal::seal_byte src, const seal::seal_byte other)
+        {
+            const std::byte& byte_src = static_cast<const std::byte>(src);
+            const std::byte& byte_other = static_cast<const std::byte>(other);
+            return static_cast<seal::seal_byte>(byte_src | byte_other);
+        }
+
+        seal::seal_byte operator &(const seal::seal_byte src, const seal::seal_byte other)
+        {
+            const std::byte& byte_src = static_cast<const std::byte>(src);
+            const std::byte& byte_other = static_cast<const std::byte>(other);
+            return static_cast<seal::seal_byte>(byte_src & byte_other);
+        }
+
+        seal::seal_byte& operator &=(seal::seal_byte& src, const seal::seal_byte other)
+        {
+            std::byte byte_src = static_cast<std::byte>(src);
+            const std::byte& byte_other = static_cast<const std::byte>(other);
+            src = static_cast<seal::seal_byte>(byte_src &= byte_other);
+            return src;
+        }
+
+        seal::seal_byte& operator <<=(seal::seal_byte& src, const uint32_t shift)
+        {
+            std::byte byte_src = static_cast<std::byte>(src);
+            src = static_cast<seal::seal_byte>(byte_src <<= shift);
+            return src;
+        }
+
+        seal::seal_byte operator ~(const seal::seal_byte src)
+        {
+            const std::byte& byte_src = static_cast<const std::byte>(src);
+            return static_cast<seal::seal_byte>(~byte_src);
         }
     }
 }

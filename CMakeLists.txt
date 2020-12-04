@@ -715,7 +715,7 @@ apsi_install_target(sender APSITargets)
 if(APSI_BUILD_TESTS)
     add_executable(unit_tests)
     add_subdirectory(tests/unit/src)
-    target_link_libraries(unit_tests common sender receiver gtest)
+    target_link_libraries(unit_tests common sender receiver GTest::gtest)
 endif()
 
 ##########################
@@ -726,7 +726,7 @@ endif()
 if(APSI_BUILD_TESTS)
     add_executable(integration_tests)
     add_subdirectory(tests/integration/src)
-    target_link_libraries(integration_tests common sender receiver gtest)
+    target_link_libraries(integration_tests common sender receiver GTest::gtest)
 endif()
 
 ##########################
