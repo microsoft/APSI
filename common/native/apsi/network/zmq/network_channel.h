@@ -18,7 +18,7 @@
 namespace zmq
 {
     class socket_t;
-    class message_t;
+    class multipart_t;
     class context_t;
     enum class socket_type;
 } // namespace zmq
@@ -180,9 +180,9 @@ namespace apsi
 
             void throw_if_connected() const;
 
-            bool receive_message(zmq::message_t &msg, bool wait_for_message = true);
+            bool receive_message(zmq::multipart_t &msg, bool wait_for_message = true);
 
-            void send_message(zmq::message_t &msg);
+            void send_message(zmq::multipart_t &msg);
         }; // class NetworkChannel
 
         /**

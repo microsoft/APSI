@@ -16,10 +16,12 @@
 
 // SEAL
 #include "seal/util/streambuf.h"
+#include "seal/randomgen.h"
 
 // ZeroMQ
 #pragma warning(push, 0)
 #include "zmq.hpp"
+#include "zmq_addon.hpp"
 #pragma warning(pop)
 
 using namespace std;
@@ -52,26 +54,26 @@ namespace apsi
             }
 
             template<typename T>
-            size_t save_to_message(const T &obj, message_t &msg)
+            size_t save_to_message(const T &obj, multipart_t &msg)
             {
                 stringstream ss;
                 size_t size = obj.save(ss);
-                //msg.add(ss.str());
+                msg.addstr(ss.str());
                 return size;
             }
 
             template<>
-            size_t save_to_message(const vector<seal_byte> &obj, message_t &msg)
+            size_t save_to_message(const vector<seal_byte> &obj, multipart_t &msg)
             {
-                //msg.add_raw(obj.data(), obj.size());
+                msg.addmem(obj.data(), obj.size());
                 return obj.size();
             }
 
-            vector<seal_byte> get_client_id(const message_t &msg)
+            vector<seal_byte> get_client_id(const multipart_t &msg)
             {
                 vector<seal_byte> client_id;
-                //size_t client_id_size = msg.size(0);
-                //copy_n(reinterpret_cast<const seal_byte*>(msg.raw_data(0)), client_id_size, back_inserter(client_id));
+                size_t client_id_size = msg[0].size();
+                copy_n(reinterpret_cast<const seal_byte*>(msg[0].data()), client_id_size, back_inserter(client_id));
                 return client_id;
             }
         }
@@ -152,7 +154,7 @@ namespace apsi
 
             size_t bytes_sent = 0;
 
-            message_t msg;
+            multipart_t msg;
 
             bytes_sent += save_to_message(sop_header, msg);
             bytes_sent += save_to_message(*sop, msg);
@@ -166,7 +168,7 @@ namespace apsi
         {
             throw_if_not_connected();
 
-            message_t msg;
+            multipart_t msg;
             if (!receive_message(msg, wait_for_message))
             {
                 // No message yet.
@@ -174,7 +176,7 @@ namespace apsi
             }
 
             // Should have client_id, SenderOperationHeader, and SenderOperation.
-            //if (msg.parts() != 3)
+            if (msg.size() != 3)
             {
                 throw runtime_error("invalid message received");
             }
@@ -186,7 +188,7 @@ namespace apsi
             SenderOperationHeader sop_header;
             try
             {
-                bytes_received_ += load_from_string(/*msg.get(1)*/ "", sop_header);
+                bytes_received_ += load_from_string(msg[1].to_string(), sop_header);
             }
             catch (const runtime_error &ex)
             {
@@ -215,15 +217,15 @@ namespace apsi
                 {
                     case SenderOperationType::SOP_PARMS:
                         sop = make_unique<SenderOperationParms>();
-                        bytes_received_ += load_from_string(/*msg.get(2)*/ "", *sop);
+                        bytes_received_ += load_from_string(msg[2].to_string(), *sop);
                         break;
                     case SenderOperationType::SOP_OPRF:
                         sop = make_unique<SenderOperationOPRF>();
-                        bytes_received_ += load_from_string(/*msg.get(2)*/ "", *sop);
+                        bytes_received_ += load_from_string(msg[2].to_string(), *sop);
                         break;
                     case SenderOperationType::SOP_QUERY:
                         sop = make_unique<SenderOperationQuery>();
-                        bytes_received_ += load_from_string(/*msg.get(2)*/ "", move(context), *sop);
+                        bytes_received_ += load_from_string(msg[2].to_string(), move(context), *sop);
                         break;
                     default:
                         // Invalid operation
@@ -278,7 +280,7 @@ namespace apsi
 
             size_t bytes_sent = 0;
 
-            message_t msg;
+            multipart_t msg;
 
             // Add the client_id as the first part
             save_to_message(sop_response->client_id, msg);
@@ -303,7 +305,7 @@ namespace apsi
         {
             throw_if_not_connected();
 
-            message_t msg;
+            multipart_t msg;
             if (!receive_message(msg))
             {
                 // No message yet.
@@ -311,7 +313,7 @@ namespace apsi
             }
 
             // Should have SenderOperationHeader and SenderOperationResponse.
-            //if (msg.parts() != 2)
+            if (msg.size() != 2)
             {
                 throw runtime_error("invalid message received");
             }
@@ -320,7 +322,7 @@ namespace apsi
             SenderOperationHeader sop_header;
             try
             {
-                bytes_received_ += load_from_string(/*msg.get(0)*/ "", sop_header);
+                bytes_received_ += load_from_string(msg[0].to_string(), sop_header);
             }
             catch (const runtime_error &ex)
             {
@@ -349,15 +351,15 @@ namespace apsi
                 {
                     case SenderOperationType::SOP_PARMS:
                         sop_response = make_unique<SenderOperationResponseParms>();
-                        bytes_received_ += load_from_string(/*msg.get(1)*/ "", *sop_response);
+                        bytes_received_ += load_from_string(msg[1].to_string(), *sop_response);
                         break;
                     case SenderOperationType::SOP_OPRF:
                         sop_response = make_unique<SenderOperationResponseOPRF>();
-                        bytes_received_ += load_from_string(/*msg.get(1)*/ "", *sop_response);
+                        bytes_received_ += load_from_string(msg[1].to_string(), *sop_response);
                         break;
                     case SenderOperationType::SOP_QUERY:
                         sop_response = make_unique<SenderOperationResponseQuery>();
-                        bytes_received_ += load_from_string(/*msg.get(1)*/ "", *sop_response);
+                        bytes_received_ += load_from_string(msg[1].to_string(), *sop_response);
                         break;
                     default:
                         // Invalid operation
@@ -378,7 +380,7 @@ namespace apsi
         {
             throw_if_not_connected();
 
-            message_t msg;
+            multipart_t msg;
 
             // Add the client_id as the first part
             save_to_message(rp->client_id, msg);
@@ -402,7 +404,7 @@ namespace apsi
         {
             throw_if_not_connected();
 
-            message_t msg;
+            multipart_t msg;
             if (!receive_message(msg))
             {
                 // No message yet.
@@ -410,7 +412,7 @@ namespace apsi
             }
 
             // Should have only one part: ResultPackage.
-            //if (msg.parts() != 1)
+            if (msg.size() != 1)
             {
                 throw runtime_error("invalid message received");
             }
@@ -420,7 +422,7 @@ namespace apsi
 
             try
             {
-                bytes_received_ += load_from_string(/*msg.get(0)*/ "", move(context), *rp);
+                bytes_received_ += load_from_string(msg[0].to_string(), move(context), *rp);
             }
             catch (const runtime_error &ex)
             {
@@ -432,14 +434,15 @@ namespace apsi
             return rp;
         }
 
-        bool NetworkChannel::receive_message(message_t &msg, bool wait_for_message)
+        bool NetworkChannel::receive_message(multipart_t &msg, bool wait_for_message)
         {
             lock_guard<mutex> lock(receive_mutex_);
 
-            //bool received = get_socket()->receive(msg, !wait_for_message);
+            msg.clear();
             recv_flags receive_flags = wait_for_message? recv_flags::none : recv_flags::dontwait;
-            recv_result_t result = get_socket()->recv(msg, receive_flags);
-            bool received = result.has_value();
+            bool received = msg.recv(*get_socket(), static_cast<int>(receive_flags));
+            // recv_result_t result = recv_multipart(*get_socket(), move(msg), receive_flags);
+            // bool received = result.has_value();
             if (!received && wait_for_message)
             {
                 throw runtime_error("failed to receive message");
@@ -448,11 +451,11 @@ namespace apsi
             return received;
         }
 
-        void NetworkChannel::send_message(message_t &msg)
+        void NetworkChannel::send_message(multipart_t &msg)
         {
             lock_guard<mutex> lock(send_mutex_);
 
-            send_result_t result = get_socket()->send(msg, send_flags::none);
+            send_result_t result = send_multipart(*get_socket(), msg, send_flags::none);
             bool sent = result.has_value();
             if (!sent)
             {
@@ -480,6 +483,15 @@ namespace apsi
         {
             // Ensure messages are not dropped
             socket->set(sockopt::rcvhwm, 70000);
+
+            shared_ptr<UniformRandomGeneratorFactory> factory = make_shared<seal::Shake256PRNGFactory>();
+            auto prng = factory->create();
+            string buf;
+            buf.resize(32);
+            prng->generate(buf.size(), reinterpret_cast<seal_byte*>(buf.data()));
+            // make sure first byte is _not_ zero, as that has a special meaning for ZMQ
+            *buf.data() = 'A';
+            socket->set(sockopt::routing_id, buf);
         }
 
         zmq::socket_type SenderChannel::get_socket_type()
