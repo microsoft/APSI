@@ -200,6 +200,7 @@ dkms.conf
 *.pdb
 
 #### CMake ####
+CMakeSettings.json
 CMakeLists.txt.user
 CMakeCache.txt
 CMakeFiles

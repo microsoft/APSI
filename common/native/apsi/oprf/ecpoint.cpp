@@ -9,8 +9,8 @@
 #include "apsi/oprf/ecpoint.h"
 
 // FourQ
-#include "FourQ_internal.h"
-#include "FourQ_api.h"
+#include "apsi/fourq/FourQ_internal.h"
+#include "apsi/fourq/FourQ_api.h"
 
 // SEAL
 #include "seal/util/blake2.h"
