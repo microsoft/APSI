@@ -28,6 +28,11 @@ namespace apsi
         {
             throw invalid_argument("table_size is not a power of two");
         }
+        if (table_params_.hash_func_count < TableParams::hash_func_count_min ||
+            table_params_.hash_func_count > TableParams::hash_func_count_max)
+        {
+            throw invalid_argument("hash_func_count is too large or too small");
+        }
         if (item_params_.felts_per_item < ItemParams::felts_per_item_min ||
             item_params_.felts_per_item > ItemParams::felts_per_item_max)
         {

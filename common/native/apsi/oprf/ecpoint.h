@@ -38,6 +38,9 @@ namespace apsi
 
             using input_span_const_type = gsl::span<const unsigned char>;
 
+            using point_save_span_type = gsl::span<unsigned char, save_size>;
+            using point_save_span_const_type = gsl::span<const unsigned char, save_size>;
+
             // Output hash size is 128 bits
             static constexpr std::size_t hash_size = 16;
 
@@ -66,24 +69,17 @@ namespace apsi
                 return !operator==(compare);
             }
 
-            ECPoint &operator=(const ECPoint &assign)
-            {
-                if (&assign != this)
-                {
-                    std::memcpy(pt_, assign.pt_, point_size);
-                }
-                return *this;
-            }
+            ECPoint &operator=(const ECPoint &assign);
 
             void save(std::ostream &stream);
 
             void load(std::istream &stream);
 
-            void save(gsl::span<unsigned char, save_size> out);
+            void save(point_save_span_type out);
 
-            void load(gsl::span<const unsigned char, save_size> in);
+            void load(point_save_span_const_type in);
 
-            void extract_hash(gsl::span<unsigned char, hash_size> out);
+            void extract_hash(hash_span_type out);
 
         private:
             // Initialize to neutral element

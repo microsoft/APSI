@@ -59,6 +59,10 @@ namespace apsi
         */
         struct TableParams
         {
+            constexpr static std::uint32_t hash_func_count_min = 2;
+
+            constexpr static std::uint32_t hash_func_count_max = 8;
+
             std::uint32_t table_size;
 
             std::uint32_t max_items_per_bin;

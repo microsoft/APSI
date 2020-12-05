@@ -209,7 +209,31 @@ endmacro()
 
 set(THIRDPARTY_DIR ${APSI_SOURCE_DIR}/thirdparty)
 
-find_package(SEAL 3.6 REQUIRED)
+# # Microsoft SEAL + MSGSL + ZLIB
+# # MSGSL and ZLIB should be installed with Microsoft SEAL
+# # Download and configure
+# if(NOT MSVC)
+#     message(STATUS "Setting up Microsoft SEAL ...")
+#     execute_process(
+#         COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
+#         OUTPUT_QUIET
+#         RESULT_VARIABLE result
+#         WORKING_DIRECTORY ${THIRDPARTY_DIR}/seal)
+#     if(result)
+#         message(FATAL_ERROR "Failed to download Microsoft SEAL (${result})")
+#     endif()
+#     mark_as_advanced(SEAL_BUILD_EXAMPLES)
+#     mark_as_advanced(SEAL_BUILD_SEAL_C)
+#     mark_as_advanced(SEAL_BUILD_TESTS)
+#     mark_as_advanced(SEAL_USE_CXX17)
+#     mark_as_advanced(SEAL_USE_INTRIN)
+#     mark_as_advanced(SEAL_USE_MSGSL)
+#     mark_as_advanced(SEAL_USE_ZLIB)
+#     mark_as_advanced(SEAL_USE__ADDCARRY_U64)
+#     mark_as_advanced(SEAL_USE__SUBBORROW_U64)
+#     mark_as_advanced(SEAL_USE___BUILTIN_CLZLL)
+#     mark_as_advanced(SEAL_USE___INT128)
+# endif()
 
 # # Microsoft SEAL + MSGSL + ZLIB
 # # MSGSL and ZLIB should be installed with Microsoft SEAL
@@ -250,6 +274,8 @@ find_package(SEAL 3.6 REQUIRED)
 #     ${THIRDPARTY_DIR}/seal/src
 #     ${THIRDPARTY_DIR}/seal/build
 #     EXCLUDE_FROM_ALL)
+
+find_package(SEAL 3.6 CONFIG REQUIRED)
 
 # Microsoft Kuku
 find_package(Kuku 2.0 REQUIRED)
@@ -664,7 +690,7 @@ apsi_link_threads(common)
 apsi_install_target(common APSITargets)
 
 if(NOT MSVC)
-    apsi_combine_archives(common seal)
+    apsi_combine_archives(common SEAL::seal)
     if (APSI_USE_LOG4CPLUS)
         apsi_combine_archives(common log4cplus)
     endif()

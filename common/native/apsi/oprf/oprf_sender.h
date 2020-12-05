@@ -4,7 +4,6 @@
 #pragma once
 
 // STD
-#include <algorithm>
 #include <cstddef>
 #include <iostream>
 #include <memory>
@@ -16,8 +15,8 @@
 // SEAL
 #include "seal/util/defines.h"
 #include "seal/dynarray.h"
-#include "seal/randomgen.h"
 #include "seal/memorymanager.h"
+#include "seal/randomgen.h"
 
 // APSI
 #include "apsi/oprf/oprf_common.h"
@@ -31,8 +30,8 @@ namespace apsi
         {
         public:
             OPRFKey(std::shared_ptr<seal::UniformRandomGeneratorFactory> random_gen = nullptr)
-                : random_(std::move(random_gen))
             {
+                random_ = random_gen ? std::move(random_gen) : seal::UniformRandomGeneratorFactory::DefaultFactory();
                 create();
             }
 
@@ -46,24 +45,17 @@ namespace apsi
             inline void create()
             {
                 // Create a random key
-                ECPoint::scalar_span_type out( oprf_key_.begin(), oprf_key_size );
                 ECPoint::make_random_nonzero_scalar(
-                    out, random_ ? random_->create() : nullptr);
+                    oprf_key_span_type{ oprf_key_.begin(), oprf_key_size }, random_->create());
             }
 
             void save(std::ostream &stream) const;
 
             void load(std::istream &stream);
 
-            inline void save(oprf_key_span_type oprf_key) const
-            {
-                std::copy_n(oprf_key_.cbegin(), oprf_key_size, oprf_key.data());
-            }
+            inline void save(oprf_key_span_type oprf_key) const;
 
-            inline void load(oprf_key_span_const_type oprf_key)
-            {
-                std::copy_n(oprf_key.data(), oprf_key_size, oprf_key_.begin());
-            }
+            inline void load(oprf_key_span_const_type oprf_key);
 
             inline void clear()
             {
@@ -73,8 +65,7 @@ namespace apsi
 
             inline oprf_key_span_const_type key_span() const noexcept
             {
-                oprf_key_span_const_type result( oprf_key_.cbegin(), oprf_key_size );
-                return result;
+                return oprf_key_span_const_type{ oprf_key_.cbegin(), oprf_key_size };
             }
 
         private:
