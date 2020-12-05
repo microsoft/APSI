@@ -365,6 +365,7 @@ namespace apsi
             return view;
         }
 
+#if SEAL_COMPILER == SEAL_COMPILER_MSVC
         seal::seal_byte operator >>(const seal::seal_byte src, const uint32_t shift)
         {
             const std::byte& byte_src = static_cast<const std::byte>(src);
@@ -405,5 +406,6 @@ namespace apsi
             const std::byte& byte_src = static_cast<const std::byte>(src);
             return static_cast<seal::seal_byte>(~byte_src);
         }
+#endif
     }
 }

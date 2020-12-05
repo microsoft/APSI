@@ -88,6 +88,7 @@ namespace apsi
             std::size_t item_bit_count,
             const seal::Modulus &mod);
 
+#if SEAL_COMPILER == SEAL_COMPILER_MSVC
         seal::seal_byte operator >>(const seal::seal_byte src, const uint32_t shift);
         
         seal::seal_byte operator |(const seal::seal_byte src, const seal::seal_byte other);
@@ -99,5 +100,6 @@ namespace apsi
         seal::seal_byte& operator <<=(seal::seal_byte& src, const uint32_t shift);
 
         seal::seal_byte operator ~(const seal::seal_byte src);
+#endif
     }
 } // namespace apsi

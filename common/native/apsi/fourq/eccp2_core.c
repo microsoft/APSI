@@ -17,7 +17,7 @@
 #if defined(GENERIC_IMPLEMENTATION)
     #include "generic/fp.h"
 #elif (TARGET == TARGET_AMD64)
-    #include "AMD64/fp_x64.h"
+    #include "amd64/fp_x64.h"
 #elif (TARGET == TARGET_ARM64)
     #include "ARM64/fp_arm64.h"
 #endif
