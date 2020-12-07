@@ -281,7 +281,7 @@ namespace apsi
 
         void ECPoint::scalar_multiply(gsl::span<const unsigned char, order_size> scalar)
         {
-            ecc_mul(pt_, const_cast<digit_t *>(reinterpret_cast<const digit_t *>(scalar.data())), pt_, false);
+            ecc_mul(pt_, const_cast<digit_t *>(reinterpret_cast<const digit_t *>(scalar.data())), pt_, true);
         }
 
         bool ECPoint::operator==(const ECPoint &compare)
