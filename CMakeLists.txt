@@ -353,12 +353,6 @@ set_target_properties(common PROPERTIES OUTPUT_NAME apsi_common-${APSI_VERSION_M
 apsi_link_threads(common)
 apsi_install_target(common APSITargets)
 
-if(NOT MSVC)
-    apsi_combine_archives(common SEAL::seal)
-    if (APSI_USE_LOG4CPLUS)
-        apsi_combine_archives(common log4cplus)
-    endif()
-endif()
 
 #############################
 # APSI receiver C++ library #
