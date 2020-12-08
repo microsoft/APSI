@@ -330,7 +330,7 @@ if(APSI_USE_ZMQ)
         cppzmq-static)
 endif()
 
-# Defines
+# Defines for FourQlib
 target_compile_options(common PUBLIC -DHAVE_CONFIG)
 target_compile_options(common PUBLIC -DUSE_SECURE_SEED)
 target_compile_options(common PUBLIC -D_AMD64_)
