@@ -5,6 +5,9 @@
 #include <thread>
 #include <algorithm>
 
+// GSL
+#include <gsl/span_ext>
+
 // APSI
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/util/utils.h"

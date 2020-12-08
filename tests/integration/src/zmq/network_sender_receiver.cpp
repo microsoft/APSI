@@ -320,7 +320,7 @@ namespace APSITests
     {
         size_t sender_size = 0;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, params, 4);
+        RunUnlabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, params, thread::hardware_concurrency());
     }
 
     TEST(SenderReceiverTests, UnlabeledSingleTest)
@@ -334,7 +334,7 @@ namespace APSITests
     {
         size_t sender_size = 1;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, params, 4);
+        RunUnlabeledTest(sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, params, thread::hardware_concurrency());
     }
 
     TEST(SenderReceiverTests, UnlabeledSmallTest)
@@ -352,7 +352,7 @@ namespace APSITests
         PSIParams params = create_params();
         RunUnlabeledTest(sender_size,
             { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 5, 0 }, { 5, 2 }, { 5, 5 }, { 10, 0 }, { 10, 5 }, { 10, 10 } },
-            params, 4);
+            params, thread::hardware_concurrency());
     }
 
     TEST(SenderReceiverTests, UnlabeledMediumTest)
@@ -370,7 +370,7 @@ namespace APSITests
         PSIParams params = create_params();
         RunUnlabeledTest(sender_size,
             { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 50, 10 }, { 50, 50 }, { 100, 1 }, { 100, 50 }, { 100, 100 } },
-            params, 4);
+            params, thread::hardware_concurrency());
     }
 
     TEST(SenderReceiverTests, UnlabeledLargeTest)
@@ -390,7 +390,7 @@ namespace APSITests
         RunUnlabeledTest(sender_size,
             { { 0, 0 }, { 1, 0 }, { 500, 10 }, { 500, 50 }, { 500, 500 }, { 1000, 0 }, { 1000, 1 }, { 1000, 500 },
                 { 1000, 999 }, { 1000, 1000 } },
-            params, 4);
+            params, thread::hardware_concurrency());
     }
 
     TEST(SenderReceiverTests, UnlabeledHugeMultiThreadedTest)
@@ -400,10 +400,10 @@ namespace APSITests
         RunUnlabeledTest(sender_size,
             { { 0, 0 }, { 1, 0 }, { 5000, 100 }, { 5000, 5000 }, { 10000, 0 }, { 10000, 5000 }, { 10000, 10000 },
                 { 50000, 50000 } },
-            params, 4);
+            params, thread::hardware_concurrency());
 
         sender_size = 1'000'000;
-        RunUnlabeledTest(sender_size, { { 10000, 10000 } }, params, 4);
+        RunUnlabeledTest(sender_size, { { 10000, 10000 } }, params, thread::hardware_concurrency());
     }
 
     TEST(SenderReceiverTests, LabeledEmptyTest)
@@ -417,7 +417,7 @@ namespace APSITests
     {
         size_t sender_size = 0;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, params, 4);
+        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, params, thread::hardware_concurrency());
     }
 
     TEST(SenderReceiverTests, LabeledSingleTest)
@@ -431,7 +431,7 @@ namespace APSITests
     {
         size_t sender_size = 1;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, params, 4);
+        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, params, thread::hardware_concurrency());
     }
 
     TEST(SenderReceiverTests, LabeledSmallTest)
@@ -449,7 +449,7 @@ namespace APSITests
         PSIParams params = create_params();
         RunLabeledTest(sender_size,
             { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 5, 0 }, { 5, 2 }, { 5, 5 }, { 10, 0 }, { 10, 5 }, { 10, 10 } },
-            params, 4);
+            params, thread::hardware_concurrency());
     }
 
     TEST(SenderReceiverTests, LabeledMediumTest)
@@ -467,7 +467,7 @@ namespace APSITests
         PSIParams params = create_params();
         RunLabeledTest(sender_size,
             { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 50, 10 }, { 50, 50 }, { 100, 1 }, { 100, 50 }, { 100, 100 } },
-            params, 4);
+            params, thread::hardware_concurrency());
     }
 
     TEST(SenderReceiverTests, LabeledLargeTest)
@@ -487,7 +487,7 @@ namespace APSITests
         RunLabeledTest(sender_size,
             { { 0, 0 }, { 1, 0 }, { 500, 10 }, { 500, 50 }, { 500, 500 }, { 1000, 0 }, { 1000, 1 }, { 1000, 500 },
                 { 1000, 999 }, { 1000, 1000 } },
-            params, 4);
+            params, thread::hardware_concurrency());
     }
 
     TEST(SenderReceiverTests, LabeledHugeMultiThreadedTest)
@@ -497,9 +497,9 @@ namespace APSITests
         RunLabeledTest(sender_size,
             { { 0, 0 }, { 1, 0 }, { 5000, 100 }, { 5000, 5000 }, { 10000, 0 }, { 10000, 5000 }, { 10000, 10000 },
                 { 50000, 50000 } },
-            params, 4);
+            params, thread::hardware_concurrency());
 
         sender_size = 1'000'000;
-        RunLabeledTest(sender_size, { { 10000, 10000 } }, params, 4);
+        RunLabeledTest(sender_size, { { 10000, 10000 } }, params, thread::hardware_concurrency());
     }
 } // namespace APSITests

@@ -19,19 +19,16 @@ using namespace apsi::logging;
 
 unique_ptr<PSIParams> build_psi_params(const CLP& cmd)
 {
-    PSIParams::ItemParams item_params {
-        .felts_per_item = cmd.felts_per_item()
-    };
+    PSIParams::ItemParams item_params;
+    item_params.felts_per_item = cmd.felts_per_item();
 
-    PSIParams::TableParams table_params {
-        .table_size = cmd.table_size(),
-        .max_items_per_bin = cmd.max_items_per_bin(),
-        .hash_func_count = cmd.hash_func_count()
-    };
+    PSIParams::TableParams table_params;
+    table_params.table_size = cmd.table_size();
+    table_params.max_items_per_bin = cmd.max_items_per_bin();
+    table_params.hash_func_count = cmd.hash_func_count();
 
-    PSIParams::QueryParams query_params {
-        .query_powers_count = cmd.query_powers_count()
-    };
+    PSIParams::QueryParams query_params;
+    query_params.query_powers_count = cmd.query_powers_count();
 
     PSIParams::SEALParams seal_params;
     try

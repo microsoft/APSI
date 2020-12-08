@@ -364,5 +364,48 @@ namespace apsi
             BitstringView<seal_byte> view = bits.to_view();
             return view;
         }
+
+#if SEAL_COMPILER == SEAL_COMPILER_MSVC
+        seal::seal_byte operator >>(const seal::seal_byte src, const uint32_t shift)
+        {
+            const std::byte& byte_src = static_cast<const std::byte>(src);
+            return static_cast<seal::seal_byte>(byte_src >> shift);
+        }
+        
+        seal::seal_byte operator |(const seal::seal_byte src, const seal::seal_byte other)
+        {
+            const std::byte& byte_src = static_cast<const std::byte>(src);
+            const std::byte& byte_other = static_cast<const std::byte>(other);
+            return static_cast<seal::seal_byte>(byte_src | byte_other);
+        }
+
+        seal::seal_byte operator &(const seal::seal_byte src, const seal::seal_byte other)
+        {
+            const std::byte& byte_src = static_cast<const std::byte>(src);
+            const std::byte& byte_other = static_cast<const std::byte>(other);
+            return static_cast<seal::seal_byte>(byte_src & byte_other);
+        }
+
+        seal::seal_byte& operator &=(seal::seal_byte& src, const seal::seal_byte other)
+        {
+            std::byte byte_src = static_cast<std::byte>(src);
+            const std::byte& byte_other = static_cast<const std::byte>(other);
+            src = static_cast<seal::seal_byte>(byte_src &= byte_other);
+            return src;
+        }
+
+        seal::seal_byte& operator <<=(seal::seal_byte& src, const uint32_t shift)
+        {
+            std::byte byte_src = static_cast<std::byte>(src);
+            src = static_cast<seal::seal_byte>(byte_src <<= shift);
+            return src;
+        }
+
+        seal::seal_byte operator ~(const seal::seal_byte src)
+        {
+            const std::byte& byte_src = static_cast<const std::byte>(src);
+            return static_cast<seal::seal_byte>(~byte_src);
+        }
+#endif
     }
 }

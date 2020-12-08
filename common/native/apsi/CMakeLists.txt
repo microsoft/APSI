@@ -14,6 +14,7 @@ add_subdirectory(logging)
 add_subdirectory(network)
 add_subdirectory(util)
 add_subdirectory(oprf)
+add_subdirectory(fourq)
 
 install(
     FILES

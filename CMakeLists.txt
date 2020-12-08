@@ -15,11 +15,6 @@ cmake_minimum_required(VERSION 3.12)
 
 project(APSI VERSION 1.0.0 LANGUAGES CXX C)
 
-# Check operating system: for Windows, use Visual Studio solution/project files.
-if (DEFINED MSVC)
-    message(FATAL_ERROR "Please build APSI using the attached Visual Studio solution/project file")
-endif()
-
 # Required includes
 include(CMakeDependentOption)
 include(CheckCXXCompilerFlag)
@@ -207,422 +202,100 @@ endmacro()
 # External Dependencies #
 #########################
 
-function(create_cache_entries dir_name)
-    set(cce_file_name ${dir_name}/cache_init.txt)
-    file(WRITE  "${cce_file_name}" "set(CMAKE_C_COMPILER \"${CMAKE_C_COMPILER}\" CACHE STRING \"\" FORCE)\n")
-    file(APPEND "${cce_file_name}" "set(CMAKE_CXX_COMPILER \"${CMAKE_CXX_COMPILER}\" CACHE STRING \"\" FORCE)\n")
-    file(APPEND "${cce_file_name}" "set(CMAKE_TOOLCHAIN_FILE \"${CMAKE_TOOLCHAIN_FILE}\" CACHE FILEPATH \"\" FORCE)\n")
-    file(APPEND "${cce_file_name}" "set(ANDROID_ABI ${ANDROID_ABI} CACHE STRING \"\" FORCE)\n")
-    file(APPEND "${cce_file_name}" "set(ANDROID_NDK \"${ANDROID_NDK}\" CACHE FILEPATH \"\" FORCE)\n")
-    file(APPEND "${cce_file_name}" "set(ANDROID_PLATFORM ${ANDROID_PLATFORM} CACHE STRING \"\" FORCE)\n")
-    file(APPEND "${cce_file_name}" "set(CMAKE_ANDROID_ARCH_ABI ${CMAKE_ANDROID_ARCH_ABI} CACHE STRING \"\" FORCE)\n")
-    file(APPEND "${cce_file_name}" "set(CMAKE_ANDROID_NDK \"${CMAKE_ANDROID_NDK}\" CACHE STRING \"\" FORCE)\n")
-    file(APPEND "${cce_file_name}" "set(CMAKE_MAKE_PROGRAM \"${CMAKE_MAKE_PROGRAM}\" CACHE STRING \"\" FORCE)\n")
-    file(APPEND "${cce_file_name}" "set(CMAKE_SYSTEM_NAME ${CMAKE_SYSTEM_NAME} CACHE STRING \"\" FORCE)\n")
-    file(APPEND "${cce_file_name}" "set(CMAKE_SYSTEM_VERSION ${CMAKE_SYSTEM_VERSION} CACHE STRING \"\" FORCE)\n")
-endfunction()
-
 set(THIRDPARTY_DIR ${APSI_SOURCE_DIR}/thirdparty)
 
-## Microsoft SEAL + MSGSL + ZLIB
-## MSGSL and ZLIB should be installed with Microsoft SEAL
-## Download and configure
-#if(NOT MSVC)
-    #message(STATUS "Setting up Microsoft SEAL ...")
-    #execute_process(
-        #COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-        #OUTPUT_QUIET
-        #RESULT_VARIABLE result
-        #WORKING_DIRECTORY ${THIRDPARTY_DIR}/seal)
-    #if(result)
-        #message(FATAL_ERROR "Failed to download Microsoft SEAL (${result})")
-    #endif()
-    #mark_as_advanced(SEAL_BUILD_EXAMPLES)
-    #mark_as_advanced(SEAL_BUILD_SEAL_C)
-    #mark_as_advanced(SEAL_BUILD_TESTS)
-    #mark_as_advanced(SEAL_USE_CXX17)
-    #mark_as_advanced(SEAL_USE_INTRIN)
-    #mark_as_advanced(SEAL_USE_MSGSL)
-    #mark_as_advanced(SEAL_USE_ZLIB)
-    #mark_as_advanced(SEAL_USE__ADDCARRY_U64)
-    #mark_as_advanced(SEAL_USE__SUBBORROW_U64)
-    #mark_as_advanced(SEAL_USE___BUILTIN_CLZLL)
-    #mark_as_advanced(SEAL_USE___INT128)
-#endif()
-
-## Build
-#if(NOT MSVC)
-    #execute_process(
-        #COMMAND ${CMAKE_COMMAND} --build .
-        #OUTPUT_QUIET
-        #RESULT_VARIABLE result
-        #WORKING_DIRECTORY ${THIRDPARTY_DIR}/seal)
-    #if(result)
-        #message(FATAL_ERROR "Failed to build Microsoft SEAL (${result})")
-    #endif()
-#endif()
-
-## Set up the targets
-#if(NOT MSVC)
-    #add_subdirectory(
-        #${THIRDPARTY_DIR}/seal/src
-        #${THIRDPARTY_DIR}/seal/build
-        #EXCLUDE_FROM_ALL)
-#endif()
-
+# Microsoft SEAL
 find_package(SEAL 3.6 CONFIG REQUIRED)
 
 # Microsoft Kuku
-# Download and configure
-if(NOT MSVC)
-    message(STATUS "Setting up Microsoft Kuku ...")
-    execute_process(
-        COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-        OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/kuku)
-    if(result)
-        message(FATAL_ERROR "Failed to download Microsoft Kuku (${result})")
-    endif()
-    mark_as_advanced(KUKU_BUILD_EXAMPLES)
-    mark_as_advanced(KUKU_BUILD_KUKU_C)
-    mark_as_advanced(KUKU_BUILD_TESTS)
-endif()
-
-# Build
-if(NOT MSVC)
-    execute_process(
-        COMMAND ${CMAKE_COMMAND} --build .
-        OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/kuku)
-    if(result)
-        message(FATAL_ERROR "Failed to build Microsoft Kuku (${result})")
-    endif()
-endif()
-
-# Set up the targets
-if(NOT MSVC)
-    add_subdirectory(
-        ${THIRDPARTY_DIR}/kuku/src
-        ${THIRDPARTY_DIR}/kuku/build
-        EXCLUDE_FROM_ALL)
-endif()
-
-# FourQ
-# This is a fork of https://github.com/microsoft/FourQlib.
-# It is built with Makefile.
-# Download
-if(NOT MSVC)
-    message(STATUS "Setting up FourQ ...")
-    if(NOT CMAKE_TOOLCHAIN_FILE)
-        execute_process(
-            COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-            OUTPUT_QUIET
-            RESULT_VARIABLE result
-            WORKING_DIRECTORY ${THIRDPARTY_DIR}/fourq)
-    else()
-        create_cache_entries(${THIRDPARTY_DIR}/fourq)
-        if(EXISTS ${THIRDPARTY_DIR}/fourq/CMakeCache.txt)
-            # Force regenerating make files. When cross compiling we might be
-            # compiling more than one platform at a time.
-            file(REMOVE ${THIRDPARTY_DIR}/fourq/CMakeCache.txt)
-        endif()
-        execute_process(
-            COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" . -Ccache_init.txt
-            OUTPUT_QUIET
-            RESULT_VARIABLE result
-            WORKING_DIRECTORY ${THIRDPARTY_DIR}/fourq)
-    endif()
-    if(result)
-        message(FATAL_ERROR "Failed to download FourQ (${result})")
-    endif()
-endif()
-
-# Build
-if(NOT MSVC)
-    execute_process(
-        COMMAND ${CMAKE_COMMAND} --build .
-        OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/fourq)
-    if(result)
-        message(FATAL_ERROR "Failed to build FourQ (${result})`")
-    endif()
-endif()
-
-# Set up the targets
-# Create imported target for FourQ
-if(NOT MSVC)
-    add_library(fourq UNKNOWN IMPORTED)
-    set_target_properties(fourq PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES ${THIRDPARTY_DIR}//fourq/src/FourQ_64bit_and_portable
-        IMPORTED_LOCATION ${THIRDPARTY_DIR}/fourq/src/FourQ_64bit_and_portable/libFourQ.a)
-endif()
+find_package(Kuku 2.0 REQUIRED)
 
 # Log4cplus
-# Download and configure
-if(NOT MSVC AND APSI_USE_LOG4CPLUS)
-    message(STATUS "Setting up log4cplus ...")
-    if(NOT CMAKE_TOOLCHAIN_FILE)
-        execute_process(
-            COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-            OUTPUT_QUIET
-            RESULT_VARIABLE result
-            WORKING_DIRECTORY ${THIRDPARTY_DIR}/log4cplus)
-    else()
-        create_cache_entries(${THIRDPARTY_DIR}/log4cplus)
-        if(EXISTS ${THIRDPARTY_DIR}/log4cplus/CMakeCache.txt)
-            # Force regenerating make files. When cross compiling we might be
-            # compiling more than one platform at a time.
-            file(REMOVE ${THIRDPARTY_DIR}/log4cplus/CMakeCache.txt)
-        endif()
-        execute_process(
-            COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" . -Ccache_init.txt
-            OUTPUT_QUIET
-            RESULT_VARIABLE result
-            WORKING_DIRECTORY ${THIRDPARTY_DIR}/log4cplus)
-    endif()
-    if(result)
-        message(FATAL_ERROR "Failed to download log4cplus (${result})")
-    endif()
-    mark_as_advanced(ENABLE_SYMBOLS_VISIBILITY)
-    mark_as_advanced(LIBADVAPI32)
-    mark_as_advanced(LIBCPOSIX)
-    mark_as_advanced(LIBICONV)
-    mark_as_advanced(LIBKERNEL32)
-    mark_as_advanced(LIBNSL)
-    mark_as_advanced(LIBPOSIX4)
-    mark_as_advanced(LIBRT)
-    mark_as_advanced(LIBSOCKET)
-    mark_as_advanced(LIBWS2_32)
-    set(LOG4CPLUS_BUILD_LOGGINGSERVER OFF CACHE BOOL "" FORCE)
-    mark_as_advanced(LOG4CPLUS_BUILD_LOGGINGSERVER)
-    set(LOG4CPLUS_BUILD_TESTING OFF CACHE BOOL "" FORCE)
-    mark_as_advanced(LOG4CPLUS_BUILD_TESTING)
-    set(LOG4CPLUS_ENABLE_DECORATED_LIBRARY_NAME OFF CACHE BOOL "" FORCE)
-    mark_as_advanced(LOG4CPLUS_ENABLE_DECORATED_LIBRARY_NAME)
-    mark_as_advanced(LOG4CPLUS_QT4)
-    mark_as_advanced(LOG4CPLUS_QT5)
-    mark_as_advanced(LOG4CPLUS_REQUIRE_EXPLICIT_INITIALIZATION)
-    mark_as_advanced(LOG4CPLUS_SINGLE_THREADED)
-    mark_as_advanced(LOG4CPLUS_WORKING_C_LOCALE)
-    mark_as_advanced(LOG4CPLUS_WORKING_LOCALE)
-    mark_as_advanced(UNICODE)
-    mark_as_advanced(WITH_ICONV)
-    set(WITH_UNIT_TESTS OFF CACHE BOOL "" FORCE)
-    mark_as_advanced(WITH_UNIT_TESTS)
-    mark_as_advanced(_WIN32_WINNT)
+if(APSI_USE_LOG4CPLUS)
+    find_package(log4cplus REQUIRED)
 endif()
-
-# Build
-if(NOT MSVC AND APSI_USE_LOG4CPLUS)
-    execute_process(
-        COMMAND ${CMAKE_COMMAND} --build .
-        OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/log4cplus)
-    if(result)
-        message(FATAL_ERROR "Failed to build log4cplus (${result})`")
-    endif()
-endif()
-
-# Set up the targets
-if(NOT MSVC AND APSI_USE_LOG4CPLUS)
-    add_subdirectory(
-        ${THIRDPARTY_DIR}/log4cplus/src
-        EXCLUDE_FROM_ALL)
-    list(APPEND LOG4CPLUS_INCLUDE_DIRS ${THIRDPARTY_DIR}/log4cplus/src/include)
-    set_target_properties(${log4cplus} PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES "${LOG4CPLUS_INCLUDE_DIRS}")
-endif()
-
-# Google Test
-# This follows the example in
-# https://github.com/google/googletest/blob/release-1.10.0/googletest/README.md.
 
 # Download and configure
-if(APSI_BUILD_TESTS AND NOT MSVC)
-    message(STATUS "Setting up Google Test ...")
-    execute_process(
-        COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-        OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/googletest)
-    if(result)
-        message(WARNING "Failed to download Google Test (${result}); disabling `APSI_BUILD_TESTS`")
-    endif()
-    set(BUILD_GMOCK OFF CACHE BOOL "" FORCE)
-    mark_as_advanced(BUILD_GMOCK)
-    set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-    mark_as_advanced(INSTALL_GTEST)
+if (APSI_BUILD_TESTS)
+    find_package(GTest REQUIRED)
 endif()
 
-# Build
-if(APSI_BUILD_TESTS AND NOT MSVC)
-    execute_process(COMMAND ${CMAKE_COMMAND} --build .
-        OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/googletest)
-    if(result)
-        message(WARNING "Failed to build Google Test (${result}); disabling `APSI_BUILD_TESTS`")
-    endif()
-endif()
-
-# Set up the targets
-if(APSI_BUILD_TESTS AND NOT MSVC)
-    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-    add_subdirectory(
-        ${THIRDPARTY_DIR}/googletest/src
-        ${THIRDPARTY_DIR}/googletest/build
-        EXCLUDE_FROM_ALL)
-endif()
-
-# ZeroMQ and ZeroMQpp
 if(APSI_USE_ZMQ)
-    set(ZEROMQ_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQ.cmake)
-    set(ZEROMQPP_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindZeroMQpp.cmake)
-    if(ZeroMQ_ROOT)
-        unset(ZEROMQ_INCLUDE_DIR CACHE)
-        unset(ZEROMQ_LIBRARY_DIR CACHE)
-        unset(ZEROMQ_LIBRARY_PATH CACHE)
-    endif()
-    find_package(ZeroMQ MODULE REQUIRED)
-    if(ZeroMQpp_ROOT)
-        unset(ZEROMQPP_INCLUDE_DIR CACHE)
-        unset(ZEROMQPP_LIBRARY_DIR CACHE)
-        unset(ZEROMQPP_LIBRARY_PATH CACHE)
-    endif()
-    find_package(ZeroMQpp MODULE REQUIRED)
+    find_package(ZeroMQ REQUIRED)
+    find_package(cppzmq REQUIRED)
 endif()
 
 # CLI requires TCLAP
-if(APSI_BUILD_CLI)
-    set(TCLAP_FIND_MODULE_PATH ${APSI_SOURCE_DIR}/cmake/FindTCLAP.cmake)
-    if(TCLAP_ROOT)
-        unset(TCLAP_INCLUDE_DIR CACHE)
-    endif()
-    find_package(TCLAP MODULE REQUIRED)
+if (APSI_BUILD_CLI)
+    find_path(TCLAP_INCLUDE_DIRS "tclap/Arg.h")
 endif()
 
-# FlatBuffers 
-# Download and configure
-if(NOT MSVC)
-    message(STATUS "Setting up flatbuffers ...")
-    if(NOT CMAKE_TOOLCHAIN_FILE)
-        execute_process(
-            COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
-            OUTPUT_QUIET
-            RESULT_VARIABLE result
-            WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
-    else()
-        create_cache_entries(${THIRDPARTY_DIR}/flatbuffers)
-        if(EXISTS ${THIRDPARTY_DIR}/flatbuffers/build/CMakeCache.txt)
-            # Force regenerating make files. When cross compiling we might be
-            # compiling more than one platform at a time.
-            file(REMOVE ${THIRDPARTY_DIR}/flatbuffers/build/CMakeCache.txt)
-        endif()
-        execute_process(
-            COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" . -Ccache_init.txt
-            OUTPUT_QUIET
-            RESULT_VARIABLE result
-            WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
-    endif()
-    if(result)
-        message(FATAL_ERROR "Failed to download flatbuffers (${result})")
-    endif()
+# Flatbuffers for serialization
+find_package(Flatbuffers REQUIRED)
+get_target_property(FLATBUFFERS_FLATC_PATH flatbuffers::flatc IMPORTED_LOCATION_RELEASE)
+message(STATUS "flatc path: ${FLATBUFFERS_FLATC_PATH}")
 
-    set(FLATBUFFERS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    set(FLATBUFFERS_BUILD_FLATC ON CACHE BOOL "" FORCE)
-    set(FLATBUFFERS_INSTALL OFF CACHE BOOL "" FORCE)
+execute_process(
+    COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi" "${APSI_SOURCE_DIR}/common/native/apsi/powers.fbs"
+    OUTPUT_QUIET
+    RESULT_VARIABLE result
+    WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+if(result)
+    message(FATAL_ERROR "flatc failed (${result})")
 endif()
 
-# Build
-if(NOT MSVC)
-    execute_process(
-        COMMAND ${CMAKE_COMMAND} --build .
-        OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
-    if(result)
-        message(FATAL_ERROR "Failed to build flatbuffers (${result})`")
-    endif()
-
-    # flatc executable
-    set(FLATBUFFERS_FLATC_PATH "build/flatc")
-
-    execute_process(
-        COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi" "${APSI_SOURCE_DIR}/common/native/apsi/powers.fbs"
-        #OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
-    if(result)
-        message(FATAL_ERROR "flatc failed (${result})")
-    endif()
-
-    execute_process(
-        COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi" "${APSI_SOURCE_DIR}/common/native/apsi/psiparams.fbs"
-        #OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
-    if(result)
-        message(FATAL_ERROR "flatc failed (${result})")
-    endif()
-
-    execute_process(
-        COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/ciphertext.fbs"
-        #OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
-    if(result)
-        message(FATAL_ERROR "flatc failed (${result})")
-    endif()
-
-    execute_process(
-        COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp --include-prefix "apsi/network/" -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/sop.fbs"
-        #OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
-    if(result)
-        message(FATAL_ERROR "flatc failed (${result})")
-    endif()
-
-    execute_process(
-        COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/sop_header.fbs"
-        #OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
-    if(result)
-        message(FATAL_ERROR "flatc failed (${result})")
-    endif()
-
-    execute_process(
-        COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp --include-prefix "apsi/network/" -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/sop_response.fbs"
-        #OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
-    if(result)
-        message(FATAL_ERROR "flatc failed (${result})")
-    endif()
-
-    execute_process(
-        COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp --include-prefix "apsi/network/" -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/result_package.fbs"
-        #OUTPUT_QUIET
-        RESULT_VARIABLE result
-        WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
-    if(result)
-        message(FATAL_ERROR "flatc failed (${result})")
-    endif()
+execute_process(
+    COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi" "${APSI_SOURCE_DIR}/common/native/apsi/psiparams.fbs"
+    OUTPUT_QUIET
+    RESULT_VARIABLE result
+    WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+if(result)
+    message(FATAL_ERROR "flatc failed (${result})")
 endif()
 
-# Set up the targets
-if(NOT MSVC)
-    add_subdirectory(
-        ${THIRDPARTY_DIR}/flatbuffers/src
-        EXCLUDE_FROM_ALL)
-    list(APPEND FLATBUFFERS_INCLUDE_DIRS ${THIRDPARTY_DIR}/flatbuffers/src/include)
-    set_target_properties(${flatbuffers} PROPERTIES
-        INTERFACE_INCLUDE_DIRECTORIES "${FLATBUFFERS_INCLUDE_DIRS}")
+execute_process(
+    COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/ciphertext.fbs"
+    OUTPUT_QUIET
+    RESULT_VARIABLE result
+    WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+if(result)
+    message(FATAL_ERROR "flatc failed (${result})")
+endif()
+
+execute_process(
+    COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp --include-prefix "apsi/network/" -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/sop.fbs"
+    OUTPUT_QUIET
+    RESULT_VARIABLE result
+    WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+if(result)
+    message(FATAL_ERROR "flatc failed (${result})")
+endif()
+
+execute_process(
+    COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/sop_header.fbs"
+    OUTPUT_QUIET
+    RESULT_VARIABLE result
+    WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+if(result)
+    message(FATAL_ERROR "flatc failed (${result})")
+endif()
+
+execute_process(
+    COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp --include-prefix "apsi/network/" -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/sop_response.fbs"
+    OUTPUT_QUIET
+    RESULT_VARIABLE result
+    WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+if(result)
+    message(FATAL_ERROR "flatc failed (${result})")
+endif()
+
+execute_process(
+    COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp --include-prefix "apsi/network/" -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/result_package.fbs"
+    OUTPUT_QUIET
+    RESULT_VARIABLE result
+    WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+if(result)
+    message(FATAL_ERROR "flatc failed (${result})")
 endif()
 
 ###########################
@@ -644,40 +317,42 @@ target_include_directories(common PUBLIC
 # Link dependencies
 target_link_libraries(common PUBLIC
     SEAL::seal
-    kuku
-    fourq
-    log4cplus
-    flatbuffers)
+    Kuku::kuku
+    flatbuffers::flatbuffers)
+
+if (APSI_USE_LOG4CPLUS)
+    target_link_libraries(common PUBLIC log4cplus::log4cplus)
+endif()
 
 if(APSI_USE_ZMQ)
     target_link_libraries(common PUBLIC
-        ZeroMQ::ZeroMQ
-        ZeroMQpp::ZeroMQpp)
+        libzmq-static
+        cppzmq-static)
 endif()
 
-# Defines
+# Defines for FourQlib
 target_compile_options(common PUBLIC -DHAVE_CONFIG)
 target_compile_options(common PUBLIC -DUSE_SECURE_SEED)
 target_compile_options(common PUBLIC -D_AMD64_)
 target_compile_options(common PUBLIC -D_AVX2_)
-if (NOT APPLE)
-    target_compile_options(common PUBLIC -D_ASM_)
+target_compile_options(common PUBLIC -DUSE_ENDO=true)
+#if (NOT APPLE AND NOT MSVC)
+#    target_compile_options(common PUBLIC -D_ASM_)
+#endif()
+if (MSVC)
+    target_compile_options(common PUBLIC -D__WINDOWS__)
 endif()
-target_compile_options(common PUBLIC -D__LINUX__)
-target_compile_options(common PUBLIC -maes)
-target_compile_options(common PUBLIC -march=native)
+if (NOT MSVC)
+    target_compile_options(common PUBLIC -D__LINUX__)
+    target_compile_options(common PUBLIC -maes)
+    target_compile_options(common PUBLIC -march=native)
+endif()
 
 apsi_set_version(common)
 set_target_properties(common PROPERTIES OUTPUT_NAME apsi_common-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
 apsi_link_threads(common)
 apsi_install_target(common APSITargets)
 
-if(NOT MSVC)
-    apsi_combine_archives(common SEAL::seal)
-    if (APSI_USE_LOG4CPLUS)
-        apsi_combine_archives(common log4cplus)
-    endif()
-endif()
 
 #############################
 # APSI receiver C++ library #
@@ -724,7 +399,7 @@ apsi_install_target(sender APSITargets)
 if(APSI_BUILD_TESTS)
     add_executable(unit_tests)
     add_subdirectory(tests/unit/src)
-    target_link_libraries(unit_tests common sender receiver gtest)
+    target_link_libraries(unit_tests common sender receiver GTest::gtest)
 endif()
 
 ##########################
@@ -735,7 +410,7 @@ endif()
 if(APSI_BUILD_TESTS)
     add_executable(integration_tests)
     add_subdirectory(tests/integration/src)
-    target_link_libraries(integration_tests common sender receiver gtest)
+    target_link_libraries(integration_tests common sender receiver GTest::gtest)
 endif()
 
 ##########################
@@ -746,13 +421,20 @@ if(APSI_BUILD_CLI)
     add_library(common_cli OBJECT)
     add_subdirectory(cli/common)
     target_include_directories(common_cli PUBLIC cli)
-    target_link_libraries(common_cli PUBLIC common TCLAP::TCLAP)
+    target_include_directories(common_cli PUBLIC ${TCLAP_INCLUDE_DIRS})
+    target_link_libraries(common_cli PUBLIC common)
 
     add_executable(sender_cli)
     add_subdirectory(cli/sender)
-    target_link_libraries(sender_cli common_cli sender stdc++fs)
+    target_link_libraries(sender_cli common_cli sender)
+    if(!MSVC)
+        target_link_libraries(sender_cli PUBLIC stdc++fs)
+    endif()
 
     add_executable(receiver_cli)
     add_subdirectory(cli/receiver)
-    target_link_libraries(receiver_cli common_cli receiver stdc++fs)
+    target_link_libraries(receiver_cli common_cli receiver)
+    if (!MSVC)
+        target_link_libraries(receiver_cli PUBLIC stdc++fs)
+    endif()
 endif()
