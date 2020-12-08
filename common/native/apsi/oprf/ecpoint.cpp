@@ -25,34 +25,31 @@ namespace apsi
         namespace
         {
             // Curve constants
-            uint64_t c0h = 1064406672104372656ULL;
-            uint64_t c0l = 4737573565184866938ULL;
-            uint64_t b0h = 11442141257964318772ULL;
-            uint64_t b0l = 5379339658566403666ULL;
-            uint64_t b1h = 17ULL;
-            uint64_t b1l = 9223372036854775796ULL;
-            uint64_t A0h = 1289ULL;
-            uint64_t A0l = 9223372036854774896ULL;
-            uint64_t A1h = 12311914987857864728ULL;
-            uint64_t A1l = 7168186187914912079ULL;
-
+            uint64_t c0l = 1064406672104372656ULL;
+            uint64_t c0h = 4737573565184866938ULL;
+            uint64_t b0l = 11442141257964318772ULL;
+            uint64_t b0h = 5379339658566403666ULL;
+            uint64_t b1l = 17ULL;
+            uint64_t b1h = 9223372036854775796ULL;
+            uint64_t A0l = 1289ULL;
+            uint64_t A0h = 9223372036854774896ULL;
+            uint64_t A1l = 12311914987857864728ULL;
+            uint64_t A1h = 7168186187914912079ULL;
 #ifndef _X86_
-            felm_t c0{ c0h, c0l };
-            felm_t b0{ b0h, b0l };
-            felm_t b1{ b1h, b1l };
-            felm_t A0{ A0h, A0l };
-            felm_t A1{ A1h, A1l };
+            felm_t c0{ c0l, c0h };
+            felm_t b0{ b0l, b0h };
+            felm_t b1{ b1l, b1h };
+            felm_t A0{ A0l, A0h };
+            felm_t A1{ A1l, A1h };
 #else
 #define HIGHOF64(x) static_cast<uint32_t>(x >> 32)
 #define LOWOF64(x) static_cast<uint32_t>(x)
-
-            felm_t c0{ LOWOF64(c0h), HIGHOF64(c0h), LOWOF64(c0l), HIGHOF64(c0l) };
-            felm_t b0{ LOWOF64(b0h), HIGHOF64(b0h), LOWOF64(b0l), HIGHOF64(b0l) };
-            felm_t b1{ LOWOF64(b1h), HIGHOF64(b1h), LOWOF64(b1l), HIGHOF64(b1l) };
-            felm_t A0{ LOWOF64(A0h), HIGHOF64(A0h), LOWOF64(A0l), HIGHOF64(A0l) };
-            felm_t A1{ LOWOF64(A1h), HIGHOF64(A1h), LOWOF64(A1l), HIGHOF64(A1l) };
+            felm_t c0{ LOWOF64(c0l), HIGHOF64(c0l), LOWOF64(c0h), HIGHOF64(c0h) };
+            felm_t b0{ LOWOF64(b0l), HIGHOF64(b0l), LOWOF64(b0h), HIGHOF64(b0h) };
+            felm_t b1{ LOWOF64(b1l), HIGHOF64(b1l), LOWOF64(b1h), HIGHOF64(b1h) };
+            felm_t A0{ LOWOF64(A0l), HIGHOF64(A0l), LOWOF64(A0h), HIGHOF64(A0h) };
+            felm_t A1{ LOWOF64(A1l), HIGHOF64(A1l), LOWOF64(A1h), HIGHOF64(A1h) };
 #endif
-
             inline void fpsqrt1271(felm_t in, felm_t out)
             {
                 fpsqr1271(in, out);
