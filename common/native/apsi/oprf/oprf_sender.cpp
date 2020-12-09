@@ -115,7 +115,7 @@ namespace apsi
                 ECPoint ecpt({ reinterpret_cast<const unsigned char *>(item.data()), oprf_item_size });
 
                 // Multiply with key
-                ecpt.scalar_multiply(oprf_key.key_span(), false);
+                ecpt.scalar_multiply(oprf_key.key_span(), true);
 
                 // Extract the hash
                 oprf_hash_type hash;

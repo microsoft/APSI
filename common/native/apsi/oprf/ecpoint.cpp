@@ -278,6 +278,7 @@ namespace apsi
 
         bool ECPoint::scalar_multiply(gsl::span<const unsigned char, order_size> scalar, bool clear_cofactor)
         {
+            // The ecc_mul functions returns false when the input point is not a valid curve point
             return ecc_mul(
                 pt_,
                 const_cast<digit_t *>(reinterpret_cast<const digit_t *>(scalar.data())),
