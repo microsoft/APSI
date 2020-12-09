@@ -9,25 +9,25 @@
 #include <utility>
 
 // APSI
-#include "apsi/network/zmq/network_channel.h"
+#include "apsi/network/zmq/zmq_channel.h"
 #include "apsi/network/sender_operation.h"
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/sender.h"
-#include "apsi/senderdb.h"
+#include "apsi/sender_db.h"
 
 namespace apsi
 {
     namespace sender
     {
         /**
-        The Sender Dispatcher is in charge of handling incoming requests through the network.
+        The ZMQSenderDispatcher is in charge of handling incoming requests through the network.
         */
-        class SenderDispatcher
+        class ZMQSenderDispatcher
         {
         public:
-            SenderDispatcher() = delete;
+            ZMQSenderDispatcher() = delete;
 
-            SenderDispatcher(std::shared_ptr<SenderDB> sender_db, std::size_t thread_count = 0);
+            ZMQSenderDispatcher(std::shared_ptr<SenderDB> sender_db, std::size_t thread_count = 0);
 
             /**
             Run the dispatcher on the given port.
@@ -45,17 +45,17 @@ namespace apsi
             /**
             Dispatch a Get Parameters request to the Sender.
             */
-            void dispatch_parms(std::unique_ptr<network::NetworkSenderOperation> sop, network::SenderChannel &channel);
+            void dispatch_parms(std::unique_ptr<network::ZMQSenderOperation> sop, network::ZMQSenderChannel &channel);
 
             /**
             Dispatch an OPRF query request to the Sender.
             */
-            void dispatch_oprf(std::unique_ptr<network::NetworkSenderOperation> sop, network::SenderChannel &channel);
+            void dispatch_oprf(std::unique_ptr<network::ZMQSenderOperation> sop, network::ZMQSenderChannel &channel);
 
             /**
             Dispatch a Query request to the Sender.
             */
-            void dispatch_query(std::unique_ptr<network::NetworkSenderOperation> sop, network::SenderChannel &channel);
-        }; // class SenderDispatcher
+            void dispatch_query(std::unique_ptr<network::ZMQSenderOperation> sop, network::ZMQSenderChannel &channel);
+        }; // class ZMQSenderDispatcher
     }      // namespace sender
 } // namespace apsi

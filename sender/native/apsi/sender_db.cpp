@@ -8,8 +8,8 @@
 #include <algorithm>
 
 // APSI
-#include "apsi/psiparams.h"
-#include "apsi/senderdb.h"
+#include "apsi/psi_params.h"
+#include "apsi/sender_db.h"
 #include "apsi/util/db_encoding.h"
 
 // Kuku

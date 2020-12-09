@@ -14,7 +14,7 @@
 #include <memory>
 
 // APSI
-#include "apsi/sealobject.h"
+#include "apsi/seal_object.h"
 #include "apsi/version.h"
 #include "apsi/powers.h"
 

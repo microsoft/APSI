@@ -6,7 +6,7 @@
 #include <sstream>
 
 // APSI
-#include "apsi/psiparams.h"
+#include "apsi/psi_params.h"
 
 #include "gtest/gtest.h"
 

@@ -7,8 +7,8 @@
 #include <stdexcept>
 
 // APSI
-#include "apsi/psiparams.h"
-#include "apsi/psiparams_generated.h"
+#include "apsi/psi_params.h"
+#include "apsi/psi_params_generated.h"
 #include "apsi/util/utils.h"
 
 // SEAL

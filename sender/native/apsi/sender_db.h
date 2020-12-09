@@ -17,10 +17,10 @@
 #include "gsl/span"
 
 // APSI
-#include "apsi/binbundle.h"
+#include "apsi/bin_bundle.h"
 #include "apsi/item.h"
-#include "apsi/psiparams.h"
-#include "apsi/cryptocontext.h"
+#include "apsi/psi_params.h"
+#include "apsi/crypto_context.h"
 #include "apsi/util/db_encoding.h"
 
 // SEAL

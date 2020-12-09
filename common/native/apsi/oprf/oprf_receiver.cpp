@@ -37,7 +37,7 @@ namespace apsi
                 ECPoint::invert_scalar(random_scalar, inv_factor_data_.get_factor(i));
 
                 // Multiply our point with the random scalar
-                ecpt.scalar_multiply(random_scalar);
+                ecpt.scalar_multiply(random_scalar, false);
 
                 // Save the result to items_buffer
                 ecpt.save(ECPoint::point_save_span_type{ oprf_out_ptr, oprf_query_size });
@@ -69,7 +69,7 @@ namespace apsi
                 ecpt.load(ECPoint::point_save_span_const_type{ oprf_in_ptr, oprf_response_size });
 
                 // Multiply with inverse random scalar
-                ecpt.scalar_multiply(inv_factor_data_.get_factor(i));
+                ecpt.scalar_multiply(inv_factor_data_.get_factor(i), false);
 
                 // Write the hash to the appropriate item
                 ecpt.extract_hash(ECPoint::hash_span_type{ reinterpret_cast<unsigned char *>(oprf_hashes[i].data()), ECPoint::hash_size });

@@ -6,7 +6,7 @@
 #include <utility>
 
 // APSI
-#include "sender/senderutils.h"
+#include "sender/sender_utils.h"
 #include "apsi/logging/log.h"
 
 // SEAL
@@ -46,9 +46,9 @@ unique_ptr<PSIParams> build_psi_params(const CLP& cmd)
                 PlainModulus::Batching(seal_params.poly_modulus_degree(), cmd.plain_modulus_bits()));
         }
     }
-    catch (const exception &e)
+    catch (const exception &ex)
     {
-        APSI_LOG_ERROR("Microsoft SEAL threw an exception setting up SEALParams: " << e.what());
+        APSI_LOG_ERROR("Microsoft SEAL threw an exception setting up SEALParams: " << ex.what());
         return nullptr;
     }
 
@@ -57,9 +57,9 @@ unique_ptr<PSIParams> build_psi_params(const CLP& cmd)
     {
         params = make_unique<PSIParams>(item_params, table_params, query_params, seal_params);
     }
-    catch (const exception &e)
+    catch (const exception &ex)
     {
-        APSI_LOG_ERROR("APSI threw an exception creating PSIParams: " << e.what());
+        APSI_LOG_ERROR("APSI threw an exception creating PSIParams: " << ex.what());
         return nullptr;
     }
 

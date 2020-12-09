@@ -10,7 +10,7 @@
 // APSI
 #include "apsi/network/result_package.h"
 #include "apsi/cryptocontext.h"
-#include "apsi/psiparams.h"
+#include "apsi/psi_params.h"
 
 // SEAL
 #include "seal/context.h"

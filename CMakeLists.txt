@@ -216,8 +216,8 @@ if(APSI_USE_LOG4CPLUS)
 endif()
 
 # Download and configure
-if (APSI_BUILD_TESTS)
-    find_package(GTest REQUIRED)
+if(APSI_BUILD_TESTS)
+    find_package(GTest CONFIG REQUIRED)
 endif()
 
 if(APSI_USE_ZMQ)
@@ -245,7 +245,7 @@ if(result)
 endif()
 
 execute_process(
-    COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi" "${APSI_SOURCE_DIR}/common/native/apsi/psiparams.fbs"
+    COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi" "${APSI_SOURCE_DIR}/common/native/apsi/psi_params.fbs"
     OUTPUT_QUIET
     RESULT_VARIABLE result
     WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)

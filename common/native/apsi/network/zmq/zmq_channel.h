@@ -10,7 +10,7 @@
 #include <type_traits>
 
 // APSI
-#include "apsi/network/channel.h"
+#include "apsi/network/network_channel.h"
 #include "apsi/network/sender_operation.h"
 #include "apsi/network/sender_operation_response.h"
 #include "apsi/network/result_package.h"
@@ -32,7 +32,7 @@ namespace apsi
         /**
         Encapsulates a SenderOperation and a client identifier used internally by ZeroMQ.
         */
-        struct NetworkSenderOperation
+        struct ZMQSenderOperation
         {
             std::unique_ptr<SenderOperation> sop;
 
@@ -42,7 +42,7 @@ namespace apsi
         /**
         Encapsulates a SenderOperationResponse and a client identifier used internally by ZeroMQ.
         */
-        struct NetworkSenderOperationResponse
+        struct ZMQSenderOperationResponse
         {
             std::unique_ptr<SenderOperationResponse> sop_response;
 
@@ -52,7 +52,7 @@ namespace apsi
         /**
         Encapsulates a ResultPackage and a client identifier used internally by ZeroMQ.
         */
-        struct NetworkResultPackage
+        struct ZMQResultPackage
         {
             std::unique_ptr<ResultPackage> rp;
 
@@ -60,15 +60,15 @@ namespace apsi
         };
 
         /**
-        Communication channel between Sender and Receiver through a Network channel. All receives are synchronous,
+        Communication channel between sender and receiver through a ZeroMQ channel. All receives are synchronous,
         except for receiving a SenderOperation. All sends are asynchrounous.
         */
-        class NetworkChannel : public Channel
+        class ZMQChannel : public NetworkChannel
         {
         public:
-            NetworkChannel();
+            ZMQChannel();
 
-            virtual ~NetworkChannel();
+            virtual ~ZMQChannel();
 
             /**
             Bind the channel to the given connection point.
@@ -102,14 +102,14 @@ namespace apsi
             Receive a SenderOperation from a receiver. This call does not block if wait_for_message is false. If there
             is no operation pending, it will immediately return nullptr.
             */
-            virtual std::unique_ptr<NetworkSenderOperation> receive_network_operation(
+            virtual std::unique_ptr<ZMQSenderOperation> receive_network_operation(
                 std::shared_ptr<seal::SEALContext> context, bool wait_for_message,
                 SenderOperationType expected = SenderOperationType::SOP_UNKNOWN);
 
             /**
-            Receive a NetworkSenderOperation from a receiver.
+            Receive a ZMQSenderOperation from a receiver.
             */
-            virtual std::unique_ptr<NetworkSenderOperation> receive_network_operation(
+            virtual std::unique_ptr<ZMQSenderOperation> receive_network_operation(
                 std::shared_ptr<seal::SEALContext> context,
                 SenderOperationType expected = SenderOperationType::SOP_UNKNOWN);
 
@@ -121,9 +121,9 @@ namespace apsi
                 SenderOperationType expected = SenderOperationType::SOP_UNKNOWN) override;
 
             /**
-            Send a NetworkSenderOperationResponse to a receiver.
+            Send a ZMQSenderOperationResponse to a receiver.
             */
-            virtual void send(std::unique_ptr<NetworkSenderOperationResponse> sop_response);
+            virtual void send(std::unique_ptr<ZMQSenderOperationResponse> sop_response);
 
             /**
             Send a SenderOperationResponse to a receiver.
@@ -137,9 +137,9 @@ namespace apsi
                 SenderOperationType expected = SenderOperationType::SOP_UNKNOWN) override;
 
             /**
-            Send a NetworkResultPackage to a receiver.
+            Send a ZMQResultPackage to a receiver.
             */
-            virtual void send(std::unique_ptr<NetworkResultPackage> rp);
+            virtual void send(std::unique_ptr<ZMQResultPackage> rp);
 
             /**
             Send a ResultPackage to a receiver.
@@ -188,12 +188,12 @@ namespace apsi
         /**
         Represents a network channel for a sender.
         */
-        class SenderChannel : public NetworkChannel
+        class ZMQSenderChannel : public ZMQChannel
         {
         public:
-            SenderChannel() = default;
+            ZMQSenderChannel() = default;
 
-            ~SenderChannel()
+            ~ZMQSenderChannel()
             {
             }
 
@@ -212,12 +212,12 @@ namespace apsi
         /**
         Represents a network channel for a receiver.
         */
-        class ReceiverChannel : public NetworkChannel
+        class ZMQReceiverChannel : public ZMQChannel
         {
         public:
-            ReceiverChannel() = default;
+            ZMQReceiverChannel() = default;
 
-            ~ReceiverChannel()
+            ~ZMQReceiverChannel()
             {
             }
 

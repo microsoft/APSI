@@ -276,9 +276,13 @@ namespace apsi
             from_Montgomery(reinterpret_cast<digit_t *>(out.data()), reinterpret_cast<digit_t *>(out.data()));
         }
 
-        void ECPoint::scalar_multiply(gsl::span<const unsigned char, order_size> scalar)
+        bool ECPoint::scalar_multiply(gsl::span<const unsigned char, order_size> scalar, bool clear_cofactor)
         {
-            ecc_mul(pt_, const_cast<digit_t *>(reinterpret_cast<const digit_t *>(scalar.data())), pt_, true);
+            return ecc_mul(
+                pt_,
+                const_cast<digit_t *>(reinterpret_cast<const digit_t *>(scalar.data())),
+                pt_,
+                clear_cofactor);
         }
 
         bool ECPoint::operator==(const ECPoint &compare)

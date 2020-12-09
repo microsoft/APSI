@@ -15,14 +15,14 @@
 #include <stdexcept>
 
 // APSI
-#include "apsi/cryptocontext.h"
+#include "apsi/crypto_context.h"
 #include "apsi/item.h"
 #include "apsi/network/channel.h"
 #include "apsi/network/result_package.h"
 #include "apsi/oprf/oprf_receiver.h"
 #include "apsi/powers.h"
-#include "apsi/psiparams.h"
-#include "apsi/sealobject.h"
+#include "apsi/psi_params.h"
+#include "apsi/seal_object.h"
 #include "apsi/util/db_encoding.h"
 
 // GSL
@@ -167,7 +167,7 @@ namespace apsi
             }
 
             /**
-            Performs a parameter request and returns the receiver parameters.
+            Performs a parameter request and returns the received parameters.
             */
             static PSIParams RequestParams(network::Channel &chl);
 

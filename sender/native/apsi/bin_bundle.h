@@ -9,7 +9,7 @@
 #include <cstddef>
 
 // APSI
-#include "apsi/cryptocontext.h"
+#include "apsi/crypto_context.h"
 #include "apsi/util/db_encoding.h"
 
 // SEAL

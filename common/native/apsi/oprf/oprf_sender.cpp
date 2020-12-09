@@ -89,7 +89,10 @@ namespace apsi
                 ecpt.load(ECPoint::point_save_span_const_type{ oprf_in_ptr, oprf_query_size });
 
                 // Multiply with key
-                ecpt.scalar_multiply(oprf_key.key_span());
+                if (!ecpt.scalar_multiply(oprf_key.key_span(), true))
+                {
+                    throw logic_error("scalar multiplication failed due to invalid query data");
+                }
 
                 // Save the result to oprf_responses
                 ecpt.save(ECPoint::point_save_span_type{ oprf_out_ptr, oprf_response_size });
@@ -112,7 +115,7 @@ namespace apsi
                 ECPoint ecpt({ reinterpret_cast<const unsigned char *>(item.data()), oprf_item_size });
 
                 // Multiply with key
-                ecpt.scalar_multiply(oprf_key.key_span());
+                ecpt.scalar_multiply(oprf_key.key_span(), false);
 
                 // Extract the hash
                 oprf_hash_type hash;
@@ -137,7 +140,7 @@ namespace apsi
                 ECPoint ecpt({ reinterpret_cast<const unsigned char *>(item_label_pair.first.data()), oprf_item_size });
 
                 // Multiply with key
-                ecpt.scalar_multiply(oprf_key.key_span());
+                ecpt.scalar_multiply(oprf_key.key_span(), true);
 
                 // Extract the hash
                 pair<oprf_hash_type, FullWidthLabel> hash;

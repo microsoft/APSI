@@ -60,7 +60,7 @@ namespace apsi
 
             static void invert_scalar(scalar_span_const_type in, scalar_span_type out);
 
-            void scalar_multiply(scalar_span_const_type scalar);
+            bool scalar_multiply(scalar_span_const_type scalar, bool clear_cofactor);
 
             bool operator==(const ECPoint &compare);
 

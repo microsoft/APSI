@@ -3,7 +3,7 @@
 #include <utility>
 
 // APSI
-#include "apsi/binbundle.h"
+#include "apsi/bin_bundle.h"
 #include "apsi/logging/log.h"
 #include "apsi/util/interpolate.h"
 

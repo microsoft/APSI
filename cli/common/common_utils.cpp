@@ -13,7 +13,7 @@
 
 // APSI
 #include "common/base_clp.h"
-#include "apsi/psiparams.h"
+#include "apsi/psi_params.h"
 #include "apsi/util/utils.h"
 
 using namespace std;

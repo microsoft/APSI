@@ -14,8 +14,8 @@
 #include "apsi/version.h"
 #include "apsi/zmq/sender_dispatcher.h"
 #include "common/common_utils.h"
-#include "common/csvreader.h"
-#include "sender/senderutils.h"
+#include "common/csv_reader.h"
+#include "sender/sender_utils.h"
 #include "sender/clp.h"
 
 using namespace std;
@@ -121,7 +121,7 @@ int run_sender_dispatcher(const CLP &cmd)
 
     // Run the dispatcher
     atomic<bool> stop = false;
-    SenderDispatcher dispatcher(sender_db, cmd.threads());
+    ZMQSenderDispatcher dispatcher(sender_db, cmd.threads());
 
     // The dispatcher will run until stopped.
     dispatcher.run(stop, cmd.net_port(), oprf_key);

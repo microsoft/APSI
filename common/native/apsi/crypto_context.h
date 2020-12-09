@@ -9,7 +9,7 @@
 #include <utility>
 
 // APSI
-#include "apsi/psiparams.h"
+#include "apsi/psi_params.h"
 
 // SEAL
 #include "seal/context.h"

@@ -8,7 +8,7 @@
 #include <utility>
 
 // APSI
-#include "apsi/binbundle.h"
+#include "apsi/bin_bundle.h"
 
 // SEAL
 #include "seal/keygenerator.h"

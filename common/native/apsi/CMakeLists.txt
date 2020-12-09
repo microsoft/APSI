@@ -4,7 +4,7 @@
 target_sources(common
     PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/powers.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/psiparams.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/psi_params.cpp
 )
 
 # Create the config file
@@ -20,11 +20,11 @@ install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/apsi.h
         ${CMAKE_CURRENT_LIST_DIR}/config.h
-        ${CMAKE_CURRENT_LIST_DIR}/cryptocontext.h
+        ${CMAKE_CURRENT_LIST_DIR}/crypto_context.h
         ${CMAKE_CURRENT_LIST_DIR}/item.h
         ${CMAKE_CURRENT_LIST_DIR}/powers.h
-        ${CMAKE_CURRENT_LIST_DIR}/psiparams.h
-        ${CMAKE_CURRENT_LIST_DIR}/sealobject.h
+        ${CMAKE_CURRENT_LIST_DIR}/psi_params.h
+        ${CMAKE_CURRENT_LIST_DIR}/seal_object.h
         ${CMAKE_CURRENT_LIST_DIR}/version.h
     DESTINATION
         ${PROJECT_INCLUDES_INSTALL_DIR}/apsi

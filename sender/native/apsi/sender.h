@@ -16,15 +16,15 @@
 #include <vector>
 
 // APSI
-#include "apsi/cryptocontext.h"
+#include "apsi/crypto_context.h"
 #include "apsi/item.h"
 #include "apsi/network/channel.h"
 #include "apsi/network/sender_operation.h"
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/powers.h"
-#include "apsi/psiparams.h"
-#include "apsi/sealobject.h"
-#include "apsi/senderdb.h"
+#include "apsi/psi_params.h"
+#include "apsi/seal_object.h"
+#include "apsi/sender_db.h"
 
 // SEAL
 #include "seal/relinkeys.h"

@@ -11,7 +11,7 @@
 
 // APSI
 #include "apsi/receiver.h"
-#include "apsi/network/zmq/network_channel.h"
+#include "apsi/network/zmq/zmq_channel.h"
 
 #include "gtest/gtest.h"
 
@@ -26,8 +26,8 @@ namespace APSITests
 {
     namespace
     {
-        SenderChannel server_;
-        ReceiverChannel client_;
+        ZMQSenderChannel server_;
+        ZMQReceiverChannel client_;
 
         shared_ptr<PSIParams> get_params()
         {
@@ -95,7 +95,7 @@ namespace APSITests
                 // Run until stopped
                 while (!stop_token_)
                 {
-                    unique_ptr<NetworkSenderOperation> sop;
+                    unique_ptr<ZMQSenderOperation> sop;
                     if (!(sop = server_.receive_network_operation(get_context()->seal_context())))
                     {
                         this_thread::sleep_for(50ms);
@@ -124,33 +124,33 @@ namespace APSITests
             }, labels);
         }
 
-        void dispatch_parms(unique_ptr<NetworkSenderOperation> sop)
+        void dispatch_parms(unique_ptr<ZMQSenderOperation> sop)
         {
             // Handle parms request by responding with the default parameters
             auto response_parms = make_unique<SenderOperationResponseParms>();
             response_parms->params = make_unique<PSIParams>(*get_params());
-            auto response = make_unique<NetworkSenderOperationResponse>();
+            auto response = make_unique<ZMQSenderOperationResponse>();
             response->sop_response = move(response_parms);
             response->client_id = move(sop->client_id);
 
             server_.send(move(response));
         }
 
-        void dispatch_oprf(unique_ptr<NetworkSenderOperation> sop)
+        void dispatch_oprf(unique_ptr<ZMQSenderOperation> sop)
         {
             auto sop_oprf = dynamic_cast<SenderOperationOPRF*>(sop->sop.get());
 
             // Respond with exactly the same data we received 
             auto response_oprf = make_unique<SenderOperationResponseOPRF>();
             response_oprf->data = sop_oprf->data;
-            auto response = make_unique<NetworkSenderOperationResponse>();
+            auto response = make_unique<ZMQSenderOperationResponse>();
             response->sop_response = move(response_oprf);
             response->client_id = move(sop->client_id);
 
             server_.send(move(response));
         }
 
-        void dispatch_query(unique_ptr<NetworkSenderOperation> sop, bool labels)
+        void dispatch_query(unique_ptr<ZMQSenderOperation> sop, bool labels)
         {
             auto sop_query = dynamic_cast<SenderOperationQuery*>(sop->sop.get());
 
@@ -159,7 +159,7 @@ namespace APSITests
 
             auto response_query = make_unique<SenderOperationResponseQuery>();
             response_query->package_count = package_count;
-            auto response = make_unique<NetworkSenderOperationResponse>();
+            auto response = make_unique<ZMQSenderOperationResponse>();
             response->sop_response = move(response_query);
             response->client_id = sop->client_id;
 
@@ -185,7 +185,7 @@ namespace APSITests
                 // Always add PSI result
                 rp->psi_result = move(ct);
 
-                auto nrp = make_unique<NetworkResultPackage>();
+                auto nrp = make_unique<ZMQResultPackage>();
                 nrp->rp = move(rp);
                 nrp->client_id = sop->client_id;
                 server_.send(move(nrp));

@@ -8,7 +8,7 @@
 #include <cstdint>
 
 // APSI
-#include "apsi/psiparams.h"
+#include "apsi/psi_params.h"
 #include "apsi/network/result_package.h"
 #include "apsi/network/sender_operation.h"
 

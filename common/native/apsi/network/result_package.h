@@ -16,8 +16,8 @@
 #include "seal/ciphertext.h"
 
 // APSI
-#include "apsi/cryptocontext.h"
-#include "apsi/sealobject.h"
+#include "apsi/crypto_context.h"
+#include "apsi/seal_object.h"
 
 namespace apsi
 {

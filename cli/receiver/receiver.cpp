@@ -10,11 +10,11 @@
 
 // APSI
 #include "apsi/receiver.h"
-#include "apsi/network/zmq/network_channel.h"
+#include "apsi/network/zmq/zmq_channel.h"
 #include "apsi/logging/log.h"
 #include "apsi/version.h"
 #include "common/common_utils.h"
-#include "common/csvreader.h"
+#include "common/csv_reader.h"
 #include "receiver/clp.h"
 
 using namespace std;
@@ -78,7 +78,7 @@ int remote_query(const CLP& cmd)
     print_example_banner("Starting APSI Example Receiver");
 
     // Connect to the network
-    ReceiverChannel channel;
+    ZMQReceiverChannel channel;
 
     string conn_addr = get_conn_addr(cmd);
     APSI_LOG_INFO("Connecting to " << conn_addr);

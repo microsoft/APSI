@@ -11,7 +11,7 @@
 #include "seal/publickey.h"
 
 // APSI
-#include "apsi/network/zmq/network_channel.h"
+#include "apsi/network/zmq/zmq_channel.h"
 #include "apsi/powers.h"
 #include "apsi/util/utils.h"
 
@@ -26,8 +26,8 @@ namespace APSITests
 {
     namespace
     {
-        SenderChannel server_;
-        ReceiverChannel client_;
+        ZMQSenderChannel server_;
+        ZMQReceiverChannel client_;
 
         shared_ptr<PSIParams> get_params()
         {
@@ -75,10 +75,10 @@ namespace APSITests
         }
     } // namespace
 
-    class NetworkChannelTests : public ::testing::Test
+    class ZMQChannelTests : public ::testing::Test
     {
     protected:
-        NetworkChannelTests()
+        ZMQChannelTests()
         {
             if (!server_.is_connected())
             {
@@ -94,7 +94,7 @@ namespace APSITests
             (void)get_context();
         }
 
-        ~NetworkChannelTests()
+        ~ZMQChannelTests()
         {
             // Do not disconnect, as the Constructor / Destructor is called for every test.
             // if (client_.is_connected())
@@ -105,10 +105,10 @@ namespace APSITests
         }
     };
 
-    TEST_F(NetworkChannelTests, ThrowWithoutConnectTest)
+    TEST_F(ZMQChannelTests, ThrowWithoutConnectTest)
     {
-        // SenderChannel and ReceiverChannel are identical for the purposes of this test
-        SenderChannel mychannel;
+        // ZMQSenderChannel and ZMQReceiverChannel are identical for the purposes of this test
+        ZMQSenderChannel mychannel;
 
         // Receives
         ASSERT_THROW(mychannel.receive_operation(nullptr), runtime_error);
@@ -118,16 +118,16 @@ namespace APSITests
 
         // Sends
         ASSERT_THROW(mychannel.send(make_unique<ResultPackage>()), runtime_error);
-        ASSERT_THROW(mychannel.send(make_unique<NetworkResultPackage>()), runtime_error);
+        ASSERT_THROW(mychannel.send(make_unique<ZMQResultPackage>()), runtime_error);
         ASSERT_THROW(mychannel.send(make_unique<SenderOperationParms>()), runtime_error);
         ASSERT_THROW(mychannel.send(make_unique<SenderOperationResponseParms>()), runtime_error);
-        ASSERT_THROW(mychannel.send(make_unique<NetworkSenderOperationResponse>()), runtime_error);
+        ASSERT_THROW(mychannel.send(make_unique<ZMQSenderOperationResponse>()), runtime_error);
     }
 
-    TEST_F(NetworkChannelTests, ClientServerFullSession)
+    TEST_F(ZMQChannelTests, ClientServerFullSession)
     {
-        SenderChannel svr;
-        ReceiverChannel clt;
+        ZMQSenderChannel svr;
+        ZMQReceiverChannel clt;
 
         svr.bind("tcp://*:5554");
         clt.connect("tcp://localhost:5554");
@@ -257,8 +257,8 @@ namespace APSITests
         auto rsop_parms = make_unique<SenderOperationResponseParms>();
         rsop_parms->params = make_unique<PSIParams>(*get_params());
 
-        // Actually we need a NetworkSenderOperationResponse for ZeroMQ; we'll need to use the correct client_id here.
-        auto nrsop = make_unique<NetworkSenderOperationResponse>();
+        // Actually we need a ZMQSenderOperationResponse for ZeroMQ; we'll need to use the correct client_id here.
+        auto nrsop = make_unique<ZMQSenderOperationResponse>();
         nrsop->client_id = client_id;
         nrsop->sop_response = move(rsop_parms);
 
@@ -269,7 +269,7 @@ namespace APSITests
         // Send again so receiver actually gets it
         rsop_parms = make_unique<SenderOperationResponseParms>();
         rsop_parms->params = make_unique<PSIParams>(*get_params());
-        nrsop = make_unique<NetworkSenderOperationResponse>();
+        nrsop = make_unique<ZMQSenderOperationResponse>();
         nrsop->client_id = client_id;
         nrsop->sop_response = move(rsop_parms);
         svr.send(move(nrsop));
@@ -277,7 +277,7 @@ namespace APSITests
         // Create an OPRF response and response with the same data we received
         auto rsop_oprf = make_unique<SenderOperationResponseOPRF>();
         rsop_oprf->data = sop_oprf->data;
-        nrsop = make_unique<NetworkSenderOperationResponse>();
+        nrsop = make_unique<ZMQSenderOperationResponse>();
         nrsop->client_id = client_id;
         nrsop->sop_response = move(rsop_oprf);
         svr.send(move(nrsop));
@@ -285,16 +285,16 @@ namespace APSITests
         // Create a query response; we will return two packages
         auto rsop_query = make_unique<SenderOperationResponseQuery>();
         rsop_query->package_count = 2;
-        nrsop = make_unique<NetworkSenderOperationResponse>();
+        nrsop = make_unique<ZMQSenderOperationResponse>();
         nrsop->client_id = client_id;
         nrsop->sop_response = move(rsop_query);
         svr.send(move(nrsop));
         
-        // Finally send two NetworkResultPackages
+        // Finally send two ZMQResultPackages
         auto rp = make_unique<ResultPackage>();
         rp->bundle_idx = 0;
         rp->psi_result = query_ct0;
-        auto nrp = make_unique<NetworkResultPackage>();
+        auto nrp = make_unique<ZMQResultPackage>();
         nrp->client_id = client_id;
         nrp->rp = move(rp);
         svr.send(move(nrp));
@@ -303,7 +303,7 @@ namespace APSITests
         rp->bundle_idx = 123;
         rp->psi_result = query_ct123;
         rp->label_result.push_back(query_ct123);
-        nrp = make_unique<NetworkResultPackage>();
+        nrp = make_unique<ZMQResultPackage>();
         nrp->client_id = client_id;
         nrp->rp = move(rp);
         svr.send(move(nrp));
@@ -311,18 +311,18 @@ namespace APSITests
         clientth.join();
     }
 
-    TEST_F(NetworkChannelTests, MultipleClientsTest)
+    TEST_F(ZMQChannelTests, MultipleClientsTest)
     {
         atomic<bool> finished = false;
 
         thread serverth([this, &finished] {
-            SenderChannel sender;
+            ZMQSenderChannel sender;
 
             sender.bind("tcp://*:5552");
 
             while (!finished)
             {
-                unique_ptr<NetworkSenderOperation> sop;
+                unique_ptr<ZMQSenderOperation> sop;
                 if (!(sop = sender.receive_network_operation(get_context()->seal_context())))
                 {
                     this_thread::sleep_for(50ms);
@@ -337,7 +337,7 @@ namespace APSITests
                 // Return the same data we received
                 auto rsop_oprf = make_unique<SenderOperationResponseOPRF>();
                 rsop_oprf->data = sop_oprf->data;
-                auto sopr = make_unique<NetworkSenderOperationResponse>();
+                auto sopr = make_unique<ZMQSenderOperationResponse>();
                 sopr->client_id = client_id;
                 sopr->sop_response = move(rsop_oprf);
 
@@ -351,7 +351,7 @@ namespace APSITests
         {
             clients[i] = thread(
                 [this](size_t idx) {
-                    ReceiverChannel recv;
+                    ZMQReceiverChannel recv;
 
                     recv.connect("tcp://localhost:5552");
 

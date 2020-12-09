@@ -11,13 +11,13 @@
 
 // APSI
 #include "apsi/sender.h"
-#include "apsi/psiparams.h"
+#include "apsi/psi_params.h"
 #include "apsi/network/channel.h"
 #include "apsi/network/result_package.h"
-#include "apsi/sealobject.h"
+#include "apsi/seal_object.h"
 #include "apsi/logging/log.h"
 #include "apsi/util/utils.h"
-#include "apsi/cryptocontext.h"
+#include "apsi/crypto_context.h"
 #include "apsi/util/stopwatch.h"
 
 // SEAL
@@ -214,7 +214,18 @@ namespace apsi
 
             // OPRF response has the same size as the OPRF query 
             vector<seal_byte> oprf_result(oprf_request.data_.size());
-            OPRFSender::ProcessQueries(oprf_request.data_, key, oprf_result);
+            try
+            {
+                OPRFSender::ProcessQueries(oprf_request.data_, key, oprf_result);
+            }
+            catch (const exception &ex)
+            {
+                // Something was wrong with the OPRF request. This can mean malicious
+                // data being sent to the sender in an attempt to extract OPRF key.
+                // Best not to respond anything.
+                APSI_LOG_WARNING("Processing OPRF request threw an exception: " << ex.what());
+                return;
+            }
 
             auto response_oprf = make_unique<SenderOperationResponseOPRF>();
             response_oprf->data = move(oprf_result);

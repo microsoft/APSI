@@ -8,6 +8,6 @@
 
 // APSI
 #include "sender/clp.h"
-#include "apsi/psiparams.h"
+#include "apsi/psi_params.h"
 
 std::unique_ptr<apsi::PSIParams> build_psi_params(const CLP &cmd);

@@ -9,7 +9,7 @@
 #include <iterator>
 
 // APSI
-#include "apsi/network/zmq/network_channel.h"
+#include "apsi/network/zmq/zmq_channel.h"
 #include "apsi/network/sop_header_generated.h"
 #include "apsi/network/sop_generated.h"
 #include "apsi/network/result_package_generated.h"
@@ -78,11 +78,11 @@ namespace apsi
             }
         }
 
-        NetworkChannel::NetworkChannel()
+        ZMQChannel::ZMQChannel()
             : end_point_(""), context_(make_unique<context_t>())
         {}
 
-        NetworkChannel::~NetworkChannel()
+        ZMQChannel::~ZMQChannel()
         {
             if (is_connected())
             {
@@ -90,7 +90,7 @@ namespace apsi
             }
         }
 
-        void NetworkChannel::bind(const string &end_point)
+        void ZMQChannel::bind(const string &end_point)
         {
             throw_if_connected();
 
@@ -98,7 +98,7 @@ namespace apsi
             get_socket()->bind(end_point);
         }
 
-        void NetworkChannel::connect(const string &end_point)
+        void ZMQChannel::connect(const string &end_point)
         {
             throw_if_connected();
 
@@ -106,7 +106,7 @@ namespace apsi
             get_socket()->connect(end_point);
         }
 
-        void NetworkChannel::disconnect()
+        void ZMQChannel::disconnect()
         {
             throw_if_not_connected();
 
@@ -122,7 +122,7 @@ namespace apsi
             context_.reset();
         }
 
-        void NetworkChannel::throw_if_not_connected() const
+        void ZMQChannel::throw_if_not_connected() const
         {
             if (!is_connected())
             {
@@ -130,7 +130,7 @@ namespace apsi
             }
         }
 
-        void NetworkChannel::throw_if_connected() const
+        void ZMQChannel::throw_if_connected() const
         {
             if (is_connected())
             {
@@ -138,7 +138,7 @@ namespace apsi
             }
         }
 
-        void NetworkChannel::send(unique_ptr<SenderOperation> sop)
+        void ZMQChannel::send(unique_ptr<SenderOperation> sop)
         {
             throw_if_not_connected();
 
@@ -163,7 +163,7 @@ namespace apsi
             bytes_sent_ += bytes_sent;
         }
 
-        unique_ptr<NetworkSenderOperation> NetworkChannel::receive_network_operation(
+        unique_ptr<ZMQSenderOperation> ZMQChannel::receive_network_operation(
             shared_ptr<SEALContext> context, bool wait_for_message, SenderOperationType expected)
         {
             throw_if_not_connected();
@@ -243,28 +243,28 @@ namespace apsi
                 return nullptr;
             }
 
-            // Loaded successfully; set up NetworkSenderOperation package
-            auto n_sop = make_unique<NetworkSenderOperation>();
+            // Loaded successfully; set up ZMQSenderOperation package
+            auto n_sop = make_unique<ZMQSenderOperation>();
             n_sop->client_id = move(client_id);
             n_sop->sop = move(sop);
 
             return n_sop;
         }
 
-        unique_ptr<NetworkSenderOperation> NetworkChannel::receive_network_operation(
+        unique_ptr<ZMQSenderOperation> ZMQChannel::receive_network_operation(
             shared_ptr<SEALContext> context, SenderOperationType expected)
         {
             return receive_network_operation(move(context), false, expected);
         }
 
-        unique_ptr<SenderOperation> NetworkChannel::receive_operation(
+        unique_ptr<SenderOperation> ZMQChannel::receive_operation(
             shared_ptr<SEALContext> context, SenderOperationType expected)
         {
             // Ignore the client_id
             return move(receive_network_operation(move(context), expected)->sop);
         }
 
-        void NetworkChannel::send(unique_ptr<NetworkSenderOperationResponse> sop_response)
+        void ZMQChannel::send(unique_ptr<ZMQSenderOperationResponse> sop_response)
         {
             throw_if_not_connected();
 
@@ -292,16 +292,16 @@ namespace apsi
             bytes_sent_ += bytes_sent;
         }
 
-        void NetworkChannel::send(unique_ptr<SenderOperationResponse> sop_response)
+        void ZMQChannel::send(unique_ptr<SenderOperationResponse> sop_response)
         {
             // Leave the client_id empty
-            auto n_sop_response = make_unique<NetworkSenderOperationResponse>();
+            auto n_sop_response = make_unique<ZMQSenderOperationResponse>();
             n_sop_response->sop_response = move(sop_response);
 
             send(move(n_sop_response));
         }
 
-        unique_ptr<SenderOperationResponse> NetworkChannel::receive_response(SenderOperationType expected)
+        unique_ptr<SenderOperationResponse> ZMQChannel::receive_response(SenderOperationType expected)
         {
             throw_if_not_connected();
 
@@ -376,7 +376,7 @@ namespace apsi
             return sop_response;
         }
 
-        void NetworkChannel::send(unique_ptr<NetworkResultPackage> rp)
+        void ZMQChannel::send(unique_ptr<ZMQResultPackage> rp)
         {
             throw_if_not_connected();
 
@@ -391,16 +391,16 @@ namespace apsi
             bytes_sent_ += bytes_sent;
         }
 
-        void NetworkChannel::send(unique_ptr<ResultPackage> rp)
+        void ZMQChannel::send(unique_ptr<ResultPackage> rp)
         {
             // Leave the client_id empty
-            auto n_rp = make_unique<NetworkResultPackage>();
+            auto n_rp = make_unique<ZMQResultPackage>();
             n_rp->rp = move(rp);
 
             send(move(n_rp));
         }
 
-        unique_ptr<ResultPackage> NetworkChannel::receive_result_package(shared_ptr<SEALContext> context)
+        unique_ptr<ResultPackage> ZMQChannel::receive_result_package(shared_ptr<SEALContext> context)
         {
             throw_if_not_connected();
 
@@ -434,7 +434,7 @@ namespace apsi
             return rp;
         }
 
-        bool NetworkChannel::receive_message(multipart_t &msg, bool wait_for_message)
+        bool ZMQChannel::receive_message(multipart_t &msg, bool wait_for_message)
         {
             lock_guard<mutex> lock(receive_mutex_);
 
@@ -451,7 +451,7 @@ namespace apsi
             return received;
         }
 
-        void NetworkChannel::send_message(multipart_t &msg)
+        void ZMQChannel::send_message(multipart_t &msg)
         {
             lock_guard<mutex> lock(send_mutex_);
 
@@ -463,7 +463,7 @@ namespace apsi
             }
         }
 
-        unique_ptr<socket_t> &NetworkChannel::get_socket()
+        unique_ptr<socket_t> &ZMQChannel::get_socket()
         {
             if (nullptr == socket_)
             {
@@ -474,32 +474,32 @@ namespace apsi
             return socket_;
         }
 
-        zmq::socket_type ReceiverChannel::get_socket_type()
+        zmq::socket_type ZMQReceiverChannel::get_socket_type()
         {
             return zmq::socket_type::dealer;
         }
 
-        void ReceiverChannel::set_socket_options(socket_t *socket)
+        void ZMQReceiverChannel::set_socket_options(socket_t *socket)
         {
             // Ensure messages are not dropped
             socket->set(sockopt::rcvhwm, 70000);
 
-            shared_ptr<UniformRandomGeneratorFactory> factory = make_shared<seal::Shake256PRNGFactory>();
+            auto factory = seal::UniformRandomGeneratorFactory::DefaultFactory();
             auto prng = factory->create();
             string buf;
             buf.resize(32);
             prng->generate(buf.size(), reinterpret_cast<seal_byte*>(buf.data()));
-            // make sure first byte is _not_ zero, as that has a special meaning for ZMQ
+            // make sure first byte is _not_ zero, as that has a special meaning for ZeroMQ
             *buf.data() = 'A';
             socket->set(sockopt::routing_id, buf);
         }
 
-        zmq::socket_type SenderChannel::get_socket_type()
+        zmq::socket_type ZMQSenderChannel::get_socket_type()
         {
             return zmq::socket_type::router;
         }
 
-        void SenderChannel::set_socket_options(socket_t *socket)
+        void ZMQSenderChannel::set_socket_options(socket_t *socket)
         {
             // Ensure messages are not dropped
             socket->set(sockopt::sndhwm, 70000);

@@ -3,9 +3,9 @@
 
 target_sources(sender
     PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/binbundle.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/bin_bundle.cpp
         ${CMAKE_CURRENT_LIST_DIR}/sender.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/senderdb.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/sender_db.cpp
 )
 
 if(APSI_USE_ZMQ)
@@ -14,9 +14,9 @@ endif()
 
 install(
     FILES
-        ${CMAKE_CURRENT_LIST_DIR}/binbundle.h
+        ${CMAKE_CURRENT_LIST_DIR}/bin_bundle.h
         ${CMAKE_CURRENT_LIST_DIR}/sender.h
-        ${CMAKE_CURRENT_LIST_DIR}/senderdb.h
+        ${CMAKE_CURRENT_LIST_DIR}/sender_db.h
     DESTINATION
         ${PROJECT_INCLUDES_INSTALL_DIR}/apsi
 )

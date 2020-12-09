@@ -26,7 +26,7 @@ namespace apsi
 
     namespace sender
     {
-        SenderDispatcher::SenderDispatcher(shared_ptr<SenderDB> sender_db, size_t thread_count) :
+        ZMQSenderDispatcher::ZMQSenderDispatcher(shared_ptr<SenderDB> sender_db, size_t thread_count) :
             sender_db_(std::move(sender_db))
         {
             if (!sender_db_)
@@ -36,15 +36,15 @@ namespace apsi
             thread_count_ = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
         }
 
-        void SenderDispatcher::run(
+        void ZMQSenderDispatcher::run(
             const atomic<bool> &stop, int port, shared_ptr<const OPRFKey> oprf_key)
         {
-            SenderChannel chl;
+            ZMQSenderChannel chl;
 
             stringstream ss;
             ss << "tcp://*:" << port;
 
-            APSI_LOG_INFO("SenderDispatcher listening on port " << port);
+            APSI_LOG_INFO("ZMQSenderDispatcher listening on port " << port);
             chl.bind(ss.str());
 
             oprf_key_ = move(oprf_key);
@@ -55,7 +55,7 @@ namespace apsi
             bool logged_waiting = false;
             while (!stop)
             {
-                unique_ptr<NetworkSenderOperation> sop;
+                unique_ptr<ZMQSenderOperation> sop;
                 if (!(sop = chl.receive_network_operation(seal_context)))
                 {
                     if (!logged_waiting)
@@ -98,9 +98,9 @@ namespace apsi
             }
         }
 
-        void SenderDispatcher::dispatch_parms(unique_ptr<NetworkSenderOperation> sop, SenderChannel &chl)
+        void ZMQSenderDispatcher::dispatch_parms(unique_ptr<ZMQSenderOperation> sop, ZMQSenderChannel &chl)
         {
-            STOPWATCH(sender_stopwatch, "SenderDispatcher::dispatch_params");
+            STOPWATCH(sender_stopwatch, "ZMQSenderDispatcher::dispatch_params");
             
             try
             {
@@ -109,23 +109,23 @@ namespace apsi
 
                 Sender::RunParms(move(parms_request), sender_db_, chl,
                     [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
-                        auto nsop_response = make_unique<NetworkSenderOperationResponse>();
+                        auto nsop_response = make_unique<ZMQSenderOperationResponse>();
                         nsop_response->sop_response = move(sop_response);
                         nsop_response->client_id = move(sop->client_id);
 
                         // We know for sure that the channel is a SenderChannel so use static_cast
-                        static_cast<SenderChannel&>(c).send(move(nsop_response));
+                        static_cast<ZMQSenderChannel&>(c).send(move(nsop_response));
                     });
             }
-            catch (const exception &e)
+            catch (const exception &ex)
             {
-                APSI_LOG_ERROR("APSI threw an exception while processing parameter request: " << e.what());
+                APSI_LOG_ERROR("APSI threw an exception while processing parameter request: " << ex.what());
             }
         }
 
-        void SenderDispatcher::dispatch_oprf(unique_ptr<NetworkSenderOperation> sop, SenderChannel &chl)
+        void ZMQSenderDispatcher::dispatch_oprf(unique_ptr<ZMQSenderOperation> sop, ZMQSenderChannel &chl)
         {
-            STOPWATCH(sender_stopwatch, "SenderDispatcher::dispatch_oprf");
+            STOPWATCH(sender_stopwatch, "ZMQSenderDispatcher::dispatch_oprf");
 
             try
             {
@@ -134,23 +134,23 @@ namespace apsi
 
                 Sender::RunOPRF(move(oprf_request), *oprf_key_, chl,
                     [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
-                        auto nsop_response = make_unique<NetworkSenderOperationResponse>();
+                        auto nsop_response = make_unique<ZMQSenderOperationResponse>();
                         nsop_response->sop_response = move(sop_response);
                         nsop_response->client_id = move(sop->client_id);
 
                         // We know for sure that the channel is a SenderChannel so use static_cast
-                        static_cast<SenderChannel&>(c).send(move(nsop_response));
+                        static_cast<ZMQSenderChannel&>(c).send(move(nsop_response));
                     });
             }
-            catch (const exception &e)
+            catch (const exception &ex)
             {
-                APSI_LOG_ERROR("APSI threw an exception while processing OPRF query: " << e.what());
+                APSI_LOG_ERROR("APSI threw an exception while processing OPRF query: " << ex.what());
             }
         }
 
-        void SenderDispatcher::dispatch_query(unique_ptr<NetworkSenderOperation> sop, SenderChannel &chl)
+        void ZMQSenderDispatcher::dispatch_query(unique_ptr<ZMQSenderOperation> sop, ZMQSenderChannel &chl)
         {
-            STOPWATCH(sender_stopwatch, "SenderDispatcher::dispatch_query");
+            STOPWATCH(sender_stopwatch, "ZMQSenderDispatcher::dispatch_query");
 
             try
             {
@@ -161,26 +161,26 @@ namespace apsi
                 Sender::RunQuery(move(query_request), chl, thread_count_,
                     // Lambda function for sending the query response
                     [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
-                        auto nsop_response = make_unique<NetworkSenderOperationResponse>();
+                        auto nsop_response = make_unique<ZMQSenderOperationResponse>();
                         nsop_response->sop_response = move(sop_response);
                         nsop_response->client_id = sop->client_id;
 
                         // We know for sure that the channel is a SenderChannel so use static_cast
-                        static_cast<SenderChannel&>(c).send(move(nsop_response));
+                        static_cast<ZMQSenderChannel&>(c).send(move(nsop_response));
                     },
                     // Lambda function for sending the ResultPackages
                     [&sop](Channel &c, unique_ptr<ResultPackage> rp) {
-                        auto nrp = make_unique<NetworkResultPackage>();
+                        auto nrp = make_unique<ZMQResultPackage>();
                         nrp->rp = move(rp);
                         nrp->client_id = sop->client_id;
 
                         // We know for sure that the channel is a SenderChannel so use static_cast
-                        static_cast<SenderChannel&>(c).send(move(nrp));
+                        static_cast<ZMQSenderChannel&>(c).send(move(nrp));
                     });
             }
-            catch (const exception &e)
+            catch (const exception &ex)
             {
-                APSI_LOG_ERROR("APSI threw an exception while processing query: " << e.what());
+                APSI_LOG_ERROR("APSI threw an exception while processing query: " << ex.what());
             }
         }
     } // namespace sender

@@ -16,6 +16,7 @@ endif()
 install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/channel.h
+        ${CMAKE_CURRENT_LIST_DIR}/network_channel.h
         ${CMAKE_CURRENT_LIST_DIR}/result_package.h
         ${CMAKE_CURRENT_LIST_DIR}/sender_operation.h
         ${CMAKE_CURRENT_LIST_DIR}/sender_operation_response.h

@@ -3,5 +3,5 @@
 
 target_sources(unit_tests
     PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/network_channel.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/zmq_channel.cpp
 )
