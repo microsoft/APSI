@@ -29,23 +29,17 @@ namespace apsi
         public:
             OPRFReceiver(const OPRFReceiver &) = delete;
 
+            OPRFReceiver(OPRFReceiver &&) = default;
+
             OPRFReceiver &operator=(const OPRFReceiver &) = delete;
 
-            OPRFReceiver(
-                gsl::span<const oprf_item_type> oprf_items,
-                gsl::span<seal::seal_byte> oprf_queries)
-            {
-                process_items(oprf_items, oprf_queries);
-            }
+            OPRFReceiver &operator=(OPRFReceiver &&) = default;
 
-            OPRFReceiver(
-                const std::unordered_set<oprf_item_type> &oprf_items,
-                gsl::span<seal::seal_byte> oprf_queries)
+            OPRFReceiver(gsl::span<const oprf_item_type> oprf_items) : oprf_queries_(pool_), inv_factor_data_(pool_)
             {
-                std::vector oprf_items_vec(oprf_items.begin(), oprf_items.end());
-                process_items(oprf_items_vec, oprf_queries);
+                process_items(oprf_items);
             }
-
+            
             inline std::size_t item_count() const noexcept
             {
                 return inv_factor_data_.item_count();
@@ -55,10 +49,15 @@ namespace apsi
                 gsl::span<const seal::seal_byte> oprf_responses,
                 gsl::span<oprf_hash_type> oprf_hashes) const;
 
+            void clear();
+
+            std::vector<seal::seal_byte> query_data() const;
+
         private:
+            void set_item_count(std::size_t item_count);
+
             void process_items(
-                gsl::span<const oprf_item_type> oprf_items,
-                gsl::span<seal::seal_byte> oprf_queries);
+                gsl::span<const oprf_item_type> oprf_items);
 
             // For decrypting OPRF response
             class FactorData
@@ -66,7 +65,7 @@ namespace apsi
             public:
                 static constexpr std::size_t factor_size = ECPoint::order_size;
 
-                FactorData(std::size_t item_count = 0)
+                FactorData(seal::MemoryPoolHandle pool, std::size_t item_count = 0) : factor_data_(std::move(pool))
                 {
                     resize(item_count);
                 }
@@ -75,23 +74,15 @@ namespace apsi
 
                 FactorData(const FactorData &) = delete;
 
+                FactorData(FactorData &&) = default;
+
                 FactorData &operator=(const FactorData &) = delete;
 
-                inline void resize(std::size_t item_count = 0)
-                {
-                    item_count_ = item_count;
-                    factor_data_.resize(item_count * factor_size);
-                }
+                FactorData &operator=(FactorData &&) = default;
 
                 inline std::size_t item_count() const noexcept
                 {
                     return item_count_;
-                }
-
-                inline void clear()
-                {
-                    factor_data_ = { seal::MemoryManager::GetPool(seal::mm_prof_opt::mm_force_new, true) };
-                    item_count_ = 0;
                 }
 
                 auto get_factor(std::size_t index) -> ECPoint::scalar_span_type
@@ -115,16 +106,20 @@ namespace apsi
                 }
 
             private:
-                seal::DynArray<unsigned char> factor_data_{ seal::MemoryManager::GetPool(
-                    seal::mm_prof_opt::mm_force_new, true) };
+                inline void resize(std::size_t item_count)
+                {
+                    item_count_ = item_count;
+                    factor_data_.resize(item_count * factor_size);
+                }
+
+                seal::DynArray<unsigned char> factor_data_;
 
                 std::size_t item_count_ = 0;
             };
 
-            inline void set_item_count(std::size_t item_count)
-            {
-                inv_factor_data_.resize(item_count);
-            }
+            seal::MemoryPoolHandle pool_ = seal::MemoryManager::GetPool(seal::mm_prof_opt::mm_force_new, true);
+
+            seal::DynArray<seal::seal_byte> oprf_queries_;
 
             FactorData inv_factor_data_;
         }; // class OPRFReceiver

@@ -104,15 +104,15 @@ namespace APSITests
 
                     switch (sop->sop->type())
                     {
-                    case SenderOperationType::SOP_PARMS:
+                    case SenderOperationType::sop_parms:
                         dispatch_parms(move(sop));
                         break;
 
-                    case SenderOperationType::SOP_OPRF:
+                    case SenderOperationType::sop_oprf:
                         dispatch_oprf(move(sop));
                         break;
 
-                    case SenderOperationType::SOP_QUERY:
+                    case SenderOperationType::sop_query:
                         dispatch_query(move(sop), labels);
                         break;
 
@@ -267,27 +267,26 @@ namespace APSITests
         start_sender();
 
         vector<Item> items;
-        Receiver recv(*get_params());
-        auto hashed_items = recv.request_oprf(items, client_);
+        auto hashed_items = Receiver::RequestOPRF(items, client_);
         ASSERT_TRUE(hashed_items.empty());
 
         // A single item
         items.push_back(make_item(0, 0));
-        hashed_items = recv.request_oprf(items, client_);
+        hashed_items = Receiver::RequestOPRF(items, client_);
         ASSERT_EQ(1, hashed_items.size());
         ASSERT_NE(hashed_items[0][0], items[0][0]);
         ASSERT_NE(hashed_items[0][1], items[0][1]);
 
         // Same item repeating
         items.push_back(make_item(0, 0));
-        hashed_items = recv.request_oprf(items, client_);
+        hashed_items = Receiver::RequestOPRF(items, client_);
         ASSERT_EQ(2, hashed_items.size());
         ASSERT_EQ(hashed_items[0][0], hashed_items[1][0]);
         ASSERT_EQ(hashed_items[0][1], hashed_items[1][1]);
 
         // Two different items
         items[1][0] = 1;
-        hashed_items = recv.request_oprf(items, client_);
+        hashed_items = Receiver::RequestOPRF(items, client_);
         ASSERT_EQ(2, hashed_items.size());
         ASSERT_NE(hashed_items[0][0], hashed_items[1][0]);
         ASSERT_NE(hashed_items[0][1], hashed_items[1][1]);
@@ -306,27 +305,24 @@ namespace APSITests
 
         // Empty query; empty response
         vector<HashedItem> items;
-        auto query = recv.create_query(items);
-        auto result = recv.request_query(move(query), client_);
+        auto result = recv.request_query(items, client_);
 
         ASSERT_TRUE(result.empty());
 
         // Cannot query the empty item
         items.push_back(HashedItem{make_zero_item()});
-        ASSERT_THROW(query = recv.create_query(items), invalid_argument);
+        ASSERT_THROW(recv.request_query(items, client_), invalid_argument);
 
         // Query a single non-empty item
         items[0][0] = 1;
-        query = recv.create_query(items);
-        result = recv.request_query(move(query), client_);
+        result = recv.request_query(items, client_);
         ASSERT_EQ(1, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_FALSE(result[0].label);
 
         // Query a single non-empty item
         items[0][0] = 2;
-        query = recv.create_query(items);
-        result = recv.request_query(move(query), client_);
+        result = recv.request_query(items, client_);
         ASSERT_EQ(1, result.size());
         ASSERT_FALSE(result[0].found);
         ASSERT_FALSE(result[0].label);
@@ -335,8 +331,7 @@ namespace APSITests
         items.push_back(HashedItem{make_zero_item()});
         items[0][0] = 1;
         items[1][0] = 2;
-        query = recv.create_query(items);
-        result = recv.request_query(move(query), client_);
+        result = recv.request_query(items, client_);
         ASSERT_EQ(2, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_FALSE(result[1].found);
@@ -357,26 +352,23 @@ namespace APSITests
 
         // Empty query; empty response
         vector<HashedItem> items;
-        auto query = recv.create_query(items);
-        auto result = recv.request_query(move(query), client_);
+        auto result = recv.request_query(items, client_);
         ASSERT_TRUE(result.empty());
 
         // Cannot query the empty item
         items.push_back(HashedItem{make_zero_item()});
-        ASSERT_THROW(query = recv.create_query(items), invalid_argument);
+        ASSERT_THROW(recv.request_query(items, client_), invalid_argument);
 
         // Query a single non-empty item
         items[0][0] = 1;
-        query = recv.create_query(items);
-        result = recv.request_query(move(query), client_);
+        result = recv.request_query(items, client_);
         ASSERT_EQ(1, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_FALSE(result[0].label);
 
         // Query a single non-empty item
         items[0][0] = 2;
-        query = recv.create_query(items);
-        result = recv.request_query(move(query), client_);
+        result = recv.request_query(items, client_);
         ASSERT_EQ(1, result.size());
         ASSERT_FALSE(result[0].found);
         ASSERT_FALSE(result[0].label);
@@ -385,8 +377,7 @@ namespace APSITests
         items.push_back(HashedItem{make_zero_item()});
         items[0][0] = 1;
         items[1][0] = 2;
-        query = recv.create_query(items);
-        result = recv.request_query(move(query), client_);
+        result = recv.request_query(items, client_);
         ASSERT_EQ(2, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_FALSE(result[1].found);
@@ -408,18 +399,16 @@ namespace APSITests
 
         // Empty query; empty response
         vector<HashedItem> items;
-        auto query = recv.create_query(items);
-        auto result = recv.request_query(move(query), client_);
+        auto result = recv.request_query(items, client_);
         ASSERT_TRUE(result.empty());
 
         // Cannot query the empty item
         items.push_back(HashedItem{make_zero_item()});
-        ASSERT_THROW(query = recv.create_query(items), invalid_argument);
+        ASSERT_THROW(recv.request_query(items, client_), invalid_argument);
 
         // Query a single non-empty item
         items[0][0] = 1;
-        query = recv.create_query(items);
-        result = recv.request_query(move(query), client_);
+        result = recv.request_query(items, client_);
         ASSERT_EQ(1, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_TRUE(result[0].label);
@@ -429,8 +418,7 @@ namespace APSITests
 
         // Query a single non-empty item
         items[0][0] = 2;
-        query = recv.create_query(items);
-        result = recv.request_query(move(query), client_);
+        result = recv.request_query(items, client_);
         ASSERT_EQ(1, result.size());
         ASSERT_FALSE(result[0].found);
         ASSERT_FALSE(result[0].label);
@@ -439,8 +427,7 @@ namespace APSITests
         items.push_back(HashedItem{make_zero_item()});
         items[0][0] = 1;
         items[1][0] = 2;
-        query = recv.create_query(items);
-        result = recv.request_query(move(query), client_);
+        result = recv.request_query(items, client_);
         ASSERT_EQ(2, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_TRUE(result[0].label);
@@ -465,18 +452,16 @@ namespace APSITests
 
         // Empty query; empty response
         vector<HashedItem> items;
-        auto query = recv.create_query(items);
-        auto result = recv.request_query(move(query), client_);
+        auto result = recv.request_query(items, client_);
         ASSERT_TRUE(result.empty());
 
         // Cannot query the empty item
         items.push_back(HashedItem{make_zero_item()});
-        ASSERT_THROW(query = recv.create_query(items), invalid_argument);
+        ASSERT_THROW(recv.request_query(items, client_), invalid_argument);
 
         // Query a single non-empty item
         items[0][0] = 1;
-        query = recv.create_query(items);
-        result = recv.request_query(move(query), client_);
+        result = recv.request_query(items, client_);
         ASSERT_EQ(1, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_TRUE(result[0].label);
@@ -486,8 +471,7 @@ namespace APSITests
 
         // Query a single non-empty item
         items[0][0] = 2;
-        query = recv.create_query(items);
-        result = recv.request_query(move(query), client_);
+        result = recv.request_query(items, client_);
         ASSERT_EQ(1, result.size());
         ASSERT_FALSE(result[0].found);
         ASSERT_FALSE(result[0].label);
@@ -496,8 +480,7 @@ namespace APSITests
         items.push_back(HashedItem{make_zero_item()});
         items[0][0] = 1;
         items[1][0] = 2;
-        query = recv.create_query(items);
-        result = recv.request_query(move(query), client_);
+        result = recv.request_query(items, client_);
         ASSERT_EQ(2, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_FALSE(result[1].found);

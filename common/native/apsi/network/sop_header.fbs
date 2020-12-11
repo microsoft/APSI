@@ -3,11 +3,11 @@
 
 namespace apsi.network.fbs;
 
-enum SenderOperationType:uint32 { SOP_UNKNOWN = 0, SOP_PARMS = 1, SOP_OPRF = 2, SOP_QUERY = 3 }
+enum SenderOperationType:uint32 { sop_unknown = 0, sop_parms = 1, sop_oprf = 2, sop_query = 3 }
 
 table SenderOperationHeader {
     version:uint32;
-    type:SenderOperationType = SOP_UNKNOWN;
+    type:SenderOperationType = sop_unknown;
 }
 
 root_type SenderOperationHeader;

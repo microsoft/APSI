@@ -189,9 +189,8 @@ namespace
                 recv_items.push_back({ i + 1, ~(i + 1) });
             }
 
-            auto hashed_recv_items = receiver.request_oprf(recv_items, recv_chl);
-            auto query = receiver.create_query(hashed_recv_items);
-            auto query_result = receiver.request_query(move(query), recv_chl);
+            auto hashed_recv_items =Receiver::RequestOPRF(recv_items, recv_chl);
+            auto query_result = receiver.request_query(hashed_recv_items, recv_chl);
 
             verify_unlabeled_results(query_result, recv_items, recv_int_items);
         }
@@ -253,9 +252,8 @@ namespace
                 recv_items.push_back({ i + 1, ~(i + 1) });
             }
 
-            auto hashed_recv_items = receiver.request_oprf(recv_items, recv_chl);
-            auto query = receiver.create_query(hashed_recv_items);
-            auto query_result = receiver.request_query(move(query), recv_chl);
+            auto hashed_recv_items = Receiver::RequestOPRF(recv_items, recv_chl);
+            auto query_result = receiver.request_query(hashed_recv_items, recv_chl);
 
             verify_labeled_results(query_result, recv_items, recv_int_items, sender_items);
         }

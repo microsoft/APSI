@@ -18,6 +18,7 @@
 #include "apsi/crypto_context.h"
 #include "apsi/item.h"
 #include "apsi/network/channel.h"
+#include "apsi/network/network_channel.h"
 #include "apsi/network/result_package.h"
 #include "apsi/oprf/oprf_receiver.h"
 #include "apsi/powers.h"
@@ -35,6 +36,8 @@ namespace apsi
 {
     namespace receiver
     {
+        class Receiver;
+
         class LabelData
         {
         public:
@@ -89,19 +92,7 @@ namespace apsi
         friend class Receiver;
 
         public:
-            Query deep_copy() const
-            {
-                Query result;
-                result.item_count_ = item_count_;
-                result.table_idx_to_item_idx_ = table_idx_to_item_idx_;
-                auto sop_query = std::make_unique<network::SenderOperationQuery>();
-                auto this_query = dynamic_cast<const network::SenderOperationQuery*>(sop_.get());
-                sop_query->relin_keys = this_query->relin_keys;
-                sop_query->data = this_query->data;
-                result.sop_ = std::move(sop_query);
-
-                return std::move(result);
-            }
+            Query deep_copy() const;
 
             Query(Query &&source) = default;
 
@@ -111,26 +102,21 @@ namespace apsi
 
             Query &operator =(const Query &source) = delete;
 
-            const network::SenderOperationQuery &data() const
-            {
-                const network::SenderOperationQuery *sop_query
-                    = dynamic_cast<const network::SenderOperationQuery*>(sop_.get());
-                if (!sop_query)
-                {
-                    throw std::logic_error("query data is invalid");
-                }
-                return *sop_query;
-            }
+            const network::SenderOperationQuery &request_data() const;
 
-            const std::unordered_map<std::size_t, std::size_t> &table_idx_to_item_idx() const
+            const std::unordered_map<std::size_t, std::size_t> &table_idx_to_item_idx() const noexcept
             {
                 return table_idx_to_item_idx_;
             }
 
-            const std::size_t item_count() const
+            const std::size_t item_count() const noexcept
             {
                 return item_count_;
             }
+
+            std::unique_ptr<network::SenderOperation> extract_request();
+
+            bool has_request() const noexcept;
 
         private:
             Query() = default;
@@ -141,6 +127,12 @@ namespace apsi
 
             std::size_t item_count_ = 0;
         };
+
+        using ParamsResponse = std::unique_ptr<network::SenderOperationResponseParms>;
+
+        using OPRFResponse = std::unique_ptr<network::SenderOperationResponseOPRF>;
+
+        using QueryResponse = std::unique_ptr<network::SenderOperationResponseQuery>;
 
         class Receiver
         {
@@ -166,20 +158,48 @@ namespace apsi
                 return crypto_context_;
             }
 
+            static std::unique_ptr<network::SenderOperation> CreateParamsRequest();
+            
+            static bool SendRequest(std::unique_ptr<network::SenderOperation> sop, network::Channel &chl);
+
+            static ParamsResponse ReceiveParamsResponse(network::Channel &chl);
+
             /**
             Performs a parameter request and returns the received parameters.
             */
-            static PSIParams RequestParams(network::Channel &chl);
+            static PSIParams RequestParams(network::NetworkChannel &chl);
+
+            /**
+            Obfuscates the items and initializes the given vector with the buffer that must be sent to a sender for
+            sender-side obfuscation (OPRF hash).
+            */
+            static oprf::OPRFReceiver CreateOPRFReceiver(const std::vector<Item> &items);
+
+            /**
+            Removes receiver-side obfuscation from items received after an OPRF query from a sender so that only the
+            sender's obfuscation (OPRF hash) remains.
+            */
+            static std::vector<HashedItem> ExtractHashes(
+                const OPRFResponse &oprf_response,
+                const oprf::OPRFReceiver &oprf_receiver);
+
+            static std::unique_ptr<network::SenderOperation> CreateOPRFRequest(
+                const std::vector<Item> &items,
+                const oprf::OPRFReceiver &oprf_receiver);
+
+            static OPRFResponse ReceiveOPRFResponse(network::Channel &chl);
 
             /**
             Performs an OPRF query and returns a vector of hashed items.
             */
-            std::vector<HashedItem> request_oprf(const std::vector<Item> &items, network::Channel &chl);
+            static std::vector<HashedItem> RequestOPRF(const std::vector<Item> &items, network::NetworkChannel &chl);
 
             /**
-            Creates a query.
+            Creates a query request.
             */
             Query create_query(const std::vector<HashedItem> &items);
+
+            static QueryResponse ReceiveQueryResponse(network::Channel &chl);
 
             /**
             Performs a PSI or labeled PSI (depending on the sender) query. The query is a vector of items, and the
@@ -188,25 +208,9 @@ namespace apsi
             a sender included it. The query is left in an unusable state and a deep copy must explicitly be made if the
             query is to be used again.
             */
-            std::vector<MatchRecord> request_query(Query &&query, network::Channel &chl);
+            std::vector<MatchRecord> request_query(const std::vector<HashedItem> &items, network::NetworkChannel &chl);
 
         private:
-            /**
-            Obfuscates the items and initializes the given vector with the buffer that must be sent to a sender for
-            sender-side obfuscation (OPRF).
-            */
-            std::vector<seal::seal_byte> obfuscate_items(
-                const std::vector<Item> &items,
-                std::unique_ptr<oprf::OPRFReceiver> &oprf_receiver);
-
-            /**
-            Removes receiver-side obfuscation from items received after an OPRF query from a sender so that only the
-            sender's obfuscation (OPRF) remains.
-            */
-            std::vector<HashedItem> deobfuscate_items(
-                const std::vector<seal::seal_byte> &oprf_response,
-                std::unique_ptr<oprf::OPRFReceiver> &oprf_receiver);
-
             void result_package_worker(
                 std::atomic<std::int32_t> &package_count,
                 std::vector<MatchRecord> &mrs,

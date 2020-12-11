@@ -167,10 +167,10 @@ namespace APSITests
             clt.send(move(sop));
             
             // Next, try receiving an OPRF response; this is incorrect so should return nullptr
-            ASSERT_EQ(nullptr, clt.receive_response(SenderOperationType::SOP_OPRF));
+            ASSERT_EQ(nullptr, clt.receive_response(SenderOperationType::sop_oprf));
 
             // Receive correctly the parms response
-            auto rsop = clt.receive_response(SenderOperationType::SOP_PARMS);
+            auto rsop = clt.receive_response(SenderOperationType::sop_parms);
             unique_ptr<SenderOperationResponseParms> rsop_parms;
             rsop_parms.reset(dynamic_cast<SenderOperationResponseParms*>(rsop.release()));
 
@@ -178,7 +178,7 @@ namespace APSITests
             ASSERT_EQ(get_params()->item_bit_count(), rsop_parms->params->item_bit_count());
 
             // Receive an OPRF response
-            rsop = clt.receive_response(SenderOperationType::SOP_OPRF);
+            rsop = clt.receive_response(SenderOperationType::sop_oprf);
             unique_ptr<SenderOperationResponseOPRF> rsop_oprf;
             rsop_oprf.reset(dynamic_cast<SenderOperationResponseOPRF*>(rsop.release()));
 
@@ -189,7 +189,7 @@ namespace APSITests
             }
 
             // Receive a query response
-            rsop = clt.receive_response(SenderOperationType::SOP_QUERY);
+            rsop = clt.receive_response(SenderOperationType::sop_query);
             unique_ptr<SenderOperationResponseQuery> rsop_query;
             rsop_query.reset(dynamic_cast<SenderOperationResponseQuery*>(rsop.release()));
 
@@ -211,13 +211,13 @@ namespace APSITests
         // It's important to receive this as a SenderNetworkOperation, otherwise we can't get the client_id for ZeroMQ
         // internal routing.
         auto nsop = svr.receive_network_operation(get_context()->seal_context(), true);
-        ASSERT_EQ(SenderOperationType::SOP_PARMS, nsop->sop->type());
+        ASSERT_EQ(SenderOperationType::sop_parms, nsop->sop->type());
         ASSERT_FALSE(nsop->client_id.empty());
         auto client_id = nsop->client_id;
 
         // Receive an OPRF operation
         nsop = svr.receive_network_operation(get_context()->seal_context(), true);
-        ASSERT_EQ(SenderOperationType::SOP_OPRF, nsop->sop->type());
+        ASSERT_EQ(SenderOperationType::sop_oprf, nsop->sop->type());
         ASSERT_EQ(client_id, nsop->client_id);
         unique_ptr<SenderOperationOPRF> sop_oprf;
         sop_oprf.reset(dynamic_cast<SenderOperationOPRF*>(nsop->sop.release()));
@@ -230,7 +230,7 @@ namespace APSITests
 
         // Receive a query operation
         nsop = svr.receive_network_operation(get_context()->seal_context(), true);
-        ASSERT_EQ(SenderOperationType::SOP_QUERY, nsop->sop->type());
+        ASSERT_EQ(SenderOperationType::sop_query, nsop->sop->type());
         ASSERT_EQ(client_id, nsop->client_id);
         unique_ptr<SenderOperationQuery> sop_query;
         sop_query.reset(dynamic_cast<SenderOperationQuery*>(nsop->sop.release()));
@@ -329,7 +329,7 @@ namespace APSITests
                     continue;
                 }
 
-                ASSERT_EQ(SenderOperationType::SOP_OPRF, sop->sop->type());
+                ASSERT_EQ(SenderOperationType::sop_oprf, sop->sop->type());
                 unique_ptr<SenderOperationOPRF> sop_oprf;
                 sop_oprf.reset(dynamic_cast<SenderOperationOPRF*>(sop->sop.release()));
                 auto client_id = sop->client_id;

@@ -20,7 +20,7 @@ namespace APSITests
     TEST(SenderOperationResponseTest, SaveLoadSenderOperationResponseParms)
     {
         SenderOperationResponseParms sopr;
-        ASSERT_EQ(SenderOperationType::SOP_PARMS, sopr.type());
+        ASSERT_EQ(SenderOperationType::sop_parms, sopr.type());
         ASSERT_FALSE(sopr.params);
 
         stringstream ss;
@@ -54,7 +54,7 @@ namespace APSITests
         size_t in_size = sopr2.load(ss);
 
         ASSERT_EQ(out_size, in_size);
-        ASSERT_EQ(SenderOperationType::SOP_PARMS, sopr2.type());
+        ASSERT_EQ(SenderOperationType::sop_parms, sopr2.type());
 
         // Check that the parameters match
         ASSERT_EQ(sopr.params->item_params().felts_per_item, sopr2.params->item_params().felts_per_item);
@@ -68,7 +68,7 @@ namespace APSITests
     TEST(SenderOperationResponseTest, SaveLoadSenderOperationResponseOPRF)
     {
         SenderOperationResponseOPRF sopr;
-        ASSERT_EQ(SenderOperationType::SOP_OPRF, sopr.type());
+        ASSERT_EQ(SenderOperationType::sop_oprf, sopr.type());
         ASSERT_TRUE(sopr.data.empty());
 
         stringstream ss;
@@ -79,7 +79,7 @@ namespace APSITests
         size_t in_size = sopr2.load(ss);
 
         ASSERT_EQ(out_size, in_size);
-        ASSERT_EQ(SenderOperationType::SOP_OPRF, sopr2.type());
+        ASSERT_EQ(SenderOperationType::sop_oprf, sopr2.type());
         ASSERT_TRUE(sopr2.data.empty());
 
         sopr.data.push_back(seal_byte(0xAB));
@@ -87,7 +87,7 @@ namespace APSITests
         in_size = sopr2.load(ss);
 
         ASSERT_EQ(out_size, in_size);
-        ASSERT_EQ(SenderOperationType::SOP_OPRF, sopr2.type());
+        ASSERT_EQ(SenderOperationType::sop_oprf, sopr2.type());
         ASSERT_EQ(1, sopr2.data.size());
         ASSERT_EQ(static_cast<char>(0xAB), static_cast<char>(sopr2.data[0]));
 
@@ -96,7 +96,7 @@ namespace APSITests
         in_size = sopr2.load(ss);
 
         ASSERT_EQ(out_size, in_size);
-        ASSERT_EQ(SenderOperationType::SOP_OPRF, sopr2.type());
+        ASSERT_EQ(SenderOperationType::sop_oprf, sopr2.type());
         ASSERT_EQ(2, sopr2.data.size());
         ASSERT_EQ(static_cast<char>(0xAB), static_cast<char>(sopr2.data[0]));
         ASSERT_EQ(static_cast<char>(0xCD), static_cast<char>(sopr2.data[1]));
@@ -105,7 +105,7 @@ namespace APSITests
     TEST(SenderOperationResponseTest, SaveLoadSenderOperationResponseQuery)
     {
         SenderOperationResponseQuery sopr;
-        ASSERT_EQ(SenderOperationType::SOP_QUERY, sopr.type());
+        ASSERT_EQ(SenderOperationType::sop_query, sopr.type());
 
         stringstream ss;
 
@@ -115,7 +115,7 @@ namespace APSITests
         size_t in_size = sopr2.load(ss);
 
         ASSERT_EQ(out_size, in_size);
-        ASSERT_EQ(SenderOperationType::SOP_QUERY, sopr2.type());
+        ASSERT_EQ(SenderOperationType::sop_query, sopr2.type());
         ASSERT_EQ(sopr.package_count, sopr2.package_count);
 
         sopr.package_count = 1;
@@ -123,7 +123,7 @@ namespace APSITests
         in_size = sopr2.load(ss);
 
         ASSERT_EQ(out_size, in_size);
-        ASSERT_EQ(SenderOperationType::SOP_QUERY, sopr2.type());
+        ASSERT_EQ(SenderOperationType::sop_query, sopr2.type());
         ASSERT_EQ(sopr.package_count, sopr2.package_count);
 
         sopr.package_count = 5;
@@ -131,7 +131,7 @@ namespace APSITests
         in_size = sopr2.load(ss);
 
         ASSERT_EQ(out_size, in_size);
-        ASSERT_EQ(SenderOperationType::SOP_QUERY, sopr2.type());
+        ASSERT_EQ(SenderOperationType::sop_query, sopr2.type());
         ASSERT_EQ(sopr.package_count, sopr2.package_count);
     }
 }

@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <array>
 #include <memory>
+#include <vector>
+#include <unordered_set>
 
 // APSI
 #include "apsi/oprf/oprf_receiver.h"
@@ -85,11 +87,11 @@ namespace APSITests
 
         unordered_set<HashedItem> out_items = OPRFSender::ComputeHashes(items, oprf_key);
 
-        vector<seal_byte> query(item_count * oprf_query_size);
-        OPRFReceiver receiver(items, query);
+        vector<Item> items_vec(items.begin(), items.end());
+        OPRFReceiver receiver(items_vec);
+        auto query = receiver.query_data();
 
-        vector<seal_byte> responses(item_count * oprf_response_size);
-        OPRFSender::ProcessQueries(query, oprf_key, responses);
+        vector<seal_byte> responses = OPRFSender::ProcessQueries(query, oprf_key);
 
         vector<HashedItem> receiver_hashes(item_count);
         receiver.process_responses(responses, receiver_hashes);

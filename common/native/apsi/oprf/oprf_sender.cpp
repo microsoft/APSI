@@ -5,14 +5,12 @@
 #include <thread>
 #include <algorithm>
 
-// GSL
-#include <gsl/span_ext>
-
 // APSI
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/util/utils.h"
 
 using namespace std;
+using namespace seal;
 
 namespace apsi
 {
@@ -64,20 +62,16 @@ namespace apsi
             stream.exceptions(old_except_mask);
         }
 
-        void OPRFSender::ProcessQueries(
-            gsl::span<const seal::seal_byte> oprf_queries, const OPRFKey &oprf_key,
-            gsl::span<seal::seal_byte> oprf_responses)
+        vector<seal_byte> OPRFSender::ProcessQueries(
+            gsl::span<const seal_byte> oprf_queries, const OPRFKey &oprf_key)
         {
-            if (oprf_queries.size() != oprf_responses.size())
-            {
-                throw invalid_argument("oprf_queries size is incompatible with oprf_responses size");
-            }
-            if (static_cast<size_t>(oprf_queries.size()) % oprf_query_size)
+            if (oprf_queries.size() % oprf_query_size)
             {
                 throw invalid_argument("oprf_queries has invalid size");
             }
 
-            size_t query_count = static_cast<size_t>(oprf_queries.size()) / oprf_query_size;
+            size_t query_count = oprf_queries.size() / oprf_query_size;
+            vector<seal_byte> oprf_responses(query_count * oprf_response_size);
 
             auto oprf_in_ptr = reinterpret_cast<const unsigned char *>(oprf_queries.data());
             auto oprf_out_ptr = reinterpret_cast<unsigned char *>(oprf_responses.data());
@@ -101,6 +95,8 @@ namespace apsi
                 advance(oprf_in_ptr, oprf_query_size);
                 advance(oprf_out_ptr, oprf_response_size);
             }
+
+            return oprf_responses;
         }
 
         unordered_set<oprf_hash_type> OPRFSender::ComputeHashes(

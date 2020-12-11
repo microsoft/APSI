@@ -11,6 +11,7 @@
 #include <utility>
 #include <unordered_set>
 #include <unordered_map>
+#include <vector>
 
 // SEAL
 #include "seal/util/defines.h"
@@ -21,6 +22,9 @@
 // APSI
 #include "apsi/oprf/oprf_common.h"
 #include "apsi/util/db_encoding.h"
+
+// GSL
+#include "gsl/span"
 
 namespace apsi
 {
@@ -80,9 +84,8 @@ namespace apsi
         public:
             OPRFSender() = delete;
 
-            static void ProcessQueries(
-                gsl::span<const seal::seal_byte> oprf_queries, const OPRFKey &oprf_key,
-                gsl::span<seal::seal_byte> oprf_responses);
+            static std::vector<seal::seal_byte> ProcessQueries(
+                gsl::span<const seal::seal_byte> oprf_queries, const OPRFKey &oprf_key);
 
             static std::unordered_set<oprf_hash_type> ComputeHashes(
                 const std::unordered_set<oprf_item_type> &oprf_items,

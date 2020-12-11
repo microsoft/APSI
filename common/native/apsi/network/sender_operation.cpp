@@ -24,6 +24,27 @@ namespace apsi
 {
     namespace network
     {
+        const char *sender_operation_type_str(SenderOperationType sop_type)
+        {
+            switch (sop_type)
+            {
+                case SenderOperationType::sop_unknown:
+                    return "sop_unknown";
+
+                case SenderOperationType::sop_parms:
+                    return "sop_parms";
+
+                case SenderOperationType::sop_oprf:
+                    return "sop_oprf";
+
+                case SenderOperationType::sop_query:
+                    return "sop_query";
+
+                default:
+                    return "sop_invalid";
+            }
+        }
+
         size_t SenderOperationHeader::save(ostream &out) const
         {
             flatbuffers::FlatBufferBuilder fbs_builder(128);

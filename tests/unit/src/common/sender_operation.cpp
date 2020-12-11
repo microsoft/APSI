@@ -27,7 +27,7 @@ namespace APSITests
         SenderOperationHeader header;
         stringstream ss;
 
-        header.type = SenderOperationType::SOP_UNKNOWN;
+        header.type = SenderOperationType::sop_unknown;
         header.version = 999;
         size_t out_size = header.save(ss);
 
@@ -37,7 +37,7 @@ namespace APSITests
         ASSERT_EQ(header.type, header2.type);
         ASSERT_EQ(header.version, header2.version);
 
-        header.type = SenderOperationType::SOP_QUERY;
+        header.type = SenderOperationType::sop_query;
         header.version = 123;
         out_size = header.save(ss);
 
@@ -50,7 +50,7 @@ namespace APSITests
     TEST(SenderOperationTest, SaveLoadSenderOperationParms)
     {
         SenderOperationParms sop;
-        ASSERT_EQ(SenderOperationType::SOP_PARMS, sop.type());
+        ASSERT_EQ(SenderOperationType::sop_parms, sop.type());
 
         stringstream ss;
         size_t out_size = sop.save(ss);
@@ -58,13 +58,13 @@ namespace APSITests
         size_t in_size = sop2.load(ss, nullptr);
 
         ASSERT_EQ(out_size, in_size);
-        ASSERT_EQ(SenderOperationType::SOP_PARMS, sop2.type());
+        ASSERT_EQ(SenderOperationType::sop_parms, sop2.type());
     }
 
     TEST(SenderOperationTest, SaveLoadSenderOperationOPRF)
     {
         SenderOperationOPRF sop;
-        ASSERT_EQ(SenderOperationType::SOP_OPRF, sop.type());
+        ASSERT_EQ(SenderOperationType::sop_oprf, sop.type());
         ASSERT_TRUE(sop.data.empty());
 
         stringstream ss;
@@ -75,7 +75,7 @@ namespace APSITests
         size_t in_size = sop2.load(ss, nullptr);
 
         ASSERT_EQ(out_size, in_size);
-        ASSERT_EQ(SenderOperationType::SOP_OPRF, sop2.type());
+        ASSERT_EQ(SenderOperationType::sop_oprf, sop2.type());
         ASSERT_TRUE(sop2.data.empty());
 
         sop.data.push_back(seal_byte(0xAB));
@@ -83,7 +83,7 @@ namespace APSITests
         in_size = sop2.load(ss, nullptr);
 
         ASSERT_EQ(out_size, in_size);
-        ASSERT_EQ(SenderOperationType::SOP_OPRF, sop2.type());
+        ASSERT_EQ(SenderOperationType::sop_oprf, sop2.type());
         ASSERT_EQ(1, sop2.data.size());
         ASSERT_EQ(static_cast<char>(0xAB), static_cast<char>(sop2.data[0]));
 
@@ -92,7 +92,7 @@ namespace APSITests
         in_size = sop2.load(ss, nullptr);
 
         ASSERT_EQ(out_size, in_size);
-        ASSERT_EQ(SenderOperationType::SOP_OPRF, sop2.type());
+        ASSERT_EQ(SenderOperationType::sop_oprf, sop2.type());
         ASSERT_EQ(2, sop2.data.size());
         ASSERT_EQ(static_cast<char>(0xAB), static_cast<char>(sop2.data[0]));
         ASSERT_EQ(static_cast<char>(0xCD), static_cast<char>(sop2.data[1]));
@@ -102,7 +102,7 @@ namespace APSITests
     {
         // Constructor
         SenderOperationQuery sop;
-        ASSERT_EQ(SenderOperationType::SOP_QUERY, sop.type());
+        ASSERT_EQ(SenderOperationType::sop_query, sop.type());
         ASSERT_FALSE(sop.relin_keys.is_local());
         ASSERT_FALSE(sop.relin_keys.is_serializable());
         ASSERT_TRUE(sop.data.empty());
@@ -147,7 +147,7 @@ namespace APSITests
         size_t in_size = sop2.load(ss, context);
 
         ASSERT_EQ(out_size, in_size);
-        ASSERT_EQ(SenderOperationType::SOP_QUERY, sop2.type());
+        ASSERT_EQ(SenderOperationType::sop_query, sop2.type());
         ASSERT_FALSE(sop2.relin_keys.is_serializable());
         ASSERT_TRUE(sop2.relin_keys.is_local());
         ASSERT_TRUE(sop2.data.empty());
@@ -163,7 +163,7 @@ namespace APSITests
         in_size = sop2.load(ss, context);
 
         ASSERT_EQ(out_size, in_size);
-        ASSERT_EQ(SenderOperationType::SOP_QUERY, sop2.type());
+        ASSERT_EQ(SenderOperationType::sop_query, sop2.type());
         ASSERT_FALSE(sop2.relin_keys.is_serializable());
         ASSERT_TRUE(sop2.relin_keys.is_local());
         ASSERT_TRUE(sop2.data.empty());
@@ -178,7 +178,7 @@ namespace APSITests
         in_size = sop2.load(ss, context);
 
         ASSERT_EQ(out_size, in_size);
-        ASSERT_EQ(SenderOperationType::SOP_QUERY, sop2.type());
+        ASSERT_EQ(SenderOperationType::sop_query, sop2.type());
         ASSERT_EQ(3, sop2.data.size());
         ASSERT_TRUE(sop2.data.at(0).empty());
         ASSERT_EQ(1, sop2.data.at(1).size());

@@ -30,14 +30,16 @@ namespace apsi
     {
         enum class SenderOperationType : std::uint32_t
         {
-            SOP_UNKNOWN = 0,
+            sop_unknown = 0,
 
-            SOP_PARMS = 1,
+            sop_parms = 1,
 
-            SOP_OPRF = 2,
+            sop_oprf = 2,
 
-            SOP_QUERY = 3
+            sop_query = 3
         };
+
+        const char *sender_operation_type_str(SenderOperationType sop_type);
 
         /**
         A class describing the type of a SenderOperation object and an optional member to identify the client.
@@ -51,7 +53,7 @@ namespace apsi
 
             std::uint32_t version = apsi_version;
 
-            SenderOperationType type = SenderOperationType::SOP_UNKNOWN;
+            SenderOperationType type = SenderOperationType::sop_unknown;
         };
 
         /**
@@ -95,7 +97,7 @@ namespace apsi
 
             SenderOperationType type() const noexcept override
             {
-                return SenderOperationType::SOP_PARMS;
+                return SenderOperationType::sop_parms;
             }
         }; // class SenderOperationParms
 
@@ -111,7 +113,7 @@ namespace apsi
 
             SenderOperationType type() const noexcept override
             {
-                return SenderOperationType::SOP_OPRF;
+                return SenderOperationType::sop_oprf;
             }
 
             /**
@@ -132,7 +134,7 @@ namespace apsi
 
             SenderOperationType type() const noexcept override
             {
-                return SenderOperationType::SOP_QUERY;
+                return SenderOperationType::sop_query;
             }
 
             SEALObject<seal::RelinKeys> relin_keys;

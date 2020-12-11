@@ -60,7 +60,7 @@ namespace apsi
                 return nullptr;
             }
 
-            if (expected != SenderOperationType::SOP_UNKNOWN && expected != sop_header.type)
+            if (expected != SenderOperationType::sop_unknown && expected != sop_header.type)
             {
                 // Unexpected operation
                 return nullptr;
@@ -73,15 +73,15 @@ namespace apsi
             {
                 switch (static_cast<SenderOperationType>(sop_header.type))
                 {
-                    case SenderOperationType::SOP_PARMS:
+                    case SenderOperationType::sop_parms:
                         sop = make_unique<SenderOperationParms>();
                         bytes_received_ += sop->load(in_);
                         break;
-                    case SenderOperationType::SOP_OPRF:
+                    case SenderOperationType::sop_oprf:
                         sop = make_unique<SenderOperationOPRF>();
                         bytes_received_ += sop->load(in_);
                         break;
-                    case SenderOperationType::SOP_QUERY:
+                    case SenderOperationType::sop_query:
                         sop = make_unique<SenderOperationQuery>();
                         bytes_received_ += sop->load(in_, move(context));
                         break;
@@ -144,7 +144,7 @@ namespace apsi
                 return nullptr;
             }
 
-            if (expected != SenderOperationType::SOP_UNKNOWN && expected != sop_header.type)
+            if (expected != SenderOperationType::sop_unknown && expected != sop_header.type)
             {
                 // Unexpected operation
                 return nullptr;
@@ -157,15 +157,15 @@ namespace apsi
             {
                 switch (static_cast<SenderOperationType>(sop_header.type))
                 {
-                    case SenderOperationType::SOP_PARMS:
+                    case SenderOperationType::sop_parms:
                         sop_response = make_unique<SenderOperationResponseParms>();
                         bytes_received_ += sop_response->load(in_);
                         break;
-                    case SenderOperationType::SOP_OPRF:
+                    case SenderOperationType::sop_oprf:
                         sop_response = make_unique<SenderOperationResponseOPRF>();
                         bytes_received_ += sop_response->load(in_);
                         break;
-                    case SenderOperationType::SOP_QUERY:
+                    case SenderOperationType::sop_query:
                         sop_response = make_unique<SenderOperationResponseQuery>();
                         bytes_received_ += sop_response->load(in_);
                         break;

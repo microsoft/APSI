@@ -20,6 +20,9 @@ include(CMakeDependentOption)
 include(CheckCXXCompilerFlag)
 include(GNUInstallDirs)
 
+# Extra modules
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR}/cmake)
+
 ########################
 # Global configuration #
 ########################
@@ -45,7 +48,6 @@ message(STATUS "APSI debug mode: ${APSI_DEBUG}")
 # Should we use C++14 or C++17?
 set(APSI_USE_CXX17_OPTION_STR "Use C++17")
 option(APSI_USE_CXX17 ${APSI_USE_CXX17_OPTION_STR} ON)
-set(SEAL_USE_CXX17 ${APSI_USE_CXX17})
 
 # [Option] APSI_BUILD_TESTS
 set(APSI_BUILD_TESTS_OPTION_STR "Build unit and integration tests for APSI")

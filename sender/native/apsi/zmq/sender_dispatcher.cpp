@@ -72,17 +72,17 @@ namespace apsi
 
                 switch (sop->sop->type())
                 {
-                case SenderOperationType::SOP_PARMS:
+                case SenderOperationType::sop_parms:
                     APSI_LOG_INFO("Received parameter request");
                     dispatch_parms(move(sop), chl);
                     break;
 
-                case SenderOperationType::SOP_OPRF:
+                case SenderOperationType::sop_oprf:
                     APSI_LOG_INFO("Received OPRF query");
                     dispatch_oprf(move(sop), chl);
                     break;
 
-                case SenderOperationType::SOP_QUERY:
+                case SenderOperationType::sop_query:
                     {
                         APSI_LOG_INFO("Received query");
                         dispatch_query(move(sop), chl);

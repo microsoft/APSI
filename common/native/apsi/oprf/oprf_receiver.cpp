@@ -14,18 +14,29 @@ namespace apsi
 {
     namespace oprf
     {
-        void OPRFReceiver::process_items(
-            gsl::span<const oprf_item_type> oprf_items,
-            gsl::span<seal_byte> oprf_queries)
+        void OPRFReceiver::set_item_count(std::size_t item_count)
         {
-            if (static_cast<size_t>(oprf_queries.size()) != static_cast<size_t>(oprf_items.size()) * oprf_query_size)
-            {
-                throw invalid_argument("oprf_queries size is incompatible with oprf_items size");
-            }
+            auto new_pool = MemoryManager::GetPool(mm_prof_opt::mm_force_new, true);
+            oprf_queries_ = DynArray<seal_byte>(item_count * oprf_query_size, new_pool);
+            inv_factor_data_ = FactorData(new_pool, item_count);
+            pool_ = move(new_pool);
+        }
 
-            set_item_count(static_cast<size_t>(oprf_items.size()));
+        void OPRFReceiver::clear()
+        {
+            set_item_count(0);
+        }
 
-            auto oprf_out_ptr = reinterpret_cast<unsigned char *>(oprf_queries.data());
+        vector<seal_byte> OPRFReceiver::query_data() const
+        {
+            return { oprf_queries_.cbegin(), oprf_queries_.cend() };
+        }
+
+        void OPRFReceiver::process_items(gsl::span<const oprf_item_type> oprf_items)
+        {
+            set_item_count(oprf_items.size());
+
+            auto oprf_out_ptr = oprf_queries_.begin();
             for (size_t i = 0; i < item_count(); i++)
             {
                 // Create an elliptic curve point from the item
@@ -40,7 +51,7 @@ namespace apsi
                 ecpt.scalar_multiply(random_scalar, false);
 
                 // Save the result to items_buffer
-                ecpt.save(ECPoint::point_save_span_type{ oprf_out_ptr, oprf_query_size });
+                ecpt.save(ECPoint::point_save_span_type{ reinterpret_cast<unsigned char *>(oprf_out_ptr), oprf_query_size });
 
                 // Move forward
                 advance(oprf_out_ptr, oprf_query_size);
@@ -51,22 +62,22 @@ namespace apsi
             gsl::span<const seal_byte> oprf_responses,
             gsl::span<oprf_hash_type> oprf_hashes) const
         {
-            if (static_cast<size_t>(oprf_hashes.size()) != item_count())
+            if (oprf_hashes.size() != item_count())
             {
                 throw invalid_argument("oprf_hashes has invalid size");
             }
-            if (static_cast<size_t>(oprf_responses.size()) != item_count() * oprf_response_size)
+            if (oprf_responses.size() != item_count() * oprf_response_size)
             {
                 throw invalid_argument("oprf_responses size is incompatible with oprf_hashes size");
             }
 
-            auto oprf_in_ptr = reinterpret_cast<const unsigned char *>(oprf_responses.data());
-
+            auto oprf_in_ptr = oprf_responses.data();
             for (size_t i = 0; i < item_count(); i++)
             {
                 // Load the point from items_buffer
                 ECPoint ecpt;
-                ecpt.load(ECPoint::point_save_span_const_type{ oprf_in_ptr, oprf_response_size });
+                ecpt.load(
+                    ECPoint::point_save_span_const_type{ reinterpret_cast<const unsigned char *>(oprf_in_ptr), oprf_response_size });
 
                 // Multiply with inverse random scalar
                 ecpt.scalar_multiply(inv_factor_data_.get_factor(i), false);

@@ -48,7 +48,7 @@ namespace apsi
             {
                 throw invalid_argument("operation cannot be null");
             }
-            if (sop->type() != SenderOperationType::SOP_PARMS)
+            if (sop->type() != SenderOperationType::sop_parms)
             {
                 throw invalid_argument("operation is not a parameter request");
             }
@@ -62,7 +62,7 @@ namespace apsi
             {
                 throw invalid_argument("operation cannot be null");
             }
-            if (sop->type() != SenderOperationType::SOP_OPRF)
+            if (sop->type() != SenderOperationType::sop_oprf)
             {
                 throw invalid_argument("operation is not an OPRF request");
             }
@@ -79,7 +79,7 @@ namespace apsi
             {
                 throw invalid_argument("operation cannot be null");
             }
-            if (sop->type() != SenderOperationType::SOP_QUERY)
+            if (sop->type() != SenderOperationType::sop_query)
             {
                 throw invalid_argument("operation is not a query request");
             }
@@ -213,17 +213,17 @@ namespace apsi
                 << oprf_request.data_.size() / oprf_query_size << " items");
 
             // OPRF response has the same size as the OPRF query 
-            vector<seal_byte> oprf_result(oprf_request.data_.size());
+            vector<seal_byte> oprf_result;
             try
             {
-                OPRFSender::ProcessQueries(oprf_request.data_, key, oprf_result);
+                oprf_result = OPRFSender::ProcessQueries(oprf_request.data_, key);
             }
             catch (const exception &ex)
             {
                 // Something was wrong with the OPRF request. This can mean malicious
                 // data being sent to the sender in an attempt to extract OPRF key.
                 // Best not to respond anything.
-                APSI_LOG_WARNING("Processing OPRF request threw an exception: " << ex.what());
+                APSI_LOG_ERROR("Processing OPRF request threw an exception: " << ex.what());
                 return;
             }
 

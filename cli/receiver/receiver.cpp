@@ -7,6 +7,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <filesystem>
 
 // APSI
 #include "apsi/receiver.h"
@@ -122,7 +123,7 @@ int remote_query(const CLP& cmd)
     try
     {
         APSI_LOG_INFO("Sending OPRF request for " << items_vec.size() << " items");
-        oprf_items = receiver.request_oprf(items_vec, channel);
+        oprf_items = Receiver::RequestOPRF(items_vec, channel);
         APSI_LOG_INFO("Received OPRF request for " << items_vec.size() << " items");
     }
     catch (const exception &ex)
@@ -131,25 +132,11 @@ int remote_query(const CLP& cmd)
         return -1;
     }
 
-    unique_ptr<Query> query;
-    try
-    {
-        APSI_LOG_INFO("Creating query");
-        query = make_unique<Query>(receiver.create_query(oprf_items));
-        APSI_LOG_INFO("Finished creating query");
-    }
-    catch (const exception &ex)
-    {
-        APSI_LOG_WARNING("Failed to create query: " << ex.what());
-        return -1;
-    }
-
     vector<MatchRecord> query_result;
     try
     {
         APSI_LOG_INFO("Sending APSI query");
-        query_result = receiver.request_query(move(*query), channel);
-        query = nullptr;
+        query_result = receiver.request_query(oprf_items, channel);
         APSI_LOG_INFO("Received APSI query response");
     }
     catch (const exception &ex)

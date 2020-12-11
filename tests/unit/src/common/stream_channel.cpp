@@ -97,7 +97,7 @@ namespace APSITests
 
         sop = svr.receive_operation(get_context()->seal_context());
         ASSERT_NE(nullptr, sop);
-        ASSERT_EQ(SenderOperationType::SOP_PARMS, sop->type());
+        ASSERT_EQ(SenderOperationType::sop_parms, sop->type());
 
         // Create a parms response
         auto rsop_parms = make_unique<SenderOperationResponseParms>();
@@ -106,7 +106,7 @@ namespace APSITests
         svr.send(move(rsop));
 
         // Receive the parms response
-        rsop = clt.receive_response(SenderOperationType::SOP_PARMS);
+        rsop = clt.receive_response(SenderOperationType::sop_parms);
         rsop_parms.reset(dynamic_cast<SenderOperationResponseParms*>(rsop.release()));
 
         // We received valid parameters
@@ -140,7 +140,7 @@ namespace APSITests
 
         // Receive the operation
         sop = svr.receive_operation(get_context()->seal_context());
-        ASSERT_EQ(SenderOperationType::SOP_OPRF, sop->type());
+        ASSERT_EQ(SenderOperationType::sop_oprf, sop->type());
         sop_oprf.reset(dynamic_cast<SenderOperationOPRF*>(sop.release()));
 
         // Validate the data
@@ -157,7 +157,7 @@ namespace APSITests
         svr.send(move(rsop));
 
         // Receive the OPRF response
-        rsop = clt.receive_response(SenderOperationType::SOP_OPRF);
+        rsop = clt.receive_response(SenderOperationType::sop_oprf);
         rsop_oprf.reset(dynamic_cast<SenderOperationResponseOPRF*>(rsop.release()));
 
         // Validate the data
@@ -191,7 +191,7 @@ namespace APSITests
 
         // Receive the operation
         sop = svr.receive_operation(get_context()->seal_context());
-        ASSERT_EQ(SenderOperationType::SOP_QUERY, sop->type());
+        ASSERT_EQ(SenderOperationType::sop_query, sop->type());
         sop_query.reset(dynamic_cast<SenderOperationQuery*>(sop.release()));
 
         // Are we able to extract the relinearization keys?
@@ -219,7 +219,7 @@ namespace APSITests
         svr.send(move(rsop));
 
         // Receive the query response
-        rsop = clt.receive_response(SenderOperationType::SOP_QUERY);
+        rsop = clt.receive_response(SenderOperationType::sop_query);
         rsop_query.reset(dynamic_cast<SenderOperationResponseQuery*>(rsop.release()));
 
         // Validate the data

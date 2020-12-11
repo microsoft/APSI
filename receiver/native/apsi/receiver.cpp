@@ -123,10 +123,64 @@ namespace apsi
                     }());
             }
         };
+
+        template<typename To, typename From>
+        unique_ptr<To> downcast_ptr(unique_ptr<From> from)
+        {
+            auto ptr = dynamic_cast<To *>(from.get());
+            if (!ptr)
+            {
+                return nullptr;
+            }
+            return unique_ptr<To>{ static_cast<To *>(from.release()) };
+        }
     }
 
     namespace receiver
     {
+        bool Query::has_request() const noexcept
+        {
+            return dynamic_cast<const SenderOperationQuery*>(sop_.get());
+        }
+
+        const SenderOperationQuery &Query::request_data() const
+        {
+            if (!has_request())
+            {
+                throw logic_error("query data is invalid");
+            }
+
+            return *static_cast<const SenderOperationQuery*>(sop_.get());
+        }
+
+        Query Query::deep_copy() const
+        {
+            Query result;
+            result.item_count_ = item_count_;
+            result.table_idx_to_item_idx_ = table_idx_to_item_idx_;
+
+            const SenderOperationQuery *this_query = dynamic_cast<const SenderOperationQuery*>(sop_.get());
+            if (this_query)
+            {
+                auto sop_query = make_unique<SenderOperationQuery>();
+                sop_query->relin_keys = this_query->relin_keys;
+                sop_query->data = this_query->data;
+                result.sop_ = move(sop_query);
+            }
+
+            return result;
+        }
+
+        unique_ptr<SenderOperation> Query::extract_request()
+        {
+            if (!has_request())
+            {
+                return nullptr;
+            }
+
+            return std::move(sop_);
+        }
+
         Receiver::Receiver(PSIParams params, size_t thread_count) : params_(move(params))
         {
             thread_count_ = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
@@ -181,95 +235,194 @@ namespace apsi
             reset_keys();
         }
 
-        PSIParams Receiver::RequestParams(Channel &chl)
+        unique_ptr<SenderOperation> Receiver::CreateParamsRequest()
         {
-            APSI_LOG_INFO("Requesting parameters from Sender");
-            STOPWATCH(recv_stopwatch, "Receiver::request_params");
+            auto sop = make_unique<SenderOperationParms>();
+            APSI_LOG_INFO("Created parameter request");
 
-            // Send parameter request to Sender
-            auto sop_parms = make_unique<SenderOperationParms>();
-            chl.send(move(sop_parms));
+            return sop;
+        }
 
-            unique_ptr<SenderOperationResponse> response;
+        bool Receiver::SendRequest(unique_ptr<SenderOperation> sop, Channel &chl)
+        {
+            STOPWATCH(recv_stopwatch, "Receiver::SendRequest");
 
-            // wait_response
+            if (!sop)
             {
-                STOPWATCH(recv_stopwatch, "Receiver::request_params::wait_response");
-
-                // Wait for a valid message of the correct type
-                while (!(response = chl.receive_response(SenderOperationType::SOP_PARMS)));
+                APSI_LOG_ERROR("Failed to send request: operation is null");
+                return false;
             }
 
-            // Return the PSIParams
-            auto parms_response = dynamic_cast<SenderOperationResponseParms*>(response.get());
-            PSIParams parms = *parms_response->params;
+            const char *sop_str = sender_operation_type_str(sop->type());
+            APSI_LOG_INFO("Sending request of type: " << sop_str);
 
-            APSI_LOG_DEBUG("Received parameters:" << endl << parms.to_string());
-
-            return parms;
+            try
+            {
+                auto bytes_sent = chl.bytes_sent();
+                chl.send(move(sop));
+                bytes_sent = chl.bytes_sent() - bytes_sent;
+                APSI_LOG_INFO("Sent " << bytes_sent << " B");
+                APSI_LOG_INFO("Finished sending request of type: " << sop_str);
+            }
+            catch (const exception &ex)
+            {
+                APSI_LOG_ERROR("Sending request caused channel to throw an exception: " << ex.what());
+                return false;
+            }
+            return true;
         }
 
-        vector<seal_byte> Receiver::obfuscate_items(const vector<Item> &items, unique_ptr<OPRFReceiver> &oprf_receiver)
+        ParamsResponse Receiver::ReceiveParamsResponse(Channel &chl)
         {
-            APSI_LOG_INFO("Obfuscating items");
-            STOPWATCH(recv_stopwatch, "Receiver::obfuscate_items");
+            STOPWATCH(recv_stopwatch, "Receiver::ReceiveParamsResponse");
 
-            vector<seal_byte> oprf_query;
-            oprf_query.resize(items.size() * oprf_query_size);
-            oprf_receiver = make_unique<OPRFReceiver>(items, oprf_query);
+            auto bytes_received = chl.bytes_received();
+            auto sop_response = chl.receive_response(SenderOperationType::sop_parms);
+            bytes_received = chl.bytes_received() - bytes_received;
+            APSI_LOG_INFO("Received " << bytes_received << " B");
 
-            return oprf_query;
+            if (!sop_response)
+            {
+                APSI_LOG_ERROR("Failed to receive response to parameter request");
+                return nullptr;
+            }
+
+            // The response type must be SenderOperationType::sop_parms
+            ParamsResponse response = downcast_ptr<SenderOperationResponseParms, SenderOperationResponse>(move(sop_response));
+            if (!response->params)
+            {
+                APSI_LOG_ERROR("Missing data from response to parameter request");
+                return nullptr;
+            }
+
+            // Extract the parameters from the response object
+            if (logging::Log::get_log_level() <= logging::Log::Level::debug)
+            {
+                APSI_LOG_DEBUG("Received valid parameters: " << endl << response->params->to_string());
+            }
+            else
+            {
+                APSI_LOG_INFO("Received valid parameters");
+            }
+
+            return response;
         }
 
-        vector<HashedItem> Receiver::deobfuscate_items(
-            const vector<seal_byte> &oprf_response,
-            unique_ptr<OPRFReceiver> &oprf_receiver)
+        PSIParams Receiver::RequestParams(NetworkChannel &chl)
         {
-            APSI_LOG_INFO("Deobfuscating items");
-            STOPWATCH(recv_stopwatch, "Receiver::deobfuscate_items");
+            // Create parameter request and send to Sender
+            auto sop_parms = CreateParamsRequest();
+            if (!SendRequest(move(sop_parms), chl))
+            {
+                throw runtime_error("failed to send parameter request");
+            }
 
-            vector<HashedItem> items(oprf_receiver->item_count());
-            oprf_receiver->process_responses(oprf_response, items);
-            oprf_receiver.reset();
+            // Wait for a valid message of the correct type
+            ParamsResponse response;
+            while (!(response = ReceiveParamsResponse(chl)));
+
+            return *response->params;
+        }
+
+        OPRFReceiver Receiver::CreateOPRFReceiver(const vector<Item> &items)
+        {
+            STOPWATCH(recv_stopwatch, "Receiver::CreateOPRFReceiver");
+
+            OPRFReceiver oprf_receiver(items);
+            APSI_LOG_INFO("Created OPRFReceiver for " << oprf_receiver.item_count() << " items");
+
+            return oprf_receiver;
+        }
+
+        vector<HashedItem> Receiver::ExtractHashes(
+            const OPRFResponse &oprf_response,
+            const OPRFReceiver &oprf_receiver)
+        {
+            STOPWATCH(recv_stopwatch, "Receiver::ExtractHashes");
+
+            if (!oprf_response)
+            {
+                APSI_LOG_ERROR("Failed to extract OPRF hashes for items: OPRF response is null");
+                return {};
+            }
+            
+            auto response_size = oprf_response->data.size();
+            size_t oprf_response_item_count = response_size / oprf_response_size;
+            if ((response_size % oprf_response_size) || (oprf_response_item_count != oprf_receiver.item_count()))
+            {
+                APSI_LOG_ERROR("Failed to extract OPRF hashes for items: unexpected OPRF response size (" << response_size << " B)");
+                return {};
+            }
+
+            vector<HashedItem> items(oprf_receiver.item_count());
+            oprf_receiver.process_responses(oprf_response->data, items);
+            APSI_LOG_INFO("Extracted OPRF hashes for " << oprf_response_item_count << " items");
 
             return items;
         }
 
-        vector<HashedItem> Receiver::request_oprf(const vector<Item> &items, Channel &chl)
+        unique_ptr<SenderOperation> Receiver::CreateOPRFRequest(const vector<Item> &items, const OPRFReceiver &oprf_receiver)
         {
-            APSI_LOG_INFO("Starting OPRF request for " << items.size() << " items");
-            STOPWATCH(recv_stopwatch, "Receiver::oprf");
+            auto sop = make_unique<SenderOperationOPRF>();
+            sop->data = oprf_receiver.query_data();
+            APSI_LOG_INFO("Created OPRF request");
 
-            unique_ptr<OPRFReceiver> oprf_receiver = nullptr;
+            return sop;
+        }
 
-            // Send OPRF query to Sender
-            auto sop_oprf = make_unique<SenderOperationOPRF>();
-            sop_oprf->data = move(obfuscate_items(items, oprf_receiver));
-            APSI_LOG_DEBUG("OPRF request created");
-            chl.send(move(sop_oprf));
-            APSI_LOG_DEBUG("OPRF request sent");
+        OPRFResponse Receiver::ReceiveOPRFResponse(Channel &chl)
+        {
+            STOPWATCH(recv_stopwatch, "Receiver::ReceiveOPRFResponse");
 
-            unique_ptr<SenderOperationResponse> response;
+            auto bytes_received = chl.bytes_received();
+            auto sop_response = chl.receive_response(SenderOperationType::sop_oprf);
+            bytes_received = chl.bytes_received() - bytes_received;
+            APSI_LOG_INFO("Received " << bytes_received << " B");
+
+            if (!sop_response)
             {
-                STOPWATCH(recv_stopwatch, "Receiver::oprf::wait_response");
-
-                // Wait for a valid message of the correct type
-                APSI_LOG_DEBUG("Waiting for OPRF response");
-                while (!(response = chl.receive_response(SenderOperationType::SOP_OPRF)));
+                APSI_LOG_ERROR("Failed to receive OPRF response");
+                return nullptr;
             }
-            APSI_LOG_DEBUG("OPRF response received");
 
-            // Extract the OPRF response
-            auto &oprf_response = dynamic_cast<SenderOperationResponseOPRF*>(response.get())->data;
-            vector<HashedItem> oprf_items = deobfuscate_items(oprf_response, oprf_receiver);
-            APSI_LOG_INFO("Finished OPRF request");
+            // The response type must be SenderOperationType::sop_oprf
+            OPRFResponse response = downcast_ptr<SenderOperationResponseOPRF>(move(sop_response));
+
+            auto response_size = response->data.size();
+            if (response_size % oprf_response_size)
+            {
+                APSI_LOG_ERROR("Failed to process OPRF response: data has invalid size (" << response_size << " B)");
+                return nullptr;
+            }
+            APSI_LOG_INFO("Received OPRF response for " << response_size / oprf_response_size << " items");
+
+            return response;
+        }
+
+        vector<HashedItem> Receiver::RequestOPRF(const vector<Item> &items, NetworkChannel &chl)
+        {
+            auto oprf_receiver = CreateOPRFReceiver(items);
+
+            // Create OPRF request and send to Sender
+            auto sop_oprf = CreateOPRFRequest(items, oprf_receiver);
+            if (!SendRequest(move(sop_oprf), chl))
+            {
+                throw runtime_error("failed to send OPRF request");
+            }
+
+            // Wait for a valid message of the correct type
+            OPRFResponse response;
+            while (!(response = ReceiveOPRFResponse(chl)));
+
+            // Extract the OPRF hashed items
+            vector<HashedItem> oprf_items = ExtractHashes(response, oprf_receiver);
 
             return oprf_items;
         }
 
         Query Receiver::create_query(const vector<HashedItem> &items)
         {
-            APSI_LOG_INFO("Creating encrypted query");
+            APSI_LOG_INFO("Creating encrypted query for " << items.size() << " items");
             STOPWATCH(recv_stopwatch, "Receiver::create_query");
 
             Query query;
@@ -395,32 +548,46 @@ namespace apsi
             return query;
         }
 
-        vector<MatchRecord> Receiver::request_query(Query &&query, Channel &chl)
+        QueryResponse Receiver::ReceiveQueryResponse(Channel &chl)
         {
-            APSI_LOG_INFO("Starting query for " << query.item_count_ << " items");
-            STOPWATCH(recv_stopwatch, "Receiver::query");
+            STOPWATCH(recv_stopwatch, "Receiver::ReceiveQueryResponse");
 
-            chl.send(move(query.sop_));
-            APSI_LOG_DEBUG("Query request sent");
+            auto bytes_received = chl.bytes_received();
+            auto sop_response = chl.receive_response(SenderOperationType::sop_query);
+            bytes_received = chl.bytes_received() - bytes_received;
+            APSI_LOG_INFO("Received " << bytes_received << " B");
+
+            if (!sop_response)
+            {
+                APSI_LOG_ERROR("Failed to receive response to query request");
+                return nullptr;
+            }
+
+            // The response type must be SenderOperationType::sop_query
+            QueryResponse response = downcast_ptr<SenderOperationResponseQuery>(move(sop_response));
+            APSI_LOG_INFO("Received query response: expecting " << response->package_count << " result packages");
+
+            return response;
+        }
+
+        vector<MatchRecord> Receiver::request_query(const vector<HashedItem> &items, NetworkChannel &chl)
+        {
+            // Create query and send to Sender
+            auto query = create_query(items);
+            if (!SendRequest(query.extract_request(), chl))
+            {
+                throw runtime_error("failed to send query request");
+            }
 
             // Wait for query response
-            unique_ptr<SenderOperationResponse> response;
-            {
-                STOPWATCH(recv_stopwatch, "Receiver::query::wait_response");
-
-                // Wait for a valid message of the correct type
-                while (!(response = chl.receive_response(SenderOperationType::SOP_QUERY)));
-            }
-            APSI_LOG_DEBUG("Query response received");
+            QueryResponse response;
+            while (!(response = ReceiveQueryResponse(chl)));
 
             // Set up the result
             vector<MatchRecord> mrs(query.item_count_);
 
             // Get the number of ResultPackages we expect to receive
-            auto query_response = dynamic_cast<SenderOperationResponseQuery*>(response.get());
-            atomic<int32_t> package_count = safe_cast<int32_t>(query_response->package_count);
-
-            APSI_LOG_INFO("Expecting " << package_count << " result packages from Sender");
+            atomic<int32_t> package_count{ safe_cast<int32_t>(response->package_count) };
 
             // Launch threads to receive ResultPackages and decrypt results
             vector<thread> threads;
@@ -438,7 +605,6 @@ namespace apsi
 
             APSI_LOG_INFO("Found " << accumulate(mrs.begin(), mrs.end(), 0,
                 [](auto acc, auto &curr) { return acc + curr.found; }) << " matches");
-            APSI_LOG_INFO("Finished query");
 
             return mrs;
         }

@@ -64,7 +64,7 @@ namespace apsi
 
             SenderOperationType type() const noexcept override
             {
-                return SenderOperationType::SOP_PARMS;
+                return SenderOperationType::sop_parms;
             }
 
             /**
@@ -89,7 +89,7 @@ namespace apsi
 
             SenderOperationType type() const noexcept override
             {
-                return SenderOperationType::SOP_OPRF;
+                return SenderOperationType::sop_oprf;
             }
 
             /**
@@ -114,7 +114,7 @@ namespace apsi
 
             SenderOperationType type() const noexcept override
             {
-                return SenderOperationType::SOP_QUERY;
+                return SenderOperationType::sop_query;
             }
 
             /**

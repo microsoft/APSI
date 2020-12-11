@@ -104,21 +104,21 @@ namespace apsi
             */
             virtual std::unique_ptr<ZMQSenderOperation> receive_network_operation(
                 std::shared_ptr<seal::SEALContext> context, bool wait_for_message,
-                SenderOperationType expected = SenderOperationType::SOP_UNKNOWN);
+                SenderOperationType expected = SenderOperationType::sop_unknown);
 
             /**
             Receive a ZMQSenderOperation from a receiver.
             */
             virtual std::unique_ptr<ZMQSenderOperation> receive_network_operation(
                 std::shared_ptr<seal::SEALContext> context,
-                SenderOperationType expected = SenderOperationType::SOP_UNKNOWN);
+                SenderOperationType expected = SenderOperationType::sop_unknown);
 
             /**
             Receive a SenderOperation from a receiver.
             */
             std::unique_ptr<SenderOperation> receive_operation(
                 std::shared_ptr<seal::SEALContext> context,
-                SenderOperationType expected = SenderOperationType::SOP_UNKNOWN) override;
+                SenderOperationType expected = SenderOperationType::sop_unknown) override;
 
             /**
             Send a ZMQSenderOperationResponse to a receiver.
@@ -134,7 +134,7 @@ namespace apsi
             Receive a SenderOperationResponse from a sender.
             */
             std::unique_ptr<SenderOperationResponse> receive_response(
-                SenderOperationType expected = SenderOperationType::SOP_UNKNOWN) override;
+                SenderOperationType expected = SenderOperationType::sop_unknown) override;
 
             /**
             Send a ZMQResultPackage to a receiver.

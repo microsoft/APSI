@@ -50,7 +50,7 @@ namespace apsi
             */
             std::unique_ptr<SenderOperation> receive_operation(
                 std::shared_ptr<seal::SEALContext> context,
-                SenderOperationType expected = SenderOperationType::SOP_UNKNOWN) override;
+                SenderOperationType expected = SenderOperationType::sop_unknown) override;
 
             /**
             Send a SenderOperationResponse to the receiver.
@@ -61,7 +61,7 @@ namespace apsi
             Receive a SenderOperationResponse from a sender.
             */
             std::unique_ptr<SenderOperationResponse> receive_response(
-                SenderOperationType expected = SenderOperationType::SOP_UNKNOWN) override;
+                SenderOperationType expected = SenderOperationType::sop_unknown) override;
 
             /**
             Send a ResultPackage to a receiver.
