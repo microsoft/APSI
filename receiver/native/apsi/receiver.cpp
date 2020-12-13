@@ -134,6 +134,12 @@ namespace apsi
             }
             return unique_ptr<To>{ static_cast<To *>(from.release()) };
         }
+
+        template<typename T>
+        bool has_n_zeros(T *ptr, size_t count)
+        {
+            return all_of(ptr, ptr + count, [](auto a) { return a == T(0); });
+        }
     }
 
     namespace receiver
@@ -169,6 +175,16 @@ namespace apsi
             }
 
             return result;
+        }
+
+        size_t Query::find_item_idx(size_t table_idx) const noexcept
+        {
+            auto item_idx = table_idx_to_item_idx_.find(table_idx);
+            if (item_idx == table_idx_to_item_idx_.cend())
+            {
+                return item_count();
+            }
+            return item_idx->second;
         }
 
         unique_ptr<SenderOperation> Query::extract_request()
@@ -272,6 +288,11 @@ namespace apsi
             return true;
         }
 
+        bool Receiver::SendQuery(const Query &query, Channel &chl)
+        {
+            return SendRequest(query.deep_copy().extract_request(), chl);
+        }
+
         ParamsResponse Receiver::ReceiveParamsResponse(Channel &chl)
         {
             STOPWATCH(recv_stopwatch, "Receiver::ReceiveParamsResponse");
@@ -342,7 +363,7 @@ namespace apsi
 
             if (!oprf_response)
             {
-                APSI_LOG_ERROR("Failed to extract OPRF hashes for items: OPRF response is null");
+                APSI_LOG_ERROR("Failed to extract OPRF hashes for items: oprf_response is null");
                 return {};
             }
             
@@ -361,7 +382,7 @@ namespace apsi
             return items;
         }
 
-        unique_ptr<SenderOperation> Receiver::CreateOPRFRequest(const vector<Item> &items, const OPRFReceiver &oprf_receiver)
+        unique_ptr<SenderOperation> Receiver::CreateOPRFRequest(const OPRFReceiver &oprf_receiver)
         {
             auto sop = make_unique<SenderOperationOPRF>();
             sop->data = oprf_receiver.query_data();
@@ -404,7 +425,7 @@ namespace apsi
             auto oprf_receiver = CreateOPRFReceiver(items);
 
             // Create OPRF request and send to Sender
-            auto sop_oprf = CreateOPRFRequest(items, oprf_receiver);
+            auto sop_oprf = CreateOPRFRequest(oprf_receiver);
             if (!SendRequest(move(sop_oprf), chl))
             {
                 throw runtime_error("failed to send OPRF request");
@@ -570,6 +591,25 @@ namespace apsi
             return response;
         }
 
+        ResultPart Receiver::receive_result(Channel &chl) const
+        {
+            STOPWATCH(recv_stopwatch, "Receiver::receive_result");
+
+            auto bytes_received = chl.bytes_received();
+            auto rp = chl.receive_result_package(crypto_context_->seal_context());
+            bytes_received = chl.bytes_received() - bytes_received;
+            APSI_LOG_INFO("Received " << bytes_received << " B");
+
+            if (!rp)
+            {
+                APSI_LOG_ERROR("Failed to receive result package");
+                return {};
+            }
+
+            APSI_LOG_INFO("Received result package for bundle index " << rp->bundle_idx);
+            return rp;
+        }
+
         vector<MatchRecord> Receiver::request_query(const vector<HashedItem> &items, NetworkChannel &chl)
         {
             // Create query and send to Sender
@@ -584,7 +624,7 @@ namespace apsi
             while (!(response = ReceiveQueryResponse(chl)));
 
             // Set up the result
-            vector<MatchRecord> mrs(query.item_count_);
+            vector<MatchRecord> mrs(query.item_count());
 
             // Get the number of ResultPackages we expect to receive
             atomic<int32_t> package_count{ safe_cast<int32_t>(response->package_count) };
@@ -594,7 +634,7 @@ namespace apsi
             for (size_t t = 0; t < thread_count_; t++)
             {
                 threads.emplace_back([&, t]() {
-                    result_package_worker(package_count, mrs, query.table_idx_to_item_idx_, chl);
+                    process_result_worker(package_count, mrs, query, chl);
                 });
             }
 
@@ -609,14 +649,144 @@ namespace apsi
             return mrs;
         }
 
-        void Receiver::result_package_worker(
+        vector<MatchRecord> Receiver::process_result_part(const Query &query, const ResultPart &result_part) const
+        {
+            STOPWATCH(recv_stopwatch, "Receiver::process_result_part");
+
+            if (!result_part)
+            {
+                APSI_LOG_ERROR("Failed to process result: result_part is null");
+                return {};
+            }
+
+            // Decrypt and decode the result; the result vector will have full batch size
+            PlainResultPackage plain_rp = result_part->extract(*crypto_context_);
+
+            size_t felts_per_item = safe_cast<size_t>(params_.item_params().felts_per_item);
+            size_t items_per_bundle = safe_cast<size_t>(params_.items_per_bundle());
+            size_t bundle_start = mul_safe(safe_cast<size_t>(plain_rp.bundle_idx), items_per_bundle);
+
+            // Set up the result vector
+            vector<MatchRecord> mrs(query.item_count());
+
+            // Iterate over the decoded data to find consecutive zeros indicating a match
+            StrideIter<const uint64_t *> plain_rp_iter(plain_rp.psi_result.data(), felts_per_item);
+            SEAL_ITERATE(iter(plain_rp_iter, size_t(0)), items_per_bundle, [&](auto I) {
+                // Find felts_per_item consecutive zeros
+                bool match = has_n_zeros(get<0>(I).ptr(), felts_per_item);
+                if (!match)
+                {
+                    return;
+                }
+
+                // Compute the cuckoo table index for this item. Then find the corresponding index in the input
+                // items vector so we know where to place the result.
+                size_t table_idx = add_safe(get<1>(I), bundle_start);
+                auto item_idx = query.find_item_idx(table_idx);
+
+                // If this table_idx doesn't match any item_idx, ignore the result no matter what it is
+                if (item_idx == query.item_count())
+                {
+                    return;
+                }
+
+                // If a positive MatchRecord is already present, then something is seriously wrong
+                if (mrs[item_idx])
+                {
+                    APSI_LOG_ERROR("The table index -> item index translation table indicated a location that was "
+                        "already filled by another match from this result package; the translation table (query) "
+                        "has probably been corrupted");
+
+                    throw runtime_error("found a duplicate positive match; something is seriously wrong");
+                }
+
+                APSI_LOG_DEBUG("Match found for items[" << item_idx << "] at cuckoo table index " << table_idx);
+
+                // Create a new MatchRecord
+                MatchRecord mr;
+                mr.found = true;
+
+                // Next, extract the label result(s), if any
+                if (!plain_rp.label_result.empty())
+                {
+                    APSI_LOG_DEBUG("Found " << plain_rp.label_result.size() << "-part label for items[" << item_idx << "]");
+
+                    // Collect the entire label into this vector
+                    vector<felt_t> label_as_felts;
+
+                    for (auto &label_parts : plain_rp.label_result)
+                    {
+                        size_t label_offset = mul_safe(get<1>(I), felts_per_item);
+                        gsl::span<felt_t> label_part(
+                            label_parts.data() + label_offset, params_.item_params().felts_per_item);
+                        copy(label_part.begin(), label_part.end(), back_inserter(label_as_felts));
+                    }
+
+                    // Create the label
+                    auto label = make_unique<Bitstring>(field_elts_to_bits(
+                        label_as_felts,
+                        params_.item_bit_count(),
+                        params_.seal_params().plain_modulus()));
+
+                    // Set the label
+                    mr.label.set(move(label));
+                }
+
+                // We are done with the MatchRecord, so add it to the mrs vector
+                mrs[item_idx] = move(mr);
+            });
+
+            return mrs;
+        }
+
+        vector<MatchRecord> Receiver::process_result(const Query &query, const vector<ResultPart> &result) const
+        {
+            APSI_LOG_INFO("Processing " << result.size() << " result parts");
+            STOPWATCH(recv_stopwatch, "Receiver::process_result");
+
+            vector<MatchRecord> mrs(query.item_count());
+
+            for (auto &result_part : result)
+            {
+                auto this_mrs = process_result_part(query, result_part);
+                if (this_mrs.size() != mrs.size())
+                {
+                    // Something went wrong with process_result; error is already logged
+                    continue;
+                }
+
+                // Merge the new MatchRecords with mrs
+                SEAL_ITERATE(iter(mrs, this_mrs, size_t(0)), mrs.size(), [](auto I) {
+                    if (get<1>(I) && !get<0>(I))
+                    {
+                        // This match needs to be merged into mrs
+                        get<0>(I) = move(get<1>(I));
+                    }
+                    else if (get<1>(I) && get<0>(I))
+                    {
+                        // If a positive MatchRecord is already present, then something is seriously wrong
+                        APSI_LOG_ERROR("Found a match for items[" << get<2>(I) << "] but an existing match for this "
+                            "location was already found before from a different result part");
+
+                        throw runtime_error("found a duplicate positive match; something is seriously wrong");
+                    }
+                });
+            }
+
+            APSI_LOG_INFO("Found " << accumulate(mrs.begin(), mrs.end(), 0,
+                [](auto acc, auto &curr) { return acc + curr.found; }) << " matches");
+
+            return mrs;
+        }
+
+        void Receiver::process_result_worker(
             atomic<int32_t> &package_count,
             vector<MatchRecord> &mrs,
-            const unordered_map<size_t, size_t> &table_idx_to_item_idx,
+            const Query &query,
             Channel &chl) const
         {
             stringstream sw_ss;
-            sw_ss << "Receiver::result_package_worker [" << this_thread::get_id() << "]";
+            sw_ss << "Receiver::process_result_worker [" << this_thread::get_id() << "]";
             STOPWATCH(recv_stopwatch, sw_ss.str());
 
             APSI_LOG_INFO("Result worker [" << this_thread::get_id() << "]: starting");
@@ -631,86 +801,30 @@ namespace apsi
                     return;
                 }
 
-                // Wait for a valid ResultPackage
-                unique_ptr<ResultPackage> rp;
-                while (!(rp = chl.receive_result_package(crypto_context_->seal_context())));
-                APSI_LOG_DEBUG("Result worker [" << this_thread::get_id() << "]: "
-                    "result package received for bundle index " << rp->bundle_idx);
+                // Wait for a valid ResultPart
+                ResultPart result_part;
+                while (!(result_part = receive_result(chl)));
 
-                // Decrypt and decode the result; the result vector will have full batch size
-                PlainResultPackage plain_rp = rp->extract(*crypto_context_);
+                // Process the ResultPart to get the corresponding vector of MatchRecords
+                auto this_mrs = process_result_part(query, result_part);
 
-                // Iterate over the decoded data to find consecutive zeros indicating a match
-                StrideIter<const uint64_t *> plain_rp_iter(
-                    plain_rp.psi_result.data(), params_.item_params().felts_per_item);
-                size_t felts_per_item = safe_cast<size_t>(params_.item_params().felts_per_item);
-                size_t bundle_start = safe_cast<size_t>(mul_safe(plain_rp.bundle_idx, params_.items_per_bundle()));
-                SEAL_ITERATE(iter(plain_rp_iter, size_t(0)), params_.items_per_bundle(), [&](auto I) {
-                    // Find felts_per_item consecutive zeros
-                    bool match = all_of(get<0>(I), get<0>(I) + felts_per_item, [](auto felt) { return felt == 0; });
-                    if (!match)
+                // Merge the new MatchRecords with mrs
+                SEAL_ITERATE(iter(mrs, this_mrs, size_t(0)), mrs.size(), [](auto I) {
+                    if (get<1>(I) && !get<0>(I))
                     {
-                        return;
+                        // This match needs to be merged into mrs
+                        get<0>(I) = move(get<1>(I));
                     }
-
-                    // Compute the cuckoo table index for this item 
-                    size_t table_idx = add_safe(get<1>(I), bundle_start);
-
-                    // Next find the corresponding index in the input items vector
-                    auto item_idx_iter = table_idx_to_item_idx.find(table_idx);
-
-                    // If this table_idx doesn't match any item_idx, ignore the result no matter what it is
-                    if (item_idx_iter == table_idx_to_item_idx.cend())
-                    {
-                        return;
-                    }
-
-                    size_t item_idx = item_idx_iter->second;
-                    APSI_LOG_DEBUG("Result worker [" << this_thread::get_id() << "]: "
-                        "match found for items[" << item_idx << "] at cuckoo table index " << table_idx);
-                    if (mrs[item_idx])
+                    else if (get<1>(I) && get<0>(I))
                     {
                         // If a positive MatchRecord is already present, then something is seriously wrong
                         APSI_LOG_ERROR("Result worker [" << this_thread::get_id() << "]: "
-                            "found a match for cuckoo table index " << table_idx <<
-                            " but an existing match for this location was already found before");
+                            "found a match for items[" << get<2>(I) << "] "
+                            "but an existing match for this location was already found before from a different result "
+                            "part");
 
-                        throw runtime_error("found a pre-existing positive match in the location for this match");
+                        throw runtime_error("found a duplicate positive match; something is seriously wrong");
                     }
-
-                    // Create a new MatchRecord
-                    MatchRecord mr;
-                    mr.found = true;
-
-                    // Next, extract the label result(s), if any
-                    if (!plain_rp.label_result.empty())
-                    {
-                        APSI_LOG_DEBUG("Result worker [" << this_thread::get_id() << "]: "
-                            "found " << plain_rp.label_result.size() << "-part label for items[" << item_idx << "]");
-
-                        // Collect the entire label into this vector
-                        vector<felt_t> label_as_felts;
-
-                        for (auto &label_parts : plain_rp.label_result)
-                        {
-                            size_t label_offset = mul_safe(get<1>(I), felts_per_item);
-                            gsl::span<felt_t> label_part(
-                                label_parts.data() + label_offset, params_.item_params().felts_per_item);
-                            copy(label_part.begin(), label_part.end(), back_inserter(label_as_felts));
-                        }
-
-                        // Create the label
-                        auto label = make_unique<Bitstring>(field_elts_to_bits(
-                            label_as_felts,
-                            params_.item_bit_count(),
-                            params_.seal_params().plain_modulus()));
-
-                        // Set the label
-                        mr.label.set(move(label));
-                    }
-
-                    // We are done with the MatchRecord, so add it to the mrs vector
-                    mrs[item_idx] = move(mr);
                 });
             }
         }
