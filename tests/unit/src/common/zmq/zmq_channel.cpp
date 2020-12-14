@@ -311,7 +311,7 @@ namespace APSITests
         clientth.join();
     }
 
-    TEST_F(ZMQChannelTests, MultipleClientsTest)
+    TEST_F(ZMQChannelTests, MultipleClients)
     {
         atomic<bool> finished = false;
 

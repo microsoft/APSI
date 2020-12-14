@@ -71,114 +71,6 @@ namespace apsi
             data_ = move(sop_oprf->data);
         }
 
-        QueryRequest::QueryRequest(unique_ptr<SenderOperation> sop, shared_ptr<SenderDB> sender_db)
-        {
-            STOPWATCH(sender_stopwatch, "QueryRequest::QueryRequest");
-
-            if (!sop)
-            {
-                throw invalid_argument("operation cannot be null");
-            }
-            if (sop->type() != SenderOperationType::sop_query)
-            {
-                throw invalid_argument("operation is not a query request");
-            }
-            if (!sender_db)
-            {
-                throw invalid_argument("sender_db cannot be null");
-            }
-
-            auto sop_query = dynamic_cast<SenderOperationQuery*>(sop.get());
-
-            // Move over the SenderDB
-            sender_db_ = move(sender_db);
-            auto seal_context = sender_db_->get_context().seal_context();
-
-            // Extract and validate relinearization keys 
-            relin_keys_ = sop_query->relin_keys.extract_local();
-            if (!is_valid_for(relin_keys_, *seal_context))
-            {
-                APSI_LOG_ERROR("Extracted relinearization keys are invalid for SEALContext");
-                throw invalid_argument("relinearization keys are invalid");
-            }
-
-            // Extract and validate query ciphertexts
-            for (auto &q : sop_query->data)
-            {
-                APSI_LOG_DEBUG("Extracting " << q.second.size() << " ciphertexts for exponent " << q.first);
-                vector<Ciphertext> cts;
-                for (auto &ct : q.second)
-                {
-                    cts.push_back(ct.extract_local());
-                    if (!is_valid_for(cts.back(), *seal_context))
-                    {
-                        APSI_LOG_ERROR("Extracted ciphertext is invalid for SEALContext");
-                        throw invalid_argument("query ciphertext is invalid");
-                    }
-                }
-                data_[q.first] = move(cts);
-            }
-
-            // Extract the PowersDag
-            pd_ = move(sop_query->pd);
-
-            // Get the PSIParams
-            PSIParams params(sender_db_->get_params());
-
-            uint32_t bundle_idx_count = params.bundle_idx_count();
-            uint32_t max_items_per_bin = params.table_params().max_items_per_bin;
-            uint32_t query_powers_count = params.query_params().query_powers_count;
-
-            // Check that the PowersDag is valid and matches the PSIParams
-            if (!pd_.is_configured())
-            {
-                APSI_LOG_ERROR("Extracted PowersDag is not configured");
-                throw invalid_argument("PowersDag is not configured");
-            }
-            if (pd_.up_to_power() != max_items_per_bin)
-            {
-                APSI_LOG_ERROR("Extracted PowersDag is incompatible with PSI parameters: "
-                    "up_to_power (" << pd_.up_to_power() << ") does not match max_items_per_bin (" <<
-                    max_items_per_bin << ")");
-                throw invalid_argument("PowersDag is incompatible with PSI parameters");
-            }
-            if (pd_.source_count() != query_powers_count)
-            {
-                APSI_LOG_ERROR("Extracted PowersDag is incompatible with PSI parameters: "
-                    "source_count (" << pd_.source_count() << ") does not match query_power_count (" <<
-                    query_powers_count << ")");
-                throw invalid_argument("PowersDag is incompatible with PSI parameters");
-            }
-
-            // Check that the query data size matches the PSIParams
-            if (data_.size() != query_powers_count)
-            {
-                APSI_LOG_ERROR("Extracted query data is incompatible with PSI parameters: "
-                    "query contains " << data_.size() << " ciphertext powers which does not match with "
-                    "query_power_count (" << query_powers_count << ")");
-                throw invalid_argument("number of ciphertext powers is incompatible with PSI parameters");
-            }
-            auto query_powers = pd_.source_nodes();
-            for (auto &q : data_)
-            {
-                // Check that powers in the query data match source nodes in the PowersDag
-                if (q.second.size() != bundle_idx_count)
-                {
-                    APSI_LOG_ERROR("Extracted query data is incompatible with PSI parameters: "
-                        "query power " << q.first << " contains " << q.second.size() << " ciphertexts which does not "
-                        "match with bundle_idx_count (" << bundle_idx_count << ")");
-                    throw invalid_argument("number of ciphertexts is incompatible with PSI parameters");
-                }
-                auto where = find_if(query_powers.cbegin(), query_powers.cend(), [&q](auto n) { return n.power == q.first; });
-                if (where == query_powers.cend())
-                {
-                    APSI_LOG_ERROR("Extracted query data is incompatible with PowersDag: "
-                        "query power " << q.first << " does not match with a source node in PowersDag");
-                    throw invalid_argument("query ciphertext data does not match the PowersDag");
-                }
-            }
-        }
-
         void Sender::RunParms(
             ParmsRequest &&parms_request,
             shared_ptr<SenderDB> sender_db,
@@ -236,15 +128,21 @@ namespace apsi
         }
 
         void Sender::RunQuery(
-            QueryRequest &&query_request,
+            const Query &query,
             Channel &chl,
             size_t thread_count,
             function<void(Channel &, unique_ptr<SenderOperationResponse>)> send_fun,
             function<void(Channel &, unique_ptr<ResultPackage>)> send_rp_fun)
         {
+            if (!query)
+            {
+                APSI_LOG_ERROR("Failed to process query request: query is invalid");
+                invalid_argument("query is invalid");
+            }
+
             thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
 
-            auto sender_db = move(query_request.sender_db_);
+            auto sender_db = query.sender_db();
 
             // Acquire read lock on SenderDB
             auto sender_db_lock = sender_db->get_reader_lock();
@@ -255,7 +153,7 @@ namespace apsi
 
             // Copy over the CryptoContext from SenderDB; set the Evaluator for this local instance
             CryptoContext crypto_context(sender_db->get_context());
-            crypto_context.set_evaluator(move(query_request.relin_keys_));
+            crypto_context.set_evaluator(query.relin_keys());
 
             // Get the PSIParams
             PSIParams params(sender_db->get_params());
@@ -265,7 +163,7 @@ namespace apsi
             uint32_t query_powers_count = params.query_params().query_powers_count;
 
             // Extract the PowersDag
-            PowersDag pd = move(query_request.pd_);
+            PowersDag pd = query.pd();
 
             // The query response only tells how many ResultPackages to expect; send this first
             uint32_t package_count = safe_cast<uint32_t>(sender_db->get_bin_bundle_count());
@@ -289,7 +187,7 @@ namespace apsi
             }
 
             // Load inputs provided in the query
-            for (auto &q : query_request.data_)
+            for (auto &q : query.data())
             {
                 // The exponent of all the query powers we're about to iterate through
                 size_t exponent = static_cast<size_t>(q.first);

@@ -24,6 +24,8 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/item.h
         ${CMAKE_CURRENT_LIST_DIR}/powers.h
         ${CMAKE_CURRENT_LIST_DIR}/psi_params.h
+        ${CMAKE_CURRENT_LIST_DIR}/requests.h
+        ${CMAKE_CURRENT_LIST_DIR}/responses.h
         ${CMAKE_CURRENT_LIST_DIR}/seal_object.h
         ${CMAKE_CURRENT_LIST_DIR}/version.h
     DESTINATION

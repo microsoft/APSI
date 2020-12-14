@@ -4,6 +4,7 @@
 target_sources(sender
     PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/bin_bundle.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/query.cpp
         ${CMAKE_CURRENT_LIST_DIR}/sender.cpp
         ${CMAKE_CURRENT_LIST_DIR}/sender_db.cpp
 )
@@ -15,6 +16,7 @@ endif()
 install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/bin_bundle.h
+        ${CMAKE_CURRENT_LIST_DIR}/query.h
         ${CMAKE_CURRENT_LIST_DIR}/sender.h
         ${CMAKE_CURRENT_LIST_DIR}/sender_db.h
     DESTINATION

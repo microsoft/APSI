@@ -10,6 +10,7 @@
 #include "apsi/zmq/sender_dispatcher.h"
 #include "apsi/logging/log.h"
 #include "apsi/oprf/oprf_sender.h"
+#include "apsi/requests.h"
 
 // SEAL
 #include "seal/util/common.h"
@@ -83,11 +84,9 @@ namespace apsi
                     break;
 
                 case SenderOperationType::sop_query:
-                    {
-                        APSI_LOG_INFO("Received query");
-                        dispatch_query(move(sop), chl);
-                        break;
-                    }
+                    APSI_LOG_INFO("Received query");
+                    dispatch_query(move(sop), chl);
+                    break;
 
                 default:
                     // We should never reach this point
@@ -119,7 +118,7 @@ namespace apsi
             }
             catch (const exception &ex)
             {
-                APSI_LOG_ERROR("APSI threw an exception while processing parameter request: " << ex.what());
+                APSI_LOG_ERROR("Sender threw an exception while processing parameter request: " << ex.what());
             }
         }
 
@@ -144,7 +143,7 @@ namespace apsi
             }
             catch (const exception &ex)
             {
-                APSI_LOG_ERROR("APSI threw an exception while processing OPRF query: " << ex.what());
+                APSI_LOG_ERROR("Sender threw an exception while processing OPRF query: " << ex.what());
             }
         }
 
@@ -154,11 +153,11 @@ namespace apsi
 
             try
             {
-                // Create the QueryRequest object
-                QueryRequest query_request(move(sop->sop), sender_db_);
+                // Create the Query object
+                Query query(to_query_request(move(sop->sop)), sender_db_);
 
                 // Query will send result to client in a stream of ResultPackages
-                Sender::RunQuery(move(query_request), chl, thread_count_,
+                Sender::RunQuery(move(query), chl, thread_count_,
                     // Lambda function for sending the query response
                     [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
                         auto nsop_response = make_unique<ZMQSenderOperationResponse>();
@@ -180,7 +179,7 @@ namespace apsi
             }
             catch (const exception &ex)
             {
-                APSI_LOG_ERROR("APSI threw an exception while processing query: " << ex.what());
+                APSI_LOG_ERROR("Sender threw an exception while processing query: " << ex.what());
             }
         }
     } // namespace sender

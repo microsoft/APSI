@@ -35,6 +35,12 @@ namespace apsi
             {}
 
             /**
+            Create an instance of StreamChannel using the given stream for input and output.
+            */
+            StreamChannel(std::iostream &stream) : StreamChannel(stream, stream)
+            {}
+
+            /**
             Destroy an instance of a StreamChannel.
             */
             ~StreamChannel()

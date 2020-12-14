@@ -124,17 +124,6 @@ namespace apsi
             }
         };
 
-        template<typename To, typename From>
-        unique_ptr<To> downcast_ptr(unique_ptr<From> from)
-        {
-            auto ptr = dynamic_cast<To *>(from.get());
-            if (!ptr)
-            {
-                return nullptr;
-            }
-            return unique_ptr<To>{ static_cast<To *>(from.release()) };
-        }
-
         template<typename T>
         bool has_n_zeros(T *ptr, size_t count)
         {
@@ -144,57 +133,15 @@ namespace apsi
 
     namespace receiver
     {
-        bool Query::has_request() const noexcept
-        {
-            return dynamic_cast<const SenderOperationQuery*>(sop_.get());
-        }
-
-        const SenderOperationQuery &Query::request_data() const
-        {
-            if (!has_request())
-            {
-                throw logic_error("query data is invalid");
-            }
-
-            return *static_cast<const SenderOperationQuery*>(sop_.get());
-        }
-
-        Query Query::deep_copy() const
-        {
-            Query result;
-            result.item_count_ = item_count_;
-            result.table_idx_to_item_idx_ = table_idx_to_item_idx_;
-
-            const SenderOperationQuery *this_query = dynamic_cast<const SenderOperationQuery*>(sop_.get());
-            if (this_query)
-            {
-                auto sop_query = make_unique<SenderOperationQuery>();
-                sop_query->relin_keys = this_query->relin_keys;
-                sop_query->data = this_query->data;
-                result.sop_ = move(sop_query);
-            }
-
-            return result;
-        }
-
-        size_t Query::find_item_idx(size_t table_idx) const noexcept
+        size_t IndexTranslationTable::find_item_idx(size_t table_idx) const noexcept
         {
             auto item_idx = table_idx_to_item_idx_.find(table_idx);
             if (item_idx == table_idx_to_item_idx_.cend())
             {
                 return item_count();
             }
+
             return item_idx->second;
-        }
-
-        unique_ptr<SenderOperation> Query::extract_request()
-        {
-            if (!has_request())
-            {
-                return nullptr;
-            }
-
-            return std::move(sop_);
         }
 
         Receiver::Receiver(PSIParams params, size_t thread_count) : params_(move(params))
@@ -259,88 +206,25 @@ namespace apsi
             return sop;
         }
 
-        bool Receiver::SendRequest(unique_ptr<SenderOperation> sop, Channel &chl)
-        {
-            STOPWATCH(recv_stopwatch, "Receiver::SendRequest");
-
-            if (!sop)
-            {
-                APSI_LOG_ERROR("Failed to send request: operation is null");
-                return false;
-            }
-
-            const char *sop_str = sender_operation_type_str(sop->type());
-            APSI_LOG_INFO("Sending request of type: " << sop_str);
-
-            try
-            {
-                auto bytes_sent = chl.bytes_sent();
-                chl.send(move(sop));
-                bytes_sent = chl.bytes_sent() - bytes_sent;
-                APSI_LOG_INFO("Sent " << bytes_sent << " B");
-                APSI_LOG_INFO("Finished sending request of type: " << sop_str);
-            }
-            catch (const exception &ex)
-            {
-                APSI_LOG_ERROR("Sending request caused channel to throw an exception: " << ex.what());
-                return false;
-            }
-            return true;
-        }
-
-        bool Receiver::SendQuery(const Query &query, Channel &chl)
-        {
-            return SendRequest(query.deep_copy().extract_request(), chl);
-        }
-
-        ParamsResponse Receiver::ReceiveParamsResponse(Channel &chl)
-        {
-            STOPWATCH(recv_stopwatch, "Receiver::ReceiveParamsResponse");
-
-            auto bytes_received = chl.bytes_received();
-            auto sop_response = chl.receive_response(SenderOperationType::sop_parms);
-            bytes_received = chl.bytes_received() - bytes_received;
-            APSI_LOG_INFO("Received " << bytes_received << " B");
-
-            if (!sop_response)
-            {
-                APSI_LOG_ERROR("Failed to receive response to parameter request");
-                return nullptr;
-            }
-
-            // The response type must be SenderOperationType::sop_parms
-            ParamsResponse response = downcast_ptr<SenderOperationResponseParms, SenderOperationResponse>(move(sop_response));
-            if (!response->params)
-            {
-                APSI_LOG_ERROR("Missing data from response to parameter request");
-                return nullptr;
-            }
-
-            // Extract the parameters from the response object
-            if (logging::Log::get_log_level() <= logging::Log::Level::debug)
-            {
-                APSI_LOG_DEBUG("Received valid parameters: " << endl << response->params->to_string());
-            }
-            else
-            {
-                APSI_LOG_INFO("Received valid parameters");
-            }
-
-            return response;
-        }
-
         PSIParams Receiver::RequestParams(NetworkChannel &chl)
         {
             // Create parameter request and send to Sender
-            auto sop_parms = CreateParamsRequest();
-            if (!SendRequest(move(sop_parms), chl))
-            {
-                throw runtime_error("failed to send parameter request");
-            }
+            chl.send(CreateParamsRequest());
 
             // Wait for a valid message of the correct type
             ParamsResponse response;
-            while (!(response = ReceiveParamsResponse(chl)));
+            bool logged_waiting = false;
+            while (!(response = to_params_response(chl.receive_response())))
+            {
+                if (!logged_waiting)
+                {
+                    // We want to log 'Waiting' only once, even if we have to wait for several sleeps.
+                    logged_waiting = true;
+                    APSI_LOG_INFO("Waiting for response to parameter request");
+                }
+
+                this_thread::sleep_for(50ms);
+            }
 
             return *response->params;
         }
@@ -391,49 +275,27 @@ namespace apsi
             return sop;
         }
 
-        OPRFResponse Receiver::ReceiveOPRFResponse(Channel &chl)
-        {
-            STOPWATCH(recv_stopwatch, "Receiver::ReceiveOPRFResponse");
-
-            auto bytes_received = chl.bytes_received();
-            auto sop_response = chl.receive_response(SenderOperationType::sop_oprf);
-            bytes_received = chl.bytes_received() - bytes_received;
-            APSI_LOG_INFO("Received " << bytes_received << " B");
-
-            if (!sop_response)
-            {
-                APSI_LOG_ERROR("Failed to receive OPRF response");
-                return nullptr;
-            }
-
-            // The response type must be SenderOperationType::sop_oprf
-            OPRFResponse response = downcast_ptr<SenderOperationResponseOPRF>(move(sop_response));
-
-            auto response_size = response->data.size();
-            if (response_size % oprf_response_size)
-            {
-                APSI_LOG_ERROR("Failed to process OPRF response: data has invalid size (" << response_size << " B)");
-                return nullptr;
-            }
-            APSI_LOG_INFO("Received OPRF response for " << response_size / oprf_response_size << " items");
-
-            return response;
-        }
-
         vector<HashedItem> Receiver::RequestOPRF(const vector<Item> &items, NetworkChannel &chl)
         {
             auto oprf_receiver = CreateOPRFReceiver(items);
 
             // Create OPRF request and send to Sender
-            auto sop_oprf = CreateOPRFRequest(oprf_receiver);
-            if (!SendRequest(move(sop_oprf), chl))
-            {
-                throw runtime_error("failed to send OPRF request");
-            }
+            chl.send(CreateOPRFRequest(oprf_receiver));
 
             // Wait for a valid message of the correct type
             OPRFResponse response;
-            while (!(response = ReceiveOPRFResponse(chl)));
+            bool logged_waiting = false;
+            while (!(response = to_oprf_response(chl.receive_response())))
+            {
+                if (!logged_waiting)
+                {
+                    // We want to log 'Waiting' only once, even if we have to wait for several sleeps.
+                    logged_waiting = true;
+                    APSI_LOG_INFO("Waiting for response to OPRF request");
+                }
+
+                this_thread::sleep_for(50ms);
+            }
 
             // Extract the OPRF hashed items
             vector<HashedItem> oprf_items = ExtractHashes(response, oprf_receiver);
@@ -441,13 +303,13 @@ namespace apsi
             return oprf_items;
         }
 
-        Query Receiver::create_query(const vector<HashedItem> &items)
+        pair<Request, IndexTranslationTable> Receiver::create_query(const vector<HashedItem> &items)
         {
             APSI_LOG_INFO("Creating encrypted query for " << items.size() << " items");
             STOPWATCH(recv_stopwatch, "Receiver::create_query");
 
-            Query query;
-            query.item_count_ = items.size();
+            IndexTranslationTable itt;
+            itt.item_count_ = items.size();
 
             // Create the cuckoo table
             KukuTable cuckoo(
@@ -498,7 +360,7 @@ namespace apsi
             for (size_t item_idx = 0; item_idx < items.size(); item_idx++)
             {
                 auto item_loc = cuckoo.query(items[item_idx].value());
-                query.table_idx_to_item_idx_[item_loc.location()] = item_idx;
+                itt.table_idx_to_item_idx_[item_loc.location()] = item_idx;
             }
 
             // Set up unencrypted query data
@@ -562,33 +424,11 @@ namespace apsi
             sop_query->relin_keys = relin_keys_;
             sop_query->data = move(encrypted_powers);
             sop_query->pd = pd_;
-            query.sop_ = move(sop_query);
+            auto sop = to_request(move(sop_query));
 
             APSI_LOG_INFO("Finished creating encrypted query");
 
-            return query;
-        }
-
-        QueryResponse Receiver::ReceiveQueryResponse(Channel &chl)
-        {
-            STOPWATCH(recv_stopwatch, "Receiver::ReceiveQueryResponse");
-
-            auto bytes_received = chl.bytes_received();
-            auto sop_response = chl.receive_response(SenderOperationType::sop_query);
-            bytes_received = chl.bytes_received() - bytes_received;
-            APSI_LOG_INFO("Received " << bytes_received << " B");
-
-            if (!sop_response)
-            {
-                APSI_LOG_ERROR("Failed to receive response to query request");
-                return nullptr;
-            }
-
-            // The response type must be SenderOperationType::sop_query
-            QueryResponse response = downcast_ptr<SenderOperationResponseQuery>(move(sop_response));
-            APSI_LOG_INFO("Received query response: expecting " << response->package_count << " result packages");
-
-            return response;
+            return { move(sop), itt };
         }
 
         ResultPart Receiver::receive_result(Channel &chl) const
@@ -614,17 +454,26 @@ namespace apsi
         {
             // Create query and send to Sender
             auto query = create_query(items);
-            if (!SendRequest(query.extract_request(), chl))
-            {
-                throw runtime_error("failed to send query request");
-            }
+            chl.send(move(query.first));
+            auto itt = move(query.second);
 
             // Wait for query response
             QueryResponse response;
-            while (!(response = ReceiveQueryResponse(chl)));
+            bool logged_waiting = false;
+            while (!(response = to_query_response(chl.receive_response())))
+            {
+                if (!logged_waiting)
+                {
+                    // We want to log 'Waiting' only once, even if we have to wait for several sleeps.
+                    logged_waiting = true;
+                    APSI_LOG_INFO("Waiting for response to query request");
+                }
+
+                this_thread::sleep_for(50ms);
+            }
 
             // Set up the result
-            vector<MatchRecord> mrs(query.item_count());
+            vector<MatchRecord> mrs(query.second.item_count());
 
             // Get the number of ResultPackages we expect to receive
             atomic<int32_t> package_count{ safe_cast<int32_t>(response->package_count) };
@@ -634,7 +483,7 @@ namespace apsi
             for (size_t t = 0; t < thread_count_; t++)
             {
                 threads.emplace_back([&, t]() {
-                    process_result_worker(package_count, mrs, query, chl);
+                    process_result_worker(package_count, mrs, itt, chl);
                 });
             }
 
@@ -649,7 +498,9 @@ namespace apsi
             return mrs;
         }
 
-        vector<MatchRecord> Receiver::process_result_part(const Query &query, const ResultPart &result_part) const
+        vector<MatchRecord> Receiver::process_result_part(
+            const IndexTranslationTable &itt,
+            const ResultPart &result_part) const
         {
             STOPWATCH(recv_stopwatch, "Receiver::process_result_part");
 
@@ -667,7 +518,7 @@ namespace apsi
             size_t bundle_start = mul_safe(safe_cast<size_t>(plain_rp.bundle_idx), items_per_bundle);
 
             // Set up the result vector
-            vector<MatchRecord> mrs(query.item_count());
+            vector<MatchRecord> mrs(itt.item_count());
 
             // Iterate over the decoded data to find consecutive zeros indicating a match
             StrideIter<const uint64_t *> plain_rp_iter(plain_rp.psi_result.data(), felts_per_item);
@@ -682,10 +533,10 @@ namespace apsi
                 // Compute the cuckoo table index for this item. Then find the corresponding index in the input
                 // items vector so we know where to place the result.
                 size_t table_idx = add_safe(get<1>(I), bundle_start);
-                auto item_idx = query.find_item_idx(table_idx);
+                auto item_idx = itt.find_item_idx(table_idx);
 
                 // If this table_idx doesn't match any item_idx, ignore the result no matter what it is
-                if (item_idx == query.item_count())
+                if (item_idx == itt.item_count())
                 {
                     return;
                 }
@@ -739,16 +590,18 @@ namespace apsi
             return mrs;
         }
 
-        vector<MatchRecord> Receiver::process_result(const Query &query, const vector<ResultPart> &result) const
+        vector<MatchRecord> Receiver::process_result(
+            const IndexTranslationTable &itt,
+            const vector<ResultPart> &result) const
         {
             APSI_LOG_INFO("Processing " << result.size() << " result parts");
             STOPWATCH(recv_stopwatch, "Receiver::process_result");
 
-            vector<MatchRecord> mrs(query.item_count());
+            vector<MatchRecord> mrs(itt.item_count());
 
             for (auto &result_part : result)
             {
-                auto this_mrs = process_result_part(query, result_part);
+                auto this_mrs = process_result_part(itt, result_part);
                 if (this_mrs.size() != mrs.size())
                 {
                     // Something went wrong with process_result; error is already logged
@@ -782,7 +635,7 @@ namespace apsi
         void Receiver::process_result_worker(
             atomic<int32_t> &package_count,
             vector<MatchRecord> &mrs,
-            const Query &query,
+            const IndexTranslationTable &itt,
             Channel &chl) const
         {
             stringstream sw_ss;
@@ -806,7 +659,7 @@ namespace apsi
                 while (!(result_part = receive_result(chl)));
 
                 // Process the ResultPart to get the corresponding vector of MatchRecords
-                auto this_mrs = process_result_part(query, result_part);
+                auto this_mrs = process_result_part(itt, result_part);
 
                 // Merge the new MatchRecords with mrs
                 SEAL_ITERATE(iter(mrs, this_mrs, size_t(0)), mrs.size(), [](auto I) {

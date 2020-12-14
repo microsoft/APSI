@@ -23,6 +23,9 @@
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/powers.h"
 #include "apsi/psi_params.h"
+#include "apsi/query.h"
+#include "apsi/requests.h"
+#include "apsi/responses.h"
 #include "apsi/seal_object.h"
 #include "apsi/sender_db.h"
 
@@ -88,43 +91,6 @@ namespace apsi
             std::vector<seal::seal_byte> data_;
         };
 
-        class QueryRequest
-        {
-        friend class Sender;
-
-        public:
-            QueryRequest(std::unique_ptr<network::SenderOperation> sop, std::shared_ptr<SenderDB> sender_db);
-
-            QueryRequest deep_copy() const
-            {
-                QueryRequest result;
-                result.relin_keys_ = relin_keys_;
-                result.data_ = data_;
-                result.sender_db_ = sender_db_;
-
-                return std::move(result);
-            }
-
-            QueryRequest(const QueryRequest &source) = delete;
-
-            QueryRequest(QueryRequest &&source) = default;
-
-            QueryRequest &operator =(const QueryRequest &source) = delete;
-
-            QueryRequest &operator =(QueryRequest &&source) = default;
-
-        private:
-            QueryRequest() = default;
-
-            seal::RelinKeys relin_keys_;
-
-            std::unordered_map<std::uint32_t, std::vector<seal::Ciphertext>> data_;
-
-            PowersDag pd_;
-
-            std::shared_ptr<SenderDB> sender_db_;
-        };
-
         // An alias to denote the powers of a receiver's ciphertext. At index i, holds Cⁱ, where C is the ciphertext..
         // The 0th index is always a dummy value.
         using CiphertextPowers = std::vector<seal::Ciphertext>;
@@ -158,7 +124,7 @@ namespace apsi
             Generate and send a response to a query.
             */
             static void RunQuery(
-                QueryRequest &&query_request,
+                const Query &query,
                 network::Channel &chl,
                 std::size_t thread_count = 0,
                 std::function<void(network::Channel &, std::unique_ptr<network::SenderOperationResponse>)> send_fun

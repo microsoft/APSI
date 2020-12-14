@@ -98,5 +98,33 @@ namespace apsi
         This function reads a size-prefixed number of bytes from a stream and returns the result in a vector.
         */
         std::vector<seal::seal_byte> read_from_stream(std::istream &in);
+
+        /**
+        Casts std::unique_ptr<T> to std::unique_ptr<S>, when S* can be cast to T*. Returns nullptr if the cast fails.
+        */
+        template<typename To, typename From>
+        std::unique_ptr<To> unique_ptr_cast(std::unique_ptr<From> &from)
+        {
+            auto ptr = dynamic_cast<To *>(from.get());
+            if (!ptr)
+            {
+                return nullptr;
+            }
+            return std::unique_ptr<To>{ static_cast<To *>(from.release()) };
+        }
+
+        /**
+        Casts std::unique_ptr<T> to std::unique_ptr<S>, when S* can be cast to T*. Returns nullptr if the cast fails.
+        */
+        template<typename To, typename From>
+        std::unique_ptr<To> unique_ptr_cast(std::unique_ptr<From> &&from)
+        {
+            auto ptr = dynamic_cast<To *>(from.get());
+            if (!ptr)
+            {
+                return nullptr;
+            }
+            return std::unique_ptr<To>{ static_cast<To *>(from.release()) };
+        }
     } // namespace util
 } // namespace apsi

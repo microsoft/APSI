@@ -82,7 +82,7 @@ namespace APSITests
         {}
     };
 
-    TEST_F(StreamChannelTests, SendReceiveParmsTest)
+    TEST_F(StreamChannelTests, SendReceiveParms)
     {
         stringstream stream1;
         stringstream stream2;
@@ -171,7 +171,7 @@ namespace APSITests
         ASSERT_EQ(svr.bytes_received(), clt.bytes_sent());
     }
 
-    TEST_F(StreamChannelTests, SendReceiveQueryTest)
+    TEST_F(StreamChannelTests, SendReceiveQuery)
     {
         stringstream stream1;
         stringstream stream2;

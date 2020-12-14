@@ -23,6 +23,8 @@
 #include "apsi/oprf/oprf_receiver.h"
 #include "apsi/powers.h"
 #include "apsi/psi_params.h"
+#include "apsi/requests.h"
+#include "apsi/responses.h"
 #include "apsi/seal_object.h"
 #include "apsi/util/db_encoding.h"
 
@@ -37,6 +39,35 @@ namespace apsi
     namespace receiver
     {
         class Receiver;
+
+        class IndexTranslationTable
+        {
+        friend class Receiver;
+
+        public:
+            /**
+            Translates a cuckoo table index to an index of the vector of items that were used to create this query. If
+            the given table index was not populated, i.e., there is no translation, then this function returns the
+            number of items encoded by this query.
+            */
+            std::size_t find_item_idx(std::size_t table_idx) const noexcept;
+
+            /**
+            Returns the number of items encoded by this query. This function returns 0 if the query does not contain an
+            index translation table, e.g., when the sender has received the query.
+            */
+            const std::size_t item_count() const noexcept
+            {
+                return item_count_;
+            }
+
+        private:
+            IndexTranslationTable() = default;
+
+            std::unordered_map<std::size_t, std::size_t> table_idx_to_item_idx_;
+
+            std::size_t item_count_;
+        };
 
         /**
         A LabelData object contains the data for an arbitrary size label returned from a query. Member functions allow
@@ -134,100 +165,6 @@ namespace apsi
         };
 
         /**
-        A Query object encapsulates the query request -- data to be sent to the sender for a query operation -- and
-        a translation table to translate cuckoo table indices to indices of the vector of items that were queried. This
-        translation is used internally by the query processing API and should be of no concern to a normal user.
-        */
-        class Query
-        {
-        friend class Receiver;
-
-        public:
-            /**
-            Creates a deep copy of the query.
-            */
-            Query deep_copy() const;
-
-            /**
-            Creates a new query by moving a given one.
-            */
-            Query(Query &&source) = default;
-
-            Query(const Query &source) = delete;
-
-            /**
-            Moves a given query to the current one.
-            */
-            Query &operator =(Query &&source) = default;
-
-            Query &operator =(const Query &source) = delete;
-
-            /**
-            Returns a constant reference to the query request data held by this query. An exception is thrown if the
-            query does not hold any request data, e.g., when the request has already been extracted to be sent. This
-            function is only meant for viewing the query request data.
-            */
-            const network::SenderOperationQuery &request_data() const;
-
-            /**
-            Translates a cuckoo table index to an index of the vector of items that were used to create this query. If
-            the given table index was not populated, i.e., there is no translation, then this function returns the
-            number of items encoded by this query.
-            */
-            std::size_t find_item_idx(std::size_t table_idx) const noexcept;
-
-            /**
-            Returns the number of items encoded by this query.
-            */
-            const std::size_t item_count() const noexcept
-            {
-                return item_count_;
-            }
-
-            /**
-            Extracts (removes) the query request from this query. This function is used to extract the query request
-            for the Receiver::SendRequest function. If this query does not contain a query request, the function returns
-            an empty std::unique_ptr.
-            */
-            std::unique_ptr<network::SenderOperation> extract_request();
-
-            /**
-            Returns whether this query contains query request data. Even if this function returns false, this query may
-            still contain an index translation table needed by the Receiver::receive_result_package function.
-            */
-            bool has_request() const noexcept;
-
-        private:
-            Query() = default;
-
-            std::unique_ptr<network::SenderOperation> sop_ = nullptr;
-
-            std::unordered_map<std::size_t, std::size_t> table_idx_to_item_idx_;
-
-            std::size_t item_count_ = 0;
-        };
-
-        /**
-        A type representing a response to a parameter request.
-        */
-        using ParamsResponse = std::unique_ptr<network::SenderOperationResponseParms>;
-
-        /**
-        A type representing a response to an OPRF request.
-        */
-        using OPRFResponse = std::unique_ptr<network::SenderOperationResponseOPRF>;
-
-        /**
-        A type representing a response to a query request.
-        */
-        using QueryResponse = std::unique_ptr<network::SenderOperationResponseQuery>;
-
-        /**
-        A type representing a partial result to the query request.
-        */
-        using ResultPart = std::unique_ptr<network::ResultPackage>;
-
-        /**
         The Receiver class implements all necessary functions to create and send parameter, OPRF, and PSI or labeled PSI
         queries (depending on the sender), and process any responses received. Most of the member functions are static,
         but a few (related to query request) require a cryptographic context held by an instance of the class.
@@ -311,22 +248,11 @@ namespace apsi
             std::vector<MatchRecord> request_query(const std::vector<HashedItem> &items, network::NetworkChannel &chl);
 
             /**
-            Sends a parameter, OPRF, or query request to the sender on a given channel. The requests passed to this
-            function as network::SenderOperation objects. This function returns whether sending the request succeeded.
-            */
-            static bool SendRequest(std::unique_ptr<network::SenderOperation> sop, network::Channel &chl);
-
-            /**
             Creates and returns a parameter request that can be sent to the sender with the Receiver::SendRequest
             function.
             */
-            static std::unique_ptr<network::SenderOperation> CreateParamsRequest();
+            static Request CreateParamsRequest();
 
-            /**
-            Receives a response to a parameter request on the given channel. This function returns nullptr on failure.
-            */
-            static ParamsResponse ReceiveParamsResponse(network::Channel &chl);
-            
             /**
             Creates and returns an oprf::OPRFReceiver object for the given items.
             */
@@ -335,12 +261,7 @@ namespace apsi
             /**
             Creates an OPRF request that can be sent to the sender with the Receiver::SendRequest function. 
             */
-            static std::unique_ptr<network::SenderOperation> CreateOPRFRequest(const oprf::OPRFReceiver &oprf_receiver);
-            
-            /**
-            Receives a response to an OPRF request on the given channel. This function returns nullptr on failure.
-            */
-            static OPRFResponse ReceiveOPRFResponse(network::Channel &chl);
+            static Request CreateOPRFRequest(const oprf::OPRFReceiver &oprf_receiver);
 
             /**
             Extracts a vector of OPRF hashed items from an OPRFResponse and the corresponding oprf::OPRFReceiver.
@@ -355,22 +276,7 @@ namespace apsi
             also contains an index translation table that keeps track of the order of the hashed items vector, and is
             used internally by the Receiver::process_result_part function to sort the results in the correct order.
             */
-            Query create_query(const std::vector<HashedItem> &items);
-
-            /**
-            Creates a deep copy of the given Query object, extracts the query request from the copy, and calls
-            Receiver::SendRequest. This is a convenience function for cases where the same query is to be used multiple
-            times. However, in other cases the deep copy can be avoided if preferred for performance reasons. This
-            function returns whether sending the query succeeded.
-            */
-            static bool SendQuery(const Query &query, network::Channel &chl);
-
-            /**
-            Receives a response to a query request on the given channel. This function returns nullptr on failure. The
-            return value contains only one piece of information: how many ResultPart objects should be expected to be
-            received on the channel.
-            */
-            static QueryResponse ReceiveQueryResponse(network::Channel &chl);
+            std::pair<Request, IndexTranslationTable> create_query(const std::vector<HashedItem> &items);
 
             /**
             Receives a partial result to a PSI or labeled PSI query on the given channel. This function returns nullptr
@@ -384,20 +290,20 @@ namespace apsi
             results happened to be in this particular result part. Thus, to determine whether there was a match with the
             sender's data, the results for each received ResultPart must be checked.
             */
-            std::vector<MatchRecord> process_result_part(const Query &query, const ResultPart &result_part) const;
+            std::vector<MatchRecord> process_result_part(const IndexTranslationTable &itt, const ResultPart &result_part) const;
 
             /**
             This function does multiple calls to Receiver::process_result_part, once for each ResultPart in the given
             vector. The results are collected together so that the returned vector of MatchRecords reflects the logical
             OR of the results from each ResultPart.
             */
-            std::vector<MatchRecord> process_result(const Query &query, const std::vector<ResultPart> &result) const;
+            std::vector<MatchRecord> process_result(const IndexTranslationTable &itt, const std::vector<ResultPart> &result) const;
 
         private:
             void process_result_worker(
                 std::atomic<std::int32_t> &package_count,
                 std::vector<MatchRecord> &mrs,
-                const Query &query,
+                const IndexTranslationTable &itt,
                 network::Channel &chl) const;
 
             void initialize();
