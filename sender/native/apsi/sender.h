@@ -38,59 +38,6 @@ namespace apsi
 {
     namespace sender
     {
-        class ParmsRequest
-        {
-        friend class Sender;
-
-        public:
-            ParmsRequest(std::unique_ptr<network::SenderOperation> sop);
-
-            ParmsRequest deep_copy() const
-            {
-                // No data to copy
-                return ParmsRequest();
-            }
-
-            ParmsRequest(const ParmsRequest &source) = delete;
-
-            ParmsRequest(ParmsRequest &&source) = default;
-
-            ParmsRequest &operator =(const ParmsRequest &source) = delete;
-
-            ParmsRequest &operator =(ParmsRequest &&source) = default;
-
-        private:
-            ParmsRequest() = default;
-        };
-
-        class OPRFRequest
-        {
-        friend class Sender;
-
-        public:
-            OPRFRequest(std::unique_ptr<network::SenderOperation> sop);
-
-            OPRFRequest deep_copy() const
-            {
-                OPRFRequest result;
-                result.data_ = data_;
-                return std::move(result);
-            }
-
-            OPRFRequest(const OPRFRequest &source) = delete;
-
-            OPRFRequest(OPRFRequest &&source) = default;
-
-            OPRFRequest &operator =(const OPRFRequest &source) = delete;
-
-            OPRFRequest &operator =(OPRFRequest &&source) = default;
-
-        private:
-            OPRFRequest() = default;
-
-            std::vector<seal::seal_byte> data_;
-        };
-
         // An alias to denote the powers of a receiver's ciphertext. At index i, holds Cⁱ, where C is the ciphertext..
         // The 0th index is always a dummy value.
         using CiphertextPowers = std::vector<seal::Ciphertext>;
@@ -103,22 +50,20 @@ namespace apsi
             /**
             Generate and send a response to a parameter request.
             */
-            static void RunParms(
-                ParmsRequest &&parms_request,
+            static void RunParams(
+                const ParamsRequest &params_request,
                 std::shared_ptr<SenderDB> sender_db,
                 network::Channel &chl,
-                std::function<void(network::Channel &, std::unique_ptr<network::SenderOperationResponse>)> send_fun
-                    = BasicSend<network::SenderOperationResponse>);
+                std::function<void(network::Channel &, Response)> send_fun = BasicSend<Response::element_type>);
 
             /**
             Generate and send a response to an OPRF request.
             */
             static void RunOPRF(
-                OPRFRequest &&oprf_request,
+                const OPRFRequest &oprf_request,
                 const oprf::OPRFKey &key,
                 network::Channel &chl,
-                std::function<void(network::Channel &, std::unique_ptr<network::SenderOperationResponse>)> send_fun
-                    = BasicSend<network::SenderOperationResponse>);
+                std::function<void(network::Channel &, Response)> send_fun = BasicSend<Response::element_type>);
 
             /**
             Generate and send a response to a query.
@@ -127,10 +72,8 @@ namespace apsi
                 const Query &query,
                 network::Channel &chl,
                 std::size_t thread_count = 0,
-                std::function<void(network::Channel &, std::unique_ptr<network::SenderOperationResponse>)> send_fun
-                    = BasicSend<network::SenderOperationResponse>,
-                std::function<void(network::Channel &, std::unique_ptr<network::ResultPackage>)> send_rp_fun
-                    = BasicSend<network::ResultPackage>);
+                std::function<void(network::Channel &, Response)> send_fun = BasicSend<Response::element_type>,
+                std::function<void(network::Channel &, ResultPart)> send_rp_fun = BasicSend<ResultPart::element_type>);
 
         private:
             template<typename T>
@@ -149,7 +92,7 @@ namespace apsi
                 std::vector<std::vector<seal::Ciphertext>> &powers,
                 const PowersDag &pd,
                 network::Channel &chl,
-                std::function<void(network::Channel &, std::unique_ptr<network::ResultPackage>)> send_rp_fun);
+                std::function<void(network::Channel &, ResultPart)> send_rp_fun);
         }; // class Sender
     }      // namespace sender
 } // namespace apsi

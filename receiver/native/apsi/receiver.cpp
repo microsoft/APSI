@@ -480,6 +480,7 @@ namespace apsi
 
             // Launch threads to receive ResultPackages and decrypt results
             vector<thread> threads;
+            APSI_LOG_INFO("Launching " << thread_count_ << " result worker threads");
             for (size_t t = 0; t < thread_count_; t++)
             {
                 threads.emplace_back([&, t]() {
@@ -642,7 +643,7 @@ namespace apsi
             sw_ss << "Receiver::process_result_worker [" << this_thread::get_id() << "]";
             STOPWATCH(recv_stopwatch, sw_ss.str());
 
-            APSI_LOG_INFO("Result worker [" << this_thread::get_id() << "]: starting");
+            APSI_LOG_DEBUG("Result worker [" << this_thread::get_id() << "]: starting");
 
             while (true)
             {
@@ -650,7 +651,7 @@ namespace apsi
                 package_count--;
                 if (package_count < 0)
                 {
-                    APSI_LOG_INFO("Result worker [" << this_thread::get_id() << "]: all packages claimed; exiting");
+                    APSI_LOG_DEBUG("Result worker [" << this_thread::get_id() << "]: all packages claimed; exiting");
                     return;
                 }
 

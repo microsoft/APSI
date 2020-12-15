@@ -232,9 +232,9 @@ namespace apsi
                 uint32_t bundle_idx_start = work_range.first;
                 uint32_t bundle_idx_end = work_range.second;
 
-                APSI_LOG_INFO("Insert-or-Assign worker [" << this_thread::get_id() << "]: "
+                APSI_LOG_DEBUG("Insert-or-Assign worker [" << this_thread::get_id() << "]: "
                     "start processing bundle indices in [" << bundle_idx_start << ", " << bundle_idx_end << ")");
-                APSI_LOG_INFO("Insert-or-Assign worker [" << this_thread::get_id() << "]: "
+                APSI_LOG_DEBUG("Insert-or-Assign worker [" << this_thread::get_id() << "]: "
                     "mode of operation: " << (overwrite ? "overwriting existing" : "inserting new"));
 
                 // Keep track of the bundle indices we look at. These will be the ones whose cache we have to regen.
@@ -349,7 +349,7 @@ namespace apsi
                         "finished regenerating cache for bundle index " << bundle_idx);
                 }
 
-                APSI_LOG_INFO("Insert-or-Assign worker [" << this_thread::get_id() << "]: "
+                APSI_LOG_DEBUG("Insert-or-Assign worker [" << this_thread::get_id() << "]: "
                     "finished processing bundle indices [" << bundle_idx_start << ", " << bundle_idx_end << ")");
             }
 

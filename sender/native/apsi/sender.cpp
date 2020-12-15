@@ -40,75 +40,66 @@ namespace apsi
 
     namespace sender
     {
-        ParmsRequest::ParmsRequest(unique_ptr<SenderOperation> sop)
-        {
-            STOPWATCH(sender_stopwatch, "ParmsRequest::ParmsRequest");
-
-            if (!sop)
-            {
-                throw invalid_argument("operation cannot be null");
-            }
-            if (sop->type() != SenderOperationType::sop_parms)
-            {
-                throw invalid_argument("operation is not a parameter request");
-            }
-        }
-
-        OPRFRequest::OPRFRequest(unique_ptr<SenderOperation> sop)
-        {
-            STOPWATCH(sender_stopwatch, "OPRFRequest::OPRFRequest");
-
-            if (!sop)
-            {
-                throw invalid_argument("operation cannot be null");
-            }
-            if (sop->type() != SenderOperationType::sop_oprf)
-            {
-                throw invalid_argument("operation is not an OPRF request");
-            }
-
-            auto sop_oprf = dynamic_cast<SenderOperationOPRF*>(sop.get());
-            data_ = move(sop_oprf->data);
-        }
-
-        void Sender::RunParms(
-            ParmsRequest &&parms_request,
+        void Sender::RunParams(
+            const ParamsRequest &params_request,
             shared_ptr<SenderDB> sender_db,
             network::Channel &chl,
-            function<void(Channel &, unique_ptr<SenderOperationResponse>)> send_fun)
+            function<void(Channel &, Response)> send_fun)
         {
+            STOPWATCH(sender_stopwatch, "Sender::RunParams");
+
+            if (!params_request)
+            {
+                APSI_LOG_ERROR("Failed to process parameter request: request is invalid");
+                invalid_argument("request is invalid");
+            }
+
             // Check that the database is set
             if (!sender_db)
             {
                 throw logic_error("SenderDB is not set");
             }
 
-            STOPWATCH(sender_stopwatch, "Sender::RunParms");
             APSI_LOG_INFO("Start processing parameter request");
 
-            auto response_parms = make_unique<SenderOperationResponseParms>();
-            response_parms->params = make_unique<PSIParams>(sender_db->get_params());
+            ParamsResponse response_params = make_unique<ParamsResponse::element_type>();
+            response_params->params = make_unique<PSIParams>(sender_db->get_params());
 
-            APSI_LOG_INFO("Sending parameter request response: " << response_parms->params->to_string());
-            send_fun(chl, move(response_parms));
+            try
+            {
+                send_fun(chl, move(response_params));
+            }
+            catch (const exception &ex)
+            {
+                APSI_LOG_ERROR("Failed to send response to parameter request; function threw an exception: " << ex.what());
+                throw;
+            }
+
             APSI_LOG_INFO("Finished processing parameter request");
         }
 
         void Sender::RunOPRF(
-            OPRFRequest &&oprf_request,
+            const OPRFRequest &oprf_request,
             const OPRFKey &key,
             network::Channel &chl,
-            function<void(Channel &, unique_ptr<SenderOperationResponse>)> send_fun)
+            function<void(Channel &, Response)> send_fun)
         {
             STOPWATCH(sender_stopwatch, "Sender::RunOPRF");
-            APSI_LOG_INFO("Start processing OPRF request for "
-                << oprf_request.data_.size() / oprf_query_size << " items");
 
-            // OPRF response has the same size as the OPRF query 
+            if (!oprf_request)
+            {
+                APSI_LOG_ERROR("Failed to process OPRF request: request is invalid");
+                invalid_argument("request is invalid");
+            }
+
+            APSI_LOG_INFO("Start processing OPRF request for " << oprf_request->data.size() / oprf_query_size << " items");
+
+            // OPRF response has the same size as the OPRF query
+            OPRFResponse response_oprf = make_unique<OPRFResponse::element_type>();
             vector<seal_byte> oprf_result;
             try
             {
-                oprf_result = OPRFSender::ProcessQueries(oprf_request.data_, key);
+                response_oprf->data = OPRFSender::ProcessQueries(oprf_request->data, key);
             }
             catch (const exception &ex)
             {
@@ -119,11 +110,16 @@ namespace apsi
                 return;
             }
 
-            auto response_oprf = make_unique<SenderOperationResponseOPRF>();
-            response_oprf->data = move(oprf_result);
+            try
+            {
+                send_fun(chl, move(response_oprf));
+            }
+            catch (const exception &ex)
+            {
+                APSI_LOG_ERROR("Failed to send response to OPRF request; function threw an exception: " << ex.what());
+                throw;
+            }
 
-            APSI_LOG_INFO("Sending OPRF request response");
-            send_fun(chl, move(response_oprf));
             APSI_LOG_INFO("Finished processing OPRF request");
         }
 
@@ -131,8 +127,8 @@ namespace apsi
             const Query &query,
             Channel &chl,
             size_t thread_count,
-            function<void(Channel &, unique_ptr<SenderOperationResponse>)> send_fun,
-            function<void(Channel &, unique_ptr<ResultPackage>)> send_rp_fun)
+            function<void(Channel &, Response)> send_fun,
+            function<void(Channel &, ResultPart)> send_rp_fun)
         {
             if (!query)
             {
@@ -148,8 +144,7 @@ namespace apsi
             auto sender_db_lock = sender_db->get_reader_lock();
 
             STOPWATCH(sender_stopwatch, "Sender::RunQuery");
-            APSI_LOG_INFO("Start processing query request on database with "
-                << sender_db->get_items().size() << " items");
+            APSI_LOG_INFO("Start processing query request on database with " << sender_db->get_items().size() << " items");
 
             // Copy over the CryptoContext from SenderDB; set the Evaluator for this local instance
             CryptoContext crypto_context(sender_db->get_context());
@@ -167,11 +162,18 @@ namespace apsi
 
             // The query response only tells how many ResultPackages to expect; send this first
             uint32_t package_count = safe_cast<uint32_t>(sender_db->get_bin_bundle_count());
-            auto response_query = make_unique<SenderOperationResponseQuery>();
+            QueryResponse response_query = make_unique<QueryResponse::element_type>();
             response_query->package_count = package_count;
-            APSI_LOG_INFO("Sending query request response: expect " << package_count << " packages");
-            send_fun(chl, move(response_query));
-            APSI_LOG_INFO("Query request response sent");
+
+            try
+            {
+                send_fun(chl, move(response_query));
+            }
+            catch (const exception &ex)
+            {
+                APSI_LOG_ERROR("Failed to send response to query request; function threw an exception: " << ex.what());
+                throw;
+            }
 
             // For each bundle index i, we need a vector of powers of the query Qᵢ. We need powers all
             // the way up to Qᵢ^max_items_per_bin (maybe less if the BinBundles aren't as full as expected). We don't
@@ -196,8 +198,7 @@ namespace apsi
                 for (size_t bundle_idx = 0; bundle_idx < all_powers.size(); bundle_idx++)
                 {
                     // Load input^power to all_powers[bundle_idx][exponent]
-                    APSI_LOG_DEBUG("Extracting query ciphertext power " << exponent
-                        << " for bundle index " << bundle_idx);
+                    APSI_LOG_DEBUG("Extracting query ciphertext power " << exponent << " for bundle index " << bundle_idx);
                     all_powers[bundle_idx][exponent] = move(q.second[bundle_idx]);
                 }
             }
@@ -232,7 +233,7 @@ namespace apsi
             vector<CiphertextPowers> &all_powers,
             const PowersDag &pd,
             Channel &chl,
-            function<void(Channel &, unique_ptr<ResultPackage>)> send_rp_fun)
+            function<void(Channel &, ResultPart)> send_rp_fun)
         {
             stringstream sw_ss;
             sw_ss << "Sender::QueryWorker [" << this_thread::get_id() << "]";
@@ -241,7 +242,7 @@ namespace apsi
             uint32_t bundle_idx_start = work_range.first;
             uint32_t bundle_idx_end = work_range.second;
 
-            APSI_LOG_INFO("Query worker [" << this_thread::get_id() << "]: "
+            APSI_LOG_DEBUG("Query worker [" << this_thread::get_id() << "]: "
                 "start processing bundle indices [" << bundle_idx_start << ", " << bundle_idx_end << ")");
 
             // Compute the powers for each bundle index and loop over the BinBundles
@@ -312,17 +313,23 @@ namespace apsi
                         rp->label_result.emplace_back(interp_polyn.eval(all_powers[bundle_idx]));
                     }
 
-                    // Start sending on the channel 
-                    APSI_LOG_DEBUG("Query worker [" << this_thread::get_id() << "]: "
-                        "sending result package for bundle index " << bundle_idx);
-                    send_rp_fun(chl, move(rp));
+                    // Send this result part
+                    try
+                    {
+                        send_rp_fun(chl, move(rp));
+                    }
+                    catch (const exception &ex)
+                    {
+                        APSI_LOG_ERROR("Failed to send result part; function threw an exception: " << ex.what());
+                        throw;
+                    }
                 });
 
                 APSI_LOG_DEBUG("Query worker [" << this_thread::get_id() << "]: "
                     "finished processing " << bundle_count << " bin bundles for bundle index " << bundle_idx);
             }
 
-            APSI_LOG_INFO("Query worker [" << this_thread::get_id() << "]: "
+            APSI_LOG_DEBUG("Query worker [" << this_thread::get_id() << "]: "
                 "finished processing bundle indices [" << bundle_idx_start << ", " << bundle_idx_end << ")");
         }
     } // namespace sender

@@ -104,9 +104,9 @@ namespace apsi
             try
             {
                 // Extract the parameter request
-                ParmsRequest parms_request(move(sop->sop));
+                ParamsRequest params_request = to_params_request(move(sop->sop));
 
-                Sender::RunParms(move(parms_request), sender_db_, chl,
+                Sender::RunParams(params_request, sender_db_, chl,
                     [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
                         auto nsop_response = make_unique<ZMQSenderOperationResponse>();
                         nsop_response->sop_response = move(sop_response);
@@ -129,9 +129,9 @@ namespace apsi
             try
             {
                 // Extract the OPRF request
-                OPRFRequest oprf_request(move(sop->sop));
+                OPRFRequest oprf_request = to_oprf_request(move(sop->sop));
 
-                Sender::RunOPRF(move(oprf_request), *oprf_key_, chl,
+                Sender::RunOPRF(oprf_request, *oprf_key_, chl,
                     [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
                         auto nsop_response = make_unique<ZMQSenderOperationResponse>();
                         nsop_response->sop_response = move(sop_response);
@@ -156,19 +156,19 @@ namespace apsi
                 // Create the Query object
                 Query query(to_query_request(move(sop->sop)), sender_db_);
 
-                // Query will send result to client in a stream of ResultPackages
-                Sender::RunQuery(move(query), chl, thread_count_,
+                // Query will send result to client in a stream of ResultPackages (ResultParts)
+                Sender::RunQuery(query, chl, thread_count_,
                     // Lambda function for sending the query response
-                    [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
+                    [&sop](Channel &c, Response response) {
                         auto nsop_response = make_unique<ZMQSenderOperationResponse>();
-                        nsop_response->sop_response = move(sop_response);
+                        nsop_response->sop_response = move(response);
                         nsop_response->client_id = sop->client_id;
 
                         // We know for sure that the channel is a SenderChannel so use static_cast
                         static_cast<ZMQSenderChannel&>(c).send(move(nsop_response));
                     },
-                    // Lambda function for sending the ResultPackages
-                    [&sop](Channel &c, unique_ptr<ResultPackage> rp) {
+                    // Lambda function for sending the result parts
+                    [&sop](Channel &c, ResultPart rp) {
                         auto nrp = make_unique<ZMQResultPackage>();
                         nrp->rp = move(rp);
                         nrp->client_id = sop->client_id;
