@@ -238,11 +238,11 @@ namespace APSITests
         svr.send(move(rp));
 
         // Receive two packages
-        rp = clt.receive_result_package(get_context()->seal_context());
+        rp = clt.receive_result(get_context()->seal_context());
         ASSERT_EQ(0, rp->bundle_idx);
         ASSERT_TRUE(rp->label_result.empty());
 
-        rp = clt.receive_result_package(get_context()->seal_context());
+        rp = clt.receive_result(get_context()->seal_context());
         ASSERT_EQ(123, rp->bundle_idx);
         ASSERT_EQ(1, rp->label_result.size());
 

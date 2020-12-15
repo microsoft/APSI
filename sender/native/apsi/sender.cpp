@@ -147,7 +147,7 @@ namespace apsi
             APSI_LOG_INFO("Start processing query request on database with " << sender_db->get_items().size() << " items");
 
             // Copy over the CryptoContext from SenderDB; set the Evaluator for this local instance
-            CryptoContext crypto_context(sender_db->get_context());
+            CryptoContext crypto_context(sender_db->get_crypto_context());
             crypto_context.set_evaluator(query.relin_keys());
 
             // Get the PSIParams

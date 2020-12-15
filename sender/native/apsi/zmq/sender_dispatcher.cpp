@@ -50,7 +50,7 @@ namespace apsi
 
             oprf_key_ = move(oprf_key);
 
-            auto seal_context = sender_db_->get_context().seal_context();
+            auto seal_context = sender_db_->get_seal_context();
 
             // Run until stopped
             bool logged_waiting = false;

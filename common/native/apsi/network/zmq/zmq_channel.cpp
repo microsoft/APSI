@@ -400,7 +400,7 @@ namespace apsi
             send(move(n_rp));
         }
 
-        unique_ptr<ResultPackage> ZMQChannel::receive_result_package(shared_ptr<SEALContext> context)
+        unique_ptr<ResultPackage> ZMQChannel::receive_result(shared_ptr<SEALContext> context)
         {
             throw_if_not_connected();
 

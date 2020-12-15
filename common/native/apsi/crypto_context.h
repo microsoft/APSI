@@ -27,6 +27,8 @@ namespace apsi
     class CryptoContext
     {
     public:
+        CryptoContext() = default;
+
         CryptoContext(const seal::EncryptionParameters &parms) :
             seal_context_(std::make_shared<seal::SEALContext>(parms))
         {
@@ -100,19 +102,24 @@ namespace apsi
             return evaluator_;
         }
 
+        explicit operator bool() const noexcept
+        {
+            return !!seal_context_;
+        }
+
     private:
-        std::shared_ptr<seal::SEALContext> seal_context_;
+        std::shared_ptr<seal::SEALContext> seal_context_ = nullptr;
 
-        std::shared_ptr<seal::RelinKeys> relin_keys_;
+        std::shared_ptr<seal::RelinKeys> relin_keys_ = nullptr;
 
-        std::shared_ptr<seal::SecretKey> secret_key_;
+        std::shared_ptr<seal::SecretKey> secret_key_ = nullptr;
 
-        std::shared_ptr<seal::Encryptor> encryptor_;
+        std::shared_ptr<seal::Encryptor> encryptor_ = nullptr;
 
-        std::shared_ptr<seal::Decryptor> decryptor_;
+        std::shared_ptr<seal::Decryptor> decryptor_ = nullptr;
 
-        std::shared_ptr<seal::Evaluator> evaluator_;
+        std::shared_ptr<seal::Evaluator> evaluator_ = nullptr;
 
-        std::shared_ptr<seal::BatchEncoder> encoder_;
+        std::shared_ptr<seal::BatchEncoder> encoder_ = nullptr;
     };
 } // namespace apsi

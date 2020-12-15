@@ -611,13 +611,13 @@ namespace apsi
 
         SenderDB::SenderDB(PSIParams params) : params_(params), crypto_context_(params_.seal_params())
         {
-            if (!crypto_context_.seal_context()->parameters_set())
+            if (!get_seal_context()->parameters_set())
             {
                 APSI_LOG_ERROR("Given SEALParams are invalid: "
-                    << crypto_context_.seal_context()->parameter_error_message());
+                    << get_seal_context()->parameter_error_message());
                 throw logic_error("SEALParams are invalid");
             }
-            if (!crypto_context_.seal_context()->first_context_data()->qualifiers().using_batching)
+            if (!get_seal_context()->first_context_data()->qualifiers().using_batching)
             {
                 APSI_LOG_ERROR("Given SEALParams do not support batching");
                 throw logic_error("given SEALParams do not support batching");
@@ -658,7 +658,10 @@ namespace apsi
         */
         void LabeledSenderDB::clear_db()
         {
-            APSI_LOG_INFO("Clearing SenderDB (had " << items_.size() << " items)");
+            if (items_.size())
+            {
+                APSI_LOG_INFO("Removing " << items_.size() << " item-label pairs from SenderDB");
+            }
 
             // Lock the database for writing
             auto lock = db_lock_.acquire_write();
@@ -676,7 +679,10 @@ namespace apsi
         */
         void UnlabeledSenderDB::clear_db()
         {
-            APSI_LOG_INFO("Clearing all " << items_.size() << " items from SenderDB");
+            if (items_.size())
+            {
+                APSI_LOG_INFO("Removing " << items_.size() << " items from SenderDB");
+            }
 
             // Lock the database for writing
             auto lock = db_lock_.acquire_write();
@@ -862,7 +868,7 @@ namespace apsi
             thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
 
             STOPWATCH(sender_stopwatch, "LabeledSenderDB::remove");
-            APSI_LOG_INFO("Start removing " << data.size() << " items from SenderDB");
+            APSI_LOG_INFO("Start removing " << data.size() << " items-label pairs from SenderDB");
 
             // Lock the database for writing
             auto lock = db_lock_.acquire_write();
@@ -899,7 +905,7 @@ namespace apsi
                 items_.erase(item);
             }
 
-            APSI_LOG_INFO("Finished removing " << data.size() << " items from SenderDB");
+            APSI_LOG_INFO("Finished removing " << data.size() << " item-label pairs from SenderDB");
         }
 
         /**

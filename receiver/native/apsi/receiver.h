@@ -221,11 +221,19 @@ namespace apsi
             void reset_keys();
 
             /**
-            Returns the current CryptoContext.
+            Returns a reference to the CryptoContext for this Receiver.
             */
-            std::shared_ptr<const CryptoContext> crypto_context() const
+            const CryptoContext &get_crypto_context() const
             {
                 return crypto_context_;
+            }
+            
+            /**
+            Returns a reference to the SEALContext for this SenderDB.
+            */
+            std::shared_ptr<seal::SEALContext> get_seal_context() const
+            {
+                return crypto_context_.seal_context();
             }
 
             /**
@@ -279,12 +287,6 @@ namespace apsi
             std::pair<Request, IndexTranslationTable> create_query(const std::vector<HashedItem> &items);
 
             /**
-            Receives a partial result to a PSI or labeled PSI query on the given channel. This function returns nullptr
-            on failure.
-            */
-            ResultPart receive_result(network::Channel &chl) const;
-
-            /**
             Processes a ResultPart object and returns a vector of MatchRecords in the same order as the original vector
             of OPRF hashed items used to create the query. The return value includes matches only for those items whose
             results happened to be in this particular result part. Thus, to determine whether there was a match with the
@@ -312,7 +314,7 @@ namespace apsi
 
             PSIParams params_;
 
-            std::shared_ptr<CryptoContext> crypto_context_;
+            CryptoContext crypto_context_;
 
             PowersDag pd_;
 

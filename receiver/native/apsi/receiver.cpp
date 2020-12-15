@@ -154,10 +154,10 @@ namespace apsi
         void Receiver::reset_keys()
         {
             // Generate new keys
-            KeyGenerator generator(*crypto_context_->seal_context());
+            KeyGenerator generator(*get_seal_context());
 
             // Set the symmetric key, encryptor, and decryptor
-            crypto_context_->set_secret(generator.secret_key());
+            crypto_context_.set_secret(generator.secret_key());
 
             // Create Serializable<RelinKeys> and move to relin_keys_ for storage
             Serializable<RelinKeys> relin_keys(generator.create_relin_keys());
@@ -177,14 +177,13 @@ namespace apsi
             STOPWATCH(recv_stopwatch, "Receiver::initialize");
 
             // Initialize the CryptoContext with a new SEALContext
-            crypto_context_ = make_shared<CryptoContext>(params_.seal_params());
-            if (!crypto_context_->seal_context()->parameters_set())
+            crypto_context_ = move(CryptoContext(params_.seal_params()));
+            if (!get_seal_context()->parameters_set())
             {
-                APSI_LOG_ERROR("Given SEALParams are invalid: "
-                    << crypto_context_->seal_context()->parameter_error_message());
+                APSI_LOG_ERROR("Given SEALParams are invalid: " << get_seal_context()->parameter_error_message());
                 throw logic_error("SEALParams are invalid");
             }
-            if (!crypto_context_->seal_context()->first_context_data()->qualifiers().using_batching)
+            if (!get_seal_context()->first_context_data()->qualifiers().using_batching)
             {
                 APSI_LOG_ERROR("Given SEALParams do not support batching");
                 throw logic_error("given SEALParams do not support batching");
@@ -270,7 +269,7 @@ namespace apsi
         {
             auto sop = make_unique<SenderOperationOPRF>();
             sop->data = oprf_receiver.query_data();
-            APSI_LOG_INFO("Created OPRF request");
+            APSI_LOG_INFO("Created OPRF request for " << oprf_receiver.item_count() << " items");
 
             return sop;
         }
@@ -409,7 +408,7 @@ namespace apsi
                     APSI_LOG_DEBUG("Encoding and encrypting data for bundle index " << bundle_idx);
 
                     // Encrypt the data for this power
-                    auto encrypted_power(plain_powers[bundle_idx].encrypt(*crypto_context_));
+                    auto encrypted_power(plain_powers[bundle_idx].encrypt(crypto_context_));
 
                     // Move the encrypted data to encrypted_powers
                     for (auto &e : encrypted_power)
@@ -429,25 +428,6 @@ namespace apsi
             APSI_LOG_INFO("Finished creating encrypted query");
 
             return { move(sop), itt };
-        }
-
-        ResultPart Receiver::receive_result(Channel &chl) const
-        {
-            STOPWATCH(recv_stopwatch, "Receiver::receive_result");
-
-            auto bytes_received = chl.bytes_received();
-            auto rp = chl.receive_result_package(crypto_context_->seal_context());
-            bytes_received = chl.bytes_received() - bytes_received;
-            APSI_LOG_INFO("Received " << bytes_received << " B");
-
-            if (!rp)
-            {
-                APSI_LOG_ERROR("Failed to receive result package");
-                return {};
-            }
-
-            APSI_LOG_INFO("Received result package for bundle index " << rp->bundle_idx);
-            return rp;
         }
 
         vector<MatchRecord> Receiver::request_query(const vector<HashedItem> &items, NetworkChannel &chl)
@@ -512,7 +492,7 @@ namespace apsi
             }
 
             // Decrypt and decode the result; the result vector will have full batch size
-            PlainResultPackage plain_rp = result_part->extract(*crypto_context_);
+            PlainResultPackage plain_rp = result_part->extract(crypto_context_);
 
             size_t felts_per_item = safe_cast<size_t>(params_.item_params().felts_per_item);
             size_t items_per_bundle = safe_cast<size_t>(params_.items_per_bundle());
@@ -645,6 +625,8 @@ namespace apsi
 
             APSI_LOG_DEBUG("Result worker [" << this_thread::get_id() << "]: starting");
 
+            auto seal_context = get_seal_context();
+
             while (true)
             {
                 // Return if all packages have been claimed
@@ -657,7 +639,7 @@ namespace apsi
 
                 // Wait for a valid ResultPart
                 ResultPart result_part;
-                while (!(result_part = receive_result(chl)));
+                while (!(result_part = chl.receive_result(seal_context)));
 
                 // Process the ResultPart to get the corresponding vector of MatchRecords
                 auto this_mrs = process_result_part(itt, result_part);

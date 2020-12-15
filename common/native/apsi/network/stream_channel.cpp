@@ -191,7 +191,7 @@ namespace apsi
             bytes_sent_ += rp->save(out_);
         }
 
-        unique_ptr<ResultPackage> StreamChannel::receive_result_package(shared_ptr<SEALContext> context)
+        unique_ptr<ResultPackage> StreamChannel::receive_result(shared_ptr<SEALContext> context)
         {
             lock_guard<mutex> lock(receive_mutex_);
 

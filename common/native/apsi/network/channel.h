@@ -69,7 +69,7 @@ namespace apsi
             /**
             Receive a ResultPackage from a sender.
             */
-            virtual std::unique_ptr<ResultPackage> receive_result_package(
+            virtual std::unique_ptr<ResultPackage> receive_result(
                 std::shared_ptr<seal::SEALContext> context) = 0;
 
             /**

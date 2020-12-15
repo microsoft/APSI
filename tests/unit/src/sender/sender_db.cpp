@@ -59,12 +59,12 @@ namespace APSITests
         sender_db.clear_db();
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
 
-        ASSERT_FALSE(sender_db.get_context().encryptor());
-        ASSERT_FALSE(sender_db.get_context().decryptor());
-        ASSERT_TRUE(sender_db.get_context().evaluator());
-        ASSERT_FALSE(sender_db.get_context().relin_keys());
-        ASSERT_TRUE(sender_db.get_context().seal_context());
-        ASSERT_FALSE(sender_db.get_context().secret_key());
+        ASSERT_FALSE(sender_db.get_crypto_context().encryptor());
+        ASSERT_FALSE(sender_db.get_crypto_context().decryptor());
+        ASSERT_TRUE(sender_db.get_crypto_context().evaluator());
+        ASSERT_FALSE(sender_db.get_crypto_context().relin_keys());
+        ASSERT_TRUE(sender_db.get_crypto_context().seal_context());
+        ASSERT_FALSE(sender_db.get_crypto_context().secret_key());
 
         auto items = sender_db.get_items();
         ASSERT_TRUE(items.empty());
@@ -82,12 +82,12 @@ namespace APSITests
         sender_db.clear_db();
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
 
-        ASSERT_FALSE(sender_db.get_context().encryptor());
-        ASSERT_FALSE(sender_db.get_context().decryptor());
-        ASSERT_TRUE(sender_db.get_context().evaluator());
-        ASSERT_FALSE(sender_db.get_context().relin_keys());
-        ASSERT_TRUE(sender_db.get_context().seal_context());
-        ASSERT_FALSE(sender_db.get_context().secret_key());
+        ASSERT_FALSE(sender_db.get_crypto_context().encryptor());
+        ASSERT_FALSE(sender_db.get_crypto_context().decryptor());
+        ASSERT_TRUE(sender_db.get_crypto_context().evaluator());
+        ASSERT_FALSE(sender_db.get_crypto_context().relin_keys());
+        ASSERT_TRUE(sender_db.get_crypto_context().seal_context());
+        ASSERT_FALSE(sender_db.get_crypto_context().secret_key());
 
         auto items = sender_db.get_items();
         ASSERT_TRUE(items.empty());

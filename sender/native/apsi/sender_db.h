@@ -126,9 +126,17 @@ namespace apsi
             /**
             Returns a reference to the CryptoContext for this SenderDB.
             */
-            const CryptoContext &get_context() const
+            const CryptoContext &get_crypto_context() const
             {
                 return crypto_context_;
+            }
+
+            /**
+            Returns a reference to the SEALContext for this SenderDB.
+            */
+            std::shared_ptr<seal::SEALContext> get_seal_context() const
+            {
+                return crypto_context_.seal_context();
             }
 
             /**

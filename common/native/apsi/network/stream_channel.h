@@ -77,7 +77,7 @@ namespace apsi
             /**
             Receive a ResultPackage from a sender.
             */
-            std::unique_ptr<ResultPackage> receive_result_package(
+            std::unique_ptr<ResultPackage> receive_result(
                 std::shared_ptr<seal::SEALContext> context) override;
 
         protected:

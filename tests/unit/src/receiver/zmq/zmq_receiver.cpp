@@ -301,7 +301,7 @@ namespace APSITests
         Receiver recv(*get_params(), 1);
 
         // Give the sender the secret key so they can fake responses
-        get_context()->set_secret(*recv.crypto_context()->secret_key());
+        get_context()->set_secret(*recv.get_crypto_context().secret_key());
 
         // Empty query; empty response
         vector<HashedItem> items;
@@ -348,7 +348,7 @@ namespace APSITests
         Receiver recv(*get_params(), 2);
 
         // Give the sender the secret key so they can fake responses
-        get_context()->set_secret(*recv.crypto_context()->secret_key());
+        get_context()->set_secret(*recv.get_crypto_context().secret_key());
 
         // Empty query; empty response
         vector<HashedItem> items;
@@ -394,7 +394,7 @@ namespace APSITests
         Receiver recv(*get_params(), 1);
 
         // Give the sender the secret key so they can fake responses
-        get_context()->set_secret(*recv.crypto_context()->secret_key());
+        get_context()->set_secret(*recv.get_crypto_context().secret_key());
         get_context()->set_evaluator();
 
         // Empty query; empty response
@@ -447,7 +447,7 @@ namespace APSITests
         Receiver recv(*get_params(), 2);
 
         // Give the sender the secret key so they can fake responses
-        get_context()->set_secret(*recv.crypto_context()->secret_key());
+        get_context()->set_secret(*recv.get_crypto_context().secret_key());
         get_context()->set_evaluator();
 
         // Empty query; empty response
