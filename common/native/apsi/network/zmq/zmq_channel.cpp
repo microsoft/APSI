@@ -168,6 +168,13 @@ namespace apsi
         {
             throw_if_not_connected();
 
+            bool valid_context = context && context->parameters_set();
+            if (!valid_context && (expected == SenderOperationType::sop_unknown || expected == SenderOperationType::sop_query))
+            {
+                // Cannot receive unknown or query operations without a valid SEALContext
+                return nullptr;
+            }
+
             multipart_t msg;
             if (!receive_message(msg, wait_for_message))
             {
@@ -249,12 +256,6 @@ namespace apsi
             n_sop->sop = move(sop);
 
             return n_sop;
-        }
-
-        unique_ptr<ZMQSenderOperation> ZMQChannel::receive_network_operation(
-            shared_ptr<SEALContext> context, SenderOperationType expected)
-        {
-            return receive_network_operation(move(context), false, expected);
         }
 
         unique_ptr<SenderOperation> ZMQChannel::receive_operation(
@@ -404,6 +405,13 @@ namespace apsi
         {
             throw_if_not_connected();
 
+            bool valid_context = context && context->parameters_set();
+            if (!valid_context)
+            {
+                // Cannot receive a result package without a valid SEALContext
+                return nullptr;
+            }
+
             multipart_t msg;
             if (!receive_message(msg))
             {
@@ -424,6 +432,11 @@ namespace apsi
             {
                 bytes_received_ += load_from_string(msg[0].to_string(), move(context), *rp);
             }
+            catch (const invalid_argument &ex)
+            {
+                // Invalid SEALContext
+                return nullptr;
+            }
             catch (const runtime_error &ex)
             {
                 // Invalid result package data
@@ -440,9 +453,8 @@ namespace apsi
 
             msg.clear();
             recv_flags receive_flags = wait_for_message? recv_flags::none : recv_flags::dontwait;
+
             bool received = msg.recv(*get_socket(), static_cast<int>(receive_flags));
-            // recv_result_t result = recv_multipart(*get_socket(), move(msg), receive_flags);
-            // bool received = result.has_value();
             if (!received && wait_for_message)
             {
                 throw runtime_error("failed to receive message");

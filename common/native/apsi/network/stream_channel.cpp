@@ -43,6 +43,13 @@ namespace apsi
         {
             lock_guard<mutex> lock(receive_mutex_);
 
+            bool valid_context = context && context->parameters_set();
+            if (!valid_context && (expected == SenderOperationType::sop_unknown || expected == SenderOperationType::sop_query))
+            {
+                // Cannot receive unknown or query operations without a valid SEALContext
+                return nullptr;
+            }
+
             SenderOperationHeader sop_header;
             try
             {
@@ -195,12 +202,24 @@ namespace apsi
         {
             lock_guard<mutex> lock(receive_mutex_);
 
+            bool valid_context = context && context->parameters_set();
+            if (!valid_context)
+            {
+                // Cannot receive a result package without a valid SEALContext
+                return nullptr;
+            }
+
             // Return value
             unique_ptr<ResultPackage> rp(make_unique<ResultPackage>());
 
             try
             {
                 bytes_received_ += rp->load(in_, move(context));
+            }
+            catch (const invalid_argument &ex)
+            {
+                // Invalid SEALContext
+                return nullptr;
             }
             catch (const runtime_error &ex)
             {

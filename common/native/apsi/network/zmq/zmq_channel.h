@@ -60,14 +60,26 @@ namespace apsi
         };
 
         /**
-        Communication channel between sender and receiver through a ZeroMQ channel. All receives are synchronous,
-        except for receiving a SenderOperation. All sends are asynchrounous.
+        ZMQChannel is a communication channel between a sender and a receiver implemented using ZeroMQ. All receives
+        are synchronous, except for receiving a SenderOperation. All sends are asynchronous.
+        
+        ZeroMQ uses an identifier number for internal package routing, which is why the ZMQChannel operates on custom
+        ZMQSenderOperation, ZMQSenderOperationResponse, and ZMQResultPackage objects rather than the underlying
+        SenderOperation, SenderOperationResponse, and ResultPackage.
+
+        ZMQChannel is an interface class and is implemented by the ZMQSenderChannel and ZMQReceiverChannel.
         */
         class ZMQChannel : public NetworkChannel
         {
         public:
+            /**
+            Create an instance of a ZMQChannel.
+            */
             ZMQChannel();
 
+            /**
+            Destroy an instance of a ZMQChannel.
+            */
             virtual ~ZMQChannel();
 
             /**
@@ -81,7 +93,7 @@ namespace apsi
             void connect(const std::string &connection_point);
 
             /**
-            Disconnect from the connection point.
+            Disconnect the channel from the connection point.
             */
             void disconnect();
 
@@ -94,63 +106,77 @@ namespace apsi
             }
 
             /**
-            Send a SenderOperation to a sender.
+            Send a SenderOperation from a receiver to a sender. These operations represent either a parameter request,
+            an OPRF request, or a query request. The function throws an exception on failure.
             */
             void send(std::unique_ptr<SenderOperation> sop) override;
 
             /**
-            Receive a SenderOperation from a receiver. This call does not block if wait_for_message is false. If there
-            is no operation pending, it will immediately return nullptr.
+            Receive a ZMQSenderOperation from a receiver. Operations of type sop_query and sop_unknown require a valid
+            seal::SEALContext to be provided. For operations of type sop_parms and sop_oprf the context can be set as
+            nullptr. The function returns nullptr on failure. This call does not block if wait_for_message is false:
+            if there is no operation pending, it will immediately return nullptr.
             */
             virtual std::unique_ptr<ZMQSenderOperation> receive_network_operation(
                 std::shared_ptr<seal::SEALContext> context, bool wait_for_message,
                 SenderOperationType expected = SenderOperationType::sop_unknown);
 
             /**
-            Receive a ZMQSenderOperation from a receiver.
+            Receive a ZMQSenderOperation from a receiver. Operations of type sop_query and sop_unknown require a valid
+            seal::SEALContext to be provided. For operations of type sop_parms and sop_oprf the context can be set as
+            nullptr. The function returns nullptr on failure. This call does not block: if there is no operation
+            pending, it will immediately return nullptr.
             */
             virtual std::unique_ptr<ZMQSenderOperation> receive_network_operation(
                 std::shared_ptr<seal::SEALContext> context,
-                SenderOperationType expected = SenderOperationType::sop_unknown);
+                SenderOperationType expected = SenderOperationType::sop_unknown)
+            {
+                return receive_network_operation(std::move(context), false, expected);
+            }
 
             /**
-            Receive a SenderOperation from a receiver.
+            Send a ZMQSenderOperationResponse from a sender to a receiver. These operations represent a response to
+            either a parameter request, an OPRF request, or a query request. The function throws and exception on
+            failure. The sender is expected to manually read the client identifier from the received ZMQSenderOperation
+            and use the same client identifier in the ZMQSenderOperationResponse.
+            */
+            virtual void send(std::unique_ptr<ZMQSenderOperationResponse> sop_response);
+
+            /**
+            Receive a SenderOperationResponse from a sender. The function returns nullptr on failure.
+            */
+            std::unique_ptr<SenderOperationResponse> receive_response(
+                SenderOperationType expected = SenderOperationType::sop_unknown) override;
+
+            /**
+            Send a ZMQResultPackage to a receiver. The function throws and exception on failure. The sender is expected
+            to manually read the client identifier from the received ZMQSenderOperation and use the same client
+            identifier in the ZMQResultPackage.
+            */
+            virtual void send(std::unique_ptr<ZMQResultPackage> rp);
+
+            /**
+            Receive a ResultPackage from a sender. A valid seal::SEALContext must be provided. The function returns
+            nullptr on failure.
+            */
+            std::unique_ptr<ResultPackage> receive_result(std::shared_ptr<seal::SEALContext> context) override;
+
+            /**
+            Do not use this function. Use ZMQChannel::receive_network_operation instead.
             */
             std::unique_ptr<SenderOperation> receive_operation(
                 std::shared_ptr<seal::SEALContext> context,
                 SenderOperationType expected = SenderOperationType::sop_unknown) override;
 
             /**
-            Send a ZMQSenderOperationResponse to a receiver.
-            */
-            virtual void send(std::unique_ptr<ZMQSenderOperationResponse> sop_response);
-
-            /**
-            Send a SenderOperationResponse to a receiver.
+            Do not use this function. Use ZMQChannel::send(std::unique_ptr<ZMQSenderOperationResponse>) instead.
             */
             void send(std::unique_ptr<SenderOperationResponse> sop_response) override;
 
             /**
-            Receive a SenderOperationResponse from a sender.
-            */
-            std::unique_ptr<SenderOperationResponse> receive_response(
-                SenderOperationType expected = SenderOperationType::sop_unknown) override;
-
-            /**
-            Send a ZMQResultPackage to a receiver.
-            */
-            virtual void send(std::unique_ptr<ZMQResultPackage> rp);
-
-            /**
-            Send a ResultPackage to a receiver.
+            Do not use this function. Use ZMQChannel::send(std::unique_ptr<ZMQResultPackage>) instead.
             */
             void send(std::unique_ptr<ResultPackage> rp) override;
-
-            /**
-            Receive a ResultPackage from a sender.
-            */
-            std::unique_ptr<ResultPackage> receive_result(
-                std::shared_ptr<seal::SEALContext> context) override;
 
         protected:
             /**
@@ -183,16 +209,22 @@ namespace apsi
             bool receive_message(zmq::multipart_t &msg, bool wait_for_message = true);
 
             void send_message(zmq::multipart_t &msg);
-        }; // class NetworkChannel
+        }; // class ZMQChannel
 
         /**
-        Represents a network channel for a sender.
+        Implements a ZMQChannel for a sender.
         */
         class ZMQSenderChannel : public ZMQChannel
         {
         public:
+            /**
+            Create an instance of a ZMQSenderChannel.
+            */
             ZMQSenderChannel() = default;
 
+            /**
+            Destroy an instance of a ZMQSenderChannel.
+            */
             ~ZMQSenderChannel()
             {
             }
@@ -210,13 +242,19 @@ namespace apsi
         };
 
         /**
-        Represents a network channel for a receiver.
+        Implements a ZMQChannel for a receiver.
         */
         class ZMQReceiverChannel : public ZMQChannel
         {
         public:
+            /**
+            Create an instance of a ZMQReceiverChannel.
+            */
             ZMQReceiverChannel() = default;
 
+            /**
+            Destroy an instance of a ZMQReceiverChannel.
+            */
             ~ZMQReceiverChannel()
             {
             }
