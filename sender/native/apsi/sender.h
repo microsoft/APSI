@@ -44,6 +44,16 @@ namespace apsi
 
         class Sender
         {
+        private:
+            /**
+            Sends a given 
+            */
+            template<typename T>
+            static void BasicSend(network::Channel &chl, std::unique_ptr<T> pkg)
+            {
+                chl.send(std::move(pkg));
+            }
+
         public:
             Sender() = delete;
 
@@ -76,12 +86,6 @@ namespace apsi
                 std::function<void(network::Channel &, ResultPart)> send_rp_fun = BasicSend<ResultPart::element_type>);
 
         private:
-            template<typename T>
-            static void BasicSend(network::Channel &chl, std::unique_ptr<T> pkg)
-            {
-                chl.send(std::move(pkg));
-            }
-
             /**
             Method that handles the work of a single thread that computes the response to a query.
             */

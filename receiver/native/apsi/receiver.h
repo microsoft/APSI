@@ -35,38 +35,46 @@ namespace apsi
         /**
         The Receiver class implements all necessary functions to create and send parameter, OPRF, and PSI or labeled PSI
         queries (depending on the sender), and process any responses received. Most of the member functions are static,
-        but a few (related to query request) require a cryptographic context held by an instance of the class.
+        but a few (related to creating and processing the query itself) require an instance of the class to be created.
 
         The class includes two versions of an API to performs the necessary operations. The "simple" API consists of
         three functions: Receiver::RequestParams, Receiver::RequestOPRF, and Receiver::request_query. However, these
         functions only support network::NetworkChannel, such as network::ZMQChannel, for the communication. Other
         channels, such as network::StreamChannel, are only supported by the "advanced" API.
 
-        The advanced API is requires many more steps:
+        The advanced API requires many more steps. The full process is as follows:
 
-        (1) Receiver::CreateParamsRequest must be used to create a parameter request and Receiver::SendRequest must be
-        used to send it on a network::Channel. The response must be received with Receiver::ReceiveParamsResponse.
-        The PSIParams object can be extracted from the response and a Receiver object can be created.
+        (1 -- optional) Receiver::CreateParamsRequest must be used to create a parameter request. The request must be
+        sent to the sender on a channel with network::Channel::send. The sender must respond to the request and the
+        response must be received on the channel with network::Channel::receive_response. The received Response object
+        must be converted to the right type (ParamsResponse) with the to_params_response function. This function will
+        return nullptr if the received response was not of the correct type. A PSIParams object can be extracted from
+        the response and a Receiver object can subsequently be created.
 
         (2) Receiver::CreateOPRFReceiver must be used to process the input vector of items and return an associated
         oprf::OPRFReceiver object. Next, Receiver::CreateOPRFRequest must be used to create an OPRF request from the
-        oprf::OPRFReceiver, which can subsequently be sent to the sender with Receiver::SendRequest. The response must
-        be received with Receiver::ReceiveOPRFResponse. Finally, Receiver::ExtractHashes is used to obtain the OPRF
-        hashed items from the OPRF response with the help of the oprf::OPRFReceiver object.
+        oprf::OPRFReceiver, which can subsequently be sent to the sender with network::Channel::send. The sender must
+        respond to the request and the response must be received on the channel with network::Channel::receive_response.
+        The received Response object must be converted to the right type (OPRFResponse) with the to_oprf_response
+        function. This function will return nullptr if the received response was not of the correct type. Finally,
+        Receiver::ExtractHashes must be called to obtain the OPRF hashed items from the OPRFResponse with the help of
+        the oprf::OPRFReceiver object.
 
-        (3) Receiver::create_query must be used to create a Query object from the vector of OPRF hashed items received
-        in the previous step. The query request must be extracted from the Query object with Query::extract_request and
-        subsequently be sent to the sender with Receiver::SendRequest; the same Query object can no longer be used for
-        performing another query. Another way is to use Receiver:::SendQuery that makes a deep copy of the Query and
-        calls Receiver::SendRequest with the request extracted from the copy. Next, the response must be received with
-        Receiver::ReceiveQueryResponse. From the response one can read the package_count member variable that tells
-        how many ResultPart objects can be expected to be received.
+        (3) Receiver::create_query (non-static member function) must then be used to create the query itself. The
+        function returns std::pair<Request, IndexTranslationTable>, where the Request object contains the query itself
+        to be send to the sender, and the IndexTranslationTable is an object associated to this query describing how the
+        internal data structures of the query maps to the vector of OPRF hashed items given to Receiver::create_query.
+        The IndexTranslationTable object is needed later to process the responses from the sender. The Request object
+        must be sent to the sender with network::Channel::send. The received Response object must be converted to the
+        right type (QueryResponse) with the to_query_response function. This function will return nullptr if the
+        received response was not of the correct type. The QueryResponse contains only one important piece of data: the
+        number of ResultPart objects the receiver should expect to receive from the sender in the next step.
 
-        (4) Receiver::receive_result must be called repeatedly to receive all ResultParts. For each received ResultPart
-        Receiver::process_result_part must be called to find a std::vector<MatchRecord> representing the match data
-        associated to that ResultPart. Alternatively, one can first retrieve all ResultParts, collect them into
-        a std::vector<ResultPart>, and use Receiver::process_result to find the complete result -- just like what the
-        simple API returns.
+        (4) network::Channel::receive_result must be called repeatedly to receive all ResultParts. For each received
+        ResultPart Receiver::process_result_part must be called to find a std::vector<MatchRecord> representing the
+        match data associated to that ResultPart. Alternatively, one can first retrieve all ResultParts, collect them
+        into a std::vector<ResultPart>, and use Receiver::process_result to find the complete result -- just like what
+        the simple API returns.
         */
         class Receiver
         {
@@ -97,7 +105,7 @@ namespace apsi
             }
 
             /**
-            Returns a reference to the SEALContext for this SenderDB.
+            Returns a reference to the SEALContext for this Receiver..
             */
             std::shared_ptr<seal::SEALContext> get_seal_context() const
             {
