@@ -4,7 +4,7 @@ D. J. Bernstein
 Public domain.
 */
 
-#include "sha512.h"
+#include "apsi/fourq/sha512.h"
 
 typedef unsigned long long uint64;
 

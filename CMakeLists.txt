@@ -240,8 +240,7 @@ message(STATUS "flatc path: ${FLATBUFFERS_FLATC_PATH}")
 execute_process(
     COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi" "${APSI_SOURCE_DIR}/common/native/apsi/powers.fbs"
     OUTPUT_QUIET
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+    RESULT_VARIABLE result)
 if(result)
     message(FATAL_ERROR "flatc failed (${result})")
 endif()
@@ -249,8 +248,7 @@ endif()
 execute_process(
     COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi" "${APSI_SOURCE_DIR}/common/native/apsi/psi_params.fbs"
     OUTPUT_QUIET
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+    RESULT_VARIABLE result)
 if(result)
     message(FATAL_ERROR "flatc failed (${result})")
 endif()
@@ -258,8 +256,7 @@ endif()
 execute_process(
     COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/ciphertext.fbs"
     OUTPUT_QUIET
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+    RESULT_VARIABLE result)
 if(result)
     message(FATAL_ERROR "flatc failed (${result})")
 endif()
@@ -267,8 +264,7 @@ endif()
 execute_process(
     COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp --include-prefix "apsi/network/" -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/sop.fbs"
     OUTPUT_QUIET
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+    RESULT_VARIABLE result)
 if(result)
     message(FATAL_ERROR "flatc failed (${result})")
 endif()
@@ -276,8 +272,7 @@ endif()
 execute_process(
     COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/sop_header.fbs"
     OUTPUT_QUIET
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+    RESULT_VARIABLE result)
 if(result)
     message(FATAL_ERROR "flatc failed (${result})")
 endif()
@@ -285,8 +280,7 @@ endif()
 execute_process(
     COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp --include-prefix "apsi/network/" -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/sop_response.fbs"
     OUTPUT_QUIET
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+    RESULT_VARIABLE result)
 if(result)
     message(FATAL_ERROR "flatc failed (${result})")
 endif()
@@ -294,8 +288,7 @@ endif()
 execute_process(
     COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp --include-prefix "apsi/network/" -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/result_package.fbs"
     OUTPUT_QUIET
-    RESULT_VARIABLE result
-    WORKING_DIRECTORY ${THIRDPARTY_DIR}/flatbuffers)
+    RESULT_VARIABLE result)
 if(result)
     message(FATAL_ERROR "flatc failed (${result})")
 endif()

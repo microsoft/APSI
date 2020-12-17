@@ -62,13 +62,6 @@ namespace apsi
 
             bool scalar_multiply(scalar_span_const_type scalar, bool clear_cofactor);
 
-            bool operator==(const ECPoint &compare);
-
-            inline bool operator!=(const ECPoint &compare)
-            {
-                return !operator==(compare);
-            }
-
             ECPoint &operator=(const ECPoint &assign);
 
             void save(std::ostream &stream);
