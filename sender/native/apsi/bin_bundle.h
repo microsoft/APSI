@@ -64,6 +64,14 @@ namespace apsi
             CryptoContext crypto_context_;
 
         public:
+            BatchedPlaintextPolyn(const BatchedPlaintextPolyn &copy) = delete;
+
+            BatchedPlaintextPolyn(BatchedPlaintextPolyn &&source) = default;
+
+            BatchedPlaintextPolyn &operator=(const BatchedPlaintextPolyn &assign) = delete;
+
+            BatchedPlaintextPolyn &operator=(BatchedPlaintextPolyn &&assign) = default;
+
             /**
             Constructs a batched Plaintext polynomial from a list of polynomials. Takes an evaluator and batch encoder
             to do encoding and NTT ops.
@@ -100,6 +108,14 @@ namespace apsi
         // A cache of all the polynomial and plaintext computations on a single BinBundle
         struct BinBundleCache
         {
+                BinBundleCache(const BinBundleCache &copy) = delete;
+
+                BinBundleCache(BinBundleCache &&source) = default;
+
+                BinBundleCache &operator=(const BinBundleCache &assign) = delete;
+
+                BinBundleCache &operator=(BinBundleCache &&assign) = default;
+
                 BinBundleCache(const CryptoContext &crypto_context) :
                     batched_matching_polyn(crypto_context),
                     batched_interp_polyn(crypto_context)
@@ -189,6 +205,14 @@ namespace apsi
 
         public:
             BinBundle(const CryptoContext &crypto_context, bool compressed);
+
+            BinBundle(const BinBundle &copy) = delete;
+
+            BinBundle(BinBundle &&source) = default;
+
+            BinBundle &operator=(const BinBundle &assign) = delete;
+
+            BinBundle &operator=(BinBundle &&assign) = default;
 
             /**
             Does a dry-run insertion of item-label pairs into sequential bins, beginning at start_bin_idx. This does not

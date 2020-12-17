@@ -245,14 +245,14 @@ namespace apsi
         {
             // Compute and cache the batched "matching" polynomials. They're computed in both labeled and unlabeled PSI.
             BatchedPlaintextPolyn p(cache_.felt_matching_polyns, crypto_context_, compressed_);
-            cache_.batched_matching_polyn = p;
+            cache_.batched_matching_polyn = move(p);
 
             // Compute and cache the batched Newton interpolation polynomials iff they exist. They're only computed for
             // labeled PSI.
             if (cache_.felt_interp_polyns.size() > 0)
             {
                 BatchedPlaintextPolyn p(cache_.felt_interp_polyns, crypto_context_, compressed_);
-                cache_.batched_interp_polyn = p;
+                cache_.batched_interp_polyn = move(p);
             }
         }
 

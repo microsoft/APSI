@@ -491,7 +491,7 @@ namespace apsi
                     }
 
                     // We may have produced some empty BinBundles so just remove them all
-                    auto rem_it = remove_if(bundle_set.begin(), bundle_set.end(), [](auto it) { return it.empty(); });
+                    auto rem_it = remove_if(bundle_set.begin(), bundle_set.end(), [](auto &bundle) { return bundle.empty(); });
                     bundle_set.erase(rem_it, bundle_set.end());
 
                     // We tried to remove an item that doesn't exist. This should never happen

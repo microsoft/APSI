@@ -134,8 +134,8 @@ namespace APSITests
             auto cache = sender_db.get_cache_at(i);
 
             // Check the cache; we have only one bundle at this index
-            ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto &a) { return a.get().batched_matching_polyn; }));
-            ASSERT_TRUE(none_of(cache.begin(), cache.end(), [](auto &a) { return a.get().batched_interp_polyn; }));
+            ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto &a) { return !!a.get().batched_matching_polyn; }));
+            ASSERT_TRUE(none_of(cache.begin(), cache.end(), [](auto &a) { return !!a.get().batched_interp_polyn; }));
         }
 
         // Accessing cache beyond range
@@ -193,8 +193,8 @@ namespace APSITests
             auto cache = sender_db.get_cache_at(i);
 
             // Check the cache; we have only one bundle at this index
-            ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto a) { return a.get().batched_matching_polyn; }));
-            ASSERT_TRUE(none_of(cache.begin(), cache.end(), [](auto a) { return a.get().batched_interp_polyn; }));
+            ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto a) { return !!a.get().batched_matching_polyn; }));
+            ASSERT_TRUE(none_of(cache.begin(), cache.end(), [](auto a) { return !!a.get().batched_interp_polyn; }));
         }
 
         // Accessing cache beyond range
@@ -302,8 +302,8 @@ namespace APSITests
             auto cache = sender_db.get_cache_at(i);
 
             // Check the cache; we have only one bundle at this index
-            ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto a) { return a.get().batched_matching_polyn; }));
-            ASSERT_FALSE(none_of(cache.begin(), cache.end(), [](auto a) { return a.get().batched_interp_polyn; }));
+            ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto a) { return !!a.get().batched_matching_polyn; }));
+            ASSERT_FALSE(none_of(cache.begin(), cache.end(), [](auto a) { return !!a.get().batched_interp_polyn; }));
         }
 
         // Accessing cache beyond range
