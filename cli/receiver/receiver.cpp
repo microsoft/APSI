@@ -109,6 +109,11 @@ int remote_query(const CLP& cmd)
 
     Receiver receiver(*params, cmd.threads());
 
+    ofstream key_stream;
+    key_stream.open("c:\\secretkey.bin", ios::out | ios::binary);
+    receiver.get_crypto_context().secret_key()->save(key_stream);
+    key_stream.close();
+
     unique_ptr<CSVReader::DBData> query_data = load_db(cmd.query_file());
     if (!query_data || !holds_alternative<CSVReader::UnlabeledData>(*query_data))
     {

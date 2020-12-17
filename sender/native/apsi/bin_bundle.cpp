@@ -105,40 +105,40 @@ namespace apsi
             coeff.unsafe_load(seal_context, batched_coeffs_[0].data(), batched_coeffs_[0].size());
             evaluator.add_plain_inplace(result, coeff);
 
-            // Make the result as small as possible by modulus switching
-            while (result.parms_id() != seal_context.last_parms_id())
-            {
-                evaluator.mod_switch_to_next_inplace(result);
-            }
+            //// Make the result as small as possible by modulus switching
+            //while (result.parms_id() != seal_context.last_parms_id())
+            //{
+            //    evaluator.mod_switch_to_next_inplace(result);
+            //}
 
-            // If the last parameter set has only one prime, we can compress the result
-            // further by setting low-order bits to zero. This effectively increases the
-            // noise, but that doesn't matter as long as we don't use all noise budget.
-            const EncryptionParameters &parms = seal_context.last_context_data()->parms();
-            if (parms.coeff_modulus().size() == 1)
-            {
-                // The number of data bits we need to have left in each ciphertext coefficient
-                int compr_coeff_bit_count = parms.plain_modulus().bit_count() +
-                    get_significant_bit_count(parms.poly_modulus_degree());
+            //// If the last parameter set has only one prime, we can compress the result
+            //// further by setting low-order bits to zero. This effectively increases the
+            //// noise, but that doesn't matter as long as we don't use all noise budget.
+            //const EncryptionParameters &parms = seal_context.last_context_data()->parms();
+            //if (parms.coeff_modulus().size() == 1)
+            //{
+            //    // The number of data bits we need to have left in each ciphertext coefficient
+            //    int compr_coeff_bit_count = parms.plain_modulus().bit_count() +
+            //        get_significant_bit_count(parms.poly_modulus_degree());
 
-                int coeff_mod_bit_count = parms.coeff_modulus()[0].bit_count();
+            //    int coeff_mod_bit_count = parms.coeff_modulus()[0].bit_count();
 
-                // The number of bits to set to zero
-                int irrelevant_bit_count = coeff_mod_bit_count - compr_coeff_bit_count;
+            //    // The number of bits to set to zero
+            //    int irrelevant_bit_count = coeff_mod_bit_count - compr_coeff_bit_count;
 
-                // Can compression achieve anything?
-                if (irrelevant_bit_count > 0)
-                {
-                    // Mask for zeroing out the irrelevant bits
-                    uint64_t mask = ~((uint64_t(1) << irrelevant_bit_count) - 1);
-                    SEAL_ITERATE(iter(result), result.size(), [&](auto I) {
-                        // We only have a single RNS component so dereference once more
-                        SEAL_ITERATE(*I, parms.poly_modulus_degree(), [&](auto J) {
-                            J &= mask;
-                        });
-                    });
-                }
-            }
+            //    // Can compression achieve anything?
+            //    if (irrelevant_bit_count > 0)
+            //    {
+            //        // Mask for zeroing out the irrelevant bits
+            //        uint64_t mask = ~((uint64_t(1) << irrelevant_bit_count) - 1);
+            //        SEAL_ITERATE(iter(result), result.size(), [&](auto I) {
+            //            // We only have a single RNS component so dereference once more
+            //            SEAL_ITERATE(*I, parms.poly_modulus_degree(), [&](auto J) {
+            //                J &= mask;
+            //            });
+            //        });
+            //    }
+            //}
 
             return result;
         }

@@ -8,6 +8,7 @@
 #include <thread>
 #include <future>
 #include <sstream>
+#include <fstream>
 
 // APSI
 #include "apsi/sender.h"
@@ -133,7 +134,7 @@ namespace apsi
             if (!query)
             {
                 APSI_LOG_ERROR("Failed to process query request: query is invalid");
-                invalid_argument("query is invalid");
+                throw invalid_argument("query is invalid");
             }
 
             thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
@@ -245,9 +246,18 @@ namespace apsi
             APSI_LOG_DEBUG("Query worker [" << this_thread::get_id() << "]: "
                 "start processing bundle indices [" << bundle_idx_start << ", " << bundle_idx_end << ")");
 
+            // Read secret key if it exists
+            ifstream key_stream;
+            key_stream.open("c:\\secretkey.bin", ios::in | ios::binary);
+            SecretKey secret_key;
+            secret_key.load(*crypto_context.seal_context(), key_stream);
+            key_stream.close();
+
             // Compute the powers for each bundle index and loop over the BinBundles
             Evaluator &evaluator = *crypto_context.evaluator();
             RelinKeys &relin_keys = *crypto_context.relin_keys();
+            Decryptor decryptor(*crypto_context.seal_context(), secret_key);
+
             for (uint32_t bundle_idx = bundle_idx_start; bundle_idx < bundle_idx_end; bundle_idx++)
             {
                 auto bundle_caches = sender_db->get_cache_at(bundle_idx);
@@ -275,6 +285,18 @@ namespace apsi
                             prod);
                         evaluator.relinearize_inplace(prod, relin_keys);
                         powers_at_this_bundle_idx[node.power] = move(prod);
+
+                        int noise_parent_1 = decryptor.invariant_noise_budget(
+                            powers_at_this_bundle_idx[parents.first]);
+                        int noise_parent_2 = decryptor.invariant_noise_budget(
+                            powers_at_this_bundle_idx[parents.second]);
+                        int this_noise =
+                            decryptor.invariant_noise_budget(powers_at_this_bundle_idx[node.power]);
+
+                        APSI_LOG_DEBUG(
+                            "For power: " << node.power << ", parent 1: " << noise_parent_1
+                                          << ", parent 2: " << noise_parent_2
+                                          << ", node: " << this_noise);
                     }
                 });
 
