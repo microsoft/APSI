@@ -74,9 +74,9 @@ namespace APSITests
     protected:
         ReceiverTests()
         {
-            logging::Log::set_console_disabled(true);
-            logging::Log::set_log_level(logging::Log::Level::debug);
-            logging::Log::set_log_file("out.log");
+            logging::Log::set_console_disabled(false);
+            logging::Log::set_log_level(logging::Log::Level::info);
+            // logging::Log::set_log_file("out.log");
 
             if (!server_.is_connected())
             {
