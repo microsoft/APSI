@@ -6,6 +6,7 @@
 // STD
 #include <array>
 #include <cstddef>
+#include <cstdio>
 #include <cstdint>
 #include <sstream>
 #include <string>
@@ -20,6 +21,9 @@
 // SEAL
 #include "seal/util/defines.h"
 #include "seal/util/blake2.h"
+
+// APSI
+#include "apsi/logging/log.h"
 
 namespace apsi
 {
@@ -91,15 +95,15 @@ namespace apsi
             {
                 throw std::invalid_argument("bit_count exceeds the data length");
             }
-            // Sanity check: bit_count should not be more than 7 bits from the total length. If you want that, use a
-            // smaller vector
-            if (bit_count <= (data.size() - 1) * 8)
-            {
-                throw std::invalid_argument("bit_count is at least a whole byte less than the underlying data length");
-            }
 
             // Now move
-            data_ = std::move(data);
+            size_t data_length = (bit_count + 7) / 8;
+            if (data.size() == data_length) {
+                data_ = std::move(data);
+            } else {
+                data_ = data.subspan(0, data_length);
+            }
+
             bit_count_ = bit_count;
         }
 
@@ -153,15 +157,14 @@ namespace apsi
             {
                 throw std::invalid_argument("bit_count exceeds the data length");
             }
-            // Sanity check: bit_count should not be more than 7 bits from the total length. If you want that, use
-            // a smaller vector
-            if (bit_count <= (data.size() - 1) * 8)
-            {
-                throw std::invalid_argument("bit_count is at least a whole byte less than the underlying data length");
-            }
 
             // Now move
             data_ = std::move(data);
+            size_t data_length = (bit_count + 7) / 8;
+            if (data_length < data_.size()) {
+                data_.resize(data_length);
+            }
+
             bit_count_ = bit_count;
         }
 
