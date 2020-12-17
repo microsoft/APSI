@@ -56,7 +56,7 @@ namespace apsi
             A sequence of coefficients represented as batched plaintexts. The length of this vector is the degree of the
             highest-degree polynomial in the sequence.
             */
-            std::vector<seal::Plaintext> batched_coeffs_;
+            std::vector<std::vector<seal::seal_byte>> batched_coeffs_;
 
             /**
             We need this to compute eval()
@@ -70,7 +70,8 @@ namespace apsi
             */
             BatchedPlaintextPolyn(
                 const std::vector<FEltPolyn> &polyns,
-                CryptoContext crypto_context
+                CryptoContext crypto_context,
+                bool compressed
             );
 
             /**
@@ -177,12 +178,17 @@ namespace apsi
             BinBundleCache cache_;
 
             /**
+            Indicates whether Microsoft SEAL plaintexts are compressed in memory.
+            */
+            bool compressed_;
+
+            /**
             Returns the modulus that defines the finite field that we're working in
             */
             const seal::Modulus &field_mod();
 
         public:
-            BinBundle(const CryptoContext &crypto_context);
+            BinBundle(const CryptoContext &crypto_context, bool compressed);
 
             /**
             Does a dry-run insertion of item-label pairs into sequential bins, beginning at start_bin_idx. This does not

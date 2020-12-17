@@ -285,7 +285,7 @@ namespace apsi
                 // all be done before transforming to NTT form. We omit the first ciphertext in the vector, because it
                 // corresponds to the zeroth power of the query and is included only for convenience of the indexing;
                 // the ciphertext is actually not set or valid for use.
-                //
+
                 // When using C++17 this function may be multi-threaded in the future with C++ execution policies.
                 seal_for_each_n(powers_at_this_bundle_idx.begin() + 1, powers_at_this_bundle_idx.size() - 1, [&](auto &ct) {
                     evaluator.transform_to_ntt_inplace(ct);

@@ -223,7 +223,8 @@ namespace apsi
                 pair<size_t, size_t> work_range,
                 uint32_t bins_per_bundle,
                 size_t max_bin_size,
-                bool overwrite)
+                bool overwrite,
+                bool compressed)
             {
                 stringstream sw_ss;
                 sw_ss << "insert_or_assign_worker [" << this_thread::get_id() << "]";
@@ -308,7 +309,7 @@ namespace apsi
                     if (!written)
                     {
                         // Make a fresh BinBundle and insert
-                        BinBundle<L> new_bin_bundle(crypto_context);
+                        BinBundle<L> new_bin_bundle(crypto_context, compressed);
                         int res = new_bin_bundle.multi_insert_for_real(data, bin_idx);
 
                         // If even that failed, I don't know what could've happened
@@ -366,7 +367,8 @@ namespace apsi
                 uint32_t bins_per_bundle,
                 uint32_t max_bin_size,
                 size_t thread_count,
-                bool overwrite
+                bool overwrite,
+                bool compressed
             ) {
                 // Collect the bundle indices and partition them into thread_count many partitions. By some uniformity
                 // assumption, the number of things to insert per partition should be roughly the same. Note that
@@ -409,7 +411,8 @@ namespace apsi
                             make_pair(bundle_indices[partition.first], bundle_indices[partition.second]),
                             bins_per_bundle,
                             max_bin_size,
-                            overwrite
+                            overwrite,
+                            compressed
                         );
                     });
                 }
@@ -609,7 +612,8 @@ namespace apsi
             }
         }
 
-        SenderDB::SenderDB(PSIParams params) : params_(params), crypto_context_(params_.seal_params())
+        SenderDB::SenderDB(PSIParams params, bool compressed) :
+            params_(params), crypto_context_(params_.seal_params()), compressed_(compressed)
         {
             if (!get_seal_context()->parameters_set())
             {
@@ -765,7 +769,8 @@ namespace apsi
                 bins_per_bundle,
                 max_bin_size,
                 thread_count,
-                false /* don't overwrite items */
+                false, /* don't overwrite items */
+                compressed_
             );
 
             dispatch_insert_or_assign(
@@ -775,7 +780,8 @@ namespace apsi
                 bins_per_bundle,
                 max_bin_size,
                 thread_count,
-                true /* overwrite items */
+                true, /* overwrite items */
+                compressed_
             );
 
             // Now that everything is inserted, add the new items to the cache of all inserted items
@@ -836,7 +842,8 @@ namespace apsi
                 bins_per_bundle,
                 max_bin_size,
                 thread_count,
-                false
+                false, /* don't overwrite items */
+                compressed_
             );
 
             // Now that everything is inserted, add the new items to the cache of all inserted items. Some of these may

@@ -78,6 +78,13 @@ namespace apsi
             relin_keys_.set(move(relin_keys));
         }
 
+        uint32_t Receiver::reset_powers_dag()
+        {
+            pd_ = optimal_powers(params_.table_params().max_items_per_bin, params_.query_params().query_powers_count);
+            APSI_LOG_INFO("Found a powers configuration with depth: " << pd_.depth());
+            return pd_.depth();
+        }
+
         void Receiver::initialize()
         {
             APSI_LOG_INFO("Initializing Receiver with " << thread_count_ << " threads");
@@ -104,8 +111,7 @@ namespace apsi
             }
 
             // Set up the PowersDag
-            pd_ = optimal_powers(params_.table_params().max_items_per_bin, params_.query_params().query_powers_count);
-            APSI_LOG_INFO("Found a powers configuration with depth: " << pd_.depth());
+            reset_powers_dag();
 
             // Create new keys
             reset_keys();

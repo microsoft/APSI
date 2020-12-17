@@ -34,7 +34,7 @@ namespace apsi
         class SenderDB
         {
         public:
-            SenderDB(PSIParams params);
+            SenderDB(PSIParams params, bool compressed);
 
             /**
             Clears the database.
@@ -179,6 +179,11 @@ namespace apsi
             A read-write lock to protect the database from modification while in use.
             */
             mutable seal::util::ReaderWriterLocker db_lock_;
+
+            /**
+            Indicates whether Microsoft SEAL plaintexts are compressed in memory.
+            */
+            bool compressed_;
         }; // class SenderDB
 
         class LabeledSenderDB : public SenderDB
@@ -194,7 +199,7 @@ namespace apsi
             /**
             Creates a new LabeledSenderDB.
             */
-            LabeledSenderDB(PSIParams params) : SenderDB(std::move(params))
+            LabeledSenderDB(PSIParams params, bool compressed = true) : SenderDB(std::move(params), compressed)
             {
                 clear_db();
             }
@@ -312,7 +317,7 @@ namespace apsi
             /**
             Creates a new UnlabeledSenderDB.
             */
-            UnlabeledSenderDB(PSIParams params) : SenderDB(std::move(params))
+            UnlabeledSenderDB(PSIParams params, bool compressed = true) : SenderDB(std::move(params), compressed)
             {
                 clear_db();
             }

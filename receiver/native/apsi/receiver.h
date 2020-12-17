@@ -97,6 +97,21 @@ namespace apsi
             void reset_keys();
 
             /**
+            Recomputes the PowersDag. The function returns the depth of the PowersDag. In some cases the receiver may
+            want to ensure that the depth of the powers computation will be as expected (PowersDag::depth), and
+            otherwise attempt to reconfigure the PowersDag.
+            */
+            std::uint32_t reset_powers_dag();
+            
+            /**
+            Returns a reference to the PowersDag configured for this Receiver.
+            */
+            const PowersDag &get_powers_dag() const
+            {
+                return pd_;
+            }
+
+            /**
             Returns a reference to the CryptoContext for this Receiver.
             */
             const CryptoContext &get_crypto_context() const
