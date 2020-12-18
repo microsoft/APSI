@@ -22,6 +22,42 @@ namespace apsi
 {
     namespace oprf
     {
+        namespace
+        {
+            void random_scalar(ECPoint::scalar_span_type value, shared_ptr<UniformRandomGenerator> rg)
+            {
+                if (rg)
+                {
+                    rg->generate(ECPoint::order_size, reinterpret_cast<seal_byte *>(value.data()));
+                }
+                else
+                {
+                    uint64_t *value_ptr = reinterpret_cast<uint64_t *>(value.data());
+                    value_ptr[0] = random_uint64();
+                    value_ptr[1] = random_uint64();
+                    value_ptr[2] = random_uint64();
+                    value_ptr[3] = random_uint64();
+                }
+                
+                modulo_order(reinterpret_cast<digit_t *>(value.data()), reinterpret_cast<digit_t *>(value.data()));
+            }
+
+            digit_t is_nonzero_scalar(ECPoint::scalar_span_type value)
+            {
+                const digit_t *value_ptr = reinterpret_cast<digit_t *>(value.data());
+                digit_t c = 0;
+
+                for (size_t i = 0; i < NWORDS_ORDER; i++)
+                {
+                    c |= value_ptr[i];
+                }
+
+                sdigit_t first_nz = -static_cast<sdigit_t>(c & 1);
+                sdigit_t rest_nz = -static_cast<sdigit_t>(c >> 1);
+                return static_cast<digit_t>((first_nz | rest_nz) >> (8 * sizeof(digit_t) - 1)); 
+            }
+        }
+
         ECPoint::ECPoint(input_span_const_type value)
         {
             if (!value.empty())
@@ -44,31 +80,12 @@ namespace apsi
 
         void ECPoint::make_random_nonzero_scalar(scalar_span_type out, shared_ptr<UniformRandomGenerator> rg)
         {
-            auto rand_scalar = [&rg](scalar_span_type value) {
-                if (rg)
-                {
-                    rg->generate(order_size, reinterpret_cast<seal_byte *>(value.data()));
-                }
-                else
-                {
-                    value[0] = random_uint64();
-                    value[1] = random_uint64();
-                    value[2] = random_uint64();
-                    value[3] = random_uint64();
-                }
-                modulo_order(reinterpret_cast<digit_t *>(value.data()), reinterpret_cast<digit_t *>(value.data()));
-            };
-
-            auto is_zero_scalar = [](scalar_span_type value) -> bool {
-                return !(value[0] | value[1] | value[2] | value[3]);
-            };
-
             // Loop until we find a non-zero element
             do
             {
-                rand_scalar(out);
+                random_scalar(out, rg);
             }
-            while (is_zero_scalar(out));
+            while (!is_nonzero_scalar(out));
         }
 
         void ECPoint::invert_scalar(scalar_span_const_type in, scalar_span_type out)
