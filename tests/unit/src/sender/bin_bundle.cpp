@@ -62,14 +62,14 @@ namespace APSITests
         ASSERT_FALSE(bpp);
 
         vector<FEltPolyn> polyns;
-        bpp = BatchedPlaintextPolyn(polyns, context);
+        bpp = BatchedPlaintextPolyn(polyns, context, true);
         ASSERT_TRUE(bpp);
 
         polyns.push_back({ 1, 2, 3 });
         polyns.push_back({ 1, 2 });
         polyns.push_back({ 3 });
         polyns.push_back({ 1, 2, 3, 4, 5 });
-        bpp = BatchedPlaintextPolyn(polyns, context);
+        bpp = BatchedPlaintextPolyn(polyns, context, true);
         ASSERT_TRUE(bpp);
     }
 
@@ -83,7 +83,7 @@ namespace APSITests
         polyns.push_back({ 1, 2 });
         polyns.push_back({ 3 });
         polyns.push_back({ 1, 2, 3, 4, 5 });
-        BatchedPlaintextPolyn bpp(polyns, context);
+        BatchedPlaintextPolyn bpp(polyns, context, true);
         ASSERT_TRUE(bpp);
 
         KeyGenerator keygen(*context.seal_context());
@@ -129,10 +129,10 @@ namespace APSITests
         CryptoContext context(get_params()->seal_params());
 
         // No evaluator set in context
-        ASSERT_THROW(BinBundle<monostate> bb(context), invalid_argument);
+        ASSERT_THROW(BinBundle<monostate> bb(context, true), invalid_argument);
 
         context.set_evaluator();
-        BinBundle<monostate> bb(context);
+        BinBundle<monostate> bb(context, true);
 
         ASSERT_TRUE(bb.cache_invalid());
         bb.clear_cache();
@@ -158,10 +158,10 @@ namespace APSITests
         CryptoContext context(get_params()->seal_params());
 
         // No evaluator set in context
-        ASSERT_THROW(BinBundle<felt_t> bb(context), invalid_argument);
+        ASSERT_THROW(BinBundle<felt_t> bb(context, true), invalid_argument);
 
         context.set_evaluator();
-        BinBundle<felt_t> bb(context);
+        BinBundle<felt_t> bb(context, true);
 
         ASSERT_TRUE(bb.cache_invalid());
         bb.clear_cache();
@@ -192,7 +192,7 @@ namespace APSITests
         CryptoContext context(get_params()->seal_params());
         context.set_evaluator();
 
-        BinBundle<monostate> bb(context);
+        BinBundle<monostate> bb(context, true);
         bb.regen_cache();
         ASSERT_FALSE(bb.cache_invalid());
         ASSERT_TRUE(bb.empty());
@@ -292,7 +292,7 @@ namespace APSITests
         CryptoContext context(get_params()->seal_params());
         context.set_evaluator();
 
-        BinBundle<felt_t> bb(context);
+        BinBundle<felt_t> bb(context, true);
         bb.regen_cache();
         ASSERT_FALSE(bb.cache_invalid());
         ASSERT_TRUE(bb.empty());
@@ -431,7 +431,7 @@ namespace APSITests
         CryptoContext context(get_params()->seal_params());
         context.set_evaluator();
 
-        BinBundle<felt_t> bb(context);
+        BinBundle<felt_t> bb(context, true);
 
         vector<pair<felt_t, felt_t>> values{ make_pair(1, 1) };
 
@@ -541,7 +541,7 @@ namespace APSITests
         CryptoContext context(get_params()->seal_params());
         context.set_evaluator();
 
-        BinBundle<monostate> bb(context);
+        BinBundle<monostate> bb(context, true);
         bb.regen_cache();
         ASSERT_FALSE(bb.cache_invalid());
         ASSERT_TRUE(bb.empty());

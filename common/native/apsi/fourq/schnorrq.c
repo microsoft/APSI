@@ -10,10 +10,10 @@
 * https://www.microsoft.com/en-us/research/wp-content/uploads/2016/07/SchnorrQ.pdf.
 ***********************************************************************************/ 
 
-#include "FourQ_internal.h"
-#include "FourQ_params.h"
-#include "../random/random.h"
-#include "../sha512/sha512.h"
+#include "apsi/fourq/FourQ_internal.h"
+#include "apsi/fourq/FourQ_params.h"
+#include "apsi/fourq/random.h"
+#include "apsi/fourq/sha512.h"
 #include <malloc.h>
 #include <string.h>
 

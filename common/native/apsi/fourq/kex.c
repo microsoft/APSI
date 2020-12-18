@@ -9,13 +9,13 @@
 *           option 2: co-factor ecdh using uncompressed, 64-byte public keys. 
 *********************************************************************************/
 
-#include "FourQ_internal.h"
-#include "FourQ_params.h"
-#include "random.h"
+#include "apsi/fourq/FourQ_internal.h"
+#include "apsi/fourq/FourQ_params.h"
+#include "apsi/fourq/random.h"
 #include <string.h>
 
 
-static bool is_neutral_point(point_t P)
+static __inline bool is_neutral_point(point_t P)
 { // Is P the neutral point (0,1)?
   // SECURITY NOTE: this function does not run in constant time (input point P is assumed to be public).
   

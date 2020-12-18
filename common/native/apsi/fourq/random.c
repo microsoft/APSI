@@ -6,7 +6,7 @@
 * Abstract: pseudo-random function
 ************************************************************************************/ 
 
-#include "random.h"
+#include "apsi/fourq/random.h"
 #include <stdlib.h>
 #include <stdbool.h>
 #if defined(__WINDOWS__)

@@ -271,7 +271,7 @@ namespace apsi
         std::size_t load(std::istream &in);
 
     private:
-        static constexpr std::uint32_t attempts_ = 1000;
+        static constexpr std::uint32_t attempts_ = 10'000;
 
         std::unordered_map<std::uint32_t, PowersNode> nodes_;
 

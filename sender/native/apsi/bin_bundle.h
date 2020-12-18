@@ -56,7 +56,7 @@ namespace apsi
             A sequence of coefficients represented as batched plaintexts. The length of this vector is the degree of the
             highest-degree polynomial in the sequence.
             */
-            std::vector<seal::Plaintext> batched_coeffs_;
+            std::vector<std::vector<seal::seal_byte>> batched_coeffs_;
 
             /**
             We need this to compute eval()
@@ -64,13 +64,22 @@ namespace apsi
             CryptoContext crypto_context_;
 
         public:
+            BatchedPlaintextPolyn(const BatchedPlaintextPolyn &copy) = delete;
+
+            BatchedPlaintextPolyn(BatchedPlaintextPolyn &&source) = default;
+
+            BatchedPlaintextPolyn &operator=(const BatchedPlaintextPolyn &assign) = delete;
+
+            BatchedPlaintextPolyn &operator=(BatchedPlaintextPolyn &&assign) = default;
+
             /**
             Constructs a batched Plaintext polynomial from a list of polynomials. Takes an evaluator and batch encoder
             to do encoding and NTT ops.
             */
             BatchedPlaintextPolyn(
                 const std::vector<FEltPolyn> &polyns,
-                CryptoContext crypto_context
+                CryptoContext crypto_context,
+                bool compressed
             );
 
             /**
@@ -99,6 +108,14 @@ namespace apsi
         // A cache of all the polynomial and plaintext computations on a single BinBundle
         struct BinBundleCache
         {
+                BinBundleCache(const BinBundleCache &copy) = delete;
+
+                BinBundleCache(BinBundleCache &&source) = default;
+
+                BinBundleCache &operator=(const BinBundleCache &assign) = delete;
+
+                BinBundleCache &operator=(BinBundleCache &&assign) = default;
+
                 BinBundleCache(const CryptoContext &crypto_context) :
                     batched_matching_polyn(crypto_context),
                     batched_interp_polyn(crypto_context)
@@ -169,7 +186,7 @@ namespace apsi
             The bins of the BinBundle. Each bin is a key-value store, where the keys are (chunks of the OPRF'd) DB
             items and the labels are either field elements or empty (a unit type).
             */
-            std::vector<std::map<felt_t, L> > bins_;
+            std::vector<std::map<felt_t, L>> bins_;
 
             /**
             A cache of all the computations we can do on the bins. This is empty by default.
@@ -177,12 +194,25 @@ namespace apsi
             BinBundleCache cache_;
 
             /**
+            Indicates whether SEAL plaintexts are compressed in memory.
+            */
+            bool compressed_;
+
+            /**
             Returns the modulus that defines the finite field that we're working in
             */
             const seal::Modulus &field_mod();
 
         public:
-            BinBundle(const CryptoContext &crypto_context);
+            BinBundle(const CryptoContext &crypto_context, bool compressed);
+
+            BinBundle(const BinBundle &copy) = delete;
+
+            BinBundle(BinBundle &&source) = default;
+
+            BinBundle &operator=(const BinBundle &assign) = delete;
+
+            BinBundle &operator=(BinBundle &&assign) = default;
 
             /**
             Does a dry-run insertion of item-label pairs into sequential bins, beginning at start_bin_idx. This does not
@@ -190,7 +220,7 @@ namespace apsi
             insertion has taken place. On failed insertion, returns -1.
             */
             int multi_insert_dry_run(
-                const std::vector<std::pair<felt_t, L> > &item_label_pairs,
+                const std::vector<std::pair<felt_t, L>> &item_label_pairs,
                 std::size_t start_bin_idx
             );
 
@@ -200,7 +230,7 @@ namespace apsi
             -1. On failure, no modification is made to the BinBundle.
             */
             int multi_insert_for_real(
-                const std::vector<std::pair<felt_t, L> > &item_label_pairs,
+                const std::vector<std::pair<felt_t, L>> &item_label_pairs,
                 std::size_t start_bin_idx
             );
 
@@ -211,7 +241,7 @@ namespace apsi
             BinBundle.
             */
             int multi_insert(
-                const std::vector<std::pair<felt_t, L> > &item_label_pairs,
+                const std::vector<std::pair<felt_t, L>> &item_label_pairs,
                 std::size_t start_bin_idx,
                 bool dry_run
             );
@@ -223,7 +253,7 @@ namespace apsi
             bother.
             */
             bool try_multi_overwrite(
-                const std::vector<std::pair<felt_t, L> > &item_label_pairs,
+                const std::vector<std::pair<felt_t, L>> &item_label_pairs,
                 std::size_t start_bin_idx
             );
 

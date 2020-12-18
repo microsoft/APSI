@@ -11,7 +11,7 @@
 * Preprint available at http://eprint.iacr.org/2015/565.
 ************************************************************************************/
 
-#include "FourQ_internal.h"
+#include "apsi/fourq/FourQ_internal.h"
 
 
 #if (USE_ENDO == true)

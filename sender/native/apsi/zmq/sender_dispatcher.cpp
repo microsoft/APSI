@@ -100,7 +100,7 @@ namespace apsi
         void ZMQSenderDispatcher::dispatch_parms(unique_ptr<ZMQSenderOperation> sop, ZMQSenderChannel &chl)
         {
             STOPWATCH(sender_stopwatch, "ZMQSenderDispatcher::dispatch_params");
-            
+
             try
             {
                 // Extract the parameter request

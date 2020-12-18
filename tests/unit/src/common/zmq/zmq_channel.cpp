@@ -151,7 +151,7 @@ namespace APSITests
             auto sop_oprf = make_unique<SenderOperationOPRF>();
             sop_oprf->data = oprf_data;
             sop = move(sop_oprf);
-            
+
             // Send an OPRF operation with some dummy data
             clt.send(move(sop));
 
@@ -165,7 +165,7 @@ namespace APSITests
 
             // Send a query operation with some dummy data
             clt.send(move(sop));
-            
+
             // Next, try receiving an OPRF response; this is incorrect so should return nullptr
             ASSERT_EQ(nullptr, clt.receive_response(SenderOperationType::sop_oprf));
 

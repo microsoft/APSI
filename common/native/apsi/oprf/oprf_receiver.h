@@ -39,7 +39,7 @@ namespace apsi
             {
                 process_items(oprf_items);
             }
-            
+
             inline std::size_t item_count() const noexcept
             {
                 return inv_factor_data_.item_count();

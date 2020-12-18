@@ -11,6 +11,7 @@
 // APSI
 #include "apsi/logging/log.h"
 #include "apsi/network/channel.h"
+#include "apsi/plaintext_powers.h"
 #include "apsi/receiver.h"
 #include "apsi/util/utils.h"
 
@@ -37,93 +38,6 @@ namespace apsi
 
     namespace
     {
-        class PlaintextPowers
-        {
-        public:
-            PlaintextPowers(vector<uint64_t> values, const PSIParams &params, const PowersDag &pd) :
-                mod_(params.seal_params().plain_modulus())
-            {
-                compute_powers(move(values), pd);
-            }
-
-            unordered_map<uint32_t, SEALObject<Ciphertext>> encrypt(const CryptoContext &crypto_context)
-            {
-                if (!crypto_context.encryptor())
-                {
-                    throw invalid_argument("encryptor is not set in crypto_context");
-                }
-
-                unordered_map<uint32_t, SEALObject<Ciphertext>> result;
-                for (auto &p : powers_)
-                {
-                    Plaintext pt;
-                    crypto_context.encoder()->encode(p.second, pt);
-                    result.emplace(make_pair(p.first, crypto_context.encryptor()->encrypt_symmetric(pt)));
-                }
-
-                return result;
-            }
-
-        private:
-            Modulus mod_;
-
-            unordered_map<uint32_t, vector<uint64_t>> powers_;
-
-            void square_array(gsl::span<uint64_t> in) const
-            {
-                transform(in.begin(), in.end(), in.begin(),
-                    [this](auto val) { return multiply_uint_mod(val, val, mod_); });
-            }
-
-            void multiply_array(gsl::span<uint64_t> in1, gsl::span<uint64_t> in2, gsl::span<uint64_t> out) const
-            {
-                transform(in1.begin(), in1.end(), in2.begin(), out.begin(),
-                    [this](auto val1, auto val2) { return multiply_uint_mod(val1, val2, mod_); });
-            }
-
-            vector<uint64_t> exponentiate_array(vector<uint64_t> values, uint32_t exponent)
-            {
-                if (!exponent)
-                {
-                    throw invalid_argument("exponent cannot be zero");
-                }
-
-                vector<uint64_t> result(values.size(), 1);
-                while (exponent)
-                {
-                    if (exponent & 1)
-                    {
-                        multiply_array(values, result, result);
-                    }
-                    square_array(values);
-                    exponent >>= 1;
-                }
-
-                return result;
-            }
-
-            void compute_powers(vector<uint64_t> values, const PowersDag &pd)
-            {
-                auto source_powers = pd.source_nodes();
-
-                for (auto &s : source_powers)
-                {
-                    powers_[s.power] = exponentiate_array(values, s.power);
-                }
-
-                APSI_LOG_DEBUG("Plaintext powers computed: " << [&]() {
-                        stringstream ss;
-                        ss << "[";
-                        for (auto &a : powers_)
-                        {
-                            ss << " " << a.first;
-                        }
-                        ss << " ]";
-                        return ss.str();
-                    }());
-            }
-        };
-
         template<typename T>
         bool has_n_zeros(T *ptr, size_t count)
         {
@@ -164,6 +78,13 @@ namespace apsi
             relin_keys_.set(move(relin_keys));
         }
 
+        uint32_t Receiver::reset_powers_dag()
+        {
+            pd_ = optimal_powers(params_.table_params().max_items_per_bin, params_.query_params().query_powers_count);
+            APSI_LOG_INFO("Found a powers configuration with depth: " << pd_.depth());
+            return pd_.depth();
+        }
+
         void Receiver::initialize()
         {
             APSI_LOG_INFO("Initializing Receiver with " << thread_count_ << " threads");
@@ -190,8 +111,7 @@ namespace apsi
             }
 
             // Set up the PowersDag
-            pd_ = optimal_powers(params_.table_params().max_items_per_bin, params_.query_params().query_powers_count);
-            APSI_LOG_INFO("Found a powers configuration with depth: " << pd_.depth());
+            reset_powers_dag();
 
             // Create new keys
             reset_keys();
@@ -249,7 +169,7 @@ namespace apsi
                 APSI_LOG_ERROR("Failed to extract OPRF hashes for items: oprf_response is null");
                 return {};
             }
-            
+
             auto response_size = oprf_response->data.size();
             size_t oprf_response_item_count = response_size / oprf_response_size;
             if ((response_size % oprf_response_size) || (oprf_response_item_count != oprf_receiver.item_count()))

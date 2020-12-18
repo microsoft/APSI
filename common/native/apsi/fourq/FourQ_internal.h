@@ -21,7 +21,7 @@ extern "C" {
 #endif
 
     
-#include "FourQ_api.h"
+#include "apsi/fourq/FourQ_api.h"
 
 
 // Extended datatype support

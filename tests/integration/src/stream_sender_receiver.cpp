@@ -81,9 +81,12 @@ namespace APSITests
 
                 // Send the OPRF request
                 ASSERT_NO_THROW(chl.send(move(oprf_request)));
+                size_t bytes_sent = chl.bytes_sent();
 
                 // Receive the OPRF request and process response
-                OPRFRequest oprf_request2 = to_oprf_request(chl.receive_operation(nullptr));
+                OPRFRequest oprf_request2 = to_oprf_request(chl.receive_operation(nullptr, SenderOperationType::sop_oprf));
+                size_t bytes_received = chl.bytes_received();
+                ASSERT_EQ(bytes_sent, bytes_received);
                 ASSERT_NO_THROW(Sender::RunOPRF(oprf_request2, oprf_key, chl));
 
                 // Receive OPRF response
@@ -169,9 +172,12 @@ namespace APSITests
 
                 // Send the OPRF request
                 ASSERT_NO_THROW(chl.send(move(oprf_request)));
+                size_t bytes_sent = chl.bytes_sent();
 
                 // Receive the OPRF request and process response
-                OPRFRequest oprf_request2 = to_oprf_request(chl.receive_operation(nullptr));
+                OPRFRequest oprf_request2 = to_oprf_request(chl.receive_operation(nullptr, SenderOperationType::sop_oprf));
+                size_t bytes_received = chl.bytes_received();
+                ASSERT_EQ(bytes_sent, bytes_received);
                 ASSERT_NO_THROW(Sender::RunOPRF(oprf_request2, oprf_key, chl));
 
                 // Receive OPRF response

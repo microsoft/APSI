@@ -91,16 +91,19 @@ namespace apsi
             result.resize(seal_context, seal_context.first_parms_id(), 2);
             result.is_ntt_form() = true;
             Ciphertext temp;
+            Plaintext coeff;
             for (size_t deg = 1; deg < batched_coeffs_.size(); deg++)
             {
-                evaluator.multiply_plain(ciphertext_powers[deg], batched_coeffs_[deg], temp);
+                coeff.unsafe_load(seal_context, batched_coeffs_[deg].data(), batched_coeffs_[deg].size());
+                evaluator.multiply_plain(ciphertext_powers[deg], coeff, temp);
                 evaluator.add_inplace(result, temp);
             }
 
             // Need to transform back from NTT form before we can add the constant coefficient. The constant coefficient
             // is specifically not in NTT form so this can work.
             evaluator.transform_from_ntt_inplace(result);
-            evaluator.add_plain_inplace(result, batched_coeffs_[0]);
+            coeff.unsafe_load(seal_context, batched_coeffs_[0].data(), batched_coeffs_[0].size());
+            evaluator.add_plain_inplace(result, coeff);
 
             // Make the result as small as possible by modulus switching
             while (result.parms_id() != seal_context.last_parms_id())
@@ -146,9 +149,12 @@ namespace apsi
         */
         BatchedPlaintextPolyn::BatchedPlaintextPolyn(
             const vector<FEltPolyn> &polyns,
-            CryptoContext crypto_context
+            CryptoContext crypto_context,
+            bool compressed
         ) : crypto_context_(move(crypto_context))
         {
+            compr_mode_type compr_mode = compressed ? compr_mode_type::zstd : compr_mode_type::none;
+
             // Find the highest degree polynomial in the list. The max degree determines how many Plaintexts we
             // need to make
             size_t max_deg = 0;
@@ -195,15 +201,20 @@ namespace apsi
                 }
 
                 // Push the new Plaintext
-                batched_coeffs_.push_back(move(pt));
+                vector<seal_byte> pt_data;
+                pt_data.resize(pt.save_size(compr_mode));
+                size_t size = pt.save(pt_data.data(), pt_data.size(), compr_mode);
+                pt_data.resize(size);
+                batched_coeffs_.push_back(move(pt_data));
             }
         }
 
         template<typename L>
-        BinBundle<L>::BinBundle(const CryptoContext &crypto_context) :
+        BinBundle<L>::BinBundle(const CryptoContext &crypto_context, bool compressed) :
             cache_invalid_(true),
             cache_(crypto_context),
-            crypto_context_(crypto_context)
+            crypto_context_(crypto_context),
+            compressed_(compressed)
         {
             if (!crypto_context_.evaluator())
             {
@@ -233,15 +244,15 @@ namespace apsi
         void BinBundle<L>::regen_plaintexts()
         {
             // Compute and cache the batched "matching" polynomials. They're computed in both labeled and unlabeled PSI.
-            BatchedPlaintextPolyn p(cache_.felt_matching_polyns, crypto_context_);
-            cache_.batched_matching_polyn = p;
+            BatchedPlaintextPolyn p(cache_.felt_matching_polyns, crypto_context_, compressed_);
+            cache_.batched_matching_polyn = move(p);
 
             // Compute and cache the batched Newton interpolation polynomials iff they exist. They're only computed for
             // labeled PSI.
             if (cache_.felt_interp_polyns.size() > 0)
             {
-                BatchedPlaintextPolyn p(cache_.felt_interp_polyns, crypto_context_);
-                cache_.batched_interp_polyn = p;
+                BatchedPlaintextPolyn p(cache_.felt_interp_polyns, crypto_context_, compressed_);
+                cache_.batched_interp_polyn = move(p);
             }
         }
 
@@ -253,7 +264,7 @@ namespace apsi
         */
         template<typename L>
         int BinBundle<L>::multi_insert_dry_run(
-            const vector<pair<felt_t, L> > &item_label_pairs,
+            const vector<pair<felt_t, L>> &item_label_pairs,
             size_t start_bin_idx
         ) {
             return multi_insert(item_label_pairs, start_bin_idx, true);
@@ -266,7 +277,7 @@ namespace apsi
         */
         template<typename L>
         int BinBundle<L>::multi_insert_for_real(
-            const vector<pair<felt_t, L> > &item_label_pairs,
+            const vector<pair<felt_t, L>> &item_label_pairs,
             size_t start_bin_idx
         ) {
             return multi_insert(item_label_pairs, start_bin_idx, false);
@@ -280,7 +291,7 @@ namespace apsi
         */
         template<typename L>
         int BinBundle<L>::multi_insert(
-            const vector<pair<felt_t, L> > &item_label_pairs,
+            const vector<pair<felt_t, L>> &item_label_pairs,
             size_t start_bin_idx,
             bool dry_run
         ) {
@@ -343,7 +354,7 @@ namespace apsi
         */
         template<typename L>
         bool BinBundle<L>::try_multi_overwrite(
-            const vector<pair<felt_t, L> > &item_label_pairs,
+            const vector<pair<felt_t, L>> &item_label_pairs,
             size_t start_bin_idx
         ) {
             // Return false if there isn't enough room in the bin bundle to insert at the given location
@@ -416,7 +427,8 @@ namespace apsi
                 {
                     // One of the items isn't there; return false;
                     return false;
-                } else
+                }
+                else
                 {
                     // Found the label, put it in the return vector. *label_it is a key-value pair.
                     to_remove_its.push_back(move(to_remove_it));

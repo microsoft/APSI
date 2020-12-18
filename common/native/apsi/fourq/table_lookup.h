@@ -16,7 +16,7 @@ extern "C" {
 #endif
 
 
-#include "FourQ_internal.h"
+#include "apsi/fourq/FourQ_internal.h"
 #if (TARGET == TARGET_AMD64) && !defined(GENERIC_IMPLEMENTATION)
     #include <immintrin.h>
 #endif

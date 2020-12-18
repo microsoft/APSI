@@ -37,7 +37,7 @@ namespace apsi
         // A representation of item-label as a sequence of felt_t pairs, or item-unit as a sequence of pairs where the
         // first element is felt_t and the second is monostate
         template<typename L>
-        using AlgItemLabel = std::vector<std::pair<felt_t, L> >;
+        using AlgItemLabel = std::vector<std::pair<felt_t, L>>;
 
         // Labels are always the same size as items
         using FullWidthLabel = Item;
