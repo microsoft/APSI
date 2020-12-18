@@ -74,27 +74,25 @@ namespace apsi
         /**
         Creates a new PowersDag. The DAG must be configured before it can be used.
         */
-        PowersDag() : mt_(std::random_device{}())
-        {}
+        PowersDag() = default;
 
         /**
         Attempts to initialize the PowersDag by finding a valid configuration satisfying the bounds given as input. The
         parameters represent up to which power of an input query the DAG computes, an upper bound on the allowed depth,
-        and an upper bound on the number of source nodes. This is a probabilistic function and may fail either because
-        no valid configuration exists, or because it simply was not found by the process. This function returns true,
-        precisely when the configuration finished successfully.
+        and the exact number of source nodes. This is a probabilistic function and will often fail. The function returns
+        true if it succeeded in finding a valid configuration.
         */
         bool configure(
+            std::uint32_t seed,
             std::uint32_t up_to_power,
-            std::uint32_t depth_bound,
-            std::uint32_t source_count_bound);
+            std::uint32_t source_count);
 
         /**
         Reset all internal members of the PowersDag instance.
         */
         void reset()
         {
-            nodes_.clear();
+            mt_.seed(0);
             up_to_power_ = 0;
             depth_ = 0;
             source_count_ = 0;
@@ -260,24 +258,10 @@ namespace apsi
         */
         PowersDag(const PowersDag &pd) = default;
 
-        /**
-        Writes the PowersDag to a stream.
-        */
-        std::size_t save(std::ostream &out) const;
-
-        /**
-        Reads the PowersDag from a stream.
-        */
-        std::size_t load(std::istream &in);
-
     private:
-        static constexpr std::uint32_t attempts_ = 10'000;
-
         std::unordered_map<std::uint32_t, PowersNode> nodes_;
 
         std::mt19937 mt_;
-
-        std::uniform_real_distribution<double> rnd_{ 0, 1 };
 
         bool configured_ = false;
 
@@ -287,11 +271,4 @@ namespace apsi
 
         std::uint32_t source_count_;
     };
-
-    /**
-    Creates a PowersDag computing powers up to the given power with exactly the number of source nodes specified. This
-    is different from the PowersDag::configure function, which accepts an upper bound on the number of source nodes but
-    may result in a configuration with fewer source nodes.
-    */
-    PowersDag optimal_powers(std::uint32_t up_to_power, std::uint32_t source_count);
 }

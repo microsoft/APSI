@@ -102,7 +102,7 @@ namespace apsi
             }
             catch(const zmq::error_t &ex)
             {
-                APSI_LOG_ERROR("ZeroMQ failed to bind socket to endpoint: " << end_point);
+                APSI_LOG_ERROR("ZeroMQ failed to bind socket to endpoint " << end_point);
                 throw;
             }
         }
@@ -118,7 +118,7 @@ namespace apsi
             }
             catch(const zmq::error_t &ex)
             {
-                APSI_LOG_ERROR("ZeroMQ failed to connect socket to endpoint: " << end_point);
+                APSI_LOG_ERROR("ZeroMQ failed to connect socket to endpoint " << end_point);
                 throw;
             }
         }
@@ -171,7 +171,7 @@ namespace apsi
             // Construct the header
             SenderOperationHeader sop_header;
             sop_header.type = sop->type();
-            APSI_LOG_DEBUG("Sending operation of type: " << sender_operation_type_str(sop_header.type));
+            APSI_LOG_DEBUG("Sending operation of type " << sender_operation_type_str(sop_header.type));
 
             size_t bytes_sent = 0;
 
@@ -183,7 +183,7 @@ namespace apsi
             send_message(msg);
             bytes_sent_ += bytes_sent;
 
-            APSI_LOG_DEBUG("Sent an operation of type: " << sender_operation_type_str(sop_header.type)
+            APSI_LOG_DEBUG("Sent an operation of type " << sender_operation_type_str(sop_header.type)
                 << "(" << bytes_sent << " bytes)");
         }
 
@@ -196,7 +196,7 @@ namespace apsi
             if (!valid_context && (expected == SenderOperationType::sop_unknown || expected == SenderOperationType::sop_query))
             {
                 // Cannot receive unknown or query operations without a valid SEALContext
-                APSI_LOG_ERROR("Cannot receive an operation of type: " << sender_operation_type_str(expected)
+                APSI_LOG_ERROR("Cannot receive an operation of type " << sender_operation_type_str(expected)
                     << "; SEALContext is missing or invalid");
                 return nullptr;
             }
@@ -236,15 +236,15 @@ namespace apsi
             if (!same_version(sop_header.version))
             {
                 // Check that the version numbers match exactly
-                APSI_LOG_ERROR("Received header indicates a version number (" << sop_header.version
-                    << ") incompatible with the current version number (" << apsi_version << ")");
+                APSI_LOG_ERROR("Received header indicates a version number " << sop_header.version
+                    << " incompatible with the current version number " << apsi_version);
                 return nullptr;
             }
 
             if (expected != SenderOperationType::sop_unknown && expected != sop_header.type)
             {
                 // Unexpected operation
-                APSI_LOG_ERROR("Received header indicates an unexpected operation type: "
+                APSI_LOG_ERROR("Received header indicates an unexpected operation type "
                     << sender_operation_type_str(sop_header.type));
                 return nullptr;
             }
@@ -270,7 +270,7 @@ namespace apsi
                         break;
                     default:
                         // Invalid operation
-                        APSI_LOG_ERROR("Received header indicates an invalid operation type: "
+                        APSI_LOG_ERROR("Received header indicates an invalid operation type "
                             << sender_operation_type_str(sop_header.type));
                         return nullptr;
                 }
@@ -291,7 +291,7 @@ namespace apsi
             n_sop->client_id = move(client_id);
             n_sop->sop = move(sop);
 
-            APSI_LOG_DEBUG("Received an operation of type: " << sender_operation_type_str(sop_header.type)
+            APSI_LOG_DEBUG("Received an operation of type " << sender_operation_type_str(sop_header.type)
                 << "(" << bytes_received_ - old_bytes_received << " bytes)");
 
             return n_sop;
@@ -318,7 +318,7 @@ namespace apsi
             // Construct the header
             SenderOperationHeader sop_header;
             sop_header.type = sop_response->sop_response->type();
-            APSI_LOG_DEBUG("Sending response of type: " << sender_operation_type_str(sop_header.type));
+            APSI_LOG_DEBUG("Sending response of type " << sender_operation_type_str(sop_header.type));
 
             size_t bytes_sent = 0;
 
@@ -333,7 +333,7 @@ namespace apsi
             send_message(msg);
             bytes_sent_ += bytes_sent;
 
-            APSI_LOG_DEBUG("Sent an operation of type: " << sender_operation_type_str(sop_header.type)
+            APSI_LOG_DEBUG("Sent an operation of type " << sender_operation_type_str(sop_header.type)
                 << "(" << bytes_sent << " bytes)");
         }
 
@@ -382,15 +382,15 @@ namespace apsi
             if (!same_version(sop_header.version))
             {
                 // Check that the version numbers match exactly
-                APSI_LOG_ERROR("Received header indicates a version number (" << sop_header.version
-                    << ") incompatible with the current version number (" << apsi_version << ")");
+                APSI_LOG_ERROR("Received header indicates a version number " << sop_header.version
+                    << " incompatible with the current version number " << apsi_version);
                 return nullptr;
             }
 
             if (expected != SenderOperationType::sop_unknown && expected != sop_header.type)
             {
                 // Unexpected operation
-                APSI_LOG_ERROR("Received header indicates an unexpected operation type: "
+                APSI_LOG_ERROR("Received header indicates an unexpected operation type "
                     << sender_operation_type_str(sop_header.type));
                 return nullptr;
             }
@@ -416,7 +416,7 @@ namespace apsi
                         break;
                     default:
                         // Invalid operation
-                        APSI_LOG_ERROR("Received header indicates an invalid operation type: "
+                        APSI_LOG_ERROR("Received header indicates an invalid operation type "
                             << sender_operation_type_str(sop_header.type));
                         return nullptr;
                 }
@@ -428,7 +428,7 @@ namespace apsi
             }
 
             // Loaded successfully
-            APSI_LOG_DEBUG("Received a response of type: " << sender_operation_type_str(sop_header.type)
+            APSI_LOG_DEBUG("Received a response of type " << sender_operation_type_str(sop_header.type)
                 << "(" << bytes_received_ - old_bytes_received << " bytes)");
 
             return sop_response;

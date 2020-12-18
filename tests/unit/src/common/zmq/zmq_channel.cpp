@@ -160,7 +160,6 @@ namespace APSITests
             sop_query->relin_keys = *relin_keys;
             sop_query->data[0].push_back(get_context()->encryptor()->encrypt_zero_symmetric());
             sop_query->data[123].push_back(get_context()->encryptor()->encrypt_zero_symmetric());
-            sop_query->pd = optimal_powers(10, 2);
             sop = move(sop_query);
 
             // Send a query operation with some dummy data
@@ -248,10 +247,6 @@ namespace APSITests
         ASSERT_FALSE(sop_query->data.at(123).empty());
         ASSERT_EQ(1, sop_query->data[123].size());
         auto query_ct123 = sop_query->data[123][0].extract_local();
-
-        ASSERT_TRUE(sop_query->pd.is_configured());
-        ASSERT_EQ(10, sop_query->pd.up_to_power());
-        ASSERT_EQ(2, sop_query->pd.source_count());
 
         // Create a parms response
         auto rsop_parms = make_unique<SenderOperationResponseParms>();

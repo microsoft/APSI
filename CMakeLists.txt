@@ -238,14 +238,6 @@ get_target_property(FLATBUFFERS_FLATC_PATH flatbuffers::flatc IMPORTED_LOCATION_
 message(STATUS "flatc path: ${FLATBUFFERS_FLATC_PATH}")
 
 execute_process(
-    COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi" "${APSI_SOURCE_DIR}/common/native/apsi/powers.fbs"
-    OUTPUT_QUIET
-    RESULT_VARIABLE result)
-if(result)
-    message(FATAL_ERROR "flatc failed (${result})")
-endif()
-
-execute_process(
     COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_SOURCE_DIR}/common/native/apsi" "${APSI_SOURCE_DIR}/common/native/apsi/psi_params.fbs"
     OUTPUT_QUIET
     RESULT_VARIABLE result)
@@ -431,5 +423,14 @@ if(APSI_BUILD_CLI)
     target_link_libraries(receiver_cli common_cli receiver)
     if (!MSVC)
         target_link_libraries(receiver_cli PUBLIC stdc++fs)
+    endif()
+
+    add_executable(pd_tool)
+    add_subdirectory(cli/pd_tool)
+    target_include_directories(pd_tool PRIVATE cli)
+    target_include_directories(pd_tool PRIVATE ${TCLAP_INCLUDE_DIRS})
+    target_link_libraries(pd_tool common)
+    if (!MSVC)
+        target_link_libraries(pd_tool PUBLIC stdc++fs)
     endif()
 endif()

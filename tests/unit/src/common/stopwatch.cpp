@@ -46,7 +46,7 @@ namespace APSITests
         string msg;
         {
             stringstream ss;
-            ss << "Duration should be at least 50ms, it is: " << diff;
+            ss << "Duration should be at least 50ms; it is " << diff;
             msg = ss.str();
         }
 
@@ -124,21 +124,21 @@ namespace APSITests
         string msg;
         {
             stringstream ss;
-            ss << "Avg should be >= 50.0, it is: " << timesp->avg;
+            ss << "Avg should be >= 50.0; it is " << timesp->avg;
             msg = ss.str();
         }
         ASSERT_TRUE(timesp->avg >= 50.0);
 
         {
             stringstream ss;
-            ss << "Min should be >= 40 && < 60, it is: " << timesp->min;
+            ss << "Min should be >= 40 && < 60; it is " << timesp->min;
             msg = ss.str();
         }
         ASSERT_TRUE(timesp->min >= 40 && timesp->min < 60);
 
         {
             stringstream ss;
-            ss << "Max should be >= 60 && < 80, it is: " << timesp->max;
+            ss << "Max should be >= 60 && < 80; it is " << timesp->max;
             msg = ss.str();
         }
         ASSERT_TRUE(timesp->max >= 60 && timesp->max < 80);
