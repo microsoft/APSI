@@ -186,7 +186,7 @@ namespace apsi
             The bins of the BinBundle. Each bin is a key-value store, where the keys are (chunks of the OPRF'd) DB
             items and the labels are either field elements or empty (a unit type).
             */
-            std::vector<std::map<felt_t, L> > bins_;
+            std::vector<std::map<felt_t, L>> bins_;
 
             /**
             A cache of all the computations we can do on the bins. This is empty by default.
@@ -194,7 +194,7 @@ namespace apsi
             BinBundleCache cache_;
 
             /**
-            Indicates whether Microsoft SEAL plaintexts are compressed in memory.
+            Indicates whether SEAL plaintexts are compressed in memory.
             */
             bool compressed_;
 
@@ -220,7 +220,7 @@ namespace apsi
             insertion has taken place. On failed insertion, returns -1.
             */
             int multi_insert_dry_run(
-                const std::vector<std::pair<felt_t, L> > &item_label_pairs,
+                const std::vector<std::pair<felt_t, L>> &item_label_pairs,
                 std::size_t start_bin_idx
             );
 
@@ -230,7 +230,7 @@ namespace apsi
             -1. On failure, no modification is made to the BinBundle.
             */
             int multi_insert_for_real(
-                const std::vector<std::pair<felt_t, L> > &item_label_pairs,
+                const std::vector<std::pair<felt_t, L>> &item_label_pairs,
                 std::size_t start_bin_idx
             );
 
@@ -241,7 +241,7 @@ namespace apsi
             BinBundle.
             */
             int multi_insert(
-                const std::vector<std::pair<felt_t, L> > &item_label_pairs,
+                const std::vector<std::pair<felt_t, L>> &item_label_pairs,
                 std::size_t start_bin_idx,
                 bool dry_run
             );
@@ -253,7 +253,7 @@ namespace apsi
             bother.
             */
             bool try_multi_overwrite(
-                const std::vector<std::pair<felt_t, L> > &item_label_pairs,
+                const std::vector<std::pair<felt_t, L>> &item_label_pairs,
                 std::size_t start_bin_idx
             );
 

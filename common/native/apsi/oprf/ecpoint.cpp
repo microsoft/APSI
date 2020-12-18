@@ -38,7 +38,7 @@ namespace apsi
                     value_ptr[2] = random_uint64();
                     value_ptr[3] = random_uint64();
                 }
-                
+
                 modulo_order(reinterpret_cast<digit_t *>(value.data()), reinterpret_cast<digit_t *>(value.data()));
             }
 

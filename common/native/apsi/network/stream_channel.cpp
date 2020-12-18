@@ -238,7 +238,7 @@ namespace apsi
             }
 
             APSI_LOG_DEBUG("Sending " << (rp->label_result.empty() ? "unlabeled)" : "labeled") << " result package");
-            
+
             lock_guard<mutex> lock(send_mutex_);
             size_t old_bytes_sent = bytes_sent_;
 

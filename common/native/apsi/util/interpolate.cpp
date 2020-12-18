@@ -105,7 +105,7 @@ namespace apsi
 
             auto size = points.size();
 
-            vector<vector<uint64_t> > divided_differences;
+            vector<vector<uint64_t>> divided_differences;
             divided_differences.reserve(size);
             for (size_t i = 0; i < size; i++)
             {

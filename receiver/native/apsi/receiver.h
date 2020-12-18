@@ -102,7 +102,7 @@ namespace apsi
             otherwise attempt to reconfigure the PowersDag.
             */
             std::uint32_t reset_powers_dag();
-            
+
             /**
             Returns a reference to the PowersDag configured for this Receiver.
             */

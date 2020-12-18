@@ -264,7 +264,7 @@ namespace apsi
         */
         template<typename L>
         int BinBundle<L>::multi_insert_dry_run(
-            const vector<pair<felt_t, L> > &item_label_pairs,
+            const vector<pair<felt_t, L>> &item_label_pairs,
             size_t start_bin_idx
         ) {
             return multi_insert(item_label_pairs, start_bin_idx, true);
@@ -277,7 +277,7 @@ namespace apsi
         */
         template<typename L>
         int BinBundle<L>::multi_insert_for_real(
-            const vector<pair<felt_t, L> > &item_label_pairs,
+            const vector<pair<felt_t, L>> &item_label_pairs,
             size_t start_bin_idx
         ) {
             return multi_insert(item_label_pairs, start_bin_idx, false);
@@ -291,7 +291,7 @@ namespace apsi
         */
         template<typename L>
         int BinBundle<L>::multi_insert(
-            const vector<pair<felt_t, L> > &item_label_pairs,
+            const vector<pair<felt_t, L>> &item_label_pairs,
             size_t start_bin_idx,
             bool dry_run
         ) {
@@ -354,7 +354,7 @@ namespace apsi
         */
         template<typename L>
         bool BinBundle<L>::try_multi_overwrite(
-            const vector<pair<felt_t, L> > &item_label_pairs,
+            const vector<pair<felt_t, L>> &item_label_pairs,
             size_t start_bin_idx
         ) {
             // Return false if there isn't enough room in the bin bundle to insert at the given location
@@ -427,7 +427,8 @@ namespace apsi
                 {
                     // One of the items isn't there; return false;
                     return false;
-                } else
+                }
+                else
                 {
                     // Found the label, put it in the return vector. *label_it is a key-value pair.
                     to_remove_its.push_back(move(to_remove_it));

@@ -4,49 +4,83 @@
 #pragma once
 
 // STD
-#include <array>
-#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
-#include <iostream>
-#include <unordered_map>
 #include <memory>
 #include <utility>
 #include <vector>
 
 // APSI
-#include "apsi/crypto_context.h"
-#include "apsi/item.h"
 #include "apsi/network/channel.h"
 #include "apsi/network/sender_operation.h"
 #include "apsi/oprf/oprf_sender.h"
-#include "apsi/powers.h"
-#include "apsi/psi_params.h"
 #include "apsi/query.h"
 #include "apsi/requests.h"
 #include "apsi/responses.h"
-#include "apsi/seal_object.h"
 #include "apsi/sender_db.h"
-
-// SEAL
-#include "seal/relinkeys.h"
-#include "seal/ciphertext.h"
-#include "seal/util/defines.h"
 
 namespace apsi
 {
     namespace sender
     {
-        // An alias to denote the powers of a receiver's ciphertext. At index i, holds Cⁱ, where C is the ciphertext..
+        // An alias to denote the powers of a receiver's ciphertext. At index i, holds Cⁱ, where C is the ciphertext.
         // The 0th index is always a dummy value.
         using CiphertextPowers = std::vector<seal::Ciphertext>;
 
+        /**
+        The Sender class implements all necessary functions to process and respond to parameter, OPRF, and PSI or
+        labeled PSI queries (depending on the sender). Unlike the Receiver class, Sender also takes care of sending
+        data back to the receiver. Sender is a static class and cannot be instantiated.
+
+        Like the Receiver, there are two ways of using the Sender. The "simple" approach supports network::ZMQChannel
+        and is implemented in the ZMQSenderDispatcher class in zmq/sender_dispatcher.h. The ZMQSenderDispatcher provides
+        a very fast way of deploying an APSI Sender. It automatically binds to a ZeroMQ socket, starts listening to
+        requests, and acts on them as appropriate.
+
+        The advanced Sender API consisting of three functions: RunParams, RunOPRF, and RunQuery. Of these, RunParams and
+        RunOPRF take the request object (ParamsRequest or OPRFRequest) as input. RunQuery requires the QueryRequest to
+        be "unpacked" into a Query object first.
+
+        The full process for the sender is as follows:
+
+        (1) Create an oprf::OPRFKey object and use oprf::OPRFSender::ComputeHashes with the oprf::OPRFKey to process the
+        sender's items (or item-label pairs) and convert them into hashed items (or hashed-item-label pairs).
+        
+        (2) Create a PSIParams object and a SenderDB object. The SenderDB must be created with the PSIParams and the
+        hashed items (or hashed item-label pairs) must be loaded into it with SenderDB::set_data. The SenderDB
+        can be used repeatedly and can be updated efficiently.
+
+        (3 -- optional) Receive a parameter request with network::Channel::receive_operation. The received Request
+        object must be converted to the right type (ParamsRequest) with the to_params_request function. This function
+        will return nullptr if the received request was not of the correct type. Once the request has been obtained,
+        the RunParams function can be called with the ParamsRequest, the SenderDB, the network::Channel, and optionally
+        a lambda function that implements custom logic for sending the ParamsResponse object on the channel.
+
+        (4) Receive an OPRF request with network::Channel::receive_operation. The received Request object must be
+        converted to the right type (OPRFRequest) with the to_oprf_request function. This function will return nullptr
+        if the received request was not of the correct type. Once the request has been obtained, the RunOPRF function
+        can be called with the OPRFRequest, the oprf::OPRFKey, the network::Channel, and optionally a lambda function
+        that implements custom logic for sending the OPRFResponse object on the channel.
+
+        (5) Receive a query request with network::Channel::receive_operation. The received Request object must be
+        converted to the right type (QueryRequest) with the to_query_request function. This function will return nullptr
+        if the received request was not of the correct type. Once the request has been obtained, a Query object must be
+        created from it. The constructor of the Query class verifies that the QueryRequest is valid for the given
+        SenderDB, and if it is not the constructor still returns successfully but the Query is marked as invalid
+        (Query::is_valid() returns false) and cannot be used in the next step. Once a valid Query object is created,
+        the RunQuery function can be used to perform the query and respond on the given channel. Optionally, two lambda
+        functions can be given to RunQuery to provide custom logic for sending the QueryResponse and the ResultPart
+        objects on the channel.
+        */
         class Sender
         {
         private:
             /**
-            Sends a given 
+            The most basic kind of function for sending an APSI message on a given channel. This function can be used
+            unless the channel requires encapsulating the raw APSI messages, e.g., for including routing information
+            or a digital signature. For example, network::ZMQChannel cannot use BasicSend; see zmq/sender_dispatcher.cpp
+            for another example of a send function that works with the ZMQChannel. 
             */
             template<typename T>
             static void BasicSend(network::Channel &chl, std::unique_ptr<T> pkg)

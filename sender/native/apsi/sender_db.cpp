@@ -83,7 +83,7 @@ namespace apsi
             Converts each given Item-Label pair in between the given iterators into its algebraic form, i.e., a sequence
             of felt-felt pairs. Also computes each Item's cuckoo index.
             */
-            vector<pair<AlgItemLabel<felt_t>, size_t> > preprocess_labeled_data(
+            vector<pair<AlgItemLabel<felt_t>, size_t>> preprocess_labeled_data(
                 const unordered_map<HashedItem, FullWidthLabel>::const_iterator begin,
                 const unordered_map<HashedItem, FullWidthLabel>::const_iterator end,
                 const PSIParams &params
@@ -102,7 +102,7 @@ namespace apsi
                 // Calculate the cuckoo indices for each item. Store every pair of (item-label, cuckoo_idx) in a vector.
                 // Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the work of
                 // inserting the items into BinBundles.
-                vector<pair<AlgItemLabel<felt_t>, size_t> > data_with_indices;
+                vector<pair<AlgItemLabel<felt_t>, size_t>> data_with_indices;
                 for (auto it = begin; it != end; it++)
                 {
                     const pair<HashedItem, FullWidthLabel> &item_label_pair = *it;
@@ -148,7 +148,7 @@ namespace apsi
             Converts each given Item into its algebraic form, i.e., a sequence of felt-monostate pairs. Also computes
             each Item's cuckoo index.
             */
-            vector<pair<AlgItemLabel<monostate>, size_t> > preprocess_unlabeled_data(
+            vector<pair<AlgItemLabel<monostate>, size_t>> preprocess_unlabeled_data(
                 const unordered_set<HashedItem>::const_iterator begin,
                 const unordered_set<HashedItem>::const_iterator end,
                 const PSIParams &params
@@ -167,7 +167,7 @@ namespace apsi
                 // Calculate the cuckoo indices for each item. Store every pair of (item-label, cuckoo_idx) in a vector.
                 // Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the work of
                 // inserting the items into BinBundles.
-                vector<pair<AlgItemLabel<monostate>, size_t> > data_with_indices;
+                vector<pair<AlgItemLabel<monostate>, size_t>> data_with_indices;
                 for (auto it = begin; it != end; it++)
                 {
                     const HashedItem &item = *it;
@@ -217,8 +217,8 @@ namespace apsi
             */
             template<typename L>
             void insert_or_assign_worker(
-                const vector<pair<AlgItemLabel<L>, size_t> > &data_with_indices,
-                vector<vector<BinBundle<L> > > &bin_bundles,
+                const vector<pair<AlgItemLabel<L>, size_t>> &data_with_indices,
+                vector<vector<BinBundle<L>>> &bin_bundles,
                 CryptoContext &crypto_context,
                 pair<size_t, size_t> work_range,
                 uint32_t bins_per_bundle,
@@ -262,7 +262,7 @@ namespace apsi
                     bundle_indices.insert(bundle_idx);
 
                     // Get the bundle set at the given bundle index
-                    vector<BinBundle<L> > &bundle_set = bin_bundles.at(bundle_idx);
+                    vector<BinBundle<L>> &bundle_set = bin_bundles.at(bundle_idx);
 
                     // Try to insert or overwrite these field elements in an existing BinBundle at this bundle index.
                     // Keep track of whether or not we succeed.
@@ -333,7 +333,7 @@ namespace apsi
                 for (const size_t &bundle_idx : bundle_indices)
                 {
                     // Get the set of BinBundles at this bundle index
-                    vector<BinBundle<L> > &bundle_set = bin_bundles.at(bundle_idx);
+                    vector<BinBundle<L>> &bundle_set = bin_bundles.at(bundle_idx);
 
                     APSI_LOG_DEBUG("Insert-or-Assign worker [" << this_thread::get_id() << "]: "
                         "regenerating cache for bundle index " << bundle_idx << " "
@@ -361,8 +361,8 @@ namespace apsi
             */
             template<typename L>
             void dispatch_insert_or_assign(
-                vector<pair<AlgItemLabel<L>, size_t > > &data_with_indices,
-                vector<vector<BinBundle<L> > > &bin_bundles,
+                vector<pair<AlgItemLabel<L>, size_t >> &data_with_indices,
+                vector<vector<BinBundle<L>>> &bin_bundles,
                 CryptoContext &crypto_context,
                 uint32_t bins_per_bundle,
                 uint32_t max_bin_size,
@@ -389,7 +389,7 @@ namespace apsi
                 sort(bundle_indices.begin(), bundle_indices.end());
 
                 // Partition the bundle indices appropriately
-                vector<pair<size_t, size_t> > partitions = partition_evenly(bundle_indices.size(), thread_count);
+                vector<pair<size_t, size_t>> partitions = partition_evenly(bundle_indices.size(), thread_count);
 
                 // Insert one larger "end" value to the bundle_indices vector; this represents one-past upper bound for
                 // the bundle indices that need to be processed.
@@ -429,8 +429,8 @@ namespace apsi
             */
             template<typename L>
             void remove_worker(
-                const vector<pair<AlgItemLabel<monostate>, size_t> > &data_with_indices,
-                vector<vector<BinBundle<L> > > &bin_bundles,
+                const vector<pair<AlgItemLabel<monostate>, size_t>> &data_with_indices,
+                vector<vector<BinBundle<L>>> &bin_bundles,
                 CryptoContext &crypto_context,
                 pair<size_t, size_t> work_range,
                 uint32_t bins_per_bundle)
@@ -475,7 +475,7 @@ namespace apsi
                     bundle_indices.insert(bundle_idx);
 
                     // Get the bundle set at the given bundle index
-                    vector<BinBundle<L> > &bundle_set = bin_bundles.at(bundle_idx);
+                    vector<BinBundle<L>> &bundle_set = bin_bundles.at(bundle_idx);
 
                     // Try to remove these field elements from an existing BinBundle at this bundle index. Keep track
                     // of whether or not we succeed.
@@ -512,7 +512,7 @@ namespace apsi
                 for (const size_t &bundle_idx : bundle_indices)
                 {
                     // Get the set of BinBundles at this bundle index
-                    vector<BinBundle<L> > &bundle_set = bin_bundles.at(bundle_idx);
+                    vector<BinBundle<L>> &bundle_set = bin_bundles.at(bundle_idx);
 
                     APSI_LOG_DEBUG("Remove worker [" << this_thread::get_id() << "]: "
                         "regenerating cache for bundle index " << bundle_idx << " "
@@ -540,7 +540,7 @@ namespace apsi
             template <typename L>
             void dispatch_remove(
                 const vector<pair<AlgItemLabel<monostate>, size_t >> &data_with_indices,
-                vector<vector<BinBundle<L> > > &bin_bundles,
+                vector<vector<BinBundle<L>>> &bin_bundles,
                 CryptoContext &crypto_context,
                 uint32_t bins_per_bundle,
                 size_t thread_count
@@ -564,7 +564,7 @@ namespace apsi
                 sort(bundle_indices.begin(), bundle_indices.end());
 
                 // Partition the bundle indices appropriately
-                vector<pair<size_t, size_t> > partitions = partition_evenly(bundle_indices.size(), thread_count);
+                vector<pair<size_t, size_t>> partitions = partition_evenly(bundle_indices.size(), thread_count);
 
                 // Insert one larger "end" value to the bundle_indices vector; this represents one-past upper bound for
                 // the bundle indices that need to be processed.
@@ -600,9 +600,9 @@ namespace apsi
             Returns a set of DB cache references corresponding to the bundles in the given set
             */
             template<typename L>
-            vector<reference_wrapper<const BinBundleCache> > collect_caches(vector<BinBundle<L> > &bin_bundles)
+            vector<reference_wrapper<const BinBundleCache>> collect_caches(vector<BinBundle<L>> &bin_bundles)
             {
-                vector<reference_wrapper<const BinBundleCache> > result;
+                vector<reference_wrapper<const BinBundleCache>> result;
                 for (const auto &bundle : bin_bundles)
                 {
                     result.emplace_back(cref(bundle.get_cache()));
@@ -702,7 +702,7 @@ namespace apsi
         /**
         Returns a set of DB cache references corresponding to the bundles at the given bundle index.
         */
-        vector<reference_wrapper<const BinBundleCache> > LabeledSenderDB::get_cache_at(uint32_t bundle_idx)
+        vector<reference_wrapper<const BinBundleCache>> LabeledSenderDB::get_cache_at(uint32_t bundle_idx)
         {
             return collect_caches(bin_bundles_.at(safe_cast<size_t>(bundle_idx)));
         }
@@ -710,7 +710,7 @@ namespace apsi
         /**
         Returns a set of DB cache references corresponding to the bundles at the given bundle index.
         */
-        vector<reference_wrapper<const BinBundleCache> > UnlabeledSenderDB::get_cache_at(uint32_t bundle_idx)
+        vector<reference_wrapper<const BinBundleCache>> UnlabeledSenderDB::get_cache_at(uint32_t bundle_idx)
         {
             return collect_caches(bin_bundles_.at(safe_cast<size_t>(bundle_idx)));
         }
@@ -751,11 +751,11 @@ namespace apsi
             APSI_LOG_INFO("Found " << existing_data.size() << " existing items to replace in SenderDB");
 
             // Break the new data down into its field element representation. Also compute the items' cuckoo indices.
-            vector<pair<AlgItemLabel<felt_t>, size_t> > new_data_with_indices
+            vector<pair<AlgItemLabel<felt_t>, size_t>> new_data_with_indices
                 = preprocess_labeled_data(new_data.begin(), new_data.end(), params_);
 
             // Now do the same for the data we're going to overwrite
-            vector<pair<AlgItemLabel<felt_t>, size_t> > overwritable_data_with_indices
+            vector<pair<AlgItemLabel<felt_t>, size_t>> overwritable_data_with_indices
                 = preprocess_labeled_data(existing_data.begin(), existing_data.end(), params_);
 
             // Dispatch the insertion, first for the new data, then for the data we're gonna overwrite
@@ -828,7 +828,7 @@ namespace apsi
             }
 
             // Break the new data down into its field element representation. Also compute the items' cuckoo indices.
-            vector<pair<AlgItemLabel<monostate>, size_t> > data_with_indices
+            vector<pair<AlgItemLabel<monostate>, size_t>> data_with_indices
                 = preprocess_unlabeled_data(new_data.begin(), new_data.end(), params_);
 
             // Dispatch the insertion
@@ -892,7 +892,7 @@ namespace apsi
 
             // Break the data to be removed down into its field element representation. Also compute the items' cuckoo
             // indices.
-            vector<pair<AlgItemLabel<monostate>, size_t> > data_with_indices
+            vector<pair<AlgItemLabel<monostate>, size_t>> data_with_indices
                 = preprocess_unlabeled_data(data.begin(), data.end(), params_);
 
             // Dispatch the removal 
@@ -942,7 +942,7 @@ namespace apsi
 
             // Break the data to be removed down into its field element representation. Also compute the items' cuckoo
             // indices.
-            vector<pair<AlgItemLabel<monostate>, size_t> > data_with_indices
+            vector<pair<AlgItemLabel<monostate>, size_t>> data_with_indices
                 = preprocess_unlabeled_data(data.begin(), data.end(), params_);
 
             // Dispatch the removal 
@@ -1038,7 +1038,7 @@ namespace apsi
             tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
 
             // Retrieve the algebraic labels from one of the BinBundles at this index
-            const vector<BinBundle<felt_t> > &bundle_set = bin_bundles_.at(bundle_idx);
+            const vector<BinBundle<felt_t>> &bundle_set = bin_bundles_.at(bundle_idx);
             vector<felt_t> alg_labels;
             bool got_labels = false;
             for (const BinBundle<felt_t> &bundle : bundle_set)

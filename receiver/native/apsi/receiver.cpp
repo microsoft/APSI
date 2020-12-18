@@ -169,7 +169,7 @@ namespace apsi
                 APSI_LOG_ERROR("Failed to extract OPRF hashes for items: oprf_response is null");
                 return {};
             }
-            
+
             auto response_size = oprf_response->data.size();
             size_t oprf_response_item_count = response_size / oprf_response_size;
             if ((response_size % oprf_response_size) || (oprf_response_item_count != oprf_receiver.item_count()))

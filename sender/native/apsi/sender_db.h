@@ -31,13 +31,29 @@ namespace apsi
 {
     namespace sender
     {
+        /**
+        SenderDB is an interface class with two implementations: UnlabeledSenderDB and LabeledSenderDB. A SenderDB is
+        maintains an in-memory representation of the sender's set of items. These items are not simply copied into the
+        SenderDB data structures, but also preprocessed heavily to allow for faster online computation time. Since
+        inserting a large number of new items into a SenderDB can take time, it is not recommended to recreate the
+        SenderDB when the database changes a little bit. Instead, the class supports fast update and deletion operations
+        that should be preferred.
+
+        The SenderDB requires substantially more memory than the raw data would. Part of that memory can automatically
+        be compressed when it is not in use; this feature is enabled by default, and can be disabled when constructing
+        the SenderDB. The downside of in-memory compression is a performance reduction from decompressing parts of the
+        data when they are used, and recompressing them if they are updated. 
+        */
         class SenderDB
         {
         public:
+            /**
+            Creates a new SenderDB.
+            */
             SenderDB(PSIParams params, bool compressed);
 
             /**
-            Clears the database.
+            Clears the database. Every item and label will be removed.
             */
             virtual void clear_db() = 0;
 
@@ -61,7 +77,8 @@ namespace apsi
 
             /**
             Inserts the given data into the database, using at most thread_count threads. This function can be used only
-            on a LabeledSenderDB instance. If an item already exists, its label is overwritten with the new label.
+            on a LabeledSenderDB instance. If an item already exists in the database, its label is overwritten with the
+            new label.
             */
             virtual void insert_or_assign(
                 const std::unordered_map<HashedItem, util::FullWidthLabel> &data,
@@ -69,8 +86,9 @@ namespace apsi
             ) = 0;
 
             /**
-            Inserts the given data into the database, using at most thread_count threads. This function can be used only
-            on a LabeledSenderDB instance. If an item already exists, its label is overwritten with the new label.
+            Inserts the given (hashed) item-label pair into the database, using at most thread_count threads. This
+            function can be used only on a LabeledSenderDB instance. If the item already exists in the database, its
+            label is overwritten with the new label.
             */
             virtual void insert_or_assign(
                 const std::pair<HashedItem, util::FullWidthLabel> &data
@@ -86,34 +104,27 @@ namespace apsi
             ) = 0;
 
             /**
-            Inserts the given data into the database, using at most thread_count threads. This function can be used only
-            on an UnlabeledSenderDB instance.
+            Inserts the given (hashed) item into the database, using at most thread_count threads. This function can be
+            used only on an UnlabeledSenderDB instance.
             */
-            virtual void insert_or_assign(
-                const HashedItem &data
-            ) = 0;
+            virtual void insert_or_assign(const HashedItem &data) = 0;
 
             /**
             Removes the given data from the database, using at most thread_count threads.
             */
-            virtual void remove(
-                const std::unordered_set<HashedItem> &data,
-                std::size_t thread_count = 0
-            ) = 0;
+            virtual void remove(const std::unordered_set<HashedItem> &data, std::size_t thread_count = 0) = 0;
 
             /**
-            Removes the given data from the database, using at most thread_count threads.
+            Removes the given (hashed) item from the database, using at most thread_count threads.
             */
-            virtual void remove(
-                const HashedItem &data
-            ) = 0;
+            virtual void remove(const HashedItem &data) = 0;
 
             /**
             Returns a set of cache references corresponding to the bundles at the given bundle index. Even though this
-            function returns a vector, the order has no significance.
+            function returns a vector, the order has no significance. This function is meant for internal use.
             */
             virtual auto get_cache_at(std::uint32_t bundle_idx)
-                -> std::vector<std::reference_wrapper<const BinBundleCache> > = 0;
+                -> std::vector<std::reference_wrapper<const BinBundleCache>> = 0;
 
             /**
             Returns a reference to the PSI parameters for this SenderDB.
@@ -166,7 +177,7 @@ namespace apsi
             std::unordered_set<HashedItem> items_;
 
             /**
-            This defines our SEAL context, base field, item size, etc.
+            The PSI parameters define the SEAL parameters, base field, item size, table size, etc.
             */
             PSIParams params_;
 
@@ -181,7 +192,7 @@ namespace apsi
             mutable seal::util::ReaderWriterLocker db_lock_;
 
             /**
-            Indicates whether Microsoft SEAL plaintexts are compressed in memory.
+            Indicates whether SEAL plaintexts are compressed in memory.
             */
             bool compressed_;
         }; // class SenderDB
@@ -190,10 +201,10 @@ namespace apsi
         {
         private:
             /**
-            All the BinBundles in the DB, indexed by bin index. The set (represented by a vector internally) at bundle
-            index i contains all the BinBundles with bundle index i.
+            All the BinBundles in the database, indexed by bundle index. The set (represented by a vector internally) at
+            bundle index i contains all the BinBundles with bundle index i.
             */
-            std::vector<std::vector<BinBundle<felt_t> > > bin_bundles_;
+            std::vector<std::vector<BinBundle<felt_t>>> bin_bundles_;
 
         public:
             /**
@@ -205,7 +216,7 @@ namespace apsi
             }
 
             /**
-            Clears the database.
+            Clears the database. Every item and label will be removed.
             */
             void clear_db() override;
 
@@ -215,11 +226,11 @@ namespace apsi
             std::size_t get_bin_bundle_count() override;
 
             /**
-            Returns a set of DB cache references corresponding to the bundles at the given
-            bundle index. This returns a vector but order doesn't matter.
+            Returns a set of cache references corresponding to the bundles at the given bundle index. Even though this
+            function returns a vector, the order has no significance. This function is meant for internal use.
             */
             auto get_cache_at(std::uint32_t bundle_idx)
-                -> std::vector<std::reference_wrapper<const BinBundleCache> > override;
+                -> std::vector<std::reference_wrapper<const BinBundleCache>> override;
 
             /**
             Clears the database and inserts the given data, using at most thread_count threads.
@@ -230,7 +241,7 @@ namespace apsi
             ) override;
 
             /**
-            DO NOT USE. Unlabeled insertion on a labeled database does not and should not work.
+            Do not use this function. Unlabeled insertion on a labeled database does not and should not work.
             */
             void set_data(
                 const std::unordered_set<HashedItem> &data,
@@ -238,7 +249,8 @@ namespace apsi
             ) override;
 
             /**
-            Inserts the given data into the database, using at most thread_count threads.
+            Inserts the given data into the database, using at most thread_count threads. If an item already exists in
+            the database, its label is overwritten with the new label.
             */
             void insert_or_assign(
                 const std::unordered_map<HashedItem, FullWidthLabel> &data,
@@ -246,7 +258,8 @@ namespace apsi
             ) override;
 
             /**
-            Inserts the given data into the database, using at most thread_count threads.
+            Inserts the given (hashed) item-label pair into the database, using at most thread_count threads. If the
+            item already exists in the database, its label is overwritten with the new label.
             */
             void insert_or_assign(
                 const std::pair<HashedItem, FullWidthLabel> &data
@@ -258,7 +271,7 @@ namespace apsi
             }
 
             /**
-            DO NOT USE. Unlabeled insertion on a labeled database does not and should not work.
+            Do not use this function. Unlabeled insertion on a labeled database does not and should not work.
             */
             void insert_or_assign(
                 const std::unordered_set<HashedItem> &data,
@@ -266,7 +279,7 @@ namespace apsi
             ) override;
 
             /**
-            DO NOT USE. Unlabeled insertion on a labeled database does not and should not work.
+            Do not use this function. Unlabeled insertion on a labeled database does not and should not work.
             */
             void insert_or_assign(
                 const HashedItem &data
@@ -286,11 +299,9 @@ namespace apsi
             ) override;
 
             /**
-            Removes the given data from the database, using at most thread_count threads.
+            Removes the given (hashed) item from the database, using at most thread_count threads.
             */
-            void remove(
-                const HashedItem &data
-            ) override
+            void remove(const HashedItem &data) override
             {
                 std::unordered_set<HashedItem> data_set;
                 data_set.emplace(data);
@@ -311,7 +322,7 @@ namespace apsi
             All the BinBundles in the DB, indexed by bin index. The set (represented by a vector internally) at bundle
             index i contains all the BinBundles with bundle index i.
             */
-            std::vector<std::vector<BinBundle<monostate> > > bin_bundles_;
+            std::vector<std::vector<BinBundle<monostate>>> bin_bundles_;
 
         public:
             /**
@@ -323,7 +334,7 @@ namespace apsi
             }
 
             /**
-            Clears the database.
+            Clears the database. Every item and label will be removed.
             */
             void clear_db() override;
 
@@ -333,13 +344,13 @@ namespace apsi
             std::size_t get_bin_bundle_count() override;
 
             /**
-            Returns a set of DB cache references corresponding to the bundles at the given
-            bundle index. This returns a vector but order doesn't matter.
+            Returns a set of cache references corresponding to the bundles at the given bundle index. Even though this
+            function returns a vector, the order has no significance. This function is meant for internal use.
             */
-            std::vector<std::reference_wrapper<const BinBundleCache> > get_cache_at(std::uint32_t bundle_idx)  override;
+            std::vector<std::reference_wrapper<const BinBundleCache>> get_cache_at(std::uint32_t bundle_idx)  override;
 
             /**
-            DO NOT USE. Labeled insertion on an unlabeled database does not and should not work.
+            Do not use this function. Labeled insertion on an unlabeled database does not and should not work.
             */
             void set_data(
                 const std::unordered_map<HashedItem, FullWidthLabel> &data,
@@ -355,7 +366,7 @@ namespace apsi
             ) override;
 
             /**
-            DO NOT USE. Labeled insertion on an unlabeled database does not and should not work.
+            Do not use this function. Labeled insertion on an unlabeled database does not and should not work.
             */
             void insert_or_assign(
                 const std::unordered_map<HashedItem, FullWidthLabel> &data,
@@ -363,7 +374,7 @@ namespace apsi
             ) override;
 
             /**
-            DO NOT USE. Labeled insertion on an unlabeled database does not and should not work.
+            Do not use this function. Labeled insertion on an unlabeled database does not and should not work.
             */
             void insert_or_assign(
                 const std::pair<HashedItem, FullWidthLabel> &data
@@ -383,11 +394,9 @@ namespace apsi
             ) override;
 
             /**
-            Inserts the given data into the database, using at most thread_count threads.
+            Inserts the given (hashed) item into the database, using at most thread_count threads.
             */
-            void insert_or_assign(
-                const HashedItem &data
-            ) override
+            void insert_or_assign(const HashedItem &data) override
             {
                 std::unordered_set<HashedItem> data_set;
                 data_set.emplace(data);
@@ -403,11 +412,9 @@ namespace apsi
             ) override;
 
             /**
-            Removes the given data from the database, using at most thread_count threads.
+            Removes the given (hashed) item from the database, using at most thread_count threads.
             */
-            void remove(
-                const HashedItem &data
-            ) override
+            void remove(const HashedItem &data) override
             {
                 std::unordered_set<HashedItem> data_set;
                 data_set.emplace(data);
