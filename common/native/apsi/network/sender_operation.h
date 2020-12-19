@@ -16,7 +16,6 @@
 // APSI
 #include "apsi/seal_object.h"
 #include "apsi/version.h"
-#include "apsi/powers.h"
 
 // SEAL
 #include "seal/util/defines.h"
@@ -144,11 +143,6 @@ namespace apsi
             ciphertext and the vector holds the ciphertext data for different bundle indices.
             */
             std::unordered_map<std::uint32_t, std::vector<SEALObject<seal::Ciphertext>>> data;
-
-            /**
-            Holds the execution graph for computing all powers from what is sent in the data field.
-            */
-            PowersDag pd;
         }; // class SenderOperationQuery
     }      // namespace network
 } // namespace apsi

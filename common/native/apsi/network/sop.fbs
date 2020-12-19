@@ -20,7 +20,6 @@ table QueryRequestPart {
 table QueryRequest {
     relin_keys:[ubyte];
     query:[QueryRequestPart];
-    pd:[ubyte];
 }
 
 union Request { ParmsRequest, OPRFRequest, QueryRequest }

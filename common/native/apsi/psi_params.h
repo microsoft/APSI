@@ -76,6 +76,13 @@ namespace apsi
         struct QueryParams
         {
             std::uint32_t query_powers_count;
+            
+            /**
+            Specifies a seed to be used for generating a PowersDag for these parameters. This can be left to be the
+            default value (zero), or set to a different value that is known to result in a particular configuration for
+            the PowersDag.
+            */
+            std::uint32_t powers_dag_seed = 0;
         };
 
         const ItemParams &item_params() const

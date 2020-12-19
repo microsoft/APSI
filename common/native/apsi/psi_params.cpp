@@ -97,7 +97,9 @@ namespace apsi
             params.table_params().max_items_per_bin,
             params.table_params().hash_func_count);
 
-        fbs::QueryParams query_params(params.query_params().query_powers_count);
+        fbs::QueryParams query_params(
+            params.query_params().query_powers_count,
+            params.query_params().powers_dag_seed);
 
         vector<seal_byte> temp;
         temp.resize(params.seal_params().save_size(compr_mode_type::zstd));
@@ -143,6 +145,7 @@ namespace apsi
 
         PSIParams::QueryParams query_params;
         query_params.query_powers_count = psi_params->query_params()->query_powers_count();
+        query_params.powers_dag_seed = psi_params->query_params()->powers_dag_seed();
 
         PSIParams::SEALParams seal_params;
         auto &seal_params_data = *psi_params->seal_params()->data();
@@ -183,6 +186,7 @@ namespace apsi
             << "; table_params.max_items_per_bin: " << table_params_.max_items_per_bin
             << "; table_params.hash_func_count: " << table_params_.hash_func_count
             << "; query_params.query_powers_count: " << query_params_.query_powers_count
+            << "; query_params.powers_dag_seed: " << query_params_.powers_dag_seed
             << "; seal_params.poly_modulus_degree: " << seal_params_.poly_modulus_degree()
             << "; seal_params.coeff_modulus: [ ";
         for (auto &mod : seal_params_.coeff_modulus())

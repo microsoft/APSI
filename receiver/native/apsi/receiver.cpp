@@ -78,10 +78,26 @@ namespace apsi
             relin_keys_.set(move(relin_keys));
         }
 
-        uint32_t Receiver::reset_powers_dag()
+        uint32_t Receiver::reset_powers_dag(std::uint32_t seed)
         {
-            pd_ = optimal_powers(params_.table_params().max_items_per_bin, params_.query_params().query_powers_count);
-            APSI_LOG_INFO("Found a powers configuration with depth: " << pd_.depth());
+            uint32_t max_items_per_bin = params_.table_params().max_items_per_bin;
+            uint32_t query_powers_count = params_.query_params().query_powers_count;
+            uint32_t powers_dag_seed = params_.query_params().powers_dag_seed;
+
+            // Configure the PowersDag
+            pd_.configure(seed, max_items_per_bin, query_powers_count);
+
+            // Check that the PowersDag is valid
+            if (!pd_.is_configured())
+            {
+                APSI_LOG_ERROR("Failed to configure PowersDag ("
+                    << "seed: " << powers_dag_seed << ", "
+                    << "up_to_power: " << max_items_per_bin << ", "
+                    << "source_count: " << query_powers_count << ")");
+                throw logic_error("failed to configure PowersDag");
+            }
+            APSI_LOG_DEBUG("Configured PowersDag with depth " << pd_.depth());
+
             return pd_.depth();
         }
 
@@ -111,7 +127,7 @@ namespace apsi
             }
 
             // Set up the PowersDag
-            reset_powers_dag();
+            reset_powers_dag(params_.query_params().powers_dag_seed);
 
             // Create new keys
             reset_keys();
@@ -342,7 +358,6 @@ namespace apsi
             auto sop_query = make_unique<SenderOperationQuery>();
             sop_query->relin_keys = relin_keys_;
             sop_query->data = move(encrypted_powers);
-            sop_query->pd = pd_;
             auto sop = to_request(move(sop_query));
 
             APSI_LOG_INFO("Finished creating encrypted query");

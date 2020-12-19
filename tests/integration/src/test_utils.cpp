@@ -147,6 +147,7 @@ namespace APSITests
 
         PSIParams::QueryParams query_params;
         query_params.query_powers_count = 3;
+        query_params.powers_dag_seed = 1169555636; // depth PowersDag
 
         PSIParams::SEALParams seal_params;
         seal_params.set_poly_modulus_degree(16384);

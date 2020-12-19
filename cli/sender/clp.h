@@ -52,7 +52,10 @@ public:
         cout_param("hashFuncCount", hash_func_count_);
 
         query_powers_count_ = query_powers_count_arg_.getValue();
-        cout_param("queryPowerCount", query_powers_count_);
+        cout_param("queryPowersCount", query_powers_count_);
+
+        powers_dag_seed_ = powers_dag_seed_arg_.getValue();
+        cout_param("powersDagSeed", powers_dag_seed_);
 
         poly_modulus_degree_ = poly_modulus_degree_arg_.getValue();
         cout_param("polyModulusDegree", poly_modulus_degree_);
@@ -116,6 +119,11 @@ public:
     std::uint32_t query_powers_count() const
     {
         return query_powers_count_;
+    }
+
+    std::uint32_t powers_dag_seed() const
+    {
+        return powers_dag_seed_;
     }
 
     std::size_t poly_modulus_degree() const
@@ -183,8 +191,16 @@ private:
 
     TCLAP::ValueArg<std::uint32_t> query_powers_count_arg_ = TCLAP::ValueArg<std::uint32_t>(
         "w",
-        "queryPowerCount",
+        "queryPowersCount",
         "The number of query powers sent",
+        true,
+        0,
+        "unsigned integer");
+
+    TCLAP::ValueArg<std::uint32_t> powers_dag_seed_arg_ = TCLAP::ValueArg<std::uint32_t>(
+        "s",
+        "powersDagSeed",
+        "32-bit seed for creating the PowersDag",
         true,
         0,
         "unsigned integer");
@@ -247,6 +263,8 @@ private:
     std::uint32_t hash_func_count_;
 
     std::uint32_t query_powers_count_;
+
+    std::uint32_t powers_dag_seed_;
 
     std::size_t poly_modulus_degree_;
 
