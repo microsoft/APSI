@@ -78,10 +78,10 @@ PowersDag do_depth_bound_given(const CLP &clp)
 
     atomic_bool stop_token{ false };
     uint32_t attempts = 0;
-    const uint32_t attempts_max = 100000000;
+    const uint32_t attempts_max = max<uint32_t>(1, clp.attempts());
     const uint32_t num_dots = 7;
-    uint32_t until_next_print = attempts_max / num_dots;
-    uint32_t lowest_depth = clp.source_count();
+    uint32_t until_next_print = clp.attempts() >= 10'000 ? attempts_max / num_dots : attempts_max + 1;
+    uint32_t lowest_depth = clp.up_to_power();
     uint32_t lowest_depth_seed;
     mutex mx;
 
@@ -90,8 +90,8 @@ PowersDag do_depth_bound_given(const CLP &clp)
     for (unsigned i = 0; i < th_count; i++)
     {
         threads.emplace_back([&]() {
-            PowersDag pd;
             random_device rd;
+            PowersDag pd;
             uint32_t seed = rd();
 
             while (!stop_token)
@@ -115,13 +115,13 @@ PowersDag do_depth_bound_given(const CLP &clp)
                         {
                             stop_token = true;
                         }
-                    }
 
-                    if (--until_next_print == 0)
-                    {
-                        cout << ".";
-                        cout.flush();
-                        until_next_print = attempts_max / num_dots;
+                        if (--until_next_print == 0)
+                        {
+                            cout << ".";
+                            cout.flush();
+                            until_next_print = attempts_max / num_dots;
+                        }
                     }
                 }
                 seed += th_count;
