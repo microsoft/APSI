@@ -27,7 +27,11 @@ namespace apsi
     {
         reset();
 
-        if (up_to_power < 1)
+        if (up_to_power < 1 || source_count < 1 )
+        {
+            return false;
+        }
+        if (source_count > up_to_power)
         {
             return false;
         }

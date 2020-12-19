@@ -115,6 +115,14 @@ int main(int argc, char **argv)
             "PowersDag configurations for APSI.", to_string(apsi_version));
     clp.parse_args(argc, argv);
 
+    if (clp.source_count() > clp.up_to_power())
+    {
+        cout << "source-count (" << clp.source_count()
+            << ") cannot be larger than up-to-power (" << clp.up_to_power() << ")" << endl;
+
+        return 0;
+    }
+
     PowersDag pd;
     if (clp.seed_given())
     {
