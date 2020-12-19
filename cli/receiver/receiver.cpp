@@ -110,7 +110,7 @@ int remote_query(const CLP& cmd)
     Receiver receiver(*params, cmd.threads());
 
     ofstream key_stream;
-    key_stream.open("c:\\secretkey.bin", ios::out | ios::binary);
+    key_stream.open("d:\\progs\\temp\\secretkey.bin", ios::out | ios::binary);
     receiver.get_crypto_context().secret_key()->save(key_stream);
     key_stream.close();
 

@@ -248,7 +248,7 @@ namespace apsi
 
             // Read secret key if it exists
             ifstream key_stream;
-            key_stream.open("c:\\secretkey.bin", ios::in | ios::binary);
+            key_stream.open("d:\\progs\\temp\\secretkey.bin", ios::in | ios::binary);
             SecretKey secret_key;
             secret_key.load(*crypto_context.seal_context(), key_stream);
             key_stream.close();
