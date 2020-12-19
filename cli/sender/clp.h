@@ -30,6 +30,7 @@ public:
         add(max_item_per_bin_arg_);
         add(hash_func_count_arg_);
         add(query_powers_count_arg_);
+        add(powers_dag_seed_arg_);
         add(poly_modulus_degree_arg_);
         add(coeff_modulus_bits_arg_);
         xorAdd(plain_modulus_bits_arg_, plain_modulus_arg_);
