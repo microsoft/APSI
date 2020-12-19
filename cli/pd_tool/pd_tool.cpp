@@ -2,10 +2,14 @@
 // Licensed under the MIT license.
 
 // STD
+#include <atomic>
 #include <fstream>
-#include <iostream>
 #include <filesystem>
+#include <iostream>
+#include <mutex>
 #include <random>
+#include <thread>
+#include <vector>
 
 // APSI
 #include "pd_tool/clp.h"
@@ -69,37 +73,82 @@ PowersDag do_depth_bound_given(const CLP &clp)
 {
     cout << "Using depth bound: " << clp.depth_bound() << endl;
 
-    cout << "Trying to find PowersDag ... ";
+    cout << "Trying to find PowersDag ...";
     cout.flush();
-    random_device rd;
-    PowersDag pd;
-    uint32_t seed;
+
+    atomic_bool stop_token{ false };
     uint32_t attempts = 0;
-    uint32_t attempts_max = 1000000;
+    const uint32_t attempts_max = 100000000;
+    const uint32_t num_dots = 7;
+    uint32_t until_next_print = attempts_max / num_dots;
     uint32_t lowest_depth = clp.source_count();
     uint32_t lowest_depth_seed;
-    while ((!pd.is_configured() || pd.depth() > clp.depth_bound()) && attempts < attempts_max)
+    mutex mx;
+
+    unsigned th_count = thread::hardware_concurrency();
+    vector<thread> threads;
+    for (unsigned i = 0; i < th_count; i++)
     {
-        seed = rd();
-        pd.configure(seed, clp.up_to_power(), clp.source_count());
-        if (pd.is_configured() && (pd.depth() < lowest_depth))
-        {
-            lowest_depth = pd.depth();
-            lowest_depth_seed = seed;
-        }
-        attempts++;
+        threads.emplace_back([&]() {
+            PowersDag pd;
+            random_device rd;
+            uint32_t seed = rd();
+
+            while (!stop_token)
+            {
+                pd.configure(seed, clp.up_to_power(), clp.source_count());
+                {
+                    lock_guard<mutex> lg(mx);
+                    if (!stop_token)
+                    {
+                        if (pd.is_configured() && pd.depth() < lowest_depth)
+                        {
+                            lowest_depth = pd.depth();
+                            lowest_depth_seed = seed;
+                            if (lowest_depth <= clp.depth_bound())
+                            {
+                                stop_token = true;
+                            }
+                        }
+
+                        if (++attempts >= attempts_max)
+                        {
+                            stop_token = true;
+                        }
+                    }
+
+                    if (--until_next_print == 0)
+                    {
+                        cout << ".";
+                        cout.flush();
+                        until_next_print = attempts_max / num_dots;
+                    }
+                }
+                seed += th_count;
+            }
+        });
     }
-    cout << "done (" << attempts << " attempts)" << endl;
+
+    for (auto &th : threads)
+    {
+        th.join();
+    }
+
+    PowersDag pd;
+    pd.configure(lowest_depth_seed, clp.up_to_power(), clp.source_count());
+
+    cout << " done (" << attempts << " attempts)" << endl;
 
     if (pd.is_configured() && pd.depth() <= clp.depth_bound())
     {
         cout << "Found a valid configuration; depth: " << pd.depth() << endl;
-        cout << "PowersDag seed: " << seed << endl;
+        cout << "PowersDag seed: " << lowest_depth_seed << endl;
     }
     else if (pd.is_configured() && pd.depth() > clp.depth_bound())
     {
         cout << "Failed to find a valid configuration; lowest depth found: " << lowest_depth << endl;
         cout << "PowersDag seed: " << lowest_depth_seed << endl;
+        pd.reset();
     }
     else
     {

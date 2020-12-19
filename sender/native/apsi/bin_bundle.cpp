@@ -133,7 +133,7 @@ namespace apsi
                     uint64_t mask = ~((uint64_t(1) << irrelevant_bit_count) - 1);
                     SEAL_ITERATE(iter(result), result.size(), [&](auto I) {
                         // We only have a single RNS component so dereference once more
-                        SEAL_ITERATE(*I, parms.poly_modulus_degree(), [&](auto J) {
+                        SEAL_ITERATE(*I, parms.poly_modulus_degree(), [&](auto &J) {
                             J &= mask;
                         });
                     });
