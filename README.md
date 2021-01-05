@@ -536,7 +536,8 @@ The following arguments specify the sender's behavior and determine the paramete
 | `-T` \| `--tableSize` | Size of the cuckoo hash table |
 | `-m` \| `--maxItemsPerBin` | Bound on the bin size for sender's hash tables |
 | `-H` \| `--hashFuncCount` | Number of hash functions to use for cuckoo hashing |
-| `-w` \| `--queryPowerCount` | Number of encrypted powers of the query data to be sent |
+| `-w` \| `--queryPowersCount` | Number of encrypted powers of the query data to be sent |
+| `-s` \| `--powersDagSeed` | 32-bit seed for creating the PowersDag |
 | `-P` \| `--polyModulusDegree` | Microsoft SEAL `poly_modulus_degree` parameter |
 | `-C` \| `--coeffModulusBits` | Bit count for a single Microsoft SEAL `coeff_modulus` prime |
 | `-a` \| `--plainModulusBits` | Bit count for a Microsoft SEAL `plain_modulus` prime (cannot be used with `-A`) |
@@ -619,7 +620,7 @@ This clearly increases the communication cost, as the result size is proportiona
 A smaller value for `-m` reduces the complexity of the encrypted match computation, allowing possibly smaller encryption parameters to be used.
 Since the bin bundles can also be processed independently in parallel, (more) smaller bin bundles often outperforms (fewer) larger bin bundles.
 
-#### `-w` \| `--queryPowerCount`
+#### `-w` \| `--queryPowersCount`
 
 Suppose we use `-m 32`. Upon receiving a query ciphertext `Q`, the sender must compute all powers of `Q`, up to `Q^32`.
 Homomorphic encryption makes this possible, but the computation can easily have significantly large multiplicative depth, and may require impractically large encryption parameters.

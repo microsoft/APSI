@@ -51,15 +51,14 @@ namespace apsi
         uint32_t curr_depth = 0;
 
         // In order, handle second, third, fourth, etc. powers
-        for (uint32_t curr_power = 2; curr_power <= up_to_power; curr_power++)
+        uint32_t curr_power = 2;
+        for (; curr_power <= up_to_power && curr_source_count <= source_count; curr_power++)
         {
             // The idea of the algorithm is to add a new source node with some small probability. Otherwise, we look
             // for a depth-optimal way of reaching this node from the nodes we have already available.
-            //
-            // If we have enough source node budget available to add the rest of the nodes, then we do that. This
-            // makes the optimal_powers function work correctly when a lot of source nodes are requested.
             uint32_t dice = mt_();
 
+            // If we have enough source node budget available to add the rest of the nodes, then we do that.
             if (dice > new_node_dice_bound || up_to_power - curr_power + 1 <= source_count - curr_source_count)
             {
                 // In this case we have decided to add a new source node
@@ -103,8 +102,8 @@ namespace apsi
             curr_depth = max(curr_depth, optimal_depth);
         }
 
-        // If the source count is correct, return true. This may not be the best possible configuration, of course.
-        if (curr_source_count == source_count)
+        // If we were able to construct all powers, return true. This may not be the best possible solution, of course.
+        if (curr_power > up_to_power)
         {
             // Found a good configuration
             configured_ = true;
