@@ -122,18 +122,20 @@ namespace apsi
                     get_significant_bit_count(parms.poly_modulus_degree());
 
                 int coeff_mod_bit_count = parms.coeff_modulus()[0].bit_count();
+                APSI_LOG_DEBUG("coeffmodbitcount " << coeff_mod_bit_count);
 
                 // The number of bits to set to zero
                 int irrelevant_bit_count = coeff_mod_bit_count - compr_coeff_bit_count;
+                APSI_LOG_DEBUG("irrelevant_bit_count " << irrelevant_bit_count);
 
                 // Can compression achieve anything?
                 if (irrelevant_bit_count > 0)
                 {
                     // Mask for zeroing out the irrelevant bits
                     uint64_t mask = ~((uint64_t(1) << irrelevant_bit_count) - 1);
-                    SEAL_ITERATE(iter(result), result.size(), [&](auto I) {
+                    SEAL_ITERATE(iter(result), result.size(), [&](auto &&I) {
                         // We only have a single RNS component so dereference once more
-                        SEAL_ITERATE(*I, parms.poly_modulus_degree(), [&](auto J) {
+                        SEAL_ITERATE(*I, parms.poly_modulus_degree(), [&](auto &&J) {
                             J &= mask;
                         });
                     });

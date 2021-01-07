@@ -75,7 +75,7 @@ PowersDag do_depth_bound_given(const CLP &clp)
     PowersDag pd;
     uint32_t seed;
     uint32_t attempts = 0;
-    uint32_t attempts_max = 1000000;
+    uint32_t attempts_max = 100'000'000;
     uint32_t lowest_depth = clp.source_count();
     uint32_t lowest_depth_seed;
     while ((!pd.is_configured() || pd.depth() > clp.depth_bound()) && attempts < attempts_max)
