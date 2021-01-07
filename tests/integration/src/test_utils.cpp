@@ -125,7 +125,7 @@ namespace APSITests
         table_params.table_size = 4096;
 
         PSIParams::QueryParams query_params;
-        query_params.query_powers_count = 3;
+        query_params.query_powers = { 1, 3, 5 };
 
         PSIParams::SEALParams seal_params;
         seal_params.set_poly_modulus_degree(8192);
@@ -146,8 +146,7 @@ namespace APSITests
         table_params.table_size = 65536;
 
         PSIParams::QueryParams query_params;
-        query_params.query_powers_count = 3;
-        query_params.powers_dag_seed = 1169555636; // depth PowersDag
+        query_params.query_powers = { 1, 7, 12, 43, 52 };
 
         PSIParams::SEALParams seal_params;
         seal_params.set_poly_modulus_degree(16384);

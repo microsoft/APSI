@@ -46,7 +46,7 @@ auto CSVReader::read(istream &stream) const -> DBData
         if (!has_item)
         {
             APSI_LOG_WARNING("Failed to read item from `" << file_.string() << "`");
-            return UnlabeledData{}; 
+            return UnlabeledData{};
         }
         if (has_label)
         {
@@ -82,7 +82,7 @@ auto CSVReader::read(istream &stream) const -> DBData
         {
             // Something is terribly wrong
             APSI_LOG_ERROR("Critical error reading data");
-            throw runtime_error("variant is in bad state"); 
+            throw runtime_error("variant is in bad state");
         }
     }
 

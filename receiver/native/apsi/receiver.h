@@ -11,6 +11,7 @@
 #include <memory>
 #include <utility>
 #include <atomic>
+#include <set>
 #include <type_traits>
 #include <stdexcept>
 
@@ -113,7 +114,7 @@ namespace apsi
             }
 
             /**
-            Returns a reference to the SEALContext for this Receiver..
+            Returns a reference to the SEALContext for this Receiver.
             */
             std::shared_ptr<seal::SEALContext> get_seal_context() const
             {
@@ -134,7 +135,7 @@ namespace apsi
             /**
             Performs a PSI or labeled PSI (depending on the sender) query. The query is a vector of items, and the
             result is a same-size vector of MatchRecord objects. If an item is in the intersection, the corresponding
-            MatchRecord indicates it in the `found` field, and the `label` field may contain the corresponding label if 
+            MatchRecord indicates it in the `found` field, and the `label` field may contain the corresponding label if
             a sender's data included it.
             */
             std::vector<MatchRecord> request_query(const std::vector<HashedItem> &items, network::NetworkChannel &chl);
@@ -151,7 +152,7 @@ namespace apsi
             static oprf::OPRFReceiver CreateOPRFReceiver(const std::vector<Item> &items);
 
             /**
-            Creates an OPRF request that can be sent to the sender with the Receiver::SendRequest function. 
+            Creates an OPRF request that can be sent to the sender with the Receiver::SendRequest function.
             */
             static Request CreateOPRFRequest(const oprf::OPRFReceiver &oprf_receiver);
 
@@ -191,7 +192,7 @@ namespace apsi
             want to ensure that the depth of the powers computation will be as expected (PowersDag::depth), and
             otherwise attempt to reconfigure the PowersDag.
             */
-            std::uint32_t reset_powers_dag(std::uint32_t seed);
+            std::uint32_t reset_powers_dag(const std::set<std::uint32_t> &source_powers);
 
             void process_result_worker(
                 std::atomic<std::int32_t> &package_count,

@@ -79,7 +79,7 @@ namespace apsi
                 throw runtime_error("unexpected operation type");
             }
 
-            // Load the PSIParams response 
+            // Load the PSIParams response
             const auto &params_data = *sop_response->response_as_ParmsResponse()->data();
             ArrayGetBuffer agbuf(
                 reinterpret_cast<const char *>(params_data.data()),
@@ -133,7 +133,7 @@ namespace apsi
                 throw runtime_error("unexpected operation type");
             }
 
-            // Load the OPRF response 
+            // Load the OPRF response
             const auto &oprf_data = *sop_response->response_as_OPRFResponse()->data();
             transform(oprf_data.begin(), oprf_data.end(), back_inserter(data),
                 [](auto a) { return static_cast<seal_byte>(a); });
@@ -179,7 +179,7 @@ namespace apsi
                 throw runtime_error("unexpected operation type");
             }
 
-            // Load the query response 
+            // Load the query response
             package_count = sop_response->response_as_QueryResponse()->package_count();
 
             return in_data.size();

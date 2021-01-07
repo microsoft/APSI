@@ -371,7 +371,7 @@ namespace apsi
             const std::byte& byte_src = static_cast<const std::byte>(src);
             return static_cast<seal::seal_byte>(byte_src >> shift);
         }
-        
+
         seal::seal_byte operator |(const seal::seal_byte src, const seal::seal_byte other)
         {
             const std::byte& byte_src = static_cast<const std::byte>(src);

@@ -4,7 +4,8 @@
 #pragma once
 
 // STD
-#include <string>
+#include <set>
+#include <sstream>
 #include <cstdint>
 #include <vector>
 #include <type_traits>
@@ -125,6 +126,96 @@ namespace apsi
                 return nullptr;
             }
             return std::unique_ptr<To>{ static_cast<To *>(from.release()) };
+        }
+
+        /**
+        Writes a vector into an std::ostream as [ a, b, c, ..., z ].
+        */
+        template<typename T>
+        std::string to_string(const std::vector<T> &values)
+        {
+            if (values.empty())
+            {
+                return "[ ]";
+            }
+
+            std::stringstream ss;
+            ss << "[ ";
+            for (std::size_t i = 0; i < values.size() - 1; i++)
+            {
+                ss << values[i] << ", ";
+            }
+            ss << values.back() << " ]";
+
+            return ss.str();
+        }
+
+        /**
+        Writes a vector into an std::ostream as [ a, b, c, ..., z ].
+        */
+        template<typename T, typename ToString>
+        std::string to_string(const std::vector<T> &values, ToString to_string_fun)
+        {
+            if (values.empty())
+            {
+                return "[ ]";
+            }
+
+            std::stringstream ss;
+            ss << "[ ";
+            for (std::size_t i = 0; i < values.size() - 1; i++)
+            {
+                ss << to_string_fun(values[i]) << ", ";
+            }
+            ss << to_string_fun(values.back()) << " ]";
+
+            return ss.str();
+        }
+
+        /**
+        Writes a set into an std::ostream as { a, b, c, ..., z }.
+        */
+        template<typename T>
+        std::string to_string(const std::set<T> &values)
+        {
+            if (values.empty())
+            {
+                return "{ }";
+            }
+
+            std::stringstream ss;
+            ss << "{ ";
+            auto values_last = std::next(values.cbegin(), values.size() - 1);
+            for (auto it = values.cbegin(); it != values_last; it++)
+            {
+                ss << *it << ", ";
+            }
+            ss << *values_last << " }";
+
+            return ss.str();
+        }
+
+        /**
+        Writes a set into an std::ostream as { a, b, c, ..., z }.
+        */
+        template<typename T, typename ToString>
+        std::string to_string(const std::set<T> &values, ToString to_string_fun)
+        {
+            if (values.empty())
+            {
+                return "{ }";
+            }
+
+            std::stringstream ss;
+            ss << "{ ";
+            auto values_last = values.cbegin() + values.size() - 1;
+            for (auto it = values.cbegin(); it != values_last; it++)
+            {
+                ss << to_string_fun(*it) << ", ";
+            }
+            ss << to_string_fun(*values_last) << " }";
+
+            return ss.str();
         }
     } // namespace util
 } // namespace apsi

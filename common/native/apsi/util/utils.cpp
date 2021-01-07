@@ -57,7 +57,7 @@ namespace apsi
             const size_t first_to_read = 1024;
 
             // How many bytes we read in this round
-            size_t to_read = min(static_cast<size_t>(byte_count), first_to_read); 
+            size_t to_read = min(static_cast<size_t>(byte_count), first_to_read);
 
             while (byte_count)
             {

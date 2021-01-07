@@ -156,7 +156,6 @@ namespace apsi
 
             uint32_t bundle_idx_count = params.bundle_idx_count();
             uint32_t max_items_per_bin = params.table_params().max_items_per_bin;
-            uint32_t query_powers_count = params.query_params().query_powers_count;
 
             // Extract the PowersDag
             PowersDag pd = query.pd();

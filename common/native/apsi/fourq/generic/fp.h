@@ -25,7 +25,7 @@ const digit_t prime1271_0 = (digit_t)(-1);
 
 
 void digit_x_digit(digit_t a, digit_t b, digit_t* c)
-{ // Digit multiplication, digit * digit -> 2-digit result    
+{ // Digit multiplication, digit * digit -> 2-digit result
     register digit_t al, ah, bl, bh, temp;
     digit_t albl, albh, ahbl, ahbh, res1, res2, res3, carry;
     digit_t mask_low = (digit_t)(-1) >> (sizeof(digit_t)*4), mask_high = (digit_t)(-1) << (sizeof(digit_t)*4);
@@ -43,17 +43,17 @@ void digit_x_digit(digit_t a, digit_t b, digit_t* c)
 
     res1 = albl >> (sizeof(digit_t) * 4);
     res2 = ahbl & mask_low;
-    res3 = albh & mask_low;  
+    res3 = albh & mask_low;
     temp = res1 + res2 + res3;
     carry = temp >> (sizeof(digit_t) * 4);
-    c[0] ^= temp << (sizeof(digit_t) * 4);    // C01   
+    c[0] ^= temp << (sizeof(digit_t) * 4);    // C01
 
     res1 = ahbl >> (sizeof(digit_t) * 4);
     res2 = albh >> (sizeof(digit_t) * 4);
     res3 = ahbh & mask_low;
     temp = res1 + res2 + res3 + carry;
-    c[1] = temp & mask_low;                   // C10 
-    carry = temp & mask_high; 
+    c[1] = temp & mask_low;                   // C10
+    carry = temp & mask_high;
     c[1] ^= (ahbh & mask_high) + carry;       // C11
 }
 
@@ -77,33 +77,33 @@ static __inline void fpzero1271(felm_t a)
 
 
 __inline void fpadd1271(felm_t a, felm_t b, felm_t c)
-{ // Field addition, c = a+b mod p  
-    unsigned int i;    
+{ // Field addition, c = a+b mod p
+    unsigned int i;
     unsigned int carry = 0;
-    
+
     for (i = 0; i < NWORDS_FIELD; i++) {
-        ADDC(carry, a[i], b[i], carry, c[i]); 
+        ADDC(carry, a[i], b[i], carry, c[i]);
     }
     carry = (unsigned int)(c[NWORDS_FIELD-1] >> (RADIX-1));
-    c[NWORDS_FIELD-1] &= mask_7fff; 
+    c[NWORDS_FIELD-1] &= mask_7fff;
     for (i = 0; i < NWORDS_FIELD; i++) {
-        ADDC(carry, c[i], 0, carry, c[i]); 
+        ADDC(carry, c[i], 0, carry, c[i]);
     }
 }
 
 
 __inline void fpsub1271(felm_t a, felm_t b, felm_t c)
-{ // Field subtraction, c = a-b mod p  
+{ // Field subtraction, c = a-b mod p
     unsigned int i;
     unsigned int borrow = 0;
-    
+
     for (i = 0; i < NWORDS_FIELD; i++) {
-        SUBC(borrow, a[i], b[i], borrow, c[i]); 
+        SUBC(borrow, a[i], b[i], borrow, c[i]);
     }
     borrow = (unsigned int)(c[NWORDS_FIELD-1] >> (RADIX-1));
-    c[NWORDS_FIELD-1] &= mask_7fff; 
+    c[NWORDS_FIELD-1] &= mask_7fff;
     for (i = 0; i < NWORDS_FIELD; i++) {
-        SUBC(borrow, c[i], 0, borrow, c[i]); 
+        SUBC(borrow, c[i], 0, borrow, c[i]);
     }
 }
 
@@ -112,79 +112,79 @@ __inline void fpneg1271(felm_t a)
 { // Field negation, a = -a mod p
     unsigned int i;
     unsigned int borrow = 0;
-    
+
     for (i = 0; i < (NWORDS_FIELD-1); i++) {
-        SUBC(borrow, prime1271_0, a[i], borrow, a[i]); 
+        SUBC(borrow, prime1271_0, a[i], borrow, a[i]);
     }
     a[NWORDS_FIELD-1] = prime1271_1 - a[NWORDS_FIELD-1];
 }
 
 
 void fpmul1271(felm_t a, felm_t b, felm_t c)
-{ // Field multiplication using schoolbook method, c = a*b mod p  
+{ // Field multiplication using schoolbook method, c = a*b mod p
     unsigned int i, j;
     digit_t u, v, UV[2], temp, bit_mask;
     digit_t t[2*NWORDS_FIELD] = {0};
     unsigned int carry = 0;
-    
+
     for (i = 0; i < NWORDS_FIELD; i++) {
          u = 0;
          for (j = 0; j < NWORDS_FIELD; j++) {
-              MUL(a[i], b[j], UV+1, UV[0]); 
-              ADDC(0, UV[0], u, carry, v); 
+              MUL(a[i], b[j], UV+1, UV[0]);
+              ADDC(0, UV[0], u, carry, v);
               u = UV[1] + carry;
-              ADDC(0, t[i+j], v, carry, v); 
+              ADDC(0, t[i+j], v, carry, v);
               u = u + carry;
               t[i+j] = v;
          }
          t[NWORDS_FIELD+i] = u;
     }
     bit_mask = (t[NWORDS_FIELD-1] >> (RADIX-1));
-    t[NWORDS_FIELD-1] &= mask_7fff; 
+    t[NWORDS_FIELD-1] &= mask_7fff;
     carry = 0;
     for (i = 0; i < NWORDS_FIELD; i++) {
         temp = (t[NWORDS_FIELD+i] >> (RADIX-1));
         t[NWORDS_FIELD+i] = (t[NWORDS_FIELD+i] << 1) + bit_mask;
-        bit_mask = temp; 
-        ADDC(carry, t[i], t[NWORDS_FIELD+i], carry, t[i]); 
+        bit_mask = temp;
+        ADDC(carry, t[i], t[NWORDS_FIELD+i], carry, t[i]);
     }
     carry = (unsigned int)(t[NWORDS_FIELD-1] >> (RADIX-1));
-    t[NWORDS_FIELD-1] &= mask_7fff; 
+    t[NWORDS_FIELD-1] &= mask_7fff;
     for (i = 0; i < NWORDS_FIELD; i++) {
-        ADDC(carry, t[i], 0, carry, c[i]); 
+        ADDC(carry, t[i], 0, carry, c[i]);
     }
 }
 
 
 void fpsqr1271(felm_t a, felm_t c)
-{ // Field squaring using schoolbook method, c = a^2 mod p  
-    
+{ // Field squaring using schoolbook method, c = a^2 mod p
+
     fpmul1271(a, a, c);
 }
 
 
 void mod1271(felm_t a)
-{ // Modular correction, a = a mod (2^127-1)  
+{ // Modular correction, a = a mod (2^127-1)
     digit_t mask;
     unsigned int i;
     unsigned int borrow = 0;
-    
+
     for (i = 0; i < (NWORDS_FIELD-1); i++) {
-        SUBC(borrow, a[i], prime1271_0, borrow, a[i]); 
+        SUBC(borrow, a[i], prime1271_0, borrow, a[i]);
     }
-    SUBC(borrow, a[NWORDS_FIELD-1], prime1271_1, borrow, a[NWORDS_FIELD-1]); 
+    SUBC(borrow, a[NWORDS_FIELD-1], prime1271_1, borrow, a[NWORDS_FIELD-1]);
 
     mask = 0 - (digit_t)borrow;    // If result < 0 then mask = 0xFF...F else sign = 0x00...0
     borrow = 0;
     for (i = 0; i < (NWORDS_FIELD-1); i++) {
-        ADDC(borrow, a[i], mask, borrow, a[i]); 
+        ADDC(borrow, a[i], mask, borrow, a[i]);
     }
-    ADDC(borrow, a[NWORDS_FIELD-1], (mask >> 1), borrow, a[NWORDS_FIELD-1]); 
+    ADDC(borrow, a[NWORDS_FIELD-1], (mask >> 1), borrow, a[NWORDS_FIELD-1]);
 }
 
 
 void mp_mul(const digit_t* a, const digit_t* b, digit_t* c, const unsigned int nwords)
-{ // Schoolbook multiprecision multiply, c = a*b   
+{ // Schoolbook multiprecision multiply, c = a*b
     unsigned int i, j;
     digit_t u, v, UV[2];
     unsigned int carry = 0;
@@ -194,10 +194,10 @@ void mp_mul(const digit_t* a, const digit_t* b, digit_t* c, const unsigned int n
      for (i = 0; i < nwords; i++) {
           u = 0;
           for (j = 0; j < nwords; j++) {
-               MUL(a[i], b[j], UV+1, UV[0]); 
-               ADDC(0, UV[0], u, carry, v); 
+               MUL(a[i], b[j], UV+1, UV[0]);
+               ADDC(0, UV[0], u, carry, v);
                u = UV[1] + carry;
-               ADDC(0, c[i+j], v, carry, v); 
+               ADDC(0, c[i+j], v, carry, v);
                u = u + carry;
                c[i+j] = v;
           }
@@ -207,13 +207,13 @@ void mp_mul(const digit_t* a, const digit_t* b, digit_t* c, const unsigned int n
 
 
 unsigned int mp_add(digit_t* a, digit_t* b, digit_t* c, unsigned int nwords)
-{ // Multiprecision addition, c = a+b, where lng(a) = lng(b) = nwords. Returns the carry bit 
+{ // Multiprecision addition, c = a+b, where lng(a) = lng(b) = nwords. Returns the carry bit
     unsigned int i, carry = 0;
 
     for (i = 0; i < nwords; i++) {
         ADDC(carry, a[i], b[i], carry, c[i]);
     }
-    
+
     return carry;
 }
 
@@ -223,34 +223,34 @@ __inline void fpexp1251(felm_t a, felm_t af)
     int i;
     felm_t t1, t2, t3, t4, t5;
 
-    fpsqr1271(a, t2);                              
-    fpmul1271(a, t2, t2); 
-    fpsqr1271(t2, t3);  
-    fpsqr1271(t3, t3);                          
+    fpsqr1271(a, t2);
+    fpmul1271(a, t2, t2);
+    fpsqr1271(t2, t3);
+    fpsqr1271(t3, t3);
     fpmul1271(t2, t3, t3);
-    fpsqr1271(t3, t4);  
-    fpsqr1271(t4, t4);   
-    fpsqr1271(t4, t4);  
-    fpsqr1271(t4, t4);                         
-    fpmul1271(t3, t4, t4);  
+    fpsqr1271(t3, t4);
+    fpsqr1271(t4, t4);
+    fpsqr1271(t4, t4);
+    fpsqr1271(t4, t4);
+    fpmul1271(t3, t4, t4);
     fpsqr1271(t4, t5);
-    for (i=0; i<7; i++) fpsqr1271(t5, t5);                      
-    fpmul1271(t4, t5, t5); 
-    fpsqr1271(t5, t2); 
-    for (i=0; i<15; i++) fpsqr1271(t2, t2);                    
-    fpmul1271(t5, t2, t2); 
-    fpsqr1271(t2, t1); 
-    for (i=0; i<31; i++) fpsqr1271(t1, t1);                         
-    fpmul1271(t2, t1, t1); 
-    for (i=0; i<32; i++) fpsqr1271(t1, t1);    
-    fpmul1271(t1, t2, t1); 
-    for (i=0; i<16; i++) fpsqr1271(t1, t1);                         
-    fpmul1271(t5, t1, t1);    
-    for (i=0; i<8; i++) fpsqr1271(t1, t1);                           
-    fpmul1271(t4, t1, t1);    
-    for (i=0; i<4; i++) fpsqr1271(t1, t1);                          
-    fpmul1271(t3, t1, t1);    
-    fpsqr1271(t1, t1);                           
+    for (i=0; i<7; i++) fpsqr1271(t5, t5);
+    fpmul1271(t4, t5, t5);
+    fpsqr1271(t5, t2);
+    for (i=0; i<15; i++) fpsqr1271(t2, t2);
+    fpmul1271(t5, t2, t2);
+    fpsqr1271(t2, t1);
+    for (i=0; i<31; i++) fpsqr1271(t1, t1);
+    fpmul1271(t2, t1, t1);
+    for (i=0; i<32; i++) fpsqr1271(t1, t1);
+    fpmul1271(t1, t2, t1);
+    for (i=0; i<16; i++) fpsqr1271(t1, t1);
+    fpmul1271(t5, t1, t1);
+    for (i=0; i<8; i++) fpsqr1271(t1, t1);
+    fpmul1271(t4, t1, t1);
+    for (i=0; i<4; i++) fpsqr1271(t1, t1);
+    fpmul1271(t3, t1, t1);
+    fpsqr1271(t1, t1);
     fpmul1271(a, t1, af);
 }
 
@@ -260,29 +260,29 @@ void fpinv1271(felm_t a)
   // Hardcoded for p = 2^127-1
     felm_t t;
 
-    fpexp1251(a, t);    
-    fpsqr1271(t, t);     
-    fpsqr1271(t, t);                             
-    fpmul1271(a, t, a); 
+    fpexp1251(a, t);
+    fpsqr1271(t, t);
+    fpsqr1271(t, t);
+    fpmul1271(a, t, a);
 }
 
 
 static __inline void multiply(const digit_t* a, const digit_t* b, digit_t* c)
-{ // Schoolbook multiprecision multiply, c = a*b 
+{ // Schoolbook multiprecision multiply, c = a*b
 
     mp_mul(a, b, c, NWORDS_ORDER);
 }
 
 
 static __inline unsigned int add(const digit_t* a, const digit_t* b, digit_t* c, const unsigned int nwords)
-{ // Multiprecision addition, c = a+b, where lng(a) = lng(b) = nwords. Returns the carry bit 
-    
+{ // Multiprecision addition, c = a+b, where lng(a) = lng(b) = nwords. Returns the carry bit
+
     return mp_add((digit_t*)a, (digit_t*)b, c, (unsigned int)nwords);
 }
 
 
 unsigned int subtract(const digit_t* a, const digit_t* b, digit_t* c, const unsigned int nwords)
-{ // Multiprecision subtraction, c = a-b, where lng(a) = lng(b) = nwords. Returns the borrow bit 
+{ // Multiprecision subtraction, c = a-b, where lng(a) = lng(b) = nwords. Returns the borrow bit
     unsigned int i;
     unsigned int borrow = 0;
 
@@ -320,7 +320,7 @@ void add_mod_order(const digit_t* a, const digit_t* b, digit_t* c)
 void Montgomery_multiply_mod_order(const digit_t* ma, const digit_t* mb, digit_t* mc)
 { // 256-bit Montgomery multiplication modulo the curve order, mc = ma*mb*r' mod order, where ma,mb,mc in [0, order-1]
   // ma, mb and mc are assumed to be in Montgomery representation
-  // The Montgomery constant r' = -r^(-1) mod 2^(log_2(r)) is the global value "Montgomery_rprime", where r is the order   
+  // The Montgomery constant r' = -r^(-1) mod 2^(log_2(r)) is the global value "Montgomery_rprime", where r is the order
 	unsigned int i;
 	digit_t mask, P[2 * NWORDS_ORDER], Q[2 * NWORDS_ORDER], temp[2 * NWORDS_ORDER];
 	digit_t* order = (digit_t*)curve_order;
@@ -329,13 +329,13 @@ void Montgomery_multiply_mod_order(const digit_t* ma, const digit_t* mb, digit_t
 	multiply(ma, mb, P);                               // P = ma * mb
 	multiply(P, (digit_t*)&Montgomery_rprime, Q);      // Q = P * r' mod 2^(log_2(r))
 	multiply(Q, (digit_t*)&curve_order, temp);         // temp = Q * r
-	cout = add(P, temp, temp, 2 * NWORDS_ORDER);         // (cout, temp) = P + Q * r     
+	cout = add(P, temp, temp, 2 * NWORDS_ORDER);         // (cout, temp) = P + Q * r
 
 	for (i = 0; i < NWORDS_ORDER; i++) {               // (cout, mc) = (P + Q * r)/2^(log_2(r))
 		mc[i] = temp[NWORDS_ORDER + i];
 	}
 
-	// Final, constant-time subtraction     
+	// Final, constant-time subtraction
 	bout = subtract(mc, (digit_t*)&curve_order, mc, NWORDS_ORDER);    // (cout, mc) = (cout, mc) - r
 	mask = (digit_t)cout - (digit_t)bout;              // if (cout, mc) >= 0 then mask = 0x00..0, else if (cout, mc) < 0 then mask = 0xFF..F
 
@@ -368,7 +368,7 @@ void conversion_to_odd(digit_t* k, digit_t* k_odd)
 
 	mask = ~(0 - (k[0] & 1));
 
-	for (i = 0; i < NWORDS_ORDER; i++) {  // If (k is odd) then k_odd = k else k_odd = k + r 
+	for (i = 0; i < NWORDS_ORDER; i++) {  // If (k is odd) then k_odd = k else k_odd = k + r
 		ADDC(carry, order[i] & mask, k[i], carry, k_odd[i]);
 	}
 }
@@ -381,7 +381,7 @@ __inline void fpdiv1271(felm_t a)
     unsigned int i;
 
     mask = 0 - (a[0] & 1);  // if a is odd then mask = 0xFF...FF, else mask = 0
-    
+
     for (i = 0; i < (NWORDS_FIELD-1); i++) {
         ADDC(carry, mask, a[i], carry, a[i]);
     }

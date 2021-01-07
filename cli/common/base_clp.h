@@ -98,7 +98,7 @@ public:
 
             get_args();
 
-            std::cout << std::endl; 
+            std::cout << std::endl;
         }
         catch (...)
         {

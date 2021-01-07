@@ -90,7 +90,7 @@ namespace apsi
 
 #if SEAL_COMPILER == SEAL_COMPILER_MSVC
         seal::seal_byte operator >>(const seal::seal_byte src, const uint32_t shift);
-        
+
         seal::seal_byte operator |(const seal::seal_byte src, const seal::seal_byte other);
 
         seal::seal_byte operator &(const seal::seal_byte src, const seal::seal_byte other);

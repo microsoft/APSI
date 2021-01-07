@@ -43,7 +43,7 @@ namespace APSITests
                 table_params.table_size = 512;
 
                 PSIParams::QueryParams query_params;
-                query_params.query_powers_count = 3;
+                query_params.query_powers = { 1, 3, 5 };
 
                 size_t pmd = 4096;
                 PSIParams::SEALParams seal_params;
@@ -140,7 +140,7 @@ namespace APSITests
         {
             auto sop_oprf = dynamic_cast<SenderOperationOPRF*>(sop->sop.get());
 
-            // Respond with exactly the same data we received 
+            // Respond with exactly the same data we received
             auto response_oprf = make_unique<SenderOperationResponseOPRF>();
             response_oprf->data = sop_oprf->data;
             auto response = make_unique<ZMQSenderOperationResponse>();
@@ -155,7 +155,7 @@ namespace APSITests
             auto sop_query = dynamic_cast<SenderOperationQuery*>(sop->sop.get());
 
             // We'll return 1 package
-            uint32_t package_count = 1; 
+            uint32_t package_count = 1;
 
             auto response_query = make_unique<SenderOperationResponseQuery>();
             response_query->package_count = package_count;

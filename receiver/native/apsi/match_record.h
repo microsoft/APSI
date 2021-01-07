@@ -37,13 +37,13 @@ namespace apsi
 
             /**
             Creates a LabelData object holding a given bit string.
-            */ 
+            */
             LabelData(std::unique_ptr<Bitstring> label) : label_(std::move(label))
             {}
 
             /**
             Sets the current label data to a given bit string.
-            */ 
+            */
             void set(std::unique_ptr<Bitstring> label)
             {
                 label_ = std::move(label);
@@ -51,17 +51,17 @@ namespace apsi
 
             /**
             Returns a span of a desired (standard layout) type to the label data.
-            */ 
+            */
             template<typename T, typename = std::enable_if_t<std::is_standard_layout<T>::value>>
             gsl::span<std::add_const_t<T>> get_as() const
             {
-                return { reinterpret_cast<std::add_const_t<T>*>(label_->data().data()), 
+                return { reinterpret_cast<std::add_const_t<T>*>(label_->data().data()),
                     label_->data().size() / sizeof(T) };
             }
 
             /**
             Returns a string containing the label data.
-            */ 
+            */
             template<typename CharT = char>
             std::basic_string<CharT> to_string() const
             {
@@ -94,7 +94,7 @@ namespace apsi
         a LabelData object holding the corresponding label data, if such was retrieved. There is usually no reason for
         a normal user to create MatchRecord objects. These are created by the query response processing API.
         */
-        class MatchRecord 
+        class MatchRecord
         {
         public:
             /**

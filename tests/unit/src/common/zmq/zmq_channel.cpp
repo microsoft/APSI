@@ -43,7 +43,7 @@ namespace APSITests
                 table_params.table_size = 512;
 
                 PSIParams::QueryParams query_params;
-                query_params.query_powers_count = 3;
+                query_params.query_powers = { 1, 3, 5 };
 
                 size_t pmd = 4096;
                 PSIParams::SEALParams seal_params;
@@ -284,7 +284,7 @@ namespace APSITests
         nrsop->client_id = client_id;
         nrsop->sop_response = move(rsop_query);
         svr.send(move(nrsop));
-        
+
         // Finally send two ZMQResultPackages
         auto rp = make_unique<ResultPackage>();
         rp->bundle_idx = 0;

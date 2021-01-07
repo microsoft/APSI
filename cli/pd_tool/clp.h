@@ -44,6 +44,16 @@ public:
 
         xorAdd(seed_arg, depth_bound_arg);
 
+        TCLAP::ValueArg<std::uint32_t> attempts_arg(
+            "a",
+            "attempts",
+            "Number of attempts; has effect only when --depth-bound is given",
+            /* req */ false,
+            /* value */ 100'000'000,
+            /* type desc */ "unsigned integer"
+        );
+        add(attempts_arg);
+
         TCLAP::ValueArg<std::uint32_t> up_to_power_arg(
             "p",
             "up-to-power",
@@ -88,6 +98,7 @@ public:
                 depth_bound_ = depth_bound_arg.getValue();
             }
 
+            attempts_ = attempts_arg.getValue();
             up_to_power_ = up_to_power_arg.getValue();
             source_count_ = source_count_arg.getValue();
 
@@ -108,6 +119,11 @@ public:
     bool seed_given() const
     {
         return seed_given_;
+    }
+
+    std::uint32_t attempts() const
+    {
+        return attempts_;
     }
 
     std::uint32_t seed() const
@@ -144,13 +160,15 @@ public:
     }
 
 private:
-    std::uint32_t seed_ = 0;
+    std::uint32_t attempts_;
 
-    std::uint32_t depth_bound_ = 0;
+    std::uint32_t seed_;
 
-    std::uint32_t up_to_power_ = 0;
+    std::uint32_t depth_bound_;
 
-    std::uint32_t source_count_ = 0;
+    std::uint32_t up_to_power_;
+
+    std::uint32_t source_count_;
 
     std::string dot_file_;
 

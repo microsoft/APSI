@@ -46,7 +46,7 @@ namespace apsi
 
         (1) Create an oprf::OPRFKey object and use oprf::OPRFSender::ComputeHashes with the oprf::OPRFKey to process the
         sender's items (or item-label pairs) and convert them into hashed items (or hashed-item-label pairs).
-        
+
         (2) Create a PSIParams object and a SenderDB object. The SenderDB must be created with the PSIParams and the
         hashed items (or hashed item-label pairs) must be loaded into it with SenderDB::set_data. The SenderDB
         can be used repeatedly and can be updated efficiently.
@@ -80,7 +80,7 @@ namespace apsi
             The most basic kind of function for sending an APSI message on a given channel. This function can be used
             unless the channel requires encapsulating the raw APSI messages, e.g., for including routing information
             or a digital signature. For example, network::ZMQChannel cannot use BasicSend; see zmq/sender_dispatcher.cpp
-            for another example of a send function that works with the ZMQChannel. 
+            for another example of a send function that works with the ZMQChannel.
             */
             template<typename T>
             static void BasicSend(network::Channel &chl, std::unique_ptr<T> pkg)

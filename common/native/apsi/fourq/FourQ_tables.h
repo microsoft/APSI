@@ -12,7 +12,7 @@
 #include <stddef.h>
 
 
-// The table below was generated using window width W = 5 and table parameter V = 5 (see http://eprint.iacr.org/2013/158). 
+// The table below was generated using window width W = 5 and table parameter V = 5 (see http://eprint.iacr.org/2013/158).
 // Number of point entries = 5 * 2^4 = 80 points, where each point (x,y) is represented using coordinates (x+y,y-x,2*d*t).
 // Table size = 80 * 3 * 256 = 7.5KB
 
@@ -99,7 +99,7 @@ static const uint64_t FIXED_BASE_TABLE[960] = {
 , 0xf068e2d286047d0a, 0x14999b5d6c770e20, 0xd1874a592385da79, 0x78aeb552c15a1cd9, 0x482dcccc23e9c06e, 0x7b18a19fb54b5745, 0x036c896efe9a7a06, 0x2f2c2ce0d1871c13, 0x3b2d9b9ed65492c7, 0x0649c7e50819d077, 0xcdab66ea7b65e3cb, 0x49b15b40c4aaf03f };
 
 
-// The table below consists of four mini-tables each generated using window width W = 8. 
+// The table below consists of four mini-tables each generated using window width W = 8.
 // Number of point entries = 4 * 2^6 = 256 points, where each point (x,y) is represented using coordinates (x+y,y-x,2*d*t).
 // Table size = 256 * 3 * 256 = 24KB
 

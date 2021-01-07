@@ -69,7 +69,7 @@ namespace apsi
         {
 #ifdef SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT
             static_assert(false,
-                "SEAL must be built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF"); 
+                "SEAL must be built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF");
 #endif
             // We need to have enough ciphertext powers to evaluate this polynomial
             if (batched_coeffs_.size() > ciphertext_powers.size())
@@ -135,7 +135,7 @@ namespace apsi
                     uint64_t mask = ~((uint64_t(1) << irrelevant_bit_count) - 1);
                     SEAL_ITERATE(iter(result), result.size(), [&](auto &&I) {
                         // We only have a single RNS component so dereference once more
-                        SEAL_ITERATE(*I, parms.poly_modulus_degree(), [&](auto &&J) {
+                        SEAL_ITERATE(*I, parms.poly_modulus_degree(), [&](auto &J) {
                             J &= mask;
                         });
                     });

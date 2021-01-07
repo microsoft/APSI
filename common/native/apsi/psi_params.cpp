@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 
 // APSI
 #include "apsi/psi_params.h"
@@ -23,10 +24,14 @@ namespace apsi
 {
     void PSIParams::initialize()
     {
-        // Checking the validity of parameters 
+        // Checking the validity of parameters
         if (!table_params_.table_size || (table_params_.table_size & (table_params_.table_size - 1)))
         {
             throw invalid_argument("table_size is not a power of two");
+        }
+        if (!table_params_.max_items_per_bin)
+        {
+            throw invalid_argument("max_items_per_bin cannot be zero");
         }
         if (table_params_.hash_func_count < TableParams::hash_func_count_min ||
             table_params_.hash_func_count > TableParams::hash_func_count_max)
@@ -42,9 +47,14 @@ namespace apsi
         {
             throw invalid_argument("felts_per_item is not a power of two");
         }
-        if (!query_params_.query_powers_count || query_params_.query_powers_count > table_params_.max_items_per_bin)
+        if (query_params_.query_powers.find(0) != query_params_.query_powers.cend() ||
+            query_params_.query_powers.find(1) == query_params_.query_powers.cend())
         {
-            throw invalid_argument("query_power_count is too large or too small");
+            throw invalid_argument("query_powers cannot contain 0 and must contain 1");
+        }
+        if (query_params_.query_powers.size() > table_params_.max_items_per_bin)
+        {
+            throw invalid_argument("query_powers is too large");
         }
         if (!seal_params_.plain_modulus().is_prime() || seal_params_.plain_modulus().value() == 2)
         {
@@ -97,9 +107,14 @@ namespace apsi
             params.table_params().max_items_per_bin,
             params.table_params().hash_func_count);
 
-        fbs::QueryParams query_params(
-            params.query_params().query_powers_count,
-            params.query_params().powers_dag_seed);
+        // There may or may not be query powers
+        vector<uint32_t> query_powers_vec;
+        copy(
+            params.query_params().query_powers.cbegin(),
+            params.query_params().query_powers.cend(),
+            back_inserter(query_powers_vec));
+        auto query_powers = fbs_builder.CreateVector(query_powers_vec);
+        auto query_params = fbs::CreateQueryParams(fbs_builder, query_powers);
 
         vector<seal_byte> temp;
         temp.resize(params.seal_params().save_size(compr_mode_type::zstd));
@@ -110,7 +125,7 @@ namespace apsi
         fbs::PSIParamsBuilder psi_params_builder(fbs_builder);
         psi_params_builder.add_item_params(&item_params);
         psi_params_builder.add_table_params(&table_params);
-        psi_params_builder.add_query_params(&query_params);
+        psi_params_builder.add_query_params(query_params);
         psi_params_builder.add_seal_params(seal_params);
         auto psi_params = psi_params_builder.Finish();
         fbs_builder.FinishSizePrefixed(psi_params);
@@ -144,8 +159,10 @@ namespace apsi
         table_params.hash_func_count = psi_params->table_params()->hash_func_count();
 
         PSIParams::QueryParams query_params;
-        query_params.query_powers_count = psi_params->query_params()->query_powers_count();
-        query_params.powers_dag_seed = psi_params->query_params()->powers_dag_seed();
+        copy(
+            psi_params->query_params()->query_powers()->cbegin(),
+            psi_params->query_params()->query_powers()->cend(),
+            inserter(query_params.query_powers, query_params.query_powers.end()));
 
         PSIParams::SEALParams seal_params;
         auto &seal_params_data = *psi_params->seal_params()->data();
@@ -185,15 +202,14 @@ namespace apsi
             << "; table_params.table_size: " << table_params_.table_size
             << "; table_params.max_items_per_bin: " << table_params_.max_items_per_bin
             << "; table_params.hash_func_count: " << table_params_.hash_func_count
-            << "; query_params.query_powers_count: " << query_params_.query_powers_count
-            << "; query_params.powers_dag_seed: " << query_params_.powers_dag_seed
+            << "; query_params.query_powers: "
+            << util::to_string(query_params_.query_powers)
             << "; seal_params.poly_modulus_degree: " << seal_params_.poly_modulus_degree()
-            << "; seal_params.coeff_modulus: [ ";
-        for (auto &mod : seal_params_.coeff_modulus())
-        {
-            ss << mod.bit_count() << " ";
-        }
-        ss << "]; seal_params.plain_modulus: " << seal_params_.plain_modulus().value();
+            << "; seal_params.coeff_modulus: "
+            << util::to_string(
+                seal_params_.coeff_modulus(),
+                [](const Modulus &mod) { return std::to_string(mod.bit_count()); })
+            << "; seal_params.plain_modulus: " << seal_params_.plain_modulus().value();
 
         return ss.str();
     }

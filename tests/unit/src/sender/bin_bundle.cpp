@@ -38,7 +38,7 @@ namespace APSITests
                 table_params.table_size = 1024;
 
                 PSIParams::QueryParams query_params;
-                query_params.query_powers_count = 3;
+                query_params.query_powers = { 1, 3, 5 };
 
                 size_t pmd = 4096;
                 PSIParams::SEALParams seal_params;
@@ -217,7 +217,7 @@ namespace APSITests
 
         values.resize(
             context.seal_context()->first_context_data()->parms().poly_modulus_degree(),
-            make_pair(1, monostate())); 
+            make_pair(1, monostate()));
         res = bb.multi_insert_dry_run(values, 0);
         ASSERT_EQ(1 /* largest bin size after insert */, res);
         ASSERT_FALSE(bb.cache_invalid());
@@ -268,7 +268,7 @@ namespace APSITests
 
         values.resize(
             context.seal_context()->first_context_data()->parms().poly_modulus_degree(),
-            make_pair(4, monostate())); 
+            make_pair(4, monostate()));
         res = bb.multi_insert_for_real(values, 0);
         ASSERT_EQ(3 /* largest bin size after insert */, res);
         ASSERT_TRUE(bb.cache_invalid());
@@ -323,7 +323,7 @@ namespace APSITests
 
         values.resize(
             context.seal_context()->first_context_data()->parms().poly_modulus_degree(),
-            make_pair(1, 1)); 
+            make_pair(1, 1));
         res = bb.multi_insert_dry_run(values, 0);
         ASSERT_EQ(1 /* largest bin size after insert */, res);
         ASSERT_FALSE(bb.cache_invalid());
@@ -407,7 +407,7 @@ namespace APSITests
 
         values.resize(
             context.seal_context()->first_context_data()->parms().poly_modulus_degree(),
-            make_pair(4, 4)); 
+            make_pair(4, 4));
         res = bb.multi_insert_for_real(values, 0);
         ASSERT_EQ(3 /* largest bin size after insert */, res);
         ASSERT_TRUE(bb.cache_invalid());
@@ -522,7 +522,7 @@ namespace APSITests
         bb.clear();
         values.resize(
             context.seal_context()->first_context_data()->parms().poly_modulus_degree(),
-            make_pair(4, 4)); 
+            make_pair(4, 4));
         res = bb.multi_insert_for_real(values, 0);
         ASSERT_EQ(1 /* largest bin size after insert */, res);
 

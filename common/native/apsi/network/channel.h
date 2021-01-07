@@ -22,7 +22,7 @@ namespace apsi
     {
         /**
         Channel is an interfacate to implement a communication channel between a sender and a receiver. It keeps track
-        of the number of bytes sent and received. 
+        of the number of bytes sent and received.
         */
         class Channel
         {

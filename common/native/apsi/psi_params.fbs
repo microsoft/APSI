@@ -13,9 +13,8 @@ struct TableParams {
     hash_func_count:uint32;
 }
 
-struct QueryParams {
-    query_powers_count:uint32;
-    powers_dag_seed:uint32;
+table QueryParams {
+    query_powers:[uint32];
 }
 
 table SEALParams {

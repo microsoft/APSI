@@ -4,7 +4,7 @@
 *    Copyright (c) Microsoft Corporation. All rights reserved.
 *
 * Abstract: pseudo-random function
-************************************************************************************/ 
+************************************************************************************/
 
 #include "apsi/fourq/random.h"
 #include <stdlib.h>
@@ -35,7 +35,7 @@ int random_bytes(unsigned char* random_array, unsigned int nbytes)
 
 #elif defined(__LINUX__)
 	int r, n = nbytes, count = 0;
-    
+
     if (lock == -1) {
 	    do {
 		    lock = open("/dev/urandom", O_RDONLY);

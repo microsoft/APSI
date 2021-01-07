@@ -5,11 +5,11 @@
 *
 * Abstract: FourQ's curve parameters
 *
-* This code is based on the paper "FourQ: four-dimensional decompositions on a 
-* Q-curve over the Mersenne prime" by Craig Costello and Patrick Longa, in Advances 
+* This code is based on the paper "FourQ: four-dimensional decompositions on a
+* Q-curve over the Mersenne prime" by Craig Costello and Patrick Longa, in Advances
 * in Cryptology - ASIACRYPT, 2015.
 * Preprint available at http://eprint.iacr.org/2015/565.
-************************************************************************************/ 
+************************************************************************************/
 
 #pragma once
 #ifndef __FOURQ_PARAMS_H__
@@ -20,7 +20,7 @@
 
 // Encoding of field elements, elements over Z_r and elements over GF(p^2):
 // -----------------------------------------------------------------------
-// Elements over GF(p) and Z_r are encoded with the least significant digit located in the leftmost position (i.e., little endian format). 
+// Elements over GF(p) and Z_r are encoded with the least significant digit located in the leftmost position (i.e., little endian format).
 // Elements (a+b*i) over GF(p^2), where a and b are defined over GF(p), are encoded as a||b, with a in the least significant position.
 
 static const uint64_t PARAMETER_d[4]       = { 0x0000000000000142, 0x00000000000000E4, 0xB3821488F1FC0C8D, 0x5E472F846657E0FC };

@@ -20,56 +20,41 @@ namespace apsi
 {
     using namespace util;
 
-    bool PowersDag::configure(
-        uint32_t seed,
-        uint32_t up_to_power,
-        uint32_t source_count)
+    bool PowersDag::configure(set<uint32_t> source_powers, uint32_t up_to_power)
     {
         reset();
 
-        if (up_to_power < 1 || source_count < 1 )
+        // Sources cannot contain 0 and must contain 1
+        if (source_powers.find(0) != source_powers.cend() || source_powers.find(1) == source_powers.cend())
         {
             return false;
         }
-        if (source_count > up_to_power)
+
+        // Need to compute at least the number of sources many powers
+        if (source_powers.size() > up_to_power)
         {
             return false;
         }
 
-        // Set up the PRNG
-        mt_.seed(seed);
+        // Insert all source nodes
+        for (auto s : source_powers)
+        {
+            nodes_[s] = PowersNode{/* power */ s, /* depth */ 0};
+        }
 
-        // We add a new node when mt_ samples a number larger than the following bound corresponding to a roughly 90%
-        // probability.
-        uint32_t new_node_dice_bound = 3865470565;
-
-        // Initialize the first power; parents are left to zero, because the first power must always be a source node.
-        nodes_[1] = PowersNode{/* power */ 1, /* depth */ 0};
-
-        // Keep track of the total number of source nodes and the largest encountered depth
-        uint32_t curr_source_count = 1;
+        // Keep track of the largest encountered depth
         uint32_t curr_depth = 0;
 
-        // In order, handle second, third, fourth, etc. powers
+        // Now compute the non-source powers
         for (uint32_t curr_power = 2; curr_power <= up_to_power; curr_power++)
         {
-            // The idea of the algorithm is to add a new source node with some small probability. Otherwise, we look
-            // for a depth-optimal way of reaching this node from the nodes we have already available.
-            //
-            // If we have enough source node budget available to add the rest of the nodes, then we do that. This
-            // makes the optimal_powers function work correctly when a lot of source nodes are requested.
-            uint32_t dice = mt_();
-
-            if (dice > new_node_dice_bound || up_to_power - curr_power + 1 <= source_count - curr_source_count)
+            // Do nothing if this is a source node
+            if (source_powers.find(curr_power) != source_powers.cend())
             {
-                // In this case we have decided to add a new source node
-                curr_source_count++;
-                nodes_[curr_power] = PowersNode{ curr_power, 0 };
                 continue;
             }
 
-            // We decided to obtain this node from two nodes of lower power. We need to first find a depth-optimal
-            // way to split the current power into a sum of two smaller powers.
+            // The current power should be written as a sum of two lower powers in a depth-optimal way.
             uint32_t optimal_depth = curr_power - 1;
             uint32_t optimal_s1 = curr_power - 1;
             uint32_t optimal_s2 = 1;
@@ -103,20 +88,12 @@ namespace apsi
             curr_depth = max(curr_depth, optimal_depth);
         }
 
-        // If the source count is correct, return true. This may not be the best possible configuration, of course.
-        if (curr_source_count == source_count)
-        {
-            // Found a good configuration
-            configured_ = true;
-            up_to_power_ = up_to_power;
-            depth_ = curr_depth;
-            source_count_ = source_count;
-            return true;
-        }
-
-        // Tried but failed
-        reset();
-        return false;
+        // Success
+        configured_ = true;
+        up_to_power_ = up_to_power;
+        depth_ = curr_depth;
+        source_count_ = source_powers.size();
+        return true;
     }
 
     uint32_t PowersDag::up_to_power() const

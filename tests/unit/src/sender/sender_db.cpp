@@ -35,7 +35,7 @@ namespace APSITests
                 table_params.table_size = 1024;
 
                 PSIParams::QueryParams query_params;
-                query_params.query_powers_count = 3;
+                query_params.query_powers = { 1, 3, 5 };
 
                 size_t pmd = 4096;
                 PSIParams::SEALParams seal_params;
@@ -347,7 +347,7 @@ namespace APSITests
         ASSERT_EQ(val, sender_db.get_items().size());
         ASSERT_EQ(5, sender_db.get_bin_bundle_count());
 
-        // Now remove the first one; we should immediately drop to 4 BinBundles 
+        // Now remove the first one; we should immediately drop to 4 BinBundles
         val--;
         sender_db.remove(HashedItem(val, ~val));
         ASSERT_EQ(val, sender_db.get_items().size());

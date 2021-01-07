@@ -12,7 +12,7 @@
 // APSI
 #include "apsi/oprf/oprf_common.h"
 
-// SEAL 
+// SEAL
 #include "seal/util/defines.h"
 #include "seal/dynarray.h"
 #include "seal/memorymanager.h"
