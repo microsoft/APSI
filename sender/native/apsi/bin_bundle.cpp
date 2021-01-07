@@ -69,7 +69,7 @@ namespace apsi
         {
 #ifdef SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT
             static_assert(false,
-                "SEAL must be built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF"); 
+                "SEAL must be built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF");
 #endif
             // We need to have enough ciphertext powers to evaluate this polynomial
             if (batched_coeffs_.size() > ciphertext_powers.size())

@@ -51,7 +51,7 @@ namespace APSITests
         ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);
 
         item_params.felts_per_item = 8;
-        
+
         // Invalid table_size (must be a power of two) and divide poly_modulus_degree
         table_params.table_size = 0;
         ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);

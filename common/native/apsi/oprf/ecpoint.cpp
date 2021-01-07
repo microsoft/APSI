@@ -54,7 +54,7 @@ namespace apsi
 
                 sdigit_t first_nz = -static_cast<sdigit_t>(c & 1);
                 sdigit_t rest_nz = -static_cast<sdigit_t>(c >> 1);
-                return static_cast<digit_t>((first_nz | rest_nz) >> (8 * sizeof(digit_t) - 1)); 
+                return static_cast<digit_t>((first_nz | rest_nz) >> (8 * sizeof(digit_t) - 1));
             }
         }
 

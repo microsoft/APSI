@@ -4,7 +4,7 @@
 *    Copyright (c) Microsoft Corporation. All rights reserved.
 *
 * Abstract: hash to FourQ
-***********************************************************************************/ 
+***********************************************************************************/
 
 #include "apsi/fourq/FourQ_internal.h"
 #include "apsi/fourq/FourQ_params.h"
@@ -17,9 +17,9 @@ static digit_t fpeq1271(digit_t* a, digit_t* b)
 
     for (unsigned int i = 0; i < NWORDS_FIELD; i++)
         c |= a[i] ^ b[i];
-    
-    return (digit_t)((-(sdigit_t)(c >> 1) | -(sdigit_t)(c & 1)) >> (8*sizeof(digit_t) - 1)); 
-}   
+
+    return (digit_t)((-(sdigit_t)(c >> 1) | -(sdigit_t)(c & 1)) >> (8*sizeof(digit_t) - 1));
+}
 
 
 static void fpselect(digit_t* a, digit_t* b, digit_t* c, digit_t selector)
@@ -27,8 +27,8 @@ static void fpselect(digit_t* a, digit_t* b, digit_t* c, digit_t selector)
   // If selector = 0 do c <- a, else if selector =-1 do a <- a
 
     for (unsigned int i = 0; i < NWORDS_FIELD; i++)
-        c[i] = (selector & (a[i] ^ b[i])) ^ a[i]; 
-}           
+        c[i] = (selector & (a[i] ^ b[i])) ^ a[i];
+}
 
 
 static inline void fpsqrt1271(felm_t in, felm_t out)
@@ -111,7 +111,7 @@ ECCRYPTO_STATUS HashToCurve(f2elm_t r, point_t out)
     fpadd1271(t4, t6, t4);
     fpsqrt1271(t4, t6);
     fpsqr1271(t6, t9);
-    
+
     fpcopy1271(t0, tt0);
     fpcopy1271(t5, tt1);
     fpcopy1271(t6, tt2);
@@ -133,7 +133,7 @@ ECCRYPTO_STATUS HashToCurve(f2elm_t r, point_t out)
     fpadd1271(t8, t2, t8);
     fpmul1271(t1, t6, t6);
     fpmul1271(c0, t6, t6);
-    
+
     fpselect(tt0, t0, t0, selector);
     fpselect(tt1, t5, t5, selector);
     fpselect(tt2, t6, t6, selector);
@@ -159,7 +159,7 @@ ECCRYPTO_STATUS HashToCurve(f2elm_t r, point_t out)
     fpmul1271(t3, t6, t9);
     fpmul1271(t3, t8, t3);
     fpmul1271(t2, t8, t2);
-    
+
     selector = fpeq1271(t1, t7);
     fpselect(t4, t9, tt0, selector);
     fpselect(t3, t2, tt1, selector);

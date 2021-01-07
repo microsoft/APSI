@@ -24,7 +24,7 @@ namespace apsi
 {
     void PSIParams::initialize()
     {
-        // Checking the validity of parameters 
+        // Checking the validity of parameters
         if (!table_params_.table_size || (table_params_.table_size & (table_params_.table_size - 1)))
         {
             throw invalid_argument("table_size is not a power of two");

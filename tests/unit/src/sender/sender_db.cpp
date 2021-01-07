@@ -347,7 +347,7 @@ namespace APSITests
         ASSERT_EQ(val, sender_db.get_items().size());
         ASSERT_EQ(5, sender_db.get_bin_bundle_count());
 
-        // Now remove the first one; we should immediately drop to 4 BinBundles 
+        // Now remove the first one; we should immediately drop to 4 BinBundles
         val--;
         sender_db.remove(HashedItem(val, ~val));
         ASSERT_EQ(val, sender_db.get_items().size());

@@ -460,7 +460,7 @@ The `apsi::network::SenderOperation` is an abstract base class that we discuss i
 In this case, `Query` holds an instance of a derived class `SenderOperationQuery` that contains the necessary powers of the query ciphertexts (recall [Lowering the Depth](#lowering-the-depth)), the public keys needed by the sender (Microsoft SEAL class `seal::RelinKeys`), and an `apsi::PowersDag` object (see [PowersDag](#powersdag) below).
 
 Second, it holds information to map the cuckoo hash table locations back to the vector of (OPRF hashed) items provided to the `Receiver::create_query` function.
-This is needed by the `Receiver::request_query` function to be able to provide the result vector in the correct order. 
+This is needed by the `Receiver::request_query` function to be able to provide the result vector in the correct order.
 
 #### MatchRecord
 
@@ -508,7 +508,7 @@ For example, if `h = 2` and `k = 3`, then `{ 1, 3, 4 }` provides a solution for 
 This is easy to verify:
 
 | Value | First summand | Second summand |
-|-------|---------------|----------------| 
+|-------|---------------|----------------|
 | 1     | 1             | N/A            |
 | 2     | 1             | 1              |
 | 3     | 3             | N/A            |
@@ -586,7 +586,7 @@ Therefore, the sender's command line arguments are much more complex than the re
 
 The following arguments are common both to the sender and the receiver applications.
 
-| Parameter | Explanation | 
+| Parameter | Explanation |
 |-----------|-------------|
 | `-t` \| `--threads` | Number of threads to use |
 | `-f` \| `--logFile` | Log file path (optional) |
@@ -597,7 +597,7 @@ The following arguments are common both to the sender and the receiver applicati
 
 The following arguments specify the receiver's behavior.
 
-| Parameter | Explanation | 
+| Parameter | Explanation |
 |-----------|-------------|
 | `-q` \| `--queryFile` | File containing the query data |
 | `-o` \| `--outFile` | Output file (not implemented; currently printed in terminal) |
@@ -608,7 +608,7 @@ The following arguments specify the receiver's behavior.
 
 The following arguments specify the sender's behavior and determine the parameters for the protocol.
 
-| Parameter | Explanation | 
+| Parameter | Explanation |
 |-----------|-------------|
 | `-d` \| `--dbFile` | CSV file describing a look-up table with possibly empty values |
 | `-p` \| `--port` | TCP port to bind to (default is 1212) |

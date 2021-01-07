@@ -135,7 +135,7 @@ namespace apsi
             /**
             Performs a PSI or labeled PSI (depending on the sender) query. The query is a vector of items, and the
             result is a same-size vector of MatchRecord objects. If an item is in the intersection, the corresponding
-            MatchRecord indicates it in the `found` field, and the `label` field may contain the corresponding label if 
+            MatchRecord indicates it in the `found` field, and the `label` field may contain the corresponding label if
             a sender's data included it.
             */
             std::vector<MatchRecord> request_query(const std::vector<HashedItem> &items, network::NetworkChannel &chl);
@@ -152,7 +152,7 @@ namespace apsi
             static oprf::OPRFReceiver CreateOPRFReceiver(const std::vector<Item> &items);
 
             /**
-            Creates an OPRF request that can be sent to the sender with the Receiver::SendRequest function. 
+            Creates an OPRF request that can be sent to the sender with the Receiver::SendRequest function.
             */
             static Request CreateOPRFRequest(const oprf::OPRFReceiver &oprf_receiver);
 

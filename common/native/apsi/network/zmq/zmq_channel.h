@@ -63,7 +63,7 @@ namespace apsi
         /**
         ZMQChannel is a communication channel between a sender and a receiver implemented using ZeroMQ. All receives
         are synchronous, except for receiving a SenderOperation. All sends are asynchronous.
-        
+
         ZeroMQ uses an identifier number for internal package routing, which is why the ZMQChannel operates on custom
         ZMQSenderOperation, ZMQSenderOperationResponse, and ZMQResultPackage objects rather than the underlying
         SenderOperation, SenderOperationResponse, and ResultPackage.

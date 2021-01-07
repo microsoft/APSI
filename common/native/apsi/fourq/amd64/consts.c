@@ -4,7 +4,7 @@
 *    Copyright (c) Microsoft Corporation. All rights reserved.
 *
 * Abstract: constants for assembly implementation
-************************************************************************************/ 
+************************************************************************************/
 
 #include <stdint.h>
 

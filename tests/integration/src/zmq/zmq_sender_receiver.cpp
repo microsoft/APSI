@@ -153,7 +153,7 @@ namespace APSITests
             sender_th.join();
         }
     }
-    
+
     TEST(ZMQSenderReceiverTests, UnlabeledEmpty)
     {
         size_t sender_size = 0;

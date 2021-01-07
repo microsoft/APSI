@@ -42,7 +42,7 @@ namespace apsi
         The SenderDB requires substantially more memory than the raw data would. Part of that memory can automatically
         be compressed when it is not in use; this feature is enabled by default, and can be disabled when constructing
         the SenderDB. The downside of in-memory compression is a performance reduction from decompressing parts of the
-        data when they are used, and recompressing them if they are updated. 
+        data when they are used, and recompressing them if they are updated.
         */
         class SenderDB
         {

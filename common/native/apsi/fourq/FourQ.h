@@ -5,11 +5,11 @@
 *
 * Abstract: main header file
 *
-* This code is based on the paper "FourQ: four-dimensional decompositions on a 
-* Q-curve over the Mersenne prime" by Craig Costello and Patrick Longa, in Advances 
+* This code is based on the paper "FourQ: four-dimensional decompositions on a
+* Q-curve over the Mersenne prime" by Craig Costello and Patrick Longa, in Advances
 * in Cryptology - ASIACRYPT, 2015.
 * Preprint available at http://eprint.iacr.org/2015/565.
-************************************************************************************/  
+************************************************************************************/
 
 #ifndef __FOURQ_H__
 #define __FOURQ_H__
@@ -34,7 +34,7 @@ extern "C" {
 #if defined(__WINDOWS__)        // Microsoft Windows OS
     #define OS_TARGET OS_WIN
 #elif defined(__LINUX__)        // Linux OS
-    #define OS_TARGET OS_LINUX 
+    #define OS_TARGET OS_LINUX
 #else
     #error -- "Unsupported OS"
 #endif
@@ -49,16 +49,16 @@ extern "C" {
 #if defined(_MSC_VER)           // Microsoft Visual C compiler
     #define COMPILER COMPILER_VC
 #elif defined(__GNUC__)         // GNU GCC compiler
-    #define COMPILER COMPILER_GCC   
+    #define COMPILER COMPILER_GCC
 #elif defined(__clang__)        // Clang compiler
-    #define COMPILER COMPILER_CLANG   
+    #define COMPILER COMPILER_CLANG
 #else
     #error -- "Unsupported COMPILER"
 #endif
 
 
 // Definition of the targeted architecture and basic data types
-    
+
 #define TARGET_AMD64        1
 #define TARGET_x86          2
 #define TARGET_ARM          3
@@ -70,28 +70,28 @@ extern "C" {
     typedef uint64_t        digit_t;      // Unsigned 64-bit digit
     typedef int64_t         sdigit_t;     // Signed 64-bit digit
     #define NWORDS_FIELD    2             // Number of words of a field element
-    #define NWORDS_ORDER    4             // Number of words of an element in Z_r 
+    #define NWORDS_ORDER    4             // Number of words of an element in Z_r
 #elif defined(_X86_)
     #define TARGET TARGET_x86
     #define RADIX           32
     typedef uint32_t        digit_t;      // Unsigned 32-bit digit
     typedef int32_t         sdigit_t;     // Signed 32-bit digit
-    #define NWORDS_FIELD    4             
-    #define NWORDS_ORDER    8 
+    #define NWORDS_FIELD    4
+    #define NWORDS_ORDER    8
 #elif defined(_ARM_)
     #define TARGET TARGET_ARM
     #define RADIX           32
     typedef uint32_t        digit_t;      // Unsigned 32-bit digit
     typedef int32_t         sdigit_t;     // Signed 32-bit digit
-    #define NWORDS_FIELD    4             
-    #define NWORDS_ORDER    8 
+    #define NWORDS_FIELD    4
+    #define NWORDS_ORDER    8
 #elif defined(_ARM64_)
     #define TARGET TARGET_ARM64
     #define RADIX           64
     typedef uint64_t        digit_t;      // Unsigned 64-bit digit
     typedef int64_t         sdigit_t;     // Signed 64-bit digit
-    #define NWORDS_FIELD    2             
-    #define NWORDS_ORDER    4              
+    #define NWORDS_FIELD    2
+    #define NWORDS_ORDER    4
 #else
     #error -- "Unsupported ARCHITECTURE"
 #endif
@@ -100,8 +100,8 @@ extern "C" {
 // Constants
 
 #define RADIX64         64
-#define NWORDS64_FIELD  2                 // Number of 64-bit words of a field element 
-#define NWORDS64_ORDER  4                 // Number of 64-bit words of an element in Z_r 
+#define NWORDS64_FIELD  2                 // Number of 64-bit words of a field element
+#define NWORDS64_ORDER  4                 // Number of 64-bit words of an element in Z_r
 
 
 // Instruction support
@@ -111,9 +111,9 @@ extern "C" {
 #define AVX2_SUPPORT    2
 
 #if defined(_AVX2_)
-    #define SIMD_SUPPORT AVX2_SUPPORT       // AVX2 support selection 
+    #define SIMD_SUPPORT AVX2_SUPPORT       // AVX2 support selection
 #elif defined(_AVX_)
-    #define SIMD_SUPPORT AVX_SUPPORT        // AVX support selection 
+    #define SIMD_SUPPORT AVX_SUPPORT        // AVX support selection
 #else
     #define SIMD_SUPPORT NO_SIMD_SUPPORT
 #endif
@@ -128,14 +128,14 @@ extern "C" {
 
 
 // Unsupported configurations
-                         
+
 #if defined(ASM_SUPPORT) && (OS_TARGET == OS_WIN)
     #error -- "Assembly is not supported on this platform"
-#endif        
+#endif
 
 #if defined(ASM_SUPPORT) && defined(GENERIC_IMPLEMENTATION)
     #error -- "Unsupported configuration"
-#endif        
+#endif
 
 #if (SIMD_SUPPORT != NO_SIMD_SUPPORT) && defined(GENERIC_IMPLEMENTATION)
     #error -- "Unsupported configuration"
@@ -148,32 +148,32 @@ extern "C" {
 
 // Definition of complementary cryptographic functions
 
-#define RandomBytesFunction     random_bytes    
+#define RandomBytesFunction     random_bytes
 #define CryptoHashFunction      crypto_sha512        // Use SHA-512 by default
 
 
 // Basic parameters for variable-base scalar multiplication (without using endomorphisms)
-#define W_VARBASE             5 
-#define NBITS_ORDER_PLUS_ONE  246+1 
+#define W_VARBASE             5
+#define NBITS_ORDER_PLUS_ONE  246+1
 
 
 // Basic parameters for fixed-base scalar multiplication
 #define W_FIXEDBASE       5                            // Memory requirement: 7.5KB (storage for 80 points).
-#define V_FIXEDBASE       5                  
+#define V_FIXEDBASE       5
 
 
 // Basic parameters for double scalar multiplication
 #define WP_DOUBLEBASE     8                            // Memory requirement: 24KB (storage for 256 points).
-#define WQ_DOUBLEBASE     4  
-   
+#define WQ_DOUBLEBASE     4
+
 
 // FourQ's basic element definitions and point representations
 
 typedef digit_t felm_t[NWORDS_FIELD];                  // Datatype for representing 128-bit field elements
 typedef felm_t f2elm_t[2];                             // Datatype for representing quadratic extension field elements
-        
+
 typedef struct { f2elm_t x; f2elm_t y; } point_affine; // Point representation in affine coordinates.
-typedef point_affine point_t[1]; 
+typedef point_affine point_t[1];
 
 
 // Definitions of the error-handling type and error codes
@@ -204,7 +204,7 @@ typedef enum {
 #define ECCRYPTO_MSG_ERROR_NO_MEMORY                        "ECCRYPTO_ERROR_NO_MEMORY"
 #define ECCRYPTO_MSG_ERROR_INVALID_PARAMETER                "ECCRYPTO_ERROR_INVALID_PARAMETER"
 #define ECCRYPTO_MSG_ERROR_SHARED_KEY                       "ECCRYPTO_ERROR_SHARED_KEY"
-#define ECCRYPTO_MSG_ERROR_SIGNATURE_VERIFICATION           "ECCRYPTO_ERROR_SIGNATURE_VERIFICATION" 
+#define ECCRYPTO_MSG_ERROR_SIGNATURE_VERIFICATION           "ECCRYPTO_ERROR_SIGNATURE_VERIFICATION"
 
 
 #ifdef __cplusplus

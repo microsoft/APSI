@@ -284,7 +284,7 @@ namespace APSITests
         nrsop->client_id = client_id;
         nrsop->sop_response = move(rsop_query);
         svr.send(move(nrsop));
-        
+
         // Finally send two ZMQResultPackages
         auto rp = make_unique<ResultPackage>();
         rp->bundle_idx = 0;

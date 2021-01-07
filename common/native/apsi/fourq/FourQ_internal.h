@@ -5,11 +5,11 @@
 *
 * Abstract: internal header file
 *
-* This code is based on the paper "FourQ: four-dimensional decompositions on a 
-* Q-curve over the Mersenne prime" by Craig Costello and Patrick Longa, in Advances 
+* This code is based on the paper "FourQ: four-dimensional decompositions on a
+* Q-curve over the Mersenne prime" by Craig Costello and Patrick Longa, in Advances
 * in Cryptology - ASIACRYPT, 2015.
 * Preprint available at http://eprint.iacr.org/2015/565.
-************************************************************************************/  
+************************************************************************************/
 
 #ifndef __FOURQ_INTERNAL_H__
 #define __FOURQ_INTERNAL_H__
@@ -20,22 +20,22 @@
 extern "C" {
 #endif
 
-    
+
 #include "apsi/fourq/FourQ_api.h"
 
 
 // Extended datatype support
- 
-#if defined(GENERIC_IMPLEMENTATION)                       
+
+#if defined(GENERIC_IMPLEMENTATION)
     typedef uint64_t uint128_t[2];
 #elif (TARGET == TARGET_AMD64 && OS_TARGET == OS_LINUX) && (COMPILER == COMPILER_GCC || COMPILER == COMPILER_CLANG)
     #define UINT128_SUPPORT
-    typedef unsigned uint128_t __attribute__((mode(TI)));  
+    typedef unsigned uint128_t __attribute__((mode(TI)));
 #elif (TARGET == TARGET_ARM64 && OS_TARGET == OS_LINUX) && (COMPILER == COMPILER_GCC || COMPILER == COMPILER_CLANG)
     #define UINT128_SUPPORT
-    typedef unsigned uint128_t __attribute__((mode(TI))); 
+    typedef unsigned uint128_t __attribute__((mode(TI)));
 #elif (TARGET == TARGET_AMD64) && (OS_TARGET == OS_WIN && COMPILER == COMPILER_VC)
-    #define SCALAR_INTRIN_SUPPORT   
+    #define SCALAR_INTRIN_SUPPORT
     typedef uint64_t uint128_t[2];
 #else
     #error -- "Unsupported configuration"
@@ -47,32 +47,32 @@ extern "C" {
 
 
 // Basic parameters for variable-base scalar multiplication (without using endomorphisms)
-#define NPOINTS_VARBASE       (1 << (W_VARBASE-2)) 
+#define NPOINTS_VARBASE       (1 << (W_VARBASE-2))
 #define t_VARBASE             ((NBITS_ORDER_PLUS_ONE+W_VARBASE-2)/(W_VARBASE-1))
 
 
 // Basic parameters for fixed-base scalar multiplication
 #define E_FIXEDBASE       (NBITS_ORDER_PLUS_ONE + W_FIXEDBASE*V_FIXEDBASE - 1)/(W_FIXEDBASE*V_FIXEDBASE)
 #define D_FIXEDBASE       E_FIXEDBASE*V_FIXEDBASE
-#define L_FIXEDBASE       D_FIXEDBASE*W_FIXEDBASE  
-#define NPOINTS_FIXEDBASE V_FIXEDBASE*(1 << (W_FIXEDBASE-1))  
-#define VPOINTS_FIXEDBASE (1 << (W_FIXEDBASE-1)) 
-#if (NBITS_ORDER_PLUS_ONE-L_FIXEDBASE == 0)  // This parameter selection is not supported  
+#define L_FIXEDBASE       D_FIXEDBASE*W_FIXEDBASE
+#define NPOINTS_FIXEDBASE V_FIXEDBASE*(1 << (W_FIXEDBASE-1))
+#define VPOINTS_FIXEDBASE (1 << (W_FIXEDBASE-1))
+#if (NBITS_ORDER_PLUS_ONE-L_FIXEDBASE == 0)  // This parameter selection is not supported
     #error -- "Unsupported parameter selection for fixed-base scalar multiplication"
-#endif 
+#endif
 
 
 // Basic parameters for double scalar multiplication
-#define NPOINTS_DOUBLEMUL_WP   (1 << (WP_DOUBLEBASE-2)) 
-#define NPOINTS_DOUBLEMUL_WQ   (1 << (WQ_DOUBLEBASE-2)) 
-   
+#define NPOINTS_DOUBLEMUL_WP   (1 << (WP_DOUBLEBASE-2))
+#define NPOINTS_DOUBLEMUL_WQ   (1 << (WQ_DOUBLEBASE-2))
 
-// FourQ's point representations        
+
+// FourQ's point representations
 
 typedef struct { f2elm_t x; f2elm_t y; f2elm_t z; f2elm_t ta; f2elm_t tb; } point_extproj;  // Point representation in extended coordinates.
-typedef point_extproj point_extproj_t[1];                                                              
+typedef point_extproj point_extproj_t[1];
 typedef struct { f2elm_t xy; f2elm_t yx; f2elm_t z2; f2elm_t t2; } point_extproj_precomp;   // Point representation in extended coordinates (for precomputed points).
-typedef point_extproj_precomp point_extproj_precomp_t[1];  
+typedef point_extproj_precomp point_extproj_precomp_t[1];
 typedef struct { f2elm_t xy; f2elm_t yx; f2elm_t t2; } point_precomp;                       // Point representation in extended affine coordinates (for precomputed points).
 typedef point_precomp point_precomp_t[1];
 
@@ -93,7 +93,7 @@ static __inline unsigned int is_digit_zero_ct(digit_t x)
 
 static __inline unsigned int is_digit_lessthan_ct(digit_t x, digit_t y)
 { // Is x < y?
-    return (unsigned int)((x ^ ((x ^ y) | ((x - y) ^ y))) >> (RADIX-1)); 
+    return (unsigned int)((x ^ ((x ^ y) | ((x - y) ^ y))) >> (RADIX-1));
 }
 
 
@@ -104,7 +104,7 @@ static __inline unsigned int is_digit_lessthan_ct(digit_t x, digit_t y)
 // Digit multiplication
 #define MUL(multiplier, multiplicand, hi, lo)                                                     \
     digit_x_digit((multiplier), (multiplicand), &(lo));
-    
+
 // Digit addition with carry
 #define ADDC(carryIn, addend1, addend2, carryOut, sumOut)                                         \
     { digit_t tempReg = (addend1) + (digit_t)(carryIn);                                           \
@@ -117,7 +117,7 @@ static __inline unsigned int is_digit_lessthan_ct(digit_t x, digit_t y)
     unsigned int borrowReg = (is_digit_lessthan_ct((minuend), (subtrahend)) | ((borrowIn) & is_digit_zero_ct(tempReg)));  \
     (differenceOut) = tempReg - (digit_t)(borrowIn);                                              \
     (borrowOut) = borrowReg; }
-    
+
 // Shift right with flexible datatype
 #define SHIFTR(highIn, lowIn, shift, shiftOut, DigitSize)                                         \
     (shiftOut) = ((lowIn) >> (shift)) ^ ((highIn) << (DigitSize - (shift)));
@@ -142,7 +142,7 @@ static __inline unsigned int is_digit_lessthan_ct(digit_t x, digit_t y)
 
 // Digit multiplication
 #define MUL(multiplier, multiplicand, hi, lo)                                                     \
-    (lo) = _umul128((multiplier), (multiplicand), (hi));                
+    (lo) = _umul128((multiplier), (multiplicand), (hi));
 
 // Digit addition with carry
 #define ADDC(carryIn, addend1, addend2, carryOut, sumOut)                                         \
@@ -172,7 +172,7 @@ static __inline unsigned int is_digit_lessthan_ct(digit_t x, digit_t y)
 // 128-bit addition with output carry
 #define ADC128(addend1, addend2, carry, addition)                                                 \
     (carry) = _addcarry_u64(0, (addend1)[0], (addend2)[0], &(addition)[0]);                       \
-    (carry) = _addcarry_u64((carry), (addend1)[1], (addend2)[1], &(addition)[1]); 
+    (carry) = _addcarry_u64((carry), (addend1)[1], (addend2)[1], &(addition)[1]);
 
 // 128-bit subtraction, subtrahend < 2^127
 #define SUB128(minuend, subtrahend, difference)                                                   \
@@ -182,12 +182,12 @@ static __inline unsigned int is_digit_lessthan_ct(digit_t x, digit_t y)
 // 128-bit right shift, max. shift value is 64
 #define SHIFTR128(Input, shift, shiftOut)                                                         \
     (shiftOut)[0]  = __shiftright128((Input)[0], (Input)[1], (shift));                            \
-    (shiftOut)[1] = (Input)[1] >> (shift);    
+    (shiftOut)[1] = (Input)[1] >> (shift);
 
 // 128-bit left shift, max. shift value is 64
 #define SHIFTL128(Input, shift, shiftOut)                                                         \
     (shiftOut)[1]  = __shiftleft128((Input)[0], (Input)[1], (shift));                             \
-    (shiftOut)[0] = (Input)[0] << (shift);  
+    (shiftOut)[0] = (Input)[0] << (shift);
 
 #elif ((TARGET == TARGET_AMD64 || TARGET == TARGET_ARM64) && OS_TARGET == OS_LINUX)
 
@@ -201,8 +201,8 @@ static __inline unsigned int is_digit_lessthan_ct(digit_t x, digit_t y)
 #define ADDC(carryIn, addend1, addend2, carryOut, sumOut)                                         \
     { uint128_t tempReg = (uint128_t)(addend1) + (uint128_t)(addend2) + (uint128_t)(carryIn);     \
     (carryOut) = (digit_t)(tempReg >> RADIX);                                                     \
-    (sumOut) = (digit_t)tempReg; }  
-    
+    (sumOut) = (digit_t)tempReg; }
+
 // Digit subtraction with borrow
 #define SUBC(borrowIn, minuend, subtrahend, borrowOut, differenceOut)                             \
     { uint128_t tempReg = (uint128_t)(minuend) - (uint128_t)(subtrahend) - (uint128_t)(borrowIn); \
@@ -228,7 +228,7 @@ static __inline unsigned int is_digit_lessthan_ct(digit_t x, digit_t y)
 bool is_zero_ct(digit_t* a, unsigned int nwords);
 
 // Multiprecision addition, c = a+b. Returns the carry bit
-unsigned int mp_add(digit_t* a, digit_t* b, digit_t* c, unsigned int nwords);          
+unsigned int mp_add(digit_t* a, digit_t* b, digit_t* c, unsigned int nwords);
 
 // Schoolbook multiprecision multiply, c = a*b
 void mp_mul(const digit_t* a, const digit_t* b, digit_t* c, const unsigned int nwords);
@@ -252,13 +252,13 @@ void fpcopy1271(felm_t a, felm_t c);
 void fpneg1271(felm_t a);
 
 // Modular correction, a = a mod p
-void mod1271(felm_t a); 
+void mod1271(felm_t a);
 
 // Field addition, c = a+b mod p
 void fpadd1271(felm_t a, felm_t b, felm_t c);
 
 // Field subtraction, c = a-b mod p
-void fpsub1271(felm_t a, felm_t b, felm_t c); 
+void fpsub1271(felm_t a, felm_t b, felm_t c);
 
 // Field division by two, c = a/2 mod p
 void fpdiv1271(felm_t a);
@@ -277,11 +277,11 @@ void fpexp1251(felm_t a, felm_t af);
 
 /************ Quadratic extension field arithmetic functions *************/
 
-// Zeroing a quadratic extension field element, a=0 
+// Zeroing a quadratic extension field element, a=0
 void fp2zero1271(f2elm_t a);
 
 // Copy quadratic extension field element, c = a
-void fp2copy1271(f2elm_t a, f2elm_t c); 
+void fp2copy1271(f2elm_t a, f2elm_t c);
 
 // Quadratic extension field negation, a = -a in GF((2^127-1)^2)
 void fp2neg1271(f2elm_t a);
@@ -314,11 +314,11 @@ void eccnorm(point_extproj_t P, point_t Q);
 // Conversion from representation (X,Y,Z,Ta,Tb) to (X+Y,Y-X,2Z,2dT), where T = Ta*Tb
 void R1_to_R2(point_extproj_t P, point_extproj_precomp_t Q);
 
-// Conversion from representation (X,Y,Z,Ta,Tb) to (X+Y,Y-X,Z,T), where T = Ta*Tb 
-void R1_to_R3(point_extproj_t P, point_extproj_precomp_t Q);  
- 
+// Conversion from representation (X,Y,Z,Ta,Tb) to (X+Y,Y-X,Z,T), where T = Ta*Tb
+void R1_to_R3(point_extproj_t P, point_extproj_precomp_t Q);
+
 // Conversion from representation (X+Y,Y-X,2Z,2dT) to (2X,2Y,2Z,2dT)
-void R2_to_R4(point_extproj_precomp_t P, point_extproj_t Q);     
+void R2_to_R4(point_extproj_precomp_t P, point_extproj_t Q);
 
 // Point doubling 2P
 void eccdouble_ni(point_extproj_t P);
@@ -327,10 +327,10 @@ void eccdouble(point_extproj_t P);
 // Complete point addition P = P+Q or P = P+P
 void eccadd_ni(point_extproj_precomp_t Q, point_extproj_t P);
 void eccadd(point_extproj_precomp_t Q, point_extproj_t P);
-void eccadd_core(point_extproj_precomp_t P, point_extproj_precomp_t Q, point_extproj_t R); 
+void eccadd_core(point_extproj_precomp_t P, point_extproj_precomp_t Q, point_extproj_t R);
 
 // Psi mapping of a point, P = psi(P)
-void ecc_psi(point_extproj_t P); 
+void ecc_psi(point_extproj_t P);
 
 // Phi mapping of a point, P = phi(P)
 void ecc_phi(point_extproj_t P);
@@ -357,11 +357,11 @@ void ecc_precomp(point_extproj_t P, point_extproj_precomp_t *T);
 void table_lookup_1x8(point_extproj_precomp_t* table, point_extproj_precomp_t P, unsigned int digit, unsigned int sign_mask);
 void table_lookup_1x8_a(point_extproj_precomp_t* table, point_extproj_precomp_t P, unsigned int* digit, unsigned int* sign_mask);
 
-// Modular correction of input coordinates and conversion to representation (X,Y,Z,Ta,Tb) 
+// Modular correction of input coordinates and conversion to representation (X,Y,Z,Ta,Tb)
 void point_setup(point_t P, point_extproj_t Q);
 void point_setup_ni(point_t P, point_extproj_t Q);
-    
-// Point validation: check if point lies on the curve     
+
+// Point validation: check if point lies on the curve
 bool ecc_point_validate(point_extproj_t P);
 
 // Output error/success message for a given ECCRYPTO_STATUS
@@ -402,7 +402,7 @@ ECCRYPTO_STATUS decode(const unsigned char* Pencoded, point_t P);
 #define ecccopy_precomp(Q, P); fp2copy1271((Q)->xy, (P)->xy); \
                                fp2copy1271((Q)->yx, (P)->yx); \
                                fp2copy1271((Q)->z2, (P)->z2); \
-                               fp2copy1271((Q)->t2, (P)->t2); 
+                               fp2copy1271((Q)->t2, (P)->t2);
 
 // Copy extended affine point Q = (x+y,y-x,2dt) to P
 #define ecccopy_precomp_fixed_base(Q, P); fp2copy1271((Q)->xy, (P)->xy); \

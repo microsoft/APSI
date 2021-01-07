@@ -742,7 +742,7 @@ namespace apsi
                 }
                 else
                 {
-                    // Replacing an existing item 
+                    // Replacing an existing item
                     existing_data.emplace(move(item_label_pair));
                 }
             }
@@ -895,7 +895,7 @@ namespace apsi
             vector<pair<AlgItemLabel<monostate>, size_t>> data_with_indices
                 = preprocess_unlabeled_data(data.begin(), data.end(), params_);
 
-            // Dispatch the removal 
+            // Dispatch the removal
             uint32_t bins_per_bundle = params_.bins_per_bundle();
 
             dispatch_remove(
@@ -945,7 +945,7 @@ namespace apsi
             vector<pair<AlgItemLabel<monostate>, size_t>> data_with_indices
                 = preprocess_unlabeled_data(data.begin(), data.end(), params_);
 
-            // Dispatch the removal 
+            // Dispatch the removal
             uint32_t bins_per_bundle = params_.bins_per_bundle();
 
             dispatch_remove(

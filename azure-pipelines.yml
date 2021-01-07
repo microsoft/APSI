@@ -59,7 +59,7 @@ steps:
   inputs:
     script: |
       echo Copying library DLLs for test execution
-      
+
       copy %APSILIBS%\libzmq\dll\x64\Release\libzmq.dll x64\Release
       copy %APSILIBS%\libzmqpp\lib\x64\Release\zmqpp.dll x64\Release
     workingDirectory: '$(Build.SourcesDirectory)'

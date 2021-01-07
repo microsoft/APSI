@@ -21,7 +21,7 @@
 namespace apsi
 {
     /**
-    PowersDag represents a DAG for computing all powers of a given query ciphertext in a depth-optimal manner given 
+    PowersDag represents a DAG for computing all powers of a given query ciphertext in a depth-optimal manner given
     a certain "base" (sources) of powers of the query.
 
     For example, the computation up to power 7 with sources 1, 2, 5 one can represented as the DAG with nodes 1..7 and
@@ -214,7 +214,7 @@ namespace apsi
                             continue;
                         }
 
-                        // Check for parents 
+                        // Check for parents
                         auto node = nodes_.at(ns + 1);
                         auto p1 = node.parents.first;
                         auto p2 = node.parents.second;

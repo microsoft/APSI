@@ -140,7 +140,7 @@ namespace APSITests
         ASSERT_FALSE(rp.psi_result.is_local());
         ASSERT_FALSE(rp.psi_result.is_serializable());
 
-        // bundle_idx is unchanged by extract 
+        // bundle_idx is unchanged by extract
         ASSERT_EQ(rp.bundle_idx, prp.bundle_idx);
         ASSERT_TRUE(all_of(prp.psi_result.begin(), prp.psi_result.end(), [](auto a) { return !a; }));
         ASSERT_TRUE(prp.label_result.empty());

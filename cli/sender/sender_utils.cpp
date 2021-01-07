@@ -53,7 +53,7 @@ unique_ptr<PSIParams> build_psi_params(const CLP& cmd)
     }
 
     unique_ptr<PSIParams> params;
-    try 
+    try
     {
         params = make_unique<PSIParams>(item_params, table_params, query_params, seal_params);
     }

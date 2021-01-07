@@ -42,7 +42,7 @@ namespace apsi
             sender_db_ = move(sender_db);
             auto seal_context = sender_db_->get_seal_context();
 
-            // Extract and validate relinearization keys 
+            // Extract and validate relinearization keys
             relin_keys_ = query_request->relin_keys.extract_local();
             if (!is_valid_for(relin_keys_, *seal_context))
             {

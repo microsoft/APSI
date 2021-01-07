@@ -27,7 +27,7 @@ namespace apsi
     {
         class Query
         {
-        public: 
+        public:
             Query() = default;
 
             Query(QueryRequest query_request, std::shared_ptr<sender::SenderDB> sender_db);

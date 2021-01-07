@@ -249,7 +249,7 @@ namespace apsi
                 0,                                       // Not using a stash
                 params_.table_params().hash_func_count, // Number of hash functions
                 { 0, 0 },                                // Hardcoded { 0, 0 } as the seed
-                cuckoo_table_insert_attempts,            // The number of insertion attempts 
+                cuckoo_table_insert_attempts,            // The number of insertion attempts
                 { 0, 0 });                               // The empty element can be set to anything
 
             // Hash the data into a cuckoo hash table
@@ -313,7 +313,7 @@ namespace apsi
                     vector<uint64_t> alg_items;
                     for (auto &item : bundle_items)
                     {
-                        // Now set up a BitstringView to this item    
+                        // Now set up a BitstringView to this item
                         gsl::span<const seal_byte> item_bytes(
                             reinterpret_cast<const seal_byte*>(item.data()), sizeof(item));
                         BitstringView<const seal_byte> item_bits(item_bytes, params_.item_bit_count());

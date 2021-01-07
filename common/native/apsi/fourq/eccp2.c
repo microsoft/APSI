@@ -5,8 +5,8 @@
 *
 * Abstract: ECC operations over GF(p^2) exploiting endomorphisms
 *
-* This code is based on the paper "FourQ: four-dimensional decompositions on a 
-* Q-curve over the Mersenne prime" by Craig Costello and Patrick Longa, in Advances 
+* This code is based on the paper "FourQ: four-dimensional decompositions on a
+* Q-curve over the Mersenne prime" by Craig Costello and Patrick Longa, in Advances
 * in Cryptology - ASIACRYPT, 2015.
 * Preprint available at http://eprint.iacr.org/2015/565.
 ************************************************************************************/
@@ -16,8 +16,8 @@
 
 #if (USE_ENDO == true)
 
-// Fixed GF(p^2) constants for the endomorphisms 
-static uint64_t ctau1[4]     = {0x74DCD57CEBCE74C3, 0x1964DE2C3AFAD20C, 0x12, 0x0C};         
+// Fixed GF(p^2) constants for the endomorphisms
+static uint64_t ctau1[4]     = {0x74DCD57CEBCE74C3, 0x1964DE2C3AFAD20C, 0x12, 0x0C};
 static uint64_t ctaudual1[4] = {0x9ECAA6D9DECDF034, 0x4AA740EB23058652, 0x11, 0x7FFFFFFFFFFFFFF4};
 static uint64_t cphi0[4] = {0xFFFFFFFFFFFFFFF7, 0x05, 0x4F65536CEF66F81A, 0x2553A0759182C329};
 static uint64_t cphi1[4] = {0x07, 0x05, 0x334D90E9E28296F9, 0x62C8CAA0C50C62CF};
@@ -40,11 +40,11 @@ static uint64_t c1  = {0x72482C5251A4559C};
 static uint64_t c2  = {0x59F95B0ADD276F6C};
 static uint64_t c3  = {0x7DD2D17C4625FA78};
 static uint64_t c4  = {0x6BC57DEF56CE8877};
-// Optimal basis vectors 
-static uint64_t b11 = {0x0906FF27E0A0A196};   
-static uint64_t b12 = {0x1363E862C22A2DA0};                                              
-static uint64_t b13 = {0x07426031ECC8030F};                                              
-static uint64_t b14 = {0x084F739986B9E651};   
+// Optimal basis vectors
+static uint64_t b11 = {0x0906FF27E0A0A196};
+static uint64_t b12 = {0x1363E862C22A2DA0};
+static uint64_t b13 = {0x07426031ECC8030F};
+static uint64_t b14 = {0x084F739986B9E651};
 static uint64_t b21 = {0x1D495BEA84FCC2D4};
 static uint64_t b24 = {0x25DBC5BC8DD167D0};
 static uint64_t b31 = {0x17ABAD1D231F0302};
@@ -69,7 +69,7 @@ static __inline void ecc_tau(point_extproj_t P)
 { // Apply tau mapping to a point, P = tau(P)
   // Input: P = (X1:Y1:Z1) on E in twisted Edwards coordinates
   // Output: P = (Xfinal:Yfinal:Zfinal) on Ehat in twisted Edwards coordinates
-    f2elm_t t0, t1; 
+    f2elm_t t0, t1;
 
     fp2sqr1271(P->x, t0);                     // t0 = X1^2
     fp2sqr1271(P->y, t1);                     // t1 = Y1^2
@@ -109,11 +109,11 @@ static __inline void ecc_tau_dual(point_extproj_t P)
 
 
 static __inline void ecc_delphidel(point_extproj_t P)
-{ // Apply delta_phi_delta mapping to a point, P = delta(phi_W(delta_inv(P))), 
+{ // Apply delta_phi_delta mapping to a point, P = delta(phi_W(delta_inv(P))),
   // where phi_W is the endomorphism on the Weierstrass form.
   // Input: P = (X1:Y1:Z1) on Ehat in twisted Edwards coordinates
   // Output: P = (Xfinal:Yfinal:Zfinal) on Ehat in twisted Edwards coordinates
-    f2elm_t t0, t1, t2, t3, t4, t5, t6; 
+    f2elm_t t0, t1, t2, t3, t4, t5, t6;
 
     fp2sqr1271(P->z, t4);                          // t4 = Z1^2
     fp2mul1271(P->y, P->z, t3);                    // t3 = Y1*Z1
@@ -157,11 +157,11 @@ static __inline void ecc_delphidel(point_extproj_t P)
 
 
 static __inline void ecc_delpsidel(point_extproj_t P)
-{ // Apply delta_psi_delta mapping to a point, P = delta(psi_W(delta_inv(P))), 
+{ // Apply delta_psi_delta mapping to a point, P = delta(psi_W(delta_inv(P))),
   // where psi_W is the endomorphism on the Weierstrass form.
   // Input: P = (X1:Y1:Z1) on Ehat in twisted Edwards coordinates
   // Output: P = (Xfinal:Yfinal:Zfinal) on Ehat in twisted Edwards coordinates
-    f2elm_t t0, t1, t2; 
+    f2elm_t t0, t1, t2;
 
     fpneg1271(P->x[1]);                            // X = X1^p
     fpneg1271(P->z[1]);                            // Z = Z1^p
@@ -190,9 +190,9 @@ void ecc_psi(point_extproj_t P)
   // Output: P = (Xfinal,Yfinal,Zfinal,Tafinal,Tbfinal) on E, where Tfinal = Tafinal*Tbfinal,
   //         corresponding to (Xfinal:Yfinal:Zfinal:Tfinal) in extended twisted Edwards coordinates
 
-    ecc_tau(P);                            
+    ecc_tau(P);
     ecc_delpsidel(P);                      		
-    ecc_tau_dual(P);                        
+    ecc_tau_dual(P);
 }
 
 
@@ -202,13 +202,13 @@ void ecc_phi(point_extproj_t P)
   // Output: P = (Xfinal,Yfinal,Zfinal,Tafinal,Tbfinal) on E, where Tfinal = Tafinal*Tbfinal,
   //         corresponding to (Xfinal:Yfinal:Zfinal:Tfinal) in extended twisted Edwards coordinates
 
-    ecc_tau(P);                            
+    ecc_tau(P);
     ecc_delphidel(P);                      		
-    ecc_tau_dual(P);  
+    ecc_tau_dual(P);
 }
 
 
-static __inline void mul_truncate(uint64_t* s, uint64_t* C, uint64_t* out)       
+static __inline void mul_truncate(uint64_t* s, uint64_t* C, uint64_t* out)
 { // 256-bit multiplication with truncation for the scalar decomposition
   // Outputs 64-bit value "out" = (uint64_t)((s * C) >> 256).
     uint128_t tt1, tt2;
@@ -218,39 +218,39 @@ static __inline void mul_truncate(uint64_t* s, uint64_t* C, uint64_t* out)
     unsigned int carry2;
     uint64_t temp;
 
-    MUL128(s[0], C[0], tt2);   
+    MUL128(s[0], C[0], tt2);
     tt2[0] = tt2[1];
     tt2[1] = 0;
-    MUL128(s[1], C[0], tt1); 
+    MUL128(s[1], C[0], tt1);
     ADD128(tt1, tt2, tt1);
-    MUL128(s[0], C[1], tt2); 
+    MUL128(s[0], C[1], tt2);
     ADC128(tt1, tt2, carry1, tt1);
     tt1[0] = tt1[1];
     tt1[1] = (uint64_t)(carry1);
-    MUL128(s[2], C[0], tt2); 
+    MUL128(s[2], C[0], tt2);
     ADD128(tt1, tt2, tt1);
-    MUL128(s[0], C[2], tt2); 
+    MUL128(s[0], C[2], tt2);
     ADC128(tt1, tt2, carry1, tt1);
-    MUL128(s[1], C[1], tt2); 
+    MUL128(s[1], C[1], tt2);
     ADC128(tt1, tt2, carry2, tt1);
     tt1[0] = tt1[1];
     tt1[1] = (uint64_t)carry1 + (uint64_t)carry2;
-    MUL128(s[0], C[3], tt2); 
+    MUL128(s[0], C[3], tt2);
     ADD128(tt1, tt2, tt1);
-    MUL128(s[3], C[0], tt2); 
+    MUL128(s[3], C[0], tt2);
     ADC128(tt1, tt2, carry1, tt1);
-    MUL128(s[1], C[2], tt2); 
+    MUL128(s[1], C[2], tt2);
     ADC128(tt1, tt2, carry2, tt1);
     temp = (uint64_t)carry1 + (uint64_t)carry2;
-    MUL128(s[2], C[1], tt2); 
+    MUL128(s[2], C[1], tt2);
     ADC128(tt1, tt2, carry2, tt1);
     tt1[0] = tt1[1];
     tt1[1] = temp + (uint64_t)carry2;
-    MUL128(s[1], C[3], tt2); 
+    MUL128(s[1], C[3], tt2);
     ADD128(tt1, tt2, tt1);
-    MUL128(s[3], C[1], tt2); 
+    MUL128(s[3], C[1], tt2);
     ADD128(tt1, tt2, tt1);
-    MUL128(s[2], C[2], tt2); 
+    MUL128(s[2], C[2], tt2);
     ADD128(tt1, tt2, tt1);
     *out = tt1[0];
 #ifdef TEMP_ZEROING
@@ -258,7 +258,7 @@ static __inline void mul_truncate(uint64_t* s, uint64_t* C, uint64_t* out)
     clear_words((void*)tt2, sizeof(uint128_t)/sizeof(unsigned int));
     clear_words((void*)&temp, sizeof(uint64_t)/sizeof(unsigned int));
 #endif
-    
+
 #elif defined(UINT128_SUPPORT)
     uint128_t tt3, tt4;
 
@@ -273,8 +273,8 @@ static __inline void mul_truncate(uint64_t* s, uint64_t* C, uint64_t* out)
     carry1 = (unsigned int)(((uint128_t)((uint64_t)tt1) + (uint128_t)((uint64_t)tt2) + (uint128_t)((uint64_t)tt3)) >> 64);
     tt1 = (uint128_t)(tt1 >> 64) + (uint128_t)(tt2 >> 64) + (uint128_t)(tt3 >> 64) + (uint64_t)carry1;
     tt1 += (uint128_t)s[0]*C[3];
-    tt2 = (uint128_t)s[3]*C[0]; 
-    tt3 = (uint128_t)s[1]*C[2]; 
+    tt2 = (uint128_t)s[3]*C[0];
+    tt3 = (uint128_t)s[1]*C[2];
     tt4 = (uint128_t)s[2]*C[1];
     carry1 = (unsigned int)(((uint128_t)((uint64_t)tt1) + (uint128_t)((uint64_t)tt2) + (uint128_t)((uint64_t)tt3) + (uint128_t)((uint64_t)tt4)) >> 64);
     tt1 = (uint128_t)(tt1 >> 64) + (uint128_t)(tt2 >> 64) + (uint128_t)(tt3 >> 64) + (uint128_t)(tt4 >> 64) + (uint64_t)carry1;
@@ -293,7 +293,7 @@ static __inline void mul_truncate(uint64_t* s, uint64_t* C, uint64_t* out)
 void decompose(uint64_t* k, uint64_t* scalars)
 { // Scalar decomposition for the variable-base scalar multiplication
   // Input: scalar in the range [0, 2^256-1].
-  // Output: 4 64-bit sub-scalars. 
+  // Output: 4 64-bit sub-scalars.
     uint64_t a1, a2, a3, a4, temp, mask;
 
 #if (TARGET == TARGET_x86) && (COMPILER == COMPILER_VC)
@@ -307,15 +307,15 @@ void decompose(uint64_t* k, uint64_t* scalars)
     MUL128(a1, b11, t1); MUL128(a2, b21, t2); MUL128(a3, b31, t3); MUL128(a4, b41, t4);
     temp = k[0] - t1[0] - t2[0] - t3[0] - t4[0] + c1;
     mask = ~(0 - (temp & 1));      // If temp is even then mask = 0xFF...FF, else mask = 0
-    
+
     scalars[0] = temp + (mask & b41);
-    MUL128(a1, b12, t1); MUL128(a3, b32, t2); MUL128(a4, b42, t3); 
+    MUL128(a1, b12, t1); MUL128(a3, b32, t2); MUL128(a4, b42, t3);
     scalars[1] = t1[0] + (uint64_t)a2 - t2[0] - t3[0] + c2 + (mask & b42);
-    MUL128(a3, b33, t1); MUL128(a1, b13, t2); MUL128(a4, b43, t3); 
+    MUL128(a3, b33, t1); MUL128(a1, b13, t2); MUL128(a4, b43, t3);
     scalars[2] = t1[0] - t2[0] - (uint64_t)a2 + t3[0] + c3 - (mask & b43);
-    MUL128(a1, b14, t1); MUL128(a2, b24, t2); MUL128(a3, b34, t3); MUL128(a4, b44, t4); 
+    MUL128(a1, b14, t1); MUL128(a2, b24, t2); MUL128(a3, b34, t3); MUL128(a4, b44, t4);
     scalars[3] = t1[0] - t2[0] - t3[0] + t4[0] + c4 - (mask & b44);
-#else 
+#else
     mul_truncate(k, ell1, &a1);
     mul_truncate(k, ell2, &a2);
     mul_truncate(k, ell3, &a3);
@@ -323,7 +323,7 @@ void decompose(uint64_t* k, uint64_t* scalars)
 
     temp = k[0] - (uint64_t)a1*b11 - (uint64_t)a2*b21 - (uint64_t)a3*b31 - (uint64_t)a4*b41 + c1;
     mask = ~(0 - (temp & 1));      // If temp is even then mask = 0xFF...FF, else mask = 0
-    
+
     scalars[0] = temp + (mask & b41);
     scalars[1] = (uint64_t)a1*b12 + (uint64_t)a2     - (uint64_t)a3*b32 - (uint64_t)a4*b42 + c2 + (mask & b42);
     scalars[2] = (uint64_t)a3*b33 - (uint64_t)a1*b13 - (uint64_t)a2     + (uint64_t)a4*b43 + c3 - (mask & b43);
@@ -347,51 +347,51 @@ void ecc_precomp(point_extproj_t P, point_extproj_precomp_t *T)
   // Output: table T containing 8 points: P, P+phi(P), P+psi(P), P+phi(P)+psi(P), P+psi(phi(P)), P+phi(P)+psi(phi(P)), P+psi(P)+psi(phi(P)), P+phi(P)+psi(P)+psi(phi(P))
   // Precomputed points use the representation (X+Y,Y-X,2Z,2dT) corresponding to (X:Y:Z:T) in extended twisted Edwards coordinates
     point_extproj_precomp_t Q, R, S;
-    point_extproj_t PP;                    
+    point_extproj_t PP;
 
     // Generating Q = phi(P) = (XQ+YQ,YQ-XQ,ZQ,TQ)
     ecccopy(P, PP);
     ecc_phi(PP);
-    R1_to_R3(PP, Q);                       // Converting from (X,Y,Z,Ta,Tb) to (X+Y,Y-X,Z,T) 
+    R1_to_R3(PP, Q);                       // Converting from (X,Y,Z,Ta,Tb) to (X+Y,Y-X,Z,T)
 
     // Generating S = psi(Q) = (XS+YS,YS-XS,ZS,TS)
-    ecc_psi(PP);  
-    R1_to_R3(PP, S);                       // Converting from (X,Y,Z,Ta,Tb) to (X+Y,Y-X,Z,T) 
+    ecc_psi(PP);
+    R1_to_R3(PP, S);                       // Converting from (X,Y,Z,Ta,Tb) to (X+Y,Y-X,Z,T)
 
-    // Generating T[0] = P = (XP+YP,YP-XP,2ZP,2dTP) 
+    // Generating T[0] = P = (XP+YP,YP-XP,2ZP,2dTP)
     R1_to_R2(P, T[0]);                     // Converting from (X,Y,Z,Ta,Tb) to (X+Y,Y-X,2Z,2dT)
 
     // Generating R = psi(P) = (XR+YR,YR-XR,ZR,TR)
-    ecc_psi(P); 
-    R1_to_R3(P, R);                        // Converting from (X,Y,Z,Ta,Tb) to (X+Y,Y-X,Z,T)  
+    ecc_psi(P);
+    R1_to_R3(P, R);                        // Converting from (X,Y,Z,Ta,Tb) to (X+Y,Y-X,Z,T)
 
     eccadd_core(T[0], Q, PP);              // T[1] = P+Q using the representations (X,Y,Z,Ta,Tb) <- (X+Y,Y-X,2Z,2dT) + (X+Y,Y-X,Z,T)
     R1_to_R2(PP, T[1]);                    // Converting from (X,Y,Z,Ta,Tb) to (X+Y,Y-X,2Z,2dT)
-    eccadd_core(T[0], R, PP);              // T[2] = P+R 
+    eccadd_core(T[0], R, PP);              // T[2] = P+R
     R1_to_R2(PP, T[2]);
-    eccadd_core(T[1], R, PP);              // T[3] = P+Q+R 
+    eccadd_core(T[1], R, PP);              // T[3] = P+Q+R
     R1_to_R2(PP, T[3]);
-    eccadd_core(T[0], S, PP);              // T[4] = P+S 
+    eccadd_core(T[0], S, PP);              // T[4] = P+S
     R1_to_R2(PP, T[4]);
-    eccadd_core(T[1], S, PP);              // T[5] = P+Q+S 
+    eccadd_core(T[1], S, PP);              // T[5] = P+Q+S
     R1_to_R2(PP, T[5]);
-    eccadd_core(T[2], S, PP);              // T[6] = P+R+S 
+    eccadd_core(T[2], S, PP);              // T[6] = P+R+S
     R1_to_R2(PP, T[6]);
-    eccadd_core(T[3], S, PP);              // T[7] = P+Q+R+S 
-    R1_to_R2(PP, T[7]);              
+    eccadd_core(T[3], S, PP);              // T[7] = P+Q+R+S
+    R1_to_R2(PP, T[7]);
 }
 
 
 void recode(uint64_t* scalars, unsigned int* digits, unsigned int* sign_masks)
-{ // Recoding sub-scalars for use in the variable-base scalar multiplication. See Algorithm 1 in "Efficient and Secure Methods for GLV-Based Scalar 
+{ // Recoding sub-scalars for use in the variable-base scalar multiplication. See Algorithm 1 in "Efficient and Secure Methods for GLV-Based Scalar
   // Multiplication and their Implementation on GLV-GLS Curves (Extended Version)", A. Faz-Hernandez, P. Longa, and A.H. Sanchez, in Journal
   // of Cryptographic Engineering, Vol. 5(1), 2015.
   // Input: 4 64-bit sub-scalars passed through "scalars", which are obtained after calling decompose().
   // Outputs: "digits" array with 65 nonzero entries. Each entry is in the range [0, 7], corresponding to one entry in the precomputed table.
-  //          "sign_masks" array with 65 entries storing the signs for their corresponding digits in "digits". 
+  //          "sign_masks" array with 65 entries storing the signs for their corresponding digits in "digits".
   //          Notation: if the corresponding digit > 0 then sign_mask = 0xFF...FF, else if digit < 0 then sign_mask = 0.
     unsigned int i, bit, bit0, carry;
-    sign_masks[64] = (unsigned int)-1; 
+    sign_masks[64] = (unsigned int)-1;
 
     for (i = 0; i < 64; i++)
     {
@@ -400,18 +400,18 @@ void recode(uint64_t* scalars, unsigned int* digits, unsigned int* sign_masks)
         sign_masks[i] = 0 - bit0;
 
         bit = (unsigned int)scalars[1] & 1;
-        carry = (bit0 | bit) ^ bit0; 
-        scalars[1] = (scalars[1] >> 1) + (uint64_t)carry; 
+        carry = (bit0 | bit) ^ bit0;
+        scalars[1] = (scalars[1] >> 1) + (uint64_t)carry;
         digits[i] = bit;
 
         bit = (unsigned int)scalars[2] & 1;
-        carry = (bit0 | bit) ^ bit0; 
-        scalars[2] = (scalars[2] >> 1) + (uint64_t)carry; 
+        carry = (bit0 | bit) ^ bit0;
+        scalars[2] = (scalars[2] >> 1) + (uint64_t)carry;
         digits[i] += (bit << 1);
 
         bit = (unsigned int)scalars[3] & 1;
-        carry = (bit0 | bit) ^ bit0; 
-        scalars[3] = (scalars[3] >> 1) + (uint64_t)carry; 
+        carry = (bit0 | bit) ^ bit0;
+        scalars[3] = (scalars[3] >> 1) + (uint64_t)carry;
         digits[i] += (bit << 2);
     }
     digits[64] = (unsigned int)(scalars[1] + (scalars[2] << 1) + (scalars[3] << 2));
@@ -433,11 +433,11 @@ bool ecc_mul(point_t P, digit_t* k, point_t Q, bool clear_cofactor)
 
     point_setup(P, R);                                        // Convert to representation (X,Y,1,Ta,Tb)
     decompose((uint64_t*)k, scalars);                         // Scalar decomposition
-    
+
     if (ecc_point_validate(R) == false) {                     // Check if point lies on the curve
         return false;
     }
-    
+
     if (clear_cofactor == true) {
         cofactor_clearing(R);
     }
@@ -445,15 +445,15 @@ bool ecc_mul(point_t P, digit_t* k, point_t Q, bool clear_cofactor)
     ecc_precomp(R, Table);                                    // Precomputation
     table_lookup_1x8(Table, S, digits[64], sign_masks[64]);   // Extract initial point in (X+Y,Y-X,2Z,2dT) representation
     R2_to_R4(S, R);                                           // Conversion to representation (2X,2Y,2Z)
-    
+
     for (i = 63; i >= 0; i--)
     {
         table_lookup_1x8(Table, S, digits[i], sign_masks[i]); // Extract point S in (X+Y,Y-X,2Z,2dT) representation
         eccdouble(R);                                         // P = 2*P using representations (X,Y,Z,Ta,Tb) <- 2*(X,Y,Z)
         eccadd(S, R);                                         // P = P+S using representations (X,Y,Z,Ta,Tb) <- (X,Y,Z,Ta,Tb) + (X+Y,Y-X,2Z,2dT)
     }
-    eccnorm(R, Q);                                            // Conversion to affine coordinates (x,y) and modular correction. 
-    
+    eccnorm(R, Q);                                            // Conversion to affine coordinates (x,y) and modular correction.
+
 #ifdef TEMP_ZEROING
     clear_words((void*)digits, 65);
     clear_words((void*)sign_masks, 65);
@@ -469,7 +469,7 @@ void cofactor_clearing(point_extproj_t P)
   // Output: P = 392*P = (Xfinal,Yfinal,Zfinal,Tafinal,Tbfinal), where Tfinal = Tafinal*Tbfinal,
   //         corresponding to (Xfinal:Yfinal:Zfinal:Tfinal) in extended twisted Edwards coordinates
     point_extproj_precomp_t Q;
-     
+
     R1_to_R2(P, Q);                      // Converting from (X,Y,Z,Ta,Tb) to (X+Y,Y-X,2Z,2dT)
     eccdouble(P);                        // P = 2*P using representations (X,Y,Z,Ta,Tb) <- 2*(X,Y,Z)
     eccadd(Q, P);                        // P = P+Q using representations (X,Y,Z,Ta,Tb) <- (X,Y,Z,Ta,Tb) + (X+Y,Y-X,2Z,2dT)

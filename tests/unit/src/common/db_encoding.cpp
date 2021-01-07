@@ -127,7 +127,7 @@ namespace APSITests
         mod = 0;
         ASSERT_THROW(felts = bits_to_field_elts(bsv, mod), invalid_argument);
 
-        // An input of size 0 is not allowed when converting from felts to bits 
+        // An input of size 0 is not allowed when converting from felts to bits
         mod = 3;
         ASSERT_THROW(back_bs = field_elts_to_bits({ }, 0, mod), invalid_argument);
     }
