@@ -414,8 +414,8 @@ If any of them does, the item simply cannot be inserted into that bin bundle, an
 
 #### Overview
 
-The receiver's side is handled mainly by a `apsi::receiver::Receiver` object, which operates on a few container objects: `apsi::receiver::Query`, `apsi::receiver::MatchRecord`, and `apsi::receiver::LabelData`.
-Communication with the sender is handled by objects of type derived from the abstract base class `apsi::network::Channel`.
+The receiver's side is mainly handled by the `apsi::receiver::Receiver` class.
+Communication with a sender is handled by objects of type derived from the abstract base class `apsi::network::Channel`, such as `apsi::network::ZMQReceiverChannel`, or `apsi::network::StreamChannel`.
 
 The `Receiver` class has a few important member functions:
 ```
