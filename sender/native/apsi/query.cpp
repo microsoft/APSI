@@ -72,32 +72,30 @@ namespace apsi
 
             uint32_t bundle_idx_count = params.bundle_idx_count();
             uint32_t max_items_per_bin = params.table_params().max_items_per_bin;
-            uint32_t query_powers_count = params.query_params().query_powers_count;
-            uint32_t powers_dag_seed = params.query_params().powers_dag_seed;
+            const set<uint32_t> &query_powers = params.query_params().query_powers;
 
             // Create the PowersDag
-            pd_.configure(powers_dag_seed, max_items_per_bin, query_powers_count);
+            pd_.configure(query_powers, max_items_per_bin);
 
             // Check that the PowersDag is valid
             if (!pd_.is_configured())
             {
                 APSI_LOG_ERROR("Failed to configure PowersDag ("
-                    << "seed: " << powers_dag_seed << ", "
-                    << "up_to_power: " << max_items_per_bin << ", "
-                    << "source_count: " << query_powers_count << ")");
+                    << "source_powers: " << to_string(query_powers) << ", "
+                    << "up_to_power: " << max_items_per_bin << ")");
                 return;
             }
             APSI_LOG_DEBUG("Configured PowersDag with depth " << pd_.depth());
 
             // Check that the query data size matches the PSIParams
-            if (data_.size() != query_powers_count)
+            if (data_.size() != query_powers.size())
             {
                 APSI_LOG_ERROR("Extracted query data is incompatible with PSI parameters: "
                     "query contains " << data_.size() << " ciphertext powers which does not match with "
-                    "query_power_count (" << query_powers_count << ")");
+                    "the size of query_powers (" << query_powers.size() << ")");
                 return;
             }
-            auto query_powers = pd_.source_nodes();
+
             for (auto &q : data_)
             {
                 // Check that powers in the query data match source nodes in the PowersDag
@@ -108,7 +106,7 @@ namespace apsi
                         "match with bundle_idx_count (" << bundle_idx_count << ")");
                     return;
                 }
-                auto where = find_if(query_powers.cbegin(), query_powers.cend(), [&q](auto n) { return n.power == q.first; });
+                auto where = find_if(query_powers.cbegin(), query_powers.cend(), [&q](auto n) { return n == q.first; });
                 if (where == query_powers.cend())
                 {
                     APSI_LOG_ERROR("Extracted query data is incompatible with PowersDag: "

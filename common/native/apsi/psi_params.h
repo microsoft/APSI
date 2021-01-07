@@ -5,9 +5,11 @@
 
 // STD
 #include <cstdint>
-#include <utility>
 #include <iostream>
+#include <limits>
+#include <utility>
 #include <string>
+#include <set>
 
 // APSI
 #include "apsi/logging/log.h"
@@ -28,6 +30,9 @@ namespace apsi
     class PSIParams
     {
     public:
+        /**
+        Specifies the Microsoft SEAL encryption parameters for the BFV homomorphic encryption scheme.
+        */
         class SEALParams : public seal::EncryptionParameters
         {
         public:
@@ -63,10 +68,21 @@ namespace apsi
 
             constexpr static std::uint32_t hash_func_count_max = 8;
 
+            /**
+            Specified the size of the cuckoo hash table for storing the receiver's items.
+            */
             std::uint32_t table_size;
 
+            /**
+            Specifies the number of sender's items stored in a single hash table bin. A larger value requires a deeper
+            encrypted computation, or more powers of the encrypted query to be sent from the receiver to the sender, but
+            reduces the number of ciphertexts sent from the sender to the receiver.
+            */
             std::uint32_t max_items_per_bin;
 
+            /**
+            The number of hash functions used in receiver's cuckoo hashing.
+            */
             std::uint32_t hash_func_count;
         }; // struct TableParams
 
@@ -75,14 +91,14 @@ namespace apsi
         */
         struct QueryParams
         {
-            std::uint32_t query_powers_count;
-            
             /**
-            Specifies a seed to be used for generating a PowersDag for these parameters. This can be left to be the
-            default value (zero), or set to a different value that is known to result in a particular configuration for
-            the PowersDag.
+            The encrypted powers of the query that are sent from the receiver to the sender. The set must contain at
+            least the power 1, and may contain all positive integers up to max_items_per_bin. Specific sets of powers
+            will result in a lower depth computation requiring smaller encryption parameters, and may subsequently
+            reduce both the computation and communication cost. Good choices for query_powers can be found by guessing
+            or systematically enumerating all options.
             */
-            std::uint32_t powers_dag_seed = 0;
+            std::set<std::uint32_t> query_powers;
         };
 
         const ItemParams &item_params() const

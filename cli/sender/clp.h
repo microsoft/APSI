@@ -6,9 +6,11 @@
 // STD
 #include <cstdint>
 #include <cstddef>
+#include <set>
 #include <vector>
 
 // APSI
+#include "apsi/util/utils.h"
 #include "common/base_clp.h"
 
 // SEAL
@@ -29,8 +31,7 @@ public:
         add(table_size_arg_);
         add(max_item_per_bin_arg_);
         add(hash_func_count_arg_);
-        add(query_powers_count_arg_);
-        add(powers_dag_seed_arg_);
+        add(query_powers_arg_);
         add(poly_modulus_degree_arg_);
         add(coeff_modulus_bits_arg_);
         xorAdd(plain_modulus_bits_arg_, plain_modulus_arg_);
@@ -52,31 +53,16 @@ public:
         hash_func_count_ = hash_func_count_arg_.getValue();
         cout_param("hashFuncCount", hash_func_count_);
 
-        query_powers_count_ = query_powers_count_arg_.getValue();
-        cout_param("queryPowersCount", query_powers_count_);
-
-        powers_dag_seed_ = powers_dag_seed_arg_.getValue();
-        cout_param("powersDagSeed", powers_dag_seed_);
+        std::vector<std::uint32_t> query_powers_vec = query_powers_arg_.getValue();
+        query_powers_vec.push_back(1);
+        std::copy(query_powers_vec.cbegin(), query_powers_vec.cend(), inserter(query_powers_, query_powers_.end()));
+        cout_param("queryPowers", apsi::util::to_string(query_powers_));
 
         poly_modulus_degree_ = poly_modulus_degree_arg_.getValue();
         cout_param("polyModulusDegree", poly_modulus_degree_);
 
         coeff_modulus_bits_ = coeff_modulus_bits_arg_.getValue();
-        std::string coeff_modulus_bits_str;
-        if (coeff_modulus_bits_.size() == 0)
-        {
-            coeff_modulus_bits_str = "N/A";
-        }
-        else
-        {
-            std::ostringstream ss;
-            for (auto &coeff : coeff_modulus_bits_)
-            {
-                ss << coeff << ", ";
-            }
-            coeff_modulus_bits_str = ss.str();
-        }
-        cout_param("coeffModulusBits", coeff_modulus_bits_str);
+        cout_param("coeffModulusBits", apsi::util::to_string(coeff_modulus_bits_));
 
         if (plain_modulus_bits_arg_.isSet())
         {
@@ -117,14 +103,9 @@ public:
         return hash_func_count_;
     }
 
-    std::uint32_t query_powers_count() const
+    const std::set<std::uint32_t> &query_powers() const
     {
-        return query_powers_count_;
-    }
-
-    std::uint32_t powers_dag_seed() const
-    {
-        return powers_dag_seed_;
+        return query_powers_;
     }
 
     std::size_t poly_modulus_degree() const
@@ -190,20 +171,11 @@ private:
         0,
         "unsigned integer");
 
-    TCLAP::ValueArg<std::uint32_t> query_powers_count_arg_ = TCLAP::ValueArg<std::uint32_t>(
+    TCLAP::MultiArg<std::uint32_t> query_powers_arg_ = TCLAP::MultiArg<std::uint32_t>(
         "w",
-        "queryPowersCount",
-        "The number of query powers sent",
-        true,
-        0,
-        "unsigned integer");
-
-    TCLAP::ValueArg<std::uint32_t> powers_dag_seed_arg_ = TCLAP::ValueArg<std::uint32_t>(
-        "s",
-        "powersDagSeed",
-        "32-bit seed for creating the PowersDag",
-        true,
-        0,
+        "queryPowers",
+        "Query powers to send in addition to 1",
+        false,
         "unsigned integer");
 
     TCLAP::ValueArg<std::size_t> poly_modulus_degree_arg_ = TCLAP::ValueArg<std::size_t>(
@@ -263,9 +235,7 @@ private:
 
     std::uint32_t hash_func_count_;
 
-    std::uint32_t query_powers_count_;
-
-    std::uint32_t powers_dag_seed_;
+    std::set<std::uint32_t> query_powers_;
 
     std::size_t poly_modulus_degree_;
 

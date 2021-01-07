@@ -43,7 +43,7 @@ namespace APSITests
                 table_params.table_size = 512;
 
                 PSIParams::QueryParams query_params;
-                query_params.query_powers_count = 3;
+                query_params.query_powers = { 1, 3, 5 };
 
                 size_t pmd = 4096;
                 PSIParams::SEALParams seal_params;

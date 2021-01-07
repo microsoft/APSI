@@ -27,7 +27,7 @@ namespace APSITests
         table_params.table_size = 256;
 
         PSIParams::QueryParams query_params;
-        query_params.query_powers_count = 3;
+        query_params.query_powers = { 1, 2, 3 };
 
         size_t pmd = 1024;
         PSIParams::SEALParams seal_params;
@@ -69,17 +69,17 @@ namespace APSITests
         table_params.table_size = 4;
         ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);
 
-        // Too small query_powers_count
+        // query_powers must contain 1
         table_params.table_size = 256;
-        query_params.query_powers_count = 0;
+        query_params.query_powers = { 2 };
         ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);
 
-        // Biggest possible query_powers_count
-        query_params.query_powers_count = 16;
-        ASSERT_NO_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params));
+        // query_powers cannot contain 0
+        query_params.query_powers = { 0, 1, 2 };
+        ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);
 
-        // Too big query_powers_count
-        query_params.query_powers_count = 17;
+        // Too big query_powers
+        query_params.query_powers = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 };
         ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);
     }
 
@@ -94,7 +94,7 @@ namespace APSITests
         table_params.table_size = 256;
 
         PSIParams::QueryParams query_params;
-        query_params.query_powers_count = 3;
+        query_params.query_powers = { 1, 2, 3 };
 
         size_t pmd = 1024;
         PSIParams::SEALParams seal_params;
@@ -114,6 +114,10 @@ namespace APSITests
         ASSERT_EQ(psi_params.table_params().hash_func_count, load_params.table_params().hash_func_count);
         ASSERT_EQ(psi_params.table_params().max_items_per_bin, load_params.table_params().max_items_per_bin);
         ASSERT_EQ(psi_params.table_params().table_size, load_params.table_params().table_size);
-        ASSERT_EQ(psi_params.query_params().query_powers_count, load_params.query_params().query_powers_count);
+        ASSERT_EQ(psi_params.query_params().query_powers.size(), load_params.query_params().query_powers.size());
+        ASSERT_TRUE(equal(
+            psi_params.query_params().query_powers.cbegin(),
+            psi_params.query_params().query_powers.cend(),
+            load_params.query_params().query_powers.cbegin()));
     }
 }

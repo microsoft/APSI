@@ -9,6 +9,7 @@
 #include <memory>
 #include <unordered_map>
 #include <random>
+#include <set>
 #include <string>
 #include <vector>
 #include <stdexcept>
@@ -20,8 +21,8 @@
 namespace apsi
 {
     /**
-    This class represents a DAG for creating, serializing, and processing information on how to compute all powers of
-    a given ciphertext in a depth-optimal manner given a certain "base" (sources) of powers of the query.
+    PowersDag represents a DAG for computing all powers of a given query ciphertext in a depth-optimal manner given 
+    a certain "base" (sources) of powers of the query.
 
     For example, the computation up to power 7 with sources 1, 2, 5 one can represented as the DAG with nodes 1..7 and
     edges
@@ -31,7 +32,9 @@ namespace apsi
         1 --> 6 <-- 5 (q^6 = q^1 * q^5)
         2 --> 7 <-- 5 (q^7 = q^2 * q^5)
 
-    The graph above describes how q^1...q^7 can be computed from q^1, q^2, and q^5 with a depth 1 circuit.
+    The graph above describes how q^1...q^7 can be computed from q^1, q^2, and q^5 with a depth 1 circuit. A PowersDag
+    is configured from a given set of source powers ({ 1, 2, 5 } in the example above). The class contains no mechanism
+    for discovering a good set of source powers: it is up to the user to find using methods external to APSI.
     */
     class PowersDag
     {
@@ -77,22 +80,16 @@ namespace apsi
         PowersDag() = default;
 
         /**
-        Attempts to initialize the PowersDag by finding a valid configuration satisfying the bounds given as input. The
-        parameters represent up to which power of an input query the DAG computes, an upper bound on the allowed depth,
-        and the exact number of source nodes. This is a probabilistic function and will often fail. The function returns
-        true if it succeeded in finding a valid configuration.
+        Attempts to initialize the PowersDag from the given source powers, computing powers up to the given value.
+        The function returns true on success.
         */
-        bool configure(
-            std::uint32_t seed,
-            std::uint32_t up_to_power,
-            std::uint32_t source_count);
+        bool configure(std::set<std::uint32_t> source_powers, std::uint32_t up_to_power);
 
         /**
         Reset all internal members of the PowersDag instance.
         */
         void reset()
         {
-            mt_.seed(0);
             up_to_power_ = 0;
             depth_ = 0;
             source_count_ = 0;
@@ -126,7 +123,7 @@ namespace apsi
         std::uint32_t source_count() const;
 
         /**
-        Returns a vector of source nodes for this PowersDag. If the PowersDag is not configured, this function throws
+        Returns a set of source nodes for this PowersDag. If the PowersDag is not configured, this function throws
         an exception.
         */
         std::vector<PowersNode> source_nodes() const;
@@ -260,8 +257,6 @@ namespace apsi
 
     private:
         std::unordered_map<std::uint32_t, PowersNode> nodes_;
-
-        std::mt19937 mt_;
 
         bool configured_ = false;
 

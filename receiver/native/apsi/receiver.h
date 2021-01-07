@@ -11,6 +11,7 @@
 #include <memory>
 #include <utility>
 #include <atomic>
+#include <set>
 #include <type_traits>
 #include <stdexcept>
 
@@ -113,7 +114,7 @@ namespace apsi
             }
 
             /**
-            Returns a reference to the SEALContext for this Receiver..
+            Returns a reference to the SEALContext for this Receiver.
             */
             std::shared_ptr<seal::SEALContext> get_seal_context() const
             {
@@ -191,7 +192,7 @@ namespace apsi
             want to ensure that the depth of the powers computation will be as expected (PowersDag::depth), and
             otherwise attempt to reconfigure the PowersDag.
             */
-            std::uint32_t reset_powers_dag(std::uint32_t seed);
+            std::uint32_t reset_powers_dag(const std::set<std::uint32_t> &source_powers);
 
             void process_result_worker(
                 std::atomic<std::int32_t> &package_count,

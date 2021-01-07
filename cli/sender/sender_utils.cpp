@@ -28,8 +28,7 @@ unique_ptr<PSIParams> build_psi_params(const CLP& cmd)
     table_params.hash_func_count = cmd.hash_func_count();
 
     PSIParams::QueryParams query_params;
-    query_params.query_powers_count = cmd.query_powers_count();
-    query_params.powers_dag_seed = cmd.powers_dag_seed();
+    query_params.query_powers = cmd.query_powers();
 
     PSIParams::SEALParams seal_params;
     try

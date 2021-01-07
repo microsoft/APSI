@@ -479,7 +479,7 @@ The sender is much more complex than the receiver and consists of several import
 It contains static functions that operate on instances of the *request classes* `apsi::sender::ParmsRequest`,`apsi::sender::OPRFRequest`, and `apsi::sender::QueryRequest`.
 - `apsi::sender::SenderDB` is an abstract base class with two derived classes: `apsi::sender::UnlabeledSenderDB` and `apsi::sender::LabeledSenderDB`.
 Instances of either kind of `SenderDB` class are used to hold the data structures described in [Practice](#practice) and [Labeled Mode](#labeled-mode).
-The `SenderDB` supports fast CRUD operations, but creating it from scratch can be slow due to complex pre-computations that are needed.
+The `SenderDB` supports fast CRUD operations, but creating it from scratch can be slow due to complex precomputations that are needed.
 
 
 ### Common
@@ -493,6 +493,86 @@ The `SenderDB` supports fast CRUD operations, but creating it from scratch can b
 #### SenderOperationResponse
 
 #### ResultPackage
+
+#### Query Powers
+
+It is unfortunately difficult to find good choices for the `query_powers` parameter in `PSIParams`.
+This is related to the so-called *global postage-stamp problem* in combinatorial number theory (see [Challis and Robinson (2010)](http://emis.impa.br/EMIS/journals/JIS/VOL13/Challis/challis6.pdf)).
+In short, the global postage-stamp problem can be stated as follows:
+
+For given positive integers `h` and `k`, determine a set of k integers `{ a_i | 1 = a_0 < a_1 < ... < a_k }`, such that
+- any positive integer up to n can be realized as a sum of at most `h` of the `a_i` (possibly with repetition), and
+- `n` is as large as possible.
+
+For example, if `h = 2` and `k = 3`, then `{ 1, 3, 4 }` provides a solution for `n = 8`.
+This is easy to verify:
+
+| Value | First summand | Second summand |
+|-------|---------------|----------------| 
+| 1     | 1             | N/A            |
+| 2     | 1             | 1              |
+| 3     | 3             | N/A            |
+| 4     | 4             | N/A            |
+| 5     | 1             | 4              |
+| 6     | 3             | 3              |
+| 7     | 3             | 4              |
+| 8     | 4             | 4              |
+
+For a larger example, if `h = 3` and `k = 3`, then `{ 1, 4, 5 }` provides a solution for `n = 15`.
+Simply start from 1 and write each number, in order, a sum of two of the previous numbers, in a way that minimizes the total number of summands:
+
+| Value | First summand | Second summand | Total # of summands |
+|-------|---------------|----------------|---------------------|
+| 1     | 1             | N/A            | 1                   |
+| 2     | 1             | 1              | 2                   |
+| 3     | 1             | 2              | 3                   |
+| 4     | 4             | N/A            | 1                   |
+| 5     | 5             | N/A            | 1                   |
+| 6     | 1             | 5              | 2                   |
+| 7     | 2             | 5              | 3                   |
+| 8     | 4             | 4              | 2                   |
+| 9     | 4             | 5              | 2                   |
+| 10    | 5             | 5              | 2                   |
+| 11    | 5             | 6              | 3                   |
+| 12    | 4             | 8              | 3                   |
+| 13    | 5             | 8              | 3                   |
+| 14    | 4             | 10             | 3                   |
+| 15    | 5             | 10             | 3                   |
+
+The choice of `{ 1, 4, 5 }` is optimal in the sense that there is no set `{a_i}` of size 3 (`k = 3`) that allows for `n >= 16` without at least 4 total summands (`h = 4`).
+
+The above table can now immediately be represented as a directed graph with each value (integers 1 through 15) labeling the nodes and the *is-a-summand-of* relationship represented by directed edges.
+In this case `{ 1, 4, 5 }` will appear as sink nodes.
+
+Now, recall from [Practice](#practice) how bin bundle rows can hold only a predetermined number of items.
+For this example, suppose that number was 15.
+Then, once the sender receives a query ciphertext from the receiver, it must compute &ndash; in encrypted form &ndash; all powers of the query up to 15.
+Computing these powers will require a circuit of multiplicative depth 4.
+Evaluating the matching polynomials will further require an additional multiplication (by the coefficients), so in the end the encrypted computation will have multiplicative depth 5: this requires large encryption parameters.
+Instead, the receiver can precompute the 4th and the 5th powers of the query, encrypt them, and send them to the sender in addition to the query itself (1st power).
+Now the sender can use the graph to compute all powers of the query in an efficient manner with only a depth 2 circuit.
+The coefficient multiplications will increase the depth of the full computation to 3, but this is considerably better than 5, and will allow for much smaller encryption parameters to be used.
+The downside is, of course, that the communication from the receiver to the sender is now three times larger than if only the query itself was sent.
+Still, the reduction in the size of the parameters is typically immensely beneficial, and using appropriate source powers will be the key to good performance.
+
+We recommend using the tables in [Challis and Robinson (2010)](http://emis.impa.br/EMIS/journals/JIS/VOL13/Challis/challis6.pdf) to determine good source powers.
+For example, suppose the bin bundle rows are desired to hold at least 70 items.
+Then, looking at the tables in [Challis and Robinson (2010)](http://emis.impa.br/EMIS/journals/JIS/VOL13/Challis/challis6.pdf), we find the following possibly good source powers:
+
+| Multiplicative depth | Source powers                                           | Highest power |
+|----------------------|---------------------------------------------------------|---------------|
+| 1 (h = 2)            | 1, 3, 4, 9, 11, 16, 20, 25, 27, 32, 33, 35, 36 (k = 13) | 72            |
+| 2 (h = 3)            | 1, 4, 5, 15, 18, 27, 34 (k = 7)                         | 70            |
+| 2 (h = 4)            | 1, 3, 11, 15, 32 (k = 5)                                | 70            |
+| 3 (h = 5)            | 1, 4, 12, 21 (or 1, 5, 12, 28) (k = 4)                  | 71            |
+| 3 (h = 6)            | 1, 4, 19, 33 (k = 4)                                    | 114           |
+
+Several comments are in order:
+- The second and the third row represent a communication-computationt trade-off. The two computations have the same depth (2), but one (second row) requires 40% more communication. The computational cost will be only slightly lower for the second row, because in both cases `70 - k` encrypted multiplications must be performed. Hence, we can conclude that the second row will almost certainly not make sense, and the third row is objectively better.
+- It is not easy to compare rows with different multiplicative depth. Their performance differences will depend largely on the other protocol parameters &ndash; in particular the Microsoft SEAL encryption parameters.
+- If depth 3 is acceptable, then the last row is definitely the best choice, as it allows the bin bundle row size to be increased from 70 to 114. This will result in fewer bin bundles, and hence smaller communication from the sender to the receiver.
+- It may be necessary to try all options to determine what is overall best for a particular use-case.
+- [Challis and Robinson (2010)](http://emis.impa.br/EMIS/journals/JIS/VOL13/Challis/challis6.pdf) also shows a possible set for `k = 3` with depth 3 (`h = 7`): `{ 1, 8, 13 }`. While this only allows a highest power of 69, which does not quite satisfy our requirement of 70, such a set should be considered as it reduces the receiver-to-sender communication by 25%, while increasing the sender-to-receiver communication by only a tiny amount (roughly by a factor of 70/69 = 1.45%) due to the slightly smaller bin bundles. This will almost certainly be a beneficial trade-off.
 
 # Command-Line Interface (CLI)
 
@@ -536,8 +616,7 @@ The following arguments specify the sender's behavior and determine the paramete
 | `-T` \| `--tableSize` | Size of the cuckoo hash table |
 | `-m` \| `--maxItemsPerBin` | Bound on the bin size for sender's hash tables |
 | `-H` \| `--hashFuncCount` | Number of hash functions to use for cuckoo hashing |
-| `-w` \| `--queryPowersCount` | Number of encrypted powers of the query data to be sent |
-| `-s` \| `--powersDagSeed` | 32-bit seed for creating the PowersDag |
+| `-w` \| `--queryPowers` | Power of the query to send in addition to the first power |
 | `-P` \| `--polyModulusDegree` | Microsoft SEAL `poly_modulus_degree` parameter |
 | `-C` \| `--coeffModulusBits` | Bit count for a single Microsoft SEAL `coeff_modulus` prime |
 | `-a` \| `--plainModulusBits` | Bit count for a Microsoft SEAL `plain_modulus` prime (cannot be used with `-A`) |
@@ -620,18 +699,16 @@ This clearly increases the communication cost, as the result size is proportiona
 A smaller value for `-m` reduces the complexity of the encrypted match computation, allowing possibly smaller encryption parameters to be used.
 Since the bin bundles can also be processed independently in parallel, (more) smaller bin bundles often outperforms (fewer) larger bin bundles.
 
-#### `-w` \| `--queryPowersCount`
+#### `-w` \| `--queryPowers`
 
 Suppose we use `-m 32`. Upon receiving a query ciphertext `Q`, the sender must compute all powers of `Q`, up to `Q^32`.
 Homomorphic encryption makes this possible, but the computation can easily have significantly large multiplicative depth, and may require impractically large encryption parameters.
 
-Instead of using very large encryption parameters, the receiver will compute ahead of time certain powers of its query, encrypt those powers, and send them all to the sender, along with instructions for how to multiply the ciphertexts together to obtain all of the required powers.
-Much of this is invisible to the user, and is controlled by the `-w` option, which specifies how many powers will be sent.
-APSI will determine internally exactly which powers it will send.
-For example, using `-w 6` will have twice larger communication cost from receiver to sender, compared to using `-w 3`, whereas the communication cost from sender to receiver is not directly impacted by this choice.
+Instead of using very large encryption parameters, the receiver can compute ahead of time certain powers of its query, encrypt those powers, and send them all to the sender.
+This reduces the multiplicative depth of the encrypted computation, which can be beneficial.
 
-Using a larger value for `-w` results in increased communication and reduced computation.
-In some cases it can allow for smaller encryption parameters to be used.
+The `-w` option can be specified multiple times to provide the exact powers of the query which the receiver should send to the sender in addition to the first power (so no need to write `-w 1`).
+This is critically important to use correctly to achieve good performance; please see [Query Powers](#query-powers) for details.
 
 
 

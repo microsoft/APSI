@@ -78,22 +78,19 @@ namespace apsi
             relin_keys_.set(move(relin_keys));
         }
 
-        uint32_t Receiver::reset_powers_dag(std::uint32_t seed)
+        uint32_t Receiver::reset_powers_dag(const set<uint32_t> &source_powers)
         {
             uint32_t max_items_per_bin = params_.table_params().max_items_per_bin;
-            uint32_t query_powers_count = params_.query_params().query_powers_count;
-            uint32_t powers_dag_seed = params_.query_params().powers_dag_seed;
 
             // Configure the PowersDag
-            pd_.configure(seed, max_items_per_bin, query_powers_count);
+            pd_.configure(source_powers, max_items_per_bin);
 
             // Check that the PowersDag is valid
             if (!pd_.is_configured())
             {
                 APSI_LOG_ERROR("Failed to configure PowersDag ("
-                    << "seed: " << powers_dag_seed << ", "
-                    << "up_to_power: " << max_items_per_bin << ", "
-                    << "source_count: " << query_powers_count << ")");
+                    << "source_powers: " << to_string(source_powers) << ", "
+                    << "up_to_power: " << max_items_per_bin << ")");
                 throw logic_error("failed to configure PowersDag");
             }
             APSI_LOG_DEBUG("Configured PowersDag with depth " << pd_.depth());
@@ -127,7 +124,7 @@ namespace apsi
             }
 
             // Set up the PowersDag
-            reset_powers_dag(params_.query_params().powers_dag_seed);
+            reset_powers_dag(params_.query_params().query_powers);
 
             // Create new keys
             reset_keys();

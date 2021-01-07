@@ -362,7 +362,7 @@ namespace apsi
             // Should have SenderOperationHeader and SenderOperationResponse.
             if (msg.size() != 2)
             {
-                APSI_LOG_ERROR("ZeroMQ received a message with " << msg.size() << " parts but expected 3 parts");
+                APSI_LOG_ERROR("ZeroMQ received a message with " << msg.size() << " parts but expected 2 parts");
                 throw runtime_error("invalid message received");
             }
 
