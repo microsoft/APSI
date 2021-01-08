@@ -4,6 +4,9 @@
 // APSI
 #include "test_utils.h"
 
+// STD
+#include <random>
+
 #include "gtest/gtest.h"
 
 using namespace std;
@@ -16,12 +19,12 @@ namespace APSITests
 {
     unordered_set<Item> rand_subset(const unordered_set<Item> &items, size_t size)
     {
-        random_device rd;
+        mt19937_64 rg;
 
         set<size_t> ss;
         while (ss.size() != size)
         {
-            ss.emplace(static_cast<size_t>(rd() % items.size()));
+            ss.emplace(static_cast<size_t>(rg() % items.size()));
         }
 
         vector<Item> items_vec(items.begin(), items.end());
@@ -36,12 +39,12 @@ namespace APSITests
 
     unordered_set<Item> rand_subset(const unordered_map<Item, FullWidthLabel> &items, size_t size)
     {
-        random_device rd;
+        mt19937_64 rg;
 
         set<size_t> ss;
         while (ss.size() != size)
         {
-            ss.emplace(static_cast<size_t>(rd() % items.size()));
+            ss.emplace(static_cast<size_t>(rg() % items.size()));
         }
 
         vector<Item> items_vec;

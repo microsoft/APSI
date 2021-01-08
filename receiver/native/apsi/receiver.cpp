@@ -111,17 +111,7 @@ namespace apsi
             STOPWATCH(recv_stopwatch, "Receiver::initialize");
 
             // Initialize the CryptoContext with a new SEALContext
-            crypto_context_ = move(CryptoContext(params_.seal_params()));
-            if (!get_seal_context()->parameters_set())
-            {
-                APSI_LOG_ERROR("Given SEALParams are invalid: " << get_seal_context()->parameter_error_message());
-                throw logic_error("SEALParams are invalid");
-            }
-            if (!get_seal_context()->first_context_data()->qualifiers().using_batching)
-            {
-                APSI_LOG_ERROR("Given SEALParams do not support batching");
-                throw logic_error("given SEALParams do not support batching");
-            }
+            crypto_context_ = CryptoContext(params_);
 
             // Set up the PowersDag
             reset_powers_dag(params_.query_params().query_powers);

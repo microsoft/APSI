@@ -184,7 +184,7 @@ namespace apsi
             bytes_sent_ += bytes_sent;
 
             APSI_LOG_DEBUG("Sent an operation of type " << sender_operation_type_str(sop_header.type)
-                << "(" << bytes_sent << " bytes)");
+                << " (" << bytes_sent << " bytes)");
         }
 
         unique_ptr<ZMQSenderOperation> ZMQChannel::receive_network_operation(
@@ -292,7 +292,7 @@ namespace apsi
             n_sop->sop = move(sop);
 
             APSI_LOG_DEBUG("Received an operation of type " << sender_operation_type_str(sop_header.type)
-                << "(" << bytes_received_ - old_bytes_received << " bytes)");
+                << " (" << bytes_received_ - old_bytes_received << " bytes)");
 
             return n_sop;
         }
@@ -334,7 +334,7 @@ namespace apsi
             bytes_sent_ += bytes_sent;
 
             APSI_LOG_DEBUG("Sent an operation of type " << sender_operation_type_str(sop_header.type)
-                << "(" << bytes_sent << " bytes)");
+                << " (" << bytes_sent << " bytes)");
         }
 
         void ZMQChannel::send(unique_ptr<SenderOperationResponse> sop_response)
@@ -429,7 +429,7 @@ namespace apsi
 
             // Loaded successfully
             APSI_LOG_DEBUG("Received a response of type " << sender_operation_type_str(sop_header.type)
-                << "(" << bytes_received_ - old_bytes_received << " bytes)");
+                << " (" << bytes_received_ - old_bytes_received << " bytes)");
 
             return sop_response;
         }

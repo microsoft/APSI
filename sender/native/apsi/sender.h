@@ -30,12 +30,12 @@ namespace apsi
 
         /**
         The Sender class implements all necessary functions to process and respond to parameter, OPRF, and PSI or
-        labeled PSI queries (depending on the sender). Unlike the Receiver class, Sender also takes care of sending
-        data back to the receiver. Sender is a static class and cannot be instantiated.
+        labeled PSI queries (depending on the sender). Unlike the Receiver class, Sender also takes care of actually
+        sending data back to the receiver. Sender is a static class and cannot be instantiated.
 
         Like the Receiver, there are two ways of using the Sender. The "simple" approach supports network::ZMQChannel
         and is implemented in the ZMQSenderDispatcher class in zmq/sender_dispatcher.h. The ZMQSenderDispatcher provides
-        a very fast way of deploying an APSI Sender. It automatically binds to a ZeroMQ socket, starts listening to
+        a very fast way of deploying an APSI Sender: it automatically binds to a ZeroMQ socket, starts listening to
         requests, and acts on them as appropriate.
 
         The advanced Sender API consisting of three functions: RunParams, RunOPRF, and RunQuery. Of these, RunParams and

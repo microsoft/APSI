@@ -13,6 +13,7 @@
 #include "apsi/util/utils.h"
 
 // SEAL
+#include "seal/context.h"
 #include "seal/util/defines.h"
 #include "seal/util/common.h"
 
@@ -54,16 +55,33 @@ namespace apsi
         }
         if (query_params_.query_powers.size() > table_params_.max_items_per_bin)
         {
-            throw invalid_argument("query_powers is too large");
+            throw invalid_argument("query_powers cannot be larger than max_items_per_bin");
         }
-        if (!seal_params_.plain_modulus().is_prime() || seal_params_.plain_modulus().value() == 2)
+        for (uint32_t p : query_params_.query_powers)
         {
-            throw invalid_argument("plain_modulus is not an odd prime");
+            if (p > table_params_.max_items_per_bin)
+            {
+                throw invalid_argument("query_powers cannot contain values larger than max_items_per_bin");
+            }
         }
-        if (!seal_params_.poly_modulus_degree() ||
-            (seal_params_.poly_modulus_degree() & (seal_params_.poly_modulus_degree() - 1)))
+
+        // Create a SEALContext (with expand_mod_chain == false) to check validity of parameters
+        SEALContext seal_context(seal_params_, false, sec_level_type::tc128);
+        if (!seal_context.parameters_set())
         {
-            throw invalid_argument("poly_modulus_degree is not a power of two");
+            stringstream ss;
+            ss << "Microsoft SEAL parameters are invalid: " << seal_context.parameter_error_message();
+            throw invalid_argument(ss.str());
+        }
+        if (!seal_context.using_keyswitching())
+        {
+            throw invalid_argument(
+                "Microsoft SEAL parameters do not support keyswitching; at least two coeff_modulus primes are required");
+        }
+        if (!seal_context.key_context_data()->qualifiers().using_batching)
+        {
+            throw invalid_argument(
+                "Microsoft SEAL parameters do not support batching; plain_modulus must be a prime congruent to 1 modulo 2*poly_modulus_degree");
         }
 
         // Compute the bit-length of an item
@@ -86,7 +104,7 @@ namespace apsi
             throw invalid_argument("poly_modulus_degree is too small");
         }
 
-        // table_size must divide items_per_bundle; it suffices to test that table_size is not smaller
+        // table_size must be divisible by items_per_bundle; it suffices to test that table_size is not smaller
         if (table_params_.table_size < items_per_bundle_)
         {
             throw invalid_argument("table_size is too small");

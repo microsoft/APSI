@@ -24,15 +24,15 @@ namespace APSITests
         PSIParams::TableParams table_params;
         table_params.hash_func_count = 3;
         table_params.max_items_per_bin = 16;
-        table_params.table_size = 256;
+        table_params.table_size = 1024;
 
         PSIParams::QueryParams query_params;
         query_params.query_powers = { 1, 2, 3 };
 
-        size_t pmd = 1024;
+        size_t pmd = 4096;
         PSIParams::SEALParams seal_params;
         seal_params.set_poly_modulus_degree(pmd);
-        seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(pmd));
+        seal_params.set_coeff_modulus(CoeffModulus::Create(pmd, { 40, 40 }));
         seal_params.set_plain_modulus(65537);
 
         // All good parameters
@@ -56,13 +56,13 @@ namespace APSITests
         table_params.table_size = 0;
         ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);
 
-        // Invalid table_size; poly_modulus_degree == 1024 with felts_per_item implies 128 items per SEAL ciphertext,
+        // Invalid table_size; poly_modulus_degree == 4096 with felts_per_item implies 512 items per SEAL ciphertext,
         // so this table will be too small to fill even one SEAL ciphertext.
-        table_params.table_size = 64;
+        table_params.table_size = 256;
         ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);
 
-        // Size 128 is in this case the smallest table_size possible
-        table_params.table_size = 128;
+        // Size 512 is in this case the smallest table_size possible
+        table_params.table_size = 512;
         ASSERT_NO_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params));
 
         // table_size is less than felts_per_item
@@ -70,7 +70,7 @@ namespace APSITests
         ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);
 
         // query_powers must contain 1
-        table_params.table_size = 256;
+        table_params.table_size = 512;
         query_params.query_powers = { 2 };
         ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);
 
@@ -91,15 +91,15 @@ namespace APSITests
         PSIParams::TableParams table_params;
         table_params.hash_func_count = 3;
         table_params.max_items_per_bin = 16;
-        table_params.table_size = 256;
+        table_params.table_size = 1024;
 
         PSIParams::QueryParams query_params;
         query_params.query_powers = { 1, 2, 3 };
 
-        size_t pmd = 1024;
+        size_t pmd = 8192;
         PSIParams::SEALParams seal_params;
         seal_params.set_poly_modulus_degree(pmd);
-        seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(pmd));
+        seal_params.set_coeff_modulus(CoeffModulus::Create(pmd, { 40, 50, 40 }));
         seal_params.set_plain_modulus(65537);
 
         PSIParams psi_params(item_params, table_params, query_params, seal_params);
