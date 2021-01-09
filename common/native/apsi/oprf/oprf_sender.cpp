@@ -2,8 +2,9 @@
 // Licensed under the MIT license.
 
 // STD
-#include <thread>
 #include <algorithm>
+#include <array>
+#include <thread>
 
 // APSI
 #include "apsi/oprf/oprf_sender.h"
@@ -113,9 +114,14 @@ namespace apsi
                 // Multiply with key
                 ecpt.scalar_multiply(oprf_key.key_span(), true);
 
-                // Extract the hash
+                // Extract the item hash and the label encryption key
+                array<unsigned char, ECPoint::hash_size> item_hash_and_label_key;
+                ecpt.extract_hash(item_hash_and_label_key);
+
+                // The first 128 bits represent the item hash; the next 128 bits represent the label encryption key and
+                // are discarded in this overload of ComputeHashes
                 oprf_hash_type hash;
-                ecpt.extract_hash(ECPoint::hash_span_type{ reinterpret_cast<unsigned char *>(hash.data()), ECPoint::hash_size });
+                copy_n(item_hash_and_label_key.data(), oprf_hash_size, reinterpret_cast<unsigned char *>(hash.data()));
 
                 // Add to result
                 oprf_hashes.insert(move(hash));
@@ -138,9 +144,13 @@ namespace apsi
                 // Multiply with key
                 ecpt.scalar_multiply(oprf_key.key_span(), true);
 
-                // Extract the hash
+                // Extract the item hash and the label encryption key
+                array<unsigned char, ECPoint::hash_size> item_hash_and_label_key;
+                ecpt.extract_hash(item_hash_and_label_key);
+
+                // The first 128 bits represent the item hash; the next 128 bits represent the label encryption key
                 pair<oprf_hash_type, FullWidthLabel> hash;
-                ecpt.extract_hash(ECPoint::hash_span_type{ reinterpret_cast<unsigned char *>(hash.first.data()), ECPoint::hash_size });
+                copy_n(item_hash_and_label_key.data(), oprf_hash_size, reinterpret_cast<unsigned char *>(hash.first.data()));
 
                 // Copy the label
                 hash.second = item_label_pair.second;

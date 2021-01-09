@@ -4,6 +4,7 @@
 #pragma once
 
 // STD
+#include <atomic>
 #include <memory>
 #include <cstdint>
 #include <cstddef>
@@ -94,9 +95,9 @@ namespace apsi
             }
 
         protected:
-            std::uint64_t bytes_sent_;
+            std::atomic<std::uint64_t> bytes_sent_;
 
-            std::uint64_t bytes_received_;
+            std::atomic<std::uint64_t> bytes_received_;
         }; // class Channel
     }      // namespace network
 } // namespace apsi

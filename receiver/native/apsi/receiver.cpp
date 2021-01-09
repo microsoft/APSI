@@ -378,11 +378,12 @@ namespace apsi
             vector<MatchRecord> mrs(query.second.item_count());
 
             // Get the number of ResultPackages we expect to receive
-            atomic<int32_t> package_count{ safe_cast<int32_t>(response->package_count) };
+            atomic<uint32_t> package_count{ response->package_count };
 
             // Launch threads to receive ResultPackages and decrypt results
             vector<thread> threads;
-            APSI_LOG_INFO("Launching " << thread_count_ << " result worker threads");
+            APSI_LOG_INFO("Launching " << thread_count_ << " result worker threads to handle " << package_count
+                << " result parts");
             for (size_t t = 0; t < thread_count_; t++)
             {
                 threads.emplace_back([&, t]() {
@@ -536,7 +537,7 @@ namespace apsi
         }
 
         void Receiver::process_result_worker(
-            atomic<int32_t> &package_count,
+            atomic<uint32_t> &package_count,
             vector<MatchRecord> &mrs,
             const IndexTranslationTable &itt,
             Channel &chl) const
@@ -552,11 +553,17 @@ namespace apsi
             while (true)
             {
                 // Return if all packages have been claimed
-                package_count--;
-                if (package_count < 0)
+                uint32_t curr_package_count = package_count;
+                if (curr_package_count == 0)
                 {
                     APSI_LOG_DEBUG("Result worker [" << this_thread::get_id() << "]: all packages claimed; exiting");
                     return;
+                }
+
+                // If there has been no change to package_count, then decrement atomically
+                if (!package_count.compare_exchange_strong(curr_package_count, curr_package_count - 1))
+                {
+                    continue;
                 }
 
                 // Wait for a valid ResultPart
