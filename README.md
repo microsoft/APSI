@@ -91,9 +91,9 @@ In APSI, the user will need to explicitly provide the `coeff_modulus` prime bit 
 The basic idea of APSI is as follows.
 Suppose the sender holds a set `{Y_i}` of items &ndash; each an integer modulo `plain_modulus` &ndash; and the receiver holds a single item `X` &ndash; also an integer modulo `plain_modulus`.
 The receiver can choose a secret key, encrypts `X` to obtain a ciphertext `Q = Enc(X)`, and sends it over to the sender.
-The sender can now evaluate the *matching polynomial* `M(x) = (x-Y_0)*(x-Y_1)*...*(x-Y_n)` at `x=Q`.
+The sender can now evaluate the *matching polynomial* `M(x) = (x - Y_0)(x - Y_1)...(x - Y_n)` at `x = Q`.
 Here the values `Y_i` are unencrypted data held by the sender.
-Due to the capabilities of homomorphic encryption, `M(Q)` will hold an encryption of `(X-Y_0)*(X-Y_1)*...*(X-Y_n)` which is zero if `X` matches one of the sender's items and non-zero otherwise.
+Due to the capabilities of homomorphic encryption, `M(Q)` will hold an encryption of `(X - Y_0)(X-Y_1)...(X-Y_n)` which is zero if `X` matches one of the sender's items and non-zero otherwise.
 The sender who performs computation on `X` &ndash; encrypted data &ndash; will not be able to know this result due to the secret key being held only by the receiver.
 
 One problem with the above is that the computation has an enormously high multiplicative depth.
@@ -108,7 +108,7 @@ All of these results must be sent back to the receiver, so the sender-to-receive
 Nevertheless, this turns out to be a really valuable trick in helping reduce the size of the encryption parameters.
 
 The second step is to use batching in Microsoft SEAL.
-Per each of the `S` parts described above, the sender can further split its set into `poly_modulus_degree` many equally sized parts, and the receiver can batch-encrypt its item into a single batched query ciphertext `Q = Enc({X, X, ...})`.
+Per each of the `S` parts described above, the sender can further split its set into `poly_modulus_degree` many equally sized parts, and the receiver can batch-encrypt its item into a single batched query ciphertext `Q = Enc([ X, X, ..., X ])`.
 Now, the sender can evaluate vectorized versions of the matching polynomials on `Q`, improving the computational complexity by a factor of `poly_modulus_degree` and significantly reducing the multiplicative depth.
 
 The third step is to have the receiver compute higher powers of its query, encrypt those separately, and send them all to the sender.
@@ -155,7 +155,7 @@ We hash to 128 bits and truncate the hash to a shorter length (large enough to b
 The shortest item length we support (after truncation) is 80 bits, which is still far above the practical sizes of `plain_modulus`.
 
 The second trick is to break up each item into multiple parts and encode them separately into consecutive batching slots.
-Namely, if `plain_modulus` is a `B`-bit prime, then we write only `B-1` bits of an item into a batching slot and the next `B-1` bits into the next slot.
+Namely, if `plain_modulus` is a `B`-bit prime, then we write only `B - 1` bits of an item into a batching slot and the next `B - 1` bits into the next slot.
 One downside is that a batched plaintext/ciphertext now only holds a fraction of `poly_modulus_degree` items.
 Typically we would use either 4 or 8 slots per item.
 For example, if `plain_modulus` is a 20-bit prime, then 4 slots could encode an item of length 80, and the query ciphertext `Q` (and its powers) can encrypt up to `poly_modulus_degree / 4` of the receiver's items.
@@ -178,7 +178,7 @@ The receiver hashes its item `X` to an elliptic curve point `A` in some cryptogr
 Next, the receiver chooses a secret number `r`, computes the point `B = rA`, and sends it to the sender.
 The sender uses its secret `s` to compute `C = sB`, and sends it to back to the receiver.
 Upon receiving `C`, the receiver computes the inverse `r^(-1)` modulo the order of the elliptic curve, and further computes `r^(-1) C = r^(-1) srA = sA`.
-The receiver then extracts the final hash value `Hash-OPRF(s, X)` from this point, for example by hashing its x-coordinate to an appropriate domain.
+The receiver then extracts the OPRF hash value `Hash-OPRF(s, X)` from this point, for example by hashing its x-coordinate to an appropriate domain.
 
 The sender knows `s`, so it can simply replace its items `{Y_i}` with `{Hash-OPRF(s, Y_i)}`.
 The receiver needs to communicate with the sender to obtain `{Hash-OPRF(s, X_i)}`.
@@ -187,6 +187,9 @@ With OPRF, the problem of the receiver learning whether parts of its query match
 Since all the items are hashed with a hash function known only by the sender, the receiver will benefit nothing from learning parts of the sender's hashed items.
 In fact, the sender's dataset is not private information and could in principle be sent in full to the receiver.
 Homomorphic encryption only protects the receiver's data.
+
+There is one further detail that must be mentioned here: instead of using `{Hash-OPRF(s, X_i)}` as the items, we apply one more public cryptographic hash function `Hash-item(-)` with a 128-bit output to the OPRF hashed items, and use `{Hash-item(Hash-OPRF(s, X_i))}` instead as the items.
+The reason for this will be given later in [Label Encryption](#label-encryption).
 
 ### Practice
 
@@ -389,12 +392,15 @@ The receiver decrypts the results and concatenates them to recover the label for
 #### Label Encryption
 
 There is a serious issue with the above approach that must be resolved.
-Namely, recall how we used [OPRF](#oprf) to prevent partial (or full) leakage of the sender's items to the receiver.
-However, if the receiver can guess a part of the sender's OPRF hashed item, it can use it to query for the corresponding part of the label for that item, which is clearly unacceptable since the receiver does not actually know the item.
+Recall how we used [OPRF](#oprf) to prevent partial (or full) leakage of the sender's items to the receiver: given an item `Y`, the matching polynomial is not actually computed for `Y` itself, but rather for `Hash-item(Hash-OPRF(s, Y))`, where `Hash-item` is some public cryptographic hash function and the OPRF key `s` is only known by the sender.
+This means that the label interpolation polynomial `L` should actually have the property that `L(Hash-item(Hash-OPRF(s, Y_i))) = V_i` for each of the sender's items `Y_i`.
+However, if the receiver can guess a part of some `Hash-item(Hash-OPRF(s, Y_i))`, it can use it to query for the corresponding part of the label for that item, which is clearly unacceptable since the receiver does not actually know the item `Y_i`.
 
-To solve this issue, the sender uses a symmetric encryption scheme `Enc(-,-)` to encrypt each of its labels using a key derived from the original item &ndash; not the OPRF hashed item.
-In other words, instead of `{(Y_i, V_i)}` it uses `{(Y_i, Enc(HKDF(Y_i), V_i))}` and proceeds as before; `HKDF(-)` is a hash-based key derivation function.
-The receiver benefits nothing from learning parts (or all) of the encrypted label, unless it also knows the original item.
+To solve this issue, the sender uses a symmetric encryption scheme `Enc(-, -)` to encrypt the labels `V_i` using keys derived from `Hash-OPRF(s, Y_i)`.
+In other words, instead of `V_i`, it uses `Enc(HKDF(Hash-OPRF(s, Y_i)), V_i)` as the labels, and proceeds as before; `HKDF(-)` denotes a hash-based key derivation function.
+
+The receiver benefits nothing from learning parts (or all) of the encrypted label unless it also knows the original item.
+Furthermore, even if the receiver manages to obtain `Enc(HKDF(Hash-OPRF(s, Y_i)), V_i)` by guessing `Hash-item(Hash-OPRF(s, Y_i))` and in an offline attack enumerates all possible items `Y_i`, or later learns `Y_i` through other means, it still cannot obtain the label because the encryption key is derived from `Hash-OPRF(s, Y_i))` &ndash; not just from `Y_i`.
 
 #### Partial Item Collisions
 
