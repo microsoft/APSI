@@ -209,7 +209,8 @@ namespace apsi
 
             // Launch threads, but not more than necessary
             vector<thread> threads;
-            APSI_LOG_INFO("Launching " << partitions.size() << " query worker threads");
+            APSI_LOG_INFO("Launching " << partitions.size() << " query worker threads to compute " << package_count
+                << " result parts");
             for (size_t t = 0; t < partitions.size(); t++)
             {
                 threads.emplace_back([&, t]() {

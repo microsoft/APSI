@@ -195,7 +195,7 @@ namespace apsi
             std::uint32_t reset_powers_dag(const std::set<std::uint32_t> &source_powers);
 
             void process_result_worker(
-                std::atomic<std::int32_t> &package_count,
+                std::atomic<std::uint32_t> &package_count,
                 std::vector<MatchRecord> &mrs,
                 const IndexTranslationTable &itt,
                 network::Channel &chl) const;

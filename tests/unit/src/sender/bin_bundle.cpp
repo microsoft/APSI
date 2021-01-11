@@ -55,7 +55,7 @@ namespace APSITests
 
     TEST(BinBundleTests, BatchedPlaintextPolynCreate)
     {
-        CryptoContext context(get_params()->seal_params());
+        CryptoContext context(*get_params());
         context.set_evaluator();
 
         BatchedPlaintextPolyn bpp(context);
@@ -75,7 +75,7 @@ namespace APSITests
 
     TEST(BinBundleTests, BatchedPlaintextPolynEval)
     {
-        CryptoContext context(get_params()->seal_params());
+        CryptoContext context(*get_params());
         context.set_evaluator();
 
         vector<FEltPolyn> polyns;
@@ -126,7 +126,7 @@ namespace APSITests
 
     TEST(BinBundleTests, BinBundleUnlabeledCreate)
     {
-        CryptoContext context(get_params()->seal_params());
+        CryptoContext context(*get_params());
 
         // No evaluator set in context
         ASSERT_THROW(BinBundle<monostate> bb(context, true), invalid_argument);
@@ -155,7 +155,7 @@ namespace APSITests
 
     TEST(BinBundleTests, BinBundleLabeledCreate)
     {
-        CryptoContext context(get_params()->seal_params());
+        CryptoContext context(*get_params());
 
         // No evaluator set in context
         ASSERT_THROW(BinBundle<felt_t> bb(context, true), invalid_argument);
@@ -189,7 +189,7 @@ namespace APSITests
 
     TEST(BinBundleTests, BinBundleUnlabeledMultiInsert)
     {
-        CryptoContext context(get_params()->seal_params());
+        CryptoContext context(*get_params());
         context.set_evaluator();
 
         BinBundle<monostate> bb(context, true);
@@ -289,7 +289,7 @@ namespace APSITests
 
     TEST(BinBundleTests, BinBundleLabeledMultiInsert)
     {
-        CryptoContext context(get_params()->seal_params());
+        CryptoContext context(*get_params());
         context.set_evaluator();
 
         BinBundle<felt_t> bb(context, true);
@@ -428,7 +428,7 @@ namespace APSITests
 
     TEST(BinBundleTests, BinBundleTryMultiOverwrite)
     {
-        CryptoContext context(get_params()->seal_params());
+        CryptoContext context(*get_params());
         context.set_evaluator();
 
         BinBundle<felt_t> bb(context, true);
@@ -538,7 +538,7 @@ namespace APSITests
 
     TEST(BinBundleTests, BinBundleTryMultiRemove)
     {
-        CryptoContext context(get_params()->seal_params());
+        CryptoContext context(*get_params());
         context.set_evaluator();
 
         BinBundle<monostate> bb(context, true);

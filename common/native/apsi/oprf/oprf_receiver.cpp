@@ -1,6 +1,9 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
+// STD
+#include <array>
+
 // APSI
 #include "apsi/oprf/oprf_receiver.h"
 
@@ -82,8 +85,12 @@ namespace apsi
                 // Multiply with inverse random scalar
                 ecpt.scalar_multiply(inv_factor_data_.get_factor(i), false);
 
-                // Write the hash to the appropriate item
-                ecpt.extract_hash(ECPoint::hash_span_type{ reinterpret_cast<unsigned char *>(oprf_hashes[i].data()), ECPoint::hash_size });
+                // Extract the item hash and the label encryption key
+                array<unsigned char, ECPoint::hash_size> item_hash_and_label_key;
+                ecpt.extract_hash(item_hash_and_label_key);
+
+                // The first 128 bits represent the item hash; the next 128 bits represent the label decryption key
+                copy_n(item_hash_and_label_key.data(), oprf_hash_size, reinterpret_cast<unsigned char *>(oprf_hashes[i].data()));
 
                 // Move forward
                 advance(oprf_in_ptr, oprf_response_size);

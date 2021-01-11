@@ -32,12 +32,12 @@ namespace apsi
     namespace sender
     {
         /**
-        SenderDB is an interface class with two implementations: UnlabeledSenderDB and LabeledSenderDB. A SenderDB is
+        SenderDB is an interface class with two implementations: UnlabeledSenderDB and LabeledSenderDB. A SenderDB
         maintains an in-memory representation of the sender's set of items. These items are not simply copied into the
         SenderDB data structures, but also preprocessed heavily to allow for faster online computation time. Since
         inserting a large number of new items into a SenderDB can take time, it is not recommended to recreate the
         SenderDB when the database changes a little bit. Instead, the class supports fast update and deletion operations
-        that should be preferred.
+        that should be preferred: SenderDB::insert_or_assign and SenderDB::remove.
 
         The SenderDB requires substantially more memory than the raw data would. Part of that memory can automatically
         be compressed when it is not in use; this feature is enabled by default, and can be disabled when constructing
@@ -197,7 +197,7 @@ namespace apsi
             bool compressed_;
         }; // class SenderDB
 
-        class LabeledSenderDB : public SenderDB
+        class LabeledSenderDB final : public SenderDB
         {
         private:
             /**
@@ -315,7 +315,7 @@ namespace apsi
             FullWidthLabel get_label(const HashedItem &item) const;
         }; // class LabeledSenderDB
 
-        class UnlabeledSenderDB : public SenderDB
+        class UnlabeledSenderDB final : public SenderDB
         {
         private:
             /**

@@ -41,8 +41,8 @@ namespace apsi
             using point_save_span_type = gsl::span<unsigned char, save_size>;
             using point_save_span_const_type = gsl::span<const unsigned char, save_size>;
 
-            // Output hash size is 128 bits
-            static constexpr std::size_t hash_size = 16;
+            // Output hash size is 256 bits: 128 for item hash and 128 bits for label encryption key
+            static constexpr std::size_t hash_size = 32;
 
             using hash_span_type = gsl::span<unsigned char, hash_size>;
 

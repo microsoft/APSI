@@ -41,7 +41,7 @@ namespace apsi
             bytes_sent_ += sop->save(out_);
 
             APSI_LOG_DEBUG("Sent an operation of type " << sender_operation_type_str(sop_header.type)
-                << "(" << bytes_sent_ - old_bytes_sent << " bytes)");
+                << " (" << bytes_sent_ - old_bytes_sent << " bytes)");
         }
 
         unique_ptr<SenderOperation> StreamChannel::receive_operation(
@@ -127,7 +127,7 @@ namespace apsi
 
             // Loaded successfully
             APSI_LOG_DEBUG("Received an operation of type " << sender_operation_type_str(sop_header.type)
-                << "(" << bytes_received_ - old_bytes_received << " bytes)");
+                << " (" << bytes_received_ - old_bytes_received << " bytes)");
 
             return sop;
         }
@@ -153,7 +153,7 @@ namespace apsi
             bytes_sent_ += sop_response->save(out_);
 
             APSI_LOG_DEBUG("Sent a response of type " << sender_operation_type_str(sop_header.type)
-                << "(" << bytes_sent_ - old_bytes_sent << " bytes)");
+                << " (" << bytes_sent_ - old_bytes_sent << " bytes)");
         }
 
         unique_ptr<SenderOperationResponse> StreamChannel::receive_response(SenderOperationType expected)
@@ -223,7 +223,7 @@ namespace apsi
 
             // Loaded successfully
             APSI_LOG_DEBUG("Received a response of type " << sender_operation_type_str(sop_header.type)
-                << "(" << bytes_received_ - old_bytes_received << " bytes)");
+                << " (" << bytes_received_ - old_bytes_received << " bytes)");
 
             return sop_response;
         }

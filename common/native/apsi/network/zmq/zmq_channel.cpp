@@ -184,7 +184,7 @@ namespace apsi
             bytes_sent_ += bytes_sent;
 
             APSI_LOG_DEBUG("Sent an operation of type " << sender_operation_type_str(sop_header.type)
-                << "(" << bytes_sent << " bytes)");
+                << " (" << bytes_sent << " bytes)");
         }
 
         unique_ptr<ZMQSenderOperation> ZMQChannel::receive_network_operation(
@@ -249,6 +249,9 @@ namespace apsi
                 return nullptr;
             }
 
+            // Number of bytes received now
+            size_t bytes_received = 0;
+
             // Return value
             unique_ptr<SenderOperation> sop = nullptr;
 
@@ -258,15 +261,18 @@ namespace apsi
                 {
                     case SenderOperationType::sop_parms:
                         sop = make_unique<SenderOperationParms>();
-                        bytes_received_ += load_from_string(msg[2].to_string(), *sop);
+                        bytes_received = load_from_string(msg[2].to_string(), *sop);
+                        bytes_received_ += bytes_received;
                         break;
                     case SenderOperationType::sop_oprf:
                         sop = make_unique<SenderOperationOPRF>();
-                        bytes_received_ += load_from_string(msg[2].to_string(), *sop);
+                        bytes_received = load_from_string(msg[2].to_string(), *sop);
+                        bytes_received_ += bytes_received;
                         break;
                     case SenderOperationType::sop_query:
                         sop = make_unique<SenderOperationQuery>();
-                        bytes_received_ += load_from_string(msg[2].to_string(), move(context), *sop);
+                        bytes_received = load_from_string(msg[2].to_string(), move(context), *sop);
+                        bytes_received_ += bytes_received;
                         break;
                     default:
                         // Invalid operation
@@ -292,7 +298,7 @@ namespace apsi
             n_sop->sop = move(sop);
 
             APSI_LOG_DEBUG("Received an operation of type " << sender_operation_type_str(sop_header.type)
-                << "(" << bytes_received_ - old_bytes_received << " bytes)");
+                << " (" << bytes_received_ - old_bytes_received << " bytes)");
 
             return n_sop;
         }
@@ -334,7 +340,7 @@ namespace apsi
             bytes_sent_ += bytes_sent;
 
             APSI_LOG_DEBUG("Sent an operation of type " << sender_operation_type_str(sop_header.type)
-                << "(" << bytes_sent << " bytes)");
+                << " (" << bytes_sent << " bytes)");
         }
 
         void ZMQChannel::send(unique_ptr<SenderOperationResponse> sop_response)
@@ -395,6 +401,9 @@ namespace apsi
                 return nullptr;
             }
 
+            // Number of bytes received now
+            size_t bytes_received = 0;
+
             // Return value
             unique_ptr<SenderOperationResponse> sop_response = nullptr;
 
@@ -404,15 +413,18 @@ namespace apsi
                 {
                     case SenderOperationType::sop_parms:
                         sop_response = make_unique<SenderOperationResponseParms>();
-                        bytes_received_ += load_from_string(msg[1].to_string(), *sop_response);
+                        bytes_received = load_from_string(msg[1].to_string(), *sop_response);
+                        bytes_received_ += bytes_received;
                         break;
                     case SenderOperationType::sop_oprf:
                         sop_response = make_unique<SenderOperationResponseOPRF>();
-                        bytes_received_ += load_from_string(msg[1].to_string(), *sop_response);
+                        bytes_received = load_from_string(msg[1].to_string(), *sop_response);
+                        bytes_received_ += bytes_received;
                         break;
                     case SenderOperationType::sop_query:
                         sop_response = make_unique<SenderOperationResponseQuery>();
-                        bytes_received_ += load_from_string(msg[1].to_string(), *sop_response);
+                        bytes_received = load_from_string(msg[1].to_string(), *sop_response);
+                        bytes_received_ += bytes_received;
                         break;
                     default:
                         // Invalid operation
@@ -429,7 +441,7 @@ namespace apsi
 
             // Loaded successfully
             APSI_LOG_DEBUG("Received a response of type " << sender_operation_type_str(sop_header.type)
-                << "(" << bytes_received_ - old_bytes_received << " bytes)");
+                << " (" << bytes_received << " bytes)");
 
             return sop_response;
         }
@@ -481,8 +493,6 @@ namespace apsi
                 return nullptr;
             }
 
-            size_t old_bytes_received = bytes_received_;
-
             multipart_t msg;
             if (!receive_message(msg))
             {
@@ -497,12 +507,16 @@ namespace apsi
                 throw runtime_error("invalid message received");
             }
 
+            // Number of bytes received now
+            size_t bytes_received = 0;
+
             // Return value
             unique_ptr<ResultPackage> rp(make_unique<ResultPackage>());
 
             try
             {
-                bytes_received_ += load_from_string(msg[0].to_string(), move(context), *rp);
+                bytes_received = load_from_string(msg[0].to_string(), move(context), *rp);
+                bytes_received_ += bytes_received;
             }
             catch (const invalid_argument &ex)
             {
@@ -516,7 +530,7 @@ namespace apsi
             }
 
             // Loaded successfully
-            APSI_LOG_DEBUG("Received a result package (" << bytes_received_ - old_bytes_received << " bytes)");
+            APSI_LOG_DEBUG("Received a result package (" << bytes_received << " bytes)");
 
             return rp;
         }

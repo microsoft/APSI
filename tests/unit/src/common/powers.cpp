@@ -61,6 +61,11 @@ namespace APSITests
         ASSERT_FALSE(pd.configure(source_powers, 1));
         ASSERT_FALSE(pd.is_configured());
 
+        // Bad configuration
+        source_powers = { 1, 3 };
+        ASSERT_FALSE(pd.configure(source_powers, 2));
+        ASSERT_FALSE(pd.is_configured());
+
         // Good configuration; required depth is 0
         source_powers = { 1 };
         ASSERT_TRUE(pd.configure(source_powers, 1));

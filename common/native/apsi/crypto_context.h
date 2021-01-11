@@ -5,6 +5,8 @@
 
 // STD
 #include <memory>
+#include <stdexcept>
+#include <sstream>
 #include <string>
 #include <utility>
 
@@ -29,8 +31,8 @@ namespace apsi
     public:
         CryptoContext() = default;
 
-        CryptoContext(const seal::EncryptionParameters &parms) :
-            seal_context_(std::make_shared<seal::SEALContext>(parms))
+        CryptoContext(const PSIParams &parms) :
+            seal_context_(std::make_shared<seal::SEALContext>(parms.seal_params(), true, seal::sec_level_type::tc128))
         {
             encoder_ = std::make_shared<seal::BatchEncoder>(*seal_context_);
         }

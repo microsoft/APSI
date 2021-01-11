@@ -45,7 +45,7 @@ namespace APSITests
                 size_t pmd = 4096;
                 PSIParams::SEALParams seal_params;
                 seal_params.set_poly_modulus_degree(pmd);
-                seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(pmd));
+                seal_params.set_coeff_modulus(CoeffModulus::Create(pmd, { 40, 40 }));
                 seal_params.set_plain_modulus(65537);
 
                 params = make_shared<PSIParams>(
@@ -60,7 +60,7 @@ namespace APSITests
             static shared_ptr<CryptoContext> context = nullptr;
             if (!context)
             {
-                context = make_shared<CryptoContext>(get_params()->seal_params());
+                context = make_shared<CryptoContext>(*get_params());
                 KeyGenerator keygen(*context->seal_context());
                 context->set_secret(keygen.secret_key());
                 RelinKeys rlk;

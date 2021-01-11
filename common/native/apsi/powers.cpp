@@ -30,14 +30,23 @@ namespace apsi
             return false;
         }
 
-        // Need to compute at least the number of sources many powers
+        // The number of sources cannot be larger than up_to_power
         if (source_powers.size() > up_to_power)
         {
             return false;
         }
 
+        // The source powers cannot be larger than up_to_power
+        for (uint32_t s : source_powers)
+        {
+            if (s > up_to_power)
+            {
+                return false;
+            }
+        }
+
         // Insert all source nodes
-        for (auto s : source_powers)
+        for (uint32_t s : source_powers)
         {
             nodes_[s] = PowersNode{/* power */ s, /* depth */ 0};
         }

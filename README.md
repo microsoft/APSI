@@ -91,9 +91,9 @@ In APSI, the user will need to explicitly provide the `coeff_modulus` prime bit 
 The basic idea of APSI is as follows.
 Suppose the sender holds a set `{Y_i}` of items &ndash; each an integer modulo `plain_modulus` &ndash; and the receiver holds a single item `X` &ndash; also an integer modulo `plain_modulus`.
 The receiver can choose a secret key, encrypts `X` to obtain a ciphertext `Q = Enc(X)`, and sends it over to the sender.
-The sender can now evaluate the *matching polynomial* `M(x) = (x-Y_0)*(x-Y_1)*...*(x-Y_n)` at `x=Q`.
+The sender can now evaluate the *matching polynomial* `M(x) = (x - Y_0)(x - Y_1)...(x - Y_n)` at `x = Q`.
 Here the values `Y_i` are unencrypted data held by the sender.
-Due to the capabilities of homomorphic encryption, `M(Q)` will hold an encryption of `(X-Y_0)*(X-Y_1)*...*(X-Y_n)` which is zero if `X` matches one of the sender's items and non-zero otherwise.
+Due to the capabilities of homomorphic encryption, `M(Q)` will hold an encryption of `(X - Y_0)(X-Y_1)...(X-Y_n)` which is zero if `X` matches one of the sender's items and non-zero otherwise.
 The sender who performs computation on `X` &ndash; encrypted data &ndash; will not be able to know this result due to the secret key being held only by the receiver.
 
 One problem with the above is that the computation has an enormously high multiplicative depth.
@@ -108,7 +108,7 @@ All of these results must be sent back to the receiver, so the sender-to-receive
 Nevertheless, this turns out to be a really valuable trick in helping reduce the size of the encryption parameters.
 
 The second step is to use batching in Microsoft SEAL.
-Per each of the `S` parts described above, the sender can further split its set into `poly_modulus_degree` many equally sized parts, and the receiver can batch-encrypt its item into a single batched query ciphertext `Q = Enc({X, X, ...})`.
+Per each of the `S` parts described above, the sender can further split its set into `poly_modulus_degree` many equally sized parts, and the receiver can batch-encrypt its item into a single batched query ciphertext `Q = Enc([ X, X, ..., X ])`.
 Now, the sender can evaluate vectorized versions of the matching polynomials on `Q`, improving the computational complexity by a factor of `poly_modulus_degree` and significantly reducing the multiplicative depth.
 
 The third step is to have the receiver compute higher powers of its query, encrypt those separately, and send them all to the sender.
@@ -155,7 +155,7 @@ We hash to 128 bits and truncate the hash to a shorter length (large enough to b
 The shortest item length we support (after truncation) is 80 bits, which is still far above the practical sizes of `plain_modulus`.
 
 The second trick is to break up each item into multiple parts and encode them separately into consecutive batching slots.
-Namely, if `plain_modulus` is a `B`-bit prime, then we write only `B-1` bits of an item into a batching slot and the next `B-1` bits into the next slot.
+Namely, if `plain_modulus` is a `B`-bit prime, then we write only `B - 1` bits of an item into a batching slot and the next `B - 1` bits into the next slot.
 One downside is that a batched plaintext/ciphertext now only holds a fraction of `poly_modulus_degree` items.
 Typically we would use either 4 or 8 slots per item.
 For example, if `plain_modulus` is a 20-bit prime, then 4 slots could encode an item of length 80, and the query ciphertext `Q` (and its powers) can encrypt up to `poly_modulus_degree / 4` of the receiver's items.
@@ -178,7 +178,7 @@ The receiver hashes its item `X` to an elliptic curve point `A` in some cryptogr
 Next, the receiver chooses a secret number `r`, computes the point `B = rA`, and sends it to the sender.
 The sender uses its secret `s` to compute `C = sB`, and sends it to back to the receiver.
 Upon receiving `C`, the receiver computes the inverse `r^(-1)` modulo the order of the elliptic curve, and further computes `r^(-1) C = r^(-1) srA = sA`.
-The receiver then extracts the final hash value `Hash-OPRF(s, X)` from this point, for example by hashing its x-coordinate to an appropriate domain.
+The receiver then extracts the OPRF hash value `Hash-OPRF(s, X)` from this point, for example by hashing its x-coordinate to an appropriate domain.
 
 The sender knows `s`, so it can simply replace its items `{Y_i}` with `{Hash-OPRF(s, Y_i)}`.
 The receiver needs to communicate with the sender to obtain `{Hash-OPRF(s, X_i)}`.
@@ -187,6 +187,9 @@ With OPRF, the problem of the receiver learning whether parts of its query match
 Since all the items are hashed with a hash function known only by the sender, the receiver will benefit nothing from learning parts of the sender's hashed items.
 In fact, the sender's dataset is not private information and could in principle be sent in full to the receiver.
 Homomorphic encryption only protects the receiver's data.
+
+There is one further detail that must be mentioned here: instead of using `{Hash-OPRF(s, X_i)}` as the items, we apply one more public cryptographic hash function `Hash-item(-)` with a 128-bit output to the OPRF hashed items, and use `{Hash-item(Hash-OPRF(s, X_i))}` instead as the items.
+The reason for this will be given later in [Label Encryption](#label-encryption).
 
 ### Practice
 
@@ -389,12 +392,15 @@ The receiver decrypts the results and concatenates them to recover the label for
 #### Label Encryption
 
 There is a serious issue with the above approach that must be resolved.
-Namely, recall how we used [OPRF](#oprf) to prevent partial (or full) leakage of the sender's items to the receiver.
-However, if the receiver can guess a part of the sender's OPRF hashed item, it can use it to query for the corresponding part of the label for that item, which is clearly unacceptable since the receiver does not actually know the item.
+Recall how we used [OPRF](#oprf) to prevent partial (or full) leakage of the sender's items to the receiver: given an item `Y`, the matching polynomial is not actually computed for `Y` itself, but rather for `Hash-item(Hash-OPRF(s, Y))`, where `Hash-item` is some public cryptographic hash function and the OPRF key `s` is only known by the sender.
+This means that the label interpolation polynomial `L` should actually have the property that `L(Hash-item(Hash-OPRF(s, Y_i))) = V_i` for each of the sender's items `Y_i`.
+However, if the receiver can guess a part of some `Hash-item(Hash-OPRF(s, Y_i))`, it can use it to query for the corresponding part of the label for that item, which is clearly unacceptable since the receiver does not actually know the item `Y_i`.
 
-To solve this issue, the sender uses a symmetric encryption scheme `Enc(-,-)` to encrypt each of its labels using a key derived from the original item &ndash; not the OPRF hashed item.
-In other words, instead of `{(Y_i, V_i)}` it uses `{(Y_i, Enc(HKDF(Y_i), V_i))}` and proceeds as before; `HKDF(-)` is a hash-based key derivation function.
-The receiver benefits nothing from learning parts (or all) of the encrypted label, unless it also knows the original item.
+To solve this issue, the sender uses a symmetric encryption scheme `Enc(-, -)` to encrypt the labels `V_i` using keys derived from `Hash-OPRF(s, Y_i)`.
+In other words, instead of `V_i`, it uses `Enc(HKDF(Hash-OPRF(s, Y_i)), V_i)` as the labels, and proceeds as before; `HKDF(-)` denotes a hash-based key derivation function.
+
+The receiver benefits nothing from learning parts (or all) of the encrypted label unless it also knows the original item.
+Furthermore, even if the receiver manages to obtain `Enc(HKDF(Hash-OPRF(s, Y_i)), V_i)` by guessing `Hash-item(Hash-OPRF(s, Y_i))` and in an offline attack enumerates all possible items `Y_i`, or later learns `Y_i` through other means, it still cannot obtain the label because the encryption key is derived from `Hash-OPRF(s, Y_i))` &ndash; not just from `Y_i`.
 
 #### Partial Item Collisions
 
@@ -412,89 +418,192 @@ If any of them does, the item simply cannot be inserted into that bin bundle, an
 
 ### Receiver
 
-#### Overview
+The `apsi::receiver::Receiver` class implements all necessary functions to create and send parameter, OPRF, and PSI or labeled PSI queries (depending on the sender), and process any responses received.
+Most of the member functions are static, but a few (related to creating and processing the query itself) require an instance of the class to be created.
+All functions and types are in the `apsi` namespace, so we omit `apsi::` from all names below.
+For simplicity, we also use `Receiver` to denote `apsi::receiver::Receiver`.
 
-The receiver's side is mainly handled by the `apsi::receiver::Receiver` class.
-Communication with a sender is handled by objects of type derived from the abstract base class `apsi::network::Channel`, such as `apsi::network::ZMQReceiverChannel`, or `apsi::network::StreamChannel`.
+This same text appears in the [receiver.h](receiver/native/apsi/receiver.h) header file.
 
-The `Receiver` class has a few important member functions:
-```
-static PSIParams RequestParams(network::Channel &chl);
-void reset_keys();
-std::vector<HashedItem> request_oprf(const std::vector<Item> &items, network::Channel &chl);
-Query create_query(const std::vector<HashedItem> &items);
-std::vector<MatchRecord> request_query(Query &&query, network::Channel &chl);
-```
-The static `Receiver::RequestParams` function allows the receiver to request the protocol parameters, encapsulated in an `apsi::PSIParams` object.
-This is necessary when the receiver does not know what the parameters are, because the `Receiver` constructor requires them.
-We will discuss `apsi::PSIParams` below in [PSIParams](#psiparams).
-In any case, once the receiver knows the protocol parameters it can create a `Receiver` object.
-
+`Receiver` includes functionality to request protocol parameters (`PSIParams` object) from a sender.
+This is needed when the receiver does not know what parameters it is supposed to use with a specific sender.
+In other cases the receiver would know the parameters ahead of time, and can skip this step.
+In any case, once the receiver has an appropriate `PSIParams` object, an `Receiver` can be instantiated.
 The `Receiver` constructor automatically creates Microsoft SEAL public and private keys.
-The public keys are sent to the sender with a query request (more precisely, we send the Microsoft SEAL `RelinKeys`), and the private keys are held internally by the `Receiver` for decrypting the query response.
-New keys can be generated by calling `Receiver::reset_keys`.
+The public keys are sent to the sender along with every query request, and the private keys are held internally by the Receiver object for decrypting query responses.
+New keys can be generated by calling the member function `Receiver::reset_keys`, and we recommend doing this after every query has been completed to
+protect against leaked keys.
 
-**Note.** For protecting against leaked keys, we recommend resetting the keys after every query.
+The class includes two versions of an API to performs the necessary operations.
+The "simple" API consists of three functions: `Receiver::RequestParams`, `Receiver::RequestOPRF`, and `Receiver::request_query`.
+However, these functions only support `network::NetworkChannel`, such as `network::ZMQReceiverChannel`, for the communication.
+Other channels, such as `network::StreamChannel`, are only supported by the "advanced" API.
 
-Next, the receiver creates `apsi::Item` objects for each item in its query; these are simple arbitrary-length byte strings.
-The receiver then requests the OPRF hashes for its items from the sender by calling the `Receiver::request_oprf` function, which returns a new set of OPRF hashed items, this time wrapped in `apsi::HashedItem` objects.
+The advanced API requires many more steps.
+The full process is as follows:
 
-The receiver can store the OPRF hashed items and use them repeatedly for querying the sender.
-Next the receiver needs to create the encrypted query with the `Receiver::create_query` function, which returns the query as an `apsi::receiver::Query` object.
-We discuss the contents of the `Query` object below in [Query](#query).
-In principle many `Query` objects can be created and stored, but since they depend on the secret key they cannot be used after a call to `Receiver::reset_keys`.
+1. (optional) `Receiver::CreateParamsRequest` must be used to create a parameter request.
+The request must be sent to the sender on a channel with `network::Channel::send`.
+The sender must respond to the request and the response must be received on the channel with `network::Channel::receive_response`.
+The received `Response` object must be converted to the right type (`ParamsResponse`) with the `to_params_response` function.
+This function will return `nullptr` if the received response was not of the correct type.
+A `PSIParams` object can be extracted from the response and a `Receiver` object can subsequently be created.
 
-Finally, the receiver can pass the `Query` object to the `Receiver::request_query` function to perform the actual unlabeled or labeled PSI query.
-The function returns a vector of `MatchRecord` objects with order matching the order of the `Item` objects used for creating the query.
-We discuss the details of `MatchRecord` below in [MatchRecord](#matchrecord).
+1. `Receiver::CreateOPRFReceiver` must be used to process the input vector of items and return an associated `oprf::OPRFReceiver` object.
+Next, `Receiver::CreateOPRFRequest` must be used to create an OPRF request from the `oprf::OPRFReceiver`, which can subsequently be sent to the sender with `network::Channel::send`.
+The sender must respond to the request and the response must be received on the channel with `network::Channel::receive_response`.
+The received `Response` object must be converted to the right type (`OPRFResponse`) with the `to_oprf_response` function. This function will return `nullptr` if the received response was not of the correct type.
+Finally, `Receiver::ExtractHashes` must be called to obtain the OPRF hashed items from the `OPRFResponse` with the help of the `oprf::OPRFReceiver` object.
 
-**Note.** A `Query` object can be used only once, as is evident from the signature of `Receiver::request_query`, where the `Query` is passed by rvalue reference.
-This is compatible with our recommendation to call `Receiver::reset_keys` ideally after every query.
+1. `Receiver::create_query` (non-static member function) must then be used to create the query itself.
+The function returns `std::pair<Request, IndexTranslationTable>`, where the `Request` object contains the query itself to be send to the sender, and the `IndexTranslationTable` is an object associated to this query describing how the internal data structures of the query maps to the vector of OPRF hashed items given to `Receiver::create_query`.
+The `IndexTranslationTable` is needed later to process the responses from the sender.
+The `Request` object must be sent to the sender with `network::Channel::send`.
+The received `Response` object must be converted to the right type (`QueryResponse`) with the `to_query_response` function.
+This function will return `nullptr` if the received response was not of the correct type.
+The `QueryResponse` contains only one important piece of data: the number of `ResultPart` objects the receiver should expect to receive from the sender in the next step.
 
-#### Query
+1. `network::Channel::receive_result` must be called repeatedly to receive all `ResultParts`.
+For each received `ResultPart`, `Receiver::process_result_part` must be called to find a `std::vector<MatchRecord>` representing the match data associated to that `ResultPart`.
+Alternatively, one can first retrieve all `ResultParts`, collect them into a `std::vector<ResultPart>`, and use `Receiver::process_result` to find the complete result -- just like what the simple API returns.
 
-The `apsi::receiver::Query` object contains all information necessary for performing an encrypted unlabeled or labeled PSI query.
+### Request, Response, and ResultPart
 
-First, it holds all data needed by the sender in a member variable of type `std::unique_ptr<network::SenderOperation>`.
-The `apsi::network::SenderOperation` is an abstract base class that we discuss in more detail in [SenderOperation](#senderoperation).
-In this case, `Query` holds an instance of a derived class `SenderOperationQuery` that contains the necessary powers of the query ciphertexts (recall [Lowering the Depth](#lowering-the-depth)), the public keys needed by the sender (Microsoft SEAL class `seal::RelinKeys`), and an `apsi::PowersDag` object (see [PowersDag](#powersdag) below).
+The `Request` type is defined in [requests.h](common/native/apsi/requests.h) as an alias for `std::unique_ptr<network::SenderOperation>`, where `network::SenderOperation` is a purely virtual class representing either a parameter request (`network::SenderOperationParms`), an OPRF request (`network::SenderOperationOPRF`), or a PSI or labeled PSI query request (`network::SenderOperationQuery`).
+The types `ParamsRequest`, `OPRFRequest`, and `QueryRequest` are similar aliases to unique pointers of these derived types.
+The functions `to_params_request`, `to_oprf_request`, and `to_query_request` convert a `Request` into the specific kind of request, returning `nullptr` if the `Request` was not of the correct type.
+Conversely, the `to_request` function converts a `ParamsRequest`, `OPRFRequest`, or `QueryRequest` into a `Request` object.
 
-Second, it holds information to map the cuckoo hash table locations back to the vector of (OPRF hashed) items provided to the `Receiver::create_query` function.
-This is needed by the `Receiver::request_query` function to be able to provide the result vector in the correct order.
+Similarly, the `Response` type is defined in [responses.h](common/native/apsi/responses.h) as an alias for `std::unique_ptr<network::SenderOperationResponse>`, along with related type aliases `ParamsResponse`, `OPRFResponse`, and `QueryResponse`, and corresponding conversion functions `to_params_response`, `to_oprf_responset`, `to_query_response`, and `to_response`.
 
-#### MatchRecord
+Finally, the `ResultPart` type is defined in [responses.h](common/native/apsi/responses.h) as an alias for `std::unique_ptr<network::ResultPackage>`, where `network::ResultPackage` contains an encrypted result to a query request.
+Since the query is evaluated independently per each bin bundle (recall [Practice](#practice)), the results for each bin bundle are sent back to the receiver as separate `ResultPart` objects.
+The receiver must collect all these together to find the final result, as was described above in [Receiver](#receiver).
 
-The `Receiver::request_query` function returns a vector of `apsi::receiver::MatchRecord` objects.
-A `MatchRecord` supports both the unlabeled and the labeled mode.
-In unlabeled mode, it will simply contain a boolean value indicating whether the particular record was found in the sender's dataset.
-In labeled mode, it contains the same boolean value, and additionally populates a member of type `apsi::receiver::LabelData` that holds the received label.
-The receiver can read the label from the `LabelData` object as a `std::string`, or as an array (possibly of size one) of any standard layout types.
+The important thing about `Request`, `Response`, and `ResultPart` is that these are the object handled by the `network::Channel` class member functions `send`, `receive_operation`, `receive_response`, and `receive_result` (see [channel.h](common/native/apsi/network/channel.h)).
 
 ### Sender
 
-#### Overview
+The `Sender` class implements all necessary functions to process and respond to parameter, OPRF, and PSI or labeled PSI queries (depending on the sender).
+Unlike the `Receiver` class, `Sender` also takes care of actually sending data back to the receiver.
+Sender is a static class and cannot be instantiated.
 
-The sender is much more complex than the receiver and consists of several important classes:
-- `apsi::sender::Sender` is a class with a deleted constructor.
-It contains static functions that operate on instances of the *request classes* `apsi::sender::ParmsRequest`,`apsi::sender::OPRFRequest`, and `apsi::sender::QueryRequest`.
-- `apsi::sender::SenderDB` is an abstract base class with two derived classes: `apsi::sender::UnlabeledSenderDB` and `apsi::sender::LabeledSenderDB`.
-Instances of either kind of `SenderDB` class are used to hold the data structures described in [Practice](#practice) and [Labeled Mode](#labeled-mode).
-The `SenderDB` supports fast CRUD operations, but creating it from scratch can be slow due to complex precomputations that are needed.
+All functions and types are in the `apsi` namespace, so we omit `apsi::` from all names below.
+For simplicity, we also use `Sender` to denote `apsi::sender::Sender`, and `SenderDB` to denote `apsi::sender::SenderDB`.
 
+This same text appears in the [sender.h](sender/native/apsi/sender.h) header file.
 
-### Common
+Just like `Receiver`, there are two ways of using `Sender`. The "simple" approach supports `network::ZMQSenderChannel` and is implemented in the `ZMQSenderDispatcher` class in [zmq/sender_dispatcher.h](sender/native/apsi/zmq/sender_dispatcher.h).
+The `ZMQSenderDispatcher` provides a very fast way of deploying an APSI `Sender`: it automatically binds to a ZeroMQ socket, starts listening to requests, and acts on them as appropriate.
 
-#### PSIParams
+The advanced `Sender` API consisting of three functions: `RunParams`, `RunOPRF`, and `RunQuery`.
+Of these, `RunParams` and `RunOPRF` take the request object (`ParamsRequest` or `OPRFRequest`) as input.
+`RunQuery` requires the `QueryRequest` to be "unpacked" into a `Query` object first.
 
-#### PowersDag
+The full process for the sender is as follows:
 
-#### SenderOperation
+1. Create an `oprf::OPRFKey` object and use `oprf::OPRFSender::ComputeHashes` with the `oprf::OPRFKey` to process the sender's items (or item-label pairs) and convert them into hashed items (or hashed-item-label pairs).
 
-#### SenderOperationResponse
+1. Create a `PSIParams` object and a `SenderDB` object. The `SenderDB` must be created with the `PSIParams` and the hashed items (or hashed item-label pairs) must be loaded into it with `SenderDB::set_data`.
+The `SenderDB` can be used repeatedly and can be updated efficiently.
 
-#### ResultPackage
+1. (optional) Receive a parameter request with `network::Channel::receive_operation`.
+The received `Request` object must be converted to the right type (`ParamsRequest`) with the `to_params_request` function.
+This function will return `nullptr` if the received request was not of the correct type.
+Once the request has been obtained, the `RunParams` function can be called with the `ParamsRequest`, the `SenderDB`, the `network::Channel`, and optionally a lambda function that implements custom logic for sending the `ParamsResponse` object on the channel.
 
-#### Query Powers
+1. Receive an OPRF request with `network::Channel::receive_operation`.
+The received `Request` object must be converted to the right type (`OPRFRequest`) with the `to_oprf_request` function.
+This function will return `nullptr` if the received request was not of the correct type.
+Once the request has been obtained, the `RunOPRF` function can be called with the `OPRFRequest`, the `oprf::OPRFKey`, the `network::Channel`, and optionally a lambda function that implements custom logic for sending the `OPRFResponse` object on the channel.
+
+1. Receive a query request with `network::Channel::receive_operation`. The received `Request` object must be converted to the right type (`QueryRequest`) with the `to_query_request` function.
+This function will return `nullptr` if the received request was not of the correct type.
+Once the request has been obtained, a `Query` object must be created from it.
+The constructor of the `Query` class verifies that the `QueryRequest` is valid for the given `SenderDB`, and if it is not the constructor still returns successfully but the `Query` is marked as invalid (`Query::is_valid()` returns `false`) and cannot be used in the next step.
+Once a valid `Query` object is created, the `RunQuery` function can be used to perform the query and respond on the given channel.
+Optionally, two lambda functions can be given to `RunQuery` to provide custom logic for sending the `QueryResponse` and the `ResultPart` objects on the channel.
+
+### SenderDB
+
+For simplicity, we use `SenderDB` to denote `apsi::sender::SenderDB`.
+
+This same text appears in the [sender_db.h](sender/native/apsi/sender_db.h) header file.
+
+`SenderDB` is an interface class with two implementations: `UnlabeledSenderDB` and `LabeledSenderDB`.
+A `SenderDB` maintains an in-memory representation of the sender's set of items.
+These items are not simply copied into the `SenderDB` data structures, but also preprocessed heavily to allow for faster online computation time.
+Since inserting a large number of new items into a `SenderDB` can take time, it is not recommended to recreate the `SenderDB` when the database changes a little bit.
+Instead, the class supports fast update and deletion operations that should be preferred: `SenderDB::insert_or_assign` and `SenderDB::remove`.
+
+The `SenderDB` requires substantially more memory than the raw data would.
+Part of that memory can automatically be compressed when it is not in use; this feature is enabled by default, and can be disabled when constructing the `SenderDB`.
+The downside of in-memory compression is a performance reduction from decompressing parts of the data when they are used, and recompressing them if they are updated.
+
+### PSIParams
+
+The `apsi::PSIParams` class encapsulates parameters for the PSI or labeled PSI protocol.
+These parameters are important to set correctly to ensure correct behavior and good performance.
+All of the concepts behind these parameters have come up in [How APSI Works](#how-apsi-works), which we urge the reader to review unless it is absolutely clear to them.
+
+For simplicity, we use `PSIParams` to denote `apsi::PSIParams`.
+
+A `PSIParams` object contains four kinds of parameters, encapsulated in sub-structs: `PSIParams::SEALParams`, `PSIParams::ItemParams`, `PSIParams::TableParams`, and `PSIParams::QueryParams`.
+We shall discuss each separately.
+
+#### SEALParams
+
+The `PSIParams::SEALParams` simply wraps an instance of Microsoft SEAL `seal::EncryptionParameters` object with the encryption scheme always set to `seal::scheme_type::bfv`.
+Unfortunately these parameters are not entirely easy to comprehend, and while some explanation was given above in [Encryption Parameters](#encryption-parameters), we highly recommend the reader study the extensive comments in the Microsoft SEAL [examples](https://github.com/microsoft/SEAL/tree/main/native/examples) to have a better grasp of how the parameters should be set, and what their impact on performance is.
+
+#### ItemParams
+
+The `PSIParams::ItemParams` struct contains only one member variable: a 32-bit integer `felts_per_item`.
+This number was described in [Large Items](#large-items); it specifies how many Microsoft SEAL [batching slots](#encryption-parameters) should represent each item, and hence influences the item length.
+
+The item length (in bits) is a product of `felts_per_item` and `floor(log_2(plain_modulus))`, where `plain_modulus` refers to the Microsoft SEAL [plain_modulus](#encryption-parameters) parameter set in the `PSIParams::SEALParams`.
+The `PSIParams` constructor will verify that the item length is bounded between 80 and 128 bits, and will throw an exception otherwise.
+
+`felts_per_item` must be one of 2, 4, 8, 16, or 32.
+
+#### TableParams
+
+The `PSIParams::ItemParams` struct contains parameters describing the receiver's [cuckoo hash table](#cuckoo-hashing) and the [sender's data structure](#practice).
+It holds three member variables:
+- `table_size` denotes the size of the receiver's cuckoo hash table.
+It must be such that its size is a positive multiple of (possibly equal to) the number of batching slots in a Microsoft SEAL plaintext, i.e., it must be a multiple of the [poly_modulus_degree](#encryption-parameters) parameter set in the `PSIParams::SEALParams`.
+- `max_items_per_bin` denotes how many items fit into each row of the sender's bin bundles.
+It cannot be zero.
+- `hash_func_count` denotes the number of hash functions used for cuckoo hashing.
+It must be at least 2 and at most 8.
+
+#### QueryParams
+
+The `PSIParams::QueryParams` struct contains only one member variable: a `std::set<std::uint32_t>` called `query_powers`.
+It defines which encrypted powers of the query the receiver sends to the sender, as was discussed in [Lowering the Depth](#lowering-the-depth).
+This is one of the most complex parameters to set, which is why we have dedicated an [entire subsection below](#query-powers) for describing how to choose it.
+
+`query_powers` must contain 1, cannot contain 0, and cannot contain values larger than `PSIParams::TableParams::max_items_per_bin`.
+
+#### PSIParams Constructor
+
+To construct a `PSIParams` object, one needs to provide the constructor with a valid `PSIParams::SEALParams`, `PSIParams::ItemParams`, `PSIParams::TableParams`, and `PSIParams::QueryParams`. The constructor will perform the following validations on the parameters, in order, and will throw an exception (with a descriptive message) if any of them fails:
+
+1. `PSIParams::TableParams::table_size` is verified to be a power of two.
+1. `PSIParams::TableParams::max_items_per_bin` is verified to be non-zero.
+1. `PSIParams::TableParams::hash_func_count` is verified to be at least 2 and at most 8.
+1. `PSIParams::ItemParams::felts_per_item` is verified to be 2, 4, 8, 16, or 32.
+1. `PSIParams::QueryParams::query_powers` is verified to not contain 0, to contain 1, to not contain values larger than `PSIParams::TableParams::max_items_per_bin`.
+1. `PSIParams::SEALParams` are verified to be valid and to support Microsoft SEAL keyswithing and batching.
+Specificially, the parameters must have at least two valid `coeff_modulus` primes and a `plain_modulus` prime that is congruent to 1 modulo `2 * poly_modulus_degree`.
+Microsoft SEAL contains functions in `seal::CoeffModulus` and `seal::PlainModulus` classes (see [modulus.h](https://github.com/microsoft/SEAL/blob/main/native/src/seal/modulus.h)) to choose appropriate `coeff_modulus` and `plain_modulus` primes.
+1. The item bit count is computed as the product of `PSIParams::ItemParams::felts_per_item` and `floor(log_2(plain_modulus))`, and is verified to be at least 80 and at most 128.
+1. The number of item fitting vertically in a bin bundle is computed as `poly_modulus_degree / PSIParams::ItemParams::felts_per_item`.
+This number is verified to be non-zero and at most as large as `PSIParams::TableParams::table_size`.
+
+If all of these checks pass, the `PSIParams` object is successfully created and is valid for use in APSI.
+
+### Query Powers
 
 It is unfortunately difficult to find good choices for the `query_powers` parameter in `PSIParams`.
 This is related to the so-called *global postage-stamp problem* in combinatorial number theory (see [Challis and Robinson (2010)](http://emis.impa.br/EMIS/journals/JIS/VOL13/Challis/challis6.pdf)).
