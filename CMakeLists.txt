@@ -285,6 +285,22 @@ if(result)
     message(FATAL_ERROR "flatc failed (${result})")
 endif()
 
+execute_process(
+    COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp --include-prefix "apsi/" -o "${APSI_SOURCE_DIR}/sender/native/apsi" "${APSI_SOURCE_DIR}/sender/native/apsi/bin_bundle.fbs"
+    OUTPUT_QUIET
+    RESULT_VARIABLE result)
+if(result)
+    message(FATAL_ERROR "flatc failed (${result})")
+endif()
+
+execute_process(
+    COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp --include-prefix "apsi/" -I "${APSI_SOURCE_DIR}/common/native/apsi" -o "${APSI_SOURCE_DIR}/sender/native/apsi" "${APSI_SOURCE_DIR}/sender/native/apsi/sender_db.fbs"
+    OUTPUT_QUIET
+    RESULT_VARIABLE result)
+if(result)
+    message(FATAL_ERROR "flatc failed (${result})")
+endif()
+
 ###########################
 # APSI common C++ library #
 ###########################

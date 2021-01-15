@@ -48,7 +48,7 @@ unique_ptr<PSIParams> build_psi_params(const CLP& cmd)
     }
     catch (const exception &ex)
     {
-        APSI_LOG_ERROR("Microsoft SEAL threw an exception setting up SEALParams: " << ex.what());
+        APSI_LOG_ERROR("Microsoft SEAL threw an exception creating SEALParams: " << ex.what());
         return nullptr;
     }
 

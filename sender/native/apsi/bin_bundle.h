@@ -160,28 +160,10 @@ namespace apsi
             bool cache_invalid_;
 
             /**
-            The modulus that defines our field
-            */
-            seal::Modulus mod_;
-
-            /**
             We need this to make Plaintexts
             */
             CryptoContext crypto_context_;
 
-            /**
-            Computes and caches the appropriate polynomials of each bin. For unlabeled PSI, this is just the "matching"
-            polynomial. For labeled PSI, this is the "matching" polynomial and the Newton interpolation polynomial.
-            Resulting values are stored in cache_.
-            */
-            void regen_polyns();
-
-            /**
-            Batches this BinBundle's polynomials into SEAL Plaintexts. Resulting values are stored in cache_.
-            */
-            void regen_plaintexts();
-
-        protected:
             /**
             The bins of the BinBundle. Each bin is a key-value store, where the keys are (chunks of the OPRF'd) DB
             items and the labels are either field elements or empty (a unit type).
@@ -199,9 +181,21 @@ namespace apsi
             bool compressed_;
 
             /**
-            Returns the modulus that defines the finite field that we're working in
+            Computes and caches the appropriate polynomials of each bin. For unlabeled PSI, this is just the "matching"
+            polynomial. For labeled PSI, this is the "matching" polynomial and the Newton interpolation polynomial.
+            Resulting values are stored in cache_.
             */
-            const seal::Modulus &field_mod();
+            void regen_polyns();
+
+            /**
+            Batches this BinBundle's polynomials into SEAL Plaintexts. Resulting values are stored in cache_.
+            */
+            void regen_plaintexts();
+
+            /**
+            Returns the modulus that defines the finite field that we're working in.
+            */
+            const seal::Modulus &field_mod() const;
 
         public:
             BinBundle(const CryptoContext &crypto_context, bool compressed);
@@ -304,9 +298,27 @@ namespace apsi
             void regen_cache();
 
             /**
+            Returns a constant reference to the vector of bins in this BinBundle.
+            */
+            const std::vector<std::map<felt_t, L>> &get_bins() const
+            {
+                return bins_;
+            }
+
+            /**
             Returns whether this BinBundle is empty.
             */
             bool empty() const;
+
+            /**
+            Saves the BinBundle to a stream.
+            */
+            std::size_t save(std::ostream &out, std::uint32_t bundle_idx) const;
+
+            /**
+            Loads the BinBundle from a stream.
+            */
+            std::pair<std::uint32_t, std::size_t> load(std::istream &in);
         }; // class BinBundle
     } // namespace sender
 } // namespace apsi

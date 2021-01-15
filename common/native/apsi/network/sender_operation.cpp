@@ -15,6 +15,7 @@
 
 // SEAL
 #include "seal/util/common.h"
+#include "seal/util/streambuf.h"
 
 using namespace std;
 using namespace seal;

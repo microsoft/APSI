@@ -1,11 +1,17 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license.
+
 // STD
 #include <algorithm>
 #include <utility>
 
 // APSI
+#include "apsi/bin_bundle_generated.h"
 #include "apsi/bin_bundle.h"
-#include "apsi/logging/log.h"
 #include "apsi/util/interpolate.h"
+
+// SEAL
+#include "seal/util/defines.h"
 
 namespace apsi
 {
@@ -13,7 +19,6 @@ namespace apsi
     using namespace seal;
     using namespace seal::util;
     using namespace util;
-    using namespace logging;
 
     namespace sender
     {
@@ -230,9 +235,8 @@ namespace apsi
         Returns the modulus that defines the finite field that we're working in
         */
         template<typename L>
-        const Modulus& BinBundle<L>::field_mod()
+        const Modulus& BinBundle<L>::field_mod() const
         {
-            // Forgive me
             const auto &context_data = crypto_context_.seal_context()->first_context_data();
             return context_data->parms().plain_modulus();
         }
@@ -620,6 +624,195 @@ namespace apsi
         bool BinBundle<L>::empty() const
         {
             return all_of(bins_.begin(), bins_.end(), [](auto &b) { return b.empty(); });
+        }
+
+        /**
+        Saves the BinBundle to a stream.
+        */
+        template<typename L>
+        size_t BinBundle<L>::save(ostream &out, uint32_t bundle_idx) const
+        {
+            // Is this a labeled BinBundle?
+            constexpr bool labeled = is_same_v<L, felt_t>;
+            
+            const Modulus &mod = field_mod();
+            auto mod_bit_count = mod.bit_count();
+            auto mod_byte_count = (mod_bit_count + 7) >> 3;
+            
+            flatbuffers::FlatBufferBuilder fbs_builder(1024);
+
+            auto bins = fbs_builder.CreateVector([&]() {
+                // The Bin vector is populated with an immediately-invoked lambda
+                vector<flatbuffers::Offset<fbs::Bin>> ret;
+                for (const auto &bin : bins_)
+                {
+                    // Then create the vector of FEltItemLabels
+                    vector<flatbuffers::Offset<fbs::FEltItemLabel>> ret_inner;
+                    for (auto felt_item_label : bin)
+                    {
+                        auto felt_item = fbs_builder.CreateVector(
+                            reinterpret_cast<const unsigned char *>(&felt_item_label.first), mod_byte_count);
+                        SEAL_IF_CONSTEXPR (labeled)
+                        {
+                            auto felt_label = fbs_builder.CreateVector(
+                                reinterpret_cast<const unsigned char *>(&felt_item_label.second), mod_byte_count);
+                            ret_inner.push_back(fbs::CreateFEltItemLabel(fbs_builder, felt_item, felt_label));
+                        }
+                        else
+                        {
+                            ret_inner.push_back(fbs::CreateFEltItemLabel(fbs_builder, felt_item));
+                        }
+                    }
+                    auto felt_item_labels = fbs_builder.CreateVector(ret_inner);
+                    ret.push_back(fbs::CreateBin(fbs_builder, felt_item_labels));
+                }
+                return ret;
+            }());
+
+            fbs::BinBundleBuilder bin_bundle_builder(fbs_builder);
+            bin_bundle_builder.add_bundle_idx(bundle_idx);
+            bin_bundle_builder.add_labeled(labeled);
+            bin_bundle_builder.add_mod(mod.value());
+            bin_bundle_builder.add_bins(bins);
+            auto bb = bin_bundle_builder.Finish();
+            fbs_builder.FinishSizePrefixed(bb);
+
+            out.write(
+                reinterpret_cast<const char*>(fbs_builder.GetBufferPointer()),
+                safe_cast<streamsize>(fbs_builder.GetSize()));
+
+            return fbs_builder.GetSize();
+        }
+
+        namespace
+        {
+            template<typename L>
+            bool add_to_bin(map<felt_t, L> &bin, felt_t felt_item, felt_t felt_label);
+
+            template<>
+            bool add_to_bin(map<felt_t, monostate> &bin, felt_t felt_item, felt_t felt_label)
+            {
+                return bin.emplace(make_pair(felt_item, monostate{})).second;
+            }
+
+            template<>
+            bool add_to_bin(map<felt_t, felt_t> &bin, felt_t felt_item, felt_t felt_label)
+            {
+                return bin.emplace(make_pair(felt_item, felt_label)).second;
+            }
+        }
+
+        /**
+        Loads the BinBundle from a stream. Returns the bundle index and the number of bytes read.
+        */
+        template<typename L>
+        pair<uint32_t, size_t> BinBundle<L>::load(istream &in)
+        {
+            // Remove everything and clear the cache
+            clear();
+
+            vector<seal_byte> in_data(util::read_from_stream(in));
+
+            auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
+            bool safe = fbs::VerifySizePrefixedBinBundleBuffer(verifier);
+            if (!safe)
+            {
+                APSI_LOG_ERROR("Failed to load BinBundle: the buffer is invalid");
+                throw runtime_error("failed to load BinBundle");
+            }
+
+            auto bb = fbs::GetSizePrefixedBinBundle(in_data.data());
+
+            // Throw if this is not the right kind of BinBundle
+            constexpr bool labeled = is_same_v<L, felt_t>;
+            const char *loaded_type_str = bb->labeled() ? "labeled" : "unlabeled";
+            const char *this_type_str = labeled ? "labeled" : "unlabeled";
+            if (bb->labeled() != labeled)
+            {
+                APSI_LOG_ERROR("The loaded BinBundle is of incorrect type (" << loaded_type_str
+                    << "; expected " << this_type_str << ")");
+                throw runtime_error("failed to load BinBundle");
+            }
+
+            // Load the bundle index
+            uint32_t bundle_idx = bb->bundle_idx();
+
+            // Throw if the field modulus does not match
+            uint64_t mod = bb->mod();
+            if (mod != field_mod().value())
+            {
+                APSI_LOG_ERROR("The loaded BinBundle field modulus (" << mod
+                    << ") differs from the field modulus of this BinBundle (" << field_mod().value() << ")");
+                throw runtime_error("failed to load BinBundle");
+            }
+
+            auto mod_bit_count = field_mod().bit_count();
+            auto mod_byte_count = (mod_bit_count + 7) >> 3;
+
+            // Check that the number of bins is correct
+            const auto &bins = *bb->bins();
+            if (bins_.size() != bins.size())
+            {
+                APSI_LOG_ERROR("The loaded BinBundle has " << bins.size()
+                    << " bins but this BinBundle expects " << bins_.size() << " bins");
+                throw runtime_error("failed to load BinBundle");
+            }
+
+            for (size_t i = 0; i < bins.size(); i++)
+            {
+                for (const auto &felt_item_label : *bins[i]->felt_item_labels())
+                {
+                    // This felt_item_label must have a label precisely when labeled is true
+                    bool has_label = !!(felt_item_label->felt_label());
+                    if (labeled != has_label)
+                    {
+                        const char *felt_item_label_type_str = has_label ? "labeled" : "unlabeled";
+                        APSI_LOG_ERROR("The loaded BinBundle contains data of incorrect type (" << felt_item_label_type_str
+                            << "; expected " << this_type_str << ")");
+                        throw runtime_error("failed to load BinBundle");
+                    }
+
+                    if (felt_item_label->felt_item()->size() != mod_byte_count)
+                    {
+                        APSI_LOG_ERROR("The loaded BinBundle contains (item) data buffers of incorrect size ("
+                            << felt_item_label->felt_item()->size() << " bytes; expected " << mod_byte_count
+                            << " bytes)");
+                        throw runtime_error("failed to load BinBundle");
+                    }
+
+                    felt_t felt_item = 0;
+                    copy_n(
+                        reinterpret_cast<const seal_byte*>(felt_item_label->felt_item()->data()),
+                        mod_byte_count,
+                        reinterpret_cast<seal_byte*>(&felt_item));
+
+                    felt_t felt_label = 0;
+                    SEAL_IF_CONSTEXPR (labeled)
+                    {
+                        if (felt_item_label->felt_label()->size() != mod_byte_count)
+                        {
+                            APSI_LOG_ERROR("The loaded BinBundle contains (label) data buffers of incorrect size ("
+                                << felt_item_label->felt_label()->size() << " bytes; expected " << mod_byte_count
+                                << " bytes)");
+                            throw runtime_error("failed to load BinBundle");
+                        }
+
+                        copy_n(
+                            reinterpret_cast<const seal_byte*>(felt_item_label->felt_label()->data()),
+                            mod_byte_count,
+                            reinterpret_cast<seal_byte*>(&felt_label));
+                    }
+
+                    // Add the loaded item-label pair to the bin
+                    if (!add_to_bin(bins_[i], felt_item, felt_label))
+                    {
+                        APSI_LOG_ERROR("The loaded BinBundle data contains repeated values for the same bin");
+                        throw runtime_error("failed to load BinBundle");
+                    }
+                }
+            }
+
+            return { bundle_idx, in_data.size() };
         }
 
         // BinBundle will only ever be used with these two label types. Ordinarily we'd have to put method definitions

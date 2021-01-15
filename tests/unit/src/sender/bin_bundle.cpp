@@ -2,10 +2,11 @@
 // Licensed under the MIT license.
 
 // STD
-#include <memory>
 #include <cstddef>
-#include <vector>
+#include <memory>
+#include <sstream>
 #include <utility>
+#include <vector>
 
 // APSI
 #include "apsi/bin_bundle.h"
@@ -591,5 +592,133 @@ namespace APSITests
         ASSERT_TRUE(bres);
         ASSERT_TRUE(bb.cache_invalid());
         ASSERT_TRUE(bb.empty());
+    }
+
+    TEST(BinBundleTests, SaveLoadUnlabeled)
+    {
+        stringstream ss;
+
+        CryptoContext context(*get_params());
+        context.set_evaluator();
+
+        BinBundle<monostate> bb(context, true);
+        bb.regen_cache();
+        ASSERT_TRUE(bb.empty());
+        auto save_size = bb.save(ss, 1212);
+
+        BinBundle<monostate> bb2(context, true);
+        auto load_size = bb2.load(ss);
+        ASSERT_EQ(1212, load_size.first);
+        ASSERT_EQ(save_size, load_size.second);
+        ASSERT_TRUE(bb2.empty());
+
+        int res = bb.multi_insert_for_real({ make_pair(1, monostate()) }, 0);
+        ASSERT_EQ(1 /* largest bin size after insert */, res);
+        ASSERT_TRUE(bb.cache_invalid());
+        ASSERT_FALSE(bb.empty());
+        save_size = bb.save(ss, 131313);
+
+        load_size = bb2.load(ss);
+        ASSERT_EQ(131313, load_size.first);
+        ASSERT_EQ(save_size, load_size.second);
+        ASSERT_TRUE(bb2.cache_invalid());
+        ASSERT_FALSE(bb2.empty());
+
+        res = bb.multi_insert_for_real({ make_pair(2, monostate()), make_pair(3, monostate()) }, 0);
+        ASSERT_EQ(2 /* largest bin size after insert */, res);
+        ASSERT_TRUE(bb.cache_invalid());
+        ASSERT_FALSE(bb.empty());
+        save_size = bb.save(ss, 0);
+
+        load_size = bb2.load(ss);
+        ASSERT_EQ(0, load_size.first);
+        ASSERT_EQ(save_size, load_size.second);
+        ASSERT_TRUE(bb2.cache_invalid());
+        ASSERT_FALSE(bb2.empty());
+
+        // These pass for the original BinBundle
+        ASSERT_NE(bb.get_bins()[0].end(), bb.get_bins()[0].find(1));
+        ASSERT_NE(bb.get_bins()[0].end(), bb.get_bins()[0].find(2));
+        ASSERT_NE(bb.get_bins()[1].end(), bb.get_bins()[1].find(3));
+
+        // These should pass for the loaded BinBundle
+        ASSERT_NE(bb2.get_bins()[0].end(), bb2.get_bins()[0].find(1));
+        ASSERT_NE(bb2.get_bins()[0].end(), bb2.get_bins()[0].find(2));
+        ASSERT_NE(bb2.get_bins()[1].end(), bb2.get_bins()[1].find(3));
+
+        // Try loading to labeled BinBundle
+        ss.seekg(0);
+        BinBundle<felt_t> bb3(context, true);
+        ASSERT_THROW(bb3.load(ss), runtime_error);
+    }
+
+    TEST(BinBundleTests, SaveLoadLabeled)
+    {
+        stringstream ss;
+
+        CryptoContext context(*get_params());
+        context.set_evaluator();
+
+        BinBundle<felt_t> bb(context, true);
+        bb.regen_cache();
+        ASSERT_TRUE(bb.empty());
+        auto save_size = bb.save(ss, 1);
+
+        BinBundle<felt_t> bb2(context, true);
+        auto load_size = bb2.load(ss);
+        ASSERT_EQ(1, load_size.first);
+        ASSERT_EQ(save_size, load_size.second);
+        ASSERT_TRUE(bb2.empty());
+
+        int res = bb.multi_insert_for_real({ make_pair(1, 2) }, 0);
+        ASSERT_EQ(1 /* largest bin size after insert */, res);
+        ASSERT_TRUE(bb.cache_invalid());
+        ASSERT_FALSE(bb.empty());
+        save_size = bb.save(ss, 1212);
+
+        load_size = bb2.load(ss);
+        ASSERT_EQ(1212, load_size.first);
+        ASSERT_EQ(save_size, load_size.second);
+        ASSERT_TRUE(bb2.cache_invalid());
+        ASSERT_FALSE(bb2.empty());
+
+        res = bb.multi_insert_for_real({ make_pair(2, 3), make_pair(3, 4) }, 0);
+        ASSERT_EQ(2 /* largest bin size after insert */, res);
+        ASSERT_TRUE(bb.cache_invalid());
+        ASSERT_FALSE(bb.empty());
+        save_size = bb.save(ss, 131313);
+
+        load_size = bb2.load(ss);
+        ASSERT_EQ(131313, load_size.first);
+        ASSERT_EQ(save_size, load_size.second);
+        ASSERT_TRUE(bb2.cache_invalid());
+        ASSERT_FALSE(bb2.empty());
+
+        // These pass for the original BinBundle
+        auto find_res = bb.get_bins()[0].find(1);
+        ASSERT_NE(bb.get_bins()[0].end(), find_res);
+        ASSERT_EQ(2, find_res->second);
+        find_res = bb.get_bins()[0].find(2);
+        ASSERT_NE(bb.get_bins()[0].end(), find_res);
+        ASSERT_EQ(3, find_res->second);
+        find_res = bb.get_bins()[1].find(3);
+        ASSERT_NE(bb.get_bins()[1].end(), find_res);
+        ASSERT_EQ(4, find_res->second);
+
+        // These should pass for the loaded BinBundle
+        find_res = bb2.get_bins()[0].find(1);
+        ASSERT_NE(bb2.get_bins()[0].end(), find_res);
+        ASSERT_EQ(2, find_res->second);
+        find_res = bb2.get_bins()[0].find(2);
+        ASSERT_NE(bb2.get_bins()[0].end(), find_res);
+        ASSERT_EQ(3, find_res->second);
+        find_res = bb2.get_bins()[1].find(3);
+        ASSERT_NE(bb2.get_bins()[1].end(), find_res);
+        ASSERT_EQ(4, find_res->second);
+
+        // Try loading to unlabeled BinBundle
+        ss.seekg(0);
+        BinBundle<monostate> bb3(context, true);
+        ASSERT_THROW(bb3.load(ss), runtime_error);
     }
 }

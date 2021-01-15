@@ -1,6 +1,9 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
+#pragma message("Clean up this stuff")
+#include <fstream>
+
 // APSI
 #include "apsi/logging/log.h"
 #include "apsi/network/zmq/zmq_channel.h"
@@ -109,8 +112,12 @@ namespace APSITests
             auto oprf_key = make_shared<OPRFKey>();
             auto hashed_sender_items = OPRFSender::ComputeHashes(sender_items, *oprf_key);
 
-            auto sender_db = make_shared<LabeledSenderDB>(params);
-            sender_db->set_data(hashed_sender_items, num_threads);
+            #pragma message("Clean up this stuff")
+            auto sender_db0 = make_shared<LabeledSenderDB>(params);
+            sender_db0->set_data(hashed_sender_items, num_threads);
+            stringstream ss;
+            SaveSenderDB(sender_db0, ss);
+            auto sender_db = LoadSenderDB(ss).first;
 
             atomic<bool> stop_sender = false;
 

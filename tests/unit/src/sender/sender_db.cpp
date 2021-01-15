@@ -4,6 +4,7 @@
 // STD
 #include <memory>
 #include <cstddef>
+#include <sstream>
 
 // APSI
 #include "apsi/sender_db.h"
@@ -152,7 +153,7 @@ namespace APSITests
         auto params = get_params();
         UnlabeledSenderDB sender_db(*params);
 
-        // Create a vector of items with duplicates
+        // Create a vector of items without duplicates
         unordered_set<HashedItem> items;
         for (uint64_t i = 0; i < 200; i++)
         {
@@ -259,7 +260,7 @@ namespace APSITests
         auto params = get_params();
         LabeledSenderDB sender_db(*params);
 
-        // Create a vector of items and labels with duplicates
+        // Create a vector of items and labels without duplicates
         unordered_map<HashedItem, FullWidthLabel> items;
         for (uint64_t i = 0; i < 200; i++)
         {
@@ -379,5 +380,123 @@ namespace APSITests
         // No BinBundles should be left at this time
         ASSERT_TRUE(sender_db.get_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
+    }
+
+    TEST(SenderDBTests, SaveLoadUnlabeled)
+    {
+        auto params = get_params();
+        shared_ptr<SenderDB> sender_db(make_shared<UnlabeledSenderDB>(*params));
+
+        stringstream ss;
+        size_t save_size = SaveSenderDB(sender_db, ss);
+        auto other = LoadSenderDB(ss);
+        auto other_sdb = other.first;
+        ASSERT_NE(nullptr, other_sdb);
+
+        ASSERT_EQ(save_size, other.second);
+        ASSERT_EQ(params->to_string(), other_sdb->get_params().to_string());
+        ASSERT_EQ(sender_db->get_items().size(), other_sdb->get_items().size());
+        ASSERT_EQ(sender_db->is_compressed(), other_sdb->is_compressed());
+        ASSERT_EQ(sender_db->is_labeled(), other_sdb->is_labeled());
+
+        // Insert a single item
+        sender_db->insert_or_assign(HashedItem(0, 0));
+
+        save_size = SaveSenderDB(sender_db, ss);
+        other = LoadSenderDB(ss);
+        other_sdb = other.first;
+        ASSERT_NE(nullptr, other_sdb);
+
+        ASSERT_EQ(save_size, other.second);
+        ASSERT_EQ(params->to_string(), other_sdb->get_params().to_string());
+        ASSERT_EQ(sender_db->get_items().size(), other_sdb->get_items().size());
+        ASSERT_EQ(sender_db->is_compressed(), other_sdb->is_compressed());
+        ASSERT_EQ(sender_db->is_labeled(), other_sdb->is_labeled());
+
+        // Create a vector of items without duplicates
+        unordered_set<HashedItem> items;
+        for (uint64_t i = 0; i < 200; i++)
+        {
+            items.emplace(i, i + 1);
+        }
+
+        // Insert all items
+        sender_db->insert_or_assign(items);
+
+        save_size = SaveSenderDB(sender_db, ss);
+        other = LoadSenderDB(ss);
+        other_sdb = other.first;
+        ASSERT_NE(nullptr, other_sdb);
+
+        ASSERT_EQ(save_size, other.second);
+        ASSERT_EQ(params->to_string(), other_sdb->get_params().to_string());
+        ASSERT_EQ(sender_db->get_items().size(), other_sdb->get_items().size());
+        ASSERT_EQ(sender_db->is_compressed(), other_sdb->is_compressed());
+        ASSERT_EQ(sender_db->is_labeled(), other_sdb->is_labeled());
+
+        // Check that the items match
+        for (auto &it : sender_db->get_items())
+        {
+            ASSERT_NE(other_sdb->get_items().end(), other_sdb->get_items().find(it));
+        }
+    }
+
+    TEST(SenderDBTests, SaveLoadLabeled)
+    {
+        auto params = get_params();
+        shared_ptr<SenderDB> sender_db(make_shared<LabeledSenderDB>(*params));
+
+        stringstream ss;
+        size_t save_size = SaveSenderDB(sender_db, ss);
+        auto other = LoadSenderDB(ss);
+        auto other_sdb = other.first;
+        ASSERT_NE(nullptr, other_sdb);
+
+        ASSERT_EQ(save_size, other.second);
+        ASSERT_EQ(params->to_string(), other_sdb->get_params().to_string());
+        ASSERT_EQ(sender_db->get_items().size(), other_sdb->get_items().size());
+        ASSERT_EQ(sender_db->is_compressed(), other_sdb->is_compressed());
+        ASSERT_EQ(sender_db->is_labeled(), other_sdb->is_labeled());
+
+        // Insert a single item
+        sender_db->insert_or_assign(make_pair(HashedItem(0, 0), FullWidthLabel(0, 0)));
+
+        save_size = SaveSenderDB(sender_db, ss);
+        other = LoadSenderDB(ss);
+        other_sdb = other.first;
+        ASSERT_NE(nullptr, other_sdb);
+
+        ASSERT_EQ(save_size, other.second);
+        ASSERT_EQ(params->to_string(), other_sdb->get_params().to_string());
+        ASSERT_EQ(sender_db->get_items().size(), other_sdb->get_items().size());
+        ASSERT_EQ(sender_db->is_compressed(), other_sdb->is_compressed());
+        ASSERT_EQ(sender_db->is_labeled(), other_sdb->is_labeled());
+
+        // Create a vector of items and labels without duplicates
+        unordered_map<HashedItem, FullWidthLabel> items;
+        for (uint64_t i = 0; i < 200; i++)
+        {
+            items.emplace(make_pair(HashedItem(i, i + 1), FullWidthLabel(i, i + 1)));
+        }
+
+        // Insert all items
+        sender_db->insert_or_assign(items);
+
+        save_size = SaveSenderDB(sender_db, ss);
+        other = LoadSenderDB(ss);
+        other_sdb = other.first;
+        ASSERT_NE(nullptr, other_sdb);
+
+        ASSERT_EQ(save_size, other.second);
+        ASSERT_EQ(params->to_string(), other_sdb->get_params().to_string());
+        ASSERT_EQ(sender_db->get_items().size(), other_sdb->get_items().size());
+        ASSERT_EQ(sender_db->is_compressed(), other_sdb->is_compressed());
+        ASSERT_EQ(sender_db->is_labeled(), other_sdb->is_labeled());
+
+        // Check that the items match
+        for (auto &it : sender_db->get_items())
+        {
+            ASSERT_NE(other_sdb->get_items().end(), other_sdb->get_items().find(it));
+        }
     }
 }
