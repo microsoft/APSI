@@ -3,8 +3,8 @@
 
 namespace apsi.fbs;
 
-table FEltPolyn {
-    felt_polyn:[uint64] (required);
+table FEltArray {
+    felts:[uint64] (required);
 }
 
 table Plaintext {
@@ -12,21 +12,19 @@ table Plaintext {
 }
 
 table BatchedPlaintextPolyn {
-    batched_coeffs:[Plaintext] (required);
+    coeffs:[Plaintext] (required);
 }
 
 table BinBundleCache {
-    felt_matching_polyns:[FEltPolyn] (required);
-    felt_interp_polyns:[FEltPolyn];
-}
-
-table FEltItemLabel {
-    felt_item:[ubyte] (required);
-    felt_label:[ubyte];
+    felt_matching_polyns:[FEltArray] (required);
+    batched_matching_polyn:BatchedPlaintextPolyn (required);
+    felt_interp_polyns:[FEltArray];
+    batched_interp_polyn:BatchedPlaintextPolyn;
 }
 
 table Bin {
-    felt_item_labels:[FEltItemLabel] (required);
+    felt_items:FEltArray (required);
+    felt_labels:FEltArray;
 }
 
 table BinBundle {
@@ -34,6 +32,7 @@ table BinBundle {
     labeled:bool;
     mod:uint64;
     bins:[Bin] (required);
+    cache:BinBundleCache;
 }
 
 root_type BinBundle;

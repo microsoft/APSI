@@ -285,8 +285,7 @@ namespace apsi
                             }
                         }
 
-                        // Do a dry-run insertion and see if the new largest bin size in the range
-                        // exceeds the limit
+                        // Do a dry-run insertion and see if the new largest bin size in the range exceeds the limit
                         int new_largest_bin_size = bundle.multi_insert_dry_run(data, bin_idx);
 
                         // Check if inserting would violate the max bin size constraint
@@ -1083,7 +1082,7 @@ namespace apsi
 
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
-            auto params = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(params_str.data()), params_str.size());
+            auto params = fbs_builder.CreateVector(reinterpret_cast<unsigned char*>(params_str.data()), params_str.size());
             fbs::SenderDBInfo info(sender_db->is_labeled(), sender_db->is_compressed());
             auto hashed_items = fbs_builder.CreateVector([&]() {
                 // The HashedItems vector is populated with an immediately-invoked lambda
@@ -1121,7 +1120,10 @@ namespace apsi
                 {
                     for (auto &bb : labeled_sender_db->bin_bundles_[bundle_idx])
                     {
-                        bin_bundle_data_size += bb.save(out, static_cast<uint32_t>(bundle_idx));
+                        auto size = bb.save(out, static_cast<uint32_t>(bundle_idx));
+                        APSI_LOG_DEBUG("Saved labeled bin bundle at bundle index " << bundle_idx
+                            << " (" << size << " bytes)");
+                        bin_bundle_data_size += size;
                     }
                 }
             }
@@ -1132,19 +1134,26 @@ namespace apsi
                 {
                     for (auto &bb : unlabeled_sender_db->bin_bundles_[bundle_idx])
                     {
-                        bin_bundle_data_size += bb.save(out, static_cast<uint32_t>(bundle_idx));
+                        auto size = bb.save(out, static_cast<uint32_t>(bundle_idx));
+                        APSI_LOG_DEBUG("Saved unlabeled bin bundle at bundle index " << bundle_idx
+                            << " (" << size << " bytes)");
+                        bin_bundle_data_size += size;
                     }
                 }
             }
 
-            return fbs_builder.GetSize() + bin_bundle_data_size;
+            size_t total_size = fbs_builder.GetSize() + bin_bundle_data_size;
+            APSI_LOG_DEBUG("Saved SenderDB with " << sender_db->get_items().size() << " items ("
+                << total_size << " bytes)");
+
+            return total_size;
         }
 
         pair<shared_ptr<SenderDB>, size_t> LoadSenderDB(istream &in)
         {
             vector<seal_byte> in_data(util::read_from_stream(in));
 
-            auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
+            auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderDBBuffer(verifier);
             if (!safe)
             {
@@ -1232,6 +1241,9 @@ namespace apsi
 
                     // Add the loaded BinBundle to the correct location in bin_bundles_
                     labeled_sender_db->bin_bundles_[bb_data.first].push_back(move(bb));
+
+                    APSI_LOG_DEBUG("Loaded labeled bin bundle at bundle index " << bb_data.first
+                        << " (" << bb_data.second << " bytes)");
                     bin_bundle_data_size += bb_data.second;
                 }
             }
@@ -1253,11 +1265,18 @@ namespace apsi
 
                     // Add the loaded BinBundle to the correct location in bin_bundles_
                     unlabeled_sender_db->bin_bundles_[bb_data.first].push_back(move(bb));
+
+                    APSI_LOG_DEBUG("Loaded unlabeled bin bundle at bundle index " << bb_data.first
+                        << " (" << bb_data.second << " bytes)");
                     bin_bundle_data_size += bb_data.second;
                 }
             }
+
+            size_t total_size = in_data.size() + bin_bundle_data_size;
+            APSI_LOG_DEBUG("Loaded SenderDB with " << sender_db->get_items().size() << " items ("
+                << total_size << " bytes)");
             
-            return { move(sender_db), in_data.size() + bin_bundle_data_size };
+            return { move(sender_db), total_size };
         }
     } // namespace sender
 } // namespace apsi

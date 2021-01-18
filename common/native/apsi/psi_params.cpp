@@ -159,7 +159,7 @@ namespace apsi
     {
         vector<seal_byte> in_data(util::read_from_stream(in));
 
-        auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
+        auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
         bool safe = fbs::VerifySizePrefixedPSIParamsBuffer(verifier);
         if (!safe)
         {

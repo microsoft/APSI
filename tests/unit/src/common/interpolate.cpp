@@ -112,7 +112,7 @@ namespace APSITests
     {
         Modulus mod(3);
 
-        ASSERT_TRUE(newton_interpolate_polyn({}, {}, mod).empty());
+        ASSERT_TRUE(newton_interpolate_polyn({}, {}, mod) == vector<uint64_t>{ 0 });
 
         // Invalid number of points/values
         ASSERT_THROW(auto poly = newton_interpolate_polyn({ 0 }, {}, mod), invalid_argument);

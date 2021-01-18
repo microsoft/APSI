@@ -49,21 +49,19 @@ namespace apsi
             | 0| 0| 8| 5| 0| 1|
             | 0| 9| 2| 0| 1| 8|
         */
-        class BatchedPlaintextPolyn
+        struct BatchedPlaintextPolyn
         {
-        private:
             /**
             A sequence of coefficients represented as batched plaintexts. The length of this vector is the degree of the
             highest-degree polynomial in the sequence.
             */
-            std::vector<std::vector<seal::seal_byte>> batched_coeffs_;
+            std::vector<std::vector<seal::seal_byte>> batched_coeffs;
 
             /**
             We need this to compute eval()
             */
-            CryptoContext crypto_context_;
+            CryptoContext crypto_context;
 
-        public:
             BatchedPlaintextPolyn(const BatchedPlaintextPolyn &copy) = delete;
 
             BatchedPlaintextPolyn(BatchedPlaintextPolyn &&source) = default;
@@ -86,7 +84,7 @@ namespace apsi
             Constructs an uninitialized Plaintext polynomial using the given crypto context
             */
             BatchedPlaintextPolyn(CryptoContext crypto_context) :
-                crypto_context_(std::move(crypto_context))
+                crypto_context(std::move(crypto_context))
             {}
 
             /**
@@ -101,48 +99,48 @@ namespace apsi
             */
             explicit operator bool() const noexcept
             {
-                return batched_coeffs_.size();
+                return batched_coeffs.size();
             }
         };
 
         // A cache of all the polynomial and plaintext computations on a single BinBundle
         struct BinBundleCache
         {
-                BinBundleCache(const BinBundleCache &copy) = delete;
+            BinBundleCache(const BinBundleCache &copy) = delete;
 
-                BinBundleCache(BinBundleCache &&source) = default;
+            BinBundleCache(BinBundleCache &&source) = default;
 
-                BinBundleCache &operator=(const BinBundleCache &assign) = delete;
+            BinBundleCache &operator=(const BinBundleCache &assign) = delete;
 
-                BinBundleCache &operator=(BinBundleCache &&assign) = default;
+            BinBundleCache &operator=(BinBundleCache &&assign) = default;
 
-                BinBundleCache(const CryptoContext &crypto_context) :
-                    batched_matching_polyn(crypto_context),
-                    batched_interp_polyn(crypto_context)
-                {}
+            BinBundleCache(const CryptoContext &crypto_context) :
+                batched_matching_polyn(crypto_context),
+                batched_interp_polyn(crypto_context)
+            {}
 
-                /**
-                For each bin, stores the "matching polynomial", i.e., unique monic polynomial whose roots are precisely
-                the items in the bin
-                */
-                std::vector<FEltPolyn> felt_matching_polyns;
+            /**
+            For each bin, stores the "matching polynomial", i.e., unique monic polynomial whose roots are precisely
+            the items in the bin.
+            */
+            std::vector<FEltPolyn> felt_matching_polyns;
 
-                /**
-                For each bin, stores the Newton intepolation polynomial whose value at each item in the bin equals the
-                item's corresponding label. Note that this field is empty when doing unlabeled PSI.
-                */
-                std::vector<FEltPolyn> felt_interp_polyns;
+            /**
+            For each bin, stores the Newton intepolation polynomial whose value at each item in the bin equals the
+            item's corresponding label. Note that this field is empty when doing unlabeled PSI.
+            */
+            std::vector<FEltPolyn> felt_interp_polyns;
 
-                /**
-                Cached seal::Plaintext representation of the "matching" polynomial of this BinBundle
-                */
-                BatchedPlaintextPolyn batched_matching_polyn;
+            /**
+            Cached seal::Plaintext representation of the "matching" polynomial of this BinBundle.
+            */
+            BatchedPlaintextPolyn batched_matching_polyn;
 
-                /**
-                Cached seal::Plaintext representation of the interpolation polynomial of this BinBundle. Note that this
-                field is empty when doing unlabeled PSI.
-                */
-                BatchedPlaintextPolyn batched_interp_polyn;
+            /**
+            Cached seal::Plaintext representation of the interpolation polynomial of this BinBundle. Note that this
+            field is empty when doing unlabeled PSI.
+            */
+            BatchedPlaintextPolyn batched_interp_polyn;
         }; // struct BinBundleCache
 
         /**
