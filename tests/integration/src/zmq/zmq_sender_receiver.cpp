@@ -48,6 +48,7 @@ namespace APSITests
 
             auto sender_db = make_shared<UnlabeledSenderDB>(params);
             sender_db->set_data(hashed_sender_items, num_threads);
+            APSI_LOG_WARNING("Packing rate: " << sender_db->get_packing_rate());
 
             atomic<bool> stop_sender = false;
 
@@ -111,6 +112,7 @@ namespace APSITests
 
             auto sender_db = make_shared<LabeledSenderDB>(params, true);
             sender_db->set_data(hashed_sender_items, num_threads);
+            APSI_LOG_WARNING("Packing rate: " << sender_db->get_packing_rate());
 
             atomic<bool> stop_sender = false;
 

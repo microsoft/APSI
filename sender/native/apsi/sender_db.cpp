@@ -364,7 +364,7 @@ namespace apsi
             */
             template<typename L>
             void dispatch_insert_or_assign(
-                vector<pair<AlgItemLabel<L>, size_t >> &data_with_indices,
+                vector<pair<AlgItemLabel<L>, size_t>> &data_with_indices,
                 vector<vector<BinBundle<L>>> &bin_bundles,
                 CryptoContext &crypto_context,
                 uint32_t bins_per_bundle,
@@ -625,7 +625,7 @@ namespace apsi
         /**
         Returns the total number of bin bundles.
         */
-        size_t LabeledSenderDB::get_bin_bundle_count()
+        size_t LabeledSenderDB::get_bin_bundle_count() const
         {
             // Lock the database for reading
             auto lock = get_reader_lock();
@@ -638,7 +638,7 @@ namespace apsi
         /**
         Returns the total number of bin bundles.
         */
-        size_t UnlabeledSenderDB::get_bin_bundle_count()
+        size_t UnlabeledSenderDB::get_bin_bundle_count() const
         {
             // Lock the database for reading
             auto lock = get_reader_lock();
@@ -646,6 +646,22 @@ namespace apsi
             // Compute the total number of bin bundles
             return accumulate(bin_bundles_.cbegin(), bin_bundles_.cend(), size_t(0),
                 [&](auto &a, auto &b) { return a + b.size(); });
+        }
+
+        double SenderDB::get_packing_rate() const
+        {
+            // Lock the database for reading
+            auto lock = get_reader_lock();
+
+            uint64_t item_count = mul_safe(
+                static_cast<uint64_t>(items_.size()),
+                static_cast<uint64_t>(params_.table_params().hash_func_count));
+            uint64_t max_item_count = mul_safe(
+                static_cast<uint64_t>(get_bin_bundle_count()),
+                static_cast<uint64_t>(params_.items_per_bundle()),
+                static_cast<uint64_t>(params_.table_params().max_items_per_bin));
+
+            return static_cast<double>(item_count) / max_item_count;
         }
 
         /**

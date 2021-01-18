@@ -177,19 +177,26 @@ namespace apsi
             /**
             Returns a reference to a set of items already existing in the SenderDB.
             */
-            const std::unordered_set<HashedItem> &get_items() {
+            const std::unordered_set<HashedItem> &get_items() const 
+            {
                 return items_;
             }
 
             /**
             Returns the total number of bin bundles.
             */
-            virtual std::size_t get_bin_bundle_count() = 0;
+            virtual std::size_t get_bin_bundle_count() const = 0;
+
+            /**
+            Returns how efficiently the SenderDB is packaged. A higher rate indicates better performance and a lower
+            communication cost in a query execution.
+            */
+            double get_packing_rate() const;
 
             /**
             Obtains a scoped lock preventing the SenderDB from being changed.
             */
-            seal::util::ReaderLock get_reader_lock()
+            seal::util::ReaderLock get_reader_lock() const
             {
                 return db_lock_.acquire_read();
             }
@@ -264,7 +271,7 @@ namespace apsi
             /**
             Returns the total number of bin bundles.
             */
-            std::size_t get_bin_bundle_count() override;
+            std::size_t get_bin_bundle_count() const override;
 
             /**
             Returns a set of cache references corresponding to the bundles at the given bundle index. Even though this
@@ -394,7 +401,7 @@ namespace apsi
             /**
             Returns the total number of bin bundles.
             */
-            std::size_t get_bin_bundle_count() override;
+            std::size_t get_bin_bundle_count() const override;
 
             /**
             Returns a set of cache references corresponding to the bundles at the given bundle index. Even though this
