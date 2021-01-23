@@ -575,7 +575,8 @@ It must be such that its size is a positive multiple of (possibly equal to) the 
 - `max_items_per_bin` denotes how many items fit into each row of the sender's bin bundles.
 It cannot be zero.
 - `hash_func_count` denotes the number of hash functions used for cuckoo hashing.
-It must be at least 2 and at most 8.
+It must be at least 1 and at most 8.
+While setting `hash_func_count` to 1 means essentially disabling cuckoo hashing, it can improve performance in cases where the receiver is known to have only a single item (set membership).
 
 #### QueryParams
 
@@ -591,7 +592,7 @@ To construct a `PSIParams` object, one needs to provide the constructor with a v
 
 1. `PSIParams::TableParams::table_size` is verified to be a power of two.
 1. `PSIParams::TableParams::max_items_per_bin` is verified to be non-zero.
-1. `PSIParams::TableParams::hash_func_count` is verified to be at least 2 and at most 8.
+1. `PSIParams::TableParams::hash_func_count` is verified to be at least 1 and at most 8.
 1. `PSIParams::ItemParams::felts_per_item` is verified to be 2, 4, 8, 16, or 32.
 1. `PSIParams::QueryParams::query_powers` is verified to not contain 0, to contain 1, to not contain values larger than `PSIParams::TableParams::max_items_per_bin`.
 1. `PSIParams::SEALParams` are verified to be valid and to support Microsoft SEAL keyswithing and batching.

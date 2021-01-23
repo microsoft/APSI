@@ -210,7 +210,7 @@ set(THIRDPARTY_DIR ${APSI_SOURCE_DIR}/thirdparty)
 find_package(SEAL 3.6.2 CONFIG REQUIRED)
 
 # Microsoft Kuku
-find_package(Kuku 2.0 REQUIRED)
+find_package(Kuku 2.1 REQUIRED)
 
 # Log4cplus
 if(APSI_USE_LOG4CPLUS)
