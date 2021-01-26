@@ -62,7 +62,7 @@ namespace apsi
             used only on a LabeledSenderDB instance.
             */
             virtual void set_data(
-                const std::unordered_map<HashedItem, util::FullWidthLabel> &data,
+                const std::unordered_map<HashedItem, apsi::util::FullWidthLabel> &data,
                 std::size_t thread_count = 0
             ) = 0;
 
@@ -81,7 +81,7 @@ namespace apsi
             new label.
             */
             virtual void insert_or_assign(
-                const std::unordered_map<HashedItem, util::FullWidthLabel> &data,
+                const std::unordered_map<HashedItem, apsi::util::FullWidthLabel> &data,
                 std::size_t thread_count = 0
             ) = 0;
 
@@ -91,7 +91,7 @@ namespace apsi
             label is overwritten with the new label.
             */
             virtual void insert_or_assign(
-                const std::pair<HashedItem, util::FullWidthLabel> &data
+                const std::pair<HashedItem, apsi::util::FullWidthLabel> &data
             ) = 0;
 
             /**

@@ -129,10 +129,10 @@ namespace APSITests
         CryptoContext context(*get_params());
 
         // No evaluator set in context
-        ASSERT_THROW(BinBundle<monostate> bb(context, true), invalid_argument);
+        ASSERT_THROW(BinBundle<monostate> bb(context, true, 50), invalid_argument);
 
         context.set_evaluator();
-        BinBundle<monostate> bb(context, true);
+        BinBundle<monostate> bb(context, true, 50);
 
         ASSERT_TRUE(bb.cache_invalid());
         bb.clear_cache();
@@ -158,10 +158,10 @@ namespace APSITests
         CryptoContext context(*get_params());
 
         // No evaluator set in context
-        ASSERT_THROW(BinBundle<felt_t> bb(context, true), invalid_argument);
+        ASSERT_THROW(BinBundle<felt_t> bb(context, true, 50), invalid_argument);
 
         context.set_evaluator();
-        BinBundle<felt_t> bb(context, true);
+        BinBundle<felt_t> bb(context, true, 50);
 
         ASSERT_TRUE(bb.cache_invalid());
         bb.clear_cache();
@@ -192,7 +192,7 @@ namespace APSITests
         CryptoContext context(*get_params());
         context.set_evaluator();
 
-        BinBundle<monostate> bb(context, true);
+        BinBundle<monostate> bb(context, true, 50);
         bb.regen_cache();
         ASSERT_FALSE(bb.cache_invalid());
         ASSERT_TRUE(bb.empty());
@@ -292,7 +292,7 @@ namespace APSITests
         CryptoContext context(*get_params());
         context.set_evaluator();
 
-        BinBundle<felt_t> bb(context, true);
+        BinBundle<felt_t> bb(context, true, 50);
         bb.regen_cache();
         ASSERT_FALSE(bb.cache_invalid());
         ASSERT_TRUE(bb.empty());
@@ -431,7 +431,7 @@ namespace APSITests
         CryptoContext context(*get_params());
         context.set_evaluator();
 
-        BinBundle<felt_t> bb(context, true);
+        BinBundle<felt_t> bb(context, true, 50);
 
         vector<pair<felt_t, felt_t>> values{ make_pair(1, 1) };
 
@@ -541,7 +541,7 @@ namespace APSITests
         CryptoContext context(*get_params());
         context.set_evaluator();
 
-        BinBundle<monostate> bb(context, true);
+        BinBundle<monostate> bb(context, true, 50);
         bb.regen_cache();
         ASSERT_FALSE(bb.cache_invalid());
         ASSERT_TRUE(bb.empty());

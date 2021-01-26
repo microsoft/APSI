@@ -7,6 +7,10 @@
 #include "apsi/logging/log.h"
 #include "apsi/util/interpolate.h"
 
+static size_t false_positives = 0;
+static size_t true_positives = 0;
+static size_t total_search_count = 0;
+
 namespace apsi
 {
     using namespace std;
@@ -17,6 +21,8 @@ namespace apsi
 
     namespace sender
     {
+        using namespace util;
+
         namespace
         {
             /**
@@ -24,7 +30,7 @@ namespace apsi
             precisely the items of the bin.
             */
             template<typename L>
-            FEltPolyn compute_matching_polyn(const map<felt_t, L> &bin, const Modulus &mod)
+            FEltPolyn compute_matching_polyn(const vector<pair<felt_t, L>> &bin, const Modulus &mod)
             {
                 // Collect the roots
                 vector<felt_t> roots;
@@ -40,7 +46,7 @@ namespace apsi
             /**
             Helper function. Computes the Newton interpolation polynomial of a bin
             */
-            FEltPolyn compute_newton_polyn(const map<felt_t, felt_t> &bin, const Modulus &mod)
+            FEltPolyn compute_newton_polyn(const vector<pair<felt_t, felt_t>> &bin, const Modulus &mod)
             {
                 // Collect the items and labels into different vectors
                 vector<felt_t> points;
@@ -57,6 +63,102 @@ namespace apsi
 
                 // Compute and return the Newton interpolation polynomial
                 return newton_interpolate_polyn(points, values, mod);
+            }
+
+            /**
+            Helper function. Determines if a field element is present in a bin.
+            */
+            template<typename L>
+            bool is_present(const vector<std::pair<felt_t, L>> &curr_bin, const BloomFilter &curr_filter, const felt_t &element)
+            {
+                total_search_count++;
+
+                // Check if the key is already in the current bin.
+                if (curr_filter.maybe_present(element)) {
+                    // Perform a linear search to determine true/false positives
+                    if (curr_bin.end() != std::find_if(
+                                              curr_bin.begin(),
+                                              curr_bin.end(),
+                                              [&element](const std::pair<felt_t, L> &elem) {
+                                                  return elem.first == element;
+                                              })) {
+                        true_positives++;
+
+                        return true;
+                    }
+
+                    false_positives++;
+                }
+
+                return false;
+            }
+
+            /**
+            Helper function. Returns an iterator pointing to the given field element in the bin if found,
+            invalid iterator otherwise.
+            */
+            template<typename L>
+            /*vector<std::pair<felt_t, L>>::iterator*/
+            auto get_iterator(
+                vector<pair<felt_t, L>> &bin, const BloomFilter &filter, const felt_t &element)
+            {
+                total_search_count++;
+
+                if (filter.maybe_present(element)) {
+                    auto result = std::find_if(
+                        bin.begin(), bin.end(), [&element](const pair<felt_t, L> &elem) {
+                            return elem.first == element;
+                        });
+
+                    if (bin.end() == result) {
+                        false_positives++;
+                    } else {
+                        true_positives;
+                    }
+
+                    return result;
+                }
+
+                return bin.end();
+            }
+
+            /**
+            Helper function. Returns a const iterator pointing to the given field element in the bin if
+            found, invalid iterator otherwise.
+            */
+            template <typename L>
+            auto get_iterator(const vector<pair<felt_t, L>> &bin, const BloomFilter &filter, const felt_t &element)
+            {
+                total_search_count++;
+
+                if (filter.maybe_present(element)) {
+                    auto result = std::find_if(
+                        bin.begin(), bin.end(), [&element](const pair<felt_t, L> &elem) {
+                            return elem.first == element;
+                        });
+
+                    if (bin.end() == result)
+                        false_positives++;
+                    else
+                        true_positives++;
+
+                    return result;
+                }
+
+                return bin.end();
+            }
+
+            /**
+            Helper function. Regenerate bloom filter for a given bin.
+            */
+            template<typename L>
+            void regenerate_filter(const vector<std::pair<felt_t, L>> &bin, BloomFilter &filter)
+            {
+                filter.clear();
+
+                for (std::pair<felt_t, L> pair : bin) {
+                    filter.add(pair.first);
+                }
             }
         }
 
@@ -212,11 +314,12 @@ namespace apsi
         }
 
         template<typename L>
-        BinBundle<L>::BinBundle(const CryptoContext &crypto_context, bool compressed) :
+        BinBundle<L>::BinBundle(const CryptoContext &crypto_context, bool compressed, size_t max_bin_size) :
             cache_invalid_(true),
             cache_(crypto_context),
             crypto_context_(crypto_context),
-            compressed_(compressed)
+            compressed_(compressed),
+            max_bin_size_(max_bin_size)
         {
             if (!crypto_context_.evaluator())
             {
@@ -225,7 +328,12 @@ namespace apsi
 
             size_t num_bins = crypto_context_.seal_context()->first_context_data()->parms().poly_modulus_degree();
             bins_.resize(num_bins);
+            filters_.reserve(num_bins);
             cache_.felt_matching_polyns.reserve(num_bins);
+
+            for (size_t i = 0; i < num_bins; i++) {
+                filters_.emplace_back(BloomFilter(max_bin_size, /* size_ratio */ 20));
+            }
         }
 
         /**
@@ -309,11 +417,11 @@ namespace apsi
             for (auto &pair : item_label_pairs)
             {
                 auto item_component = pair.first;
-                map<felt_t, L> &curr_bin = bins_.at(curr_bin_idx);
+                vector<std::pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
+                auto &curr_filter = filters_.at(curr_bin_idx);
 
                 // Check if the key is already in the current bin. If so, that's an insertion error
-                if (curr_bin.find(item_component) != curr_bin.end())
-                {
+                if (is_present(curr_bin, curr_filter, item_component)) {
                     return -1;
                 }
 
@@ -325,7 +433,8 @@ namespace apsi
             curr_bin_idx = start_bin_idx;
             for (auto &pair : item_label_pairs)
             {
-                map<felt_t, L> &curr_bin = bins_.at(curr_bin_idx);
+                vector<std::pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
+                auto &curr_filter = filters_.at(curr_bin_idx);
 
                 // Compare the would-be bin size here to the running max
                 if (max_bin_size < curr_bin.size() + 1)
@@ -336,7 +445,8 @@ namespace apsi
                 // Insert if not dry run
                 if (!dry_run)
                 {
-                    curr_bin.insert(pair);
+                    curr_bin.push_back(pair);
+                    curr_filter.add(pair.first);
 
                     // Indicate that the polynomials need to be recomputed
                     cache_invalid_ = true;
@@ -367,16 +477,15 @@ namespace apsi
 
             // Check that all the item components appear sequentially in this BinBundle
             size_t curr_bin_idx = start_bin_idx;
-            for (auto &pair : item_label_pairs)
-            {
+            for (auto &pair : item_label_pairs) {
                 auto &item_component = pair.first;
-                map<felt_t, L> &curr_bin = bins_.at(curr_bin_idx);
+                vector<std::pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
+                auto &curr_filter = filters_.at(curr_bin_idx);
 
                 // A non-match was found. This isn't the item we're looking for
-                if (curr_bin.find(item_component) == curr_bin.end())
-                {
+                if (!is_present(curr_bin, curr_filter, pair.first)) {
                     return false;
-                }
+                } 
 
                 curr_bin_idx++;
             }
@@ -390,8 +499,18 @@ namespace apsi
                 auto value = pair.second;
 
                 // Overwrite the label in the bin
-                map<felt_t, L> &curr_bin = bins_.at(curr_bin_idx);
-                curr_bin[key] = value;
+                vector <std::pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
+                auto &curr_filter = filters_.at(curr_bin_idx);
+
+                auto found_pos = std::find_if(
+                    curr_bin.begin(), curr_bin.end(), [&key](const std::pair<felt_t, L> &element) {
+                        return element.first == key;
+                    });
+                if (found_pos != curr_bin.end())
+                {
+                    found_pos->second = value;
+                    regenerate_filter(curr_bin, curr_filter);
+                }
 
                 // Indicate that the polynomials need to be recomputed
                 cache_invalid_ = true;
@@ -419,11 +538,13 @@ namespace apsi
 
             // Go through all the items. If any item doesn't appear, we scrap the whole computation and return false.
             size_t curr_bin_idx = start_bin_idx;
-            vector<typename map<felt_t, L>::iterator> to_remove_its;
+            vector<typename vector<pair<felt_t, L>>::iterator> to_remove_its;
             for (auto &item : items)
             {
-                map<felt_t, L> &curr_bin = bins_.at(curr_bin_idx);
-                auto to_remove_it = curr_bin.find(item);
+                vector < pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
+                auto &curr_filter = filters_.at(curr_bin_idx);
+
+                auto to_remove_it = get_iterator(curr_bin, curr_filter, item);
 
                 if (to_remove_it == curr_bin.end())
                 {
@@ -443,8 +564,11 @@ namespace apsi
             curr_bin_idx = start_bin_idx;
             for (auto to_remove_it : to_remove_its)
             {
-                map<felt_t, L> &curr_bin = bins_.at(curr_bin_idx);
+                vector < pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
+                auto &curr_filter = filters_.at(curr_bin_idx);
+
                 curr_bin.erase(to_remove_it);
+                regenerate_filter(curr_bin, curr_filter);
 
                 // Indicate that the polynomials need to be recomputed
                 cache_invalid_ = true;
@@ -481,8 +605,10 @@ namespace apsi
             size_t curr_bin_idx = start_bin_idx;
             for (auto &item : items)
             {
-                const map<felt_t, L> &curr_bin = bins_.at(curr_bin_idx);
-                auto label_it = curr_bin.find(item);
+                const vector<pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
+                const auto &curr_filter = filters_.at(curr_bin_idx);
+
+                auto label_it = get_iterator(curr_bin, curr_filter, (felt_t)item);
 
                 if (label_it == curr_bin.end())
                 {
@@ -511,6 +637,13 @@ namespace apsi
             size_t bins_size = bins_.size();
             bins_.clear();
             bins_.resize(bins_size);
+            filters_.clear();
+            filters_.reserve(bins_size);
+
+            for (size_t i = 0; i < bins_size; i++) {
+                filters_.emplace_back(BloomFilter(max_bin_size_, /* size_ratio */ 20));
+            }
+
             clear_cache();
         }
 
@@ -580,7 +713,7 @@ namespace apsi
             cache_.felt_matching_polyns.clear();
 
             // For each bin in the bundle, compute and cache the corresponding "matching" polynomial
-            for (map<felt_t, monostate> &bin : bins_)
+            for (vector<pair<felt_t, monostate>> & bin : bins_)
             {
                 // Compute and cache the matching polynomial
                 FEltPolyn p = compute_matching_polyn(bin, mod);
@@ -603,7 +736,7 @@ namespace apsi
             cache_.felt_interp_polyns.clear();
 
             // For each bin in the bundle, compute and cache the corresponding "matching" and Newton polynomials
-            for (map<felt_t, felt_t> &bin : bins_)
+            for (vector<pair<felt_t, felt_t>> & bin : bins_)
             {
                 // Compute and cache the matching polynomial
                 FEltPolyn p = compute_matching_polyn(bin, mod);

@@ -309,7 +309,7 @@ namespace apsi
                     if (!written)
                     {
                         // Make a fresh BinBundle and insert
-                        BinBundle<L> new_bin_bundle(crypto_context, compressed);
+                        BinBundle<L> new_bin_bundle(crypto_context, compressed, max_bin_size);
                         int res = new_bin_bundle.multi_insert_for_real(data, bin_idx);
 
                         // If even that failed, I don't know what could've happened

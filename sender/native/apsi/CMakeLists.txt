@@ -11,6 +11,7 @@ target_sources(sender
 
 if(APSI_USE_ZMQ)
     add_subdirectory(zmq)
+    add_subdirectory(util)
 endif()
 
 install(

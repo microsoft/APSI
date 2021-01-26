@@ -116,6 +116,7 @@ int run_sender_dispatcher(const CLP &cmd)
     }
 
     auto [oprf_key, sender_db] = create_sender_db(*db_data, *params, cmd.threads());
+    db_data = nullptr;
 
     signal(SIGINT, sigint_handler);
 
