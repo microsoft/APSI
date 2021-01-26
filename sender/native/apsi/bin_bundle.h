@@ -310,7 +310,7 @@ namespace apsi
             /**
             Returns a constant reference to the vector of bins in this BinBundle.
             */
-            const std::vector<std::map<felt_t, L>> &get_bins() const
+            const std::vector<std::vector<std::pair<felt_t, L>>> &get_bins() const
             {
                 return bins_;
             }

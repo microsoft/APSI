@@ -74,25 +74,39 @@ namespace apsi
             Helper function. Determines if a field element is present in a bin.
             */
             template<typename L>
-            bool is_present(const vector<std::pair<felt_t, L>> &curr_bin, const BloomFilter &curr_filter, const felt_t &element)
+            bool is_present(const vector<pair<felt_t, L>> &bin, const BloomFilter &filter, const felt_t &element)
             {
                 total_search_count++;
 
                 // Check if the key is already in the current bin.
-                if (curr_filter.maybe_present(element)) {
+                if (filter.maybe_present(element)) {
                     // Perform a linear search to determine true/false positives
-                    if (curr_bin.end() != std::find_if(
-                                              curr_bin.begin(),
-                                              curr_bin.end(),
-                                              [&element](const std::pair<felt_t, L> &elem) {
-                                                  return elem.first == element;
-                                              })) {
+                    bool result = is_present(bin, element);
+
+                    if (result)
                         true_positives++;
+                    else
+                        false_positives++;
 
-                        return true;
-                    }
+                    return result;
+                }
 
-                    false_positives++;
+                return false;
+            }
+
+            /**
+            Helper function. Determines if a field element is present in a bin.
+            */
+            template<typename L>
+            bool is_present(const vector<pair<felt_t, L>> &bin, const felt_t &element)
+            {
+                if (bin.end() != std::find_if(
+                                          bin.begin(),
+                                          bin.end(),
+                                          [&element](const std::pair<felt_t, L> &elem) {
+                                              return elem.first == element;
+                                          })) {
+                    return true;
                 }
 
                 return false;
@@ -103,7 +117,6 @@ namespace apsi
             invalid iterator otherwise.
             */
             template<typename L>
-            /*vector<std::pair<felt_t, L>>::iterator*/
             auto get_iterator(
                 vector<pair<felt_t, L>> &bin, const BloomFilter &filter, const felt_t &element)
             {
@@ -767,7 +780,7 @@ namespace apsi
         namespace
         {
             template<typename L>
-            flatbuffers::Offset<fbs::FEltArray> add_felt_items(flatbuffers::FlatBufferBuilder &fbs_builder, const map<felt_t, L> &bin)
+            flatbuffers::Offset<fbs::FEltArray> add_felt_items(flatbuffers::FlatBufferBuilder &fbs_builder, const vector<pair<felt_t, L>> &bin)
             {
                 vector<felt_t> felts_data;
                 felts_data.reserve(bin.size());
@@ -777,16 +790,16 @@ namespace apsi
             }
 
             template<typename L>
-            flatbuffers::Offset<fbs::FEltArray> add_felt_labels(flatbuffers::FlatBufferBuilder &fbs_builder, const map<felt_t, L> &bin);
+            flatbuffers::Offset<fbs::FEltArray> add_felt_labels(flatbuffers::FlatBufferBuilder &fbs_builder, const vector<pair<felt_t, L>> &bin);
 
             template<>
-            flatbuffers::Offset<fbs::FEltArray> add_felt_labels(flatbuffers::FlatBufferBuilder &fbs_builder, const map<felt_t, monostate> &bin)
+            flatbuffers::Offset<fbs::FEltArray> add_felt_labels(flatbuffers::FlatBufferBuilder &fbs_builder, const vector<pair<felt_t, monostate>> &bin)
             {
                 return flatbuffers::Offset<fbs::FEltArray>{};
             }
 
             template<>
-            flatbuffers::Offset<fbs::FEltArray> add_felt_labels(flatbuffers::FlatBufferBuilder &fbs_builder, const map<felt_t, felt_t> &bin)
+            flatbuffers::Offset<fbs::FEltArray> add_felt_labels(flatbuffers::FlatBufferBuilder &fbs_builder, const vector<pair<felt_t, felt_t>> &bin)
             {
                 vector<felt_t> felts_data;
                 felts_data.reserve(bin.size());
@@ -910,18 +923,26 @@ namespace apsi
         namespace
         {
             template<typename L>
-            bool add_to_bin(map<felt_t, L> &bin, felt_t felt_item, felt_t felt_label);
+            bool add_to_bin(vector<pair<felt_t, L>> &bin, felt_t felt_item, felt_t felt_label);
 
             template<>
-            bool add_to_bin(map<felt_t, monostate> &bin, felt_t felt_item, felt_t felt_label)
+            bool add_to_bin(vector<pair<felt_t, monostate>> &bin, felt_t felt_item, felt_t felt_label)
             {
-                return bin.emplace(make_pair(felt_item, monostate{})).second;
+                if (is_present(bin, felt_item))
+                    return false;
+
+                bin.push_back(make_pair(felt_item, monostate{}));
+                return true;
             }
 
             template<>
-            bool add_to_bin(map<felt_t, felt_t> &bin, felt_t felt_item, felt_t felt_label)
+            bool add_to_bin(vector<pair<felt_t, felt_t>> &bin, felt_t felt_item, felt_t felt_label)
             {
-                return bin.emplace(make_pair(felt_item, felt_label)).second;
+                if (is_present(bin, felt_item))
+                    return false;
+
+                bin.push_back(make_pair(felt_item, felt_label));
+                return true;
             }
         }
 
@@ -934,7 +955,7 @@ namespace apsi
             // Remove everything and clear the cache
             clear();
 
-            vector<seal_byte> in_data(util::read_from_stream(in));
+            vector<seal_byte> in_data(apsi::util::read_from_stream(in));
 
             auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedBinBundleBuffer(verifier);
