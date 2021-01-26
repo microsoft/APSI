@@ -15,6 +15,7 @@
 
 // SEAL
 #include "seal/util/common.h"
+#include "seal/util/streambuf.h"
 
 using namespace std;
 using namespace seal;
@@ -66,7 +67,7 @@ namespace apsi
         {
             vector<seal_byte> in_data(util::read_from_stream(in));
 
-            auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
+            auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationHeaderBuffer(verifier);
             if (!safe)
             {
@@ -113,7 +114,7 @@ namespace apsi
 
             vector<seal_byte> in_data(util::read_from_stream(in));
 
-            auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
+            auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationBuffer(verifier);
             if (!safe)
             {
@@ -135,7 +136,7 @@ namespace apsi
         {
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
-            auto oprf_data = fbs_builder.CreateVector(reinterpret_cast<const uint8_t*>(data.data()), data.size());
+            auto oprf_data = fbs_builder.CreateVector(reinterpret_cast<const unsigned char*>(data.data()), data.size());
             auto req = fbs::CreateOPRFRequest(fbs_builder, oprf_data);
 
             fbs::SenderOperationBuilder sop_builder(fbs_builder);
@@ -164,7 +165,7 @@ namespace apsi
 
             vector<seal_byte> in_data(util::read_from_stream(in));
 
-            auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
+            auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationBuffer(verifier);
             if (!safe)
             {
@@ -261,7 +262,7 @@ namespace apsi
 
             vector<seal_byte> in_data(util::read_from_stream(in));
 
-            auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
+            auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationBuffer(verifier);
             if (!safe)
             {

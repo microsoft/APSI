@@ -1,11 +1,17 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license.
+
 // STD
 #include <algorithm>
 #include <utility>
 
 // APSI
+#include "apsi/bin_bundle_generated.h"
 #include "apsi/bin_bundle.h"
-#include "apsi/logging/log.h"
 #include "apsi/util/interpolate.h"
+
+// SEAL
+#include "seal/util/defines.h"
 
 static size_t false_positives = 0;
 static size_t true_positives = 0;
@@ -17,7 +23,6 @@ namespace apsi
     using namespace seal;
     using namespace seal::util;
     using namespace util;
-    using namespace logging;
 
     namespace sender
     {
@@ -174,19 +179,19 @@ namespace apsi
                 "SEAL must be built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF");
 #endif
             // We need to have enough ciphertext powers to evaluate this polynomial
-            if (batched_coeffs_.size() > ciphertext_powers.size())
+            if (batched_coeffs.size() > ciphertext_powers.size())
             {
                 throw invalid_argument("not enough ciphertext powers available");
             }
 
-            const SEALContext &seal_context = *crypto_context_.seal_context();
-            Evaluator &evaluator = *crypto_context_.evaluator();
+            const SEALContext &seal_context = *crypto_context.seal_context();
+            Evaluator &evaluator = *crypto_context.evaluator();
 
             // Lowest degree terms are stored in the lowest index positions in vectors. Specifically,
-            // ciphertext_powers[1] is the first power of the ciphertext data, but batched_coeffs_[0] is the constant
+            // ciphertext_powers[1] is the first power of the ciphertext data, but batched_coeffs[0] is the constant
             // coefficient.
             //
-            // Because the plaintexts in batched_coeffs_ can be identically zero, SEAL should be built with
+            // Because the plaintexts in batched_coeffs can be identically zero, SEAL should be built with
             // SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF. We create a result ciphertext that is identically zero and set
             // its NTT form flag to true so the additions below will work.
             Ciphertext result;
@@ -194,9 +199,9 @@ namespace apsi
             result.is_ntt_form() = true;
             Ciphertext temp;
             Plaintext coeff;
-            for (size_t deg = 1; deg < batched_coeffs_.size(); deg++)
+            for (size_t deg = 1; deg < batched_coeffs.size(); deg++)
             {
-                coeff.unsafe_load(seal_context, batched_coeffs_[deg].data(), batched_coeffs_[deg].size());
+                coeff.unsafe_load(seal_context, batched_coeffs[deg].data(), batched_coeffs[deg].size());
                 evaluator.multiply_plain(ciphertext_powers[deg], coeff, temp);
                 evaluator.add_inplace(result, temp);
             }
@@ -204,7 +209,7 @@ namespace apsi
             // Need to transform back from NTT form before we can add the constant coefficient. The constant coefficient
             // is specifically not in NTT form so this can work.
             evaluator.transform_from_ntt_inplace(result);
-            coeff.unsafe_load(seal_context, batched_coeffs_[0].data(), batched_coeffs_[0].size());
+            coeff.unsafe_load(seal_context, batched_coeffs[0].data(), batched_coeffs[0].size());
             evaluator.add_plain_inplace(result, coeff);
 
             // Make the result as small as possible by modulus switching
@@ -255,7 +260,7 @@ namespace apsi
             const vector<FEltPolyn> &polyns,
             CryptoContext crypto_context,
             bool compressed
-        ) : crypto_context_(move(crypto_context))
+        ) : crypto_context(move(crypto_context))
         {
             compr_mode_type compr_mode = compressed ? compr_mode_type::zstd : compr_mode_type::none;
 
@@ -289,18 +294,17 @@ namespace apsi
 
                 // Now let pt be the Plaintext consisting of all those degree i coefficients
                 Plaintext pt;
-                crypto_context_.encoder()->encode(coeffs_of_deg_i, pt);
+                this->crypto_context.encoder()->encode(coeffs_of_deg_i, pt);
 
                 // When evaluating the match and interpolation polynomials on encrypted query data, we multiply each
                 // power of the encrypted query with a plaintext (pt here) corresponding to the polynomial coefficient,
-                // and add the results together. The constant coefficients (i == 0 here) is handled by performing
-                // a "dummy encryption" operation on it so it can be added to the result. The dummy encryption, however,
-                // requires that the plaintext is not in NTT form.
+                // and add the results together. The constant coefficient (i == 0 here) is handled by simply adding to
+                // the result, which requires that the plaintext is not in NTT form.
                 if (i != 0)
                 {
-                    crypto_context_.evaluator()->transform_to_ntt_inplace(
+                    this->crypto_context.evaluator()->transform_to_ntt_inplace(
                         pt,
-                        crypto_context_.seal_context()->first_parms_id()
+                        this->crypto_context.seal_context()->first_parms_id()
                     );
                 }
 
@@ -309,7 +313,7 @@ namespace apsi
                 pt_data.resize(pt.save_size(compr_mode));
                 size_t size = pt.save(pt_data.data(), pt_data.size(), compr_mode);
                 pt_data.resize(size);
-                batched_coeffs_.push_back(move(pt_data));
+                batched_coeffs.push_back(move(pt_data));
             }
         }
 
@@ -340,9 +344,8 @@ namespace apsi
         Returns the modulus that defines the finite field that we're working in
         */
         template<typename L>
-        const Modulus& BinBundle<L>::field_mod()
+        const Modulus& BinBundle<L>::field_mod() const
         {
-            // Forgive me
             const auto &context_data = crypto_context_.seal_context()->first_context_data();
             return context_data->parms().plain_modulus();
         }
@@ -654,7 +657,11 @@ namespace apsi
         void BinBundle<L>::clear_cache()
         {
             cache_.felt_matching_polyns.clear();
+            cache_.batched_matching_polyn = crypto_context_;
+
             cache_.felt_interp_polyns.clear();
+            cache_.batched_interp_polyn.crypto_context = crypto_context_;
+
             cache_invalid_ = true;
         }
 
@@ -755,6 +762,370 @@ namespace apsi
         bool BinBundle<L>::empty() const
         {
             return all_of(bins_.begin(), bins_.end(), [](auto &b) { return b.empty(); });
+        }
+
+        namespace
+        {
+            template<typename L>
+            flatbuffers::Offset<fbs::FEltArray> add_felt_items(flatbuffers::FlatBufferBuilder &fbs_builder, const map<felt_t, L> &bin)
+            {
+                vector<felt_t> felts_data;
+                felts_data.reserve(bin.size());
+                transform(bin.cbegin(), bin.cend(), back_inserter(felts_data), [](const auto &ilp) { return ilp.first; });
+                auto felt_items = fbs_builder.CreateVector(felts_data);
+                return fbs::CreateFEltArray(fbs_builder, felt_items);
+            }
+
+            template<typename L>
+            flatbuffers::Offset<fbs::FEltArray> add_felt_labels(flatbuffers::FlatBufferBuilder &fbs_builder, const map<felt_t, L> &bin);
+
+            template<>
+            flatbuffers::Offset<fbs::FEltArray> add_felt_labels(flatbuffers::FlatBufferBuilder &fbs_builder, const map<felt_t, monostate> &bin)
+            {
+                return flatbuffers::Offset<fbs::FEltArray>{};
+            }
+
+            template<>
+            flatbuffers::Offset<fbs::FEltArray> add_felt_labels(flatbuffers::FlatBufferBuilder &fbs_builder, const map<felt_t, felt_t> &bin)
+            {
+                vector<felt_t> felts_data;
+                felts_data.reserve(bin.size());
+                transform(bin.cbegin(), bin.cend(), back_inserter(felts_data), [](const auto &ilp) { return ilp.second; });
+                auto felt_labels = fbs_builder.CreateVector(felts_data);
+                return fbs::CreateFEltArray(fbs_builder, felt_labels);
+            }
+        }
+
+        /**
+        Saves the BinBundle to a stream.
+        */
+        template<typename L>
+        size_t BinBundle<L>::save(ostream &out, uint32_t bundle_idx) const
+        {
+            // Is this a labeled BinBundle?
+            constexpr bool labeled = is_same_v<L, felt_t>;
+            
+            const Modulus &mod = field_mod();
+            auto mod_bit_count = mod.bit_count();
+            auto mod_byte_count = (mod_bit_count + 7) >> 3;
+            
+            flatbuffers::FlatBufferBuilder fbs_builder(1024);
+
+            auto bins = fbs_builder.CreateVector([&]() {
+                // The Bin vector is populated with an immediately-invoked lambda
+                vector<flatbuffers::Offset<fbs::Bin>> ret;
+                for (const auto &bin : bins_)
+                {
+                    // Create the FEltArrays of items and labels (if in labeled mode)
+                    auto felt_items = add_felt_items(fbs_builder, bin);
+                    auto felt_labels = add_felt_labels(fbs_builder, bin);
+                    ret.push_back(fbs::CreateBin(fbs_builder, felt_items, felt_labels));
+                }
+                return ret;
+            }());
+
+            flatbuffers::Offset<fbs::BinBundleCache> bin_bundle_cache;
+            if (!cache_invalid_)
+            {
+                auto felt_matching_polyns = fbs_builder.CreateVector([&]() {
+                    // The felt_matching_polyns vector is populated with an immediately-invoked lambda
+                    vector<flatbuffers::Offset<fbs::FEltArray>> ret;
+                    for (const auto &fmp : cache_.felt_matching_polyns)
+                    {
+                        auto fmp_coeffs = fbs_builder.CreateVector(fmp);
+                        ret.push_back(fbs::CreateFEltArray(fbs_builder, fmp_coeffs));
+                    }
+                    return ret;
+                }());
+
+                auto batched_matching_polyn_data = fbs_builder.CreateVector([&]() {
+                    // The batched_matching_polyn is populated with an immediately-invoked lambda
+                    vector<flatbuffers::Offset<fbs::Plaintext>> ret;
+                    for (const auto &coeff : cache_.batched_matching_polyn.batched_coeffs)
+                    {
+                        auto data = fbs_builder.CreateVector(
+                            reinterpret_cast<const unsigned char*>(coeff.data()),
+                            coeff.size());
+                        ret.push_back(fbs::CreatePlaintext(fbs_builder, data));
+                    }
+                    return ret;
+                }());
+                auto batched_matching_polyn = fbs::CreateBatchedPlaintextPolyn(fbs_builder, batched_matching_polyn_data);
+
+                flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<fbs::FEltArray>>> felt_interp_polyns;
+                flatbuffers::Offset<fbs::BatchedPlaintextPolyn> batched_interp_polyn;
+                if (labeled)
+                {
+                    felt_interp_polyns = fbs_builder.CreateVector([&]() {
+                        // The felt_interp_polyns vector is populated with an immediately-invoked lambda
+                        vector<flatbuffers::Offset<fbs::FEltArray>> ret;
+                        for (const auto &fip : cache_.felt_interp_polyns)
+                        {
+                            auto fip_coeffs = fbs_builder.CreateVector(fip);
+                            ret.push_back(fbs::CreateFEltArray(fbs_builder, fip_coeffs));
+                        }
+                        return ret;
+                    }());
+
+                    auto batched_interp_polyn_data = fbs_builder.CreateVector([&]() {
+                        // The batched_interp_polyn is populated with an immediately-invoked lambda
+                        vector<flatbuffers::Offset<fbs::Plaintext>> ret;
+                        for (const auto &coeff : cache_.batched_interp_polyn.batched_coeffs)
+                        {
+                            auto data = fbs_builder.CreateVector(
+                                reinterpret_cast<const unsigned char*>(coeff.data()),
+                                coeff.size());
+                            ret.push_back(fbs::CreatePlaintext(fbs_builder, data));
+                        }
+                        return ret;
+                    }());
+                    batched_interp_polyn = fbs::CreateBatchedPlaintextPolyn(fbs_builder, batched_interp_polyn_data);
+                }
+
+                fbs::BinBundleCacheBuilder bin_bundle_cache_builder(fbs_builder);
+                bin_bundle_cache_builder.add_felt_matching_polyns(felt_matching_polyns);
+                bin_bundle_cache_builder.add_batched_matching_polyn(batched_matching_polyn);
+                bin_bundle_cache_builder.add_felt_interp_polyns(felt_interp_polyns);
+                bin_bundle_cache_builder.add_batched_interp_polyn(batched_interp_polyn);
+                bin_bundle_cache = bin_bundle_cache_builder.Finish();
+            }
+
+            fbs::BinBundleBuilder bin_bundle_builder(fbs_builder);
+            bin_bundle_builder.add_bundle_idx(bundle_idx);
+            bin_bundle_builder.add_labeled(labeled);
+            bin_bundle_builder.add_mod(mod.value());
+            bin_bundle_builder.add_bins(bins);
+            bin_bundle_builder.add_cache(bin_bundle_cache);
+
+            auto bb = bin_bundle_builder.Finish();
+            fbs_builder.FinishSizePrefixed(bb);
+
+            out.write(
+                reinterpret_cast<const char*>(fbs_builder.GetBufferPointer()),
+                safe_cast<streamsize>(fbs_builder.GetSize()));
+
+            return fbs_builder.GetSize();
+        }
+
+        namespace
+        {
+            template<typename L>
+            bool add_to_bin(map<felt_t, L> &bin, felt_t felt_item, felt_t felt_label);
+
+            template<>
+            bool add_to_bin(map<felt_t, monostate> &bin, felt_t felt_item, felt_t felt_label)
+            {
+                return bin.emplace(make_pair(felt_item, monostate{})).second;
+            }
+
+            template<>
+            bool add_to_bin(map<felt_t, felt_t> &bin, felt_t felt_item, felt_t felt_label)
+            {
+                return bin.emplace(make_pair(felt_item, felt_label)).second;
+            }
+        }
+
+        /**
+        Loads the BinBundle from a stream. Returns the bundle index and the number of bytes read.
+        */
+        template<typename L>
+        pair<uint32_t, size_t> BinBundle<L>::load(istream &in)
+        {
+            // Remove everything and clear the cache
+            clear();
+
+            vector<seal_byte> in_data(util::read_from_stream(in));
+
+            auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
+            bool safe = fbs::VerifySizePrefixedBinBundleBuffer(verifier);
+            if (!safe)
+            {
+                APSI_LOG_ERROR("Failed to load BinBundle: the buffer is invalid");
+                throw runtime_error("failed to load BinBundle");
+            }
+
+            auto bb = fbs::GetSizePrefixedBinBundle(in_data.data());
+
+            // Throw if this is not the right kind of BinBundle
+            constexpr bool labeled = is_same_v<L, felt_t>;
+            const char *loaded_type_str = bb->labeled() ? "labeled" : "unlabeled";
+            const char *this_type_str = labeled ? "labeled" : "unlabeled";
+            if (bb->labeled() != labeled)
+            {
+                APSI_LOG_ERROR("The loaded BinBundle is of incorrect type (" << loaded_type_str
+                    << "; expected " << this_type_str << ")");
+                throw runtime_error("failed to load BinBundle");
+            }
+
+            // Load the bundle index
+            uint32_t bundle_idx = bb->bundle_idx();
+
+            // Throw if the field modulus does not match
+            uint64_t mod = bb->mod();
+            if (mod != field_mod().value())
+            {
+                APSI_LOG_ERROR("The loaded BinBundle field modulus (" << mod
+                    << ") differs from the field modulus of this BinBundle (" << field_mod().value() << ")");
+                throw runtime_error("failed to load BinBundle");
+            }
+
+            auto mod_bit_count = field_mod().bit_count();
+            auto mod_byte_count = (mod_bit_count + 7) >> 3;
+
+            size_t num_bins = bins_.size();
+
+            // Check that the number of bins is correct
+            const auto &bins = *bb->bins();
+            if (num_bins != bins.size())
+            {
+                APSI_LOG_ERROR("The loaded BinBundle has " << bins.size()
+                    << " bins but this BinBundle expects " << num_bins << " bins");
+                throw runtime_error("failed to load BinBundle");
+            }
+
+            for (size_t i = 0; i < bins.size(); i++)
+            {
+                bool has_labels = !!(bins[i]->felt_labels());
+                if (labeled != has_labels)
+                {
+                    const char *labeled_type_str = has_labels ? "labeled" : "unlabeled";
+                    APSI_LOG_ERROR("The loaded BinBundle contains data of incorrect type (" << labeled_type_str
+                        << "; expected " << this_type_str << ")");
+                    throw runtime_error("failed to load BinBundle");
+                }
+
+                if (labeled && (bins[i]->felt_items()->felts()->size() != bins[i]->felt_labels()->felts()->size()))
+                {
+                    APSI_LOG_ERROR("The loaded BinBundle contains data for " << bins[i]->felt_items()->felts()->size()
+                        << " items and " << bins[i]->felt_labels()->felts()->size() << " labels (expected to be equal)");
+                    throw runtime_error("failed to load BinBundle");
+                }
+
+                for (size_t j = 0; j < bins[i]->felt_items()->felts()->size(); j++)
+                {
+                    felt_t felt_item = bins[i]->felt_items()->felts()->data()[j];
+
+                    felt_t felt_label = 0;
+                    if (labeled)
+                    {
+                        felt_label = bins[i]->felt_labels()->felts()->data()[j];
+                    }
+
+                    // Add the loaded item-label pair to the bin
+                    if (!add_to_bin(bins_[i], felt_item, felt_label))
+                    {
+                        APSI_LOG_ERROR("The loaded BinBundle data contains repeated values for the same bin");
+                        throw runtime_error("failed to load BinBundle");
+                    }
+                }
+            }
+
+            if (bb->cache())
+            {
+                const auto &cache = *bb->cache();
+
+                if (cache.felt_matching_polyns()->size() != num_bins)
+                {
+                    APSI_LOG_ERROR("The loaded BinBundle cache contains an incorrect number ("
+                        << cache.felt_matching_polyns()->size() << ") of matching polynomials (expected "
+                        << num_bins << ")");
+                    throw runtime_error("failed to load BinBundle");
+                }
+
+                size_t max_bin_size = 0;
+                cache_.felt_matching_polyns.reserve(num_bins);
+                for (const auto &felt_matching_polyn : *cache.felt_matching_polyns())
+                {
+                    FEltPolyn p;
+                    p.reserve(felt_matching_polyn->felts()->size());
+                    copy(
+                        felt_matching_polyn->felts()->cbegin(),
+                        felt_matching_polyn->felts()->cend(),
+                        back_inserter(p));
+                    cache_.felt_matching_polyns.push_back(move(p));
+                    max_bin_size = max<size_t>(max_bin_size, felt_matching_polyn->felts()->size());
+                }
+
+                if (cache.batched_matching_polyn()->coeffs()->size() != max_bin_size)
+                {
+                    APSI_LOG_ERROR("The loaded BinBundle cache contains an incorrect number ("
+                        << cache.batched_matching_polyn()->coeffs()->size() 
+                        << ") of batched matching polynomial coefficients (expected " << max_bin_size << ")");
+                    throw runtime_error("failed to load BinBundle");
+                }
+                for (auto batched_matching_polyn_coeff : *cache.batched_matching_polyn()->coeffs())
+                {
+                    vector<seal_byte> pt_data;
+                    pt_data.reserve(batched_matching_polyn_coeff->data()->size());
+                    transform(
+                        batched_matching_polyn_coeff->data()->cbegin(),
+                        batched_matching_polyn_coeff->data()->cend(),
+                        back_inserter(pt_data),
+                        [](auto b) { return static_cast<seal_byte>(b); });
+                    cache_.batched_matching_polyn.batched_coeffs.push_back(move(pt_data));
+                }
+
+                if (labeled)
+                {
+                    if (!cache.felt_interp_polyns())
+                    {
+                        APSI_LOG_ERROR("The loaded BinBundle cache does not contain interpolation polynomials");
+                        throw runtime_error("failed to load BinBundle");
+                    }
+
+                    if (cache.felt_interp_polyns()->size() != num_bins)
+                    {
+                        APSI_LOG_ERROR("The loaded BinBundle cache contains an incorrect number ("
+                            << cache.felt_interp_polyns()->size() << ") of interpolation polynomials (expected "
+                            << num_bins << ")");
+                        throw runtime_error("failed to load BinBundle");
+                    }
+
+                    max_bin_size = 0;
+                    cache_.felt_interp_polyns.reserve(num_bins);
+                    for (const auto &felt_interp_polyn : *cache.felt_interp_polyns())
+                    {
+                        FEltPolyn p;
+                        p.reserve(felt_interp_polyn->felts()->size());
+                        copy(
+                            felt_interp_polyn->felts()->cbegin(),
+                            felt_interp_polyn->felts()->cend(),
+                            back_inserter(p));
+                        cache_.felt_interp_polyns.push_back(move(p));
+                        max_bin_size = max<size_t>(max_bin_size, felt_interp_polyn->felts()->size());
+                    }
+
+                    if (!cache.batched_interp_polyn())
+                    {
+                        APSI_LOG_ERROR("The loaded BinBundle cache does not contain a batched interpolation polynomial");
+                        throw runtime_error("failed to load BinBundle");
+                    }
+
+                    if (cache.batched_interp_polyn()->coeffs()->size() != max_bin_size)
+                    {
+                        APSI_LOG_ERROR("The loaded BinBundle cache contains an incorrect number ("
+                            << cache.batched_interp_polyn()->coeffs()->size() 
+                            << ") of batched interpolation polynomial coefficients (expected " << max_bin_size << ")");
+                        throw runtime_error("failed to load BinBundle");
+                    }
+                    for (auto batched_interp_polyn_coeff : *cache.batched_interp_polyn()->coeffs())
+                    {
+                        vector<seal_byte> pt_data;
+                        pt_data.reserve(batched_interp_polyn_coeff->data()->size());
+                        transform(
+                            batched_interp_polyn_coeff->data()->cbegin(),
+                            batched_interp_polyn_coeff->data()->cend(),
+                            back_inserter(pt_data),
+                            [](auto b) { return static_cast<seal_byte>(b); });
+                        cache_.batched_interp_polyn.batched_coeffs.push_back(move(pt_data));
+                    }
+                }
+
+                // Mark the cache as valid
+                cache_invalid_ = false;
+            }
+
+            return { bundle_idx, in_data.size() };
         }
 
         // BinBundle will only ever be used with these two label types. Ordinarily we'd have to put method definitions

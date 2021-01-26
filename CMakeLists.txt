@@ -210,7 +210,7 @@ set(THIRDPARTY_DIR ${APSI_SOURCE_DIR}/thirdparty)
 find_package(SEAL 3.6 CONFIG REQUIRED)
 
 # Microsoft Kuku
-find_package(Kuku 2.0 REQUIRED)
+find_package(Kuku 2.1 REQUIRED)
 
 # Log4cplus
 if(APSI_USE_LOG4CPLUS)
@@ -279,6 +279,22 @@ endif()
 
 execute_process(
     COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp --include-prefix "apsi/network/" -o "${APSI_SOURCE_DIR}/common/native/apsi/network" "${APSI_SOURCE_DIR}/common/native/apsi/network/result_package.fbs"
+    OUTPUT_QUIET
+    RESULT_VARIABLE result)
+if(result)
+    message(FATAL_ERROR "flatc failed (${result})")
+endif()
+
+execute_process(
+    COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp --include-prefix "apsi/" -o "${APSI_SOURCE_DIR}/sender/native/apsi" "${APSI_SOURCE_DIR}/sender/native/apsi/bin_bundle.fbs"
+    OUTPUT_QUIET
+    RESULT_VARIABLE result)
+if(result)
+    message(FATAL_ERROR "flatc failed (${result})")
+endif()
+
+execute_process(
+    COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp --include-prefix "apsi/" -I "${APSI_SOURCE_DIR}/common/native/apsi" -o "${APSI_SOURCE_DIR}/sender/native/apsi" "${APSI_SOURCE_DIR}/sender/native/apsi/sender_db.fbs"
     OUTPUT_QUIET
     RESULT_VARIABLE result)
 if(result)

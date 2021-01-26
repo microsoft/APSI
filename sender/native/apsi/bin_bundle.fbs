@@ -1,0 +1,38 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license.
+
+namespace apsi.fbs;
+
+table FEltArray {
+    felts:[uint64] (required);
+}
+
+table Plaintext {
+    data:[ubyte] (required);
+}
+
+table BatchedPlaintextPolyn {
+    coeffs:[Plaintext] (required);
+}
+
+table BinBundleCache {
+    felt_matching_polyns:[FEltArray] (required);
+    batched_matching_polyn:BatchedPlaintextPolyn (required);
+    felt_interp_polyns:[FEltArray];
+    batched_interp_polyn:BatchedPlaintextPolyn;
+}
+
+table Bin {
+    felt_items:FEltArray (required);
+    felt_labels:FEltArray;
+}
+
+table BinBundle {
+    bundle_idx:uint32;
+    labeled:bool;
+    mod:uint64;
+    bins:[Bin] (required);
+    cache:BinBundleCache;
+}
+
+root_type BinBundle;

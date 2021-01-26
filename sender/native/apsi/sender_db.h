@@ -7,6 +7,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <iostream>
 #include <memory>
 #include <unordered_set>
 #include <unordered_map>
@@ -31,6 +32,12 @@ namespace apsi
 {
     namespace sender
     {
+        class SenderDB;
+
+        std::size_t SaveSenderDB(std::shared_ptr<SenderDB> sender_db, std::ostream &out);
+
+        std::pair<std::shared_ptr<SenderDB>, std::size_t> LoadSenderDB(std::istream &in);
+
         /**
         SenderDB is an interface class with two implementations: UnlabeledSenderDB and LabeledSenderDB. A SenderDB
         maintains an in-memory representation of the sender's set of items. These items are not simply copied into the
@@ -46,6 +53,10 @@ namespace apsi
         */
         class SenderDB
         {
+        friend std::size_t SaveSenderDB(std::shared_ptr<SenderDB> sender_db, std::ostream &out);
+
+        friend std::pair<std::shared_ptr<SenderDB>, std::size_t> LoadSenderDB(std::istream &in);
+
         public:
             /**
             Creates a new SenderDB.
@@ -56,6 +67,19 @@ namespace apsi
             Clears the database. Every item and label will be removed.
             */
             virtual void clear_db() = 0;
+
+            /**
+            Returns whether this is a labeled SenderDB.
+            */
+            virtual bool is_labeled() const = 0;
+
+            /**
+            Indicates whether SEAL plaintexts are compressed in memory.
+            */
+            bool is_compressed() const
+            {
+                return compressed_;
+            }
 
             /**
             Clears the database and inserts the given data, using at most thread_count threads. This function can be
@@ -153,24 +177,36 @@ namespace apsi
             /**
             Returns a reference to a set of items already existing in the SenderDB.
             */
-            const std::unordered_set<HashedItem> &get_items() {
+            const std::unordered_set<HashedItem> &get_items() const 
+            {
                 return items_;
             }
 
             /**
             Returns the total number of bin bundles.
             */
-            virtual std::size_t get_bin_bundle_count() = 0;
+            virtual std::size_t get_bin_bundle_count() const = 0;
+
+            /**
+            Returns how efficiently the SenderDB is packaged. A higher rate indicates better performance and a lower
+            communication cost in a query execution.
+            */
+            double get_packing_rate() const;
 
             /**
             Obtains a scoped lock preventing the SenderDB from being changed.
             */
-            seal::util::ReaderLock get_reader_lock()
+            seal::util::ReaderLock get_reader_lock() const
             {
                 return db_lock_.acquire_read();
             }
 
         protected:
+            seal::util::WriterLock get_writer_lock()
+            {
+                return db_lock_.acquire_write();
+            }
+
             /**
             The set of all items that have been inserted into the database
             */
@@ -199,6 +235,10 @@ namespace apsi
 
         class LabeledSenderDB final : public SenderDB
         {
+        friend std::size_t SaveSenderDB(std::shared_ptr<SenderDB> sender_db, std::ostream &out);
+
+        friend std::pair<std::shared_ptr<SenderDB>, std::size_t> LoadSenderDB(std::istream &in);
+
         private:
             /**
             All the BinBundles in the database, indexed by bundle index. The set (represented by a vector internally) at
@@ -221,9 +261,17 @@ namespace apsi
             void clear_db() override;
 
             /**
+            Returns whether this is a labeled SenderDB.
+            */
+            bool is_labeled() const override
+            {
+                return true;
+            }
+
+            /**
             Returns the total number of bin bundles.
             */
-            std::size_t get_bin_bundle_count() override;
+            std::size_t get_bin_bundle_count() const override;
 
             /**
             Returns a set of cache references corresponding to the bundles at the given bundle index. Even though this
@@ -317,12 +365,16 @@ namespace apsi
 
         class UnlabeledSenderDB final : public SenderDB
         {
+        friend std::size_t SaveSenderDB(std::shared_ptr<SenderDB> sender_db, std::ostream &out);
+
+        friend std::pair<std::shared_ptr<SenderDB>, std::size_t> LoadSenderDB(std::istream &in);
+
         private:
             /**
-            All the BinBundles in the DB, indexed by bin index. The set (represented by a vector internally) at bundle
-            index i contains all the BinBundles with bundle index i.
+            All the BinBundles in the DB, indexed by bundle index. The set (represented by a vector internally) at
+            bundle index i contains all the BinBundles with bundle index i.
             */
-            std::vector<std::vector<BinBundle<monostate>>> bin_bundles_;
+            std::vector<std::vector<BinBundle<apsi::util::monostate>>> bin_bundles_;
 
         public:
             /**
@@ -339,9 +391,17 @@ namespace apsi
             void clear_db() override;
 
             /**
+            Returns whether this is a labeled SenderDB.
+            */
+            bool is_labeled() const override
+            {
+                return false;
+            }
+
+            /**
             Returns the total number of bin bundles.
             */
-            std::size_t get_bin_bundle_count() override;
+            std::size_t get_bin_bundle_count() const override;
 
             /**
             Returns a set of cache references corresponding to the bundles at the given bundle index. Even though this

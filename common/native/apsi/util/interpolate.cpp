@@ -100,7 +100,7 @@ namespace apsi
             bool all_zeros = all_of(values.cbegin(), values.cend(), [](auto a) { return a == 0; });
             if (all_zeros)
             {
-                return {};
+                return { 0 };
             }
 
             auto size = points.size();

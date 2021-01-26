@@ -116,7 +116,7 @@ namespace apsi
 
     size_t SaveParams(const PSIParams &params, ostream &out)
     {
-        flatbuffers::FlatBufferBuilder fbs_builder(1024);
+        flatbuffers::FlatBufferBuilder fbs_builder(128);
 
         fbs::ItemParams item_params(params.item_params().felts_per_item);
 
@@ -159,7 +159,7 @@ namespace apsi
     {
         vector<seal_byte> in_data(util::read_from_stream(in));
 
-        auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(in_data.data()), in_data.size());
+        auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
         bool safe = fbs::VerifySizePrefixedPSIParamsBuffer(verifier);
         if (!safe)
         {
@@ -208,9 +208,7 @@ namespace apsi
             throw runtime_error("failed to load parameters: invalid scheme type");
         }
 
-        return make_pair(
-            PSIParams(item_params, table_params, query_params, seal_params),
-            in_data.size());
+        return { PSIParams(item_params, table_params, query_params, seal_params), in_data.size() };
     }
 
     string PSIParams::to_string() const

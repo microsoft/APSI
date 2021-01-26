@@ -145,11 +145,11 @@ namespace APSITests
 
         PSIParams::TableParams table_params;
         table_params.hash_func_count = 4;
-        table_params.max_items_per_bin = 128;
+        table_params.max_items_per_bin = 70;
         table_params.table_size = 65536;
 
         PSIParams::QueryParams query_params;
-        query_params.query_powers = { 1, 7, 12, 43, 52 };
+        query_params.query_powers = { 1, 3, 11, 15, 32 };
 
         PSIParams::SEALParams seal_params;
         seal_params.set_poly_modulus_degree(16384);
