@@ -52,6 +52,17 @@ namespace APSITests
 
             return params;
         }
+
+        template <typename L>
+        auto find_in_bin(const vector<pair<felt_t, L>> &bin, const felt_t &element)
+        {
+            auto result =
+                std::find_if(bin.begin(), bin.end(), [&element](const pair<felt_t, L> &elem) {
+                    return elem.first == element;
+                });
+
+            return result;
+        }
     }
 
     TEST(BinBundleTests, BatchedPlaintextPolynCreate)
@@ -130,10 +141,10 @@ namespace APSITests
         CryptoContext context(*get_params());
 
         // No evaluator set in context
-        ASSERT_THROW(BinBundle<monostate> bb(context, true), invalid_argument);
+        ASSERT_THROW(BinBundle<monostate> bb(context, true, 50), invalid_argument);
 
         context.set_evaluator();
-        BinBundle<monostate> bb(context, true);
+        BinBundle<monostate> bb(context, true, 50);
 
         ASSERT_TRUE(bb.cache_invalid());
         bb.clear_cache();
@@ -159,10 +170,10 @@ namespace APSITests
         CryptoContext context(*get_params());
 
         // No evaluator set in context
-        ASSERT_THROW(BinBundle<felt_t> bb(context, true), invalid_argument);
+        ASSERT_THROW(BinBundle<felt_t> bb(context, true, 50), invalid_argument);
 
         context.set_evaluator();
-        BinBundle<felt_t> bb(context, true);
+        BinBundle<felt_t> bb(context, true, 50);
 
         ASSERT_TRUE(bb.cache_invalid());
         bb.clear_cache();
@@ -193,7 +204,7 @@ namespace APSITests
         CryptoContext context(*get_params());
         context.set_evaluator();
 
-        BinBundle<monostate> bb(context, true);
+        BinBundle<monostate> bb(context, true, 50);
         bb.regen_cache();
         ASSERT_FALSE(bb.cache_invalid());
         ASSERT_TRUE(bb.empty());
@@ -293,7 +304,7 @@ namespace APSITests
         CryptoContext context(*get_params());
         context.set_evaluator();
 
-        BinBundle<felt_t> bb(context, true);
+        BinBundle<felt_t> bb(context, true, 50);
         bb.regen_cache();
         ASSERT_FALSE(bb.cache_invalid());
         ASSERT_TRUE(bb.empty());
@@ -432,7 +443,7 @@ namespace APSITests
         CryptoContext context(*get_params());
         context.set_evaluator();
 
-        BinBundle<felt_t> bb(context, true);
+        BinBundle<felt_t> bb(context, true, 50);
 
         vector<pair<felt_t, felt_t>> values{ make_pair(1, 1) };
 
@@ -542,7 +553,7 @@ namespace APSITests
         CryptoContext context(*get_params());
         context.set_evaluator();
 
-        BinBundle<monostate> bb(context, true);
+        BinBundle<monostate> bb(context, true, 50);
         bb.regen_cache();
         ASSERT_FALSE(bb.cache_invalid());
         ASSERT_TRUE(bb.empty());
@@ -601,12 +612,12 @@ namespace APSITests
         CryptoContext context(*get_params());
         context.set_evaluator();
 
-        BinBundle<monostate> bb(context, true);
+        BinBundle<monostate> bb(context, true, get_params()->table_params().max_items_per_bin);
         bb.regen_cache();
         ASSERT_TRUE(bb.empty());
         auto save_size = bb.save(ss, 1212);
 
-        BinBundle<monostate> bb2(context, true);
+        BinBundle<monostate> bb2(context, true, get_params()->table_params().max_items_per_bin);
         auto load_size = bb2.load(ss);
         ASSERT_EQ(1212, load_size.first);
         ASSERT_EQ(save_size, load_size.second);
@@ -637,18 +648,18 @@ namespace APSITests
         ASSERT_FALSE(bb2.empty());
 
         // These pass for the original BinBundle
-        ASSERT_NE(bb.get_bins()[0].end(), bb.get_bins()[0].find(1));
-        ASSERT_NE(bb.get_bins()[0].end(), bb.get_bins()[0].find(2));
-        ASSERT_NE(bb.get_bins()[1].end(), bb.get_bins()[1].find(3));
+        ASSERT_NE(bb.get_bins()[0].end(), find_in_bin(bb.get_bins()[0], 1));
+        ASSERT_NE(bb.get_bins()[0].end(), find_in_bin(bb.get_bins()[0], 2));
+        ASSERT_NE(bb.get_bins()[1].end(), find_in_bin(bb.get_bins()[1], 3));
 
         // These should pass for the loaded BinBundle
-        ASSERT_NE(bb2.get_bins()[0].end(), bb2.get_bins()[0].find(1));
-        ASSERT_NE(bb2.get_bins()[0].end(), bb2.get_bins()[0].find(2));
-        ASSERT_NE(bb2.get_bins()[1].end(), bb2.get_bins()[1].find(3));
+        ASSERT_NE(bb2.get_bins()[0].end(), find_in_bin(bb2.get_bins()[0], 1));
+        ASSERT_NE(bb2.get_bins()[0].end(), find_in_bin(bb2.get_bins()[0], 2));
+        ASSERT_NE(bb2.get_bins()[1].end(), find_in_bin(bb2.get_bins()[1], 3));
 
         // Try loading to labeled BinBundle
         ss.seekg(0);
-        BinBundle<felt_t> bb3(context, true);
+        BinBundle<felt_t> bb3(context, true, get_params()->table_params().max_items_per_bin);
         ASSERT_THROW(bb3.load(ss), runtime_error);
     }
 
@@ -659,12 +670,12 @@ namespace APSITests
         CryptoContext context(*get_params());
         context.set_evaluator();
 
-        BinBundle<felt_t> bb(context, true);
+        BinBundle<felt_t> bb(context, true, get_params()->table_params().max_items_per_bin);
         bb.regen_cache();
         ASSERT_TRUE(bb.empty());
         auto save_size = bb.save(ss, 1);
 
-        BinBundle<felt_t> bb2(context, true);
+        BinBundle<felt_t> bb2(context, true, get_params()->table_params().max_items_per_bin);
         auto load_size = bb2.load(ss);
         ASSERT_EQ(1, load_size.first);
         ASSERT_EQ(save_size, load_size.second);
@@ -695,30 +706,30 @@ namespace APSITests
         ASSERT_FALSE(bb2.empty());
 
         // These pass for the original BinBundle
-        auto find_res = bb.get_bins()[0].find(1);
+        auto find_res = find_in_bin(bb.get_bins()[0], 1);
         ASSERT_NE(bb.get_bins()[0].end(), find_res);
         ASSERT_EQ(2, find_res->second);
-        find_res = bb.get_bins()[0].find(2);
+        find_res = find_in_bin(bb.get_bins()[0], 2);
         ASSERT_NE(bb.get_bins()[0].end(), find_res);
         ASSERT_EQ(3, find_res->second);
-        find_res = bb.get_bins()[1].find(3);
+        find_res = find_in_bin(bb.get_bins()[1], 3);
         ASSERT_NE(bb.get_bins()[1].end(), find_res);
         ASSERT_EQ(4, find_res->second);
 
         // These should pass for the loaded BinBundle
-        find_res = bb2.get_bins()[0].find(1);
+        find_res = find_in_bin(bb2.get_bins()[0], 1);
         ASSERT_NE(bb2.get_bins()[0].end(), find_res);
         ASSERT_EQ(2, find_res->second);
-        find_res = bb2.get_bins()[0].find(2);
+        find_res = find_in_bin(bb2.get_bins()[0], 2);
         ASSERT_NE(bb2.get_bins()[0].end(), find_res);
         ASSERT_EQ(3, find_res->second);
-        find_res = bb2.get_bins()[1].find(3);
+        find_res = find_in_bin(bb2.get_bins()[1], 3);
         ASSERT_NE(bb2.get_bins()[1].end(), find_res);
         ASSERT_EQ(4, find_res->second);
 
         // Try loading to unlabeled BinBundle
         ss.seekg(0);
-        BinBundle<monostate> bb3(context, true);
+        BinBundle<monostate> bb3(context, true, get_params()->table_params().max_items_per_bin);
         ASSERT_THROW(bb3.load(ss), runtime_error);
     }
 }

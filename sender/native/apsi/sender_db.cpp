@@ -312,7 +312,7 @@ namespace apsi
                     if (!written)
                     {
                         // Make a fresh BinBundle and insert
-                        BinBundle<L> new_bin_bundle(crypto_context, compressed);
+                        BinBundle<L> new_bin_bundle(crypto_context, compressed, max_bin_size);
                         int res = new_bin_bundle.multi_insert_for_real(data, bin_idx);
 
                         // If even that failed, I don't know what could've happened
@@ -1167,7 +1167,7 @@ namespace apsi
 
         pair<shared_ptr<SenderDB>, size_t> LoadSenderDB(istream &in)
         {
-            vector<seal_byte> in_data(util::read_from_stream(in));
+            vector<seal_byte> in_data(apsi::util::read_from_stream(in));
 
             auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderDBBuffer(verifier);
@@ -1235,13 +1235,14 @@ namespace apsi
 
             auto bin_bundle_count = sdb->bin_bundle_count();
             size_t bin_bundle_data_size = 0;
+            uint32_t max_bin_size = params->table_params().max_items_per_bin;
 
             if (labeled)
             {
                 auto labeled_sender_db = dynamic_pointer_cast<LabeledSenderDB>(sender_db);
                 while (bin_bundle_count--)
                 {
-                    BinBundle<felt_t> bb(labeled_sender_db->crypto_context_, compressed);
+                    BinBundle<felt_t> bb(labeled_sender_db->crypto_context_, compressed, max_bin_size);
                     auto bb_data = bb.load(in);
 
                     // Make sure BinBundle cache is valid
@@ -1268,7 +1269,7 @@ namespace apsi
                 auto unlabeled_sender_db = dynamic_pointer_cast<UnlabeledSenderDB>(sender_db);
                 while (bin_bundle_count--)
                 {
-                    BinBundle<monostate> bb(unlabeled_sender_db->crypto_context_, compressed);
+                    BinBundle<monostate> bb(unlabeled_sender_db->crypto_context_, compressed, max_bin_size);
                     auto bb_data = bb.load(in);
 
                     // Check that the loaded bundle index is not out of range

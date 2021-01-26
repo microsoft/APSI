@@ -8,6 +8,7 @@
 #include <thread>
 #include <future>
 #include <sstream>
+#include <fstream>
 
 // APSI
 #include "apsi/sender.h"
@@ -133,7 +134,7 @@ namespace apsi
             if (!query)
             {
                 APSI_LOG_ERROR("Failed to process query request: query is invalid");
-                invalid_argument("query is invalid");
+                throw invalid_argument("query is invalid");
             }
 
             thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
@@ -248,6 +249,7 @@ namespace apsi
             // Compute the powers for each bundle index and loop over the BinBundles
             Evaluator &evaluator = *crypto_context.evaluator();
             RelinKeys &relin_keys = *crypto_context.relin_keys();
+
             for (uint32_t bundle_idx = bundle_idx_start; bundle_idx < bundle_idx_end; bundle_idx++)
             {
                 auto bundle_caches = sender_db->get_cache_at(bundle_idx);

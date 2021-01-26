@@ -11,6 +11,7 @@
 // APSI
 #include "apsi/crypto_context.h"
 #include "apsi/util/db_encoding.h"
+#include "apsi/util/bloom_filter.h"
 
 // SEAL
 #include "seal/util/defines.h"
@@ -166,7 +167,13 @@ namespace apsi
             The bins of the BinBundle. Each bin is a key-value store, where the keys are (chunks of the OPRF'd) DB
             items and the labels are either field elements or empty (a unit type).
             */
-            std::vector<std::map<felt_t, L>> bins_;
+            std::vector<std::vector<std::pair<felt_t, L>>> bins_;
+
+            /**
+            Each bin in the BinBundle has a BloomFilter that helps quickly determine whether a field element is
+            contained.
+            */
+            std::vector<apsi::sender::util::BloomFilter> filters_;
 
             /**
             A cache of all the computations we can do on the bins. This is empty by default.
@@ -191,12 +198,17 @@ namespace apsi
             void regen_plaintexts();
 
             /**
-            Returns the modulus that defines the finite field that we're working in.
+            Maximum size of the bins
+            */
+            std::size_t max_bin_size_;
+
+            /**
+            Returns the modulus that defines the finite field that we're working in
             */
             const seal::Modulus &field_mod() const;
 
         public:
-            BinBundle(const CryptoContext &crypto_context, bool compressed);
+            BinBundle(const CryptoContext &crypto_context, bool compressed, std::size_t max_bin_size);
 
             BinBundle(const BinBundle &copy) = delete;
 
@@ -298,7 +310,7 @@ namespace apsi
             /**
             Returns a constant reference to the vector of bins in this BinBundle.
             */
-            const std::vector<std::map<felt_t, L>> &get_bins() const
+            const std::vector<std::vector<std::pair<felt_t, L>>> &get_bins() const
             {
                 return bins_;
             }

@@ -50,7 +50,11 @@ namespace APSITests
         // Corner-cases
         ASSERT_THROW(BitstringView<seal_byte> bsv(data, 0), invalid_argument);
         ASSERT_THROW(BitstringView<seal_byte> bsv(data, 65), invalid_argument);
-        ASSERT_THROW(BitstringView<seal_byte> bsv(data, 56), invalid_argument);
+
+        bsv = BitstringView<seal_byte>(data, 56);
+        ASSERT_EQ(bsv.bit_count(), 56);
+        ASSERT_EQ(bsv.data().size(), 7);
+        //ASSERT_THROW(BitstringView<seal_byte> bsv(data, 56), invalid_argument);
     }
 
     TEST(BitstringTests, Basics)
@@ -90,7 +94,11 @@ namespace APSITests
         // Corner-cases
         ASSERT_THROW(Bitstring bs(get_data(), 0), invalid_argument);
         ASSERT_THROW(Bitstring bs(get_data(), 65), invalid_argument);
-        ASSERT_THROW(Bitstring bs(get_data(), 56), invalid_argument);
+        //ASSERT_THROW(Bitstring bs(get_data(), 56), invalid_argument);
+
+        bs = Bitstring(get_data(), 56);
+        ASSERT_EQ(bs.bit_count(), 56);
+        ASSERT_EQ(bs.data().size(), 7);
     }
 
     TEST(ItemTests, Constructor)
