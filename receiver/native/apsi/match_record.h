@@ -55,8 +55,8 @@ namespace apsi
             template<typename T, typename = std::enable_if_t<std::is_standard_layout<T>::value>>
             gsl::span<std::add_const_t<T>> get_as() const
             {
-                return { reinterpret_cast<std::add_const_t<T>*>(label_->data().data()),
-                    label_->data().size() / sizeof(T) };
+                std::size_t count = label_->data().size() / sizeof(T);
+                return { reinterpret_cast<std::add_const_t<T>*>(label_->data().data()), count };
             }
 
             /**

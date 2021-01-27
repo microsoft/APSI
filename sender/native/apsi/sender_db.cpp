@@ -37,7 +37,7 @@ namespace apsi
         namespace
         {
             /**
-            Creates and returns the vector of hash functions similarly to how Kuku 2.0 sets them internally.
+            Creates and returns the vector of hash functions similarly to how Kuku 2.x sets them internally.
             */
             vector<LocFunc> hash_functions(const PSIParams &params)
             {
@@ -1098,7 +1098,8 @@ namespace apsi
 
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
-            auto params = fbs_builder.CreateVector(reinterpret_cast<unsigned char*>(params_str.data()), params_str.size());
+            auto params = fbs_builder.CreateVector(
+                reinterpret_cast<unsigned char*>(params_str.data()), params_str.size());
             fbs::SenderDBInfo info(sender_db->is_labeled(), sender_db->is_compressed());
             auto hashed_items = fbs_builder.CreateVector([&]() {
                 // The HashedItems vector is populated with an immediately-invoked lambda
@@ -1107,7 +1108,7 @@ namespace apsi
                 {
                     // Then create the vector of bytes for this hashed item
                     auto hashed_item = fbs_builder.CreateVector(
-                        reinterpret_cast<const unsigned char *>(it.data()), item_byte_count);
+                        it.get_as<const unsigned char>().data(), item_byte_count);
                     ret.push_back(fbs::CreateHashedItem(fbs_builder, hashed_item));
                 }
                 return ret;
@@ -1229,7 +1230,7 @@ namespace apsi
                 copy_n(
                     reinterpret_cast<const seal_byte*>(it->data()->data()),
                     item_byte_count,
-                    reinterpret_cast<seal_byte*>(item.data()));
+                    item.get_as<seal_byte>().data());
                 sender_db->items_.insert(move(item));
             }
 

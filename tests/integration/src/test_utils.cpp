@@ -111,8 +111,8 @@ namespace APSITests
                 [&item](auto &item_label) { return item == item_label.first; });
             ASSERT_NE(all_item_labels.end(), reference_label);
 
-            array<uint64_t, 2> label;
-            copy_n(query_result[idx].label.get_as<uint64_t>().begin(), 2, label.begin());
+            array<unsigned char, 16> label;
+            copy_n(query_result[idx].label.get_as<unsigned char>().begin(), 16, label.data());
             ASSERT_EQ(reference_label->second.value(), label);
         }
     }

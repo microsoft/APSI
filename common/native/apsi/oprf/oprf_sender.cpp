@@ -109,7 +109,7 @@ namespace apsi
             for (auto &item : oprf_items)
             {
                 // Create an elliptic curve point from the item
-                ECPoint ecpt({ reinterpret_cast<const unsigned char *>(item.data()), oprf_item_size });
+                ECPoint ecpt(item.get_as<const unsigned char>());
 
                 // Multiply with key
                 ecpt.scalar_multiply(oprf_key.key_span(), true);
@@ -121,7 +121,7 @@ namespace apsi
                 // The first 128 bits represent the item hash; the next 128 bits represent the label encryption key and
                 // are discarded in this overload of ComputeHashes
                 oprf_hash_type hash;
-                copy_n(item_hash_and_label_key.data(), oprf_hash_size, reinterpret_cast<unsigned char *>(hash.data()));
+                copy_n(item_hash_and_label_key.data(), oprf_hash_size, hash.get_as<unsigned char>().data());
 
                 // Add to result
                 oprf_hashes.insert(move(hash));
@@ -139,7 +139,7 @@ namespace apsi
             for (auto &item_label_pair : oprf_item_labels)
             {
                 // Create an elliptic curve point from the item
-                ECPoint ecpt({ reinterpret_cast<const unsigned char *>(item_label_pair.first.data()), oprf_item_size });
+                ECPoint ecpt(item_label_pair.first.get_as<const unsigned char>());
 
                 // Multiply with key
                 ecpt.scalar_multiply(oprf_key.key_span(), true);
@@ -150,7 +150,7 @@ namespace apsi
 
                 // The first 128 bits represent the item hash; the next 128 bits represent the label encryption key
                 pair<oprf_hash_type, FullWidthLabel> hash;
-                copy_n(item_hash_and_label_key.data(), oprf_hash_size, reinterpret_cast<unsigned char *>(hash.first.data()));
+                copy_n(item_hash_and_label_key.data(), oprf_hash_size, hash.first.get_as<unsigned char>().data());
 
                 // Copy the label
                 hash.second = item_label_pair.second;

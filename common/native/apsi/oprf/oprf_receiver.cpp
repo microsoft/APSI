@@ -43,7 +43,7 @@ namespace apsi
             for (size_t i = 0; i < item_count(); i++)
             {
                 // Create an elliptic curve point from the item
-                ECPoint ecpt({ reinterpret_cast<const unsigned char *>(oprf_items[i].data()), oprf_item_size });
+                ECPoint ecpt(oprf_items[i].get_as<const unsigned char>());
 
                 // Create a random scalar for OPRF and save its inverse
                 ECPoint::scalar_type random_scalar;
@@ -79,8 +79,8 @@ namespace apsi
             {
                 // Load the point from items_buffer
                 ECPoint ecpt;
-                ecpt.load(
-                    ECPoint::point_save_span_const_type{ reinterpret_cast<const unsigned char *>(oprf_in_ptr), oprf_response_size });
+                ecpt.load(ECPoint::point_save_span_const_type{
+                    reinterpret_cast<const unsigned char *>(oprf_in_ptr), oprf_response_size });
 
                 // Multiply with inverse random scalar
                 ecpt.scalar_multiply(inv_factor_data_.get_factor(i), false);
@@ -90,7 +90,7 @@ namespace apsi
                 ecpt.extract_hash(item_hash_and_label_key);
 
                 // The first 128 bits represent the item hash; the next 128 bits represent the label decryption key
-                copy_n(item_hash_and_label_key.data(), oprf_hash_size, reinterpret_cast<unsigned char *>(oprf_hashes[i].data()));
+                copy_n(item_hash_and_label_key.data(), oprf_hash_size, oprf_hashes[i].get_as<unsigned char>().data());
 
                 // Move forward
                 advance(oprf_in_ptr, oprf_response_size);

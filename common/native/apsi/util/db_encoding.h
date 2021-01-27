@@ -17,9 +17,7 @@
 #include "gsl/span"
 
 // SEAL
-#include "seal/util/defines.h"
-#include "seal/util/common.h"
-#include "seal/plaintext.h"
+#include "seal/modulus.h"
 
 // APSI
 #include "apsi/item.h"
@@ -43,14 +41,24 @@ namespace apsi
         using FullWidthLabel = Item;
 
         /**
-        Converts the given bitstring to a sequence of field elements (modulo `mod`).
+        Reads a sequence of 8 bytes as a little-endian encoded uint64_t
         */
-        std::vector<felt_t> bits_to_field_elts(BitstringView<const seal::seal_byte> bits, const seal::Modulus &mod);
+        std::uint64_t read_u64_little_endian(const std::array<unsigned char, 8> &bytes);
+
+        /**
+        Writes a uint64_t to a little-endian sequence of 8 bytes
+        */
+        std::array<unsigned char, 8> write_u64_little_endian(std::uint64_t num);
 
         /**
         Converts the given bitstring to a sequence of field elements (modulo `mod`).
         */
-        std::vector<felt_t> bits_to_field_elts(BitstringView<seal::seal_byte> bits, const seal::Modulus &mod);
+        std::vector<felt_t> bits_to_field_elts(BitstringView<const unsigned char> bits, const seal::Modulus &mod);
+
+        /**
+        Converts the given bitstring to a sequence of field elements (modulo `mod`).
+        */
+        std::vector<felt_t> bits_to_field_elts(BitstringView<unsigned char> bits, const seal::Modulus &mod);
 
         /**
         Converts the given field elements (modulo `mod`) to a bitstring.
@@ -87,19 +95,5 @@ namespace apsi
             const std::vector<felt_t> &item,
             std::size_t item_bit_count,
             const seal::Modulus &mod);
-
-#if SEAL_COMPILER == SEAL_COMPILER_MSVC
-        seal::seal_byte operator >>(const seal::seal_byte src, const uint32_t shift);
-
-        seal::seal_byte operator |(const seal::seal_byte src, const seal::seal_byte other);
-
-        seal::seal_byte operator &(const seal::seal_byte src, const seal::seal_byte other);
-
-        seal::seal_byte& operator &=(seal::seal_byte& src, const seal::seal_byte other);
-
-        seal::seal_byte& operator <<=(seal::seal_byte& src, const uint32_t shift);
-
-        seal::seal_byte operator ~(const seal::seal_byte src);
-#endif
     }
 } // namespace apsi
