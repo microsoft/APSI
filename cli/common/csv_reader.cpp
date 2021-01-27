@@ -125,7 +125,7 @@ pair<bool, bool> CSVReader::process_line(const string &line, Item &item, FullWid
     // Second is the label, if present; truncate if too long
     token.clear();
     getline(ss, token);
-    copy_n(token.begin(), min(sizeof(label), token.size()), reinterpret_cast<char *>(label.data()));
+    copy_n(token.begin(), min(sizeof(label), token.size()), label.get_as<char>().begin());
 
     return { true, !token.empty() };
 }

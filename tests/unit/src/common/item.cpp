@@ -22,55 +22,51 @@ namespace APSITests
 {
     TEST(BitstringViewTests, Basics)
     {
-        array<seal_byte, 8> data = {};
+        array<unsigned char, 8> data = {};
         for (size_t i = 0; i < data.size(); i++)
         {
-            data[i] = static_cast<seal_byte>(i);
+            data[i] = static_cast<unsigned char>(i);
         }
 
         // BitstringView to a single byte
-        seal_byte sb{ 0xA5 };
-        BitstringView<seal_byte> bsv(gsl::span<seal_byte>(&sb, 1), 1);
+        unsigned char sb{ 0xA5 };
+        BitstringView<unsigned char> bsv(gsl::span<unsigned char>(&sb, 1), 1);
         ASSERT_EQ(bsv.bit_count(), 1);
         ASSERT_EQ(bsv.data().size(), 1);
         ASSERT_EQ(static_cast<char>(sb), static_cast<char>(bsv.data()[0]));
 
         // Use all bits in the buffer
-        bsv = BitstringView<seal_byte>(data, 64);
+        bsv = BitstringView<unsigned char>(data, 64);
         ASSERT_EQ(bsv.bit_count(), 64);
         ASSERT_EQ(bsv.data().size(), 8);
         ASSERT_EQ(data.data(), bsv.data().data());
 
         // Use as few bits as possible but same number of bytes as buffer
-        bsv = BitstringView<seal_byte>(data, 57);
+        bsv = BitstringView<unsigned char>(data, 57);
         ASSERT_EQ(bsv.bit_count(), 57);
         ASSERT_EQ(bsv.data().size(), 8);
         ASSERT_EQ(data.data(), bsv.data().data());
 
         // Corner-cases
-        ASSERT_THROW(BitstringView<seal_byte> bsv(data, 0), invalid_argument);
-        ASSERT_THROW(BitstringView<seal_byte> bsv(data, 65), invalid_argument);
-
-        bsv = BitstringView<seal_byte>(data, 56);
-        ASSERT_EQ(bsv.bit_count(), 56);
-        ASSERT_EQ(bsv.data().size(), 7);
-        //ASSERT_THROW(BitstringView<seal_byte> bsv(data, 56), invalid_argument);
+        ASSERT_THROW(BitstringView<unsigned char> bsv(data, 0), invalid_argument);
+        ASSERT_THROW(BitstringView<unsigned char> bsv(data, 65), invalid_argument);
+        ASSERT_THROW(BitstringView<unsigned char> bsv(data, 56), invalid_argument);
     }
 
     TEST(BitstringTests, Basics)
     {
         auto get_data = []() {
-            vector<seal_byte> data(8, seal_byte(0));
+            vector<unsigned char> data(8, 0);
             for (size_t i = 0; i < data.size(); i++)
             {
-                data[i] = static_cast<seal_byte>(i);
+                data[i] = static_cast<unsigned char>(i);
             }
             return data;
         };
 
         auto get_single_byte = []() {
-            vector<seal_byte> single_byte;
-            single_byte.push_back(seal_byte(0xA5));
+            vector<unsigned char> single_byte;
+            single_byte.push_back(0xA5);
             return single_byte;
         };
 
@@ -106,10 +102,16 @@ namespace APSITests
         // Zero item test
         Item item;
 
-        ASSERT_EQ(uint64_t(0), item[0]);
-        ASSERT_EQ(uint64_t(0), item[1]);
+        auto data = item.get_as<uint64_t>();
+        ASSERT_EQ(uint64_t(0), data[0]);
+        ASSERT_EQ(uint64_t(0), data[1]);
 
         // Size must be 16 bytes
         ASSERT_EQ(size_t(16), sizeof(Item));
+
+        Item item2(0xFAFAFAFAFAFAFAFAULL, 0xB0B0B0B0B0B0B0B0ULL);
+        auto data2 = item2.get_as<uint64_t>();
+        ASSERT_EQ(0xFAFAFAFAFAFAFAFAULL, data2[0]);
+        ASSERT_EQ(0xB0B0B0B0B0B0B0B0ULL, data2[1]);
     }
 } // namespace APSITests

@@ -24,7 +24,7 @@ namespace APSITests
 {
     namespace
     {
-        felt_t get_bit(const vector<seal_byte> &in, size_t bit_idx)
+        felt_t get_bit(const vector<unsigned char> &in, size_t bit_idx)
         {
             size_t byte_idx = bit_idx >> 3;
             felt_t res = static_cast<felt_t>(in[byte_idx]);
@@ -32,7 +32,7 @@ namespace APSITests
             return (res >> bit_in_byte) & 0x1;
         }
 
-        felt_t get_nibble(const vector<seal_byte> &in, size_t nibble_idx)
+        felt_t get_nibble(const vector<unsigned char> &in, size_t nibble_idx)
         {
             size_t byte_idx = nibble_idx >> 1;
             felt_t res = static_cast<felt_t>(in[byte_idx]);
@@ -43,13 +43,13 @@ namespace APSITests
 
     TEST(DbEncodingTests, BitsToFieldElts)
     {
-        vector<seal_byte> data(4);
-        data[0] = seal_byte(0xF);
-        data[1] = seal_byte(0x1F);
-        data[2] = seal_byte(0x0F);
-        data[3] = seal_byte(0x1F);
+        vector<unsigned char> data(4);
+        data[0] = 0xF;
+        data[1] = 0x1F;
+        data[2] = 0x0F;
+        data[3] = 0x1F;
 
-        BitstringView<const seal_byte> bsv({ data.data(), data.size() }, 8 * data.size());
+        BitstringView<const unsigned char> bsv({ data.data(), data.size() }, 8 * data.size());
 
         // Modulus 3 should cause every bit to be extracted separately
         Modulus mod = 3;
@@ -142,8 +142,8 @@ namespace APSITests
 
             // Make a random bitstring
             random_device rd;
-            vector<seal_byte> bytes(256);
-            std::generate(begin(bytes), end(bytes), [&]() { return static_cast<seal_byte>(rd()); });
+            vector<unsigned char> bytes(256);
+            std::generate(begin(bytes), end(bytes), [&]() { return static_cast<unsigned char>(rd()); });
 
             // Pick a random bit length within range, i.e., within 7 bits of the total length
             std::uniform_int_distribution<size_t> bitlen_dist(0, 7);
@@ -151,7 +151,7 @@ namespace APSITests
             size_t bit_len = bytes.size() * 8 - bitlen_diff;
 
             // Mask away extra bits from top byte
-            bytes.back() &= static_cast<seal_byte>((1 << (8 - bitlen_diff)) - 1);
+            bytes.back() &= static_cast<unsigned char>((1 << (8 - bitlen_diff)) - 1);
 
             // Make the Bitstring object
             Bitstring bs(move(bytes), bit_len);

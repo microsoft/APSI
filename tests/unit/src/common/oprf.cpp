@@ -78,7 +78,7 @@ namespace APSITests
         for (auto i = 0; i < item_count; i++)
         {
             Item it;
-            rng->generate(sizeof(Item), reinterpret_cast<seal_byte *>(it.data()));
+            rng->generate(sizeof(Item), it.get_as<seal_byte>().data());
             items.insert(move(it));
         }
 

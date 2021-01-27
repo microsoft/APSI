@@ -251,8 +251,8 @@ namespace apsi
                     << " with " << cuckoo.loc_func_count() << " hash functions");
                 for (size_t item_idx = 0; item_idx < items.size(); item_idx++)
                 {
-                    auto &item = items[item_idx];
-                    if (!cuckoo.insert(items[item_idx].value()))
+                    const auto &item = items[item_idx];
+                    if (!cuckoo.insert(item.value()))
                     {
                         // Insertion can fail for two reasons:
                         //
@@ -304,9 +304,9 @@ namespace apsi
                     for (auto &item : bundle_items)
                     {
                         // Now set up a BitstringView to this item
-                        gsl::span<const seal_byte> item_bytes(
-                            reinterpret_cast<const seal_byte*>(item.data()), sizeof(item));
-                        BitstringView<const seal_byte> item_bits(item_bytes, params_.item_bit_count());
+                        gsl::span<const unsigned char> item_bytes(
+                            reinterpret_cast<const unsigned char*>(item.data()), sizeof(item));
+                        BitstringView<const unsigned char> item_bits(item_bytes, params_.item_bit_count());
 
                         // Create an algebraic item by breaking up the item into modulo plain_modulus parts
                         vector<uint64_t> alg_item = bits_to_field_elts(item_bits, params_.seal_params().plain_modulus());
