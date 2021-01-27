@@ -47,10 +47,14 @@ namespace APSITests
         ASSERT_EQ(bsv.data().size(), 8);
         ASSERT_EQ(data.data(), bsv.data().data());
 
+        bsv = BitstringView<unsigned char>(data, 56);
+        ASSERT_EQ(bsv.bit_count(), 56);
+        ASSERT_EQ(bsv.data().size(), 7);
+        ASSERT_EQ(data.data(), bsv.data().data());
+
         // Corner-cases
         ASSERT_THROW(BitstringView<unsigned char> bsv(data, 0), invalid_argument);
         ASSERT_THROW(BitstringView<unsigned char> bsv(data, 65), invalid_argument);
-        ASSERT_THROW(BitstringView<unsigned char> bsv(data, 56), invalid_argument);
     }
 
     TEST(BitstringTests, Basics)

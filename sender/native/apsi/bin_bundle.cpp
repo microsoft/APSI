@@ -69,12 +69,30 @@ namespace apsi
                 // Compute and return the Newton interpolation polynomial
                 return newton_interpolate_polyn(points, values, mod);
             }
+            
+            /**
+            Helper function. Determines if a field element is present in a bin.
+            */
+            template<typename L>
+            bool is_present(const vector<pair<felt_t, L>> &bin, felt_t element)
+            {
+                if (bin.end() != find_if(
+                                          bin.begin(),
+                                          bin.end(),
+                                          [&element](const pair<felt_t, L> &elem) {
+                                              return elem.first == element;
+                                          })) {
+                    return true;
+                }
+
+                return false;
+            }
 
             /**
             Helper function. Determines if a field element is present in a bin.
             */
             template<typename L>
-            bool is_present(const vector<pair<felt_t, L>> &bin, const BloomFilter &filter, const felt_t &element)
+            bool is_present(const vector<pair<felt_t, L>> &bin, const BloomFilter &filter, felt_t element)
             {
                 total_search_count++;
 
@@ -95,24 +113,6 @@ namespace apsi
             }
 
             /**
-            Helper function. Determines if a field element is present in a bin.
-            */
-            template<typename L>
-            bool is_present(const vector<pair<felt_t, L>> &bin, const felt_t &element)
-            {
-                if (bin.end() != std::find_if(
-                                          bin.begin(),
-                                          bin.end(),
-                                          [&element](const std::pair<felt_t, L> &elem) {
-                                              return elem.first == element;
-                                          })) {
-                    return true;
-                }
-
-                return false;
-            }
-
-            /**
             Helper function. Returns an iterator pointing to the given field element in the bin if found,
             invalid iterator otherwise.
             */
@@ -123,7 +123,7 @@ namespace apsi
                 total_search_count++;
 
                 if (filter.maybe_present(element)) {
-                    auto result = std::find_if(
+                    auto result = find_if(
                         bin.begin(), bin.end(), [&element](const pair<felt_t, L> &elem) {
                             return elem.first == element;
                         });
@@ -150,7 +150,7 @@ namespace apsi
                 total_search_count++;
 
                 if (filter.maybe_present(element)) {
-                    auto result = std::find_if(
+                    auto result = find_if(
                         bin.begin(), bin.end(), [&element](const pair<felt_t, L> &elem) {
                             return elem.first == element;
                         });
@@ -170,11 +170,11 @@ namespace apsi
             Helper function. Regenerate bloom filter for a given bin.
             */
             template<typename L>
-            void regenerate_filter(const vector<std::pair<felt_t, L>> &bin, BloomFilter &filter)
+            void regenerate_filter(const vector<pair<felt_t, L>> &bin, BloomFilter &filter)
             {
                 filter.clear();
 
-                for (std::pair<felt_t, L> pair : bin) {
+                for (pair<felt_t, L> pair : bin) {
                     filter.add(pair.first);
                 }
             }
@@ -430,10 +430,10 @@ namespace apsi
             // For each key, check that we can insert into the corresponding bin. If the answer is "no" at any point,
             // return -1.
             size_t curr_bin_idx = start_bin_idx;
-            for (auto &pair : item_label_pairs)
+            for (auto &curr_pair : item_label_pairs)
             {
-                auto item_component = pair.first;
-                vector<std::pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
+                auto item_component = curr_pair.first;
+                vector<pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
                 auto &curr_filter = filters_.at(curr_bin_idx);
 
                 // Check if the key is already in the current bin. If so, that's an insertion error
@@ -447,9 +447,9 @@ namespace apsi
             // If we're here, that means we can insert in all bins
             size_t max_bin_size = 0;
             curr_bin_idx = start_bin_idx;
-            for (auto &pair : item_label_pairs)
+            for (auto &curr_pair : item_label_pairs)
             {
-                vector<std::pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
+                vector<pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
                 auto &curr_filter = filters_.at(curr_bin_idx);
 
                 // Compare the would-be bin size here to the running max
@@ -461,8 +461,8 @@ namespace apsi
                 // Insert if not dry run
                 if (!dry_run)
                 {
-                    curr_bin.push_back(pair);
-                    curr_filter.add(pair.first);
+                    curr_bin.push_back(curr_pair);
+                    curr_filter.add(curr_pair.first);
 
                     // Indicate that the polynomials need to be recomputed
                     cache_invalid_ = true;
@@ -493,13 +493,13 @@ namespace apsi
 
             // Check that all the item components appear sequentially in this BinBundle
             size_t curr_bin_idx = start_bin_idx;
-            for (auto &pair : item_label_pairs) {
-                auto &item_component = pair.first;
-                vector<std::pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
+            for (auto &curr_pair : item_label_pairs) {
+                auto &item_component = curr_pair.first;
+                vector<pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
                 auto &curr_filter = filters_.at(curr_bin_idx);
 
                 // A non-match was found. This isn't the item we're looking for
-                if (!is_present(curr_bin, curr_filter, pair.first)) {
+                if (!is_present(curr_bin, curr_filter, curr_pair.first)) {
                     return false;
                 } 
 
@@ -509,17 +509,17 @@ namespace apsi
             // If we're here, that means we can overwrite the labels
             size_t max_bin_size = 0;
             curr_bin_idx = start_bin_idx;
-            for (auto &pair : item_label_pairs)
+            for (auto &curr_pair : item_label_pairs)
             {
-                auto key = pair.first;
-                auto value = pair.second;
+                auto key = curr_pair.first;
+                auto value = curr_pair.second;
 
                 // Overwrite the label in the bin
-                vector <std::pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
+                vector <pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
                 auto &curr_filter = filters_.at(curr_bin_idx);
 
-                auto found_pos = std::find_if(
-                    curr_bin.begin(), curr_bin.end(), [&key](const std::pair<felt_t, L> &element) {
+                auto found_pos = find_if(
+                    curr_bin.begin(), curr_bin.end(), [&key](const pair<felt_t, L> &element) {
                         return element.first == key;
                     });
                 if (found_pos != curr_bin.end())
