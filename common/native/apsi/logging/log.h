@@ -73,12 +73,6 @@ namespace apsi
     std::string msg_str = ss.str();           \
     logging::Log::do_log(msg_str, msg_level); \
 
-#define APSI_LOG_ALL(msg)                                              \
-    do {                                                               \
-        APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::all); \
-        APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::all);     \
-    } while (0);
-
 #define APSI_LOG_INFO(msg)                                              \
     do {                                                                \
         APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::info); \

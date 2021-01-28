@@ -27,7 +27,7 @@ namespace apsi
             bool disable_console = false;
         };
 
-        static LogProperties *log_properties;
+        static unique_ptr<LogProperties> log_properties;
 
         constexpr auto MSG_BUFFER_LEN = 512;
 
@@ -37,7 +37,7 @@ namespace apsi
         {
             if (nullptr == log_properties)
             {
-                log_properties = new LogProperties();
+                log_properties = make_unique<LogProperties>();
             }
 
             return *log_properties;
@@ -125,7 +125,7 @@ namespace apsi
             {
                 if (nullptr != log_properties)
                 {
-                    delete log_properties;
+                    //delete log_properties;
                     log_properties = nullptr;
                 }
             }
@@ -138,7 +138,7 @@ namespace apsi
                 throw runtime_error("Logger is already configured.");
             }
 
-            atexit(exit_handler);
+            //atexit(exit_handler);
 
             if (!get_log_properties().disable_console)
             {
@@ -228,6 +228,7 @@ namespace apsi
         void Log::terminate()
         {
             log4cplus::deinitialize();
+            log_properties = nullptr;
         }
     } // namespace logging
 } // namespace apsi
