@@ -15,10 +15,14 @@
 #include <iostream>
 
 // APSI
+#include "apsi/item.h"
 #include "apsi/util/stopwatch.h"
 
 // SEAL
 #include "seal/util/defines.h"
+
+// Kuku
+#include "kuku/common.h"
 
 namespace apsi
 {
@@ -47,6 +51,11 @@ namespace apsi
         {
             return ((val + step - 1) / step) * step;
         }
+
+        /**
+        Convert an APSI item to a Kuku item
+        */
+        const kuku::item_type &item_to_kuku_item(const apsi::Item::value_type &item);
 
         /**
         Partitions count many points into partition_count many disjoint parts as equally as
