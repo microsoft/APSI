@@ -7,7 +7,7 @@
             "inheritEnvironments": [ "msvc_x64_x64" ],
             "buildRoot": "${projectDir}\\out\\build\\${name}",
             "installRoot": "${projectDir}\\out\\install\\${name}",
-            "cmakeCommandArgs": "-DVCPKG_TARGET_TRIPLET=x64-windows-static-md -DCMAKE_PREFIX_PATH=d:\\progs\\libs\\cmake\\Debug",
+            "cmakeCommandArgs": "-DVCPKG_TARGET_TRIPLET=x64-windows-static-md",
             "buildCommandArgs": "",
             "ctestCommandArgs": "",
             "variables": [
@@ -37,7 +37,7 @@
                     "type": "BOOL"
                 }
             ],
-            "cmakeToolchain": "D:/repos/kiromaru/vcpkg/scripts/buildsystems/vcpkg.cmake"
+            "cmakeToolchain": "D:/repos/vcpkg/scripts/buildsystems/vcpkg.cmake"
         },
         {
             "name": "x64-Release",
@@ -45,7 +45,7 @@
             "configurationType": "Release",
             "buildRoot": "${projectDir}\\out\\build\\${name}",
             "installRoot": "${projectDir}\\out\\install\\${name}",
-            "cmakeCommandArgs": "-DVCPKG_TARGET_TRIPLET=x64-windows-static-md -DCMAKE_PREFIX_PATH=d:\\progs\\libs\\cmake\\Release",
+            "cmakeCommandArgs": "-DVCPKG_TARGET_TRIPLET=x64-windows-static-md",
             "buildCommandArgs": "",
             "ctestCommandArgs": "",
             "inheritEnvironments": [ "msvc_x64_x64" ],
@@ -76,7 +76,7 @@
                     "type": "BOOL"
                 }
             ],
-            "cmakeToolchain": "D:/repos/kiromaru/vcpkg/scripts/buildsystems/vcpkg.cmake"
+            "cmakeToolchain": "D:/repos/vcpkg/scripts/buildsystems/vcpkg.cmake"
         }
     ]
 }
