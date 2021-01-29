@@ -87,7 +87,7 @@ namespace apsi
             static constexpr std::uint64_t cuckoo_table_insert_attempts = 500;
 
             /**
-            Constructs a new receiver with parameters specified. In this case the receiver has specified the parameters
+            Creates a new receiver with parameters specified. In this case the receiver has specified the parameters
             and expects the sender to use the same set.
             */
             Receiver(PSIParams params, std::size_t thread_count = 0);

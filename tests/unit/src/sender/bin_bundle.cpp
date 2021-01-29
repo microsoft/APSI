@@ -262,17 +262,18 @@ namespace APSITests
         ASSERT_FALSE(bb.cache_invalid());
         ASSERT_FALSE(bb.empty());
 
-        // Insert at index 2; the value 1 will intersect with the current bin so will fail
+        // Insert at index 2; the value 1 will intersect with the current bin but that's fine
+        // in the unlabeled case.
         res = bb.multi_insert_for_real(values, 2);
-        ASSERT_EQ(-1 /* largest bin size after insert */, res);
-        ASSERT_FALSE(bb.cache_invalid());
+        ASSERT_EQ(2 /* largest bin size after insert */, res);
+        ASSERT_TRUE(bb.cache_invalid());
         ASSERT_FALSE(bb.empty());
 
         values.clear();
         values.push_back(make_pair(2, monostate()));
         values.push_back(make_pair(3, monostate()));
         res = bb.multi_insert_for_real(values, 1);
-        ASSERT_EQ(2 /* largest bin size after insert */, res);
+        ASSERT_EQ(3 /* largest bin size after insert */, res);
         ASSERT_TRUE(bb.cache_invalid());
         bb.regen_cache();
         ASSERT_FALSE(bb.cache_invalid());
@@ -282,7 +283,7 @@ namespace APSITests
             context.seal_context()->first_context_data()->parms().poly_modulus_degree(),
             make_pair(4, monostate()));
         res = bb.multi_insert_for_real(values, 0);
-        ASSERT_EQ(3 /* largest bin size after insert */, res);
+        ASSERT_EQ(4 /* largest bin size after insert */, res);
         ASSERT_TRUE(bb.cache_invalid());
         bb.regen_cache();
         ASSERT_FALSE(bb.cache_invalid());

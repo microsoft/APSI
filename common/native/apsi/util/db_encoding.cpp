@@ -21,6 +21,36 @@ namespace apsi
     {
         namespace
         {
+            uint64_t read_u64_little_endian(const array<unsigned char, 8> &bytes)
+            {
+                uint64_t val = 0;
+                val |= static_cast<uint64_t>(bytes[0]);
+                val |= static_cast<uint64_t>(bytes[1]) << 8;
+                val |= static_cast<uint64_t>(bytes[2]) << 16;
+                val |= static_cast<uint64_t>(bytes[3]) << 24;
+                val |= static_cast<uint64_t>(bytes[4]) << 32;
+                val |= static_cast<uint64_t>(bytes[5]) << 40;
+                val |= static_cast<uint64_t>(bytes[6]) << 48;
+                val |= static_cast<uint64_t>(bytes[7]) << 56;
+
+                return val;
+            }
+
+            array<unsigned char, 8> write_u64_little_endian(uint64_t num)
+            {
+                array<unsigned char, 8> bytes;
+                bytes[0] = static_cast<unsigned char>( num & 0x00000000000000FFULL);
+                bytes[1] = static_cast<unsigned char>((num & 0x000000000000FF00ULL) >> 8);
+                bytes[2] = static_cast<unsigned char>((num & 0x0000000000FF0000ULL) >> 16);
+                bytes[3] = static_cast<unsigned char>((num & 0x00000000FF000000ULL) >> 24);
+                bytes[4] = static_cast<unsigned char>((num & 0x000000FF00000000ULL) >> 32);
+                bytes[5] = static_cast<unsigned char>((num & 0x0000FF0000000000ULL) >> 40);
+                bytes[6] = static_cast<unsigned char>((num & 0x00FF000000000000ULL) >> 48);
+                bytes[7] = static_cast<unsigned char>((num & 0xFF00000000000000ULL) >> 56);
+
+                return bytes;
+            }
+
             void copy_with_bit_offset(
                 gsl::span<const unsigned char> src,
                 uint32_t bit_offset,
@@ -39,9 +69,13 @@ namespace apsi
                 uint32_t rem_bits = bit_count - full_byte_count * 8;
 #ifdef APSI_DEBUG
                 if (bit_offset + bit_count > src.size() * 8)
+                {
                     throw invalid_argument("invalid split_length, or index out of range");
+                }
                 if (bit_count > dest.size() * 8)
+                {
                     throw invalid_argument("bit_count too large for dest");
+                }
 #endif
                 if (low_offset)
                 {
@@ -182,36 +216,6 @@ namespace apsi
             }
         }
 
-        uint64_t read_u64_little_endian(const array<unsigned char, 8> &bytes)
-        {
-            uint64_t val = 0;
-            val |= static_cast<uint64_t>(bytes[0]);
-            val |= static_cast<uint64_t>(bytes[1]) << 8;
-            val |= static_cast<uint64_t>(bytes[2]) << 16;
-            val |= static_cast<uint64_t>(bytes[3]) << 24;
-            val |= static_cast<uint64_t>(bytes[4]) << 32;
-            val |= static_cast<uint64_t>(bytes[5]) << 40;
-            val |= static_cast<uint64_t>(bytes[6]) << 48;
-            val |= static_cast<uint64_t>(bytes[7]) << 56;
-
-            return val;
-        }
-
-        array<unsigned char, 8> write_u64_little_endian(uint64_t num)
-        {
-            array<unsigned char, 8> bytes;
-            bytes[0] = static_cast<unsigned char>( num & 0x00000000000000FFULL);
-            bytes[1] = static_cast<unsigned char>((num & 0x000000000000FF00ULL) >> 8);
-            bytes[2] = static_cast<unsigned char>((num & 0x0000000000FF0000ULL) >> 16);
-            bytes[3] = static_cast<unsigned char>((num & 0x00000000FF000000ULL) >> 24);
-            bytes[4] = static_cast<unsigned char>((num & 0x000000FF00000000ULL) >> 32);
-            bytes[5] = static_cast<unsigned char>((num & 0x0000FF0000000000ULL) >> 40);
-            bytes[6] = static_cast<unsigned char>((num & 0x00FF000000000000ULL) >> 48);
-            bytes[7] = static_cast<unsigned char>((num & 0xFF00000000000000ULL) >> 56);
-
-            return bytes;
-        }
-
         /**
         Converts the given bitstring to a sequence of field elements (modulo `mod`)
         */
@@ -342,10 +346,12 @@ namespace apsi
             const HashedItem &item, const FullWidthLabel &label, size_t item_bit_count, const Modulus &mod)
         {
             // Convert the item from to a sequence of field elements. This is the "algebraic item".
-            vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(item_bit_count).to_view(), mod);
+            BitstringView<const unsigned char> item_bsw(item.get_as<const unsigned char>(), item_bit_count);
+            vector<felt_t> alg_item = bits_to_field_elts(item_bsw, mod);
 
             // Convert the label from to a sequence of field elements. This is the "algebraic label".
-            vector<felt_t> alg_label = bits_to_field_elts(label.to_bitstring(item_bit_count).to_view(), mod);
+            BitstringView<const unsigned char> label_bsw(label.get_as<const unsigned char>(), item_bit_count);
+            vector<felt_t> alg_label = bits_to_field_elts(label_bsw, mod);
 
             // The number of field elements necessary to represent both these values MUST be the same
             if (alg_item.size() != alg_label.size())
@@ -371,7 +377,8 @@ namespace apsi
         AlgItemLabel<monostate> algebraize_item(const HashedItem &item, size_t item_bit_count, const Modulus &mod)
         {
             // Convert the item from to a sequence of field elements. This is the "algebraic item".
-            vector<felt_t> alg_item = bits_to_field_elts(item.to_bitstring(item_bit_count).to_view(), mod);
+            BitstringView<const unsigned char> item_bsw(item.get_as<const unsigned char>(), item_bit_count);
+            vector<felt_t> alg_item = bits_to_field_elts(item_bsw, mod);
 
             // Convert vector to vector of pairs where the second element of each pair is monostate
             AlgItemLabel<monostate> ret;
@@ -383,7 +390,6 @@ namespace apsi
             return ret;
         }
 
-
         /**
         Converts a sequence of field elements into an Item. This will throw an invalid_argument if too many field
         elements are given, i.e., if modulus_bitlen * num_elements > 128.
@@ -391,8 +397,7 @@ namespace apsi
         HashedItem dealgebraize_item(const vector<felt_t> &item, size_t item_bit_count, const Modulus &mod)
         {
             Bitstring bits = field_elts_to_bits(item, item_bit_count, mod);
-            BitstringView<unsigned char> view = bits.to_view();
-            return view;
+            return HashedItem(bits.to_view());
         }
     }
 }

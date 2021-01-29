@@ -3,6 +3,7 @@
 
 // STD
 #include <algorithm>
+#include <type_traits>
 #include <utility>
 
 // APSI
@@ -13,6 +14,7 @@
 // SEAL
 #include "seal/util/defines.h"
 
+#pragma message("REMOVE THESE EVENTUALLY")
 static size_t false_positives = 0;
 static size_t true_positives = 0;
 static size_t total_search_count = 0;
@@ -113,8 +115,8 @@ namespace apsi
             }
 
             /**
-            Helper function. Returns an iterator pointing to the given field element in the bin if found,
-            invalid iterator otherwise.
+            Helper function. Returns an iterator pointing to the given field element in the bin if found
+            and bin.end() otherwise.
             */
             template<typename L>
             auto get_iterator(
@@ -128,9 +130,12 @@ namespace apsi
                             return elem.first == element;
                         });
 
-                    if (bin.end() == result) {
+                    if (bin.end() == result)
+                    {
                         false_positives++;
-                    } else {
+                    }
+                    else
+                    {
                         true_positives;
                     }
 
@@ -142,7 +147,7 @@ namespace apsi
 
             /**
             Helper function. Returns a const iterator pointing to the given field element in the bin if
-            found, invalid iterator otherwise.
+            found and bin.end() otherwise.
             */
             template <typename L>
             auto get_iterator(const vector<pair<felt_t, L>> &bin, const BloomFilter &filter, const felt_t &element)
@@ -156,9 +161,13 @@ namespace apsi
                         });
 
                     if (bin.end() == result)
+                    {
                         false_positives++;
+                    }
                     else
+                    {
                         true_positives++;
+                    }
 
                     return result;
                 }
@@ -167,14 +176,14 @@ namespace apsi
             }
 
             /**
-            Helper function. Regenerate bloom filter for a given bin.
+            Helper function. Regenerate Bloom filter for a given bin.
             */
             template<typename L>
             void regenerate_filter(const vector<pair<felt_t, L>> &bin, BloomFilter &filter)
             {
                 filter.clear();
-
-                for (pair<felt_t, L> pair : bin) {
+                for (pair<felt_t, L> pair : bin)
+                {
                     filter.add(pair.first);
                 }
             }
@@ -242,11 +251,9 @@ namespace apsi
                     get_significant_bit_count(parms.poly_modulus_degree());
 
                 int coeff_mod_bit_count = parms.coeff_modulus()[0].bit_count();
-                APSI_LOG_DEBUG("coeffmodbitcount " << coeff_mod_bit_count);
 
                 // The number of bits to set to zero
                 int irrelevant_bit_count = coeff_mod_bit_count - compr_coeff_bit_count;
-                APSI_LOG_DEBUG("irrelevant_bit_count " << irrelevant_bit_count);
 
                 // Can compression achieve anything?
                 if (irrelevant_bit_count > 0)
@@ -427,30 +434,33 @@ namespace apsi
                 return -1;
             }
 
-            // For each key, check that we can insert into the corresponding bin. If the answer is "no" at any point,
-            // return -1.
-            size_t curr_bin_idx = start_bin_idx;
-            for (auto &curr_pair : item_label_pairs)
+            if (is_same<L, felt_t>::value)
             {
-                auto item_component = curr_pair.first;
-                vector<pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
-                auto &curr_filter = filters_.at(curr_bin_idx);
+                // For each key, check that we can insert into the corresponding bin. If the answer is "no" at any
+                // point, return -1.
+                size_t curr_bin_idx = start_bin_idx;
+                for (auto &curr_pair : item_label_pairs)
+                {
+                    auto item = curr_pair.first;
+                    vector<pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
+                    auto &curr_filter = filters_.at(curr_bin_idx);
 
-                // Check if the key is already in the current bin. If so, that's an insertion error
-                if (is_present(curr_bin, curr_filter, item_component)) {
-                    return -1;
+                    // Check if the key is already in the current bin. If so, that's an insertion error
+                    if (is_present(curr_bin, curr_filter, item))
+                    {
+                        return -1;
+                    }
+
+                    curr_bin_idx++;
                 }
-
-                curr_bin_idx++;
             }
 
             // If we're here, that means we can insert in all bins
             size_t max_bin_size = 0;
-            curr_bin_idx = start_bin_idx;
+            size_t curr_bin_idx = start_bin_idx;
             for (auto &curr_pair : item_label_pairs)
             {
                 vector<pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
-                auto &curr_filter = filters_.at(curr_bin_idx);
 
                 // Compare the would-be bin size here to the running max
                 if (max_bin_size < curr_bin.size() + 1)
@@ -461,6 +471,7 @@ namespace apsi
                 // Insert if not dry run
                 if (!dry_run)
                 {
+                    auto &curr_filter = filters_.at(curr_bin_idx);
                     curr_bin.push_back(curr_pair);
                     curr_filter.add(curr_pair.first);
 
@@ -494,7 +505,7 @@ namespace apsi
             // Check that all the item components appear sequentially in this BinBundle
             size_t curr_bin_idx = start_bin_idx;
             for (auto &curr_pair : item_label_pairs) {
-                auto &item_component = curr_pair.first;
+                auto &item = curr_pair.first;
                 vector<pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
                 auto &curr_filter = filters_.at(curr_bin_idx);
 
@@ -561,7 +572,6 @@ namespace apsi
                 auto &curr_filter = filters_.at(curr_bin_idx);
 
                 auto to_remove_it = get_iterator(curr_bin, curr_filter, item);
-
                 if (to_remove_it == curr_bin.end())
                 {
                     // One of the items isn't there; return false;
@@ -570,7 +580,7 @@ namespace apsi
                 else
                 {
                     // Found the label, put it in the return vector. *label_it is a key-value pair.
-                    to_remove_its.push_back(move(to_remove_it));
+                    to_remove_its.push_back(to_remove_it);
                 }
 
                 curr_bin_idx++;
@@ -624,7 +634,7 @@ namespace apsi
                 const vector<pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
                 const auto &curr_filter = filters_.at(curr_bin_idx);
 
-                auto label_it = get_iterator(curr_bin, curr_filter, (felt_t)item);
+                auto label_it = get_iterator(curr_bin, curr_filter, item);
 
                 if (label_it == curr_bin.end())
                 {
@@ -657,7 +667,7 @@ namespace apsi
             filters_.reserve(bins_size);
 
             for (size_t i = 0; i < bins_size; i++) {
-                filters_.emplace_back(BloomFilter(max_bin_size_, /* size_ratio */ 20));
+                filters_.emplace_back(max_bin_size_, /* size_ratio */ 20);
             }
 
             clear_cache();
@@ -816,7 +826,7 @@ namespace apsi
         size_t BinBundle<L>::save(ostream &out, uint32_t bundle_idx) const
         {
             // Is this a labeled BinBundle?
-            constexpr bool labeled = is_same_v<L, felt_t>;
+            constexpr bool labeled = is_same<L, felt_t>::value;
             
             const Modulus &mod = field_mod();
             auto mod_bit_count = mod.bit_count();
@@ -923,23 +933,22 @@ namespace apsi
         namespace
         {
             template<typename L>
-            bool add_to_bin(vector<pair<felt_t, L>> &bin, felt_t felt_item, felt_t felt_label);
+            bool add_to_bin(vector<pair<felt_t, L>> &bin, util::BloomFilter &filter, felt_t felt_item, felt_t felt_label);
 
             template<>
-            bool add_to_bin(vector<pair<felt_t, monostate>> &bin, felt_t felt_item, felt_t felt_label)
+            bool add_to_bin(vector<pair<felt_t, monostate>> &bin, util::BloomFilter &filter, felt_t felt_item, felt_t felt_label)
             {
-                if (is_present(bin, felt_item))
-                    return false;
-
                 bin.push_back(make_pair(felt_item, monostate{}));
                 return true;
             }
 
             template<>
-            bool add_to_bin(vector<pair<felt_t, felt_t>> &bin, felt_t felt_item, felt_t felt_label)
+            bool add_to_bin(vector<pair<felt_t, felt_t>> &bin, util::BloomFilter &filter, felt_t felt_item, felt_t felt_label)
             {
-                if (is_present(bin, felt_item))
+                if (is_present(bin, filter, felt_item))
+                {
                     return false;
+                }
 
                 bin.push_back(make_pair(felt_item, felt_label));
                 return true;
@@ -968,7 +977,7 @@ namespace apsi
             auto bb = fbs::GetSizePrefixedBinBundle(in_data.data());
 
             // Throw if this is not the right kind of BinBundle
-            constexpr bool labeled = is_same_v<L, felt_t>;
+            constexpr bool labeled = is_same<L, felt_t>::value;
             const char *loaded_type_str = bb->labeled() ? "labeled" : "unlabeled";
             const char *this_type_str = labeled ? "labeled" : "unlabeled";
             if (bb->labeled() != labeled)
@@ -1033,12 +1042,14 @@ namespace apsi
                     }
 
                     // Add the loaded item-label pair to the bin
-                    if (!add_to_bin(bins_[i], felt_item, felt_label))
+                    if (!add_to_bin(bins_[i], filters_[i], felt_item, felt_label))
                     {
                         APSI_LOG_ERROR("The loaded BinBundle data contains repeated values for the same bin");
                         throw runtime_error("failed to load BinBundle");
                     }
                 }
+
+                regenerate_filter(bins_[i], filters_[i]);
             }
 
             if (bb->cache())

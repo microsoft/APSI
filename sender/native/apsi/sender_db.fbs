@@ -5,8 +5,9 @@ include "psi_params.fbs";
 
 namespace apsi.fbs;
 
-table HashedItem {
-    data:[ubyte] (required);
+struct HashedItem {
+    low_word:uint64;
+    high_word:uint64;
 }
 
 struct SenderDBInfo {

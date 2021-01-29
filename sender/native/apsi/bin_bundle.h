@@ -173,7 +173,7 @@ namespace apsi
             Each bin in the BinBundle has a BloomFilter that helps quickly determine whether a field element is
             contained.
             */
-            std::vector<apsi::sender::util::BloomFilter> filters_;
+            std::vector<util::BloomFilter> filters_;
 
             /**
             A cache of all the computations we can do on the bins. This is empty by default.

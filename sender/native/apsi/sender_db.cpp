@@ -192,7 +192,7 @@ namespace apsi
                     }
                 }
 
-                APSI_LOG_DEBUG("Finished preprocessing " << distance(begin, end) << " labeled items");
+                APSI_LOG_DEBUG("Finished preprocessing " << distance(begin, end) << " unlabeled items");
 
                 return data_with_indices;
             }
@@ -271,14 +271,14 @@ namespace apsi
                     // Try to insert or overwrite these field elements in an existing BinBundle at this bundle index.
                     // Keep track of whether or not we succeed.
                     bool written = false;
-                    for (BinBundle<L> &bundle : bundle_set)
+                    for (auto bundle_it = bundle_set.rbegin(); bundle_it != bundle_set.rend(); bundle_it++)
                     {
                         // If we're supposed to overwrite, try to overwrite. One of these BinBundles has to have the
                         // data we're trying to overwrite.
                         if (overwrite)
                         {
                             // If we successfully overwrote, we're done with this bundle
-                            written = bundle.try_multi_overwrite(data, bin_idx);
+                            written = bundle_it->try_multi_overwrite(data, bin_idx);
                             if (written)
                             {
                                 break;
@@ -286,13 +286,13 @@ namespace apsi
                         }
 
                         // Do a dry-run insertion and see if the new largest bin size in the range exceeds the limit
-                        int new_largest_bin_size = bundle.multi_insert_dry_run(data, bin_idx);
+                        int new_largest_bin_size = bundle_it->multi_insert_dry_run(data, bin_idx);
 
                         // Check if inserting would violate the max bin size constraint
                         if (new_largest_bin_size > 0 && new_largest_bin_size < max_bin_size)
                         {
                             // All good
-                            bundle.multi_insert_for_real(data, bin_idx);
+                            bundle_it->multi_insert_for_real(data, bin_idx);
                             written = true;
                             break;
                         }
@@ -661,7 +661,7 @@ namespace apsi
                 static_cast<uint64_t>(params_.items_per_bundle()),
                 static_cast<uint64_t>(params_.table_params().max_items_per_bin));
 
-            return static_cast<double>(item_count) / max_item_count;
+            return max_item_count ? static_cast<double>(item_count) / max_item_count : 0.0;
         }
 
         /**
@@ -741,7 +741,6 @@ namespace apsi
             for (auto item_label_pair : data)
             {
                 const HashedItem &item = item_label_pair.first;
-
                 if (items_.find(item) == items_.end())
                 {
                     // Item is not already in items_, i.e., if this is a new item
@@ -1101,15 +1100,15 @@ namespace apsi
             auto params = fbs_builder.CreateVector(
                 reinterpret_cast<unsigned char*>(params_str.data()), params_str.size());
             fbs::SenderDBInfo info(sender_db->is_labeled(), sender_db->is_compressed());
-            auto hashed_items = fbs_builder.CreateVector([&]() {
+            auto hashed_items = fbs_builder.CreateVectorOfStructs([&]() {
                 // The HashedItems vector is populated with an immediately-invoked lambda
-                vector<flatbuffers::Offset<fbs::HashedItem>> ret;
+                vector<fbs::HashedItem> ret;
+                ret.reserve(sender_db->get_items().size());
                 for (const auto &it : sender_db->get_items())
                 {
                     // Then create the vector of bytes for this hashed item
-                    auto hashed_item = fbs_builder.CreateVector(
-                        it.get_as<const unsigned char>().data(), item_byte_count);
-                    ret.push_back(fbs::CreateHashedItem(fbs_builder, hashed_item));
+                    auto item_data = it.get_as<uint64_t>();
+                    ret.emplace_back(item_data[0], item_data[1]);
                 }
                 return ret;
             }());
@@ -1127,6 +1126,9 @@ namespace apsi
             out.write(
                 reinterpret_cast<const char*>(fbs_builder.GetBufferPointer()),
                 safe_cast<streamsize>(fbs_builder.GetSize()));
+            size_t total_size = fbs_builder.GetSize();
+
+            APSI_LOG_ERROR("WROTE " << total_size << " OF METADATA");
 
             // Finally write the BinBundles
             size_t bin_bundle_data_size = 0;
@@ -1159,7 +1161,7 @@ namespace apsi
                 }
             }
 
-            size_t total_size = fbs_builder.GetSize() + bin_bundle_data_size;
+            total_size += bin_bundle_data_size;
             APSI_LOG_DEBUG("Saved SenderDB with " << sender_db->get_items().size() << " items ("
                 << total_size << " bytes)");
 
@@ -1169,6 +1171,8 @@ namespace apsi
         pair<shared_ptr<SenderDB>, size_t> LoadSenderDB(istream &in)
         {
             vector<seal_byte> in_data(apsi::util::read_from_stream(in));
+            APSI_LOG_ERROR("READ " << in_data.size() << " OF METADATA");
+
 
             auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderDBBuffer(verifier);
@@ -1219,19 +1223,7 @@ namespace apsi
             sender_db->items_.reserve(hashed_items.size());
             for (const auto &it : hashed_items)
             {
-                if (it->data()->size() != item_byte_count)
-                {
-                    APSI_LOG_ERROR("The loaded SenderDB contains data buffers of incorrect size ("
-                        << it->data()->size() << " bytes; expected " << item_byte_count << " bytes)");
-                    throw runtime_error("failed to load SenderDB");
-                }
-
-                HashedItem item;
-                copy_n(
-                    reinterpret_cast<const seal_byte*>(it->data()->data()),
-                    item_byte_count,
-                    item.get_as<seal_byte>().data());
-                sender_db->items_.insert(move(item));
+                sender_db->items_.insert({ it->low_word(), it->high_word() });
             }
 
             auto bin_bundle_count = sdb->bin_bundle_count();
