@@ -119,26 +119,12 @@ namespace apsi
 {
     namespace logging
     {
-        namespace
-        {
-            void exit_handler()
-            {
-                if (nullptr != log_properties)
-                {
-                    //delete log_properties;
-                    log_properties = nullptr;
-                }
-            }
-        }
-
         void Log::configure()
         {
             if (nullptr != log_properties && log_properties->configured)
             {
                 throw runtime_error("Logger is already configured.");
             }
-
-            //atexit(exit_handler);
 
             if (!get_log_properties().disable_console)
             {
