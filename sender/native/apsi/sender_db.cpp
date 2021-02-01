@@ -1128,8 +1128,6 @@ namespace apsi
                 safe_cast<streamsize>(fbs_builder.GetSize()));
             size_t total_size = fbs_builder.GetSize();
 
-            APSI_LOG_ERROR("WROTE " << total_size << " OF METADATA");
-
             // Finally write the BinBundles
             size_t bin_bundle_data_size = 0;
             if (sender_db->is_labeled())
@@ -1171,8 +1169,6 @@ namespace apsi
         pair<shared_ptr<SenderDB>, size_t> LoadSenderDB(istream &in)
         {
             vector<seal_byte> in_data(apsi::util::read_from_stream(in));
-            APSI_LOG_ERROR("READ " << in_data.size() << " OF METADATA");
-
 
             auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderDBBuffer(verifier);

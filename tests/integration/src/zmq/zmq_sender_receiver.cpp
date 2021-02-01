@@ -36,7 +36,7 @@ namespace APSITests
             size_t num_threads)
         {
             logging::Log::set_console_disabled(false);
-            logging::Log::set_log_level(logging::Log::Level::all);
+            logging::Log::set_log_level(logging::Log::Level::info);
             //logging::Log::set_log_file("out.log");
 
             unordered_set<Item> sender_items;
@@ -50,17 +50,17 @@ namespace APSITests
 
             auto sender_db = make_shared<UnlabeledSenderDB>(params);
             sender_db->set_data(hashed_sender_items, num_threads);
-            APSI_LOG_WARNING("Packing rate: " << sender_db->get_packing_rate());
+            APSI_LOG_INFO("Packing rate: " << sender_db->get_packing_rate());
 
             stringstream ss;
-            auto save_size = SaveSenderDB(sender_db, ss);
+            SaveSenderDB(sender_db, ss);
             auto sender_db_data = LoadSenderDB(ss);
-            auto sender_db2 = sender_db_data.first;
+            auto loaded_sender_db = sender_db_data.first;
 
             atomic<bool> stop_sender = false;
 
             auto sender_th = thread([&]() {
-                ZMQSenderDispatcher dispatcher(sender_db2, num_threads);
+                ZMQSenderDispatcher dispatcher(loaded_sender_db, num_threads);
                 dispatcher.run(stop_sender, 5550, oprf_key);
             });
 
@@ -119,12 +119,17 @@ namespace APSITests
 
             auto sender_db = make_shared<LabeledSenderDB>(params, true);
             sender_db->set_data(hashed_sender_items, num_threads);
-            APSI_LOG_WARNING("Packing rate: " << sender_db->get_packing_rate());
+            APSI_LOG_INFO("Packing rate: " << sender_db->get_packing_rate());
+
+            stringstream ss;
+            SaveSenderDB(sender_db, ss);
+            auto sender_db_data = LoadSenderDB(ss);
+            auto loaded_sender_db = sender_db_data.first;
 
             atomic<bool> stop_sender = false;
 
             auto sender_th = thread([&]() {
-                ZMQSenderDispatcher dispatcher(sender_db, num_threads);
+                ZMQSenderDispatcher dispatcher(loaded_sender_db, num_threads);
                 dispatcher.run(stop_sender, 5550, oprf_key);
             });
 

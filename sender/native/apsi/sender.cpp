@@ -2,13 +2,8 @@
 // Licensed under the MIT license.
 
 // STD
-#include <cmath>
-#include <chrono>
-#include <numeric>
 #include <thread>
-#include <future>
 #include <sstream>
-#include <fstream>
 
 // APSI
 #include "apsi/sender.h"
@@ -26,7 +21,6 @@
 #include "seal/util/common.h"
 #include "seal/util/iterator.h"
 #include "seal/evaluator.h"
-#include "seal/valcheck.h"
 
 using namespace std;
 using namespace seal;
@@ -145,7 +139,8 @@ namespace apsi
             auto sender_db_lock = sender_db->get_reader_lock();
 
             STOPWATCH(sender_stopwatch, "Sender::RunQuery");
-            APSI_LOG_INFO("Start processing query request on database with " << sender_db->get_items().size() << " items");
+            APSI_LOG_INFO("Start processing query request on database with "
+                << sender_db->get_items().size() << " items");
 
             // Copy over the CryptoContext from SenderDB; set the Evaluator for this local instance
             CryptoContext crypto_context(sender_db->get_crypto_context());
@@ -198,7 +193,8 @@ namespace apsi
                 for (size_t bundle_idx = 0; bundle_idx < all_powers.size(); bundle_idx++)
                 {
                     // Load input^power to all_powers[bundle_idx][exponent]
-                    APSI_LOG_DEBUG("Extracting query ciphertext power " << exponent << " for bundle index " << bundle_idx);
+                    APSI_LOG_DEBUG("Extracting query ciphertext power "
+                        << exponent << " for bundle index " << bundle_idx);
                     all_powers[bundle_idx][exponent] = move(q.second[bundle_idx]);
                 }
             }
@@ -289,8 +285,10 @@ namespace apsi
                 // the ciphertext is actually not set or valid for use.
 
                 // When using C++17 this function may be multi-threaded in the future with C++ execution policies.
-                seal_for_each_n(powers_at_this_bundle_idx.begin() + 1, powers_at_this_bundle_idx.size() - 1, [&](auto &ct) {
-                    evaluator.transform_to_ntt_inplace(ct);
+                seal_for_each_n(
+                    powers_at_this_bundle_idx.begin() + 1,
+                    powers_at_this_bundle_idx.size() - 1,
+                    [&](auto &ct) { evaluator.transform_to_ntt_inplace(ct);
                 });
 
                 // Next, iterate over each bundle with this bundle index

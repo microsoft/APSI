@@ -355,8 +355,9 @@ namespace apsi
             filters_.reserve(num_bins);
             cache_.felt_matching_polyns.reserve(num_bins);
 
-            for (size_t i = 0; i < num_bins; i++) {
-                filters_.emplace_back(BloomFilter(max_bin_size, /* size_ratio */ 20));
+            for (size_t i = 0; i < num_bins; i++)
+            {
+                filters_.emplace_back(max_bin_size, /* size_ratio */ 20);
             }
         }
 
@@ -743,11 +744,11 @@ namespace apsi
             cache_.felt_matching_polyns.clear();
 
             // For each bin in the bundle, compute and cache the corresponding "matching" polynomial
-            for (vector<pair<felt_t, monostate>> & bin : bins_)
+            for (const auto &bin : bins_)
             {
                 // Compute and cache the matching polynomial
                 FEltPolyn p = compute_matching_polyn(bin, mod);
-                cache_.felt_matching_polyns.emplace_back(p);
+                cache_.felt_matching_polyns.push_back(move(p));
             }
         }
 
@@ -766,15 +767,15 @@ namespace apsi
             cache_.felt_interp_polyns.clear();
 
             // For each bin in the bundle, compute and cache the corresponding "matching" and Newton polynomials
-            for (vector<pair<felt_t, felt_t>> & bin : bins_)
+            for (const auto &bin : bins_)
             {
                 // Compute and cache the matching polynomial
                 FEltPolyn p = compute_matching_polyn(bin, mod);
-                cache_.felt_matching_polyns.emplace_back(move(p));
+                cache_.felt_matching_polyns.push_back(move(p));
 
                 // Compute and cache the Newton polynomial
                 p = compute_newton_polyn(bin, mod);
-                cache_.felt_interp_polyns.emplace_back(move(p));
+                cache_.felt_interp_polyns.push_back(move(p));
             }
         }
 
