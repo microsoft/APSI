@@ -343,7 +343,7 @@ namespace apsi
             */
             void remove(
                 const std::unordered_set<HashedItem> &data,
-                std::size_t thread_count
+                std::size_t thread_count = 0
             ) override;
 
             /**

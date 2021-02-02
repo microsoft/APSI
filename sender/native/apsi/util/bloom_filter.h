@@ -26,6 +26,16 @@ namespace util {
         BloomFilter(int max_bin_size, std::size_t size_ratio = 0);
 
         /**
+        Creates a new BloomFilter by moving a given one.
+        */
+        BloomFilter(BloomFilter &&filter) = default;
+
+        /**
+        Creates a new BloomFilter by copying a given one.
+        */
+        BloomFilter(const BloomFilter &filter) = default;
+
+        /**
         Add a field element to the bloom filter
         */
         void add(const apsi::util::felt_t &elem);
@@ -41,11 +51,13 @@ namespace util {
         void clear();
 
     private:
-        static std::vector<HashFunc> hash_funcs_;
-        std::vector<bool> bits_;
-
         static constexpr std::size_t hash_func_count_ = 4;
-        static constexpr std::size_t size_ratio_ = 10;
+        
+        static constexpr std::size_t default_size_ratio_ = 10;
+
+        static const std::vector<HashFunc> &hash_funcs();
+
+        std::vector<bool> bits_;
 
         std::size_t compute_idx(const size_t hash_idx, const apsi::util::felt_t &elem) const;
     };

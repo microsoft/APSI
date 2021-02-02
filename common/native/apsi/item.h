@@ -186,7 +186,7 @@ namespace apsi
         std::array<unsigned char, 16>.
         */
         template<typename T>
-        Item(BitstringView<T> &bitstring)
+        Item(const BitstringView<T> &bitstring)
         {
             auto bitstring_bytes = bitstring.data();
             if (bitstring_bytes.size() > sizeof(value_))

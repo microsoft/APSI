@@ -41,16 +41,6 @@ namespace apsi
         using FullWidthLabel = Item;
 
         /**
-        Reads a sequence of 8 bytes as a little-endian encoded uint64_t
-        */
-        std::uint64_t read_u64_little_endian(const std::array<unsigned char, 8> &bytes);
-
-        /**
-        Writes a uint64_t to a little-endian sequence of 8 bytes
-        */
-        std::array<unsigned char, 8> write_u64_little_endian(std::uint64_t num);
-
-        /**
         Converts the given bitstring to a sequence of field elements (modulo `mod`).
         */
         std::vector<felt_t> bits_to_field_elts(BitstringView<const unsigned char> bits, const seal::Modulus &mod);

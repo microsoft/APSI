@@ -319,10 +319,13 @@ namespace APSITests
     TEST(SenderDBTests, Remove)
     {
         auto params = get_params();
-        UnlabeledSenderDB sender_db(*params);
+
+        // We use a LabeledSenderDB here to end up with multiple BinBundles more quickly. This happens because in the
+        // labeled case BinBundles cannot tolerate repetitions of item parts (felts) in bins.
+        LabeledSenderDB sender_db(*params);
 
         // Insert a single item
-        sender_db.insert_or_assign(HashedItem(0, 0));
+        sender_db.insert_or_assign({ HashedItem(0, 0), FullWidthLabel(0, 0) });
         ASSERT_EQ(1, sender_db.get_items().size());
         ASSERT_EQ(1, sender_db.get_bin_bundle_count());
         ASSERT_FALSE(sender_db.get_items().find({ 0, 0 }) == sender_db.get_items().end());
@@ -340,7 +343,7 @@ namespace APSITests
         uint64_t val = 0;
         while (sender_db.get_bin_bundle_count() < 5)
         {
-            sender_db.insert_or_assign(HashedItem(val, ~val));
+            sender_db.insert_or_assign({ HashedItem(val, ~val), FullWidthLabel(val, ~val) });
             val++;
         }
 
@@ -369,7 +372,7 @@ namespace APSITests
         val = 0;
         while (sender_db.get_bin_bundle_count() < 5)
         {
-            sender_db.insert_or_assign(HashedItem(val, ~val));
+            sender_db.insert_or_assign({ HashedItem(val, ~val), FullWidthLabel(val, ~val) });
             val++;
         }
 
