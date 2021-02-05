@@ -7,7 +7,7 @@ namespace apsi.network.fbs;
 
 table ResultPackage {
     bundle_idx:uint32;
-    psi_result:Ciphertext;
+    psi_result:Ciphertext (required);
     label_result:[Ciphertext];
 }
 

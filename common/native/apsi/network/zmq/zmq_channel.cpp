@@ -457,7 +457,9 @@ namespace apsi
                 throw invalid_argument("result package data is missing");
             }
 
-            APSI_LOG_DEBUG("Sending " << (rp->rp->label_result.empty() ? "unlabeled)" : "labeled") << " result package");
+            APSI_LOG_DEBUG("Sending result package ("
+                << "has matching data: " << (rp->rp->psi_result ? "yes" : "no") << "; "
+                << "has label data: " << (rp->rp->label_result.size() ? "yes" : "no") << ")");
 
             multipart_t msg;
 

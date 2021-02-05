@@ -235,18 +235,18 @@ namespace APSITests
         sop_query.reset(dynamic_cast<SenderOperationQuery*>(nsop->sop.release()));
 
         // Are we able to extract the relinearization keys?
-        ASSERT_NO_THROW(auto rlk = sop_query->relin_keys.extract_local());
+        ASSERT_NO_THROW(auto rlk = sop_query->relin_keys.extract_if_local());
 
         // Check for query ciphertexts
         ASSERT_EQ(2, sop_query->data.size());
 
         ASSERT_FALSE(sop_query->data.at(0).empty());
         ASSERT_EQ(1, sop_query->data[0].size());
-        auto query_ct0 = sop_query->data[0][0].extract_local();
+        auto query_ct0 = sop_query->data[0][0].extract_if_local();
 
         ASSERT_FALSE(sop_query->data.at(123).empty());
         ASSERT_EQ(1, sop_query->data[123].size());
-        auto query_ct123 = sop_query->data[123][0].extract_local();
+        auto query_ct123 = sop_query->data[123][0].extract_if_local();
 
         // Create a parms response
         auto rsop_parms = make_unique<SenderOperationResponseParms>();

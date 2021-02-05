@@ -237,7 +237,9 @@ namespace apsi
                 throw invalid_argument("result package data is missing");
             }
 
-            APSI_LOG_DEBUG("Sending " << (rp->label_result.empty() ? "unlabeled)" : "labeled") << " result package");
+            APSI_LOG_DEBUG("Sending result package ("
+                << "has matching data: " << (rp->psi_result ? "yes" : "no") << "; "
+                << "has label data: " << (rp->label_result.size() ? "yes" : "no") << ")");
 
             lock_guard<mutex> lock(send_mutex_);
             size_t old_bytes_sent = bytes_sent_;

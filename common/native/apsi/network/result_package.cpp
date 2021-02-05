@@ -157,26 +157,25 @@ namespace apsi
 
         PlainResultPackage ResultPackage::extract(const CryptoContext &crypto_context)
         {
-            PlainResultPackage plain_rp;
-
-            plain_rp.bundle_idx = bundle_idx;
-
-            Ciphertext psi_result_ct = psi_result.extract_local();
-            Plaintext psi_result_pt;
             if (!crypto_context.decryptor())
             {
                 throw runtime_error("decryptor is not configured in CryptoContext");
             }
+
+            Ciphertext psi_result_ct = psi_result.extract(crypto_context.seal_context());
+            Plaintext psi_result_pt;
             crypto_context.decryptor()->decrypt(psi_result_ct, psi_result_pt);
             APSI_LOG_DEBUG("Matching result noise budget: "
                 << crypto_context.decryptor()->invariant_noise_budget(psi_result_ct)
                 << " bits [" << this_thread::get_id() << "]");
 
+            PlainResultPackage plain_rp;
+            plain_rp.bundle_idx = bundle_idx;
             crypto_context.encoder()->decode(psi_result_pt, plain_rp.psi_result);
 
             for (auto &ct : label_result)
             {
-                Ciphertext label_result_ct = ct.extract_local();
+                Ciphertext label_result_ct = ct.extract(crypto_context.seal_context());
                 Plaintext label_result_pt;
                 crypto_context.decryptor()->decrypt(label_result_ct, label_result_pt);
                 APSI_LOG_DEBUG("Label result noise budget: "

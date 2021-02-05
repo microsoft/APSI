@@ -217,7 +217,7 @@ namespace apsi
         }
 
         /**
-        Converts the given bitstring to a sequence of field elements (modulo `mod`)
+        Converts the given bitstring to a sequence of field elements (modulo mod)
         */
         vector<felt_t> bits_to_field_elts(BitstringView<const unsigned char> bits, const Modulus &mod)
         {
@@ -278,7 +278,7 @@ namespace apsi
         }
 
         /**
-        Converts the given sequence of field elements (modulo `mod`) to a bitstring of length `bit_count`
+        Converts the given sequence of field elements (modulo mod) to a bitstring of length bit_count
         */
         Bitstring field_elts_to_bits(gsl::span<const felt_t> felts, uint32_t bit_count, const Modulus &mod)
         {
@@ -294,15 +294,15 @@ namespace apsi
             // This is the largest n such that 2ⁿ ≤ mod < 2ⁿ⁺¹. We'll pack n bits into each field element.
             uint32_t bits_per_felt = static_cast<uint32_t>(mod.bit_count() - 1);
 
-            // Sanity check that `bit_count` isn't more than the field elements hold
+            // Sanity check that bit_count isn't more than the field elements hold
             uint32_t max_num_bits = mul_safe(bits_per_felt, safe_cast<uint32_t>(felts.size()));
             if (bit_count > max_num_bits)
             {
                 throw invalid_argument("bit_count exceeds the max number of bits the input holds");
             }
 
-            // Sanity check that `bit_count` is within a field element's size from the total number of bits. Using `bit_count`
-            // to omit an entire field element is nasty and unnecessary.
+            // Sanity check that bit_count is within a field element's size from the total number of bits. Using
+            // bit_count to omit an entire field element is nasty and unnecessary.
             if (bit_count <= max_num_bits - bits_per_felt)
             {
                 throw invalid_argument("bit_count causes conversion to ignore entire field elements");
@@ -338,9 +338,9 @@ namespace apsi
 
 
         /**
-        Converts an item and label into a sequence of (felt_t, felt_t) pairs, where the the first pair value is a chunk of
-        the item, and the second is a chunk of the label. item_bit_count denotes the bit length of the items and labels
-        (they're the same length). mod denotes the modulus of the prime field.
+        Converts an item and label into a sequence of (felt_t, felt_t) pairs, where the the first pair value is a chunk
+        of the item, and the second is a chunk of the label. item_bit_count denotes the bit length of the items and
+        labels (they're the same length). mod denotes the modulus of the prime field.
         */
         AlgItemLabel<felt_t> algebraize_item_label(
             const HashedItem &item, const FullWidthLabel &label, size_t item_bit_count, const Modulus &mod)
@@ -371,8 +371,8 @@ namespace apsi
 
         /**
         Converts an item into a sequence of (felt_t, monostate) pairs, where the the first pair value is a chunk of the
-        item, and the second is the unit type. item_bit_count denotes the bit length of the items and labels (they're the
-        same length). mod denotes the modulus of the prime field. mod denotes the modulus of the prime field.
+        item, and the second is the unit type. item_bit_count denotes the bit length of the items and labels (they are
+        the same length). mod denotes the modulus of the prime field. mod denotes the modulus of the prime field.
         */
         AlgItemLabel<monostate> algebraize_item(const HashedItem &item, size_t item_bit_count, const Modulus &mod)
         {

@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <stdexcept>
+#include <sstream>
 #include <iostream>
 #include <utility>
 #include <memory>
@@ -112,6 +113,11 @@ namespace apsi
             return !!serializable_;
         }
 
+        explicit operator bool() const
+        {
+            return is_local() || is_serializable();
+        }
+
         void set(LocalType &&value)
         {
             serializable_.reset();
@@ -136,7 +142,7 @@ namespace apsi
             serializable_ = std::make_unique<SerializableType>(value);
         }
 
-        SerializableType extract_serializable()
+        SerializableType extract_if_serializable()
         {
             if (!is_serializable())
             {
@@ -147,7 +153,7 @@ namespace apsi
             return std::move(result);
         }
 
-        LocalType extract_local()
+        LocalType extract_if_local()
         {
             if (!is_local())
             {
@@ -156,6 +162,33 @@ namespace apsi
             LocalType result = std::move(*local_);
             local_.reset();
             return std::move(result);
+        }
+
+        LocalType extract(std::shared_ptr<seal::SEALContext> context)
+        {
+            LocalType ret;
+            if (is_local())
+            {
+                ret = extract_if_local();
+            }
+            else if (is_serializable())
+            {
+                if (!context)
+                {
+                    throw std::invalid_argument("context cannot be null");
+                }
+
+                SerializableType ser = extract_if_serializable();
+                std::stringstream ss;
+                ser.save(ss, seal::compr_mode_type::none);
+                ret.unsafe_load(*context, ss);
+            }
+            else
+            {
+                throw std::logic_error("no object to extract");
+            }
+
+            return std::move(ret);
         }
 
         std::size_t save(seal::seal_byte *out, std::size_t size, seal::compr_mode_type compr_mode) const
@@ -186,6 +219,10 @@ namespace apsi
 
         std::size_t load(std::shared_ptr<seal::SEALContext> context, const seal::seal_byte *in, std::size_t size)
         {
+            if (!context)
+            {
+                throw std::invalid_argument("context cannot be null");
+            }
             set(LocalType());
             return seal::util::safe_cast<std::size_t>(local_->load(std::move(*context), in, size));
         }
