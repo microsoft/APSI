@@ -20,6 +20,12 @@ namespace apsi
 {
     namespace util
     {
+        const kuku::item_type &item_to_kuku_item(const apsi::Item::value_type &item)
+        {
+            const kuku::item_type *kuku_item = reinterpret_cast<const kuku::item_type *>(&item);
+            return *kuku_item;
+        }
+
         vector<uint64_t> conversion_to_digits(const uint64_t input, const uint64_t base)
         {
             vector<uint64_t> result;
