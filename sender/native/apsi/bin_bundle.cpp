@@ -136,7 +136,7 @@ namespace apsi
                     }
                     else
                     {
-                        true_positives;
+                        true_positives++;
                     }
 
                     return result;

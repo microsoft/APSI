@@ -60,7 +60,7 @@ namespace apsi
                 unordered_set<location_type> result;
                 for (auto &hf : hash_funcs)
                 {
-                    result.emplace(hf(item_to_kuku_item(item.value())));
+                    result.emplace(hf(item.value()));
                 }
 
                 return result;

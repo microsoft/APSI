@@ -53,11 +53,6 @@ namespace apsi
         }
 
         /**
-        Convert an APSI item to a Kuku item
-        */
-        const kuku::item_type &item_to_kuku_item(const apsi::Item::value_type &item);
-
-        /**
         Partitions count many points into partition_count many disjoint parts as equally as
         possible. If count or partition_count is zero, the result is empty. If partition_count
         if larger than count, only count many partitions will be returned, each of size 1.

@@ -252,7 +252,7 @@ namespace apsi
                 for (size_t item_idx = 0; item_idx < items.size(); item_idx++)
                 {
                     const auto &item = items[item_idx];
-                    if (!cuckoo.insert(item_to_kuku_item(item.value())))
+                    if (!cuckoo.insert(item.value()))
                     {
                         // Insertion can fail for two reasons:
                         //
@@ -281,7 +281,7 @@ namespace apsi
             // Once the table is filled, fill the table_idx_to_item_idx map
             for (size_t item_idx = 0; item_idx < items.size(); item_idx++)
             {
-                auto item_loc = cuckoo.query(item_to_kuku_item(items[item_idx].value()));
+                auto item_loc = cuckoo.query(items[item_idx].value());
                 itt.table_idx_to_item_idx_[item_loc.location()] = item_idx;
             }
 
