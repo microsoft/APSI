@@ -226,5 +226,11 @@ namespace apsi
 
             return ss.str();
         }
+
+        /**
+        Returns the next power of 2 for the given number 
+        */
+        std::uint64_t next_power_of_2(std::uint64_t v);
+
     } // namespace util
 } // namespace apsi
