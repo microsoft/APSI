@@ -14,7 +14,6 @@ using namespace apsi::sender::util;
 
 namespace {
     struct TagIndexInfo {
-        size_t tag_start_bit;
         size_t tag_start_idx;
         size_t tag_start_offset;
         size_t bits_first_word;
@@ -22,7 +21,7 @@ namespace {
 
         TagIndexInfo(size_t bits_per_tag, size_t tags_per_bucket, size_t bucket, size_t tag_idx)
         {
-            tag_start_bit = (bucket * bits_per_tag * tags_per_bucket) + (tag_idx * bits_per_tag);
+            size_t tag_start_bit = (bucket * bits_per_tag * tags_per_bucket) + (tag_idx * bits_per_tag);
             tag_start_idx = tag_start_bit / 64;
             tag_start_offset = tag_start_bit % 64;
             bits_first_word = bits_per_tag;
