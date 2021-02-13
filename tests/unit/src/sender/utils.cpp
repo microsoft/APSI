@@ -122,4 +122,22 @@ namespace APSITests {
         ASSERT_EQ(0x123, table.read_tag(2, 2));
         ASSERT_EQ(0x456, table.read_tag(2, 3));
     }
+
+    TEST(SenderUtilsTests, CuckooFilterTableInvalidTag)
+    {
+        CuckooFilterTable table1(70, 4);
+        CuckooFilterTable table2(70, 8);
+        CuckooFilterTable table3(70, 12);
+        CuckooFilterTable table4(70, 16);
+
+        ASSERT_NO_THROW(table1.write_tag(0, 0, 0x0000000F));
+        ASSERT_NO_THROW(table2.write_tag(0, 0, 0x000000FF));
+        ASSERT_NO_THROW(table3.write_tag(0, 0, 0x00000FFF));
+        ASSERT_NO_THROW(table4.write_tag(0, 0, 0x0000FFFF));
+
+        ASSERT_THROW(table1.write_tag(0, 0, 0x0000001F), std::invalid_argument);
+        ASSERT_THROW(table2.write_tag(0, 0, 0x000001FF), std::invalid_argument);
+        ASSERT_THROW(table3.write_tag(0, 0, 0x00001FFF), std::invalid_argument);
+        ASSERT_THROW(table4.write_tag(0, 0, 0x0001FFFF), std::invalid_argument);
+    }
 } // namespace APSITests
