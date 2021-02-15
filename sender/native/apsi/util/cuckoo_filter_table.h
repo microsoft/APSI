@@ -24,6 +24,10 @@ namespace apsi {
                     return num_buckets_;
                 }
 
+                bool find_tag_in_bucket(std::size_t bucket, std::uint32_t tag) const;
+                bool find_tag_in_buckets(
+                    std::size_t bucket1, std::size_t bucket2, std::uint32_t tag) const;
+
             private:
                 constexpr static std::size_t tags_per_bucket_ = 4;
 
