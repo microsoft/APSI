@@ -84,7 +84,7 @@ void CuckooFilterTable::write_tag(size_t bucket, size_t tag_idx, uint32_t tag)
 
     TagIndexInfo tii(bits_per_tag_, tags_per_bucket_, bucket, tag_idx);
 
-    uint64_t tag_ones = (1ull << (bits_per_tag_ + 1)) - 1;
+    uint64_t tag_ones = (1ull << bits_per_tag_) - 1;
     uint64_t tag_mask = ~(tag_ones << tii.tag_start_offset);
     uint64_t tag_word = static_cast<uint64_t>(tag) << tii.tag_start_offset;
     table_[tii.tag_start_idx] &= tag_mask;
@@ -96,6 +96,37 @@ void CuckooFilterTable::write_tag(size_t bucket, size_t tag_idx, uint32_t tag)
         table_[tii.tag_start_idx + 1] &= tag_mask;
         table_[tii.tag_start_idx + 1] |= tag_word;
     }
+}
+
+bool CuckooFilterTable::insert_tag(size_t bucket, uint32_t tag, bool kickout, uint32_t& old_tag)
+{
+    for (size_t i = 0; i < tags_per_bucket_; i++)
+    {
+        if (read_tag(bucket, i) == 0) {
+            write_tag(bucket, i, tag);
+            return true;
+        }
+    }
+
+    if (kickout) {
+        size_t rnd_idx = rand() % tags_per_bucket_;
+        old_tag = read_tag(bucket, rnd_idx);
+        write_tag(bucket, rnd_idx, tag);
+    }
+
+    return false;
+}
+
+bool CuckooFilterTable::delete_tag(std::size_t bucket, std::uint32_t tag)
+{
+    for (size_t i = 0; i < tags_per_bucket_; i++) {
+        if (read_tag(bucket, i) == tag) {
+            write_tag(bucket, i, 0);
+            return true;
+        }
+    }
+
+    return false;
 }
 
 bool CuckooFilterTable::find_tag_in_bucket(std::size_t bucket, std::uint32_t tag) const

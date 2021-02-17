@@ -18,10 +18,18 @@ namespace apsi {
 
                 std::uint32_t read_tag(std::size_t bucket, std::size_t tag_idx) const;
                 void write_tag(std::size_t bucket, std::size_t tag_idx, std::uint32_t tag);
+                bool insert_tag(
+                    std::size_t bucket, std::uint32_t tag, bool kickout, std::uint32_t &old_tag);
+                bool delete_tag(std::size_t bucket, std::uint32_t tag);
 
                 std::size_t get_num_buckets() const
                 {
                     return num_buckets_;
+                }
+
+                std::size_t get_bits_per_tag() const
+                {
+                    return bits_per_tag_;
                 }
 
                 bool find_tag_in_bucket(std::size_t bucket, std::uint32_t tag) const;

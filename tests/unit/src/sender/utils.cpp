@@ -5,6 +5,7 @@
 
 // APSI
 #include "gtest/gtest.h"
+#include "apsi/util/cuckoo_filter.h"
 #include "apsi/util/cuckoo_filter_table.h"
 
 using namespace std;
@@ -13,6 +14,57 @@ using namespace apsi::sender;
 using namespace apsi::sender::util;
 
 namespace APSITests {
+    TEST(SenderUtilsTests, CuckooFilterBasics)
+    {
+        CuckooFilter filter(70 * 2, 12);
+
+        for (uint64_t elem = 1; elem <= 100; elem++)
+        {
+            ASSERT_EQ(true, filter.add(elem));
+        }
+
+        for (uint64_t elem = 1; elem <= 100; elem++) {
+            ASSERT_EQ(true, filter.contains(elem));
+        }
+
+        ASSERT_EQ(true, filter.contains(1));
+        ASSERT_EQ(true, filter.contains(2));
+        ASSERT_EQ(true, filter.contains(10));
+        ASSERT_EQ(true, filter.contains(11));
+        ASSERT_EQ(true, filter.contains(20));
+        ASSERT_EQ(true, filter.contains(21));
+        ASSERT_EQ(true, filter.contains(80));
+        ASSERT_EQ(true, filter.contains(81));
+
+        ASSERT_EQ(true, filter.remove(1));
+        ASSERT_EQ(true, filter.remove(10));
+        ASSERT_EQ(true, filter.remove(20));
+        ASSERT_EQ(true, filter.remove(80));
+
+        ASSERT_EQ(false, filter.contains(1));
+        ASSERT_EQ(true,  filter.contains(2));
+        ASSERT_EQ(false, filter.contains(10));
+        ASSERT_EQ(true,  filter.contains(11));
+        ASSERT_EQ(false, filter.contains(20));
+        ASSERT_EQ(true,  filter.contains(21));
+        ASSERT_EQ(false, filter.contains(80));
+        ASSERT_EQ(true,  filter.contains(81));
+    }
+
+    TEST(SenderUtilsTests, CuckooFilterLimits)
+    {
+        CuckooFilter filter(70 * 2, 12);
+        uint64_t elem = 1;
+
+        for (; elem < 1000; elem++)
+        {
+            if (!filter.add(elem)) {
+                break;
+            }
+        }
+
+        ASSERT_TRUE(elem < 1000);
+    }
 
     TEST(SenderUtilsTests, CuckooFilterTableBasics12)
     {

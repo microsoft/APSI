@@ -5,35 +5,49 @@
 
 // STL
 #include <array>
+#include <memory>
 #include <vector>
 
 // APSI
 #include "cuckoo_filter_table.h"
+#include "apsi/util/db_encoding.h"
 
 
 namespace apsi {
     namespace sender {
         namespace util {
 
-            template<typename ItemType, std::size_t bits_per_tag>
             class CuckooFilter {
             public:
-                CuckooFilter(std::size_t key_count_max);
+                CuckooFilter(std::size_t key_count_max, std::size_t bits_per_tag);
 
-                bool is_present(const ItemType &item) const;
-                void add(const ItemType &item);
-                bool remove(const ItemType &item);
+                bool contains(const apsi::util::felt_t &item) const;
+                bool add(const apsi::util::felt_t &item);
+                bool remove(const apsi::util::felt_t &item);
 
             private:
-                std::size_t key_count_max_;
+                constexpr static std::size_t max_cuckoo_kicks_ = 500;
 
-                struct VictimCache {
+                std::size_t key_count_max_;
+                std::size_t num_items_;
+
+                struct OverflowCache {
                     std::size_t index;
                     std::uint32_t tag;
                     bool used;
                 };
 
-                VictimCache victim_;
+                OverflowCache overflow_;
+
+                std::unique_ptr<CuckooFilterTable> table_;
+
+
+                std::uint32_t tag_bit_limit(std::uint32_t value) const;
+                std::size_t idx_bucket_limit(std::size_t value) const;
+                void get_tag_and_index(const apsi::util::felt_t &item, std::uint32_t &tag, std::size_t &idx) const;
+                std::size_t get_alt_index(std::size_t idx, std::uint32_t tag) const;
+                bool add_index_tag(std::size_t idx, std::uint32_t tag);
+                void try_eliminate_victim();
             };
         } // namespace util
     } // namespace sender
