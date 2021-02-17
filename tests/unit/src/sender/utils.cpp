@@ -59,16 +59,51 @@ namespace APSITests {
     {
         size_t max_items = 140;
         CuckooFilter filter(max_items, 12);
+        uint64_t last_elem = 0;
 
-        for (uint64_t elem = 1; elem < 1000; elem++)
-        {
+        for (uint64_t elem = 1; elem < 1000; elem++) {
             if (!filter.add(elem)) {
+                last_elem = elem - 1;
                 break;
             }
         }
 
         ASSERT_TRUE(filter.get_num_items() > max_items);
         ASSERT_TRUE(filter.get_num_items() < (max_items * 2));
+
+        for (uint64_t elem = 1; elem <= last_elem; elem++) {
+            ASSERT_TRUE(filter.contains(elem));
+        }
+
+        max_items = 128000;
+        CuckooFilter filter_big(max_items, 16);
+        last_elem = 0;
+
+        for (uint64_t elem = 1; elem < (max_items * 10); elem++) {
+            if (!filter_big.add(elem)) {
+                last_elem = elem - 1;
+                break;
+            }
+        }
+
+        for (uint64_t elem = 1; elem <= last_elem; elem++) {
+            ASSERT_TRUE(filter_big.contains(elem));
+        }
+
+        max_items = 600000;
+        CuckooFilter filter_big2(max_items, 24);
+        last_elem = 0;
+
+        for (uint64_t elem = 1; elem < (max_items * 10); elem++) {
+            if (!filter_big2.add(elem)) {
+                last_elem = elem - 1;
+                break;
+            }
+        }
+
+        for (uint64_t elem = 1; elem <= last_elem; elem++) {
+            ASSERT_TRUE(filter_big2.contains(elem));
+        }
     }
 
     TEST(SenderUtilsTests, CuckooFilterTableBasics12)
