@@ -19,6 +19,10 @@ namespace {
         size_t bits_first_word;
         size_t bits_second_word;
 
+        /**
+        Compute the necessary indexes and bit positions to locate a tag position
+        within an array of uint64_t
+        */
         TagIndexInfo(size_t bits_per_tag, size_t tags_per_bucket, size_t bucket, size_t tag_idx)
         {
             size_t tag_start_bit = (bucket * bits_per_tag * tags_per_bucket) + (tag_idx * bits_per_tag);
@@ -62,6 +66,7 @@ uint32_t CuckooFilterTable::read_tag(size_t bucket, size_t tag_idx) const
     uint32_t tag = static_cast<uint32_t>((tag_word >> tii.tag_start_offset) & mask);
 
     if (tii.bits_second_word != 0) {
+        // The tag needs to be completed with the next uint64_t
         tag_word = table_[tii.tag_start_idx + 1];
         mask = ~(static_cast<uint64_t>(-1) << tii.bits_second_word);
         tag |= (static_cast<uint32_t>(tag_word) & mask) << tii.bits_first_word;
@@ -91,6 +96,7 @@ void CuckooFilterTable::write_tag(size_t bucket, size_t tag_idx, uint32_t tag)
     table_[tii.tag_start_idx] |= tag_word;
 
     if (tii.bits_second_word != 0) {
+        // Write the rest of the tag to the next uint64_t
         tag_mask = ~(tag_ones >> tii.bits_first_word);
         tag_word = static_cast<uint64_t>(tag) >> tii.bits_first_word;
         table_[tii.tag_start_idx + 1] &= tag_mask;
@@ -119,6 +125,13 @@ bool CuckooFilterTable::insert_tag(size_t bucket, uint32_t tag, bool kickout, ui
 
 bool CuckooFilterTable::delete_tag(std::size_t bucket, std::uint32_t tag)
 {
+    if (bucket >= num_buckets_) {
+        throw invalid_argument("bucket out of range");
+    }
+    if (tag & tag_input_mask_) {
+        throw invalid_argument("tag is not constrained to bits_per_tag");
+    }
+
     for (size_t i = 0; i < tags_per_bucket_; i++) {
         if (read_tag(bucket, i) == tag) {
             write_tag(bucket, i, 0);
@@ -150,10 +163,10 @@ bool CuckooFilterTable::find_tag_in_bucket(std::size_t bucket, std::uint32_t tag
 bool CuckooFilterTable::find_tag_in_buckets(std::size_t bucket1, std::size_t bucket2, std::uint32_t tag) const
 {
     if (bucket1 >= num_buckets_) {
-        throw invalid_argument("bucket out of range");
+        throw invalid_argument("bucket1 out of range");
     }
     if (bucket2 >= num_buckets_) {
-        throw invalid_argument("bucket out of range");
+        throw invalid_argument("bucket2 out of range");
     }
 
     if (find_tag_in_bucket(bucket1, tag))
