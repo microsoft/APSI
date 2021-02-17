@@ -36,6 +36,8 @@ namespace APSITests {
         ASSERT_EQ(true, filter.contains(80));
         ASSERT_EQ(true, filter.contains(81));
 
+        ASSERT_EQ(100, filter.get_num_items());
+
         ASSERT_EQ(true, filter.remove(1));
         ASSERT_EQ(true, filter.remove(10));
         ASSERT_EQ(true, filter.remove(20));
@@ -49,21 +51,24 @@ namespace APSITests {
         ASSERT_EQ(true,  filter.contains(21));
         ASSERT_EQ(false, filter.contains(80));
         ASSERT_EQ(true,  filter.contains(81));
+
+        ASSERT_EQ(96, filter.get_num_items());
     }
 
     TEST(SenderUtilsTests, CuckooFilterLimits)
     {
-        CuckooFilter filter(70 * 2, 12);
-        uint64_t elem = 1;
+        size_t max_items = 140;
+        CuckooFilter filter(max_items, 12);
 
-        for (; elem < 1000; elem++)
+        for (uint64_t elem = 1; elem < 1000; elem++)
         {
             if (!filter.add(elem)) {
                 break;
             }
         }
 
-        ASSERT_TRUE(elem < 1000);
+        ASSERT_TRUE(filter.get_num_items() > max_items);
+        ASSERT_TRUE(filter.get_num_items() < (max_items * 2));
     }
 
     TEST(SenderUtilsTests, CuckooFilterTableBasics12)

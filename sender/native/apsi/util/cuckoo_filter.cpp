@@ -96,17 +96,20 @@ bool CuckooFilter::remove(const felt_t &item)
     idx2 = get_alt_index(idx1, tag);
 
     if (table_->delete_tag(idx1, tag)) {
-        try_eliminate_victim();
+        num_items_--;
+        try_eliminate_overflow();
         return true;
     }
 
     if (table_->delete_tag(idx2, tag)) {
-        try_eliminate_victim();
+        num_items_--;
+        try_eliminate_overflow();
         return true;
     }
 
     if (overflow_.used && (overflow_.index == idx1 || overflow_.index == idx2) && overflow_.tag == tag) {
         overflow_.used = false;
+        num_items_--;
         return true;
     }
 
@@ -141,10 +144,9 @@ size_t CuckooFilter::get_alt_index(size_t idx, uint32_t tag) const
     return idx ^ idx_hash;
 }
 
-void CuckooFilter::try_eliminate_victim()
+void CuckooFilter::try_eliminate_overflow()
 {
     if (overflow_.used) {
-        overflow_.used = false;
-        add_index_tag(overflow_.index, overflow_.tag);
+        overflow_.used = !add_index_tag(overflow_.index, overflow_.tag);
     }
 }

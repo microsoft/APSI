@@ -25,6 +25,11 @@ namespace apsi {
                 bool add(const apsi::util::felt_t &item);
                 bool remove(const apsi::util::felt_t &item);
 
+                std::size_t get_num_items() const
+                {
+                    return num_items_;
+                }
+
             private:
                 constexpr static std::size_t max_cuckoo_kicks_ = 500;
 
@@ -47,7 +52,7 @@ namespace apsi {
                 void get_tag_and_index(const apsi::util::felt_t &item, std::uint32_t &tag, std::size_t &idx) const;
                 std::size_t get_alt_index(std::size_t idx, std::uint32_t tag) const;
                 bool add_index_tag(std::size_t idx, std::uint32_t tag);
-                void try_eliminate_victim();
+                void try_eliminate_overflow();
             };
         } // namespace util
     } // namespace sender
