@@ -78,12 +78,10 @@ namespace apsi
             template<typename L>
             bool is_present(const vector<pair<felt_t, L>> &bin, felt_t element)
             {
-                if (bin.end() != find_if(
-                                          bin.begin(),
-                                          bin.end(),
-                                          [&element](const pair<felt_t, L> &elem) {
-                                              return elem.first == element;
-                                          })) {
+                if (bin.end() !=
+                    find_if(bin.begin(), bin.end(), [&element](const pair<felt_t, L> &elem) {
+                        return elem.first == element;
+                    })) {
                     return true;
                 }
 
@@ -94,12 +92,12 @@ namespace apsi
             Helper function. Determines if a field element is present in a bin.
             */
             template<typename L>
-            bool is_present(const vector<pair<felt_t, L>> &bin, const BloomFilter &filter, felt_t element)
+            bool is_present(const vector<pair<felt_t, L>> &bin, const CuckooFilter &filter, felt_t element)
             {
                 total_search_count++;
 
                 // Check if the key is already in the current bin.
-                if (filter.maybe_present(element)) {
+                if (filter.contains(element)) {
                     // Perform a linear search to determine true/false positives
                     bool result = is_present(bin, element);
 
@@ -120,41 +118,11 @@ namespace apsi
             */
             template<typename L>
             auto get_iterator(
-                vector<pair<felt_t, L>> &bin, const BloomFilter &filter, const felt_t &element)
+                vector<pair<felt_t, L>> &bin, const CuckooFilter &filter, const felt_t &element)
             {
                 total_search_count++;
 
-                if (filter.maybe_present(element)) {
-                    auto result = find_if(
-                        bin.begin(), bin.end(), [&element](const pair<felt_t, L> &elem) {
-                            return elem.first == element;
-                        });
-
-                    if (bin.end() == result)
-                    {
-                        false_positives++;
-                    }
-                    else
-                    {
-                        true_positives;
-                    }
-
-                    return result;
-                }
-
-                return bin.end();
-            }
-
-            /**
-            Helper function. Returns a const iterator pointing to the given field element in the bin if
-            found and bin.end() otherwise.
-            */
-            template <typename L>
-            auto get_iterator(const vector<pair<felt_t, L>> &bin, const BloomFilter &filter, const felt_t &element)
-            {
-                total_search_count++;
-
-                if (filter.maybe_present(element)) {
+                if (filter.contains(element)) {
                     auto result = find_if(
                         bin.begin(), bin.end(), [&element](const pair<felt_t, L> &elem) {
                             return elem.first == element;
@@ -176,16 +144,33 @@ namespace apsi
             }
 
             /**
-            Helper function. Regenerate Bloom filter for a given bin.
+            Helper function. Returns a const iterator pointing to the given field element in the bin if
+            found and bin.end() otherwise.
             */
-            template<typename L>
-            void regenerate_filter(const vector<pair<felt_t, L>> &bin, BloomFilter &filter)
+            template <typename L>
+            auto get_iterator(const vector<pair<felt_t, L>> &bin, const CuckooFilter &filter, const felt_t &element)
             {
-                filter.clear();
-                for (pair<felt_t, L> pair : bin)
-                {
-                    filter.add(pair.first);
+                total_search_count++;
+
+                if (filter.contains(element)) {
+                    auto result = find_if(
+                        bin.begin(), bin.end(), [&element](const pair<felt_t, L> &elem) {
+                            return elem.first == element;
+                        });
+
+                    if (bin.end() == result)
+                    {
+                        false_positives++;
+                    }
+                    else
+                    {
+                        true_positives++;
+                    }
+
+                    return result;
                 }
+
+                return bin.end();
             }
         }
 
@@ -356,7 +341,7 @@ namespace apsi
             cache_.felt_matching_polyns.reserve(num_bins);
 
             for (size_t i = 0; i < num_bins; i++) {
-                filters_.emplace_back(BloomFilter(max_bin_size, /* size_ratio */ 20));
+                filters_.emplace_back(CuckooFilter(max_bin_size, /* bits per tag */ 12));
             }
         }
 
@@ -536,7 +521,6 @@ namespace apsi
                 if (found_pos != curr_bin.end())
                 {
                     found_pos->second = value;
-                    regenerate_filter(curr_bin, curr_filter);
                 }
 
                 // Indicate that the polynomials need to be recomputed
@@ -593,8 +577,8 @@ namespace apsi
                 vector < pair<felt_t, L>> &curr_bin = bins_.at(curr_bin_idx);
                 auto &curr_filter = filters_.at(curr_bin_idx);
 
+                curr_filter.remove(to_remove_it->first);
                 curr_bin.erase(to_remove_it);
-                regenerate_filter(curr_bin, curr_filter);
 
                 // Indicate that the polynomials need to be recomputed
                 cache_invalid_ = true;
@@ -667,7 +651,7 @@ namespace apsi
             filters_.reserve(bins_size);
 
             for (size_t i = 0; i < bins_size; i++) {
-                filters_.emplace_back(max_bin_size_, /* size_ratio */ 20);
+                filters_.emplace_back(max_bin_size_, /* bits per tag */ 12);
             }
 
             clear_cache();
@@ -933,17 +917,17 @@ namespace apsi
         namespace
         {
             template<typename L>
-            bool add_to_bin(vector<pair<felt_t, L>> &bin, util::BloomFilter &filter, felt_t felt_item, felt_t felt_label);
+            bool add_to_bin(vector<pair<felt_t, L>> &bin, util::CuckooFilter &filter, felt_t felt_item, felt_t felt_label);
 
             template<>
-            bool add_to_bin(vector<pair<felt_t, monostate>> &bin, util::BloomFilter &filter, felt_t felt_item, felt_t felt_label)
+            bool add_to_bin(vector<pair<felt_t, monostate>> &bin, util::CuckooFilter &filter, felt_t felt_item, felt_t felt_label)
             {
                 bin.push_back(make_pair(felt_item, monostate{}));
                 return true;
             }
 
             template<>
-            bool add_to_bin(vector<pair<felt_t, felt_t>> &bin, util::BloomFilter &filter, felt_t felt_item, felt_t felt_label)
+            bool add_to_bin(vector<pair<felt_t, felt_t>> &bin, util::CuckooFilter &filter, felt_t felt_item, felt_t felt_label)
             {
                 if (is_present(bin, filter, felt_item))
                 {
@@ -1047,9 +1031,9 @@ namespace apsi
                         APSI_LOG_ERROR("The loaded BinBundle data contains repeated values for the same bin");
                         throw runtime_error("failed to load BinBundle");
                     }
-                }
 
-                regenerate_filter(bins_[i], filters_[i]);
+                    filters_[i].add(felt_item);
+                }
             }
 
             if (bb->cache())
