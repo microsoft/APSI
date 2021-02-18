@@ -43,6 +43,13 @@ CuckooFilterTable::CuckooFilterTable(size_t num_items, size_t bits_per_tag)
     : bits_per_tag_(bits_per_tag), tag_input_mask_(static_cast<std::uint32_t>(-1) << bits_per_tag)
 {
     num_buckets_ = next_power_of_2(std::max<uint64_t>(1, num_items / tags_per_bucket_));
+    double items_to_bucket_ratio = (double)num_items / num_buckets_ / tags_per_bucket_;
+    if (items_to_bucket_ratio > 0.96) {
+        // If the ratio is too close to 1 we might have failures trying to insert 
+        // the maximum number of items
+        num_buckets_ *= 2;
+    }
+
 
     // Round up to the nearest uint64_t
     size_t bits_per_bucket = tags_per_bucket_ * bits_per_tag;

@@ -1,8 +1,6 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-// STD
-
 // APSI
 #include "cuckoo_filter.h"
 #include "apsi/util/utils.h"
@@ -13,7 +11,11 @@ using namespace apsi::util;
 using namespace apsi::sender::util;
 
 namespace {
-    HashFunc hasher_(20);
+    /**
+    Hash function for the cuckoo filter.
+    The seed is completely arbitrary, doesn't need to be random.
+    */
+    HashFunc hasher_(/* seed */ 20);
 }
 
 
@@ -146,7 +148,9 @@ size_t CuckooFilter::get_alt_index(size_t idx, uint32_t tag) const
 
 void CuckooFilter::try_eliminate_overflow()
 {
+    // Try to insert the overflow item into the table.
     if (overflow_.used) {
-        overflow_.used = !add_index_tag(overflow_.index, overflow_.tag);
+        overflow_.used = false;
+        add_index_tag(overflow_.index, overflow_.tag);
     }
 }
