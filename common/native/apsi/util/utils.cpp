@@ -89,5 +89,21 @@ namespace apsi
 
             return result;
         }
+
+        uint64_t next_power_of_2(uint64_t v)
+        {
+            // From: graphics.stanford.edu/~seander/bithacks.html
+            v--;
+            v |= v >> 1;
+            v |= v >> 2;
+            v |= v >> 4;
+            v |= v >> 8;
+            v |= v >> 16;
+            v |= v >> 32;
+            v++;
+            v += (v == 0);
+
+            return v;
+        }
     } // namespace util
 } // namespace apsi

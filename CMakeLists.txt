@@ -207,7 +207,7 @@ endmacro()
 set(THIRDPARTY_DIR ${APSI_SOURCE_DIR}/thirdparty)
 
 # Microsoft SEAL
-find_package(SEAL 3.6.2 CONFIG REQUIRED)
+find_package(SEAL 3.6 CONFIG REQUIRED)
 
 # Microsoft Kuku
 find_package(Kuku 2.1 REQUIRED)

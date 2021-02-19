@@ -11,7 +11,7 @@
 // APSI
 #include "apsi/crypto_context.h"
 #include "apsi/util/db_encoding.h"
-#include "apsi/util/bloom_filter.h"
+#include "apsi/util/cuckoo_filter.h"
 
 // SEAL
 #include "seal/util/defines.h"
@@ -170,10 +170,10 @@ namespace apsi
             std::vector<std::vector<std::pair<felt_t, L>>> bins_;
 
             /**
-            Each bin in the BinBundle has a BloomFilter that helps quickly determine whether a field element is
+            Each bin in the BinBundle has a CuckooFilter that helps quickly determine whether a field element is
             contained.
             */
-            std::vector<util::BloomFilter> filters_;
+            std::vector<util::CuckooFilter> filters_;
 
             /**
             A cache of all the computations we can do on the bins. This is empty by default.
