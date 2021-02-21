@@ -266,7 +266,7 @@ namespace apsi
                     bundle_indices.insert(bundle_idx);
 
                     // Get the bundle set at the given bundle index
-                    vector<BinBundle<L>> &bundle_set = bin_bundles.at(bundle_idx);
+                    vector<BinBundle<L>> &bundle_set = bin_bundles[bundle_idx];
 
                     // Try to insert or overwrite these field elements in an existing BinBundle at this bundle index.
                     // Keep track of whether or not we succeed.
@@ -336,7 +336,7 @@ namespace apsi
                 for (const size_t &bundle_idx : bundle_indices)
                 {
                     // Get the set of BinBundles at this bundle index
-                    vector<BinBundle<L>> &bundle_set = bin_bundles.at(bundle_idx);
+                    vector<BinBundle<L>> &bundle_set = bin_bundles[bundle_idx];
 
                     APSI_LOG_DEBUG("Insert-or-Assign worker [" << this_thread::get_id() << "]: "
                         "regenerating cache for bundle index " << bundle_idx << " "
@@ -478,7 +478,7 @@ namespace apsi
                     bundle_indices.insert(bundle_idx);
 
                     // Get the bundle set at the given bundle index
-                    vector<BinBundle<L>> &bundle_set = bin_bundles.at(bundle_idx);
+                    vector<BinBundle<L>> &bundle_set = bin_bundles[bundle_idx];
 
                     // Try to remove these field elements from an existing BinBundle at this bundle index. Keep track
                     // of whether or not we succeed.
@@ -515,7 +515,7 @@ namespace apsi
                 for (const size_t &bundle_idx : bundle_indices)
                 {
                     // Get the set of BinBundles at this bundle index
-                    vector<BinBundle<L>> &bundle_set = bin_bundles.at(bundle_idx);
+                    vector<BinBundle<L>> &bundle_set = bin_bundles[bundle_idx];
 
                     APSI_LOG_DEBUG("Remove worker [" << this_thread::get_id() << "]: "
                         "regenerating cache for bundle index " << bundle_idx << " "
@@ -602,8 +602,7 @@ namespace apsi
             /**
             Returns a set of DB cache references corresponding to the bundles in the given set
             */
-            template<typename L>
-            vector<reference_wrapper<const BinBundleCache>> collect_caches(vector<BinBundle<L>> &bin_bundles)
+            vector<reference_wrapper<const BinBundleCache>> collect_caches(vector<BinBundle> &bin_bundles)
             {
                 vector<reference_wrapper<const BinBundleCache>> result;
                 for (const auto &bundle : bin_bundles)
@@ -1044,7 +1043,7 @@ namespace apsi
             tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
 
             // Retrieve the algebraic labels from one of the BinBundles at this index
-            const vector<BinBundle<felt_t>> &bundle_set = bin_bundles_.at(bundle_idx);
+            const vector<BinBundle<felt_t>> &bundle_set = bin_bundles_[bundle_idx];
             vector<felt_t> alg_labels;
             bool got_labels = false;
             for (const BinBundle<felt_t> &bundle : bundle_set)

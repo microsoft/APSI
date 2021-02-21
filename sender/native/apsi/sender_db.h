@@ -244,7 +244,7 @@ namespace apsi
             All the BinBundles in the database, indexed by bundle index. The set (represented by a vector internally) at
             bundle index i contains all the BinBundles with bundle index i.
             */
-            std::vector<std::vector<BinBundle<felt_t>>> bin_bundles_;
+            std::vector<std::vector<BinBundle>> bin_bundles_;
 
         public:
             /**
@@ -374,7 +374,7 @@ namespace apsi
             All the BinBundles in the DB, indexed by bundle index. The set (represented by a vector internally) at
             bundle index i contains all the BinBundles with bundle index i.
             */
-            std::vector<std::vector<BinBundle<apsi::util::monostate>>> bin_bundles_;
+            std::vector<std::vector<BinBundle>> bin_bundles_;
 
         public:
             /**
