@@ -60,7 +60,7 @@ namespace apsi
                 unordered_set<location_type> result;
                 for (auto &hf : hash_funcs)
                 {
-                    result.emplace(hf(item.value()));
+                    result.emplace(hf(item.get_as<kuku::item_type>().front()));
                 }
 
                 return result;

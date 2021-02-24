@@ -71,7 +71,7 @@ namespace APSITests
     TEST(OPRFTests, OPRFOperation)
     {
         int item_count = 100;
-        unordered_set<Item> items;
+        vector<Item> items;
 
         shared_ptr<UniformRandomGeneratorFactory> rng_factory(make_shared<Blake2xbPRNGFactory>());
         auto rng = rng_factory->create();
@@ -79,7 +79,7 @@ namespace APSITests
         {
             Item it;
             rng->generate(sizeof(Item), it.get_as<seal_byte>().data());
-            items.insert(move(it));
+            items.push_back(move(it));
         }
 
         // Create random key

@@ -23,9 +23,9 @@ Simple CSV file parser
 class CSVReader
 {
 public:
-    using UnlabeledData = std::unordered_set<apsi::Item>;
+    using UnlabeledData = std::vector<apsi::Item>;
 
-    using LabeledData = std::unordered_map<apsi::Item, apsi::util::FullWidthLabel>;
+    using LabeledData = std::vector<std::pair<apsi::Item, apsi::util::FullWidthLabel>>;
 
     using DBData = std::variant<UnlabeledData, LabeledData>;
 

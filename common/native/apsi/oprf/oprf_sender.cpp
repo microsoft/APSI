@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <thread>
+#include <mutex>
 
 // APSI
 #include "apsi/oprf/oprf_sender.h"
@@ -101,13 +102,17 @@ namespace apsi
         }
 
         unordered_set<oprf_hash_type> OPRFSender::ComputeHashes(
-            const unordered_set<oprf_item_type> &oprf_items,
-            const OPRFKey &oprf_key)
+            const gsl::span<const oprf_item_type> &oprf_items,
+            const OPRFKey &oprf_key,
+            size_t threads)
         {
+            if (0 == threads) {
+                threads = thread::hardware_concurrency();
+            }
+
             unordered_set<oprf_hash_type> oprf_hashes;
 
-            for (auto &item : oprf_items)
-            {
+            for (auto &item : oprf_items) {
                 // Create an elliptic curve point from the item
                 ECPoint ecpt(item.get_as<const unsigned char>());
 
@@ -118,10 +123,13 @@ namespace apsi
                 array<unsigned char, ECPoint::hash_size> item_hash_and_label_key;
                 ecpt.extract_hash(item_hash_and_label_key);
 
-                // The first 128 bits represent the item hash; the next 128 bits represent the label encryption key and
-                // are discarded in this overload of ComputeHashes
+                // The first 128 bits represent the item hash; the next 128 bits represent the label
+                // encryption key and are discarded in this overload of ComputeHashes
                 oprf_hash_type hash;
-                copy_n(item_hash_and_label_key.data(), oprf_hash_size, hash.get_as<unsigned char>().data());
+                copy_n(
+                    item_hash_and_label_key.data(),
+                    oprf_hash_size,
+                    hash.get_as<unsigned char>().data());
 
                 // Add to result
                 oprf_hashes.insert(move(hash));
@@ -131,13 +139,17 @@ namespace apsi
         }
 
         unordered_map<oprf_hash_type, FullWidthLabel> OPRFSender::ComputeHashes(
-            const unordered_map<oprf_item_type, FullWidthLabel> &oprf_item_labels,
-            const OPRFKey &oprf_key)
+            const gsl::span<const pair<oprf_item_type, FullWidthLabel>> &oprf_item_labels,
+            const OPRFKey &oprf_key,
+            size_t threads)
         {
+            if (0 == threads) {
+                threads = thread::hardware_concurrency();
+            }
+
             unordered_map<oprf_hash_type, FullWidthLabel> oprf_hashes;
 
-            for (auto &item_label_pair : oprf_item_labels)
-            {
+            for (auto &item_label_pair : oprf_item_labels) {
                 // Create an elliptic curve point from the item
                 ECPoint ecpt(item_label_pair.first.get_as<const unsigned char>());
 
@@ -148,9 +160,13 @@ namespace apsi
                 array<unsigned char, ECPoint::hash_size> item_hash_and_label_key;
                 ecpt.extract_hash(item_hash_and_label_key);
 
-                // The first 128 bits represent the item hash; the next 128 bits represent the label encryption key
+                // The first 128 bits represent the item hash; the next 128 bits represent the label
+                // encryption key
                 pair<oprf_hash_type, FullWidthLabel> hash;
-                copy_n(item_hash_and_label_key.data(), oprf_hash_size, hash.first.get_as<unsigned char>().data());
+                copy_n(
+                    item_hash_and_label_key.data(),
+                    oprf_hash_size,
+                    hash.first.get_as<unsigned char>().data());
 
                 // Copy the label
                 hash.second = item_label_pair.second;

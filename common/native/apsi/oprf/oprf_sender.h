@@ -88,12 +88,12 @@ namespace apsi
                 gsl::span<const seal::seal_byte> oprf_queries, const OPRFKey &oprf_key);
 
             static std::unordered_set<oprf_hash_type> ComputeHashes(
-                const std::unordered_set<oprf_item_type> &oprf_items,
-                const OPRFKey &oprf_key);
+                const gsl::span<const oprf_item_type> &oprf_items,
+                const OPRFKey &oprf_key, std::size_t threads = 0);
 
             static std::unordered_map<oprf_hash_type, util::FullWidthLabel> ComputeHashes(
-                const std::unordered_map<oprf_item_type, util::FullWidthLabel> &oprf_item_labels,
-                const OPRFKey &oprf_key);
+                const gsl::span<const std::pair<oprf_item_type, util::FullWidthLabel>> &oprf_item_labels,
+                const OPRFKey &oprf_key, std::size_t threads = 0);
         }; // class OPRFSender
     }      // namespace oprf
 } // namespace apsi

@@ -39,10 +39,10 @@ namespace APSITests
             logging::Log::set_log_level(logging::Log::Level::info);
             //logging::Log::set_log_file("out.log");
 
-            unordered_set<Item> sender_items;
+            vector<Item> sender_items;
             for (size_t i = 0; i < sender_size; i++)
             {
-                sender_items.insert({ i + 1, i + 1 });
+                sender_items.push_back({ i + 1, i + 1 });
             }
 
             OPRFKey oprf_key;
@@ -64,7 +64,7 @@ namespace APSITests
                 auto int_size = client_total_and_int_size.second;
                 ASSERT_TRUE(int_size <= client_size);
 
-                unordered_set<Item> recv_int_items = rand_subset(sender_items, int_size);
+                vector<Item> recv_int_items = rand_subset(sender_items, int_size);
                 vector<Item> recv_items;
                 for (auto item : recv_int_items)
                 {
@@ -130,10 +130,10 @@ namespace APSITests
             logging::Log::set_log_level(logging::Log::Level::info);
             //logging::Log::set_log_file("out.log");
 
-            unordered_map<Item, FullWidthLabel> sender_items;
+            vector<pair<Item, FullWidthLabel>> sender_items;
             for (size_t i = 0; i < sender_size; i++)
             {
-                sender_items.insert(make_pair(Item(i + 1, i + 1), FullWidthLabel(~(i + 1), i + 1)));
+                sender_items.push_back(make_pair(Item(i + 1, i + 1), FullWidthLabel(~(i + 1), i + 1)));
             }
 
             OPRFKey oprf_key;
@@ -155,7 +155,7 @@ namespace APSITests
                 auto int_size = client_total_and_int_size.second;
                 ASSERT_TRUE(int_size <= client_size);
 
-                unordered_set<Item> recv_int_items = rand_subset(sender_items, int_size);
+                vector<Item> recv_int_items = rand_subset(sender_items, int_size);
                 vector<Item> recv_items;
                 for (auto item : recv_int_items)
                 {
