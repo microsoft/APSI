@@ -745,6 +745,7 @@ namespace apsi
                 {
                     // Item is not already in items_, i.e., if this is a new item
                     new_data.push_back(move(item_label_pair));
+                    items_.insert(item);
                 }
                 else
                 {
@@ -790,12 +791,6 @@ namespace apsi
                 compressed_
             );
 
-            // Now that everything is inserted, add the new items to the cache of all inserted items
-            for (const auto &it : new_data)
-            {
-                items_.insert(it.first);
-            }
-
             APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
         }
 
@@ -830,6 +825,7 @@ namespace apsi
                 {
                     // Item is not already in items_, i.e., if this is a new item
                     new_data.push_back(move(item));
+                    items_.insert(item);
                 }
             }
 
@@ -851,10 +847,6 @@ namespace apsi
                 false, /* don't overwrite items */
                 compressed_
             );
-
-            // Now that everything is inserted, add the new items to the cache of all inserted items. Some of these may
-            // be repeats but it doesn't matter because set insertion is idempotent.
-            items_.insert(data.begin(), data.end());
 
             APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
         }
