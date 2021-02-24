@@ -87,11 +87,11 @@ namespace apsi
             static std::vector<seal::seal_byte> ProcessQueries(
                 gsl::span<const seal::seal_byte> oprf_queries, const OPRFKey &oprf_key);
 
-            static std::unordered_set<oprf_hash_type> ComputeHashes(
+            static std::vector<oprf_hash_type> ComputeHashes(
                 const gsl::span<const oprf_item_type> &oprf_items,
                 const OPRFKey &oprf_key, std::size_t threads = 0);
 
-            static std::unordered_map<oprf_hash_type, util::FullWidthLabel> ComputeHashes(
+            static std::vector<std::pair<oprf_hash_type, util::FullWidthLabel>> ComputeHashes(
                 const gsl::span<const std::pair<oprf_item_type, util::FullWidthLabel>> &oprf_item_labels,
                 const OPRFKey &oprf_key, std::size_t threads = 0);
         }; // class OPRFSender

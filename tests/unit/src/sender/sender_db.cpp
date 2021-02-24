@@ -154,10 +154,10 @@ namespace APSITests
         UnlabeledSenderDB sender_db(*params);
 
         // Create a vector of items without duplicates
-        unordered_set<HashedItem> items;
+        vector<HashedItem> items;
         for (uint64_t i = 0; i < 200; i++)
         {
-            items.emplace(i, i + 1);
+            items.push_back({ i, i + 1 });
         }
 
         // Insert all items
@@ -261,10 +261,10 @@ namespace APSITests
         LabeledSenderDB sender_db(*params);
 
         // Create a vector of items and labels without duplicates
-        unordered_map<HashedItem, FullWidthLabel> items;
+        vector<pair<HashedItem, FullWidthLabel>> items;
         for (uint64_t i = 0; i < 200; i++)
         {
-            items.emplace(make_pair(HashedItem(i, i + 1), FullWidthLabel(i, i + 1)));
+            items.push_back(make_pair(HashedItem(i, i + 1), FullWidthLabel(i, i + 1)));
         }
 
         // Insert all items
@@ -377,7 +377,10 @@ namespace APSITests
         }
 
         // Now remove all
-        unordered_set<HashedItem> items = sender_db.get_items();
+        unordered_set<HashedItem> item_set = sender_db.get_items();
+        vector<HashedItem> items;
+        items.reserve(item_set.size());
+        copy(item_set.begin(), item_set.end(), back_inserter(items));
         sender_db.remove(items);
 
         // No BinBundles should be left at this time
@@ -417,10 +420,10 @@ namespace APSITests
         ASSERT_EQ(sender_db->is_labeled(), other_sdb->is_labeled());
 
         // Create a vector of items without duplicates
-        unordered_set<HashedItem> items;
+        vector<HashedItem> items;
         for (uint64_t i = 0; i < 200; i++)
         {
-            items.emplace(i, i + 1);
+            items.push_back({ i, i + 1 });
         }
 
         // Insert all items
@@ -476,10 +479,10 @@ namespace APSITests
         ASSERT_EQ(sender_db->is_labeled(), other_sdb->is_labeled());
 
         // Create a vector of items and labels without duplicates
-        unordered_map<HashedItem, FullWidthLabel> items;
+        vector<pair<HashedItem, FullWidthLabel>> items;
         for (uint64_t i = 0; i < 200; i++)
         {
-            items.emplace(make_pair(HashedItem(i, i + 1), FullWidthLabel(i, i + 1)));
+            items.push_back(make_pair(HashedItem(i, i + 1), FullWidthLabel(i, i + 1)));
         }
 
         // Insert all items

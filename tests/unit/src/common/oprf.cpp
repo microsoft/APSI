@@ -85,7 +85,7 @@ namespace APSITests
         // Create random key
         OPRFKey oprf_key(rng_factory);
 
-        unordered_set<HashedItem> out_items = OPRFSender::ComputeHashes(items, oprf_key);
+        vector<HashedItem> out_items = OPRFSender::ComputeHashes(items, oprf_key);
 
         vector<Item> items_vec(items.begin(), items.end());
         OPRFReceiver receiver(items_vec);
@@ -98,7 +98,11 @@ namespace APSITests
 
         for (auto &recv_hash : receiver_hashes)
         {
-            ASSERT_TRUE(out_items.find(recv_hash) != out_items.end());
+            bool found = out_items.end() ==
+                         find_if(out_items.begin(), out_items.end(), [&](HashedItem &item) {
+                             return item == recv_hash;
+                         });
+            ASSERT_FALSE(found);
         }
     }
 

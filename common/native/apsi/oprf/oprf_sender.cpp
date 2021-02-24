@@ -101,7 +101,7 @@ namespace apsi
             return oprf_responses;
         }
 
-        unordered_set<oprf_hash_type> OPRFSender::ComputeHashes(
+        vector<oprf_hash_type> OPRFSender::ComputeHashes(
             const gsl::span<const oprf_item_type> &oprf_items,
             const OPRFKey &oprf_key,
             size_t threads)
@@ -110,7 +110,8 @@ namespace apsi
                 threads = thread::hardware_concurrency();
             }
 
-            unordered_set<oprf_hash_type> oprf_hashes;
+            vector<oprf_hash_type> oprf_hashes;
+            oprf_hashes.reserve(oprf_items.size());
 
             for (auto &item : oprf_items) {
                 // Create an elliptic curve point from the item
@@ -132,13 +133,13 @@ namespace apsi
                     hash.get_as<unsigned char>().data());
 
                 // Add to result
-                oprf_hashes.insert(move(hash));
+                oprf_hashes.emplace_back(move(hash));
             }
 
             return oprf_hashes;
         }
 
-        unordered_map<oprf_hash_type, FullWidthLabel> OPRFSender::ComputeHashes(
+        vector<pair<oprf_hash_type, FullWidthLabel>> OPRFSender::ComputeHashes(
             const gsl::span<const pair<oprf_item_type, FullWidthLabel>> &oprf_item_labels,
             const OPRFKey &oprf_key,
             size_t threads)
@@ -147,7 +148,8 @@ namespace apsi
                 threads = thread::hardware_concurrency();
             }
 
-            unordered_map<oprf_hash_type, FullWidthLabel> oprf_hashes;
+            vector<pair<oprf_hash_type, FullWidthLabel>> oprf_hashes;
+            oprf_hashes.reserve(oprf_item_labels.size());
 
             for (auto &item_label_pair : oprf_item_labels) {
                 // Create an elliptic curve point from the item
@@ -172,7 +174,7 @@ namespace apsi
                 hash.second = item_label_pair.second;
 
                 // Add to result
-                oprf_hashes.insert(move(hash));
+                oprf_hashes.emplace_back(move(hash));
             }
 
             return oprf_hashes;
