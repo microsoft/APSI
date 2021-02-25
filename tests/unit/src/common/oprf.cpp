@@ -102,7 +102,7 @@ namespace APSITests
                          find_if(out_items.begin(), out_items.end(), [&](HashedItem &item) {
                              return item == recv_hash;
                          });
-            ASSERT_FALSE(found);
+            ASSERT_TRUE(found);
         }
     }
 
