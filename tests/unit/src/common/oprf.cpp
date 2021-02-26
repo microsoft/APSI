@@ -98,7 +98,7 @@ namespace APSITests
 
         for (auto &recv_hash : receiver_hashes)
         {
-            bool found = out_items.end() ==
+            bool found = out_items.end() !=
                          find_if(out_items.begin(), out_items.end(), [&](HashedItem &item) {
                              return item == recv_hash;
                          });
