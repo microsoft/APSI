@@ -3,7 +3,7 @@
 
 // STD
 #include <memory>
-#include <thread>
+#include <future>
 #include <iterator>
 #include <algorithm>
 #include <sstream>
@@ -371,59 +371,63 @@ namespace apsi
                 uint32_t max_bin_size,
                 size_t thread_count,
                 bool overwrite,
-                bool compressed
-            ) {
-                // Collect the bundle indices and partition them into thread_count many partitions. By some uniformity
-                // assumption, the number of things to insert per partition should be roughly the same. Note that
-                // the contents of bundle_indices is always sorted (increasing order).
+                bool compressed)
+            {
+                // Collect the bundle indices and partition them into thread_count many partitions.
+                // By some uniformity assumption, the number of things to insert per partition
+                // should be roughly the same. Note that the contents of bundle_indices is always
+                // sorted (increasing order).
                 set<size_t> bundle_indices_set;
-                for (auto &data_with_idx : data_with_indices)
-                {
+                for (auto &data_with_idx : data_with_indices) {
                     size_t cuckoo_idx = data_with_idx.second;
                     size_t bin_idx, bundle_idx;
                     tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
                     bundle_indices_set.insert(bundle_idx);
                 }
 
-                // Copy the set of indices into a vector and sort so each thread processes a range of indices
+                // Copy the set of indices into a vector and sort so each thread processes a range
+                // of indices
                 vector<size_t> bundle_indices;
                 bundle_indices.reserve(bundle_indices_set.size());
-                copy(bundle_indices_set.begin(), bundle_indices_set.end(), back_inserter(bundle_indices));
+                copy(
+                    bundle_indices_set.begin(),
+                    bundle_indices_set.end(),
+                    back_inserter(bundle_indices));
                 sort(bundle_indices.begin(), bundle_indices.end());
 
                 // Partition the bundle indices appropriately
-                vector<pair<size_t, size_t>> partitions = partition_evenly(bundle_indices.size(), thread_count);
+                vector<pair<size_t, size_t>> partitions =
+                    partition_evenly(bundle_indices.size(), thread_count);
 
-                // Insert one larger "end" value to the bundle_indices vector; this represents one-past upper bound for
-                // the bundle indices that need to be processed.
-                if (!bundle_indices.empty())
-                {
+                // Insert one larger "end" value to the bundle_indices vector; this represents
+                // one-past upper bound for the bundle indices that need to be processed.
+                if (!bundle_indices.empty()) {
                     bundle_indices.push_back(bundle_indices.back() + 1);
                 }
 
                 // Run the threads on the partitions
-                vector<thread> threads;
-                APSI_LOG_INFO("Launching " << partitions.size() << " insert-or-assign worker threads");
-                for (auto &partition : partitions)
-                {
-                    threads.emplace_back([&, partition]() {
+                vector<future<void>> futures(partitions.size());
+                APSI_LOG_INFO(
+                    "Launching " << partitions.size() << " insert-or-assign worker threads");
+                for (size_t part_idx = 0; part_idx < partitions.size(); part_idx++) {
+                    auto &partition = partitions[part_idx];
+                    futures[part_idx] = async(launch::async, [&]() {
                         insert_or_assign_worker(
                             data_with_indices,
                             bin_bundles,
                             crypto_context,
-                            make_pair(bundle_indices[partition.first], bundle_indices[partition.second]),
+                            make_pair(
+                                bundle_indices[partition.first], bundle_indices[partition.second]),
                             bins_per_bundle,
                             max_bin_size,
                             overwrite,
-                            compressed
-                        );
+                            compressed);
                     });
                 }
 
                 // Wait for the threads to finish
-                for (auto &t : threads)
-                {
-                    t.join();
+                for (auto &f : futures) {
+                    f.get();
                 }
             }
 
@@ -577,25 +581,25 @@ namespace apsi
                 }
 
                 // Run the threads on the partitions
-                vector<thread> threads;
+                vector<future<void>> futures(partitions.size());
                 APSI_LOG_INFO("Launching " << partitions.size() << " remove worker threads");
-                for (auto &partition : partitions)
-                {
-                    threads.emplace_back([&, partition]() {
+                for (size_t part_idx = 0; part_idx < partitions.size(); part_idx++) {
+                    auto &partition = partitions[part_idx];
+                    futures[part_idx] = async(launch::async, [&]() {
                         remove_worker(
                             data_with_indices,
                             bin_bundles,
                             crypto_context,
-                            make_pair(bundle_indices[partition.first], bundle_indices[partition.second]),
-                            bins_per_bundle
-                        );
+                            make_pair(
+                                bundle_indices[partition.first], bundle_indices[partition.second]),
+                            bins_per_bundle);
                     });
                 }
 
                 // Wait for the threads to finish
-                for (auto &t : threads)
+                for (auto &f : futures)
                 {
-                    t.join();
+                    f.get();
                 }
             }
 

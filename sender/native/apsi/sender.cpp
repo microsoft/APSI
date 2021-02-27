@@ -2,7 +2,7 @@
 // Licensed under the MIT license.
 
 // STD
-#include <thread>
+#include <future>
 #include <sstream>
 
 // APSI
@@ -125,8 +125,7 @@ namespace apsi
             function<void(Channel &, Response)> send_fun,
             function<void(Channel &, ResultPart)> send_rp_fun)
         {
-            if (!query)
-            {
+            if (!query) {
                 APSI_LOG_ERROR("Failed to process query request: query is invalid");
                 throw invalid_argument("query is invalid");
             }
@@ -139,8 +138,9 @@ namespace apsi
             auto sender_db_lock = sender_db->get_reader_lock();
 
             STOPWATCH(sender_stopwatch, "Sender::RunQuery");
-            APSI_LOG_INFO("Start processing query request on database with "
-                << sender_db->get_items().size() << " items");
+            APSI_LOG_INFO(
+                "Start processing query request on database with " << sender_db->get_items().size()
+                                                                   << " items");
 
             // Copy over the CryptoContext from SenderDB; set the Evaluator for this local instance
             CryptoContext crypto_context(sender_db->get_crypto_context());
@@ -160,64 +160,62 @@ namespace apsi
             QueryResponse response_query = make_unique<QueryResponse::element_type>();
             response_query->package_count = package_count;
 
-            try
-            {
+            try {
                 send_fun(chl, move(response_query));
-            }
-            catch (const exception &ex)
-            {
-                APSI_LOG_ERROR("Failed to send response to query request; function threw an exception: " << ex.what());
+            } catch (const exception &ex) {
+                APSI_LOG_ERROR(
+                    "Failed to send response to query request; function threw an exception: "
+                    << ex.what());
                 throw;
             }
 
-            // For each bundle index i, we need a vector of powers of the query Qᵢ. We need powers all
-            // the way up to Qᵢ^max_items_per_bin (maybe less if the BinBundles aren't as full as expected). We don't
-            // store the zeroth power.
+            // For each bundle index i, we need a vector of powers of the query Qᵢ. We need powers
+            // all the way up to Qᵢ^max_items_per_bin (maybe less if the BinBundles aren't as full
+            // as expected). We don't store the zeroth power.
             vector<CiphertextPowers> all_powers(bundle_idx_count);
 
             // Initialize powers
-            for (CiphertextPowers &powers : all_powers)
-            {
-                // The + 1 is because we index by power. The 0th power is a dummy value. I promise this makes things
-                // easier to read.
+            for (CiphertextPowers &powers : all_powers) {
+                // The + 1 is because we index by power. The 0th power is a dummy value. I promise
+                // this makes things easier to read.
                 powers.resize(max_items_per_bin + 1);
             }
 
             // Load inputs provided in the query
-            for (auto &q : query.data())
-            {
+            for (auto &q : query.data()) {
                 // The exponent of all the query powers we're about to iterate through
                 size_t exponent = static_cast<size_t>(q.first);
 
                 // Load Qᵢᵉ for all bundle indices i, where e is the exponent specified above
-                for (size_t bundle_idx = 0; bundle_idx < all_powers.size(); bundle_idx++)
-                {
+                for (size_t bundle_idx = 0; bundle_idx < all_powers.size(); bundle_idx++) {
                     // Load input^power to all_powers[bundle_idx][exponent]
-                    APSI_LOG_DEBUG("Extracting query ciphertext power "
-                        << exponent << " for bundle index " << bundle_idx);
+                    APSI_LOG_DEBUG(
+                        "Extracting query ciphertext power " << exponent << " for bundle index "
+                                                             << bundle_idx);
                     all_powers[bundle_idx][exponent] = move(q.second[bundle_idx]);
                 }
             }
 
-            // Partition the data and run the threads on the partitions. The i-th thread will compute query powers at
-            // bundle indices starting at partitions[i], up to but not including partitions[i+1].
+            // Partition the data and run the threads on the partitions. The i-th thread will
+            // compute query powers at bundle indices starting at partitions[i], up to but not
+            // including partitions[i+1].
             auto partitions = partition_evenly(bundle_idx_count, safe_cast<uint32_t>(thread_count));
 
             // Launch threads, but not more than necessary
-            vector<thread> threads;
-            APSI_LOG_INFO("Launching " << partitions.size() << " query worker threads to compute " << package_count
-                << " result parts");
-            for (size_t t = 0; t < partitions.size(); t++)
-            {
-                threads.emplace_back([&, t]() {
-                    QueryWorker(sender_db, crypto_context, partitions[t], all_powers, pd, chl, send_rp_fun);
+            vector<future<void>> futures(partitions.size());
+            APSI_LOG_INFO(
+                "Launching " << partitions.size() << " query worker threads to compute "
+                             << package_count << " result parts");
+            for (size_t t = 0; t < partitions.size(); t++) {
+                futures[t] = async(launch::async, [&]() {
+                    QueryWorker(
+                        sender_db, crypto_context, partitions[t], all_powers, pd, chl, send_rp_fun);
                 });
             }
 
             // Wait for the threads to finish
-            for (auto &t : threads)
-            {
-                t.join();
+            for (auto &f : futures) {
+                f.get();
             }
 
             APSI_LOG_INFO("Finished processing query request");

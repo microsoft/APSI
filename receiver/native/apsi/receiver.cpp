@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <sstream>
 #include <algorithm>
-#include <thread>
+#include <future>
 
 // APSI
 #include "apsi/logging/log.h"
@@ -381,19 +381,18 @@ namespace apsi
             atomic<uint32_t> package_count{ response->package_count };
 
             // Launch threads to receive ResultPackages and decrypt results
-            vector<thread> threads;
+            vector<future<void>> futures(thread_count_);
             APSI_LOG_INFO("Launching " << thread_count_ << " result worker threads to handle " << package_count
                 << " result parts");
             for (size_t t = 0; t < thread_count_; t++)
             {
-                threads.emplace_back([&, t]() {
-                    process_result_worker(package_count, mrs, itt, chl);
-                });
+                futures[t] = async(
+                    launch::async, [&]() { process_result_worker(package_count, mrs, itt, chl); });
             }
 
-            for (auto &t : threads)
+            for (auto &f : futures)
             {
-                t.join();
+                f.get();
             }
 
             APSI_LOG_INFO("Found " << accumulate(mrs.begin(), mrs.end(), 0,

@@ -8,7 +8,7 @@
 #include <iostream>
 #include <mutex>
 #include <random>
-#include <thread>
+#include <future>
 #include <vector>
 
 // APSI
@@ -80,44 +80,38 @@ PowersDag do_depth_bound_given(const CLP &clp)
     uint32_t attempts = 0;
     const uint32_t attempts_max = max<uint32_t>(1, clp.attempts());
     const uint32_t num_dots = 7;
-    uint32_t until_next_print = clp.attempts() >= 10'000 ? attempts_max / num_dots : attempts_max + 1;
+    uint32_t until_next_print =
+        clp.attempts() >= 10'000 ? attempts_max / num_dots : attempts_max + 1;
     uint32_t lowest_depth = clp.up_to_power();
     uint32_t lowest_depth_seed;
     mutex mx;
 
     unsigned th_count = thread::hardware_concurrency();
-    vector<thread> threads;
-    for (unsigned i = 0; i < th_count; i++)
-    {
-        threads.emplace_back([&]() {
+    vector<future> futures(th_count);
+    for (unsigned i = 0; i < th_count; i++) {
+        futures[i] = async(launch::async, [&]() {
             random_device rd;
             PowersDag pd;
             uint32_t seed = rd();
 
-            while (!stop_token)
-            {
+            while (!stop_token) {
                 pd.configure(seed, clp.up_to_power(), clp.source_count());
                 {
                     lock_guard<mutex> lg(mx);
-                    if (!stop_token)
-                    {
-                        if (pd.is_configured() && pd.depth() < lowest_depth)
-                        {
+                    if (!stop_token) {
+                        if (pd.is_configured() && pd.depth() < lowest_depth) {
                             lowest_depth = pd.depth();
                             lowest_depth_seed = seed;
-                            if (lowest_depth <= clp.depth_bound())
-                            {
+                            if (lowest_depth <= clp.depth_bound()) {
                                 stop_token = true;
                             }
                         }
 
-                        if (++attempts >= attempts_max)
-                        {
+                        if (++attempts >= attempts_max) {
                             stop_token = true;
                         }
 
-                        if (--until_next_print == 0)
-                        {
+                        if (--until_next_print == 0) {
                             cout << ".";
                             cout.flush();
                             until_next_print = attempts_max / num_dots;
@@ -129,9 +123,8 @@ PowersDag do_depth_bound_given(const CLP &clp)
         });
     }
 
-    for (auto &th : threads)
-    {
-        th.join();
+    for (auto &f : futures) {
+        f.get();
     }
 
     PowersDag pd;
@@ -139,19 +132,15 @@ PowersDag do_depth_bound_given(const CLP &clp)
 
     cout << " done (" << attempts << " attempts)" << endl;
 
-    if (pd.is_configured() && pd.depth() <= clp.depth_bound())
-    {
+    if (pd.is_configured() && pd.depth() <= clp.depth_bound()) {
         cout << "Found a valid configuration; depth: " << pd.depth() << endl;
         cout << "PowersDag seed: " << lowest_depth_seed << endl;
-    }
-    else if (pd.is_configured() && pd.depth() > clp.depth_bound())
-    {
-        cout << "Failed to find a valid configuration; lowest depth found: " << lowest_depth << endl;
+    } else if (pd.is_configured() && pd.depth() > clp.depth_bound()) {
+        cout << "Failed to find a valid configuration; lowest depth found: " << lowest_depth
+             << endl;
         cout << "PowersDag seed: " << lowest_depth_seed << endl;
         pd.reset();
-    }
-    else
-    {
+    } else {
         cout << "Failed to find a valid configuration. Try increasing the depth bound." << endl;
     }
 

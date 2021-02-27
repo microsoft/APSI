@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 #include <stdexcept>
-#include <thread>
+#include <future>
 #include <atomic>
 #include <algorithm>
 #include <iostream>
@@ -156,97 +156,84 @@ namespace apsi
         template<typename Func>
         void parallel_apply(Func &&func, std::size_t thread_count = 0) const
         {
-            if (!is_configured())
-            {
+            if (!is_configured()) {
                 throw std::logic_error("PowersDag has not been configured");
             }
 
             thread_count = thread_count < 1 ? std::thread::hardware_concurrency() : thread_count;
 
-            enum class NodeState
-            {
-                Uncomputed = 0,
-                Computing = 1,
-                Computed = 2
-            };
+            enum class NodeState { Uncomputed = 0, Computing = 1, Computed = 2 };
 
-            std::unique_ptr<std::atomic<NodeState>[]> node_states(new std::atomic<NodeState>[up_to_power_]);
-            for (std::uint32_t i = 0; i < up_to_power_; i++)
-            {
-                if (nodes_.at(i + 1).is_source())
-                {
+            std::unique_ptr<std::atomic<NodeState>[]> node_states(
+                new std::atomic<NodeState>[up_to_power_]);
+            for (std::uint32_t i = 0; i < up_to_power_; i++) {
+                if (nodes_.at(i + 1).is_source()) {
                     // Process source nodes right now
                     func(nodes_.at(i + 1));
                     node_states[i].store(NodeState::Computed);
-                }
-                else
-                {
+                } else {
                     // Other nodes are still uncomputed
                     node_states[i].store(NodeState::Uncomputed);
                 }
             }
 
-            std::vector<std::thread> threads;
-            for (std::size_t t = 0; t < thread_count; t++)
-            {
-                threads.emplace_back([&, t]() {
-                    // Start looking for work by going over node_states vector
-                    std::uint32_t ns = 0;
-                    while (true)
-                    {
-                        // Check if everything is done
-                        bool done = std::all_of(node_states.get(), node_states.get() + up_to_power_, [](auto &ns) {
+            auto compute_powers = [&]() {
+                // Start looking for work by going over node_states vector
+                std::uint32_t ns = 0;
+                while (true) {
+                    // Check if everything is done
+                    bool done = std::all_of(
+                        node_states.get(), node_states.get() + up_to_power_, [](auto &ns) {
                             return ns == NodeState::Computed;
                         });
-                        if (done)
-                        {
-                            return;
-                        }
+                    if (done) {
+                        return;
+                    }
 
-                        NodeState state = NodeState::Uncomputed;
-                        bool cmp = node_states[ns].compare_exchange_strong(
-                            state, NodeState::Computing);
+                    NodeState state = NodeState::Uncomputed;
+                    bool cmp = node_states[ns].compare_exchange_strong(state, NodeState::Computing);
 
-                        if (!cmp)
-                        {
-                            // Either done or already being processed
-                            ns = (ns + 1) % up_to_power_;
-                            continue;
-                        }
+                    if (!cmp) {
+                        // Either done or already being processed
+                        ns = (ns + 1) % up_to_power_;
+                        continue;
+                    }
 
-                        // Check for parents
-                        auto node = nodes_.at(ns + 1);
-                        auto p1 = node.parents.first;
-                        auto p2 = node.parents.second;
-                        bool p1_computed = node_states[p1 - 1] == NodeState::Computed;
-                        bool p2_computed = node_states[p2 - 1] == NodeState::Computed;
+                    // Check for parents
+                    auto node = nodes_.at(ns + 1);
+                    auto p1 = node.parents.first;
+                    auto p2 = node.parents.second;
+                    bool p1_computed = node_states[p1 - 1] == NodeState::Computed;
+                    bool p2_computed = node_states[p2 - 1] == NodeState::Computed;
 
-                        if (!(p1_computed && p2_computed))
-                        {
-                            // Parents are not done
-                            NodeState state = NodeState::Computing;
-                            node_states[ns].compare_exchange_strong(state, NodeState::Uncomputed);
-
-                            // Move on to the next node
-                            ns = (ns + 1) % up_to_power_;
-                            continue;
-                        }
-
-                        // Parents are done so process this node
-                        func(nodes_.at(ns + 1));
-
-                        state = NodeState::Computing;
-                        node_states[ns].compare_exchange_strong(state, NodeState::Computed);
+                    if (!(p1_computed && p2_computed)) {
+                        // Parents are not done
+                        NodeState state = NodeState::Computing;
+                        node_states[ns].compare_exchange_strong(state, NodeState::Uncomputed);
 
                         // Move on to the next node
                         ns = (ns + 1) % up_to_power_;
+                        continue;
                     }
-                });
+
+                    // Parents are done so process this node
+                    func(nodes_.at(ns + 1));
+
+                    state = NodeState::Computing;
+                    node_states[ns].compare_exchange_strong(state, NodeState::Computed);
+
+                    // Move on to the next node
+                    ns = (ns + 1) % up_to_power_;
+                }
+            };
+
+            std::vector<std::future<void>> futures(thread_count);
+            for (std::size_t t = 0; t < thread_count; t++) {
+                futures[t] = std::async(std::launch::async, compute_powers);
             }
 
-            for (auto &th : threads)
-            {
-                th.join();
+            for (auto &f : futures) {
+                f.get();
             }
         }
 
