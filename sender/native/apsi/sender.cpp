@@ -207,7 +207,7 @@ namespace apsi
                 "Launching " << partitions.size() << " query worker threads to compute "
                              << package_count << " result parts");
             for (size_t t = 0; t < partitions.size(); t++) {
-                futures[t] = async(launch::async, [&]() {
+                futures[t] = async(launch::async, [&, t]() {
                     QueryWorker(
                         sender_db, crypto_context, partitions[t], all_powers, pd, chl, send_rp_fun);
                 });
