@@ -829,18 +829,20 @@ On Windows, append `:x64-windows-static` to package name to install libraries fo
 For examples, to install Microsoft SEAL, on Windows do `.\vcpkg install seal:x64-windows-static[no-throw-tran]`, while on other systems do `./vcpkg install seal[no-throw-tran]`.
 The CMake build system will then automatically find these pre-installed packages.
 
-| Package                                             | vcpkg                         |
-|-----------------------------------------------------|-------------------------------|
-| [Microsoft GSL](https://github.com/Microsoft/GSL)   | with Microsoft SEAL           |
-| [ZLIB](https://github.com/madler/zlib)              | with Microsoft SEAL           |
-| [Microsoft SEAL](https://github.com/microsoft/SEAL) | `seal[no-throw-tran]`         |
-| [Microsoft Kuku](https://github.com/microsoft/Kuku) | `kuku`                        |
-| [Log4cplus](https://github.com/log4cplus/log4cplus) | `log4cplus`                   |
-| [libzmq](https://github.com/zeromq/libzmq)          | with cppzmq                   |
-| [cppzmq](https://github.com/zeromq/cppzmq)          | `cppzmq`                      |
-| [FourQlib](https://github.com/kiromaru/FourQlib)    | redistributed                 |
-| [Google Test](https://github.com/google/googletest) | `gtest`                       |
-| [TCLAP](https://sourceforge.net/projects/tclap/)    | `tclap`                       |
+| Package                                              | vcpkg                         |
+|------------------------------------------------------|-------------------------------|
+| [Microsoft GSL](https://github.com/Microsoft/GSL)    | with Microsoft SEAL           |
+| [ZLIB](https://github.com/madler/zlib)               | with Microsoft SEAL           |
+| [Zstandard](https://github.com/facebook/zstd)        | with Microsoft SEAL           |
+| [Microsoft SEAL](https://github.com/microsoft/SEAL)  | `seal[no-throw-tran]`         |
+| [Microsoft Kuku](https://github.com/microsoft/Kuku)  | `kuku`                        |
+| [Log4cplus](https://github.com/log4cplus/log4cplus)  | `log4cplus`                   |
+| [libzmq](https://github.com/zeromq/libzmq)           | with cppzmq                   |
+| [cppzmq](https://github.com/zeromq/cppzmq)           | `cppzmq`                      |
+| [FourQlib](https://github.com/kiromaru/FourQlib)     | redistributed by APSI         |
+| [FlatBuffers](https://github.com/google/flatbuffers) | `flatbuffers`                 |
+| [Google Test](https://github.com/google/googletest)  | `gtest`                       |
+| [TCLAP](https://sourceforge.net/projects/tclap/)     | `tclap`                       |
 
 ## Directory structure
 
@@ -880,7 +882,15 @@ APSI
     `-- receiver
 ```
 
-TODO: move `cli` directory to foundry99/Private AI/APSI-CLI which already  have the most up-to-date version of files.
+## Questions
+
+- Is the release native/C++ only? Do we remove C export library, dotnet wrapper, and SDK?
+- Are all unit tests, integration tests, and CLI included in release?
+- Do we rearrange the directory structure?
+- Should I commit `monostate` fixes?
+
+TODO: Add to "Dependencies" section, check for static after find_package.
+
 TODO: fix CMake in subdirectories of `cli`.
 TODO: fix CMake in subdirectories of `tests`.
 TODO: fix CMake library/project names.

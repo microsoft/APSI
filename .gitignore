@@ -3,8 +3,6 @@
 #### APSI Specific ####
 bin/
 build/
-thirdparty/*/**
-!thirdparty/*/CMakeLists.txt
 *_generated.h
 **/config.h
 
