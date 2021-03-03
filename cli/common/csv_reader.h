@@ -25,7 +25,7 @@ class CSVReader
 public:
     using UnlabeledData = std::unordered_set<apsi::Item>;
 
-    using LabeledData = std::unordered_map<apsi::Item, apsi::util::FullWidthLabel>;
+    using LabeledData = std::unordered_map<apsi::Item, apsi::Label>;
 
     using DBData = std::variant<UnlabeledData, LabeledData>;
 
@@ -43,7 +43,7 @@ private:
     std::pair<bool, bool> process_line(
         const std::string &line,
         apsi::Item &item,
-        apsi::util::FullWidthLabel &label) const;
+        apsi::Label &label) const;
 
     void throw_if_file_invalid() const;
 }; // class CSVReader

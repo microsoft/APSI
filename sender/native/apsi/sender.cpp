@@ -304,10 +304,10 @@ namespace apsi
 
                     // Compute the matching result and move to rp
                     const BatchedPlaintextPolyn &matching_polyn = cache.get().batched_matching_polyn;
-                    rp->psi_result = move(matching_polyn.eval(all_powers[bundle_idx]));
+                    rp->psi_result = matching_polyn.eval(all_powers[bundle_idx]);
 
-                    const BatchedPlaintextPolyn &interp_polyn = cache.get().batched_interp_polyn;
-                    if (interp_polyn)
+                    rp->label_byte_count = sender_db->get_label_byte_count();
+                    for (const auto &interp_polyn : cache.get().batched_interp_polyns)
                     {
                         // Compute the label result and move to rp
                         rp->label_result.emplace_back(interp_polyn.eval(all_powers[bundle_idx]));

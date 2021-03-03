@@ -459,6 +459,7 @@ namespace apsi
 
             APSI_LOG_DEBUG("Sending result package ("
                 << "has matching data: " << (rp->rp->psi_result ? "yes" : "no") << "; "
+                << "label byte count: " << rp->rp->label_byte_count << "; "
                 << "has label data: " << (rp->rp->label_result.size() ? "yes" : "no") << ")");
 
             multipart_t msg;

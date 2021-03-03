@@ -130,11 +130,11 @@ namespace apsi
             return oprf_hashes;
         }
 
-        unordered_map<oprf_hash_type, FullWidthLabel> OPRFSender::ComputeHashes(
-            const unordered_map<oprf_item_type, FullWidthLabel> &oprf_item_labels,
+        unordered_map<oprf_hash_type, EncryptedLabel> OPRFSender::ComputeHashes(
+            const unordered_map<oprf_item_type, Label> &oprf_item_labels,
             const OPRFKey &oprf_key)
         {
-            unordered_map<oprf_hash_type, FullWidthLabel> oprf_hashes;
+            unordered_map<oprf_hash_type, EncryptedLabel> oprf_hashes;
 
             for (auto &item_label_pair : oprf_item_labels)
             {
@@ -149,11 +149,11 @@ namespace apsi
                 ecpt.extract_hash(item_hash_and_label_key);
 
                 // The first 128 bits represent the item hash; the next 128 bits represent the label encryption key
-                pair<oprf_hash_type, FullWidthLabel> hash;
+                pair<oprf_hash_type, EncryptedLabel> hash;
                 copy_n(item_hash_and_label_key.data(), oprf_hash_size, hash.first.get_as<unsigned char>().data());
 
                 // Copy the label
-                hash.second = item_label_pair.second;
+                hash.second = EncryptedLabel(item_label_pair.second, allocator<unsigned char>());
 
                 // Add to result
                 oprf_hashes.insert(move(hash));

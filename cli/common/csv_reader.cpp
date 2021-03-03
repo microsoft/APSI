@@ -11,7 +11,6 @@
 
 // APSI
 #include "common/csv_reader.h"
-#include "apsi/util/db_encoding.h"
 #include "apsi/logging/log.h"
 
 using namespace std;
@@ -40,7 +39,7 @@ auto CSVReader::read(istream &stream) const -> DBData
     else
     {
         Item item;
-        FullWidthLabel label;
+        Label label;
         auto [has_item, has_label] = process_line(line, item, label);
 
         if (!has_item)
@@ -61,7 +60,7 @@ auto CSVReader::read(istream &stream) const -> DBData
     while (stream >> line)
     {
         Item item;
-        FullWidthLabel label;
+        Label label;
         auto [has_item, _] = process_line(line, item, label);
 
         if (!has_item)
@@ -102,7 +101,7 @@ auto CSVReader::read() const -> DBData
     return read(file);
 }
 
-pair<bool, bool> CSVReader::process_line(const string &line, Item &item, FullWidthLabel &label) const
+pair<bool, bool> CSVReader::process_line(const string &line, Item &item, Label &label) const
 {
     stringstream ss(line);
     string token;
@@ -122,10 +121,12 @@ pair<bool, bool> CSVReader::process_line(const string &line, Item &item, FullWid
     // Item can be of arbitrary length; the constructor of Item will automatically hash it
     item = token;
 
-    // Second is the label, if present; truncate if too long
+    // Second is the label
     token.clear();
     getline(ss, token);
-    copy_n(token.begin(), min(sizeof(label), token.size()), label.get_as<char>().begin());
+    label.clear();
+    label.reserve(token.size());
+    copy(token.begin(), token.end(), back_inserter(label));
 
     return { true, !token.empty() };
 }

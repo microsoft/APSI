@@ -29,6 +29,23 @@ namespace APSITests
 {
     namespace
     {
+        Label create_label(uint64_t lw, uint64_t hw, size_t byte_count)
+        {
+            uint64_t label_data[2]{ lw, hw };
+            if (byte_count > sizeof(label_data))
+            {
+                throw runtime_error("output is too large");
+            }
+
+            Label label;
+            copy_n(
+                reinterpret_cast<const unsigned char*>(label_data),
+                byte_count,
+                back_inserter(label));
+
+            return label;
+        }
+
         void RunUnlabeledTest(
             size_t sender_size,
             vector<pair<size_t, size_t>> client_total_and_int_sizes,
@@ -108,16 +125,16 @@ namespace APSITests
             logging::Log::set_log_level(logging::Log::Level::info);
             //logging::Log::set_log_file("out.log");
 
-            unordered_map<Item, FullWidthLabel> sender_items;
+            unordered_map<Item, Label> sender_items;
             for (size_t i = 0; i < sender_size; i++)
             {
-                sender_items.insert(make_pair(Item(i + 1, i + 1), FullWidthLabel(~(i + 1), i + 1)));
+                sender_items.insert(make_pair(Item(i + 1, i + 1), create_label(~(i + 1), i + 1, 10)));
             }
 
             auto oprf_key = make_shared<OPRFKey>();
             auto hashed_sender_items = OPRFSender::ComputeHashes(sender_items, *oprf_key);
 
-            auto sender_db = make_shared<LabeledSenderDB>(params, true);
+            auto sender_db = make_shared<LabeledSenderDB>(params, 10, true);
             sender_db->set_data(hashed_sender_items, num_threads);
             APSI_LOG_INFO("Packing rate: " << sender_db->get_packing_rate());
 

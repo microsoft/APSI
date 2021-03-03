@@ -130,10 +130,16 @@ namespace APSITests
             logging::Log::set_log_level(logging::Log::Level::info);
             //logging::Log::set_log_file("out.log");
 
-            unordered_map<Item, FullWidthLabel> sender_items;
+            unordered_map<Item, Label> sender_items;
             for (size_t i = 0; i < sender_size; i++)
             {
-                sender_items.insert(make_pair(Item(i + 1, i + 1), FullWidthLabel(~(i + 1), i + 1)));
+                uint64_t label_data[2]{ ~(i + 1), i + 1 };
+                Label label;
+                copy_n(
+                    reinterpret_cast<const unsigned char*>(label_data),
+                    sizeof(label_data),
+                    back_inserter(label));
+                sender_items.insert(make_pair(Item(i + 1, i + 1), move(label)));
             }
 
             OPRFKey oprf_key;

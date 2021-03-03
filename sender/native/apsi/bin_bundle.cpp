@@ -238,11 +238,21 @@ namespace apsi
             }
         }
 
+        BinBundleCache::BinBundleCache(const CryptoContext &crypto_context, size_t label_size) :
+            batched_matching_polyn(crypto_context)
+        {
+            batched_interp_polyns.reserve(label_size);
+            for (size_t label_idx = 0; label_idx < label_size; label_idx++)
+            {
+                batched_interp_polyns.emplace_back(crypto_context);
+            }
+        }
+
         BinBundle::BinBundle(
             const CryptoContext &crypto_context,
-            bool compressed,
             size_t label_size,
-            size_t max_bin_size) :
+            size_t max_bin_size,
+            bool compressed) :
             cache_invalid_(true),
             cache_(crypto_context, label_size),
             crypto_context_(crypto_context),
@@ -268,30 +278,75 @@ namespace apsi
             return context_data->parms().plain_modulus();
         }
 
-        /**
-        Batches this BinBundle's polynomials into SEAL Plaintexts. Resulting values are stored in cache_.
-        */
-        void BinBundle::regen_plaintexts()
-        {
-            // Compute and cache the batched "matching" polynomials. They're computed in both labeled and unlabeled PSI.
-            BatchedPlaintextPolyn p(cache_.felt_matching_polyns, crypto_context_, compressed_);
-            cache_.batched_matching_polyn = move(p);
-
-            // Compute and cache the batched Newton interpolation polynomials iff they exist.
-            cache_.batched_interp_polyns.clear();
-            cache_.batched_interp_polyns.reserve(cache_.felt_interp_polyns.size());
-            for (const auto &interp_polyn : cache_.felt_interp_polyns)
+        template<>
+        int BinBundle::multi_insert(
+            const vector<felt_t> &items,
+            size_t start_bin_idx,
+            bool dry_run
+        ) {
+            // We are inserting items only; no labels. This BinBundle cannot have a non-zero label size.
+            if (get_label_size())
             {
-                BatchedPlaintextPolyn p(interp_polyn, crypto_context_, compressed_);
-                cache_.batched_interp_polyns.push_back(move(p));
+                APSI_LOG_ERROR("Attempted to insert unlabeled data in a labeled BinBundle");
+                throw runtime_error("failed to insert items");
             }
+
+            if (items.empty())
+            {
+                APSI_LOG_ERROR("No item data to insert");
+                return -1;
+            }
+
+            // Return -1 if there isn't enough room in the BinBundle to insert at the given location
+            if (start_bin_idx >= get_num_bins() || items.size() > get_num_bins() - start_bin_idx)
+            {
+                return -1;
+            }
+
+            // If we're here, that means we can insert in all bins
+            size_t max_bin_size = 0;
+            size_t curr_bin_idx = start_bin_idx;
+            for (felt_t curr_item : items)
+            {
+                vector<felt_t> &curr_bin = item_bins_[curr_bin_idx];
+
+                // Compare the would-be bin size here to the running max
+                if (max_bin_size < curr_bin.size() + 1)
+                {
+                    max_bin_size = curr_bin.size() + 1;
+                }
+
+                // Insert if not dry run
+                if (!dry_run)
+                {
+                    // Insert the new item
+                    CuckooFilter &curr_filter = filters_[curr_bin_idx];
+                    curr_bin.push_back(curr_item);
+                    curr_filter.add(curr_item);
+
+                    // Indicate that the polynomials need to be recomputed
+                    cache_invalid_ = true;
+                }
+
+                curr_bin_idx++;
+            }
+
+            return max_bin_size;
         }
 
+        template<>
         int BinBundle::multi_insert(
             const vector<pair<felt_t, vector<felt_t>>> &item_labels,
             size_t start_bin_idx,
             bool dry_run
         ) {
+            // We are inserting item-labels. This BinBundle cannot have a zero label size.
+            if (!get_label_size())
+            {
+                APSI_LOG_ERROR("Attempted to insert labeled data in an unlabeled BinBundle");
+                throw runtime_error("failed to insert item-labels");
+            }
+
             if (item_labels.empty())
             {
                 APSI_LOG_ERROR("No item or label data to insert");
@@ -311,7 +366,7 @@ namespace apsi
                 }
             }
 
-            // Return -1 if there isn't enough room in the bin bundle to insert at the given location
+            // Return -1 if there isn't enough room in the BinBundle to insert at the given location
             if (start_bin_idx >= get_num_bins() || item_labels.size() > get_num_bins() - start_bin_idx)
             {
                 return -1;
@@ -379,6 +434,49 @@ namespace apsi
             return max_bin_size;
         }
 
+        template<>
+        bool BinBundle::try_multi_overwrite(
+            const vector<felt_t> &items,
+            size_t start_bin_idx
+        ) {
+            if (items.empty())
+            {
+                APSI_LOG_ERROR("No item data to insert");
+                return -1;
+            }
+
+            // This function may have been called accidentally; no label data is given, so nothing will be overwritten.
+            // This is equivalent to searching for the presence of the felt items in this BinBundle and forcing the
+            // cache to be recomputed.
+            APSI_LOG_WARNING("No label data was given to overwrite existing label data; nothing will be done");
+
+            // Return false if there isn't enough room in the BinBundle to insert at the given location
+            if (start_bin_idx >= get_num_bins() || items.size() > get_num_bins() - start_bin_idx)
+            {
+                return false;
+            }
+
+            // Check that all the item components appear sequentially in this BinBundle
+            size_t curr_bin_idx = start_bin_idx;
+            for (felt_t curr_item : items) {
+                vector<felt_t> &curr_bin = item_bins_[curr_bin_idx];
+                CuckooFilter &curr_filter = filters_[curr_bin_idx];
+
+                // A non-match was found; the item is not here.
+                if (!is_present(curr_bin, curr_filter, curr_item)) {
+                    return false;
+                } 
+
+                curr_bin_idx++;
+            }
+
+            // Nothing was done, but mark the cache as dirty anyway
+            cache_invalid_ = true;
+
+            return true;
+        }
+
+        template<>
         bool BinBundle::try_multi_overwrite(
             const vector<pair<felt_t, vector<felt_t>>> &item_labels,
             size_t start_bin_idx
@@ -402,7 +500,7 @@ namespace apsi
                 }
             }
 
-            // Return false if there isn't enough room in the bin bundle to insert at the given location
+            // Return false if there isn't enough room in the BinBundle to insert at the given location
             if (start_bin_idx >= get_num_bins() || item_labels.size() > get_num_bins() - start_bin_idx)
             {
                 return false;
@@ -475,7 +573,7 @@ namespace apsi
                 return -1;
             }
 
-            // Return false if there isn't enough room in the bin bundle at the given location
+            // Return false if there isn't enough room in the BinBundle at the given location
             if (start_bin_idx >= get_num_bins() || items.size() > get_num_bins() - start_bin_idx)
             {
                 return false;
@@ -545,54 +643,51 @@ namespace apsi
         }
 
         bool BinBundle::try_get_multi_label(
-            vector<pair<felt_t, vector<felt_t>>> &item_labels,
-            size_t start_bin_idx
+            const vector<felt_t> &items,
+            size_t start_bin_idx,
+            vector<felt_t> &labels
         ) const
         {
-            if (item_labels.empty())
+            if (items.empty())
             {
                 APSI_LOG_ERROR("No item data to search for");
                 return -1;
             }
 
-            // Return false if there isn't enough room in the bin bundle at the given location
-            if (start_bin_idx >= get_num_bins() || item_labels.size() > get_num_bins() - start_bin_idx)
+            // Return false if there isn't enough room in the BinBundle at the given location
+            if (start_bin_idx >= get_num_bins() || items.size() > get_num_bins() - start_bin_idx)
             {
                 return false;
             }
 
-            // Clear the label vectors
-            auto clear_labels = [&item_labels]() {
-                for (auto &item_label : item_labels)
-                {
-                    item_label.second.clear();
-                }
-            };
+            // Resize the labels vector to expected size; we will write in a non-linear order
+            labels.clear();
+            labels.resize(items.size() * get_label_size());
 
-            clear_labels();
-
-            // Go through all the items. If the item appears, find its label and write to item_labels. If any item
+            // Go through all the items. If the item appears, find its label and write to labels. If any item
             // doesn't appear, we scrap the whole computation and return false.
             size_t curr_bin_idx = start_bin_idx;
-            for (auto &item_label : item_labels)
+            for (size_t item_idx = 0; item_idx < items.size(); item_idx++)
             {
                 const vector<felt_t> &curr_bin = item_bins_[curr_bin_idx];
                 const CuckooFilter &curr_filter = filters_[curr_bin_idx];
 
-                auto item_it = get_iterator(curr_bin, curr_filter, item_label.first);
+                // Find the item if present in this bin
+                auto item_it = get_iterator(curr_bin, curr_filter, items[item_idx]);
 
                 if (curr_bin.end() == item_it)
                 {
                     // One of the items isn't there. No label to fetch. Clear the labels and return early.
-                    clear_labels();
+                    labels.clear();
                     return false;
                 }
                 
-                // Found the item. Next collect the label parts.
+                // Found the (felt) item. Next collect the label parts for this and write to label.
                 auto item_loc_in_bin = distance(curr_bin.begin(), item_it);
                 for (size_t label_idx = 0; label_idx < get_label_size(); label_idx++)
                 {
-                    item_label.second.push_back(label_bins_[label_idx][curr_bin_idx][item_loc_in_bin]);
+                    // Need to reorder the felts
+                    labels[items.size() * label_idx + item_idx] = label_bins_[label_idx][curr_bin_idx][item_loc_in_bin];
                 }
 
                 curr_bin_idx++;
@@ -629,23 +724,11 @@ namespace apsi
 
         void BinBundle::clear_cache()
         {
-            size_t num_bins = get_num_bins();
             cache_.felt_matching_polyns.clear();
-            cache_.felt_matching_polyns.reserve(num_bins);
             cache_.batched_matching_polyn = crypto_context_;
 
-            size_t label_size = get_label_size();
             cache_.felt_interp_polyns.clear();
-            cache_.felt_interp_polyns.resize(label_size);
-            for (size_t i = 0; i < label_size; i++)
-            {
-                cache_.felt_interp_polyns[i].reserve(num_bins);
-            }
-
-            // There is no reason to construct (empty) the interpolation polynomials here; they are created from scratch
-            // by BinBundle::regen_plaintexts.
             cache_.batched_interp_polyns.clear();
-            cache_.batched_interp_polyns.reserve(label_size);
 
             cache_invalid_ = true;
         }
@@ -660,15 +743,21 @@ namespace apsi
             return cache_;
         }
 
-        void BinBundle::regen_cache()
+        void BinBundle::regen_plaintexts()
         {
-            // Only recompute the cache if it needs to be recomputed
-            if (cache_invalid_)
+            // This function assumes that BinBundle::clear_cache and BinBundle::regen_polyns have been called and the
+            // polynomials have not been modified since then.
+
+            // Compute and cache the batched "matching" polynomials. They're computed in both labeled and unlabeled PSI.
+            BatchedPlaintextPolyn p(cache_.felt_matching_polyns, crypto_context_, compressed_);
+            cache_.batched_matching_polyn = move(p);
+
+            // Compute and cache the batched Newton interpolation polynomials iff they exist.
+            cache_.batched_interp_polyns.reserve(get_label_size());
+            for (const auto &interp_polyn : cache_.felt_interp_polyns)
             {
-                clear_cache();
-                regen_polyns();
-                regen_plaintexts();
-                cache_invalid_ = false;
+                BatchedPlaintextPolyn p(interp_polyn, crypto_context_, compressed_);
+                cache_.batched_interp_polyns.push_back(move(p));
             }
         }
 
@@ -680,6 +769,15 @@ namespace apsi
 
             // Get the field modulus. We need this for polynomial calculations
             const Modulus &mod = field_mod();
+
+            size_t num_bins = get_num_bins();
+            size_t label_size = get_label_size();
+            cache_.felt_matching_polyns.reserve(num_bins);
+            cache_.felt_interp_polyns.resize(label_size);
+            for (auto &fip : cache_.felt_interp_polyns)
+            {
+                fip.reserve(num_bins);
+            }
 
             // For each bin in the bundle, compute and cache the corresponding "matching polynomial"
             for (size_t bin_idx = 0; bin_idx < get_num_bins(); bin_idx++)
@@ -695,6 +793,18 @@ namespace apsi
                     FEltPolyn p = newton_interpolate_polyn(item_bins_[bin_idx], label_bins_[label_idx][bin_idx], mod);
                     cache_.felt_interp_polyns[label_idx].push_back(move(p));
                 }
+            }
+        }
+
+        void BinBundle::regen_cache()
+        {
+            // Only recompute the cache if it needs to be recomputed
+            if (cache_invalid_)
+            {
+                clear_cache();
+                regen_polyns();
+                regen_plaintexts();
+                cache_invalid_ = false;
             }
         }
 
@@ -753,7 +863,7 @@ namespace apsi
         }
 
         size_t BinBundle::save(ostream &out, uint32_t bundle_idx) const
-        {            
+        {
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
             // Write the items and labels
@@ -857,6 +967,9 @@ namespace apsi
                 throw runtime_error("failed to load BinBundle");
             }
 
+            // The loaded label size must match the label size for this BinBundle
+            size_t label_size = get_label_size();
+
             for (size_t bin_idx = 0; bin_idx < num_bins; bin_idx++)
             {
                 auto &item_bin = *item_bins[bin_idx]->felts();
@@ -871,20 +984,23 @@ namespace apsi
 
                 // All is good; copy over the item data
                 transform(item_bin.begin(), item_bin.end(), back_inserter(item_bins_[bin_idx]), [&](auto felt_item) {
-                    if (is_present(item_bins_[bin_idx], filters_[bin_idx], felt_item))
+#ifdef APSI_DEBUG
+                    if (label_size && is_present(item_bins_[bin_idx], filters_[bin_idx], felt_item))
                     {
                         APSI_LOG_ERROR("The loaded BinBundle data contains a repeated value " << felt_item
                             << " in bin at index " << bin_idx);
                         throw runtime_error("failed to load BinBundle");
                     }
-
+#endif
                     // Add to the cuckoo filter
                     filters_[bin_idx].add(felt_item);
+
+                    // Return to add the item to item_bins_[bin_idx]
+                    return felt_item;
                 });
             }
 
             // We are now done with the item data; next check that the label size is correct
-            size_t label_size = get_label_size();
             size_t loaded_label_size = bb->label_bins() ? bb->label_bins()->size() : 0;
             if (label_size != loaded_label_size)
             {
@@ -966,6 +1082,9 @@ namespace apsi
                     throw runtime_error("failed to load BinBundle");
                 }
 
+                // Create the batched matching polynomial; we load the data below
+                cache_.batched_matching_polyn = crypto_context_;
+
                 // The number of plaintexts is correct; copy them over
                 for (size_t coeff_idx = 0; coeff_idx < max_coeff_count; coeff_idx++)
                 {
@@ -988,6 +1107,7 @@ namespace apsi
                 // We are now done with the item cache data; next check that the label cache size is correct
                 size_t felt_interp_polyns_size = cache.felt_interp_polyns() ? cache.felt_interp_polyns()->size() : 0;
                 size_t batched_interp_polyns_size = cache.batched_interp_polyns() ? cache.batched_interp_polyns()->size() : 0;
+
                 if (label_size != felt_interp_polyns_size)
                 {
                     APSI_LOG_ERROR("The loaded BinBundle cache has (felt_interp_polyns) label size "
@@ -1000,6 +1120,11 @@ namespace apsi
                         << batched_interp_polyns_size << " but this BinBundle expects label size " << label_size);
                     throw runtime_error("failed to load BinBundle");
                 }
+
+                // Resize felt_interp_polyns to correct size at this point; reserve space for batched_interp_polyns but
+                // construct them only when needed
+                cache_.felt_interp_polyns.resize(label_size);
+                cache_.batched_interp_polyns.reserve(label_size);
 
                 for (size_t label_idx = 0; label_idx < label_size; label_idx++)
                 {
@@ -1021,19 +1146,26 @@ namespace apsi
                         // Compare the number of interpolation polynomial coefficients to the number of matching
                         // polynomial coefficients
                         size_t matching_polyn_coeff_count = cache_.felt_matching_polyns[bin_idx].size();
-                        if (felt_interp_polyn.size() != matching_polyn_coeff_count)
+                        size_t interp_polyn_coeff_count = felt_interp_polyn.size();
+
+                        // This is an empty bin if the matching polynomial has zero or one coefficients; in this case
+                        // the interpolation polynomial size should equal the matching polynomial size. Otherwise the
+                        // interpolation polynomial size is one less than the matching polynomial size.
+                        bool empty_bin = matching_polyn_coeff_count <= 1;
+                        size_t expected_interp_polyn_coeff_count =
+                            empty_bin ? matching_polyn_coeff_count : matching_polyn_coeff_count - 1;
+
+                        if (interp_polyn_coeff_count != expected_interp_polyn_coeff_count)
                         {
                             APSI_LOG_ERROR("The loaded BinBundle cache has at bin index " << bin_idx << " "
-                                << felt_interp_polyn.size()
-                                << " interpolation polynomial coefficients which does not match the matching"
-                                   " polynomial coefficient count "
-                                << matching_polyn_coeff_count);
+                                << interp_polyn_coeff_count << " interpolation polynomial coefficients (expected "
+                                << expected_interp_polyn_coeff_count << ")");
                             throw runtime_error("failed to load BinBundle");
                         }
 
                         // Copy over the interpolation polynomial coefficients for this bin index
                         FEltPolyn p;
-                        p.reserve(felt_interp_polyn.size());
+                        p.reserve(interp_polyn_coeff_count);
                         copy(felt_interp_polyn.begin(), felt_interp_polyn.end(), back_inserter(p));
                         cache_.felt_interp_polyns[label_idx].push_back(move(p));
                     }
@@ -1041,17 +1173,23 @@ namespace apsi
                     // Finally check that the number of batched interpolation polynomial coefficients is correct and
                     // copy them over.
                     auto &batched_interp_polyn = *cache.batched_interp_polyns()->operator[](label_idx)->coeffs();
-                    if (batched_interp_polyn.size() != max_coeff_count)
+                    size_t batched_interp_polyn_coeff_count = batched_interp_polyn.size();
+                    bool empty_bundle = max_coeff_count <= 1;
+                    size_t expected_batch_interp_polyn_coeff_count = empty_bundle ? max_coeff_count : max_coeff_count - 1;
+                    if (batched_interp_polyn_coeff_count != expected_batch_interp_polyn_coeff_count)
                     {
                         APSI_LOG_ERROR("The loaded BinBundle cache contains an incorrect number ("
-                            << batched_interp_polyn.size() 
+                            << batched_interp_polyn_coeff_count 
                             << ") of batched interpolation polynomial coefficients (expected "
-                            << max_coeff_count << ")");
+                            << expected_batch_interp_polyn_coeff_count << ")");
                         throw runtime_error("failed to load BinBundle");
                     }
 
+                    // Create a new batched interpolation polynomial; we load the data below
+                    cache_.batched_interp_polyns.emplace_back(crypto_context_);
+
                     // The number of plaintexts is correct; copy them over
-                    for (size_t coeff_idx = 0; coeff_idx < max_coeff_count; coeff_idx++)
+                    for (size_t coeff_idx = 0; coeff_idx < batched_interp_polyn_coeff_count; coeff_idx++)
                     {
                         // Get the current coefficient data
                         auto &batched_interp_polyn_coeff = *batched_interp_polyn[coeff_idx]->data();

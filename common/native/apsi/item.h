@@ -62,6 +62,11 @@ namespace apsi
             bit_count_ = bit_count;
         }
 
+        BitstringView(T *data, std::uint32_t bit_count) :
+            BitstringView(gsl::span<T>{ data, (bit_count + 7) / 8 }, bit_count)
+        {
+        }
+
         template<typename S>
         BitstringView(const BitstringView<S> &view)
         {
@@ -165,6 +170,15 @@ namespace apsi
         gsl::span<const unsigned char> data() const
         {
             return { data_.data(), data_.size() };
+        }
+
+        /**
+        Releases ownership of, and returns the data as a std::vector<unsigned char>.
+        */
+        std::vector<unsigned char> release()
+        {
+            bit_count_ = 0;
+            return std::move(data_);
         }
     };
 
@@ -289,6 +303,20 @@ namespace apsi
     {
     public:
         using Item::Item;
+    };
+
+    /**
+    Represents an arbitrary-length label.
+    */
+    using Label = std::vector<unsigned char>;
+
+    /**
+    Represents an encrypted Label.
+    */
+    class EncryptedLabel : public Label
+    {
+    public:
+        using Label::Label;
     };
 } // namespace apsi
 

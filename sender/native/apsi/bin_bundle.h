@@ -115,10 +115,7 @@ namespace apsi
 
             BinBundleCache &operator=(BinBundleCache &&assign) = default;
 
-            BinBundleCache(const CryptoContext &crypto_context, std::size_t label_size) :
-                batched_matching_polyn(crypto_context),
-                batched_interp_polyns(label_size, { crypto_context })
-            {}
+            BinBundleCache(const CryptoContext &crypto_context, std::size_t label_size);
 
             /**
             For each bin, stores the "matching polynomial", i.e., unique monic polynomial whose roots are precisely
@@ -225,9 +222,9 @@ namespace apsi
         public:
             BinBundle(
                 const CryptoContext &crypto_context,
-                bool compressed,
                 std::size_t label_size,
-                std::size_t max_bin_size);
+                std::size_t max_bin_size,
+                bool compressed);
 
             BinBundle(const BinBundle &copy) = delete;
 
@@ -243,8 +240,9 @@ namespace apsi
             after insertion has taken place. On failed insertion, returns -1. On failure, no modification is made to the
             BinBundle.
             */
+            template<typename T>
             int multi_insert(
-                const std::vector<std::pair<felt_t, std::vector<felt_t>>> &item_labels,
+                const std::vector<T> &item_labels,
                 std::size_t start_bin_idx,
                 bool dry_run
             );
@@ -254,32 +252,36 @@ namespace apsi
             mutate the BinBundle. On success, returns the size of the largest bin bins in the modified range, after
             insertion has taken place. On failed insertion, returns -1.
             */
+            template<typename T>
             int multi_insert_dry_run(
-                const std::vector<std::pair<felt_t, std::vector<felt_t>>> &item_labels,
+                const std::vector<T> &item_labels,
                 std::size_t start_bin_idx
             ) {
-                multi_insert(item_labels, start_bin_idx, true);
+                return multi_insert(item_labels, start_bin_idx, true);
             }
+
             /**
             Inserts item-label pairs into sequential bins, beginning at start_bin_idx. On success, returns the size of
             the largest bin bins in the modified range, after insertion has taken place. On failed insertion, returns
             -1. On failure, no modification is made to the BinBundle.
             */
+            template<typename T>
             int multi_insert_for_real(
-                const std::vector<std::pair<felt_t, std::vector<felt_t>>> &item_labels,
+                const std::vector<T> &item_labels,
                 std::size_t start_bin_idx
             ) {
-                multi_insert(item_labels, start_bin_idx, false);
+                return multi_insert(item_labels, start_bin_idx, false);
             }
 
             /**
             Attempts to overwrite the stored items' labels with the given labels. Returns true iff it found a contiguous
             sequence of given items. If no such sequence was found, this BinBundle is not mutated. This function can be
-            called on a BinBundle<monostate> but it won't do anything except force the cache to get recomputed, so don't
-            bother.
+            called on a BinBundle<std::vector<felt_t>> but it won't do anything except force the cache to get recomputed,
+            so don't bother. The labeled case has T equal to std::pair<felt_t, std::vector<felt_t>>.
             */
+            template<typename T>
             bool try_multi_overwrite(
-                const std::vector<std::pair<felt_t, std::vector<felt_t>>> &item_labels,
+                const std::vector<T> &item_labels,
                 std::size_t start_bin_idx
             );
 
@@ -298,8 +300,9 @@ namespace apsi
             labels vector. Returns true on success.
             */
             bool try_get_multi_label(
-                std::vector<std::pair<felt_t, std::vector<felt_t>>> &item_labels,
-                std::size_t start_bin_idx
+                const std::vector<felt_t> &items,
+                std::size_t start_bin_idx,
+                std::vector<felt_t> &labels
             ) const;
 
             /**

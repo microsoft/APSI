@@ -173,6 +173,7 @@ namespace APSITests
                 // Add label to result if requested
                 if (labels)
                 {
+                    rp->label_byte_count = 1;
                     Ciphertext label_ct = ct;
 
                     // Every other byte will be 1 and every other 0 due to plain_modulus giving 16-bit encodings per

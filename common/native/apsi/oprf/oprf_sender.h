@@ -91,8 +91,8 @@ namespace apsi
                 const std::unordered_set<oprf_item_type> &oprf_items,
                 const OPRFKey &oprf_key);
 
-            static std::unordered_map<oprf_hash_type, util::FullWidthLabel> ComputeHashes(
-                const std::unordered_map<oprf_item_type, util::FullWidthLabel> &oprf_item_labels,
+            static std::unordered_map<oprf_hash_type, EncryptedLabel> ComputeHashes(
+                const std::unordered_map<oprf_item_type, Label> &oprf_item_labels,
                 const OPRFKey &oprf_key);
         }; // class OPRFSender
     }      // namespace oprf

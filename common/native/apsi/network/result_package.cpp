@@ -54,6 +54,7 @@ namespace apsi
             fbs::ResultPackageBuilder rp_builder(fbs_builder);
             rp_builder.add_bundle_idx(bundle_idx);
             rp_builder.add_psi_result(psi_ct);
+            rp_builder.add_label_byte_count(label_byte_count);
             rp_builder.add_label_result(label_cts);
             auto rp = rp_builder.Finish();
             fbs_builder.FinishSizePrefixed(rp);
@@ -120,6 +121,15 @@ namespace apsi
                 throw runtime_error(ss.str());
             }
 
+            // Load the label_byte_count and -- if non-zero -- check that we actually have label data present. This
+            // does not guarantee that we have *enough* label data present though, so it is important to check that
+            // when the label data has been decrypted and decoded.
+            label_byte_count = rp->label_byte_count();
+            if (label_byte_count && !rp->label_result())
+            {
+                throw runtime_error("failed to load ResultPackage: label data is missing");
+            }
+
             // Load the label_result data if present
             if (rp->label_result())
             {
@@ -173,6 +183,7 @@ namespace apsi
             plain_rp.bundle_idx = bundle_idx;
             crypto_context.encoder()->decode(psi_result_pt, plain_rp.psi_result);
 
+            plain_rp.label_byte_count = label_byte_count;
             for (auto &ct : label_result)
             {
                 Ciphertext label_result_ct = ct.extract(crypto_context.seal_context());

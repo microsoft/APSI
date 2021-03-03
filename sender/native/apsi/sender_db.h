@@ -22,7 +22,6 @@
 #include "apsi/item.h"
 #include "apsi/psi_params.h"
 #include "apsi/crypto_context.h"
-#include "apsi/util/db_encoding.h"
 
 // SEAL
 #include "seal/plaintext.h"
@@ -61,7 +60,7 @@ namespace apsi
             /**
             Creates a new SenderDB.
             */
-            SenderDB(PSIParams params, bool compressed);
+            SenderDB(PSIParams params, std::size_t label_byte_count, bool compressed);
 
             /**
             Clears the database. Every item and label will be removed.
@@ -86,7 +85,7 @@ namespace apsi
             used only on a LabeledSenderDB instance.
             */
             virtual void set_data(
-                const std::unordered_map<HashedItem, apsi::util::FullWidthLabel> &data,
+                std::unordered_map<HashedItem, EncryptedLabel> data,
                 std::size_t thread_count = 0
             ) = 0;
 
@@ -105,7 +104,7 @@ namespace apsi
             new label.
             */
             virtual void insert_or_assign(
-                const std::unordered_map<HashedItem, apsi::util::FullWidthLabel> &data,
+                std::unordered_map<HashedItem, EncryptedLabel> data,
                 std::size_t thread_count = 0
             ) = 0;
 
@@ -115,7 +114,7 @@ namespace apsi
             label is overwritten with the new label.
             */
             virtual void insert_or_assign(
-                const std::pair<HashedItem, apsi::util::FullWidthLabel> &data
+                std::pair<HashedItem, EncryptedLabel> data
             ) = 0;
 
             /**
@@ -201,6 +200,14 @@ namespace apsi
                 return db_lock_.acquire_read();
             }
 
+            /**
+            Returns the label byte count. A zero value indicates an unlabeled SenderDB.
+            */
+            std::size_t get_label_byte_count() const
+            {
+                return label_byte_count_;
+            }
+
         protected:
             seal::util::WriterLock get_writer_lock()
             {
@@ -231,6 +238,11 @@ namespace apsi
             Indicates whether SEAL plaintexts are compressed in memory.
             */
             bool compressed_;
+
+            /**
+            Indicates the size of the label in bytes. A zero value indicates an unlabeled SenderDB.
+            */
+            std::size_t label_byte_count_;
         }; // class SenderDB
 
         class LabeledSenderDB final : public SenderDB
@@ -250,7 +262,8 @@ namespace apsi
             /**
             Creates a new LabeledSenderDB.
             */
-            LabeledSenderDB(PSIParams params, bool compressed = true) : SenderDB(std::move(params), compressed)
+            LabeledSenderDB(PSIParams params, std::size_t label_byte_count = 10, bool compressed = true) :
+                SenderDB(std::move(params), label_byte_count, compressed)
             {
                 clear_db();
             }
@@ -284,7 +297,7 @@ namespace apsi
             Clears the database and inserts the given data, using at most thread_count threads.
             */
             void set_data(
-                const std::unordered_map<HashedItem, FullWidthLabel> &data,
+                std::unordered_map<HashedItem, EncryptedLabel> data,
                 std::size_t thread_count = 0
             ) override;
 
@@ -301,7 +314,7 @@ namespace apsi
             the database, its label is overwritten with the new label.
             */
             void insert_or_assign(
-                const std::unordered_map<HashedItem, FullWidthLabel> &data,
+                std::unordered_map<HashedItem, EncryptedLabel> data,
                 std::size_t thread_count = 0
             ) override;
 
@@ -310,12 +323,12 @@ namespace apsi
             item already exists in the database, its label is overwritten with the new label.
             */
             void insert_or_assign(
-                const std::pair<HashedItem, FullWidthLabel> &data
+                std::pair<HashedItem, EncryptedLabel> data
             ) override
             {
-                std::unordered_map<HashedItem, FullWidthLabel> data_map;
-                data_map.emplace(data);
-                insert_or_assign(data_map, 1);
+                std::unordered_map<HashedItem, EncryptedLabel> data_map;
+                data_map.emplace(std::move(data));
+                insert_or_assign(std::move(data_map), 1);
             }
 
             /**
@@ -360,7 +373,7 @@ namespace apsi
             Returns the label associated to the given item in the database. Throws std::invalid_argument if the item
             does not appear in the database.
             */
-            FullWidthLabel get_label(const HashedItem &item) const;
+            EncryptedLabel get_label(const HashedItem &item) const;
         }; // class LabeledSenderDB
 
         class UnlabeledSenderDB final : public SenderDB
@@ -380,7 +393,7 @@ namespace apsi
             /**
             Creates a new UnlabeledSenderDB.
             */
-            UnlabeledSenderDB(PSIParams params, bool compressed = true) : SenderDB(std::move(params), compressed)
+            UnlabeledSenderDB(PSIParams params, bool compressed = true) : SenderDB(std::move(params), 0, compressed)
             {
                 clear_db();
             }
@@ -413,7 +426,7 @@ namespace apsi
             Do not use this function. Labeled insertion on an unlabeled database does not and should not work.
             */
             void set_data(
-                const std::unordered_map<HashedItem, FullWidthLabel> &data,
+                std::unordered_map<HashedItem, EncryptedLabel> data,
                 std::size_t thread_count = 0
             ) override;
 
@@ -429,7 +442,7 @@ namespace apsi
             Do not use this function. Labeled insertion on an unlabeled database does not and should not work.
             */
             void insert_or_assign(
-                const std::unordered_map<HashedItem, FullWidthLabel> &data,
+                std::unordered_map<HashedItem, EncryptedLabel> data,
                 std::size_t thread_count = 0
             ) override;
 
@@ -437,12 +450,12 @@ namespace apsi
             Do not use this function. Labeled insertion on an unlabeled database does not and should not work.
             */
             void insert_or_assign(
-                const std::pair<HashedItem, FullWidthLabel> &data
+                std::pair<HashedItem, EncryptedLabel> data
             ) override
             {
-                std::unordered_map<HashedItem, FullWidthLabel> data_map;
-                data_map.emplace(data);
-                insert_or_assign(data_map, 1);
+                std::unordered_map<HashedItem, EncryptedLabel> data_map;
+                data_map.emplace(std::move(data));
+                insert_or_assign(std::move(data_map), 1);
             }
 
             /**
