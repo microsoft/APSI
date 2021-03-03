@@ -157,10 +157,10 @@ pair<shared_ptr<OPRFKey>, shared_ptr<SenderDB>> create_sender_db(
     shared_ptr<SenderDB> sender_db;
     if (holds_alternative<CSVReader::UnlabeledData>(db_data))
     {
-        unordered_set<HashedItem> hashed_db_data;
+        vector<HashedItem> hashed_db_data;
         {
             STOPWATCH(sender_stopwatch, "OPRF");
-            hashed_db_data = OPRFSender::ComputeHashes(get<CSVReader::UnlabeledData>(db_data), *oprf_key);
+            hashed_db_data = OPRFSender::ComputeHashes(get<CSVReader::UnlabeledData>(db_data), *oprf_key, thread_count);
         }
         APSI_LOG_INFO("Computed OPRF hash for " << hashed_db_data.size() << " items");
 
@@ -178,10 +178,10 @@ pair<shared_ptr<OPRFKey>, shared_ptr<SenderDB>> create_sender_db(
     }
     else if (holds_alternative<CSVReader::LabeledData>(db_data))
     {
-        unordered_map<HashedItem, EncryptedLabel> hashed_db_data;
+        vector<pair<HashedItem, EncryptedLabel>> hashed_db_data;
         {
             STOPWATCH(sender_stopwatch, "OPRF");
-            hashed_db_data = OPRFSender::ComputeHashes(get<CSVReader::LabeledData>(db_data), *oprf_key);
+            hashed_db_data = OPRFSender::ComputeHashes(get<CSVReader::LabeledData>(db_data), *oprf_key, thread_count);
         }
         APSI_LOG_INFO("Computed OPRF hash for " << hashed_db_data.size() << " items");
 

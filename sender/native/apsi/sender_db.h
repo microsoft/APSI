@@ -85,18 +85,15 @@ namespace apsi
             used only on a LabeledSenderDB instance.
             */
             virtual void set_data(
-                std::unordered_map<HashedItem, EncryptedLabel> data,
-                std::size_t thread_count = 0
-            ) = 0;
+                std::vector<std::pair<HashedItem, EncryptedLabel>> data,
+                std::size_t thread_count = 0) = 0;
 
             /**
             Clears the database and inserts the given data, using at most thread_count threads. This function can be
             used only on an UnlabeledSenderDB instance.
             */
             virtual void set_data(
-                const std::unordered_set<HashedItem> &data,
-                std::size_t thread_count = 0
-            ) = 0;
+                const std::vector<HashedItem> &data, std::size_t thread_count = 0) = 0;
 
             /**
             Inserts the given data into the database, using at most thread_count threads. This function can be used only
@@ -104,9 +101,8 @@ namespace apsi
             new label.
             */
             virtual void insert_or_assign(
-                std::unordered_map<HashedItem, EncryptedLabel> data,
-                std::size_t thread_count = 0
-            ) = 0;
+                std::vector<std::pair<HashedItem, EncryptedLabel>> data,
+                std::size_t thread_count = 0) = 0;
 
             /**
             Inserts the given (hashed) item-label pair into the database, using at most thread_count threads. This
@@ -122,9 +118,7 @@ namespace apsi
             on an UnlabeledSenderDB instance.
             */
             virtual void insert_or_assign(
-                const std::unordered_set<HashedItem> &data,
-                std::size_t thread_count = 0
-            ) = 0;
+                const std::vector<HashedItem> &data, std::size_t thread_count = 0) = 0;
 
             /**
             Inserts the given (hashed) item into the database, using at most thread_count threads. This function can be
@@ -135,7 +129,7 @@ namespace apsi
             /**
             Removes the given data from the database, using at most thread_count threads.
             */
-            virtual void remove(const std::unordered_set<HashedItem> &data, std::size_t thread_count = 0) = 0;
+            virtual void remove(const std::vector<HashedItem> &data, std::size_t thread_count = 0) = 0;
 
             /**
             Removes the given (hashed) item from the database, using at most thread_count threads.
@@ -297,7 +291,7 @@ namespace apsi
             Clears the database and inserts the given data, using at most thread_count threads.
             */
             void set_data(
-                std::unordered_map<HashedItem, EncryptedLabel> data,
+                std::vector<std::pair<HashedItem, EncryptedLabel>> data,
                 std::size_t thread_count = 0
             ) override;
 
@@ -305,7 +299,7 @@ namespace apsi
             Do not use this function. Unlabeled insertion on a labeled database does not and should not work.
             */
             void set_data(
-                const std::unordered_set<HashedItem> &data,
+                const std::vector<HashedItem> &data,
                 std::size_t thread_count = 0
             ) override;
 
@@ -314,7 +308,7 @@ namespace apsi
             the database, its label is overwritten with the new label.
             */
             void insert_or_assign(
-                std::unordered_map<HashedItem, EncryptedLabel> data,
+                std::vector<std::pair<HashedItem, EncryptedLabel>> data,
                 std::size_t thread_count = 0
             ) override;
 
@@ -326,8 +320,8 @@ namespace apsi
                 std::pair<HashedItem, EncryptedLabel> data
             ) override
             {
-                std::unordered_map<HashedItem, EncryptedLabel> data_map;
-                data_map.emplace(std::move(data));
+                std::vector<std::pair<HashedItem, EncryptedLabel>> data_map;
+                data_map.push_back(data);
                 insert_or_assign(std::move(data_map), 1);
             }
 
@@ -335,7 +329,7 @@ namespace apsi
             Do not use this function. Unlabeled insertion on a labeled database does not and should not work.
             */
             void insert_or_assign(
-                const std::unordered_set<HashedItem> &data,
+                const std::vector<HashedItem> &data,
                 std::size_t thread_count = 0
             ) override;
 
@@ -346,8 +340,8 @@ namespace apsi
                 const HashedItem &data
             ) override
             {
-                std::unordered_set<HashedItem> data_set;
-                data_set.emplace(data);
+                std::vector<HashedItem> data_set;
+                data_set.push_back(data);
                 insert_or_assign(data_set, 1);
             }
 
@@ -355,7 +349,7 @@ namespace apsi
             Removes the given data from the database, using at most thread_count threads.
             */
             void remove(
-                const std::unordered_set<HashedItem> &data,
+                const std::vector<HashedItem> &data,
                 std::size_t thread_count = 0
             ) override;
 
@@ -364,8 +358,8 @@ namespace apsi
             */
             void remove(const HashedItem &data) override
             {
-                std::unordered_set<HashedItem> data_set;
-                data_set.emplace(data);
+                std::vector<HashedItem> data_set;
+                data_set.push_back(data);
                 remove(data_set, 1);
             }
 
@@ -426,7 +420,7 @@ namespace apsi
             Do not use this function. Labeled insertion on an unlabeled database does not and should not work.
             */
             void set_data(
-                std::unordered_map<HashedItem, EncryptedLabel> data,
+                std::vector<std::pair<HashedItem, EncryptedLabel>> data,
                 std::size_t thread_count = 0
             ) override;
 
@@ -434,7 +428,7 @@ namespace apsi
             Clears the database and inserts the given data using at most thread_count threads.
             */
             void set_data(
-                const std::unordered_set<HashedItem> &data,
+                const std::vector<HashedItem> &data,
                 std::size_t thread_count = 0
             ) override;
 
@@ -442,7 +436,7 @@ namespace apsi
             Do not use this function. Labeled insertion on an unlabeled database does not and should not work.
             */
             void insert_or_assign(
-                std::unordered_map<HashedItem, EncryptedLabel> data,
+                std::vector<std::pair<HashedItem, EncryptedLabel>> data,
                 std::size_t thread_count = 0
             ) override;
 
@@ -453,8 +447,8 @@ namespace apsi
                 std::pair<HashedItem, EncryptedLabel> data
             ) override
             {
-                std::unordered_map<HashedItem, EncryptedLabel> data_map;
-                data_map.emplace(std::move(data));
+                std::vector<std::pair<HashedItem, EncryptedLabel>> data_map;
+                data_map.push_back(data);
                 insert_or_assign(std::move(data_map), 1);
             }
 
@@ -462,7 +456,7 @@ namespace apsi
             Inserts the given data into the database, using at most thread_count threads.
             */
             void insert_or_assign(
-                const std::unordered_set<HashedItem> &data,
+                const std::vector<HashedItem> &data,
                 std::size_t thread_count = 0
             ) override;
 
@@ -471,8 +465,8 @@ namespace apsi
             */
             void insert_or_assign(const HashedItem &data) override
             {
-                std::unordered_set<HashedItem> data_set;
-                data_set.emplace(data);
+                std::vector<HashedItem> data_set;
+                data_set.push_back(data);
                 insert_or_assign(data_set, 1);
             }
 
@@ -480,7 +474,7 @@ namespace apsi
             Removes the given data from the database, using at most thread_count threads.
             */
             void remove(
-                const std::unordered_set<HashedItem> &data,
+                const std::vector<HashedItem> &data,
                 std::size_t thread_count = 0
             ) override;
 
@@ -489,8 +483,8 @@ namespace apsi
             */
             void remove(const HashedItem &data) override
             {
-                std::unordered_set<HashedItem> data_set;
-                data_set.emplace(data);
+                std::vector<HashedItem> data_set;
+                data_set.push_back(data);
                 remove(data_set, 1);
             }
         }; // class UnlabeledSenderDB

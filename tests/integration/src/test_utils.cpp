@@ -5,7 +5,9 @@
 #include "test_utils.h"
 
 // STD
+#include <algorithm>
 #include <random>
+#include <stdexcept>
 
 #include "gtest/gtest.h"
 
@@ -17,6 +19,23 @@ using namespace seal;
 
 namespace APSITests
 {
+    Label create_label(uint64_t lw, uint64_t hw, size_t byte_count)
+    {
+        uint64_t label_data[2]{ lw, hw };
+        if (byte_count > sizeof(label_data))
+        {
+            throw runtime_error("output is too large");
+        }
+
+        Label label;
+        copy_n(
+            reinterpret_cast<const unsigned char*>(label_data),
+            byte_count,
+            back_inserter(label));
+
+        return label;
+    }
+
     unordered_set<Item> rand_subset(const unordered_set<Item> &items, size_t size)
     {
         mt19937_64 rg;
@@ -58,10 +77,44 @@ namespace APSITests
         return items_subset;
     }
 
+    vector<Item> rand_subset(const vector<Item> &items, size_t size)
+    {
+        mt19937_64 rg;
+
+        set<size_t> ss;
+        while (ss.size() != size) {
+            ss.emplace(static_cast<size_t>(rg() % items.size()));
+        }
+
+        vector<Item> items_subset;
+        for (auto idx : ss) {
+            items_subset.push_back(items[idx]);
+        }
+
+        return items_subset;
+    }
+
+    vector<Item> rand_subset(const vector<pair<Item, Label>> &items, size_t size)
+    {
+        mt19937_64 rg;
+
+        set<size_t> ss;
+        while (ss.size() != size) {
+            ss.emplace(static_cast<size_t>(rg() % items.size()));
+        }
+
+        vector<Item> items_subset;
+        for (auto idx : ss) {
+            items_subset.push_back(items[idx].first);
+        }
+
+        return items_subset;
+    }
+
     void verify_unlabeled_results(
         const vector<MatchRecord> &query_result,
         const vector<Item> &query_vec,
-        const unordered_set<Item> &int_items
+        const vector<Item> &int_items
     ) {
         // Count matches
         size_t match_count = accumulate(query_result.cbegin(), query_result.cend(), size_t(0),
@@ -84,8 +137,8 @@ namespace APSITests
     void verify_labeled_results(
         const vector<MatchRecord> &query_result,
         const vector<Item> &query_vec,
-        const unordered_set<Item> &int_items,
-        const unordered_map<Item, Label> &all_item_labels
+        const vector<Item> &int_items,
+        const vector<pair<Item, Label>> &all_item_labels
     ) {
         verify_unlabeled_results(query_result, query_vec, int_items);
 

@@ -29,23 +29,6 @@ namespace APSITests
 {
     namespace
     {
-        Label create_label(uint64_t lw, uint64_t hw, size_t byte_count)
-        {
-            uint64_t label_data[2]{ lw, hw };
-            if (byte_count > sizeof(label_data))
-            {
-                throw runtime_error("output is too large");
-            }
-
-            Label label;
-            copy_n(
-                reinterpret_cast<const unsigned char*>(label_data),
-                byte_count,
-                back_inserter(label));
-
-            return label;
-        }
-
         void RunUnlabeledTest(
             size_t sender_size,
             vector<pair<size_t, size_t>> client_total_and_int_sizes,
@@ -56,10 +39,10 @@ namespace APSITests
             logging::Log::set_log_level(logging::Log::Level::info);
             //logging::Log::set_log_file("out.log");
 
-            unordered_set<Item> sender_items;
+            vector<Item> sender_items;
             for (size_t i = 0; i < sender_size; i++)
             {
-                sender_items.insert({ i + 1, i + 1 });
+                sender_items.push_back({ i + 1, i + 1 });
             }
 
             auto oprf_key = make_shared<OPRFKey>();
@@ -94,7 +77,7 @@ namespace APSITests
                 auto int_size = client_total_and_int_size.second;
                 ASSERT_TRUE(int_size <= client_size);
 
-                unordered_set<Item> recv_int_items = APSITests::rand_subset(sender_items, int_size);
+                vector<Item> recv_int_items = APSITests::rand_subset(sender_items, int_size);
                 vector<Item> recv_items;
                 for (auto item : recv_int_items)
                 {
@@ -125,10 +108,10 @@ namespace APSITests
             logging::Log::set_log_level(logging::Log::Level::info);
             //logging::Log::set_log_file("out.log");
 
-            unordered_map<Item, Label> sender_items;
+            vector<pair<Item, Label>> sender_items;
             for (size_t i = 0; i < sender_size; i++)
             {
-                sender_items.insert(make_pair(Item(i + 1, i + 1), create_label(~(i + 1), i + 1, 10)));
+                sender_items.push_back(make_pair(Item(i + 1, i + 1), create_label(~(i + 1), i + 1, 10)));
             }
 
             auto oprf_key = make_shared<OPRFKey>();
@@ -163,7 +146,7 @@ namespace APSITests
                 auto int_size = client_total_and_int_size.second;
                 ASSERT_TRUE(int_size <= client_size);
 
-                unordered_set<Item> recv_int_items = APSITests::rand_subset(sender_items, int_size);
+                vector<Item> recv_int_items = APSITests::rand_subset(sender_items, int_size);
                 vector<Item> recv_items;
                 for (auto item : recv_int_items)
                 {

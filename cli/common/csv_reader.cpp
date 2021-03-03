@@ -71,11 +71,11 @@ auto CSVReader::read(istream &stream) const -> DBData
         }
         if (holds_alternative<UnlabeledData>(result))
         {
-            get<UnlabeledData>(result).emplace(item);
+            get<UnlabeledData>(result).push_back(item);
         }
         else if (holds_alternative<LabeledData>(result))
         {
-            get<LabeledData>(result).emplace(make_pair(item, label));
+            get<LabeledData>(result).push_back(make_pair(item, label));
         }
         else
         {

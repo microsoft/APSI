@@ -4,7 +4,9 @@
 // STD
 #include <algorithm>
 #include <array>
+#include <future>
 #include <thread>
+#include <mutex>
 
 // APSI
 #include "apsi/oprf/oprf_sender.h"
@@ -12,6 +14,7 @@
 
 using namespace std;
 using namespace seal;
+
 
 namespace apsi
 {
@@ -100,63 +103,107 @@ namespace apsi
             return oprf_responses;
         }
 
-        unordered_set<oprf_hash_type> OPRFSender::ComputeHashes(
-            const unordered_set<oprf_item_type> &oprf_items,
-            const OPRFKey &oprf_key)
+        vector<oprf_hash_type> OPRFSender::ComputeHashes(
+            const gsl::span<const oprf_item_type> &oprf_items,
+            const OPRFKey &oprf_key,
+            size_t threads)
         {
-            unordered_set<oprf_hash_type> oprf_hashes;
+            if (0 == threads) {
+                threads = thread::hardware_concurrency();
+            }
 
-            for (auto &item : oprf_items)
-            {
-                // Create an elliptic curve point from the item
-                ECPoint ecpt(item.get_as<const unsigned char>());
+            vector<oprf_hash_type> oprf_hashes(oprf_items.size());
+            vector<future<void>> futures(threads);
 
-                // Multiply with key
-                ecpt.scalar_multiply(oprf_key.key_span(), true);
+            auto ComputeHashesLambda = [&](size_t start_idx, size_t step) {
+                for (size_t idx = start_idx; idx < oprf_items.size(); idx += step) {
+                    const oprf_item_type &item = oprf_items[idx];
 
-                // Extract the item hash and the label encryption key
-                array<unsigned char, ECPoint::hash_size> item_hash_and_label_key;
-                ecpt.extract_hash(item_hash_and_label_key);
+                    // Create an elliptic curve point from the item
+                    ECPoint ecpt(item.get_as<const unsigned char>());
 
-                // The first 128 bits represent the item hash; the next 128 bits represent the label encryption key and
-                // are discarded in this overload of ComputeHashes
-                oprf_hash_type hash;
-                copy_n(item_hash_and_label_key.data(), oprf_hash_size, hash.get_as<unsigned char>().data());
+                    // Multiply with key
+                    ecpt.scalar_multiply(oprf_key.key_span(), true);
 
-                // Add to result
-                oprf_hashes.insert(move(hash));
+                    // Extract the item hash and the label encryption key
+                    array<unsigned char, ECPoint::hash_size> item_hash_and_label_key;
+                    ecpt.extract_hash(item_hash_and_label_key);
+
+                    // The first 128 bits represent the item hash; the next 128 bits represent the
+                    // label encryption key and are discarded in this overload of ComputeHashes
+                    oprf_hash_type hash;
+                    copy_n(
+                        item_hash_and_label_key.data(),
+                        oprf_hash_size,
+                        hash.get_as<unsigned char>().data());
+
+                    // Set result
+                    oprf_hashes[idx] = hash;
+                }
+            };
+
+            for (size_t thread_idx = 0; thread_idx < threads; thread_idx++) {
+                futures[thread_idx] =
+                    async(launch::async, ComputeHashesLambda, thread_idx, threads);
+            }
+
+            for (auto &f : futures) {
+                f.get();
             }
 
             return oprf_hashes;
         }
 
-        unordered_map<oprf_hash_type, EncryptedLabel> OPRFSender::ComputeHashes(
-            const unordered_map<oprf_item_type, Label> &oprf_item_labels,
-            const OPRFKey &oprf_key)
+        vector<pair<oprf_hash_type, EncryptedLabel>> OPRFSender::ComputeHashes(
+            const gsl::span<const pair<oprf_item_type, Label>> &oprf_item_labels,
+            const OPRFKey &oprf_key,
+            size_t threads)
         {
-            unordered_map<oprf_hash_type, EncryptedLabel> oprf_hashes;
+            if (0 == threads) {
+                threads = thread::hardware_concurrency();
+            }
 
-            for (auto &item_label_pair : oprf_item_labels)
-            {
-                // Create an elliptic curve point from the item
-                ECPoint ecpt(item_label_pair.first.get_as<const unsigned char>());
+            vector<pair<oprf_hash_type, EncryptedLabel>> oprf_hashes(oprf_item_labels.size());
+            vector<future<void>> futures(threads);
 
-                // Multiply with key
-                ecpt.scalar_multiply(oprf_key.key_span(), true);
+            auto ComputeHashesLambda = [&](size_t start_idx, size_t step) {
+                for (size_t idx = start_idx; idx < oprf_item_labels.size(); idx += step) {
+                    const pair<oprf_item_type, Label> &item = oprf_item_labels[idx];
 
-                // Extract the item hash and the label encryption key
-                array<unsigned char, ECPoint::hash_size> item_hash_and_label_key;
-                ecpt.extract_hash(item_hash_and_label_key);
+                    // Create an elliptic curve point from the item
+                    ECPoint ecpt(item.first.get_as<const unsigned char>());
 
-                // The first 128 bits represent the item hash; the next 128 bits represent the label encryption key
-                pair<oprf_hash_type, EncryptedLabel> hash;
-                copy_n(item_hash_and_label_key.data(), oprf_hash_size, hash.first.get_as<unsigned char>().data());
+                    // Multiply with key
+                    ecpt.scalar_multiply(oprf_key.key_span(), true);
 
-                // Copy the label
-                hash.second = EncryptedLabel(item_label_pair.second, allocator<unsigned char>());
+                    // Extract the item hash and the label encryption key
+                    array<unsigned char, ECPoint::hash_size> item_hash_and_label_key;
+                    ecpt.extract_hash(item_hash_and_label_key);
 
-                // Add to result
-                oprf_hashes.insert(move(hash));
+                    // The first 128 bits represent the item hash; the next 128 bits represent
+                    // the label encryption key
+                    pair<oprf_hash_type, Label> hash;
+                    copy_n(
+                        item_hash_and_label_key.data(),
+                        oprf_hash_size,
+                        hash.first.get_as<unsigned char>().data());
+
+                    // Copy the label
+                    hash.second = item.second;
+
+                    // Set result
+                    oprf_hashes[idx].first = hash.first;
+                    oprf_hashes[idx].second = EncryptedLabel(move(hash.second), allocator<unsigned char>());
+                }
+            };
+
+            for (size_t thread_idx = 0; thread_idx < threads; thread_idx++) {
+                futures[thread_idx] =
+                    async(launch::async, ComputeHashesLambda, thread_idx, threads);
+            }
+
+            for (auto &f : futures) {
+                f.get();
             }
 
             return oprf_hashes;

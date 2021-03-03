@@ -21,7 +21,7 @@
 
 // APSI
 #include "apsi/oprf/oprf_common.h"
-#include "apsi/util/db_encoding.h"
+#include "apsi/item.h"
 
 // GSL
 #include "gsl/span"
@@ -87,13 +87,13 @@ namespace apsi
             static std::vector<seal::seal_byte> ProcessQueries(
                 gsl::span<const seal::seal_byte> oprf_queries, const OPRFKey &oprf_key);
 
-            static std::unordered_set<oprf_hash_type> ComputeHashes(
-                const std::unordered_set<oprf_item_type> &oprf_items,
-                const OPRFKey &oprf_key);
+            static std::vector<oprf_hash_type> ComputeHashes(
+                const gsl::span<const oprf_item_type> &oprf_items,
+                const OPRFKey &oprf_key, std::size_t threads = 0);
 
-            static std::unordered_map<oprf_hash_type, EncryptedLabel> ComputeHashes(
-                const std::unordered_map<oprf_item_type, Label> &oprf_item_labels,
-                const OPRFKey &oprf_key);
+            static std::vector<std::pair<oprf_hash_type, EncryptedLabel>> ComputeHashes(
+                const gsl::span<const std::pair<oprf_item_type, Label>> &oprf_item_labels,
+                const OPRFKey &oprf_key, std::size_t threads = 0);
         }; // class OPRFSender
     }      // namespace oprf
 } // namespace apsi
