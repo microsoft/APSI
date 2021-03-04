@@ -216,9 +216,6 @@ namespace apsi
             }
         }
 
-        /**
-        Converts the given bitstring to a sequence of field elements (modulo mod)
-        */
         vector<felt_t> bits_to_field_elts(BitstringView<const unsigned char> bits, const Modulus &mod)
         {
             if (mod.is_zero())
@@ -277,9 +274,6 @@ namespace apsi
             return bits_to_field_elts(BitstringView<const unsigned char>(bits), mod);
         }
 
-        /**
-        Converts the given sequence of field elements (modulo mod) to a bitstring of length bit_count
-        */
         Bitstring field_elts_to_bits(gsl::span<const felt_t> felts, uint32_t bit_count, const Modulus &mod)
         {
             if (felts.empty())
@@ -336,68 +330,61 @@ namespace apsi
             return Bitstring(move(bit_buf), bit_count);
         }
 
-
-        /**
-        Converts an item and label into a sequence of (felt_t, felt_t) pairs, where the the first pair value is a chunk
-        of the item, and the second is a chunk of the label. item_bit_count denotes the bit length of the items and
-        labels (they're the same length). mod denotes the modulus of the prime field.
-        */
-        AlgItemLabel<felt_t> algebraize_item_label(
-            const HashedItem &item, const FullWidthLabel &label, size_t item_bit_count, const Modulus &mod)
+        AlgItemLabel algebraize_item_label(
+            const HashedItem &item, const EncryptedLabel &label, size_t item_bit_count, const Modulus &mod)
         {
-            // Convert the item from to a sequence of field elements. This is the "algebraic item".
+            // Convert the item to a sequence of field elements. This is the "algebraic item".
             BitstringView<const unsigned char> item_bsw(item.get_as<const unsigned char>(), item_bit_count);
             vector<felt_t> alg_item = bits_to_field_elts(item_bsw, mod);
+            size_t felts_per_item = alg_item.size();
 
-            // Convert the label from to a sequence of field elements. This is the "algebraic label".
-            BitstringView<const unsigned char> label_bsw(label.get_as<const unsigned char>(), item_bit_count);
+            // Convert the label to a sequence of field elements. This is the "algebraic label".
+            BitstringView<const unsigned char> label_bsw(label.data(), label.size() * 8);
             vector<felt_t> alg_label = bits_to_field_elts(label_bsw, mod);
 
-            // The number of field elements necessary to represent both these values MUST be the same
-            if (alg_item.size() != alg_label.size())
-            {
-                throw invalid_argument("items must take up as many slots as labels");
-            }
+            // Pad alg_label with zeros to be a multiple of alg_item length; label_size indicates number of multiples
+            // of item length
+            size_t label_size = (alg_label.size() + felts_per_item - 1) / felts_per_item;
+            size_t alg_label_padded_size = label_size * felts_per_item;
+            alg_label.resize(alg_label_padded_size);
 
-            // Convert pair of vector to vector of pairs
-            AlgItemLabel<felt_t> ret;
-            for (size_t i = 0; i < alg_item.size(); i++)
+            // We rearrange the alg_label field elements here so the receiver receives them in a order where they can
+            // just be concatenated. Another option would be for the receiver to do the work.
+            AlgItemLabel ret;
+            for (size_t felt_item_idx = 0; felt_item_idx < felts_per_item; felt_item_idx++)
             {
-                ret.emplace_back(make_pair(alg_item[i], alg_label[i]));
+                // Create a vector of size label_size and populate it here
+                vector<felt_t> label_parts;
+                label_parts.reserve(label_size);
+                for (size_t label_idx = 0; label_idx < label_size; label_idx++)
+                {
+                    label_parts.push_back(alg_label[felts_per_item * label_idx + felt_item_idx]);
+                }
+
+                // Append to the AlgItemLabel
+                ret.emplace_back(make_pair(alg_item[felt_item_idx], move(label_parts)));
             }
 
             return ret;
         }
 
-        /**
-        Converts an item into a sequence of (felt_t, monostate) pairs, where the the first pair value is a chunk of the
-        item, and the second is the unit type. item_bit_count denotes the bit length of the items and labels (they are
-        the same length). mod denotes the modulus of the prime field. mod denotes the modulus of the prime field.
-        */
-        AlgItemLabel<monostate> algebraize_item(const HashedItem &item, size_t item_bit_count, const Modulus &mod)
+        AlgItem algebraize_item(const HashedItem &item, size_t item_bit_count, const Modulus &mod)
         {
             // Convert the item from to a sequence of field elements. This is the "algebraic item".
             BitstringView<const unsigned char> item_bsw(item.get_as<const unsigned char>(), item_bit_count);
-            vector<felt_t> alg_item = bits_to_field_elts(item_bsw, mod);
-
-            // Convert vector to vector of pairs where the second element of each pair is monostate
-            AlgItemLabel<monostate> ret;
-            for (size_t i = 0; i < alg_item.size(); i++)
-            {
-                ret.emplace_back(make_pair(alg_item[i], monostate{}));
-            }
-
-            return ret;
+            return bits_to_field_elts(item_bsw, mod);
         }
 
-        /**
-        Converts a sequence of field elements into an Item. This will throw an invalid_argument if too many field
-        elements are given, i.e., if modulus_bitlen * num_elements > 128.
-        */
-        HashedItem dealgebraize_item(const vector<felt_t> &item, size_t item_bit_count, const Modulus &mod)
+        HashedItem dealgebraize_item(const AlgItem &item, size_t item_bit_count, const Modulus &mod)
         {
             Bitstring bits = field_elts_to_bits(item, item_bit_count, mod);
             return HashedItem(bits.to_view());
+        }
+
+        EncryptedLabel dealgebraize_label(const AlgLabel &label, size_t label_bit_count, const Modulus &mod)
+        {
+            vector<unsigned char> bits(field_elts_to_bits(label, label_bit_count, mod).release());
+            return EncryptedLabel(move(bits), allocator<unsigned char>());
         }
     }
 }

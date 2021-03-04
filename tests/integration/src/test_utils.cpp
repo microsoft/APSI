@@ -5,7 +5,9 @@
 #include "test_utils.h"
 
 // STD
+#include <algorithm>
 #include <random>
+#include <stdexcept>
 
 #include "gtest/gtest.h"
 
@@ -17,6 +19,23 @@ using namespace seal;
 
 namespace APSITests
 {
+    Label create_label(uint64_t lw, uint64_t hw, size_t byte_count)
+    {
+        uint64_t label_data[2]{ lw, hw };
+        if (byte_count > sizeof(label_data))
+        {
+            throw runtime_error("output is too large");
+        }
+
+        Label label;
+        copy_n(
+            reinterpret_cast<const unsigned char*>(label_data),
+            byte_count,
+            back_inserter(label));
+
+        return label;
+    }
+
     unordered_set<Item> rand_subset(const unordered_set<Item> &items, size_t size)
     {
         mt19937_64 rg;
@@ -37,18 +56,18 @@ namespace APSITests
         return items_subset;
     }
 
-    unordered_set<Item> rand_subset(const unordered_map<Item, FullWidthLabel> &items, size_t size)
+    unordered_set<Item> rand_subset(const unordered_map<Item, Label> &item_labels, size_t size)
     {
         mt19937_64 rg;
 
         set<size_t> ss;
         while (ss.size() != size)
         {
-            ss.emplace(static_cast<size_t>(rg() % items.size()));
+            ss.emplace(static_cast<size_t>(rg() % item_labels.size()));
         }
 
         vector<Item> items_vec;
-        transform(items.begin(), items.end(), back_inserter(items_vec), [](auto &item) { return item.first; });
+        transform(item_labels.begin(), item_labels.end(), back_inserter(items_vec), [](auto &il) { return il.first; });
         unordered_set<Item> items_subset;
         for (auto idx : ss)
         {
@@ -75,7 +94,7 @@ namespace APSITests
         return items_subset;
     }
 
-    vector<Item> rand_subset(const vector<pair<Item, FullWidthLabel>> &items, size_t size)
+    vector<Item> rand_subset(const vector<pair<Item, Label>> &items, size_t size)
     {
         mt19937_64 rg;
 
@@ -119,7 +138,7 @@ namespace APSITests
         const vector<MatchRecord> &query_result,
         const vector<Item> &query_vec,
         const vector<Item> &int_items,
-        const vector<pair<Item, FullWidthLabel>> &all_item_labels
+        const vector<pair<Item, Label>> &all_item_labels
     ) {
         verify_unlabeled_results(query_result, query_vec, int_items);
 
@@ -129,7 +148,6 @@ namespace APSITests
             if (result.found)
             {
                 ASSERT_TRUE(result.label);
-
             }
         }
 
@@ -145,9 +163,13 @@ namespace APSITests
                 [&item](auto &item_label) { return item == item_label.first; });
             ASSERT_NE(all_item_labels.end(), reference_label);
 
-            array<unsigned char, 16> label;
-            copy_n(query_result[idx].label.get_as<unsigned char>().begin(), 16, label.data());
-            ASSERT_EQ(reference_label->second.value(), label);
+            size_t label_byte_count = reference_label->second.size();
+            ASSERT_EQ(label_byte_count, query_result[idx].label.get_as<unsigned char>().size());
+
+            ASSERT_TRUE(equal(
+                reference_label->second.begin(),
+                reference_label->second.end(),
+                query_result[idx].label.get_as<unsigned char>().begin()));
         }
     }
 

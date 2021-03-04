@@ -21,7 +21,6 @@
 using namespace std;
 namespace fs = std::filesystem;
 using namespace apsi;
-using namespace apsi::util;
 using namespace apsi::sender;
 using namespace apsi::network;
 using namespace apsi::logging;
@@ -179,7 +178,7 @@ pair<shared_ptr<OPRFKey>, shared_ptr<SenderDB>> create_sender_db(
     }
     else if (holds_alternative<CSVReader::LabeledData>(db_data))
     {
-        vector<pair<HashedItem, FullWidthLabel>> hashed_db_data;
+        vector<pair<HashedItem, EncryptedLabel>> hashed_db_data;
         {
             STOPWATCH(sender_stopwatch, "OPRF");
             hashed_db_data = OPRFSender::ComputeHashes(get<CSVReader::LabeledData>(db_data), *oprf_key, thread_count);

@@ -2,8 +2,9 @@
 // Licensed under the MIT license.
 
 // STD
-#include <memory>
 #include <cstddef>
+#include <memory>
+#include <numeric>
 #include <sstream>
 
 // APSI
@@ -48,6 +49,29 @@ namespace APSITests
             }
 
             return params;
+        }
+
+        Label create_label(uint64_t lw, uint64_t hw, size_t byte_count)
+        {
+            uint64_t label_data[2]{ lw, hw };
+            if (byte_count > sizeof(label_data))
+            {
+                throw runtime_error("output is too large");
+            }
+
+            Label label;
+            copy_n(
+                reinterpret_cast<const unsigned char*>(label_data),
+                byte_count,
+                back_inserter(label));
+
+            return label;
+        }
+
+        EncryptedLabel create_encrypted_label(uint64_t lw, uint64_t hw, size_t byte_count)
+        {
+            Label label = create_label(lw, hw, byte_count);
+            return EncryptedLabel(move(label), allocator<unsigned char>());
         }
     }
 
@@ -136,7 +160,7 @@ namespace APSITests
 
             // Check the cache; we have only one bundle at this index
             ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto &a) { return !!a.get().batched_matching_polyn; }));
-            ASSERT_TRUE(none_of(cache.begin(), cache.end(), [](auto &a) { return !!a.get().batched_interp_polyn; }));
+            ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto &a) { return a.get().batched_interp_polyns.empty(); }));
         }
 
         // Accessing cache beyond range
@@ -195,7 +219,7 @@ namespace APSITests
 
             // Check the cache; we have only one bundle at this index
             ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto a) { return !!a.get().batched_matching_polyn; }));
-            ASSERT_TRUE(none_of(cache.begin(), cache.end(), [](auto a) { return !!a.get().batched_interp_polyn; }));
+            ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto a) { return a.get().batched_interp_polyns.empty(); }));
         }
 
         // Accessing cache beyond range
@@ -213,33 +237,33 @@ namespace APSITests
         LabeledSenderDB sender_db(*params);
 
         // Insert a single item with zero label
-        sender_db.insert_or_assign(make_pair(HashedItem(0, 0), FullWidthLabel(0, 0)));
+        sender_db.insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(0, 0, 10)));
         ASSERT_EQ(1, sender_db.get_items().size());
         ASSERT_EQ(1, sender_db.get_bin_bundle_count());
         auto label = sender_db.get_label(HashedItem(0, 0));
-        ASSERT_EQ(FullWidthLabel(0, 0), label);
+        ASSERT_EQ(create_encrypted_label(0, 0, 10), label);
 
         // Replace label
-        sender_db.insert_or_assign(make_pair(HashedItem(0, 0), FullWidthLabel(1, 0)));
+        sender_db.insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(1, 0, 10)));
         ASSERT_EQ(1, sender_db.get_items().size());
         ASSERT_EQ(1, sender_db.get_bin_bundle_count());
         label = sender_db.get_label(HashedItem(0, 0));
-        ASSERT_EQ(FullWidthLabel(1, 0), label);
+        ASSERT_EQ(create_encrypted_label(1, 0, 10), label);
 
         // Replace label again
-        sender_db.insert_or_assign(make_pair(HashedItem(0, 0), FullWidthLabel(~uint64_t(0), ~uint64_t(0))));
+        sender_db.insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(~uint64_t(0), ~uint64_t(0), 10)));
         ASSERT_EQ(1, sender_db.get_items().size());
         ASSERT_EQ(1, sender_db.get_bin_bundle_count());
         label = sender_db.get_label(HashedItem(0, 0));
-        ASSERT_EQ(FullWidthLabel(~uint64_t(0), ~uint64_t(0)), label);
+        ASSERT_EQ(create_encrypted_label(~uint64_t(0), ~uint64_t(0), 10), label);
 
         // Insert another item
-        sender_db.insert_or_assign(make_pair(HashedItem(1, 0), FullWidthLabel(1, 1)));
+        sender_db.insert_or_assign(make_pair(HashedItem(1, 0), create_encrypted_label(1, 1, 10)));
         ASSERT_EQ(2, sender_db.get_items().size());
         label = sender_db.get_label(HashedItem(0, 0));
-        ASSERT_EQ(FullWidthLabel(~uint64_t(0), ~uint64_t(0)), label);
+        ASSERT_EQ(create_encrypted_label(~uint64_t(0), ~uint64_t(0), 10), label);
         label = sender_db.get_label(HashedItem(1, 0));
-        ASSERT_EQ(FullWidthLabel(1, 1), label);
+        ASSERT_EQ(create_encrypted_label(1, 1, 10), label);
 
         // Check that both items are found and whatever was not inserted is not found.
         auto items = sender_db.get_items();
@@ -261,10 +285,10 @@ namespace APSITests
         LabeledSenderDB sender_db(*params);
 
         // Create a vector of items and labels without duplicates
-        vector<pair<HashedItem, FullWidthLabel>> items;
+        vector<pair<HashedItem, EncryptedLabel>> items;
         for (uint64_t i = 0; i < 200; i++)
         {
-            items.push_back(make_pair(HashedItem(i, i + 1), FullWidthLabel(i, i + 1)));
+            items.push_back(make_pair(HashedItem(i, i + 1), create_encrypted_label(i, i + 1, 10)));
         }
 
         // Insert all items
@@ -304,7 +328,7 @@ namespace APSITests
 
             // Check the cache; we have only one bundle at this index
             ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto a) { return !!a.get().batched_matching_polyn; }));
-            ASSERT_FALSE(none_of(cache.begin(), cache.end(), [](auto a) { return !!a.get().batched_interp_polyn; }));
+            ASSERT_TRUE(none_of(cache.begin(), cache.end(), [](auto a) { return a.get().batched_interp_polyns.empty(); }));
         }
 
         // Accessing cache beyond range
@@ -325,7 +349,7 @@ namespace APSITests
         LabeledSenderDB sender_db(*params);
 
         // Insert a single item
-        sender_db.insert_or_assign({ HashedItem(0, 0), FullWidthLabel(0, 0) });
+        sender_db.insert_or_assign({ HashedItem(0, 0), create_encrypted_label(0, 0, 10) });
         ASSERT_EQ(1, sender_db.get_items().size());
         ASSERT_EQ(1, sender_db.get_bin_bundle_count());
         ASSERT_FALSE(sender_db.get_items().find({ 0, 0 }) == sender_db.get_items().end());
@@ -343,7 +367,7 @@ namespace APSITests
         uint64_t val = 0;
         while (sender_db.get_bin_bundle_count() < 5)
         {
-            sender_db.insert_or_assign({ HashedItem(val, ~val), FullWidthLabel(val, ~val) });
+            sender_db.insert_or_assign({ HashedItem(val, ~val), create_encrypted_label(val, ~val, 10) });
             val++;
         }
 
@@ -372,7 +396,7 @@ namespace APSITests
         val = 0;
         while (sender_db.get_bin_bundle_count() < 5)
         {
-            sender_db.insert_or_assign({ HashedItem(val, ~val), FullWidthLabel(val, ~val) });
+            sender_db.insert_or_assign({ HashedItem(val, ~val), create_encrypted_label(val, ~val, 10) });
             val++;
         }
 
@@ -465,7 +489,7 @@ namespace APSITests
         ASSERT_EQ(sender_db->is_labeled(), other_sdb->is_labeled());
 
         // Insert a single item
-        sender_db->insert_or_assign(make_pair(HashedItem(0, 0), FullWidthLabel(0, 0)));
+        sender_db->insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(0, 0, 10)));
 
         save_size = SaveSenderDB(sender_db, ss);
         other = LoadSenderDB(ss);
@@ -479,10 +503,10 @@ namespace APSITests
         ASSERT_EQ(sender_db->is_labeled(), other_sdb->is_labeled());
 
         // Create a vector of items and labels without duplicates
-        vector<pair<HashedItem, FullWidthLabel>> items;
+        vector<pair<HashedItem, EncryptedLabel>> items;
         for (uint64_t i = 0; i < 200; i++)
         {
-            items.push_back(make_pair(HashedItem(i, i + 1), FullWidthLabel(i, i + 1)));
+            items.push_back(make_pair(HashedItem(i, i + 1), create_encrypted_label(i, i + 1, 10)));
         }
 
         // Insert all items

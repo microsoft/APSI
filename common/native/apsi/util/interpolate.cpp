@@ -97,13 +97,14 @@ namespace apsi
                 throw invalid_argument("mod must be prime");
             }
 
+            auto size = points.size();
+
             bool all_zeros = all_of(values.cbegin(), values.cend(), [](auto a) { return a == 0; });
             if (all_zeros)
             {
-                return { 0 };
+                // Return a vector of all zeros
+                return vector<uint64_t>(max<size_t>(size, 1));
             }
-
-            auto size = points.size();
 
             vector<vector<uint64_t>> divided_differences;
             divided_differences.reserve(size);
@@ -178,11 +179,11 @@ namespace apsi
 
             // Start with P = 0
             vector<uint64_t> result;
-            result.reserve(size+1);
+            result.reserve(size);
             result.push_back(0);
 
             // Do Horner's method for all inner terms
-            for (size_t i = size-1; i > 0; i--)
+            for (size_t i = size - 1; i > 0; i--)
             {
                 // P += [y₀, ..., yᵢ]
                 result[0] = add_uint_mod(result[0], divided_differences[0][i], mod);

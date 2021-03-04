@@ -14,6 +14,7 @@
 #include "apsi/plaintext_powers.h"
 #include "apsi/receiver.h"
 #include "apsi/util/utils.h"
+#include "apsi/util/db_encoding.h"
 
 // SEAL
 #include "seal/util/defines.h"
@@ -420,6 +421,29 @@ namespace apsi
             size_t items_per_bundle = safe_cast<size_t>(params_.items_per_bundle());
             size_t bundle_start = mul_safe(safe_cast<size_t>(plain_rp.bundle_idx), items_per_bundle);
 
+            // Check if we are supposed to have label data present but don't have for some reason
+            size_t expected_label_byte_count = safe_cast<size_t>(plain_rp.label_byte_count);
+            if (expected_label_byte_count && plain_rp.label_result.empty())
+            {
+                APSI_LOG_WARNING("Expected " << expected_label_byte_count << "-byte labels in this result part, "
+                    "but label data is missing entirely");
+            }
+
+            // How much label data did we actually receive?
+            size_t received_label_bit_count =
+                mul_safe(safe_cast<size_t>(params_.item_bit_count()), plain_rp.label_result.size());
+
+            // Compute the received label byte count and check that it is not less than what was expected
+            size_t received_label_byte_count = received_label_bit_count / 8;
+            if (received_label_byte_count < expected_label_byte_count)
+            {
+                APSI_LOG_WARNING("Expected " << expected_label_byte_count << "-byte labels in this result "
+                    "part, but only " << received_label_byte_count << "-byte labels were present");
+
+                // Reset our expectations to what was actually received
+                expected_label_byte_count = received_label_byte_count;
+            }
+
             // Set up the result vector
             vector<MatchRecord> mrs(itt.item_count());
 
@@ -460,27 +484,30 @@ namespace apsi
                 MatchRecord mr;
                 mr.found = true;
 
-                // Next, extract the label result(s), if any
+                // Next, extract the label results, if any
                 if (!plain_rp.label_result.empty())
                 {
-                    APSI_LOG_DEBUG("Found " << plain_rp.label_result.size() << "-part label for items[" << item_idx << "]");
+                    APSI_LOG_DEBUG("Found " << plain_rp.label_result.size() << " label parts for items[" << item_idx
+                        << "]; expecting " << expected_label_byte_count << "-byte label");
 
                     // Collect the entire label into this vector
-                    vector<felt_t> label_as_felts;
+                    AlgLabel alg_label;
 
+                    size_t label_offset = mul_safe(get<1>(I), felts_per_item);
                     for (auto &label_parts : plain_rp.label_result)
                     {
-                        size_t label_offset = mul_safe(get<1>(I), felts_per_item);
-                        gsl::span<felt_t> label_part(
-                            label_parts.data() + label_offset, params_.item_params().felts_per_item);
-                        copy(label_part.begin(), label_part.end(), back_inserter(label_as_felts));
+                        gsl::span<felt_t> label_part(label_parts.data() + label_offset, felts_per_item);
+                        copy(label_part.begin(), label_part.end(), back_inserter(alg_label));
                     }
 
                     // Create the label
-                    auto label = make_unique<Bitstring>(field_elts_to_bits(
-                        label_as_felts,
-                        params_.item_bit_count(),
-                        params_.seal_params().plain_modulus()));
+                    EncryptedLabel label = dealgebraize_label(
+                        alg_label,
+                        received_label_bit_count,
+                        params_.seal_params().plain_modulus());
+
+                    // Truncate the label as necessary
+                    label.resize(expected_label_byte_count);
 
                     // Set the label
                     mr.label.set(move(label));

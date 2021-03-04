@@ -67,6 +67,14 @@ namespace apsi
             }
 
             /**
+            Compute the label size in multiples of item-size chunks.
+            */
+            size_t compute_label_size(size_t label_byte_count, const PSIParams &params)
+            {
+                return (label_byte_count * 8 + params.item_bit_count() - 1) / params.item_bit_count();
+            }
+
+            /**
             Unpacks a cuckoo idx into its bin and bundle indices
             */
             pair<size_t, size_t> unpack_cuckoo_idx(size_t cuckoo_idx, size_t bins_per_bundle)
@@ -87,9 +95,9 @@ namespace apsi
             Converts each given Item-Label pair in between the given iterators into its algebraic form, i.e., a sequence
             of felt-felt pairs. Also computes each Item's cuckoo index.
             */
-            vector<pair<AlgItemLabel<felt_t>, size_t>> preprocess_labeled_data(
-                const vector<pair<HashedItem, FullWidthLabel>>::const_iterator begin,
-                const vector<pair<HashedItem, FullWidthLabel>>::const_iterator end,
+            vector<pair<AlgItemLabel, size_t>> preprocess_labeled_data(
+                const vector<pair<HashedItem, EncryptedLabel>>::const_iterator begin,
+                const vector<pair<HashedItem, EncryptedLabel>>::const_iterator end,
                 const PSIParams &params
             ) {
                 STOPWATCH(sender_stopwatch, "preprocess_labeled_data");
@@ -98,7 +106,6 @@ namespace apsi
                 // Some variables we'll need
                 size_t bins_per_item = params.item_params().felts_per_item;
                 size_t item_bit_count = params.item_bit_count();
-                const Modulus &mod = params.seal_params().plain_modulus();
 
                 // Set up Kuku hash functions
                 auto hash_funcs = hash_functions(params);
@@ -106,14 +113,16 @@ namespace apsi
                 // Calculate the cuckoo indices for each item. Store every pair of (item-label, cuckoo_idx) in a vector.
                 // Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the work of
                 // inserting the items into BinBundles.
-                vector<pair<AlgItemLabel<felt_t>, size_t>> data_with_indices;
+                vector<pair<AlgItemLabel, size_t>> data_with_indices;
                 for (auto it = begin; it != end; it++)
                 {
-                    const pair<HashedItem, FullWidthLabel> &item_label_pair = *it;
+                    const pair<HashedItem, EncryptedLabel> &item_label_pair = *it;
+
                     // Serialize the data into field elements
                     const HashedItem &item = item_label_pair.first;
-                    const FullWidthLabel &label = item_label_pair.second;
-                    AlgItemLabel<felt_t> alg_item_label = algebraize_item_label(item, label, item_bit_count, mod);
+                    const EncryptedLabel &label = item_label_pair.second;
+                    AlgItemLabel alg_item_label = algebraize_item_label(
+                        item, label, item_bit_count, params.seal_params().plain_modulus());
 
                     // Get the cuckoo table locations for this item and add to data_with_indices
                     for (auto location : all_locations(hash_funcs, item))
@@ -123,8 +132,7 @@ namespace apsi
                         size_t bin_idx = location * bins_per_item;
 
                         // Store the data along with its index
-                        pair<AlgItemLabel<felt_t>, size_t> data_with_idx = { alg_item_label, bin_idx };
-                        data_with_indices.push_back(move(data_with_idx));
+                        data_with_indices.push_back(make_pair(alg_item_label, bin_idx));
                     }
                 }
 
@@ -137,11 +145,11 @@ namespace apsi
             Converts given Item-Label pair into its algebraic form, i.e., a sequence of felt-felt pairs. Also computes
             the Item's cuckoo index.
             */
-            vector<pair<AlgItemLabel<felt_t>, size_t>> preprocess_labeled_data(
-                const pair<HashedItem, FullWidthLabel> &item_label,
+            vector<pair<AlgItemLabel, size_t>> preprocess_labeled_data(
+                pair<HashedItem, EncryptedLabel> item_label,
                 const PSIParams &params
             ) {
-                vector<pair<HashedItem, FullWidthLabel>> item_label_singleton{ item_label };
+                vector<pair<HashedItem, EncryptedLabel>> item_label_singleton{ move(item_label) };
                 return preprocess_labeled_data(
                     item_label_singleton.begin(),
                     item_label_singleton.end(),
@@ -152,7 +160,7 @@ namespace apsi
             Converts each given Item into its algebraic form, i.e., a sequence of felt-monostate pairs. Also computes
             each Item's cuckoo index.
             */
-            vector<pair<AlgItemLabel<monostate>, size_t>> preprocess_unlabeled_data(
+            vector<pair<AlgItem, size_t>> preprocess_unlabeled_data(
                 const vector<HashedItem>::const_iterator begin,
                 const vector<HashedItem>::const_iterator end,
                 const PSIParams &params
@@ -163,7 +171,6 @@ namespace apsi
                 // Some variables we'll need
                 size_t bins_per_item = params.item_params().felts_per_item;
                 size_t item_bit_count = params.item_bit_count();
-                const Modulus &mod = params.seal_params().plain_modulus();
 
                 // Set up Kuku hash functions
                 auto hash_funcs = hash_functions(params);
@@ -171,13 +178,13 @@ namespace apsi
                 // Calculate the cuckoo indices for each item. Store every pair of (item-label, cuckoo_idx) in a vector.
                 // Later, we're gonna sort this vector by cuckoo_idx and use the result to parallelize the work of
                 // inserting the items into BinBundles.
-                vector<pair<AlgItemLabel<monostate>, size_t>> data_with_indices;
+                vector<pair<AlgItem, size_t>> data_with_indices;
                 for (auto it = begin; it != end; it++)
                 {
                     const HashedItem &item = *it;
 
                     // Serialize the data into field elements
-                    AlgItemLabel<monostate> alg_item = algebraize_item(item, item_bit_count, mod);
+                    AlgItem alg_item = algebraize_item(item, item_bit_count, params.seal_params().plain_modulus());
 
                     // Get the cuckoo table locations for this item and add to data_with_indices
                     for (auto location : all_locations(hash_funcs, item))
@@ -187,8 +194,7 @@ namespace apsi
                         size_t bin_idx = location * bins_per_item;
 
                         // Store the data along with its index
-                        pair<AlgItemLabel<monostate>, size_t> data_with_idx = { alg_item, bin_idx };
-                        data_with_indices.push_back(move(data_with_idx));
+                        data_with_indices.emplace_back(make_pair(alg_item, bin_idx));
                     }
                 }
 
@@ -201,7 +207,7 @@ namespace apsi
             Converts given Item into its algebraic form, i.e., a sequence of felt-monostate pairs. Also computes the
             Item's cuckoo index.
             */
-            vector<pair<AlgItemLabel<monostate>, size_t>> preprocess_unlabeled_data(
+            vector<pair<AlgItem, size_t>> preprocess_unlabeled_data(
                 const HashedItem &item,
                 const PSIParams &params
             ) {
@@ -219,13 +225,14 @@ namespace apsi
             will create and insert a new BinBundle. If overwrite is set, this will overwrite the labels if it finds an
             AlgItemLabel that matches the input perfectly.
             */
-            template<typename L>
+            template<typename T>
             void insert_or_assign_worker(
-                const vector<pair<AlgItemLabel<L>, size_t>> &data_with_indices,
-                vector<vector<BinBundle<L>>> &bin_bundles,
+                const vector<pair<T, size_t>> &data_with_indices,
+                vector<vector<BinBundle>> &bin_bundles,
                 CryptoContext &crypto_context,
                 pair<size_t, size_t> work_range,
                 uint32_t bins_per_bundle,
+                size_t label_size,
                 size_t max_bin_size,
                 bool overwrite,
                 bool compressed)
@@ -248,7 +255,7 @@ namespace apsi
                 // Iteratively insert each item-label pair at the given cuckoo index
                 for (auto &data_with_idx : data_with_indices)
                 {
-                    auto &data = data_with_idx.first;
+                    const T &data = data_with_idx.first;
 
                     // Get the bundle index
                     size_t cuckoo_idx = data_with_idx.second;
@@ -266,7 +273,7 @@ namespace apsi
                     bundle_indices.insert(bundle_idx);
 
                     // Get the bundle set at the given bundle index
-                    vector<BinBundle<L>> &bundle_set = bin_bundles.at(bundle_idx);
+                    vector<BinBundle> &bundle_set = bin_bundles[bundle_idx];
 
                     // Try to insert or overwrite these field elements in an existing BinBundle at this bundle index.
                     // Keep track of whether or not we succeed.
@@ -312,7 +319,7 @@ namespace apsi
                     if (!written)
                     {
                         // Make a fresh BinBundle and insert
-                        BinBundle<L> new_bin_bundle(crypto_context, compressed, max_bin_size);
+                        BinBundle new_bin_bundle(crypto_context, label_size, max_bin_size, compressed);
                         int res = new_bin_bundle.multi_insert_for_real(data, bin_idx);
 
                         // If even that failed, I don't know what could've happened
@@ -336,14 +343,14 @@ namespace apsi
                 for (const size_t &bundle_idx : bundle_indices)
                 {
                     // Get the set of BinBundles at this bundle index
-                    vector<BinBundle<L>> &bundle_set = bin_bundles.at(bundle_idx);
+                    vector<BinBundle> &bundle_set = bin_bundles[bundle_idx];
 
                     APSI_LOG_DEBUG("Insert-or-Assign worker [" << this_thread::get_id() << "]: "
                         "regenerating cache for bundle index " << bundle_idx << " "
                         "with " << bundle_set.size() << " BinBundles");
 
                     // Regenerate the cache of every BinBundle in the set
-                    for (BinBundle<L> &bundle : bundle_set)
+                    for (BinBundle &bundle : bundle_set)
                     {
                         // Don't worry, this doesn't do anything unless the BinBundle was actually modified
                         bundle.regen_cache();
@@ -362,12 +369,13 @@ namespace apsi
             can all insert in parallel. If overwrite is set, this will overwrite the labels if it finds an AlgItemLabel
             that matches the input perfectly.
             */
-            template<typename L>
+            template<typename T>
             void dispatch_insert_or_assign(
-                vector<pair<AlgItemLabel<L>, size_t>> &data_with_indices,
-                vector<vector<BinBundle<L>>> &bin_bundles,
+                vector<pair<T, size_t>> &data_with_indices,
+                vector<vector<BinBundle>> &bin_bundles,
                 CryptoContext &crypto_context,
                 uint32_t bins_per_bundle,
+                size_t label_size,
                 uint32_t max_bin_size,
                 size_t thread_count,
                 bool overwrite,
@@ -419,6 +427,7 @@ namespace apsi
                             make_pair(
                                 bundle_indices[partition.first], bundle_indices[partition.second]),
                             bins_per_bundle,
+                            label_size,
                             max_bin_size,
                             overwrite,
                             compressed);
@@ -434,10 +443,9 @@ namespace apsi
             /**
             Removes the given items and corresponding labels from bin_bundles at their respective cuckoo indices.
             */
-            template<typename L>
             void remove_worker(
-                const vector<pair<AlgItemLabel<monostate>, size_t>> &data_with_indices,
-                vector<vector<BinBundle<L>>> &bin_bundles,
+                const vector<pair<AlgItem, size_t>> &data_with_indices,
+                vector<vector<BinBundle>> &bin_bundles,
                 CryptoContext &crypto_context,
                 pair<size_t, size_t> work_range,
                 uint32_t bins_per_bundle)
@@ -458,14 +466,6 @@ namespace apsi
                 // Iteratively remove each item-label pair at the given cuckoo index
                 for (auto &data_with_idx : data_with_indices)
                 {
-                    // Convert the vector [(felt, ()), (felt, ()), ..., ] to [felt, felt, felt, ...]
-                    vector<felt_t> algebraized_item;
-                    algebraized_item.reserve(data_with_idx.first.size());
-                    for (auto &item_label : data_with_idx.first)
-                    {
-                        algebraized_item.push_back(item_label.first);
-                    }
-
                     // Get the bundle index
                     size_t cuckoo_idx = data_with_idx.second;
                     size_t bin_idx, bundle_idx;
@@ -482,15 +482,15 @@ namespace apsi
                     bundle_indices.insert(bundle_idx);
 
                     // Get the bundle set at the given bundle index
-                    vector<BinBundle<L>> &bundle_set = bin_bundles.at(bundle_idx);
+                    vector<BinBundle> &bundle_set = bin_bundles[bundle_idx];
 
                     // Try to remove these field elements from an existing BinBundle at this bundle index. Keep track
                     // of whether or not we succeed.
                     bool removed = false;
-                    for (BinBundle<L> &bundle : bundle_set)
+                    for (BinBundle &bundle : bundle_set)
                     {
                         // If we successfully removed, we're done with this bundle
-                        removed = bundle.try_multi_remove(algebraized_item, bin_idx);
+                        removed = bundle.try_multi_remove(data_with_idx.first, bin_idx);
                         if (removed)
                         {
                             break;
@@ -519,14 +519,14 @@ namespace apsi
                 for (const size_t &bundle_idx : bundle_indices)
                 {
                     // Get the set of BinBundles at this bundle index
-                    vector<BinBundle<L>> &bundle_set = bin_bundles.at(bundle_idx);
+                    vector<BinBundle> &bundle_set = bin_bundles[bundle_idx];
 
                     APSI_LOG_DEBUG("Remove worker [" << this_thread::get_id() << "]: "
                         "regenerating cache for bundle index " << bundle_idx << " "
                         "with " << bundle_set.size() << " BinBundles");
 
                     // Regenerate the cache of every BinBundle in the set
-                    for (BinBundle<L> &bundle : bundle_set)
+                    for (BinBundle &bundle : bundle_set)
                     {
                         // Don't worry, this doesn't do anything unless the BinBundle was actually modified
                         bundle.regen_cache();
@@ -544,10 +544,9 @@ namespace apsi
             Takes algebraized data to be removed, splits it up, and distributes it so that thread_count many threads
             can all remove in parallel.
             */
-            template <typename L>
             void dispatch_remove(
-                const vector<pair<AlgItemLabel<monostate>, size_t >> &data_with_indices,
-                vector<vector<BinBundle<L>>> &bin_bundles,
+                const vector<pair<AlgItem, size_t >> &data_with_indices,
+                vector<vector<BinBundle>> &bin_bundles,
                 CryptoContext &crypto_context,
                 uint32_t bins_per_bundle,
                 size_t thread_count
@@ -606,8 +605,7 @@ namespace apsi
             /**
             Returns a set of DB cache references corresponding to the bundles in the given set
             */
-            template<typename L>
-            vector<reference_wrapper<const BinBundleCache>> collect_caches(vector<BinBundle<L>> &bin_bundles)
+            vector<reference_wrapper<const BinBundleCache>> collect_caches(vector<BinBundle> &bin_bundles)
             {
                 vector<reference_wrapper<const BinBundleCache>> result;
                 for (const auto &bundle : bin_bundles)
@@ -619,35 +617,29 @@ namespace apsi
             }
         }
 
-        SenderDB::SenderDB(PSIParams params, bool compressed) :
-            params_(params), crypto_context_(params_), compressed_(compressed)
+        SenderDB::SenderDB(PSIParams params, size_t label_byte_count, bool compressed) :
+            params_(params), crypto_context_(params_), label_byte_count_(label_byte_count), compressed_(compressed)
         {
             // Set the evaluator. This will be used for BatchedPlaintextPolyn::eval.
             crypto_context_.set_evaluator();
         }
 
-        /**
-        Returns the total number of bin bundles.
-        */
         size_t LabeledSenderDB::get_bin_bundle_count() const
         {
             // Lock the database for reading
             auto lock = get_reader_lock();
 
-            // Compute the total number of bin bundles
+            // Compute the total number of BinBundles
             return accumulate(bin_bundles_.cbegin(), bin_bundles_.cend(), size_t(0),
                 [&](auto &a, auto &b) { return a + b.size(); });
         }
 
-        /**
-        Returns the total number of bin bundles.
-        */
         size_t UnlabeledSenderDB::get_bin_bundle_count() const
         {
             // Lock the database for reading
             auto lock = get_reader_lock();
 
-            // Compute the total number of bin bundles
+            // Compute the total number of BinBundles
             return accumulate(bin_bundles_.cbegin(), bin_bundles_.cend(), size_t(0),
                 [&](auto &a, auto &b) { return a + b.size(); });
         }
@@ -668,9 +660,6 @@ namespace apsi
             return max_item_count ? static_cast<double>(item_count) / max_item_count : 0.0;
         }
 
-        /**
-        Clears the database
-        */
         void LabeledSenderDB::clear_db()
         {
             if (items_.size())
@@ -689,9 +678,6 @@ namespace apsi
             bin_bundles_.resize(params_.bundle_idx_count());
         }
 
-        /**
-        Clears the database
-        */
         void UnlabeledSenderDB::clear_db()
         {
             if (items_.size())
@@ -710,26 +696,17 @@ namespace apsi
             bin_bundles_.resize(params_.bundle_idx_count());
         }
 
-        /**
-        Returns a set of DB cache references corresponding to the bundles at the given bundle index.
-        */
         vector<reference_wrapper<const BinBundleCache>> LabeledSenderDB::get_cache_at(uint32_t bundle_idx)
         {
             return collect_caches(bin_bundles_.at(safe_cast<size_t>(bundle_idx)));
         }
 
-        /**
-        Returns a set of DB cache references corresponding to the bundles at the given bundle index.
-        */
         vector<reference_wrapper<const BinBundleCache>> UnlabeledSenderDB::get_cache_at(uint32_t bundle_idx)
         {
             return collect_caches(bin_bundles_.at(safe_cast<size_t>(bundle_idx)));
         }
 
-        /**
-        Inserts the given data into the database, using at most thread_count threads.
-        */
-        void LabeledSenderDB::insert_or_assign(const vector<pair<HashedItem, FullWidthLabel>> &data, size_t thread_count)
+        void LabeledSenderDB::insert_or_assign(vector<pair<HashedItem, EncryptedLabel>> data, size_t thread_count)
         {
             thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
 
@@ -741,14 +718,26 @@ namespace apsi
 
             // We need to know which items are new and which are old, since we have to tell dispatch_insert_or_assign
             // when to have an overwrite-on-collision versus add-binbundle-on-collision policy.
-            vector<pair<HashedItem, FullWidthLabel>> new_data, existing_data;
-            for (auto item_label_pair : data)
+            vector<pair<HashedItem, EncryptedLabel>> new_data, existing_data;
+            for (auto &item_label_pair : data)
             {
                 const HashedItem &item = item_label_pair.first;
+                const EncryptedLabel &label = item_label_pair.second;
+
+                // The label sizes must match the label size for this SenderDB
+                if (label.size() != label_byte_count_)
+                {
+                    APSI_LOG_ERROR("Attempted to insert or assign data with " << label.size()
+                        << "-byte label, but this SenderDB expects " << label_byte_count_ << "-byte labels");
+                    throw invalid_argument("failed to insert or assign data");
+                }
+
                 if (items_.find(item) == items_.end())
                 {
                     // Item is not already in items_, i.e., if this is a new item
                     new_data.push_back(move(item_label_pair));
+
+                    // Add to items_ already at this point!
                     items_.insert(item);
                 }
                 else
@@ -762,22 +751,26 @@ namespace apsi
             APSI_LOG_INFO("Found " << existing_data.size() << " existing items to replace in SenderDB");
 
             // Break the new data down into its field element representation. Also compute the items' cuckoo indices.
-            vector<pair<AlgItemLabel<felt_t>, size_t>> new_data_with_indices
+            vector<pair<AlgItemLabel, size_t>> new_data_with_indices
                 = preprocess_labeled_data(new_data.begin(), new_data.end(), params_);
 
             // Now do the same for the data we're going to overwrite
-            vector<pair<AlgItemLabel<felt_t>, size_t>> overwritable_data_with_indices
+            vector<pair<AlgItemLabel, size_t>> overwritable_data_with_indices
                 = preprocess_labeled_data(existing_data.begin(), existing_data.end(), params_);
 
             // Dispatch the insertion, first for the new data, then for the data we're gonna overwrite
             uint32_t bins_per_bundle = params_.bins_per_bundle();
             uint32_t max_bin_size = params_.table_params().max_items_per_bin;
 
+            // Compute the label size; this ceil(label_bit_count / item_bit_count)
+            size_t label_size = compute_label_size(label_byte_count_, params_);
+
             dispatch_insert_or_assign(
                 new_data_with_indices,
                 bin_bundles_,
                 crypto_context_,
                 bins_per_bundle,
+                label_size,
                 max_bin_size,
                 thread_count,
                 false, /* don't overwrite items */
@@ -789,6 +782,7 @@ namespace apsi
                 bin_bundles_,
                 crypto_context_,
                 bins_per_bundle,
+                label_size,
                 max_bin_size,
                 thread_count,
                 true, /* overwrite items */
@@ -798,19 +792,12 @@ namespace apsi
             APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
         }
 
-        /**
-        Throws an error. This should never be called. The only reason this exists is because SenderDB is an interface
-        that needs to support both labeled and unlabeled insertion. A LabeledSenderDB does not do unlabeled insertion.
-        */
         void LabeledSenderDB::insert_or_assign(const vector<HashedItem> &data, size_t thread_count)
         {
             APSI_LOG_ERROR("Attempted to insert unlabeled data but this is a LabeledSenderDB instance")
             throw logic_error("cannot do unlabeled insertion on a LabeledSenderDB");
         }
 
-        /**
-        Inserts the given data into the database, using at most thread_count threads.
-        */
         void UnlabeledSenderDB::insert_or_assign(const vector<HashedItem> &data, size_t thread_count)
         {
             thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
@@ -834,7 +821,7 @@ namespace apsi
             }
 
             // Break the new data down into its field element representation. Also compute the items' cuckoo indices.
-            vector<pair<AlgItemLabel<monostate>, size_t>> data_with_indices
+            vector<pair<AlgItem, size_t>> data_with_indices
                 = preprocess_unlabeled_data(new_data.begin(), new_data.end(), params_);
 
             // Dispatch the insertion
@@ -846,6 +833,7 @@ namespace apsi
                 bin_bundles_,
                 crypto_context_,
                 bins_per_bundle,
+                0, /* label size */
                 max_bin_size,
                 thread_count,
                 false, /* don't overwrite items */
@@ -855,21 +843,14 @@ namespace apsi
             APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
         }
 
-        /**
-        Throws an error. This should never be called. The only reason this exists is because SenderDB is an interface
-        that needs to support both labeled and unlabeled insertion. An UnlabeledSenderDB does not do labeled insertion.
-        */
         void UnlabeledSenderDB::insert_or_assign(
-            const vector<pair<HashedItem, FullWidthLabel>> &data,
+            vector<pair<HashedItem, EncryptedLabel>> data,
             size_t thread_count
         ) {
             APSI_LOG_ERROR("Attempted to insert labeled data but this is an UnlabeledSenderDB instance")
             throw logic_error("cannot do labeled insertion on an UnlabeledSenderDB");
         }
 
-        /**
-        Removes the given data from the database, using at most thread_count threads.
-        */
         void LabeledSenderDB::remove(
             const vector<HashedItem> &data,
             size_t thread_count
@@ -894,7 +875,7 @@ namespace apsi
 
             // Break the data to be removed down into its field element representation. Also compute the items' cuckoo
             // indices.
-            vector<pair<AlgItemLabel<monostate>, size_t>> data_with_indices
+            vector<pair<AlgItem, size_t>> data_with_indices
                 = preprocess_unlabeled_data(data.begin(), data.end(), params_);
 
             // Dispatch the removal
@@ -917,9 +898,6 @@ namespace apsi
             APSI_LOG_INFO("Finished removing " << data.size() << " item-label pairs from SenderDB");
         }
 
-        /**
-        Removes the given data from the database, using at most thread_count threads.
-        */
         void UnlabeledSenderDB::remove(
             const vector<HashedItem> &data,
             size_t thread_count
@@ -944,7 +922,7 @@ namespace apsi
 
             // Break the data to be removed down into its field element representation. Also compute the items' cuckoo
             // indices.
-            vector<pair<AlgItemLabel<monostate>, size_t>> data_with_indices
+            vector<pair<AlgItem, size_t>> data_with_indices
                 = preprocess_unlabeled_data(data.begin(), data.end(), params_);
 
             // Dispatch the removal
@@ -967,47 +945,31 @@ namespace apsi
             APSI_LOG_INFO("Finished removing " << data.size() << " items from SenderDB");
         }
 
-        /**
-        Clears the database and inserts the given data, using at most thread_count threads
-        */
         void LabeledSenderDB::set_data(
-            const vector<pair<HashedItem, FullWidthLabel>> &data,
+            vector<pair<HashedItem, EncryptedLabel>> data,
             size_t thread_count
         ) {
             clear_db();
-            insert_or_assign(data, thread_count);
+            insert_or_assign(move(data), thread_count);
         }
 
-        /**
-        This does not and should not work. See LabeledSenderDB::insert_or_assign
-        */
         void LabeledSenderDB::set_data(const vector<HashedItem> &data, size_t thread_count) {
             APSI_LOG_ERROR("Attempted to set unlabeled data but this is a LabeledSenderDB instance")
             throw logic_error("cannot do unlabeled insertion on a LabeledSenderDB");
         }
 
-        /**
-        Clears the database and inserts the given data, using at most thread_count threads
-        */
         void UnlabeledSenderDB::set_data(const vector<HashedItem> &data, size_t thread_count) {
             clear_db();
             insert_or_assign(data, thread_count);
         }
 
-        /**
-        This does not and should not work. See UnlabeledSenderDB::insert_or_assign
-        */
-        void UnlabeledSenderDB::set_data(const vector<pair<HashedItem, FullWidthLabel>> &data, size_t thread_count)
+        void UnlabeledSenderDB::set_data(vector<pair<HashedItem, EncryptedLabel>> data, size_t thread_count)
         {
             APSI_LOG_ERROR("Attempted to set labeled data but this is an UnlabeledSenderDB instance")
             throw logic_error("cannot do labeled insertion on an UnlabeledSenderDB");
         }
 
-        /**
-        Returns the label associated to the given item in the database. Throws invalid_argument if the item does
-        not appear in the database.
-        */
-        FullWidthLabel LabeledSenderDB::get_label(const HashedItem &item) const
+        EncryptedLabel LabeledSenderDB::get_label(const HashedItem &item) const
         {
             // Check if this item is in the DB. If not, throw an exception
             if (items_.count(item) == 0)
@@ -1023,30 +985,22 @@ namespace apsi
             // Preprocess a single element. This algebraizes the item and gives back its field element representation
             // as well as its cuckoo hash. We only read one of the locations because the labels are the same in each
             // location.
-            AlgItemLabel<monostate> algebraized_item_label;
+            AlgItem alg_item;
             size_t cuckoo_idx;
-            tie(algebraized_item_label, cuckoo_idx) = preprocess_unlabeled_data(item, params_)[0];
-
-            // Convert the vector [(felt, ()), (felt, ()), ..., ] to [felt, felt, felt, ...]
-            vector<felt_t> algebraized_item;
-            algebraized_item.reserve(algebraized_item_label.size());
-            for (auto &item_label : algebraized_item_label)
-            {
-                algebraized_item.push_back(item_label.first);
-            }
+            tie(alg_item, cuckoo_idx) = preprocess_unlabeled_data(item, params_)[0];
 
             // Now figure out where to look to get the label
             size_t bin_idx, bundle_idx;
             tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
 
             // Retrieve the algebraic labels from one of the BinBundles at this index
-            const vector<BinBundle<felt_t>> &bundle_set = bin_bundles_.at(bundle_idx);
-            vector<felt_t> alg_labels;
+            const vector<BinBundle> &bundle_set = bin_bundles_[bundle_idx];
+            vector<felt_t> alg_label;
             bool got_labels = false;
-            for (const BinBundle<felt_t> &bundle : bundle_set)
+            for (const BinBundle &bundle : bundle_set)
             {
                 // Try to retrieve the contiguous labels from this BinBundle
-                if (bundle.try_get_multi_label(algebraized_item, bin_idx, alg_labels))
+                if (bundle.try_get_multi_label(alg_item, bin_idx, alg_label))
                 {
                     got_labels = true;
                     break;
@@ -1062,11 +1016,11 @@ namespace apsi
             }
 
             // All good. Now just reconstruct the big label from its split-up parts and return it
-            size_t item_bit_count = params_.item_bit_count();
-            const Modulus &mod = params_.seal_params().plain_modulus();
-
-            // We can use dealgebraize_item because items and labels are the same size
-            auto result = dealgebraize_item(alg_labels, item_bit_count, mod);
+            EncryptedLabel result = dealgebraize_label(
+                alg_label,
+                alg_label.size() * static_cast<size_t>(params_.item_bit_count_per_felt()),
+                params_.seal_params().plain_modulus());
+            result.resize(label_byte_count_);
 
             APSI_LOG_DEBUG("Finished retrieving label for " << item.to_string());
 
@@ -1095,7 +1049,7 @@ namespace apsi
 
             auto params = fbs_builder.CreateVector(
                 reinterpret_cast<unsigned char*>(params_str.data()), params_str.size());
-            fbs::SenderDBInfo info(sender_db->is_labeled(), sender_db->is_compressed());
+            fbs::SenderDBInfo info(sender_db->get_label_byte_count(), sender_db->is_compressed());
             auto hashed_items = fbs_builder.CreateVectorOfStructs([&]() {
                 // The HashedItems vector is populated with an immediately-invoked lambda
                 vector<fbs::HashedItem> ret;
@@ -1134,7 +1088,7 @@ namespace apsi
                     for (auto &bb : labeled_sender_db->bin_bundles_[bundle_idx])
                     {
                         auto size = bb.save(out, static_cast<uint32_t>(bundle_idx));
-                        APSI_LOG_DEBUG("Saved labeled bin bundle at bundle index " << bundle_idx
+                        APSI_LOG_DEBUG("Saved labeled BinBundle at bundle index " << bundle_idx
                             << " (" << size << " bytes)");
                         bin_bundle_data_size += size;
                     }
@@ -1148,7 +1102,7 @@ namespace apsi
                     for (auto &bb : unlabeled_sender_db->bin_bundles_[bundle_idx])
                     {
                         auto size = bb.save(out, static_cast<uint32_t>(bundle_idx));
-                        APSI_LOG_DEBUG("Saved unlabeled bin bundle at bundle index " << bundle_idx
+                        APSI_LOG_DEBUG("Saved unlabeled BinBundle at bundle index " << bundle_idx
                             << " (" << size << " bytes)");
                         bin_bundle_data_size += size;
                     }
@@ -1193,14 +1147,14 @@ namespace apsi
             }
             
             // Load the info so we know what kind of SenderDB to create
-            bool labeled = sdb->info()->labeled();
+            size_t label_byte_count = static_cast<size_t>(sdb->info()->label_byte_count());
             bool compressed = sdb->info()->compressed();
 
             // Create the correct kind of SenderDB
             shared_ptr<SenderDB> sender_db;
-            if (labeled)
+            if (label_byte_count)
             {
-                sender_db = make_shared<LabeledSenderDB>(*params, compressed);
+                sender_db = make_shared<LabeledSenderDB>(*params, label_byte_count, compressed);
             }
             else
             {
@@ -1222,12 +1176,14 @@ namespace apsi
             size_t bin_bundle_data_size = 0;
             uint32_t max_bin_size = params->table_params().max_items_per_bin;
 
-            if (labeled)
+            if (label_byte_count)
             {
+                size_t label_size = compute_label_size(label_byte_count, *params);
+
                 auto labeled_sender_db = dynamic_pointer_cast<LabeledSenderDB>(sender_db);
                 while (bin_bundle_count--)
                 {
-                    BinBundle<felt_t> bb(labeled_sender_db->crypto_context_, compressed, max_bin_size);
+                    BinBundle bb(labeled_sender_db->crypto_context_, label_size, max_bin_size, compressed);
                     auto bb_data = bb.load(in);
 
                     // Make sure BinBundle cache is valid
@@ -1244,7 +1200,7 @@ namespace apsi
                     // Add the loaded BinBundle to the correct location in bin_bundles_
                     labeled_sender_db->bin_bundles_[bb_data.first].push_back(move(bb));
 
-                    APSI_LOG_DEBUG("Loaded labeled bin bundle at bundle index " << bb_data.first
+                    APSI_LOG_DEBUG("Loaded labeled BinBundle at bundle index " << bb_data.first
                         << " (" << bb_data.second << " bytes)");
                     bin_bundle_data_size += bb_data.second;
                 }
@@ -1254,7 +1210,7 @@ namespace apsi
                 auto unlabeled_sender_db = dynamic_pointer_cast<UnlabeledSenderDB>(sender_db);
                 while (bin_bundle_count--)
                 {
-                    BinBundle<monostate> bb(unlabeled_sender_db->crypto_context_, compressed, max_bin_size);
+                    BinBundle bb(unlabeled_sender_db->crypto_context_, 0, max_bin_size, compressed);
                     auto bb_data = bb.load(in);
 
                     // Check that the loaded bundle index is not out of range
@@ -1268,7 +1224,7 @@ namespace apsi
                     // Add the loaded BinBundle to the correct location in bin_bundles_
                     unlabeled_sender_db->bin_bundles_[bb_data.first].push_back(move(bb));
 
-                    APSI_LOG_DEBUG("Loaded unlabeled bin bundle at bundle index " << bb_data.first
+                    APSI_LOG_DEBUG("Loaded unlabeled BinBundle at bundle index " << bb_data.first
                         << " (" << bb_data.second << " bytes)");
                     bin_bundle_data_size += bb_data.second;
                 }

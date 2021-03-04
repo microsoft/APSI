@@ -4,6 +4,7 @@
 // STD
 #include <cstddef>
 #include <memory>
+#include <numeric>
 #include <sstream>
 #include <utility>
 #include <vector>
@@ -53,15 +54,51 @@ namespace APSITests
             return params;
         }
 
-        template <typename L>
-        auto find_in_bin(const vector<pair<felt_t, L>> &bin, const felt_t &element)
+        bool find_in_bin(const vector<felt_t> &bin, felt_t element)
         {
-            auto result =
-                std::find_if(bin.begin(), bin.end(), [&element](const pair<felt_t, L> &elem) {
-                    return elem.first == element;
-                });
+            return find(bin.begin(), bin.end(), element) != bin.end();
+        }
 
-            return result;
+        vector<felt_t> create_label(size_t label_size, felt_t start)
+        {
+            vector<felt_t> ret(label_size);
+            iota(ret.begin(), ret.end(), start);
+            return ret;
+        }
+
+        vector<felt_t> zipper_merge(const vector<felt_t> &first, const vector<felt_t> &second)
+        {
+            if (first.size() != second.size())
+            {
+                throw runtime_error("invalid sizes for zipper_merge");
+            }
+            
+            vector<felt_t> ret;
+            for (size_t i = 0; i < first.size(); i++)
+            {
+                ret.push_back(first[i]);
+                ret.push_back(second[i]);
+            }
+
+            return ret;
+        }
+
+        vector<felt_t> zipper_merge(const vector<felt_t> &first, const vector<felt_t> &second, const vector<felt_t> &third)
+        {
+            if (first.size() != second.size() || first.size() != third.size())
+            {
+                throw runtime_error("invalid sizes for zipper_merge");
+            }
+            
+            vector<felt_t> ret;
+            for (size_t i = 0; i < first.size(); i++)
+            {
+                ret.push_back(first[i]);
+                ret.push_back(second[i]);
+                ret.push_back(third[i]);
+            }
+
+            return ret;
         }
     }
 
@@ -141,10 +178,10 @@ namespace APSITests
         CryptoContext context(*get_params());
 
         // No evaluator set in context
-        ASSERT_THROW(BinBundle<monostate> bb(context, true, 50), invalid_argument);
+        ASSERT_THROW(BinBundle bb(context, 0, 50, true), invalid_argument);
 
         context.set_evaluator();
-        BinBundle<monostate> bb(context, true, 50);
+        BinBundle bb(context, 0, 50, true);
 
         ASSERT_TRUE(bb.cache_invalid());
         bb.clear_cache();
@@ -162,41 +199,49 @@ namespace APSITests
             cache.felt_matching_polyns.size());
         ASSERT_TRUE(cache.felt_interp_polyns.empty());
         ASSERT_TRUE(cache.batched_matching_polyn);
-        ASSERT_FALSE(cache.batched_interp_polyn);
+        ASSERT_TRUE(cache.batched_interp_polyns.empty());
     }
 
     TEST(BinBundleTests, BinBundleLabeledCreate)
     {
-        CryptoContext context(*get_params());
+        auto test_fun = [&](size_t label_size) {
+            CryptoContext context(*get_params());
 
-        // No evaluator set in context
-        ASSERT_THROW(BinBundle<felt_t> bb(context, true, 50), invalid_argument);
+            // No evaluator set in context
+            ASSERT_THROW(BinBundle bb(context, label_size, 50, true), invalid_argument);
 
-        context.set_evaluator();
-        BinBundle<felt_t> bb(context, true, 50);
+            context.set_evaluator();
+            BinBundle bb(context, label_size, 50, true);
 
-        ASSERT_TRUE(bb.cache_invalid());
-        bb.clear_cache();
-        ASSERT_TRUE(bb.cache_invalid());
+            ASSERT_TRUE(bb.cache_invalid());
+            bb.clear_cache();
+            ASSERT_TRUE(bb.cache_invalid());
 
-        // The cache is stale; cannot get it
-        ASSERT_THROW(auto &cache = bb.get_cache(), logic_error);
+            // The cache is stale; cannot get it
+            ASSERT_THROW(auto &cache = bb.get_cache(), logic_error);
 
-        bb.regen_cache();
-        auto &cache = bb.get_cache();
+            bb.regen_cache();
+            auto &cache = bb.get_cache();
 
-        // The matching polynomial is set to a single constant zero polynomial since we haven't inserted anything
-        ASSERT_EQ(
-            context.seal_context()->first_context_data()->parms().poly_modulus_degree(),
-            cache.felt_matching_polyns.size());
+            ASSERT_TRUE(cache.batched_matching_polyn);
+            ASSERT_EQ(label_size, cache.batched_interp_polyns.size());
 
-        // The label polynomial is set to a single constant zero polynomial since we haven't inserted anything
-        ASSERT_EQ(
-            context.seal_context()->first_context_data()->parms().poly_modulus_degree(),
-            cache.felt_interp_polyns.size());
+            for (auto &bip : cache.batched_interp_polyns)
+            {
+                // Nothing has been inserted yet; we have a constant interpolation polynomial
+                ASSERT_EQ(1, bip.batched_coeffs.size());
+            }
 
-        ASSERT_TRUE(cache.batched_matching_polyn);
-        ASSERT_TRUE(cache.batched_interp_polyn);
+            for (auto &fip : cache.felt_interp_polyns)
+            {
+                // We have one (empty) vector allocated per bin
+                ASSERT_EQ(context.seal_context()->first_context_data()->parms().poly_modulus_degree(), fip.size());
+            }
+        };
+
+        test_fun(1);
+        test_fun(2);
+        test_fun(3);
     }
 
     TEST(BinBundleTests, BinBundleUnlabeledMultiInsert)
@@ -204,32 +249,30 @@ namespace APSITests
         CryptoContext context(*get_params());
         context.set_evaluator();
 
-        BinBundle<monostate> bb(context, true, 50);
+        BinBundle bb(context, 0, 50, true);
         bb.regen_cache();
         ASSERT_FALSE(bb.cache_invalid());
         ASSERT_TRUE(bb.empty());
 
-        vector<pair<felt_t, monostate>> values{ make_pair(1, monostate()) };
+        AlgItem values{ 1 };
         int res = bb.multi_insert_dry_run(values, 0);
         ASSERT_EQ(1 /* largest bin size after insert */, res);
         ASSERT_FALSE(bb.cache_invalid());
         ASSERT_TRUE(bb.empty());
 
-        values.push_back(make_pair(1, monostate()));
+        values.push_back(1);
         res = bb.multi_insert_dry_run(values, 0);
         ASSERT_EQ(1 /* largest bin size after insert */, res);
         ASSERT_FALSE(bb.cache_invalid());
         ASSERT_TRUE(bb.empty());
 
-        values.push_back(make_pair(2, monostate()));
+        values.push_back(2);
         res = bb.multi_insert_dry_run(values, 0);
         ASSERT_EQ(1 /* largest bin size after insert */, res);
         ASSERT_FALSE(bb.cache_invalid());
         ASSERT_TRUE(bb.empty());
 
-        values.resize(
-            context.seal_context()->first_context_data()->parms().poly_modulus_degree(),
-            make_pair(1, monostate()));
+        values.resize(context.seal_context()->first_context_data()->parms().poly_modulus_degree(), 1);
         res = bb.multi_insert_dry_run(values, 0);
         ASSERT_EQ(1 /* largest bin size after insert */, res);
         ASSERT_FALSE(bb.cache_invalid());
@@ -243,7 +286,7 @@ namespace APSITests
 
         // Clear the values vector
         values.clear();
-        values.push_back(make_pair(1, monostate()));
+        values.push_back(1);
 
         // Now insert for real
         res = bb.multi_insert_for_real(values, 0);
@@ -254,7 +297,7 @@ namespace APSITests
         ASSERT_FALSE(bb.empty());
 
         // Insert at index 1 so that we don't actually increase the max size
-        values.push_back(make_pair(1, monostate()));
+        values.push_back(1);
         res = bb.multi_insert_for_real(values, 1);
         ASSERT_EQ(1 /* largest bin size after insert */, res);
         ASSERT_TRUE(bb.cache_invalid());
@@ -270,8 +313,8 @@ namespace APSITests
         ASSERT_FALSE(bb.empty());
 
         values.clear();
-        values.push_back(make_pair(2, monostate()));
-        values.push_back(make_pair(3, monostate()));
+        values.push_back(2);
+        values.push_back(3);
         res = bb.multi_insert_for_real(values, 1);
         ASSERT_EQ(3 /* largest bin size after insert */, res);
         ASSERT_TRUE(bb.cache_invalid());
@@ -279,9 +322,7 @@ namespace APSITests
         ASSERT_FALSE(bb.cache_invalid());
         ASSERT_FALSE(bb.empty());
 
-        values.resize(
-            context.seal_context()->first_context_data()->parms().poly_modulus_degree(),
-            make_pair(4, monostate()));
+        values.resize(context.seal_context()->first_context_data()->parms().poly_modulus_degree(), 4);
         res = bb.multi_insert_for_real(values, 0);
         ASSERT_EQ(4 /* largest bin size after insert */, res);
         ASSERT_TRUE(bb.cache_invalid());
@@ -302,251 +343,296 @@ namespace APSITests
 
     TEST(BinBundleTests, BinBundleLabeledMultiInsert)
     {
-        CryptoContext context(*get_params());
-        context.set_evaluator();
+        auto test_fun = [&](size_t label_size) {
+            CryptoContext context(*get_params());
+            context.set_evaluator();
 
-        BinBundle<felt_t> bb(context, true, 50);
-        bb.regen_cache();
-        ASSERT_FALSE(bb.cache_invalid());
-        ASSERT_TRUE(bb.empty());
+            BinBundle bb(context, label_size, 50, true);
+            bb.regen_cache();
+            ASSERT_FALSE(bb.cache_invalid());
+            ASSERT_TRUE(bb.empty());
 
-        vector<pair<felt_t, felt_t>> values{ make_pair(1, 1) };
-        int res = bb.multi_insert_dry_run(values, 0);
-        ASSERT_EQ(1 /* largest bin size after insert */, res);
-        ASSERT_FALSE(bb.cache_invalid());
-        ASSERT_TRUE(bb.empty());
+            AlgItemLabel values{ make_pair(1, create_label(label_size, 1)) };
+            int res = bb.multi_insert_dry_run(values, 0);
+            ASSERT_EQ(1 /* largest bin size after insert */, res);
+            ASSERT_FALSE(bb.cache_invalid());
+            ASSERT_TRUE(bb.empty());
 
-        // Nothing was inserted in the dry-run; verify that
-        vector<felt_t> labels;
-        bool bres = bb.try_get_multi_label({ 1 } , 0, labels);
-        ASSERT_FALSE(bres);
-        ASSERT_TRUE(labels.empty());
+            // Nothing was inserted in the dry-run; verify that
+            vector<felt_t> labels;
+            bool bres = bb.try_get_multi_label({ 1 } , 0, labels);
+            ASSERT_FALSE(bres);
+            ASSERT_TRUE(labels.empty());
 
-        values.push_back(make_pair(1, 1));
-        res = bb.multi_insert_dry_run(values, 0);
-        ASSERT_EQ(1 /* largest bin size after insert */, res);
-        ASSERT_FALSE(bb.cache_invalid());
-        ASSERT_TRUE(bb.empty());
+            // Attempt to insert with no label
+            values.push_back(make_pair(1, vector<felt_t>{}));
+            res = bb.multi_insert_dry_run(values, 0);
+            ASSERT_EQ(-1, res);
+            values.pop_back();
 
-        values.push_back(make_pair(2, 2));
-        res = bb.multi_insert_dry_run(values, 0);
-        ASSERT_EQ(1 /* largest bin size after insert */, res);
-        ASSERT_FALSE(bb.cache_invalid());
-        ASSERT_TRUE(bb.empty());
+            // Attempt to insert wrong size label
+            values.push_back(make_pair(1, create_label(label_size + 1, 1)));
+            res = bb.multi_insert_dry_run(values, 0);
+            ASSERT_EQ(-1, res);
+            values.pop_back();
 
-        values.resize(
-            context.seal_context()->first_context_data()->parms().poly_modulus_degree(),
-            make_pair(1, 1));
-        res = bb.multi_insert_dry_run(values, 0);
-        ASSERT_EQ(1 /* largest bin size after insert */, res);
-        ASSERT_FALSE(bb.cache_invalid());
-        ASSERT_TRUE(bb.empty());
+            values.push_back(make_pair(1, create_label(label_size, 1)));
+            res = bb.multi_insert_dry_run(values, 0);
+            ASSERT_EQ(1 /* largest bin size after insert */, res);
+            ASSERT_FALSE(bb.cache_invalid());
+            ASSERT_TRUE(bb.empty());
 
-        // Overflowing
-        res = bb.multi_insert_dry_run(values, 1);
-        ASSERT_EQ(-1 /* error code */, res);
-        ASSERT_FALSE(bb.cache_invalid());
-        ASSERT_TRUE(bb.empty());
+            values.push_back(make_pair(2, create_label(label_size, 2)));
+            res = bb.multi_insert_dry_run(values, 0);
+            ASSERT_EQ(1 /* largest bin size after insert */, res);
+            ASSERT_FALSE(bb.cache_invalid());
+            ASSERT_TRUE(bb.empty());
 
-        // Clear the values vector
-        values.clear();
-        values.push_back(make_pair(1, 1));
+            values.resize(
+                context.seal_context()->first_context_data()->parms().poly_modulus_degree(),
+                make_pair(1, create_label(label_size, 1)));
+            res = bb.multi_insert_dry_run(values, 0);
+            ASSERT_EQ(1 /* largest bin size after insert */, res);
+            ASSERT_FALSE(bb.cache_invalid());
+            ASSERT_TRUE(bb.empty());
 
-        // Now insert for real
-        res = bb.multi_insert_for_real(values, 0);
-        ASSERT_EQ(1 /* largest bin size after insert */, res);
-        ASSERT_TRUE(bb.cache_invalid());
-        bb.regen_cache();
-        ASSERT_FALSE(bb.cache_invalid());
-        ASSERT_FALSE(bb.empty());
+            // Overflowing
+            res = bb.multi_insert_dry_run(values, 1);
+            ASSERT_EQ(-1 /* error code */, res);
+            ASSERT_FALSE(bb.cache_invalid());
+            ASSERT_TRUE(bb.empty());
 
-        // Get the label
-        bres = bb.try_get_multi_label({ 1 } , 0, labels);
-        ASSERT_TRUE(bres);
-        ASSERT_EQ(1, labels.size());
-        ASSERT_EQ(1, labels[0]);
+            // Clear the values vector
+            values.clear();
+            values.push_back(make_pair(1, create_label(label_size, 1)));
 
-        // Try getting a label for wrong value
-        bres = bb.try_get_multi_label({ 2 } , 0, labels);
-        ASSERT_FALSE(bres);
-        ASSERT_EQ(0, labels.size());
+            // Now insert for real
+            res = bb.multi_insert_for_real(values, 0);
+            ASSERT_EQ(1 /* largest bin size after insert */, res);
+            ASSERT_TRUE(bb.cache_invalid());
+            bb.regen_cache();
+            ASSERT_FALSE(bb.cache_invalid());
+            ASSERT_FALSE(bb.empty());
 
-        // Insert at index 1 so that we don't actually increase the max size
-        values.push_back(make_pair(1, 1));
-        res = bb.multi_insert_for_real(values, 1);
-        ASSERT_EQ(1 /* largest bin size after insert */, res);
-        ASSERT_TRUE(bb.cache_invalid());
-        bb.regen_cache();
-        ASSERT_FALSE(bb.cache_invalid());
-        ASSERT_FALSE(bb.empty());
+            // Get the label
+            bres = bb.try_get_multi_label({ 1 } , 0, labels);
+            ASSERT_TRUE(bres);
+            ASSERT_EQ(label_size, labels.size());
+            auto expected_label = create_label(label_size, 1);
+            ASSERT_TRUE(equal(expected_label.begin(), expected_label.end(), labels.begin()));
 
-        // Get the label
-        bres = bb.try_get_multi_label({ 1, 1 } , 0, labels);
-        ASSERT_TRUE(bres);
-        ASSERT_EQ(2, labels.size());
-        ASSERT_EQ(1, labels[0]);
-        ASSERT_EQ(1, labels[1]);
+            // Try getting a label for wrong value
+            bres = bb.try_get_multi_label({ 2 } , 0, labels);
+            ASSERT_FALSE(bres);
+            ASSERT_EQ(0, labels.size());
 
-        // Try getting a label for wrong value
-        bres = bb.try_get_multi_label({ 0, 1 } , 0, labels);
-        ASSERT_FALSE(bres);
-        ASSERT_EQ(0, labels.size());
-        ASSERT_FALSE(bb.empty());
+            // Insert at index 1 so that we don't actually increase the max size
+            values.push_back(make_pair(1, create_label(label_size, 1)));
+            res = bb.multi_insert_for_real(values, 1);
+            ASSERT_EQ(1 /* largest bin size after insert */, res);
+            ASSERT_TRUE(bb.cache_invalid());
+            bb.regen_cache();
+            ASSERT_FALSE(bb.cache_invalid());
+            ASSERT_FALSE(bb.empty());
 
-        // Insert at index 2; the value 1 will intersect with the current bin so will fail
-        res = bb.multi_insert_for_real(values, 2);
-        ASSERT_EQ(-1 /* largest bin size after insert */, res);
-        ASSERT_FALSE(bb.cache_invalid());
+            // Get the label
+            bres = bb.try_get_multi_label({ 1, 1 } , 0, labels);
+            ASSERT_TRUE(bres);
+            expected_label = zipper_merge(create_label(label_size, 1), create_label(label_size, 1));
+            ASSERT_EQ(expected_label.size(), labels.size());
+            ASSERT_TRUE(equal(expected_label.begin(), expected_label.end(), labels.begin()));
 
-        values.clear();
+            // Try getting a label for wrong value
+            bres = bb.try_get_multi_label({ 0, 1 } , 0, labels);
+            ASSERT_FALSE(bres);
+            ASSERT_EQ(0, labels.size());
+            ASSERT_FALSE(bb.empty());
 
-        // Use a repeating label; there is no problem since the item value is different
-        values.push_back(make_pair(2, 7));
-        values.push_back(make_pair(3, 8));
-        res = bb.multi_insert_for_real(values, 1);
-        ASSERT_EQ(2 /* largest bin size after insert */, res);
-        ASSERT_TRUE(bb.cache_invalid());
-        bb.regen_cache();
-        ASSERT_FALSE(bb.cache_invalid());
-        ASSERT_FALSE(bb.empty());
+            // Insert at index 2; the value 1 will intersect with the current bin so will fail
+            res = bb.multi_insert_for_real(values, 2);
+            ASSERT_EQ(-1 /* largest bin size after insert */, res);
+            ASSERT_FALSE(bb.cache_invalid());
 
-        // Get the label
-        bres = bb.try_get_multi_label({ 1, 2, 3 } , 0, labels);
-        ASSERT_TRUE(bres);
-        ASSERT_EQ(3, labels.size());
-        ASSERT_EQ(1, labels[0]);
-        ASSERT_EQ(7, labels[1]);
-        ASSERT_EQ(8, labels[2]);
+            values.clear();
 
-        values.resize(
-            context.seal_context()->first_context_data()->parms().poly_modulus_degree(),
-            make_pair(4, 4));
-        res = bb.multi_insert_for_real(values, 0);
-        ASSERT_EQ(3 /* largest bin size after insert */, res);
-        ASSERT_TRUE(bb.cache_invalid());
-        bb.regen_cache();
-        ASSERT_FALSE(bb.cache_invalid());
-        ASSERT_FALSE(bb.empty());
+            // Use a repeating label; there is no problem since the item value is different
+            values.push_back(make_pair(2, create_label(label_size, 7)));
+            values.push_back(make_pair(3, create_label(label_size, 8)));
+            res = bb.multi_insert_for_real(values, 1);
+            ASSERT_EQ(2 /* largest bin size after insert */, res);
+            ASSERT_TRUE(bb.cache_invalid());
+            bb.regen_cache();
+            ASSERT_FALSE(bb.cache_invalid());
+            ASSERT_FALSE(bb.empty());
 
-        // Overflowing
-        res = bb.multi_insert_for_real(values, 1);
-        ASSERT_EQ(-1 /* error code */, res);
-        ASSERT_FALSE(bb.cache_invalid());
-        ASSERT_FALSE(bb.empty());
+            // Get the label
+            bres = bb.try_get_multi_label({ 1, 2, 3 } , 0, labels);
+            ASSERT_TRUE(bres);
+            expected_label = zipper_merge(
+                create_label(label_size, 1),
+                create_label(label_size, 7),
+                create_label(label_size, 8));
+            ASSERT_EQ(expected_label.size(), labels.size());
+            ASSERT_TRUE(equal(expected_label.begin(), expected_label.end(), labels.begin()));
 
-        bb.clear();
-        ASSERT_TRUE(bb.cache_invalid());
-        ASSERT_TRUE(bb.empty());
+            values.resize(
+                context.seal_context()->first_context_data()->parms().poly_modulus_degree(),
+                make_pair(4, create_label(label_size, 4)));
+            res = bb.multi_insert_for_real(values, 0);
+            ASSERT_EQ(3 /* largest bin size after insert */, res);
+            ASSERT_TRUE(bb.cache_invalid());
+            bb.regen_cache();
+            ASSERT_FALSE(bb.cache_invalid());
+            ASSERT_FALSE(bb.empty());
+
+            // Overflowing
+            res = bb.multi_insert_for_real(values, 1);
+            ASSERT_EQ(-1 /* error code */, res);
+            ASSERT_FALSE(bb.cache_invalid());
+            ASSERT_FALSE(bb.empty());
+
+            bb.clear();
+            ASSERT_TRUE(bb.cache_invalid());
+            ASSERT_TRUE(bb.empty());
+        };
+
+        test_fun(1);
+        test_fun(2);
+        test_fun(3);
     }
 
     TEST(BinBundleTests, BinBundleTryMultiOverwrite)
     {
-        CryptoContext context(*get_params());
-        context.set_evaluator();
+        auto test_fun = [&](size_t label_size) {
+            CryptoContext context(*get_params());
+            context.set_evaluator();
 
-        BinBundle<felt_t> bb(context, true, 50);
+            BinBundle bb(context, label_size, 50, true);
 
-        vector<pair<felt_t, felt_t>> values{ make_pair(1, 1) };
+            AlgItemLabel values{ make_pair(1, create_label(label_size, 1)) };
 
-        // Now insert for real
-        int res = bb.multi_insert_for_real(values, 0);
-        ASSERT_EQ(1 /* largest bin size after insert */, res);
+            // Now insert for real
+            int res = bb.multi_insert_for_real(values, 0);
+            ASSERT_EQ(1 /* largest bin size after insert */, res);
 
-        // Check the label
-        vector<felt_t> labels;
-        bool bres = bb.try_get_multi_label({ 1 } , 0, labels);
-        ASSERT_TRUE(bres);
-        ASSERT_EQ(1, labels.size());
-        ASSERT_EQ(1, labels[0]);
+            // Check the label
+            vector<felt_t> labels;
+            bool bres = bb.try_get_multi_label({ 1 } , 0, labels);
+            ASSERT_TRUE(bres);
+            auto expected_label = create_label(label_size, 1);
+            ASSERT_EQ(expected_label.size(), labels.size());
+            ASSERT_TRUE(equal(expected_label.begin(), expected_label.end(), labels.begin()));
 
-        ASSERT_TRUE(bb.cache_invalid());
-        bb.regen_cache();
-        ASSERT_FALSE(bb.cache_invalid());
+            ASSERT_TRUE(bb.cache_invalid());
+            bb.regen_cache();
+            ASSERT_FALSE(bb.cache_invalid());
 
-        values[0].second = 2;
-        bres = bb.try_multi_overwrite(values, 0);
-        ASSERT_TRUE(bres);
+            values[0].second = create_label(label_size, 2);
+            bres = bb.try_multi_overwrite(values, 0);
+            ASSERT_TRUE(bres);
 
-        // Check the label
-        bres = bb.try_get_multi_label({ 1 } , 0, labels);
-        ASSERT_TRUE(bres);
-        ASSERT_EQ(1, labels.size());
-        ASSERT_EQ(2, labels[0]);
+            // Check the label
+            bres = bb.try_get_multi_label({ 1 } , 0, labels);
+            ASSERT_TRUE(bres);
+            expected_label = create_label(label_size, 2);
+            ASSERT_EQ(expected_label.size(), labels.size());
+            ASSERT_TRUE(equal(expected_label.begin(), expected_label.end(), labels.begin()));
 
-        ASSERT_TRUE(bb.cache_invalid());
-        bb.regen_cache();
-        ASSERT_FALSE(bb.cache_invalid());
+            ASSERT_TRUE(bb.cache_invalid());
+            bb.regen_cache();
+            ASSERT_FALSE(bb.cache_invalid());
 
-        // Item doesn't match so won't overwrite
-        values[0].first = 2;
-        values[0].second = 3;
-        bres = bb.try_multi_overwrite(values, 0);
-        ASSERT_FALSE(bres);
+            // Item doesn't match so won't overwrite
+            values[0].first = 2;
+            values[0].second = create_label(label_size, 3);
+            bres = bb.try_multi_overwrite(values, 0);
+            ASSERT_FALSE(bres);
 
-        // Check the label; no change expected
-        bres = bb.try_get_multi_label({ 1 } , 0, labels);
-        ASSERT_TRUE(bres);
-        ASSERT_EQ(1, labels.size());
-        ASSERT_EQ(2, labels[0]);
-        ASSERT_FALSE(bb.cache_invalid());
+            // Check the label; no change expected
+            bres = bb.try_get_multi_label({ 1 } , 0, labels);
+            ASSERT_TRUE(bres);
+            ASSERT_EQ(expected_label.size(), labels.size());
+            ASSERT_TRUE(equal(expected_label.begin(), expected_label.end(), labels.begin()));
+            ASSERT_FALSE(bb.cache_invalid());
 
-        values.clear();
-        values = { make_pair(1, 1), make_pair(2, 2), make_pair(3, 3) };
-        bb.clear();
-        res = bb.multi_insert_for_real(values, 0);
-        values = { make_pair(4, 4), make_pair(5, 5), make_pair(6, 6) };
-        res = bb.multi_insert_for_real(values, 0);
-        ASSERT_EQ(2 /* largest bin size after insert */, res);
+            values.clear();
+            values = {
+                make_pair(1, create_label(label_size, 1)),
+                make_pair(2, create_label(label_size, 2)),
+                make_pair(3, create_label(label_size, 3)) };
+            bb.clear();
+            res = bb.multi_insert_for_real(values, 0);
+            values = {
+                make_pair(4, create_label(label_size, 4)),
+                make_pair(5, create_label(label_size, 5)),
+                make_pair(6, create_label(label_size, 6)) };
+            res = bb.multi_insert_for_real(values, 0);
+            ASSERT_EQ(2 /* largest bin size after insert */, res);
 
-        // Check the label
-        bres = bb.try_get_multi_label({ 1, 5, 3 } , 0, labels);
-        ASSERT_TRUE(bres);
-        ASSERT_EQ(3, labels.size());
-        ASSERT_EQ(1, labels[0]);
-        ASSERT_EQ(5, labels[1]);
-        ASSERT_EQ(3, labels[2]);
+            // Check the label
+            bres = bb.try_get_multi_label({ 1, 5, 3 } , 0, labels);
+            ASSERT_TRUE(bres);
+            expected_label = zipper_merge(
+                create_label(label_size, 1),
+                create_label(label_size, 5),
+                create_label(label_size, 3));
+            ASSERT_EQ(expected_label.size(), labels.size());
+            ASSERT_TRUE(equal(expected_label.begin(), expected_label.end(), labels.begin()));
 
-        ASSERT_TRUE(bb.cache_invalid());
-        bb.regen_cache();
-        ASSERT_FALSE(bb.cache_invalid());
+            ASSERT_TRUE(bb.cache_invalid());
+            bb.regen_cache();
+            ASSERT_FALSE(bb.cache_invalid());
 
-        // Item sequence doesn't match
-        values = { make_pair(1, 1), make_pair(4, 4), make_pair(3, 3) };
-        bres = bb.try_multi_overwrite(values, 0);
-        ASSERT_FALSE(bres);
+            // Item sequence doesn't match
+            values = {
+                make_pair(1, create_label(label_size, 1)),
+                make_pair(4, create_label(label_size, 4)),
+                make_pair(3, create_label(label_size, 3)) };
+            bres = bb.try_multi_overwrite(values, 0);
+            ASSERT_FALSE(bres);
 
-        // Overwriting labels
-        values = { make_pair(1, 6), make_pair(5, 7), make_pair(3, 8) };
-        bres = bb.try_multi_overwrite(values, 0);
-        ASSERT_TRUE(bres);
+            // Overwriting labels
+            values = {
+                make_pair(1, create_label(label_size, 6)),
+                make_pair(5, create_label(label_size, 7)),
+                make_pair(3, create_label(label_size, 8)) };
+            bres = bb.try_multi_overwrite(values, 0);
+            ASSERT_TRUE(bres);
 
-        ASSERT_TRUE(bb.cache_invalid());
-        bb.regen_cache();
-        ASSERT_FALSE(bb.cache_invalid());
+            ASSERT_TRUE(bb.cache_invalid());
+            bb.regen_cache();
+            ASSERT_FALSE(bb.cache_invalid());
 
-        // Check the label
-        bres = bb.try_get_multi_label({ 1, 5, 3 } , 0, labels);
-        ASSERT_TRUE(bres);
-        ASSERT_EQ(3, labels.size());
-        ASSERT_EQ(6, labels[0]);
-        ASSERT_EQ(7, labels[1]);
-        ASSERT_EQ(8, labels[2]);
+            // Check the label
+            bres = bb.try_get_multi_label({ 1, 5, 3 } , 0, labels);
+            ASSERT_TRUE(bres);
+            expected_label = zipper_merge(
+                create_label(label_size, 6),
+                create_label(label_size, 7),
+                create_label(label_size, 8));
+            ASSERT_EQ(expected_label.size(), labels.size());
+            ASSERT_TRUE(equal(expected_label.begin(), expected_label.end(), labels.begin()));
 
-        bb.clear();
-        values.resize(
-            context.seal_context()->first_context_data()->parms().poly_modulus_degree(),
-            make_pair(4, 4));
-        res = bb.multi_insert_for_real(values, 0);
-        ASSERT_EQ(1 /* largest bin size after insert */, res);
+            bb.clear();
+            values.resize(
+                context.seal_context()->first_context_data()->parms().poly_modulus_degree(),
+                make_pair(4, create_label(label_size, 4)));
+            res = bb.multi_insert_for_real(values, 0);
+            ASSERT_EQ(1 /* largest bin size after insert */, res);
 
-        ASSERT_TRUE(bb.cache_invalid());
-        bb.regen_cache();
-        ASSERT_FALSE(bb.cache_invalid());
+            ASSERT_TRUE(bb.cache_invalid());
+            bb.regen_cache();
+            ASSERT_FALSE(bb.cache_invalid());
 
-        // Overflowing
-        bres = bb.try_multi_overwrite(values, 1);
-        ASSERT_FALSE(bres);
-        ASSERT_FALSE(bb.cache_invalid());
+            // Overflowing
+            bres = bb.try_multi_overwrite(values, 1);
+            ASSERT_FALSE(bres);
+            ASSERT_FALSE(bb.cache_invalid());
+        };
+
+        test_fun(1);
+        test_fun(2);
+        test_fun(3);
     }
 
     TEST(BinBundleTests, BinBundleTryMultiRemove)
@@ -554,25 +640,17 @@ namespace APSITests
         CryptoContext context(*get_params());
         context.set_evaluator();
 
-        BinBundle<monostate> bb(context, true, 50);
+        BinBundle bb(context, 0, 50, true);
         bb.regen_cache();
         ASSERT_FALSE(bb.cache_invalid());
         ASSERT_TRUE(bb.empty());
 
         // Now insert for real
-        vector<pair<felt_t, monostate>> values{
-            make_pair(1, monostate()),
-            make_pair(2, monostate()),
-            make_pair(3, monostate()) };
+        AlgItem values{ 1, 2, 3 };
         int res = bb.multi_insert_for_real(values, 0);
         ASSERT_EQ(1 /* largest bin size after insert */, res);
 
-        values = {
-            make_pair(4, monostate()),
-            make_pair(5, monostate()),
-            make_pair(6, monostate()),
-            make_pair(7, monostate()),
-            make_pair(8, monostate()) };
+        values = { 4, 5, 6, 7, 8 };
         res = bb.multi_insert_for_real(values, 0);
         ASSERT_EQ(2 /* largest bin size after insert */, res);
 
@@ -613,18 +691,18 @@ namespace APSITests
         CryptoContext context(*get_params());
         context.set_evaluator();
 
-        BinBundle<monostate> bb(context, true, get_params()->table_params().max_items_per_bin);
+        BinBundle bb(context, 0, get_params()->table_params().max_items_per_bin, true);
         bb.regen_cache();
         ASSERT_TRUE(bb.empty());
         auto save_size = bb.save(ss, 1212);
 
-        BinBundle<monostate> bb2(context, true, get_params()->table_params().max_items_per_bin);
+        BinBundle bb2(context, 0, get_params()->table_params().max_items_per_bin, true);
         auto load_size = bb2.load(ss);
         ASSERT_EQ(1212, load_size.first);
         ASSERT_EQ(save_size, load_size.second);
         ASSERT_TRUE(bb2.empty());
 
-        int res = bb.multi_insert_for_real({ make_pair(1, monostate()) }, 0);
+        int res = bb.multi_insert_for_real(AlgItem{ 1 }, 0);
         ASSERT_EQ(1 /* largest bin size after insert */, res);
         ASSERT_TRUE(bb.cache_invalid());
         ASSERT_FALSE(bb.empty());
@@ -636,7 +714,7 @@ namespace APSITests
         ASSERT_TRUE(bb2.cache_invalid());
         ASSERT_FALSE(bb2.empty());
 
-        res = bb.multi_insert_for_real({ make_pair(2, monostate()), make_pair(3, monostate()) }, 0);
+        res = bb.multi_insert_for_real(AlgItem{ 2, 3 }, 0);
         ASSERT_EQ(2 /* largest bin size after insert */, res);
         ASSERT_TRUE(bb.cache_invalid());
         ASSERT_FALSE(bb.empty());
@@ -649,88 +727,112 @@ namespace APSITests
         ASSERT_FALSE(bb2.empty());
 
         // These pass for the original BinBundle
-        ASSERT_NE(bb.get_bins()[0].end(), find_in_bin(bb.get_bins()[0], 1));
-        ASSERT_NE(bb.get_bins()[0].end(), find_in_bin(bb.get_bins()[0], 2));
-        ASSERT_NE(bb.get_bins()[1].end(), find_in_bin(bb.get_bins()[1], 3));
+        ASSERT_TRUE(find_in_bin(bb.get_item_bins()[0], 1));
+        ASSERT_TRUE(find_in_bin(bb.get_item_bins()[0], 2));
+        ASSERT_TRUE(find_in_bin(bb.get_item_bins()[1], 3));
 
         // These should pass for the loaded BinBundle
-        ASSERT_NE(bb2.get_bins()[0].end(), find_in_bin(bb2.get_bins()[0], 1));
-        ASSERT_NE(bb2.get_bins()[0].end(), find_in_bin(bb2.get_bins()[0], 2));
-        ASSERT_NE(bb2.get_bins()[1].end(), find_in_bin(bb2.get_bins()[1], 3));
+        ASSERT_TRUE(find_in_bin(bb2.get_item_bins()[0], 1));
+        ASSERT_TRUE(find_in_bin(bb2.get_item_bins()[0], 2));
+        ASSERT_TRUE(find_in_bin(bb2.get_item_bins()[1], 3));
 
         // Try loading to labeled BinBundle
         ss.seekg(0);
-        BinBundle<felt_t> bb3(context, true, get_params()->table_params().max_items_per_bin);
+        BinBundle bb3(context, 1, get_params()->table_params().max_items_per_bin, true);
         ASSERT_THROW(bb3.load(ss), runtime_error);
     }
 
     TEST(BinBundleTests, SaveLoadLabeled)
     {
-        stringstream ss;
+        auto test_fun = [&](size_t label_size) {
+            stringstream ss;
 
-        CryptoContext context(*get_params());
-        context.set_evaluator();
+            CryptoContext context(*get_params());
+            context.set_evaluator();
 
-        BinBundle<felt_t> bb(context, true, get_params()->table_params().max_items_per_bin);
-        bb.regen_cache();
-        ASSERT_TRUE(bb.empty());
-        auto save_size = bb.save(ss, 1);
+            BinBundle bb(context, label_size, get_params()->table_params().max_items_per_bin, true);
+            bb.regen_cache();
+            ASSERT_TRUE(bb.empty());
+            auto save_size = bb.save(ss, 1);
 
-        BinBundle<felt_t> bb2(context, true, get_params()->table_params().max_items_per_bin);
-        auto load_size = bb2.load(ss);
-        ASSERT_EQ(1, load_size.first);
-        ASSERT_EQ(save_size, load_size.second);
-        ASSERT_TRUE(bb2.empty());
+            BinBundle bb2(context, label_size, get_params()->table_params().max_items_per_bin, true);
+            auto load_size = bb2.load(ss);
+            ASSERT_EQ(1, load_size.first);
+            ASSERT_EQ(save_size, load_size.second);
+            ASSERT_TRUE(bb2.empty());
 
-        int res = bb.multi_insert_for_real({ make_pair(1, 2) }, 0);
-        ASSERT_EQ(1 /* largest bin size after insert */, res);
-        ASSERT_TRUE(bb.cache_invalid());
-        ASSERT_FALSE(bb.empty());
-        save_size = bb.save(ss, 1212);
+            int res = bb.multi_insert_for_real(AlgItemLabel{ make_pair(1, create_label(label_size, 2)) }, 0);
+            ASSERT_EQ(1 /* largest bin size after insert */, res);
+            ASSERT_TRUE(bb.cache_invalid());
+            ASSERT_FALSE(bb.empty());
+            save_size = bb.save(ss, 1212);
 
-        load_size = bb2.load(ss);
-        ASSERT_EQ(1212, load_size.first);
-        ASSERT_EQ(save_size, load_size.second);
-        ASSERT_TRUE(bb2.cache_invalid());
-        ASSERT_FALSE(bb2.empty());
+            load_size = bb2.load(ss);
+            ASSERT_EQ(1212, load_size.first);
+            ASSERT_EQ(save_size, load_size.second);
+            ASSERT_TRUE(bb2.cache_invalid());
+            ASSERT_FALSE(bb2.empty());
 
-        res = bb.multi_insert_for_real({ make_pair(2, 3), make_pair(3, 4) }, 0);
-        ASSERT_EQ(2 /* largest bin size after insert */, res);
-        ASSERT_TRUE(bb.cache_invalid());
-        ASSERT_FALSE(bb.empty());
-        save_size = bb.save(ss, 131313);
+            res = bb.multi_insert_for_real(AlgItemLabel{
+                make_pair(2, create_label(label_size, 3)),
+                make_pair(3, create_label(label_size, 4)) }, 0);
+            ASSERT_EQ(2 /* largest bin size after insert */, res);
+            ASSERT_TRUE(bb.cache_invalid());
+            ASSERT_FALSE(bb.empty());
+            save_size = bb.save(ss, 131313);
 
-        load_size = bb2.load(ss);
-        ASSERT_EQ(131313, load_size.first);
-        ASSERT_EQ(save_size, load_size.second);
-        ASSERT_TRUE(bb2.cache_invalid());
-        ASSERT_FALSE(bb2.empty());
+            load_size = bb2.load(ss);
+            ASSERT_EQ(131313, load_size.first);
+            ASSERT_EQ(save_size, load_size.second);
+            ASSERT_TRUE(bb2.cache_invalid());
+            ASSERT_FALSE(bb2.empty());
 
-        // These pass for the original BinBundle
-        auto find_res = find_in_bin(bb.get_bins()[0], 1);
-        ASSERT_NE(bb.get_bins()[0].end(), find_res);
-        ASSERT_EQ(2, find_res->second);
-        find_res = find_in_bin(bb.get_bins()[0], 2);
-        ASSERT_NE(bb.get_bins()[0].end(), find_res);
-        ASSERT_EQ(3, find_res->second);
-        find_res = find_in_bin(bb.get_bins()[1], 3);
-        ASSERT_NE(bb.get_bins()[1].end(), find_res);
-        ASSERT_EQ(4, find_res->second);
+            // These pass for the original BinBundle
+            ASSERT_TRUE(find_in_bin(bb.get_item_bins()[0], 1));
+            for (size_t label_idx = 0; label_idx < label_size; label_idx++)
+            {
+                ASSERT_TRUE(find_in_bin(bb.get_label_bins()[label_idx][0], 2 + label_idx));
+            }
 
-        // These should pass for the loaded BinBundle
-        find_res = find_in_bin(bb2.get_bins()[0], 1);
-        ASSERT_NE(bb2.get_bins()[0].end(), find_res);
-        ASSERT_EQ(2, find_res->second);
-        find_res = find_in_bin(bb2.get_bins()[0], 2);
-        ASSERT_NE(bb2.get_bins()[0].end(), find_res);
-        ASSERT_EQ(3, find_res->second);
-        find_res = find_in_bin(bb2.get_bins()[1], 3);
-        ASSERT_NE(bb2.get_bins()[1].end(), find_res);
-        ASSERT_EQ(4, find_res->second);
+            ASSERT_TRUE(find_in_bin(bb.get_item_bins()[0], 2));
+            for (size_t label_idx = 0; label_idx < label_size; label_idx++)
+            {
+                ASSERT_TRUE(find_in_bin(bb.get_label_bins()[label_idx][0], 3 + label_idx));
+            }
 
-        // Try loading to unlabeled BinBundle
-        ss.seekg(0);
-        BinBundle<monostate> bb3(context, true, get_params()->table_params().max_items_per_bin);
-        ASSERT_THROW(bb3.load(ss), runtime_error);
+            ASSERT_TRUE(find_in_bin(bb.get_item_bins()[1], 3));
+            for (size_t label_idx = 0; label_idx < label_size; label_idx++)
+            {
+                ASSERT_TRUE(find_in_bin(bb.get_label_bins()[label_idx][1], 4 + label_idx));
+            }
+
+            // These should pass for the loaded BinBundle
+            ASSERT_TRUE(find_in_bin(bb2.get_item_bins()[0], 1));
+            for (size_t label_idx = 0; label_idx < label_size; label_idx++)
+            {
+                ASSERT_TRUE(find_in_bin(bb2.get_label_bins()[label_idx][0], 2 + label_idx));
+            }
+
+            ASSERT_TRUE(find_in_bin(bb2.get_item_bins()[0], 2));
+            for (size_t label_idx = 0; label_idx < label_size; label_idx++)
+            {
+                ASSERT_TRUE(find_in_bin(bb2.get_label_bins()[label_idx][0], 3 + label_idx));
+            }
+
+            ASSERT_TRUE(find_in_bin(bb2.get_item_bins()[1], 3));
+            for (size_t label_idx = 0; label_idx < label_size; label_idx++)
+            {
+                ASSERT_TRUE(find_in_bin(bb2.get_label_bins()[label_idx][1], 4 + label_idx));
+            }
+
+            // Try loading to unlabeled BinBundle
+            ss.seekg(0);
+            BinBundle bb3(context, 0, get_params()->table_params().max_items_per_bin, true);
+            ASSERT_THROW(bb3.load(ss), runtime_error);
+        };
+
+        test_fun(1);
+        test_fun(2);
+        test_fun(3);
     }
 }

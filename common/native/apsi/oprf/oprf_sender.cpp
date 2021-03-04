@@ -154,8 +154,8 @@ namespace apsi
             return oprf_hashes;
         }
 
-        vector<pair<oprf_hash_type, FullWidthLabel>> OPRFSender::ComputeHashes(
-            const gsl::span<const pair<oprf_item_type, FullWidthLabel>> &oprf_item_labels,
+        vector<pair<oprf_hash_type, EncryptedLabel>> OPRFSender::ComputeHashes(
+            const gsl::span<const pair<oprf_item_type, Label>> &oprf_item_labels,
             const OPRFKey &oprf_key,
             size_t threads)
         {
@@ -163,12 +163,12 @@ namespace apsi
                 threads = thread::hardware_concurrency();
             }
 
-            vector<pair<oprf_hash_type, FullWidthLabel>> oprf_hashes(oprf_item_labels.size());
+            vector<pair<oprf_hash_type, EncryptedLabel>> oprf_hashes(oprf_item_labels.size());
             vector<future<void>> futures(threads);
 
             auto ComputeHashesLambda = [&](size_t start_idx, size_t step) {
                 for (size_t idx = start_idx; idx < oprf_item_labels.size(); idx += step) {
-                    const pair<oprf_item_type, FullWidthLabel> &item = oprf_item_labels[idx];
+                    const pair<oprf_item_type, Label> &item = oprf_item_labels[idx];
 
                     // Create an elliptic curve point from the item
                     ECPoint ecpt(item.first.get_as<const unsigned char>());
@@ -182,7 +182,7 @@ namespace apsi
 
                     // The first 128 bits represent the item hash; the next 128 bits represent
                     // the label encryption key
-                    pair<oprf_hash_type, FullWidthLabel> hash;
+                    pair<oprf_hash_type, Label> hash;
                     copy_n(
                         item_hash_and_label_key.data(),
                         oprf_hash_size,
@@ -192,7 +192,8 @@ namespace apsi
                     hash.second = item.second;
 
                     // Set result
-                    oprf_hashes[idx] = hash;
+                    oprf_hashes[idx].first = hash.first;
+                    oprf_hashes[idx].second = EncryptedLabel(move(hash.second), allocator<unsigned char>());
                 }
             };
 

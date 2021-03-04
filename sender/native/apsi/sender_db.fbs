@@ -11,7 +11,7 @@ struct HashedItem {
 }
 
 struct SenderDBInfo {
-    labeled:bool;
+    label_byte_count:uint32;
     compressed:bool;
 }
 

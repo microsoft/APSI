@@ -9,10 +9,10 @@
 #include <memory>
 #include <utility>
 #include <type_traits>
+#include <vector>
 
 // APSI
 #include "apsi/item.h"
-#include "apsi/util/db_encoding.h"
 
 // GSL
 #include "gsl/span"
@@ -38,13 +38,13 @@ namespace apsi
             /**
             Creates a LabelData object holding a given bit string.
             */
-            LabelData(std::unique_ptr<Bitstring> label) : label_(std::move(label))
+            LabelData(Label label) : label_(std::move(label))
             {}
 
             /**
             Sets the current label data to a given bit string.
             */
-            void set(std::unique_ptr<Bitstring> label)
+            void set(Label label)
             {
                 label_ = std::move(label);
             }
@@ -55,12 +55,12 @@ namespace apsi
             template<typename T, typename = std::enable_if_t<std::is_standard_layout<T>::value>>
             gsl::span<std::add_const_t<T>> get_as() const
             {
-                if(!label_)
+                if(!has_data())
                 {
                     return {};
                 }
-                std::size_t count = label_->data().size() / sizeof(T);
-                return { reinterpret_cast<std::add_const_t<T>*>(label_->data().data()), count };
+                std::size_t count = label_.size() / sizeof(T);
+                return { reinterpret_cast<std::add_const_t<T>*>(label_.data()), count };
             }
 
             /**
@@ -69,7 +69,7 @@ namespace apsi
             template<typename CharT = char>
             std::basic_string<CharT> to_string() const
             {
-                if (!label_)
+                if (!has_data())
                 {
                     return {};
                 }
@@ -82,7 +82,7 @@ namespace apsi
             */
             bool has_data() const noexcept
             {
-                return !!label_;
+                return !label_.empty();
             }
 
             /**
@@ -94,7 +94,7 @@ namespace apsi
             }
 
         private:
-            std::unique_ptr<Bitstring> label_ = nullptr;
+            Label label_;
         };
 
         /**

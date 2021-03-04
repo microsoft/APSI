@@ -7,6 +7,10 @@ table FEltArray {
     felts:[uint64] (required);
 }
 
+table FEltMatrix {
+    rows:[FEltArray] (required);
+}
+
 table Plaintext {
     data:[ubyte] (required);
 }
@@ -16,22 +20,17 @@ table BatchedPlaintextPolyn {
 }
 
 table BinBundleCache {
-    felt_matching_polyns:[FEltArray] (required);
+    felt_matching_polyns:FEltMatrix (required);
     batched_matching_polyn:BatchedPlaintextPolyn (required);
-    felt_interp_polyns:[FEltArray];
-    batched_interp_polyn:BatchedPlaintextPolyn;
-}
-
-table Bin {
-    felt_items:FEltArray (required);
-    felt_labels:FEltArray;
+    felt_interp_polyns:[FEltMatrix];
+    batched_interp_polyns:[BatchedPlaintextPolyn];
 }
 
 table BinBundle {
     bundle_idx:uint32;
-    labeled:bool;
     mod:uint64;
-    bins:[Bin] (required);
+    item_bins:FEltMatrix (required);
+    label_bins:[FEltMatrix];
     cache:BinBundleCache;
 }
 

@@ -29,16 +29,14 @@ namespace apsi
         // An element of a field with prime modulus < 2⁶⁴
         using felt_t = std::uint64_t;
 
-        // The unit type
-        struct monostate {};
+        // A representation of item as a sequence felt_t
+        using AlgItem = std::vector<felt_t>;
 
-        // A representation of item-label as a sequence of felt_t pairs, or item-unit as a sequence of pairs where the
-        // first element is felt_t and the second is monostate
-        template<typename L>
-        using AlgItemLabel = std::vector<std::pair<felt_t, L>>;
+        // A representation of label as a sequence of felt_t
+        using AlgLabel = std::vector<felt_t>;
 
-        // Labels are always the same size as items
-        using FullWidthLabel = Item;
+        // A representation of item-label as a sequence of pairs of felt_t and std::vector<felt_t>
+        using AlgItemLabel = std::vector<std::pair<felt_t, std::vector<felt_t>>>;
 
         /**
         Converts the given bitstring to a sequence of field elements (modulo `mod`).
@@ -60,9 +58,9 @@ namespace apsi
         the item, and the second is a chunk of the label. item_bit_count denotes the bit length of the items and labels
         (they are the same length). mod denotes the modulus of the prime field.
         */
-        AlgItemLabel<felt_t> algebraize_item_label(
+        AlgItemLabel algebraize_item_label(
             const HashedItem &item,
-            const FullWidthLabel &label,
+            const EncryptedLabel &label,
             std::size_t item_bit_count,
             const seal::Modulus &mod
         );
@@ -72,18 +70,27 @@ namespace apsi
         item, and the second is the unit type. item_bit_count denotes the bit length of the items and labels (they are the
         same length). mod denotes the modulus of the prime field. mod denotes the modulus of the prime field.
         */
-        AlgItemLabel<monostate> algebraize_item(
+        AlgItem algebraize_item(
             const HashedItem &item,
             std::size_t item_bit_count,
             const seal::Modulus &mod);
 
         /**
-        Converts a sequence of field elements into an Item. This will throw an invalid_argument if too many field
+        Converts a sequence of field elements into a HashedItem. This will throw an invalid_argument if too many field
         elements are given, i.e., if modulus_bitlen * num_elements > 128.
         */
         HashedItem dealgebraize_item(
-            const std::vector<felt_t> &item,
+            const AlgItem &item,
             std::size_t item_bit_count,
+            const seal::Modulus &mod);
+
+        /**
+        Converts a sequence of field elements into an EncryptedLabel. This will throw an invalid_argument if too many field
+        elements are given, i.e., if modulus_bitlen * num_elements > 128.
+        */
+        EncryptedLabel dealgebraize_label(
+            const AlgLabel &label,
+            std::size_t label_bit_count,
             const seal::Modulus &mod);
     }
 } // namespace apsi
