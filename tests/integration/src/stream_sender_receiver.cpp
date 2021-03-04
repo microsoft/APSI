@@ -8,6 +8,7 @@
 #include "apsi/logging/log.h"
 #include "apsi/network/stream_channel.h"
 #include "apsi/oprf/oprf_sender.h"
+#include "apsi/util/thread_pool_mgr.h"
 #include "apsi/receiver.h"
 #include "apsi/sender.h"
 #include "apsi/sender_db.h"
@@ -35,9 +36,10 @@ namespace APSITests
             const PSIParams &params,
             size_t num_threads)
         {
-            logging::Log::set_console_disabled(false);
+            logging::Log::set_console_disabled(true);
             logging::Log::set_log_level(logging::Log::Level::info);
-            //logging::Log::set_log_file("out.log");
+
+            ThreadPoolMgr::set_thread_count(num_threads);
 
             vector<Item> sender_items;
             for (size_t i = 0; i < sender_size; i++)
@@ -126,9 +128,10 @@ namespace APSITests
             const PSIParams &params,
             size_t num_threads)
         {
-            logging::Log::set_console_disabled(false);
+            logging::Log::set_console_disabled(true);
             logging::Log::set_log_level(logging::Log::Level::info);
-            //logging::Log::set_log_file("out.log");
+
+            ThreadPoolMgr::set_thread_count(num_threads);
 
             vector<pair<Item, Label>> sender_items;
             for (size_t i = 0; i < sender_size; i++)
