@@ -12,6 +12,7 @@
 #include "apsi/logging/log.h"
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/version.h"
+#include "apsi/util/thread_pool_mgr.h"
 #include "apsi/zmq/sender_dispatcher.h"
 #include "common/common_utils.h"
 #include "common/csv_reader.h"
@@ -32,8 +33,7 @@ unique_ptr<CSVReader::DBData> load_db(const string &db_file);
 
 pair<shared_ptr<OPRFKey>, shared_ptr<SenderDB>> create_sender_db(
     const CSVReader::DBData &db_data,
-    const PSIParams &psi_params,
-    size_t thread_count);
+    const PSIParams &psi_params);
 
 int main(int argc, char *argv[])
 {
@@ -114,7 +114,9 @@ int run_sender_dispatcher(const CLP &cmd)
         return -1;
     }
 
-    auto [oprf_key, sender_db] = create_sender_db(*db_data, *params, cmd.threads());
+    ThreadPoolMgr::set_thread_count(cmd.threads());
+
+    auto [oprf_key, sender_db] = create_sender_db(*db_data, *params);
     db_data = nullptr;
 
     signal(SIGINT, sigint_handler);
@@ -148,8 +150,7 @@ unique_ptr<CSVReader::DBData> load_db(const string &db_file)
 
 pair<shared_ptr<OPRFKey>, shared_ptr<SenderDB>> create_sender_db(
     const CSVReader::DBData &db_data,
-    const PSIParams &psi_params,
-    size_t thread_count)
+    const PSIParams &psi_params)
 {
     auto oprf_key = make_shared<OPRFKey>();
     APSI_LOG_INFO("Created new OPRF key");
@@ -160,14 +161,14 @@ pair<shared_ptr<OPRFKey>, shared_ptr<SenderDB>> create_sender_db(
         vector<HashedItem> hashed_db_data;
         {
             STOPWATCH(sender_stopwatch, "OPRF");
-            hashed_db_data = OPRFSender::ComputeHashes(get<CSVReader::UnlabeledData>(db_data), *oprf_key, thread_count);
+            hashed_db_data = OPRFSender::ComputeHashes(get<CSVReader::UnlabeledData>(db_data), *oprf_key);
         }
         APSI_LOG_INFO("Computed OPRF hash for " << hashed_db_data.size() << " items");
 
         try
         {
             sender_db = make_shared<UnlabeledSenderDB>(psi_params);
-            sender_db->set_data(hashed_db_data, thread_count);
+            sender_db->set_data(hashed_db_data);
             APSI_LOG_INFO("Created unlabeled SenderDB with " << sender_db->get_items().size() << " items");
         }
         catch (const exception &ex)
@@ -181,14 +182,14 @@ pair<shared_ptr<OPRFKey>, shared_ptr<SenderDB>> create_sender_db(
         vector<pair<HashedItem, EncryptedLabel>> hashed_db_data;
         {
             STOPWATCH(sender_stopwatch, "OPRF");
-            hashed_db_data = OPRFSender::ComputeHashes(get<CSVReader::LabeledData>(db_data), *oprf_key, thread_count);
+            hashed_db_data = OPRFSender::ComputeHashes(get<CSVReader::LabeledData>(db_data), *oprf_key);
         }
         APSI_LOG_INFO("Computed OPRF hash for " << hashed_db_data.size() << " items");
 
         try
         {
             sender_db = make_shared<LabeledSenderDB>(psi_params);
-            sender_db->set_data(hashed_db_data, thread_count);
+            sender_db->set_data(hashed_db_data);
             APSI_LOG_INFO("Created labeled SenderDB with " << sender_db->get_items().size() << " items");
         }
         catch (const exception &ex)

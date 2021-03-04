@@ -51,7 +51,7 @@ namespace APSITests
             auto hashed_sender_items = OPRFSender::ComputeHashes(sender_items, oprf_key);
 
             auto sender_db = make_shared<UnlabeledSenderDB>(params);
-            sender_db->set_data(hashed_sender_items, num_threads);
+            sender_db->set_data(hashed_sender_items);
 
             auto seal_context = sender_db->get_seal_context();
 
@@ -143,7 +143,7 @@ namespace APSITests
             auto hashed_sender_items = OPRFSender::ComputeHashes(sender_items, oprf_key);
 
             auto sender_db = make_shared<LabeledSenderDB>(params, 10, true);
-            sender_db->set_data(hashed_sender_items, num_threads);
+            sender_db->set_data(hashed_sender_items);
 
             auto seal_context = sender_db->get_seal_context();
 
