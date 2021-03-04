@@ -14,6 +14,7 @@
 #include "apsi/sender_db_generated.h"
 #include "apsi/util/db_encoding.h"
 #include "apsi/util/utils.h"
+#include "apsi/util/thread_pool_mgr.h"
 
 // Kuku
 #include "kuku/locfunc.h"
@@ -230,27 +231,17 @@ namespace apsi
                 const vector<pair<T, size_t>> &data_with_indices,
                 vector<vector<BinBundle>> &bin_bundles,
                 CryptoContext &crypto_context,
-                pair<size_t, size_t> work_range,
+                uint32_t bundle_index,
                 uint32_t bins_per_bundle,
                 size_t label_size,
                 size_t max_bin_size,
                 bool overwrite,
                 bool compressed)
             {
-                stringstream sw_ss;
-                sw_ss << "insert_or_assign_worker [" << this_thread::get_id() << "]";
-                STOPWATCH(sender_stopwatch, sw_ss.str());
+                STOPWATCH(sender_stopwatch, "insert_or_assign_worker");
+                APSI_LOG_DEBUG("Insert-or-Assign worker for bundle index [" << bundle_index << "]. Mode of operation: " << (overwrite ? "overwriting existing" : "inserting new"));
 
-                uint32_t bundle_idx_start = work_range.first;
-                uint32_t bundle_idx_end = work_range.second;
-
-                APSI_LOG_DEBUG("Insert-or-Assign worker [" << this_thread::get_id() << "]: "
-                    "start processing bundle indices in [" << bundle_idx_start << ", " << bundle_idx_end << ")");
-                APSI_LOG_DEBUG("Insert-or-Assign worker [" << this_thread::get_id() << "]: "
-                    "mode of operation: " << (overwrite ? "overwriting existing" : "inserting new"));
-
-                // Keep track of the bundle indices we look at. These will be the ones whose cache we have to regen.
-                unordered_set<size_t> bundle_indices;
+                bool regen_cache = false;
 
                 // Iteratively insert each item-label pair at the given cuckoo index
                 for (auto &data_with_idx : data_with_indices)
@@ -263,14 +254,14 @@ namespace apsi
                     tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
 
                     // If the bundle_idx isn't in the prescribed range, don't try to insert this data
-                    if (bundle_idx < bundle_idx_start || bundle_idx >= bundle_idx_end)
+                    if (bundle_idx != bundle_index)
                     {
                         // Dealing with this bundle index is not our job
                         continue;
                     }
 
                     // We are inserting an item so mark the bundle index for cache regen
-                    bundle_indices.insert(bundle_idx);
+                    regen_cache = true;
 
                     // Get the bundle set at the given bundle index
                     vector<BinBundle> &bundle_set = bin_bundles[bundle_idx];
@@ -308,7 +299,7 @@ namespace apsi
                     // We tried to overwrite an item that doesn't exist. This should never happen
                     if (overwrite && !written)
                     {
-                        APSI_LOG_ERROR("Insert-or-Assign worker [" << this_thread::get_id() << "]: "
+                        APSI_LOG_ERROR("Insert-or-Assign worker: "
                             "failed to overwrite item at bundle index " << bundle_idx << " "
                             "because the item was not found");
                         throw logic_error("tried to overwrite non-existent item");
@@ -325,7 +316,7 @@ namespace apsi
                         // If even that failed, I don't know what could've happened
                         if (res < 0)
                         {
-                            APSI_LOG_ERROR("Insert-or-Assign worker [" << this_thread::get_id() << "]: "
+                            APSI_LOG_ERROR("Insert-or-Assign worker: "
                                 "failed to insert item into a new BinBundle at bundle index " << bundle_idx);
                             throw logic_error("failed to insert item into a new BinBundle");
                         }
@@ -335,19 +326,18 @@ namespace apsi
                     }
                 }
 
-                APSI_LOG_DEBUG("Insert-or-Assign worker [" << this_thread::get_id() << "]: "
-                    "starting cache regeneration for " << bundle_indices.size() << " bundle indices");
+                APSI_LOG_DEBUG("Insert-or-Assign worker [" << bundle_index << "]: "
+                    "starting cache regeneration");
 
                 // Now it's time to regenerate the caches of all the modified BinBundles. We'll just go through all the
                 // bundle indices we touched and lazily regenerate the caches of all the BinBundles at those indices.
-                for (const size_t &bundle_idx : bundle_indices)
+                if (regen_cache)
                 {
                     // Get the set of BinBundles at this bundle index
-                    vector<BinBundle> &bundle_set = bin_bundles[bundle_idx];
+                    vector<BinBundle> &bundle_set = bin_bundles[bundle_index];
 
-                    APSI_LOG_DEBUG("Insert-or-Assign worker [" << this_thread::get_id() << "]: "
-                        "regenerating cache for bundle index " << bundle_idx << " "
-                        "with " << bundle_set.size() << " BinBundles");
+                    APSI_LOG_DEBUG("Insert-or-Assign worker: "
+                        "regenerating cache for bundle index " << bundle_index);
 
                     // Regenerate the cache of every BinBundle in the set
                     for (BinBundle &bundle : bundle_set)
@@ -356,12 +346,12 @@ namespace apsi
                         bundle.regen_cache();
                     }
 
-                    APSI_LOG_DEBUG("Insert-or-Assign worker [" << this_thread::get_id() << "]: "
-                        "finished regenerating cache for bundle index " << bundle_idx);
+                    APSI_LOG_DEBUG("Insert-or-Assign worker"
+                        "finished regenerating cache for bundle index " << bundle_index);
                 }
 
-                APSI_LOG_DEBUG("Insert-or-Assign worker [" << this_thread::get_id() << "]: "
-                    "finished processing bundle indices [" << bundle_idx_start << ", " << bundle_idx_end << ")");
+                APSI_LOG_DEBUG("Insert-or-Assign worker: "
+                    "finished processing bundle index [" << bundle_index << "]");
             }
 
             /**
@@ -377,10 +367,11 @@ namespace apsi
                 uint32_t bins_per_bundle,
                 size_t label_size,
                 uint32_t max_bin_size,
-                size_t thread_count,
                 bool overwrite,
                 bool compressed)
             {
+                ThreadPoolMgr tpm;
+
                 // Collect the bundle indices and partition them into thread_count many partitions.
                 // By some uniformity assumption, the number of things to insert per partition
                 // should be roughly the same. Note that the contents of bundle_indices is always
@@ -403,9 +394,9 @@ namespace apsi
                     back_inserter(bundle_indices));
                 sort(bundle_indices.begin(), bundle_indices.end());
 
-                // Partition the bundle indices appropriately
-                vector<pair<size_t, size_t>> partitions =
-                    partition_evenly(bundle_indices.size(), thread_count);
+                //// Partition the bundle indices appropriately
+                //vector<pair<size_t, size_t>> partitions =
+                //    partition_evenly(bundle_indices.size(), thread_count);
 
                 // Insert one larger "end" value to the bundle_indices vector; this represents
                 // one-past upper bound for the bundle indices that need to be processed.
@@ -414,18 +405,16 @@ namespace apsi
                 }
 
                 // Run the threads on the partitions
-                vector<future<void>> futures(partitions.size());
+                vector<future<void>> futures(bundle_indices.size());
                 APSI_LOG_INFO(
-                    "Launching " << partitions.size() << " insert-or-assign worker threads");
-                for (size_t part_idx = 0; part_idx < partitions.size(); part_idx++) {
-                    auto &partition = partitions[part_idx];
-                    futures[part_idx] = async(launch::async, [&]() {
+                    "Launching " << bundle_indices.size() << " insert-or-assign worker tasks");
+                for (size_t bundle_idx = 0; bundle_idx < bundle_indices.size(); bundle_idx++) {
+                    futures[bundle_idx] = tpm.thread_pool().enqueue([&, bundle_idx]() {
                         insert_or_assign_worker(
                             data_with_indices,
                             bin_bundles,
                             crypto_context,
-                            make_pair(
-                                bundle_indices[partition.first], bundle_indices[partition.second]),
+                            static_cast<uint32_t>(bundle_idx),
                             bins_per_bundle,
                             label_size,
                             max_bin_size,
@@ -434,7 +423,7 @@ namespace apsi
                     });
                 }
 
-                // Wait for the threads to finish
+                // Wait for the tasks to finish
                 for (auto &f : futures) {
                     f.get();
                 }
@@ -447,21 +436,15 @@ namespace apsi
                 const vector<pair<AlgItem, size_t>> &data_with_indices,
                 vector<vector<BinBundle>> &bin_bundles,
                 CryptoContext &crypto_context,
-                pair<size_t, size_t> work_range,
+                uint32_t bundle_index,
                 uint32_t bins_per_bundle)
             {
-                stringstream sw_ss;
-                sw_ss << "remove_worker [" << this_thread::get_id() << "]";
-                STOPWATCH(sender_stopwatch, sw_ss.str());
+                STOPWATCH(sender_stopwatch, "remove_worker");
 
-                uint32_t bundle_idx_start = work_range.first;
-                uint32_t bundle_idx_end = work_range.second;
-
-                APSI_LOG_INFO("Remove worker [" << this_thread::get_id() << "]: "
-                    "start processing bundle indices in [" << bundle_idx_start << ", " << bundle_idx_end << ")");
+                APSI_LOG_INFO("Remove worker [" << bundle_index << "]");
 
                 // Keep track of the bundle indices we look at. These will be the ones whose cache we have to regen.
-                unordered_set<size_t> bundle_indices;
+                bool regen_cache = false;
 
                 // Iteratively remove each item-label pair at the given cuckoo index
                 for (auto &data_with_idx : data_with_indices)
@@ -472,14 +455,14 @@ namespace apsi
                     tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
 
                     // If the bundle_idx isn't in the prescribed range, don't try to remove this data
-                    if (bundle_idx < bundle_idx_start || bundle_idx >= bundle_idx_end)
+                    if (bundle_idx != bundle_index)
                     {
                         // Dealing with this bundle index is not our job
                         continue;
                     }
 
                     // We are removing an item so mark the bundle index for cache regen
-                    bundle_indices.insert(bundle_idx);
+                    regen_cache = true;
 
                     // Get the bundle set at the given bundle index
                     vector<BinBundle> &bundle_set = bin_bundles[bundle_idx];
@@ -504,25 +487,25 @@ namespace apsi
                     // We tried to remove an item that doesn't exist. This should never happen
                     if (!removed)
                     {
-                        APSI_LOG_ERROR("Remove worker [" << this_thread::get_id() << "]: "
+                        APSI_LOG_ERROR("Remove worker: "
                             "failed to remove item at bundle index " << bundle_idx << " "
                             "because the item was not found");
                         throw logic_error("failed to remove item");
                     }
                 }
 
-                APSI_LOG_DEBUG("Remove worker [" << this_thread::get_id() << "]: "
-                    "starting cache regeneration for " << bundle_indices.size() << " bundle indices");
+                APSI_LOG_DEBUG("Remove worker: "
+                    "starting cache regeneration for bundle index " << bundle_index);
 
                 // Now it's time to regenerate the caches of all the modified BinBundles. We'll just go through all the
                 // bundle indices we touched and lazily regenerate the caches of all the BinBundles at those indices.
-                for (const size_t &bundle_idx : bundle_indices)
+                if (regen_cache)
                 {
                     // Get the set of BinBundles at this bundle index
-                    vector<BinBundle> &bundle_set = bin_bundles[bundle_idx];
+                    vector<BinBundle> &bundle_set = bin_bundles[bundle_index];
 
-                    APSI_LOG_DEBUG("Remove worker [" << this_thread::get_id() << "]: "
-                        "regenerating cache for bundle index " << bundle_idx << " "
+                    APSI_LOG_DEBUG("Remove worker: "
+                        "regenerating cache for bundle index " << bundle_index << " "
                         "with " << bundle_set.size() << " BinBundles");
 
                     // Regenerate the cache of every BinBundle in the set
@@ -532,12 +515,12 @@ namespace apsi
                         bundle.regen_cache();
                     }
 
-                    APSI_LOG_DEBUG("Remove worker [" << this_thread::get_id() << "]: "
-                        "finished regenerating cache for bundle index " << bundle_idx);
+                    APSI_LOG_DEBUG("Remove worker: "
+                        "finished regenerating cache for bundle index " << bundle_index);
                 }
 
-                APSI_LOG_INFO("Remove worker [" << this_thread::get_id() << "]: "
-                    "finished processing bundle indices [" << bundle_idx_start << ", " << bundle_idx_end << ")");
+                APSI_LOG_INFO("Remove worker: "
+                    "finished processing bundle index " << bundle_index);
             }
 
             /**
@@ -548,9 +531,10 @@ namespace apsi
                 const vector<pair<AlgItem, size_t >> &data_with_indices,
                 vector<vector<BinBundle>> &bin_bundles,
                 CryptoContext &crypto_context,
-                uint32_t bins_per_bundle,
-                size_t thread_count
+                uint32_t bins_per_bundle
             ) {
+                ThreadPoolMgr tpm;
+
                 // Collect the bundle indices and partition them into thread_count many partitions. By some uniformity
                 // assumption, the number of things to remove per partition should be roughly the same. Note that the
                 // contents of bundle_indices is always sorted (increasing order).
@@ -569,8 +553,8 @@ namespace apsi
                 copy(bundle_indices_set.begin(), bundle_indices_set.end(), back_inserter(bundle_indices));
                 sort(bundle_indices.begin(), bundle_indices.end());
 
-                // Partition the bundle indices appropriately
-                vector<pair<size_t, size_t>> partitions = partition_evenly(bundle_indices.size(), thread_count);
+                //// Partition the bundle indices appropriately
+                //vector<pair<size_t, size_t>> partitions = partition_evenly(bundle_indices.size(), thread_count);
 
                 // Insert one larger "end" value to the bundle_indices vector; this represents one-past upper bound for
                 // the bundle indices that need to be processed.
@@ -580,22 +564,20 @@ namespace apsi
                 }
 
                 // Run the threads on the partitions
-                vector<future<void>> futures(partitions.size());
-                APSI_LOG_INFO("Launching " << partitions.size() << " remove worker threads");
-                for (size_t part_idx = 0; part_idx < partitions.size(); part_idx++) {
-                    auto &partition = partitions[part_idx];
-                    futures[part_idx] = async(launch::async, [&]() {
+                vector<future<void>> futures(bundle_indices.size());
+                APSI_LOG_INFO("Launching " << bundle_indices.size() << " remove worker tasks");
+                for (size_t bundle_idx = 0; bundle_idx < bundle_indices.size(); bundle_idx++) {
+                    futures[bundle_idx] = tpm.thread_pool().enqueue([&]() {
                         remove_worker(
                             data_with_indices,
                             bin_bundles,
                             crypto_context,
-                            make_pair(
-                                bundle_indices[partition.first], bundle_indices[partition.second]),
+                            static_cast<uint32_t>(bundle_idx),
                             bins_per_bundle);
                     });
                 }
 
-                // Wait for the threads to finish
+                // Wait for the tasks to finish
                 for (auto &f : futures)
                 {
                     f.get();
@@ -706,10 +688,8 @@ namespace apsi
             return collect_caches(bin_bundles_.at(safe_cast<size_t>(bundle_idx)));
         }
 
-        void LabeledSenderDB::insert_or_assign(vector<pair<HashedItem, EncryptedLabel>> data, size_t thread_count)
+        void LabeledSenderDB::insert_or_assign(vector<pair<HashedItem, EncryptedLabel>> data)
         {
-            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
-
             STOPWATCH(sender_stopwatch, "LabeledSenderDB::insert_or_assign");
             APSI_LOG_INFO("Start inserting " << data.size() << " items in SenderDB");
 
@@ -772,7 +752,6 @@ namespace apsi
                 bins_per_bundle,
                 label_size,
                 max_bin_size,
-                thread_count,
                 false, /* don't overwrite items */
                 compressed_
             );
@@ -784,7 +763,6 @@ namespace apsi
                 bins_per_bundle,
                 label_size,
                 max_bin_size,
-                thread_count,
                 true, /* overwrite items */
                 compressed_
             );
@@ -792,16 +770,14 @@ namespace apsi
             APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
         }
 
-        void LabeledSenderDB::insert_or_assign(const vector<HashedItem> &data, size_t thread_count)
+        void LabeledSenderDB::insert_or_assign(const vector<HashedItem> &data)
         {
             APSI_LOG_ERROR("Attempted to insert unlabeled data but this is a LabeledSenderDB instance")
             throw logic_error("cannot do unlabeled insertion on a LabeledSenderDB");
         }
 
-        void UnlabeledSenderDB::insert_or_assign(const vector<HashedItem> &data, size_t thread_count)
+        void UnlabeledSenderDB::insert_or_assign(const vector<HashedItem> &data)
         {
-            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
-
             STOPWATCH(sender_stopwatch, "UnlabeledSenderDB::insert_or_assign");
             APSI_LOG_INFO("Start inserting " << data.size() << " items in SenderDB");
 
@@ -835,7 +811,6 @@ namespace apsi
                 bins_per_bundle,
                 0, /* label size */
                 max_bin_size,
-                thread_count,
                 false, /* don't overwrite items */
                 compressed_
             );
@@ -843,20 +818,15 @@ namespace apsi
             APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
         }
 
-        void UnlabeledSenderDB::insert_or_assign(
-            vector<pair<HashedItem, EncryptedLabel>> data,
-            size_t thread_count
-        ) {
-            APSI_LOG_ERROR("Attempted to insert labeled data but this is an UnlabeledSenderDB instance")
+        void UnlabeledSenderDB::insert_or_assign(vector<pair<HashedItem, EncryptedLabel>> data)
+        {
+            APSI_LOG_ERROR(
+                "Attempted to insert labeled data but this is an UnlabeledSenderDB instance")
             throw logic_error("cannot do labeled insertion on an UnlabeledSenderDB");
         }
 
-        void LabeledSenderDB::remove(
-            const vector<HashedItem> &data,
-            size_t thread_count
-        ) {
-            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
-
+        void LabeledSenderDB::remove(const vector<HashedItem> &data)
+        {
             STOPWATCH(sender_stopwatch, "LabeledSenderDB::remove");
             APSI_LOG_INFO("Start removing " << data.size() << " items-label pairs from SenderDB");
 
@@ -864,46 +834,34 @@ namespace apsi
             auto lock = get_writer_lock();
 
             // We need to check that all the items actually are in the database.
-            for (auto item : data)
-            {
-                if (items_.find(item) == items_.end())
-                {
+            for (auto item : data) {
+                if (items_.find(item) == items_.end()) {
                     // Item is not in items_; cannot remove it
                     throw invalid_argument("item to be removed was not found in SenderDB");
                 }
             }
 
-            // Break the data to be removed down into its field element representation. Also compute the items' cuckoo
-            // indices.
-            vector<pair<AlgItem, size_t>> data_with_indices
-                = preprocess_unlabeled_data(data.begin(), data.end(), params_);
+            // Break the data to be removed down into its field element representation. Also compute
+            // the items' cuckoo indices.
+            vector<pair<AlgItem, size_t>> data_with_indices =
+                preprocess_unlabeled_data(data.begin(), data.end(), params_);
 
             // Dispatch the removal
             uint32_t bins_per_bundle = params_.bins_per_bundle();
 
-            dispatch_remove(
-                data_with_indices,
-                bin_bundles_,
-                crypto_context_,
-                bins_per_bundle,
-                thread_count
-            );
+            dispatch_remove(data_with_indices, bin_bundles_, crypto_context_, bins_per_bundle);
 
-            // Now that everything is removed, clear these items from the cache of all inserted items.
-            for (auto &item : data)
-            {
+            // Now that everything is removed, clear these items from the cache of all inserted
+            // items.
+            for (auto &item : data) {
                 items_.erase(item);
             }
 
             APSI_LOG_INFO("Finished removing " << data.size() << " item-label pairs from SenderDB");
         }
 
-        void UnlabeledSenderDB::remove(
-            const vector<HashedItem> &data,
-            size_t thread_count
-        ) {
-            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
-
+        void UnlabeledSenderDB::remove(const vector<HashedItem> &data)
+        {
             STOPWATCH(sender_stopwatch, "UnlabeledSenderDB::remove");
             APSI_LOG_INFO("Start removing " << data.size() << " items from SenderDB");
 
@@ -911,61 +869,54 @@ namespace apsi
             auto lock = get_writer_lock();
 
             // We need to check that all the items actually are in the database.
-            for (auto item : data)
-            {
-                if (items_.find(item) == items_.end())
-                {
+            for (auto item : data) {
+                if (items_.find(item) == items_.end()) {
                     // Item is not in items_; cannot remove it
                     throw invalid_argument("item to be removed was not found in SenderDB");
                 }
             }
 
-            // Break the data to be removed down into its field element representation. Also compute the items' cuckoo
-            // indices.
-            vector<pair<AlgItem, size_t>> data_with_indices
-                = preprocess_unlabeled_data(data.begin(), data.end(), params_);
+            // Break the data to be removed down into its field element representation. Also compute
+            // the items' cuckoo indices.
+            vector<pair<AlgItem, size_t>> data_with_indices =
+                preprocess_unlabeled_data(data.begin(), data.end(), params_);
 
             // Dispatch the removal
             uint32_t bins_per_bundle = params_.bins_per_bundle();
 
-            dispatch_remove(
-                data_with_indices,
-                bin_bundles_,
-                crypto_context_,
-                bins_per_bundle,
-                thread_count
-            );
+            dispatch_remove(data_with_indices, bin_bundles_, crypto_context_, bins_per_bundle);
 
-            // Now that everything is removed, clear these items from the cache of all inserted items.
-            for (auto &item : data)
-            {
+            // Now that everything is removed, clear these items from the cache of all inserted
+            // items.
+            for (auto &item : data) {
                 items_.erase(item);
             }
 
             APSI_LOG_INFO("Finished removing " << data.size() << " items from SenderDB");
         }
 
-        void LabeledSenderDB::set_data(
-            vector<pair<HashedItem, EncryptedLabel>> data,
-            size_t thread_count
-        ) {
+        void LabeledSenderDB::set_data(vector<pair<HashedItem, EncryptedLabel>> data)
+        {
             clear_db();
-            insert_or_assign(move(data), thread_count);
+            insert_or_assign(move(data));
         }
 
-        void LabeledSenderDB::set_data(const vector<HashedItem> &data, size_t thread_count) {
+        void LabeledSenderDB::set_data(const vector<HashedItem> &data)
+        {
             APSI_LOG_ERROR("Attempted to set unlabeled data but this is a LabeledSenderDB instance")
             throw logic_error("cannot do unlabeled insertion on a LabeledSenderDB");
         }
 
-        void UnlabeledSenderDB::set_data(const vector<HashedItem> &data, size_t thread_count) {
+        void UnlabeledSenderDB::set_data(const vector<HashedItem> &data)
+        {
             clear_db();
-            insert_or_assign(data, thread_count);
+            insert_or_assign(data);
         }
 
-        void UnlabeledSenderDB::set_data(vector<pair<HashedItem, EncryptedLabel>> data, size_t thread_count)
+        void UnlabeledSenderDB::set_data(vector<pair<HashedItem, EncryptedLabel>> data)
         {
-            APSI_LOG_ERROR("Attempted to set labeled data but this is an UnlabeledSenderDB instance")
+            APSI_LOG_ERROR(
+                "Attempted to set labeled data but this is an UnlabeledSenderDB instance")
             throw logic_error("cannot do labeled insertion on an UnlabeledSenderDB");
         }
 

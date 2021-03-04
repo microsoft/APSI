@@ -15,7 +15,7 @@
 #include "apsi/util/utils.h"
 #include "apsi/crypto_context.h"
 #include "apsi/util/stopwatch.h"
-#include "apsi/util/thread_pool.h"
+#include "apsi/util/thread_pool_mgr.h"
 
 // SEAL
 #include "seal/modulus.h"
@@ -132,7 +132,7 @@ namespace apsi
             }
 
             thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
-            ThreadPool thread_pool(thread_count);
+            ThreadPoolMgr tpm;
 
             auto sender_db = query.sender_db();
 
@@ -201,7 +201,7 @@ namespace apsi
             // Queue computation of powers for the bundle indexes
             vector<future<void>> futures(bundle_idx_count);
             for (size_t bundle_idx = 0; bundle_idx < bundle_idx_count; bundle_idx++) {
-                futures[bundle_idx] = thread_pool.enqueue([&, bundle_idx]() {
+                futures[bundle_idx] = tpm.thread_pool().enqueue([&, bundle_idx]() {
                     ComputePowers(sender_db, crypto_context, all_powers, pd, bundle_idx);
                 });
             }
@@ -224,7 +224,7 @@ namespace apsi
                 }
 
                 for (auto &cache : bundle_caches) {
-                    futures.emplace_back(thread_pool.enqueue([&, bundle_idx, cache]() {
+                    futures.emplace_back(tpm.thread_pool().enqueue([&, bundle_idx, cache]() {
                         ProcessBinBundleCache(sender_db, cache, all_powers, chl, send_rp_fun, bundle_idx);
                     }));
                 }
