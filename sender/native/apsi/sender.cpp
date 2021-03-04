@@ -225,7 +225,7 @@ namespace apsi
 
                 for (auto &cache : bundle_caches) {
                     futures.emplace_back(thread_pool.enqueue([&, bundle_idx, cache]() {
-                        ProcessBinBundleCache(cache, all_powers, chl, send_rp_fun, bundle_idx);
+                        ProcessBinBundleCache(sender_db, cache, all_powers, chl, send_rp_fun, bundle_idx);
                     }));
                 }
             }
@@ -291,6 +291,7 @@ namespace apsi
         }
 
         void Sender::ProcessBinBundleCache(
+            const shared_ptr<SenderDB> &sender_db,
             const reference_wrapper<const BinBundleCache> &cache,
             vector<CiphertextPowers> &all_powers,
             Channel &chl,
@@ -304,16 +305,15 @@ namespace apsi
 
             rp->bundle_idx = bundle_idx;
 
-                    // Compute the matching result and move to rp
-                    const BatchedPlaintextPolyn &matching_polyn = cache.get().batched_matching_polyn;
-                    rp->psi_result = matching_polyn.eval(all_powers[bundle_idx]);
+            // Compute the matching result and move to rp
+            const BatchedPlaintextPolyn &matching_polyn = cache.get().batched_matching_polyn;
+            rp->psi_result = matching_polyn.eval(all_powers[bundle_idx]);
 
-                    rp->label_byte_count = sender_db->get_label_byte_count();
-                    for (const auto &interp_polyn : cache.get().batched_interp_polyns)
-                    {
-                        // Compute the label result and move to rp
-                        rp->label_result.emplace_back(interp_polyn.eval(all_powers[bundle_idx]));
-                    }
+            rp->label_byte_count = sender_db->get_label_byte_count();
+            for (const auto &interp_polyn : cache.get().batched_interp_polyns) {
+                // Compute the label result and move to rp
+                rp->label_result.emplace_back(interp_polyn.eval(all_powers[bundle_idx]));
+            }
 
             // Send this result part
             try {
