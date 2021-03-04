@@ -15,6 +15,7 @@
 #include "apsi/util/utils.h"
 #include "apsi/crypto_context.h"
 #include "apsi/util/stopwatch.h"
+#include "apsi/util/thread_pool.h"
 
 // SEAL
 #include "seal/modulus.h"
@@ -131,6 +132,7 @@ namespace apsi
             }
 
             thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
+            ThreadPool thread_pool(thread_count);
 
             auto sender_db = query.sender_db();
 
@@ -196,24 +198,39 @@ namespace apsi
                 }
             }
 
-            // Partition the data and run the threads on the partitions. The i-th thread will
-            // compute query powers at bundle indices starting at partitions[i], up to but not
-            // including partitions[i+1].
-            auto partitions = partition_evenly(bundle_idx_count, safe_cast<uint32_t>(thread_count));
-
-            // Launch threads, but not more than necessary
-            vector<future<void>> futures(partitions.size());
-            APSI_LOG_INFO(
-                "Launching " << partitions.size() << " query worker threads to compute "
-                             << package_count << " result parts");
-            for (size_t t = 0; t < partitions.size(); t++) {
-                futures[t] = async(launch::async, [&, t]() {
-                    QueryWorker(
-                        sender_db, crypto_context, partitions[t], all_powers, pd, chl, send_rp_fun);
+            // Queue computation of powers for the bundle indexes
+            vector<future<void>> futures(bundle_idx_count);
+            for (size_t bundle_idx = 0; bundle_idx < bundle_idx_count; bundle_idx++) {
+                futures[bundle_idx] = thread_pool.enqueue([&, bundle_idx]() {
+                    ComputePowers(sender_db, crypto_context, all_powers, pd, bundle_idx);
                 });
             }
 
-            // Wait for the threads to finish
+            // Wait until all powers are computed
+            for (auto &f : futures) {
+                f.get();
+            }
+
+            APSI_LOG_DEBUG("Finished computing powers for all bundle indices");
+            APSI_LOG_DEBUG("Start processing bin bundle caches");
+
+            futures.clear();
+            for (size_t bundle_idx = 0; bundle_idx < bundle_idx_count; bundle_idx++) {
+                auto bundle_caches = sender_db->get_cache_at(bundle_idx);
+                size_t bundle_count = bundle_caches.size();
+                if (!bundle_count) {
+                    APSI_LOG_DEBUG("No bin bundles found at bundle index " << bundle_idx);
+                    continue;
+                }
+
+                for (auto &cache : bundle_caches) {
+                    futures.emplace_back(thread_pool.enqueue([&, bundle_idx, cache]() {
+                        ProcessBinBundleCache(cache, all_powers, chl, send_rp_fun, bundle_idx);
+                    }));
+                }
+            }
+
+            // Wait until all bin bundle caches have been processed
             for (auto &f : futures) {
                 f.get();
             }
@@ -221,114 +238,90 @@ namespace apsi
             APSI_LOG_INFO("Finished processing query request");
         }
 
-        void Sender::QueryWorker(
+        void Sender::ComputePowers(
             const shared_ptr<SenderDB> &sender_db,
-            CryptoContext crypto_context,
-            pair<uint32_t, uint32_t> work_range,
+            CryptoContext &crypto_context,
             vector<CiphertextPowers> &all_powers,
             const PowersDag &pd,
-            Channel &chl,
-            function<void(Channel &, ResultPart)> send_rp_fun)
+            uint32_t bundle_idx)
         {
-            stringstream sw_ss;
-            sw_ss << "Sender::QueryWorker [" << this_thread::get_id() << "]";
-            STOPWATCH(sender_stopwatch, sw_ss.str());
+            STOPWATCH(sender_stopwatch, "Sender::ComputePowers");
+            auto bundle_caches = sender_db->get_cache_at(bundle_idx);
+            size_t bundle_count = bundle_caches.size();
+            if (!bundle_count) {
+                APSI_LOG_DEBUG("No bin bundles found at bundle index " << bundle_idx);
+                return;
+            }
 
-            uint32_t bundle_idx_start = work_range.first;
-            uint32_t bundle_idx_end = work_range.second;
+            // Compute all powers of the query
+            APSI_LOG_DEBUG("Computing all query ciphertext powers for bundle index " << bundle_idx);
 
-            APSI_LOG_DEBUG("Query worker [" << this_thread::get_id() << "]: "
-                "start processing bundle indices [" << bundle_idx_start << ", " << bundle_idx_end << ")");
-
-            // Compute the powers for each bundle index and loop over the BinBundles
             Evaluator &evaluator = *crypto_context.evaluator();
             RelinKeys &relin_keys = *crypto_context.relin_keys();
 
-            for (uint32_t bundle_idx = bundle_idx_start; bundle_idx < bundle_idx_end; bundle_idx++)
-            {
-                auto bundle_caches = sender_db->get_cache_at(bundle_idx);
-                size_t bundle_count = bundle_caches.size();
-                if (!bundle_count)
-                {
-                    APSI_LOG_DEBUG("Query worker [" << this_thread::get_id() << "]: "
-                        "no bin bundles found at bundle index " << bundle_idx);
-                    continue;
+            CiphertextPowers &powers_at_this_bundle_idx = all_powers[bundle_idx];
+            pd.apply([&](const PowersDag::PowersNode &node) {
+                if (!node.is_source()) {
+                    auto parents = node.parents;
+                    Ciphertext prod;
+                    evaluator.multiply(
+                        powers_at_this_bundle_idx[parents.first],
+                        powers_at_this_bundle_idx[parents.second],
+                        prod);
+                    evaluator.relinearize_inplace(prod, relin_keys);
+                    powers_at_this_bundle_idx[node.power] = move(prod);
                 }
+            });
 
-                // Compute all powers of the query
-                APSI_LOG_DEBUG("Query worker [" << this_thread::get_id() << "]: "
-                    "computing all query ciphertext powers for bundle index " << bundle_idx);
+            // Now that all powers of the ciphertext have been computed, we need to transform them
+            // to NTT form. This will substantially improve the polynomial evaluation (below),
+            // because the plaintext polynomials are already in NTT transformed form, and the
+            // ciphertexts are used repeatedly for each bin bundle at this index. This computation
+            // is separate from the graph processing above, because the multiplications must all be
+            // done before transforming to NTT form. We omit the first ciphertext in the vector,
+            // because it corresponds to the zeroth power of the query and is included only for
+            // convenience of the indexing; the ciphertext is actually not set or valid for use.
 
-                CiphertextPowers &powers_at_this_bundle_idx = all_powers[bundle_idx];
-                pd.apply([&](const PowersDag::PowersNode &node) {
-                    if (!node.is_source())
-                    {
-                        auto parents = node.parents;
-                        Ciphertext prod;
-                        evaluator.multiply(
-                            powers_at_this_bundle_idx[parents.first],
-                            powers_at_this_bundle_idx[parents.second],
-                            prod);
-                        evaluator.relinearize_inplace(prod, relin_keys);
-                        powers_at_this_bundle_idx[node.power] = move(prod);
-                    }
-                });
+            // When using C++17 this function may be multi-threaded in the future with C++ execution
+            // policies.
+            seal_for_each_n(
+                powers_at_this_bundle_idx.begin() + 1,
+                powers_at_this_bundle_idx.size() - 1,
+                [&](auto &ct) { evaluator.transform_to_ntt_inplace(ct); });
+        }
 
-                // Now that all powers of the ciphertext have been computed, we need to transform them to NTT form. This
-                // will substantially improve the polynomial evaluation (below), because the plaintext polynomials are
-                // already in NTT transformed form, and the ciphertexts are used repeatedly for each bin bundle at this
-                // index. This computation is separate from the graph processing above, because the multiplications must
-                // all be done before transforming to NTT form. We omit the first ciphertext in the vector, because it
-                // corresponds to the zeroth power of the query and is included only for convenience of the indexing;
-                // the ciphertext is actually not set or valid for use.
+        void Sender::ProcessBinBundleCache(
+            const reference_wrapper<const BinBundleCache> &cache,
+            vector<CiphertextPowers> &all_powers,
+            Channel &chl,
+            function<void(Channel &, ResultPart)> send_rp_fun,
+            uint32_t bundle_idx)
+        {
+            STOPWATCH(sender_stopwatch, "Sender::ProcessBinBundleCache");
 
-                // When using C++17 this function may be multi-threaded in the future with C++ execution policies.
-                seal_for_each_n(
-                    powers_at_this_bundle_idx.begin() + 1,
-                    powers_at_this_bundle_idx.size() - 1,
-                    [&](auto &ct) { evaluator.transform_to_ntt_inplace(ct);
-                });
+            // Package for the result data
+            auto rp = make_unique<ResultPackage>();
 
-                // Next, iterate over each bundle with this bundle index
-                APSI_LOG_DEBUG("Query worker [" << this_thread::get_id() << "]: "
-                    "start processing " << bundle_count << " bin bundles for bundle index " << bundle_idx);
+            rp->bundle_idx = bundle_idx;
 
-                // When using C++17 this function may be multi-threaded in the future with C++ execution policies
-                seal_for_each_n(bundle_caches.begin(), bundle_count, [&](auto &cache) {
-                    // Package for the result data
-                    auto rp = make_unique<ResultPackage>();
+            // Compute the matching result and move to rp
+            const BatchedPlaintextPolyn &matching_polyn = cache.get().batched_matching_polyn;
+            rp->psi_result = move(matching_polyn.eval(all_powers[bundle_idx]));
 
-                    rp->bundle_idx = bundle_idx;
-
-                    // Compute the matching result and move to rp
-                    const BatchedPlaintextPolyn &matching_polyn = cache.get().batched_matching_polyn;
-                    rp->psi_result = move(matching_polyn.eval(all_powers[bundle_idx]));
-
-                    const BatchedPlaintextPolyn &interp_polyn = cache.get().batched_interp_polyn;
-                    if (interp_polyn)
-                    {
-                        // Compute the label result and move to rp
-                        rp->label_result.emplace_back(interp_polyn.eval(all_powers[bundle_idx]));
-                    }
-
-                    // Send this result part
-                    try
-                    {
-                        send_rp_fun(chl, move(rp));
-                    }
-                    catch (const exception &ex)
-                    {
-                        APSI_LOG_ERROR("Failed to send result part; function threw an exception: " << ex.what());
-                        throw;
-                    }
-                });
-
-                APSI_LOG_DEBUG("Query worker [" << this_thread::get_id() << "]: "
-                    "finished processing " << bundle_count << " bin bundles for bundle index " << bundle_idx);
+            const BatchedPlaintextPolyn &interp_polyn = cache.get().batched_interp_polyn;
+            if (interp_polyn) {
+                // Compute the label result and move to rp
+                rp->label_result.emplace_back(interp_polyn.eval(all_powers[bundle_idx]));
             }
 
-            APSI_LOG_DEBUG("Query worker [" << this_thread::get_id() << "]: "
-                "finished processing bundle indices [" << bundle_idx_start << ", " << bundle_idx_end << ")");
+            // Send this result part
+            try {
+                send_rp_fun(chl, move(rp));
+            } catch (const exception &ex) {
+                APSI_LOG_ERROR(
+                    "Failed to send result part; function threw an exception: " << ex.what());
+                throw;
+            }
         }
     } // namespace sender
 } // namespace apsi
