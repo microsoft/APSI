@@ -47,7 +47,7 @@ namespace apsi
             if (!params_request)
             {
                 APSI_LOG_ERROR("Failed to process parameter request: request is invalid");
-                invalid_argument("request is invalid");
+                throw invalid_argument("request is invalid");
             }
 
             // Check that the database is set
@@ -85,7 +85,7 @@ namespace apsi
             if (!oprf_request)
             {
                 APSI_LOG_ERROR("Failed to process OPRF request: request is invalid");
-                invalid_argument("request is invalid");
+                throw invalid_argument("request is invalid");
             }
 
             APSI_LOG_INFO("Start processing OPRF request for " << oprf_request->data.size() / oprf_query_size << " items");
