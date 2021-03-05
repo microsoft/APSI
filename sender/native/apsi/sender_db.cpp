@@ -528,46 +528,51 @@ namespace apsi
             can all remove in parallel.
             */
             void dispatch_remove(
-                const vector<pair<AlgItem, size_t >> &data_with_indices,
+                const vector<pair<AlgItem, size_t>> &data_with_indices,
                 vector<vector<BinBundle>> &bin_bundles,
                 CryptoContext &crypto_context,
-                uint32_t bins_per_bundle
-            ) {
+                uint32_t bins_per_bundle)
+            {
                 ThreadPoolMgr tpm;
 
-                // Collect the bundle indices and partition them into thread_count many partitions. By some uniformity
-                // assumption, the number of things to remove per partition should be roughly the same. Note that the
-                // contents of bundle_indices is always sorted (increasing order).
+                // Collect the bundle indices and partition them into thread_count many partitions.
+                // By some uniformity assumption, the number of things to remove per partition
+                // should be roughly the same. Note that the contents of bundle_indices is always
+                // sorted (increasing order).
                 set<size_t> bundle_indices_set;
-                for (auto &data_with_idx : data_with_indices)
-                {
+                for (auto &data_with_idx : data_with_indices) {
                     size_t cuckoo_idx = data_with_idx.second;
                     size_t bin_idx, bundle_idx;
                     tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
                     bundle_indices_set.insert(bundle_idx);
                 }
 
-                // Copy the set of indices into a vector and sort so each thread processes a range of indices
+                // Copy the set of indices into a vector and sort so each thread processes a range
+                // of indices
                 vector<size_t> bundle_indices;
                 bundle_indices.reserve(bundle_indices_set.size());
-                copy(bundle_indices_set.begin(), bundle_indices_set.end(), back_inserter(bundle_indices));
+                copy(
+                    bundle_indices_set.begin(),
+                    bundle_indices_set.end(),
+                    back_inserter(bundle_indices));
                 sort(bundle_indices.begin(), bundle_indices.end());
 
                 //// Partition the bundle indices appropriately
-                //vector<pair<size_t, size_t>> partitions = partition_evenly(bundle_indices.size(), thread_count);
+                // vector<pair<size_t, size_t>> partitions = partition_evenly(bundle_indices.size(),
+                // thread_count);
 
-                // Insert one larger "end" value to the bundle_indices vector; this represents one-past upper bound for
-                // the bundle indices that need to be processed.
-                if (!bundle_indices.empty())
-                {
-                    bundle_indices.push_back(bundle_indices.back() + 1);
-                }
+                //// Insert one larger "end" value to the bundle_indices vector; this represents
+                //// one-past upper bound for the bundle indices that need to be processed.
+                //if (!bundle_indices.empty()) {
+                //    bundle_indices.push_back(bundle_indices.back() + 1);
+                //}
 
                 // Run the threads on the partitions
                 vector<future<void>> futures(bundle_indices.size());
                 APSI_LOG_INFO("Launching " << bundle_indices.size() << " remove worker tasks");
-                for (size_t bundle_idx = 0; bundle_idx < bundle_indices.size(); bundle_idx++) {
-                    futures[bundle_idx] = tpm.thread_pool().enqueue([&]() {
+                size_t future_idx = 0;
+                for (auto &bundle_idx : bundle_indices) {
+                    futures[future_idx++] = tpm.thread_pool().enqueue([&]() {
                         remove_worker(
                             data_with_indices,
                             bin_bundles,
@@ -578,8 +583,7 @@ namespace apsi
                 }
 
                 // Wait for the tasks to finish
-                for (auto &f : futures)
-                {
+                for (auto &f : futures) {
                     f.get();
                 }
             }
