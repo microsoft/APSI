@@ -28,6 +28,10 @@ message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
 project(APSI VERSION 1.0.0 LANGUAGES CXX C)
 
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.13)
+    cmake_policy(SET CMP0077 NEW)
+endif()
+
 ########################
 # Global configuration #
 ########################
