@@ -884,10 +884,8 @@ APSI
 
 ## Questions
 
-- Is the release native/C++ only? Do we remove C export library, dotnet wrapper, and SDK?
-- Are all unit tests, integration tests, and CLI included in release?
-- Do we rearrange the directory structure?
-- Should I commit `monostate` fixes?
+TODO: Rearrange the directory structure?
+TODO: hide advanced cmake options
 
 TODO: Add to "Dependencies" section, check for static after find_package.
 

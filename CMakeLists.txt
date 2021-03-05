@@ -79,6 +79,7 @@ include(GNUInstallDirs)
 
 # Source tree
 set(APSI_CONFIG_IN_FILENAME ${CMAKE_CURRENT_LIST_DIR}/cmake/APSIConfig.cmake.in)
+set(APSI_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}) # TODO: remove this
 
 # Build tree
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${OUTLIB_PATH})
