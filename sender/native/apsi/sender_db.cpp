@@ -709,14 +709,15 @@ namespace apsi
             STOPWATCH(sender_stopwatch, "LabeledSenderDB::insert_or_assign");
             APSI_LOG_INFO("Start inserting " << data.size() << " items in SenderDB");
 
+            size_t full_data_size = data.size();
+
             // Lock the database for writing
             auto lock = get_writer_lock();
 
             // We need to know which items are new and which are old, since we have to tell dispatch_insert_or_assign
             // when to have an overwrite-on-collision versus add-binbundle-on-collision policy.
-            vector<pair<HashedItem, EncryptedLabel>> new_data, existing_data;
-            for (auto &item_label_pair : data)
-            {
+            vector<pair<HashedItem, EncryptedLabel>> existing_data;
+            auto new_data_end = remove_if(data.begin(), data.end(), [&](const auto &item_label_pair) {
                 const HashedItem &item = item_label_pair.first;
                 const EncryptedLabel &label = item_label_pair.second;
 
@@ -728,27 +729,32 @@ namespace apsi
                     throw invalid_argument("failed to insert or assign data");
                 }
 
-                if (items_.find(item) == items_.end())
+                bool found = items_.find(item) != items_.end();
+                if (!found)
                 {
-                    // Item is not already in items_, i.e., if this is a new item
-                    new_data.push_back(move(item_label_pair));
-
                     // Add to items_ already at this point!
                     items_.insert(item);
                 }
-                else
-                {
-                    // Replacing an existing item
-                    existing_data.push_back(move(item_label_pair));
-                }
-            }
 
-            APSI_LOG_INFO("Found " << new_data.size() << " new items to insert in SenderDB");
+                // Remove those that were found
+                return found;
+            });
+
+            // Add the previously existing items to existing_data
+            for_each(new_data_end, data.end(), [&](auto &item_label_pair) {
+                // Replacing an existing item
+                existing_data.push_back(move(item_label_pair));
+            });
+
+            // Erase the previously existing items from data
+            data.erase(new_data_end, data.end());
+
+            APSI_LOG_INFO("Found " << data.size() << " new items to insert in SenderDB");
             APSI_LOG_INFO("Found " << existing_data.size() << " existing items to replace in SenderDB");
 
             // Break the new data down into its field element representation. Also compute the items' cuckoo indices.
             vector<pair<AlgItemLabel, size_t>> new_data_with_indices
-                = preprocess_labeled_data(new_data.begin(), new_data.end(), params_);
+                = preprocess_labeled_data(data.begin(), data.end(), params_);
 
             // Now do the same for the data we're going to overwrite
             vector<pair<AlgItemLabel, size_t>> overwritable_data_with_indices
@@ -785,40 +791,48 @@ namespace apsi
                 compressed_
             );
 
-            APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
+            APSI_LOG_INFO("Finished inserting " << full_data_size << " items in SenderDB");
         }
 
-        void LabeledSenderDB::insert_or_assign(const vector<HashedItem> &data, size_t thread_count)
+        void LabeledSenderDB::insert_or_assign(vector<HashedItem> data, size_t thread_count)
         {
             APSI_LOG_ERROR("Attempted to insert unlabeled data but this is a LabeledSenderDB instance")
             throw logic_error("cannot do unlabeled insertion on a LabeledSenderDB");
         }
 
-        void UnlabeledSenderDB::insert_or_assign(const vector<HashedItem> &data, size_t thread_count)
+        void UnlabeledSenderDB::insert_or_assign(vector<HashedItem> data, size_t thread_count)
         {
             thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
 
             STOPWATCH(sender_stopwatch, "UnlabeledSenderDB::insert_or_assign");
             APSI_LOG_INFO("Start inserting " << data.size() << " items in SenderDB");
 
+            size_t full_data_size = data.size();
+
             // Lock the database for writing
             auto lock = get_writer_lock();
 
             // We are not going to insert items that already appear in the database.
-            vector<HashedItem> new_data;
-            for (auto item : data)
-            {
-                if (items_.find(item) == items_.end())
+            auto new_data_end = remove_if(data.begin(), data.end(), [&](const auto &item) {
+                bool found = items_.find(item) != items_.end();
+                if (!found)
                 {
-                    // Item is not already in items_, i.e., if this is a new item
-                    new_data.push_back(move(item));
+                    // Add to items_ already at this point!
                     items_.insert(item);
                 }
-            }
+
+                // Remove those that were found
+                return found;
+            });
+
+            // Erase the previously existing items from data
+            data.erase(new_data_end, data.end());
+
+            APSI_LOG_INFO("Found " << data.size() << " new items to insert in SenderDB");
 
             // Break the new data down into its field element representation. Also compute the items' cuckoo indices.
             vector<pair<AlgItem, size_t>> data_with_indices
-                = preprocess_unlabeled_data(new_data.begin(), new_data.end(), params_);
+                = preprocess_unlabeled_data(data.begin(), data.end(), params_);
 
             // Dispatch the insertion
             uint32_t bins_per_bundle = params_.bins_per_bundle();
@@ -836,7 +850,7 @@ namespace apsi
                 compressed_
             );
 
-            APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
+            APSI_LOG_INFO("Finished inserting " << full_data_size << " items in SenderDB");
         }
 
         void UnlabeledSenderDB::insert_or_assign(
@@ -949,14 +963,14 @@ namespace apsi
             insert_or_assign(move(data), thread_count);
         }
 
-        void LabeledSenderDB::set_data(const vector<HashedItem> &data, size_t thread_count) {
+        void LabeledSenderDB::set_data(vector<HashedItem> data, size_t thread_count) {
             APSI_LOG_ERROR("Attempted to set unlabeled data but this is a LabeledSenderDB instance")
             throw logic_error("cannot do unlabeled insertion on a LabeledSenderDB");
         }
 
-        void UnlabeledSenderDB::set_data(const vector<HashedItem> &data, size_t thread_count) {
+        void UnlabeledSenderDB::set_data(vector<HashedItem> data, size_t thread_count) {
             clear_db();
-            insert_or_assign(data, thread_count);
+            insert_or_assign(move(data), thread_count);
         }
 
         void UnlabeledSenderDB::set_data(vector<pair<HashedItem, EncryptedLabel>> data, size_t thread_count)

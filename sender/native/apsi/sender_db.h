@@ -93,7 +93,7 @@ namespace apsi
             used only on an UnlabeledSenderDB instance.
             */
             virtual void set_data(
-                const std::vector<HashedItem> &data, std::size_t thread_count = 0) = 0;
+                std::vector<HashedItem> data, std::size_t thread_count = 0) = 0;
 
             /**
             Inserts the given data into the database, using at most thread_count threads. This function can be used only
@@ -118,13 +118,13 @@ namespace apsi
             on an UnlabeledSenderDB instance.
             */
             virtual void insert_or_assign(
-                const std::vector<HashedItem> &data, std::size_t thread_count = 0) = 0;
+                std::vector<HashedItem> data, std::size_t thread_count = 0) = 0;
 
             /**
             Inserts the given (hashed) item into the database, using at most thread_count threads. This function can be
             used only on an UnlabeledSenderDB instance.
             */
-            virtual void insert_or_assign(const HashedItem &data) = 0;
+            virtual void insert_or_assign(HashedItem data) = 0;
 
             /**
             Removes the given data from the database, using at most thread_count threads.
@@ -299,7 +299,7 @@ namespace apsi
             Do not use this function. Unlabeled insertion on a labeled database does not and should not work.
             */
             void set_data(
-                const std::vector<HashedItem> &data,
+                std::vector<HashedItem> data,
                 std::size_t thread_count = 0
             ) override;
 
@@ -320,29 +320,23 @@ namespace apsi
                 std::pair<HashedItem, EncryptedLabel> data
             ) override
             {
-                std::vector<std::pair<HashedItem, EncryptedLabel>> data_map;
-                data_map.push_back(data);
-                insert_or_assign(std::move(data_map), 1);
+                insert_or_assign({ std::move(data) }, 1);
             }
 
             /**
             Do not use this function. Unlabeled insertion on a labeled database does not and should not work.
             */
             void insert_or_assign(
-                const std::vector<HashedItem> &data,
+                std::vector<HashedItem> data,
                 std::size_t thread_count = 0
             ) override;
 
             /**
             Do not use this function. Unlabeled insertion on a labeled database does not and should not work.
             */
-            void insert_or_assign(
-                const HashedItem &data
-            ) override
+            void insert_or_assign(HashedItem data) override
             {
-                std::vector<HashedItem> data_set;
-                data_set.push_back(data);
-                insert_or_assign(data_set, 1);
+                insert_or_assign({ std::move(data) }, 1);
             }
 
             /**
@@ -428,7 +422,7 @@ namespace apsi
             Clears the database and inserts the given data using at most thread_count threads.
             */
             void set_data(
-                const std::vector<HashedItem> &data,
+                std::vector<HashedItem> data,
                 std::size_t thread_count = 0
             ) override;
 
@@ -447,27 +441,23 @@ namespace apsi
                 std::pair<HashedItem, EncryptedLabel> data
             ) override
             {
-                std::vector<std::pair<HashedItem, EncryptedLabel>> data_map;
-                data_map.push_back(data);
-                insert_or_assign(std::move(data_map), 1);
+                insert_or_assign({ std::move(data) }, 1);
             }
 
             /**
             Inserts the given data into the database, using at most thread_count threads.
             */
             void insert_or_assign(
-                const std::vector<HashedItem> &data,
+                std::vector<HashedItem> data,
                 std::size_t thread_count = 0
             ) override;
 
             /**
             Inserts the given (hashed) item into the database, using at most thread_count threads.
             */
-            void insert_or_assign(const HashedItem &data) override
+            void insert_or_assign(HashedItem data) override
             {
-                std::vector<HashedItem> data_set;
-                data_set.push_back(data);
-                insert_or_assign(data_set, 1);
+                insert_or_assign({ std::move(data) }, 1);
             }
 
             /**

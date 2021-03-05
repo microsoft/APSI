@@ -285,9 +285,9 @@ namespace apsi
                 // the ciphertext is actually not set or valid for use.
 
                 // When using C++17 this function may be multi-threaded in the future with C++ execution policies.
-                seal_for_each_n(
-                    powers_at_this_bundle_idx.begin() + 1,
-                    powers_at_this_bundle_idx.size() - 1,
+                for_each(
+                    next(powers_at_this_bundle_idx.begin()),
+                    powers_at_this_bundle_idx.end(),
                     [&](auto &ct) { evaluator.transform_to_ntt_inplace(ct);
                 });
 
@@ -296,7 +296,7 @@ namespace apsi
                     "start processing " << bundle_count << " bin bundles for bundle index " << bundle_idx);
 
                 // When using C++17 this function may be multi-threaded in the future with C++ execution policies
-                seal_for_each_n(bundle_caches.begin(), bundle_count, [&](auto &cache) {
+                for_each(bundle_caches.begin(), bundle_caches.end(), [&](auto &cache) {
                     // Package for the result data
                     auto rp = make_unique<ResultPackage>();
 
