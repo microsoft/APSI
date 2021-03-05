@@ -563,48 +563,41 @@ namespace apsi
             return true;
         }
 
-        bool BinBundle::try_multi_remove(
-            const vector<felt_t> &items,
-            size_t start_bin_idx
-        ) {
-            if (items.empty())
-            {
+        bool BinBundle::try_multi_remove(const vector<felt_t> &items, size_t start_bin_idx)
+        {
+            if (items.empty()) {
                 APSI_LOG_ERROR("No item data to remove");
                 return -1;
             }
 
             // Return false if there isn't enough room in the BinBundle at the given location
-            if (start_bin_idx >= get_num_bins() || items.size() > get_num_bins() - start_bin_idx)
-            {
+            if (start_bin_idx >= get_num_bins() || items.size() > get_num_bins() - start_bin_idx) {
                 return false;
             }
 
-            // Go through all the items. If any item doesn't appear, we scrap the whole computation and return false.
+            // Go through all the items. If any item doesn't appear, we scrap the whole computation
+            // and return false.
             size_t curr_bin_idx = start_bin_idx;
             vector<vector<felt_t>::iterator> to_remove_item_its;
             vector<vector<vector<felt_t>::iterator>> to_remove_label_its(get_label_size());
 
-            for (auto &item : items)
-            {
+            for (auto &item : items) {
                 vector<felt_t> &curr_bin = item_bins_[curr_bin_idx];
                 CuckooFilter &curr_filter = filters_[curr_bin_idx];
 
                 auto to_remove_item_it = get_iterator(curr_bin, curr_filter, item);
-                if (curr_bin.end() == to_remove_item_it)
-                {
+                if (curr_bin.end() == to_remove_item_it) {
                     // One of the items isn't there; return false;
                     return false;
-                }
-                else
-                {
+                } else {
                     // Found the item; mark it for removal
                     to_remove_item_its.push_back(to_remove_item_it);
 
                     // We need to also mark the corresponding labels for removal
                     auto item_loc_in_bin = distance(curr_bin.begin(), to_remove_item_it);
-                    for (size_t label_idx = 0; label_idx < get_label_size(); label_idx++)
-                    {
-                        auto to_remove_label_it = label_bins_[label_idx][curr_bin_idx].begin() + item_loc_in_bin;
+                    for (size_t label_idx = 0; label_idx < get_label_size(); label_idx++) {
+                        auto to_remove_label_it =
+                            label_bins_[label_idx][curr_bin_idx].begin() + item_loc_in_bin;
                         to_remove_label_its[label_idx].push_back(to_remove_label_it);
                     }
                 }
@@ -614,11 +607,10 @@ namespace apsi
 
             // We got to this point, so all of the items were found. Now just erase them.
             curr_bin_idx = start_bin_idx;
-            for (auto to_remove_item_it : to_remove_item_its)
-            {
+            for (auto to_remove_item_it : to_remove_item_its) {
                 // Remove the item
-                item_bins_[curr_bin_idx].erase(to_remove_item_it);
                 filters_[curr_bin_idx].remove(*to_remove_item_it);
+                item_bins_[curr_bin_idx].erase(to_remove_item_it);
 
                 // Indicate that the polynomials need to be recomputed
                 cache_invalid_ = true;
@@ -627,11 +619,9 @@ namespace apsi
             }
 
             // Finally erase the label parts
-            for (size_t label_idx = 0; label_idx < get_label_size(); label_idx++)
-            {
+            for (size_t label_idx = 0; label_idx < get_label_size(); label_idx++) {
                 curr_bin_idx = start_bin_idx;
-                for (auto to_remove_label_it : to_remove_label_its[label_idx])
-                {
+                for (auto to_remove_label_it : to_remove_label_its[label_idx]) {
                     // Remove the label
                     label_bins_[label_idx][curr_bin_idx].erase(to_remove_label_it);
 
