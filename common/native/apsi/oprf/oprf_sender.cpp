@@ -11,6 +11,7 @@
 // APSI
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/util/utils.h"
+#include "apsi/util/thread_pool_mgr.h"
 
 using namespace std;
 using namespace seal;
@@ -104,16 +105,11 @@ namespace apsi
         }
 
         vector<oprf_hash_type> OPRFSender::ComputeHashes(
-            const gsl::span<const oprf_item_type> &oprf_items,
-            const OPRFKey &oprf_key,
-            size_t threads)
+            const gsl::span<const oprf_item_type> &oprf_items, const OPRFKey &oprf_key)
         {
-            if (0 == threads) {
-                threads = thread::hardware_concurrency();
-            }
-
+            ThreadPoolMgr tpm;
             vector<oprf_hash_type> oprf_hashes(oprf_items.size());
-            vector<future<void>> futures(threads);
+            vector<future<void>> futures(ThreadPoolMgr::get_thread_count());
 
             auto ComputeHashesLambda = [&](size_t start_idx, size_t step) {
                 for (size_t idx = start_idx; idx < oprf_items.size(); idx += step) {
@@ -142,9 +138,10 @@ namespace apsi
                 }
             };
 
-            for (size_t thread_idx = 0; thread_idx < threads; thread_idx++) {
-                futures[thread_idx] =
-                    async(launch::async, ComputeHashesLambda, thread_idx, threads);
+            for (size_t thread_idx = 0; thread_idx < ThreadPoolMgr::get_thread_count();
+                 thread_idx++) {
+                futures[thread_idx] = tpm.thread_pool().enqueue(
+                    ComputeHashesLambda, thread_idx, ThreadPoolMgr::get_thread_count());
             }
 
             for (auto &f : futures) {
@@ -156,15 +153,11 @@ namespace apsi
 
         vector<pair<oprf_hash_type, EncryptedLabel>> OPRFSender::ComputeHashes(
             const gsl::span<const pair<oprf_item_type, Label>> &oprf_item_labels,
-            const OPRFKey &oprf_key,
-            size_t threads)
+            const OPRFKey &oprf_key)
         {
-            if (0 == threads) {
-                threads = thread::hardware_concurrency();
-            }
-
+            ThreadPoolMgr tpm;
             vector<pair<oprf_hash_type, EncryptedLabel>> oprf_hashes(oprf_item_labels.size());
-            vector<future<void>> futures(threads);
+            vector<future<void>> futures(ThreadPoolMgr::get_thread_count());
 
             auto ComputeHashesLambda = [&](size_t start_idx, size_t step) {
                 for (size_t idx = start_idx; idx < oprf_item_labels.size(); idx += step) {
@@ -197,9 +190,10 @@ namespace apsi
                 }
             };
 
-            for (size_t thread_idx = 0; thread_idx < threads; thread_idx++) {
-                futures[thread_idx] =
-                    async(launch::async, ComputeHashesLambda, thread_idx, threads);
+            for (size_t thread_idx = 0; thread_idx < ThreadPoolMgr::get_thread_count();
+                 thread_idx++) {
+                futures[thread_idx] = tpm.thread_pool().enqueue(
+                    ComputeHashesLambda, thread_idx, ThreadPoolMgr::get_thread_count());
             }
 
             for (auto &f : futures) {

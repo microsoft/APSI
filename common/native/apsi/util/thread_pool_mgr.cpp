@@ -61,3 +61,8 @@ void ThreadPoolMgr::set_thread_count(size_t threads)
         thread_pool_->set_pool_size(thread_count_);
     }
 }
+
+size_t ThreadPoolMgr::get_thread_count()
+{
+    return thread_count_;
+}

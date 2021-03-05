@@ -19,6 +19,7 @@ namespace apsi {
             ThreadPool &thread_pool() const;
 
             static void set_thread_count(std::size_t threads);
+            static std::size_t get_thread_count();
 
         private:
             static std::size_t ref_count_;
