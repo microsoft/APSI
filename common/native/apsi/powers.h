@@ -18,6 +18,9 @@
 #include <algorithm>
 #include <iostream>
 
+// APSI
+#include "apsi/util/thread_pool_mgr.h"
+
 namespace apsi
 {
     /**
@@ -154,14 +157,14 @@ namespace apsi
         Applies a function in a topological order to each node in the PowersDag using multiple threads.
         */
         template<typename Func>
-        void parallel_apply(Func &&func, std::size_t thread_count = 0) const
+        void parallel_apply(Func &&func) const
         {
             if (!is_configured()) {
                 throw std::logic_error("PowersDag has not been configured");
             }
 
-            thread_count = thread_count < 1 ? std::thread::hardware_concurrency() : thread_count;
-
+            apsi::util::ThreadPoolMgr tpm;
+            
             enum class NodeState { Uncomputed = 0, Computing = 1, Computed = 2 };
 
             std::unique_ptr<std::atomic<NodeState>[]> node_states(
@@ -227,9 +230,10 @@ namespace apsi
                 }
             };
 
-            std::vector<std::future<void>> futures(thread_count);
-            for (std::size_t t = 0; t < thread_count; t++) {
-                futures[t] = std::async(std::launch::async, compute_powers);
+            std::size_t task_count = apsi::util::ThreadPoolMgr::get_thread_count();
+            std::vector<std::future<void>> futures(task_count);
+            for (std::size_t t = 0; t < task_count; t++) {
+                futures[t] = tpm.thread_pool().enqueue(compute_powers);
             }
 
             for (auto &f : futures) {
