@@ -331,7 +331,7 @@ namespace apsi
                 curr_bin_idx++;
             }
 
-            return max_bin_size;
+            return safe_cast<int>(max_bin_size);
         }
 
         template<>
@@ -354,7 +354,7 @@ namespace apsi
             }
 
             // Check that item_labels has correct size
-            uint32_t label_size = get_label_size();
+            size_t label_size = get_label_size();
             for (const auto &curr_item_label : item_labels)
             {
                 size_t curr_label_size = curr_item_label.second.size();
@@ -431,7 +431,7 @@ namespace apsi
                 curr_bin_idx++;
             }
 
-            return max_bin_size;
+            return safe_cast<int>(max_bin_size);
         }
 
         template<>
@@ -442,7 +442,7 @@ namespace apsi
             if (items.empty())
             {
                 APSI_LOG_ERROR("No item data to insert");
-                return -1;
+                return false;
             }
 
             // This function may have been called accidentally; no label data is given, so nothing will be overwritten.
@@ -484,11 +484,11 @@ namespace apsi
             if (item_labels.empty())
             {
                 APSI_LOG_ERROR("No item or label data to insert");
-                return -1;
+                return false;
             }
 
             // Check that item_labels has correct size
-            uint32_t label_size = get_label_size();
+            size_t label_size = get_label_size();
             for (const auto &curr_item_label : item_labels)
             {
                 size_t curr_label_size = curr_item_label.second.size();
@@ -496,7 +496,7 @@ namespace apsi
                 {
                     APSI_LOG_ERROR("Attempted to insert an item with incorrect label size ("
                         << curr_label_size << "; expected " << label_size << ")");
-                    return -1;
+                    return false;
                 }
             }
 
@@ -570,7 +570,7 @@ namespace apsi
             if (items.empty())
             {
                 APSI_LOG_ERROR("No item data to remove");
-                return -1;
+                return false;
             }
 
             // Return false if there isn't enough room in the BinBundle at the given location
@@ -651,7 +651,7 @@ namespace apsi
             if (items.empty())
             {
                 APSI_LOG_ERROR("No item data to search for");
-                return -1;
+                return false;
             }
 
             // Return false if there isn't enough room in the BinBundle at the given location

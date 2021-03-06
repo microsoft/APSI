@@ -46,7 +46,7 @@ namespace apsi
             if (!params_request)
             {
                 APSI_LOG_ERROR("Failed to process parameter request: request is invalid");
-                invalid_argument("request is invalid");
+                throw invalid_argument("request is invalid");
             }
 
             // Check that the database is set
@@ -84,7 +84,7 @@ namespace apsi
             if (!oprf_request)
             {
                 APSI_LOG_ERROR("Failed to process OPRF request: request is invalid");
-                invalid_argument("request is invalid");
+                throw invalid_argument("request is invalid");
             }
 
             APSI_LOG_INFO("Start processing OPRF request for " << oprf_request->data.size() / oprf_query_size << " items");
@@ -180,7 +180,7 @@ namespace apsi
             {
                 // The + 1 is because we index by power. The 0th power is a dummy value. I promise this makes things
                 // easier to read.
-                powers.resize(max_items_per_bin + 1);
+                powers.resize(max_items_per_bin++);
             }
 
             // Load inputs provided in the query
@@ -306,7 +306,7 @@ namespace apsi
                     const BatchedPlaintextPolyn &matching_polyn = cache.get().batched_matching_polyn;
                     rp->psi_result = matching_polyn.eval(all_powers[bundle_idx]);
 
-                    rp->label_byte_count = sender_db->get_label_byte_count();
+                    rp->label_byte_count = safe_cast<uint32_t>(sender_db->get_label_byte_count());
                     for (const auto &interp_polyn : cache.get().batched_interp_polyns)
                     {
                         // Compute the label result and move to rp
