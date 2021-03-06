@@ -616,6 +616,12 @@ namespace apsi
         SenderDB::SenderDB(PSIParams params, size_t label_byte_count, bool compressed) :
             params_(params), crypto_context_(params_), label_byte_count_(label_byte_count), compressed_(compressed)
         {
+            if (label_byte_count_ > 1024)
+            {
+                APSI_LOG_ERROR("Requested label byte count " << label_byte_count_ << " exceeds the maximum (1024)");
+                throw invalid_argument("failed to create SenderDB");
+            }
+
             // Set the evaluator. This will be used for BatchedPlaintextPolyn::eval.
             crypto_context_.set_evaluator();
 
