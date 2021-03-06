@@ -84,9 +84,9 @@ namespace apsi
                     uint32_t i = 0;
                     while (i < full_byte_count)
                     {
-                        unsigned char low = src[word_begin + 0] >> low_offset;
+                        unsigned char low = src[word_begin] >> low_offset;
                         unsigned char high =
-                            static_cast<unsigned char>(static_cast<uint32_t>(src[word_begin + 1]) << (8 - low_offset));
+                            static_cast<unsigned char>(static_cast<uint32_t>(src[word_begin++]) << (8 - low_offset));
                         dest[i] = low | high;
                         word_begin++;
                         i++;
@@ -139,7 +139,7 @@ namespace apsi
                         uint32_t mid_count = rem_bits - low_count;
                         unsigned char mid_mask = static_cast<unsigned char>((uint32_t(1) << mid_count) - 1);
                         unsigned char mid =
-                            static_cast<unsigned char>(static_cast<uint32_t>(src[word_begin + 1] & mid_mask) << low_count);
+                            static_cast<unsigned char>(static_cast<uint32_t>(src[word_begin++] & mid_mask) << low_count);
 
                         // keep the high bits of dest_word
                         unsigned char high_mask = static_cast<unsigned char>((~uint32_t(0)) << rem_bits);
@@ -203,7 +203,7 @@ namespace apsi
                         low &= low_mask;
 
                         unsigned char high_mask = static_cast<unsigned char>((uint32_t(1) << high_diff) - 1);
-                        unsigned char high = src[src_begin + 1] & high_mask;
+                        unsigned char high = src[src_begin++] & high_mask;
 
                         low <<= dest_offset;
                         high <<= (dest_offset + low_diff);
@@ -334,12 +334,12 @@ namespace apsi
             const HashedItem &item, const EncryptedLabel &label, size_t item_bit_count, const Modulus &mod)
         {
             // Convert the item to a sequence of field elements. This is the "algebraic item".
-            BitstringView<const unsigned char> item_bsw(item.get_as<const unsigned char>(), item_bit_count);
+            BitstringView<const unsigned char> item_bsw(item.get_as<const unsigned char>(), safe_cast<uint32_t>(item_bit_count));
             vector<felt_t> alg_item = bits_to_field_elts(item_bsw, mod);
             size_t felts_per_item = alg_item.size();
 
             // Convert the label to a sequence of field elements. This is the "algebraic label".
-            BitstringView<const unsigned char> label_bsw(label.data(), label.size() * 8);
+            BitstringView<const unsigned char> label_bsw(label.data(), safe_cast<uint32_t>(label.size() * 8));
             vector<felt_t> alg_label = bits_to_field_elts(label_bsw, mod);
 
             // Pad alg_label with zeros to be a multiple of alg_item length; label_size indicates number of multiples
@@ -371,19 +371,20 @@ namespace apsi
         AlgItem algebraize_item(const HashedItem &item, size_t item_bit_count, const Modulus &mod)
         {
             // Convert the item from to a sequence of field elements. This is the "algebraic item".
-            BitstringView<const unsigned char> item_bsw(item.get_as<const unsigned char>(), item_bit_count);
+            BitstringView<const unsigned char> item_bsw(item.get_as<const unsigned char>(), safe_cast<uint32_t>(item_bit_count));
             return bits_to_field_elts(item_bsw, mod);
         }
 
         HashedItem dealgebraize_item(const AlgItem &item, size_t item_bit_count, const Modulus &mod)
         {
-            Bitstring bits = field_elts_to_bits(item, item_bit_count, mod);
+            Bitstring bits = field_elts_to_bits(item, safe_cast<uint32_t>(item_bit_count), mod);
             return HashedItem(bits.to_view());
         }
 
         EncryptedLabel dealgebraize_label(const AlgLabel &label, size_t label_bit_count, const Modulus &mod)
         {
-            vector<unsigned char> bits(field_elts_to_bits(label, label_bit_count, mod).release());
+            vector<unsigned char> bits(
+                field_elts_to_bits(label, safe_cast<uint32_t>(label_bit_count), mod).release());
             return EncryptedLabel(move(bits), allocator<unsigned char>());
         }
     }

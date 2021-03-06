@@ -8,6 +8,7 @@ target_sources(common
         ${CMAKE_CURRENT_LIST_DIR}/psi_params.cpp
 )
 
+# TODO: move output to build tree
 # Create the config file
 configure_file(${CMAKE_CURRENT_LIST_DIR}/config.h.in ${CMAKE_CURRENT_LIST_DIR}/config.h)
 
@@ -20,6 +21,7 @@ add_subdirectory(fourq)
 install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/apsi.h
+        # TODO: install separately since it should be in build tree
         ${CMAKE_CURRENT_LIST_DIR}/config.h
         ${CMAKE_CURRENT_LIST_DIR}/crypto_context.h
         ${CMAKE_CURRENT_LIST_DIR}/item.h

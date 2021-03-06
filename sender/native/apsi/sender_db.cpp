@@ -241,8 +241,8 @@ namespace apsi
                 sw_ss << "insert_or_assign_worker [" << this_thread::get_id() << "]";
                 STOPWATCH(sender_stopwatch, sw_ss.str());
 
-                uint32_t bundle_idx_start = work_range.first;
-                uint32_t bundle_idx_end = work_range.second;
+                size_t bundle_idx_start = work_range.first;
+                size_t bundle_idx_end = work_range.second;
 
                 APSI_LOG_DEBUG("Insert-or-Assign worker [" << this_thread::get_id() << "]: "
                     "start processing bundle indices in [" << bundle_idx_start << ", " << bundle_idx_end << ")");
@@ -450,8 +450,8 @@ namespace apsi
                 sw_ss << "remove_worker [" << this_thread::get_id() << "]";
                 STOPWATCH(sender_stopwatch, sw_ss.str());
 
-                uint32_t bundle_idx_start = work_range.first;
-                uint32_t bundle_idx_end = work_range.second;
+                size_t bundle_idx_start = work_range.first;
+                size_t bundle_idx_end = work_range.second;
 
                 APSI_LOG_INFO("Remove worker [" << this_thread::get_id() << "]: "
                     "start processing bundle indices in [" << bundle_idx_start << ", " << bundle_idx_end << ")");
@@ -959,7 +959,7 @@ namespace apsi
 
             auto params = fbs_builder.CreateVector(
                 reinterpret_cast<unsigned char*>(params_str.data()), params_str.size());
-            fbs::SenderDBInfo info(sender_db->get_label_byte_count(), sender_db->is_compressed());
+            fbs::SenderDBInfo info(safe_cast<uint32_t>(sender_db->get_label_byte_count()), sender_db->is_compressed());
             auto hashed_items = fbs_builder.CreateVectorOfStructs([&]() {
                 // The HashedItems vector is populated with an immediately-invoked lambda
                 vector<fbs::HashedItem> ret;
@@ -979,7 +979,7 @@ namespace apsi
             sender_db_builder.add_params(params);
             sender_db_builder.add_info(&info);
             sender_db_builder.add_hashed_items(hashed_items);
-            sender_db_builder.add_bin_bundle_count(bin_bundle_count);
+            sender_db_builder.add_bin_bundle_count(safe_cast<uint32_t>(bin_bundle_count));
             auto sdb = sender_db_builder.Finish();
             fbs_builder.FinishSizePrefixed(sdb);
 

@@ -49,7 +49,7 @@ namespace APSITests
         data[2] = 0x0F;
         data[3] = 0x1F;
 
-        BitstringView<const unsigned char> bsv({ data.data(), data.size() }, 8 * data.size());
+        BitstringView<const unsigned char> bsv({ data.data(), data.size() }, static_cast<uint32_t>(8 * data.size()));
 
         // Modulus 3 should cause every bit to be extracted separately
         Modulus mod = 3;
@@ -148,7 +148,7 @@ namespace APSITests
             // Pick a random bit length within range, i.e., within 7 bits of the total length
             std::uniform_int_distribution<size_t> bitlen_dist(0, 7);
             size_t bitlen_diff = bitlen_dist(rd);
-            size_t bit_len = bytes.size() * 8 - bitlen_diff;
+            uint32_t bit_len = static_cast<uint32_t>(bytes.size() * 8 - bitlen_diff);
 
             // Mask away extra bits from top byte
             bytes.back() &= static_cast<unsigned char>((1 << (8 - bitlen_diff)) - 1);

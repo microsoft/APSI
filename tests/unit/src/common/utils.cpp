@@ -157,7 +157,7 @@ namespace APSITests
         compare_up_to(compare, bytes, 6);
 
         // Read the rest
-        read_from_stream(ss, bytes.size() - 6, compare);
+        read_from_stream(ss, static_cast<uint32_t>(bytes.size() - 6), compare);
         ASSERT_EQ(bytes.size(), compare.size());
         compare_up_to(compare, bytes, bytes.size());
     }

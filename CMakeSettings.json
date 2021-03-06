@@ -37,7 +37,7 @@
                     "type": "BOOL"
                 }
             ],
-            "cmakeToolchain": "D:/repos/vcpkg/scripts/buildsystems/vcpkg.cmake"
+            "cmakeToolchain": "C:/Users/wdai3/Repositories/Tools/vcpkg/scripts/buildsystems/vcpkg.cmake"
         },
         {
             "name": "x64-Release",
@@ -76,7 +76,7 @@
                     "type": "BOOL"
                 }
             ],
-            "cmakeToolchain": "D:/repos/vcpkg/scripts/buildsystems/vcpkg.cmake"
+            "cmakeToolchain": "C:/Users/wdai3/Repositories/Tools/vcpkg/scripts/buildsystems/vcpkg.cmake"
         }
     ]
 }
