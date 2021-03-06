@@ -86,7 +86,7 @@ namespace apsi
                     {
                         unsigned char low = src[word_begin] >> low_offset;
                         unsigned char high =
-                            static_cast<unsigned char>(static_cast<uint32_t>(src[word_begin++]) << (8 - low_offset));
+                            static_cast<unsigned char>(static_cast<uint32_t>(src[word_begin + 1]) << (8 - low_offset));
                         dest[i] = low | high;
                         word_begin++;
                         i++;
@@ -139,7 +139,7 @@ namespace apsi
                         uint32_t mid_count = rem_bits - low_count;
                         unsigned char mid_mask = static_cast<unsigned char>((uint32_t(1) << mid_count) - 1);
                         unsigned char mid =
-                            static_cast<unsigned char>(static_cast<uint32_t>(src[word_begin++] & mid_mask) << low_count);
+                            static_cast<unsigned char>(static_cast<uint32_t>(src[word_begin + 1] & mid_mask) << low_count);
 
                         // keep the high bits of dest_word
                         unsigned char high_mask = static_cast<unsigned char>((~uint32_t(0)) << rem_bits);
@@ -203,7 +203,7 @@ namespace apsi
                         low &= low_mask;
 
                         unsigned char high_mask = static_cast<unsigned char>((uint32_t(1) << high_diff) - 1);
-                        unsigned char high = src[src_begin++] & high_mask;
+                        unsigned char high = src[src_begin + 1] & high_mask;
 
                         low <<= dest_offset;
                         high <<= (dest_offset + low_diff);

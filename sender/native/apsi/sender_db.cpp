@@ -618,6 +618,9 @@ namespace apsi
         {
             // Set the evaluator. This will be used for BatchedPlaintextPolyn::eval.
             crypto_context_.set_evaluator();
+
+            // Reset the SenderDB data structures
+            clear_db();
         }
 
         size_t SenderDB::get_bin_bundle_count() const

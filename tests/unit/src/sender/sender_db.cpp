@@ -223,7 +223,6 @@ namespace APSITests
 
     TEST(SenderDBTests, LabeledInsertOrAssignSingle)
     {
-        logging::Log::set_log_level("debug");
         auto params = get_params();
         SenderDB sender_db(*params, 20, true);
 
