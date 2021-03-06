@@ -58,7 +58,7 @@ namespace APSITests
             stringstream ss;
             StreamChannel chl(ss);
 
-            Receiver receiver(params, num_threads);
+            Receiver receiver(params);
 
             for (auto client_total_and_int_size : client_total_and_int_sizes)
             {
@@ -150,7 +150,7 @@ namespace APSITests
             stringstream ss;
             StreamChannel chl(ss);
 
-            Receiver receiver(params, num_threads);
+            Receiver receiver(params);
 
             for (auto client_total_and_int_size : client_total_and_int_sizes)
             {

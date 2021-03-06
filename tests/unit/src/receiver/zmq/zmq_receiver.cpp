@@ -12,13 +12,16 @@
 // APSI
 #include "apsi/receiver.h"
 #include "apsi/network/zmq/zmq_channel.h"
+#include "apsi/util/thread_pool_mgr.h"
 
+// Google Test
 #include "gtest/gtest.h"
 
 using namespace std;
 using namespace apsi;
 using namespace apsi::network;
 using namespace apsi::receiver;
+using namespace apsi::util;
 using namespace seal;
 using namespace kuku;
 
@@ -248,9 +251,7 @@ namespace APSITests
 
     TEST_F(ReceiverTests, Constructor)
     {
-        ASSERT_NO_THROW(auto recv = Receiver(*get_params(), 0));
-        ASSERT_NO_THROW(auto recv = Receiver(*get_params(), 1));
-        ASSERT_NO_THROW(auto recv = Receiver(*get_params(), 2));
+        ASSERT_NO_THROW(auto recv = Receiver(*get_params()));
     }
 
     TEST_F(ReceiverTests, RequestParams)
@@ -294,9 +295,11 @@ namespace APSITests
 
     TEST_F(ReceiverTests, SingleThread)
     {
+        ThreadPoolMgr::set_thread_count(1);
+
         start_sender();
 
-        Receiver recv(*get_params(), 1);
+        Receiver recv(*get_params());
 
         // Give the sender the secret key so they can fake responses
         get_context()->set_secret(*recv.get_crypto_context().secret_key());
@@ -341,9 +344,11 @@ namespace APSITests
 
     TEST_F(ReceiverTests, MultiThread)
     {
+        ThreadPoolMgr::set_thread_count(2);
+
         start_sender();
 
-        Receiver recv(*get_params(), 2);
+        Receiver recv(*get_params());
 
         // Give the sender the secret key so they can fake responses
         get_context()->set_secret(*recv.get_crypto_context().secret_key());
@@ -387,9 +392,11 @@ namespace APSITests
 
     TEST_F(ReceiverTests, SingleThreadLabels)
     {
+        ThreadPoolMgr::set_thread_count(1);
+
         start_sender(/* labels */ true);
 
-        Receiver recv(*get_params(), 1);
+        Receiver recv(*get_params());
 
         // Give the sender the secret key so they can fake responses
         get_context()->set_secret(*recv.get_crypto_context().secret_key());
@@ -440,9 +447,11 @@ namespace APSITests
 
     TEST_F(ReceiverTests, MultiThreadLabels)
     {
+        ThreadPoolMgr::set_thread_count(2);
+
         start_sender(/* labels */ true);
 
-        Receiver recv(*get_params(), 2);
+        Receiver recv(*get_params());
 
         // Give the sender the secret key so they can fake responses
         get_context()->set_secret(*recv.get_crypto_context().secret_key());

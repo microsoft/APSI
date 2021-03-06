@@ -71,7 +71,7 @@ namespace APSITests
             string conn_addr = "tcp://localhost:5550";
             recv_chl.connect(conn_addr);
 
-            Receiver receiver(params, num_threads);
+            Receiver receiver(params);
 
             for (auto client_total_and_int_size : client_total_and_int_sizes)
             {
@@ -141,7 +141,7 @@ namespace APSITests
             string conn_addr = "tcp://localhost:5550";
             recv_chl.connect(conn_addr);
 
-            Receiver receiver(params, num_threads);
+            Receiver receiver(params);
 
             for (auto client_total_and_int_size : client_total_and_int_sizes)
             {

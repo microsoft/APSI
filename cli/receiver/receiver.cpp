@@ -14,6 +14,7 @@
 #include "apsi/network/zmq/zmq_channel.h"
 #include "apsi/logging/log.h"
 #include "apsi/version.h"
+#include "apsi/util/thread_pool_mgr.h"
 #include "common/common_utils.h"
 #include "common/csv_reader.h"
 #include "receiver/clp.h"
@@ -107,7 +108,9 @@ int remote_query(const CLP& cmd)
         return -1;
     }
 
-    Receiver receiver(*params, cmd.threads());
+    ThreadPoolMgr::set_thread_count(cmd.threads());
+
+    Receiver receiver(*params);
 
     unique_ptr<CSVReader::DBData> query_data = load_db(cmd.query_file());
     if (!query_data || !holds_alternative<CSVReader::UnlabeledData>(*query_data))
