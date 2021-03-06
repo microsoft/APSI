@@ -366,14 +366,12 @@ namespace APSITests
 
             // Attempt to insert with no label
             values.push_back(make_pair(1, vector<felt_t>{}));
-            res = bb.multi_insert_dry_run(values, 0);
-            ASSERT_EQ(-1, res);
+            ASSERT_THROW(res = bb.multi_insert_dry_run(values, 0), invalid_argument);
             values.pop_back();
 
             // Attempt to insert wrong size label
             values.push_back(make_pair(1, create_label(label_size + 1, 1)));
-            res = bb.multi_insert_dry_run(values, 0);
-            ASSERT_EQ(-1, res);
+            ASSERT_THROW(res = bb.multi_insert_dry_run(values, 0), invalid_argument);
             values.pop_back();
 
             values.push_back(make_pair(1, create_label(label_size, 1)));

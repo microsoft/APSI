@@ -360,9 +360,9 @@ namespace apsi
                 size_t curr_label_size = curr_item_label.second.size();
                 if (curr_label_size != label_size)
                 {
-                    APSI_LOG_ERROR("Attempted to insert an item with incorrect label size " << curr_label_size
+                    APSI_LOG_ERROR("Attempted to insert item-label with incorrect label size " << curr_label_size
                         << " (expected " << label_size << ")");
-                    return -1;
+                    throw invalid_argument("failed to insert item-labels");
                 }
             }
 
@@ -494,9 +494,9 @@ namespace apsi
                 size_t curr_label_size = curr_item_label.second.size();
                 if (curr_label_size != label_size)
                 {
-                    APSI_LOG_ERROR("Attempted to insert an item with incorrect label size ("
-                        << curr_label_size << "; expected " << label_size << ")");
-                    return -1;
+                    APSI_LOG_ERROR("Attempted to overwrite item-label with incorrect label size " << curr_label_size
+                        << " (expected " << label_size << ")");
+                    throw invalid_argument("failed to overwrite item-labels");
                 }
             }
 
@@ -540,7 +540,7 @@ namespace apsi
                     APSI_LOG_ERROR(
                         "Attempted to overwrite item-label, but the item could no longer be found; "
                         "the internal state of this BinBundle has been corrupted")
-                    throw runtime_error("failed to overwrite item-label");
+                    throw runtime_error("failed to overwrite item-labels");
                 }
 
                 // Compute the location in the curr_bin so we know how to index into the label bins

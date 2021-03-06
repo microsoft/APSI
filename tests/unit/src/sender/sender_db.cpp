@@ -68,7 +68,7 @@ namespace APSITests
     TEST(SenderDBTests, UnlabeledBasics)
     {
         auto params = get_params();
-        UnlabeledSenderDB sender_db(*params);
+        SenderDB sender_db(*params, 0);
 
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
         sender_db.clear_db();
@@ -91,7 +91,7 @@ namespace APSITests
     TEST(SenderDBTests, LabeledBasics)
     {
         auto params = get_params();
-        LabeledSenderDB sender_db(*params);
+        SenderDB sender_db(*params, 20);
 
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
         sender_db.clear_db();
@@ -114,7 +114,7 @@ namespace APSITests
     TEST(SenderDBTests, UnlabeledInsertOrAssignSingle)
     {
         auto params = get_params();
-        UnlabeledSenderDB sender_db(*params);
+        SenderDB sender_db(*params, 0);
 
         // Insert a single item
         sender_db.insert_or_assign(HashedItem(0, 0));
@@ -165,7 +165,7 @@ namespace APSITests
     TEST(SenderDBTests, UnlabeledInsertOrAssignMany)
     {
         auto params = get_params();
-        UnlabeledSenderDB sender_db(*params);
+        SenderDB sender_db(*params, 0);
 
         // Create a vector of items without duplicates
         vector<HashedItem> items;
@@ -225,7 +225,7 @@ namespace APSITests
     {
         logging::Log::set_log_level("debug");
         auto params = get_params();
-        LabeledSenderDB sender_db(*params, 20, true);
+        SenderDB sender_db(*params, 20, true);
 
         // Insert a single item with zero label
         sender_db.insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(0, 20)));
@@ -273,7 +273,7 @@ namespace APSITests
     TEST(SenderDBTests, LabeledInsertOrAssignMany)
     {
         auto params = get_params();
-        LabeledSenderDB sender_db(*params, 20, true);
+        SenderDB sender_db(*params, 20, true);
 
         // Create a vector of items and labels without duplicates
         vector<pair<HashedItem, EncryptedLabel>> items;
@@ -336,9 +336,9 @@ namespace APSITests
     {
         auto params = get_params();
 
-        // We use a LabeledSenderDB here to end up with multiple BinBundles more quickly. This happens because in the
+        // We use a labeled SenderDB here to end up with multiple BinBundles more quickly. This happens because in the
         // labeled case BinBundles cannot tolerate repetitions of item parts (felts) in bins.
-        LabeledSenderDB sender_db(*params, 20, true);
+        SenderDB sender_db(*params, 20, true);
 
         // Insert a single item
         sender_db.insert_or_assign({ HashedItem(0, 0), create_encrypted_label(0, 20) });
@@ -409,7 +409,7 @@ namespace APSITests
     TEST(SenderDBTests, SaveLoadUnlabeled)
     {
         auto params = get_params();
-        shared_ptr<SenderDB> sender_db(make_shared<UnlabeledSenderDB>(*params));
+        auto sender_db(make_shared<SenderDB>(*params, 0));
 
         stringstream ss;
         size_t save_size = SaveSenderDB(sender_db, ss);
@@ -468,7 +468,7 @@ namespace APSITests
     TEST(SenderDBTests, SaveLoadLabeled)
     {
         auto params = get_params();
-        shared_ptr<SenderDB> sender_db(make_shared<LabeledSenderDB>(*params, 20));
+        auto sender_db(make_shared<SenderDB>(*params, 20));
 
         stringstream ss;
         size_t save_size = SaveSenderDB(sender_db, ss);
