@@ -24,7 +24,7 @@
 
 namespace APSITests
 {
-    apsi::Label create_label(std::uint64_t lw, std::uint64_t hw, std::size_t byte_count);
+    apsi::Label create_label(unsigned char start, std::size_t byte_count);
 
     std::unordered_set<apsi::Item> rand_subset(const std::unordered_set<apsi::Item> &items, std::size_t size);
 

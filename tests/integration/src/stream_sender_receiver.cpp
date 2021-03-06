@@ -127,19 +127,19 @@ namespace APSITests
             size_t num_threads)
         {
             logging::Log::set_console_disabled(false);
-            logging::Log::set_log_level(logging::Log::Level::info);
+            logging::Log::set_log_level("all");
             //logging::Log::set_log_file("out.log");
 
             vector<pair<Item, Label>> sender_items;
             for (size_t i = 0; i < sender_size; i++)
             {
-                sender_items.push_back(make_pair(Item(i + 1, i + 1), create_label(~(i + 1), i + 1, 10)));
+                sender_items.push_back(make_pair(Item(i + 1, i + 1), create_label(i + 1, 20)));
             }
 
             OPRFKey oprf_key;
             auto hashed_sender_items = OPRFSender::ComputeHashes(sender_items, oprf_key);
 
-            auto sender_db = make_shared<LabeledSenderDB>(params, 10, true);
+            auto sender_db = make_shared<LabeledSenderDB>(params, 20, true);
             sender_db->set_data(hashed_sender_items, num_threads);
 
             auto seal_context = sender_db->get_seal_context();

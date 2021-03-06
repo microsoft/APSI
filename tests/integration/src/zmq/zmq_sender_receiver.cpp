@@ -111,7 +111,7 @@ namespace APSITests
             vector<pair<Item, Label>> sender_items;
             for (size_t i = 0; i < sender_size; i++)
             {
-                sender_items.push_back(make_pair(Item(i + 1, i + 1), create_label(~(i + 1), i + 1, 10)));
+                sender_items.push_back(make_pair(Item(i + 1, i + 1), create_label(i + 1, 10)));
             }
 
             auto oprf_key = make_shared<OPRFKey>();
