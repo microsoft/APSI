@@ -10,7 +10,6 @@
 #include <iostream>
 #include <memory>
 #include <unordered_set>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -31,12 +30,6 @@ namespace apsi
 {
     namespace sender
     {
-        class SenderDB;
-
-        std::size_t SaveSenderDB(std::shared_ptr<SenderDB> sender_db, std::ostream &out);
-
-        std::pair<std::shared_ptr<SenderDB>, std::size_t> LoadSenderDB(std::istream &in);
-
         /**
         A SenderDB maintains an in-memory representation of the sender's set of items and labels. This data is not
         simply copied into the SenderDB data structures, but also preprocessed heavily to allow for faster online
@@ -51,15 +44,21 @@ namespace apsi
         */
         class SenderDB
         {
-        friend std::size_t SaveSenderDB(std::shared_ptr<SenderDB> sender_db, std::ostream &out);
-
-        friend std::pair<std::shared_ptr<SenderDB>, std::size_t> LoadSenderDB(std::istream &in);
-
         public:
             /**
             Creates a new SenderDB.
             */
             SenderDB(PSIParams params, std::size_t label_byte_count = 0, bool compressed = true);
+
+            /**
+            Creates a new SenderDB by moving from an existing one.
+            */
+            SenderDB(SenderDB &&source);
+
+            /**
+            Moves an existing SenderDB to the current one.
+            */
+            SenderDB &operator =(SenderDB &&source);
 
             /**
             Clears the database. Every item and label will be removed.
@@ -92,7 +91,7 @@ namespace apsi
 
             /**
             Inserts the given data into the database, using at most thread_count threads. This function can be used only
-            on a LabeledSenderDB instance. If an item already exists in the database, its label is overwritten with the
+            on a labeled SenderDB instance. If an item already exists in the database, its label is overwritten with the
             new label.
             */
             void insert_or_assign(
@@ -101,7 +100,7 @@ namespace apsi
 
             /**
             Inserts the given (hashed) item-label pair into the database, using at most thread_count threads. This
-            function can be used only on a LabeledSenderDB instance. If the item already exists in the database, its
+            function can be used only on a labeled SenderDB instance. If the item already exists in the database, its
             label is overwritten with the new label.
             */
             void insert_or_assign(std::pair<HashedItem, EncryptedLabel> data)
@@ -111,13 +110,13 @@ namespace apsi
 
             /**
             Inserts the given data into the database, using at most thread_count threads. This function can be used only
-            on an UnlabeledSenderDB instance.
+            on an unlabeled SenderDB instance.
             */
             void insert_or_assign(std::vector<HashedItem> data, std::size_t thread_count = 0);
 
             /**
             Inserts the given (hashed) item into the database, using at most thread_count threads. This function can be
-            used only on an UnlabeledSenderDB instance.
+            used only on an unlabeled SenderDB instance.
             */
             void insert_or_assign(HashedItem data)
             {
@@ -126,7 +125,7 @@ namespace apsi
 
             /**
             Clears the database and inserts the given data, using at most thread_count threads. This function can be
-            used only on a LabeledSenderDB instance.
+            used only on a labeled SenderDB instance.
             */
             void set_data(
                 std::vector<std::pair<HashedItem, EncryptedLabel>> data,
@@ -138,7 +137,7 @@ namespace apsi
 
             /**
             Clears the database and inserts the given data, using at most thread_count threads. This function can be
-            used only on an UnlabeledSenderDB instance.
+            used only on an unlabeled SenderDB instance.
             */
             void set_data(std::vector<HashedItem> data, std::size_t thread_count = 0)
             {
@@ -222,11 +221,25 @@ namespace apsi
                 return db_lock_.acquire_read();
             }
 
+            /**
+            Writes the SenderDB to a stream.
+            */
+            std::size_t save(std::ostream &out) const;
+
+            /**
+            Reads the SenderDB from a stream.
+            */
+            static std::pair<SenderDB, std::size_t> Load(std::istream &in);
+
         private:
+            SenderDB(const SenderDB &copy) = delete;
+
             seal::util::WriterLock get_writer_lock()
             {
                 return db_lock_.acquire_write();
             }
+
+            void clear_db_internal();
 
             /**
             The set of all items that have been inserted into the database

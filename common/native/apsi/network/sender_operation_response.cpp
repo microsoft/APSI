@@ -35,7 +35,7 @@ namespace apsi
 
             // Save the parameters into a temporary string
             stringstream ss;
-            SaveParams(*params, ss);
+            params->save(ss);
             string params_str = ss.str();
 
             // Set up a vector to hold the parameter data
@@ -85,7 +85,7 @@ namespace apsi
                 reinterpret_cast<const char *>(params_data.data()),
                 static_cast<streamsize>(params_data.size()));
             istream params_stream(&agbuf);
-            params = make_unique<PSIParams>(LoadParams(params_stream).first);
+            params = make_unique<PSIParams>(PSIParams::Load(params_stream).first);
 
             return in_data.size();
         }

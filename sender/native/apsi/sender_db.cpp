@@ -629,6 +629,50 @@ namespace apsi
             clear_db();
         }
 
+        SenderDB::SenderDB(SenderDB &&source) :
+            params_(source.params_),
+            crypto_context_(source.crypto_context_),
+            label_byte_count_(source.label_byte_count_),
+            compressed_(source.compressed_)
+        {
+            // Lock the source before moving stuff over
+            auto lock = source.get_writer_lock();
+
+            items_ = move(source.items_);
+            bin_bundles_ = move(source.bin_bundles_);
+
+            // Reset the source data structures
+            source.clear_db_internal();
+        }
+
+        SenderDB &SenderDB::operator =(SenderDB &&source)
+        {
+            // Do nothing if moving to self
+            if (&source == this)
+            {
+                return *this;
+            }
+
+            // Lock the current SenderDB
+            auto this_lock = get_writer_lock();
+
+            params_ = source.params_;
+            crypto_context_ = source.crypto_context_;
+            compressed_ = source.compressed_;
+            label_byte_count_ = source.label_byte_count_;
+
+            // Lock the source before moving stuff over
+            auto source_lock = source.get_writer_lock();
+
+            items_ = move(source.items_);
+            bin_bundles_ = move(source.bin_bundles_);
+
+            // Reset the source data structures
+            source.clear_db_internal();
+
+            return *this;
+        }
+
         size_t SenderDB::get_bin_bundle_count() const
         {
             // Lock the database for reading
@@ -655,6 +699,18 @@ namespace apsi
             return max_item_count ? static_cast<double>(item_count) / max_item_count : 0.0;
         }
 
+        void SenderDB::clear_db_internal()
+        {
+            // Assume the SenderDB is already locked for writing
+
+            // Clear the set of inserted items
+            items_.clear();
+
+            // Clear the BinBundles
+            bin_bundles_.clear();
+            bin_bundles_.resize(params_.bundle_idx_count());
+        }
+
         void SenderDB::clear_db()
         {
             if (items_.size())
@@ -665,12 +721,7 @@ namespace apsi
             // Lock the database for writing
             auto lock = get_writer_lock();
 
-            // Clear the set of inserted items
-            items_.clear();
-
-            // Clear the BinBundles
-            bin_bundles_.clear();
-            bin_bundles_.resize(params_.bundle_idx_count());
+            clear_db_internal();
         }
 
         vector<reference_wrapper<const BinBundleCache>> SenderDB::get_cache_at(uint32_t bundle_idx)
@@ -946,34 +997,29 @@ namespace apsi
             return result;
         }
 
-        size_t SaveSenderDB(shared_ptr<SenderDB> sender_db, ostream &out)
+        size_t SenderDB::save(ostream &out) const
         {
-            if (!sender_db)
-            {
-                throw invalid_argument("sender_db cannot be null");
-            }
-
             // Lock the database for reading
-            auto lock = sender_db->get_reader_lock();
+            auto lock = get_reader_lock();
 
             // First save the PSIParam
             stringstream ss;
-            SaveParams(sender_db->params_, ss);
+            params_.save(ss);
             string params_str = ss.str();
 
-            int32_t item_bit_count = sender_db->params_.item_bit_count();
+            int32_t item_bit_count = params_.item_bit_count();
             int32_t item_byte_count = (item_bit_count + 7) >> 3;
 
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
             auto params = fbs_builder.CreateVector(
                 reinterpret_cast<unsigned char*>(params_str.data()), params_str.size());
-            fbs::SenderDBInfo info(safe_cast<uint32_t>(sender_db->get_label_byte_count()), sender_db->is_compressed());
+            fbs::SenderDBInfo info(safe_cast<uint32_t>(label_byte_count_), compressed_);
             auto hashed_items = fbs_builder.CreateVectorOfStructs([&]() {
                 // The HashedItems vector is populated with an immediately-invoked lambda
                 vector<fbs::HashedItem> ret;
-                ret.reserve(sender_db->get_items().size());
-                for (const auto &it : sender_db->get_items())
+                ret.reserve(get_items().size());
+                for (const auto &it : get_items())
                 {
                     // Then create the vector of bytes for this hashed item
                     auto item_data = it.get_as<uint64_t>();
@@ -982,7 +1028,7 @@ namespace apsi
                 return ret;
             }());
 
-            auto bin_bundle_count = sender_db->get_bin_bundle_count();
+            auto bin_bundle_count = get_bin_bundle_count();
 
             fbs::SenderDBBuilder sender_db_builder(fbs_builder);
             sender_db_builder.add_params(params);
@@ -999,9 +1045,9 @@ namespace apsi
 
             // Finally write the BinBundles
             size_t bin_bundle_data_size = 0;
-            for (size_t bundle_idx = 0; bundle_idx < sender_db->bin_bundles_.size(); bundle_idx++)
+            for (size_t bundle_idx = 0; bundle_idx < bin_bundles_.size(); bundle_idx++)
             {
-                for (auto &bb : sender_db->bin_bundles_[bundle_idx])
+                for (auto &bb : bin_bundles_[bundle_idx])
                 {
                     auto size = bb.save(out, static_cast<uint32_t>(bundle_idx));
                     APSI_LOG_DEBUG("Saved BinBundle at bundle index " << bundle_idx
@@ -1011,13 +1057,13 @@ namespace apsi
             }
 
             total_size += bin_bundle_data_size;
-            APSI_LOG_DEBUG("Saved SenderDB with " << sender_db->get_items().size() << " items ("
+            APSI_LOG_DEBUG("Saved SenderDB with " << get_items().size() << " items ("
                 << total_size << " bytes)");
 
             return total_size;
         }
 
-        pair<shared_ptr<SenderDB>, size_t> LoadSenderDB(istream &in)
+        pair<SenderDB, size_t> SenderDB::Load(istream &in)
         {
             vector<seal_byte> in_data(apsi::util::read_from_stream(in));
 
@@ -1039,7 +1085,7 @@ namespace apsi
                     reinterpret_cast<const char *>(sdb->params()->data()),
                     static_cast<streamsize>(sdb->params()->size()));
                 istream params_stream(&agbuf);
-                params = make_shared<PSIParams>(LoadParams(params_stream).first);
+                params = make_shared<PSIParams>(PSIParams::Load(params_stream).first);
             }
             catch (const runtime_error &ex)
             {
@@ -1052,17 +1098,17 @@ namespace apsi
             bool compressed = sdb->info()->compressed();
 
             // Create the correct kind of SenderDB
-            auto sender_db = make_shared<SenderDB>(*params, label_byte_count, compressed);
+            SenderDB sender_db(*params, label_byte_count, compressed);
 
-            int32_t item_bit_count = sender_db->params_.item_bit_count();
+            int32_t item_bit_count = sender_db.params_.item_bit_count();
             int32_t item_byte_count = (item_bit_count + 7) >> 3;
 
             // Load the hashed items
             const auto &hashed_items = *sdb->hashed_items();
-            sender_db->items_.reserve(hashed_items.size());
+            sender_db.items_.reserve(hashed_items.size());
             for (const auto &it : hashed_items)
             {
-                sender_db->items_.insert({ it->low_word(), it->high_word() });
+                sender_db.items_.insert({ it->low_word(), it->high_word() });
             }
 
             uint32_t bin_bundle_count = sdb->bin_bundle_count();
@@ -1072,14 +1118,14 @@ namespace apsi
 
             while (bin_bundle_count--)
             {
-                BinBundle bb(sender_db->crypto_context_, label_size, max_bin_size, compressed);
+                BinBundle bb(sender_db.crypto_context_, label_size, max_bin_size, compressed);
                 auto bb_data = bb.load(in);
 
                 // Make sure BinBundle cache is valid
                 bb.regen_cache();
 
                 // Check that the loaded bundle index is not out of range
-                if (bb_data.first >= sender_db->bin_bundles_.size())
+                if (bb_data.first >= sender_db.bin_bundles_.size())
                 {
                     APSI_LOG_ERROR("The bundle index of the loaded BinBundle (" << bb_data.first
                         << ") exceeds the maximum (" << params->bundle_idx_count() - 1 << ")");
@@ -1087,7 +1133,7 @@ namespace apsi
                 }
 
                 // Add the loaded BinBundle to the correct location in bin_bundles_
-                sender_db->bin_bundles_[bb_data.first].push_back(move(bb));
+                sender_db.bin_bundles_[bb_data.first].push_back(move(bb));
 
                 APSI_LOG_DEBUG("Loaded BinBundle at bundle index " << bb_data.first
                     << " (" << bb_data.second << " bytes)");
@@ -1095,9 +1141,9 @@ namespace apsi
             }
 
             size_t total_size = in_data.size() + bin_bundle_data_size;
-            APSI_LOG_DEBUG("Loaded SenderDB with " << sender_db->get_items().size() << " items ("
+            APSI_LOG_DEBUG("Loaded SenderDB with " << sender_db.get_items().size() << " items ("
                 << total_size << " bytes)");
-            
+
             return { move(sender_db), total_size };
         }
     } // namespace sender

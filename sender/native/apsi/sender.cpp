@@ -180,7 +180,7 @@ namespace apsi
             {
                 // The + 1 is because we index by power. The 0th power is a dummy value. I promise this makes things
                 // easier to read.
-                powers.resize(max_items_per_bin++);
+                powers.resize(max_items_per_bin + 1);
             }
 
             // Load inputs provided in the query
@@ -200,7 +200,7 @@ namespace apsi
             }
 
             // Partition the data and run the threads on the partitions. The i-th thread will compute query powers at
-            // bundle indices starting at partitions[i], up to but not including partitions[i+1].
+            // bundle indices starting at partitions[i], up to but not including partitions[i + 1].
             auto partitions = partition_evenly(bundle_idx_count, safe_cast<uint32_t>(thread_count));
 
             // Launch threads, but not more than necessary

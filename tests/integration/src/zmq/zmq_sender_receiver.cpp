@@ -48,14 +48,13 @@ namespace APSITests
             auto oprf_key = make_shared<OPRFKey>();
             auto hashed_sender_items = OPRFSender::ComputeHashes(sender_items, *oprf_key);
 
-            auto sender_db = make_shared<SenderDB>(params, 0);
+            auto sender_db = make_shared<SenderDB>(params, 0, true);
             sender_db->set_data(hashed_sender_items, num_threads);
             APSI_LOG_INFO("Packing rate: " << sender_db->get_packing_rate());
 
             stringstream ss;
-            SaveSenderDB(sender_db, ss);
-            auto sender_db_data = LoadSenderDB(ss);
-            auto loaded_sender_db = sender_db_data.first;
+            sender_db->save(ss);
+            auto loaded_sender_db = make_shared<SenderDB>(SenderDB::Load(ss).first);
 
             atomic<bool> stop_sender = false;
 
@@ -122,9 +121,8 @@ namespace APSITests
             APSI_LOG_INFO("Packing rate: " << sender_db->get_packing_rate());
 
             stringstream ss;
-            SaveSenderDB(sender_db, ss);
-            auto sender_db_data = LoadSenderDB(ss);
-            auto loaded_sender_db = sender_db_data.first;
+            sender_db->save(ss);
+            auto loaded_sender_db = make_shared<SenderDB>(SenderDB::Load(ss).first);
 
             atomic<bool> stop_sender = false;
 

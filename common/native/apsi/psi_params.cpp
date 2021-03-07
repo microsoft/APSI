@@ -114,29 +114,29 @@ namespace apsi
         bundle_idx_count_ = (table_params_.table_size + items_per_bundle_ - 1) / items_per_bundle_;
     }
 
-    size_t SaveParams(const PSIParams &params, ostream &out)
+    size_t PSIParams::save(ostream &out) const
     {
         flatbuffers::FlatBufferBuilder fbs_builder(128);
 
-        fbs::ItemParams item_params(params.item_params().felts_per_item);
+        fbs::ItemParams item_params(item_params_.felts_per_item);
 
         fbs::TableParams table_params(
-            params.table_params().table_size,
-            params.table_params().max_items_per_bin,
-            params.table_params().hash_func_count);
+            table_params_.table_size,
+            table_params_.max_items_per_bin,
+            table_params_.hash_func_count);
 
         // There may or may not be query powers
         vector<uint32_t> query_powers_vec;
         copy(
-            params.query_params().query_powers.cbegin(),
-            params.query_params().query_powers.cend(),
+            query_params_.query_powers.cbegin(),
+            query_params_.query_powers.cend(),
             back_inserter(query_powers_vec));
         auto query_powers = fbs_builder.CreateVector(query_powers_vec);
         auto query_params = fbs::CreateQueryParams(fbs_builder, query_powers);
 
         vector<seal_byte> temp;
-        temp.resize(params.seal_params().save_size(compr_mode_type::zstd));
-        auto size = params.seal_params().save(temp.data(), temp.size(), compr_mode_type::zstd);
+        temp.resize(seal_params_.save_size(compr_mode_type::zstd));
+        auto size = seal_params_.save(temp.data(), temp.size(), compr_mode_type::zstd);
         auto seal_params_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(temp.data()), size);
         auto seal_params = fbs::CreateSEALParams(fbs_builder, seal_params_data);
 
@@ -155,7 +155,7 @@ namespace apsi
         return fbs_builder.GetSize();
     }
 
-    pair<PSIParams, size_t> LoadParams(istream &in)
+    pair<PSIParams, size_t> PSIParams::Load(istream &in)
     {
         vector<seal_byte> in_data(util::read_from_stream(in));
 

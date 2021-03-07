@@ -104,9 +104,9 @@ namespace APSITests
 
         PSIParams psi_params(item_params, table_params, query_params, seal_params);
         stringstream ss;
-        auto save_size = SaveParams(psi_params, ss);
+        auto save_size = psi_params.save(ss);
 
-        auto compare = LoadParams(ss);
+        auto compare = PSIParams::Load(ss);
         ASSERT_EQ(save_size, compare.second);
         auto load_params = compare.first;
 
