@@ -398,18 +398,19 @@ namespace apsi
                 //vector<pair<size_t, size_t>> partitions =
                 //    partition_evenly(bundle_indices.size(), thread_count);
 
-                // Insert one larger "end" value to the bundle_indices vector; this represents
-                // one-past upper bound for the bundle indices that need to be processed.
-                if (!bundle_indices.empty()) {
-                    bundle_indices.push_back(bundle_indices.back() + 1);
-                }
+                //// Insert one larger "end" value to the bundle_indices vector; this represents
+                //// one-past upper bound for the bundle indices that need to be processed.
+                //if (!bundle_indices.empty()) {
+                //    bundle_indices.push_back(bundle_indices.back() + 1);
+                //}
 
                 // Run the threads on the partitions
                 vector<future<void>> futures(bundle_indices.size());
                 APSI_LOG_INFO(
                     "Launching " << bundle_indices.size() << " insert-or-assign worker tasks");
-                for (size_t bundle_idx = 0; bundle_idx < bundle_indices.size(); bundle_idx++) {
-                    futures[bundle_idx] = tpm.thread_pool().enqueue([&, bundle_idx]() {
+                size_t future_idx = 0;
+                for (auto &bundle_idx : bundle_indices) {
+                    futures[future_idx++] = tpm.thread_pool().enqueue([&, bundle_idx]() {
                         insert_or_assign_worker(
                             data_with_indices,
                             bin_bundles,
