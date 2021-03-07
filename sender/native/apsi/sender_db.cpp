@@ -394,16 +394,6 @@ namespace apsi
                     back_inserter(bundle_indices));
                 sort(bundle_indices.begin(), bundle_indices.end());
 
-                //// Partition the bundle indices appropriately
-                //vector<pair<size_t, size_t>> partitions =
-                //    partition_evenly(bundle_indices.size(), thread_count);
-
-                //// Insert one larger "end" value to the bundle_indices vector; this represents
-                //// one-past upper bound for the bundle indices that need to be processed.
-                //if (!bundle_indices.empty()) {
-                //    bundle_indices.push_back(bundle_indices.back() + 1);
-                //}
-
                 // Run the threads on the partitions
                 vector<future<void>> futures(bundle_indices.size());
                 APSI_LOG_INFO(
@@ -557,16 +547,6 @@ namespace apsi
                     bundle_indices_set.end(),
                     back_inserter(bundle_indices));
                 sort(bundle_indices.begin(), bundle_indices.end());
-
-                //// Partition the bundle indices appropriately
-                // vector<pair<size_t, size_t>> partitions = partition_evenly(bundle_indices.size(),
-                // thread_count);
-
-                //// Insert one larger "end" value to the bundle_indices vector; this represents
-                //// one-past upper bound for the bundle indices that need to be processed.
-                //if (!bundle_indices.empty()) {
-                //    bundle_indices.push_back(bundle_indices.back() + 1);
-                //}
 
                 // Run the threads on the partitions
                 vector<future<void>> futures(bundle_indices.size());

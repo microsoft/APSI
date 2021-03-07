@@ -13,8 +13,10 @@ using namespace apsi;
 using namespace apsi::util;
 
 
-// Static reference count that will manage the lifetime of the single ThreadPool
-//object that all users of this class will share.
+/**
+Static reference count that will manage the lifetime of the single ThreadPool
+object that all users of this class will share.
+*/
 size_t ThreadPoolMgr::ref_count_ = 0;
 
 namespace {
