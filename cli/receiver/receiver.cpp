@@ -169,7 +169,7 @@ pair<unique_ptr<CSVReader::DBData>, vector<string>> load_db(const string &db_fil
     catch (const exception &ex)
     {
         APSI_LOG_WARNING("Could not open or read file `" << db_file << "`: " << ex.what());
-        return { nullptr, {} };
+        return { nullptr, orig_items };
     }
 
     return { make_unique<CSVReader::DBData>(move(db_data)), move(orig_items) };
