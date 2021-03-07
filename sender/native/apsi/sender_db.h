@@ -96,13 +96,14 @@ namespace apsi
             void insert_or_assign(std::vector<std::pair<HashedItem, EncryptedLabel>> data);
 
             /**
-            Inserts the given (hashed) item-label pair into the database, using at most thread_count threads. This
-            function can be used only on a labeled SenderDB instance. If the item already exists in the database, its
-            label is overwritten with the new label.
+            Inserts the given (hashed) item-label pair into the database. This function can be used only on a
+            labeled SenderDB instance. If the item already exists in the database, its label is overwritten
+            with the new label.
             */
             void insert_or_assign(std::pair<HashedItem, EncryptedLabel> data)
             {
-                insert_or_assign({ std::move(data) });
+                insert_or_assign(
+                    std::vector<std::pair<HashedItem, EncryptedLabel>>{ std::move(data) });
             }
 
             /**
@@ -115,7 +116,7 @@ namespace apsi
             */
             void insert_or_assign(HashedItem data)
             {
-                insert_or_assign({ std::move(data) });
+                insert_or_assign(std::vector<HashedItem> { std::move(data) });
             }
 
             /**
@@ -146,7 +147,7 @@ namespace apsi
             */
             void remove(const HashedItem &data)
             {
-                remove({ std::move(data) });
+                remove(std::vector<HashedItem> { std::move(data) });
             }
 
             /**
