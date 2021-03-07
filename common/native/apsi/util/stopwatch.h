@@ -32,10 +32,10 @@ namespace apsi
         */
         class Stopwatch
         {
-            friend class StopwatchScope;
+        friend class StopwatchScope;
 
         public:
-            typedef std::chrono::high_resolution_clock::time_point time_unit;
+            using time_unit = std::chrono::high_resolution_clock::time_point;
 
             /**
             Structure used to accumulate data about timespan timing events
@@ -59,11 +59,6 @@ namespace apsi
             };
 
             /**
-            Default constructor
-            */
-            Stopwatch();
-
-            /**
             Used as a reference point for single events
             */
             const static time_unit start_time;
@@ -76,12 +71,12 @@ namespace apsi
             /**
             Get the timespan timings we have stored at the moment.
             */
-            void get_timespans(std::vector<TimespanSummary> &timespans);
+            void get_timespans(std::vector<TimespanSummary> &timespans) const;
 
             /**
             Get the single event timings we have stored at the moment.
             */
-            void get_events(std::vector<Timepoint> &events);
+            void get_events(std::vector<Timepoint> &events) const;
 
             /**
             Get the length of the longest single event name
@@ -102,15 +97,15 @@ namespace apsi
         private:
             // Single events
             std::list<Timepoint> events_;
-            std::shared_ptr<std::mutex> events_mtx_;
+            mutable std::mutex events_mtx_;
 
             // Events that have a beginning and end
             std::map<std::string, TimespanSummary> timespan_events_;
-            std::shared_ptr<std::mutex> timespan_events_mtx_;
+            mutable std::mutex timespan_events_mtx_;
 
             // Useful for generating reports
-            int max_event_name_length_;
-            int max_timespan_event_name_length_;
+            int max_event_name_length_ = 0;
+            int max_timespan_event_name_length_ = 0;
 
             /**
             Add a time event with beginning and end

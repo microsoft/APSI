@@ -24,6 +24,7 @@ public:
         add(net_addr_arg_);
         add(net_port_arg_);
         add(query_file_arg_);
+        add(out_file_arg_);
     }
 
     virtual void get_args()
@@ -93,7 +94,7 @@ private:
         "o",
         "outFile",
         "Path for writing the output to",
-        true,
+        false,
         "",
         "string"
     );

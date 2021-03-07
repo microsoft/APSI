@@ -710,7 +710,7 @@ The following arguments specify the receiver's behavior.
 | Parameter | Explanation |
 |-----------|-------------|
 | `-q` \| `--queryFile` | File containing the query data |
-| `-o` \| `--outFile` | Output file (not implemented; currently printed in terminal) |
+| `-o` \| `--outFile` | Output file for the intersection result |
 | `-a` \| `--ipAddr` | IP address for a sender endpoint |
 | `-p` \| `--port` | TCP port to connect to (default is 1212) |
 
