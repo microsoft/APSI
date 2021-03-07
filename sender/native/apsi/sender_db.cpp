@@ -700,15 +700,13 @@ namespace apsi
             return collect_caches(bin_bundles_.at(safe_cast<size_t>(bundle_idx)));
         }
 
-        void SenderDB::insert_or_assign(vector<pair<HashedItem, EncryptedLabel>> data, size_t thread_count)
+        void SenderDB::insert_or_assign(vector<pair<HashedItem, EncryptedLabel>> data)
         {
             if (!is_labeled())
             {
                 APSI_LOG_ERROR("Attempted to insert labeled data but this is an unlabeled SenderDB")
                 throw logic_error("cannot do labeled insertion on an unlabeled SenderDB");
             }
-
-            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
 
             STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign (labeled)");
             APSI_LOG_INFO("Start inserting " << data.size() << " items in SenderDB");
@@ -796,15 +794,13 @@ namespace apsi
             APSI_LOG_INFO("Finished inserting " << full_data_size << " items in SenderDB");
         }
 
-        void SenderDB::insert_or_assign(vector<HashedItem> data, size_t thread_count)
+        void SenderDB::insert_or_assign(vector<HashedItem> data)
         {
             if (is_labeled())
             {
                 APSI_LOG_ERROR("Attempted to insert unlabeled data but this is a labeled SenderDB")
                 throw logic_error("cannot do unlabeled insertion on a labeled SenderDB");
             }
-
-            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
 
             STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign (unlabeled)");
             APSI_LOG_INFO("Start inserting " << data.size() << " items in SenderDB");
@@ -854,12 +850,8 @@ namespace apsi
             APSI_LOG_INFO("Finished inserting " << full_data_size << " items in SenderDB");
         }
 
-        void SenderDB::remove(
-            const vector<HashedItem> &data,
-            size_t thread_count
-        ) {
-            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
-
+        void SenderDB::remove(const vector<HashedItem> &data)
+        {
             STOPWATCH(sender_stopwatch, "SenderDB::remove");
             APSI_LOG_INFO("Start removing " << data.size() << " items from SenderDB");
 

@@ -90,13 +90,10 @@ namespace apsi
             }
 
             /**
-            Inserts the given data into the database, using at most thread_count threads. This function can be used only
-            on a labeled SenderDB instance. If an item already exists in the database, its label is overwritten with the
-            new label.
+            Inserts the given data into the database. This function can be used only on a labeled SenderDB instance.
+            If an item already exists in the database, its label is overwritten with the new label.
             */
-            void insert_or_assign(
-                std::vector<std::pair<HashedItem, EncryptedLabel>> data,
-                std::size_t thread_count = 0);
+            void insert_or_assign(std::vector<std::pair<HashedItem, EncryptedLabel>> data);
 
             /**
             Inserts the given (hashed) item-label pair into the database, using at most thread_count threads. This
@@ -105,57 +102,51 @@ namespace apsi
             */
             void insert_or_assign(std::pair<HashedItem, EncryptedLabel> data)
             {
-                insert_or_assign({ std::move(data) }, 1);
+                insert_or_assign({ std::move(data) });
             }
 
             /**
-            Inserts the given data into the database, using at most thread_count threads. This function can be used only
-            on an unlabeled SenderDB instance.
+            Inserts the given data into the database. This function can be used only on an unlabeled SenderDB instance.
             */
-            void insert_or_assign(std::vector<HashedItem> data, std::size_t thread_count = 0);
+            void insert_or_assign(std::vector<HashedItem> data);
 
             /**
-            Inserts the given (hashed) item into the database, using at most thread_count threads. This function can be
-            used only on an unlabeled SenderDB instance.
+            Inserts the given (hashed) item into the database. This function can be used only on an unlabeled SenderDB instance.
             */
             void insert_or_assign(HashedItem data)
             {
-                insert_or_assign({ std::move(data) }, 1);
+                insert_or_assign({ std::move(data) });
             }
 
             /**
-            Clears the database and inserts the given data, using at most thread_count threads. This function can be
-            used only on a labeled SenderDB instance.
+            Clears the database and inserts the given data. This function can be used only on a labeled SenderDB instance.
             */
-            void set_data(
-                std::vector<std::pair<HashedItem, EncryptedLabel>> data,
-                std::size_t thread_count = 0)
+            void set_data(std::vector<std::pair<HashedItem, EncryptedLabel>> data)
             {
                 clear_db();
-                insert_or_assign(std::move(data), thread_count);
+                insert_or_assign(std::move(data));
             }
 
             /**
-            Clears the database and inserts the given data, using at most thread_count threads. This function can be
-            used only on an unlabeled SenderDB instance.
+            Clears the database and inserts the given data. This function can be used only on an unlabeled SenderDB instance.
             */
-            void set_data(std::vector<HashedItem> data, std::size_t thread_count = 0)
+            void set_data(std::vector<HashedItem> data)
             {
                 clear_db();
-                insert_or_assign(std::move(data), thread_count);
+                insert_or_assign(std::move(data));
             }
 
             /**
             Removes the given data from the database, using at most thread_count threads.
             */
-            void remove(const std::vector<HashedItem> &data, std::size_t thread_count = 0);
+            void remove(const std::vector<HashedItem> &data);
 
             /**
             Removes the given (hashed) item from the database.
             */
             void remove(const HashedItem &data)
             {
-                remove({ std::move(data) }, 1);
+                remove({ std::move(data) });
             }
 
             /**

@@ -282,12 +282,13 @@ namespace apsi
             // because it corresponds to the zeroth power of the query and is included only for
             // convenience of the indexing; the ciphertext is actually not set or valid for use.
 
-                // When using C++17 this function may be multi-threaded in the future with C++ execution policies.
-                for_each(
-                    next(powers_at_this_bundle_idx.begin()),
-                    powers_at_this_bundle_idx.end(),
-                    [&](auto &ct) { evaluator.transform_to_ntt_inplace(ct);
-                });
+            // When using C++17 this function may be multi-threaded in the future with C++ execution
+            // policies.
+            for_each(
+                next(powers_at_this_bundle_idx.begin()),
+                powers_at_this_bundle_idx.end(),
+                [&](auto &ct) { evaluator.transform_to_ntt_inplace(ct); });
+        }
 
         void Sender::ProcessBinBundleCache(
             const shared_ptr<SenderDB> &sender_db,
