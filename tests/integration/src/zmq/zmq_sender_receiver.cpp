@@ -40,6 +40,7 @@ namespace APSITests
             logging::Log::set_log_level(logging::Log::Level::info);
 
             ThreadPoolMgr::set_thread_count(num_threads);
+            ThreadPoolMgr::set_phys_thread_count(num_threads * 2);
 
             vector<Item> sender_items;
             for (size_t i = 0; i < sender_size; i++)
@@ -110,6 +111,7 @@ namespace APSITests
             logging::Log::set_log_level(logging::Log::Level::info);
 
             ThreadPoolMgr::set_thread_count(num_threads);
+            ThreadPoolMgr::set_phys_thread_count(num_threads * 2);
 
             vector<pair<Item, Label>> sender_items;
             for (size_t i = 0; i < sender_size; i++)
