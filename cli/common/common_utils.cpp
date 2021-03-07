@@ -13,6 +13,7 @@
 
 // APSI
 #include "common/base_clp.h"
+#include "apsi/logging/log.h"
 #include "apsi/psi_params.h"
 #include "apsi/util/utils.h"
 
@@ -112,4 +113,36 @@ vector<string> generate_event_report(const vector<Stopwatch::Timepoint> &timepoi
     }
 
     return report;
+}
+
+void print_timing_report(const Stopwatch &stopwatch)
+{
+    vector<string> timing_report;
+    vector<Stopwatch::TimespanSummary> timings;
+    stopwatch.get_timespans(timings);
+
+    if (timings.size() > 0)
+    {
+        timing_report = generate_timespan_report(timings, stopwatch.get_max_timespan_event_name_length());
+
+        APSI_LOG_INFO("Timespan event information");
+        for (const auto &timing : timing_report)
+        {
+            APSI_LOG_INFO(timing.c_str());
+        }
+    }
+
+    vector<Stopwatch::Timepoint> timepoints;
+    stopwatch.get_events(timepoints);
+
+    if (timepoints.size() > 0)
+    {
+        timing_report = generate_event_report(timepoints, stopwatch.get_max_event_name_length());
+
+        APSI_LOG_INFO("Single event information");
+        for (const auto &timing : timing_report)
+        {
+            APSI_LOG_INFO(timing.c_str());
+        }
+    }
 }

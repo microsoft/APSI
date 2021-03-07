@@ -7,6 +7,7 @@
 
 // APSI
 #include "apsi/item.h"
+#include "apsi/util/utils.h"
 
 // SEAL
 #include "seal/util/blake2.h"
@@ -30,13 +31,6 @@ namespace apsi
 
     string Item::to_string() const
     {
-        stringstream ss;
-        ss << "[ ";
-        for (auto a : get_as<uint32_t>())
-        {
-            ss << a << " ";
-        }
-        ss << "]";
-        return ss.str();
+        return util::to_string(get_as<uint32_t>());
     }
 }

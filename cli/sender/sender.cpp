@@ -60,36 +60,7 @@ int main(int argc, char *argv[])
 void sigint_handler(int param)
 {
     APSI_LOG_WARNING("Sender interrupted");
-
-    vector<string> timing_report;
-    vector<Stopwatch::TimespanSummary> timings;
-    sender_stopwatch.get_timespans(timings);
-
-    if (timings.size() > 0)
-    {
-        timing_report = generate_timespan_report(timings, sender_stopwatch.get_max_timespan_event_name_length());
-
-        APSI_LOG_INFO("Timespan event information");
-        for (const auto &timing : timing_report)
-        {
-            APSI_LOG_INFO(timing.c_str());
-        }
-    }
-
-    vector<Stopwatch::Timepoint> timepoints;
-    sender_stopwatch.get_events(timepoints);
-
-    if (timepoints.size() > 0)
-    {
-        timing_report = generate_event_report(timepoints, sender_stopwatch.get_max_event_name_length());
-
-        APSI_LOG_INFO("Single event information");
-        for (const auto &timing : timing_report)
-        {
-            APSI_LOG_INFO(timing.c_str());
-        }
-    }
-
+    print_timing_report(sender_stopwatch);
     exit(0);
 }
 
@@ -135,7 +106,7 @@ unique_ptr<CSVReader::DBData> load_db(const string &db_file)
     try
     {
         CSVReader reader(db_file);
-        db_data = reader.read();
+        tie(db_data, ignore) = reader.read();
     }
     catch (const exception &ex)
     {
@@ -159,7 +130,7 @@ pair<shared_ptr<OPRFKey>, shared_ptr<SenderDB>> create_sender_db(
     {
         vector<HashedItem> hashed_db_data;
         {
-            STOPWATCH(sender_stopwatch, "OPRF");
+            STOPWATCH(sender_stopwatch, "OPRF preprocessing (unlabeled)");
             hashed_db_data = OPRFSender::ComputeHashes(get<CSVReader::UnlabeledData>(db_data), *oprf_key, thread_count);
         }
         APSI_LOG_INFO("Computed OPRF hash for " << hashed_db_data.size() << " items");
@@ -180,16 +151,18 @@ pair<shared_ptr<OPRFKey>, shared_ptr<SenderDB>> create_sender_db(
     {
         vector<pair<HashedItem, EncryptedLabel>> hashed_db_data;
         {
-            STOPWATCH(sender_stopwatch, "OPRF");
+            STOPWATCH(sender_stopwatch, "OPRF preprocessing (labeled)");
             hashed_db_data = OPRFSender::ComputeHashes(get<CSVReader::LabeledData>(db_data), *oprf_key, thread_count);
         }
         APSI_LOG_INFO("Computed OPRF hash for " << hashed_db_data.size() << " items");
 
         try
         {
-            sender_db = make_shared<SenderDB>(psi_params, hashed_db_data[0].second.size());
+            size_t label_size = hashed_db_data[0].second.size();
+            sender_db = make_shared<SenderDB>(psi_params, label_size);
             sender_db->set_data(hashed_db_data, thread_count);
-            APSI_LOG_INFO("Created labeled SenderDB with " << sender_db->get_items().size() << " items");
+            APSI_LOG_INFO("Created labeled SenderDB with "
+                << sender_db->get_items().size() << " items and " << label_size << "-byte labels");
         }
         catch (const exception &ex)
         {

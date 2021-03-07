@@ -46,11 +46,13 @@ int remote_query(const CLP &cmd);
 
 string get_conn_addr(const CLP &cmd);
 
-unique_ptr<CSVReader::DBData> load_db(const string &db_file);
+pair<unique_ptr<CSVReader::DBData>, vector<string>> load_db(const string &db_file);
 
-void print_intersection_results(const vector<Item> &items, const vector<MatchRecord> &intersection);
-
-void print_timing_info();
+void print_intersection_results(
+    const vector<string> &orig_items,
+    const vector<Item> &items,
+    const vector<MatchRecord> &intersection,
+    const string &out_file);
 
 void print_transmitted_data(Channel &channel);
 
@@ -109,7 +111,7 @@ int remote_query(const CLP& cmd)
 
     Receiver receiver(*params, cmd.threads());
 
-    unique_ptr<CSVReader::DBData> query_data = load_db(cmd.query_file());
+    auto [ query_data, orig_items ] = load_db(cmd.query_file());
     if (!query_data || !holds_alternative<CSVReader::UnlabeledData>(*query_data))
     {
         // Failed to read query file
@@ -145,105 +147,71 @@ int remote_query(const CLP& cmd)
         return -1;
     }
 
-    print_intersection_results(items_vec, query_result);
-    print_timing_info();
+    print_intersection_results(orig_items, items_vec, query_result, cmd.output_file());
     print_transmitted_data(channel);
+    print_timing_report(recv_stopwatch);
 
     return 0;
 }
 
-unique_ptr<CSVReader::DBData> load_db(const string &db_file)
+pair<unique_ptr<CSVReader::DBData>, vector<string>> load_db(const string &db_file)
 {
     CSVReader::DBData db_data;
+    vector<string> orig_items;
     try
     {
         CSVReader reader(db_file);
-        db_data = reader.read();
+        tie(db_data, orig_items) = reader.read();
     }
     catch (const exception &ex)
     {
         APSI_LOG_WARNING("Could not open or read file `" << db_file << "`: " << ex.what());
-        return nullptr;
+        return { nullptr, {} };
     }
 
-    return make_unique<CSVReader::DBData>(move(db_data));
+    return { make_unique<CSVReader::DBData>(move(db_data)), move(orig_items) };
 }
 
-string print_hex(gsl::span<unsigned char> s)
+void print_intersection_results(
+    const vector<string> &orig_items,
+    const vector<Item> &items,
+    const vector<MatchRecord> &intersection,
+    const string &out_file)
 {
-    stringstream ss;
-    ss << "{ ";
-    for (int i = static_cast<int>(s.size()) - 1; i >= 0; i--)
+    if (orig_items.size() != items.size())
     {
-        ss << setw(2) << setfill('0') << hex << int(s[i]) << (i ? ", " : " }");
+        throw invalid_argument("orig_items must have same size as items");
     }
-
-    return ss.str();
-}
-
-void print_intersection_results(const vector<Item> &items, const vector<MatchRecord> &intersection)
-{
-    for (size_t i = 0; i < intersection.size(); i++)
+    
+    stringstream csv_output;
+    for (size_t i = 0; i < orig_items.size(); i++)
     {
         stringstream msg;
-        msg << items[i].to_string() << ": ";
         if (intersection[i].found)
         {
-            msg << Colors::GreenBold << "found" << Colors::Reset;
-            msg << "; label: ";
+            msg << Colors::GreenBold << orig_items[i] << Colors::Reset;
             if (intersection[i].label)
             {
+                msg << ": ";
                 msg << Colors::GreenBold << intersection[i].label.to_string() << Colors::Reset;
             }
-            else
-            {
-                msg << Colors::GreenBold << "<empty>" << Colors::Reset;
-            }
+
+            csv_output << orig_items[i] << "," << intersection[i].label.to_string() << endl;
         }
         else
         {
-            msg << Colors::Red << "not found" << Colors::Reset;
+            msg << Colors::RedBold << orig_items[i] << Colors::Reset;
         }
 
         APSI_LOG_INFO(msg.str());
     }
-}
 
-void print_timing_info(Stopwatch &stopwatch, const string &caption)
-{
-    vector<string> timing_report;
-    vector<Stopwatch::TimespanSummary> timings;
-    sender_stopwatch.get_timespans(timings);
-
-    if (timings.size() > 0)
+    if (!out_file.empty())
     {
-        timing_report = generate_timespan_report(timings, sender_stopwatch.get_max_timespan_event_name_length());
-
-        APSI_LOG_INFO("Timespan event information");
-        for (const auto &timing : timing_report)
-        {
-            APSI_LOG_INFO(timing.c_str());
-        }
+        ofstream ofs(out_file);
+        ofs << csv_output.str();
+        APSI_LOG_INFO("Wrote output to " << out_file);
     }
-
-    vector<Stopwatch::Timepoint> timepoints;
-    sender_stopwatch.get_events(timepoints);
-
-    if (timepoints.size() > 0)
-    {
-        timing_report = generate_event_report(timepoints, sender_stopwatch.get_max_event_name_length());
-
-        APSI_LOG_INFO("Single event information");
-        for (const auto &timing : timing_report)
-        {
-            APSI_LOG_INFO(timing.c_str());
-        }
-    }
-}
-
-void print_timing_info()
-{
-    print_timing_info(recv_stopwatch, "Timing events for Receiver");
 }
 
 void print_transmitted_data(Channel &channel)

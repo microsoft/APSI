@@ -15,14 +15,9 @@ namespace apsi
     {
         const Stopwatch::time_unit Stopwatch::start_time(Stopwatch::time_unit::clock::now());
 
-        Stopwatch::Stopwatch()
-            : events_mtx_(make_shared<mutex>()), timespan_events_mtx_(make_shared<mutex>()), max_event_name_length_(0),
-              max_timespan_event_name_length_(0)
-        {}
-
         void Stopwatch::add_event(const string &name)
         {
-            unique_lock<mutex> events_lock(*events_mtx_);
+            unique_lock<mutex> events_lock(events_mtx_);
             events_.push_back(Timepoint{ name, time_unit::clock::now() });
 
             if (static_cast<int>(name.length()) > max_event_name_length_)
@@ -33,7 +28,7 @@ namespace apsi
 
         void Stopwatch::add_timespan_event(const string &name, const time_unit &start, const time_unit &end)
         {
-            unique_lock<mutex> timespan_events_lock(*timespan_events_mtx_);
+            unique_lock<mutex> timespan_events_lock(timespan_events_mtx_);
             uint64_t duration = static_cast<uint64_t>(chrono::duration_cast<chrono::milliseconds>(end - start).count());
             auto timespan_evt = timespan_events_.find(name);
 
@@ -73,9 +68,9 @@ namespace apsi
             }
         }
 
-        void Stopwatch::get_timespans(vector<TimespanSummary> &timespans)
+        void Stopwatch::get_timespans(vector<TimespanSummary> &timespans) const
         {
-            unique_lock<mutex> timespan_events_lock(*timespan_events_mtx_);
+            unique_lock<mutex> timespan_events_lock(timespan_events_mtx_);
 
             timespans.clear();
             for (const auto &timespan_evt : timespan_events_)
@@ -84,9 +79,9 @@ namespace apsi
             }
         }
 
-        void Stopwatch::get_events(vector<Timepoint> &events)
+        void Stopwatch::get_events(vector<Timepoint> &events) const
         {
-            unique_lock<mutex> events_lock(*events_mtx_);
+            unique_lock<mutex> events_lock(events_mtx_);
 
             events.clear();
             for (const auto &evt : events_)

@@ -72,7 +72,7 @@ public:
             "c",
             "logToConsole",
             "Output log to console",
-            false);
+            true);
         add(enable_console_log_arg);
 
         // No need to add log_level_arg_, already added in constructor
@@ -122,7 +122,7 @@ protected:
     void cout_param(const std::string &param_name, const T &param)
     {
         std::ostringstream ss;
-        ss << param_name << "=" << param;
+        ss << std::boolalpha << param_name << "=" << param;
         std::cout << std::setw(column_width) << std::left << ss.str();
         param_cols++;
 
@@ -135,8 +135,8 @@ protected:
 
 private:
     // For printing parameters
-    const int column_number = 4;
-    const int column_width = 20;
+    const int column_number = 2;
+    const int column_width = 40;
     int param_cols = 0;
 
     // Parameters from command line

@@ -33,3 +33,8 @@ Generate timing report for single events.
 std::vector<std::string> generate_event_report(
     const std::vector<apsi::util::Stopwatch::Timepoint> &timepoints,
     int max_name_length);
+
+/**
+Print timings.
+*/
+void print_timing_report(const apsi::util::Stopwatch &stopwatch);

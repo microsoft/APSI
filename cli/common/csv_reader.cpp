@@ -26,42 +26,47 @@ CSVReader::CSVReader(const string &file_name) : file_(file_name)
     throw_if_file_invalid();
 }
 
-auto CSVReader::read(istream &stream) const -> DBData
+auto CSVReader::read(istream &stream) const -> pair<DBData, vector<string>>
 {
     string line;
     DBData result;
+    vector<string> orig_items;
 
     if (!getline(stream, line))
     {
         APSI_LOG_WARNING("Nothing to read in `" << file_.string() << "`");
-        return UnlabeledData{};
+        return { UnlabeledData{}, {} };
     }
     else
     {
+        string orig_item;
         Item item;
         Label label;
-        auto [has_item, has_label] = process_line(line, item, label);
+        auto [has_item, has_label] = process_line(line, orig_item, item, label);
 
         if (!has_item)
         {
             APSI_LOG_WARNING("Failed to read item from `" << file_.string() << "`");
-            return UnlabeledData{};
+            return { UnlabeledData{}, {} };
         }
+
+        orig_items.push_back(move(orig_item));
         if (has_label)
         {
-            result = LabeledData{ make_pair(item, label) };
+            result = LabeledData{ make_pair(move(item), move(label)) };
         }
         else
         {
-            result = UnlabeledData{ item };
+            result = UnlabeledData{ move(item) };
         }
     }
 
     while (getline(stream, line))
     {
+        string orig_item;
         Item item;
         Label label;
-        auto [has_item, _] = process_line(line, item, label);
+        auto [has_item, _] = process_line(line, orig_item, item, label);
 
         if (!has_item)
         {
@@ -69,13 +74,15 @@ auto CSVReader::read(istream &stream) const -> DBData
             APSI_LOG_WARNING("Failed to read item from `" << file_.string() << "`");
             continue;
         }
+
+        orig_items.push_back(move(orig_item));
         if (holds_alternative<UnlabeledData>(result))
         {
-            get<UnlabeledData>(result).push_back(item);
+            get<UnlabeledData>(result).push_back(move(item));
         }
         else if (holds_alternative<LabeledData>(result))
         {
-            get<LabeledData>(result).push_back(make_pair(item, label));
+            get<LabeledData>(result).push_back(make_pair(move(item), move(label)));
         }
         else
         {
@@ -98,10 +105,10 @@ auto CSVReader::read(istream &stream) const -> DBData
         for_each(labeled_data.begin(), labeled_data.end(), [&](auto &a) { a.second.resize(label_byte_count); });
     }
 
-    return result;
+    return { move(result), move(orig_items) };
 }
 
-auto CSVReader::read() const -> DBData
+auto CSVReader::read() const -> pair<DBData, vector<string>>
 {
     throw_if_file_invalid();
     ifstream file(file_);
@@ -114,7 +121,7 @@ auto CSVReader::read() const -> DBData
     return read(file);
 }
 
-pair<bool, bool> CSVReader::process_line(const string &line, Item &item, Label &label) const
+pair<bool, bool> CSVReader::process_line(const string &line, string &orig_item, Item &item, Label &label) const
 {
     stringstream ss(line);
     string token;
@@ -132,6 +139,7 @@ pair<bool, bool> CSVReader::process_line(const string &line, Item &item, Label &
     }
 
     // Item can be of arbitrary length; the constructor of Item will automatically hash it
+    orig_item = token;
     item = token;
 
     // Second is the label
