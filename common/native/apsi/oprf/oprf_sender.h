@@ -89,11 +89,11 @@ namespace apsi
 
             static std::vector<oprf_hash_type> ComputeHashes(
                 const gsl::span<const oprf_item_type> &oprf_items,
-                const OPRFKey &oprf_key, std::size_t threads = 0);
+                const OPRFKey &oprf_key);
 
             static std::vector<std::pair<oprf_hash_type, EncryptedLabel>> ComputeHashes(
                 const gsl::span<const std::pair<oprf_item_type, Label>> &oprf_item_labels,
-                const OPRFKey &oprf_key, std::size_t threads = 0);
+                const OPRFKey &oprf_key);
         }; // class OPRFSender
     }      // namespace oprf
 } // namespace apsi

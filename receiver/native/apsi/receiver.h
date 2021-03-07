@@ -90,7 +90,7 @@ namespace apsi
             Creates a new receiver with parameters specified. In this case the receiver has specified the parameters
             and expects the sender to use the same set.
             */
-            Receiver(PSIParams params, std::size_t thread_count = 0);
+            Receiver(PSIParams params);
 
             /**
             Generates a new set of keys to use for queries.
@@ -201,8 +201,6 @@ namespace apsi
                 network::Channel &chl) const;
 
             void initialize();
-
-            std::size_t thread_count_;
 
             PSIParams params_;
 

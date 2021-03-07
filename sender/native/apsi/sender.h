@@ -121,16 +121,26 @@ namespace apsi
 
         private:
             /**
-            Method that handles the work of a single thread that computes the response to a query.
+            Method that handles computing powers for a given bundle index
             */
-            static void QueryWorker(
+            static void ComputePowers(
                 const std::shared_ptr<SenderDB> &sender_db,
-                CryptoContext crypto_context,
-                std::pair<std::uint32_t, std::uint32_t> work_range,
+                CryptoContext &crypto_context,
                 std::vector<std::vector<seal::Ciphertext>> &powers,
                 const PowersDag &pd,
+                std::uint32_t bundle_idx);
+
+            /**
+            Method that processes a single Bin Bundle cache.
+            Sends a result package through the given channel.
+            */
+            static void ProcessBinBundleCache(
+                const std::shared_ptr<SenderDB> &sender_db,
+                const std::reference_wrapper<const BinBundleCache> &cache,
+                std::vector<CiphertextPowers> &all_powers,
                 network::Channel &chl,
-                std::function<void(network::Channel &, ResultPart)> send_rp_fun);
+                std::function<void(network::Channel &, ResultPart)> send_rp_fun,
+                std::uint32_t bundle_idx);
         }; // class Sender
     }      // namespace sender
 } // namespace apsi

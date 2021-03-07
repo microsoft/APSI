@@ -8,6 +8,7 @@
 #include "apsi/logging/log.h"
 #include "apsi/network/stream_channel.h"
 #include "apsi/oprf/oprf_sender.h"
+#include "apsi/util/thread_pool_mgr.h"
 #include "apsi/receiver.h"
 #include "apsi/sender.h"
 #include "apsi/sender_db.h"
@@ -35,9 +36,10 @@ namespace APSITests
             const PSIParams &params,
             size_t num_threads)
         {
-            logging::Log::set_console_disabled(false);
+            logging::Log::set_console_disabled(true);
             logging::Log::set_log_level(logging::Log::Level::info);
-            //logging::Log::set_log_file("out.log");
+
+            ThreadPoolMgr::set_thread_count(num_threads);
 
             vector<Item> sender_items;
             for (size_t i = 0; i < sender_size; i++)
@@ -49,14 +51,14 @@ namespace APSITests
             auto hashed_sender_items = OPRFSender::ComputeHashes(sender_items, oprf_key);
 
             auto sender_db = make_shared<SenderDB>(params, 0);
-            sender_db->set_data(hashed_sender_items, num_threads);
+            sender_db->set_data(hashed_sender_items);
 
             auto seal_context = sender_db->get_seal_context();
 
             stringstream ss;
             StreamChannel chl(ss);
 
-            Receiver receiver(params, num_threads);
+            Receiver receiver(params);
 
             for (auto client_total_and_int_size : client_total_and_int_sizes)
             {
@@ -126,9 +128,10 @@ namespace APSITests
             const PSIParams &params,
             size_t num_threads)
         {
-            logging::Log::set_console_disabled(false);
-            logging::Log::set_log_level("all");
-            //logging::Log::set_log_file("out.log");
+            logging::Log::set_console_disabled(true);
+            logging::Log::set_log_level(logging::Log::Level::info);
+
+            ThreadPoolMgr::set_thread_count(num_threads);
 
             vector<pair<Item, Label>> sender_items;
             for (size_t i = 0; i < sender_size; i++)
@@ -140,14 +143,14 @@ namespace APSITests
             auto hashed_sender_items = OPRFSender::ComputeHashes(sender_items, oprf_key);
 
             auto sender_db = make_shared<SenderDB>(params, 20, true);
-            sender_db->set_data(hashed_sender_items, num_threads);
+            sender_db->set_data(hashed_sender_items);
 
             auto seal_context = sender_db->get_seal_context();
 
             stringstream ss;
             StreamChannel chl(ss);
 
-            Receiver receiver(params, num_threads);
+            Receiver receiver(params);
 
             for (auto client_total_and_int_size : client_total_and_int_sizes)
             {

@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <sstream>
 #include <algorithm>
-#include <thread>
+#include <future>
 
 // APSI
 #include "apsi/logging/log.h"
@@ -15,6 +15,7 @@
 #include "apsi/receiver.h"
 #include "apsi/util/utils.h"
 #include "apsi/util/db_encoding.h"
+#include "apsi/util/thread_pool_mgr.h"
 
 // SEAL
 #include "seal/util/defines.h"
@@ -59,10 +60,8 @@ namespace apsi
             return item_idx->second;
         }
 
-        Receiver::Receiver(PSIParams params, size_t thread_count) : params_(move(params))
+        Receiver::Receiver(PSIParams params) : params_(move(params))
         {
-            thread_count_ = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
-
             initialize();
         }
 
@@ -101,7 +100,6 @@ namespace apsi
 
         void Receiver::initialize()
         {
-            APSI_LOG_INFO("Initializing Receiver with " << thread_count_ << " threads");
             APSI_LOG_DEBUG("PSI parameters set to: " << params_.to_string());
             APSI_LOG_DEBUG("Derived parameters: "
                 << "item_bit_count_per_felt: " << params_.item_bit_count_per_felt()
@@ -355,6 +353,8 @@ namespace apsi
 
         vector<MatchRecord> Receiver::request_query(const vector<HashedItem> &items, NetworkChannel &chl)
         {
+            ThreadPoolMgr tpm;
+
             // Create query and send to Sender
             auto query = create_query(items);
             chl.send(move(query.first));
@@ -382,19 +382,19 @@ namespace apsi
             atomic<uint32_t> package_count{ response->package_count };
 
             // Launch threads to receive ResultPackages and decrypt results
-            vector<thread> threads;
-            APSI_LOG_INFO("Launching " << thread_count_ << " result worker threads to handle " << package_count
+            size_t task_count = ThreadPoolMgr::get_thread_count();
+            vector<future<void>> futures(task_count);
+            APSI_LOG_INFO("Launching " << task_count << " result worker tasks to handle " << package_count
                 << " result parts");
-            for (size_t t = 0; t < thread_count_; t++)
+            for (size_t t = 0; t < task_count; t++)
             {
-                threads.emplace_back([&, t]() {
-                    process_result_worker(package_count, mrs, itt, chl);
-                });
+                futures[t] = tpm.thread_pool().enqueue(
+                    [&]() { process_result_worker(package_count, mrs, itt, chl); });
             }
 
-            for (auto &t : threads)
+            for (auto &f : futures)
             {
-                t.join();
+                f.get();
             }
 
             APSI_LOG_INFO("Found " << accumulate(mrs.begin(), mrs.end(), 0,

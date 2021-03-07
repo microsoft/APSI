@@ -5,6 +5,7 @@
 #include "apsi/logging/log.h"
 #include "apsi/network/zmq/zmq_channel.h"
 #include "apsi/oprf/oprf_sender.h"
+#include "apsi/util/thread_pool_mgr.h"
 #include "apsi/receiver.h"
 #include "apsi/sender.h"
 #include "apsi/sender_db.h"
@@ -35,9 +36,11 @@ namespace APSITests
             const PSIParams &params,
             size_t num_threads)
         {
-            logging::Log::set_console_disabled(false);
+            logging::Log::set_console_disabled(true);
             logging::Log::set_log_level(logging::Log::Level::info);
-            //logging::Log::set_log_file("out.log");
+
+            ThreadPoolMgr::set_thread_count(num_threads);
+            ThreadPoolMgr::set_phys_thread_count(num_threads * 2);
 
             vector<Item> sender_items;
             for (size_t i = 0; i < sender_size; i++)
@@ -49,7 +52,7 @@ namespace APSITests
             auto hashed_sender_items = OPRFSender::ComputeHashes(sender_items, *oprf_key);
 
             auto sender_db = make_shared<SenderDB>(params, 0, true);
-            sender_db->set_data(hashed_sender_items, num_threads);
+            sender_db->set_data(hashed_sender_items);
             APSI_LOG_INFO("Packing rate: " << sender_db->get_packing_rate());
 
             stringstream ss;
@@ -68,7 +71,7 @@ namespace APSITests
             string conn_addr = "tcp://localhost:5550";
             recv_chl.connect(conn_addr);
 
-            Receiver receiver(params, num_threads);
+            Receiver receiver(params);
 
             for (auto client_total_and_int_size : client_total_and_int_sizes)
             {
@@ -103,9 +106,11 @@ namespace APSITests
             const PSIParams &params,
             size_t num_threads)
         {
-            logging::Log::set_console_disabled(false);
+            logging::Log::set_console_disabled(true);
             logging::Log::set_log_level(logging::Log::Level::info);
-            //logging::Log::set_log_file("out.log");
+
+            ThreadPoolMgr::set_thread_count(num_threads);
+            ThreadPoolMgr::set_phys_thread_count(num_threads * 2);
 
             vector<pair<Item, Label>> sender_items;
             for (size_t i = 0; i < sender_size; i++)
@@ -117,7 +122,7 @@ namespace APSITests
             auto hashed_sender_items = OPRFSender::ComputeHashes(sender_items, *oprf_key);
 
             auto sender_db = make_shared<SenderDB>(params, 10, true);
-            sender_db->set_data(hashed_sender_items, num_threads);
+            sender_db->set_data(hashed_sender_items);
             APSI_LOG_INFO("Packing rate: " << sender_db->get_packing_rate());
 
             stringstream ss;
@@ -136,7 +141,7 @@ namespace APSITests
             string conn_addr = "tcp://localhost:5550";
             recv_chl.connect(conn_addr);
 
-            Receiver receiver(params, num_threads);
+            Receiver receiver(params);
 
             for (auto client_total_and_int_size : client_total_and_int_sizes)
             {
