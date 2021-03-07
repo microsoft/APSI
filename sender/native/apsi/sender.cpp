@@ -282,13 +282,12 @@ namespace apsi
             // because it corresponds to the zeroth power of the query and is included only for
             // convenience of the indexing; the ciphertext is actually not set or valid for use.
 
-            // When using C++17 this function may be multi-threaded in the future with C++ execution
-            // policies.
-            seal_for_each_n(
-                powers_at_this_bundle_idx.begin() + 1,
-                powers_at_this_bundle_idx.size() - 1,
-                [&](auto &ct) { evaluator.transform_to_ntt_inplace(ct); });
-        }
+                // When using C++17 this function may be multi-threaded in the future with C++ execution policies.
+                for_each(
+                    next(powers_at_this_bundle_idx.begin()),
+                    powers_at_this_bundle_idx.end(),
+                    [&](auto &ct) { evaluator.transform_to_ntt_inplace(ct);
+                });
 
         void Sender::ProcessBinBundleCache(
             const shared_ptr<SenderDB> &sender_db,
@@ -309,11 +308,11 @@ namespace apsi
             const BatchedPlaintextPolyn &matching_polyn = cache.get().batched_matching_polyn;
             rp->psi_result = matching_polyn.eval(all_powers[bundle_idx]);
 
-            rp->label_byte_count = sender_db->get_label_byte_count();
-            for (const auto &interp_polyn : cache.get().batched_interp_polyns) {
-                // Compute the label result and move to rp
-                rp->label_result.emplace_back(interp_polyn.eval(all_powers[bundle_idx]));
-            }
+                    rp->label_byte_count = safe_cast<uint32_t>(sender_db->get_label_byte_count());
+                    for (const auto &interp_polyn : cache.get().batched_interp_polyns) {
+                        // Compute the label result and move to rp
+                        rp->label_result.emplace_back(interp_polyn.eval(all_powers[bundle_idx]));
+                    }
 
             // Send this result part
             try {

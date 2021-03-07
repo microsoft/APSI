@@ -70,7 +70,7 @@ namespace apsi
                 in.read(reinterpret_cast<char*>(destination.data() + old_size), to_read);
 
                 // Decrement byte_count and increase to_read for next round
-                byte_count -= to_read;
+                byte_count -= static_cast<uint32_t>(to_read);
 
                 // Set to_read for next round exactly to right size so we don't read too much
                 to_read = min(2 * to_read, static_cast<size_t>(byte_count));

@@ -73,27 +73,26 @@ namespace apsi
     std::string msg_str = ss.str();           \
     logging::Log::do_log(msg_str, msg_level); \
 
-#define APSI_LOG_INFO(msg)                                              \
-    do {                                                                \
-        APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::info); \
-        APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::info);     \
-    } while (0);
-
-#define APSI_LOG_DEBUG(msg)                                              \
-    do {                                                                 \
+#define APSI_LOG_DEBUG(msg)                                        \
+    do {                                                           \
         APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::debug); \
         APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::debug);     \
     } while (0);
 
-#define APSI_LOG_WARNING(msg)                                              \
-    do {                                                                   \
+#define APSI_LOG_INFO(msg)                                        \
+    do {                                                          \
+        APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::info); \
+        APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::info);     \
+    } while (0);
+
+#define APSI_LOG_WARNING(msg)                                        \
+    do {                                                             \
         APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::warning); \
         APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::warning);     \
     } while (0);
 
-#define APSI_LOG_ERROR(msg)                                              \
-    do {                                                                 \
+#define APSI_LOG_ERROR(msg)                                        \
+    do {                                                           \
         APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::error); \
         APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::error);     \
     } while (0);
-

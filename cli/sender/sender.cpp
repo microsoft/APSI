@@ -167,7 +167,7 @@ pair<shared_ptr<OPRFKey>, shared_ptr<SenderDB>> create_sender_db(
 
         try
         {
-            sender_db = make_shared<UnlabeledSenderDB>(psi_params);
+            sender_db = make_shared<SenderDB>(psi_params, 0);
             sender_db->set_data(hashed_db_data);
             APSI_LOG_INFO("Created unlabeled SenderDB with " << sender_db->get_items().size() << " items");
         }
@@ -188,7 +188,7 @@ pair<shared_ptr<OPRFKey>, shared_ptr<SenderDB>> create_sender_db(
 
         try
         {
-            sender_db = make_shared<LabeledSenderDB>(psi_params);
+            sender_db = make_shared<SenderDB>(psi_params, hashed_db_data[0].second.size());
             sender_db->set_data(hashed_db_data);
             APSI_LOG_INFO("Created labeled SenderDB with " << sender_db->get_items().size() << " items");
         }

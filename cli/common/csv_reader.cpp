@@ -31,7 +31,7 @@ auto CSVReader::read(istream &stream) const -> DBData
     string line;
     DBData result;
 
-    if (!(stream >> line))
+    if (!getline(stream, line))
     {
         APSI_LOG_WARNING("Nothing to read in `" << file_.string() << "`");
         return UnlabeledData{};
@@ -57,7 +57,7 @@ auto CSVReader::read(istream &stream) const -> DBData
         }
     }
 
-    while (stream >> line)
+    while (getline(stream, line))
     {
         Item item;
         Label label;
@@ -83,6 +83,19 @@ auto CSVReader::read(istream &stream) const -> DBData
             APSI_LOG_ERROR("Critical error reading data");
             throw runtime_error("variant is in bad state");
         }
+    }
+
+    // Pad labels with zeros to same size
+    if (holds_alternative<LabeledData>(result))
+    {
+        // Find the longest label
+        auto &labeled_data = get<LabeledData>(result);
+        size_t label_byte_count = max_element(labeled_data.begin(), labeled_data.end(), [](auto &a, auto &b) {
+            return a.second.size() < b.second.size();
+        })->second.size();
+
+        // Resize each label to label_byte_count
+        for_each(labeled_data.begin(), labeled_data.end(), [&](auto &a) { a.second.resize(label_byte_count); });
     }
 
     return result;
@@ -124,6 +137,10 @@ pair<bool, bool> CSVReader::process_line(const string &line, Item &item, Label &
     // Second is the label
     token.clear();
     getline(ss, token);
+
+    // Trim leading whitespace
+    token.erase(token.begin(), find_if(token.begin(), token.end(), [](int ch) { return !isspace(ch); }));
+
     label.clear();
     label.reserve(token.size());
     copy(token.begin(), token.end(), back_inserter(label));

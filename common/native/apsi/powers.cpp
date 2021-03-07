@@ -101,7 +101,7 @@ namespace apsi
         configured_ = true;
         up_to_power_ = up_to_power;
         depth_ = curr_depth;
-        source_count_ = source_powers.size();
+        source_count_ = static_cast<uint32_t>(source_powers.size());
         return true;
     }
 
@@ -140,7 +140,7 @@ namespace apsi
         }
 
         vector<PowersNode> result;
-        for (auto node : nodes_)
+        for (auto &node : nodes_)
         {
             if (!node.second.parents.first && !node.second.parents.second)
             {

@@ -77,10 +77,6 @@ namespace APSITests
     protected:
         ReceiverTests()
         {
-            logging::Log::set_console_disabled(false);
-            logging::Log::set_log_level(logging::Log::Level::info);
-            // logging::Log::set_log_file("out.log");
-
             if (!server_.is_connected())
             {
                 server_.bind("tcp://*:5556");
@@ -210,7 +206,7 @@ namespace APSITests
                 uint32_t bundle_idx = loc / get_params()->items_per_bundle();
                 uint32_t bundle_offset = loc - bundle_idx * get_params()->items_per_bundle();
                 fill_n(
-                    rp_vec.begin() + bundle_offset * get_params()->item_params().felts_per_item,
+                    rp_vec.begin() + static_cast<size_t>(bundle_offset) * get_params()->item_params().felts_per_item,
                     get_params()->item_params().felts_per_item, 0);
             }
 

@@ -159,16 +159,30 @@ namespace apsi
             initialize();
         }
 
+        PSIParams(const PSIParams &copy) = default;
+
+        PSIParams &operator =(const PSIParams &copy) = default;
+
         std::string to_string() const;
 
+        /**
+        Writes the PSIParams to a stream.
+        */
+        std::size_t save(std::ostream &out) const;
+
+        /**
+        Reads the PSIParams from a stream.
+        */
+        static std::pair<PSIParams, std::size_t> Load(std::istream &in);
+
     private:
-        const ItemParams item_params_;
+        ItemParams item_params_;
 
-        const TableParams table_params_;
+        TableParams table_params_;
 
-        const QueryParams query_params_;
+        QueryParams query_params_;
 
-        const SEALParams seal_params_;
+        SEALParams seal_params_;
 
         std::uint32_t items_per_bundle_;
 
@@ -180,14 +194,4 @@ namespace apsi
 
         void initialize();
     }; // class PSIParams
-
-    /**
-    Writes the PSIParams to a stream.
-    */
-    std::size_t SaveParams(const PSIParams &params, std::ostream &out);
-
-    /**
-    Reads the PSIParams from a stream.
-    */
-    std::pair<PSIParams, std::size_t> LoadParams(std::istream &in);
 } // namespace apsi

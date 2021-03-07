@@ -54,9 +54,9 @@ namespace apsi
         Bitstring field_elts_to_bits(gsl::span<const felt_t> felts, std::uint32_t bit_count, const seal::Modulus &mod);
 
         /**
-        Converts an item and label into a sequence of (felt_t, felt_t) pairs, where the the first pair value is a chunk of
-        the item, and the second is a chunk of the label. item_bit_count denotes the bit length of the items and labels
-        (they are the same length). mod denotes the modulus of the prime field.
+        Converts an item and label into a sequence of (felt_t, felt_t) pairs, where the the first pair value is a chunk
+        of the item, and the second is a chunk of the label. item_bit_count denotes the bit length of the items and
+        labels (they are the same length). mod denotes the modulus of the prime field.
         */
         AlgItemLabel algebraize_item_label(
             const HashedItem &item,
@@ -67,8 +67,8 @@ namespace apsi
 
         /**
         Converts an item into a sequence of (felt_t, monostate) pairs, where the the first pair value is a chunk of the
-        item, and the second is the unit type. item_bit_count denotes the bit length of the items and labels (they are the
-        same length). mod denotes the modulus of the prime field. mod denotes the modulus of the prime field.
+        item, and the second is the unit type. item_bit_count denotes the bit length of the items and labels (they are
+        the same length). mod denotes the modulus of the prime field. mod denotes the modulus of the prime field.
         */
         AlgItem algebraize_item(
             const HashedItem &item,
@@ -85,8 +85,8 @@ namespace apsi
             const seal::Modulus &mod);
 
         /**
-        Converts a sequence of field elements into an EncryptedLabel. This will throw an invalid_argument if too many field
-        elements are given, i.e., if modulus_bitlen * num_elements > 128.
+        Converts a sequence of field elements into an EncryptedLabel. This will throw an invalid_argument if too many
+        field elements are given, i.e., if modulus_bitlen * num_elements > 128.
         */
         EncryptedLabel dealgebraize_label(
             const AlgLabel &label,

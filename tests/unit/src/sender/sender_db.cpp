@@ -51,26 +51,16 @@ namespace APSITests
             return params;
         }
 
-        Label create_label(uint64_t lw, uint64_t hw, size_t byte_count)
+        Label create_label(unsigned char start, size_t byte_count)
         {
-            uint64_t label_data[2]{ lw, hw };
-            if (byte_count > sizeof(label_data))
-            {
-                throw runtime_error("output is too large");
-            }
-
-            Label label;
-            copy_n(
-                reinterpret_cast<const unsigned char*>(label_data),
-                byte_count,
-                back_inserter(label));
-
+            Label label(byte_count);
+            iota(label.begin(), label.end(), start);
             return label;
         }
 
-        EncryptedLabel create_encrypted_label(uint64_t lw, uint64_t hw, size_t byte_count)
+        EncryptedLabel create_encrypted_label(unsigned char start, size_t byte_count)
         {
-            Label label = create_label(lw, hw, byte_count);
+            Label label = create_label(start, byte_count);
             return EncryptedLabel(move(label), allocator<unsigned char>());
         }
     }
@@ -78,7 +68,7 @@ namespace APSITests
     TEST(SenderDBTests, UnlabeledBasics)
     {
         auto params = get_params();
-        UnlabeledSenderDB sender_db(*params);
+        SenderDB sender_db(*params, 0);
 
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
         sender_db.clear_db();
@@ -101,7 +91,7 @@ namespace APSITests
     TEST(SenderDBTests, LabeledBasics)
     {
         auto params = get_params();
-        LabeledSenderDB sender_db(*params);
+        SenderDB sender_db(*params, 20);
 
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
         sender_db.clear_db();
@@ -124,7 +114,7 @@ namespace APSITests
     TEST(SenderDBTests, UnlabeledInsertOrAssignSingle)
     {
         auto params = get_params();
-        UnlabeledSenderDB sender_db(*params);
+        SenderDB sender_db(*params, 0);
 
         // Insert a single item
         sender_db.insert_or_assign(HashedItem(0, 0));
@@ -175,7 +165,7 @@ namespace APSITests
     TEST(SenderDBTests, UnlabeledInsertOrAssignMany)
     {
         auto params = get_params();
-        UnlabeledSenderDB sender_db(*params);
+        SenderDB sender_db(*params, 0);
 
         // Create a vector of items without duplicates
         vector<HashedItem> items;
@@ -234,36 +224,36 @@ namespace APSITests
     TEST(SenderDBTests, LabeledInsertOrAssignSingle)
     {
         auto params = get_params();
-        LabeledSenderDB sender_db(*params);
+        SenderDB sender_db(*params, 20, true);
 
         // Insert a single item with zero label
-        sender_db.insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(0, 0, 10)));
+        sender_db.insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(0, 20)));
         ASSERT_EQ(1, sender_db.get_items().size());
         ASSERT_EQ(1, sender_db.get_bin_bundle_count());
         auto label = sender_db.get_label(HashedItem(0, 0));
-        ASSERT_EQ(create_encrypted_label(0, 0, 10), label);
+        ASSERT_EQ(create_encrypted_label(0, 20), label);
 
         // Replace label
-        sender_db.insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(1, 0, 10)));
+        sender_db.insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(1, 20)));
         ASSERT_EQ(1, sender_db.get_items().size());
         ASSERT_EQ(1, sender_db.get_bin_bundle_count());
         label = sender_db.get_label(HashedItem(0, 0));
-        ASSERT_EQ(create_encrypted_label(1, 0, 10), label);
+        ASSERT_EQ(create_encrypted_label(1, 20), label);
 
         // Replace label again
-        sender_db.insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(~uint64_t(0), ~uint64_t(0), 10)));
+        sender_db.insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(0xFF, 20)));
         ASSERT_EQ(1, sender_db.get_items().size());
         ASSERT_EQ(1, sender_db.get_bin_bundle_count());
         label = sender_db.get_label(HashedItem(0, 0));
-        ASSERT_EQ(create_encrypted_label(~uint64_t(0), ~uint64_t(0), 10), label);
+        ASSERT_EQ(create_encrypted_label(0xFF, 20), label);
 
         // Insert another item
-        sender_db.insert_or_assign(make_pair(HashedItem(1, 0), create_encrypted_label(1, 1, 10)));
+        sender_db.insert_or_assign(make_pair(HashedItem(1, 0), create_encrypted_label(1, 20)));
         ASSERT_EQ(2, sender_db.get_items().size());
         label = sender_db.get_label(HashedItem(0, 0));
-        ASSERT_EQ(create_encrypted_label(~uint64_t(0), ~uint64_t(0), 10), label);
+        ASSERT_EQ(create_encrypted_label(0xFF, 20), label);
         label = sender_db.get_label(HashedItem(1, 0));
-        ASSERT_EQ(create_encrypted_label(1, 1, 10), label);
+        ASSERT_EQ(create_encrypted_label(1, 20), label);
 
         // Check that both items are found and whatever was not inserted is not found.
         auto items = sender_db.get_items();
@@ -282,13 +272,14 @@ namespace APSITests
     TEST(SenderDBTests, LabeledInsertOrAssignMany)
     {
         auto params = get_params();
-        LabeledSenderDB sender_db(*params);
+        SenderDB sender_db(*params, 20, true);
 
         // Create a vector of items and labels without duplicates
         vector<pair<HashedItem, EncryptedLabel>> items;
         for (uint64_t i = 0; i < 200; i++)
         {
-            items.push_back(make_pair(HashedItem(i, i + 1), create_encrypted_label(i, i + 1, 10)));
+            items.push_back(
+                make_pair(HashedItem(i, i + 1), create_encrypted_label(static_cast<unsigned char>(i), 20)));
         }
 
         // Insert all items
@@ -344,12 +335,12 @@ namespace APSITests
     {
         auto params = get_params();
 
-        // We use a LabeledSenderDB here to end up with multiple BinBundles more quickly. This happens because in the
+        // We use a labeled SenderDB here to end up with multiple BinBundles more quickly. This happens because in the
         // labeled case BinBundles cannot tolerate repetitions of item parts (felts) in bins.
-        LabeledSenderDB sender_db(*params);
+        SenderDB sender_db(*params, 20, true);
 
         // Insert a single item
-        sender_db.insert_or_assign({ HashedItem(0, 0), create_encrypted_label(0, 0, 10) });
+        sender_db.insert_or_assign({ HashedItem(0, 0), create_encrypted_label(0, 20) });
         ASSERT_EQ(1, sender_db.get_items().size());
         ASSERT_EQ(1, sender_db.get_bin_bundle_count());
         ASSERT_FALSE(sender_db.get_items().find({ 0, 0 }) == sender_db.get_items().end());
@@ -367,7 +358,8 @@ namespace APSITests
         uint64_t val = 0;
         while (sender_db.get_bin_bundle_count() < 5)
         {
-            sender_db.insert_or_assign({ HashedItem(val, ~val), create_encrypted_label(val, ~val, 10) });
+            sender_db.insert_or_assign(
+                { HashedItem(val, ~val), create_encrypted_label(static_cast<unsigned char>(val), 20) });
             val++;
         }
 
@@ -396,7 +388,8 @@ namespace APSITests
         val = 0;
         while (sender_db.get_bin_bundle_count() < 5)
         {
-            sender_db.insert_or_assign({ HashedItem(val, ~val), create_encrypted_label(val, ~val, 10) });
+            sender_db.insert_or_assign(
+                { HashedItem(val, ~val), create_encrypted_label(static_cast<unsigned char>(val), 20) });
             val++;
         }
 
@@ -415,33 +408,31 @@ namespace APSITests
     TEST(SenderDBTests, SaveLoadUnlabeled)
     {
         auto params = get_params();
-        shared_ptr<SenderDB> sender_db(make_shared<UnlabeledSenderDB>(*params));
+        SenderDB sender_db(*params, 0);
 
         stringstream ss;
-        size_t save_size = SaveSenderDB(sender_db, ss);
-        auto other = LoadSenderDB(ss);
-        auto other_sdb = other.first;
-        ASSERT_NE(nullptr, other_sdb);
+        size_t save_size = sender_db.save(ss);
+        auto other = SenderDB::Load(ss);
+        auto other_sdb = move(other.first);
 
         ASSERT_EQ(save_size, other.second);
-        ASSERT_EQ(params->to_string(), other_sdb->get_params().to_string());
-        ASSERT_EQ(sender_db->get_items().size(), other_sdb->get_items().size());
-        ASSERT_EQ(sender_db->is_compressed(), other_sdb->is_compressed());
-        ASSERT_EQ(sender_db->is_labeled(), other_sdb->is_labeled());
+        ASSERT_EQ(params->to_string(), other_sdb.get_params().to_string());
+        ASSERT_EQ(sender_db.get_items().size(), other_sdb.get_items().size());
+        ASSERT_EQ(sender_db.is_compressed(), other_sdb.is_compressed());
+        ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
 
         // Insert a single item
-        sender_db->insert_or_assign(HashedItem(0, 0));
+        sender_db.insert_or_assign(HashedItem(0, 0));
 
-        save_size = SaveSenderDB(sender_db, ss);
-        other = LoadSenderDB(ss);
-        other_sdb = other.first;
-        ASSERT_NE(nullptr, other_sdb);
+        save_size = sender_db.save(ss);
+        other = SenderDB::Load(ss);
+        other_sdb = move(other.first);
 
         ASSERT_EQ(save_size, other.second);
-        ASSERT_EQ(params->to_string(), other_sdb->get_params().to_string());
-        ASSERT_EQ(sender_db->get_items().size(), other_sdb->get_items().size());
-        ASSERT_EQ(sender_db->is_compressed(), other_sdb->is_compressed());
-        ASSERT_EQ(sender_db->is_labeled(), other_sdb->is_labeled());
+        ASSERT_EQ(params->to_string(), other_sdb.get_params().to_string());
+        ASSERT_EQ(sender_db.get_items().size(), other_sdb.get_items().size());
+        ASSERT_EQ(sender_db.is_compressed(), other_sdb.is_compressed());
+        ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
 
         // Create a vector of items without duplicates
         vector<HashedItem> items;
@@ -451,82 +442,78 @@ namespace APSITests
         }
 
         // Insert all items
-        sender_db->insert_or_assign(items);
+        sender_db.insert_or_assign(items);
 
-        save_size = SaveSenderDB(sender_db, ss);
-        other = LoadSenderDB(ss);
-        other_sdb = other.first;
-        ASSERT_NE(nullptr, other_sdb);
+        save_size = sender_db.save(ss);
+        other = SenderDB::Load(ss);
+        other_sdb = move(other.first);
 
         ASSERT_EQ(save_size, other.second);
-        ASSERT_EQ(params->to_string(), other_sdb->get_params().to_string());
-        ASSERT_EQ(sender_db->get_items().size(), other_sdb->get_items().size());
-        ASSERT_EQ(sender_db->is_compressed(), other_sdb->is_compressed());
-        ASSERT_EQ(sender_db->is_labeled(), other_sdb->is_labeled());
+        ASSERT_EQ(params->to_string(), other_sdb.get_params().to_string());
+        ASSERT_EQ(sender_db.get_items().size(), other_sdb.get_items().size());
+        ASSERT_EQ(sender_db.is_compressed(), other_sdb.is_compressed());
+        ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
 
         // Check that the items match
-        for (auto &it : sender_db->get_items())
+        for (auto &it : sender_db.get_items())
         {
-            ASSERT_NE(other_sdb->get_items().end(), other_sdb->get_items().find(it));
+            ASSERT_NE(other_sdb.get_items().end(), other_sdb.get_items().find(it));
         }
     }
 
     TEST(SenderDBTests, SaveLoadLabeled)
     {
         auto params = get_params();
-        shared_ptr<SenderDB> sender_db(make_shared<LabeledSenderDB>(*params));
+        SenderDB sender_db(*params, 20);
 
         stringstream ss;
-        size_t save_size = SaveSenderDB(sender_db, ss);
-        auto other = LoadSenderDB(ss);
-        auto other_sdb = other.first;
-        ASSERT_NE(nullptr, other_sdb);
+        size_t save_size = sender_db.save(ss);
+        auto other = SenderDB::Load(ss);
+        auto other_sdb = move(other.first);
 
         ASSERT_EQ(save_size, other.second);
-        ASSERT_EQ(params->to_string(), other_sdb->get_params().to_string());
-        ASSERT_EQ(sender_db->get_items().size(), other_sdb->get_items().size());
-        ASSERT_EQ(sender_db->is_compressed(), other_sdb->is_compressed());
-        ASSERT_EQ(sender_db->is_labeled(), other_sdb->is_labeled());
+        ASSERT_EQ(params->to_string(), other_sdb.get_params().to_string());
+        ASSERT_EQ(sender_db.get_items().size(), other_sdb.get_items().size());
+        ASSERT_EQ(sender_db.is_compressed(), other_sdb.is_compressed());
+        ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
 
         // Insert a single item
-        sender_db->insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(0, 0, 10)));
+        sender_db.insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(0, 20)));
 
-        save_size = SaveSenderDB(sender_db, ss);
-        other = LoadSenderDB(ss);
-        other_sdb = other.first;
-        ASSERT_NE(nullptr, other_sdb);
+        save_size = sender_db.save(ss);
+        other = SenderDB::Load(ss);
+        other_sdb = move(other.first);
 
         ASSERT_EQ(save_size, other.second);
-        ASSERT_EQ(params->to_string(), other_sdb->get_params().to_string());
-        ASSERT_EQ(sender_db->get_items().size(), other_sdb->get_items().size());
-        ASSERT_EQ(sender_db->is_compressed(), other_sdb->is_compressed());
-        ASSERT_EQ(sender_db->is_labeled(), other_sdb->is_labeled());
+        ASSERT_EQ(params->to_string(), other_sdb.get_params().to_string());
+        ASSERT_EQ(sender_db.get_items().size(), other_sdb.get_items().size());
+        ASSERT_EQ(sender_db.is_compressed(), other_sdb.is_compressed());
+        ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
 
         // Create a vector of items and labels without duplicates
         vector<pair<HashedItem, EncryptedLabel>> items;
         for (uint64_t i = 0; i < 200; i++)
         {
-            items.push_back(make_pair(HashedItem(i, i + 1), create_encrypted_label(i, i + 1, 10)));
+            items.push_back(make_pair(HashedItem(i, i + 1), create_encrypted_label(static_cast<unsigned char>(i), 20)));
         }
 
         // Insert all items
-        sender_db->insert_or_assign(items);
+        sender_db.insert_or_assign(items);
 
-        save_size = SaveSenderDB(sender_db, ss);
-        other = LoadSenderDB(ss);
-        other_sdb = other.first;
-        ASSERT_NE(nullptr, other_sdb);
+        save_size = sender_db.save(ss);
+        other = SenderDB::Load(ss);
+        other_sdb = move(other.first);
 
         ASSERT_EQ(save_size, other.second);
-        ASSERT_EQ(params->to_string(), other_sdb->get_params().to_string());
-        ASSERT_EQ(sender_db->get_items().size(), other_sdb->get_items().size());
-        ASSERT_EQ(sender_db->is_compressed(), other_sdb->is_compressed());
-        ASSERT_EQ(sender_db->is_labeled(), other_sdb->is_labeled());
+        ASSERT_EQ(params->to_string(), other_sdb.get_params().to_string());
+        ASSERT_EQ(sender_db.get_items().size(), other_sdb.get_items().size());
+        ASSERT_EQ(sender_db.is_compressed(), other_sdb.is_compressed());
+        ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
 
         // Check that the items match
-        for (auto &it : sender_db->get_items())
+        for (auto &it : sender_db.get_items())
         {
-            ASSERT_NE(other_sdb->get_items().end(), other_sdb->get_items().find(it));
+            ASSERT_NE(other_sdb.get_items().end(), other_sdb.get_items().find(it));
         }
     }
 }

@@ -6,6 +6,7 @@
 
 // STD
 #include <algorithm>
+#include <numeric>
 #include <random>
 #include <stdexcept>
 
@@ -19,20 +20,10 @@ using namespace seal;
 
 namespace APSITests
 {
-    Label create_label(uint64_t lw, uint64_t hw, size_t byte_count)
+    Label create_label(unsigned char start, size_t byte_count)
     {
-        uint64_t label_data[2]{ lw, hw };
-        if (byte_count > sizeof(label_data))
-        {
-            throw runtime_error("output is too large");
-        }
-
-        Label label;
-        copy_n(
-            reinterpret_cast<const unsigned char*>(label_data),
-            byte_count,
-            back_inserter(label));
-
+        Label label(byte_count);
+        iota(label.begin(), label.end(), start);
         return label;
     }
 

@@ -70,7 +70,7 @@ namespace apsi
             partition_count = std::min(count, partition_count);
 
             std::vector<std::pair<T, T>> partitions;
-            partitions.reserve(std::min(count, partition_count) + 1);
+            partitions.reserve(std::min(count, partition_count) + T(1));
 
             // May be zero
             T per_partition = count / partition_count;

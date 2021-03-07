@@ -587,21 +587,64 @@ namespace apsi
         SenderDB::SenderDB(PSIParams params, size_t label_byte_count, bool compressed) :
             params_(params), crypto_context_(params_), label_byte_count_(label_byte_count), compressed_(compressed)
         {
+            if (label_byte_count_ > 1024)
+            {
+                APSI_LOG_ERROR("Requested label byte count " << label_byte_count_ << " exceeds the maximum (1024)");
+                throw invalid_argument("failed to create SenderDB");
+            }
+
             // Set the evaluator. This will be used for BatchedPlaintextPolyn::eval.
             crypto_context_.set_evaluator();
+
+            // Reset the SenderDB data structures
+            clear_db();
         }
 
-        size_t LabeledSenderDB::get_bin_bundle_count() const
+        SenderDB::SenderDB(SenderDB &&source) :
+            params_(source.params_),
+            crypto_context_(source.crypto_context_),
+            label_byte_count_(source.label_byte_count_),
+            compressed_(source.compressed_)
         {
-            // Lock the database for reading
-            auto lock = get_reader_lock();
+            // Lock the source before moving stuff over
+            auto lock = source.get_writer_lock();
 
-            // Compute the total number of BinBundles
-            return accumulate(bin_bundles_.cbegin(), bin_bundles_.cend(), size_t(0),
-                [&](auto &a, auto &b) { return a + b.size(); });
+            items_ = move(source.items_);
+            bin_bundles_ = move(source.bin_bundles_);
+
+            // Reset the source data structures
+            source.clear_db_internal();
         }
 
-        size_t UnlabeledSenderDB::get_bin_bundle_count() const
+        SenderDB &SenderDB::operator =(SenderDB &&source)
+        {
+            // Do nothing if moving to self
+            if (&source == this)
+            {
+                return *this;
+            }
+
+            // Lock the current SenderDB
+            auto this_lock = get_writer_lock();
+
+            params_ = source.params_;
+            crypto_context_ = source.crypto_context_;
+            compressed_ = source.compressed_;
+            label_byte_count_ = source.label_byte_count_;
+
+            // Lock the source before moving stuff over
+            auto source_lock = source.get_writer_lock();
+
+            items_ = move(source.items_);
+            bin_bundles_ = move(source.bin_bundles_);
+
+            // Reset the source data structures
+            source.clear_db_internal();
+
+            return *this;
+        }
+
+        size_t SenderDB::get_bin_bundle_count() const
         {
             // Lock the database for reading
             auto lock = get_reader_lock();
@@ -627,15 +670,9 @@ namespace apsi
             return max_item_count ? static_cast<double>(item_count) / max_item_count : 0.0;
         }
 
-        void LabeledSenderDB::clear_db()
+        void SenderDB::clear_db_internal()
         {
-            if (items_.size())
-            {
-                APSI_LOG_INFO("Removing " << items_.size() << " item-label pairs from SenderDB");
-            }
-
-            // Lock the database for writing
-            auto lock = get_writer_lock();
+            // Assume the SenderDB is already locked for writing
 
             // Clear the set of inserted items
             items_.clear();
@@ -645,47 +682,46 @@ namespace apsi
             bin_bundles_.resize(params_.bundle_idx_count());
         }
 
-        void UnlabeledSenderDB::clear_db()
+        void SenderDB::clear_db()
         {
             if (items_.size())
             {
-                APSI_LOG_INFO("Removing " << items_.size() << " items from SenderDB");
+                APSI_LOG_INFO("Removing " << items_.size() << " items pairs from SenderDB");
             }
 
             // Lock the database for writing
             auto lock = get_writer_lock();
 
-            // Clear the set of inserted items
-            items_.clear();
-
-            // Clear the BinBundles
-            bin_bundles_.clear();
-            bin_bundles_.resize(params_.bundle_idx_count());
+            clear_db_internal();
         }
 
-        vector<reference_wrapper<const BinBundleCache>> LabeledSenderDB::get_cache_at(uint32_t bundle_idx)
+        vector<reference_wrapper<const BinBundleCache>> SenderDB::get_cache_at(uint32_t bundle_idx)
         {
             return collect_caches(bin_bundles_.at(safe_cast<size_t>(bundle_idx)));
         }
 
-        vector<reference_wrapper<const BinBundleCache>> UnlabeledSenderDB::get_cache_at(uint32_t bundle_idx)
+        void SenderDB::insert_or_assign(vector<pair<HashedItem, EncryptedLabel>> data, size_t thread_count)
         {
-            return collect_caches(bin_bundles_.at(safe_cast<size_t>(bundle_idx)));
-        }
+            if (!is_labeled())
+            {
+                APSI_LOG_ERROR("Attempted to insert labeled data but this is an unlabeled SenderDB")
+                throw logic_error("cannot do labeled insertion on an unlabeled SenderDB");
+            }
 
-        void LabeledSenderDB::insert_or_assign(vector<pair<HashedItem, EncryptedLabel>> data)
-        {
-            STOPWATCH(sender_stopwatch, "LabeledSenderDB::insert_or_assign");
+            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
+
+            STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign (labeled)");
             APSI_LOG_INFO("Start inserting " << data.size() << " items in SenderDB");
+
+            size_t full_data_size = data.size();
 
             // Lock the database for writing
             auto lock = get_writer_lock();
 
             // We need to know which items are new and which are old, since we have to tell dispatch_insert_or_assign
             // when to have an overwrite-on-collision versus add-binbundle-on-collision policy.
-            vector<pair<HashedItem, EncryptedLabel>> new_data, existing_data;
-            for (auto &item_label_pair : data)
-            {
+            vector<pair<HashedItem, EncryptedLabel>> existing_data;
+            auto new_data_end = remove_if(data.begin(), data.end(), [&](const auto &item_label_pair) {
                 const HashedItem &item = item_label_pair.first;
                 const EncryptedLabel &label = item_label_pair.second;
 
@@ -697,27 +733,32 @@ namespace apsi
                     throw invalid_argument("failed to insert or assign data");
                 }
 
-                if (items_.find(item) == items_.end())
+                bool found = items_.find(item) != items_.end();
+                if (!found)
                 {
-                    // Item is not already in items_, i.e., if this is a new item
-                    new_data.push_back(move(item_label_pair));
-
                     // Add to items_ already at this point!
                     items_.insert(item);
                 }
-                else
-                {
-                    // Replacing an existing item
-                    existing_data.push_back(move(item_label_pair));
-                }
-            }
 
-            APSI_LOG_INFO("Found " << new_data.size() << " new items to insert in SenderDB");
+                // Remove those that were found
+                return found;
+            });
+
+            // Add the previously existing items to existing_data
+            for_each(new_data_end, data.end(), [&](auto &item_label_pair) {
+                // Replacing an existing item
+                existing_data.push_back(move(item_label_pair));
+            });
+
+            // Erase the previously existing items from data
+            data.erase(new_data_end, data.end());
+
+            APSI_LOG_INFO("Found " << data.size() << " new items to insert in SenderDB");
             APSI_LOG_INFO("Found " << existing_data.size() << " existing items to replace in SenderDB");
 
             // Break the new data down into its field element representation. Also compute the items' cuckoo indices.
             vector<pair<AlgItemLabel, size_t>> new_data_with_indices
-                = preprocess_labeled_data(new_data.begin(), new_data.end(), params_);
+                = preprocess_labeled_data(data.begin(), data.end(), params_);
 
             // Now do the same for the data we're going to overwrite
             vector<pair<AlgItemLabel, size_t>> overwritable_data_with_indices
@@ -752,38 +793,48 @@ namespace apsi
                 compressed_
             );
 
-            APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
+            APSI_LOG_INFO("Finished inserting " << full_data_size << " items in SenderDB");
         }
 
-        void LabeledSenderDB::insert_or_assign(const vector<HashedItem> &data)
+        void SenderDB::insert_or_assign(vector<HashedItem> data, size_t thread_count)
         {
-            APSI_LOG_ERROR("Attempted to insert unlabeled data but this is a LabeledSenderDB instance")
-            throw logic_error("cannot do unlabeled insertion on a LabeledSenderDB");
-        }
+            if (is_labeled())
+            {
+                APSI_LOG_ERROR("Attempted to insert unlabeled data but this is a labeled SenderDB")
+                throw logic_error("cannot do unlabeled insertion on a labeled SenderDB");
+            }
 
-        void UnlabeledSenderDB::insert_or_assign(const vector<HashedItem> &data)
-        {
-            STOPWATCH(sender_stopwatch, "UnlabeledSenderDB::insert_or_assign");
+            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
+
+            STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign (unlabeled)");
             APSI_LOG_INFO("Start inserting " << data.size() << " items in SenderDB");
+
+            size_t full_data_size = data.size();
 
             // Lock the database for writing
             auto lock = get_writer_lock();
 
             // We are not going to insert items that already appear in the database.
-            vector<HashedItem> new_data;
-            for (auto item : data)
-            {
-                if (items_.find(item) == items_.end())
+            auto new_data_end = remove_if(data.begin(), data.end(), [&](const auto &item) {
+                bool found = items_.find(item) != items_.end();
+                if (!found)
                 {
-                    // Item is not already in items_, i.e., if this is a new item
-                    new_data.push_back(move(item));
+                    // Add to items_ already at this point!
                     items_.insert(item);
                 }
-            }
+
+                // Remove those that were found
+                return found;
+            });
+
+            // Erase the previously existing items from data
+            data.erase(new_data_end, data.end());
+
+            APSI_LOG_INFO("Found " << data.size() << " new items to insert in SenderDB");
 
             // Break the new data down into its field element representation. Also compute the items' cuckoo indices.
             vector<pair<AlgItem, size_t>> data_with_indices
-                = preprocess_unlabeled_data(new_data.begin(), new_data.end(), params_);
+                = preprocess_unlabeled_data(data.begin(), data.end(), params_);
 
             // Dispatch the insertion
             uint32_t bins_per_bundle = params_.bins_per_bundle();
@@ -800,54 +851,16 @@ namespace apsi
                 compressed_
             );
 
-            APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
+            APSI_LOG_INFO("Finished inserting " << full_data_size << " items in SenderDB");
         }
 
-        void UnlabeledSenderDB::insert_or_assign(vector<pair<HashedItem, EncryptedLabel>> data)
-        {
-            APSI_LOG_ERROR(
-                "Attempted to insert labeled data but this is an UnlabeledSenderDB instance")
-            throw logic_error("cannot do labeled insertion on an UnlabeledSenderDB");
-        }
+        void SenderDB::remove(
+            const vector<HashedItem> &data,
+            size_t thread_count
+        ) {
+            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
 
-        void LabeledSenderDB::remove(const vector<HashedItem> &data)
-        {
-            STOPWATCH(sender_stopwatch, "LabeledSenderDB::remove");
-            APSI_LOG_INFO("Start removing " << data.size() << " items-label pairs from SenderDB");
-
-            // Lock the database for writing
-            auto lock = get_writer_lock();
-
-            // We need to check that all the items actually are in the database.
-            for (auto item : data) {
-                if (items_.find(item) == items_.end()) {
-                    // Item is not in items_; cannot remove it
-                    throw invalid_argument("item to be removed was not found in SenderDB");
-                }
-            }
-
-            // Break the data to be removed down into its field element representation. Also compute
-            // the items' cuckoo indices.
-            vector<pair<AlgItem, size_t>> data_with_indices =
-                preprocess_unlabeled_data(data.begin(), data.end(), params_);
-
-            // Dispatch the removal
-            uint32_t bins_per_bundle = params_.bins_per_bundle();
-
-            dispatch_remove(data_with_indices, bin_bundles_, crypto_context_, bins_per_bundle);
-
-            // Now that everything is removed, clear these items from the cache of all inserted
-            // items.
-            for (auto &item : data) {
-                items_.erase(item);
-            }
-
-            APSI_LOG_INFO("Finished removing " << data.size() << " item-label pairs from SenderDB");
-        }
-
-        void UnlabeledSenderDB::remove(const vector<HashedItem> &data)
-        {
-            STOPWATCH(sender_stopwatch, "UnlabeledSenderDB::remove");
+            STOPWATCH(sender_stopwatch, "SenderDB::remove");
             APSI_LOG_INFO("Start removing " << data.size() << " items from SenderDB");
 
             // Lock the database for writing
@@ -880,35 +893,16 @@ namespace apsi
             APSI_LOG_INFO("Finished removing " << data.size() << " items from SenderDB");
         }
 
-        void LabeledSenderDB::set_data(vector<pair<HashedItem, EncryptedLabel>> data)
+        EncryptedLabel SenderDB::get_label(const HashedItem &item) const
         {
-            clear_db();
-            insert_or_assign(move(data));
-        }
+            if (!is_labeled())
+            {
+                APSI_LOG_ERROR("Attempted to retrieve a label but this is an unlabeled SenderDB");
+                throw logic_error("failed to retrieve label");
+            }
 
-        void LabeledSenderDB::set_data(const vector<HashedItem> &data)
-        {
-            APSI_LOG_ERROR("Attempted to set unlabeled data but this is a LabeledSenderDB instance")
-            throw logic_error("cannot do unlabeled insertion on a LabeledSenderDB");
-        }
-
-        void UnlabeledSenderDB::set_data(const vector<HashedItem> &data)
-        {
-            clear_db();
-            insert_or_assign(data);
-        }
-
-        void UnlabeledSenderDB::set_data(vector<pair<HashedItem, EncryptedLabel>> data)
-        {
-            APSI_LOG_ERROR(
-                "Attempted to set labeled data but this is an UnlabeledSenderDB instance")
-            throw logic_error("cannot do labeled insertion on an UnlabeledSenderDB");
-        }
-
-        EncryptedLabel LabeledSenderDB::get_label(const HashedItem &item) const
-        {
             // Check if this item is in the DB. If not, throw an exception
-            if (items_.count(item) == 0)
+            if (!items_.count(item))
             {
                 APSI_LOG_ERROR("Cannot retrieve label for an item that is not in the SenderDB")
                 throw invalid_argument("item was not found in SenderDB");
@@ -963,34 +957,29 @@ namespace apsi
             return result;
         }
 
-        size_t SaveSenderDB(shared_ptr<SenderDB> sender_db, ostream &out)
+        size_t SenderDB::save(ostream &out) const
         {
-            if (!sender_db)
-            {
-                throw invalid_argument("sender_db cannot be null");
-            }
-
             // Lock the database for reading
-            auto lock = sender_db->get_reader_lock();
+            auto lock = get_reader_lock();
 
             // First save the PSIParam
             stringstream ss;
-            SaveParams(sender_db->params_, ss);
+            params_.save(ss);
             string params_str = ss.str();
 
-            auto item_bit_count = sender_db->params_.item_bit_count();
-            auto item_byte_count = (item_bit_count + 7) >> 3;
+            int32_t item_bit_count = params_.item_bit_count();
+            int32_t item_byte_count = (item_bit_count + 7) >> 3;
 
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
             auto params = fbs_builder.CreateVector(
                 reinterpret_cast<unsigned char*>(params_str.data()), params_str.size());
-            fbs::SenderDBInfo info(sender_db->get_label_byte_count(), sender_db->is_compressed());
+            fbs::SenderDBInfo info(safe_cast<uint32_t>(label_byte_count_), compressed_);
             auto hashed_items = fbs_builder.CreateVectorOfStructs([&]() {
                 // The HashedItems vector is populated with an immediately-invoked lambda
                 vector<fbs::HashedItem> ret;
-                ret.reserve(sender_db->get_items().size());
-                for (const auto &it : sender_db->get_items())
+                ret.reserve(get_items().size());
+                for (const auto &it : get_items())
                 {
                     // Then create the vector of bytes for this hashed item
                     auto item_data = it.get_as<uint64_t>();
@@ -999,13 +988,13 @@ namespace apsi
                 return ret;
             }());
 
-            auto bin_bundle_count = sender_db->get_bin_bundle_count();
+            auto bin_bundle_count = get_bin_bundle_count();
 
             fbs::SenderDBBuilder sender_db_builder(fbs_builder);
             sender_db_builder.add_params(params);
             sender_db_builder.add_info(&info);
             sender_db_builder.add_hashed_items(hashed_items);
-            sender_db_builder.add_bin_bundle_count(bin_bundle_count);
+            sender_db_builder.add_bin_bundle_count(safe_cast<uint32_t>(bin_bundle_count));
             auto sdb = sender_db_builder.Finish();
             fbs_builder.FinishSizePrefixed(sdb);
 
@@ -1016,43 +1005,25 @@ namespace apsi
 
             // Finally write the BinBundles
             size_t bin_bundle_data_size = 0;
-            if (sender_db->is_labeled())
+            for (size_t bundle_idx = 0; bundle_idx < bin_bundles_.size(); bundle_idx++)
             {
-                auto labeled_sender_db = dynamic_pointer_cast<LabeledSenderDB>(sender_db);
-                for (size_t bundle_idx = 0; bundle_idx < labeled_sender_db->bin_bundles_.size(); bundle_idx++)
+                for (auto &bb : bin_bundles_[bundle_idx])
                 {
-                    for (auto &bb : labeled_sender_db->bin_bundles_[bundle_idx])
-                    {
-                        auto size = bb.save(out, static_cast<uint32_t>(bundle_idx));
-                        APSI_LOG_DEBUG("Saved labeled BinBundle at bundle index " << bundle_idx
-                            << " (" << size << " bytes)");
-                        bin_bundle_data_size += size;
-                    }
-                }
-            }
-            else
-            {
-                auto unlabeled_sender_db = dynamic_pointer_cast<UnlabeledSenderDB>(sender_db);
-                for (size_t bundle_idx = 0; bundle_idx < unlabeled_sender_db->bin_bundles_.size(); bundle_idx++)
-                {
-                    for (auto &bb : unlabeled_sender_db->bin_bundles_[bundle_idx])
-                    {
-                        auto size = bb.save(out, static_cast<uint32_t>(bundle_idx));
-                        APSI_LOG_DEBUG("Saved unlabeled BinBundle at bundle index " << bundle_idx
-                            << " (" << size << " bytes)");
-                        bin_bundle_data_size += size;
-                    }
+                    auto size = bb.save(out, static_cast<uint32_t>(bundle_idx));
+                    APSI_LOG_DEBUG("Saved BinBundle at bundle index " << bundle_idx
+                        << " (" << size << " bytes)");
+                    bin_bundle_data_size += size;
                 }
             }
 
             total_size += bin_bundle_data_size;
-            APSI_LOG_DEBUG("Saved SenderDB with " << sender_db->get_items().size() << " items ("
+            APSI_LOG_DEBUG("Saved SenderDB with " << get_items().size() << " items ("
                 << total_size << " bytes)");
 
             return total_size;
         }
 
-        pair<shared_ptr<SenderDB>, size_t> LoadSenderDB(istream &in)
+        pair<SenderDB, size_t> SenderDB::Load(istream &in)
         {
             vector<seal_byte> in_data(apsi::util::read_from_stream(in));
 
@@ -1074,7 +1045,7 @@ namespace apsi
                     reinterpret_cast<const char *>(sdb->params()->data()),
                     static_cast<streamsize>(sdb->params()->size()));
                 istream params_stream(&agbuf);
-                params = make_shared<PSIParams>(LoadParams(params_stream).first);
+                params = make_shared<PSIParams>(PSIParams::Load(params_stream).first);
             }
             catch (const runtime_error &ex)
             {
@@ -1087,89 +1058,52 @@ namespace apsi
             bool compressed = sdb->info()->compressed();
 
             // Create the correct kind of SenderDB
-            shared_ptr<SenderDB> sender_db;
-            if (label_byte_count)
-            {
-                sender_db = make_shared<LabeledSenderDB>(*params, label_byte_count, compressed);
-            }
-            else
-            {
-                sender_db = make_shared<UnlabeledSenderDB>(*params, compressed);
-            }
+            SenderDB sender_db(*params, label_byte_count, compressed);
 
-            auto item_bit_count = sender_db->params_.item_bit_count();
-            auto item_byte_count = (item_bit_count + 7) >> 3;
+            int32_t item_bit_count = sender_db.params_.item_bit_count();
+            int32_t item_byte_count = (item_bit_count + 7) >> 3;
 
             // Load the hashed items
             const auto &hashed_items = *sdb->hashed_items();
-            sender_db->items_.reserve(hashed_items.size());
+            sender_db.items_.reserve(hashed_items.size());
             for (const auto &it : hashed_items)
             {
-                sender_db->items_.insert({ it->low_word(), it->high_word() });
+                sender_db.items_.insert({ it->low_word(), it->high_word() });
             }
 
-            auto bin_bundle_count = sdb->bin_bundle_count();
+            uint32_t bin_bundle_count = sdb->bin_bundle_count();
             size_t bin_bundle_data_size = 0;
             uint32_t max_bin_size = params->table_params().max_items_per_bin;
+            size_t label_size = compute_label_size(label_byte_count, *params);
 
-            if (label_byte_count)
+            while (bin_bundle_count--)
             {
-                size_t label_size = compute_label_size(label_byte_count, *params);
+                BinBundle bb(sender_db.crypto_context_, label_size, max_bin_size, compressed);
+                auto bb_data = bb.load(in);
 
-                auto labeled_sender_db = dynamic_pointer_cast<LabeledSenderDB>(sender_db);
-                while (bin_bundle_count--)
+                // Make sure BinBundle cache is valid
+                bb.regen_cache();
+
+                // Check that the loaded bundle index is not out of range
+                if (bb_data.first >= sender_db.bin_bundles_.size())
                 {
-                    BinBundle bb(labeled_sender_db->crypto_context_, label_size, max_bin_size, compressed);
-                    auto bb_data = bb.load(in);
-
-                    // Make sure BinBundle cache is valid
-                    bb.regen_cache();
-
-                    // Check that the loaded bundle index is not out of range
-                    if (bb_data.first >= labeled_sender_db->bin_bundles_.size())
-                    {
-                        APSI_LOG_ERROR("The bundle index of the loaded BinBundle (" << bb_data.first
-                            << ") exceeds the maximum (" << params->bundle_idx_count() - 1 << ")");
-                        throw runtime_error("failed to load SenderDB");
-                    }
-
-                    // Add the loaded BinBundle to the correct location in bin_bundles_
-                    labeled_sender_db->bin_bundles_[bb_data.first].push_back(move(bb));
-
-                    APSI_LOG_DEBUG("Loaded labeled BinBundle at bundle index " << bb_data.first
-                        << " (" << bb_data.second << " bytes)");
-                    bin_bundle_data_size += bb_data.second;
+                    APSI_LOG_ERROR("The bundle index of the loaded BinBundle (" << bb_data.first
+                        << ") exceeds the maximum (" << params->bundle_idx_count() - 1 << ")");
+                    throw runtime_error("failed to load SenderDB");
                 }
-            }
-            else
-            {
-                auto unlabeled_sender_db = dynamic_pointer_cast<UnlabeledSenderDB>(sender_db);
-                while (bin_bundle_count--)
-                {
-                    BinBundle bb(unlabeled_sender_db->crypto_context_, 0, max_bin_size, compressed);
-                    auto bb_data = bb.load(in);
 
-                    // Check that the loaded bundle index is not out of range
-                    if (bb_data.first >= unlabeled_sender_db->bin_bundles_.size())
-                    {
-                        APSI_LOG_ERROR("The bundle index of the loaded BinBundle (" << bb_data.first
-                            << ") exceeds the maximum (" << params->bundle_idx_count() - 1 << ")");
-                        throw runtime_error("failed to load SenderDB");
-                    }
+                // Add the loaded BinBundle to the correct location in bin_bundles_
+                sender_db.bin_bundles_[bb_data.first].push_back(move(bb));
 
-                    // Add the loaded BinBundle to the correct location in bin_bundles_
-                    unlabeled_sender_db->bin_bundles_[bb_data.first].push_back(move(bb));
-
-                    APSI_LOG_DEBUG("Loaded unlabeled BinBundle at bundle index " << bb_data.first
-                        << " (" << bb_data.second << " bytes)");
-                    bin_bundle_data_size += bb_data.second;
-                }
+                APSI_LOG_DEBUG("Loaded BinBundle at bundle index " << bb_data.first
+                    << " (" << bb_data.second << " bytes)");
+                bin_bundle_data_size += bb_data.second;
             }
 
             size_t total_size = in_data.size() + bin_bundle_data_size;
-            APSI_LOG_DEBUG("Loaded SenderDB with " << sender_db->get_items().size() << " items ("
+            APSI_LOG_DEBUG("Loaded SenderDB with " << sender_db.get_items().size() << " items ("
                 << total_size << " bytes)");
-            
+
             return { move(sender_db), total_size };
         }
     } // namespace sender
