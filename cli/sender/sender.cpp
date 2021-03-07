@@ -187,7 +187,7 @@ pair<shared_ptr<OPRFKey>, shared_ptr<SenderDB>> create_sender_db(
 
         try
         {
-            sender_db = make_shared<SenderDB>(psi_params, 10);
+            sender_db = make_shared<SenderDB>(psi_params, hashed_db_data[0].second.size());
             sender_db->set_data(hashed_db_data, thread_count);
             APSI_LOG_INFO("Created labeled SenderDB with " << sender_db->get_items().size() << " items");
         }
