@@ -65,7 +65,7 @@ message(STATUS "APSI debug mode: ${APSI_DEBUG}")
 # [option] APSI_USE_CXX17_OPTION_STR (default: ON)
 # Use C++17, use C++14 otherwise.
 set(APSI_USE_CXX17_OPTION_STR "Use C++17")
-option(APSI_USE_CXX17_OPTION_STR ${APSI_USE_CXX17_OPTION_STR_OPTION_STR} ON)
+option(APSI_USE_CXX17 ${APSI_USE_CXX17_OPTION_STR_OPTION_STR} ON)
 # Enable features from C++17 if available, disable features if set to OFF.
 #include(EnableCXX17)
 
