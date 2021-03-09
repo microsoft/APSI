@@ -41,6 +41,7 @@
 
 // APSI
 #include "apsi/config.h"
+#include "apsi/logging/log.h"
 
 #ifdef APSI_USE_CXX17
 #define apsi_result_of_type typename std::invoke_result<F, Args...>::type
@@ -66,6 +67,7 @@ namespace apsi {
 
         private:
             void emplace_back_worker(std::size_t worker_number);
+            void set_queue_size_limit_no_lock(std::size_t limit);
 
             // need to keep track of threads so we can join them
             std::vector<std::thread> workers;
@@ -124,10 +126,17 @@ namespace apsi {
             std::future<return_type> res = task->get_future();
 
             std::unique_lock<std::mutex> lock(queue_mutex);
-            if (tasks.size() >= max_queue_size)
+            if (tasks.size() >= max_queue_size) {
+                std::size_t new_queue_size = max_queue_size * 2;
+                APSI_LOG_WARNING(
+                    "Thread pool queue has reached maximum size. Increasing to " << new_queue_size
+                                                                                 << " tasks.");
+                set_queue_size_limit_no_lock(new_queue_size);
+
                 // wait for the queue to empty or be stopped
                 condition_producers.wait(
                     lock, [this] { return tasks.size() < max_queue_size || stop; });
+            }
 
             // don't allow enqueueing after stopping the pool
             if (stop)
@@ -167,14 +176,7 @@ namespace apsi {
         inline void ThreadPool::set_queue_size_limit(std::size_t limit)
         {
             std::unique_lock<std::mutex> lock(this->queue_mutex);
-
-            if (stop)
-                return;
-
-            std::size_t const old_limit = max_queue_size;
-            max_queue_size = (std::max)(limit, std::size_t(1));
-            if (old_limit < max_queue_size)
-                condition_producers.notify_all();
+            set_queue_size_limit_no_lock(limit);
         }
 
         inline void ThreadPool::set_pool_size(std::size_t limit)
@@ -245,6 +247,17 @@ namespace apsi {
                     task();
                 }
             });
+        }
+
+        inline void ThreadPool::set_queue_size_limit_no_lock(std::size_t limit)
+        {
+            if (stop)
+                return;
+
+            std::size_t const old_limit = max_queue_size;
+            max_queue_size = (std::max)(limit, std::size_t(1));
+            if (old_limit < max_queue_size)
+                condition_producers.notify_all();
         }
 
     } // namespace util
