@@ -1,9 +1,29 @@
 steps:
+
+- task: CmdLine@2
+  displayName: 'Bootstrap vcpkg'
+  inputs:
+    script: |
+      cd $(Build.SourcesDirectory)
+      git clone https://github.com/microsoft/vcpkg.git
+      cd vcpkg
+      ./bootstrap-vcpkg.sh -disableMetrics
+    workingDirectory: '$(Build.SourcesDirectory)'
+    failOnStderr: true
+
+- task: CmdLine@2
+  displayName: 'Configure vcpkg dependencies'
+  inputs:
+    script: |
+      ./vcpkg install --triplet=x64-windows-static-md cppzmq flatbuffers gtest kuku log4cplus seal[ms-gsl,zlib,zstd,no-throw-tran] tclap
+    workingDirectory: '$(Build.SourcesDirectory)/vcpkg'
+    failOnStderr: true
+
 - task: CMake@1
   displayName: 'CMake APSI'
   inputs:
     workingDirectory: '$(Build.SourcesDirectory)'
-    cmakeArgs: '-DCMAKE_BUILD_TYPE=${{ parameters.configuration }} -DAPSI_BUILD_TESTS=ON .'
+    cmakeArgs: '-DCMAKE_BUILD_TYPE=${{ parameters.configuration }} -DAPSI_BUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE=$(Build.SourcesDirectory)/vcpkg/scripts/buildsystems/vcpkg.cmake .'
 
 - script: |
       cd $BUILD_SOURCESDIRECTORY
