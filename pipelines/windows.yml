@@ -58,7 +58,7 @@ steps:
 - task: CMake@1
   displayName: 'Configure APSI'
   inputs:
-    cmakeArgs: .. -DCMAKE_BUILD_TYPE='${{ parameters.configuration }}' -DAPSI_BUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE=$(Build.SourcesDirectory)\vcpkg\scripts\buildsystems\vcpkg.cmake
+    cmakeArgs: .. -DCMAKE_BUILD_TYPE='${{ parameters.configuration }}' -DAPSI_BUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE=$(Build.SourcesDirectory)\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static-md
     workingDirectory: '$(Build.SourcesDirectory)/build'
 
 - task: MSBuild@1
