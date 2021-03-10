@@ -4,12 +4,12 @@ steps:
   inputs:
     versionSpec: ${{ parameters.nuget_version }}
 
-- task: securedevelopmentteam.vss-secure-development-tools.build-task-credscan.CredScan@2
-  displayName: 'Run CredScan'
-  inputs:
-    toolMajorVersion: 'V2'
-    outputFormat: sarif
-    debugMode: false
+#- task: securedevelopmentteam.vss-secure-development-tools.build-task-credscan.CredScan@2
+#  displayName: 'Run CredScan'
+#  inputs:
+#    toolMajorVersion: 'V2'
+#    outputFormat: sarif
+#    debugMode: false
 
 #- ${{ if eq(parameters.configuration, 'Release') }}:
 #  - task: UseDotNet@2
@@ -43,7 +43,7 @@ steps:
       cd $(Build.SourcesDirectory)
       git clone https://github.com/microsoft/vcpkg.git
       cd vcpkg
-      bootstrap-vcpkg.bat
+      bootstrap-vcpkg.bat -disableMetrics
     workingDirectory: '$(Build.SourcesDirectory)'
     failOnStderr: true
 
