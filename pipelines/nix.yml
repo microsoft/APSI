@@ -1,0 +1,29 @@
+steps:
+- task: CMake@1
+  displayName: 'CMake APSI'
+  inputs:
+    workingDirectory: '$(Build.SourcesDirectory)'
+    cmakeArgs: '-DCMAKE_BUILD_TYPE=${{ parameters.configuration }} -DAPSI_BUILD_TESTS=ON .'
+
+- script: |
+      cd $BUILD_SOURCESDIRECTORY
+      make
+  displayName: 'Build APSI'
+
+- script: |
+      cd $BUILD_SOURCESDIRECTORY
+      ./bin/unit_tests
+  displayName: 'Run unit tests'
+
+- task: CopyFiles@2
+  displayName: 'Copy Files to: $(Build.ArtifactStagingDirectory)'
+  inputs:
+      SourceFolder: '$(Build.SourcesDirectory)/lib'
+      Contents: 'libkukuc.*'
+      TargetFolder: '$(Build.ArtifactStagingDirectory)/lib'
+
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Artifact: drop'
+  inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      artifactName: ${{ parameters.artifactName }}
