@@ -37,6 +37,7 @@ jobs:
         clang++-9 --version
         which clang-9
         which clang++-9
+      displayName: 'Install clang-9'
     - template: nix.yml
       parameters:
         artifactName: linux-drop
