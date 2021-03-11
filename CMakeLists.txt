@@ -173,10 +173,6 @@ endif()
 #add_subdirectory()
 
 
-
-
-
-
 add_library(common STATIC)
 add_subdirectory(common/native/apsi)
 set_target_properties(common PROPERTIES OUTPUT_NAME apsi_common-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
@@ -186,21 +182,28 @@ target_include_directories(common PUBLIC
     $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
 
 # TODO: move this block into a module
+include(FindAVX)
+check_for_avx(common)
+
 # Defines for FourQlib
 target_compile_options(common PUBLIC -DHAVE_CONFIG)
 target_compile_options(common PUBLIC -DUSE_SECURE_SEED)
 target_compile_options(common PUBLIC -D_AMD64_)
-target_compile_options(common PUBLIC -D_AVX2_)
 target_compile_options(common PUBLIC -DUSE_ENDO=true)
-#if (NOT APPLE AND NOT MSVC)
-#    target_compile_options(common PUBLIC -D_ASM_)
-#endif()
+
+if (HAVE_AVX2_EXTENSIONS)
+    target_compile_options(common PUBLIC -D_AVX2_)
+elseif(HAVE_AVX_EXTENSIONS)
+    target_compile_options(common PUBLIC -D_AVX_)
+else()
+    target_compile_options(common PUBLIC -D_GENERIC_)
+endif()
+
 if (MSVC)
     target_compile_options(common PUBLIC -D__WINDOWS__)
 endif()
 if (NOT MSVC)
     target_compile_options(common PUBLIC -D__LINUX__)
-    target_compile_options(common PUBLIC -mavx2)
     target_compile_options(common PUBLIC -march=native)
 endif()
 
