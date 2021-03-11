@@ -127,21 +127,21 @@ namespace APSITests
             ss << "Avg should be >= 50.0; it is " << timesp->avg;
             msg = ss.str();
         }
-        ASSERT_TRUE(timesp->avg >= 50.0);
+        ASSERT_TRUE(timesp->avg >= 50.0) << msg;
 
         {
             stringstream ss;
             ss << "Min should be >= 40 && < 60; it is " << timesp->min;
             msg = ss.str();
         }
-        ASSERT_TRUE(timesp->min >= 40 && timesp->min < 60);
+        ASSERT_TRUE(timesp->min >= 40 && timesp->min < 60) << msg;
 
         {
             stringstream ss;
             ss << "Max should be >= 60 && < 80; it is " << timesp->max;
             msg = ss.str();
         }
-        ASSERT_TRUE(timesp->max >= 60 && timesp->max < 80);
+        ASSERT_TRUE(timesp->max >= 60 && timesp->max < 80) << msg;
 
         timesp = std::find_if(tsp.begin(), tsp.end(),
             [](Stopwatch::TimespanSummary &tss) { return tss.event_name == "two"; });
