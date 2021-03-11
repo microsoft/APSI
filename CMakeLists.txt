@@ -299,7 +299,7 @@ if(APSI_BUILD_CLI)
         target_link_libraries(sender_cli PUBLIC stdc++fs)
     endif()
     if (APPLE)
-        target_compile_option(common_cli PUBLIC -DHAVE_LONG_LONG)
+        target_compile_options(common_cli PUBLIC -DHAVE_LONG_LONG)
     endif()
 
     add_executable(receiver_cli)
