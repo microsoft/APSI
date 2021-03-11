@@ -95,14 +95,14 @@ void fp2mul1271(f2elm_t a, f2elm_t b, f2elm_t c)
 }
 
 
-__inline void fp2add1271(f2elm_t a, f2elm_t b, f2elm_t c)
+void fp2add1271(f2elm_t a, f2elm_t b, f2elm_t c)
 {// GF(p^2) addition, c = a+b in GF((2^127-1)^2)
     fpadd1271(a[0], b[0], c[0]);
     fpadd1271(a[1], b[1], c[1]);
 }
 
 
-__inline void fp2sub1271(f2elm_t a, f2elm_t b, f2elm_t c)
+void fp2sub1271(f2elm_t a, f2elm_t b, f2elm_t c)
 {// GF(p^2) subtraction, c = a-b in GF((2^127-1)^2)
     fpsub1271(a[0], b[0], c[0]);
     fpsub1271(a[1], b[1], c[1]);
@@ -265,7 +265,7 @@ __inline void eccadd_core(point_extproj_precomp_t P, point_extproj_precomp_t Q, 
 }
 
 
-__inline void eccadd(point_extproj_precomp_t Q, point_extproj_t P)
+void eccadd(point_extproj_precomp_t Q, point_extproj_t P)
 { // Complete point addition P = P+Q or P = P+P
   // Inputs: P = (X1,Y1,Z1,Ta,Tb), where T1 = Ta*Tb, corresponding to (X1:Y1:Z1:T1) in extended twisted Edwards coordinates
   //         Q = (X2+Y2,Y2-X2,2Z2,2dT2) corresponding to (X2:Y2:Z2:T2) in extended twisted Edwards coordinates
@@ -282,7 +282,7 @@ __inline void eccadd(point_extproj_precomp_t Q, point_extproj_t P)
 }
 
 
-__inline void point_setup(point_t P, point_extproj_t Q)
+void point_setup(point_t P, point_extproj_t Q)
 { // Point conversion to representation (X,Y,Z,Ta,Tb)
   // Input: P = (x,y) in affine coordinates
   // Output: P = (X,Y,1,Ta,Tb), where Ta=X, Tb=Y and T=Ta*Tb, corresponding to (X:Y:Z:T) in extended twisted Edwards coordinates
