@@ -4,12 +4,13 @@ steps:
   inputs:
     versionSpec: ${{ parameters.nuget_version }}
 
-#- task: securedevelopmentteam.vss-secure-development-tools.build-task-credscan.CredScan@2
-#  displayName: 'Run CredScan'
-#  inputs:
-#    toolMajorVersion: 'V2'
-#    outputFormat: sarif
-#    debugMode: false
+- ${{ if eq(parameters.configuration, 'Release') }}:
+  - task: securedevelopmentteam.vss-secure-development-tools.build-task-credscan.CredScan@2
+    displayName: 'Run CredScan'
+    inputs:
+      toolMajorVersion: 'V2'
+      outputFormat: sarif
+      debugMode: false
 
 #- ${{ if eq(parameters.configuration, 'Release') }}:
 #  - task: UseDotNet@2
@@ -212,8 +213,9 @@ steps:
 - task: ms.vss-governance-buildtask.governance-build-task-component-detection.ComponentGovernanceComponentDetection@0
   displayName: 'Component Detection'
 
-- task: securedevelopmentteam.vss-secure-development-tools.build-task-publishsecurityanalysislogs.PublishSecurityAnalysisLogs@2
-  displayName: 'Publish Security Analysis Logs'
+- ${{ if eq(parameters.configuration, 'Release') }}:
+  - task: securedevelopmentteam.vss-secure-development-tools.build-task-publishsecurityanalysislogs.PublishSecurityAnalysisLogs@2
+    displayName: 'Publish Security Analysis Logs'
 
 - task: PublishBuildArtifacts@1
   displayName: 'Publish Artifact: drop'
