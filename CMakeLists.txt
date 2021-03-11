@@ -200,7 +200,7 @@ if (MSVC)
 endif()
 if (NOT MSVC)
     target_compile_options(common PUBLIC -D__LINUX__)
-    target_compile_options(common PUBLIC -maes)
+    target_compile_options(common PUBLIC -mavx2)
     target_compile_options(common PUBLIC -march=native)
 endif()
 
