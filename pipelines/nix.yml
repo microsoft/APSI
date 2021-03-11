@@ -35,12 +35,11 @@ steps:
       ./bin/unit_tests
   displayName: 'Run unit tests'
 
-- task: CopyFiles@2
-  displayName: 'Copy Files to: $(Build.ArtifactStagingDirectory)'
-  inputs:
-      SourceFolder: '$(Build.SourcesDirectory)/lib'
-      Contents: 'libkukuc.*'
-      TargetFolder: '$(Build.ArtifactStagingDirectory)/lib'
+- ${{ if eq(parameters.configuration, 'Release') }}:
+  - script: |
+        cd $BUILD_SOURCESDIRECTORY
+        ./bin/integration_tests
+    displayName: 'Run integration tests'
 
 - task: PublishBuildArtifacts@1
   displayName: 'Publish Artifact: drop'
