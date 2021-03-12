@@ -117,6 +117,9 @@ get_target_property(FLATBUFFERS_FLATC_PATH flatbuffers::flatc IMPORTED_LOCATION_
 message(STATUS "flatc path: ${FLATBUFFERS_FLATC_PATH}")
 include(CompileSchemaCXX)
 
+# jsoncpp: for parameter configuration
+find_package(jsoncpp REQUIRED)
+
 # [Option] APSI_USE_LOG4CPLUS (default: ON)
 set(APSI_USE_LOG4CPLUS_OPTION_STR "Use Log4cplus for logging")
 option(APSI_USE_LOG4CPLUS ${APSI_USE_LOG4CPLUS_OPTION_STR} ON)
@@ -211,7 +214,7 @@ apsi_set_version(common)
 apsi_link_threads(common)
 apsi_install_target(common APSITargets)
 
-target_link_libraries(common PUBLIC SEAL::seal Kuku::kuku flatbuffers::flatbuffers)
+target_link_libraries(common PUBLIC SEAL::seal Kuku::kuku flatbuffers::flatbuffers jsoncpp_static)
 if (APSI_USE_LOG4CPLUS)
     target_link_libraries(common PUBLIC log4cplus::log4cplus)
 endif()
