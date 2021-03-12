@@ -61,17 +61,6 @@ steps:
     configuration: ${{ parameters.configuration }}
     diagnosticsEnabled: True
 
-- ${{ if eq(parameters.configuration, 'Release') }}:
-  - task: VSTest@2
-    displayName: 'VsTest - integration tests'
-    inputs:
-      testAssemblyVer2: |
-          **\${{ parameters.configuration }}\integration_tests.exe
-          !**\obj\**
-      platform: 'x64'
-      configuration: ${{ parameters.configuration }}
-      diagnosticsEnabled: True
-
 - task: PublishSymbols@2
   displayName: 'Publish symbols path'
   inputs:
