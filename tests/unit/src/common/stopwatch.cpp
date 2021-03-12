@@ -94,17 +94,17 @@ namespace APSITests
 
         thread th1([&sw] {
             StopwatchScope sc(sw, "one");
-            this_thread::sleep_for(60ms);
+            this_thread::sleep_for(100ms);
         });
 
         thread th2([&sw] {
             StopwatchScope sc(sw, "two");
-            this_thread::sleep_for(30ms);
+            this_thread::sleep_for(50ms);
         });
 
         thread th3([&sw] {
             StopwatchScope sc(sw, "one");
-            this_thread::sleep_for(40ms);
+            this_thread::sleep_for(200ms);
         });
 
         th1.join();
@@ -124,24 +124,24 @@ namespace APSITests
         string msg;
         {
             stringstream ss;
-            ss << "Avg should be >= 50.0; it is " << timesp->avg;
+            ss << "Avg should be >= 150.0; it is " << timesp->avg;
             msg = ss.str();
         }
-        ASSERT_TRUE(timesp->avg >= 50.0) << msg;
+        ASSERT_TRUE(timesp->avg >= 150.0) << msg;
 
         {
             stringstream ss;
-            ss << "Min should be >= 40 && < 60; it is " << timesp->min;
+            ss << "Min should be >= 100 && < 150; it is " << timesp->min;
             msg = ss.str();
         }
-        ASSERT_TRUE(timesp->min >= 40 && timesp->min < 60) << msg;
+        ASSERT_TRUE(timesp->min >= 100 && timesp->min < 150) << msg;
 
         {
             stringstream ss;
-            ss << "Max should be >= 60 && < 80; it is " << timesp->max;
+            ss << "Max should be >= 200 && < 250; it is " << timesp->max;
             msg = ss.str();
         }
-        ASSERT_TRUE(timesp->max >= 60 && timesp->max < 80) << msg;
+        ASSERT_TRUE(timesp->max >= 200 && timesp->max < 250) << msg;
 
         timesp = std::find_if(tsp.begin(), tsp.end(),
             [](Stopwatch::TimespanSummary &tss) { return tss.event_name == "two"; });
