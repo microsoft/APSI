@@ -1,0 +1,29 @@
+// APSI parameters
+{
+    "table_params": {
+        // Number of hash functions to use
+        "hash_func_count": 3,
+        // Size of the hash table to use
+        "table_size": 512,
+        // Maximum number of items allowed in a bin
+        "max_items_per_bin": 92
+    },
+    "item_params": {
+        // Number of field elements to use per item
+        "felts_per_item": 8
+    },
+    "query_params": {
+        // Query powers to send in addition to 1
+        "query_powers": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]
+    },
+    "seal_params": {
+        // Bit size for plaintext modulus prime for Microsoft SEAL encryption
+        // "plain_modulus_bits": 16,
+        // Plaintext modulus prime for Microsoft SEAL encryption
+        "plain_modulus": 40961,
+        // Degree of the polynomial modulus for Microsoft SEAL encryption
+        "poly_modulus_degree": 4096,
+        // Bit sizes for coefficient modulus primes for Microsoft SEAL encryption
+        "coeff_modulus_bits": [ 49, 40, 20 ]
+    }
+}

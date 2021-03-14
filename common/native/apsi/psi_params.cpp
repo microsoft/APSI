@@ -17,9 +17,37 @@
 #include "seal/util/defines.h"
 #include "seal/util/common.h"
 
+// JSON
+#include "json/json.h"
+
 using namespace std;
 using namespace seal;
 using namespace seal::util;
+
+namespace {
+
+    uint32_t json_value_ui32(const string &name, const Json::Value& value)
+    {
+        if (!value.isUInt()) {
+            stringstream ss;
+            ss << name << " should be an unsigned int32";
+            throw runtime_error(ss.str());
+        }
+
+        return value.asUInt();
+    }
+
+    uint64_t json_value_ui64(const string &name, const Json::Value &value)
+    {
+        if (!value.isUInt64()) {
+            stringstream ss;
+            ss << name << " should be an unsigned int64";
+            throw runtime_error(ss.str());
+        }
+
+        return value.asUInt64();
+    }
+}
 
 namespace apsi
 {
@@ -209,6 +237,67 @@ namespace apsi
         }
 
         return { PSIParams(item_params, table_params, query_params, seal_params), in_data.size() };
+    }
+
+    PSIParams PSIParams::Load(const string& in)
+    {
+        Json::Value root;
+        stringstream ss(in);
+        ss >> root;
+
+        const auto &json_table_params = root["table_params"];
+        const auto &json_item_params = root["item_params"];
+        const auto &json_query_params = root["query_params"];
+        const auto &json_seal_params = root["seal_params"];
+
+        if (json_table_params.isNull()) {
+            throw runtime_error("table_params not found in JSON");
+        }
+        if (json_item_params.isNull()) {
+            throw runtime_error("item_params not found in JSON");
+        }
+        if (json_query_params.isNull()) {
+            throw runtime_error("query_params not found in JSON");
+        }
+        if (json_seal_params.isNull()) {
+            throw runtime_error("seal_params not found in JSON");
+        }
+
+        PSIParams::TableParams table_params;
+        const auto &hash_func_count = json_table_params["hash_func_count"];
+        const auto &table_size = json_table_params["table_size"];
+        const auto &max_items_per_bin = json_table_params["max_items_per_bin"];
+
+        table_params.hash_func_count = json_value_ui32("hash_func_count", hash_func_count);
+        table_params.table_size = json_value_ui32("table_size", table_size);
+        table_params.max_items_per_bin = json_value_ui32("max_items_per_bin", max_items_per_bin);
+
+        PSIParams::ItemParams item_params;
+        const auto &felts_per_item = json_item_params["felts_per_item"];
+        item_params.felts_per_item = json_value_ui32("felts_per_item", felts_per_item);
+
+        PSIParams::QueryParams query_params;
+        const auto &query_powers = json_query_params["query_powers"];
+        // Should always contain 1
+        query_params.query_powers.insert(1);
+        for (const auto &power : query_powers) {
+            query_params.query_powers.insert(json_value_ui32("", power));
+        }
+
+        PSIParams::SEALParams seal_params;
+        const auto &plain_modulus = json_seal_params["plain_modulus"];
+        const auto &poly_modulus_degree = json_seal_params["poly_modulus_degree"];
+        const auto &coeff_modulus_bits = json_seal_params["coeff_modulus_bits"];
+        seal_params.set_plain_modulus(json_value_ui64("plain_modulus", plain_modulus));
+        seal_params.set_poly_modulus_degree(
+            json_value_ui64("poly_modulus_degree", poly_modulus_degree));
+        vector<Modulus> coeff_modulus;
+        for (const auto &coeff : coeff_modulus_bits) {
+            coeff_modulus.push_back(Modulus(json_value_ui64("", coeff)));
+        }
+        seal_params.set_coeff_modulus(coeff_modulus);
+
+        return PSIParams(item_params, table_params, query_params, seal_params);
     }
 
     string PSIParams::to_string() const

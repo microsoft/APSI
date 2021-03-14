@@ -120,4 +120,69 @@ namespace APSITests
             psi_params.query_params().query_powers.cend(),
             load_params.query_params().query_powers.cbegin()));
     }
+
+    TEST(PSIParamsTest, JSONLoadPSIParams)
+    {
+        string json = 
+"/* APSI Parameters */"
+"{"
+"    \"table_params\": {"
+"        /* Number of hash functions to use */"
+"        \"hash_func_count\": 3,"
+"        /* Size of the hash table to use */"
+"        \"table_size\": 512,"
+"        /* Maximum number of items allowed in a bin */"
+"        \"max_items_per_bin\": 92"
+"    },"
+"    \"item_params\": {"
+"        /* Number of field elements to use per item */"
+"        \"felts_per_item\": 8"
+"    },"
+"    \"query_params\": {"
+"        /* Query powers to send in addition to 1 */"
+"        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+"    },"
+"    \"seal_params\": {"
+"        /* Bit size for plaintext modulus prime for Microsoft SEAL encryption */"
+"        /* \"plain_modulus_bits\": 16, */"
+"        /* Plaintext modulus prime for Microsoft SEAL encryption */"
+"        \"plain_modulus\": 40961,"
+"        /* Degree of the polynomial modulus for Microsoft SEAL encryption */"
+"        \"poly_modulus_degree\": 4096,"
+"        /* Bit sizes for coefficient modulus primes for Microsoft SEAL encryption */"
+"        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+"    }"
+"}";
+
+        PSIParams params = PSIParams::Load(json);
+
+        ASSERT_EQ(3, params.table_params().hash_func_count);
+        ASSERT_EQ(512, params.table_params().table_size);
+        ASSERT_EQ(92, params.table_params().max_items_per_bin);
+
+        ASSERT_EQ(8, params.item_params().felts_per_item);
+
+        auto qp_end = params.query_params().query_powers.end();
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(3));
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(4));
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(5));
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(8));
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(14));
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(20));
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(26));
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(32));
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(38));
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(41));
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(42));
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(43));
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(45));
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(46));
+
+        ASSERT_EQ(40961, params.seal_params().plain_modulus().value());
+        ASSERT_EQ(4096, params.seal_params().poly_modulus_degree());
+        ASSERT_EQ(3, params.seal_params().coeff_modulus().size());
+        ASSERT_EQ(49, params.seal_params().coeff_modulus()[0].value());
+        ASSERT_EQ(40, params.seal_params().coeff_modulus()[1].value());
+        ASSERT_EQ(20, params.seal_params().coeff_modulus()[2].value());
+    }
 }

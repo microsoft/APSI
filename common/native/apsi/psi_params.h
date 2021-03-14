@@ -175,6 +175,11 @@ namespace apsi
         */
         static std::pair<PSIParams, std::size_t> Load(std::istream &in);
 
+        /**
+        Reads the PSIParams from a JSON string
+        */
+        static PSIParams Load(const std::string &in);
+
     private:
         ItemParams item_params_;
 
