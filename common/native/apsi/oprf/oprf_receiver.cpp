@@ -35,7 +35,7 @@ namespace apsi
             return { oprf_queries_.cbegin(), oprf_queries_.cend() };
         }
 
-        void OPRFReceiver::process_items(gsl::span<const oprf_item_type> oprf_items)
+        void OPRFReceiver::process_items(gsl::span<const Item> oprf_items)
         {
             set_item_count(oprf_items.size());
 
@@ -63,7 +63,7 @@ namespace apsi
 
         void OPRFReceiver::process_responses(
             gsl::span<const seal_byte> oprf_responses,
-            gsl::span<oprf_hash_type> oprf_hashes) const
+            gsl::span<HashedItem> oprf_hashes) const
         {
             if (oprf_hashes.size() != item_count())
             {

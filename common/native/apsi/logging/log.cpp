@@ -43,27 +43,27 @@ namespace apsi
             return *log_properties;
         }
 
-        void Log::set_log_file(const string &file)
+        void Log::SetLogFile(const string &file)
         {
             get_log_properties().log_file = file;
         }
 
-        void Log::set_console_disabled(bool disable_console)
+        void Log::SetConsoleDisabled(bool disable_console)
         {
             get_log_properties().disable_console = disable_console;
         }
 
-        void Log::configure_if_needed()
+        void Log::ConfigureIfNeeded()
         {
             if (!get_log_properties().configured)
             {
-                configure();
+                Configure();
             }
         }
 
         Log::Level Log::log_level_ = Log::Level::off;
 
-        void Log::set_log_level(const string &level)
+        void Log::SetLogLevel(const string &level)
         {
             Log::Level ll;
 
@@ -96,10 +96,10 @@ namespace apsi
                 throw invalid_argument("unknown log level");
             }
 
-            set_log_level(ll);
+            SetLogLevel(ll);
         }
 
-        Log::Level Log::get_log_level()
+        Log::Level Log::GetLogLevel()
         {
             return log_level_;
         }
@@ -119,7 +119,7 @@ namespace apsi
 {
     namespace logging
     {
-        void Log::configure()
+        void Log::Configure()
         {
             if (nullptr != log_properties && log_properties->configured)
             {
@@ -150,7 +150,7 @@ namespace apsi
             get_log_properties().configured = true;
         }
 
-        void Log::do_log(string msg, Level msg_level)
+        void Log::DoLog(string msg, Level msg_level)
         {
             LogLevel ll;
             switch (msg_level)
@@ -179,7 +179,7 @@ namespace apsi
             Logger::getInstance("APSI").log(ll, msg);
         }
 
-        void Log::set_log_level(Log::Level level)
+        void Log::SetLogLevel(Log::Level level)
         {
             // Verify level is a known log level
             LogLevel ll = ALL_LOG_LEVEL;
@@ -211,7 +211,7 @@ namespace apsi
             Logger::getInstance("APSI").setLogLevel(ll);
         }
 
-        void Log::terminate()
+        void Log::Terminate()
         {
             log4cplus::deinitialize();
             log_properties = nullptr;
@@ -225,16 +225,16 @@ namespace apsi
 {
     namespace logging
     {
-        void Log::set_log_level(Level level)
+        void Log::SetLogLevel(Level level)
         {}
 
-        void Log::configure()
+        void Log::Configure()
         {}
 
-        void Log::terminate()
+        void Log::Terminate()
         {}
 
-        void Log::do_log(string msg, Level msg_level)
+        void Log::DoLog(string msg, Level msg_level)
         {}
     } // namespace logging
 } // namespace apsi

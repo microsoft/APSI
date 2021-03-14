@@ -90,13 +90,15 @@ namespace apsi
             static std::vector<seal::seal_byte> ProcessQueries(
                 gsl::span<const seal::seal_byte> oprf_queries, const OPRFKey &oprf_key);
 
-            static std::vector<oprf_hash_type> ComputeHashes(
-                const gsl::span<const oprf_item_type> &oprf_items,
+            static std::vector<HashedItem> ComputeHashes(
+                const gsl::span<const Item> &oprf_items,
                 const OPRFKey &oprf_key);
 
-            static std::vector<std::pair<oprf_hash_type, EncryptedLabel>> ComputeHashes(
-                const gsl::span<const std::pair<oprf_item_type, Label>> &oprf_item_labels,
-                const OPRFKey &oprf_key);
+            static std::vector<std::pair<HashedItem, EncryptedLabel>> ComputeHashes(
+                const gsl::span<const std::pair<Item, Label>> &oprf_item_labels,
+                const OPRFKey &oprf_key,
+                std::size_t label_byte_count,
+                std::size_t nonce_byte_count);
         }; // class OPRFSender
     }      // namespace oprf
 } // namespace apsi

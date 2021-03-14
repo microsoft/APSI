@@ -36,8 +36,8 @@ namespace APSITests
             const PSIParams &params,
             size_t num_threads)
         {
-            logging::Log::set_console_disabled(true);
-            logging::Log::set_log_level(logging::Log::Level::info);
+            logging::Log::SetConsoleDisabled(true);
+            logging::Log::SetLogLevel(logging::Log::Level::info);
 
             ThreadPoolMgr::set_thread_count(num_threads);
 
@@ -47,11 +47,10 @@ namespace APSITests
                 sender_items.push_back({ i + 1, i + 1 });
             }
 
-            OPRFKey oprf_key;
-            auto hashed_sender_items = OPRFSender::ComputeHashes(sender_items, oprf_key);
-
             auto sender_db = make_shared<SenderDB>(params, 0);
-            sender_db->set_data(hashed_sender_items);
+            auto oprf_key = sender_db->get_oprf_key();
+
+            sender_db->set_data(sender_items);
 
             auto seal_context = sender_db->get_seal_context();
 
@@ -128,22 +127,20 @@ namespace APSITests
             const PSIParams &params,
             size_t num_threads)
         {
-            logging::Log::set_console_disabled(true);
-            logging::Log::set_log_level(logging::Log::Level::info);
+            logging::Log::SetConsoleDisabled(true);
+            logging::Log::SetLogLevel(logging::Log::Level::info);
 
             ThreadPoolMgr::set_thread_count(num_threads);
 
             vector<pair<Item, Label>> sender_items;
             for (size_t i = 0; i < sender_size; i++)
             {
-                sender_items.push_back(make_pair(Item(i + 1, i + 1), create_label(i + 1, 20)));
+                sender_items.push_back(make_pair(Item(i + 1, i + 1), create_label(i + 1, 10)));
             }
 
-            OPRFKey oprf_key;
-            auto hashed_sender_items = OPRFSender::ComputeHashes(sender_items, oprf_key);
-
             auto sender_db = make_shared<SenderDB>(params, 10, 4, true);
-            sender_db->set_data(hashed_sender_items);
+            sender_db->set_data(sender_items);
+            auto oprf_key = sender_db->get_oprf_key();
 
             auto seal_context = sender_db->get_seal_context();
 

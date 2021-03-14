@@ -92,19 +92,6 @@ auto CSVReader::read(istream &stream) const -> pair<DBData, vector<string>>
         }
     }
 
-    // Pad labels with zeros to same size
-    if (holds_alternative<LabeledData>(result))
-    {
-        // Find the longest label
-        auto &labeled_data = get<LabeledData>(result);
-        size_t label_byte_count = max_element(labeled_data.begin(), labeled_data.end(), [](auto &a, auto &b) {
-            return a.second.size() < b.second.size();
-        })->second.size();
-
-        // Resize each label to label_byte_count
-        for_each(labeled_data.begin(), labeled_data.end(), [&](auto &a) { a.second.resize(label_byte_count); });
-    }
-
     return { move(result), move(orig_items) };
 }
 

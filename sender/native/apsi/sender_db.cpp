@@ -431,7 +431,6 @@ namespace apsi
                 uint32_t bins_per_bundle)
             {
                 STOPWATCH(sender_stopwatch, "remove_worker");
-
                 APSI_LOG_INFO("Remove worker [" << bundle_index << "]");
 
                 // Keep track of the bundle indices we look at. These will be the ones whose cache we have to regen.
@@ -608,10 +607,10 @@ namespace apsi
             // to use for arbitrary label changes.
             if (label_byte_count_ && nonce_byte_count_ < 16)
             {
-                APSI_LOG_WARNING("You have instantiated a labeled SenderDB instance with a nonce byte count ("
-                    << nonce_byte_count_ << ", which is less than 16. Updating labels for existing items in the "
-                    "SenderDB or removing and reinserting items with different labels may leak information about the "
-                    "labels. You need to understand why you are seeing this warning.")
+                APSI_LOG_WARNING("You have instantiated a labeled SenderDB instance with a nonce byte count "
+                    << nonce_byte_count_ << ", which is less than the safe default value 16. Updating labels for "
+                    " existing items in the SenderDB or removing and reinserting items with different labels may "
+                    "leak information about the labels.")
             }
 
             // Set the evaluator. This will be used for BatchedPlaintextPolyn::eval.
@@ -631,7 +630,7 @@ namespace apsi
             // Lock the source before moving stuff over
             auto lock = source.get_writer_lock();
 
-            items_ = move(source.items_);
+            hashed_items_ = move(source.hashed_items_);
             bin_bundles_ = move(source.bin_bundles_);
             oprf_key_ = move(source.oprf_key_);
             source.oprf_key_ = oprf::OPRFKey();
@@ -660,7 +659,7 @@ namespace apsi
             // Lock the source before moving stuff over
             auto source_lock = source.get_writer_lock();
 
-            items_ = move(source.items_);
+            hashed_items_ = move(source.hashed_items_);
             bin_bundles_ = move(source.bin_bundles_);
             oprf_key_ = move(source.oprf_key_);
             source.oprf_key_ = oprf::OPRFKey();
@@ -687,7 +686,7 @@ namespace apsi
             auto lock = get_reader_lock();
 
             uint64_t item_count = mul_safe(
-                static_cast<uint64_t>(items_.size()),
+                static_cast<uint64_t>(hashed_items_.size()),
                 static_cast<uint64_t>(params_.table_params().hash_func_count));
             uint64_t max_item_count = mul_safe(
                 static_cast<uint64_t>(get_bin_bundle_count()),
@@ -702,7 +701,7 @@ namespace apsi
             // Assume the SenderDB is already locked for writing
 
             // Clear the set of inserted items
-            items_.clear();
+            hashed_items_.clear();
 
             // Clear the BinBundles
             bin_bundles_.clear();
@@ -711,9 +710,9 @@ namespace apsi
 
         void SenderDB::clear_db()
         {
-            if (items_.size())
+            if (hashed_items_.size())
             {
-                APSI_LOG_INFO("Removing " << items_.size() << " items pairs from SenderDB");
+                APSI_LOG_INFO("Removing " << hashed_items_.size() << " items pairs from SenderDB");
             }
 
             // Lock the database for writing
@@ -727,7 +726,7 @@ namespace apsi
             return collect_caches(bin_bundles_.at(safe_cast<size_t>(bundle_idx)));
         }
 
-        void SenderDB::insert_or_assign(vector<pair<HashedItem, EncryptedLabel>> data)
+        void SenderDB::insert_or_assign(const vector<pair<Item, Label>> &data)
         {
             if (!is_labeled())
             {
@@ -738,74 +737,39 @@ namespace apsi
             STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign (labeled)");
             APSI_LOG_INFO("Start inserting " << data.size() << " items in SenderDB");
 
-            size_t full_data_size = data.size();
+            // First compute the hashes for the input data
+            auto hashed_data = oprf::OPRFSender::ComputeHashes(data, oprf_key_, label_byte_count_, nonce_byte_count_);
 
             // Lock the database for writing
             auto lock = get_writer_lock();
 
             // We need to know which items are new and which are old, since we have to tell dispatch_insert_or_assign
             // when to have an overwrite-on-collision versus add-binbundle-on-collision policy.
-            vector<pair<HashedItem, EncryptedLabel>> existing_data;
-            auto new_data_end = remove_if(data.begin(), data.end(), [&](const auto &item_label_pair) {
-                const HashedItem &item = item_label_pair.first;
-                const EncryptedLabel &label = item_label_pair.second;
-
-                // The label sizes must match the label size for this SenderDB
-                if (label.size() != label_byte_count_)
-                {
-                    APSI_LOG_ERROR("Attempted to insert or assign data with " << label.size()
-                        << "-byte label, but this SenderDB expects " << label_byte_count_ << "-byte labels");
-                    throw invalid_argument("failed to insert or assign data");
-                }
-
-                bool found = items_.find(item) != items_.end();
+            auto new_data_end = remove_if(hashed_data.begin(), hashed_data.end(), [&](const auto &item_label_pair) {
+                bool found = hashed_items_.find(item_label_pair.first) != hashed_items_.end();
                 if (!found)
                 {
-                    // Add to items_ already at this point!
-                    items_.insert(item);
+                    // Add to hashed_items_ already at this point!
+                    hashed_items_.insert(item_label_pair.first);
                 }
 
                 // Remove those that were found
                 return found;
             });
 
-            // Add the previously existing items to existing_data
-            for_each(new_data_end, data.end(), [&](auto &item_label_pair) {
-                // Replacing an existing item
-                existing_data.push_back(move(item_label_pair));
-            });
-
-            // Erase the previously existing items from data
-            data.erase(new_data_end, data.end());
-
-            APSI_LOG_INFO("Found " << data.size() << " new items to insert in SenderDB");
-            APSI_LOG_INFO("Found " << existing_data.size() << " existing items to replace in SenderDB");
-
-            // Break the new data down into its field element representation. Also compute the items' cuckoo indices.
-            vector<pair<AlgItemLabel, size_t>> new_data_with_indices
-                = preprocess_labeled_data(data.begin(), data.end(), params_);
-
-            // Now do the same for the data we're going to overwrite
-            vector<pair<AlgItemLabel, size_t>> overwritable_data_with_indices
-                = preprocess_labeled_data(existing_data.begin(), existing_data.end(), params_);
+            APSI_LOG_INFO("Found " << distance(hashed_data.begin(), new_data_end) << " new items to insert in SenderDB");
+            APSI_LOG_INFO("Found " << distance(new_data_end, hashed_data.end()) << " existing items to replace in SenderDB");
 
             // Dispatch the insertion, first for the new data, then for the data we're gonna overwrite
             uint32_t bins_per_bundle = params_.bins_per_bundle();
             uint32_t max_bin_size = params_.table_params().max_items_per_bin;
 
-            // Compute the label size; this ceil(label_bit_count / item_bit_count)
-            size_t label_size = compute_label_size(label_byte_count_, params_);
+            // Compute the label size; this ceil(effective_label_bit_count / item_bit_count)
+            size_t label_size = compute_label_size(nonce_byte_count_ + label_byte_count_, params_);
 
-            dispatch_insert_or_assign(
-                new_data_with_indices,
-                bin_bundles_,
-                crypto_context_,
-                bins_per_bundle,
-                label_size,
-                max_bin_size,
-                false, /* don't overwrite items */
-                compressed_
-            );
+            // Break the data into field element representation. Also compute the items' cuckoo indices.
+            vector<pair<AlgItemLabel, size_t>> overwritable_data_with_indices
+                = preprocess_labeled_data(new_data_end, hashed_data.end(), params_);
 
             dispatch_insert_or_assign(
                 overwritable_data_with_indices,
@@ -818,10 +782,30 @@ namespace apsi
                 compressed_
             );
 
-            APSI_LOG_INFO("Finished inserting " << full_data_size << " items in SenderDB");
+            // Release memory that is no longer needed
+            overwritable_data_with_indices.clear();
+            hashed_data.erase(new_data_end, hashed_data.end());
+
+            // Finally process and add the new data. Break the data into field element representation. Also compute the
+            // items' cuckoo indices.
+            vector<pair<AlgItemLabel, size_t>> new_data_with_indices
+                = preprocess_labeled_data(hashed_data.begin(), hashed_data.end(), params_);
+
+            dispatch_insert_or_assign(
+                new_data_with_indices,
+                bin_bundles_,
+                crypto_context_,
+                bins_per_bundle,
+                label_size,
+                max_bin_size,
+                false, /* don't overwrite items */
+                compressed_
+            );
+
+            APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
         }
 
-        void SenderDB::insert_or_assign(vector<HashedItem> data)
+        void SenderDB::insert_or_assign(const vector<Item> &data)
         {
             if (is_labeled())
             {
@@ -832,32 +816,34 @@ namespace apsi
             STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign (unlabeled)");
             APSI_LOG_INFO("Start inserting " << data.size() << " items in SenderDB");
 
-            size_t full_data_size = data.size();
+            // First compute the hashes for the input data
+            auto hashed_data = oprf::OPRFSender::ComputeHashes(data, oprf_key_);
+            size_t full_data_size = hashed_data.size();
 
             // Lock the database for writing
             auto lock = get_writer_lock();
 
             // We are not going to insert items that already appear in the database.
-            auto new_data_end = remove_if(data.begin(), data.end(), [&](const auto &item) {
-                bool found = items_.find(item) != items_.end();
+            auto new_data_end = remove_if(hashed_data.begin(), hashed_data.end(), [&](const auto &item) {
+                bool found = hashed_items_.find(item) != hashed_items_.end();
                 if (!found)
                 {
-                    // Add to items_ already at this point!
-                    items_.insert(item);
+                    // Add to hashed_items_ already at this point!
+                    hashed_items_.insert(item);
                 }
 
                 // Remove those that were found
                 return found;
             });
 
-            // Erase the previously existing items from data
-            data.erase(new_data_end, data.end());
+            // Erase the previously existing items from hashed_data; in unlabeled case there is nothing to do
+            hashed_data.erase(new_data_end, hashed_data.end());
 
-            APSI_LOG_INFO("Found " << data.size() << " new items to insert in SenderDB");
+            APSI_LOG_INFO("Found " << hashed_data.size() << " new items to insert in SenderDB");
 
             // Break the new data down into its field element representation. Also compute the items' cuckoo indices.
             vector<pair<AlgItem, size_t>> data_with_indices
-                = preprocess_unlabeled_data(data.begin(), data.end(), params_);
+                = preprocess_unlabeled_data(hashed_data.begin(), hashed_data.end(), params_);
 
             // Dispatch the insertion
             uint32_t bins_per_bundle = params_.bins_per_bundle();
@@ -874,45 +860,62 @@ namespace apsi
                 compressed_
             );
 
-            APSI_LOG_INFO("Finished inserting " << full_data_size << " items in SenderDB");
+            APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
         }
 
-        void SenderDB::remove(const vector<HashedItem> &data)
+        void SenderDB::remove(const vector<Item> &data)
         {
             STOPWATCH(sender_stopwatch, "SenderDB::remove");
             APSI_LOG_INFO("Start removing " << data.size() << " items from SenderDB");
 
+            // First compute the hashes for the input data
+            auto hashed_data = oprf::OPRFSender::ComputeHashes(data, oprf_key_);
+
             // Lock the database for writing
             auto lock = get_writer_lock();
 
-            // We need to check that all the items actually are in the database.
-            for (auto item : data) {
-                if (items_.find(item) == items_.end()) {
-                    // Item is not in items_; cannot remove it
-                    throw invalid_argument("item to be removed was not found in SenderDB");
+            // Remove items that do not exist in the database.
+            auto existing_data_end = remove_if(hashed_data.begin(), hashed_data.end(), [&](const auto &item) {
+                bool found = hashed_items_.find(item) != hashed_items_.end();
+                if (found)
+                {
+                    // Remove from hashed_items_ already at this point!
+                    hashed_items_.erase(item);
                 }
+
+                // Remove those that were not found
+                return !found;
+            });
+
+            size_t existing_item_count = distance(existing_data_end, hashed_data.end());
+            if (existing_item_count)
+            {
+                APSI_LOG_WARNING("Ignoring " << existing_item_count << " items that are not present in the SenderDB");
             }
 
-            // Break the data to be removed down into its field element representation. Also compute
-            // the items' cuckoo indices.
+            // Break the data down into its field element representation. Also compute the items' cuckoo indices.
             vector<pair<AlgItem, size_t>> data_with_indices =
-                preprocess_unlabeled_data(data.begin(), data.end(), params_);
+                preprocess_unlabeled_data(hashed_data.begin(), hashed_data.end(), params_);
 
             // Dispatch the removal
             uint32_t bins_per_bundle = params_.bins_per_bundle();
-
             dispatch_remove(data_with_indices, bin_bundles_, crypto_context_, bins_per_bundle);
-
-            // Now that everything is removed, clear these items from the cache of all inserted
-            // items.
-            for (auto &item : data) {
-                items_.erase(item);
-            }
 
             APSI_LOG_INFO("Finished removing " << data.size() << " items from SenderDB");
         }
 
-        EncryptedLabel SenderDB::get_label(const HashedItem &item) const
+        bool SenderDB::has_item(const Item &item) const
+        {
+            // First compute the hash for the input item
+            auto hashed_item = oprf::OPRFSender::ComputeHashes({ &item, 1 }, oprf_key_)[0];
+            
+            // Lock the database for reading
+            auto lock = get_reader_lock();
+
+            return hashed_items_.find(hashed_item) != hashed_items_.end();
+        }
+
+        Label SenderDB::get_label(const Item &item) const
         {
             if (!is_labeled())
             {
@@ -920,14 +923,18 @@ namespace apsi
                 throw logic_error("failed to retrieve label");
             }
 
+            // First compute the hash for the input item
+            auto hashed_item = oprf::OPRFSender::ComputeHashes({ &item, 1 }, oprf_key_)[0];
+
+            // Lock the database for reading
+            auto lock = get_reader_lock();
+
             // Check if this item is in the DB. If not, throw an exception
-            if (!items_.count(item))
+            if (hashed_items_.find(hashed_item) == hashed_items_.end())
             {
                 APSI_LOG_ERROR("Cannot retrieve label for an item that is not in the SenderDB")
                 throw invalid_argument("item was not found in SenderDB");
             }
-
-            APSI_LOG_DEBUG("Start retrieving label for " << item.to_string());
 
             uint32_t bins_per_bundle = params_.bins_per_bundle();
 
@@ -936,7 +943,7 @@ namespace apsi
             // location.
             AlgItem alg_item;
             size_t cuckoo_idx;
-            tie(alg_item, cuckoo_idx) = preprocess_unlabeled_data(item, params_)[0];
+            tie(alg_item, cuckoo_idx) = preprocess_unlabeled_data(hashed_item, params_)[0];
 
             // Now figure out where to look to get the label
             size_t bin_idx, bundle_idx;
@@ -965,15 +972,18 @@ namespace apsi
             }
 
             // All good. Now just reconstruct the big label from its split-up parts and return it
-            EncryptedLabel result = dealgebraize_label(
+            EncryptedLabel enc_label = dealgebraize_label(
                 alg_label,
                 alg_label.size() * static_cast<size_t>(params_.item_bit_count_per_felt()),
                 params_.seal_params().plain_modulus());
-            result.resize(label_byte_count_);
+            enc_label.resize(nonce_byte_count_ + label_byte_count_);
 
-            APSI_LOG_DEBUG("Finished retrieving label for " << item.to_string());
+            // Decrypt the label
+            Label label;
+            label.reserve(label_byte_count_);
+            copy(enc_label.begin() + nonce_byte_count_, enc_label.end(), back_inserter(label));
 
-            return result;
+            return label;
         }
 
         size_t SenderDB::save(ostream &out) const
@@ -1002,8 +1012,8 @@ namespace apsi
             auto hashed_items = fbs_builder.CreateVectorOfStructs([&]() {
                 // The HashedItems vector is populated with an immediately-invoked lambda
                 vector<fbs::HashedItem> ret;
-                ret.reserve(get_items().size());
-                for (const auto &it : get_items())
+                ret.reserve(get_hashed_items().size());
+                for (const auto &it : get_hashed_items())
                 {
                     // Then create the vector of bytes for this hashed item
                     auto item_data = it.get_as<uint64_t>();
@@ -1042,7 +1052,7 @@ namespace apsi
             }
 
             total_size += bin_bundle_data_size;
-            APSI_LOG_DEBUG("Saved SenderDB with " << get_items().size() << " items ("
+            APSI_LOG_DEBUG("Saved SenderDB with " << get_hashed_items().size() << " items ("
                 << total_size << " bytes)");
 
             return total_size;
@@ -1114,10 +1124,10 @@ namespace apsi
 
             // Load the hashed items
             const auto &hashed_items = *sdb->hashed_items();
-            sender_db->items_.reserve(hashed_items.size());
+            sender_db->hashed_items_.reserve(hashed_items.size());
             for (const auto &it : hashed_items)
             {
-                sender_db->items_.insert({ it->low_word(), it->high_word() });
+                sender_db->hashed_items_.insert({ it->low_word(), it->high_word() });
             }
 
             uint32_t bin_bundle_count = sdb->bin_bundle_count();
@@ -1150,7 +1160,7 @@ namespace apsi
             }
 
             size_t total_size = in_data.size() + bin_bundle_data_size;
-            APSI_LOG_DEBUG("Loaded SenderDB with " << sender_db->get_items().size() << " items ("
+            APSI_LOG_DEBUG("Loaded SenderDB with " << sender_db->get_hashed_items().size() << " items ("
                 << total_size << " bytes)");
 
             return { move(*sender_db), total_size };

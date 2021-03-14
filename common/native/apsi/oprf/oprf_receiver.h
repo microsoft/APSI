@@ -35,7 +35,7 @@ namespace apsi
 
             OPRFReceiver &operator=(OPRFReceiver &&) = default;
 
-            OPRFReceiver(gsl::span<const oprf_item_type> oprf_items) : oprf_queries_(pool_), inv_factor_data_(pool_)
+            OPRFReceiver(gsl::span<const Item> oprf_items) : oprf_queries_(pool_), inv_factor_data_(pool_)
             {
                 process_items(oprf_items);
             }
@@ -47,7 +47,7 @@ namespace apsi
 
             void process_responses(
                 gsl::span<const seal::seal_byte> oprf_responses,
-                gsl::span<oprf_hash_type> oprf_hashes) const;
+                gsl::span<HashedItem> oprf_hashes) const;
 
             void clear();
 
@@ -57,7 +57,7 @@ namespace apsi
             void set_item_count(std::size_t item_count);
 
             void process_items(
-                gsl::span<const oprf_item_type> oprf_items);
+                gsl::span<const Item> oprf_items);
 
             // For decrypting OPRF response
             class FactorData

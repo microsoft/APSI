@@ -114,68 +114,75 @@ namespace apsi
             Inserts the given data into the database. This function can be used only on a labeled SenderDB instance.
             If an item already exists in the database, its label is overwritten with the new label.
             */
-            void insert_or_assign(std::vector<std::pair<HashedItem, EncryptedLabel>> data);
+            void insert_or_assign(const std::vector<std::pair<Item, Label>> &data);
 
             /**
             Inserts the given (hashed) item-label pair into the database. This function can be used only on a
             labeled SenderDB instance. If the item already exists in the database, its label is overwritten
             with the new label.
             */
-            void insert_or_assign(std::pair<HashedItem, EncryptedLabel> data)
+            void insert_or_assign(const std::pair<Item, Label> &data)
             {
-                insert_or_assign(
-                    std::vector<std::pair<HashedItem, EncryptedLabel>>{ std::move(data) });
+                std::vector<std::pair<Item, Label>> data_singleton{ data };
+                insert_or_assign(data_singleton);
             }
 
             /**
             Inserts the given data into the database. This function can be used only on an unlabeled SenderDB instance.
             */
-            void insert_or_assign(std::vector<HashedItem> data);
+            void insert_or_assign(const std::vector<Item> &data);
 
             /**
             Inserts the given (hashed) item into the database. This function can be used only on an unlabeled SenderDB instance.
             */
-            void insert_or_assign(HashedItem data)
+            void insert_or_assign(const Item &data)
             {
-                insert_or_assign(std::vector<HashedItem> { std::move(data) });
+                std::vector<Item> data_singleton{ data };
+                insert_or_assign(data_singleton);
             }
 
             /**
             Clears the database and inserts the given data. This function can be used only on a labeled SenderDB instance.
             */
-            void set_data(std::vector<std::pair<HashedItem, EncryptedLabel>> data)
+            void set_data(const std::vector<std::pair<Item, Label>> &data)
             {
                 clear_db();
-                insert_or_assign(std::move(data));
+                insert_or_assign(data);
             }
 
             /**
             Clears the database and inserts the given data. This function can be used only on an unlabeled SenderDB instance.
             */
-            void set_data(std::vector<HashedItem> data)
+            void set_data(const std::vector<Item> &data)
             {
                 clear_db();
-                insert_or_assign(std::move(data));
+                insert_or_assign(data);
             }
 
             /**
             Removes the given data from the database, using at most thread_count threads.
             */
-            void remove(const std::vector<HashedItem> &data);
+            void remove(const std::vector<Item> &data);
 
             /**
             Removes the given (hashed) item from the database.
             */
-            void remove(const HashedItem &data)
+            void remove(const Item &data)
             {
-                remove(std::vector<HashedItem> { std::move(data) });
+                std::vector<Item> data_singleton{ data };
+                remove(data_singleton);
             }
+
+            /**
+            Returns whether the given item has been inserted in the SenderDB.
+            */
+            bool has_item(const Item &item) const;
 
             /**
             Returns the label associated to the given item in the database. Throws std::invalid_argument if the item
             does not appear in the database.
             */
-            EncryptedLabel get_label(const HashedItem &item) const;
+            Label get_label(const Item &item) const;
 
             /**
             Returns a set of cache references corresponding to the bundles at the given bundle index. Even though this
@@ -208,11 +215,19 @@ namespace apsi
             }
 
             /**
-            Returns a reference to a set of items already existing in the SenderDB.
+            Returns a reference to a set of item hashes already existing in the SenderDB.
             */
-            const std::unordered_set<HashedItem> &get_items() const 
+            const std::unordered_set<HashedItem> &get_hashed_items() const 
             {
-                return items_;
+                return hashed_items_;
+            }
+
+            /**
+            Returns the number of items in this SenderDB.
+            */
+            size_t get_item_count() const 
+            {
+                return hashed_items_.size();
             }
 
             /**
@@ -257,7 +272,7 @@ namespace apsi
             /**
             The set of all items that have been inserted into the database
             */
-            std::unordered_set<HashedItem> items_;
+            std::unordered_set<HashedItem> hashed_items_;
 
             /**
             The PSI parameters define the SEAL parameters, base field, item size, table size, etc.

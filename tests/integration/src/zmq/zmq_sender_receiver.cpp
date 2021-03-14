@@ -122,8 +122,8 @@ namespace APSITests
             size_t num_clients,
             size_t num_threads)
         {
-            logging::Log::set_console_disabled(true);
-            logging::Log::set_log_level(logging::Log::Level::info);
+            logging::Log::SetConsoleDisabled(true);
+            logging::Log::SetLogLevel(logging::Log::Level::info);
 
             ThreadPoolMgr::set_thread_count(num_threads);
             ThreadPoolMgr::set_phys_thread_count(num_threads * 2);
@@ -134,11 +134,8 @@ namespace APSITests
                 sender_items.push_back({ i + 1, i + 1 });
             }
 
-            auto oprf_key = make_shared<OPRFKey>();
-            auto hashed_sender_items = OPRFSender::ComputeHashes(sender_items, *oprf_key);
-
             auto sender_db = make_shared<SenderDB>(params, 0);
-            sender_db->set_data(hashed_sender_items);
+            sender_db->set_data(sender_items);
             APSI_LOG_INFO("Packing rate: " << sender_db->get_packing_rate());
 
             unique_ptr<stringstream> ss = make_unique<stringstream>();
@@ -151,7 +148,7 @@ namespace APSITests
 
             future<void> sender_f = async(launch::async, [&]() {
                 ZMQSenderDispatcher dispatcher(loaded_sender_db, num_threads);
-                dispatcher.run(stop_sender, 5550, oprf_key);
+                dispatcher.run(stop_sender, 5550);
             });
 
             string conn_addr = "tcp://localhost:5550";
@@ -206,8 +203,8 @@ namespace APSITests
             size_t num_clients,
             size_t num_threads)
         {
-            logging::Log::set_console_disabled(true);
-            logging::Log::set_log_level(logging::Log::Level::info);
+            logging::Log::SetConsoleDisabled(true);
+            logging::Log::SetLogLevel(logging::Log::Level::info);
 
             ThreadPoolMgr::set_thread_count(num_threads);
             ThreadPoolMgr::set_phys_thread_count(num_threads * 2);
@@ -218,11 +215,8 @@ namespace APSITests
                 sender_items.push_back(make_pair(Item(i + 1, i + 1), create_label(i + 1, 10)));
             }
 
-            auto oprf_key = make_shared<OPRFKey>();
-            auto hashed_sender_items = OPRFSender::ComputeHashes(sender_items, *oprf_key);
-
             auto sender_db = make_shared<SenderDB>(params, 10, 4, true);
-            sender_db->set_data(hashed_sender_items);
+            sender_db->set_data(sender_items);
             APSI_LOG_INFO("Packing rate: " << sender_db->get_packing_rate());
 
             unique_ptr<stringstream> ss = make_unique<stringstream>();
@@ -235,7 +229,7 @@ namespace APSITests
 
             future<void> sender_f = async(launch::async, [&]() {
                 ZMQSenderDispatcher dispatcher(loaded_sender_db, num_threads);
-                dispatcher.run(stop_sender, 5550, oprf_key);
+                dispatcher.run(stop_sender, 5550);
             });
 
             string conn_addr = "tcp://localhost:5550";

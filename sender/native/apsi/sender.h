@@ -105,7 +105,7 @@ namespace apsi
             */
             static void RunOPRF(
                 const OPRFRequest &oprf_request,
-                const oprf::OPRFKey &key,
+                oprf::OPRFKey key,
                 network::Channel &chl,
                 std::function<void(network::Channel &, Response)> send_fun = BasicSend<Response::element_type>);
 

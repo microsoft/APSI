@@ -37,8 +37,7 @@ namespace apsi
             thread_count_ = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
         }
 
-        void ZMQSenderDispatcher::run(
-            const atomic<bool> &stop, int port, shared_ptr<const OPRFKey> oprf_key)
+        void ZMQSenderDispatcher::run(const atomic<bool> &stop, int port)
         {
             ZMQSenderChannel chl;
 
@@ -47,8 +46,6 @@ namespace apsi
 
             APSI_LOG_INFO("ZMQSenderDispatcher listening on port " << port);
             chl.bind(ss.str());
-
-            oprf_key_ = move(oprf_key);
 
             auto seal_context = sender_db_->get_seal_context();
 
@@ -131,7 +128,7 @@ namespace apsi
                 // Extract the OPRF request
                 OPRFRequest oprf_request = to_oprf_request(move(sop->sop));
 
-                Sender::RunOPRF(oprf_request, *oprf_key_, chl,
+                Sender::RunOPRF(oprf_request, sender_db_->get_oprf_key(), chl,
                     [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
                         auto nsop_response = make_unique<ZMQSenderOperationResponse>();
                         nsop_response->sop_response = move(sop_response);

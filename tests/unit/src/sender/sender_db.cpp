@@ -33,8 +33,8 @@ namespace APSITests
 
                 PSIParams::TableParams table_params;
                 table_params.hash_func_count = 3;
-                table_params.max_items_per_bin = 16;
-                table_params.table_size = 1024;
+                table_params.max_items_per_bin = 8;
+                table_params.table_size = 512;
 
                 PSIParams::QueryParams query_params;
                 query_params.query_powers = { 1, 3, 5 };
@@ -62,12 +62,6 @@ namespace APSITests
             iota(label.begin(), label.end(), start);
             return label;
         }
-
-        EncryptedLabel create_encrypted_label(unsigned char start, size_t byte_count)
-        {
-            Label label = create_label(start, byte_count);
-            return EncryptedLabel(move(label), allocator<unsigned char>());
-        }
     }
 
     TEST(SenderDBTests, UnlabeledBasics)
@@ -90,7 +84,7 @@ namespace APSITests
         ASSERT_TRUE(sender_db.get_crypto_context().seal_context());
         ASSERT_FALSE(sender_db.get_crypto_context().secret_key());
 
-        auto items = sender_db.get_items();
+        auto items = sender_db.get_hashed_items();
         ASSERT_TRUE(items.empty());
 
         auto set_params = sender_db.get_params();
@@ -125,7 +119,7 @@ namespace APSITests
         ASSERT_TRUE(sender_db.get_crypto_context().seal_context());
         ASSERT_FALSE(sender_db.get_crypto_context().secret_key());
 
-        auto items = sender_db.get_items();
+        auto items = sender_db.get_hashed_items();
         ASSERT_TRUE(items.empty());
 
         auto set_params = sender_db.get_params();
@@ -141,30 +135,31 @@ namespace APSITests
         SenderDB sender_db(*params, 0);
 
         // Insert a single item
-        sender_db.insert_or_assign(HashedItem(0, 0));
-        ASSERT_EQ(1, sender_db.get_items().size());
+        sender_db.insert_or_assign(Item(0, 0));
+        ASSERT_EQ(1, sender_db.get_hashed_items().size());
         ASSERT_EQ(1, sender_db.get_bin_bundle_count());
+        ASSERT_TRUE(sender_db.has_item(Item(0, 0)));
 
         // Now re-insert; this should have no effect
-        sender_db.insert_or_assign(HashedItem(0, 0));
-        ASSERT_EQ(1, sender_db.get_items().size());
+        sender_db.insert_or_assign(Item(0, 0));
+        ASSERT_EQ(1, sender_db.get_hashed_items().size());
         ASSERT_EQ(1, sender_db.get_bin_bundle_count());
+        ASSERT_TRUE(sender_db.has_item(Item(0, 0)));
 
         // Clear and check that items were removed
         sender_db.clear_db();
-        ASSERT_TRUE(sender_db.get_items().empty());
+        ASSERT_TRUE(sender_db.get_hashed_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
+        ASSERT_FALSE(sender_db.has_item(Item(0, 0)));
 
         // Insert an item and then a second item separately; note that we have only one bundle index
-        sender_db.insert_or_assign(HashedItem(0, 0));
-        sender_db.insert_or_assign(HashedItem(1, 0));
-        ASSERT_EQ(2, sender_db.get_items().size());
+        sender_db.insert_or_assign(Item(0, 0));
+        sender_db.insert_or_assign(Item(1, 0));
+        ASSERT_EQ(2, sender_db.get_hashed_items().size());
         ASSERT_EQ(1, sender_db.get_bin_bundle_count());
-
-        // Check that both items are found and whatever was not inserted is not found.
-        ASSERT_FALSE(sender_db.get_items().find({ 0, 0 }) == sender_db.get_items().end());
-        ASSERT_FALSE(sender_db.get_items().find({ 1, 0 }) == sender_db.get_items().end());
-        ASSERT_TRUE(sender_db.get_items().find({ 2, 0 }) == sender_db.get_items().end());
+        ASSERT_TRUE(sender_db.has_item(Item(0, 0)));
+        ASSERT_TRUE(sender_db.has_item(Item(1, 0)));
+        ASSERT_FALSE(sender_db.has_item(Item(2, 0)));
 
         auto bundle_idx_count = params->bundle_idx_count();
         for (uint32_t i = 0; i < bundle_idx_count; i++)
@@ -182,7 +177,7 @@ namespace APSITests
 
         // Clear and check that items were removed
         sender_db.clear_db();
-        ASSERT_TRUE(sender_db.get_items().empty());
+        ASSERT_TRUE(sender_db.get_hashed_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
     }
 
@@ -192,7 +187,7 @@ namespace APSITests
         SenderDB sender_db(*params, 0);
 
         // Create a vector of items without duplicates
-        vector<HashedItem> items;
+        vector<Item> items;
         for (uint64_t i = 0; i < 200; i++)
         {
             items.push_back({ i, i + 1 });
@@ -200,30 +195,42 @@ namespace APSITests
 
         // Insert all items
         sender_db.insert_or_assign(items);
-        ASSERT_EQ(200, sender_db.get_items().size());
+        ASSERT_EQ(200, sender_db.get_hashed_items().size());
         auto bin_bundle_count = sender_db.get_bin_bundle_count();
+        for (auto &item : items)
+        {
+            ASSERT_TRUE(sender_db.has_item(item));
+        }
+        ASSERT_FALSE(sender_db.has_item(Item(1000, 1001)));
 
         // Now re-insert; this should have no effect
         sender_db.insert_or_assign(items);
-        ASSERT_EQ(200, sender_db.get_items().size());
+        ASSERT_EQ(200, sender_db.get_hashed_items().size());
         ASSERT_EQ(bin_bundle_count, sender_db.get_bin_bundle_count());
+        for (auto &item : items)
+        {
+            ASSERT_TRUE(sender_db.has_item(item));
+        }
+        ASSERT_FALSE(sender_db.has_item(Item(1000, 1001)));
 
         // Clear and check that items were removed
         sender_db.clear_db();
-        ASSERT_TRUE(sender_db.get_items().empty());
+        ASSERT_TRUE(sender_db.get_hashed_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
+        for (auto &item : items)
+        {
+            ASSERT_FALSE(sender_db.has_item(item));
+        }
 
         // Insert again
         sender_db.insert_or_assign(items);
-        ASSERT_EQ(200, sender_db.get_items().size());
+        ASSERT_EQ(200, sender_db.get_hashed_items().size());
         ASSERT_EQ(bin_bundle_count, sender_db.get_bin_bundle_count());
-
-        // Check that all items are found
-        for (auto item : items)
+        for (auto &item : items)
         {
-            ASSERT_FALSE(sender_db.get_items().find(item) == sender_db.get_items().end());
+            ASSERT_TRUE(sender_db.has_item(item));
         }
-        ASSERT_TRUE(sender_db.get_items().find({ 200, 201 }) == sender_db.get_items().end());
+        ASSERT_FALSE(sender_db.has_item(Item(1000, 1001)));
 
         auto bundle_idx_count = params->bundle_idx_count();
         for (uint32_t i = 0; i < bundle_idx_count; i++)
@@ -241,7 +248,7 @@ namespace APSITests
 
         // Clear and check that items were removed
         sender_db.clear_db();
-        ASSERT_TRUE(sender_db.get_items().empty());
+        ASSERT_TRUE(sender_db.get_hashed_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
     }
 
@@ -251,46 +258,49 @@ namespace APSITests
         SenderDB sender_db(*params, 20, 16, true);
 
         // Insert a single item with zero label
-        sender_db.insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(0, 20)));
-        ASSERT_EQ(1, sender_db.get_items().size());
+        sender_db.insert_or_assign(make_pair(Item(0, 0), create_label(0, 20)));
+        ASSERT_EQ(1, sender_db.get_hashed_items().size());
         ASSERT_EQ(1, sender_db.get_bin_bundle_count());
-        auto label = sender_db.get_label(HashedItem(0, 0));
-        ASSERT_EQ(create_encrypted_label(0, 20), label);
+        ASSERT_TRUE(sender_db.has_item(Item(0, 0)));
+        auto label = sender_db.get_label(Item(0, 0));
+        ASSERT_EQ(create_label(0, 20), label);
 
         // Replace label
-        sender_db.insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(1, 20)));
-        ASSERT_EQ(1, sender_db.get_items().size());
+        sender_db.insert_or_assign(make_pair(Item(0, 0), create_label(1, 20)));
+        ASSERT_EQ(1, sender_db.get_hashed_items().size());
         ASSERT_EQ(1, sender_db.get_bin_bundle_count());
-        label = sender_db.get_label(HashedItem(0, 0));
-        ASSERT_EQ(create_encrypted_label(1, 20), label);
+        ASSERT_TRUE(sender_db.has_item(Item(0, 0)));
+        label = sender_db.get_label(Item(0, 0));
+        ASSERT_EQ(create_label(1, 20), label);
 
         // Replace label again
-        sender_db.insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(0xFF, 20)));
-        ASSERT_EQ(1, sender_db.get_items().size());
+        sender_db.insert_or_assign(make_pair(Item(0, 0), create_label(0xFF, 20)));
+        ASSERT_EQ(1, sender_db.get_hashed_items().size());
         ASSERT_EQ(1, sender_db.get_bin_bundle_count());
-        label = sender_db.get_label(HashedItem(0, 0));
-        ASSERT_EQ(create_encrypted_label(0xFF, 20), label);
+        ASSERT_TRUE(sender_db.has_item(Item(0, 0)));
+        label = sender_db.get_label(Item(0, 0));
+        ASSERT_EQ(create_label(0xFF, 20), label);
 
         // Insert another item
-        sender_db.insert_or_assign(make_pair(HashedItem(1, 0), create_encrypted_label(1, 20)));
-        ASSERT_EQ(2, sender_db.get_items().size());
-        label = sender_db.get_label(HashedItem(0, 0));
-        ASSERT_EQ(create_encrypted_label(0xFF, 20), label);
-        label = sender_db.get_label(HashedItem(1, 0));
-        ASSERT_EQ(create_encrypted_label(1, 20), label);
-
-        // Check that both items are found and whatever was not inserted is not found.
-        auto items = sender_db.get_items();
-        ASSERT_FALSE(items.empty());
-        ASSERT_FALSE(sender_db.get_items().find({ 0, 0 }) == sender_db.get_items().end());
-        ASSERT_FALSE(sender_db.get_items().find({ 1, 0 }) == sender_db.get_items().end());
-        ASSERT_TRUE(sender_db.get_items().find({ 2, 0 }) == sender_db.get_items().end());
+        sender_db.insert_or_assign(make_pair(Item(1, 0), create_label(1, 20)));
+        ASSERT_EQ(2, sender_db.get_hashed_items().size());
+        ASSERT_TRUE(sender_db.has_item(Item(0, 0)));
+        ASSERT_TRUE(sender_db.has_item(Item(1, 0)));
+        label = sender_db.get_label(Item(0, 0));
+        ASSERT_EQ(create_label(0xFF, 20), label);
+        label = sender_db.get_label(Item(1, 0));
+        ASSERT_EQ(create_label(1, 20), label);
 
         // Clear and check that items were removed
         sender_db.clear_db();
-        ASSERT_TRUE(sender_db.get_items().empty());
+        ASSERT_TRUE(sender_db.get_hashed_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
-        ASSERT_TRUE(sender_db.get_items().empty());
+        ASSERT_TRUE(sender_db.get_hashed_items().empty());
+        ASSERT_FALSE(sender_db.has_item(Item(0, 0)));
+        ASSERT_FALSE(sender_db.has_item(Item(1, 0)));
+
+        ASSERT_THROW(auto label2 = sender_db.get_label(Item(0, 0)), logic_error);
+        ASSERT_THROW(auto label2 = sender_db.get_label(Item(1, 0)), logic_error);
     }
 
     TEST(SenderDBTests, LabeledInsertOrAssignMany)
@@ -299,41 +309,54 @@ namespace APSITests
         SenderDB sender_db(*params, 20, 16, true);
 
         // Create a vector of items and labels without duplicates
-        vector<pair<HashedItem, EncryptedLabel>> items;
+        vector<pair<Item, Label>> items;
         for (uint64_t i = 0; i < 200; i++)
         {
-            items.push_back(
-                make_pair(HashedItem(i, i + 1), create_encrypted_label(static_cast<unsigned char>(i), 20)));
+            items.push_back(make_pair(Item(i, i + 1), create_label(static_cast<unsigned char>(i), 20)));
         }
 
         // Insert all items
         sender_db.insert_or_assign(items);
-        ASSERT_EQ(200, sender_db.get_items().size());
+        ASSERT_EQ(200, sender_db.get_hashed_items().size());
         auto bin_bundle_count = sender_db.get_bin_bundle_count();
+        for (auto &item : items)
+        {
+            ASSERT_TRUE(sender_db.has_item(item.first));
+            ASSERT_EQ(item.second, sender_db.get_label(item.first));
+        }
+        ASSERT_FALSE(sender_db.has_item(Item(1000, 1001)));
 
         // Now re-insert; this should have no effect
         sender_db.insert_or_assign(items);
-        ASSERT_EQ(200, sender_db.get_items().size());
+        ASSERT_EQ(200, sender_db.get_hashed_items().size());
         ASSERT_EQ(bin_bundle_count, sender_db.get_bin_bundle_count());
+        for (auto &item : items)
+        {
+            ASSERT_TRUE(sender_db.has_item(item.first));
+            ASSERT_EQ(item.second, sender_db.get_label(item.first));
+        }
+        ASSERT_FALSE(sender_db.has_item(Item(1000, 1001)));
 
         // Clear and check that items were removed
         sender_db.clear_db();
-        ASSERT_TRUE(sender_db.get_items().empty());
+        ASSERT_TRUE(sender_db.get_hashed_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
+        for (auto &item : items)
+        {
+            ASSERT_FALSE(sender_db.has_item(item.first));
+            ASSERT_THROW(auto label2 = sender_db.get_label(item.first), logic_error);
+        }
 
         // Insert again
         sender_db.insert_or_assign(items);
-        ASSERT_EQ(200, sender_db.get_items().size());
+        ASSERT_EQ(200, sender_db.get_hashed_items().size());
         ASSERT_EQ(bin_bundle_count, sender_db.get_bin_bundle_count());
-
-        // Check that all items are found and labels are correct
-        for (auto item : items)
+        for (auto &item : items)
         {
-            ASSERT_FALSE(sender_db.get_items().find(item.first) == sender_db.get_items().end());
-            auto label = sender_db.get_label(item.first);
-            ASSERT_EQ(item.second, label);
+            ASSERT_TRUE(sender_db.has_item(item.first));
+            ASSERT_EQ(item.second, sender_db.get_label(item.first));
         }
-        ASSERT_TRUE(sender_db.get_items().find({ 200, 201 }) == sender_db.get_items().end());
+        ASSERT_FALSE(sender_db.has_item(Item(1000, 1001)));
 
         auto bundle_idx_count = params->bundle_idx_count();
         for (uint32_t i = 0; i < bundle_idx_count; i++)
@@ -351,7 +374,7 @@ namespace APSITests
 
         // Clear and check that items were removed
         sender_db.clear_db();
-        ASSERT_TRUE(sender_db.get_items().empty());
+        ASSERT_TRUE(sender_db.get_hashed_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
     }
 
@@ -364,68 +387,64 @@ namespace APSITests
         SenderDB sender_db(*params, 20, 16, true);
 
         // Insert a single item
-        sender_db.insert_or_assign({ HashedItem(0, 0), create_encrypted_label(0, 20) });
-        ASSERT_EQ(1, sender_db.get_items().size());
+        sender_db.insert_or_assign({ Item(0, 0), create_label(0, 20) });
+        ASSERT_EQ(1, sender_db.get_hashed_items().size());
         ASSERT_EQ(1, sender_db.get_bin_bundle_count());
-        ASSERT_FALSE(sender_db.get_items().find({ 0, 0 }) == sender_db.get_items().end());
 
         // Try remove item that doesn't exist
-        ASSERT_THROW(sender_db.remove(HashedItem(1, 0)), invalid_argument);
+        ASSERT_THROW(sender_db.remove(Item(1, 0)), logic_error);
 
         // Remove inserted item
-        sender_db.remove(HashedItem(0, 0));
-        ASSERT_EQ(0, sender_db.get_items().size());
+        sender_db.remove(Item(0, 0));
+        ASSERT_EQ(0, sender_db.get_hashed_items().size());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
-        ASSERT_TRUE(sender_db.get_items().find({ 0, 0 }) == sender_db.get_items().end());
+        ASSERT_FALSE(sender_db.has_item(Item(0, 0)));
 
-        // Now insert until we have 5 BinBundles
+        // Now insert until we have 2 BinBundles
         uint64_t val = 0;
-        while (sender_db.get_bin_bundle_count() < 5)
+        while (sender_db.get_bin_bundle_count() < 2)
         {
             sender_db.insert_or_assign(
-                { HashedItem(val, ~val), create_encrypted_label(static_cast<unsigned char>(val), 20) });
+                { Item(val, ~val), create_label(static_cast<unsigned char>(val), 20) });
             val++;
+            APSI_LOG_ERROR(val << " " << sender_db.get_bin_bundle_count());
         }
 
-        // Check that everything was found
-        ASSERT_EQ(val, sender_db.get_items().size());
-        ASSERT_EQ(5, sender_db.get_bin_bundle_count());
+        // Check that everything was inserted
+        ASSERT_EQ(val, sender_db.get_hashed_items().size());
+        ASSERT_EQ(2, sender_db.get_bin_bundle_count());
 
-        // Now remove the first one; we should immediately drop to 4 BinBundles
+        // Now remove the first one; we should immediately drop to 2 BinBundles
         val--;
-        sender_db.remove(HashedItem(val, ~val));
-        ASSERT_EQ(val, sender_db.get_items().size());
-        ASSERT_EQ(4, sender_db.get_bin_bundle_count());
+        sender_db.remove(Item(val, ~val));
+        ASSERT_EQ(val, sender_db.get_hashed_items().size());
+        ASSERT_EQ(1, sender_db.get_bin_bundle_count());
 
         // Remove all inserted items, one-by-one
         while (val > 0)
         {
             val--;
-            sender_db.remove(HashedItem(val, ~val));
+            sender_db.remove(Item(val, ~val));
         }
 
         // No BinBundles should be left at this time
-        ASSERT_TRUE(sender_db.get_items().empty());
+        ASSERT_TRUE(sender_db.get_hashed_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
 
-        // Again insert until we have 5 BinBundles
+        // Again insert until we have 2 BinBundles
         val = 0;
-        while (sender_db.get_bin_bundle_count() < 5)
+        while (sender_db.get_bin_bundle_count() < 2)
         {
             sender_db.insert_or_assign(
-                { HashedItem(val, ~val), create_encrypted_label(static_cast<unsigned char>(val), 20) });
+                { Item(val, ~val), create_label(static_cast<unsigned char>(val), 20) });
             val++;
         }
 
         // Now remove all
-        unordered_set<HashedItem> item_set = sender_db.get_items();
-        vector<HashedItem> items;
-        items.reserve(item_set.size());
-        copy(item_set.begin(), item_set.end(), back_inserter(items));
-        sender_db.remove(items);
+        sender_db.clear_db();
 
         // No BinBundles should be left at this time
-        ASSERT_TRUE(sender_db.get_items().empty());
+        ASSERT_TRUE(sender_db.get_hashed_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
     }
 
@@ -441,7 +460,7 @@ namespace APSITests
 
         ASSERT_EQ(save_size, other.second);
         ASSERT_EQ(params->to_string(), other_sdb.get_params().to_string());
-        ASSERT_EQ(sender_db.get_items().size(), other_sdb.get_items().size());
+        ASSERT_EQ(sender_db.get_hashed_items().size(), other_sdb.get_hashed_items().size());
         ASSERT_EQ(sender_db.is_compressed(), other_sdb.is_compressed());
         ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
         ASSERT_EQ(sender_db.get_label_byte_count(), other_sdb.get_label_byte_count());
@@ -457,7 +476,7 @@ namespace APSITests
 
         ASSERT_EQ(save_size, other.second);
         ASSERT_EQ(params->to_string(), other_sdb.get_params().to_string());
-        ASSERT_EQ(sender_db.get_items().size(), other_sdb.get_items().size());
+        ASSERT_EQ(sender_db.get_hashed_items().size(), other_sdb.get_hashed_items().size());
         ASSERT_EQ(sender_db.is_compressed(), other_sdb.is_compressed());
         ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
         ASSERT_EQ(sender_db.get_label_byte_count(), other_sdb.get_label_byte_count());
@@ -465,7 +484,7 @@ namespace APSITests
         ASSERT_TRUE(oprf_keys_equal(sender_db.get_oprf_key(), other_sdb.get_oprf_key()));
 
         // Create a vector of items without duplicates
-        vector<HashedItem> items;
+        vector<Item> items;
         for (uint64_t i = 0; i < 200; i++)
         {
             items.push_back({ i, i + 1 });
@@ -480,7 +499,7 @@ namespace APSITests
 
         ASSERT_EQ(save_size, other.second);
         ASSERT_EQ(params->to_string(), other_sdb.get_params().to_string());
-        ASSERT_EQ(sender_db.get_items().size(), other_sdb.get_items().size());
+        ASSERT_EQ(sender_db.get_hashed_items().size(), other_sdb.get_hashed_items().size());
         ASSERT_EQ(sender_db.is_compressed(), other_sdb.is_compressed());
         ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
         ASSERT_EQ(sender_db.get_label_byte_count(), other_sdb.get_label_byte_count());
@@ -488,9 +507,9 @@ namespace APSITests
         ASSERT_TRUE(oprf_keys_equal(sender_db.get_oprf_key(), other_sdb.get_oprf_key()));
 
         // Check that the items match
-        for (auto &it : sender_db.get_items())
+        for (auto &it : sender_db.get_hashed_items())
         {
-            ASSERT_NE(other_sdb.get_items().end(), other_sdb.get_items().find(it));
+            ASSERT_NE(other_sdb.get_hashed_items().end(), other_sdb.get_hashed_items().find(it));
         }
     }
 
@@ -506,7 +525,7 @@ namespace APSITests
 
         ASSERT_EQ(save_size, other.second);
         ASSERT_EQ(params->to_string(), other_sdb.get_params().to_string());
-        ASSERT_EQ(sender_db.get_items().size(), other_sdb.get_items().size());
+        ASSERT_EQ(sender_db.get_hashed_items().size(), other_sdb.get_hashed_items().size());
         ASSERT_EQ(sender_db.is_compressed(), other_sdb.is_compressed());
         ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
         ASSERT_EQ(sender_db.get_label_byte_count(), other_sdb.get_label_byte_count());
@@ -514,7 +533,7 @@ namespace APSITests
         ASSERT_TRUE(oprf_keys_equal(sender_db.get_oprf_key(), other_sdb.get_oprf_key()));
 
         // Insert a single item
-        sender_db.insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(0, 20)));
+        sender_db.insert_or_assign(make_pair(Item(0, 0), create_label(0, 20)));
 
         save_size = sender_db.save(ss);
         other = SenderDB::Load(ss);
@@ -522,7 +541,7 @@ namespace APSITests
 
         ASSERT_EQ(save_size, other.second);
         ASSERT_EQ(params->to_string(), other_sdb.get_params().to_string());
-        ASSERT_EQ(sender_db.get_items().size(), other_sdb.get_items().size());
+        ASSERT_EQ(sender_db.get_hashed_items().size(), other_sdb.get_hashed_items().size());
         ASSERT_EQ(sender_db.is_compressed(), other_sdb.is_compressed());
         ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
         ASSERT_EQ(sender_db.get_label_byte_count(), other_sdb.get_label_byte_count());
@@ -530,10 +549,10 @@ namespace APSITests
         ASSERT_TRUE(oprf_keys_equal(sender_db.get_oprf_key(), other_sdb.get_oprf_key()));
 
         // Create a vector of items and labels without duplicates
-        vector<pair<HashedItem, EncryptedLabel>> items;
+        vector<pair<Item, Label>> items;
         for (uint64_t i = 0; i < 200; i++)
         {
-            items.push_back(make_pair(HashedItem(i, i + 1), create_encrypted_label(static_cast<unsigned char>(i), 20)));
+            items.push_back(make_pair(Item(i, i + 1), create_label(static_cast<unsigned char>(i), 20)));
         }
 
         // Insert all items
@@ -545,7 +564,7 @@ namespace APSITests
 
         ASSERT_EQ(save_size, other.second);
         ASSERT_EQ(params->to_string(), other_sdb.get_params().to_string());
-        ASSERT_EQ(sender_db.get_items().size(), other_sdb.get_items().size());
+        ASSERT_EQ(sender_db.get_hashed_items().size(), other_sdb.get_hashed_items().size());
         ASSERT_EQ(sender_db.is_compressed(), other_sdb.is_compressed());
         ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
         ASSERT_EQ(sender_db.get_label_byte_count(), other_sdb.get_label_byte_count());
@@ -553,9 +572,9 @@ namespace APSITests
         ASSERT_TRUE(oprf_keys_equal(sender_db.get_oprf_key(), other_sdb.get_oprf_key()));
 
         // Check that the items match
-        for (auto &it : sender_db.get_items())
+        for (auto &it : sender_db.get_hashed_items())
         {
-            ASSERT_NE(other_sdb.get_items().end(), other_sdb.get_items().find(it));
+            ASSERT_NE(other_sdb.get_hashed_items().end(), other_sdb.get_hashed_items().find(it));
         }
     }
 }

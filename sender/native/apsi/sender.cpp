@@ -76,7 +76,7 @@ namespace apsi
 
         void Sender::RunOPRF(
             const OPRFRequest &oprf_request,
-            const OPRFKey &key,
+            OPRFKey key,
             network::Channel &chl,
             function<void(Channel &, Response)> send_fun)
         {
@@ -141,7 +141,7 @@ namespace apsi
 
             STOPWATCH(sender_stopwatch, "Sender::RunQuery");
             APSI_LOG_INFO(
-                "Start processing query request on database with " << sender_db->get_items().size()
+                "Start processing query request on database with " << sender_db->get_hashed_items().size()
                                                                    << " items");
 
             // Copy over the CryptoContext from SenderDB; set the Evaluator for this local instance
@@ -304,6 +304,8 @@ namespace apsi
             auto rp = make_unique<ResultPackage>();
 
             rp->bundle_idx = bundle_idx;
+            rp->nonce_byte_count = sender_db->get_nonce_byte_count();
+            rp->label_byte_count = sender_db->get_label_byte_count();
 
             // Compute the matching result and move to rp
             const BatchedPlaintextPolyn &matching_polyn = cache.get().batched_matching_polyn;

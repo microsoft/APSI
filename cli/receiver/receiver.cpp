@@ -60,8 +60,8 @@ void print_transmitted_data(Channel &channel);
 int main(int argc, char *argv[])
 {
     // Enable full logging to console until desired values are read from command line arguments
-    Log::set_console_disabled(true);
-    Log::set_log_level(Log::Level::all);
+    Log::SetConsoleDisabled(true);
+    Log::SetLogLevel(Log::Level::all);
 
     CLP cmd("Example of a Receiver implementation", APSI_VERSION);
     if (!cmd.parse_args(argc, argv))
@@ -70,9 +70,9 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    Log::set_log_file(cmd.log_file());
-    Log::set_console_disabled(!cmd.enable_console());
-    Log::set_log_level(cmd.log_level());
+    Log::SetLogFile(cmd.log_file());
+    Log::SetConsoleDisabled(!cmd.enable_console());
+    Log::SetLogLevel(cmd.log_level());
 
     return remote_query(cmd);
 }

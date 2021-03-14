@@ -423,12 +423,16 @@ namespace apsi
             size_t bundle_start = mul_safe(safe_cast<size_t>(plain_rp.bundle_idx), items_per_bundle);
 
             // Check if we are supposed to have label data present but don't have for some reason
-            size_t expected_label_byte_count = safe_cast<size_t>(plain_rp.label_byte_count);
-            if (expected_label_byte_count && plain_rp.label_result.empty())
+            size_t label_byte_count = safe_cast<size_t>(plain_rp.label_byte_count);
+            if (label_byte_count && plain_rp.label_result.empty())
             {
-                APSI_LOG_WARNING("Expected " << expected_label_byte_count << "-byte labels in this result part, "
+                APSI_LOG_WARNING("Expected " << label_byte_count << "-byte labels in this result part, "
                     "but label data is missing entirely");
             }
+
+            // Read the nonce byte count and compute the effective label byte count
+            size_t nonce_byte_count = safe_cast<size_t>(plain_rp.nonce_byte_count);
+            size_t effective_label_byte_count = add_safe(nonce_byte_count, label_byte_count);
 
             // How much label data did we actually receive?
             size_t received_label_bit_count =
@@ -436,13 +440,21 @@ namespace apsi
 
             // Compute the received label byte count and check that it is not less than what was expected
             size_t received_label_byte_count = received_label_bit_count / 8;
-            if (received_label_byte_count < expected_label_byte_count)
+            if (received_label_byte_count < nonce_byte_count)
             {
-                APSI_LOG_WARNING("Expected " << expected_label_byte_count << "-byte labels in this result "
-                    "part, but only " << received_label_byte_count << "-byte labels were present");
+                APSI_LOG_WARNING("Expected " << nonce_byte_count << " bytes of nonce data in this result part but "
+                    "only " << received_label_byte_count << " bytes were received; ignoring the label data");
+
+                // Just ignore the label data
+                label_byte_count = 0;
+            }
+            else if (received_label_byte_count < effective_label_byte_count)
+            {
+                APSI_LOG_WARNING("Expected " << label_byte_count << " bytes of label data in this result part but only "
+                    << received_label_byte_count - nonce_byte_count << " bytes were received");
 
                 // Reset our expectations to what was actually received
-                expected_label_byte_count = received_label_byte_count;
+                label_byte_count = received_label_byte_count - nonce_byte_count;
             }
 
             // Set up the result vector
@@ -486,10 +498,10 @@ namespace apsi
                 mr.found = true;
 
                 // Next, extract the label results, if any
-                if (!plain_rp.label_result.empty())
+                if (label_byte_count)
                 {
                     APSI_LOG_DEBUG("Found " << plain_rp.label_result.size() << " label parts for items[" << item_idx
-                        << "]; expecting " << expected_label_byte_count << "-byte label");
+                        << "]; expecting " << label_byte_count << "-byte label");
 
                     // Collect the entire label into this vector
                     AlgLabel alg_label;
@@ -502,16 +514,17 @@ namespace apsi
                     }
 
                     // Create the label
-                    EncryptedLabel label = dealgebraize_label(
+                    EncryptedLabel encrypted_label = dealgebraize_label(
                         alg_label,
                         received_label_bit_count,
                         params_.seal_params().plain_modulus());
 
-                    // Truncate the label as necessary
-                    label.resize(expected_label_byte_count);
+                    // Decrypt the label
+                    encrypted_label.erase(encrypted_label.begin(), encrypted_label.begin() + nonce_byte_count);
+                    encrypted_label.resize(label_byte_count);
 
                     // Set the label
-                    mr.label.set(move(label));
+                    mr.label.set(move(encrypted_label));
                 }
 
                 // We are done with the MatchRecord, so add it to the mrs vector
