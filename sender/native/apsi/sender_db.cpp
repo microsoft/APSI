@@ -633,6 +633,8 @@ namespace apsi
 
             items_ = move(source.items_);
             bin_bundles_ = move(source.bin_bundles_);
+            oprf_key_ = move(source.oprf_key_);
+            source.oprf_key_ = oprf::OPRFKey();
 
             // Reset the source data structures
             source.clear_db_internal();
@@ -660,6 +662,8 @@ namespace apsi
 
             items_ = move(source.items_);
             bin_bundles_ = move(source.bin_bundles_);
+            oprf_key_ = move(source.oprf_key_);
+            source.oprf_key_ = oprf::OPRFKey();
 
             // Reset the source data structures
             source.clear_db_internal();
@@ -993,6 +997,8 @@ namespace apsi
                 safe_cast<uint32_t>(label_byte_count_),
                 safe_cast<uint32_t>(nonce_byte_count_),
                 compressed_);
+            auto oprf_key_span = oprf_key_.key_span();
+            auto oprf_key = fbs_builder.CreateVector(oprf_key_span.data(), oprf_key_span.size());
             auto hashed_items = fbs_builder.CreateVectorOfStructs([&]() {
                 // The HashedItems vector is populated with an immediately-invoked lambda
                 vector<fbs::HashedItem> ret;
@@ -1011,6 +1017,7 @@ namespace apsi
             fbs::SenderDBBuilder sender_db_builder(fbs_builder);
             sender_db_builder.add_params(params);
             sender_db_builder.add_info(&info);
+            sender_db_builder.add_oprf_key(oprf_key);
             sender_db_builder.add_hashed_items(hashed_items);
             sender_db_builder.add_bin_bundle_count(safe_cast<uint32_t>(bin_bundle_count));
             auto sdb = sender_db_builder.Finish();
@@ -1087,6 +1094,20 @@ namespace apsi
                 APSI_LOG_ERROR("APSI threw an exception creating SenderDB: " << ex.what());
                 throw runtime_error("failed to load SenderDB");
             }
+
+            // Check that the OPRF key size is correct
+            size_t oprf_key_size = sdb->oprf_key()->size();
+            if (oprf_key_size != oprf::oprf_key_size)
+            {
+                APSI_LOG_ERROR("The loaded OPRF key has invalid size (" << oprf_key_size << " bytes; expected "
+                    << oprf::oprf_key_size << " bytes)");
+                throw runtime_error("failed to load SenderDB");
+            }
+
+            // Copy over the OPRF key
+            sender_db->oprf_key_.load(oprf::oprf_key_span_const_type(
+                reinterpret_cast<const unsigned char*>(sdb->oprf_key()->data()),
+                oprf::oprf_key_size));
 
             int32_t item_bit_count = sender_db->params_.item_bit_count();
             int32_t item_byte_count = (item_bit_count + 7) >> 3;

@@ -80,7 +80,7 @@ namespace apsi
 
                 FactorData &operator=(FactorData &&) = default;
 
-                inline std::size_t item_count() const noexcept
+                std::size_t item_count() const noexcept
                 {
                     return item_count_;
                 }
@@ -106,7 +106,7 @@ namespace apsi
                 }
 
             private:
-                inline void resize(std::size_t item_count)
+                void resize(std::size_t item_count)
                 {
                     item_count_ = item_count;
                     factor_data_.resize(item_count * factor_size);

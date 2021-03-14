@@ -21,6 +21,7 @@
 #include "apsi/item.h"
 #include "apsi/psi_params.h"
 #include "apsi/crypto_context.h"
+#include "apsi/oprf/oprf_sender.h"
 
 // SEAL
 #include "seal/plaintext.h"
@@ -99,6 +100,14 @@ namespace apsi
             bool is_compressed() const
             {
                 return compressed_;
+            }
+
+            /**
+            Returns a copy of the OPRF key.
+            */
+            oprf::OPRFKey get_oprf_key() const
+            {
+                return oprf_key_;
             }
 
             /**
@@ -287,6 +296,11 @@ namespace apsi
             bundle index i contains all the BinBundles with bundle index i.
             */
             std::vector<std::vector<BinBundle>> bin_bundles_;
+
+            /**
+            Holds the OPRF key for this SenderDB.
+            */
+            oprf::OPRFKey oprf_key_;
         }; // class SenderDB
     }  // namespace sender
 } // namespace apsi

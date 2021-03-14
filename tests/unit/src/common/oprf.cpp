@@ -42,17 +42,6 @@ namespace APSITests
         auto oprf_key2_span = oprf_key2.key_span();
         ASSERT_FALSE(all_of(oprf_key2_span.begin(), oprf_key2_span.end(), [](auto a) { return a == 0; }));
         ASSERT_FALSE(equal(oprf_key_span.begin(), oprf_key_span.end(), oprf_key2_span.begin()));
-
-        // Set up seeded PRNG
-        shared_ptr<UniformRandomGeneratorFactory> rg =
-            make_shared<Blake2xbPRNGFactory>(prng_seed_type{ 0, 1, 2, 3, 4, 5, 6, 7 });
-        OPRFKey oprf_key3(rg);
-        auto oprf_key3_span = oprf_key3.key_span();
-        OPRFKey oprf_key4(rg);
-        auto oprf_key4_span = oprf_key4.key_span();
-        ASSERT_FALSE(all_of(oprf_key3_span.begin(), oprf_key3_span.end(), [](auto a) { return a == 0; }));
-        ASSERT_FALSE(all_of(oprf_key4_span.begin(), oprf_key4_span.end(), [](auto a) { return a == 0; }));
-        ASSERT_TRUE(equal(oprf_key3_span.begin(), oprf_key3_span.end(), oprf_key4_span.begin()));
     }
 
     TEST(OPRFTests, OPRFKeySaveLoad)
@@ -83,7 +72,7 @@ namespace APSITests
         }
 
         // Create random key
-        OPRFKey oprf_key(rng_factory);
+        OPRFKey oprf_key;
 
         vector<HashedItem> out_items = OPRFSender::ComputeHashes(items, oprf_key);
 

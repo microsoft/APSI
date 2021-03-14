@@ -12,7 +12,6 @@ using namespace std;
 using namespace apsi;
 using namespace apsi::util;
 
-
 /**
 Static reference count that will manage the lifetime of the single ThreadPool
 object that all users of this class will share.

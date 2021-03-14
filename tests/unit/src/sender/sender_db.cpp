@@ -51,6 +51,11 @@ namespace APSITests
             return params;
         }
 
+        bool oprf_keys_equal(oprf::OPRFKey key1, oprf::OPRFKey key2)
+        {
+            return equal(key1.key_span().begin(), key1.key_span().end(), key2.key_span().begin());
+        }
+
         Label create_label(unsigned char start, size_t byte_count)
         {
             Label label(byte_count);
@@ -90,6 +95,9 @@ namespace APSITests
 
         auto set_params = sender_db.get_params();
         ASSERT_EQ(params->to_string(), set_params.to_string());
+
+        oprf::OPRFKey oprf_key = sender_db.get_oprf_key(); 
+        ASSERT_FALSE(all_of(oprf_key.key_span().begin(), oprf_key.key_span().end(), [](auto b) { return b == 0; }));
     }
 
     TEST(SenderDBTests, LabeledBasics)
@@ -122,6 +130,9 @@ namespace APSITests
 
         auto set_params = sender_db.get_params();
         ASSERT_EQ(params->to_string(), set_params.to_string());
+
+        oprf::OPRFKey oprf_key = sender_db.get_oprf_key(); 
+        ASSERT_FALSE(all_of(oprf_key.key_span().begin(), oprf_key.key_span().end(), [](auto b) { return b == 0; }));
     }
 
     TEST(SenderDBTests, UnlabeledInsertOrAssignSingle)
@@ -435,6 +446,7 @@ namespace APSITests
         ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
         ASSERT_EQ(sender_db.get_label_byte_count(), other_sdb.get_label_byte_count());
         ASSERT_EQ(sender_db.get_nonce_byte_count(), other_sdb.get_nonce_byte_count());
+        ASSERT_TRUE(oprf_keys_equal(sender_db.get_oprf_key(), other_sdb.get_oprf_key()));
 
         // Insert a single item
         sender_db.insert_or_assign(HashedItem(0, 0));
@@ -450,6 +462,7 @@ namespace APSITests
         ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
         ASSERT_EQ(sender_db.get_label_byte_count(), other_sdb.get_label_byte_count());
         ASSERT_EQ(sender_db.get_nonce_byte_count(), other_sdb.get_nonce_byte_count());
+        ASSERT_TRUE(oprf_keys_equal(sender_db.get_oprf_key(), other_sdb.get_oprf_key()));
 
         // Create a vector of items without duplicates
         vector<HashedItem> items;
@@ -472,6 +485,7 @@ namespace APSITests
         ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
         ASSERT_EQ(sender_db.get_label_byte_count(), other_sdb.get_label_byte_count());
         ASSERT_EQ(sender_db.get_nonce_byte_count(), other_sdb.get_nonce_byte_count());
+        ASSERT_TRUE(oprf_keys_equal(sender_db.get_oprf_key(), other_sdb.get_oprf_key()));
 
         // Check that the items match
         for (auto &it : sender_db.get_items())
@@ -497,6 +511,7 @@ namespace APSITests
         ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
         ASSERT_EQ(sender_db.get_label_byte_count(), other_sdb.get_label_byte_count());
         ASSERT_EQ(sender_db.get_nonce_byte_count(), other_sdb.get_nonce_byte_count());
+        ASSERT_TRUE(oprf_keys_equal(sender_db.get_oprf_key(), other_sdb.get_oprf_key()));
 
         // Insert a single item
         sender_db.insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(0, 20)));
@@ -512,6 +527,7 @@ namespace APSITests
         ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
         ASSERT_EQ(sender_db.get_label_byte_count(), other_sdb.get_label_byte_count());
         ASSERT_EQ(sender_db.get_nonce_byte_count(), other_sdb.get_nonce_byte_count());
+        ASSERT_TRUE(oprf_keys_equal(sender_db.get_oprf_key(), other_sdb.get_oprf_key()));
 
         // Create a vector of items and labels without duplicates
         vector<pair<HashedItem, EncryptedLabel>> items;
@@ -534,6 +550,7 @@ namespace APSITests
         ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
         ASSERT_EQ(sender_db.get_label_byte_count(), other_sdb.get_label_byte_count());
         ASSERT_EQ(sender_db.get_nonce_byte_count(), other_sdb.get_nonce_byte_count());
+        ASSERT_TRUE(oprf_keys_equal(sender_db.get_oprf_key(), other_sdb.get_oprf_key()));
 
         // Check that the items match
         for (auto &it : sender_db.get_items())

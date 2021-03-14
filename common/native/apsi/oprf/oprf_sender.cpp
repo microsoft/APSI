@@ -176,10 +176,7 @@ namespace apsi
                     // The first 128 bits represent the item hash; the next 128 bits represent
                     // the label encryption key
                     pair<oprf_hash_type, Label> hash;
-                    copy_n(
-                        item_hash_and_label_key.data(),
-                        oprf_hash_size,
-                        hash.first.get_as<unsigned char>().data());
+                    memcpy(hash.first.value().data(), item_hash_and_label_key.data(), oprf_hash_size);
 
                     // Copy the label
                     hash.second = item.second;
