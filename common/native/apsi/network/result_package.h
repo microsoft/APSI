@@ -34,6 +34,8 @@ namespace apsi
 
             std::uint32_t label_byte_count;
 
+            std::uint32_t nonce_byte_count;
+
             std::vector<std::vector<std::uint64_t>> label_result;
         };
 
@@ -60,6 +62,8 @@ namespace apsi
             SEALObject<seal::Ciphertext> psi_result;
 
             std::uint32_t label_byte_count;
+
+            std::uint32_t nonce_byte_count;
 
             std::vector<SEALObject<seal::Ciphertext>> label_result;
         }; // struct ResultPackage

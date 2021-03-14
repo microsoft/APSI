@@ -48,7 +48,11 @@ namespace apsi
             /**
             Creates a new SenderDB.
             */
-            SenderDB(PSIParams params, std::size_t label_byte_count = 0, bool compressed = true);
+            SenderDB(
+                PSIParams params,
+                std::size_t label_byte_count = 0,
+                std::size_t nonce_byte_count = 16,
+                bool compressed = true);
 
             /**
             Creates a new SenderDB by moving from an existing one.
@@ -79,6 +83,14 @@ namespace apsi
             std::size_t get_label_byte_count() const
             {
                 return label_byte_count_;
+            }
+
+            /**
+            Returns the nonce byte count used for encrypting labels.
+            */
+            std::size_t get_nonce_byte_count() const
+            {
+                return nonce_byte_count_;
             }
 
             /**
@@ -254,14 +266,21 @@ namespace apsi
             mutable seal::util::ReaderWriterLocker db_lock_;
 
             /**
-            Indicates whether SEAL plaintexts are compressed in memory.
-            */
-            bool compressed_;
-
-            /**
             Indicates the size of the label in bytes. A zero value indicates an unlabeled SenderDB.
             */
             std::size_t label_byte_count_;
+
+            /**
+            Indicates the number of bytes of the effective label reserved for a randomly sampled nonce. The effective
+            label byte count is the sum of label_byte_count and nonce_byte_count. The value can range between 0 and 16.
+            If label_byte_count is zero, nonce_byte_count has no effect.
+            */
+            std::size_t nonce_byte_count_;
+
+            /**
+            Indicates whether SEAL plaintexts are compressed in memory.
+            */
+            bool compressed_;
 
             /**
             All the BinBundles in the database, indexed by bundle index. The set (represented by a vector internally) at

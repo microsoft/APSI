@@ -68,7 +68,11 @@ namespace APSITests
     TEST(SenderDBTests, UnlabeledBasics)
     {
         auto params = get_params();
-        SenderDB sender_db(*params, 0);
+
+        // Nonce byte count is totally ignored when label byte count is zero
+        ASSERT_NO_THROW(SenderDB sender_db(*params, 0, 17));
+
+        SenderDB sender_db(*params, 0);        
 
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
         sender_db.clear_db();
@@ -91,7 +95,16 @@ namespace APSITests
     TEST(SenderDBTests, LabeledBasics)
     {
         auto params = get_params();
-        SenderDB sender_db(*params, 20);
+
+        // Label byte count is too large
+        ASSERT_THROW(SenderDB sender_db(*params, 1025, 0), invalid_argument);
+
+        // Nonce byte count is too large
+        ASSERT_THROW(SenderDB sender_db(*params, 1, 17), invalid_argument);
+
+        SenderDB sender_db(*params, 20, 16);
+        ASSERT_EQ(20, sender_db.get_label_byte_count());
+        ASSERT_EQ(16, sender_db.get_nonce_byte_count());
 
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
         sender_db.clear_db();
@@ -224,7 +237,7 @@ namespace APSITests
     TEST(SenderDBTests, LabeledInsertOrAssignSingle)
     {
         auto params = get_params();
-        SenderDB sender_db(*params, 20, true);
+        SenderDB sender_db(*params, 20, 16, true);
 
         // Insert a single item with zero label
         sender_db.insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(0, 20)));
@@ -272,7 +285,7 @@ namespace APSITests
     TEST(SenderDBTests, LabeledInsertOrAssignMany)
     {
         auto params = get_params();
-        SenderDB sender_db(*params, 20, true);
+        SenderDB sender_db(*params, 20, 16, true);
 
         // Create a vector of items and labels without duplicates
         vector<pair<HashedItem, EncryptedLabel>> items;
@@ -337,7 +350,7 @@ namespace APSITests
 
         // We use a labeled SenderDB here to end up with multiple BinBundles more quickly. This happens because in the
         // labeled case BinBundles cannot tolerate repetitions of item parts (felts) in bins.
-        SenderDB sender_db(*params, 20, true);
+        SenderDB sender_db(*params, 20, 16, true);
 
         // Insert a single item
         sender_db.insert_or_assign({ HashedItem(0, 0), create_encrypted_label(0, 20) });
@@ -408,7 +421,7 @@ namespace APSITests
     TEST(SenderDBTests, SaveLoadUnlabeled)
     {
         auto params = get_params();
-        SenderDB sender_db(*params, 0);
+        SenderDB sender_db(*params, 0, 0, false);
 
         stringstream ss;
         size_t save_size = sender_db.save(ss);
@@ -420,6 +433,8 @@ namespace APSITests
         ASSERT_EQ(sender_db.get_items().size(), other_sdb.get_items().size());
         ASSERT_EQ(sender_db.is_compressed(), other_sdb.is_compressed());
         ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
+        ASSERT_EQ(sender_db.get_label_byte_count(), other_sdb.get_label_byte_count());
+        ASSERT_EQ(sender_db.get_nonce_byte_count(), other_sdb.get_nonce_byte_count());
 
         // Insert a single item
         sender_db.insert_or_assign(HashedItem(0, 0));
@@ -433,6 +448,8 @@ namespace APSITests
         ASSERT_EQ(sender_db.get_items().size(), other_sdb.get_items().size());
         ASSERT_EQ(sender_db.is_compressed(), other_sdb.is_compressed());
         ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
+        ASSERT_EQ(sender_db.get_label_byte_count(), other_sdb.get_label_byte_count());
+        ASSERT_EQ(sender_db.get_nonce_byte_count(), other_sdb.get_nonce_byte_count());
 
         // Create a vector of items without duplicates
         vector<HashedItem> items;
@@ -453,6 +470,8 @@ namespace APSITests
         ASSERT_EQ(sender_db.get_items().size(), other_sdb.get_items().size());
         ASSERT_EQ(sender_db.is_compressed(), other_sdb.is_compressed());
         ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
+        ASSERT_EQ(sender_db.get_label_byte_count(), other_sdb.get_label_byte_count());
+        ASSERT_EQ(sender_db.get_nonce_byte_count(), other_sdb.get_nonce_byte_count());
 
         // Check that the items match
         for (auto &it : sender_db.get_items())
@@ -464,7 +483,7 @@ namespace APSITests
     TEST(SenderDBTests, SaveLoadLabeled)
     {
         auto params = get_params();
-        SenderDB sender_db(*params, 20);
+        SenderDB sender_db(*params, 20, 8);
 
         stringstream ss;
         size_t save_size = sender_db.save(ss);
@@ -476,6 +495,8 @@ namespace APSITests
         ASSERT_EQ(sender_db.get_items().size(), other_sdb.get_items().size());
         ASSERT_EQ(sender_db.is_compressed(), other_sdb.is_compressed());
         ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
+        ASSERT_EQ(sender_db.get_label_byte_count(), other_sdb.get_label_byte_count());
+        ASSERT_EQ(sender_db.get_nonce_byte_count(), other_sdb.get_nonce_byte_count());
 
         // Insert a single item
         sender_db.insert_or_assign(make_pair(HashedItem(0, 0), create_encrypted_label(0, 20)));
@@ -489,6 +510,8 @@ namespace APSITests
         ASSERT_EQ(sender_db.get_items().size(), other_sdb.get_items().size());
         ASSERT_EQ(sender_db.is_compressed(), other_sdb.is_compressed());
         ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
+        ASSERT_EQ(sender_db.get_label_byte_count(), other_sdb.get_label_byte_count());
+        ASSERT_EQ(sender_db.get_nonce_byte_count(), other_sdb.get_nonce_byte_count());
 
         // Create a vector of items and labels without duplicates
         vector<pair<HashedItem, EncryptedLabel>> items;
@@ -509,6 +532,8 @@ namespace APSITests
         ASSERT_EQ(sender_db.get_items().size(), other_sdb.get_items().size());
         ASSERT_EQ(sender_db.is_compressed(), other_sdb.is_compressed());
         ASSERT_EQ(sender_db.is_labeled(), other_sdb.is_labeled());
+        ASSERT_EQ(sender_db.get_label_byte_count(), other_sdb.get_label_byte_count());
+        ASSERT_EQ(sender_db.get_nonce_byte_count(), other_sdb.get_nonce_byte_count());
 
         // Check that the items match
         for (auto &it : sender_db.get_items())

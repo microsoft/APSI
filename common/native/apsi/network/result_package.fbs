@@ -9,6 +9,7 @@ table ResultPackage {
     bundle_idx:uint32;
     psi_result:Ciphertext (required);
     label_byte_count:uint32;
+    nonce_byte_count:uint32;
     label_result:[Ciphertext];
 }
 

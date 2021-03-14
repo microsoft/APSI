@@ -584,13 +584,34 @@ namespace apsi
             }
         }
 
-        SenderDB::SenderDB(PSIParams params, size_t label_byte_count, bool compressed) :
-            params_(params), crypto_context_(params_), label_byte_count_(label_byte_count), compressed_(compressed)
+        SenderDB::SenderDB(PSIParams params, size_t label_byte_count, size_t nonce_byte_count, bool compressed) :
+            params_(params),
+            crypto_context_(params_),
+            label_byte_count_(label_byte_count),
+            nonce_byte_count_(label_byte_count_ ? nonce_byte_count : 0),
+            compressed_(compressed)
         {
+            // The labels cannot be more than 1 KB.
             if (label_byte_count_ > 1024)
             {
                 APSI_LOG_ERROR("Requested label byte count " << label_byte_count_ << " exceeds the maximum (1024)");
-                throw invalid_argument("failed to create SenderDB");
+                throw invalid_argument("label_byte_count is too large");
+            }
+
+            if (nonce_byte_count_ > 16)
+            {
+                APSI_LOG_ERROR("Request nonce byte count " << nonce_byte_count_ << " exceeds the maximum (16)");
+                throw invalid_argument("nonce_byte_count is too large");
+            }
+
+            // If the nonce byte count is less than 16, print a warning; this is a labeled SenderDB but may not be safe
+            // to use for arbitrary label changes.
+            if (label_byte_count_ && nonce_byte_count_ < 16)
+            {
+                APSI_LOG_WARNING("You have instantiated a labeled SenderDB instance with a nonce byte count ("
+                    << nonce_byte_count_ << ", which is less than 16. Updating labels for existing items in the "
+                    "SenderDB or removing and reinserting items with different labels may leak information about the "
+                    "labels. You need to understand why you are seeing this warning.")
             }
 
             // Set the evaluator. This will be used for BatchedPlaintextPolyn::eval.
@@ -604,6 +625,7 @@ namespace apsi
             params_(source.params_),
             crypto_context_(source.crypto_context_),
             label_byte_count_(source.label_byte_count_),
+            nonce_byte_count_(source.nonce_byte_count_),
             compressed_(source.compressed_)
         {
             // Lock the source before moving stuff over
@@ -629,8 +651,9 @@ namespace apsi
 
             params_ = source.params_;
             crypto_context_ = source.crypto_context_;
-            compressed_ = source.compressed_;
             label_byte_count_ = source.label_byte_count_;
+            nonce_byte_count_ = source.nonce_byte_count_;
+            compressed_ = source.compressed_;
 
             // Lock the source before moving stuff over
             auto source_lock = source.get_writer_lock();
@@ -966,7 +989,10 @@ namespace apsi
 
             auto params = fbs_builder.CreateVector(
                 reinterpret_cast<unsigned char*>(params_str.data()), params_str.size());
-            fbs::SenderDBInfo info(safe_cast<uint32_t>(label_byte_count_), compressed_);
+            fbs::SenderDBInfo info(
+                safe_cast<uint32_t>(label_byte_count_),
+                safe_cast<uint32_t>(nonce_byte_count_),
+                compressed_);
             auto hashed_items = fbs_builder.CreateVectorOfStructs([&]() {
                 // The HashedItems vector is populated with an immediately-invoked lambda
                 vector<fbs::HashedItem> ret;
@@ -1030,14 +1056,14 @@ namespace apsi
             auto sdb = fbs::GetSizePrefixedSenderDB(in_data.data());
 
             // Load the PSIParams
-            shared_ptr<PSIParams> params;
+            unique_ptr<PSIParams> params;
             try
             {
                 ArrayGetBuffer agbuf(
                     reinterpret_cast<const char *>(sdb->params()->data()),
                     static_cast<streamsize>(sdb->params()->size()));
                 istream params_stream(&agbuf);
-                params = make_shared<PSIParams>(PSIParams::Load(params_stream).first);
+                params = make_unique<PSIParams>(PSIParams::Load(params_stream).first);
             }
             catch (const runtime_error &ex)
             {
@@ -1047,20 +1073,30 @@ namespace apsi
             
             // Load the info so we know what kind of SenderDB to create
             size_t label_byte_count = static_cast<size_t>(sdb->info()->label_byte_count());
+            size_t nonce_byte_count = static_cast<size_t>(sdb->info()->nonce_byte_count());
             bool compressed = sdb->info()->compressed();
 
             // Create the correct kind of SenderDB
-            SenderDB sender_db(*params, label_byte_count, compressed);
+            unique_ptr<SenderDB> sender_db;
+            try
+            {
+                sender_db = make_unique<SenderDB>(*params, label_byte_count, nonce_byte_count, compressed);
+            }
+            catch(const invalid_argument &ex)
+            {
+                APSI_LOG_ERROR("APSI threw an exception creating SenderDB: " << ex.what());
+                throw runtime_error("failed to load SenderDB");
+            }
 
-            int32_t item_bit_count = sender_db.params_.item_bit_count();
+            int32_t item_bit_count = sender_db->params_.item_bit_count();
             int32_t item_byte_count = (item_bit_count + 7) >> 3;
 
             // Load the hashed items
             const auto &hashed_items = *sdb->hashed_items();
-            sender_db.items_.reserve(hashed_items.size());
+            sender_db->items_.reserve(hashed_items.size());
             for (const auto &it : hashed_items)
             {
-                sender_db.items_.insert({ it->low_word(), it->high_word() });
+                sender_db->items_.insert({ it->low_word(), it->high_word() });
             }
 
             uint32_t bin_bundle_count = sdb->bin_bundle_count();
@@ -1070,14 +1106,14 @@ namespace apsi
 
             while (bin_bundle_count--)
             {
-                BinBundle bb(sender_db.crypto_context_, label_size, max_bin_size, compressed);
+                BinBundle bb(sender_db->crypto_context_, label_size, max_bin_size, compressed);
                 auto bb_data = bb.load(in);
 
                 // Make sure BinBundle cache is valid
                 bb.regen_cache();
 
                 // Check that the loaded bundle index is not out of range
-                if (bb_data.first >= sender_db.bin_bundles_.size())
+                if (bb_data.first >= sender_db->bin_bundles_.size())
                 {
                     APSI_LOG_ERROR("The bundle index of the loaded BinBundle (" << bb_data.first
                         << ") exceeds the maximum (" << params->bundle_idx_count() - 1 << ")");
@@ -1085,7 +1121,7 @@ namespace apsi
                 }
 
                 // Add the loaded BinBundle to the correct location in bin_bundles_
-                sender_db.bin_bundles_[bb_data.first].push_back(move(bb));
+                sender_db->bin_bundles_[bb_data.first].push_back(move(bb));
 
                 APSI_LOG_DEBUG("Loaded BinBundle at bundle index " << bb_data.first
                     << " (" << bb_data.second << " bytes)");
@@ -1093,10 +1129,10 @@ namespace apsi
             }
 
             size_t total_size = in_data.size() + bin_bundle_data_size;
-            APSI_LOG_DEBUG("Loaded SenderDB with " << sender_db.get_items().size() << " items ("
+            APSI_LOG_DEBUG("Loaded SenderDB with " << sender_db->get_items().size() << " items ("
                 << total_size << " bytes)");
 
-            return { move(sender_db), total_size };
+            return { move(*sender_db), total_size };
         }
     } // namespace sender
 } // namespace apsi

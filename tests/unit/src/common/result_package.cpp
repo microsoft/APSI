@@ -88,6 +88,8 @@ namespace APSITests
         size_t in_size = rp2.load(ss, context->seal_context());
         ASSERT_EQ(out_size, in_size);
         ASSERT_EQ(rp2.bundle_idx, rp.bundle_idx);
+        ASSERT_EQ(rp2.label_byte_count, rp.label_byte_count);
+        ASSERT_EQ(rp2.nonce_byte_count, rp.nonce_byte_count);
         ASSERT_TRUE(rp2.label_result.empty());
         Plaintext pt;
         context->decryptor()->decrypt(rp2.psi_result.extract_local(), pt);
@@ -101,6 +103,8 @@ namespace APSITests
         in_size = rp2.load(ss, context->seal_context());
         ASSERT_EQ(out_size, in_size);
         ASSERT_EQ(rp2.bundle_idx, rp.bundle_idx);
+        ASSERT_EQ(rp2.label_byte_count, rp.label_byte_count);
+        ASSERT_EQ(rp2.nonce_byte_count, rp.nonce_byte_count);
 
         // Loaded package can never be serializable
         ASSERT_FALSE(rp2.psi_result.is_serializable());
@@ -115,6 +119,8 @@ namespace APSITests
         in_size = rp2.load(ss, context->seal_context());
         ASSERT_EQ(out_size, in_size);
         ASSERT_EQ(rp2.bundle_idx, rp.bundle_idx);
+        ASSERT_EQ(rp2.label_byte_count, rp.label_byte_count);
+        ASSERT_EQ(rp2.nonce_byte_count, rp.nonce_byte_count);
         ASSERT_EQ(rp2.label_result.size(), rp.label_result.size());
         context->decryptor()->decrypt(rp2.label_result[0].extract_local(), pt);
         ASSERT_TRUE(pt.is_zero());
@@ -142,6 +148,8 @@ namespace APSITests
 
         // bundle_idx is unchanged by extract
         ASSERT_EQ(rp.bundle_idx, prp.bundle_idx);
+        ASSERT_EQ(rp.label_byte_count, prp.label_byte_count);
+        ASSERT_EQ(rp.nonce_byte_count, prp.nonce_byte_count);
         ASSERT_TRUE(all_of(prp.psi_result.begin(), prp.psi_result.end(), [](auto a) { return !a; }));
         ASSERT_TRUE(prp.label_result.empty());
 
@@ -158,6 +166,8 @@ namespace APSITests
         ASSERT_TRUE(rp.label_result.empty());
 
         ASSERT_EQ(rp.bundle_idx, prp.bundle_idx);
+        ASSERT_EQ(rp.label_byte_count, prp.label_byte_count);
+        ASSERT_EQ(rp.nonce_byte_count, prp.nonce_byte_count);
         ASSERT_TRUE(all_of(prp.psi_result.begin(), prp.psi_result.end(), [](auto a) { return !a; }));
         ASSERT_EQ(2, prp.label_result.size());
         ASSERT_TRUE(all_of(prp.label_result[0].begin(), prp.label_result[0].end(), [](auto a) { return !a; }));
