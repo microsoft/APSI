@@ -269,6 +269,8 @@ namespace apsi
 
             void clear_db_internal();
 
+            void regenerate_caches();
+
             /**
             The set of all items that have been inserted into the database
             */

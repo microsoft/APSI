@@ -240,10 +240,8 @@ namespace apsi
                 bool compressed)
             {
                 STOPWATCH(sender_stopwatch, "insert_or_assign_worker");
-                APSI_LOG_DEBUG("Insert-or-Assign worker for bundle index [" << bundle_index << "]. Mode of operation: "
+                APSI_LOG_DEBUG("Insert-or-Assign worker for bundle index " << bundle_index << "; mode of operation: "
                     << (overwrite ? "overwriting existing" : "inserting new"));
-
-                bool regen_cache = false;
 
                 // Iteratively insert each item-label pair at the given cuckoo index
                 for (auto &data_with_idx : data_with_indices)
@@ -261,9 +259,6 @@ namespace apsi
                         // Dealing with this bundle index is not our job
                         continue;
                     }
-
-                    // We are inserting an item so mark the bundle index for cache regen
-                    regen_cache = true;
 
                     // Get the bundle set at the given bundle index
                     vector<BinBundle> &bundle_set = bin_bundles[bundle_idx];
@@ -328,32 +323,7 @@ namespace apsi
                     }
                 }
 
-                APSI_LOG_DEBUG("Insert-or-Assign worker [" << bundle_index << "]: "
-                    "starting cache regeneration");
-
-                // Now it's time to regenerate the caches of all the modified BinBundles. We'll just go through all the
-                // bundle indices we touched and lazily regenerate the caches of all the BinBundles at those indices.
-                if (regen_cache)
-                {
-                    // Get the set of BinBundles at this bundle index
-                    vector<BinBundle> &bundle_set = bin_bundles[bundle_index];
-
-                    APSI_LOG_DEBUG("Insert-or-Assign worker: "
-                        "regenerating cache for bundle index " << bundle_index);
-
-                    // Regenerate the cache of every BinBundle in the set
-                    for (BinBundle &bundle : bundle_set)
-                    {
-                        // Don't worry, this doesn't do anything unless the BinBundle was actually modified
-                        bundle.regen_cache();
-                    }
-
-                    APSI_LOG_DEBUG("Insert-or-Assign worker"
-                        "finished regenerating cache for bundle index " << bundle_index);
-                }
-
-                APSI_LOG_DEBUG("Insert-or-Assign worker: "
-                    "finished processing bundle index [" << bundle_index << "]");
+                APSI_LOG_DEBUG("Insert-or-Assign worker: finished processing bundle index " << bundle_index);
             }
 
             /**
@@ -420,6 +390,8 @@ namespace apsi
                 for (auto &f : futures) {
                     f.get();
                 }
+
+                APSI_LOG_INFO("Finished insert-or-assign worker tasks");
             }
 
             /**
@@ -435,9 +407,6 @@ namespace apsi
                 STOPWATCH(sender_stopwatch, "remove_worker");
                 APSI_LOG_INFO("Remove worker [" << bundle_index << "]");
 
-                // Keep track of the bundle indices we look at. These will be the ones whose cache we have to regen.
-                bool regen_cache = false;
-
                 // Iteratively remove each item-label pair at the given cuckoo index
                 for (auto &data_with_idx : data_with_indices)
                 {
@@ -452,9 +421,6 @@ namespace apsi
                         // Dealing with this bundle index is not our job
                         continue;
                     }
-
-                    // We are removing an item so mark the bundle index for cache regen
-                    regen_cache = true;
 
                     // Get the bundle set at the given bundle index
                     vector<BinBundle> &bundle_set = bin_bundles[bundle_idx];
@@ -486,33 +452,7 @@ namespace apsi
                     }
                 }
 
-                APSI_LOG_DEBUG("Remove worker: "
-                    "starting cache regeneration for bundle index " << bundle_index);
-
-                // Now it's time to regenerate the caches of all the modified BinBundles. We'll just go through all the
-                // bundle indices we touched and lazily regenerate the caches of all the BinBundles at those indices.
-                if (regen_cache)
-                {
-                    // Get the set of BinBundles at this bundle index
-                    vector<BinBundle> &bundle_set = bin_bundles[bundle_index];
-
-                    APSI_LOG_DEBUG("Remove worker: "
-                        "regenerating cache for bundle index " << bundle_index << " "
-                        "with " << bundle_set.size() << " BinBundles");
-
-                    // Regenerate the cache of every BinBundle in the set
-                    for (BinBundle &bundle : bundle_set)
-                    {
-                        // Don't worry, this doesn't do anything unless the BinBundle was actually modified
-                        bundle.regen_cache();
-                    }
-
-                    APSI_LOG_DEBUG("Remove worker: "
-                        "finished regenerating cache for bundle index " << bundle_index);
-                }
-
-                APSI_LOG_INFO("Remove worker: "
-                    "finished processing bundle index " << bundle_index);
+                APSI_LOG_INFO("Remove worker: finished processing bundle index " << bundle_index);
             }
 
             /**
@@ -723,6 +663,28 @@ namespace apsi
             clear_db_internal();
         }
 
+        void SenderDB::regenerate_caches()
+        {
+            STOPWATCH(sender_stopwatch, "SenderDB::regenerate_caches");
+            APSI_LOG_INFO("Start regenerating bin bundle caches");
+
+            ThreadPoolMgr tpm;
+
+            vector<future<void>> futures;
+            for (auto &bundle_idx : bin_bundles_) {
+                for (auto &bb : bundle_idx) {
+                    futures.emplace_back(tpm.thread_pool().enqueue([&bb]() { bb.regen_cache(); }));
+                }
+            }
+
+            // Wait for the tasks to finish
+            for (auto &f : futures) {
+                f.get();
+            }
+
+            APSI_LOG_INFO("Finished regenerating bin bundle caches");
+        }
+
         vector<reference_wrapper<const BinBundleCache>> SenderDB::get_cache_at(uint32_t bundle_idx)
         {
             return collect_caches(bin_bundles_.at(safe_cast<size_t>(bundle_idx)));
@@ -788,8 +750,8 @@ namespace apsi
             overwritable_data_with_indices.clear();
             hashed_data.erase(new_data_end, hashed_data.end());
 
-            // Finally process and add the new data. Break the data into field element representation. Also compute the
-            // items' cuckoo indices.
+            // Process and add the new data. Break the data into field element representation. Also compute the items'
+            // cuckoo indices.
             vector<pair<AlgItemLabel, size_t>> new_data_with_indices
                 = preprocess_labeled_data(hashed_data.begin(), hashed_data.end(), params_);
 
@@ -803,6 +765,9 @@ namespace apsi
                 false, /* don't overwrite items */
                 compressed_
             );
+
+            // Regenerate the BinBundle caches
+            regenerate_caches();
 
             APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
         }
@@ -862,6 +827,9 @@ namespace apsi
                 compressed_
             );
 
+            // Regenerate the BinBundle caches
+            regenerate_caches();
+
             APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
         }
 
@@ -902,6 +870,9 @@ namespace apsi
             // Dispatch the removal
             uint32_t bins_per_bundle = params_.bins_per_bundle();
             dispatch_remove(data_with_indices, bin_bundles_, crypto_context_, bins_per_bundle);
+
+            // Regenerate the BinBundle caches
+            regenerate_caches();
 
             APSI_LOG_INFO("Finished removing " << data.size() << " items from SenderDB");
         }
@@ -1142,9 +1113,6 @@ namespace apsi
                 BinBundle bb(sender_db->crypto_context_, label_size, max_bin_size, compressed);
                 auto bb_data = bb.load(in);
 
-                // Make sure BinBundle cache is valid
-                bb.regen_cache();
-
                 // Check that the loaded bundle index is not out of range
                 if (bb_data.first >= sender_db->bin_bundles_.size())
                 {
@@ -1164,6 +1132,9 @@ namespace apsi
             size_t total_size = in_data.size() + bin_bundle_data_size;
             APSI_LOG_DEBUG("Loaded SenderDB with " << sender_db->get_hashed_items().size() << " items ("
                 << total_size << " bytes)");
+
+            // Make sure the BinBundle caches are valid
+            sender_db->regenerate_caches();
 
             return { move(*sender_db), total_size };
         }

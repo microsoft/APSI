@@ -385,7 +385,7 @@ namespace apsi
             atomic<uint32_t> package_count{ response->package_count };
 
             // Launch threads to receive ResultPackages and decrypt results
-            size_t task_count = ThreadPoolMgr::get_thread_count();
+            size_t task_count = min<size_t>(ThreadPoolMgr::get_thread_count(), package_count);
             vector<future<void>> futures(task_count);
             APSI_LOG_INFO("Launching " << task_count << " result worker tasks to handle " << package_count
                 << " result parts");

@@ -40,20 +40,12 @@ int main(int argc, char *argv[])
 {
     prepare_console();
 
-    // Enable full logging to console until desired values are read from command line arguments
-    Log::SetConsoleDisabled(true);
-    Log::SetLogLevel(Log::Level::all);
-
     CLP cmd("Example of a Sender implementation", APSI_VERSION);
     if (!cmd.parse_args(argc, argv))
     {
         APSI_LOG_ERROR("Failed parsing command line arguments");
         return -1;
     }
-
-    Log::SetLogFile(cmd.log_file());
-    Log::SetConsoleDisabled(!cmd.enable_console());
-    Log::SetLogLevel(cmd.log_level());
 
     return run_sender_dispatcher(cmd);
 }
@@ -67,8 +59,6 @@ void sigint_handler(int param)
 
 int run_sender_dispatcher(const CLP &cmd)
 {
-    print_example_banner("Starting APSI Example Sender");
-
     // Set up parameters according to command line input
     unique_ptr<PSIParams> params = build_psi_params(cmd);
     if (!params)

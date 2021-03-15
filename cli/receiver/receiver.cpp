@@ -59,10 +59,6 @@ void print_transmitted_data(Channel &channel);
 
 int main(int argc, char *argv[])
 {
-    // Enable full logging to console until desired values are read from command line arguments
-    Log::SetConsoleDisabled(true);
-    Log::SetLogLevel(Log::Level::all);
-
     CLP cmd("Example of a Receiver implementation", APSI_VERSION);
     if (!cmd.parse_args(argc, argv))
     {
@@ -70,17 +66,11 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    Log::SetLogFile(cmd.log_file());
-    Log::SetConsoleDisabled(!cmd.enable_console());
-    Log::SetLogLevel(cmd.log_level());
-
     return remote_query(cmd);
 }
 
 int remote_query(const CLP& cmd)
 {
-    print_example_banner("Starting APSI Example Receiver");
-
     // Connect to the network
     ZMQReceiverChannel channel;
 
@@ -194,13 +184,14 @@ void print_intersection_results(
         if (intersection[i].found)
         {
             msg << Colors::GreenBold << orig_items[i] << Colors::Reset;
+            csv_output << orig_items[i];
             if (intersection[i].label)
             {
                 msg << ": ";
                 msg << Colors::GreenBold << intersection[i].label.to_string() << Colors::Reset;
+                csv_output << "," << intersection[i].label.to_string();
             }
-
-            csv_output << orig_items[i] << "," << intersection[i].label.to_string() << endl;
+            csv_output << endl;
         }
         else
         {

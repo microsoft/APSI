@@ -60,39 +60,39 @@ namespace apsi
     }      // namespace logging
 } // namespace apsi
 
-#define APSI_INTERNAL_CHECK_LOG_LEVEL(log_level)   \
-    logging::Log::ConfigureIfNeeded();           \
-    if (logging::Log::GetLogLevel() > log_level) \
-    {                                              \
-        break;                                     \
-    }                                              \
+#define APSI_INTERNAL_CHECK_LOG_LEVEL(log_level)       \
+    apsi::logging::Log::ConfigureIfNeeded();           \
+    if (apsi::logging::Log::GetLogLevel() > log_level) \
+    {                                                  \
+        break;                                         \
+    }                                                  \
 
-#define APSI_INTERNAL_DO_LOG(msg, msg_level)  \
-    std::stringstream ss;                     \
-    ss << msg;                                \
-    std::string msg_str = ss.str();           \
-    logging::Log::DoLog(msg_str, msg_level); \
+#define APSI_INTERNAL_DO_LOG(msg, msg_level)       \
+    std::stringstream ss;                          \
+    ss << msg;                                     \
+    std::string msg_str = ss.str();                \
+    apsi::logging::Log::DoLog(msg_str, msg_level); \
 
-#define APSI_LOG_DEBUG(msg)                                        \
-    do {                                                           \
-        APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::debug); \
-        APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::debug);     \
+#define APSI_LOG_DEBUG(msg)                                              \
+    do {                                                                 \
+        APSI_INTERNAL_CHECK_LOG_LEVEL(apsi::logging::Log::Level::debug); \
+        APSI_INTERNAL_DO_LOG(msg, apsi::logging::Log::Level::debug);     \
     } while (0);
 
-#define APSI_LOG_INFO(msg)                                        \
-    do {                                                          \
-        APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::info); \
-        APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::info);     \
+#define APSI_LOG_INFO(msg)                                              \
+    do {                                                                \
+        APSI_INTERNAL_CHECK_LOG_LEVEL(apsi::logging::Log::Level::info); \
+        APSI_INTERNAL_DO_LOG(msg, apsi::logging::Log::Level::info);     \
     } while (0);
 
-#define APSI_LOG_WARNING(msg)                                        \
-    do {                                                             \
-        APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::warning); \
-        APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::warning);     \
+#define APSI_LOG_WARNING(msg)                                              \
+    do {                                                                   \
+        APSI_INTERNAL_CHECK_LOG_LEVEL(apsi::logging::Log::Level::warning); \
+        APSI_INTERNAL_DO_LOG(msg, apsi::logging::Log::Level::warning);     \
     } while (0);
 
-#define APSI_LOG_ERROR(msg)                                        \
-    do {                                                           \
-        APSI_INTERNAL_CHECK_LOG_LEVEL(logging::Log::Level::error); \
-        APSI_INTERNAL_DO_LOG(msg, logging::Log::Level::error);     \
+#define APSI_LOG_ERROR(msg)                                              \
+    do {                                                                 \
+        APSI_INTERNAL_CHECK_LOG_LEVEL(apsi::logging::Log::Level::error); \
+        APSI_INTERNAL_DO_LOG(msg, apsi::logging::Log::Level::error);     \
     } while (0);

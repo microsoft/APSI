@@ -12,6 +12,9 @@
 #include "tclap/CmdLine.h"
 #pragma warning(pop)
 
+// APSI
+#include "apsi/logging/log.h"
+
 /**
 Command line processor based on TCLAP. This is a base class that contains common arguments for both parties.
 */
@@ -53,7 +56,7 @@ public:
             "threads",
             "Number of threads to use",
             /* req */ false,
-            /* value */ 1,
+            /* value */ 0,
             /* type desc */ "int"
         );
         add(threads_arg);
@@ -68,12 +71,12 @@ public:
         );
         add(logfile_arg);
 
-        TCLAP::SwitchArg enable_console_log_arg(
-            "c",
-            "logToConsole",
-            "Output log to console",
-            true);
-        add(enable_console_log_arg);
+        TCLAP::SwitchArg silent_arg(
+            "s",
+            "silent",
+            "Do not output anything to console",
+            false);
+        add(silent_arg);
 
         // No need to add log_level_arg_, already added in constructor
 
@@ -84,25 +87,19 @@ public:
         {
             parse(argc, argv);
 
-            threads_ = threads_arg.getValue();
-            cout_param("threads", threads_);
-
-            log_level_ = log_level_arg_->getValue();
-            cout_param("logLevel", log_level_);
-
-            enable_console_ = enable_console_log_arg.getValue();
-            cout_param("logToConsole", enable_console_);
-
+            silent_ = silent_arg.getValue();
             log_file_ = logfile_arg.getValue();
-            cout_param("logFile", log_file_);
+            threads_ = threads_arg.getValue();
+            log_level_ = log_level_arg_->getValue();
+
+            apsi::logging::Log::SetConsoleDisabled(silent_);
+            apsi::logging::Log::SetLogFile(log_file_);
+            apsi::logging::Log::SetLogLevel(log_level_);
 
             get_args();
-
-            std::cout << std::endl;
         }
         catch (...)
         {
-            std::cout << "Error parsing parameters.";
             return false;
         }
 
@@ -115,35 +112,14 @@ public:
 
     const std::string& log_file() const { return log_file_; }
 
-    bool enable_console() const { return enable_console_; }
-
-protected:
-    template <typename T>
-    void cout_param(const std::string &param_name, const T &param)
-    {
-        std::ostringstream ss;
-        ss << std::boolalpha << param_name << "=" << param;
-        std::cout << std::setw(column_width) << std::left << ss.str();
-        param_cols++;
-
-        if (param_cols >= column_number)
-        {
-            std::cout << std::endl;
-            param_cols = 0;
-        }
-    }
+    bool silent() const { return silent_; }
 
 private:
-    // For printing parameters
-    const int column_number = 2;
-    const int column_width = 40;
-    int param_cols = 0;
-
     // Parameters from command line
     int threads_;
     std::string log_level_;
     std::string log_file_;
-    bool enable_console_;
+    bool silent_;
 
     // Parameters with constraints
     std::unique_ptr<TCLAP::ValueArg<std::string>> log_level_arg_;

@@ -217,12 +217,6 @@ namespace apsi
             futures.clear();
             for (size_t bundle_idx = 0; bundle_idx < bundle_idx_count; bundle_idx++) {
                 auto bundle_caches = sender_db->get_cache_at(bundle_idx);
-                size_t bundle_count = bundle_caches.size();
-                if (!bundle_count) {
-                    APSI_LOG_DEBUG("No bin bundles found at bundle index " << bundle_idx);
-                    continue;
-                }
-
                 for (auto &cache : bundle_caches) {
                     futures.emplace_back(tpm.thread_pool().enqueue([&, bundle_idx, cache]() {
                         ProcessBinBundleCache(sender_db, cache, all_powers, chl, send_rp_fun, bundle_idx);
@@ -247,9 +241,8 @@ namespace apsi
         {
             STOPWATCH(sender_stopwatch, "Sender::ComputePowers");
             auto bundle_caches = sender_db->get_cache_at(bundle_idx);
-            size_t bundle_count = bundle_caches.size();
-            if (!bundle_count) {
-                APSI_LOG_DEBUG("No bin bundles found at bundle index " << bundle_idx);
+            if (!bundle_caches.size())
+            {
                 return;
             }
 

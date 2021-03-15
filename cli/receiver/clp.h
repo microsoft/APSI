@@ -30,16 +30,9 @@ public:
     virtual void get_args()
     {
         net_addr_ = net_addr_arg_.getValue();
-        cout_param("ipAddr", net_addr_);
-
         net_port_ = net_port_arg_.getValue();
-        cout_param("port", net_port_);
-
         query_file_ = query_file_arg_.getValue();
-        cout_param("queryFile", query_file_);
-
         output_file_ = out_file_arg_.getValue();
-        cout_param("outFile", output_file_);
     }
 
     const std::string &net_addr() const

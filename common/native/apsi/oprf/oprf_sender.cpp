@@ -138,7 +138,8 @@ namespace apsi
 
             ThreadPoolMgr tpm;
             vector<HashedItem> oprf_hashes(oprf_items.size());
-            vector<future<void>> futures(ThreadPoolMgr::get_thread_count());
+            size_t task_count = min<size_t>(ThreadPoolMgr::get_thread_count(), oprf_items.size());
+            vector<future<void>> futures(task_count);
 
             auto ComputeHashesLambda = [&](size_t start_idx, size_t step) {
                 for (size_t idx = start_idx; idx < oprf_items.size(); idx += step) {
@@ -146,9 +147,8 @@ namespace apsi
                 }
             };
 
-            for (size_t thread_idx = 0; thread_idx < ThreadPoolMgr::get_thread_count(); thread_idx++) {
-                futures[thread_idx] = tpm.thread_pool().enqueue(
-                    ComputeHashesLambda, thread_idx, ThreadPoolMgr::get_thread_count());
+            for (size_t thread_idx = 0; thread_idx < task_count; thread_idx++) {
+                futures[thread_idx] = tpm.thread_pool().enqueue(ComputeHashesLambda, thread_idx, task_count);
             }
 
             for (auto &f : futures) {
@@ -177,7 +177,8 @@ namespace apsi
 
             ThreadPoolMgr tpm;
             vector<pair<HashedItem, EncryptedLabel>> oprf_hashes(oprf_item_labels.size());
-            vector<future<void>> futures(ThreadPoolMgr::get_thread_count());
+            size_t task_count = min<size_t>(ThreadPoolMgr::get_thread_count(), oprf_item_labels.size());
+            vector<future<void>> futures(task_count);
 
             auto ComputeHashesLambda = [&](size_t start_idx, size_t step) {
                 for (size_t idx = start_idx; idx < oprf_item_labels.size(); idx += step) {
@@ -196,10 +197,8 @@ namespace apsi
                 }
             };
 
-            for (size_t thread_idx = 0; thread_idx < ThreadPoolMgr::get_thread_count();
-                 thread_idx++) {
-                futures[thread_idx] = tpm.thread_pool().enqueue(
-                    ComputeHashesLambda, thread_idx, ThreadPoolMgr::get_thread_count());
+            for (size_t thread_idx = 0; thread_idx < task_count; thread_idx++) {
+                futures[thread_idx] = tpm.thread_pool().enqueue(ComputeHashesLambda, thread_idx, task_count);
             }
 
             for (auto &f : futures) {

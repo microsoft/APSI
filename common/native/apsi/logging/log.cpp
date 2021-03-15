@@ -46,11 +46,13 @@ namespace apsi
         void Log::SetLogFile(const string &file)
         {
             get_log_properties().log_file = file;
+            get_log_properties().configured = false;
         }
 
         void Log::SetConsoleDisabled(bool disable_console)
         {
             get_log_properties().disable_console = disable_console;
+            get_log_properties().configured = false;
         }
 
         void Log::ConfigureIfNeeded()
@@ -125,6 +127,8 @@ namespace apsi
             {
                 throw runtime_error("Logger is already configured.");
             }
+
+            Logger::getInstance("APSI").removeAllAppenders();
 
             if (!get_log_properties().disable_console)
             {
