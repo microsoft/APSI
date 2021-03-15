@@ -11,6 +11,7 @@
 // APSI
 #include "apsi/logging/log.h"
 #include "apsi/oprf/oprf_sender.h"
+#include "apsi/util/label_encryptor.h"
 #include "apsi/util/stopwatch.h"
 #include "apsi/util/thread_pool_mgr.h"
 
@@ -108,6 +109,27 @@ namespace apsi
             return oprf_responses;
         }
 
+        pair<HashedItem, LabelKey> OPRFSender::GetItemHash(const Item &item, const OPRFKey &oprf_key)
+        {
+            // Create an elliptic curve point from the item
+            ECPoint ecpt(item.get_as<const unsigned char>());
+
+            // Multiply with key
+            ecpt.scalar_multiply(oprf_key.key_span(), true);
+
+            // Extract the item hash and the label encryption key
+            array<unsigned char, ECPoint::hash_size> item_hash_and_label_key;
+            ecpt.extract_hash(item_hash_and_label_key);
+
+            // The first 128 bits represent the item hash; the next 128 bits represent the
+            // label encryption key.
+            pair<HashedItem, LabelKey> result;
+            memcpy(result.first.value().data(), item_hash_and_label_key.data(), oprf_hash_size);
+            memcpy(result.second.data(), item_hash_and_label_key.data() + oprf_hash_size, label_key_byte_count);
+
+            return result;
+        }
+
         vector<HashedItem> OPRFSender::ComputeHashes(
             const gsl::span<const Item> &oprf_items, const OPRFKey &oprf_key)
         {
@@ -120,30 +142,11 @@ namespace apsi
 
             auto ComputeHashesLambda = [&](size_t start_idx, size_t step) {
                 for (size_t idx = start_idx; idx < oprf_items.size(); idx += step) {
-                    const Item &item = oprf_items[idx];
-
-                    // Create an elliptic curve point from the item
-                    ECPoint ecpt(item.get_as<const unsigned char>());
-
-                    // Multiply with key
-                    ecpt.scalar_multiply(oprf_key.key_span(), true);
-
-                    // Extract the item hash and the label encryption key
-                    array<unsigned char, ECPoint::hash_size> item_hash_and_label_key;
-                    ecpt.extract_hash(item_hash_and_label_key);
-
-                    // The first 128 bits represent the item hash; the next 128 bits represent the
-                    // label encryption key and are discarded in this overload of ComputeHashes
-                    HashedItem hash;
-                    memcpy(hash.value().data(), item_hash_and_label_key.data(), oprf_hash_size);
-
-                    // Set result
-                    oprf_hashes[idx] = move(hash);
+                    oprf_hashes[idx] = GetItemHash(oprf_items[idx], oprf_key).first;
                 }
             };
 
-            for (size_t thread_idx = 0; thread_idx < ThreadPoolMgr::get_thread_count();
-                 thread_idx++) {
+            for (size_t thread_idx = 0; thread_idx < ThreadPoolMgr::get_thread_count(); thread_idx++) {
                 futures[thread_idx] = tpm.thread_pool().enqueue(
                     ComputeHashesLambda, thread_idx, ThreadPoolMgr::get_thread_count());
             }
@@ -181,39 +184,15 @@ namespace apsi
                     const Item &item = oprf_item_labels[idx].first;
                     const Label &label = oprf_item_labels[idx].second;
 
-                    // Create an elliptic curve point from the item
-                    ECPoint ecpt(item.get_as<const unsigned char>());
-
-                    // Multiply with key
-                    ecpt.scalar_multiply(oprf_key.key_span(), true);
-
-                    // Extract the item hash and the label encryption key
-                    array<unsigned char, ECPoint::hash_size> item_hash_and_label_key;
-                    ecpt.extract_hash(item_hash_and_label_key);
-
-                    // The first 128 bits represent the item hash; the next 128 bits represent
-                    // the label encryption key
-                    pair<HashedItem, EncryptedLabel> hash;
-                    memcpy(hash.first.value().data(), item_hash_and_label_key.data(), oprf_hash_size);
-
-                    // Resize the encrypted label
-                    hash.second.resize(label_byte_count + nonce_byte_count, 0);
-
-                    // Sample a random nonce and copy it over
-                    array<uint64_t, 2> nonce{ random_uint64(), random_uint64() };
-                    memcpy(hash.second.data(), nonce.data(), nonce_byte_count);
-
-                    // Copy over the label so it starts after the nonce; truncate or pad with zeros if the label is not
-                    // of the exact right size
-                    memcpy(
-                        hash.second.data() + nonce_byte_count,
-                        label.data(),
-                        min<size_t>(label.size(), label_byte_count));
+                    HashedItem hashed_item;
+                    LabelKey key;
+                    tie(hashed_item, key) = GetItemHash(item, oprf_key);
 
                     // Encrypt here
+                    EncryptedLabel encrypted_label = encrypt_label(label, key, label_byte_count, nonce_byte_count);
 
                     // Set result
-                    oprf_hashes[idx] = move(hash);
+                    oprf_hashes[idx] = make_pair(hashed_item, move(encrypted_label));
                 }
             };
 

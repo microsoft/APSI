@@ -47,7 +47,9 @@ namespace apsi
 
             void process_responses(
                 gsl::span<const seal::seal_byte> oprf_responses,
-                gsl::span<HashedItem> oprf_hashes) const;
+                gsl::span<HashedItem> oprf_hashes,
+                gsl::span<LabelKey> label_keys
+                ) const;
 
             void clear();
 

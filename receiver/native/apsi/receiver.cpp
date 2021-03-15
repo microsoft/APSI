@@ -15,6 +15,7 @@
 #include "apsi/receiver.h"
 #include "apsi/util/utils.h"
 #include "apsi/util/db_encoding.h"
+#include "apsi/util/label_encryptor.h"
 #include "apsi/util/thread_pool_mgr.h"
 
 // SEAL
@@ -160,7 +161,7 @@ namespace apsi
             return oprf_receiver;
         }
 
-        vector<HashedItem> Receiver::ExtractHashes(
+        pair<vector<HashedItem>, vector<LabelKey>> Receiver::ExtractHashes(
             const OPRFResponse &oprf_response,
             const OPRFReceiver &oprf_receiver)
         {
@@ -181,10 +182,11 @@ namespace apsi
             }
 
             vector<HashedItem> items(oprf_receiver.item_count());
-            oprf_receiver.process_responses(oprf_response->data, items);
+            vector<LabelKey> label_keys(oprf_receiver.item_count());
+            oprf_receiver.process_responses(oprf_response->data, items, label_keys);
             APSI_LOG_INFO("Extracted OPRF hashes for " << oprf_response_item_count << " items");
 
-            return items;
+            return make_pair(move(items), move(label_keys));
         }
 
         unique_ptr<SenderOperation> Receiver::CreateOPRFRequest(const OPRFReceiver &oprf_receiver)
@@ -196,7 +198,7 @@ namespace apsi
             return sop;
         }
 
-        vector<HashedItem> Receiver::RequestOPRF(const vector<Item> &items, NetworkChannel &chl)
+        pair<vector<HashedItem>, vector<LabelKey>> Receiver::RequestOPRF(const vector<Item> &items, NetworkChannel &chl)
         {
             auto oprf_receiver = CreateOPRFReceiver(items);
 
@@ -219,9 +221,7 @@ namespace apsi
             }
 
             // Extract the OPRF hashed items
-            vector<HashedItem> oprf_items = ExtractHashes(response, oprf_receiver);
-
-            return oprf_items;
+            return ExtractHashes(response, oprf_receiver);
         }
 
         pair<Request, IndexTranslationTable> Receiver::create_query(const vector<HashedItem> &items)
@@ -351,7 +351,10 @@ namespace apsi
             return { move(sop), itt };
         }
 
-        vector<MatchRecord> Receiver::request_query(const vector<HashedItem> &items, NetworkChannel &chl)
+        vector<MatchRecord> Receiver::request_query(
+            const vector<HashedItem> &items,
+            const vector<LabelKey> &label_keys,
+            NetworkChannel &chl)
         {
             ThreadPoolMgr tpm;
 
@@ -389,7 +392,7 @@ namespace apsi
             for (size_t t = 0; t < task_count; t++)
             {
                 futures[t] = tpm.thread_pool().enqueue(
-                    [&]() { process_result_worker(package_count, mrs, itt, chl); });
+                    [&]() { process_result_worker(package_count, mrs, label_keys, itt, chl); });
             }
 
             for (auto &f : futures)
@@ -404,6 +407,7 @@ namespace apsi
         }
 
         vector<MatchRecord> Receiver::process_result_part(
+            const vector<LabelKey> &label_keys,
             const IndexTranslationTable &itt,
             const ResultPart &result_part) const
         {
@@ -414,6 +418,9 @@ namespace apsi
                 APSI_LOG_ERROR("Failed to process result: result_part is null");
                 return {};
             }
+
+            // The number of items that were submitted in the query
+            size_t item_count = itt.item_count();
 
             // Decrypt and decode the result; the result vector will have full batch size
             PlainResultPackage plain_rp = result_part->extract(crypto_context_);
@@ -428,10 +435,14 @@ namespace apsi
             {
                 APSI_LOG_WARNING("Expected " << label_byte_count << "-byte labels in this result part, "
                     "but label data is missing entirely");
+
+                // Just ignore the label data
+                label_byte_count = 0;
             }
 
-            // Read the nonce byte count and compute the effective label byte count
-            size_t nonce_byte_count = safe_cast<size_t>(plain_rp.nonce_byte_count);
+            // Read the nonce byte count and compute the effective label byte count; set the nonce byte count to zero
+            // if no label is expected anyway.
+            size_t nonce_byte_count = label_byte_count ? safe_cast<size_t>(plain_rp.nonce_byte_count) : 0;
             size_t effective_label_byte_count = add_safe(nonce_byte_count, label_byte_count);
 
             // How much label data did we actually receive?
@@ -447,6 +458,7 @@ namespace apsi
 
                 // Just ignore the label data
                 label_byte_count = 0;
+                effective_label_byte_count = 0;
             }
             else if (received_label_byte_count < effective_label_byte_count)
             {
@@ -455,14 +467,26 @@ namespace apsi
 
                 // Reset our expectations to what was actually received
                 label_byte_count = received_label_byte_count - nonce_byte_count;
+                effective_label_byte_count = received_label_byte_count;
+            }
+
+            // If there is a label, then we better have the appropriate label encryption keys available
+            if (label_byte_count && label_keys.size() != item_count)
+            {
+                APSI_LOG_WARNING("Expected " << item_count << " label encryption keys but only " << label_keys.size()
+                    << " were given; ignoring the label data");
+
+                // Just ignore the label data
+                label_byte_count = 0;
+                effective_label_byte_count = 0;
             }
 
             // Set up the result vector
-            vector<MatchRecord> mrs(itt.item_count());
+            vector<MatchRecord> mrs(item_count);
 
             // Iterate over the decoded data to find consecutive zeros indicating a match
             StrideIter<const uint64_t *> plain_rp_iter(plain_rp.psi_result.data(), felts_per_item);
-            SEAL_ITERATE(iter(plain_rp_iter, size_t(0)), items_per_bundle, [&](auto I) {
+            SEAL_ITERATE(iter(plain_rp_iter, size_t(0)), items_per_bundle, [&](auto &&I) {
                 // Find felts_per_item consecutive zeros
                 bool match = has_n_zeros(get<0>(I).ptr(), felts_per_item);
                 if (!match)
@@ -519,12 +543,14 @@ namespace apsi
                         received_label_bit_count,
                         params_.seal_params().plain_modulus());
 
+                    // Resize down to the effective byte count
+                    encrypted_label.resize(effective_label_byte_count);
+
                     // Decrypt the label
-                    encrypted_label.erase(encrypted_label.begin(), encrypted_label.begin() + nonce_byte_count);
-                    encrypted_label.resize(label_byte_count);
+                    Label label = decrypt_label(encrypted_label, label_keys[item_idx], nonce_byte_count);
 
                     // Set the label
-                    mr.label.set(move(encrypted_label));
+                    mr.label.set(move(label));
                 }
 
                 // We are done with the MatchRecord, so add it to the mrs vector
@@ -535,6 +561,7 @@ namespace apsi
         }
 
         vector<MatchRecord> Receiver::process_result(
+            const vector<LabelKey> &label_keys,
             const IndexTranslationTable &itt,
             const vector<ResultPart> &result) const
         {
@@ -545,7 +572,7 @@ namespace apsi
 
             for (auto &result_part : result)
             {
-                auto this_mrs = process_result_part(itt, result_part);
+                auto this_mrs = process_result_part(label_keys, itt, result_part);
                 if (this_mrs.size() != mrs.size())
                 {
                     // Something went wrong with process_result; error is already logged
@@ -553,7 +580,7 @@ namespace apsi
                 }
 
                 // Merge the new MatchRecords with mrs
-                SEAL_ITERATE(iter(mrs, this_mrs, size_t(0)), mrs.size(), [](auto I) {
+                SEAL_ITERATE(iter(mrs, this_mrs, size_t(0)), mrs.size(), [](auto &&I) {
                     if (get<1>(I) && !get<0>(I))
                     {
                         // This match needs to be merged into mrs
@@ -579,6 +606,7 @@ namespace apsi
         void Receiver::process_result_worker(
             atomic<uint32_t> &package_count,
             vector<MatchRecord> &mrs,
+            const vector<LabelKey> &label_keys,
             const IndexTranslationTable &itt,
             Channel &chl) const
         {
@@ -611,10 +639,10 @@ namespace apsi
                 while (!(result_part = chl.receive_result(seal_context)));
 
                 // Process the ResultPart to get the corresponding vector of MatchRecords
-                auto this_mrs = process_result_part(itt, result_part);
+                auto this_mrs = process_result_part(label_keys, itt, result_part);
 
                 // Merge the new MatchRecords with mrs
-                SEAL_ITERATE(iter(mrs, this_mrs, size_t(0)), mrs.size(), [](auto I) {
+                SEAL_ITERATE(iter(mrs, this_mrs, size_t(0)), mrs.size(), [](auto &&I) {
                     if (get<1>(I) && !get<0>(I))
                     {
                         // This match needs to be merged into mrs

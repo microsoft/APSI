@@ -8,12 +8,13 @@
 #include <algorithm>
 
 // APSI
+#include "apsi/crypto_context.h"
 #include "apsi/network/result_package.h"
-#include "apsi/cryptocontext.h"
 #include "apsi/psi_params.h"
 
 // SEAL
 #include "seal/context.h"
+#include "seal/keygenerator.h"
 
 #include "gtest/gtest.h"
 
@@ -36,36 +37,22 @@ namespace APSITests
 
                 PSIParams::TableParams table_params;
                 table_params.hash_func_count = 3;
-                table_params.max_items_per_bin = 16;
-                table_params.table_size = 256;
+                table_params.max_items_per_bin = 8;
+                table_params.table_size = 512;
 
                 PSIParams::QueryParams query_params;
-                query_params.query_powers_count = 3;
+                query_params.query_powers = { 1, 3, 5 };
 
-                size_t pmd = 1024;
+                size_t pmd = 4096;
                 PSIParams::SEALParams seal_params;
                 seal_params.set_poly_modulus_degree(pmd);
                 seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(pmd));
                 seal_params.set_plain_modulus(65537);
 
-                params = make_shared<PSIParams>(
-                    item_params, table_params, query_params, seal_params);
+                params = make_shared<PSIParams>(item_params, table_params, query_params, seal_params);
             }
 
             return params;
-        }
-
-        shared_ptr<CryptoContext> get_context()
-        {
-            static shared_ptr<CryptoContext> context = nullptr;
-            if (!context)
-            {
-                context = make_shared<CryptoContext>(SEALContext::Create(get_params()->seal_params()));
-                KeyGenerator keygen(context->seal_context());
-                context->set_secret(keygen.secret_key());
-            }
-
-            return context;
         }
     }
 
@@ -74,7 +61,11 @@ namespace APSITests
         ResultPackage rp;
         stringstream ss;
 
-        shared_ptr<CryptoContext> context = get_context();
+        auto params = get_params();
+        auto context(make_shared<CryptoContext>(*params));
+
+        KeyGenerator keygen(*context->seal_context());
+        context->set_secret(keygen.secret_key());
 
         // Save with no data; this will fail due to invalid PSI result
         ASSERT_THROW(size_t out_size = rp.save(ss), logic_error);
@@ -83,6 +74,8 @@ namespace APSITests
         Ciphertext ct;
         context->encryptor()->encrypt_zero_symmetric(ct);
         rp.psi_result.set(move(ct));
+        rp.label_byte_count = 1;
+        rp.nonce_byte_count = 2;
         size_t out_size = rp.save(ss);
         ResultPackage rp2;
         size_t in_size = rp2.load(ss, context->seal_context());
@@ -92,7 +85,7 @@ namespace APSITests
         ASSERT_EQ(rp2.nonce_byte_count, rp.nonce_byte_count);
         ASSERT_TRUE(rp2.label_result.empty());
         Plaintext pt;
-        context->decryptor()->decrypt(rp2.psi_result.extract_local(), pt);
+        context->decryptor()->decrypt(rp2.psi_result.extract_if_local(), pt);
         ASSERT_TRUE(pt.is_zero());
 
         // Symmetric encryption as Serializable; not used in practice
@@ -122,9 +115,9 @@ namespace APSITests
         ASSERT_EQ(rp2.label_byte_count, rp.label_byte_count);
         ASSERT_EQ(rp2.nonce_byte_count, rp.nonce_byte_count);
         ASSERT_EQ(rp2.label_result.size(), rp.label_result.size());
-        context->decryptor()->decrypt(rp2.label_result[0].extract_local(), pt);
+        context->decryptor()->decrypt(rp2.label_result[0].extract_if_local(), pt);
         ASSERT_TRUE(pt.is_zero());
-        context->decryptor()->decrypt(rp2.label_result[1].extract_local(), pt);
+        context->decryptor()->decrypt(rp2.label_result[1].extract_if_local(), pt);
         ASSERT_TRUE(pt.is_zero());
     }
 
@@ -132,7 +125,11 @@ namespace APSITests
     {
         ResultPackage rp;
 
-        shared_ptr<CryptoContext> context = get_context();
+        auto params = get_params();
+        auto context(make_shared<CryptoContext>(*params));
+
+        KeyGenerator keygen(*context->seal_context());
+        context->set_secret(keygen.secret_key());
 
         // No labels
         rp.bundle_idx = 123;

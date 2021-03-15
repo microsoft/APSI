@@ -13,6 +13,7 @@
 #include "apsi/sender_db.h"
 #include "apsi/sender_db_generated.h"
 #include "apsi/util/db_encoding.h"
+#include "apsi/util/label_encryptor.h"
 #include "apsi/util/utils.h"
 #include "apsi/util/thread_pool_mgr.h"
 
@@ -239,7 +240,8 @@ namespace apsi
                 bool compressed)
             {
                 STOPWATCH(sender_stopwatch, "insert_or_assign_worker");
-                APSI_LOG_DEBUG("Insert-or-Assign worker for bundle index [" << bundle_index << "]. Mode of operation: " << (overwrite ? "overwriting existing" : "inserting new"));
+                APSI_LOG_DEBUG("Insert-or-Assign worker for bundle index [" << bundle_index << "]. Mode of operation: "
+                    << (overwrite ? "overwriting existing" : "inserting new"));
 
                 bool regen_cache = false;
 
@@ -924,7 +926,9 @@ namespace apsi
             }
 
             // First compute the hash for the input item
-            auto hashed_item = oprf::OPRFSender::ComputeHashes({ &item, 1 }, oprf_key_)[0];
+            HashedItem hashed_item;
+            LabelKey key;
+            tie(hashed_item, key) = oprf::OPRFSender::GetItemHash(item, oprf_key_);
 
             // Lock the database for reading
             auto lock = get_reader_lock();
@@ -971,19 +975,17 @@ namespace apsi
                 throw logic_error("item is in set but labels could not be found in any BinBundle");
             }
 
-            // All good. Now just reconstruct the big label from its split-up parts and return it
-            EncryptedLabel enc_label = dealgebraize_label(
+            // All good. Now just reconstruct the big label from its split-up parts
+            EncryptedLabel encrypted_label = dealgebraize_label(
                 alg_label,
                 alg_label.size() * static_cast<size_t>(params_.item_bit_count_per_felt()),
                 params_.seal_params().plain_modulus());
-            enc_label.resize(nonce_byte_count_ + label_byte_count_);
+
+            // Resize down to the effective byte count
+            encrypted_label.resize(nonce_byte_count_ + label_byte_count_);
 
             // Decrypt the label
-            Label label;
-            label.reserve(label_byte_count_);
-            copy(enc_label.begin() + nonce_byte_count_, enc_label.end(), back_inserter(label));
-
-            return label;
+            return decrypt_label(encrypted_label, key, nonce_byte_count_);
         }
 
         size_t SenderDB::save(ostream &out) const

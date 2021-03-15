@@ -179,8 +179,10 @@ namespace APSITests
 
                         Receiver receiver(params);
 
-                        auto hashed_recv_items = Receiver::RequestOPRF(recvs_items[i], recv_chl);
-                        auto query_result = receiver.request_query(hashed_recv_items, recv_chl);
+                        vector<HashedItem> hashed_recv_items;
+                        vector<LabelKey> label_keys;
+                        tie(hashed_recv_items, label_keys) = Receiver::RequestOPRF(recvs_items[i], recv_chl);
+                        auto query_result = receiver.request_query(hashed_recv_items, label_keys, recv_chl);
 
                         return verify_unlabeled_results(
                             query_result, recvs_items[i], recvs_int_items[i]);
@@ -260,8 +262,10 @@ namespace APSITests
 
                         Receiver receiver(params);
 
-                        auto hashed_recv_items = Receiver::RequestOPRF(recv_items[i], recv_chl);
-                        auto query_result = receiver.request_query(hashed_recv_items, recv_chl);
+                        vector<HashedItem> hashed_recv_items;
+                        vector<LabelKey> label_keys;
+                        tie(hashed_recv_items, label_keys) = Receiver::RequestOPRF(recv_items[i], recv_chl);
+                        auto query_result = receiver.request_query(hashed_recv_items, label_keys, recv_chl);
 
                         return verify_labeled_results(
                             query_result, recv_items[i], recv_int_items[i], sender_items);

@@ -14,11 +14,6 @@
 // SEAL
 #include "seal/util/defines.h"
 
-#pragma message("REMOVE THESE EVENTUALLY")
-static size_t false_positives = 0;
-static size_t true_positives = 0;
-static size_t total_search_count = 0;
-
 namespace apsi
 {
     using namespace std;
@@ -45,19 +40,10 @@ namespace apsi
             */
             bool is_present(const vector<felt_t> &bin, const CuckooFilter &filter, felt_t element)
             {
-                total_search_count++;
-
                 // Check if the key is already in the current bin.
                 if (filter.contains(element)) {
                     // Perform a linear search to determine true/false positives
-                    bool result = is_present(bin, element);
-
-                    if (result)
-                        true_positives++;
-                    else
-                        false_positives++;
-
-                    return result;
+                    return is_present(bin, element);
                 }
 
                 return false;
@@ -70,20 +56,8 @@ namespace apsi
             template<typename BinT>
             auto get_iterator(BinT &bin, const CuckooFilter &filter, const felt_t &element)
             {
-                total_search_count++;
-
                 if (filter.contains(element)) {
-                    auto result = find(bin.begin(), bin.end(), element);
-                    if (bin.end() == result)
-                    {
-                        false_positives++;
-                    }
-                    else
-                    {
-                        true_positives++;
-                    }
-
-                    return result;
+                    return find(bin.begin(), bin.end(), element);
                 }
 
                 return bin.end();

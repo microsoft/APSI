@@ -90,6 +90,8 @@ namespace apsi
             static std::vector<seal::seal_byte> ProcessQueries(
                 gsl::span<const seal::seal_byte> oprf_queries, const OPRFKey &oprf_key);
 
+            static std::pair<HashedItem, LabelKey> GetItemHash(const Item &item, const OPRFKey &oprf_key);
+
             static std::vector<HashedItem> ComputeHashes(
                 const gsl::span<const Item> &oprf_items,
                 const OPRFKey &oprf_key);

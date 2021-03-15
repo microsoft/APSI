@@ -92,7 +92,9 @@ namespace APSITests
 
                 // Receive OPRF response
                 OPRFResponse oprf_response = to_oprf_response(chl.receive_response());
-                auto hashed_recv_items = Receiver::ExtractHashes(oprf_response, oprf_receiver);
+                vector<HashedItem> hashed_recv_items;
+                vector<LabelKey> label_keys;
+                tie(hashed_recv_items, label_keys) = Receiver::ExtractHashes(oprf_response, oprf_receiver);
                 ASSERT_EQ(hashed_recv_items.size(), recv_items.size());
 
                 // Create query and send
@@ -115,7 +117,7 @@ namespace APSITests
                 {
                     ASSERT_NO_THROW(rps.push_back(chl.receive_result(receiver.get_seal_context())));
                 }
-                auto query_result = receiver.process_result(itt, rps);
+                auto query_result = receiver.process_result(label_keys, itt, rps);
 
                 verify_unlabeled_results(query_result, recv_items, recv_int_items);
             }
@@ -182,7 +184,9 @@ namespace APSITests
 
                 // Receive OPRF response
                 OPRFResponse oprf_response = to_oprf_response(chl.receive_response());
-                auto hashed_recv_items = Receiver::ExtractHashes(oprf_response, oprf_receiver);
+                vector<HashedItem> hashed_recv_items;
+                vector<LabelKey> label_keys;
+                tie(hashed_recv_items, label_keys) = Receiver::ExtractHashes(oprf_response, oprf_receiver);
                 ASSERT_EQ(hashed_recv_items.size(), recv_items.size());
 
                 // Create query and send
@@ -205,7 +209,7 @@ namespace APSITests
                 {
                     ASSERT_NO_THROW(rps.push_back(chl.receive_result(receiver.get_seal_context())));
                 }
-                auto query_result = receiver.process_result(itt, rps);
+                auto query_result = receiver.process_result(label_keys, itt, rps);
 
                 verify_labeled_results(query_result, recv_items, recv_int_items, sender_items);
             }

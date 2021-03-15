@@ -31,7 +31,10 @@ int run_sender_dispatcher(const CLP &cmd);
 
 unique_ptr<CSVReader::DBData> load_db(const string &db_file);
 
-shared_ptr<SenderDB> create_sender_db(const CSVReader::DBData &db_data, const PSIParams &psi_params);
+shared_ptr<SenderDB> create_sender_db(
+    const CSVReader::DBData &db_data,
+    const PSIParams &psi_params,
+    size_t nonce_byte_count);
 
 int main(int argc, char *argv[])
 {
@@ -85,7 +88,7 @@ int run_sender_dispatcher(const CLP &cmd)
 
     ThreadPoolMgr::set_thread_count(cmd.threads());
 
-    auto sender_db = create_sender_db(*db_data, *params);
+    auto sender_db = create_sender_db(*db_data, *params, cmd.nonce_byte_count());
     db_data = nullptr;
 
     signal(SIGINT, sigint_handler);
@@ -117,14 +120,17 @@ unique_ptr<CSVReader::DBData> load_db(const string &db_file)
     return make_unique<CSVReader::DBData>(move(db_data));
 }
 
-shared_ptr<SenderDB> create_sender_db(const CSVReader::DBData &db_data, const PSIParams &psi_params)
+shared_ptr<SenderDB> create_sender_db(
+    const CSVReader::DBData &db_data,
+    const PSIParams &psi_params,
+    size_t nonce_byte_count)
 {
     shared_ptr<SenderDB> sender_db;
     if (holds_alternative<CSVReader::UnlabeledData>(db_data))
     {
         try
         {
-            sender_db = make_shared<SenderDB>(psi_params, 0);
+            sender_db = make_shared<SenderDB>(psi_params, 0, 0, true);
             sender_db->set_data(get<CSVReader::UnlabeledData>(db_data));
             APSI_LOG_INFO("Created unlabeled SenderDB with " << sender_db->get_item_count() << " items");
         }
@@ -147,10 +153,11 @@ shared_ptr<SenderDB> create_sender_db(const CSVReader::DBData &db_data, const PS
                 [](auto &a, auto &b) { return a.second.size() < b.second.size(); }
             )->second.size();
 
-            sender_db = make_shared<SenderDB>(psi_params, label_byte_count);
+            sender_db = make_shared<SenderDB>(psi_params, label_byte_count, nonce_byte_count, true);
             sender_db->set_data(labeled_db_data);
             APSI_LOG_INFO("Created labeled SenderDB with "
-                << sender_db->get_item_count() << " items and " << label_byte_count << "-byte labels");
+                << sender_db->get_item_count() << " items and " << label_byte_count << "-byte labels ("
+                << nonce_byte_count << "-byte nonces)");
         }
         catch (const exception &ex)
         {

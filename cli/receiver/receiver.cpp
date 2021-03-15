@@ -125,10 +125,11 @@ int remote_query(const CLP& cmd)
     auto &items = get<CSVReader::UnlabeledData>(*query_data);
     vector<Item> items_vec(items.begin(), items.end());
     vector<HashedItem> oprf_items;
+    vector<LabelKey> label_keys;
     try
     {
         APSI_LOG_INFO("Sending OPRF request for " << items_vec.size() << " items");
-        oprf_items = Receiver::RequestOPRF(items_vec, channel);
+        tie(oprf_items, label_keys) = Receiver::RequestOPRF(items_vec, channel);
         APSI_LOG_INFO("Received OPRF request for " << items_vec.size() << " items");
     }
     catch (const exception &ex)
@@ -141,7 +142,7 @@ int remote_query(const CLP& cmd)
     try
     {
         APSI_LOG_INFO("Sending APSI query");
-        query_result = receiver.request_query(oprf_items, channel);
+        query_result = receiver.request_query(oprf_items, label_keys, channel);
         APSI_LOG_INFO("Received APSI query response");
     }
     catch (const exception &ex)

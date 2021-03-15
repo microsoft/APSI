@@ -106,10 +106,13 @@ set(APSI_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/APSI-${APSI_VERSION_MA
 # TODO: Do we care if vcpkg is not used?
 
 # Microsoft SEAL
-find_package(SEAL 3.6 CONFIG REQUIRED)
+find_package(SEAL 3.6.3 REQUIRED)
 
 # Microsoft Kuku
 find_package(Kuku 2.1 REQUIRED)
+
+# Libsodium
+find_package(unofficial-sodium REQUIRED)
 
 # Flatbuffers: for serialization
 find_package(Flatbuffers REQUIRED)
@@ -211,7 +214,11 @@ apsi_set_version(common)
 apsi_link_threads(common)
 apsi_install_target(common APSITargets)
 
-target_link_libraries(common PUBLIC SEAL::seal Kuku::kuku flatbuffers::flatbuffers)
+target_link_libraries(common
+    PUBLIC SEAL::seal
+    PUBLIC Kuku::kuku
+    PUBLIC flatbuffers::flatbuffers
+    PRIVATE unofficial-sodium::sodium)
 if (APSI_USE_LOG4CPLUS)
     target_link_libraries(common PUBLIC log4cplus::log4cplus)
 endif()

@@ -35,6 +35,7 @@ public:
         add(poly_modulus_degree_arg_);
         add(coeff_modulus_bits_arg_);
         xorAdd(plain_modulus_bits_arg_, plain_modulus_arg_);
+        add(nonce_byte_count_arg_);
         add(net_port_arg_);
         add(db_file_arg_);
     }
@@ -75,6 +76,9 @@ public:
             plain_modulus_bits_ = plain_modulus_.bit_count();
             cout_param("plainModulusBits", plain_modulus_bits_);
         }
+
+        nonce_byte_count_ = nonce_byte_count_arg_.getValue();
+        cout_param("nonceByteCount", nonce_byte_count_);
 
         db_file_ = db_file_arg_.getValue();
         cout_param("dbFile", db_file_);
@@ -126,6 +130,11 @@ public:
     const seal::Modulus &plain_modulus() const
     {
         return plain_modulus_;
+    }
+
+    std::size_t nonce_byte_count() const
+    {
+        return nonce_byte_count_;
     }
 
     int net_port() const
@@ -209,6 +218,14 @@ private:
         0,
         "unsigned integer");
 
+    TCLAP::ValueArg<std::size_t> nonce_byte_count_arg_ = TCLAP::ValueArg<std::size_t>(
+        "n",
+        "nonceByteCount",
+        "Number of bytes used for the nonce in labeled mode",
+        false,
+        16,
+        "unsigned integer");
+
     TCLAP::ValueArg<int> net_port_arg_ = TCLAP::ValueArg<int>(
         "",
         "port",
@@ -244,6 +261,8 @@ private:
     int plain_modulus_bits_;
 
     seal::Modulus plain_modulus_;
+
+    std::size_t nonce_byte_count_;
 
     int net_port_;
 

@@ -130,7 +130,9 @@ namespace apsi
             Performs an OPRF request on a vector of items through a given channel and returns a vector of OPRF hashed
             items of the same size as the input vector.
             */
-            static std::vector<HashedItem> RequestOPRF(const std::vector<Item> &items, network::NetworkChannel &chl);
+            static std::pair<std::vector<HashedItem>, std::vector<LabelKey>> RequestOPRF(
+                const std::vector<Item> &items,
+                 network::NetworkChannel &chl);
 
             /**
             Performs a PSI or labeled PSI (depending on the sender) query. The query is a vector of items, and the
@@ -138,7 +140,10 @@ namespace apsi
             MatchRecord indicates it in the `found` field, and the `label` field may contain the corresponding label if
             a sender's data included it.
             */
-            std::vector<MatchRecord> request_query(const std::vector<HashedItem> &items, network::NetworkChannel &chl);
+            std::vector<MatchRecord> request_query(
+                const std::vector<HashedItem> &items,
+                const std::vector<LabelKey> &label_keys,
+                network::NetworkChannel &chl);
 
             /**
             Creates and returns a parameter request that can be sent to the sender with the Receiver::SendRequest
@@ -159,7 +164,7 @@ namespace apsi
             /**
             Extracts a vector of OPRF hashed items from an OPRFResponse and the corresponding oprf::OPRFReceiver.
             */
-            static std::vector<HashedItem> ExtractHashes(
+            static std::pair<std::vector<HashedItem>, std::vector<LabelKey>> ExtractHashes(
                 const OPRFResponse &oprf_response,
                 const oprf::OPRFReceiver &oprf_receiver);
 
@@ -177,14 +182,20 @@ namespace apsi
             results happened to be in this particular result part. Thus, to determine whether there was a match with the
             sender's data, the results for each received ResultPart must be checked.
             */
-            std::vector<MatchRecord> process_result_part(const IndexTranslationTable &itt, const ResultPart &result_part) const;
+            std::vector<MatchRecord> process_result_part(
+                const std::vector<LabelKey> &label_keys,
+                const IndexTranslationTable &itt,
+                const ResultPart &result_part) const;
 
             /**
             This function does multiple calls to Receiver::process_result_part, once for each ResultPart in the given
             vector. The results are collected together so that the returned vector of MatchRecords reflects the logical
             OR of the results from each ResultPart.
             */
-            std::vector<MatchRecord> process_result(const IndexTranslationTable &itt, const std::vector<ResultPart> &result) const;
+            std::vector<MatchRecord> process_result(
+                const std::vector<LabelKey> &label_keys,
+                const IndexTranslationTable &itt,
+                const std::vector<ResultPart> &result) const;
 
         private:
             /**
@@ -197,6 +208,7 @@ namespace apsi
             void process_result_worker(
                 std::atomic<std::uint32_t> &package_count,
                 std::vector<MatchRecord> &mrs,
+                const std::vector<LabelKey> &label_keys,
                 const IndexTranslationTable &itt,
                 network::Channel &chl) const;
 
