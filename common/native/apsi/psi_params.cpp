@@ -14,6 +14,7 @@
 
 // SEAL
 #include "seal/context.h"
+#include "seal/modulus.h"
 #include "seal/util/defines.h"
 #include "seal/util/common.h"
 
@@ -276,29 +277,18 @@ namespace apsi
         return { PSIParams(item_params, table_params, query_params, seal_params), in_data.size() };
     }
 
-    PSIParams PSIParams::Load(const string& in)
+    PSIParams PSIParams::Load(const string &in)
     {
+        // Parse JSON string
         Json::Value root;
         stringstream ss(in);
         ss >> root;
 
-        const auto &json_table_params = root["table_params"];
-        const auto &json_item_params = root["item_params"];
-        const auto &json_query_params = root["query_params"];
-        const auto &json_seal_params = root["seal_params"];
-
-        if (json_table_params.isNull()) {
-            throw runtime_error("table_params not found in JSON");
-        }
-        if (json_item_params.isNull()) {
-            throw runtime_error("item_params not found in JSON");
-        }
-        if (json_query_params.isNull()) {
-            throw runtime_error("query_params not found in JSON");
-        }
-        if (json_seal_params.isNull()) {
-            throw runtime_error("seal_params not found in JSON");
-        }
+        // Check expected sections are present
+        const auto &json_table_params = get_non_null_json_value(root, "table_params");
+        const auto &json_item_params = get_non_null_json_value(root, "item_params");
+        const auto &json_query_params = get_non_null_json_value(root, "query_params");
+        const auto &json_seal_params = get_non_null_json_value(root, "seal_params");
 
         PSIParams::TableParams table_params;
         table_params.hash_func_count = json_value_ui32(json_table_params, "hash_func_count");
@@ -318,17 +308,28 @@ namespace apsi
         }
 
         PSIParams::SEALParams seal_params;
-        const auto &coeff_modulus_bits = get_non_null_json_value(json_seal_params, "coeff_modulus_bits");
+        const auto &coeff_modulus_bits =
+            get_non_null_json_value(json_seal_params, "coeff_modulus_bits");
 
         size_t poly_modulus_degree = json_value_ui64(json_seal_params, "poly_modulus_degree");
-        seal_params.set_plain_modulus(json_value_ui64(json_seal_params, "plain_modulus"));
         seal_params.set_poly_modulus_degree(poly_modulus_degree);
+
+        if (json_seal_params.isMember("plain_modulus")) {
+            seal_params.set_plain_modulus(json_value_ui64(json_seal_params, "plain_modulus"));
+        } else if (json_seal_params.isMember("plain_modulus_bits")) {
+            seal_params.set_plain_modulus(PlainModulus::Batching(
+                poly_modulus_degree, json_value_int(json_seal_params, "plain_modulus_bits")));
+        } else {
+            throw runtime_error(
+                "Either plain_modulus or plain_modulus_bits not found under seal_params");
+        }
 
         vector<int> coeff_modulus_bit_sizes;
         for (const auto &coeff : coeff_modulus_bits) {
             coeff_modulus_bit_sizes.push_back(json_value_int(coeff));
         }
-        seal_params.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, coeff_modulus_bit_sizes));
+        seal_params.set_coeff_modulus(
+            CoeffModulus::Create(poly_modulus_degree, coeff_modulus_bit_sizes));
 
         return PSIParams(item_params, table_params, query_params, seal_params);
     }

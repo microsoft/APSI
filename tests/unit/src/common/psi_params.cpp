@@ -123,37 +123,36 @@ namespace APSITests
 
     TEST(PSIParamsTest, JSONLoadPSIParams)
     {
-        string json = 
-"/* APSI Parameters */"
-"{"
-"    \"table_params\": {"
-"        /* Number of hash functions to use */"
-"        \"hash_func_count\": 3,"
-"        /* Size of the hash table to use */"
-"        \"table_size\": 512,"
-"        /* Maximum number of items allowed in a bin */"
-"        \"max_items_per_bin\": 92"
-"    },"
-"    \"item_params\": {"
-"        /* Number of field elements to use per item */"
-"        \"felts_per_item\": 8"
-"    },"
-"    \"query_params\": {"
-"        /* Query powers to send in addition to 1 */"
-"        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
-"    },"
-"    \"seal_params\": {"
-"        /* Bit size for plaintext modulus prime for Microsoft SEAL encryption */"
-"        /* \"plain_modulus_bits\": 16, */"
-"        /* Plaintext modulus prime for Microsoft SEAL encryption */"
-"        \"plain_modulus\": 40961,"
-"        /* Degree of the polynomial modulus for Microsoft SEAL encryption */"
-"        \"poly_modulus_degree\": 4096,"
-"        /* Bit sizes for coefficient modulus primes for Microsoft SEAL encryption */"
-"        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
-"    }"
-"}";
+        string json =
+            "/* APSI Parameters */"
+            "{"
+            "    \"table_params\": {"
+            "        /* Number of hash functions to use */"
+            "        \"hash_func_count\": 3,"
+            "        /* Size of the hash table to use */"
+            "        \"table_size\": 512,"
+            "        /* Maximum number of items allowed in a bin */"
+            "        \"max_items_per_bin\": 92"
+            "    },"
+            "    \"item_params\": {"
+            "        /* Number of field elements to use per item */"
+            "        \"felts_per_item\": 8"
+            "    },"
+            "    \"query_params\": {"
+            "        /* Query powers to send in addition to 1 */"
+            "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+            "    },"
+            "    \"seal_params\": {"
+            "        /* Plaintext modulus prime for Microsoft SEAL encryption */"
+            "        \"plain_modulus\": 40961,"
+            "        /* Degree of the polynomial modulus for Microsoft SEAL encryption */"
+            "        \"poly_modulus_degree\": 4096,"
+            "        /* Bit sizes for coefficient modulus primes for Microsoft SEAL encryption */"
+            "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+            "    }"
+            "}";
 
+        // Load params using plain_modulus
         PSIParams params = PSIParams::Load(json);
 
         ASSERT_EQ(3, params.table_params().hash_func_count);
@@ -163,6 +162,8 @@ namespace APSITests
         ASSERT_EQ(8, params.item_params().felts_per_item);
 
         auto qp_end = params.query_params().query_powers.end();
+        ASSERT_EQ(15, params.query_params().query_powers.size());
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(1));
         ASSERT_NE(qp_end, params.query_params().query_powers.find(3));
         ASSERT_NE(qp_end, params.query_params().query_powers.find(4));
         ASSERT_NE(qp_end, params.query_params().query_powers.find(5));
@@ -184,5 +185,432 @@ namespace APSITests
         ASSERT_EQ(49, params.seal_params().coeff_modulus()[0].bit_count());
         ASSERT_EQ(40, params.seal_params().coeff_modulus()[1].bit_count());
         ASSERT_EQ(20, params.seal_params().coeff_modulus()[2].bit_count());
+
+        json =
+            "/* APSI Parameters */"
+            "{"
+            "    \"table_params\": {"
+            "        /* Number of hash functions to use */"
+            "        \"hash_func_count\": 5,"
+            "        /* Size of the hash table to use */"
+            "        \"table_size\": 2048,"
+            "        /* Maximum number of items allowed in a bin */"
+            "        \"max_items_per_bin\": 200"
+            "    },"
+            "    \"item_params\": {"
+            "        /* Number of field elements to use per item */"
+            "        \"felts_per_item\": 4"
+            "    },"
+            "    \"query_params\": {"
+            "        /* Query powers to send in addition to 1 */"
+            "        \"query_powers\": [ 4, 5, 8 ]"
+            "    },"
+            "    \"seal_params\": {"
+            "        /* Bit size for plaintext modulus prime for Microsoft SEAL encryption */"
+            "        \"plain_modulus_bits\": 24,"
+            "        /* Degree of the polynomial modulus for Microsoft SEAL encryption */"
+            "        \"poly_modulus_degree\": 8192,"
+            "        /* Bit sizes for coefficient modulus primes for Microsoft SEAL encryption */"
+            "        \"coeff_modulus_bits\": [ 49, 49, 40, 20 ]"
+            "    }"
+            "}";
+
+        // Load params using plain_modulus_bits
+        params = PSIParams::Load(json);
+
+        ASSERT_EQ(5, params.table_params().hash_func_count);
+        ASSERT_EQ(2048, params.table_params().table_size);
+        ASSERT_EQ(200, params.table_params().max_items_per_bin);
+
+        ASSERT_EQ(4, params.item_params().felts_per_item);
+
+        qp_end = params.query_params().query_powers.end();
+        ASSERT_EQ(4, params.query_params().query_powers.size());
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(1));
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(4));
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(5));
+        ASSERT_NE(qp_end, params.query_params().query_powers.find(8));
+
+        ASSERT_EQ(24, params.seal_params().plain_modulus().bit_count());
+        ASSERT_EQ(8192, params.seal_params().poly_modulus_degree());
+        ASSERT_EQ(4, params.seal_params().coeff_modulus().size());
+        ASSERT_EQ(49, params.seal_params().coeff_modulus()[0].bit_count());
+        ASSERT_EQ(49, params.seal_params().coeff_modulus()[1].bit_count());
+        ASSERT_EQ(40, params.seal_params().coeff_modulus()[2].bit_count());
+        ASSERT_EQ(20, params.seal_params().coeff_modulus()[3].bit_count());
+    }
+
+    TEST(PSIParamsTest, JSONLoadParamsMissingSections)
+    {
+        string json =
+            "{"
+            "    \"table_params\": {"
+            "        \"hash_func_count\": 3,"
+            "        \"table_size\": 512,"
+            "        \"max_items_per_bin\": 92"
+            "    },"
+            "    \"item_params\": {"
+            "        \"felts_per_item\": 8"
+            "    },"
+            "    \"query_params\": {"
+            "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+            "    },"
+            "    \"seal_params\": {"
+            "        \"plain_modulus\": 40961,"
+            "        \"poly_modulus_degree\": 4096,"
+            "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+            "    }"
+            "}";
+
+        // Correct JSON
+        ASSERT_NO_THROW(PSIParams::Load(json));
+
+        // Empty json
+        json = "{}";
+        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+
+        // Missing table_params
+        json = "{"
+               "    \"item_params\": {"
+               "        \"felts_per_item\": 8"
+               "    },"
+               "    \"query_params\": {"
+               "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+               "    },"
+               "    \"seal_params\": {"
+               "        \"plain_modulus\": 40961,"
+               "        \"poly_modulus_degree\": 4096,"
+               "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+               "    }"
+               "}";
+        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+
+        // Missing item_params
+        json = "{"
+               "    \"table_params\": {"
+               "        \"hash_func_count\": 3,"
+               "        \"table_size\": 512,"
+               "        \"max_items_per_bin\": 92"
+               "    },"
+               "    \"query_params\": {"
+               "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+               "    },"
+               "    \"seal_params\": {"
+               "        \"plain_modulus\": 40961,"
+               "        \"poly_modulus_degree\": 4096,"
+               "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+               "    }"
+               "}";
+        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+
+        // Missing query_params
+        json = "{"
+               "    \"table_params\": {"
+               "        \"hash_func_count\": 3,"
+               "        \"table_size\": 512,"
+               "        \"max_items_per_bin\": 92"
+               "    },"
+               "    \"item_params\": {"
+               "        \"felts_per_item\": 8"
+               "    },"
+               "    \"seal_params\": {"
+               "        \"plain_modulus\": 40961,"
+               "        \"poly_modulus_degree\": 4096,"
+               "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+               "    }"
+               "}";
+        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+
+        // Missing seal_params
+        json = "{"
+               "    \"table_params\": {"
+               "        \"hash_func_count\": 3,"
+               "        \"table_size\": 512,"
+               "        \"max_items_per_bin\": 92"
+               "    },"
+               "    \"item_params\": {"
+               "        \"felts_per_item\": 8"
+               "    },"
+               "    \"query_params\": {"
+               "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+               "    }"
+               "}";
+        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+    }
+    
+    TEST(PSIParamsTest, JSONMissingTableParamsContent)
+    {
+        string json =
+            "{"
+            "    \"table_params\": {"
+            "        \"hash_func_count\": 3,"
+            "        \"table_size\": 512,"
+            "        \"max_items_per_bin\": 92"
+            "    },"
+            "    \"item_params\": {"
+            "        \"felts_per_item\": 8"
+            "    },"
+            "    \"query_params\": {"
+            "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+            "    },"
+            "    \"seal_params\": {"
+            "        \"plain_modulus\": 40961,"
+            "        \"poly_modulus_degree\": 4096,"
+            "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+            "    }"
+            "}";
+
+        // Correct JSON
+        ASSERT_NO_THROW(PSIParams::Load(json));
+
+        json = "{"
+               "    \"table_params\": {"
+               "        \"table_size\": 512,"
+               "        \"max_items_per_bin\": 92"
+               "    },"
+               "    \"item_params\": {"
+               "        \"felts_per_item\": 8"
+               "    },"
+               "    \"query_params\": {"
+               "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+               "    },"
+               "    \"seal_params\": {"
+               "        \"plain_modulus\": 40961,"
+               "        \"poly_modulus_degree\": 4096,"
+               "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+               "    }"
+               "}";
+
+        // Missing hash_func_count
+        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+
+        json = "{"
+               "    \"table_params\": {"
+               "        \"hash_func_count\": 3,"
+               "        \"max_items_per_bin\": 92"
+               "    },"
+               "    \"item_params\": {"
+               "        \"felts_per_item\": 8"
+               "    },"
+               "    \"query_params\": {"
+               "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+               "    },"
+               "    \"seal_params\": {"
+               "        \"plain_modulus\": 40961,"
+               "        \"poly_modulus_degree\": 4096,"
+               "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+               "    }"
+               "}";
+
+        // Missing table_size
+        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+
+        json =
+            "{"
+            "    \"table_params\": {"
+            "        \"hash_func_count\": 3,"
+            "        \"table_size\": 512"
+            "    },"
+            "    \"item_params\": {"
+            "        \"felts_per_item\": 8"
+            "    },"
+            "    \"query_params\": {"
+            "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+            "    },"
+            "    \"seal_params\": {"
+            "        \"plain_modulus\": 40961,"
+            "        \"poly_modulus_degree\": 4096,"
+            "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+            "    }"
+            "}";
+
+        // Missing max_items_per_bin
+        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+    }
+
+    TEST(PSIParamsTest, JSONMissingItemParams)
+    {
+        string json =
+            "{"
+            "    \"table_params\": {"
+            "        \"hash_func_count\": 3,"
+            "        \"table_size\": 512,"
+            "        \"max_items_per_bin\": 92"
+            "    },"
+            "    \"item_params\": {"
+            "        \"felts_per_item\": 8"
+            "    },"
+            "    \"query_params\": {"
+            "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+            "    },"
+            "    \"seal_params\": {"
+            "        \"plain_modulus\": 40961,"
+            "        \"poly_modulus_degree\": 4096,"
+            "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+            "    }"
+            "}";
+
+        // Correct JSON
+        ASSERT_NO_THROW(PSIParams::Load(json));
+
+        json =
+            "{"
+            "    \"table_params\": {"
+            "        \"hash_func_count\": 3,"
+            "        \"table_size\": 512,"
+            "        \"max_items_per_bin\": 92"
+            "    },"
+            "    \"item_params\": {"
+            "        \"other_name\": 8"
+            "    },"
+            "    \"query_params\": {"
+            "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+            "    },"
+            "    \"seal_params\": {"
+            "        \"plain_modulus\": 40961,"
+            "        \"poly_modulus_degree\": 4096,"
+            "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+            "    }"
+            "}";
+
+        // Missing felts_per_item
+        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+    }
+
+    TEST(PSIParamsTest, JSONMissingQueryParams)
+    {
+        string json =
+            "{"
+            "    \"table_params\": {"
+            "        \"hash_func_count\": 3,"
+            "        \"table_size\": 512,"
+            "        \"max_items_per_bin\": 92"
+            "    },"
+            "    \"item_params\": {"
+            "        \"felts_per_item\": 8"
+            "    },"
+            "    \"query_params\": {"
+            "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+            "    },"
+            "    \"seal_params\": {"
+            "        \"plain_modulus\": 40961,"
+            "        \"poly_modulus_degree\": 4096,"
+            "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+            "    }"
+            "}";
+
+        // Correct JSON
+        ASSERT_NO_THROW(PSIParams::Load(json));
+
+        json = "{"
+               "    \"table_params\": {"
+               "        \"hash_func_count\": 3,"
+               "        \"table_size\": 512,"
+               "        \"max_items_per_bin\": 92"
+               "    },"
+               "    \"item_params\": {"
+               "        \"felts_per_item\": 8"
+               "    },"
+               "    \"query_params\": {"
+               "        \"other_name\": [ 3, 4, 5 ]"
+               "    },"
+               "    \"seal_params\": {"
+               "        \"plain_modulus\": 40961,"
+               "        \"poly_modulus_degree\": 4096,"
+               "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+               "    }"
+               "}";
+
+        // Missing query_powers
+        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+    }
+
+    TEST(PSIParamsTest, JSONMissingSEALParams)
+    {
+        string json =
+            "{"
+            "    \"table_params\": {"
+            "        \"hash_func_count\": 3,"
+            "        \"table_size\": 512,"
+            "        \"max_items_per_bin\": 92"
+            "    },"
+            "    \"item_params\": {"
+            "        \"felts_per_item\": 8"
+            "    },"
+            "    \"query_params\": {"
+            "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+            "    },"
+            "    \"seal_params\": {"
+            "        \"plain_modulus\": 40961,"
+            "        \"poly_modulus_degree\": 4096,"
+            "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+            "    }"
+            "}";
+
+        // Correct JSON
+        ASSERT_NO_THROW(PSIParams::Load(json));
+
+        json = "{"
+               "    \"table_params\": {"
+               "        \"hash_func_count\": 3,"
+               "        \"table_size\": 512,"
+               "        \"max_items_per_bin\": 92"
+               "    },"
+               "    \"item_params\": {"
+               "        \"felts_per_item\": 8"
+               "    },"
+               "    \"query_params\": {"
+               "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+               "    },"
+               "    \"seal_params\": {"
+               "        \"poly_modulus_degree\": 4096,"
+               "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+               "    }"
+               "}";
+
+        // Missing plain_modulus
+        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+
+        json = "{"
+               "    \"table_params\": {"
+               "        \"hash_func_count\": 3,"
+               "        \"table_size\": 512,"
+               "        \"max_items_per_bin\": 92"
+               "    },"
+               "    \"item_params\": {"
+               "        \"felts_per_item\": 8"
+               "    },"
+               "    \"query_params\": {"
+               "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+               "    },"
+               "    \"seal_params\": {"
+               "        \"plain_modulus\": 40961,"
+               "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+               "    }"
+               "}";
+
+        // Missing poly_modulus_degree
+        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+
+        json = "{"
+               "    \"table_params\": {"
+               "        \"hash_func_count\": 3,"
+               "        \"table_size\": 512,"
+               "        \"max_items_per_bin\": 92"
+               "    },"
+               "    \"item_params\": {"
+               "        \"felts_per_item\": 8"
+               "    },"
+               "    \"query_params\": {"
+               "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+               "    },"
+               "    \"seal_params\": {"
+               "        \"plain_modulus\": 40961,"
+               "        \"poly_modulus_degree\": 4096"
+               "    }"
+               "}";
+
+        // Missing coeff_modulus_bits
+        ASSERT_THROW(PSIParams::Load(json), runtime_error);
     }
 }
