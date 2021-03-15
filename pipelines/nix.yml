@@ -15,7 +15,7 @@ steps:
   displayName: 'Configure vcpkg dependencies'
   inputs:
     script: |
-      ./vcpkg install cppzmq flatbuffers gtest kuku log4cplus seal[ms-gsl,zlib,zstd,no-throw-tran] tclap
+      ./vcpkg install cppzmq flatbuffers gtest kuku log4cplus seal[ms-gsl,zlib,zstd,no-throw-tran] tclap jsoncpp
     workingDirectory: '$(Build.SourcesDirectory)/vcpkg'
     failOnStderr: false
 
