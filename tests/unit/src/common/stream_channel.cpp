@@ -223,11 +223,15 @@ namespace APSITests
         // Send two ResultPackages
         auto rp = make_unique<ResultPackage>();
         rp->bundle_idx = 0;
+        rp->label_byte_count = 0;
+        rp->nonce_byte_count = 0;
         rp->psi_result = query_ct0;
         svr.send(move(rp));
 
         rp = make_unique<ResultPackage>();
         rp->bundle_idx = 123;
+        rp->label_byte_count = 80;
+        rp->nonce_byte_count = 4;
         rp->psi_result = query_ct123;
         rp->label_result.push_back(query_ct123);
         svr.send(move(rp));
@@ -235,10 +239,14 @@ namespace APSITests
         // Receive two packages
         rp = clt.receive_result(get_context()->seal_context());
         ASSERT_EQ(0, rp->bundle_idx);
+        ASSERT_EQ(0, rp->label_byte_count);
+        ASSERT_EQ(0, rp->bundle_idx);
         ASSERT_TRUE(rp->label_result.empty());
 
         rp = clt.receive_result(get_context()->seal_context());
         ASSERT_EQ(123, rp->bundle_idx);
+        ASSERT_EQ(80, rp->label_byte_count);
+        ASSERT_EQ(4, rp->nonce_byte_count);
         ASSERT_EQ(1, rp->label_result.size());
 
         ASSERT_EQ(svr.bytes_sent(), clt.bytes_received());

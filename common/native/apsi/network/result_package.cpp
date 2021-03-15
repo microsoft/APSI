@@ -55,6 +55,7 @@ namespace apsi
             rp_builder.add_bundle_idx(bundle_idx);
             rp_builder.add_psi_result(psi_ct);
             rp_builder.add_label_byte_count(label_byte_count);
+            rp_builder.add_nonce_byte_count(nonce_byte_count);
             rp_builder.add_label_result(label_cts);
             auto rp = rp_builder.Finish();
             fbs_builder.FinishSizePrefixed(rp);
@@ -125,9 +126,21 @@ namespace apsi
             // does not guarantee that we have *enough* label data present though, so it is important to check that
             // when the label data has been decrypted and decoded.
             label_byte_count = rp->label_byte_count();
+            if (label_byte_count > 1024)
+            {
+                throw runtime_error("failed to load ResultPackage: label byte count is too large");
+            }
             if (label_byte_count && !rp->label_result())
             {
                 throw runtime_error("failed to load ResultPackage: label data is missing");
+            }
+
+            // Load the nonce_byte_count only if we actually have a non-zero label_byte_count. We still need to check
+            // (as for the actual label as well) that we received enough data.
+            nonce_byte_count = label_byte_count ? rp->nonce_byte_count() : 0;
+            if (nonce_byte_count > 16)
+            {
+                throw runtime_error("failed to load ResultPackage: nonce byte count is too large");
             }
 
             // Load the label_result data if present
@@ -184,6 +197,7 @@ namespace apsi
             crypto_context.encoder()->decode(psi_result_pt, plain_rp.psi_result);
 
             plain_rp.label_byte_count = label_byte_count;
+            plain_rp.nonce_byte_count = nonce_byte_count;
             for (auto &ct : label_result)
             {
                 Ciphertext label_result_ct = ct.extract(crypto_context.seal_context());

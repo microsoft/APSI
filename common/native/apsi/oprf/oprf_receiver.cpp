@@ -3,6 +3,7 @@
 
 // STD
 #include <array>
+#include <cstring>
 
 // APSI
 #include "apsi/oprf/oprf_receiver.h"
@@ -35,7 +36,7 @@ namespace apsi
             return { oprf_queries_.cbegin(), oprf_queries_.cend() };
         }
 
-        void OPRFReceiver::process_items(gsl::span<const oprf_item_type> oprf_items)
+        void OPRFReceiver::process_items(gsl::span<const Item> oprf_items)
         {
             set_item_count(oprf_items.size());
 
@@ -54,7 +55,9 @@ namespace apsi
                 ecpt.scalar_multiply(random_scalar, false);
 
                 // Save the result to items_buffer
-                ecpt.save(ECPoint::point_save_span_type{ reinterpret_cast<unsigned char *>(oprf_out_ptr), oprf_query_size });
+                ecpt.save(ECPoint::point_save_span_type{
+                    reinterpret_cast<unsigned char *>(oprf_out_ptr),
+                    oprf_query_size });
 
                 // Move forward
                 advance(oprf_out_ptr, oprf_query_size);
@@ -63,11 +66,16 @@ namespace apsi
 
         void OPRFReceiver::process_responses(
             gsl::span<const seal_byte> oprf_responses,
-            gsl::span<oprf_hash_type> oprf_hashes) const
+            gsl::span<HashedItem> oprf_hashes,
+            gsl::span<LabelKey> label_keys) const
         {
             if (oprf_hashes.size() != item_count())
             {
                 throw invalid_argument("oprf_hashes has invalid size");
+            }
+            if (label_keys.size() != item_count())
+            {
+                throw invalid_argument("label_keys has invalid size");
             }
             if (oprf_responses.size() != item_count() * oprf_response_size)
             {
@@ -89,8 +97,9 @@ namespace apsi
                 array<unsigned char, ECPoint::hash_size> item_hash_and_label_key;
                 ecpt.extract_hash(item_hash_and_label_key);
 
-                // The first 128 bits represent the item hash; the next 128 bits represent the label decryption key
-                copy_n(item_hash_and_label_key.data(), oprf_hash_size, oprf_hashes[i].get_as<unsigned char>().data());
+                // The first 16 bytes represent the item hash; the next 32 bytes represent the label encryption key
+                memcpy(oprf_hashes[i].value().data(), item_hash_and_label_key.data(), oprf_hash_size);
+                memcpy(label_keys[i].data(), item_hash_and_label_key.data() + oprf_hash_size, label_key_byte_count);
 
                 // Move forward
                 advance(oprf_in_ptr, oprf_response_size);

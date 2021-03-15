@@ -6,6 +6,7 @@
 // STD
 #include <iostream>
 #include <string>
+#include <vector>
 
 // TCLAP
 #pragma warning(push, 0)
@@ -24,59 +25,19 @@ public:
 
     bool parse_args(int argc, char** argv)
     {
-        TCLAP::ValueArg<std::uint32_t> seed_arg(
-            "s",
-            "seed",
-            "32-bit seed for creating the PowersDag",
-            /* req */ true,
-            /* value */ 0,
-            /* type desc */ "unsigned integer"
-        );
-
-        TCLAP::ValueArg<std::uint32_t> depth_bound_arg(
-            "d",
-            "depth-bound",
-            "Try to find a seed that provides at most this depth",
-            /* req */ true,
-            /* value */ 0,
-            /* type desc */ "unsigned integer"
-        );
-
-        xorAdd(seed_arg, depth_bound_arg);
-
-        TCLAP::ValueArg<std::uint32_t> attempts_arg(
-            "a",
-            "attempts",
-            "Number of attempts; has effect only when --depth-bound is given",
-            /* req */ false,
-            /* value */ 100'000'000,
-            /* type desc */ "unsigned integer"
-        );
-        add(attempts_arg);
-
-        TCLAP::ValueArg<std::uint32_t> up_to_power_arg(
-            "p",
-            "up-to-power",
+        TCLAP::ValueArg<std::uint32_t> bound_arg(
+            "b",
+            "bound",
             "Up to what power we want to compute (max_items_per_bin)",
             /* req */ true,
             /* value */ 1,
             /* type desc */ "unsigned integer"
         );
-        add(up_to_power_arg);
-
-        TCLAP::ValueArg<std::uint32_t> source_count_arg(
-            "c",
-            "source-count",
-            "How many source nodes should we have (query_powers_count)",
-            /* req */ true,
-            /* value */ 1,
-            /* type desc */ "unsigned integer"
-        );
-        add(source_count_arg);
+        add(bound_arg);
 
         TCLAP::ValueArg<std::string> dot_file_arg(
-            "f",
-            "dot-file",
+            "o",
+            "out",
             "Write the PowersDag in DOT format to given file",
             /* req */ false,
             /* value */ "",
@@ -84,28 +45,24 @@ public:
         );
         add(dot_file_arg);
 
+        TCLAP::UnlabeledMultiArg<std::uint32_t> sources_arg(
+            "sources",
+            "The source powers",
+            /* req */ true,
+            "list of unsigned integers"
+        );
+        add(sources_arg);
+
         try
         {
             parse(argc, argv);
 
-            seed_given_ = seed_arg.isSet();
-            if (seed_given_)
-            {
-                seed_ = seed_arg.getValue();
-            }
-            else
-            {
-                depth_bound_ = depth_bound_arg.getValue();
-            }
-
-            attempts_ = attempts_arg.getValue();
-            up_to_power_ = up_to_power_arg.getValue();
-            source_count_ = source_count_arg.getValue();
-
+            bound_ = bound_arg.getValue();
             if (dot_file_arg.isSet())
             {
                 dot_file_ = dot_file_arg.getValue();
             }
+            sources_ = sources_arg.getValue();
         }
         catch (...)
         {
@@ -116,42 +73,9 @@ public:
         return true;
     }
 
-    bool seed_given() const
+    std::uint32_t bound() const
     {
-        return seed_given_;
-    }
-
-    std::uint32_t attempts() const
-    {
-        return attempts_;
-    }
-
-    std::uint32_t seed() const
-    {
-        if (!seed_given_)
-        {
-            throw std::logic_error("seed was not given");
-        }
-        return seed_;
-    }
-
-    std::uint32_t depth_bound() const
-    {
-        if (seed_given_)
-        {
-            throw std::logic_error("depth bound was not given");
-        }
-        return depth_bound_;
-    }
-
-    std::uint32_t up_to_power() const
-    {
-        return up_to_power_;
-    }
-
-    std::uint32_t source_count() const
-    {
-        return source_count_;
+        return bound_;
     }
 
     std::string dot_file() const
@@ -159,18 +83,15 @@ public:
         return dot_file_;
     }
 
+    const std::vector<std::uint32_t> &sources() const
+    {
+        return sources_;
+    }
+
 private:
-    std::uint32_t attempts_;
-
-    std::uint32_t seed_;
-
-    std::uint32_t depth_bound_;
-
-    std::uint32_t up_to_power_;
-
-    std::uint32_t source_count_;
+    std::uint32_t bound_;
 
     std::string dot_file_;
 
-    bool seed_given_;
+    std::vector<std::uint32_t> sources_;
 };

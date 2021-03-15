@@ -318,6 +318,16 @@ namespace apsi
     public:
         using Label::Label;
     };
+
+    /**
+    The byte count of label encryption keys.
+    */
+    constexpr std::size_t label_key_byte_count = 32;
+
+    /**
+    Represents a label encryption key.
+    */
+    using LabelKey = std::array<unsigned char, label_key_byte_count>;
 } // namespace apsi
 
 namespace std

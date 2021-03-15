@@ -13,9 +13,6 @@
 // GSL
 #include "gsl/span"
 
-// SEAL
-#include "seal/randomgen.h"
-
 // FourQ
 #include "apsi/fourq/FourQ.h"
 
@@ -41,8 +38,8 @@ namespace apsi
             using point_save_span_type = gsl::span<unsigned char, save_size>;
             using point_save_span_const_type = gsl::span<const unsigned char, save_size>;
 
-            // Output hash size is 256 bits: 128 for item hash and 128 bits for label encryption key
-            static constexpr std::size_t hash_size = 32;
+            // Output hash size is 48 bytes: 16 for item hash and 32 for label encryption key
+            static constexpr std::size_t hash_size = 48;
 
             using hash_span_type = gsl::span<unsigned char, hash_size>;
 
@@ -55,8 +52,7 @@ namespace apsi
 
             // Creates a random non-zero number modulo the prime order subgroup
             // order and computes its inverse.
-            static void make_random_nonzero_scalar(
-                scalar_span_type out, std::shared_ptr<seal::UniformRandomGenerator> rg = nullptr);
+            static void make_random_nonzero_scalar(scalar_span_type out);
 
             static void invert_scalar(scalar_span_const_type in, scalar_span_type out);
 

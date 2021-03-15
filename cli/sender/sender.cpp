@@ -31,17 +31,14 @@ int run_sender_dispatcher(const CLP &cmd);
 
 unique_ptr<CSVReader::DBData> load_db(const string &db_file);
 
-pair<shared_ptr<OPRFKey>, shared_ptr<SenderDB>> create_sender_db(
+shared_ptr<SenderDB> create_sender_db(
     const CSVReader::DBData &db_data,
-    const PSIParams &psi_params);
+    const PSIParams &psi_params,
+    size_t nonce_byte_count);
 
 int main(int argc, char *argv[])
 {
     prepare_console();
-
-    // Enable full logging to console until desired values are read from command line arguments
-    Log::set_console_disabled(true);
-    Log::set_log_level(Log::Level::all);
 
     CLP cmd("Example of a Sender implementation", APSI_VERSION);
     if (!cmd.parse_args(argc, argv))
@@ -49,10 +46,6 @@ int main(int argc, char *argv[])
         APSI_LOG_ERROR("Failed parsing command line arguments");
         return -1;
     }
-
-    Log::set_log_file(cmd.log_file());
-    Log::set_console_disabled(!cmd.enable_console());
-    Log::set_log_level(cmd.log_level());
 
     return run_sender_dispatcher(cmd);
 }
@@ -66,8 +59,6 @@ void sigint_handler(int param)
 
 int run_sender_dispatcher(const CLP &cmd)
 {
-    print_example_banner("Starting APSI Example Sender");
-
     // Set up parameters according to command line input
     unique_ptr<PSIParams> params = build_psi_params(cmd);
     if (!params)
@@ -87,7 +78,7 @@ int run_sender_dispatcher(const CLP &cmd)
 
     ThreadPoolMgr::set_thread_count(cmd.threads());
 
-    auto [oprf_key, sender_db] = create_sender_db(*db_data, *params);
+    auto sender_db = create_sender_db(*db_data, *params, cmd.nonce_byte_count());
     db_data = nullptr;
 
     signal(SIGINT, sigint_handler);
@@ -97,7 +88,7 @@ int run_sender_dispatcher(const CLP &cmd)
     ZMQSenderDispatcher dispatcher(sender_db, cmd.threads());
 
     // The dispatcher will run until stopped.
-    dispatcher.run(stop, cmd.net_port(), oprf_key);
+    dispatcher.run(stop, cmd.net_port());
 
     return 0;
 }
@@ -119,64 +110,57 @@ unique_ptr<CSVReader::DBData> load_db(const string &db_file)
     return make_unique<CSVReader::DBData>(move(db_data));
 }
 
-pair<shared_ptr<OPRFKey>, shared_ptr<SenderDB>> create_sender_db(
+shared_ptr<SenderDB> create_sender_db(
     const CSVReader::DBData &db_data,
-    const PSIParams &psi_params)
+    const PSIParams &psi_params,
+    size_t nonce_byte_count)
 {
-    auto oprf_key = make_shared<OPRFKey>();
-    APSI_LOG_INFO("Created new OPRF key");
-
     shared_ptr<SenderDB> sender_db;
     if (holds_alternative<CSVReader::UnlabeledData>(db_data))
     {
-        vector<HashedItem> hashed_db_data;
-        {
-            STOPWATCH(sender_stopwatch, "OPRF preprocessing (unlabeled)");
-            hashed_db_data = OPRFSender::ComputeHashes(get<CSVReader::UnlabeledData>(db_data), *oprf_key);
-        }
-        APSI_LOG_INFO("Computed OPRF hash for " << hashed_db_data.size() << " items");
-
         try
         {
-            sender_db = make_shared<SenderDB>(psi_params, 0);
-            sender_db->set_data(hashed_db_data);
-            APSI_LOG_INFO("Created unlabeled SenderDB with " << sender_db->get_items().size() << " items");
+            sender_db = make_shared<SenderDB>(psi_params, 0, 0, true);
+            sender_db->set_data(get<CSVReader::UnlabeledData>(db_data));
+            APSI_LOG_INFO("Created unlabeled SenderDB with " << sender_db->get_item_count() << " items");
         }
         catch (const exception &ex)
         {
             APSI_LOG_ERROR("Failed to create SenderDB: " << ex.what());
-            return { nullptr, nullptr };
+            return nullptr;
         }
     }
     else if (holds_alternative<CSVReader::LabeledData>(db_data))
     {
-        vector<pair<HashedItem, EncryptedLabel>> hashed_db_data;
-        {
-            STOPWATCH(sender_stopwatch, "OPRF preprocessing (labeled)");
-            hashed_db_data = OPRFSender::ComputeHashes(get<CSVReader::LabeledData>(db_data), *oprf_key);
-        }
-        APSI_LOG_INFO("Computed OPRF hash for " << hashed_db_data.size() << " items");
-
         try
         {
-            size_t label_size = hashed_db_data[0].second.size();
-            sender_db = make_shared<SenderDB>(psi_params, label_size);
-            sender_db->set_data(hashed_db_data);
+            auto &labeled_db_data = get<CSVReader::LabeledData>(db_data);
+
+            // Find the longest label and use that as label size
+            size_t label_byte_count = max_element(
+                labeled_db_data.begin(),
+                labeled_db_data.end(),
+                [](auto &a, auto &b) { return a.second.size() < b.second.size(); }
+            )->second.size();
+
+            sender_db = make_shared<SenderDB>(psi_params, label_byte_count, nonce_byte_count, true);
+            sender_db->set_data(labeled_db_data);
             APSI_LOG_INFO("Created labeled SenderDB with "
-                << sender_db->get_items().size() << " items and " << label_size << "-byte labels");
+                << sender_db->get_item_count() << " items and " << label_byte_count << "-byte labels ("
+                << nonce_byte_count << "-byte nonces)");
         }
         catch (const exception &ex)
         {
             APSI_LOG_ERROR("Failed to create SenderDB: " << ex.what());
-            return { nullptr, nullptr };
+            return nullptr;
         }
     }
     else
     {
         // Should never reach this point
         APSI_LOG_ERROR("Loaded database is in an invalid state");
-        return { nullptr, nullptr };
+        return nullptr;
     }
 
-    return { oprf_key, sender_db };
+    return sender_db ;
 }

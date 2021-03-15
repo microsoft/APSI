@@ -59,10 +59,6 @@ void print_transmitted_data(Channel &channel);
 
 int main(int argc, char *argv[])
 {
-    // Enable full logging to console until desired values are read from command line arguments
-    Log::set_console_disabled(true);
-    Log::set_log_level(Log::Level::all);
-
     CLP cmd("Example of a Receiver implementation", APSI_VERSION);
     if (!cmd.parse_args(argc, argv))
     {
@@ -70,17 +66,11 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    Log::set_log_file(cmd.log_file());
-    Log::set_console_disabled(!cmd.enable_console());
-    Log::set_log_level(cmd.log_level());
-
     return remote_query(cmd);
 }
 
 int remote_query(const CLP& cmd)
 {
-    print_example_banner("Starting APSI Example Receiver");
-
     // Connect to the network
     ZMQReceiverChannel channel;
 
@@ -125,10 +115,11 @@ int remote_query(const CLP& cmd)
     auto &items = get<CSVReader::UnlabeledData>(*query_data);
     vector<Item> items_vec(items.begin(), items.end());
     vector<HashedItem> oprf_items;
+    vector<LabelKey> label_keys;
     try
     {
         APSI_LOG_INFO("Sending OPRF request for " << items_vec.size() << " items");
-        oprf_items = Receiver::RequestOPRF(items_vec, channel);
+        tie(oprf_items, label_keys) = Receiver::RequestOPRF(items_vec, channel);
         APSI_LOG_INFO("Received OPRF request for " << items_vec.size() << " items");
     }
     catch (const exception &ex)
@@ -141,7 +132,7 @@ int remote_query(const CLP& cmd)
     try
     {
         APSI_LOG_INFO("Sending APSI query");
-        query_result = receiver.request_query(oprf_items, channel);
+        query_result = receiver.request_query(oprf_items, label_keys, channel);
         APSI_LOG_INFO("Received APSI query response");
     }
     catch (const exception &ex)
@@ -193,13 +184,14 @@ void print_intersection_results(
         if (intersection[i].found)
         {
             msg << Colors::GreenBold << orig_items[i] << Colors::Reset;
+            csv_output << orig_items[i];
             if (intersection[i].label)
             {
                 msg << ": ";
                 msg << Colors::GreenBold << intersection[i].label.to_string() << Colors::Reset;
+                csv_output << "," << intersection[i].label.to_string();
             }
-
-            csv_output << orig_items[i] << "," << intersection[i].label.to_string() << endl;
+            csv_output << endl;
         }
         else
         {

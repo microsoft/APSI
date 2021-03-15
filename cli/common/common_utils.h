@@ -11,11 +11,6 @@
 #include "apsi/util/stopwatch.h"
 
 /**
-Print a banner with asterisks on top and bottom.
-*/
-void print_example_banner(const std::string &title);
-
-/**
 Prepare console for color output.
 */
 void prepare_console();

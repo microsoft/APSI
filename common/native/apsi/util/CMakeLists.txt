@@ -4,6 +4,7 @@
 target_sources(common
     PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/interpolate.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/label_encryptor.cpp
         ${CMAKE_CURRENT_LIST_DIR}/db_encoding.cpp
         ${CMAKE_CURRENT_LIST_DIR}/stopwatch.cpp
         ${CMAKE_CURRENT_LIST_DIR}/thread_pool_mgr.cpp
@@ -13,6 +14,7 @@ target_sources(common
 install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/interpolate.h
+        ${CMAKE_CURRENT_LIST_DIR}/label_encryptor.h
         ${CMAKE_CURRENT_LIST_DIR}/db_encoding.h
         ${CMAKE_CURRENT_LIST_DIR}/stopwatch.h
         ${CMAKE_CURRENT_LIST_DIR}/thread_pool.h

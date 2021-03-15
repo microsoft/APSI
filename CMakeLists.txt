@@ -106,10 +106,13 @@ set(APSI_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/APSI-${APSI_VERSION_MA
 # TODO: Do we care if vcpkg is not used?
 
 # Microsoft SEAL
-find_package(SEAL 3.6 CONFIG REQUIRED)
+find_package(SEAL 3.6.3 REQUIRED)
 
 # Microsoft Kuku
 find_package(Kuku 2.1 REQUIRED)
+
+# Libsodium
+find_package(unofficial-sodium REQUIRED)
 
 # Flatbuffers: for serialization
 find_package(Flatbuffers REQUIRED)
@@ -214,7 +217,12 @@ apsi_set_version(common)
 apsi_link_threads(common)
 apsi_install_target(common APSITargets)
 
-target_link_libraries(common PUBLIC SEAL::seal Kuku::kuku flatbuffers::flatbuffers jsoncpp_static)
+target_link_libraries(common
+    PUBLIC SEAL::seal
+    PUBLIC Kuku::kuku
+    PUBLIC flatbuffers::flatbuffers
+    PUBLIC jsoncpp_static
+    PRIVATE unofficial-sodium::sodium)
 if (APSI_USE_LOG4CPLUS)
     target_link_libraries(common PUBLIC log4cplus::log4cplus)
 endif()
@@ -315,12 +323,9 @@ if(APSI_BUILD_CLI)
         target_link_libraries(receiver_cli PUBLIC stdc++fs)
     endif()
 
-    # add_executable(pd_tool)
-    # add_subdirectory(cli/pd_tool)
-    # target_include_directories(pd_tool PRIVATE cli)
-    # target_include_directories(pd_tool PRIVATE ${TCLAP_INCLUDE_DIRS})
-    # target_link_libraries(pd_tool common)
-    # if (!MSVC)
-    #     target_link_libraries(pd_tool PUBLIC stdc++fs)
-    # endif()
+    add_executable(pd_tool)
+    add_subdirectory(cli/pd_tool)
+    target_include_directories(pd_tool PRIVATE cli)
+    target_include_directories(pd_tool PRIVATE ${TCLAP_INCLUDE_DIRS})
+    target_link_libraries(pd_tool common)
 endif()

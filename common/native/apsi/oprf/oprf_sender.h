@@ -17,7 +17,6 @@
 #include "seal/util/defines.h"
 #include "seal/dynarray.h"
 #include "seal/memorymanager.h"
-#include "seal/randomgen.h"
 
 // APSI
 #include "apsi/oprf/oprf_common.h"
@@ -33,48 +32,52 @@ namespace apsi
         class OPRFKey
         {
         public:
-            OPRFKey(std::shared_ptr<seal::UniformRandomGeneratorFactory> random_gen = nullptr)
+            OPRFKey()
             {
-                random_ = random_gen ? std::move(random_gen) : seal::UniformRandomGeneratorFactory::DefaultFactory();
                 create();
             }
 
-            OPRFKey(const OPRFKey &copy) : OPRFKey(copy.random_)
+            OPRFKey &operator =(const OPRFKey &copy)
             {
                 oprf_key_ = copy.oprf_key_;
+                return *this;
             }
 
-            OPRFKey(OPRFKey &&copy) = default;
+            OPRFKey &operator =(OPRFKey &&source) = default;
 
-            inline void create()
+            OPRFKey(const OPRFKey &copy)
+            {
+                operator =(copy);
+            }
+
+            OPRFKey(OPRFKey &&source) = default;
+
+            void create()
             {
                 // Create a random key
-                ECPoint::make_random_nonzero_scalar(
-                    oprf_key_span_type{ oprf_key_.begin(), oprf_key_size }, random_->create());
+                ECPoint::make_random_nonzero_scalar(oprf_key_span_type{ oprf_key_.begin(), oprf_key_size });
             }
 
             void save(std::ostream &stream) const;
 
             void load(std::istream &stream);
 
-            inline void save(oprf_key_span_type oprf_key) const;
+            void save(oprf_key_span_type oprf_key) const;
 
-            inline void load(oprf_key_span_const_type oprf_key);
+            void load(oprf_key_span_const_type oprf_key);
 
-            inline void clear()
+            void clear()
             {
                 oprf_key_ = seal::DynArray<unsigned char>(
                     oprf_key_size, seal::MemoryManager::GetPool(seal::mm_prof_opt::mm_force_new, true));
             }
 
-            inline oprf_key_span_const_type key_span() const noexcept
+            oprf_key_span_const_type key_span() const noexcept
             {
                 return oprf_key_span_const_type{ oprf_key_.cbegin(), oprf_key_size };
             }
 
         private:
-            std::shared_ptr<seal::UniformRandomGeneratorFactory> random_{ nullptr };
-
             seal::DynArray<unsigned char> oprf_key_{ oprf_key_size,
                                                      seal::MemoryManager::GetPool(seal::mm_prof_opt::mm_force_new, true) };
         }; // class OPRFKey
@@ -87,13 +90,17 @@ namespace apsi
             static std::vector<seal::seal_byte> ProcessQueries(
                 gsl::span<const seal::seal_byte> oprf_queries, const OPRFKey &oprf_key);
 
-            static std::vector<oprf_hash_type> ComputeHashes(
-                const gsl::span<const oprf_item_type> &oprf_items,
+            static std::pair<HashedItem, LabelKey> GetItemHash(const Item &item, const OPRFKey &oprf_key);
+
+            static std::vector<HashedItem> ComputeHashes(
+                const gsl::span<const Item> &oprf_items,
                 const OPRFKey &oprf_key);
 
-            static std::vector<std::pair<oprf_hash_type, EncryptedLabel>> ComputeHashes(
-                const gsl::span<const std::pair<oprf_item_type, Label>> &oprf_item_labels,
-                const OPRFKey &oprf_key);
+            static std::vector<std::pair<HashedItem, EncryptedLabel>> ComputeHashes(
+                const gsl::span<const std::pair<Item, Label>> &oprf_item_labels,
+                const OPRFKey &oprf_key,
+                std::size_t label_byte_count,
+                std::size_t nonce_byte_count);
         }; // class OPRFSender
     }      // namespace oprf
 } // namespace apsi

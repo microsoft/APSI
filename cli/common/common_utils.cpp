@@ -22,23 +22,6 @@ using namespace seal;
 using namespace apsi;
 using namespace apsi::util;
 
-void print_example_banner(const string &title)
-{
-    if (!title.empty())
-    {
-        size_t title_length = title.length();
-        size_t banner_length = title_length + 2 + 2 * 10;
-        string banner_top(banner_length, '*');
-        string banner_middle = string(10, '*') + " " + title + " " + string(10, '*');
-
-        cout << endl
-            << banner_top << endl
-            << banner_middle << endl
-            << banner_top << endl
-            << endl;
-    }
-}
-
 /**
 This only turns on showing colors for Windows.
 */

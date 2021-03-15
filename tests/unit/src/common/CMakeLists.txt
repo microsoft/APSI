@@ -9,6 +9,7 @@ target_sources(unit_tests
         ${CMAKE_CURRENT_LIST_DIR}/oprf.cpp
         ${CMAKE_CURRENT_LIST_DIR}/powers.cpp
         ${CMAKE_CURRENT_LIST_DIR}/psi_params.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/result_package.cpp
         ${CMAKE_CURRENT_LIST_DIR}/sender_operation.cpp
         ${CMAKE_CURRENT_LIST_DIR}/sender_operation_response.cpp
         ${CMAKE_CURRENT_LIST_DIR}/stopwatch.cpp

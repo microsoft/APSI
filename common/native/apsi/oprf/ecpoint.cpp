@@ -13,6 +13,7 @@
 #include "apsi/fourq/FourQ_api.h"
 
 // SEAL
+#include "seal/randomgen.h"
 #include "seal/util/blake2.h"
 
 using namespace std;
@@ -24,21 +25,9 @@ namespace apsi
     {
         namespace
         {
-            void random_scalar(ECPoint::scalar_span_type value, shared_ptr<UniformRandomGenerator> rg)
+            void random_scalar(ECPoint::scalar_span_type value)
             {
-                if (rg)
-                {
-                    rg->generate(ECPoint::order_size, reinterpret_cast<seal_byte *>(value.data()));
-                }
-                else
-                {
-                    uint64_t *value_ptr = reinterpret_cast<uint64_t *>(value.data());
-                    value_ptr[0] = random_uint64();
-                    value_ptr[1] = random_uint64();
-                    value_ptr[2] = random_uint64();
-                    value_ptr[3] = random_uint64();
-                }
-
+                random_bytes(reinterpret_cast<seal_byte*>(value.data()), value.size());
                 modulo_order(reinterpret_cast<digit_t *>(value.data()), reinterpret_cast<digit_t *>(value.data()));
             }
 
@@ -78,12 +67,12 @@ namespace apsi
             }
         }
 
-        void ECPoint::make_random_nonzero_scalar(scalar_span_type out, shared_ptr<UniformRandomGenerator> rg)
+        void ECPoint::make_random_nonzero_scalar(scalar_span_type out)
         {
             // Loop until we find a non-zero element
             do
             {
-                random_scalar(out, rg);
+                random_scalar(out);
             }
             while (!is_nonzero_scalar(out));
         }

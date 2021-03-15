@@ -32,15 +32,12 @@ namespace apsi
             /**
             Run the dispatcher on the given port.
             */
-            void run(
-                const std::atomic<bool> &stop, int port, std::shared_ptr<const oprf::OPRFKey> oprf_key);
+            void run(const std::atomic<bool> &stop, int port);
 
         private:
             std::shared_ptr<sender::SenderDB> sender_db_;
 
             std::size_t thread_count_;
-
-            std::shared_ptr<const oprf::OPRFKey> oprf_key_;
 
             /**
             Dispatch a Get Parameters request to the Sender.

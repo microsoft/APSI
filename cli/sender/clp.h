@@ -35,6 +35,7 @@ public:
         add(poly_modulus_degree_arg_);
         add(coeff_modulus_bits_arg_);
         xorAdd(plain_modulus_bits_arg_, plain_modulus_arg_);
+        add(nonce_byte_count_arg_);
         add(net_port_arg_);
         add(db_file_arg_);
     }
@@ -42,45 +43,30 @@ public:
     virtual void get_args()
     {
         felts_per_item_ = felts_per_item_arg_.getValue();
-        cout_param("feltsPerItem", felts_per_item_);
-
         table_size_ = table_size_arg_.getValue();
-        cout_param("tableSize", table_size_);
-
         max_items_per_bin_ = max_item_per_bin_arg_.getValue();
-        cout_param("maxItemsPerBin", max_items_per_bin_);
-
         hash_func_count_ = hash_func_count_arg_.getValue();
-        cout_param("hashFuncCount", hash_func_count_);
 
         std::vector<std::uint32_t> query_powers_vec = query_powers_arg_.getValue();
         query_powers_vec.push_back(1);
         std::copy(query_powers_vec.cbegin(), query_powers_vec.cend(), inserter(query_powers_, query_powers_.end()));
-        cout_param("queryPowers", apsi::util::to_string(query_powers_));
 
         poly_modulus_degree_ = poly_modulus_degree_arg_.getValue();
-        cout_param("polyModulusDegree", poly_modulus_degree_);
-
         coeff_modulus_bits_ = coeff_modulus_bits_arg_.getValue();
-        cout_param("coeffModulusBits", apsi::util::to_string(coeff_modulus_bits_));
 
         if (plain_modulus_bits_arg_.isSet())
         {
             plain_modulus_bits_ = plain_modulus_bits_arg_.getValue();
-            cout_param("plainModulusBits", plain_modulus_bits_);
         }
         else if (plain_modulus_arg_.isSet())
         {
             plain_modulus_ = plain_modulus_arg_.getValue();
             plain_modulus_bits_ = plain_modulus_.bit_count();
-            cout_param("plainModulusBits", plain_modulus_bits_);
         }
 
+        nonce_byte_count_ = nonce_byte_count_arg_.getValue();
         db_file_ = db_file_arg_.getValue();
-        cout_param("dbFile", db_file_);
-
         net_port_ = net_port_arg_.getValue();
-        cout_param("port", net_port_);
     }
 
     std::uint32_t felts_per_item() const
@@ -126,6 +112,11 @@ public:
     const seal::Modulus &plain_modulus() const
     {
         return plain_modulus_;
+    }
+
+    std::size_t nonce_byte_count() const
+    {
+        return nonce_byte_count_;
     }
 
     int net_port() const
@@ -209,6 +200,14 @@ private:
         0,
         "unsigned integer");
 
+    TCLAP::ValueArg<std::size_t> nonce_byte_count_arg_ = TCLAP::ValueArg<std::size_t>(
+        "n",
+        "nonceByteCount",
+        "Number of bytes used for the nonce in labeled mode",
+        false,
+        16,
+        "unsigned integer");
+
     TCLAP::ValueArg<int> net_port_arg_ = TCLAP::ValueArg<int>(
         "",
         "port",
@@ -244,6 +243,8 @@ private:
     int plain_modulus_bits_;
 
     seal::Modulus plain_modulus_;
+
+    std::size_t nonce_byte_count_;
 
     int net_port_;
 

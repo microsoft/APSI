@@ -26,8 +26,7 @@ namespace apsi
             std::size_t find_item_idx(std::size_t table_idx) const noexcept;
 
             /**
-            Returns the number of items encoded by this query. This function returns 0 if the query does not contain an
-            index translation table, e.g., when the sender has received the query.
+            Returns the number of items encoded by this index translation table.
             */
             const std::size_t item_count() const noexcept
             {
