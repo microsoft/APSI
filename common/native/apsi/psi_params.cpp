@@ -25,20 +25,40 @@ using namespace seal;
 using namespace seal::util;
 
 namespace {
+    const Json::Value& get_non_null_json_value(const Json::Value& parent, const string& name)
+    {
+        const auto &value = parent[name];
+        if (value.isNull()) {
+            stringstream ss;
+            ss << name << " is not present in " << parent;
+            throw runtime_error(ss.str());
+        }
 
-    uint32_t json_value_ui32(const string &name, const Json::Value& value)
+        return value;
+    }
+
+    uint32_t json_value_ui32(const Json::Value &value)
     {
         if (!value.isUInt()) {
             stringstream ss;
-            ss << name << " should be an unsigned int32";
+            ss << value.asCString() << " should be an unsigned int32";
             throw runtime_error(ss.str());
         }
 
         return value.asUInt();
     }
 
-    uint64_t json_value_ui64(const string &name, const Json::Value &value)
+    uint32_t json_value_ui32(const Json::Value &parent, const string &name)
     {
+        const auto &value = get_non_null_json_value(parent, name);
+        return json_value_ui32(value);
+    }
+
+
+    uint64_t json_value_ui64(const Json::Value &parent, const string &name)
+    {
+        const auto &value = get_non_null_json_value(parent, name);
+
         if (!value.isUInt64()) {
             stringstream ss;
             ss << name << " should be an unsigned int64";
@@ -46,6 +66,23 @@ namespace {
         }
 
         return value.asUInt64();
+    }
+
+    int json_value_int(const Json::Value& value)
+    {
+        if (!value.isInt()) {
+            stringstream ss;
+            ss << value.asCString() << " should be an int";
+            throw runtime_error(ss.str());
+        }
+
+        return value.asInt();
+    }
+
+    int json_value_int(const Json::Value &parent, const string& name)
+    {
+        const auto &value = get_non_null_json_value(parent, name);
+        return json_value_int(value);
     }
 }
 
@@ -264,38 +301,34 @@ namespace apsi
         }
 
         PSIParams::TableParams table_params;
-        const auto &hash_func_count = json_table_params["hash_func_count"];
-        const auto &table_size = json_table_params["table_size"];
-        const auto &max_items_per_bin = json_table_params["max_items_per_bin"];
-
-        table_params.hash_func_count = json_value_ui32("hash_func_count", hash_func_count);
-        table_params.table_size = json_value_ui32("table_size", table_size);
-        table_params.max_items_per_bin = json_value_ui32("max_items_per_bin", max_items_per_bin);
+        table_params.hash_func_count = json_value_ui32(json_table_params, "hash_func_count");
+        table_params.table_size = json_value_ui32(json_table_params, "table_size");
+        table_params.max_items_per_bin = json_value_ui32(json_table_params, "max_items_per_bin");
 
         PSIParams::ItemParams item_params;
-        const auto &felts_per_item = json_item_params["felts_per_item"];
-        item_params.felts_per_item = json_value_ui32("felts_per_item", felts_per_item);
+        item_params.felts_per_item = json_value_ui32(json_item_params, "felts_per_item");
 
         PSIParams::QueryParams query_params;
-        const auto &query_powers = json_query_params["query_powers"];
+        const auto &query_powers = get_non_null_json_value(json_query_params, "query_powers");
+
         // Should always contain 1
         query_params.query_powers.insert(1);
         for (const auto &power : query_powers) {
-            query_params.query_powers.insert(json_value_ui32("", power));
+            query_params.query_powers.insert(json_value_ui32(power));
         }
 
         PSIParams::SEALParams seal_params;
-        const auto &plain_modulus = json_seal_params["plain_modulus"];
-        const auto &poly_modulus_degree = json_seal_params["poly_modulus_degree"];
-        const auto &coeff_modulus_bits = json_seal_params["coeff_modulus_bits"];
-        seal_params.set_plain_modulus(json_value_ui64("plain_modulus", plain_modulus));
-        seal_params.set_poly_modulus_degree(
-            json_value_ui64("poly_modulus_degree", poly_modulus_degree));
-        vector<Modulus> coeff_modulus;
+        const auto &coeff_modulus_bits = get_non_null_json_value(json_seal_params, "coeff_modulus_bits");
+
+        size_t poly_modulus_degree = json_value_ui64(json_seal_params, "poly_modulus_degree");
+        seal_params.set_plain_modulus(json_value_ui64(json_seal_params, "plain_modulus"));
+        seal_params.set_poly_modulus_degree(poly_modulus_degree);
+
+        vector<int> coeff_modulus_bit_sizes;
         for (const auto &coeff : coeff_modulus_bits) {
-            coeff_modulus.push_back(Modulus(json_value_ui64("", coeff)));
+            coeff_modulus_bit_sizes.push_back(json_value_int(coeff));
         }
-        seal_params.set_coeff_modulus(coeff_modulus);
+        seal_params.set_coeff_modulus(CoeffModulus::Create(poly_modulus_degree, coeff_modulus_bit_sizes));
 
         return PSIParams(item_params, table_params, query_params, seal_params);
     }

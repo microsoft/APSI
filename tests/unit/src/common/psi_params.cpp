@@ -181,8 +181,8 @@ namespace APSITests
         ASSERT_EQ(40961, params.seal_params().plain_modulus().value());
         ASSERT_EQ(4096, params.seal_params().poly_modulus_degree());
         ASSERT_EQ(3, params.seal_params().coeff_modulus().size());
-        ASSERT_EQ(49, params.seal_params().coeff_modulus()[0].value());
-        ASSERT_EQ(40, params.seal_params().coeff_modulus()[1].value());
-        ASSERT_EQ(20, params.seal_params().coeff_modulus()[2].value());
+        ASSERT_EQ(49, params.seal_params().coeff_modulus()[0].bit_count());
+        ASSERT_EQ(40, params.seal_params().coeff_modulus()[1].bit_count());
+        ASSERT_EQ(20, params.seal_params().coeff_modulus()[2].bit_count());
     }
 }
