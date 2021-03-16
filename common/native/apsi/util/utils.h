@@ -4,15 +4,16 @@
 #pragma once
 
 // STD
+#include <algorithm>
+#include <cstdint>
+#include <iostream>
 #include <set>
 #include <sstream>
-#include <cstdint>
-#include <vector>
-#include <type_traits>
-#include <utility>
 #include <stdexcept>
-#include <algorithm>
-#include <iostream>
+#include <type_traits>
+#include <unordered_set>
+#include <utility>
+#include <vector>
 
 // APSI
 #include "apsi/item.h"
