@@ -24,6 +24,7 @@ steps:
     script: |
       cd $(Build.SourcesDirectory)
       git clone https://github.com/microsoft/vcpkg.git
+      copy tools\vcpkg\seal\* vcpkg\ports\seal
       cd vcpkg
       bootstrap-vcpkg.bat -disableMetrics
     workingDirectory: '$(Build.SourcesDirectory)'
