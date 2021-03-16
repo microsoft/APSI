@@ -33,7 +33,7 @@ steps:
   displayName: 'Configure vcpkg dependencies'
   inputs:
     script: |
-      vcpkg install --triplet=x64-windows-static-md ./vcpkg install libsodium zeromq[sodium] cppzmq flatbuffers gtest kuku log4cplus seal[ms-gsl,zstd,no-throw-tran] tclap
+      vcpkg install --triplet=x64-windows-static-md ./vcpkg install cppzmq flatbuffers gtest kuku log4cplus seal[ms-gsl,zstd,no-throw-tran] tclap
     workingDirectory: '$(Build.SourcesDirectory)/vcpkg'
     failOnStderr: false
 

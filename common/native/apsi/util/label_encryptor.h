@@ -14,7 +14,7 @@ namespace apsi
     namespace util
     {
         EncryptedLabel encrypt_label(
-            Label label,
+            const Label &label,
             const LabelKey &key,
             std::size_t label_byte_count,
             std::size_t nonce_byte_count);

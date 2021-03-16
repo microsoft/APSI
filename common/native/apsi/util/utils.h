@@ -221,5 +221,9 @@ namespace apsi
         */
         std::uint64_t next_power_of_2(std::uint64_t v);
 
+        /**
+        Computes the XOR of two byte buffers.
+        */
+        void xor_buffers(unsigned char *buf1, const unsigned char *buf2, std::size_t count);
     } // namespace util
 } // namespace apsi

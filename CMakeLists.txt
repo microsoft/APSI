@@ -111,9 +111,6 @@ find_package(SEAL 3.6.3 REQUIRED)
 # Microsoft Kuku
 find_package(Kuku 2.1 REQUIRED)
 
-# Libsodium
-find_package(unofficial-sodium REQUIRED)
-
 # Flatbuffers: for serialization
 find_package(Flatbuffers REQUIRED)
 get_target_property(FLATBUFFERS_FLATC_PATH flatbuffers::flatc IMPORTED_LOCATION_RELEASE)
@@ -217,8 +214,7 @@ apsi_install_target(common APSITargets)
 target_link_libraries(common
     PUBLIC SEAL::seal
     PUBLIC Kuku::kuku
-    PUBLIC flatbuffers::flatbuffers
-    PRIVATE unofficial-sodium::sodium)
+    PUBLIC flatbuffers::flatbuffers)
 if (APSI_USE_LOG4CPLUS)
     target_link_libraries(common PUBLIC log4cplus::log4cplus)
 endif()

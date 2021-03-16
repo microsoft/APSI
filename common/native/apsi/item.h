@@ -322,7 +322,12 @@ namespace apsi
     /**
     The byte count of label encryption keys.
     */
-    constexpr std::size_t label_key_byte_count = 32;
+    constexpr std::size_t label_key_byte_count = 16;
+
+    /**
+    The maximal/default byte count of label encryption nonces.
+    */
+    constexpr std::size_t max_nonce_byte_count = 16;
 
     /**
     Represents a label encryption key.

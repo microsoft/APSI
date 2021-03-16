@@ -7,6 +7,7 @@
 #include <thread>
 
 // APSI
+#include "apsi/item.h"
 #include "apsi/logging/log.h"
 #include "apsi/network/result_package.h"
 #include "apsi/network/sender_operation.h"
@@ -128,7 +129,7 @@ namespace apsi
             label_byte_count = rp->label_byte_count();
             if (label_byte_count > 1024)
             {
-                throw runtime_error("failed to load ResultPackage: label byte count is too large");
+                throw runtime_error("failed to load ResultPackage: label_byte_count is too large");
             }
             if (label_byte_count && !rp->label_result())
             {
@@ -138,9 +139,9 @@ namespace apsi
             // Load the nonce_byte_count only if we actually have a non-zero label_byte_count. We still need to check
             // (as for the actual label as well) that we received enough data.
             nonce_byte_count = label_byte_count ? rp->nonce_byte_count() : 0;
-            if (nonce_byte_count > 16)
+            if (nonce_byte_count > max_nonce_byte_count)
             {
-                throw runtime_error("failed to load ResultPackage: nonce byte count is too large");
+                throw runtime_error("failed to load ResultPackage: nonce_byte_count is too large");
             }
 
             // Load the label_result data if present

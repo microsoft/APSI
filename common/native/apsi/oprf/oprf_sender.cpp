@@ -166,9 +166,9 @@ namespace apsi
             size_t label_byte_count,
             size_t nonce_byte_count)
         {
-            if (nonce_byte_count > 16)
+            if (nonce_byte_count > max_nonce_byte_count)
             {
-                throw invalid_argument("nonce byte count is too large");
+                throw invalid_argument("nonce_byte_count is too large");
             }
 
             STOPWATCH(sender_stopwatch, "OPRFSender::ComputeHashes (labeled)");
