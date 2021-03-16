@@ -10,7 +10,6 @@
 #include <utility>
 #include <unordered_set>
 #include <unordered_map>
-#include <filesystem>
 
 // APSI
 #include "apsi/item.h"
@@ -38,13 +37,11 @@ public:
     std::pair<DBData, std::vector<std::string>> read() const;
 
 private:
-    std::filesystem::path file_;
+    std::string file_name_;
 
     std::pair<bool, bool> process_line(
         const std::string &line,
         std::string &orig_item,
         apsi::Item &item,
         apsi::Label &label) const;
-
-    void throw_if_file_invalid() const;
 }; // class CSVReader

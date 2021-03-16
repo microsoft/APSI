@@ -311,25 +311,30 @@ namespace apsi
         const auto &coeff_modulus_bits =
             get_non_null_json_value(json_seal_params, "coeff_modulus_bits");
 
-        size_t poly_modulus_degree = json_value_ui64(json_seal_params, "poly_modulus_degree");
-        seal_params.set_poly_modulus_degree(poly_modulus_degree);
+        try {
+            size_t poly_modulus_degree = json_value_ui64(json_seal_params, "poly_modulus_degree");
+            seal_params.set_poly_modulus_degree(poly_modulus_degree);
 
-        if (json_seal_params.isMember("plain_modulus")) {
-            seal_params.set_plain_modulus(json_value_ui64(json_seal_params, "plain_modulus"));
-        } else if (json_seal_params.isMember("plain_modulus_bits")) {
-            seal_params.set_plain_modulus(PlainModulus::Batching(
-                poly_modulus_degree, json_value_int(json_seal_params, "plain_modulus_bits")));
-        } else {
-            throw runtime_error(
-                "Either plain_modulus or plain_modulus_bits not found under seal_params");
-        }
+            if (json_seal_params.isMember("plain_modulus")) {
+                seal_params.set_plain_modulus(json_value_ui64(json_seal_params, "plain_modulus"));
+            } else if (json_seal_params.isMember("plain_modulus_bits")) {
+                seal_params.set_plain_modulus(PlainModulus::Batching(
+                    poly_modulus_degree, json_value_int(json_seal_params, "plain_modulus_bits")));
+            } else {
+                throw runtime_error(
+                    "Either plain_modulus or plain_modulus_bits not found under seal_params");
+            }
 
-        vector<int> coeff_modulus_bit_sizes;
-        for (const auto &coeff : coeff_modulus_bits) {
-            coeff_modulus_bit_sizes.push_back(json_value_int(coeff));
+            vector<int> coeff_modulus_bit_sizes;
+            for (const auto &coeff : coeff_modulus_bits) {
+                coeff_modulus_bit_sizes.push_back(json_value_int(coeff));
+            }
+            seal_params.set_coeff_modulus(
+                CoeffModulus::Create(poly_modulus_degree, coeff_modulus_bit_sizes));
+        } catch (const exception &ex) {
+            APSI_LOG_ERROR("Microsoft SEAL threw an exception creating SEALParams: " << ex.what());
+            throw;
         }
-        seal_params.set_coeff_modulus(
-            CoeffModulus::Create(poly_modulus_degree, coeff_modulus_bit_sizes));
 
         return PSIParams(item_params, table_params, query_params, seal_params);
     }

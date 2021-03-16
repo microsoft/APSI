@@ -6,6 +6,7 @@
 // STD
 #include <iostream>
 #include <iomanip>
+#include <filesystem>
 
 #ifdef _MSC_VER
 #include "windows.h"
@@ -21,6 +22,7 @@ using namespace std;
 using namespace seal;
 using namespace apsi;
 using namespace apsi::util;
+namespace fs = std::filesystem;
 
 /**
 This only turns on showing colors for Windows.
@@ -127,5 +129,19 @@ void print_timing_report(const Stopwatch &stopwatch)
         {
             APSI_LOG_INFO(timing.c_str());
         }
+    }
+}
+
+void throw_if_file_invalid(const string &file_name)
+{
+    fs::path file(file_name);
+
+    if (!fs::exists(file)) {
+        APSI_LOG_ERROR("File `" << file.string() << "` does not exist");
+        throw logic_error("file does not exist");
+    }
+    if (!fs::is_regular_file(file)) {
+        APSI_LOG_ERROR("File `" << file.string() << "` is not a regular file");
+        throw logic_error("invalid file");
     }
 }

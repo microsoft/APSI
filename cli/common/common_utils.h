@@ -33,3 +33,8 @@ std::vector<std::string> generate_event_report(
 Print timings.
 */
 void print_timing_report(const apsi::util::Stopwatch &stopwatch);
+
+/**
+Throw an exception if the given file is invalid.
+*/
+void throw_if_file_invalid(const std::string &file_name);

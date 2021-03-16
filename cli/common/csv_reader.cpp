@@ -7,23 +7,22 @@
 #include <sstream>
 #include <utility>
 #include <algorithm>
-#include <filesystem>
 
 // APSI
 #include "common/csv_reader.h"
 #include "apsi/logging/log.h"
+#include "common/common_utils.h"
 
 using namespace std;
-namespace fs = std::filesystem;
 using namespace apsi;
 using namespace apsi::util;
 
 CSVReader::CSVReader()
 {}
 
-CSVReader::CSVReader(const string &file_name) : file_(file_name)
+CSVReader::CSVReader(const string &file_name) : file_name_(file_name)
 {
-    throw_if_file_invalid();
+    throw_if_file_invalid(file_name_);
 }
 
 auto CSVReader::read(istream &stream) const -> pair<DBData, vector<string>>
@@ -34,7 +33,7 @@ auto CSVReader::read(istream &stream) const -> pair<DBData, vector<string>>
 
     if (!getline(stream, line))
     {
-        APSI_LOG_WARNING("Nothing to read in `" << file_.string() << "`");
+        APSI_LOG_WARNING("Nothing to read in `" << file_name_ << "`");
         return { UnlabeledData{}, {} };
     }
     else
@@ -46,7 +45,7 @@ auto CSVReader::read(istream &stream) const -> pair<DBData, vector<string>>
 
         if (!has_item)
         {
-            APSI_LOG_WARNING("Failed to read item from `" << file_.string() << "`");
+            APSI_LOG_WARNING("Failed to read item from `" << file_name_ << "`");
             return { UnlabeledData{}, {} };
         }
 
@@ -71,7 +70,7 @@ auto CSVReader::read(istream &stream) const -> pair<DBData, vector<string>>
         if (!has_item)
         {
             // Something went wrong; skip this item and move on to the next
-            APSI_LOG_WARNING("Failed to read item from `" << file_.string() << "`");
+            APSI_LOG_WARNING("Failed to read item from `" << file_name_ << "`");
             continue;
         }
 
@@ -97,11 +96,12 @@ auto CSVReader::read(istream &stream) const -> pair<DBData, vector<string>>
 
 auto CSVReader::read() const -> pair<DBData, vector<string>>
 {
-    throw_if_file_invalid();
-    ifstream file(file_);
+    throw_if_file_invalid(file_name_);
+
+    ifstream file(file_name_);
     if (!file.is_open())
     {
-        APSI_LOG_ERROR("File `" << file_.string() << "` could not be opened for reading");
+        APSI_LOG_ERROR("File `" << file_name_ << "` could not be opened for reading");
         throw runtime_error("could not open file");
     }
 
@@ -141,18 +141,4 @@ pair<bool, bool> CSVReader::process_line(const string &line, string &orig_item, 
     copy(token.begin(), token.end(), back_inserter(label));
 
     return { true, !token.empty() };
-}
-
-void CSVReader::throw_if_file_invalid() const
-{
-    if (!fs::exists(file_))
-    {
-        APSI_LOG_ERROR("File `" << file_.string() << "` does not exist");
-        throw logic_error("file does not exist");
-    }
-    if (!fs::is_regular_file(file_))
-    {
-        APSI_LOG_ERROR("File `" << file_.string() << "` is not a regular file");
-        throw logic_error("invalid file");
-    }
 }

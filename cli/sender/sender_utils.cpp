@@ -4,10 +4,12 @@
 // STD
 #include <vector>
 #include <utility>
+#include <fstream>
 
 // APSI
 #include "sender/sender_utils.h"
 #include "apsi/logging/log.h"
+#include "common/common_utils.h"
 
 // SEAL
 #include "seal/modulus.h"
@@ -17,48 +19,36 @@ using namespace seal;
 using namespace apsi;
 using namespace apsi::logging;
 
-unique_ptr<PSIParams> build_psi_params(const CLP& cmd)
+unique_ptr<PSIParams> build_psi_params(const CLP &cmd)
 {
-    PSIParams::ItemParams item_params;
-    item_params.felts_per_item = cmd.felts_per_item();
+    string params_json;
 
-    PSIParams::TableParams table_params;
-    table_params.table_size = cmd.table_size();
-    table_params.max_items_per_bin = cmd.max_items_per_bin();
-    table_params.hash_func_count = cmd.hash_func_count();
+    try {
+        throw_if_file_invalid(cmd.params_file());
+        fstream input_file(cmd.params_file(), ios_base::in);
 
-    PSIParams::QueryParams query_params;
-    query_params.query_powers = cmd.query_powers();
-
-    PSIParams::SEALParams seal_params;
-    try
-    {
-        seal_params.set_poly_modulus_degree(cmd.poly_modulus_degree());
-        seal_params.set_coeff_modulus(
-            CoeffModulus::Create(seal_params.poly_modulus_degree(), cmd.coeff_modulus_bits()));
-        if (!cmd.plain_modulus().is_zero())
-        {
-            seal_params.set_plain_modulus(cmd.plain_modulus());
+        if (!input_file.is_open()) {
+            APSI_LOG_ERROR("File " << cmd.params_file() << " could not be open for reading.");
+            throw runtime_error("Could not open params file");
         }
-        else
-        {
-            seal_params.set_plain_modulus(
-                PlainModulus::Batching(seal_params.poly_modulus_degree(), cmd.plain_modulus_bits()));
+
+        string line;
+        while (getline(input_file, line)) {
+            params_json.append(line);
+            params_json.append("\n");
         }
-    }
-    catch (const exception &ex)
-    {
-        APSI_LOG_ERROR("Microsoft SEAL threw an exception creating SEALParams: " << ex.what());
+
+        input_file.close();
+    } catch (const exception &ex) {
+        APSI_LOG_ERROR(
+            "Error trying to read input file " << cmd.params_file() << ": " << ex.what());
         return nullptr;
     }
 
     unique_ptr<PSIParams> params;
-    try
-    {
-        params = make_unique<PSIParams>(item_params, table_params, query_params, seal_params);
-    }
-    catch (const exception &ex)
-    {
+    try {
+        params = make_unique<PSIParams>(PSIParams::Load(params_json));
+    } catch (const exception &ex) {
         APSI_LOG_ERROR("APSI threw an exception creating PSIParams: " << ex.what());
         return nullptr;
     }
