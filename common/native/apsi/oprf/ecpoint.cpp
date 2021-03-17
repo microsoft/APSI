@@ -27,7 +27,7 @@ namespace apsi
         {
             void random_scalar(ECPoint::scalar_span_type value)
             {
-                random_bytes(reinterpret_cast<seal_byte*>(value.data()), value.size());
+                seal::random_bytes(reinterpret_cast<seal_byte*>(value.data()), value.size());
                 modulo_order(reinterpret_cast<digit_t *>(value.data()), reinterpret_cast<digit_t *>(value.data()));
             }
 
