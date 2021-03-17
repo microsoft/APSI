@@ -29,7 +29,6 @@ install(
 )
 
 add_subdirectory(fourq)
-add_subdirectory(logging)
 add_subdirectory(network)
 add_subdirectory(oprf)
 add_subdirectory(util)
