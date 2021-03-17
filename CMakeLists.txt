@@ -84,6 +84,7 @@ include(GNUInstallDirs)
 # Source tree
 set(APSI_CONFIG_IN_FILENAME ${CMAKE_CURRENT_LIST_DIR}/cmake/APSIConfig.cmake.in)
 set(APSI_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}) # TODO: remove this
+set(APSI_CONFIG_H_IN_FILENAME ${CMAKE_CURRENT_LIST_DIR}/common/native/apsi/config.h.in) # TODO: change this
 
 # Build tree
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/${OUTLIB_PATH})
@@ -92,6 +93,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin)
 set(APSI_TARGETS_FILENAME ${CMAKE_CURRENT_BINARY_DIR}/cmake/APSITargets.cmake)
 set(APSI_CONFIG_FILENAME ${CMAKE_CURRENT_BINARY_DIR}/cmake/APSIConfig.cmake)
 set(APSI_CONFIG_VERSION_FILENAME ${CMAKE_CURRENT_BINARY_DIR}/cmake/APSIConfigVersion.cmake)
+set(APSI_CONFIG_H_FILENAME ${CMAKE_CURRENT_BINARY_DIR}/common/native/apsi/config.h) # TODO: change this
 
 # Install
 set(APSI_CONFIG_INSTALL_DIR ${CMAKE_INSTALL_LIBDIR}/cmake/APSI-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
@@ -104,18 +106,35 @@ set(APSI_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/APSI-${APSI_VERSION_MA
 # External Dependencies #
 #########################
 # TODO: Do we care if vcpkg is not used?
+# TODO: DO we want to hide vcpkg variables and dep dirs from ccmake?
+# TODO: "xxx: not found" won't print, because CMake Error at vcpkg.cmake occurs first!
 
 # Microsoft SEAL
-find_package(SEAL 3.6.3 REQUIRED)
+find_package(SEAL 3.6 QUIET REQUIRED) # TODO: Do we truly need 3.6.3?
+if(NOT SEAL_FOUND)
+    message(FATAL_ERROR "Microsoft SEAL: not found")
+else()
+    message(STATUS "Microsoft SEAL: found")
+endif()
 
 # Microsoft Kuku
-find_package(Kuku 2.1 REQUIRED)
+find_package(Kuku 2.1 QUIET REQUIRED)
+if(NOT Kuku_FOUND)
+    message(FATAL_ERROR "Microsoft Kuku: not found")
+else()
+    message(STATUS "Microsoft Kuku: found")
+endif()
 
-# Flatbuffers: for serialization
+# Flatbuffers
 find_package(Flatbuffers REQUIRED)
-get_target_property(FLATBUFFERS_FLATC_PATH flatbuffers::flatc IMPORTED_LOCATION_RELEASE)
-message(STATUS "flatc path: ${FLATBUFFERS_FLATC_PATH}")
-include(CompileSchemaCXX)
+if(NOT Flatbuffers_FOUND)
+    message(FATAL_ERROR "Flatbuffers: not found")
+else()
+    message(STATUS "Flatbuffers: found")
+    get_target_property(FLATBUFFERS_FLATC_PATH flatbuffers::flatc IMPORTED_LOCATION_RELEASE)
+    message(STATUS "    flatc path: ${FLATBUFFERS_FLATC_PATH}")
+    include(CompileSchemaCXX)
+endif()
 
 # [Option] APSI_USE_LOG4CPLUS (default: ON)
 set(APSI_USE_LOG4CPLUS_OPTION_STR "Use Log4cplus for logging")
@@ -123,6 +142,11 @@ option(APSI_USE_LOG4CPLUS ${APSI_USE_LOG4CPLUS_OPTION_STR} ON)
 if(APSI_USE_LOG4CPLUS)
     # Log4cplus
     find_package(log4cplus REQUIRED)
+    if(NOT log4cplus_FOUND)
+        message(FATAL_ERROR "log4cplus: not found")
+    else()
+        message(STATUS "log4cplus: found")
+    endif()
 endif()
 
 # [Option] APSI_USE_ZMQ (default: ON)
@@ -131,8 +155,18 @@ option(APSI_USE_ZMQ ${APSI_USE_ZMQ_OPTION_STR} ON)
 if(APSI_USE_ZMQ)
     # ZeroMQ base
     find_package(ZeroMQ REQUIRED)
+    if(NOT ZeroMQ_FOUND)
+        message(FATAL_ERROR "ZeroMQ: not found")
+    else()
+        message(STATUS "ZeroMQ: found")
+    endif()
     # cppzmq wrapper
     find_package(cppzmq REQUIRED)
+    if(NOT cppzmq_FOUND)
+        message(FATAL_ERROR "cppzmq: not found")
+    else()
+        message(STATUS "cppzmq: found")
+    endif()
 endif()
 
 # [Option] APSI_BUILD_TESTS (default: ON)
@@ -141,6 +175,11 @@ option(APSI_BUILD_TESTS ${APSI_BUILD_TESTS_OPTION_STR} ON)
 if(APSI_BUILD_TESTS)
     # Google Test
     find_package(GTest CONFIG REQUIRED)
+    if(NOT GTest_FOUND)
+        message(FATAL_ERROR "GTest: not found")
+    else()
+        message(STATUS "GTest: found")
+    endif()
 endif()
 
 # [Option] APSI_BUILD_CLI (default: ON)
@@ -149,6 +188,12 @@ cmake_dependent_option(APSI_BUILD_CLI ${APSI_BUILD_CLI_OPTION_STR} ON "APSI_USE_
 if (APSI_BUILD_CLI)
     # TCLAP
     find_path(TCLAP_INCLUDE_DIRS "tclap/Arg.h")
+    if(TCLAP_INCLUDE_DIRS STREQUAL "TCLAP_INCLUDE_DIRS-NOTFOUND")
+        message(FATAL_ERROR "TCLAP: not found")
+    else()
+        message(STATUS "TCLAP: found")
+        message(STATUS "    TCLAP_INCLUDE_DIRS: ${TCLAP_INCLUDE_DIRS}")
+    endif()
 endif()
 
 ####################
@@ -165,21 +210,45 @@ if(BUILD_SHARED_LIBS)
 endif()
 
 # TODO: what is the new filesystem structure?
+
 # Add source files to library and header files to install
-#set(APSI_SOURCE_FILES "")
-#add_subdirectory(???)
-
-#add_library(apsi STATIC)
-#add_subdirectory()
-
-
-add_library(common STATIC)
+# TODO: combine into a single variable
+set(APSI_COMMON_SOURCE_FILES "")
 add_subdirectory(common/native/apsi)
+set(APSI_RECEIVER_SOURCE_FILES "")
+add_subdirectory(receiver/native/apsi)
+set(APSI_SENDER_SOURCE_FILES "")
+add_subdirectory(sender/native/apsi)
+
+# Create the config file
+configure_file(${APSI_CONFIG_H_IN_FILENAME} ${APSI_CONFIG_H_FILENAME})
+install(
+    FILES ${APSI_CONFIG_H_FILENAME}
+    DESTINATION ${APSI_INCLUDES_INSTALL_DIR}/apsi)
+
+add_library(common STATIC ${APSI_COMMON_SOURCE_FILES})
 set_target_properties(common PROPERTIES OUTPUT_NAME apsi_common-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
 apsi_set_language(common)
 target_include_directories(common PUBLIC
     $<BUILD_INTERFACE:${APSI_SOURCE_DIR}/common/native>
     $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
+target_include_directories(common PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/common/native>
+    $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
+apsi_set_version(common)
+apsi_link_threads(common)
+apsi_install_target(common APSITargets)
+
+target_link_libraries(common
+    PUBLIC SEAL::seal
+    PUBLIC Kuku::kuku
+    PUBLIC flatbuffers::flatbuffers)
+if (APSI_USE_LOG4CPLUS)
+    target_link_libraries(common PUBLIC log4cplus::log4cplus)
+endif()
+if(APSI_USE_ZMQ)
+    target_link_libraries(common PUBLIC libzmq-static cppzmq-static)
+endif()
 
 # TODO: move this block into a module
 include(FindAVX)
@@ -206,28 +275,13 @@ if (NOT MSVC)
     target_compile_options(common PUBLIC -D__LINUX__)
     target_compile_options(common PUBLIC -march=native)
 endif()
-
-apsi_set_version(common)
-apsi_link_threads(common)
-apsi_install_target(common APSITargets)
-
-target_link_libraries(common
-    PUBLIC SEAL::seal
-    PUBLIC Kuku::kuku
-    PUBLIC flatbuffers::flatbuffers)
-if (APSI_USE_LOG4CPLUS)
-    target_link_libraries(common PUBLIC log4cplus::log4cplus)
-endif()
-if(APSI_USE_ZMQ)
-    target_link_libraries(common PUBLIC libzmq-static cppzmq-static)
-endif()
+# TODO: end of block
 
 #############################
 # APSI receiver C++ library #
 #############################
 
-add_library(receiver STATIC)
-add_subdirectory(receiver/native/apsi)
+add_library(receiver STATIC ${APSI_RECEIVER_SOURCE_FILES})
 set_target_properties(receiver PROPERTIES OUTPUT_NAME apsi_receiver-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
 apsi_set_language(receiver)
 target_include_directories(receiver PUBLIC
@@ -243,8 +297,7 @@ target_link_libraries(receiver PUBLIC common)
 # APSI sender C++ library #
 ###########################
 
-add_library(sender STATIC)
-add_subdirectory(sender/native/apsi)
+add_library(sender STATIC ${APSI_SENDER_SOURCE_FILES})
 set_target_properties(sender PROPERTIES OUTPUT_NAME apsi_sender-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
 apsi_set_language(sender)
 target_include_directories(sender PUBLIC

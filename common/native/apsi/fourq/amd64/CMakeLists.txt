@@ -1,16 +1,19 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
-target_sources(common
-    PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/consts.c
-        ${CMAKE_CURRENT_LIST_DIR}/fp2_1271_AVX2.S
-        ${CMAKE_CURRENT_LIST_DIR}/fp2_1271.S
+# Source files in this directory
+set(APSI_COMMON_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES}
+    ${CMAKE_CURRENT_LIST_DIR}/consts.c
+    ${CMAKE_CURRENT_LIST_DIR}/fp2_1271_AVX2.S
+    ${CMAKE_CURRENT_LIST_DIR}/fp2_1271.S
 )
 
+# Add header files for installation
 install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/fp_x64.h
     DESTINATION
-        ${PROJECT_INCLUDES_INSTALL_DIR}/apsi/fourq/amd64
+        ${APSI_INCLUDES_INSTALL_DIR}/apsi/fourq/amd64
 )
+
+set(APSI_COMMON_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES} PARENT_SCOPE)

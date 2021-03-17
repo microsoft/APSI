@@ -1,16 +1,17 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
-target_sources(common
-    PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/interpolate.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/label_encryptor.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/db_encoding.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/stopwatch.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/thread_pool_mgr.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
+# Source files in this directory
+set(APSI_COMMON_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES}
+    ${CMAKE_CURRENT_LIST_DIR}/interpolate.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/label_encryptor.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/db_encoding.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/stopwatch.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/thread_pool_mgr.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
 )
 
+# Add header files for installation
 install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/interpolate.h
@@ -21,5 +22,7 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/thread_pool_mgr.h
         ${CMAKE_CURRENT_LIST_DIR}/utils.h
     DESTINATION
-        ${PROJECT_INCLUDES_INSTALL_DIR}/apsi/util
+        ${APSI_INCLUDES_INSTALL_DIR}/apsi/util
 )
+
+set(APSI_COMMON_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES} PARENT_SCOPE)

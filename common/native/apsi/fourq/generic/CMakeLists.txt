@@ -1,14 +1,17 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
-target_sources(common
-    PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/fp.h
+# Source files in this directory
+set(APSI_COMMON_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES}
+    ${CMAKE_CURRENT_LIST_DIR}/fp.h # TODO: mistake?
 )
 
+# Add header files for installation
 install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/fp.h
     DESTINATION
-        ${PROJECT_INCLUDES_INSTALL_DIR}/apsi/fourq/generic
+        ${APSI_INCLUDES_INSTALL_DIR}/apsi/fourq/generic
 )
+
+set(APSI_COMMON_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES} PARENT_SCOPE)
