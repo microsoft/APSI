@@ -1,4 +1,10 @@
-# APSI Library
+# APSI: C++ library for Asymmetric PSI
+
+## WARNING: This is research code
+
+This library is research code and is not intended for production use.
+There may be serious bugs or other issues that can put your sensitive data at risk.
+If that does not scare you and you are happy using this at your own risk, read on.
 
 ## Terminology
 
@@ -170,26 +176,25 @@ Unfortunately, the above approach reveals more than whether there is a match:
 These are significant issues and unacceptable.
 
 The solution is to use an *Oblivious Pseudo-Random Function*, or *OPRF* for short.
-An OPRF can be thought of as a keyed hash function `Hash-OPRF(s, -)` that only the sender knows; here `s` denotes the sender's key.
-Further, the receiver can obtain `Hash-OPRF(s, X)` without learning the function `Hash-OPRF(s, -)` or the key `s`, and without the sender learning `X`.
+An OPRF can be thought of as a keyed hash function `OPRF(s, -)` that only the sender knows; here `s` denotes the sender's key.
+Further, the receiver can obtain `OPRF(s, X)` without learning the function `OPRF(s, -)` or the key `s`, and without the sender learning `X`.
 
 The way to do this is simple.
 The receiver hashes its item `X` to an elliptic curve point `A` in some cryptographically secure elliptic curve.
 Next, the receiver chooses a secret number `r`, computes the point `B = rA`, and sends it to the sender.
 The sender uses its secret `s` to compute `C = sB`, and sends it to back to the receiver.
 Upon receiving `C`, the receiver computes the inverse `r^(-1)` modulo the order of the elliptic curve, and further computes `r^(-1) C = r^(-1) srA = sA`.
-The receiver then extracts the OPRF hash value `Hash-OPRF(s, X)` from this point, for example by hashing its x-coordinate to an appropriate domain.
+The receiver then extracts the OPRF hash value `OPRF(s, X)` from this point, for example by hashing its x-coordinate to an appropriate domain.
 
-The sender knows `s`, so it can simply replace its items `{Y_i}` with `{Hash-OPRF(s, Y_i)}`.
-The receiver needs to communicate with the sender to obtain `{Hash-OPRF(s, X_i)}`.
-And once the receiver has received these values, the protocol can proceed as described above.
+The sender knows `s`, so it can simply replace its items `{Y_i}` with `{OPRF(s, Y_i)}`.
+The receiver needs to communicate with the sender to obtain `{OPRF(s, X_i)}`; once the receiver has received these values, the protocol can proceed as described above.
 With OPRF, the problem of the receiver learning whether parts of its query matched goes away.
 Since all the items are hashed with a hash function known only by the sender, the receiver will benefit nothing from learning parts of the sender's hashed items.
 In fact, the sender's dataset is not private information and could in principle be sent in full to the receiver.
 Homomorphic encryption only protects the receiver's data.
 
-There is one further detail that must be mentioned here: instead of using `{Hash-OPRF(s, X_i)}` as the items, we apply one more public cryptographic hash function `Hash-item(-)` with a 128-bit output to the OPRF hashed items, and use `{Hash-item(Hash-OPRF(s, X_i))}` instead as the items.
-The reason for this will be given later in [Label Encryption](#label-encryption).
+There is one further detail that must be mentioned here. We choose `OPRF(s, -)` to have a 256-bit output and denote its first 128 bits by `ItemHash(s, -)`.
+Instead of `{OPRF(s, X_i)}` we use `{ItemHash(s, X_i)}` as the items; the reason will be given later in [Label Encryption](#label-encryption).
 
 ### Practice
 
@@ -392,27 +397,41 @@ The receiver decrypts the results and concatenates them to recover the label for
 #### Label Encryption
 
 There is a serious issue with the above approach that must be resolved.
-Recall how we used [OPRF](#oprf) to prevent partial (or full) leakage of the sender's items to the receiver: given an item `Y`, the matching polynomial is not actually computed for `Y` itself, but rather for `Hash-item(Hash-OPRF(s, Y))`, where `Hash-item` is some public cryptographic hash function and the OPRF key `s` is only known by the sender.
-This means that the label interpolation polynomial `L` should actually have the property that `L(Hash-item(Hash-OPRF(s, Y_i))) = V_i` for each of the sender's items `Y_i`.
-However, if the receiver can guess a part of some `Hash-item(Hash-OPRF(s, Y_i))`, it can use it to query for the corresponding part of the label for that item, which is clearly unacceptable since the receiver does not actually know the item `Y_i`.
+Recall how we used [OPRF](#oprf) to prevent partial (or full) leakage of the sender's items to the receiver: given an item `Y`, the matching polynomial is not actually computed for `Y` itself, but rather for `ItemHash(s, Y)`, which denoted the first 128 bits of the item's OPRF value `OPRF(s, Y)`.
+This means that the label interpolation polynomial `L` should actually have the property that `L(ItemHash(s, Y_i)) = V_i` for each of the sender's items `Y_i`.
+However, if the receiver can guess a part of some `ItemHash(s, Y_i)` it can use it to query for the corresponding part of the label for that item, which is unacceptable since the receiver does not actually know the item `Y_i`.
 
-To solve this issue, the sender uses a symmetric encryption scheme `Enc(-, -)` to encrypt the labels `V_i` using keys derived from `Hash-OPRF(s, Y_i)`.
-In other words, instead of `V_i`, it uses `Enc(HKDF(Hash-OPRF(s, Y_i)), V_i)` as the labels, and proceeds as before; `HKDF(-)` denotes a hash-based key derivation function.
+To solve this issue, the sender uses a symmetric encryption function `Enc(<input>, <key>, <nonce>)` to encrypt the labels `V_i` using keys derived from `OPRF(s, Y_i)`.
+Specifically, as the encryption key `LabelKey(s, Y_i)` for the label `V_i` corresponding to an item `Y_i` we use the remaining 128 bits of the 256-bit output of `OPRF(s, Y_i)`, so the label we must communicate to the receiver becomes `Enc(V_i, LabelKey(s, Y_i), nonce)`.
+
+There is still a bit of a problem, because the receiver must somehow know the nonce as well.
+One option is to use a constant or empty nonce.
+In this case extreme care must be taken, because if an adversary can learn encryptions of two different labels for the same item with the same OPRF key `s`, then they may be able to learn information about the labels.
+This can happen, because APSI supports updating labels for items.
+Another option is to use a long randomly generated nonce &ndash; different for each encryption &ndash; which the receiver must somehow learn.
+APSI achieves this by randomly sampling a nonce, concatenating it with the encryption of `V_i`, and using the concatenation for the interpolation polynomial `L`.
+In other words, the sender samples a random nonce for each item `Y_i` and computes the label interpolation polynomial `L` such that `L(ItemHash(s, Y_i)) = nonce | Enc(V_i, LabelKey(s, Y_i), nonce)`.
 
 The receiver benefits nothing from learning parts (or all) of the encrypted label unless it also knows the original item.
-Furthermore, even if the receiver manages to obtain `Enc(HKDF(Hash-OPRF(s, Y_i)), V_i)` by guessing `Hash-item(Hash-OPRF(s, Y_i))` and in an offline attack enumerates all possible items `Y_i`, or later learns `Y_i` through other means, it still cannot obtain the label because the encryption key is derived from `Hash-OPRF(s, Y_i))` &ndash; not just from `Y_i`.
+Furthermore, even if the receiver manages to obtain `nonce | Enc(V_i, LabelKey(s, Y_i), nonce)` by guessing `ItemHash(s, Y_i)`, and in an offline attack enumerates all possible items `Y_i` (or later learns `Y_i` through other means), it still cannot obtain the label because `LabelKey(s, Y_i)` is derived from `OPRF(s, Y_i)` &ndash; not just from `Y_i`.
+Of course at this later point the sender may decide to serve a normal query to the receiver for `Y_i`, in which case the receiver will learn `V_i`, as it is supposed to.
+
+APSI allows the sender can specify the nonce size in bytes.
+The default nonce size is set to 16 bytes, but expert users who fully understand the issue may want to use smaller values to achieve improved performance.
 
 #### Partial Item Collisions
 
 There is one last subtle issue that must be addressed.
 Recall from [Practice](#practice) how the sender constructs a large hash table and breaks it into a jagged array of bin bundles.
 In the labeled mode each bin bundle holds not only the item parts in it, but also the corresponding label parts, and the label interpolation polynomials, as described above.
+The interpolation polynomials are not created for the entire label at a time, but for each part separately, although the encryption is applied to the full item before decomposing it into parts.
 
-Now consider what happens when, by pure chance, `item416-part1` and `item12-part1` (as in [Practice](#practice)) are the same.
-If the corresponding label parts `label416-part1` and `label12-part1` are different, it will be impossible to create a label interpolation polynomial `L`.
+Now consider what happens when &ndash; by change &ndash; `item416-part1` and `item12-part1` (as in [Practice](#practice)) are the same.
+If the corresponding label parts `label416-part1` and `label12-part1` are different, it will be impossible to create a label interpolation polynomial `L`, as it cannot output both `label416-part1` and `label12-part1` on the corresponding item part.
 
-This issue is resolved by checking, before inserting an item into a bin bundle, that its parts do not already appear in the same locations.
+This issue is resolved by checking that label parts do not already appear in the same locations before inserting an item into a bin bundle.
 If any of them does, the item simply cannot be inserted into that bin bundle, and a new bin bundle for the same bundle index must be created.
+Note that the problem exists only in the labeled mode and can lead to worse *packing rate* (`items_inserted / theoretical_max`) than in unlabeled mode, where no such limitation exists.
 
 ## Using APSI
 
