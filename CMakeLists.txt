@@ -245,7 +245,8 @@ apsi_install_target(common APSITargets)
 target_link_libraries(common
     PUBLIC SEAL::seal
     PUBLIC Kuku::kuku
-    PUBLIC flatbuffers::flatbuffers)
+    PUBLIC flatbuffers::flatbuffers
+    PUBLIC jsoncpp_static)
 if (APSI_USE_LOG4CPLUS)
     target_link_libraries(common PUBLIC log4cplus::log4cplus)
 endif()
