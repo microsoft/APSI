@@ -9,7 +9,7 @@
 #include <utility>
 
 // APSI
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 #include "apsi/plaintext_powers.h"
 #include "apsi/util/utils.h"
 

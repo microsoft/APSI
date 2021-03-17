@@ -13,7 +13,7 @@
 #pragma warning(pop)
 
 // APSI
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 
 /**
 Command line processor based on TCLAP. This is a base class that contains common arguments for both parties.
@@ -29,7 +29,7 @@ public:
         log_level_arg_ = std::make_unique<TCLAP::ValueArg<std::string>>(
             "l",
             "logLevel",
-            "Level for application logging",
+            "One of \"all\", \"debug\", \"info\" (default), \"warning\", \"error\", \"off\"",
             false,
             "info",
             log_level_constraint_.get(),
@@ -64,7 +64,7 @@ public:
         TCLAP::ValueArg<std::string> logfile_arg(
             "f",
             "logFile",
-            "File where logs will be written to",
+            "Log file path",
             false,
             "",
             "file path"
@@ -74,7 +74,7 @@ public:
         TCLAP::SwitchArg silent_arg(
             "s",
             "silent",
-            "Do not output anything to console",
+            "Do not write output to console",
             false);
         add(silent_arg);
 
@@ -92,9 +92,9 @@ public:
             threads_ = threads_arg.getValue();
             log_level_ = log_level_arg_->getValue();
 
-            apsi::logging::Log::SetConsoleDisabled(silent_);
-            apsi::logging::Log::SetLogFile(log_file_);
-            apsi::logging::Log::SetLogLevel(log_level_);
+            apsi::Log::SetConsoleDisabled(silent_);
+            apsi::Log::SetLogFile(log_file_);
+            apsi::Log::SetLogLevel(log_level_);
 
             get_args();
         }

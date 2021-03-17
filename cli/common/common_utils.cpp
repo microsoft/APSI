@@ -13,7 +13,7 @@
 
 // APSI
 #include "common/base_clp.h"
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 #include "apsi/psi_params.h"
 #include "apsi/util/utils.h"
 

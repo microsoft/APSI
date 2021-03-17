@@ -8,7 +8,7 @@
 
 // APSI
 #include "apsi/item.h"
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 #include "apsi/network/result_package.h"
 #include "apsi/network/sender_operation.h"
 #include "apsi/network/result_package_generated.h"

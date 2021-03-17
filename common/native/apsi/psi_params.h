@@ -12,7 +12,7 @@
 #include <set>
 
 // APSI
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 #include "apsi/util/utils.h"
 
 // Kuku

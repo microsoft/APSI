@@ -8,7 +8,7 @@
 
 // APSI
 #include "apsi/zmq/sender_dispatcher.h"
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/requests.h"
 
@@ -22,7 +22,6 @@ using namespace seal::util;
 namespace apsi
 {
     using namespace network;
-    using namespace logging;
     using namespace oprf;
 
     namespace sender

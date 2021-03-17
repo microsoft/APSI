@@ -7,7 +7,7 @@
 #include <utility>
 
 // APSI
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 #include "apsi/network/stream_channel.h"
 #include "apsi/network/sop_header_generated.h"
 #include "apsi/network/sop_generated.h"

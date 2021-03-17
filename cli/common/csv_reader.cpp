@@ -11,7 +11,7 @@
 
 // APSI
 #include "common/csv_reader.h"
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 
 using namespace std;
 namespace fs = std::filesystem;

@@ -4,15 +4,16 @@
 target_sources(common
     PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/item.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/log.cpp
         ${CMAKE_CURRENT_LIST_DIR}/powers.cpp
         ${CMAKE_CURRENT_LIST_DIR}/psi_params.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/thread_pool_mgr.cpp
 )
 
 # TODO: move output to build tree
 # Create the config file
 configure_file(${CMAKE_CURRENT_LIST_DIR}/config.h.in ${CMAKE_CURRENT_LIST_DIR}/config.h)
 
-add_subdirectory(logging)
 add_subdirectory(network)
 add_subdirectory(util)
 add_subdirectory(oprf)
@@ -25,11 +26,13 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/config.h
         ${CMAKE_CURRENT_LIST_DIR}/crypto_context.h
         ${CMAKE_CURRENT_LIST_DIR}/item.h
+        ${CMAKE_CURRENT_LIST_DIR}/log.h
         ${CMAKE_CURRENT_LIST_DIR}/powers.h
         ${CMAKE_CURRENT_LIST_DIR}/psi_params.h
         ${CMAKE_CURRENT_LIST_DIR}/requests.h
         ${CMAKE_CURRENT_LIST_DIR}/responses.h
         ${CMAKE_CURRENT_LIST_DIR}/seal_object.h
+        ${CMAKE_CURRENT_LIST_DIR}/thread_pool_mgr.h
         ${CMAKE_CURRENT_LIST_DIR}/version.h
     DESTINATION
         ${PROJECT_INCLUDES_INSTALL_DIR}/apsi

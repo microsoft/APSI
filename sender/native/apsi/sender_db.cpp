@@ -15,7 +15,7 @@
 #include "apsi/util/db_encoding.h"
 #include "apsi/util/label_encryptor.h"
 #include "apsi/util/utils.h"
-#include "apsi/util/thread_pool_mgr.h"
+#include "apsi/thread_pool_mgr.h"
 
 // Kuku
 #include "kuku/locfunc.h"
@@ -32,7 +32,6 @@ using namespace kuku;
 namespace apsi
 {
     using namespace util;
-    using namespace logging;
 
     namespace sender
     {
@@ -560,7 +559,7 @@ namespace apsi
             crypto_context_.set_evaluator();
 
             // Reset the SenderDB data structures
-            clear_db();
+            clear();
         }
 
         SenderDB::SenderDB(SenderDB &&source) :
@@ -579,7 +578,7 @@ namespace apsi
             source.oprf_key_ = oprf::OPRFKey();
 
             // Reset the source data structures
-            source.clear_db_internal();
+            source.clear_internal();
         }
 
         SenderDB &SenderDB::operator =(SenderDB &&source)
@@ -608,7 +607,7 @@ namespace apsi
             source.oprf_key_ = oprf::OPRFKey();
 
             // Reset the source data structures
-            source.clear_db_internal();
+            source.clear_internal();
 
             return *this;
         }
@@ -639,7 +638,7 @@ namespace apsi
             return max_item_count ? static_cast<double>(item_count) / max_item_count : 0.0;
         }
 
-        void SenderDB::clear_db_internal()
+        void SenderDB::clear_internal()
         {
             // Assume the SenderDB is already locked for writing
 
@@ -651,7 +650,7 @@ namespace apsi
             bin_bundles_.resize(params_.bundle_idx_count());
         }
 
-        void SenderDB::clear_db()
+        void SenderDB::clear()
         {
             if (hashed_items_.size())
             {
@@ -661,7 +660,7 @@ namespace apsi
             // Lock the database for writing
             auto lock = get_writer_lock();
 
-            clear_db_internal();
+            clear_internal();
         }
 
         void SenderDB::regenerate_caches()

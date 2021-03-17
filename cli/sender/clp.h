@@ -141,7 +141,7 @@ private:
     TCLAP::ValueArg<std::uint32_t> table_size_arg_ = TCLAP::ValueArg<std::uint32_t>(
         "T",
         "tableSize",
-        "Size of the hash table to use",
+        "Size of the cuckoo hash table",
         true,
         0,
         "unsigned integer");
@@ -157,7 +157,7 @@ private:
     TCLAP::ValueArg<std::uint32_t> hash_func_count_arg_ = TCLAP::ValueArg<std::uint32_t>(
         "H",
         "hashFuncCount",
-        "Maximum number of items allowed in a bin",
+        "Number of hash functions to use for cuckoo hashing",
         true,
         0,
         "unsigned integer");
@@ -165,14 +165,14 @@ private:
     TCLAP::MultiArg<std::uint32_t> query_powers_arg_ = TCLAP::MultiArg<std::uint32_t>(
         "w",
         "queryPowers",
-        "Query powers to send in addition to 1",
+        "A power of the query to send from receiver to sender (in addition to the first power)",
         false,
-        "unsigned integer");
+        "unsigned integer (can be specified multiple times)");
 
     TCLAP::ValueArg<std::size_t> poly_modulus_degree_arg_ = TCLAP::ValueArg<std::size_t>(
         "P",
         "polyModulusDegree",
-        "Degree of the polynomial modulus for Microsoft SEAL encryption",
+        "Microsoft SEAL `poly_modulus_degree` parameter",
         true,
         0,
         "unsigned integer");
@@ -180,14 +180,14 @@ private:
     TCLAP::MultiArg<int> coeff_modulus_bits_arg_ = TCLAP::MultiArg<int>(
         "C",
         "coeffModulusBits",
-        "Bit sizes for coefficient modulus primes for Microsoft SEAL encryption",
+        "Bit count for a single Microsoft SEAL `coeff_modulus` prime",
         true,
-        "list of unsigned integers");
+        "unsigned integer (can be specified multiple times)");
 
     TCLAP::ValueArg<int> plain_modulus_bits_arg_ = TCLAP::ValueArg<int>(
         "a",
         "plainModulusBits",
-        "Bit size for plaintext modulus prime for Microsoft SEAL encryption",
+        "Bit count for a Microsoft SEAL `plain_modulus` prime (cannot be used with `-A`)",
         true,
         0,
         "unsigned integer");
@@ -195,7 +195,7 @@ private:
     TCLAP::ValueArg<std::uint64_t> plain_modulus_arg_ = TCLAP::ValueArg<std::uint64_t>(
         "A",
         "plainModulus",
-        "Plaintext modulus prime for Microsoft SEAL encryption",
+        "Microsoft SEAL `plain_modulus` prime (cannot be used with `-a`)",
         true,
         0,
         "unsigned integer");
@@ -203,7 +203,7 @@ private:
     TCLAP::ValueArg<std::size_t> nonce_byte_count_arg_ = TCLAP::ValueArg<std::size_t>(
         "n",
         "nonceByteCount",
-        "Number of bytes used for the nonce in labeled mode",
+        "Number of bytes used for the nonce in labeled mode (default is 16)",
         false,
         16,
         "unsigned integer");
@@ -211,7 +211,7 @@ private:
     TCLAP::ValueArg<int> net_port_arg_ = TCLAP::ValueArg<int>(
         "",
         "port",
-        "Network port to bind to",
+        "TCP port to bind to (default is 1212)",
         false,
         1212,
         "TCP port"
@@ -220,7 +220,7 @@ private:
     TCLAP::ValueArg<std::string> db_file_arg_ = TCLAP::ValueArg<std::string>(
         "d",
         "dbFile",
-        "Path to a CSV file containing the database",
+        "Path to a CSV file describing the sender's dataset (an item-label pair on each row)",
         true,
         "",
         "string"

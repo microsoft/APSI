@@ -5,10 +5,10 @@
 #include <sstream>
 
 // APSI
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 #include "apsi/network/stream_channel.h"
 #include "apsi/oprf/oprf_sender.h"
-#include "apsi/util/thread_pool_mgr.h"
+#include "apsi/thread_pool_mgr.h"
 #include "apsi/receiver.h"
 #include "apsi/sender.h"
 #include "apsi/sender_db.h"
@@ -22,7 +22,6 @@ using namespace apsi::receiver;
 using namespace apsi::sender;
 using namespace apsi::network;
 using namespace apsi::util;
-using namespace apsi::logging;
 using namespace apsi::oprf;
 using namespace seal;
 
@@ -36,10 +35,10 @@ namespace APSITests
             const PSIParams &params,
             size_t num_threads)
         {
-            logging::Log::SetConsoleDisabled(true);
-            logging::Log::SetLogLevel(logging::Log::Level::info);
+            Log::SetConsoleDisabled(true);
+            Log::SetLogLevel(Log::Level::info);
 
-            ThreadPoolMgr::set_thread_count(num_threads);
+            ThreadPoolMgr::SetThreadCount(num_threads);
 
             vector<Item> sender_items;
             for (size_t i = 0; i < sender_size; i++)
@@ -129,10 +128,10 @@ namespace APSITests
             const PSIParams &params,
             size_t num_threads)
         {
-            logging::Log::SetConsoleDisabled(true);
-            logging::Log::SetLogLevel(logging::Log::Level::info);
+            Log::SetConsoleDisabled(true);
+            Log::SetLogLevel(Log::Level::info);
 
-            ThreadPoolMgr::set_thread_count(num_threads);
+            ThreadPoolMgr::SetThreadCount(num_threads);
 
             vector<pair<Item, Label>> sender_items;
             for (size_t i = 0; i < sender_size; i++)

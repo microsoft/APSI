@@ -6,7 +6,7 @@
 #include <mutex>
 
 // APSI
-#include "thread_pool_mgr.h"
+#include "apsi/thread_pool_mgr.h"
 
 using namespace std;
 using namespace apsi;
@@ -54,7 +54,7 @@ ThreadPool& ThreadPoolMgr::thread_pool() const
     return *thread_pool_;
 }
 
-void ThreadPoolMgr::set_thread_count(size_t threads)
+void ThreadPoolMgr::SetThreadCount(size_t threads)
 {
     unique_lock<mutex> lock(tp_mutex_);
 
@@ -66,7 +66,7 @@ void ThreadPoolMgr::set_thread_count(size_t threads)
     }
 }
 
-void ThreadPoolMgr::set_phys_thread_count(size_t threads)
+void ThreadPoolMgr::SetPhysThreadCount(size_t threads)
 {
     unique_lock<mutex> lock(tp_mutex_);
 
@@ -77,7 +77,7 @@ void ThreadPoolMgr::set_phys_thread_count(size_t threads)
     }
 }
 
-size_t ThreadPoolMgr::get_thread_count()
+size_t ThreadPoolMgr::GetThreadCount()
 {
     return thread_count_;
 }

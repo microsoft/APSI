@@ -12,9 +12,9 @@
 // APSI
 #include "apsi/receiver.h"
 #include "apsi/network/zmq/zmq_channel.h"
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 #include "apsi/version.h"
-#include "apsi/util/thread_pool_mgr.h"
+#include "apsi/thread_pool_mgr.h"
 #include "common/common_utils.h"
 #include "common/csv_reader.h"
 #include "receiver/clp.h"
@@ -25,7 +25,6 @@ using namespace apsi;
 using namespace apsi::util;
 using namespace apsi::receiver;
 using namespace apsi::network;
-using namespace apsi::logging;
 
 namespace {
     struct Colors {
@@ -100,7 +99,7 @@ int remote_query(const CLP& cmd)
         return -1;
     }
 
-    ThreadPoolMgr::set_thread_count(cmd.threads());
+    ThreadPoolMgr::SetThreadCount(cmd.threads());
 
     Receiver receiver(*params);
 
