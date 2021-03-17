@@ -15,7 +15,7 @@ steps:
   displayName: 'Configure vcpkg dependencies'
   inputs:
     script: |
-      ./vcpkg install libsodium zeromq[sodium] cppzmq flatbuffers gtest kuku log4cplus seal[ms-gsl,zstd,no-throw-tran] tclap jsoncpp
+      ./vcpkg install zeromq[sodium] cppzmq flatbuffers gtest kuku log4cplus seal[ms-gsl,zstd,no-throw-tran] tclap jsoncpp
     workingDirectory: '$(Build.SourcesDirectory)/vcpkg'
     failOnStderr: false
 
