@@ -14,6 +14,7 @@
 #include "apsi/network/sop_header_generated.h"
 #include "apsi/network/sop_generated.h"
 #include "apsi/network/result_package_generated.h"
+#include "apsi/fourq/random.h"
 
 // SEAL
 #include "seal/util/streambuf.h"
@@ -591,7 +592,7 @@ namespace apsi
 
             string buf;
             buf.resize(32);
-            seal::random_bytes(reinterpret_cast<seal_byte*>(buf.data()), buf.size());
+            random_bytes(reinterpret_cast<unsigned char*>(buf.data()), buf.size());
             // make sure first byte is _not_ zero, as that has a special meaning for ZeroMQ
             *buf.data() = 'A';
             socket->set(sockopt::routing_id, buf);

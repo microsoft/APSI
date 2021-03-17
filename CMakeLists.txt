@@ -110,7 +110,7 @@ set(APSI_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/APSI-${APSI_VERSION_MA
 # TODO: "xxx: not found" won't print, because CMake Error at vcpkg.cmake occurs first!
 
 # Microsoft SEAL
-find_package(SEAL 3.6.3 QUIET REQUIRED) # TODO: Do we truly need 3.6.3?
+find_package(SEAL 3.6 QUIET REQUIRED)
 if(NOT SEAL_FOUND)
     message(FATAL_ERROR "Microsoft SEAL: not found")
 else()

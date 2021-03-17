@@ -11,6 +11,7 @@
 // FourQ
 #include "apsi/fourq/FourQ_internal.h"
 #include "apsi/fourq/FourQ_api.h"
+#include "apsi/fourq/random.h"
 
 // SEAL
 #include "seal/randomgen.h"
@@ -27,7 +28,7 @@ namespace apsi
         {
             void random_scalar(ECPoint::scalar_span_type value)
             {
-                seal::random_bytes(reinterpret_cast<seal_byte*>(value.data()), value.size());
+                random_bytes(value.data(), value.size());
                 modulo_order(reinterpret_cast<digit_t *>(value.data()), reinterpret_cast<digit_t *>(value.data()));
             }
 
