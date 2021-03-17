@@ -631,6 +631,52 @@ This number is verified to be non-zero and at most as large as `PSIParams::Table
 If all of these checks pass, the `PSIParams` object is successfully created and is valid for use in APSI.
 
 #### Loading from JSON
+A `PSIParams` object can be created from JSON data. The `PSIParams::Load` method allows providing a string with JSON-formatted data that is then used to initialize a `PSIParams` object. The format of the JSON data is as follows:
+```
+// APSI parameters
+{
+    "table_params": {
+        // Number of hash functions to use
+        "hash_func_count": 3,
+        // Size of the hash table to use
+        "table_size": 512,
+        // Maximum number of items allowed in a bin
+        "max_items_per_bin": 92
+    },
+    "item_params": {
+        // Number of field elements to use per item
+        "felts_per_item": 8
+    },
+    "query_params": {
+        // Query powers to send in addition to 1
+        "query_powers": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]
+    },
+    "seal_params": {
+        // Plaintext modulus prime for Microsoft SEAL encryption
+        "plain_modulus": 40961,
+        // Degree of the polynomial modulus for Microsoft SEAL encryption
+        "poly_modulus_degree": 4096,
+        // Bit sizes for coefficient modulus primes for Microsoft SEAL encryption
+        "coeff_modulus_bits": [ 49, 40, 20 ]
+    }
+}
+```
+Note that the Microsoft SEAL `plain_modulus` parameter can be set to a specific prime, like in the example above in the `seal_params` section, or as a number of required bits for the prime which will then be computed by SEAL. In such a case, the `seal_params` section would appear as follows:
+```
+    ...
+    "seal_params": {
+        // Bit size for plaintext modulus prime for Microsoft SEAL encryption
+        "plain_modulus_bits": 24,
+        // Degree of the polynomial modulus for Microsoft SEAL encryption
+        "poly_modulus_degree": 4096,
+        // Bit sizes for coefficient modulus primes for Microsoft SEAL encryption
+        "coeff_modulus_bits": [ 49, 40, 20 ]
+    }
+    ...
+
+```
+
+
 
 ### Query Powers
 
