@@ -138,6 +138,11 @@ endif()
 
 # jsoncpp: for parameter configuration
 find_package(jsoncpp REQUIRED)
+if (NOT jsoncpp_FOUND)
+    message(FATAL_ERROR "jsoncpp: not found")
+else()
+    message(STATUS "jsoncpp: found")
+endif()
 
 # [Option] APSI_USE_LOG4CPLUS (default: ON)
 set(APSI_USE_LOG4CPLUS_OPTION_STR "Use Log4cplus for logging")
