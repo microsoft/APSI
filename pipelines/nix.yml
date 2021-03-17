@@ -6,7 +6,6 @@ steps:
     script: |
       cd $(Build.SourcesDirectory)
       git clone https://github.com/microsoft/vcpkg.git
-      cp tools/vcpkg/seal/* vcpkg/ports/seal
       cd vcpkg
       ./bootstrap-vcpkg.sh -disableMetrics
     workingDirectory: '$(Build.SourcesDirectory)'
