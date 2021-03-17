@@ -10,7 +10,7 @@
 // APSI
 #include "apsi/sender_db.h"
 #include "apsi/psi_params.h"
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 
 #include "gtest/gtest.h"
 
@@ -74,7 +74,7 @@ namespace APSITests
         SenderDB sender_db(*params, 0);        
 
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
-        sender_db.clear_db();
+        sender_db.clear();
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
 
         ASSERT_FALSE(sender_db.get_crypto_context().encryptor());
@@ -109,7 +109,7 @@ namespace APSITests
         ASSERT_EQ(16, sender_db.get_nonce_byte_count());
 
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
-        sender_db.clear_db();
+        sender_db.clear();
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
 
         ASSERT_FALSE(sender_db.get_crypto_context().encryptor());
@@ -147,7 +147,7 @@ namespace APSITests
         ASSERT_TRUE(sender_db.has_item(Item(0, 0)));
 
         // Clear and check that items were removed
-        sender_db.clear_db();
+        sender_db.clear();
         ASSERT_TRUE(sender_db.get_hashed_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
         ASSERT_FALSE(sender_db.has_item(Item(0, 0)));
@@ -176,7 +176,7 @@ namespace APSITests
         ASSERT_THROW(auto cache = sender_db.get_cache_at(bundle_idx_count), out_of_range);
 
         // Clear and check that items were removed
-        sender_db.clear_db();
+        sender_db.clear();
         ASSERT_TRUE(sender_db.get_hashed_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
     }
@@ -214,7 +214,7 @@ namespace APSITests
         ASSERT_FALSE(sender_db.has_item(Item(1000, 1001)));
 
         // Clear and check that items were removed
-        sender_db.clear_db();
+        sender_db.clear();
         ASSERT_TRUE(sender_db.get_hashed_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
         for (auto &item : items)
@@ -247,7 +247,7 @@ namespace APSITests
         ASSERT_THROW(auto cache = sender_db.get_cache_at(bundle_idx_count), out_of_range);
 
         // Clear and check that items were removed
-        sender_db.clear_db();
+        sender_db.clear();
         ASSERT_TRUE(sender_db.get_hashed_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
     }
@@ -292,7 +292,7 @@ namespace APSITests
         ASSERT_EQ(create_label(1, 20), label);
 
         // Clear and check that items were removed
-        sender_db.clear_db();
+        sender_db.clear();
         ASSERT_TRUE(sender_db.get_hashed_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
         ASSERT_TRUE(sender_db.get_hashed_items().empty());
@@ -338,7 +338,7 @@ namespace APSITests
         ASSERT_FALSE(sender_db.has_item(Item(1000, 1001)));
 
         // Clear and check that items were removed
-        sender_db.clear_db();
+        sender_db.clear();
         ASSERT_TRUE(sender_db.get_hashed_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
         for (auto &item : items)
@@ -373,7 +373,7 @@ namespace APSITests
         ASSERT_THROW(auto cache = sender_db.get_cache_at(bundle_idx_count), out_of_range);
 
         // Clear and check that items were removed
-        sender_db.clear_db();
+        sender_db.clear();
         ASSERT_TRUE(sender_db.get_hashed_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
     }
@@ -441,7 +441,7 @@ namespace APSITests
         }
 
         // Now remove all
-        sender_db.clear_db();
+        sender_db.clear();
 
         // No BinBundles should be left at this time
         ASSERT_TRUE(sender_db.get_hashed_items().empty());

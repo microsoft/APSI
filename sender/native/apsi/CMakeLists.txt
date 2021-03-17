@@ -1,19 +1,15 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
-target_sources(sender
-    PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/bin_bundle.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/query.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/sender.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/sender_db.cpp
+# Source files in this directory
+set(APSI_SENDER_SOURCE_FILES ${APSI_SENDER_SOURCE_FILES}
+    ${CMAKE_CURRENT_LIST_DIR}/bin_bundle.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/query.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/sender.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/sender_db.cpp
 )
 
-if(APSI_USE_ZMQ)
-    add_subdirectory(zmq)
-    add_subdirectory(util)
-endif()
-
+# Add header files for installation
 install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/bin_bundle.h
@@ -21,5 +17,11 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/sender.h
         ${CMAKE_CURRENT_LIST_DIR}/sender_db.h
     DESTINATION
-        ${PROJECT_INCLUDES_INSTALL_DIR}/apsi
+        ${APSI_INCLUDES_INSTALL_DIR}/apsi
 )
+
+if(APSI_USE_ZMQ)
+    add_subdirectory(util) # TODO: why does util depends on zmq?
+    add_subdirectory(zmq)
+endif()
+set(APSI_SENDER_SOURCE_FILES ${APSI_SENDER_SOURCE_FILES} PARENT_SCOPE)

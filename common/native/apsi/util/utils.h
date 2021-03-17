@@ -4,15 +4,16 @@
 #pragma once
 
 // STD
+#include <algorithm>
+#include <cstdint>
+#include <iostream>
 #include <set>
 #include <sstream>
-#include <cstdint>
-#include <vector>
-#include <type_traits>
-#include <utility>
 #include <stdexcept>
-#include <algorithm>
-#include <iostream>
+#include <type_traits>
+#include <unordered_set>
+#include <utility>
+#include <vector>
 
 // APSI
 #include "apsi/item.h"
@@ -221,5 +222,9 @@ namespace apsi
         */
         std::uint64_t next_power_of_2(std::uint64_t v);
 
+        /**
+        Computes the XOR of two byte buffers.
+        */
+        void xor_buffers(unsigned char *buf1, const unsigned char *buf2, std::size_t count);
     } // namespace util
 } // namespace apsi

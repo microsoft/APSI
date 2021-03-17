@@ -1,4 +1,10 @@
-# APSI Library
+# APSI: C++ library for Asymmetric PSI
+
+## WARNING: This is research code
+
+This library is research code and is not intended for production use.
+There may be serious bugs or other issues that can put your sensitive data at risk.
+If that does not scare you and you are happy using this at your own risk, read on.
 
 ## Terminology
 
@@ -170,26 +176,25 @@ Unfortunately, the above approach reveals more than whether there is a match:
 These are significant issues and unacceptable.
 
 The solution is to use an *Oblivious Pseudo-Random Function*, or *OPRF* for short.
-An OPRF can be thought of as a keyed hash function `Hash-OPRF(s, -)` that only the sender knows; here `s` denotes the sender's key.
-Further, the receiver can obtain `Hash-OPRF(s, X)` without learning the function `Hash-OPRF(s, -)` or the key `s`, and without the sender learning `X`.
+An OPRF can be thought of as a keyed hash function `OPRF(s, -)` that only the sender knows; here `s` denotes the sender's key.
+Further, the receiver can obtain `OPRF(s, X)` without learning the function `OPRF(s, -)` or the key `s`, and without the sender learning `X`.
 
 The way to do this is simple.
 The receiver hashes its item `X` to an elliptic curve point `A` in some cryptographically secure elliptic curve.
 Next, the receiver chooses a secret number `r`, computes the point `B = rA`, and sends it to the sender.
 The sender uses its secret `s` to compute `C = sB`, and sends it to back to the receiver.
 Upon receiving `C`, the receiver computes the inverse `r^(-1)` modulo the order of the elliptic curve, and further computes `r^(-1) C = r^(-1) srA = sA`.
-The receiver then extracts the OPRF hash value `Hash-OPRF(s, X)` from this point, for example by hashing its x-coordinate to an appropriate domain.
+The receiver then extracts the OPRF hash value `OPRF(s, X)` from this point, for example by hashing its x-coordinate to an appropriate domain.
 
-The sender knows `s`, so it can simply replace its items `{Y_i}` with `{Hash-OPRF(s, Y_i)}`.
-The receiver needs to communicate with the sender to obtain `{Hash-OPRF(s, X_i)}`.
-And once the receiver has received these values, the protocol can proceed as described above.
+The sender knows `s`, so it can simply replace its items `{Y_i}` with `{OPRF(s, Y_i)}`.
+The receiver needs to communicate with the sender to obtain `{OPRF(s, X_i)}`; once the receiver has received these values, the protocol can proceed as described above.
 With OPRF, the problem of the receiver learning whether parts of its query matched goes away.
 Since all the items are hashed with a hash function known only by the sender, the receiver will benefit nothing from learning parts of the sender's hashed items.
 In fact, the sender's dataset is not private information and could in principle be sent in full to the receiver.
 Homomorphic encryption only protects the receiver's data.
 
-There is one further detail that must be mentioned here: instead of using `{Hash-OPRF(s, X_i)}` as the items, we apply one more public cryptographic hash function `Hash-item(-)` with a 128-bit output to the OPRF hashed items, and use `{Hash-item(Hash-OPRF(s, X_i))}` instead as the items.
-The reason for this will be given later in [Label Encryption](#label-encryption).
+There is one further detail that must be mentioned here. We choose `OPRF(s, -)` to have a 256-bit output and denote its first 128 bits by `ItemHash(s, -)`.
+Instead of `{OPRF(s, X_i)}` we use `{ItemHash(s, X_i)}` as the items; the reason will be given later in [Label Encryption](#label-encryption).
 
 ### Practice
 
@@ -392,27 +397,41 @@ The receiver decrypts the results and concatenates them to recover the label for
 #### Label Encryption
 
 There is a serious issue with the above approach that must be resolved.
-Recall how we used [OPRF](#oprf) to prevent partial (or full) leakage of the sender's items to the receiver: given an item `Y`, the matching polynomial is not actually computed for `Y` itself, but rather for `Hash-item(Hash-OPRF(s, Y))`, where `Hash-item` is some public cryptographic hash function and the OPRF key `s` is only known by the sender.
-This means that the label interpolation polynomial `L` should actually have the property that `L(Hash-item(Hash-OPRF(s, Y_i))) = V_i` for each of the sender's items `Y_i`.
-However, if the receiver can guess a part of some `Hash-item(Hash-OPRF(s, Y_i))`, it can use it to query for the corresponding part of the label for that item, which is clearly unacceptable since the receiver does not actually know the item `Y_i`.
+Recall how we used [OPRF](#oprf) to prevent partial (or full) leakage of the sender's items to the receiver: given an item `Y`, the matching polynomial is not actually computed for `Y` itself, but rather for `ItemHash(s, Y)`, which denoted the first 128 bits of the item's OPRF value `OPRF(s, Y)`.
+This means that the label interpolation polynomial `L` should actually have the property that `L(ItemHash(s, Y_i)) = V_i` for each of the sender's items `Y_i`.
+However, if the receiver can guess a part of some `ItemHash(s, Y_i)` it can use it to query for the corresponding part of the label for that item, which is unacceptable since the receiver does not actually know the item `Y_i`.
 
-To solve this issue, the sender uses a symmetric encryption scheme `Enc(-, -)` to encrypt the labels `V_i` using keys derived from `Hash-OPRF(s, Y_i)`.
-In other words, instead of `V_i`, it uses `Enc(HKDF(Hash-OPRF(s, Y_i)), V_i)` as the labels, and proceeds as before; `HKDF(-)` denotes a hash-based key derivation function.
+To solve this issue, the sender uses a symmetric encryption function `Enc(<input>, <key>, <nonce>)` to encrypt the labels `V_i` using keys derived from `OPRF(s, Y_i)`.
+Specifically, as the encryption key `LabelKey(s, Y_i)` for the label `V_i` corresponding to an item `Y_i` we use the remaining 128 bits of the 256-bit output of `OPRF(s, Y_i)`, so the label we must communicate to the receiver becomes `Enc(V_i, LabelKey(s, Y_i), nonce)`.
+
+There is still a bit of a problem, because the receiver must somehow know the nonce as well.
+One option is to use a constant or empty nonce.
+In this case extreme care must be taken, because if an adversary can learn encryptions of two different labels for the same item with the same OPRF key `s`, then they may be able to learn information about the labels.
+This can happen, because APSI supports updating labels for items.
+Another option is to use a long randomly generated nonce &ndash; different for each encryption &ndash; which the receiver must somehow learn.
+APSI achieves this by randomly sampling a nonce, concatenating it with the encryption of `V_i`, and using the concatenation for the interpolation polynomial `L`.
+In other words, the sender samples a random nonce for each item `Y_i` and computes the label interpolation polynomial `L` such that `L(ItemHash(s, Y_i)) = nonce | Enc(V_i, LabelKey(s, Y_i), nonce)`.
 
 The receiver benefits nothing from learning parts (or all) of the encrypted label unless it also knows the original item.
-Furthermore, even if the receiver manages to obtain `Enc(HKDF(Hash-OPRF(s, Y_i)), V_i)` by guessing `Hash-item(Hash-OPRF(s, Y_i))` and in an offline attack enumerates all possible items `Y_i`, or later learns `Y_i` through other means, it still cannot obtain the label because the encryption key is derived from `Hash-OPRF(s, Y_i))` &ndash; not just from `Y_i`.
+Furthermore, even if the receiver manages to obtain `nonce | Enc(V_i, LabelKey(s, Y_i), nonce)` by guessing `ItemHash(s, Y_i)`, and in an offline attack enumerates all possible items `Y_i` (or later learns `Y_i` through other means), it still cannot obtain the label because `LabelKey(s, Y_i)` is derived from `OPRF(s, Y_i)` &ndash; not just from `Y_i`.
+Of course at this later point the sender may decide to serve a normal query to the receiver for `Y_i`, in which case the receiver will learn `V_i`, as it is supposed to.
+
+APSI allows the sender can specify the nonce size in bytes.
+The default nonce size is set to 16 bytes, but expert users who fully understand the issue may want to use smaller values to achieve improved performance.
 
 #### Partial Item Collisions
 
 There is one last subtle issue that must be addressed.
 Recall from [Practice](#practice) how the sender constructs a large hash table and breaks it into a jagged array of bin bundles.
 In the labeled mode each bin bundle holds not only the item parts in it, but also the corresponding label parts, and the label interpolation polynomials, as described above.
+The interpolation polynomials are not created for the entire label at a time, but for each part separately, although the encryption is applied to the full item before decomposing it into parts.
 
-Now consider what happens when, by pure chance, `item416-part1` and `item12-part1` (as in [Practice](#practice)) are the same.
-If the corresponding label parts `label416-part1` and `label12-part1` are different, it will be impossible to create a label interpolation polynomial `L`.
+Now consider what happens when &ndash; by change &ndash; `item416-part1` and `item12-part1` (as in [Practice](#practice)) are the same.
+If the corresponding label parts `label416-part1` and `label12-part1` are different, it will be impossible to create a label interpolation polynomial `L`, as it cannot output both `label416-part1` and `label12-part1` on the corresponding item part.
 
-This issue is resolved by checking, before inserting an item into a bin bundle, that its parts do not already appear in the same locations.
+This issue is resolved by checking that label parts do not already appear in the same locations before inserting an item into a bin bundle.
 If any of them does, the item simply cannot be inserted into that bin bundle, and a new bin bundle for the same bundle index must be created.
+Note that the problem exists only in the labeled mode and can lead to worse *packing rate* (`items_inserted / theoretical_max`) than in unlabeled mode, where no such limitation exists.
 
 ## Using APSI
 
@@ -442,18 +461,22 @@ Other channels, such as `network::StreamChannel`, are only supported by the "adv
 The advanced API requires many more steps.
 The full process is as follows:
 
-1. (optional) `Receiver::CreateParamsRequest` must be used to create a parameter request.
+0. (optional) `Receiver::CreateParamsRequest` must be used to create a parameter request.
 The request must be sent to the sender on a channel with `network::Channel::send`.
 The sender must respond to the request and the response must be received on the channel with `network::Channel::receive_response`.
 The received `Response` object must be converted to the right type (`ParamsResponse`) with the `to_params_response` function.
 This function will return `nullptr` if the received response was not of the correct type.
-A `PSIParams` object can be extracted from the response and a `Receiver` object can subsequently be created.
+A `PSIParams` object can be extracted from the response.
+
+1. A `Receiver` object must be created from a `PSIParams` object. The `PSIParams` must match what the sender uses.
 
 1. `Receiver::CreateOPRFReceiver` must be used to process the input vector of items and return an associated `oprf::OPRFReceiver` object.
 Next, `Receiver::CreateOPRFRequest` must be used to create an OPRF request from the `oprf::OPRFReceiver`, which can subsequently be sent to the sender with `network::Channel::send`.
 The sender must respond to the request and the response must be received on the channel with `network::Channel::receive_response`.
 The received `Response` object must be converted to the right type (`OPRFResponse`) with the `to_oprf_response` function. This function will return `nullptr` if the received response was not of the correct type.
-Finally, `Receiver::ExtractHashes` must be called to obtain the OPRF hashed items from the `OPRFResponse` with the help of the `oprf::OPRFReceiver` object.
+Finally, `Receiver::ExtractHashes` must be called with the `OPRFResponse` and the `oprf::OPRFReceiver` object.
+This function returns `std::pair<std::vector<HashedItem>, std::vector<LabelKey>>`, containing the OPRF hashed items and the label encryption keys.
+Both vectors in this pair must be kept for the next steps.
 
 1. `Receiver::create_query` (non-static member function) must then be used to create the query itself.
 The function returns `std::pair<Request, IndexTranslationTable>`, where the `Request` object contains the query itself to be send to the sender, and the `IndexTranslationTable` is an object associated to this query describing how the internal data structures of the query maps to the vector of OPRF hashed items given to `Receiver::create_query`.
@@ -466,6 +489,7 @@ The `QueryResponse` contains only one important piece of data: the number of `Re
 1. `network::Channel::receive_result` must be called repeatedly to receive all `ResultParts`.
 For each received `ResultPart`, `Receiver::process_result_part` must be called to find a `std::vector<MatchRecord>` representing the match data associated to that `ResultPart`.
 Alternatively, one can first retrieve all `ResultParts`, collect them into a `std::vector<ResultPart>`, and use `Receiver::process_result` to find the complete result -- just like what the simple API returns.
+Both `Receiver::process_result_part` and `Receiver::process_result` require the `IndexTranslationTable` and the `std::vector<LabelKey>` objects created in the previous steps.
 
 ### Request, Response, and ResultPart
 
@@ -530,11 +554,13 @@ For simplicity, we use `SenderDB` to denote `apsi::sender::SenderDB`.
 
 This same text appears in the [sender_db.h](sender/native/apsi/sender_db.h) header file.
 
-`SenderDB` is an interface class with two implementations: `UnlabeledSenderDB` and `LabeledSenderDB`.
-A `SenderDB` maintains an in-memory representation of the sender's set of items.
+A `SenderDB` maintains an in-memory representation of the sender's set of items and labels (in labeled mode).
 These items are not simply copied into the `SenderDB` data structures, but also preprocessed heavily to allow for faster online computation time.
 Since inserting a large number of new items into a `SenderDB` can take time, it is not recommended to recreate the `SenderDB` when the database changes a little bit.
 Instead, the class supports fast update and deletion operations that should be preferred: `SenderDB::insert_or_assign` and `SenderDB::remove`.
+
+The `SenderDB` constructor allows the label byte count to be specified; unlabeled mode is activated by setting the label byte count to zero.
+It is possible to optionally specify the size of the nonce used in encrypting the labels, but this is best left to its default value unless the user is absolutely sure of what they are doing.
 
 The `SenderDB` requires substantially more memory than the raw data would.
 Part of that memory can automatically be compressed when it is not in use; this feature is enabled by default, and can be disabled when constructing the `SenderDB`.
@@ -603,6 +629,8 @@ Microsoft SEAL contains functions in `seal::CoeffModulus` and `seal::PlainModulu
 This number is verified to be non-zero and at most as large as `PSIParams::TableParams::table_size`.
 
 If all of these checks pass, the `PSIParams` object is successfully created and is valid for use in APSI.
+
+#### Loading from JSON
 
 ### Query Powers
 
@@ -684,6 +712,25 @@ Several comments are in order:
 - It may be necessary to try all options to determine what is overall best for a particular use-case.
 - [Challis and Robinson (2010)](http://emis.impa.br/EMIS/journals/JIS/VOL13/Challis/challis6.pdf) also shows a possible set for `k = 3` with depth 3 (`h = 7`): `{ 1, 8, 13 }`. While this only allows a highest power of 69, which does not quite satisfy our requirement of 70, such a set should be considered as it reduces the receiver-to-sender communication by 25%, while increasing the sender-to-receiver communication by only a tiny amount (roughly by a factor of 70/69 = 1.45%) due to the slightly smaller bin bundles. This will almost certainly be a beneficial trade-off.
 
+### Thread Control
+
+Many of the computations APSI does are highly parallelizable.
+APSI uses a thread pool that can be controlled with the static functions `apsi::ThreadPoolMgr::SetThreadCount` and `apsi::ThreadPoolMgr::GetThreadCount` in [apsi/thread_pool_mgr.h](common/native/apsi/thread_pool_mgr.h).
+
+### Logging
+
+APSI can be optionally compiled to use [log4cplus](https://github.com/log4cplus/log4cplus) for logging.
+Logging is configured using the static member functions of `apsi::Log` in [apsi/log.h](common/native/apsi/log.h).
+For example, these can be used to set the log level (one of `"all"`, `"debug"`, `"info"`, `"warning"`, `"error"`, or `"off"`), set a log filename, and control console output.
+
+Log messages for different log levels are emitted with the macros `APSI_LOG_DEBUG`, `APSI_LOG_INFO`, `APSI_LOG_WARNING`, and `APSI_LOG_ERROR`.
+The macros allow "streaming"; for example,
+```
+int val = 3;
+APSI_LOG_INFO("My value is " << val);
+```
+would log the message *My value is 3* at `"info"` log level.
+
 # Command-Line Interface (CLI)
 
 APSI allows a receiver to optionally query for protocol parameters from the sender.
@@ -694,13 +741,13 @@ Therefore, the sender's command line arguments are much more complex than the re
 
 ## Common Arguments
 
-The following arguments are common both to the sender and the receiver applications.
+The following optional arguments are common both to the sender and the receiver applications.
 
 | Parameter | Explanation |
 |-----------|-------------|
 | `-t` \| `--threads` | Number of threads to use |
-| `-f` \| `--logFile` | Log file path (optional) |
-| `-c` \| `--logToConsole` | Write log output additionally to the console (optional) |
+| `-f` \| `--logFile` | Log file path |
+| `-s` \| `--silent` | Do not write output to console |
 | `-l` \| `--logLevel` | One of `all`, `debug`, `info` (default), `warning`, `error`, `off` |
 
 ## Receiver
@@ -709,8 +756,8 @@ The following arguments specify the receiver's behavior.
 
 | Parameter | Explanation |
 |-----------|-------------|
-| `-q` \| `--queryFile` | File containing the query data |
-| `-o` \| `--outFile` | Output file for the intersection result |
+| `-q` \| `--queryFile` | Path to a text file containing query data (one per line) |
+| `-o` \| `--outFile` | Path to a file where intersection result will be written |
 | `-a` \| `--ipAddr` | IP address for a sender endpoint |
 | `-p` \| `--port` | TCP port to connect to (default is 1212) |
 
@@ -720,17 +767,18 @@ The following arguments specify the sender's behavior and determine the paramete
 
 | Parameter | Explanation |
 |-----------|-------------|
-| `-d` \| `--dbFile` | CSV file describing a look-up table with possibly empty values |
-| `-p` \| `--port` | TCP port to bind to (default is 1212) |
+| `-d` \| `--dbFile` | Path to a CSV file describing the sender's dataset (an item-label pair on each row) |
+| `-p` \| `--port` | TCP port to bind to (default is 1212)" |
 | `-F` \| `--feltsPerItem` | Number of field elements to use per item |
 | `-T` \| `--tableSize` | Size of the cuckoo hash table |
-| `-m` \| `--maxItemsPerBin` | Bound on the bin size for sender's hash tables |
+| `-m` \| `--maxItemsPerBin` | Maximum number of items allowed in a bin |
 | `-H` \| `--hashFuncCount` | Number of hash functions to use for cuckoo hashing |
-| `-w` \| `--queryPowers` | Power of the query to send in addition to the first power |
+| `-w` \| `--queryPowers` | A power of the query to send from receiver to sender (in addition to the first power) |
 | `-P` \| `--polyModulusDegree` | Microsoft SEAL `poly_modulus_degree` parameter |
 | `-C` \| `--coeffModulusBits` | Bit count for a single Microsoft SEAL `coeff_modulus` prime |
 | `-a` \| `--plainModulusBits` | Bit count for a Microsoft SEAL `plain_modulus` prime (cannot be used with `-A`) |
 | `-A` \| `--plainModulus` | Microsoft SEAL `plain_modulus` prime (cannot be used with `-a`) |
+| `-n` \| `--nonceByteCount` | Number of bytes used for the nonce in labeled mode (default is 16) |
 
 #### `-d` \| `--dbFile`
 
@@ -820,6 +868,11 @@ This reduces the multiplicative depth of the encrypted computation, which can be
 The `-w` option can be specified multiple times to provide the exact powers of the query which the receiver should send to the sender in addition to the first power (so no need to write `-w 1`).
 This is critically important to use correctly to achieve good performance; please see [Query Powers](#query-powers) for details.
 
+#### `-n` \| `--nonceByteCount`
+
+Specifies the number of bytes used for the nonce in labeled mode; the value can be any integer between 0 and 16 (default).
+In some cases expert users may want to use a value smaller than 16 (even zero) for improved performance, but this is not generally recommended.
+
 ## Dependencies
 
 The APSI library depends on the following packages that need to be pre-installed.
@@ -832,7 +885,6 @@ The CMake build system will then automatically find these pre-installed packages
 | Package                                              | vcpkg                         |
 |------------------------------------------------------|-------------------------------|
 | [Microsoft GSL](https://github.com/Microsoft/GSL)    | with Microsoft SEAL           |
-| [ZLIB](https://github.com/madler/zlib)               | with Microsoft SEAL           |
 | [Zstandard](https://github.com/facebook/zstd)        | with Microsoft SEAL           |
 | [Microsoft SEAL](https://github.com/microsoft/SEAL)  | `seal[no-throw-tran]`         |
 | [Microsoft Kuku](https://github.com/microsoft/Kuku)  | `kuku`                        |

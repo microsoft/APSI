@@ -9,7 +9,7 @@
 #include <sstream>
 
 // APSI
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 #include "apsi/network/zmq/zmq_channel.h"
 #include "apsi/network/sop_header_generated.h"
 #include "apsi/network/sop_generated.h"
@@ -589,11 +589,9 @@ namespace apsi
             // Ensure messages are not dropped
             socket->set(sockopt::rcvhwm, 70000);
 
-            auto factory = seal::UniformRandomGeneratorFactory::DefaultFactory();
-            auto prng = factory->create();
             string buf;
             buf.resize(32);
-            prng->generate(buf.size(), reinterpret_cast<seal_byte*>(buf.data()));
+            seal::random_bytes(reinterpret_cast<seal_byte*>(buf.data()), buf.size());
             // make sure first byte is _not_ zero, as that has a special meaning for ZeroMQ
             *buf.data() = 'A';
             socket->set(sockopt::routing_id, buf);

@@ -185,4 +185,45 @@ namespace APSITests
         compare.erase(compare.begin(), compare.begin() + sizeof(uint32_t));
         compare_up_to(compare, bytes, bytes.size());
     }
+
+    TEST(UtilsTests, XorBuffers)
+    {
+        uint32_t val1 = 0;
+        uint32_t val2 = 0;
+        xor_buffers(
+            reinterpret_cast<unsigned char*>(&val1),
+            reinterpret_cast<const unsigned char*>(&val2),
+            sizeof(uint32_t));
+        ASSERT_EQ(0, val1);
+
+        val1 = 0xABABABAB;
+        val2 = 0xABABABAB;
+        xor_buffers(
+            reinterpret_cast<unsigned char*>(&val1),
+            reinterpret_cast<const unsigned char*>(&val2),
+            sizeof(uint32_t));
+        ASSERT_EQ(0, val1);
+
+        val1 = 0xAAAAAAAA;
+        val2 = 0x55555555;
+        xor_buffers(
+            reinterpret_cast<unsigned char*>(&val1),
+            reinterpret_cast<const unsigned char*>(&val2),
+            sizeof(uint32_t));
+        ASSERT_EQ(0xFFFFFFFF, val1);
+
+        val1 = 0xAAAAAAAA >> 1;
+        val2 = 0x55555555;
+        xor_buffers(
+            reinterpret_cast<unsigned char*>(&val1),
+            reinterpret_cast<const unsigned char*>(&val2),
+            sizeof(uint32_t));
+        ASSERT_EQ(0, val1);
+
+        unsigned char arr1_5[5]{ 0x1, 0x2, 0x1, 0x2, 0x1 };
+        unsigned char arr2_5[5]{ 0x2, 0x1, 0x2, 0x1, 0x2 };
+        unsigned char res[5]{ 0x3, 0x3, 0x3, 0x3, 0x3 };
+        xor_buffers(arr1_5, arr2_5, sizeof(arr1_5));
+        ASSERT_TRUE(equal(arr1_5, arr1_5 + sizeof(arr1_5), res));
+    }
 } // namespace APSITests

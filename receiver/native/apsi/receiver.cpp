@@ -9,14 +9,14 @@
 #include <future>
 
 // APSI
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 #include "apsi/network/channel.h"
 #include "apsi/plaintext_powers.h"
 #include "apsi/receiver.h"
 #include "apsi/util/utils.h"
 #include "apsi/util/db_encoding.h"
 #include "apsi/util/label_encryptor.h"
-#include "apsi/util/thread_pool_mgr.h"
+#include "apsi/thread_pool_mgr.h"
 
 // SEAL
 #include "seal/util/defines.h"
@@ -385,7 +385,7 @@ namespace apsi
             atomic<uint32_t> package_count{ response->package_count };
 
             // Launch threads to receive ResultPackages and decrypt results
-            size_t task_count = min<size_t>(ThreadPoolMgr::get_thread_count(), package_count);
+            size_t task_count = min<size_t>(ThreadPoolMgr::GetThreadCount(), package_count);
             vector<future<void>> futures(task_count);
             APSI_LOG_INFO("Launching " << task_count << " result worker tasks to handle " << package_count
                 << " result parts");

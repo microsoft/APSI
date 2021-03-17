@@ -11,11 +11,11 @@
 #include "apsi/network/channel.h"
 #include "apsi/network/result_package.h"
 #include "apsi/seal_object.h"
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 #include "apsi/util/utils.h"
 #include "apsi/crypto_context.h"
 #include "apsi/util/stopwatch.h"
-#include "apsi/util/thread_pool_mgr.h"
+#include "apsi/thread_pool_mgr.h"
 
 // SEAL
 #include "seal/modulus.h"
@@ -29,7 +29,6 @@ using namespace seal::util;
 
 namespace apsi
 {
-    using namespace logging;
     using namespace util;
     using namespace oprf;
     using namespace network;

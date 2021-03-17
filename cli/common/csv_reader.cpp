@@ -10,7 +10,7 @@
 
 // APSI
 #include "common/csv_reader.h"
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 #include "common/common_utils.h"
 
 using namespace std;

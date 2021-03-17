@@ -74,7 +74,7 @@ namespace apsi
                 }
                 if (bit_count > dest.size() * 8)
                 {
-                    throw invalid_argument("bit_count too large for dest");
+                    throw invalid_argument("bit_count is too large for dest");
                 }
 #endif
                 if (low_offset)

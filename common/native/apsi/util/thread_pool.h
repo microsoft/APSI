@@ -21,7 +21,7 @@
 //    distribution.
 //
 // Modified for log4cplus, copyright (c) 2014-2015 Václav Zeman.
-// Modified for APSI, copyright (c) 2021 Microsoft Corporation
+// Modified for APSI: Copyright (c) Microsoft Corporation. All rights reserved.
 
 #pragma once
 
@@ -41,7 +41,7 @@
 
 // APSI
 #include "apsi/config.h"
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 
 #ifdef APSI_USE_CXX17
 #define apsi_result_of_type typename std::invoke_result<F, Args...>::type

@@ -8,7 +8,7 @@
 
 // APSI
 #include "sender/sender_utils.h"
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 #include "common/common_utils.h"
 
 // SEAL
@@ -17,7 +17,6 @@
 using namespace std;
 using namespace seal;
 using namespace apsi;
-using namespace apsi::logging;
 
 unique_ptr<PSIParams> build_psi_params(const CLP &cmd)
 {

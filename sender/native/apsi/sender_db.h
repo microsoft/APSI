@@ -32,11 +32,15 @@ namespace apsi
     namespace sender
     {
         /**
-        A SenderDB maintains an in-memory representation of the sender's set of items and labels. This data is not
-        simply copied into the SenderDB data structures, but also preprocessed heavily to allow for faster online
-        computation time. Since inserting a large number of new items into a SenderDB can take time, it is not
-        recommended to recreate the SenderDB when the database changes a little bit. Instead, the class supports fast
-        update and deletion operations that should be preferred: SenderDB::insert_or_assign and SenderDB::remove.
+        A SenderDB maintains an in-memory representation of the sender's set of items and labels (in labeled mode).
+        This data is not simply copied into the SenderDB data structures, but also preprocessed heavily to allow for
+        faster online computation time. Since inserting a large number of new items into a SenderDB can take time, it
+        is not recommended to recreate the SenderDB when the database changes a little bit. Instead, the class supports
+        fast update and deletion operations that should be preferred: SenderDB::insert_or_assign and SenderDB::remove.
+
+        The SenderDB constructor allows the label byte count to be specified; unlabeled mode is activated by setting
+        the label byte count to zero. It is possible to optionally specify the size of the nonce used in encrypting the
+        labels, but this is best left to its default value unless the user is absolutely sure of what they are doing. 
 
         The SenderDB requires substantially more memory than the raw data would. Part of that memory can automatically
         be compressed when it is not in use; this feature is enabled by default, and can be disabled when constructing
@@ -68,7 +72,7 @@ namespace apsi
             /**
             Clears the database. Every item and label will be removed.
             */
-            void clear_db();
+            void clear();
 
             /**
             Returns whether this is a labeled SenderDB.
@@ -146,7 +150,7 @@ namespace apsi
             */
             void set_data(const std::vector<std::pair<Item, Label>> &data)
             {
-                clear_db();
+                clear();
                 insert_or_assign(data);
             }
 
@@ -155,7 +159,7 @@ namespace apsi
             */
             void set_data(const std::vector<Item> &data)
             {
-                clear_db();
+                clear();
                 insert_or_assign(data);
             }
 
@@ -267,7 +271,7 @@ namespace apsi
                 return db_lock_.acquire_write();
             }
 
-            void clear_db_internal();
+            void clear_internal();
 
             void regenerate_caches();
 

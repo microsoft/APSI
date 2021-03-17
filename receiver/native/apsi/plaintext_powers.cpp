@@ -3,13 +3,15 @@
 
 // STD
 #include <algorithm>
+#include <iterator>
 #include <stdexcept>
 #include <sstream>
 #include <utility>
 
 // APSI
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 #include "apsi/plaintext_powers.h"
+#include "apsi/util/utils.h"
 
 // SEAL
 #include "seal/util/uintarithsmallmod.h"
@@ -88,16 +90,9 @@ namespace apsi
                 powers_[s.power] = exponentiate_array(values, s.power);
             }
 
-            APSI_LOG_DEBUG("Plaintext powers computed: " << [&]() {
-                    stringstream ss;
-                    ss << "[";
-                    for (auto &a : powers_)
-                    {
-                        ss << " " << a.first;
-                    }
-                    ss << " ]";
-                    return ss.str();
-                }());
+            vector<uint32_t> powers_vec;
+            transform(powers_.begin(), powers_.end(), back_inserter(powers_vec), [](auto &p) { return p.first; });
+            APSI_LOG_DEBUG("Plaintext powers computed: " << util::to_string(powers_vec));
         }
     }
 }

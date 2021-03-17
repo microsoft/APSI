@@ -9,10 +9,10 @@
 #include <functional>
 
 // APSI
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/version.h"
-#include "apsi/util/thread_pool_mgr.h"
+#include "apsi/thread_pool_mgr.h"
 #include "apsi/zmq/sender_dispatcher.h"
 #include "common/common_utils.h"
 #include "common/csv_reader.h"
@@ -24,7 +24,6 @@ namespace fs = std::filesystem;
 using namespace apsi;
 using namespace apsi::sender;
 using namespace apsi::network;
-using namespace apsi::logging;
 using namespace apsi::oprf;
 
 int run_sender_dispatcher(const CLP &cmd);
@@ -76,7 +75,7 @@ int run_sender_dispatcher(const CLP &cmd)
         return -1;
     }
 
-    ThreadPoolMgr::set_thread_count(cmd.threads());
+    ThreadPoolMgr::SetThreadCount(cmd.threads());
 
     auto sender_db = create_sender_db(*db_data, *params, cmd.nonce_byte_count());
     db_data = nullptr;

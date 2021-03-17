@@ -65,7 +65,7 @@ private:
     TCLAP::ValueArg<std::size_t> nonce_byte_count_arg_ = TCLAP::ValueArg<std::size_t>(
         "n",
         "nonceByteCount",
-        "Number of bytes used for the nonce in labeled mode",
+        "Number of bytes used for the nonce in labeled mode (default is 16)",
         false,
         16,
         "unsigned integer");
@@ -73,7 +73,7 @@ private:
     TCLAP::ValueArg<int> net_port_arg_ = TCLAP::ValueArg<int>(
         "",
         "port",
-        "Network port to bind to",
+        "TCP port to bind to (default is 1212)",
         false,
         1212,
         "TCP port"
@@ -82,7 +82,7 @@ private:
     TCLAP::ValueArg<std::string> db_file_arg_ = TCLAP::ValueArg<std::string>(
         "d",
         "dbFile",
-        "Path to a CSV file containing the database",
+        "Path to a CSV file describing the sender's dataset (an item-label pair on each row)",
         true,
         "",
         "string"

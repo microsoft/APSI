@@ -1,18 +1,15 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
-target_sources(common
-    PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/result_package.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/sender_operation.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/sender_operation_response.cpp
-        ${CMAKE_CURRENT_LIST_DIR}/stream_channel.cpp
+# Source files in this directory
+set(APSI_COMMON_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES}
+    ${CMAKE_CURRENT_LIST_DIR}/result_package.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/sender_operation.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/sender_operation_response.cpp
+    ${CMAKE_CURRENT_LIST_DIR}/stream_channel.cpp
 )
 
-if(APSI_USE_ZMQ)
-    add_subdirectory(zmq)
-endif()
-
+# Add header files for installation
 install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/channel.h
@@ -22,5 +19,10 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/sender_operation_response.h
         ${CMAKE_CURRENT_LIST_DIR}/stream_channel.h
     DESTINATION
-        ${PROJECT_INCLUDES_INSTALL_DIR}/apsi/network
+        ${APSI_INCLUDES_INSTALL_DIR}/apsi/network
 )
+
+if(APSI_USE_ZMQ)
+    add_subdirectory(zmq)
+endif()
+set(APSI_COMMON_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES} PARENT_SCOPE)

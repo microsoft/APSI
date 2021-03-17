@@ -45,12 +45,14 @@ namespace apsi
 
         The advanced API requires many more steps. The full process is as follows:
 
-        (1 -- optional) Receiver::CreateParamsRequest must be used to create a parameter request. The request must be
+        (0 -- optional) Receiver::CreateParamsRequest must be used to create a parameter request. The request must be
         sent to the sender on a channel with network::Channel::send. The sender must respond to the request and the
         response must be received on the channel with network::Channel::receive_response. The received Response object
         must be converted to the right type (ParamsResponse) with the to_params_response function. This function will
         return nullptr if the received response was not of the correct type. A PSIParams object can be extracted from
-        the response and a Receiver object can subsequently be created.
+        the response.
+        
+        (1) A Receiver object must be created from a PSIParams object. The PSIParams must match what the sender uses.
 
         (2) Receiver::CreateOPRFReceiver must be used to process the input vector of items and return an associated
         oprf::OPRFReceiver object. Next, Receiver::CreateOPRFRequest must be used to create an OPRF request from the
@@ -58,8 +60,9 @@ namespace apsi
         respond to the request and the response must be received on the channel with network::Channel::receive_response.
         The received Response object must be converted to the right type (OPRFResponse) with the to_oprf_response
         function. This function will return nullptr if the received response was not of the correct type. Finally,
-        Receiver::ExtractHashes must be called to obtain the OPRF hashed items from the OPRFResponse with the help of
-        the oprf::OPRFReceiver object.
+        Receiver::ExtractHashes must be called with the OPRFResponse and the oprf::OPRFReceiver object. This function
+        returns std::pair<std::vector<HashedItem>, std::vector<LabelKey>>, containing the OPRF hashed items and the
+        label encryption keys. Both vectors in this pair must be kept for the next steps.
 
         (3) Receiver::create_query (non-static member function) must then be used to create the query itself. The
         function returns std::pair<Request, IndexTranslationTable>, where the Request object contains the query itself
@@ -75,7 +78,8 @@ namespace apsi
         ResultPart Receiver::process_result_part must be called to find a std::vector<MatchRecord> representing the
         match data associated to that ResultPart. Alternatively, one can first retrieve all ResultParts, collect them
         into a std::vector<ResultPart>, and use Receiver::process_result to find the complete result -- just like what
-        the simple API returns.
+        the simple API returns. Both Receiver::process_result_part and Receiver::process_result require the
+        IndexTranslationTable and the std::vector<LabelKey> objects created in the previous steps.
         */
         class Receiver
         {
@@ -132,7 +136,7 @@ namespace apsi
             */
             static std::pair<std::vector<HashedItem>, std::vector<LabelKey>> RequestOPRF(
                 const std::vector<Item> &items,
-                 network::NetworkChannel &chl);
+                network::NetworkChannel &chl);
 
             /**
             Performs a PSI or labeled PSI (depending on the sender) query. The query is a vector of items, and the

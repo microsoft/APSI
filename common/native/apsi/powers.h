@@ -19,7 +19,7 @@
 #include <iostream>
 
 // APSI
-#include "apsi/util/thread_pool_mgr.h"
+#include "apsi/thread_pool_mgr.h"
 
 namespace apsi
 {
@@ -163,7 +163,7 @@ namespace apsi
                 throw std::logic_error("PowersDag has not been configured");
             }
 
-            apsi::util::ThreadPoolMgr tpm;
+            ThreadPoolMgr tpm;
             
             enum class NodeState { Uncomputed = 0, Computing = 1, Computed = 2 };
 
@@ -230,7 +230,7 @@ namespace apsi
                 }
             };
 
-            std::size_t task_count = apsi::util::ThreadPoolMgr::get_thread_count();
+            std::size_t task_count = ThreadPoolMgr::GetThreadCount();
             std::vector<std::future<void>> futures(task_count);
             for (std::size_t t = 0; t < task_count; t++) {
                 futures[t] = tpm.thread_pool().enqueue(compute_powers);

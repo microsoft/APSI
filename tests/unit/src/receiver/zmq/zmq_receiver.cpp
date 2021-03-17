@@ -12,7 +12,7 @@
 // APSI
 #include "apsi/receiver.h"
 #include "apsi/network/zmq/zmq_channel.h"
-#include "apsi/util/thread_pool_mgr.h"
+#include "apsi/thread_pool_mgr.h"
 
 // Google Test
 #include "gtest/gtest.h"
@@ -299,7 +299,7 @@ namespace APSITests
 
     TEST_F(ReceiverTests, SingleThread)
     {
-        ThreadPoolMgr::set_thread_count(1);
+        ThreadPoolMgr::SetThreadCount(1);
 
         start_sender();
 
@@ -351,7 +351,7 @@ namespace APSITests
 
     TEST_F(ReceiverTests, MultiThread)
     {
-        ThreadPoolMgr::set_thread_count(2);
+        ThreadPoolMgr::SetThreadCount(2);
 
         start_sender();
 

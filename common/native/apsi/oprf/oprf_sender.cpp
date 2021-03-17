@@ -9,11 +9,11 @@
 #include <mutex>
 
 // APSI
-#include "apsi/logging/log.h"
+#include "apsi/log.h"
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/util/label_encryptor.h"
 #include "apsi/util/stopwatch.h"
-#include "apsi/util/thread_pool_mgr.h"
+#include "apsi/thread_pool_mgr.h"
 
 // SEAL
 #include "seal/randomgen.h"
@@ -138,7 +138,7 @@ namespace apsi
 
             ThreadPoolMgr tpm;
             vector<HashedItem> oprf_hashes(oprf_items.size());
-            size_t task_count = min<size_t>(ThreadPoolMgr::get_thread_count(), oprf_items.size());
+            size_t task_count = min<size_t>(ThreadPoolMgr::GetThreadCount(), oprf_items.size());
             vector<future<void>> futures(task_count);
 
             auto ComputeHashesLambda = [&](size_t start_idx, size_t step) {
@@ -166,9 +166,9 @@ namespace apsi
             size_t label_byte_count,
             size_t nonce_byte_count)
         {
-            if (nonce_byte_count > 16)
+            if (nonce_byte_count > max_nonce_byte_count)
             {
-                throw invalid_argument("nonce byte count is too large");
+                throw invalid_argument("nonce_byte_count is too large");
             }
 
             STOPWATCH(sender_stopwatch, "OPRFSender::ComputeHashes (labeled)");
@@ -177,7 +177,7 @@ namespace apsi
 
             ThreadPoolMgr tpm;
             vector<pair<HashedItem, EncryptedLabel>> oprf_hashes(oprf_item_labels.size());
-            size_t task_count = min<size_t>(ThreadPoolMgr::get_thread_count(), oprf_item_labels.size());
+            size_t task_count = min<size_t>(ThreadPoolMgr::GetThreadCount(), oprf_item_labels.size());
             vector<future<void>> futures(task_count);
 
             auto ComputeHashesLambda = [&](size_t start_idx, size_t step) {
