@@ -161,5 +161,7 @@ shared_ptr<SenderDB> create_sender_db(
         return nullptr;
     }
 
+    APSI_LOG_INFO("SenderDB packing rate: " << sender_db->get_packing_rate());
+
     return sender_db ;
 }

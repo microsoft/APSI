@@ -367,8 +367,7 @@ namespace apsi
 
                 // Run the threads on the partitions
                 vector<future<void>> futures(bundle_indices.size());
-                APSI_LOG_INFO(
-                    "Launching " << bundle_indices.size() << " insert-or-assign worker tasks");
+                APSI_LOG_INFO("Launching " << bundle_indices.size() << " insert-or-assign worker tasks");
                 size_t future_idx = 0;
                 for (auto &bundle_idx : bundle_indices) {
                     futures[future_idx++] = tpm.thread_pool().enqueue([&, bundle_idx]() {
