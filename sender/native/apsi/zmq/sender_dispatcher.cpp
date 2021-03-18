@@ -26,14 +26,13 @@ namespace apsi
 
     namespace sender
     {
-        ZMQSenderDispatcher::ZMQSenderDispatcher(shared_ptr<SenderDB> sender_db, size_t thread_count) :
+        ZMQSenderDispatcher::ZMQSenderDispatcher(shared_ptr<SenderDB> sender_db) :
             sender_db_(std::move(sender_db))
         {
             if (!sender_db_)
             {
                 throw invalid_argument("sender_db is not set");
             }
-            thread_count_ = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
         }
 
         void ZMQSenderDispatcher::run(const atomic<bool> &stop, int port)
@@ -153,7 +152,7 @@ namespace apsi
                 Query query(to_query_request(move(sop->sop)), sender_db_);
 
                 // Query will send result to client in a stream of ResultPackages (ResultParts)
-                Sender::RunQuery(query, chl, thread_count_,
+                Sender::RunQuery(query, chl,
                     // Lambda function for sending the query response
                     [&sop](Channel &c, Response response) {
                         auto nsop_response = make_unique<ZMQSenderOperationResponse>();

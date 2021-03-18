@@ -27,7 +27,7 @@ namespace apsi
         public:
             ZMQSenderDispatcher() = delete;
 
-            ZMQSenderDispatcher(std::shared_ptr<SenderDB> sender_db, std::size_t thread_count = 0);
+            ZMQSenderDispatcher(std::shared_ptr<SenderDB> sender_db);
 
             /**
             Run the dispatcher on the given port.
@@ -36,8 +36,6 @@ namespace apsi
 
         private:
             std::shared_ptr<sender::SenderDB> sender_db_;
-
-            std::size_t thread_count_;
 
             /**
             Dispatch a Get Parameters request to the Sender.

@@ -146,7 +146,7 @@ namespace APSITests
             atomic<bool> stop_sender = false;
 
             future<void> sender_f = async(launch::async, [&]() {
-                ZMQSenderDispatcher dispatcher(loaded_sender_db, num_threads);
+                ZMQSenderDispatcher dispatcher(loaded_sender_db);
                 dispatcher.run(stop_sender, 5550);
             });
 
@@ -229,7 +229,7 @@ namespace APSITests
             atomic<bool> stop_sender = false;
 
             future<void> sender_f = async(launch::async, [&]() {
-                ZMQSenderDispatcher dispatcher(loaded_sender_db, num_threads);
+                ZMQSenderDispatcher dispatcher(loaded_sender_db);
                 dispatcher.run(stop_sender, 5550);
             });
 

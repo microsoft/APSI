@@ -115,7 +115,6 @@ namespace apsi
             static void RunQuery(
                 const Query &query,
                 network::Channel &chl,
-                std::size_t thread_count = 0,
                 std::function<void(network::Channel &, Response)> send_fun = BasicSend<Response::element_type>,
                 std::function<void(network::Channel &, ResultPart)> send_rp_fun = BasicSend<ResultPart::element_type>);
 

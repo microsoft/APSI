@@ -29,16 +29,19 @@ public:
     {
         add(nonce_byte_count_arg_);
         add(net_port_arg_);
-        add(db_file_arg_);
         add(params_file_arg_);
+        xorAdd(db_file_arg_, sender_db_load_file_arg_);
+        add(sender_db_save_file_arg_);
     }
 
     virtual void get_args()
     {
         nonce_byte_count_ = nonce_byte_count_arg_.getValue();
-        db_file_ = db_file_arg_.getValue();
+        db_file_ = db_file_arg_.isSet() ? db_file_arg_.getValue() : "";
         net_port_ = net_port_arg_.getValue();
         params_file_ = params_file_arg_.getValue();
+        sender_db_load_file_ = sender_db_load_file_arg_.isSet() ? sender_db_load_file_arg_.getValue() : "";
+        sender_db_save_file_ = sender_db_save_file_arg_.getValue();
     }
 
     std::size_t nonce_byte_count() const
@@ -51,14 +54,24 @@ public:
         return net_port_;
     }
 
-    const std::string &db_file () const
+    const std::string &db_file() const
     {
         return db_file_;
     }
 
-    const std::string& params_file() const
+    const std::string &params_file() const
     {
         return params_file_;
+    }
+
+    const std::string &sender_db_save_file() const
+    {
+        return sender_db_save_file_;
+    }
+
+    const std::string &sender_db_load_file() const
+    {
+        return sender_db_load_file_;
     }
 
 private:
@@ -97,6 +110,24 @@ private:
         "string"
     );
 
+    TCLAP::ValueArg<std::string> sender_db_load_file_arg_ = TCLAP::ValueArg<std::string>(
+        "",
+        "loadSenderDB",
+        "File to load the SenderDB from",
+        true,
+        "",
+        "string"
+    );
+
+    TCLAP::ValueArg<std::string> sender_db_save_file_arg_ = TCLAP::ValueArg<std::string>(
+        "",
+        "saveSenderDB",
+        "File to save the SenderDB to",
+        false,
+        "",
+        "string"
+    );
+
     std::size_t nonce_byte_count_;
 
     int net_port_;
@@ -104,4 +135,8 @@ private:
     std::string db_file_;
 
     std::string params_file_;
+
+    std::string sender_db_load_file_;
+
+    std::string sender_db_save_file_;
 };

@@ -104,7 +104,7 @@ namespace APSITests
                 // Receive the query and process response
                 QueryRequest sender_query = to_query_request(chl.receive_operation(seal_context));
                 Query query(move(sender_query), sender_db);
-                ASSERT_NO_THROW(Sender::RunQuery(query, chl, num_threads));
+                ASSERT_NO_THROW(Sender::RunQuery(query, chl));
 
                 // Receive query response
                 QueryResponse query_response = to_query_response(chl.receive_response());
@@ -196,7 +196,7 @@ namespace APSITests
                 // Receive the query and process response
                 QueryRequest sender_query = to_query_request(chl.receive_operation(seal_context));
                 Query query(move(sender_query), sender_db);
-                ASSERT_NO_THROW(Sender::RunQuery(query, chl, num_threads));
+                ASSERT_NO_THROW(Sender::RunQuery(query, chl));
 
                 // Receive query response
                 QueryResponse query_response = to_query_response(chl.receive_response());

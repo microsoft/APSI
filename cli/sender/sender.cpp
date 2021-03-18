@@ -67,24 +67,65 @@ int run_sender_dispatcher(const CLP &cmd)
         return -1;
     }
 
-    unique_ptr<CSVReader::DBData> db_data = load_db(cmd.db_file());
-    if (!db_data)
+    ThreadPoolMgr::SetThreadCount(cmd.threads());
+    APSI_LOG_INFO("Thread count is set to " << ThreadPoolMgr::GetThreadCount());
+    signal(SIGINT, sigint_handler);
+
+    shared_ptr<SenderDB> sender_db;
+    if (!cmd.db_file().empty())
     {
-        // Failed to read db file
-        APSI_LOG_ERROR("Failed to read database: terminating");
+        unique_ptr<CSVReader::DBData> db_data = load_db(cmd.db_file());
+        if (!db_data)
+        {
+            // Failed to read db file
+            APSI_LOG_ERROR("Failed to read database: terminating");
+            return -1;
+        }
+
+        sender_db = create_sender_db(*db_data, *params, cmd.nonce_byte_count());
+        db_data = nullptr;
+    }
+    else if (!cmd.sender_db_load_file().empty())
+    {
+        ifstream fs(cmd.sender_db_load_file(), ios::binary);
+        try
+        {
+            auto [data, size] = SenderDB::Load(fs);
+            sender_db = make_shared<SenderDB>(move(data));
+            APSI_LOG_INFO("Loaded SenderDB (" << size << " bytes) from " << cmd.sender_db_load_file());
+        }
+        catch(const exception &e)
+        {
+            // Failed to load SenderDB
+            APSI_LOG_ERROR("Failed to load SenderDB: terminating");
+            return -1;
+        }
+    }
+    else
+    {
+        // No input given
         return -1;
     }
 
-    ThreadPoolMgr::SetThreadCount(cmd.threads());
-
-    auto sender_db = create_sender_db(*db_data, *params, cmd.nonce_byte_count());
-    db_data = nullptr;
-
-    signal(SIGINT, sigint_handler);
+    // Try to save the SenderDB if a save file was given
+    if (!cmd.sender_db_save_file().empty())
+    {
+        ofstream fs(cmd.sender_db_save_file(), ios::binary);
+        try
+        {
+            size_t size = sender_db->save(fs);
+            APSI_LOG_INFO("Saved SenderDB (" << size << " bytes) to " << cmd.sender_db_save_file());
+        }
+        catch(const exception &e)
+        {
+            // Failed to load SenderDB
+            APSI_LOG_WARNING("Failed to save SenderDB");
+        }
+    }
 
     // Run the dispatcher
     atomic<bool> stop = false;
-    ZMQSenderDispatcher dispatcher(sender_db, cmd.threads());
+    ZMQSenderDispatcher dispatcher(sender_db);
 
     // The dispatcher will run until stopped.
     dispatcher.run(stop, cmd.net_port());

@@ -121,7 +121,6 @@ namespace apsi
         void Sender::RunQuery(
             const Query &query,
             Channel &chl,
-            size_t thread_count,
             function<void(Channel &, Response)> send_fun,
             function<void(Channel &, ResultPart)> send_rp_fun)
         {
@@ -130,7 +129,6 @@ namespace apsi
                 throw invalid_argument("query is invalid");
             }
 
-            thread_count = thread_count < 1 ? thread::hardware_concurrency() : thread_count;
             ThreadPoolMgr tpm;
 
             auto sender_db = query.sender_db();
@@ -197,23 +195,15 @@ namespace apsi
                 }
             }
 
-            // Queue computation of powers for the bundle indexes
-            vector<future<void>> futures(bundle_idx_count);
+            // Compute query powers for the bundle indexes
             for (size_t bundle_idx = 0; bundle_idx < bundle_idx_count; bundle_idx++) {
-                futures[bundle_idx] = tpm.thread_pool().enqueue([&, bundle_idx]() {
-                    ComputePowers(sender_db, crypto_context, all_powers, pd, bundle_idx);
-                });
-            }
-
-            // Wait until all powers are computed
-            for (auto &f : futures) {
-                f.get();
+                ComputePowers(sender_db, crypto_context, all_powers, pd, bundle_idx);
             }
 
             APSI_LOG_DEBUG("Finished computing powers for all bundle indices");
             APSI_LOG_DEBUG("Start processing bin bundle caches");
 
-            futures.clear();
+            vector<future<void>> futures;
             for (size_t bundle_idx = 0; bundle_idx < bundle_idx_count; bundle_idx++) {
                 auto bundle_caches = sender_db->get_cache_at(bundle_idx);
                 for (auto &cache : bundle_caches) {
@@ -252,7 +242,7 @@ namespace apsi
             RelinKeys &relin_keys = *crypto_context.relin_keys();
 
             CiphertextPowers &powers_at_this_bundle_idx = all_powers[bundle_idx];
-            pd.apply([&](const PowersDag::PowersNode &node) {
+            pd.parallel_apply([&](const PowersDag::PowersNode &node) {
                 if (!node.is_source()) {
                     auto parents = node.parents;
                     Ciphertext prod;
@@ -274,12 +264,18 @@ namespace apsi
             // because it corresponds to the zeroth power of the query and is included only for
             // convenience of the indexing; the ciphertext is actually not set or valid for use.
 
-            // When using C++17 this function may be multi-threaded in the future with C++ execution
-            // policies.
-            for_each(
-                next(powers_at_this_bundle_idx.begin()),
-                powers_at_this_bundle_idx.end(),
-                [&](auto &ct) { evaluator.transform_to_ntt_inplace(ct); });
+            ThreadPoolMgr tpm;
+
+            vector<future<void>> futures;
+            for (
+                auto ct_iter = next(powers_at_this_bundle_idx.begin());
+                ct_iter != powers_at_this_bundle_idx.end();
+                ct_iter++)
+            {
+                futures.emplace_back(tpm.thread_pool().enqueue([&, ct_iter]() {
+                    evaluator.transform_to_ntt_inplace(*ct_iter);
+                }));
+            }
         }
 
         void Sender::ProcessBinBundleCache(
