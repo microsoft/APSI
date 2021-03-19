@@ -19,6 +19,9 @@
 #include "seal/util/uintcore.h"
 #include "seal/util/uintarithsmallmod.h"
 
+// GSL
+#include "gsl/span"
+
 using namespace apsi::util;
 
 namespace apsi
@@ -378,6 +381,11 @@ namespace apsi
             Saves the BinBundle to a stream.
             */
             std::size_t save(std::ostream &out, std::uint32_t bundle_idx) const;
+
+            /**
+            Loads the BinBundle from a buffer.
+            */
+            std::pair<std::uint32_t, std::size_t> load(gsl::span<const seal::seal_byte> in);
 
             /**
             Loads the BinBundle from a stream.

@@ -892,14 +892,12 @@ namespace apsi
             return fbs_builder.GetSize();
         }
 
-        pair<uint32_t, size_t> BinBundle::load(istream &in)
+        pair<uint32_t, size_t> BinBundle::load(gsl::span<const seal_byte> in)
         {
             // Remove all data and clear the cache
             clear();
 
-            vector<seal_byte> in_data(apsi::util::read_from_stream(in));
-
-            auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
+            auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in.data()), in.size());
             bool safe = fbs::VerifySizePrefixedBinBundleBuffer(verifier);
             if (!safe)
             {
@@ -907,7 +905,7 @@ namespace apsi
                 throw runtime_error("failed to load BinBundle");
             }
 
-            auto bb = fbs::GetSizePrefixedBinBundle(in_data.data());
+            auto bb = fbs::GetSizePrefixedBinBundle(in.data());
 
             // Load the bundle index
             uint32_t bundle_idx = bb->bundle_idx();
@@ -1176,7 +1174,13 @@ namespace apsi
                 cache_invalid_ = false;
             }
 
-            return { bundle_idx, in_data.size() };
+            return { bundle_idx, in.size() };
+        }
+
+        pair<uint32_t, size_t> BinBundle::load(istream &in)
+        {
+            vector<seal_byte> in_data = read_from_stream(in);
+            return load(in_data);
         }
     } // namespace sender
 } // namespace apsi

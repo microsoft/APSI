@@ -207,7 +207,7 @@ namespace apsi
             for (size_t bundle_idx = 0; bundle_idx < bundle_idx_count; bundle_idx++) {
                 auto bundle_caches = sender_db->get_cache_at(bundle_idx);
                 for (auto &cache : bundle_caches) {
-                    futures.emplace_back(tpm.thread_pool().enqueue([&, bundle_idx, cache]() {
+                    futures.push_back(tpm.thread_pool().enqueue([&, bundle_idx, cache]() {
                         ProcessBinBundleCache(sender_db, cache, all_powers, chl, send_rp_fun, bundle_idx);
                     }));
                 }
@@ -272,7 +272,7 @@ namespace apsi
                 ct_iter != powers_at_this_bundle_idx.end();
                 ct_iter++)
             {
-                futures.emplace_back(tpm.thread_pool().enqueue([&, ct_iter]() {
+                futures.push_back(tpm.thread_pool().enqueue([&, ct_iter]() {
                     evaluator.transform_to_ntt_inplace(*ct_iter);
                 }));
             }

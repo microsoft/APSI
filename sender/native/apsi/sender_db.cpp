@@ -3,6 +3,7 @@
 
 // STD
 #include <memory>
+#include <mutex>
 #include <future>
 #include <iterator>
 #include <algorithm>
@@ -672,7 +673,7 @@ namespace apsi
             vector<future<void>> futures;
             for (auto &bundle_idx : bin_bundles_) {
                 for (auto &bb : bundle_idx) {
-                    futures.emplace_back(tpm.thread_pool().enqueue([&bb]() { bb.regen_cache(); }));
+                    futures.push_back(tpm.thread_pool().enqueue([&bb]() { bb.regen_cache(); }));
                 }
             }
 
@@ -1105,27 +1106,55 @@ namespace apsi
             uint32_t bin_bundle_count = sdb->bin_bundle_count();
             size_t bin_bundle_data_size = 0;
             uint32_t max_bin_size = params->table_params().max_items_per_bin;
-            size_t label_size = compute_label_size(label_byte_count, *params);
+            size_t label_size = compute_label_size(nonce_byte_count + label_byte_count, *params);
 
+            // Load all BinBundle data
+            vector<vector<seal_byte>> bin_bundle_data;
+            bin_bundle_data.reserve(bin_bundle_count);
             while (bin_bundle_count--)
             {
-                BinBundle bb(sender_db->crypto_context_, label_size, max_bin_size, compressed);
-                auto bb_data = bb.load(in);
+                bin_bundle_data.push_back(read_from_stream(in));
+            }
 
-                // Check that the loaded bundle index is not out of range
-                if (bb_data.first >= sender_db->bin_bundles_.size())
-                {
-                    APSI_LOG_ERROR("The bundle index of the loaded BinBundle (" << bb_data.first
-                        << ") exceeds the maximum (" << params->bundle_idx_count() - 1 << ")");
-                    throw runtime_error("failed to load SenderDB");
-                }
+            // Use multiple threads to recreate the BinBundles
+            ThreadPoolMgr tpm;
 
-                // Add the loaded BinBundle to the correct location in bin_bundles_
-                sender_db->bin_bundles_[bb_data.first].push_back(move(bb));
+            vector<mutex> bundle_idx_mtxs(sender_db->bin_bundles_.size());
+            mutex bin_bundle_data_size_mtx;
+            vector<future<void>> futures;
+            for (size_t i = 0; i < bin_bundle_data.size(); i++)
+            {
+                futures.push_back(tpm.thread_pool().enqueue([&, i]() {
+                    BinBundle bb(sender_db->crypto_context_, label_size, max_bin_size, compressed);
+                    auto bb_data = bb.load(bin_bundle_data[i]);
 
-                APSI_LOG_DEBUG("Loaded BinBundle at bundle index " << bb_data.first
-                    << " (" << bb_data.second << " bytes)");
-                bin_bundle_data_size += bb_data.second;
+                    // Clear the data buffer since we have now loaded the BinBundle
+                    bin_bundle_data[i].clear();
+
+                    // Check that the loaded bundle index is not out of range
+                    if (bb_data.first >= sender_db->bin_bundles_.size())
+                    {
+                        APSI_LOG_ERROR("The bundle index of the loaded BinBundle (" << bb_data.first
+                            << ") exceeds the maximum (" << params->bundle_idx_count() - 1 << ")");
+                        throw runtime_error("failed to load SenderDB");
+                    }
+
+                    // Add the loaded BinBundle to the correct location in bin_bundles_
+                    bundle_idx_mtxs[bb_data.first].lock();
+                    sender_db->bin_bundles_[bb_data.first].push_back(move(bb));
+                    bundle_idx_mtxs[bb_data.first].unlock();
+
+                    APSI_LOG_DEBUG("Loaded BinBundle at bundle index " << bb_data.first
+                        << " (" << bb_data.second << " bytes)");
+
+                    lock_guard<mutex> bin_bundle_data_size_lock(bin_bundle_data_size_mtx);
+                    bin_bundle_data_size += bb_data.second;
+                }));
+            }
+
+            // Wait for the tasks to finish
+            for (auto &f : futures) {
+                f.get();
             }
 
             size_t total_size = in_data.size() + bin_bundle_data_size;
