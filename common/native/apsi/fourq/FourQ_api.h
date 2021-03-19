@@ -5,11 +5,11 @@
 *
 * Abstract: API header file
 *
-* This code is based on the paper "FourQ: four-dimensional decompositions on a
-* Q-curve over the Mersenne prime" by Craig Costello and Patrick Longa, in Advances
+* This code is based on the paper "FourQ: four-dimensional decompositions on a 
+* Q-curve over the Mersenne prime" by Craig Costello and Patrick Longa, in Advances 
 * in Cryptology - ASIACRYPT, 2015.
 * Preprint available at http://eprint.iacr.org/2015/565.
-************************************************************************************/
+************************************************************************************/  
 
 #ifndef __FOURQ_API_H__
 #define __FOURQ_API_H__
@@ -21,7 +21,7 @@ extern "C" {
 #endif
 
 
-#include "apsi/fourq/FourQ.h"
+#include "FourQ.h"
 
 
 /**************** Public ECC API ****************/
@@ -73,7 +73,7 @@ void modulo_order(digit_t* a, digit_t* c);
 ECCRYPTO_STATUS SchnorrQ_KeyGeneration(const unsigned char* SecretKey, unsigned char* PublicKey);
 
 // SchnorrQ keypair generation
-// It produces a private key SecretKey and computes the public key PublicKey, which is the encoding of P = s*G,
+// It produces a private key SecretKey and computes the public key PublicKey, which is the encoding of P = s*G, 
 // where G is the generator and s is the output of hashing SecretKey and taking the least significant 32 bytes of the result.
 // Outputs: 32-byte SecretKey and 32-byte PublicKey
 ECCRYPTO_STATUS SchnorrQ_FullKeyGeneration(unsigned char* SecretKey, unsigned char* PublicKey);
@@ -81,7 +81,7 @@ ECCRYPTO_STATUS SchnorrQ_FullKeyGeneration(unsigned char* SecretKey, unsigned ch
 // SchnorrQ signature generation
 // It produces the signature Signature of a message Message of size SizeMessage in bytes
 // Inputs: 32-byte SecretKey, 32-byte PublicKey, and Message of size SizeMessage in bytes
-// Output: 64-byte Signature
+// Output: 64-byte Signature 
 ECCRYPTO_STATUS SchnorrQ_Sign(const unsigned char* SecretKey, const unsigned char* PublicKey, const unsigned char* Message, const unsigned int SizeMessage, unsigned char* Signature);
 
 // SchnorrQ signature verification
@@ -101,11 +101,11 @@ ECCRYPTO_STATUS CompressedPublicKeyGeneration(const unsigned char* SecretKey, un
 
 // Keypair generation for key exchange. Public key is compressed to 32 bytes
 // It produces a private key SecretKey and a public key PublicKey, which is the encoding of P = SecretKey*G (G is the generator).
-// Outputs: 32-byte SecretKey and 32-byte PublicKey
+// Outputs: 32-byte SecretKey and 32-byte PublicKey 
 ECCRYPTO_STATUS CompressedKeyGeneration(unsigned char* SecretKey, unsigned char* PublicKey);
 
 // Secret agreement computation for key exchange using a compressed, 32-byte public key
-// The output is the y-coordinate of SecretKey*A, where A is the decoding of the public key PublicKey.
+// The output is the y-coordinate of SecretKey*A, where A is the decoding of the public key PublicKey. 
 // Inputs: 32-byte SecretKey and 32-byte PublicKey
 // Output: 32-byte SharedSecret
 ECCRYPTO_STATUS CompressedSecretAgreement(const unsigned char* SecretKey, const unsigned char* PublicKey, unsigned char* SharedSecret);
@@ -121,11 +121,11 @@ ECCRYPTO_STATUS PublicKeyGeneration(const unsigned char* SecretKey, unsigned cha
 
 // Keypair generation for key exchange
 // It produces a private key SecretKey and computes the public key PublicKey = SecretKey*G, where G is the generator.
-// Outputs: 32-byte SecretKey and 64-byte PublicKey
+// Outputs: 32-byte SecretKey and 64-byte PublicKey 
 ECCRYPTO_STATUS KeyGeneration(unsigned char* SecretKey, unsigned char* PublicKey);
 
 // Secret agreement computation for key exchange
-// The output is the y-coordinate of SecretKey*PublicKey.
+// The output is the y-coordinate of SecretKey*PublicKey. 
 // Inputs: 32-byte SecretKey and 64-byte PublicKey
 // Output: 32-byte SharedSecret
 ECCRYPTO_STATUS SecretAgreement(const unsigned char* SecretKey, const unsigned char* PublicKey, unsigned char* SharedSecret);

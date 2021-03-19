@@ -126,7 +126,7 @@ namespace APSITests
             ASSERT_EQ(1351976583327153065ULL, w1);
             ASSERT_EQ(6824769698500631404ULL, w2);
             ASSERT_EQ(4564688725223058933ULL, w3);
-            ASSERT_EQ(8480578751789819486ULL, w4);
+            ASSERT_EQ(17703950788644595294ULL, w4);
         }
         {
             std::array<unsigned char, 16> val{

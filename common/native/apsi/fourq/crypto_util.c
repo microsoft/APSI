@@ -4,10 +4,10 @@
 *    Copyright (c) Microsoft Corporation. All rights reserved.
 *
 * Abstract: crypto utility functions
-************************************************************************************/
+************************************************************************************/ 
 
-#include "apsi/fourq/FourQ_internal.h"
-#include "apsi/fourq/FourQ_params.h"
+#include "FourQ_internal.h"
+#include "FourQ_params.h"
 #include <string.h>
 
 static digit_t mask4000 = (digit_t)1 << (sizeof(digit_t)*8 - 2);
@@ -64,14 +64,14 @@ ECCRYPTO_STATUS decode(const unsigned char* Pencoded, point_t P)
 
     fpsqr1271(v[0], t0);                            // t0 = v0^2
     fpsqr1271(v[1], t1);                            // t1 = v1^2
-    fpadd1271(t0, t1, t0);                          // t0 = t0+t1
+    fpadd1271(t0, t1, t0);                          // t0 = t0+t1   
     fpmul1271(u[0], v[0], t1);                      // t1 = u0*v0
-    fpmul1271(u[1], v[1], t2);                      // t2 = u1*v1
-    fpadd1271(t1, t2, t1);                          // t1 = t1+t2
+    fpmul1271(u[1], v[1], t2);                      // t2 = u1*v1 
+    fpadd1271(t1, t2, t1);                          // t1 = t1+t2  
     fpmul1271(u[1], v[0], t2);                      // t2 = u1*v0
     fpmul1271(u[0], v[1], t3);                      // t3 = u0*v1
-    fpsub1271(t2, t3, t2);                          // t2 = t2-t3
-    fpsqr1271(t1, t3);                              // t3 = t1^2
+    fpsub1271(t2, t3, t2);                          // t2 = t2-t3    
+    fpsqr1271(t1, t3);                              // t3 = t1^2    
     fpsqr1271(t2, t4);                              // t4 = t2^2
     fpadd1271(t3, t4, t3);                          // t3 = t3+t4
     for (i = 0; i < 125; i++) {                     // t3 = t3^(2^125)
@@ -83,26 +83,26 @@ ECCRYPTO_STATUS decode(const unsigned char* Pencoded, point_t P)
     if (is_zero_ct(t, NWORDS_FIELD) == true) {
         fpsub1271(t1, t3, t);                       // t = t1-t3
     }
-    fpadd1271(t, t, t);                             // t = 2*t
-    fpsqr1271(t0, t3);                              // t3 = t0^2
-    fpmul1271(t0, t3, t3);                          // t3 = t3*t0
+    fpadd1271(t, t, t);                             // t = 2*t            
+    fpsqr1271(t0, t3);                              // t3 = t0^2      
+    fpmul1271(t0, t3, t3);                          // t3 = t3*t0   
     fpmul1271(t, t3, t3);                           // t3 = t3*t
-    fpexp1251(t3, r);                               // r = t3^(2^125-1)
-    fpmul1271(t0, r, t3);                           // t3 = t0*r
-    fpmul1271(t, t3, P->x[0]);                      // x0 = t*t3
+    fpexp1251(t3, r);                               // r = t3^(2^125-1)  
+    fpmul1271(t0, r, t3);                           // t3 = t0*r          
+    fpmul1271(t, t3, P->x[0]);                      // x0 = t*t3 
     fpsqr1271(P->x[0], t1);
-    fpmul1271(t0, t1, t1);                          // t1 = t0*x0^2
-    fpdiv1271(P->x[0]);                             // x0 = x0/2
-    fpmul1271(t2, t3, P->x[1]);                     // x1 = t3*t2
+    fpmul1271(t0, t1, t1);                          // t1 = t0*x0^2 
+    fpdiv1271(P->x[0]);                             // x0 = x0/2         
+    fpmul1271(t2, t3, P->x[1]);                     // x1 = t3*t2  
 
     fpsub1271(t, t1, t);
     mod1271(t);
-    if (is_zero_ct(t, NWORDS_FIELD) == false) {        // If t != t1 then swap x0 and x1
+    if (is_zero_ct(t, NWORDS_FIELD) == false) {        // If t != t1 then swap x0 and x1       
         fpcopy1271(P->x[0], t0);
         fpcopy1271(P->x[1], P->x[0]);
         fpcopy1271(t0, P->x[1]);
     }
-
+    
     mod1271(P->x[0]);
     if (is_zero_ct((digit_t*)P->x, NWORDS_FIELD) == true) {
         sign_dec = ((digit_t*)&P->x[1])[NWORDS_FIELD-1] >> (sizeof(digit_t)*8 - 2);
@@ -161,7 +161,7 @@ void Montgomery_inversion_mod_order(const digit_t* ma, digit_t* mc)
     subtract((digit_t*)&curve_order, modulus2, modulus2, nwords);       // modulus-2
 
     // Precomputation stage
-    memmove((unsigned char*)&table[0], (unsigned char*)ma, 32);         // table[0] = ma
+    memmove((unsigned char*)&table[0], (unsigned char*)ma, 32);         // table[0] = ma 
     Montgomery_multiply_mod_order(ma, ma, input_a);                     // ma^2
     for (j = 0; j < npoints - 1; j++) {
         Montgomery_multiply_mod_order(table[j], input_a, table[j+1]);   // table[j+1] = table[j] * ma^2
@@ -188,7 +188,7 @@ void Montgomery_inversion_mod_order(const digit_t* ma, digit_t* mc)
                 SHIFTL(modulus2[j], modulus2[j-1], 1, modulus2[j], RADIX);
             }
             modulus2[0] = modulus2[0] << 1;
-        } else {                                              // "temp" will store the longest odd bitstring with "count" bits s.t. temp <= 2^k - 1
+        } else {                                              // "temp" will store the longest odd bitstring with "count" bits s.t. temp <= 2^k - 1 
             count = k_EXPON;
             temp = (modulus2[nwords-1] & mask2) >> (sizeof(digit_t)*8 - k_EXPON);  // Extracting next k bits to the left
             mod2 = temp & 1;
@@ -200,7 +200,7 @@ void Montgomery_inversion_mod_order(const digit_t* ma, digit_t* mc)
             for (j = 0; j < count; j++) {                     // mc = mc^count
                 Montgomery_multiply_mod_order(mc, mc, mc);
             }
-            Montgomery_multiply_mod_order(mc, table[(temp-1) >> 1], mc);   // mc = mc * table[(temp-1)/2]
+            Montgomery_multiply_mod_order(mc, table[(temp-1) >> 1], mc);   // mc = mc * table[(temp-1)/2] 
             i = i - count;
 
             for (j = (nwords - 1); j > 0; j--) {              // Shift (modulus-2) "count" bits to the left
@@ -228,6 +228,7 @@ const char* FourQ_get_error_message(ECCRYPTO_STATUS Status)
         {ECCRYPTO_ERROR_INVALID_PARAMETER, ECCRYPTO_MSG_ERROR_INVALID_PARAMETER},
         {ECCRYPTO_ERROR_SHARED_KEY, ECCRYPTO_MSG_ERROR_SHARED_KEY},
         {ECCRYPTO_ERROR_SIGNATURE_VERIFICATION, ECCRYPTO_MSG_ERROR_SIGNATURE_VERIFICATION},
+        {ECCRYPTO_ERROR_HASH_TO_CURVE, ECCRYPTO_MSG_ERROR_HASH_TO_CURVE},
     };
 
     if (Status >= ECCRYPTO_STATUS_TYPE_SIZE || mapping[Status].string == NULL) {
