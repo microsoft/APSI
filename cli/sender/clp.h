@@ -30,8 +30,8 @@ public:
         add(nonce_byte_count_arg_);
         add(net_port_arg_);
         add(params_file_arg_);
-        xorAdd(db_file_arg_, sender_db_load_file_arg_);
-        add(sender_db_save_file_arg_);
+        add(db_file_arg_);
+        add(sdb_out_file_arg_);
     }
 
     virtual void get_args()
@@ -40,8 +40,7 @@ public:
         db_file_ = db_file_arg_.isSet() ? db_file_arg_.getValue() : "";
         net_port_ = net_port_arg_.getValue();
         params_file_ = params_file_arg_.getValue();
-        sender_db_load_file_ = sender_db_load_file_arg_.isSet() ? sender_db_load_file_arg_.getValue() : "";
-        sender_db_save_file_ = sender_db_save_file_arg_.getValue();
+        sdb_out_file_ = sdb_out_file_arg_.getValue();
     }
 
     std::size_t nonce_byte_count() const
@@ -64,14 +63,9 @@ public:
         return params_file_;
     }
 
-    const std::string &sender_db_save_file() const
+    const std::string &sdb_out_file() const
     {
-        return sender_db_save_file_;
-    }
-
-    const std::string &sender_db_load_file() const
-    {
-        return sender_db_load_file_;
+        return sdb_out_file_;
     }
 
 private:
@@ -95,34 +89,26 @@ private:
     TCLAP::ValueArg<std::string> db_file_arg_ = TCLAP::ValueArg<std::string>(
         "d",
         "dbFile",
-        "Path to a CSV file describing the sender's dataset (an item-label pair on each row)",
+        "Path to a saved SenderDB file or a CSV file describing the sender's dataset (an item-label pair on each row)",
         true,
         "",
         "string"
     );
 
     TCLAP::ValueArg<std::string> params_file_arg_ = TCLAP::ValueArg<std::string>(
-        "",
+        "p",
         "paramsFile",
-        "Path to a JSON file that specifies APSI parameters",
-        true,
+        "Path to a JSON file that specifies APSI parameters; this must be given if --dbFile is specified with a path "
+        " to a CSV file",
+        false,
         "",
         "string"
     );
 
-    TCLAP::ValueArg<std::string> sender_db_load_file_arg_ = TCLAP::ValueArg<std::string>(
-        "",
-        "loadSenderDB",
-        "File to load the SenderDB from",
-        true,
-        "",
-        "string"
-    );
-
-    TCLAP::ValueArg<std::string> sender_db_save_file_arg_ = TCLAP::ValueArg<std::string>(
-        "",
-        "saveSenderDB",
-        "File to save the SenderDB to",
+    TCLAP::ValueArg<std::string> sdb_out_file_arg_ = TCLAP::ValueArg<std::string>(
+        "o",
+        "sdbOutFile",
+        "Save the SenderDB in the given file",
         false,
         "",
         "string"
@@ -136,7 +122,5 @@ private:
 
     std::string params_file_;
 
-    std::string sender_db_load_file_;
-
-    std::string sender_db_save_file_;
+    std::string sdb_out_file_;
 };

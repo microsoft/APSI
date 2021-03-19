@@ -663,10 +663,10 @@ namespace apsi
             clear_internal();
         }
 
-        void SenderDB::regenerate_caches()
+        void SenderDB::generate_caches()
         {
-            STOPWATCH(sender_stopwatch, "SenderDB::regenerate_caches");
-            APSI_LOG_INFO("Start regenerating bin bundle caches");
+            STOPWATCH(sender_stopwatch, "SenderDB::generate_caches");
+            APSI_LOG_INFO("Start generating bin bundle caches");
 
             ThreadPoolMgr tpm;
 
@@ -682,7 +682,7 @@ namespace apsi
                 f.get();
             }
 
-            APSI_LOG_INFO("Finished regenerating bin bundle caches");
+            APSI_LOG_INFO("Finished generating bin bundle caches");
         }
 
         vector<reference_wrapper<const BinBundleCache>> SenderDB::get_cache_at(uint32_t bundle_idx)
@@ -721,9 +721,6 @@ namespace apsi
                 return found;
             });
 
-            APSI_LOG_INFO("Found " << distance(hashed_data.begin(), new_data_end) << " new items to insert in SenderDB");
-            APSI_LOG_INFO("Found " << distance(new_data_end, hashed_data.end()) << " existing items to replace in SenderDB");
-
             // Dispatch the insertion, first for the new data, then for the data we're gonna overwrite
             uint32_t bins_per_bundle = params_.bins_per_bundle();
             uint32_t max_bin_size = params_.table_params().max_items_per_bin;
@@ -731,43 +728,55 @@ namespace apsi
             // Compute the label size; this ceil(effective_label_bit_count / item_bit_count)
             size_t label_size = compute_label_size(nonce_byte_count_ + label_byte_count_, params_);
 
-            // Break the data into field element representation. Also compute the items' cuckoo indices.
-            vector<pair<AlgItemLabel, size_t>> overwritable_data_with_indices
-                = preprocess_labeled_data(new_data_end, hashed_data.end(), params_);
+            auto new_item_count = distance(hashed_data.begin(), new_data_end);
+            auto existing_item_count = distance(new_data_end, hashed_data.end());
 
-            dispatch_insert_or_assign(
-                overwritable_data_with_indices,
-                bin_bundles_,
-                crypto_context_,
-                bins_per_bundle,
-                label_size,
-                max_bin_size,
-                true, /* overwrite items */
-                compressed_
-            );
+            if (existing_item_count)
+            {
+                APSI_LOG_INFO("Found " << existing_item_count << " existing items to replace in SenderDB");
 
-            // Release memory that is no longer needed
-            overwritable_data_with_indices.clear();
-            hashed_data.erase(new_data_end, hashed_data.end());
+                // Break the data into field element representation. Also compute the items' cuckoo indices.
+                vector<pair<AlgItemLabel, size_t>> data_with_indices
+                    = preprocess_labeled_data(new_data_end, hashed_data.end(), params_);
 
-            // Process and add the new data. Break the data into field element representation. Also compute the items'
-            // cuckoo indices.
-            vector<pair<AlgItemLabel, size_t>> new_data_with_indices
-                = preprocess_labeled_data(hashed_data.begin(), hashed_data.end(), params_);
+                dispatch_insert_or_assign(
+                    data_with_indices,
+                    bin_bundles_,
+                    crypto_context_,
+                    bins_per_bundle,
+                    label_size,
+                    max_bin_size,
+                    true, /* overwrite items */
+                    compressed_
+                );
 
-            dispatch_insert_or_assign(
-                new_data_with_indices,
-                bin_bundles_,
-                crypto_context_,
-                bins_per_bundle,
-                label_size,
-                max_bin_size,
-                false, /* don't overwrite items */
-                compressed_
-            );
+                // Release memory that is no longer needed
+                hashed_data.erase(new_data_end, hashed_data.end());
+            }
 
-            // Regenerate the BinBundle caches
-            regenerate_caches();
+            if (new_item_count)
+            {
+                APSI_LOG_INFO("Found " << new_item_count << " new items to insert in SenderDB");
+
+                // Process and add the new data. Break the data into field element representation. Also compute the items'
+                // cuckoo indices.
+                vector<pair<AlgItemLabel, size_t>> data_with_indices
+                    = preprocess_labeled_data(hashed_data.begin(), hashed_data.end(), params_);
+
+                dispatch_insert_or_assign(
+                    data_with_indices,
+                    bin_bundles_,
+                    crypto_context_,
+                    bins_per_bundle,
+                    label_size,
+                    max_bin_size,
+                    false, /* don't overwrite items */
+                    compressed_
+                );
+            }
+
+            // Generate the BinBundle caches
+            generate_caches();
 
             APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
         }
@@ -827,8 +836,8 @@ namespace apsi
                 compressed_
             );
 
-            // Regenerate the BinBundle caches
-            regenerate_caches();
+            // Generate the BinBundle caches
+            generate_caches();
 
             APSI_LOG_INFO("Finished inserting " << data.size() << " items in SenderDB");
         }
@@ -871,8 +880,8 @@ namespace apsi
             uint32_t bins_per_bundle = params_.bins_per_bundle();
             dispatch_remove(data_with_indices, bin_bundles_, crypto_context_, bins_per_bundle);
 
-            // Regenerate the BinBundle caches
-            regenerate_caches();
+            // Generate the BinBundle caches
+            generate_caches();
 
             APSI_LOG_INFO("Finished removing " << data.size() << " items from SenderDB");
         }
@@ -1162,7 +1171,7 @@ namespace apsi
                 << total_size << " bytes)");
 
             // Make sure the BinBundle caches are valid
-            sender_db->regenerate_caches();
+            sender_db->generate_caches();
 
             return { move(*sender_db), total_size };
         }

@@ -26,13 +26,13 @@ using namespace apsi::sender;
 using namespace apsi::network;
 using namespace apsi::oprf;
 
-int run_sender_dispatcher(const CLP &cmd);
+int start_sender(const CLP &cmd);
 
 unique_ptr<CSVReader::DBData> load_db(const string &db_file);
 
 shared_ptr<SenderDB> create_sender_db(
     const CSVReader::DBData &db_data,
-    const PSIParams &psi_params,
+    unique_ptr<PSIParams> psi_params,
     size_t nonce_byte_count);
 
 int main(int argc, char *argv[])
@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    return run_sender_dispatcher(cmd);
+    return start_sender(cmd);
 }
 
 void sigint_handler(int param)
@@ -56,7 +56,75 @@ void sigint_handler(int param)
     exit(0);
 }
 
-int run_sender_dispatcher(const CLP &cmd)
+shared_ptr<SenderDB> try_load_sender_db(const CLP &cmd)
+{
+    shared_ptr<SenderDB> result = nullptr;
+
+    ifstream fs(cmd.db_file(), ios::binary);
+    fs.exceptions(ios_base::badbit | ios_base::failbit);
+    try
+    {
+        auto [data, size] = SenderDB::Load(fs);
+        APSI_LOG_INFO("Loaded SenderDB (" << size << " bytes) from " << cmd.db_file());
+        if (!cmd.params_file().empty())
+        {
+            APSI_LOG_WARNING("PSI parameters were loaded with the SenderDB; ignoring given PSI parameters");
+        }
+        result = make_shared<SenderDB>(move(data));
+    }
+    catch(const exception &e)
+    {
+        // Failed to load SenderDB
+        APSI_LOG_DEBUG("Failed to load SenderDB: " << e.what());
+    }
+
+    return result;
+}
+
+shared_ptr<SenderDB> try_load_csv_db(const CLP &cmd)
+{
+    unique_ptr<PSIParams> params = build_psi_params(cmd);
+    if (!params)
+    {
+        // We must have valid parameters given
+        return nullptr;
+    }
+
+    unique_ptr<CSVReader::DBData> db_data;
+    if (cmd.db_file().empty() || !(db_data = load_db(cmd.db_file())))
+    {
+        // Failed to read db file
+        APSI_LOG_DEBUG("Failed to load data from a CSV file");
+        return nullptr;
+    }
+
+    return create_sender_db(*db_data, move(params), cmd.nonce_byte_count());
+}
+
+bool try_save_sender_db(const CLP &cmd, shared_ptr<SenderDB> sender_db)
+{
+    if (!sender_db)
+    {
+        return false;
+    }
+
+    ofstream fs(cmd.sdb_out_file(), ios::binary);
+    fs.exceptions(ios_base::badbit | ios_base::failbit);
+    try
+    {
+        size_t size = sender_db->save(fs);
+        APSI_LOG_INFO("Saved SenderDB (" << size << " bytes) to " << cmd.sdb_out_file());
+    }
+    catch(const exception &e)
+    {
+        APSI_LOG_WARNING("Failed to save SenderDB: " << e.what());
+        return false;
+    }
+
+    return true;
+}
+
+int start_sender(const CLP &cmd)
 {
     // Set up parameters according to command line input
     unique_ptr<PSIParams> params = build_psi_params(cmd);
@@ -71,56 +139,21 @@ int run_sender_dispatcher(const CLP &cmd)
     APSI_LOG_INFO("Thread count is set to " << ThreadPoolMgr::GetThreadCount());
     signal(SIGINT, sigint_handler);
 
+    // Try loading first as a SenderDB, then as a CSV file
     shared_ptr<SenderDB> sender_db;
-    if (!cmd.db_file().empty())
+    if (!(sender_db = try_load_sender_db(cmd)) && !(sender_db = try_load_csv_db(cmd)))
     {
-        unique_ptr<CSVReader::DBData> db_data = load_db(cmd.db_file());
-        if (!db_data)
-        {
-            // Failed to read db file
-            APSI_LOG_ERROR("Failed to read database: terminating");
-            return -1;
-        }
-
-        sender_db = create_sender_db(*db_data, *params, cmd.nonce_byte_count());
-        db_data = nullptr;
-    }
-    else if (!cmd.sender_db_load_file().empty())
-    {
-        ifstream fs(cmd.sender_db_load_file(), ios::binary);
-        try
-        {
-            auto [data, size] = SenderDB::Load(fs);
-            sender_db = make_shared<SenderDB>(move(data));
-            APSI_LOG_INFO("Loaded SenderDB (" << size << " bytes) from " << cmd.sender_db_load_file());
-        }
-        catch(const exception &e)
-        {
-            // Failed to load SenderDB
-            APSI_LOG_ERROR("Failed to load SenderDB: terminating");
-            return -1;
-        }
-    }
-    else
-    {
-        // No input given
+        APSI_LOG_ERROR("Failed to create SenderDB: terminating");
         return -1;
     }
 
+    // Check that the database file is valid
+    throw_if_file_invalid(cmd.db_file());
+
     // Try to save the SenderDB if a save file was given
-    if (!cmd.sender_db_save_file().empty())
+    if (!cmd.sdb_out_file().empty() && !try_save_sender_db(cmd, sender_db))
     {
-        ofstream fs(cmd.sender_db_save_file(), ios::binary);
-        try
-        {
-            size_t size = sender_db->save(fs);
-            APSI_LOG_INFO("Saved SenderDB (" << size << " bytes) to " << cmd.sender_db_save_file());
-        }
-        catch(const exception &e)
-        {
-            // Failed to load SenderDB
-            APSI_LOG_WARNING("Failed to save SenderDB");
-        }
+        return -1;
     }
 
     // Run the dispatcher
@@ -152,15 +185,21 @@ unique_ptr<CSVReader::DBData> load_db(const string &db_file)
 
 shared_ptr<SenderDB> create_sender_db(
     const CSVReader::DBData &db_data,
-    const PSIParams &psi_params,
+    unique_ptr<PSIParams> psi_params,
     size_t nonce_byte_count)
 {
+    if (!psi_params)
+    {
+        APSI_LOG_ERROR("No PSI parameters were given");
+        return nullptr;
+    }
+
     shared_ptr<SenderDB> sender_db;
     if (holds_alternative<CSVReader::UnlabeledData>(db_data))
     {
         try
         {
-            sender_db = make_shared<SenderDB>(psi_params, 0, 0, true);
+            sender_db = make_shared<SenderDB>(*psi_params, 0, 0, true);
             sender_db->set_data(get<CSVReader::UnlabeledData>(db_data));
             APSI_LOG_INFO("Created unlabeled SenderDB with " << sender_db->get_item_count() << " items");
         }
@@ -183,7 +222,7 @@ shared_ptr<SenderDB> create_sender_db(
                 [](auto &a, auto &b) { return a.second.size() < b.second.size(); }
             )->second.size();
 
-            sender_db = make_shared<SenderDB>(psi_params, label_byte_count, nonce_byte_count, true);
+            sender_db = make_shared<SenderDB>(*psi_params, label_byte_count, nonce_byte_count, true);
             sender_db->set_data(labeled_db_data);
             APSI_LOG_INFO("Created labeled SenderDB with "
                 << sender_db->get_item_count() << " items and " << label_byte_count << "-byte labels ("

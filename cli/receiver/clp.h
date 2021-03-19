@@ -66,7 +66,7 @@ private:
     );
 
     TCLAP::ValueArg<int> net_port_arg_ = TCLAP::ValueArg<int>(
-        "p",
+        "",
         "port",
         "TCP port to connect to (default is 1212)",
         false,
