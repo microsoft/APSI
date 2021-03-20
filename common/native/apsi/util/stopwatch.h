@@ -21,7 +21,7 @@
 #define UNIQUE_STOPWATCH_NAME(base) PP_CAT(base, __COUNTER__)
 
 // Measure a block
-#define STOPWATCH(stopwatch, name) StopwatchScope UNIQUE_STOPWATCH_NAME(stopwatchscope)(stopwatch, name);
+#define STOPWATCH(stopwatch, name) apsi::util::StopwatchScope UNIQUE_STOPWATCH_NAME(stopwatchscope)(stopwatch, name);
 
 namespace apsi
 {
