@@ -8,9 +8,7 @@ set(APSI_COMMON_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES}
     ${CMAKE_CURRENT_LIST_DIR}/eccp2_no_endo.c
     ${CMAKE_CURRENT_LIST_DIR}/eccp2.c
     ${CMAKE_CURRENT_LIST_DIR}/hash_to_curve.c
-    ${CMAKE_CURRENT_LIST_DIR}/kex.c
     ${CMAKE_CURRENT_LIST_DIR}/random.c
-    ${CMAKE_CURRENT_LIST_DIR}/sha512.c
 )
 
 # Add header files for installation
