@@ -59,7 +59,8 @@ namespace apsi
                     reinterpret_cast<unsigned char *>(r), sizeof(f2elm_t), value.data(),
                     static_cast<size_t>(value.size()), nullptr, 0);
 
-                // Reduce r
+                // Reduce r; note that this does not produce a perfectly uniform distribution modulo 2^127-1, but it is
+                // good enough.
                 mod1271(r[0]);
                 mod1271(r[1]);
 
