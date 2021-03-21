@@ -7,7 +7,6 @@
 
 // APSI
 #include "apsi/oprf/ecpoint.h"
-#include "apsi/util/stopwatch.h"
 
 // FourQ
 #include "apsi/fourq/FourQ_internal.h"
@@ -65,7 +64,6 @@ namespace apsi
                 mod1271(r[1]);
 
                 // Create an elliptic curve point
-                STOPWATCH(util::sender_stopwatch, "hash2curve");
                 HashToCurve(r, pt_);
             }
         }

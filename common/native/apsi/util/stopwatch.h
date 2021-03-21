@@ -5,6 +5,7 @@
 
 // STD
 #include <chrono>
+#include <cstdint>
 #include <list>
 #include <map>
 #include <memory>
@@ -12,13 +13,12 @@
 #include <ostream>
 #include <string>
 #include <vector>
-#include <cstdint>
 
 // Macro Magic to generate unique variable names. This is used for the STOPWATCH macro.
 #define PP_CAT_II(p, res) res
 #define PP_CAT_I(a, b) PP_CAT_II(~, a##b)
 #define PP_CAT(a, b) PP_CAT_I(a, b)
-#define UNIQUE_STOPWATCH_NAME(base) PP_CAT(base, __COUNTER__)
+#define UNIQUE_STOPWATCH_NAME(base) PP_CAT(base, __LINE__)
 
 // Measure a block
 #define STOPWATCH(stopwatch, name) apsi::util::StopwatchScope UNIQUE_STOPWATCH_NAME(stopwatchscope)(stopwatch, name);
@@ -114,9 +114,7 @@ namespace apsi
         }; // class Stopwatch
 
         /**
-        Class used to time a scope.
-
-        Simply declare a variable of this type in the scope that you want to measure.
+        Class used to time a scope. Simply declare a variable of this type in the scope that you want to measure.
         */
         class StopwatchScope
         {

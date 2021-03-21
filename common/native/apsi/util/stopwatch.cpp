@@ -1,9 +1,6 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-// STD
-#include <sstream>
-
 // APSI
 #include "apsi/util/stopwatch.h"
 
@@ -17,8 +14,9 @@ namespace apsi
 
         void Stopwatch::add_event(const string &name)
         {
+            Timepoint tp{ name, time_unit::clock::now() };
             lock_guard<mutex> events_lock(events_mtx_);
-            events_.push_back(Timepoint{ name, time_unit::clock::now() });
+            events_.push_back(tp);
 
             if (static_cast<int>(name.length()) > max_event_name_length_)
             {
@@ -28,8 +26,8 @@ namespace apsi
 
         void Stopwatch::add_timespan_event(const string &name, const time_unit &start, const time_unit &end)
         {
+            uint64_t duration = static_cast<uint64_t>(chrono::duration_cast<chrono::milliseconds>(end - start).count());
             lock_guard<mutex> timespan_events_lock(timespan_events_mtx_);
-            uint64_t duration = static_cast<uint64_t>(chrono::duration_cast<chrono::microseconds>(end - start).count());
             auto timespan_evt = timespan_events_.find(name);
 
             if (timespan_evt == timespan_events_.end())
