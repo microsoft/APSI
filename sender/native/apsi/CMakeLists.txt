@@ -20,8 +20,9 @@ install(
         ${APSI_INCLUDES_INSTALL_DIR}/apsi
 )
 
+add_subdirectory(util)
+
 if(APSI_USE_ZMQ)
-    add_subdirectory(util) # TODO: why does util depends on zmq?
     add_subdirectory(zmq)
 endif()
 set(APSI_SENDER_SOURCE_FILES ${APSI_SENDER_SOURCE_FILES} PARENT_SCOPE)
