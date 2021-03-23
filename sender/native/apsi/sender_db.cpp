@@ -33,6 +33,7 @@ using namespace kuku;
 namespace apsi
 {
     using namespace util;
+    using namespace oprf;
 
     namespace sender
     {
@@ -532,27 +533,30 @@ namespace apsi
             compressed_(compressed)
         {
             // The labels cannot be more than 1 KB.
-            if (label_byte_count_ > 1024)
-            {
-                APSI_LOG_ERROR("Requested label byte count " << label_byte_count_ << " exceeds the maximum (1024)");
+            if (label_byte_count_ > 1024) {
+                APSI_LOG_ERROR(
+                    "Requested label byte count " << label_byte_count_
+                                                  << " exceeds the maximum (1024)");
                 throw invalid_argument("label_byte_count is too large");
             }
 
-            if (nonce_byte_count_ > max_nonce_byte_count)
-            {
-                APSI_LOG_ERROR("Request nonce byte count " << nonce_byte_count_ << " exceeds the maximum ("
-                    << max_nonce_byte_count << ")");
+            if (nonce_byte_count_ > max_nonce_byte_count) {
+                APSI_LOG_ERROR(
+                    "Request nonce byte count " << nonce_byte_count_ << " exceeds the maximum ("
+                                                << max_nonce_byte_count << ")");
                 throw invalid_argument("nonce_byte_count is too large");
             }
 
-            // If the nonce byte count is less than max_nonce_byte_count, print a warning; this is a labeled SenderDB
-            // but may not be safe to use for arbitrary label changes.
-            if (label_byte_count_ && nonce_byte_count_ < max_nonce_byte_count)
-            {
-                APSI_LOG_WARNING("You have instantiated a labeled SenderDB instance with a nonce byte count "
-                    << nonce_byte_count_ << ", which is less than the safe default value " << max_nonce_byte_count
-                    << ". Updating labels for existing items in the SenderDB or removing and reinserting items with "
-                    "different labels may leak information about the labels.")
+            // If the nonce byte count is less than max_nonce_byte_count, print a warning; this is a
+            // labeled SenderDB but may not be safe to use for arbitrary label changes.
+            if (label_byte_count_ && nonce_byte_count_ < max_nonce_byte_count) {
+                APSI_LOG_WARNING(
+                    "You have instantiated a labeled SenderDB instance with a nonce byte count "
+                    << nonce_byte_count_ << ", which is less than the safe default value "
+                    << max_nonce_byte_count
+                    << ". Updating labels for existing items in the SenderDB or removing and "
+                       "reinserting items with "
+                       "different labels may leak information about the labels.")
             }
 
             // Set the evaluator. This will be used for BatchedPlaintextPolyn::eval.
@@ -560,6 +564,18 @@ namespace apsi
 
             // Reset the SenderDB data structures
             clear();
+        }
+        
+        SenderDB::SenderDB(
+            PSIParams params,
+            const OPRFKey &oprf_key,
+            size_t label_byte_count,
+            size_t nonce_byte_count,
+            bool compressed)
+            : SenderDB(params, label_byte_count, nonce_byte_count, compressed)
+        {
+            // Initialize oprf key with the one given to this constructor
+            oprf_key_ = oprf_key;
         }
 
         SenderDB::SenderDB(SenderDB &&source) :

@@ -230,8 +230,7 @@ namespace apsi
         {
             STOPWATCH(sender_stopwatch, "Sender::ComputePowers");
             auto bundle_caches = sender_db->get_cache_at(bundle_idx);
-            if (!bundle_caches.size())
-            {
+            if (!bundle_caches.size()) {
                 return;
             }
 
@@ -265,16 +264,16 @@ namespace apsi
             // convenience of the indexing; the ciphertext is actually not set or valid for use.
 
             ThreadPoolMgr tpm;
-
             vector<future<void>> futures;
-            for (
-                auto ct_iter = next(powers_at_this_bundle_idx.begin());
-                ct_iter != powers_at_this_bundle_idx.end();
-                ct_iter++)
-            {
-                futures.push_back(tpm.thread_pool().enqueue([&, ct_iter]() {
-                    evaluator.transform_to_ntt_inplace(*ct_iter);
-                }));
+            for (auto ct_iter = next(powers_at_this_bundle_idx.begin());
+                 ct_iter != powers_at_this_bundle_idx.end();
+                 ct_iter++) {
+                futures.push_back(tpm.thread_pool().enqueue(
+                    [&, ct_iter]() { evaluator.transform_to_ntt_inplace(*ct_iter); }));
+            }
+
+            for (auto &f : futures) {
+                f.get();
             }
         }
 

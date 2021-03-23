@@ -64,6 +64,32 @@ namespace APSITests
         }
     }
 
+    TEST(SenderDBTests, Constructor)
+    {
+        auto params = get_params();
+
+        oprf::OPRFKey new_key;
+        stringstream ss;
+        new_key.save(ss);
+        string new_key_str = ss.str();
+
+        SenderDB sender_db(*params, 0);
+        stringstream ss2;
+        sender_db.get_oprf_key().save(ss2);
+        string db_key_str = ss2.str();
+
+        ASSERT_EQ(db_key_str.size(), new_key_str.size());
+        ASSERT_NE(0, memcmp(db_key_str.data(), new_key_str.data(), db_key_str.size()));
+
+        SenderDB sender_db2(*params, new_key, 0);
+        stringstream ss3;
+        sender_db2.get_oprf_key().save(ss3);
+        db_key_str = ss3.str();
+
+        ASSERT_EQ(db_key_str.size(), new_key_str.size());
+        ASSERT_EQ(0, memcmp(db_key_str.data(), new_key_str.data(), db_key_str.size()));
+    }
+
     TEST(SenderDBTests, UnlabeledBasics)
     {
         auto params = get_params();
@@ -71,7 +97,7 @@ namespace APSITests
         // Nonce byte count is totally ignored when label byte count is zero
         ASSERT_NO_THROW(SenderDB sender_db(*params, 0, 17));
 
-        SenderDB sender_db(*params, 0);        
+        SenderDB sender_db(*params, 0);
 
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
         sender_db.clear();
