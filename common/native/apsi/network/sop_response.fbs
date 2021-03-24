@@ -9,6 +9,7 @@ table ParmsResponse {
 
 table OPRFResponse {
     data:[ubyte];
+    aux:[ubyte];
 }
 
 table QueryResponse {
