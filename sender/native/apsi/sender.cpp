@@ -177,7 +177,7 @@ namespace apsi
             for (CiphertextPowers &powers : all_powers) {
                 // The + 1 is because we index by power. The 0th power is a dummy value. I promise
                 // this makes things easier to read.
-                powers.resize(max_items_per_bin + 1);
+                powers.resize(static_cast<size_t>(max_items_per_bin) + 1);
             }
 
             // Load inputs provided in the query
@@ -197,7 +197,7 @@ namespace apsi
 
             // Compute query powers for the bundle indexes
             for (size_t bundle_idx = 0; bundle_idx < bundle_idx_count; bundle_idx++) {
-                ComputePowers(sender_db, crypto_context, all_powers, pd, bundle_idx);
+                ComputePowers(sender_db, crypto_context, all_powers, pd, static_cast<uint32_t>(bundle_idx));
             }
 
             APSI_LOG_DEBUG("Finished computing powers for all bundle indices");
@@ -205,10 +205,10 @@ namespace apsi
 
             vector<future<void>> futures;
             for (size_t bundle_idx = 0; bundle_idx < bundle_idx_count; bundle_idx++) {
-                auto bundle_caches = sender_db->get_cache_at(bundle_idx);
+                auto bundle_caches = sender_db->get_cache_at(static_cast<uint32_t>(bundle_idx));
                 for (auto &cache : bundle_caches) {
                     futures.push_back(tpm.thread_pool().enqueue([&, bundle_idx, cache]() {
-                        ProcessBinBundleCache(sender_db, cache, all_powers, chl, send_rp_fun, bundle_idx);
+                        ProcessBinBundleCache(sender_db, cache, all_powers, chl, send_rp_fun, static_cast<uint32_t>(bundle_idx));
                     }));
                 }
             }
@@ -291,18 +291,17 @@ namespace apsi
             auto rp = make_unique<ResultPackage>();
 
             rp->bundle_idx = bundle_idx;
-            rp->nonce_byte_count = sender_db->get_nonce_byte_count();
-            rp->label_byte_count = sender_db->get_label_byte_count();
+            rp->nonce_byte_count = safe_cast<uint32_t>(sender_db->get_nonce_byte_count());
+            rp->label_byte_count = safe_cast<uint32_t>(sender_db->get_label_byte_count());
 
             // Compute the matching result and move to rp
             const BatchedPlaintextPolyn &matching_polyn = cache.get().batched_matching_polyn;
             rp->psi_result = matching_polyn.eval(all_powers[bundle_idx]);
 
-                    rp->label_byte_count = safe_cast<uint32_t>(sender_db->get_label_byte_count());
-                    for (const auto &interp_polyn : cache.get().batched_interp_polyns) {
-                        // Compute the label result and move to rp
-                        rp->label_result.emplace_back(interp_polyn.eval(all_powers[bundle_idx]));
-                    }
+            for (const auto &interp_polyn : cache.get().batched_interp_polyns) {
+                // Compute the label result and move to rp
+                rp->label_result.emplace_back(interp_polyn.eval(all_powers[bundle_idx]));
+            }
 
             // Send this result part
             try {

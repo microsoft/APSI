@@ -592,7 +592,7 @@ namespace apsi
 
             string buf;
             buf.resize(32);
-            random_bytes(reinterpret_cast<unsigned char*>(buf.data()), buf.size());
+            random_bytes(reinterpret_cast<unsigned char*>(buf.data()), static_cast<unsigned int>(buf.size()));
             // make sure first byte is _not_ zero, as that has a special meaning for ZeroMQ
             *buf.data() = 'A';
             socket->set(sockopt::routing_id, buf);

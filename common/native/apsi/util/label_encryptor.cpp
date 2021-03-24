@@ -43,7 +43,7 @@ namespace apsi
             // Set up the result and create the nonce
             size_t encrypted_label_byte_count = nonce_byte_count + label_byte_count;
             EncryptedLabel result(encrypted_label_byte_count);
-            random_bytes(result.data(), nonce_byte_count);
+            random_bytes(result.data(), static_cast<unsigned int>(nonce_byte_count));
 
             // Fill result with mask from Blake2xb
             blake2xb(

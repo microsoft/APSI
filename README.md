@@ -924,23 +924,24 @@ In some cases expert users may want to use a value smaller than 16 (even zero) f
 The APSI library depends on the following packages that need to be pre-installed.
 We recommend using [vcpkg](https://github.com/microsoft/vcpkg) to install dependencies.
 Each package's name in vcpkg is listed (unless there is no need to install it specifically).
-On Windows, append `:x64-windows-static-md` to package name to install libraries.
+**On Windows, append `:x64-windows-static-md` to package name to install libraries.**
 For examples, to install Microsoft SEAL, on Windows do `.\vcpkg install seal[no-throw-tran]:x64-windows-static-md`, while on other systems do `./vcpkg install seal[no-throw-tran]`.
 The CMake build system will then automatically find these pre-installed packages.
 
-| Package                                              | vcpkg                         |
-|------------------------------------------------------|-------------------------------|
-| [Microsoft GSL](https://github.com/Microsoft/GSL)    | with Microsoft SEAL           |
-| [Zstandard](https://github.com/facebook/zstd)        | with Microsoft SEAL           |
-| [Microsoft SEAL](https://github.com/microsoft/SEAL)  | `seal[no-throw-tran]`         |
-| [Microsoft Kuku](https://github.com/microsoft/Kuku)  | `kuku`                        |
-| [Log4cplus](https://github.com/log4cplus/log4cplus)  | `log4cplus`                   |
-| [libzmq](https://github.com/zeromq/libzmq)           | with cppzmq                   |
-| [cppzmq](https://github.com/zeromq/cppzmq)           | `cppzmq`                      |
-| [FourQlib](https://github.com/kiromaru/FourQlib)     | redistributed by APSI         |
-| [FlatBuffers](https://github.com/google/flatbuffers) | `flatbuffers`                 |
-| [Google Test](https://github.com/google/googletest)  | `gtest`                       |
-| [TCLAP](https://sourceforge.net/projects/tclap/)     | `tclap`                       |
+| Package                                                   | vcpkg                         |
+|-----------------------------------------------------------|-------------------------------|
+| [Microsoft GSL](https://github.com/Microsoft/GSL)         | with Microsoft SEAL           |
+| [Zstandard](https://github.com/facebook/zstd)             | with Microsoft SEAL           |
+| [Microsoft SEAL](https://github.com/microsoft/SEAL)       | `seal[no-throw-tran]`         |
+| [Microsoft Kuku](https://github.com/microsoft/Kuku)       | `kuku`                        |
+| [Log4cplus](https://github.com/log4cplus/log4cplus)       | `log4cplus`                   |
+| [libzmq](https://github.com/zeromq/libzmq)                | with cppzmq                   |
+| [cppzmq](https://github.com/zeromq/cppzmq)                | `cppzmq`                      |
+| [FourQlib](https://github.com/kiromaru/FourQlib)          | redistributed by APSI         |
+| [FlatBuffers](https://github.com/google/flatbuffers)      | `flatbuffers`                 |
+| [jsoncpp](https://github.com/open-source-parsers/jsoncpp) | `jsoncpp`
+| [Google Test](https://github.com/google/googletest)       | `gtest`                       |
+| [TCLAP](https://sourceforge.net/projects/tclap/)          | `tclap`                       |
 
 ## Directory structure
 
