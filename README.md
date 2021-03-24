@@ -924,9 +924,13 @@ In some cases expert users may want to use a value smaller than 16 (even zero) f
 The APSI library depends on the following packages that need to be pre-installed.
 We recommend using [vcpkg](https://github.com/microsoft/vcpkg) to install dependencies.
 Each package's name in vcpkg is listed (unless there is no need to install it specifically).
-**On Windows, append `:x64-windows-static-md` to package name to install libraries.**
+
+**Note:** On Windows, the triplet `x64-windows-static-md` should be specified.
 For examples, to install Microsoft SEAL, on Windows do `.\vcpkg install seal[no-throw-tran]:x64-windows-static-md`, while on other systems do `./vcpkg install seal[no-throw-tran]`.
-The CMake build system will then automatically find these pre-installed packages.
+
+The CMake build system can then automatically find these pre-installed packages, if the following arguments are passed to configuration:
+- `-DCMAKE_TOOLCHAIN_FILE=${vcpkg_root_dir}/scripts/buildsystems/vcpkg.cmake`, and
+- `-DVCPKG_TARGET_TRIPLET="x64-windows-static-md"` on Windows.
 
 | Package                                                   | vcpkg                         |
 |-----------------------------------------------------------|-------------------------------|
