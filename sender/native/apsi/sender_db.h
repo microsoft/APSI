@@ -64,7 +64,7 @@ namespace apsi
             */
             SenderDB(
                 PSIParams params,
-                const oprf::OPRFKey &oprf_key,
+                oprf::OPRFKey oprf_key,
                 std::size_t label_byte_count = 0,
                 std::size_t nonce_byte_count = 16,
                 bool compressed = true);

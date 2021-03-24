@@ -568,14 +568,14 @@ namespace apsi
         
         SenderDB::SenderDB(
             PSIParams params,
-            const OPRFKey &oprf_key,
+            OPRFKey oprf_key,
             size_t label_byte_count,
             size_t nonce_byte_count,
             bool compressed)
             : SenderDB(params, label_byte_count, nonce_byte_count, compressed)
         {
             // Initialize oprf key with the one given to this constructor
-            oprf_key_ = oprf_key;
+            oprf_key_ = move(oprf_key);
         }
 
         SenderDB::SenderDB(SenderDB &&source) :
