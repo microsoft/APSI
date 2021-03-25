@@ -6,7 +6,7 @@
 // STD
 #include <iostream>
 #include <iomanip>
-#include <filesystem>
+#include <experimental/filesystem>
 
 #ifdef _MSC_VER
 #include "windows.h"
@@ -22,7 +22,7 @@ using namespace std;
 using namespace seal;
 using namespace apsi;
 using namespace apsi::util;
-namespace fs = std::filesystem;
+namespace fs = std::experimental::filesystem;
 
 /**
 This only turns on showing colors for Windows.

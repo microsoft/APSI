@@ -143,7 +143,7 @@ namespace APSITests
             auto loaded_sender_db = make_shared<SenderDB>(SenderDB::Load(*ss).first);
             ss = nullptr;
 
-            atomic<bool> stop_sender = false;
+            atomic<bool> stop_sender { false };
 
             future<void> sender_f = async(launch::async, [&]() {
                 ZMQSenderDispatcher dispatcher(loaded_sender_db);
@@ -226,7 +226,7 @@ namespace APSITests
             auto loaded_sender_db = make_shared<SenderDB>(SenderDB::Load(*ss).first);
             ss = nullptr;
 
-            atomic<bool> stop_sender = false;
+            atomic<bool> stop_sender { false };
 
             future<void> sender_f = async(launch::async, [&]() {
                 ZMQSenderDispatcher dispatcher(loaded_sender_db);

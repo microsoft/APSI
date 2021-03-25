@@ -7,6 +7,7 @@
 #include <string>
 #include <csignal>
 #include <functional>
+#include <experimental/filesystem>
 
 // APSI
 #include "apsi/log.h"
@@ -20,7 +21,7 @@
 #include "sender/clp.h"
 
 using namespace std;
-namespace fs = std::filesystem;
+namespace fs = std::experimental::filesystem;
 using namespace apsi;
 using namespace apsi::sender;
 using namespace apsi::network;

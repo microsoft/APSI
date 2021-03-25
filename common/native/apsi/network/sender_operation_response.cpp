@@ -40,7 +40,7 @@ namespace apsi
 
             // Set up a vector to hold the parameter data
             auto params_data = fbs_builder.CreateVector(
-                reinterpret_cast<uint8_t*>(params_str.data()), params_str.size());
+                reinterpret_cast<uint8_t*>(&params_str[0]), params_str.size());
 
             auto resp = fbs::CreateParmsResponse(fbs_builder, params_data);
 

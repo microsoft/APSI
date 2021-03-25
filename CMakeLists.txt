@@ -64,7 +64,6 @@ message(STATUS "APSI debug mode: ${APSI_DEBUG}")
 # Description:
 #     SEAL_USE_CXX17 and SEAL_USE_STD_FOR_EACH_N depends on compiler version when vcpkg installs SEAL.
 #     If SEAL_USE_CXX17 is ON, then GNU CC 7+. --> c++17
-#     If APSI_BUILD_CLI is ON, then GNU CC 8+. --> std::filesystem
 #     If SEAL_USE_STD_FOR_EACH_N is ON, then GNU CC 9+. --> std::for_each_n
 # [option] APSI_USE_CXX17_OPTION_STR (default: ON)
 # Use C++17, use C++14 otherwise.
@@ -355,18 +354,24 @@ endif()
 ##########################
 
 if(APSI_BUILD_CLI)
+    # TODO: check variant file
+
     add_library(common_cli OBJECT)
     add_subdirectory(cli/common)
     target_include_directories(common_cli PUBLIC cli)
     target_include_directories(common_cli PUBLIC ${TCLAP_INCLUDE_DIRS})
     target_link_libraries(common_cli PUBLIC common)
+    if (NOT MSVC)
+        target_link_libraries(common_cli PUBLIC stdc++fs)
+    endif()
+    if(NOT APSI_USE_CXX17)
+        message(STATUS "Command line interface is built with C++17 regardless of APSI_USE_CXX17")
+    endif()
+    target_compile_features(common_cli PUBLIC cxx_std_17)
 
     add_executable(sender_cli)
     add_subdirectory(cli/sender)
     target_link_libraries(sender_cli PUBLIC common_cli sender)
-    if(!MSVC)
-        target_link_libraries(sender_cli PUBLIC stdc++fs)
-    endif()
     if (APPLE)
         target_compile_options(common_cli PUBLIC -DHAVE_LONG_LONG)
     endif()
@@ -374,9 +379,6 @@ if(APSI_BUILD_CLI)
     add_executable(receiver_cli)
     add_subdirectory(cli/receiver)
     target_link_libraries(receiver_cli PUBLIC common_cli receiver)
-    if (!MSVC)
-        target_link_libraries(receiver_cli PUBLIC stdc++fs)
-    endif()
 
     add_executable(pd_tool)
     add_subdirectory(cli/pd_tool)

@@ -242,7 +242,7 @@ namespace APSITests
     private:
         thread th_;
 
-        atomic<bool> stop_token_ = false;
+        atomic<bool> stop_token_ { false };
     };
 
     TEST_F(ReceiverTests, Constructor)

@@ -919,7 +919,17 @@ This is critically important to use correctly to achieve good performance; pleas
 Specifies the number of bytes used for the nonce in labeled mode; the value can be any integer between 0 and 16 (default).
 In some cases expert users may want to use a value smaller than 16 (even zero) for improved performance, but this is not generally recommended.
 
-## Dependencies
+## Building APSI Manually
+
+### Requirements
+
+| System  | Toolchain                                             |
+|---------|-------------------------------------------------------|
+| Windows | Visual Studio 2019 with C++ CMake Tools for Windows   |
+| Linux   | Clang++ (>= 7.0) or GNU G++ (>= 7.0), CMake (>= 3.12) |
+| macOS   | Xcode toolchain (>= 9.3), CMake (>= 3.12)             |
+
+### Dependencies
 
 The APSI library depends on the following packages that need to be pre-installed.
 We recommend using [vcpkg](https://github.com/microsoft/vcpkg) to install dependencies.

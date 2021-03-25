@@ -1000,7 +1000,7 @@ namespace apsi
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
             auto params = fbs_builder.CreateVector(
-                reinterpret_cast<unsigned char*>(params_str.data()), params_str.size());
+                reinterpret_cast<unsigned char*>(&params_str[0]), params_str.size());
             fbs::SenderDBInfo info(
                 safe_cast<uint32_t>(label_byte_count_),
                 safe_cast<uint32_t>(nonce_byte_count_),
