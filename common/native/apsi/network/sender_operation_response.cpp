@@ -95,8 +95,11 @@ namespace apsi
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
             // Set up a vector to hold the response data
-            auto oprf_data = fbs_builder.CreateVector(reinterpret_cast<const unsigned char*>(data.data()), data.size());
-            auto resp = fbs::CreateOPRFResponse(fbs_builder, oprf_data);
+            auto oprf_data = fbs_builder.CreateVector(
+                reinterpret_cast<const unsigned char *>(data.data()), data.size());
+            auto aux_data = fbs_builder.CreateVector(
+                reinterpret_cast<const unsigned char *>(aux.data()), aux.size());
+            auto resp = fbs::CreateOPRFResponse(fbs_builder, oprf_data, aux_data);
 
             fbs::SenderOperationResponseBuilder sop_response_builder(fbs_builder);
             sop_response_builder.add_response_type(fbs::Response_OPRFResponse);
@@ -105,7 +108,7 @@ namespace apsi
             fbs_builder.FinishSizePrefixed(sop_response);
 
             out.write(
-                reinterpret_cast<const char*>(fbs_builder.GetBufferPointer()),
+                reinterpret_cast<const char *>(fbs_builder.GetBufferPointer()),
                 safe_cast<streamsize>(fbs_builder.GetSize()));
 
             return fbs_builder.GetSize();
@@ -115,28 +118,34 @@ namespace apsi
         {
             // Clear the current data
             data.clear();
+            aux.clear();
 
             vector<seal_byte> in_data(util::read_from_stream(in));
 
-            auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
+            auto verifier = flatbuffers::Verifier(
+                reinterpret_cast<const unsigned char *>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationResponseBuffer(verifier);
-            if (!safe)
-            {
+            if (!safe) {
                 throw runtime_error("failed to load SenderOperationResponse: invalid buffer");
             }
 
             auto sop_response = fbs::GetSizePrefixedSenderOperationResponse(in_data.data());
 
             // Need to check that the operation is of the right type
-            if (sop_response->response_type() != fbs::Response_OPRFResponse)
-            {
+            if (sop_response->response_type() != fbs::Response_OPRFResponse) {
                 throw runtime_error("unexpected operation type");
             }
 
             // Load the OPRF response
             const auto &oprf_data = *sop_response->response_as_OPRFResponse()->data();
-            transform(oprf_data.begin(), oprf_data.end(), back_inserter(data),
-                [](auto a) { return static_cast<seal_byte>(a); });
+            transform(oprf_data.begin(), oprf_data.end(), back_inserter(data), [](auto a) {
+                return static_cast<seal_byte>(a);
+            });
+
+            const auto &aux_data = *sop_response->response_as_OPRFResponse()->aux();
+            transform(aux_data.begin(), aux_data.end(), back_inserter(aux), [](auto a) {
+                return static_cast<seal_byte>(a);
+            });
 
             return in_data.size();
         }
