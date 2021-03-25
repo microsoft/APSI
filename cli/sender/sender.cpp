@@ -7,7 +7,11 @@
 #include <string>
 #include <csignal>
 #include <functional>
+#if (__GNUC__ < 8) && !defined(__clang__)
 #include <experimental/filesystem>
+#else
+#include <filesystem>
+#endif
 
 // APSI
 #include "apsi/log.h"
@@ -21,7 +25,11 @@
 #include "sender/clp.h"
 
 using namespace std;
+#if (__GNUC__ < 8) && !defined(__clang__)
 namespace fs = std::experimental::filesystem;
+#else
+namespace fs = std::filesystem;
+#endif
 using namespace apsi;
 using namespace apsi::sender;
 using namespace apsi::network;
