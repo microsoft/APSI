@@ -6,6 +6,9 @@
 // STD
 #include <iostream>
 #include <iomanip>
+#if defined(_MSC_VER)
+#include <windows.h>
+#endif
 #if defined(__GNUC__) && (__GNUC__ < 8) && !defined(__clang__)
 #include <experimental/filesystem>
 #else
