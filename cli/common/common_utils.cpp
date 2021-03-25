@@ -6,7 +6,7 @@
 // STD
 #include <iostream>
 #include <iomanip>
-#if (__GNUC__ < 8) && !defined(__clang__)
+#if defined(__GNUC__) && (__GNUC__ < 8) && !defined(__clang__)
 #include <experimental/filesystem>
 #else
 #include <filesystem>
@@ -19,7 +19,7 @@
 #include "apsi/util/utils.h"
 
 using namespace std;
-#if (__GNUC__ < 8) && !defined(__clang__)
+#if defined(__GNUC__) && (__GNUC__ < 8) && !defined(__clang__)
 namespace fs = std::experimental::filesystem;
 #else
 namespace fs = std::filesystem;

@@ -7,7 +7,7 @@
 #include <string>
 #include <csignal>
 #include <functional>
-#if (__GNUC__ < 8) && !defined(__clang__)
+#if defined(__GNUC__) && (__GNUC__ < 8) && !defined(__clang__)
 #include <experimental/filesystem>
 #else
 #include <filesystem>
@@ -25,7 +25,7 @@
 #include "sender/clp.h"
 
 using namespace std;
-#if (__GNUC__ < 8) && !defined(__clang__)
+#if defined(__GNUC__) && (__GNUC__ < 8) && !defined(__clang__)
 namespace fs = std::experimental::filesystem;
 #else
 namespace fs = std::filesystem;
