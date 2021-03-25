@@ -64,13 +64,14 @@ message(STATUS "APSI debug mode: ${APSI_DEBUG}")
 # [option] APSI_USE_CXX17_OPTION_STR (default: ON)
 # Use C++17, use C++14 otherwise.
 set(APSI_USE_CXX17_OPTION_STR "Use C++17")
-option(APSI_USE_CXX17 ${APSI_USE_CXX17_OPTION_STR_OPTION_STR} ON)
+option(APSI_USE_CXX17 ${APSI_USE_CXX17_OPTION_STR} ON)
 # Enable features from C++17 if available, disable features if set to OFF.
 #include(EnableCXX17)
+message(STATUS "APSI_USE_CXX17: ${APSI_USE_CXX17}")
 
 # Enable security-related compile options (MSVC only)
-set(APSI_SECURE_COMPILE_OPTIONS_OPTIONS_STR "Enable Control Flow Guard and Spectre mitigations (MSVC only)")
-option(APSI_SECURE_COMPILE_OPTIONS ${APSI_SECURE_COMPILE_OPTIONS_OPTIONS_STR} OFF)
+set(APSI_SECURE_COMPILE_OPTIONS_OPTION_STR "Enable Control Flow Guard and Spectre mitigations (MSVC only)")
+option(APSI_SECURE_COMPILE_OPTIONS ${APSI_SECURE_COMPILE_OPTIONS_OPTION_STR} OFF)
 mark_as_advanced(APSI_SECURE_COMPILE_OPTIONS)
 
 # Path for output
@@ -357,7 +358,7 @@ if(APSI_BUILD_CLI)
 
     add_executable(sender_cli)
     add_subdirectory(cli/sender)
-    target_link_libraries(sender_cli common_cli sender)
+    target_link_libraries(sender_cli PUBLIC common_cli sender)
     if(NOT MSVC)
         target_link_libraries(sender_cli PUBLIC stdc++fs)
     endif()
@@ -367,7 +368,7 @@ if(APSI_BUILD_CLI)
 
     add_executable(receiver_cli)
     add_subdirectory(cli/receiver)
-    target_link_libraries(receiver_cli common_cli receiver)
+    target_link_libraries(receiver_cli PUBLIC common_cli receiver)
     if (NOT MSVC)
         target_link_libraries(receiver_cli PUBLIC stdc++fs)
     endif()

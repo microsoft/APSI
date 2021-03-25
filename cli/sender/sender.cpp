@@ -7,6 +7,7 @@
 #include <string>
 #include <csignal>
 #include <functional>
+#include <filesystem>
 
 // APSI
 #include "apsi/log.h"
