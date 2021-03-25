@@ -61,6 +61,11 @@ endif()
 message(STATUS "APSI debug mode: ${APSI_DEBUG}")
 
 # TODO: C++17 or C++14, extra configurations or check for_each_n for C++17
+# Description:
+#     SEAL_USE_CXX17 and SEAL_USE_STD_FOR_EACH_N depends on compiler version when vcpkg installs SEAL.
+#     If SEAL_USE_CXX17 is ON, then GNU CC 7+. --> c++17
+#     If APSI_BUILD_CLI is ON, then GNU CC 8+. --> std::filesystem
+#     If SEAL_USE_STD_FOR_EACH_N is ON, then GNU CC 9+. --> std::for_each_n
 # [option] APSI_USE_CXX17_OPTION_STR (default: ON)
 # Use C++17, use C++14 otherwise.
 set(APSI_USE_CXX17_OPTION_STR "Use C++17")
