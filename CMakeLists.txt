@@ -54,8 +54,7 @@ set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY OFF)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(APSI_DEBUG ON)
     # In Debug mode, enable extra compiler flags.
-    # TODO: Uncomment this
-    #include(EnableCXXCompilerFlags)
+    include(EnableCXXCompilerFlags)
 else()
     set(APSI_DEBUG OFF)
 endif()
@@ -69,7 +68,6 @@ option(APSI_USE_CXX17 ${APSI_USE_CXX17_OPTION_STR_OPTION_STR} ON)
 # Enable features from C++17 if available, disable features if set to OFF.
 #include(EnableCXX17)
 
-# TODO: Do we need secure compile options?
 # Enable security-related compile options (MSVC only)
 set(APSI_SECURE_COMPILE_OPTIONS_OPTIONS_STR "Enable Control Flow Guard and Spectre mitigations (MSVC only)")
 option(APSI_SECURE_COMPILE_OPTIONS ${APSI_SECURE_COMPILE_OPTIONS_OPTIONS_STR} OFF)
@@ -259,16 +257,9 @@ if(APSI_USE_ZMQ)
     target_link_libraries(common PUBLIC libzmq-static cppzmq-static)
 endif()
 
-# TODO: move this block into a module
+# Set AVX or AVX2 flags
 include(FindAVX)
 check_for_avx(common)
-
-# Defines for FourQlib
-target_compile_options(common PUBLIC -DHAVE_CONFIG)
-target_compile_options(common PUBLIC -DUSE_SECURE_SEED)
-target_compile_options(common PUBLIC -D_AMD64_)
-target_compile_options(common PUBLIC -DUSE_ENDO=true)
-
 if (HAVE_AVX2_EXTENSIONS)
     target_compile_options(common PUBLIC -D_AVX2_)
 elseif(HAVE_AVX_EXTENSIONS)
@@ -279,12 +270,16 @@ endif()
 
 if (MSVC)
     target_compile_options(common PUBLIC -D__WINDOWS__)
-endif()
-if (NOT MSVC)
+else()
     target_compile_options(common PUBLIC -D__LINUX__)
     target_compile_options(common PUBLIC -march=native)
 endif()
-# TODO: end of block
+
+# Defines for FourQlib
+target_compile_options(common PUBLIC -DHAVE_CONFIG)
+target_compile_options(common PUBLIC -DUSE_SECURE_SEED)
+target_compile_options(common PUBLIC -D_AMD64_)
+target_compile_options(common PUBLIC -DUSE_ENDO=true)
 
 #############################
 # APSI receiver C++ library #
@@ -363,7 +358,7 @@ if(APSI_BUILD_CLI)
     add_executable(sender_cli)
     add_subdirectory(cli/sender)
     target_link_libraries(sender_cli common_cli sender)
-    if(!MSVC)
+    if(NOT MSVC)
         target_link_libraries(sender_cli PUBLIC stdc++fs)
     endif()
     if (APPLE)
@@ -373,7 +368,7 @@ if(APSI_BUILD_CLI)
     add_executable(receiver_cli)
     add_subdirectory(cli/receiver)
     target_link_libraries(receiver_cli common_cli receiver)
-    if (!MSVC)
+    if (NOT MSVC)
         target_link_libraries(receiver_cli PUBLIC stdc++fs)
     endif()
 
