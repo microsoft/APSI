@@ -2,19 +2,17 @@
 // Licensed under the MIT license.
 
 // APSI
+#include <sstream>
 #include "apsi/log.h"
 #include "apsi/network/zmq/zmq_channel.h"
 #include "apsi/oprf/oprf_sender.h"
-#include "apsi/thread_pool_mgr.h"
 #include "apsi/receiver.h"
 #include "apsi/sender.h"
 #include "apsi/sender_db.h"
+#include "apsi/thread_pool_mgr.h"
 #include "apsi/zmq/sender_dispatcher.h"
-#include "test_utils.h"
-
 #include "gtest/gtest.h"
-
-#include <sstream>
+#include "test_utils.h"
 
 using namespace std;
 using namespace apsi;
@@ -25,10 +23,8 @@ using namespace apsi::util;
 using namespace apsi::oprf;
 using namespace seal;
 
-namespace APSITests
-{
-    namespace
-    {
+namespace APSITests {
+    namespace {
         bool verify_unlabeled_results(
             const vector<MatchRecord> &query_result,
             const vector<Item> &query_vec,
@@ -64,7 +60,7 @@ namespace APSITests
             return true;
         }
 
-    bool verify_labeled_results(
+        bool verify_labeled_results(
             const vector<MatchRecord> &query_result,
             const vector<Item> &query_vec,
             const vector<Item> &int_items,
@@ -128,8 +124,7 @@ namespace APSITests
             ThreadPoolMgr::SetPhysThreadCount(num_threads * 2);
 
             vector<Item> sender_items;
-            for (size_t i = 0; i < sender_size; i++)
-            {
+            for (size_t i = 0; i < sender_size; i++) {
                 sender_items.push_back({ i + 1, i + 1 });
             }
 
@@ -143,7 +138,7 @@ namespace APSITests
             auto loaded_sender_db = make_shared<SenderDB>(SenderDB::Load(*ss).first);
             ss = nullptr;
 
-            atomic<bool> stop_sender { false };
+            atomic<bool> stop_sender{ false };
 
             future<void> sender_f = async(launch::async, [&]() {
                 ZMQSenderDispatcher dispatcher(loaded_sender_db);
@@ -180,8 +175,10 @@ namespace APSITests
 
                         vector<HashedItem> hashed_recv_items;
                         vector<LabelKey> label_keys;
-                        tie(hashed_recv_items, label_keys) = Receiver::RequestOPRF(recvs_items[i], recv_chl);
-                        auto query_result = receiver.request_query(hashed_recv_items, label_keys, recv_chl);
+                        tie(hashed_recv_items, label_keys) =
+                            Receiver::RequestOPRF(recvs_items[i], recv_chl);
+                        auto query_result =
+                            receiver.request_query(hashed_recv_items, label_keys, recv_chl);
 
                         return verify_unlabeled_results(
                             query_result, recvs_items[i], recvs_int_items[i]);
@@ -211,9 +208,10 @@ namespace APSITests
             ThreadPoolMgr::SetPhysThreadCount(num_threads * 2);
 
             vector<pair<Item, Label>> sender_items;
-            for (size_t i = 0; i < sender_size; i++)
-            {
-                sender_items.push_back(make_pair(Item(i + 1, i + 1), create_label(seal::util::safe_cast<unsigned char>(i + 1), 10)));
+            for (size_t i = 0; i < sender_size; i++) {
+                sender_items.push_back(make_pair(
+                    Item(i + 1, i + 1),
+                    create_label(seal::util::safe_cast<unsigned char>(i + 1), 10)));
             }
 
             auto sender_db = make_shared<SenderDB>(params, 10, 4, true);
@@ -226,7 +224,7 @@ namespace APSITests
             auto loaded_sender_db = make_shared<SenderDB>(SenderDB::Load(*ss).first);
             ss = nullptr;
 
-            atomic<bool> stop_sender { false };
+            atomic<bool> stop_sender{ false };
 
             future<void> sender_f = async(launch::async, [&]() {
                 ZMQSenderDispatcher dispatcher(loaded_sender_db);
@@ -263,8 +261,10 @@ namespace APSITests
 
                         vector<HashedItem> hashed_recv_items;
                         vector<LabelKey> label_keys;
-                        tie(hashed_recv_items, label_keys) = Receiver::RequestOPRF(recv_items[i], recv_chl);
-                        auto query_result = receiver.request_query(hashed_recv_items, label_keys, recv_chl);
+                        tie(hashed_recv_items, label_keys) =
+                            Receiver::RequestOPRF(recv_items[i], recv_chl);
+                        auto query_result =
+                            receiver.request_query(hashed_recv_items, label_keys, recv_chl);
 
                         return verify_labeled_results(
                             query_result, recv_items[i], recv_int_items[i], sender_items);
@@ -279,7 +279,7 @@ namespace APSITests
             stop_sender = true;
             sender_f.get();
         }
-    }
+    } // namespace
 
     TEST(ZMQSenderReceiverTests, UnlabeledEmpty)
     {
@@ -292,7 +292,8 @@ namespace APSITests
     {
         size_t sender_size = 0;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, params, 1, thread::hardware_concurrency());
+        RunUnlabeledTest(
+            sender_size, { { 0, 0 }, { 1, 0 } }, params, 1, thread::hardware_concurrency());
     }
 
     TEST(ZMQSenderReceiverTests, UnlabeledSingle)
@@ -306,63 +307,132 @@ namespace APSITests
     {
         size_t sender_size = 1;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, params, 1, thread::hardware_concurrency());
+        RunUnlabeledTest(
+            sender_size,
+            { { 0, 0 }, { 1, 0 }, { 1, 1 } },
+            params,
+            1,
+            thread::hardware_concurrency());
     }
 
     TEST(ZMQSenderReceiverTests, UnlabeledSmall)
     {
         size_t sender_size = 10;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size,
-            { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 5, 0 }, { 5, 2 }, { 5, 5 }, { 10, 0 }, { 10, 5 }, { 10, 10 } },
-            params, 1, 1);
+        RunUnlabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 5, 0 },
+              { 5, 2 },
+              { 5, 5 },
+              { 10, 0 },
+              { 10, 5 },
+              { 10, 10 } },
+            params,
+            1,
+            1);
     }
 
     TEST(ZMQSenderReceiverTests, UnlabeledSmallMultiThreaded)
     {
         size_t sender_size = 10;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size,
-            { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 5, 0 }, { 5, 2 }, { 5, 5 }, { 10, 0 }, { 10, 5 }, { 10, 10 } },
-            params, 1, thread::hardware_concurrency());
+        RunUnlabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 5, 0 },
+              { 5, 2 },
+              { 5, 5 },
+              { 10, 0 },
+              { 10, 5 },
+              { 10, 10 } },
+            params,
+            1,
+            thread::hardware_concurrency());
     }
 
     TEST(ZMQSenderReceiverTests, UnlabeledMedium)
     {
         size_t sender_size = 500;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size,
-            { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 50, 10 }, { 50, 50 }, { 100, 1 }, { 100, 50 }, { 100, 100 } },
-            params, 1, 1);
+        RunUnlabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 50, 10 },
+              { 50, 50 },
+              { 100, 1 },
+              { 100, 50 },
+              { 100, 100 } },
+            params,
+            1,
+            1);
     }
 
     TEST(ZMQSenderReceiverTests, UnlabeledMediumMultiThreaded)
     {
         size_t sender_size = 500;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size,
-            { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 50, 10 }, { 50, 50 }, { 100, 1 }, { 100, 50 }, { 100, 100 } },
-            params, 1, thread::hardware_concurrency());
+        RunUnlabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 50, 10 },
+              { 50, 50 },
+              { 100, 1 },
+              { 100, 50 },
+              { 100, 100 } },
+            params,
+            1,
+            thread::hardware_concurrency());
     }
 
     TEST(ZMQSenderReceiverTests, UnlabeledLarge)
     {
         size_t sender_size = 4000;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size,
-            { { 0, 0 }, { 1, 0 }, { 500, 10 }, { 500, 50 }, { 500, 500 }, { 1000, 0 }, { 1000, 1 }, { 1000, 500 },
-                { 1000, 999 }, { 1000, 1000 } },
-            params, 1, 1);
+        RunUnlabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 500, 10 },
+              { 500, 50 },
+              { 500, 500 },
+              { 1000, 0 },
+              { 1000, 1 },
+              { 1000, 500 },
+              { 1000, 999 },
+              { 1000, 1000 } },
+            params,
+            1,
+            1);
     }
 
     TEST(ZMQSenderReceiverTests, UnlabeledLargeMultiThreaded)
     {
         size_t sender_size = 4000;
         PSIParams params = create_params();
-        RunUnlabeledTest(sender_size,
-            { { 0, 0 }, { 1, 0 }, { 500, 10 }, { 500, 50 }, { 500, 500 }, { 1000, 0 }, { 1000, 1 }, { 1000, 500 },
-                { 1000, 999 }, { 1000, 1000 } },
-            params, 1, thread::hardware_concurrency());
+        RunUnlabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 500, 10 },
+              { 500, 50 },
+              { 500, 500 },
+              { 1000, 0 },
+              { 1000, 1 },
+              { 1000, 500 },
+              { 1000, 999 },
+              { 1000, 1000 } },
+            params,
+            1,
+            thread::hardware_concurrency());
     }
 
     TEST(ZMQSenderReceiverTests, UnlabeledLargeMultiThreadedMultiClient)
@@ -390,13 +460,23 @@ namespace APSITests
     {
         size_t sender_size = 50000;
         PSIParams params = create_huge_params();
-        RunUnlabeledTest(sender_size,
-            { { 0, 0 }, { 1, 0 }, { 5000, 100 }, { 5000, 5000 }, { 10000, 0 }, { 10000, 5000 }, { 10000, 10000 },
-                { 50000, 50000 } },
-            params, 1, thread::hardware_concurrency());
+        RunUnlabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 5000, 100 },
+              { 5000, 5000 },
+              { 10000, 0 },
+              { 10000, 5000 },
+              { 10000, 10000 },
+              { 50000, 50000 } },
+            params,
+            1,
+            thread::hardware_concurrency());
 
         sender_size = 1'000'000;
-        RunUnlabeledTest(sender_size, { { 10000, 10000 } }, params, 1, thread::hardware_concurrency());
+        RunUnlabeledTest(
+            sender_size, { { 10000, 10000 } }, params, 1, thread::hardware_concurrency());
     }
 
     TEST(ZMQSenderReceiverTests, LabeledEmpty)
@@ -410,7 +490,8 @@ namespace APSITests
     {
         size_t sender_size = 0;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, params, 1, thread::hardware_concurrency());
+        RunLabeledTest(
+            sender_size, { { 0, 0 }, { 1, 0 } }, params, 1, thread::hardware_concurrency());
     }
 
     TEST(ZMQSenderReceiverTests, LabeledSingle)
@@ -424,63 +505,132 @@ namespace APSITests
     {
         size_t sender_size = 1;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, params, 1, thread::hardware_concurrency());
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 }, { 1, 0 }, { 1, 1 } },
+            params,
+            1,
+            thread::hardware_concurrency());
     }
 
     TEST(ZMQSenderReceiverTests, LabeledSmall)
     {
         size_t sender_size = 10;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size,
-            { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 5, 0 }, { 5, 2 }, { 5, 5 }, { 10, 0 }, { 10, 5 }, { 10, 10 } },
-            params, 1, 1);
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 5, 0 },
+              { 5, 2 },
+              { 5, 5 },
+              { 10, 0 },
+              { 10, 5 },
+              { 10, 10 } },
+            params,
+            1,
+            1);
     }
 
     TEST(ZMQSenderReceiverTests, LabeledSmallMultiThreaded)
     {
         size_t sender_size = 10;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size,
-            { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 5, 0 }, { 5, 2 }, { 5, 5 }, { 10, 0 }, { 10, 5 }, { 10, 10 } },
-            params, 1, thread::hardware_concurrency());
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 5, 0 },
+              { 5, 2 },
+              { 5, 5 },
+              { 10, 0 },
+              { 10, 5 },
+              { 10, 10 } },
+            params,
+            1,
+            thread::hardware_concurrency());
     }
 
     TEST(ZMQSenderReceiverTests, LabeledMedium)
     {
         size_t sender_size = 500;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size,
-            { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 50, 10 }, { 50, 50 }, { 100, 1 }, { 100, 50 }, { 100, 100 } },
-            params, 1, 1);
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 50, 10 },
+              { 50, 50 },
+              { 100, 1 },
+              { 100, 50 },
+              { 100, 100 } },
+            params,
+            1,
+            1);
     }
 
     TEST(ZMQSenderReceiverTests, LabeledMediumMultiThreaded)
     {
         size_t sender_size = 500;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size,
-            { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 50, 10 }, { 50, 50 }, { 100, 1 }, { 100, 50 }, { 100, 100 } },
-            params, 1, thread::hardware_concurrency());
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 50, 10 },
+              { 50, 50 },
+              { 100, 1 },
+              { 100, 50 },
+              { 100, 100 } },
+            params,
+            1,
+            thread::hardware_concurrency());
     }
 
     TEST(ZMQSenderReceiverTests, LabeledLarge)
     {
         size_t sender_size = 4000;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size,
-            { { 0, 0 }, { 1, 0 }, { 500, 10 }, { 500, 50 }, { 500, 500 }, { 1000, 0 }, { 1000, 1 }, { 1000, 500 },
-                { 1000, 999 }, { 1000, 1000 } },
-            params, 1, 1);
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 500, 10 },
+              { 500, 50 },
+              { 500, 500 },
+              { 1000, 0 },
+              { 1000, 1 },
+              { 1000, 500 },
+              { 1000, 999 },
+              { 1000, 1000 } },
+            params,
+            1,
+            1);
     }
 
     TEST(ZMQSenderReceiverTests, LabeledLargeMultiThreaded)
     {
         size_t sender_size = 4000;
         PSIParams params = create_params();
-        RunLabeledTest(sender_size,
-            { { 0, 0 }, { 1, 0 }, { 500, 10 }, { 500, 50 }, { 500, 500 }, { 1000, 0 }, { 1000, 1 }, { 1000, 500 },
-                { 1000, 999 }, { 1000, 1000 } },
-            params, 1, thread::hardware_concurrency());
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 500, 10 },
+              { 500, 50 },
+              { 500, 500 },
+              { 1000, 0 },
+              { 1000, 1 },
+              { 1000, 500 },
+              { 1000, 999 },
+              { 1000, 1000 } },
+            params,
+            1,
+            thread::hardware_concurrency());
     }
 
     TEST(ZMQSenderReceiverTests, LabeledLargeMultiThreadedMultiClient)
@@ -508,12 +658,22 @@ namespace APSITests
     {
         size_t sender_size = 50000;
         PSIParams params = create_huge_params();
-        RunLabeledTest(sender_size,
-            { { 0, 0 }, { 1, 0 }, { 5000, 100 }, { 5000, 5000 }, { 10000, 0 }, { 10000, 5000 }, { 10000, 10000 },
-                { 50000, 50000 } },
-            params, 1, thread::hardware_concurrency());
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 5000, 100 },
+              { 5000, 5000 },
+              { 10000, 0 },
+              { 10000, 5000 },
+              { 10000, 10000 },
+              { 50000, 50000 } },
+            params,
+            1,
+            thread::hardware_concurrency());
 
         sender_size = 1'000'000;
-        RunLabeledTest(sender_size, { { 10000, 10000 } }, params, 1, thread::hardware_concurrency());
+        RunLabeledTest(
+            sender_size, { { 10000, 10000 } }, params, 1, thread::hardware_concurrency());
     }
 } // namespace APSITests

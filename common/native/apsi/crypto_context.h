@@ -14,25 +14,24 @@
 #include "apsi/psi_params.h"
 
 // SEAL
-#include "seal/context.h"
 #include "seal/batchencoder.h"
+#include "seal/context.h"
+#include "seal/decryptor.h"
+#include "seal/encryptor.h"
+#include "seal/evaluator.h"
 #include "seal/keygenerator.h"
 #include "seal/publickey.h"
-#include "seal/secretkey.h"
 #include "seal/relinkeys.h"
-#include "seal/encryptor.h"
-#include "seal/decryptor.h"
-#include "seal/evaluator.h"
+#include "seal/secretkey.h"
 
-namespace apsi
-{
-    class CryptoContext
-    {
+namespace apsi {
+    class CryptoContext {
     public:
         CryptoContext() = default;
 
-        CryptoContext(const PSIParams &parms) :
-            seal_context_(std::make_shared<seal::SEALContext>(parms.seal_params(), true, seal::sec_level_type::tc128))
+        CryptoContext(const PSIParams &parms)
+            : seal_context_(std::make_shared<seal::SEALContext>(
+                  parms.seal_params(), true, seal::sec_level_type::tc128))
         {
             encoder_ = std::make_shared<seal::BatchEncoder>(*seal_context_);
         }

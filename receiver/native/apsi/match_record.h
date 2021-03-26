@@ -4,11 +4,11 @@
 #pragma once
 
 // STD
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
-#include <utility>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 // APSI
@@ -17,18 +17,16 @@
 // GSL
 #include "gsl/span"
 
-namespace apsi
-{
-    namespace receiver
-    {
+namespace apsi {
+    namespace receiver {
         /**
-        A LabelData object contains the data for an arbitrary size label returned from a query. Member functions allow
-        the label to be read as a string or as an array of (standard layout) objects of a desired type. There is usually
-        no reason for a normal user to create LabelData objects. These are used as a part of a MatchRecord object and
-        created by the query response processing API.
+        A LabelData object contains the data for an arbitrary size label returned from a query.
+        Member functions allow the label to be read as a string or as an array of (standard layout)
+        objects of a desired type. There is usually no reason for a normal user to create LabelData
+        objects. These are used as a part of a MatchRecord object and created by the query response
+        processing API.
         */
-        class LabelData
-        {
+        class LabelData {
         public:
             /**
             Creates an empty LabelData object.
@@ -52,25 +50,23 @@ namespace apsi
             /**
             Returns a span of a desired (standard layout) type to the label data.
             */
-            template<typename T, typename = std::enable_if_t<std::is_standard_layout<T>::value>>
+            template <typename T, typename = std::enable_if_t<std::is_standard_layout<T>::value>>
             gsl::span<std::add_const_t<T>> get_as() const
             {
-                if(!has_data())
-                {
+                if (!has_data()) {
                     return {};
                 }
                 std::size_t count = label_.size() / sizeof(T);
-                return { reinterpret_cast<std::add_const_t<T>*>(label_.data()), count };
+                return { reinterpret_cast<std::add_const_t<T> *>(label_.data()), count };
             }
 
             /**
             Returns a string containing the label data.
             */
-            template<typename CharT = char>
+            template <typename CharT = char>
             std::basic_string<CharT> to_string() const
             {
-                if (!has_data())
-                {
+                if (!has_data()) {
                     return {};
                 }
                 auto string_data = get_as<CharT>();
@@ -98,12 +94,12 @@ namespace apsi
         };
 
         /**
-        A MatchRecord object is a simple structure holding two values: a bool indicating a match found in a query and
-        a LabelData object holding the corresponding label data, if such was retrieved. There is usually no reason for
-        a normal user to create MatchRecord objects. These are created by the query response processing API.
+        A MatchRecord object is a simple structure holding two values: a bool indicating a match
+        found in a query and a LabelData object holding the corresponding label data, if such was
+        retrieved. There is usually no reason for a normal user to create MatchRecord objects. These
+        are created by the query response processing API.
         */
-        class MatchRecord
-        {
+        class MatchRecord {
         public:
             /**
             Indicates whether this MatchRecord signals a match found in a query.
@@ -111,7 +107,8 @@ namespace apsi
             bool found = false;
 
             /**
-            Holds the label data for the match indicated by this MatchRecord, if the sender returned any.
+            Holds the label data for the match indicated by this MatchRecord, if the sender returned
+            any.
             */
             LabelData label;
 
@@ -123,5 +120,5 @@ namespace apsi
                 return found;
             }
         };
-    }
-}
+    } // namespace receiver
+} // namespace apsi

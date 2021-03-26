@@ -4,9 +4,9 @@
 // STD
 
 // APSI
-#include "gtest/gtest.h"
 #include "apsi/util/cuckoo_filter.h"
 #include "apsi/util/cuckoo_filter_table.h"
+#include "gtest/gtest.h"
 
 using namespace std;
 using namespace apsi;
@@ -18,8 +18,7 @@ namespace APSITests {
     {
         CuckooFilter filter(70 * 2, 12);
 
-        for (uint64_t elem = 1; elem <= 100; elem++)
-        {
+        for (uint64_t elem = 1; elem <= 100; elem++) {
             ASSERT_EQ(true, filter.add(elem));
         }
 
@@ -44,13 +43,13 @@ namespace APSITests {
         ASSERT_EQ(true, filter.remove(80));
 
         ASSERT_EQ(false, filter.contains(1));
-        ASSERT_EQ(true,  filter.contains(2));
+        ASSERT_EQ(true, filter.contains(2));
         ASSERT_EQ(false, filter.contains(10));
-        ASSERT_EQ(true,  filter.contains(11));
+        ASSERT_EQ(true, filter.contains(11));
         ASSERT_EQ(false, filter.contains(20));
-        ASSERT_EQ(true,  filter.contains(21));
+        ASSERT_EQ(true, filter.contains(21));
         ASSERT_EQ(false, filter.contains(80));
-        ASSERT_EQ(true,  filter.contains(81));
+        ASSERT_EQ(true, filter.contains(81));
 
         ASSERT_EQ(96, filter.get_num_items());
     }

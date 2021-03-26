@@ -4,31 +4,28 @@
 #pragma once
 
 // STD
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
+#include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <unordered_map>
-#include <iostream>
-#include <vector>
 #include <utility>
-#include <memory>
+#include <vector>
 
 // APSI
 #include "apsi/seal_object.h"
 #include "apsi/version.h"
 
 // SEAL
-#include "seal/util/defines.h"
-#include "seal/util/common.h"
-#include "seal/relinkeys.h"
 #include "seal/ciphertext.h"
+#include "seal/relinkeys.h"
+#include "seal/util/common.h"
+#include "seal/util/defines.h"
 
-namespace apsi
-{
-    namespace network
-    {
-        enum class SenderOperationType : std::uint32_t
-        {
+namespace apsi {
+    namespace network {
+        enum class SenderOperationType : std::uint32_t {
             sop_unknown = 0,
 
             sop_parms = 1,
@@ -41,10 +38,10 @@ namespace apsi
         const char *sender_operation_type_str(SenderOperationType sop_type);
 
         /**
-        A class describing the type of a SenderOperation object and an optional member to identify the client.
+        A class describing the type of a SenderOperation object and an optional member to identify
+        the client.
         */
-        class SenderOperationHeader
-        {
+        class SenderOperationHeader {
         public:
             std::size_t save(std::ostream &out) const;
 
@@ -58,8 +55,7 @@ namespace apsi
         /**
         An abstract base class representing a sender operation.
         */
-        class SenderOperation
-        {
+        class SenderOperation {
         public:
             SenderOperation() = default;
 
@@ -76,7 +72,8 @@ namespace apsi
             /**
             Reads the SenderOperation from a stream.
             */
-            virtual std::size_t load(std::istream &in, std::shared_ptr<seal::SEALContext> context = nullptr) = 0;
+            virtual std::size_t load(
+                std::istream &in, std::shared_ptr<seal::SEALContext> context = nullptr) = 0;
 
             /**
             Returns the type of the SenderOperation.
@@ -87,12 +84,12 @@ namespace apsi
         /**
         A kind of SenderOperation for representing a parameter request from the receiver.
         */
-        class SenderOperationParms final : public SenderOperation
-        {
+        class SenderOperationParms final : public SenderOperation {
         public:
             std::size_t save(std::ostream &out) const override;
 
-            std::size_t load(std::istream &in, std::shared_ptr<seal::SEALContext> context = nullptr) override;
+            std::size_t load(
+                std::istream &in, std::shared_ptr<seal::SEALContext> context = nullptr) override;
 
             SenderOperationType type() const noexcept override
             {
@@ -103,12 +100,12 @@ namespace apsi
         /**
         A kind of SenderOperation for representing an OPRF query from the receiver.
         */
-        class SenderOperationOPRF final : public SenderOperation
-        {
+        class SenderOperationOPRF final : public SenderOperation {
         public:
             std::size_t save(std::ostream &out) const override;
 
-            std::size_t load(std::istream &in, std::shared_ptr<seal::SEALContext> context = nullptr) override;
+            std::size_t load(
+                std::istream &in, std::shared_ptr<seal::SEALContext> context = nullptr) override;
 
             SenderOperationType type() const noexcept override
             {
@@ -124,8 +121,7 @@ namespace apsi
         /**
         A kind of SenderOperation for representing a PSI or labeled PSI query from the receiver.
         */
-        class SenderOperationQuery final : public SenderOperation
-        {
+        class SenderOperationQuery final : public SenderOperation {
         public:
             std::size_t save(std::ostream &out) const override;
 

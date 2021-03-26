@@ -7,15 +7,13 @@
 
 // APSI
 #include "apsi/util/stopwatch.h"
-
 #include "gtest/gtest.h"
 
 using namespace std;
 using namespace apsi;
 using namespace apsi::util;
 
-namespace
-{
+namespace {
     void get_thread_name(int idx, string &str)
     {
         stringstream ss;
@@ -24,8 +22,7 @@ namespace
     }
 } // namespace
 
-namespace APSITests
-{
+namespace APSITests {
     TEST(StopwatchTests, SingleEvent)
     {
         Stopwatch sw;
@@ -42,7 +39,8 @@ namespace APSITests
         ASSERT_TRUE("two" == timepoints[1].event_name);
 
         auto diff = chrono::duration_cast<chrono::milliseconds>(
-            timepoints[1].time_point - timepoints[0].time_point).count();
+                        timepoints[1].time_point - timepoints[0].time_point)
+                        .count();
         string msg;
         {
             stringstream ss;
@@ -58,15 +56,13 @@ namespace APSITests
         Stopwatch sw;
 
         vector<thread> threads(20);
-        for (size_t i = 0; i < threads.size(); i++)
-        {
+        for (size_t i = 0; i < threads.size(); i++) {
             threads[i] = thread(
                 [&](int idx) {
                     string evt_name;
                     get_thread_name(idx, evt_name);
 
-                    for (int j = 0; j < 6; j++)
-                    {
+                    for (int j = 0; j < 6; j++) {
                         int millis = (std::rand() * 10 / RAND_MAX);
                         chrono::milliseconds ms(millis);
                         this_thread::sleep_for(ms);
@@ -77,8 +73,7 @@ namespace APSITests
                 static_cast<int>(i));
         }
 
-        for (auto &thr : threads)
-        {
+        for (auto &thr : threads) {
             thr.join();
         }
 
@@ -116,8 +111,9 @@ namespace APSITests
 
         ASSERT_EQ((size_t)2, tsp.size());
 
-        auto timesp = std::find_if(tsp.begin(), tsp.end(),
-            [](Stopwatch::TimespanSummary &tss) { return tss.event_name == "one"; });
+        auto timesp = std::find_if(tsp.begin(), tsp.end(), [](Stopwatch::TimespanSummary &tss) {
+            return tss.event_name == "one";
+        });
         ASSERT_TRUE(timesp != tsp.end());
         ASSERT_EQ(2, timesp->event_count);
 
@@ -155,8 +151,9 @@ namespace APSITests
             std::cerr << msg << std::endl;
         }
 
-        timesp = std::find_if(tsp.begin(), tsp.end(),
-            [](Stopwatch::TimespanSummary &tss) { return tss.event_name == "two"; });
+        timesp = std::find_if(tsp.begin(), tsp.end(), [](Stopwatch::TimespanSummary &tss) {
+            return tss.event_name == "two";
+        });
         ASSERT_TRUE(timesp != tsp.end());
         ASSERT_EQ(1, timesp->event_count);
     }
@@ -166,8 +163,7 @@ namespace APSITests
         Stopwatch sw;
 
         vector<thread> threads(30);
-        for (size_t i = 0; i < threads.size(); i++)
-        {
+        for (size_t i = 0; i < threads.size(); i++) {
             threads[i] = thread(
                 [&](int idx) {
                     string thr_name;
@@ -191,8 +187,7 @@ namespace APSITests
                 static_cast<int>(i));
         }
 
-        for (auto &thr : threads)
-        {
+        for (auto &thr : threads) {
             thr.join();
         }
 
@@ -200,8 +195,7 @@ namespace APSITests
         sw.get_timespans(tsp);
 
         ASSERT_EQ((size_t)30, tsp.size());
-        for (auto &tss : tsp)
-        {
+        for (auto &tss : tsp) {
             ASSERT_EQ(3, tss.event_count);
         }
     }

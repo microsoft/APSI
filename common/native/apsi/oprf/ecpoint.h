@@ -16,12 +16,9 @@
 // FourQ
 #include "apsi/fourq/FourQ.h"
 
-namespace apsi
-{
-    namespace oprf
-    {
-        class ECPoint
-        {
+namespace apsi {
+    namespace oprf {
+        class ECPoint {
         public:
             static constexpr std::size_t save_size = sizeof(f2elm_t);
             static constexpr std::size_t point_size = sizeof(point_t);

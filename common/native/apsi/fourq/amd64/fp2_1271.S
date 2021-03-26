@@ -140,7 +140,7 @@ fp2mul1271_a:
   mov    r11, [reg_p2]
   adc    r9, 0
 
-  // T1 = a1 * b0, (r12, r11, r10, r9) <- [reg_p1_16-24] * [reg_p2_0-8]	
+  // T1 = a1 * b0, (r12, r11, r10, r9) <- [reg_p1_16-24] * [reg_p2_0-8]
   mov    rax, [reg_p1+16]
   mul    r11
   mov    [rcx], r8

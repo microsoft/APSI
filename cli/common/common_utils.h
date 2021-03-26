@@ -19,15 +19,13 @@ void prepare_console();
 Generate timing report for timespans.
 */
 std::vector<std::string> generate_timespan_report(
-    const std::vector<apsi::util::Stopwatch::TimespanSummary> &timespans,
-    int max_name_length);
+    const std::vector<apsi::util::Stopwatch::TimespanSummary> &timespans, int max_name_length);
 
 /**
 Generate timing report for single events.
 */
 std::vector<std::string> generate_event_report(
-    const std::vector<apsi::util::Stopwatch::Timepoint> &timepoints,
-    int max_name_length);
+    const std::vector<apsi::util::Stopwatch::Timepoint> &timepoints, int max_name_length);
 
 /**
 Print timings.

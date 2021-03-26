@@ -14,8 +14,7 @@
 
 using namespace std;
 
-namespace apsi
-{
+namespace apsi {
     void Item::hash_to_value(const void *in, size_t size)
     {
         blake2b(value_.data(), sizeof(value_), in, size, nullptr, 0);
@@ -33,4 +32,4 @@ namespace apsi
     {
         return util::to_string(get_as<uint32_t>());
     }
-}
+} // namespace apsi

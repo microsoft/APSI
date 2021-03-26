@@ -12,12 +12,10 @@
 /**
 Command Line Processor for Receiver.
 */
-class CLP : public BaseCLP
-{
+class CLP : public BaseCLP {
 public:
     CLP(const std::string &desc, const std::string &version) : BaseCLP(desc, version)
-    {
-    }
+    {}
 
     virtual void add_args()
     {
@@ -45,34 +43,22 @@ public:
         return net_port_;
     }
 
-    const std::string& query_file() const
+    const std::string &query_file() const
     {
         return query_file_;
     }
 
-    const std::string& output_file() const
+    const std::string &output_file() const
     {
         return output_file_;
     }
 
 private:
     TCLAP::ValueArg<std::string> net_addr_arg_ = TCLAP::ValueArg<std::string>(
-        "a",
-        "ipAddr",
-        "IP address for a sender endpoint",
-        false,
-        "localhost",
-        "string"
-    );
+        "a", "ipAddr", "IP address for a sender endpoint", false, "localhost", "string");
 
     TCLAP::ValueArg<int> net_port_arg_ = TCLAP::ValueArg<int>(
-        "",
-        "port",
-        "TCP port to connect to (default is 1212)",
-        false,
-        1212,
-        "TCP port"
-    );
+        "", "port", "TCP port to connect to (default is 1212)", false, 1212, "TCP port");
 
     TCLAP::ValueArg<std::string> query_file_arg_ = TCLAP::ValueArg<std::string>(
         "q",
@@ -80,8 +66,7 @@ private:
         "Path to a text file containing query data (one per line)",
         true,
         "",
-        "string"
-    );
+        "string");
 
     TCLAP::ValueArg<std::string> out_file_arg_ = TCLAP::ValueArg<std::string>(
         "o",
@@ -89,8 +74,7 @@ private:
         "Path to a file where intersection result will be written",
         false,
         "",
-        "string"
-    );
+        "string");
 
     std::string net_addr_;
 

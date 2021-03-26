@@ -2,22 +2,20 @@
 // Licensed under the MIT license.
 
 // STD
+#include <cstddef>
+#include <cstdint>
+#include <numeric>
 #include <random>
 #include <vector>
-#include <cstdint>
-#include <cstddef>
-#include <random>
-#include <numeric>
 
 // APSI
-#include "apsi/util/interpolate.h"
 #include "apsi/config.h"
+#include "apsi/util/interpolate.h"
 
 // SEAL
 #include "seal/context.h"
 #include "seal/modulus.h"
 #include "seal/util/uintarithsmallmod.h"
-
 #include "gtest/gtest.h"
 
 using namespace std;
@@ -25,17 +23,16 @@ using namespace apsi::util;
 using namespace seal;
 using namespace seal::util;
 
-namespace APSITests
-{
-    uint64_t uint64_t_poly_eval(const vector<uint64_t> &poly, const uint64_t &x, const seal::Modulus &mod)
+namespace APSITests {
+    uint64_t uint64_t_poly_eval(
+        const vector<uint64_t> &poly, const uint64_t &x, const seal::Modulus &mod)
     {
         // cout << "f(" << x << ") = ";
         uint64_t result = 0, x_pow = 1;
 
         MultiplyUIntModOperand x_mod_op;
         x_mod_op.set(x, mod);
-        for (size_t i = 0; i < poly.size(); ++i)
-        {
+        for (size_t i = 0; i < poly.size(); ++i) {
             result = add_uint_mod(result, multiply_uint_mod(poly[i], x_pow, mod), mod);
             x_pow = multiply_uint_mod(x_pow, x_mod_op, mod);
         }
@@ -116,7 +113,7 @@ namespace APSITests
 
         // Invalid number of points/values
         ASSERT_THROW(auto poly = newton_interpolate_polyn({ 0 }, {}, mod), invalid_argument);
-        ASSERT_THROW(auto poly = newton_interpolate_polyn({ }, { 0 }, mod), invalid_argument);
+        ASSERT_THROW(auto poly = newton_interpolate_polyn({}, { 0 }, mod), invalid_argument);
 
         // Invalid modulus (not a prime)
         mod = 0;
@@ -128,10 +125,12 @@ namespace APSITests
         mod = 3;
 
         // Compatible repeated roots
-        ASSERT_THROW(auto poly = newton_interpolate_polyn({ 1, 2, 1 }, { 1, 0, 1 }, mod), logic_error);
+        ASSERT_THROW(
+            auto poly = newton_interpolate_polyn({ 1, 2, 1 }, { 1, 0, 1 }, mod), logic_error);
 
         // Incompatible repeated roots
-        ASSERT_THROW(auto poly = newton_interpolate_polyn({ 1, 2, 1 }, { 1, 0, 2 }, mod), logic_error);
+        ASSERT_THROW(
+            auto poly = newton_interpolate_polyn({ 1, 2, 1 }, { 1, 0, 2 }, mod), logic_error);
 
         // Single interpolation point
         auto poly = newton_interpolate_polyn({ 0 }, { 1 }, mod);
@@ -170,8 +169,7 @@ namespace APSITests
             // Interpolate and check the result
             auto poly = newton_interpolate_polyn(points, values, mod);
             ASSERT_EQ(mod.value(), poly.size());
-            for (auto x : points)
-            {
+            for (auto x : points) {
                 ASSERT_EQ(uint64_t_poly_eval(poly, x, mod), values[x]);
             }
         };

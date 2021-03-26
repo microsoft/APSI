@@ -7,7 +7,6 @@
 
 // APSI
 #include "apsi/network/sender_operation_response.h"
-
 #include "gtest/gtest.h"
 
 using namespace std;
@@ -15,8 +14,7 @@ using namespace seal;
 using namespace apsi;
 using namespace apsi::network;
 
-namespace APSITests
-{
+namespace APSITests {
     TEST(SenderOperationResponseTest, SaveLoadSenderOperationResponseParms)
     {
         SenderOperationResponseParms sopr;
@@ -46,8 +44,7 @@ namespace APSITests
         seal_params.set_coeff_modulus(CoeffModulus::Create(pmd, { 40, 40, 40 }));
         seal_params.set_plain_modulus(65537);
 
-        sopr.params = make_unique<PSIParams>(
-            item_params, table_params, query_params, seal_params);
+        sopr.params = make_unique<PSIParams>(item_params, table_params, query_params, seal_params);
         auto out_size = sopr.save(ss);
 
         SenderOperationResponseParms sopr2;
@@ -57,11 +54,18 @@ namespace APSITests
         ASSERT_EQ(SenderOperationType::sop_parms, sopr2.type());
 
         // Check that the parameters match
-        ASSERT_EQ(sopr.params->item_params().felts_per_item, sopr2.params->item_params().felts_per_item);
-        ASSERT_EQ(sopr.params->table_params().hash_func_count, sopr2.params->table_params().hash_func_count);
-        ASSERT_EQ(sopr.params->table_params().max_items_per_bin, sopr2.params->table_params().max_items_per_bin);
+        ASSERT_EQ(
+            sopr.params->item_params().felts_per_item, sopr2.params->item_params().felts_per_item);
+        ASSERT_EQ(
+            sopr.params->table_params().hash_func_count,
+            sopr2.params->table_params().hash_func_count);
+        ASSERT_EQ(
+            sopr.params->table_params().max_items_per_bin,
+            sopr2.params->table_params().max_items_per_bin);
         ASSERT_EQ(sopr.params->table_params().table_size, sopr2.params->table_params().table_size);
-        ASSERT_EQ(sopr.params->query_params().query_powers.size(), sopr2.params->query_params().query_powers.size());
+        ASSERT_EQ(
+            sopr.params->query_params().query_powers.size(),
+            sopr2.params->query_params().query_powers.size());
         ASSERT_TRUE(equal(
             sopr.params->query_params().query_powers.cbegin(),
             sopr.params->query_params().query_powers.cend(),
@@ -144,4 +148,4 @@ namespace APSITests
         ASSERT_EQ(SenderOperationType::sop_query, sopr2.type());
         ASSERT_EQ(sopr.package_count, sopr2.package_count);
     }
-}
+} // namespace APSITests

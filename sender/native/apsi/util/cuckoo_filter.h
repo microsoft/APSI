@@ -9,9 +9,8 @@
 #include <vector>
 
 // APSI
-#include "cuckoo_filter_table.h"
 #include "apsi/util/db_encoding.h"
-
+#include "cuckoo_filter_table.h"
 
 namespace apsi {
     namespace sender {
@@ -33,7 +32,8 @@ namespace apsi {
                 bool contains(const apsi::util::felt_t &item) const;
 
                 /**
-                Add an item to the Cuckoo Filter. Will fail if there is no more space to store items.
+                Add an item to the Cuckoo Filter. Will fail if there is no more space to store
+                items.
                 */
                 bool add(const apsi::util::felt_t &item);
 
@@ -98,7 +98,8 @@ namespace apsi {
                 /**
                 Get the tag and bucket index for a given element
                 */
-                void get_tag_and_index(const apsi::util::felt_t &item, std::uint32_t &tag, std::size_t &idx) const;
+                void get_tag_and_index(
+                    const apsi::util::felt_t &item, std::uint32_t &tag, std::size_t &idx) const;
 
                 /**
                 Get the alternate index for a given tag/index combination
@@ -116,5 +117,5 @@ namespace apsi {
                 void try_eliminate_overflow();
             };
         } // namespace util
-    } // namespace sender
+    }     // namespace sender
 } // namespace apsi

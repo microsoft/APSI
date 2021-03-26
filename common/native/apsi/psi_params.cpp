@@ -15,8 +15,8 @@
 // SEAL
 #include "seal/context.h"
 #include "seal/modulus.h"
-#include "seal/util/defines.h"
 #include "seal/util/common.h"
+#include "seal/util/defines.h"
 
 // JSON
 #include "json/json.h"
@@ -26,7 +26,7 @@ using namespace seal;
 using namespace seal::util;
 
 namespace {
-    const Json::Value& get_non_null_json_value(const Json::Value& parent, const string& name)
+    const Json::Value &get_non_null_json_value(const Json::Value &parent, const string &name)
     {
         const auto &value = parent[name];
         if (value.isNull()) {
@@ -55,7 +55,6 @@ namespace {
         return json_value_ui32(value);
     }
 
-
     uint64_t json_value_ui64(const Json::Value &parent, const string &name)
     {
         const auto &value = get_non_null_json_value(parent, name);
@@ -69,7 +68,7 @@ namespace {
         return value.asUInt64();
     }
 
-    int json_value_int(const Json::Value& value)
+    int json_value_int(const Json::Value &value)
     {
         if (!value.isInt()) {
             stringstream ss;
@@ -80,82 +79,73 @@ namespace {
         return value.asInt();
     }
 
-    int json_value_int(const Json::Value &parent, const string& name)
+    int json_value_int(const Json::Value &parent, const string &name)
     {
         const auto &value = get_non_null_json_value(parent, name);
         return json_value_int(value);
     }
-}
+} // namespace
 
-namespace apsi
-{
+namespace apsi {
     void PSIParams::initialize()
     {
         // Checking the validity of parameters
-        if (!table_params_.table_size || (table_params_.table_size & (table_params_.table_size - 1)))
-        {
+        if (!table_params_.table_size ||
+            (table_params_.table_size & (table_params_.table_size - 1))) {
             throw invalid_argument("table_size is not a power of two");
         }
-        if (!table_params_.max_items_per_bin)
-        {
+        if (!table_params_.max_items_per_bin) {
             throw invalid_argument("max_items_per_bin cannot be zero");
         }
         if (table_params_.hash_func_count < TableParams::hash_func_count_min ||
-            table_params_.hash_func_count > TableParams::hash_func_count_max)
-        {
+            table_params_.hash_func_count > TableParams::hash_func_count_max) {
             throw invalid_argument("hash_func_count is too large or too small");
         }
         if (item_params_.felts_per_item < ItemParams::felts_per_item_min ||
-            item_params_.felts_per_item > ItemParams::felts_per_item_max)
-        {
+            item_params_.felts_per_item > ItemParams::felts_per_item_max) {
             throw invalid_argument("felts_per_item is too large or too small");
         }
-        if (!item_params_.felts_per_item || (item_params_.felts_per_item & (item_params_.felts_per_item - 1)))
-        {
+        if (!item_params_.felts_per_item ||
+            (item_params_.felts_per_item & (item_params_.felts_per_item - 1))) {
             throw invalid_argument("felts_per_item is not a power of two");
         }
         if (query_params_.query_powers.find(0) != query_params_.query_powers.cend() ||
-            query_params_.query_powers.find(1) == query_params_.query_powers.cend())
-        {
+            query_params_.query_powers.find(1) == query_params_.query_powers.cend()) {
             throw invalid_argument("query_powers cannot contain 0 and must contain 1");
         }
-        if (query_params_.query_powers.size() > table_params_.max_items_per_bin)
-        {
+        if (query_params_.query_powers.size() > table_params_.max_items_per_bin) {
             throw invalid_argument("query_powers cannot be larger than max_items_per_bin");
         }
-        for (uint32_t p : query_params_.query_powers)
-        {
-            if (p > table_params_.max_items_per_bin)
-            {
-                throw invalid_argument("query_powers cannot contain values larger than max_items_per_bin");
+        for (uint32_t p : query_params_.query_powers) {
+            if (p > table_params_.max_items_per_bin) {
+                throw invalid_argument(
+                    "query_powers cannot contain values larger than max_items_per_bin");
             }
         }
 
         // Create a SEALContext (with expand_mod_chain == false) to check validity of parameters
         SEALContext seal_context(seal_params_, false, sec_level_type::tc128);
-        if (!seal_context.parameters_set())
-        {
+        if (!seal_context.parameters_set()) {
             stringstream ss;
-            ss << "Microsoft SEAL parameters are invalid: " << seal_context.parameter_error_message();
+            ss << "Microsoft SEAL parameters are invalid: "
+               << seal_context.parameter_error_message();
             throw invalid_argument(ss.str());
         }
-        if (!seal_context.using_keyswitching())
-        {
-            throw invalid_argument(
-                "Microsoft SEAL parameters do not support keyswitching; at least two coeff_modulus primes are required");
+        if (!seal_context.using_keyswitching()) {
+            throw invalid_argument("Microsoft SEAL parameters do not support keyswitching; at "
+                                   "least two coeff_modulus primes are required");
         }
-        if (!seal_context.key_context_data()->qualifiers().using_batching)
-        {
+        if (!seal_context.key_context_data()->qualifiers().using_batching) {
             throw invalid_argument(
-                "Microsoft SEAL parameters do not support batching; plain_modulus must be a prime congruent to 1 modulo 2*poly_modulus_degree");
+                "Microsoft SEAL parameters do not support batching; plain_modulus must be a prime "
+                "congruent to 1 modulo 2*poly_modulus_degree");
         }
 
         // Compute the bit-length of an item
         item_bit_count_per_felt_ = seal_params_.plain_modulus().bit_count() - 1;
         item_bit_count_ = item_bit_count_per_felt_ * item_params_.felts_per_item;
 
-        if (item_bit_count_ < item_bit_count_min || item_bit_count_ > item_bit_count_max)
-        {
+        if (item_bit_count_ < item_bit_count_min || item_bit_count_ > item_bit_count_max) {
             throw invalid_argument("parameters result in too large or too small item_bit_count");
         }
 
@@ -165,14 +155,13 @@ namespace apsi
             static_cast<uint32_t>(seal_params_.poly_modulus_degree()) / item_params_.felts_per_item;
 
         // Can we fit even one item into the SEAL ciphertext?
-        if (!items_per_bundle_)
-        {
+        if (!items_per_bundle_) {
             throw invalid_argument("poly_modulus_degree is too small");
         }
 
-        // table_size must be divisible by items_per_bundle; it suffices to test that table_size is not smaller
-        if (table_params_.table_size < items_per_bundle_)
-        {
+        // table_size must be divisible by items_per_bundle; it suffices to test that table_size is
+        // not smaller
+        if (table_params_.table_size < items_per_bundle_) {
             throw invalid_argument("table_size is too small");
         }
 
@@ -203,7 +192,8 @@ namespace apsi
         vector<seal_byte> temp;
         temp.resize(seal_params_.save_size(compr_mode_type::zstd));
         auto size = seal_params_.save(temp.data(), temp.size(), compr_mode_type::zstd);
-        auto seal_params_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(temp.data()), size);
+        auto seal_params_data =
+            fbs_builder.CreateVector(reinterpret_cast<uint8_t *>(temp.data()), size);
         auto seal_params = fbs::CreateSEALParams(fbs_builder, seal_params_data);
 
         fbs::PSIParamsBuilder psi_params_builder(fbs_builder);
@@ -215,7 +205,7 @@ namespace apsi
         fbs_builder.FinishSizePrefixed(psi_params);
 
         out.write(
-            reinterpret_cast<const char*>(fbs_builder.GetBufferPointer()),
+            reinterpret_cast<const char *>(fbs_builder.GetBufferPointer()),
             safe_cast<streamsize>(fbs_builder.GetSize()));
 
         return fbs_builder.GetSize();
@@ -225,10 +215,10 @@ namespace apsi
     {
         vector<seal_byte> in_data(util::read_from_stream(in));
 
-        auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
+        auto verifier = flatbuffers::Verifier(
+            reinterpret_cast<const unsigned char *>(in_data.data()), in_data.size());
         bool safe = fbs::VerifySizePrefixedPSIParamsBuffer(verifier);
-        if (!safe)
-        {
+        if (!safe) {
             throw runtime_error("failed to load parameters: invalid buffer");
         }
 
@@ -250,27 +240,23 @@ namespace apsi
 
         PSIParams::SEALParams seal_params;
         auto &seal_params_data = *psi_params->seal_params()->data();
-        try
-        {
-            seal_params.load(reinterpret_cast<const seal_byte *>(seal_params_data.data()), seal_params_data.size());
-        }
-        catch (const logic_error &ex)
-        {
+        try {
+            seal_params.load(
+                reinterpret_cast<const seal_byte *>(seal_params_data.data()),
+                seal_params_data.size());
+        } catch (const logic_error &ex) {
             stringstream ss;
             ss << "failed to load parameters: ";
             ss << ex.what();
             throw runtime_error(ss.str());
-        }
-        catch (const runtime_error &ex)
-        {
+        } catch (const runtime_error &ex) {
             stringstream ss;
             ss << "failed to load parameters: ";
             ss << ex.what();
             throw runtime_error(ss.str());
         }
 
-        if (seal_params.scheme() != scheme_type::bfv)
-        {
+        if (seal_params.scheme() != scheme_type::bfv) {
             throw runtime_error("failed to load parameters: invalid scheme type");
         }
 
@@ -343,18 +329,17 @@ namespace apsi
     {
         stringstream ss;
         ss << "item_params.felts_per_item: " << item_params_.felts_per_item
-            << "; table_params.table_size: " << table_params_.table_size
-            << "; table_params.max_items_per_bin: " << table_params_.max_items_per_bin
-            << "; table_params.hash_func_count: " << table_params_.hash_func_count
-            << "; query_params.query_powers: "
-            << util::to_string(query_params_.query_powers)
-            << "; seal_params.poly_modulus_degree: " << seal_params_.poly_modulus_degree()
-            << "; seal_params.coeff_modulus: "
-            << util::to_string(
-                seal_params_.coeff_modulus(),
-                [](const Modulus &mod) { return std::to_string(mod.bit_count()); })
-            << "; seal_params.plain_modulus: " << seal_params_.plain_modulus().value();
+           << "; table_params.table_size: " << table_params_.table_size
+           << "; table_params.max_items_per_bin: " << table_params_.max_items_per_bin
+           << "; table_params.hash_func_count: " << table_params_.hash_func_count
+           << "; query_params.query_powers: " << util::to_string(query_params_.query_powers)
+           << "; seal_params.poly_modulus_degree: " << seal_params_.poly_modulus_degree()
+           << "; seal_params.coeff_modulus: "
+           << util::to_string(
+                  seal_params_.coeff_modulus(),
+                  [](const Modulus &mod) { return std::to_string(mod.bit_count()); })
+           << "; seal_params.plain_modulus: " << seal_params_.plain_modulus().value();
 
         return ss.str();
     }
-}
+} // namespace apsi

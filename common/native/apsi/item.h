@@ -7,8 +7,8 @@
 #include <algorithm>
 #include <array>
 #include <cstddef>
-#include <cstdio>
 #include <cstdint>
+#include <cstdio>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -21,17 +21,15 @@
 // GSL
 #include "gsl/span"
 
-namespace apsi
-{
+namespace apsi {
     /**
     Identical to Bitstring, except the underlying data is not owned.
     */
-    template<
+    template <
         typename T,
         typename = std::enable_if_t<
             std::is_same<T, unsigned char>::value || std::is_same<T, const unsigned char>::value>>
-    class BitstringView
-    {
+    class BitstringView {
     private:
         gsl::span<T> data_;
 
@@ -41,13 +39,11 @@ namespace apsi
         BitstringView(gsl::span<T> data, std::uint32_t bit_count)
         {
             // Sanity check: bit_count cannot be 0
-            if (!bit_count)
-            {
+            if (!bit_count) {
                 throw std::invalid_argument("bit_count must be positive");
             }
             // Sanity check: bit_count cannot exceed underlying data length
-            if (data.size() * 8 < bit_count)
-            {
+            if (data.size() * 8 < bit_count) {
                 throw std::invalid_argument("bit_count exceeds the data length");
             }
 
@@ -62,12 +58,11 @@ namespace apsi
             bit_count_ = bit_count;
         }
 
-        BitstringView(T *data, std::uint32_t bit_count) :
-            BitstringView(gsl::span<T>{ data, (bit_count + 7) / 8 }, bit_count)
-        {
-        }
+        BitstringView(T *data, std::uint32_t bit_count)
+            : BitstringView(gsl::span<T>{ data, (bit_count + 7) / 8 }, bit_count)
+        {}
 
-        template<typename S>
+        template <typename S>
         BitstringView(const BitstringView<S> &view)
         {
             data_ = static_cast<gsl::span<S>>(view.data());
@@ -95,11 +90,10 @@ namespace apsi
     };
 
     /**
-    Represents a bitstring, i.e., a string of bytes that tells you how many bits it's supposed to be interpreted as.
-    The stated bit_count must be at most the number of actual underlying bits.
+    Represents a bitstring, i.e., a string of bytes that tells you how many bits it's supposed to be
+    interpreted as. The stated bit_count must be at most the number of actual underlying bits.
     */
-    class Bitstring
-    {
+    class Bitstring {
     private:
         std::vector<unsigned char> data_;
 
@@ -109,14 +103,12 @@ namespace apsi
         Bitstring(std::vector<unsigned char> &&data, std::uint32_t bit_count)
         {
             // Sanity check: bit_count cannot be 0
-            if (!bit_count)
-            {
+            if (!bit_count) {
                 throw std::invalid_argument("bit_count must be positive");
             }
 
             // Sanity check: bit_count cannot exceed underlying data length
-            if (data.size() * 8 < bit_count)
-            {
+            if (data.size() * 8 < bit_count) {
                 throw std::invalid_argument("bit_count exceeds the data length");
             }
 
@@ -182,11 +174,10 @@ namespace apsi
         }
     };
 
-    class Item
-    {
+    class Item {
     public:
         using value_type = std::array<unsigned char, 16>;
-        
+
         /**
         Constructs a zero item.
         */
@@ -196,15 +187,14 @@ namespace apsi
         {}
 
         /**
-        Constructs an Item from a BitstringView. This throws std::invalid_argument if the bitstring doesn't fit into
-        std::array<unsigned char, 16>.
+        Constructs an Item from a BitstringView. This throws std::invalid_argument if the bitstring
+        doesn't fit into std::array<unsigned char, 16>.
         */
-        template<typename T>
+        template <typename T>
         Item(const BitstringView<T> &bitstring)
         {
             auto bitstring_bytes = bitstring.data();
-            if (bitstring_bytes.size() > sizeof(value_))
-            {
+            if (bitstring_bytes.size() > sizeof(value_)) {
                 throw std::invalid_argument("bitstring is too long to fit into an Item");
             }
 
@@ -215,24 +205,23 @@ namespace apsi
 
         Item(Item &&) = default;
 
-        Item &operator =(const Item &item) = default;
+        Item &operator=(const Item &item) = default;
 
-        Item &operator =(Item &&item) = default;
+        Item &operator=(Item &&item) = default;
 
-        template<typename CharT>
+        template <typename CharT>
         Item(const std::basic_string<CharT> &str)
         {
-            operator =<CharT>(str);
+            operator=<CharT>(str);
         }
 
         /**
         Hash a given string of arbitrary length into an Item.
         */
-        template<typename CharT>
-        Item &operator =(const std::basic_string<CharT> &str)
+        template <typename CharT>
+        Item &operator=(const std::basic_string<CharT> &str)
         {
-            if (str.empty())
-            {
+            if (str.empty()) {
                 throw std::invalid_argument("str cannot be empty");
             }
 
@@ -253,22 +242,22 @@ namespace apsi
         /**
         Returns a span of a desired (standard layout) type to the label data.
         */
-        template<typename T, typename = std::enable_if_t<std::is_standard_layout<T>::value>>
+        template <typename T, typename = std::enable_if_t<std::is_standard_layout<T>::value>>
         auto get_as() const
         {
             constexpr std::size_t count = sizeof(value_) / sizeof(T);
             return gsl::span<std::add_const_t<T>, count>(
-                reinterpret_cast<std::add_const_t<T>*>(value_.data()), count);
+                reinterpret_cast<std::add_const_t<T> *>(value_.data()), count);
         }
 
         /**
         Returns a span of a desired (standard layout) type to the label data.
         */
-        template<typename T, typename = std::enable_if_t<std::is_standard_layout<T>::value>>
+        template <typename T, typename = std::enable_if_t<std::is_standard_layout<T>::value>>
         auto get_as()
         {
             constexpr std::size_t count = sizeof(value_) / sizeof(T);
-            return gsl::span<T, count>(reinterpret_cast<T*>(value_.data()), count);
+            return gsl::span<T, count>(reinterpret_cast<T *>(value_.data()), count);
         }
 
         Item(std::uint64_t lw, std::uint64_t hw)
@@ -299,8 +288,7 @@ namespace apsi
     /**
     Represents an Item that has been hashed with an OPRF.
     */
-    class HashedItem : public Item
-    {
+    class HashedItem : public Item {
     public:
         using Item::Item;
     };
@@ -313,8 +301,7 @@ namespace apsi
     /**
     Represents an encrypted Label.
     */
-    class EncryptedLabel : public Label
-    {
+    class EncryptedLabel : public Label {
     public:
         using Label::Label;
     };
@@ -335,14 +322,12 @@ namespace apsi
     using LabelKey = std::array<unsigned char, label_key_byte_count>;
 } // namespace apsi
 
-namespace std
-{
+namespace std {
     /**
     Specializes the std::hash template for Item and HashedItem.
     */
     template <>
-    struct hash<apsi::Item>
-    {
+    struct hash<apsi::Item> {
         std::size_t operator()(const apsi::Item &item) const
         {
             auto words = item.get_as<uint64_t>();
@@ -354,12 +339,10 @@ namespace std
     };
 
     template <>
-    struct hash<apsi::HashedItem>
-    {
+    struct hash<apsi::HashedItem> {
         std::size_t operator()(const apsi::HashedItem &item) const
         {
             return hash<apsi::Item>()(item);
         }
     };
 } // namespace std
-

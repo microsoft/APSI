@@ -4,15 +4,14 @@
 // STD
 #include <cstdint>
 #include <random>
-#include <vector>
 #include <stdexcept>
+#include <vector>
 
 // APSI
 #include "apsi/util/db_encoding.h"
 
 // SEAL
 #include "seal/util/defines.h"
-
 #include "gtest/gtest.h"
 
 using namespace std;
@@ -20,10 +19,8 @@ using namespace apsi;
 using namespace apsi::util;
 using namespace seal;
 
-namespace APSITests
-{
-    namespace
-    {
+namespace APSITests {
+    namespace {
         felt_t get_bit(const vector<unsigned char> &in, size_t bit_idx)
         {
             size_t byte_idx = bit_idx >> 3;
@@ -39,7 +36,7 @@ namespace APSITests
             size_t nibble_in_byte = nibble_idx - byte_idx * 2;
             return (res >> (nibble_in_byte * 4)) & 0xF;
         }
-    }
+    } // namespace
 
     TEST(DbEncodingTests, BitsToFieldElts)
     {
@@ -49,14 +46,14 @@ namespace APSITests
         data[2] = 0x0F;
         data[3] = 0x1F;
 
-        BitstringView<const unsigned char> bsv({ data.data(), data.size() }, static_cast<uint32_t>(8 * data.size()));
+        BitstringView<const unsigned char> bsv(
+            { data.data(), data.size() }, static_cast<uint32_t>(8 * data.size()));
 
         // Modulus 3 should cause every bit to be extracted separately
         Modulus mod = 3;
         vector<felt_t> felts = bits_to_field_elts(bsv, mod);
         ASSERT_EQ(8 * data.size(), felts.size());
-        for (size_t idx = 0; idx < felts.size(); idx++)
-        {
+        for (size_t idx = 0; idx < felts.size(); idx++) {
             ASSERT_EQ(get_bit(data, idx), felts[idx]);
         }
 
@@ -64,8 +61,7 @@ namespace APSITests
         Bitstring back_bs = field_elts_to_bits(felts, bsv.bit_count(), mod);
         ASSERT_EQ(bsv.bit_count(), back_bs.bit_count());
         ASSERT_EQ(bsv.data().size(), back_bs.data().size());
-        for (size_t idx = 0; idx < back_bs.data().size(); idx++)
-        {
+        for (size_t idx = 0; idx < back_bs.data().size(); idx++) {
             ASSERT_EQ(bsv.data()[idx], back_bs.data()[idx]);
         }
 
@@ -73,8 +69,7 @@ namespace APSITests
         mod = 1 << 4;
         felts = bits_to_field_elts(bsv, mod);
         ASSERT_EQ(2 * data.size(), felts.size());
-        for (size_t idx = 0; idx < felts.size(); idx++)
-        {
+        for (size_t idx = 0; idx < felts.size(); idx++) {
             ASSERT_EQ(get_nibble(data, idx), felts[idx]);
         }
 
@@ -82,8 +77,7 @@ namespace APSITests
         back_bs = field_elts_to_bits(felts, bsv.bit_count(), mod);
         ASSERT_EQ(bsv.bit_count(), back_bs.bit_count());
         ASSERT_EQ(bsv.data().size(), back_bs.data().size());
-        for (size_t idx = 0; idx < back_bs.data().size(); idx++)
-        {
+        for (size_t idx = 0; idx < back_bs.data().size(); idx++) {
             ASSERT_EQ(bsv.data()[idx], back_bs.data()[idx]);
         }
 
@@ -91,8 +85,7 @@ namespace APSITests
         mod = 1 << 8;
         felts = bits_to_field_elts(bsv, mod);
         ASSERT_EQ(data.size(), felts.size());
-        for (size_t idx = 0; idx < felts.size(); idx++)
-        {
+        for (size_t idx = 0; idx < felts.size(); idx++) {
             ASSERT_EQ(static_cast<felt_t>(data[idx]), felts[idx]);
         }
 
@@ -100,8 +93,7 @@ namespace APSITests
         back_bs = field_elts_to_bits(felts, bsv.bit_count(), mod);
         ASSERT_EQ(bsv.bit_count(), back_bs.bit_count());
         ASSERT_EQ(bsv.data().size(), back_bs.data().size());
-        for (size_t idx = 0; idx < back_bs.data().size(); idx++)
-        {
+        for (size_t idx = 0; idx < back_bs.data().size(); idx++) {
             ASSERT_EQ(bsv.data()[idx], back_bs.data()[idx]);
         }
 
@@ -117,8 +109,7 @@ namespace APSITests
         back_bs = field_elts_to_bits(felts, bsv.bit_count(), mod);
         ASSERT_EQ(bsv.bit_count(), back_bs.bit_count());
         ASSERT_EQ(bsv.data().size(), back_bs.data().size());
-        for (size_t idx = 0; idx < back_bs.data().size(); idx++)
-        {
+        for (size_t idx = 0; idx < back_bs.data().size(); idx++) {
             ASSERT_EQ(bsv.data()[idx], back_bs.data()[idx]);
         }
 
@@ -129,21 +120,21 @@ namespace APSITests
 
         // An input of size 0 is not allowed when converting from felts to bits
         mod = 3;
-        ASSERT_THROW(back_bs = field_elts_to_bits({ }, 0, mod), invalid_argument);
+        ASSERT_THROW(back_bs = field_elts_to_bits({}, 0, mod), invalid_argument);
     }
 
     TEST(DbEncodingTests, BitsToFieldEltsRoundTrip)
     {
         // Tests that encoding bitstring -> field elements -> bitstring is a lossless round trip
-        for (int rep = 0; rep < 20; rep++)
-        {
+        for (int rep = 0; rep < 20; rep++) {
             // Make a SEAL modulus. This defines our field.
             Modulus mod(0x51F2);
 
             // Make a random bitstring
             random_device rd;
             vector<unsigned char> bytes(256);
-            std::generate(begin(bytes), end(bytes), [&]() { return static_cast<unsigned char>(rd()); });
+            std::generate(
+                begin(bytes), end(bytes), [&]() { return static_cast<unsigned char>(rd()); });
 
             // Pick a random bit length within range, i.e., within 7 bits of the total length
             std::uniform_int_distribution<size_t> bitlen_dist(0, 7);
@@ -163,9 +154,9 @@ namespace APSITests
             // Make sure that the round trip is the identity
             ASSERT_EQ(bs.bit_count(), back_bs.bit_count());
             ASSERT_EQ(bs.data().size(), back_bs.data().size());
-            for (size_t idx = 0; idx < bs.data().size(); idx++)
-            {
-                ASSERT_EQ(static_cast<char>(bs.data()[idx]), static_cast<char>(back_bs.data()[idx]));
+            for (size_t idx = 0; idx < bs.data().size(); idx++) {
+                ASSERT_EQ(
+                    static_cast<char>(bs.data()[idx]), static_cast<char>(back_bs.data()[idx]));
             }
         }
     }

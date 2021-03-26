@@ -14,7 +14,6 @@
 #include "apsi/network/stream_channel.h"
 #include "apsi/powers.h"
 #include "apsi/util/utils.h"
-
 #include "gtest/gtest.h"
 
 using namespace std;
@@ -22,15 +21,12 @@ using namespace seal;
 using namespace apsi;
 using namespace apsi::network;
 
-namespace APSITests
-{
-    namespace
-    {
+namespace APSITests {
+    namespace {
         shared_ptr<PSIParams> get_params()
         {
             static shared_ptr<PSIParams> params = nullptr;
-            if (!params)
-            {
+            if (!params) {
                 PSIParams::ItemParams item_params;
                 item_params.felts_per_item = 8;
 
@@ -48,8 +44,8 @@ namespace APSITests
                 seal_params.set_coeff_modulus(CoeffModulus::Create(pmd, { 40, 40 }));
                 seal_params.set_plain_modulus(65537);
 
-                params = make_shared<PSIParams>(
-                    item_params, table_params, query_params, seal_params);
+                params =
+                    make_shared<PSIParams>(item_params, table_params, query_params, seal_params);
             }
 
             return params;
@@ -58,8 +54,7 @@ namespace APSITests
         shared_ptr<CryptoContext> get_context()
         {
             static shared_ptr<CryptoContext> context = nullptr;
-            if (!context)
-            {
+            if (!context) {
                 context = make_shared<CryptoContext>(*get_params());
                 KeyGenerator keygen(*context->seal_context());
                 context->set_secret(keygen.secret_key());
@@ -72,8 +67,7 @@ namespace APSITests
         }
     } // namespace
 
-    class StreamChannelTests : public ::testing::Test
-    {
+    class StreamChannelTests : public ::testing::Test {
     protected:
         StreamChannelTests()
         {}
@@ -107,7 +101,7 @@ namespace APSITests
 
         // Receive the parms response
         rsop = clt.receive_response(SenderOperationType::sop_parms);
-        rsop_parms.reset(dynamic_cast<SenderOperationResponseParms*>(rsop.release()));
+        rsop_parms.reset(dynamic_cast<SenderOperationResponseParms *>(rsop.release()));
 
         // We received valid parameters
         ASSERT_EQ(get_params()->item_bit_count(), rsop_parms->params->item_bit_count());
@@ -126,8 +120,7 @@ namespace APSITests
 
         // Fill a data buffer
         vector<seal_byte> oprf_data(256);
-        for (size_t i = 0; i < oprf_data.size(); i++)
-        {
+        for (size_t i = 0; i < oprf_data.size(); i++) {
             oprf_data[i] = static_cast<seal_byte>(i);
         }
 
@@ -141,12 +134,11 @@ namespace APSITests
         // Receive the operation
         sop = svr.receive_operation(get_context()->seal_context());
         ASSERT_EQ(SenderOperationType::sop_oprf, sop->type());
-        sop_oprf.reset(dynamic_cast<SenderOperationOPRF*>(sop.release()));
+        sop_oprf.reset(dynamic_cast<SenderOperationOPRF *>(sop.release()));
 
         // Validate the data
         ASSERT_EQ(256, sop_oprf->data.size());
-        for (size_t i = 0; i < sop_oprf->data.size(); i++)
-        {
+        for (size_t i = 0; i < sop_oprf->data.size(); i++) {
             ASSERT_EQ(static_cast<char>(sop_oprf->data[i]), static_cast<char>(i));
         }
 
@@ -158,12 +150,11 @@ namespace APSITests
 
         // Receive the OPRF response
         rsop = clt.receive_response(SenderOperationType::sop_oprf);
-        rsop_oprf.reset(dynamic_cast<SenderOperationResponseOPRF*>(rsop.release()));
+        rsop_oprf.reset(dynamic_cast<SenderOperationResponseOPRF *>(rsop.release()));
 
         // Validate the data
         ASSERT_EQ(256, rsop_oprf->data.size());
-        for (size_t i = 0; i < rsop_oprf->data.size(); i++)
-        {
+        for (size_t i = 0; i < rsop_oprf->data.size(); i++) {
             ASSERT_EQ(static_cast<char>(rsop_oprf->data[i]), static_cast<char>(i));
         }
 
@@ -191,7 +182,7 @@ namespace APSITests
         // Receive the operation
         sop = svr.receive_operation(get_context()->seal_context());
         ASSERT_EQ(SenderOperationType::sop_query, sop->type());
-        sop_query.reset(dynamic_cast<SenderOperationQuery*>(sop.release()));
+        sop_query.reset(dynamic_cast<SenderOperationQuery *>(sop.release()));
 
         // Are we able to extract the relinearization keys?
         ASSERT_NO_THROW(auto rlk = sop_query->relin_keys.extract_if_local());
@@ -215,7 +206,7 @@ namespace APSITests
 
         // Receive the query response
         rsop = clt.receive_response(SenderOperationType::sop_query);
-        rsop_query.reset(dynamic_cast<SenderOperationResponseQuery*>(rsop.release()));
+        rsop_query.reset(dynamic_cast<SenderOperationResponseQuery *>(rsop.release()));
 
         // Validate the data
         ASSERT_EQ(2, rsop_query->package_count);

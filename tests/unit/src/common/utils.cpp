@@ -2,18 +2,17 @@
 // Licensed under the MIT license.
 
 // STD
-#include <vector>
-#include <utility>
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 #include <sstream>
+#include <utility>
+#include <vector>
 
 // APSI
 #include "apsi/util/utils.h"
 
 // SEAL
 #include "seal/util/defines.h"
-
 #include "gtest/gtest.h"
 
 using namespace std;
@@ -21,18 +20,15 @@ using namespace seal;
 using namespace apsi;
 using namespace apsi::util;
 
-namespace APSITests
-{
-    namespace
-    {
+namespace APSITests {
+    namespace {
         void compare_up_to(const vector<seal_byte> &a, const vector<seal_byte> &b, size_t count)
         {
-            for (size_t i = 0; i < count; i++)
-            {
+            for (size_t i = 0; i < count; i++) {
                 ASSERT_EQ(static_cast<char>(a[i]), static_cast<char>(b[i]));
             }
         }
-    }
+    } // namespace
 
     TEST(UtilsTests, ConversionToDigits)
     {
@@ -64,14 +60,11 @@ namespace APSITests
     TEST(UtilsTests, PartitionEvenly)
     {
         auto compare_results = [](auto &&in1, auto &&in2) -> bool {
-            if (in1.size() != in2.size())
-            {
+            if (in1.size() != in2.size()) {
                 return false;
             }
-            for (size_t i = 0; i < in1.size(); i++)
-            {
-                if (in1[i].first != in2[i].first || in1[i].second != in2[i].second)
-                {
+            for (size_t i = 0; i < in1.size(); i++) {
+                if (in1[i].first != in2[i].first || in1[i].second != in2[i].second) {
                     return false;
                 }
             }
@@ -114,10 +107,13 @@ namespace APSITests
         ASSERT_TRUE(compare_results(res, compare));
 
         res = partition_evenly(5, 5);
-        compare = { make_pair(0, 1), make_pair(1, 2), make_pair(2, 3), make_pair(3, 4), make_pair(4, 5) };
+        compare = {
+            make_pair(0, 1), make_pair(1, 2), make_pair(2, 3), make_pair(3, 4), make_pair(4, 5)
+        };
         ASSERT_TRUE(compare_results(res, compare));
 
-        // More partitions than values; only create up to the number of values many partitions, each of size one
+        // More partitions than values; only create up to the number of values many partitions, each
+        // of size one
         res = partition_evenly(5, 6);
         ASSERT_TRUE(compare_results(res, compare));
     }
@@ -126,13 +122,12 @@ namespace APSITests
     {
         stringstream ss;
         vector<seal_byte> bytes;
-        for (size_t i = 0; i < 100; i++)
-        {
+        for (size_t i = 0; i < 100; i++) {
             bytes.push_back(static_cast<seal_byte>(i));
         }
 
         // Write the bytes to the stream
-        ss.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+        ss.write(reinterpret_cast<const char *>(bytes.data()), bytes.size());
 
         // Now read them back to a different vector
         vector<seal_byte> compare;
@@ -168,14 +163,13 @@ namespace APSITests
         vector<seal_byte> bytes;
 
         uint32_t size = 100;
-        for (uint32_t i = 0; i < size; i++)
-        {
+        for (uint32_t i = 0; i < size; i++) {
             bytes.push_back(static_cast<seal_byte>(i));
         }
 
         // Write the bytes to the stream
-        ss.write(reinterpret_cast<const char*>(&size), sizeof(uint32_t));
-        ss.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+        ss.write(reinterpret_cast<const char *>(&size), sizeof(uint32_t));
+        ss.write(reinterpret_cast<const char *>(bytes.data()), bytes.size());
 
         // Now read them back to a different vector
         vector<seal_byte> compare = read_from_stream(ss);
@@ -191,32 +185,32 @@ namespace APSITests
         uint32_t val1 = 0;
         uint32_t val2 = 0;
         xor_buffers(
-            reinterpret_cast<unsigned char*>(&val1),
-            reinterpret_cast<const unsigned char*>(&val2),
+            reinterpret_cast<unsigned char *>(&val1),
+            reinterpret_cast<const unsigned char *>(&val2),
             sizeof(uint32_t));
         ASSERT_EQ(0, val1);
 
         val1 = 0xABABABAB;
         val2 = 0xABABABAB;
         xor_buffers(
-            reinterpret_cast<unsigned char*>(&val1),
-            reinterpret_cast<const unsigned char*>(&val2),
+            reinterpret_cast<unsigned char *>(&val1),
+            reinterpret_cast<const unsigned char *>(&val2),
             sizeof(uint32_t));
         ASSERT_EQ(0, val1);
 
         val1 = 0xAAAAAAAA;
         val2 = 0x55555555;
         xor_buffers(
-            reinterpret_cast<unsigned char*>(&val1),
-            reinterpret_cast<const unsigned char*>(&val2),
+            reinterpret_cast<unsigned char *>(&val1),
+            reinterpret_cast<const unsigned char *>(&val2),
             sizeof(uint32_t));
         ASSERT_EQ(0xFFFFFFFF, val1);
 
         val1 = 0xAAAAAAAA >> 1;
         val2 = 0x55555555;
         xor_buffers(
-            reinterpret_cast<unsigned char*>(&val1),
-            reinterpret_cast<const unsigned char*>(&val2),
+            reinterpret_cast<unsigned char *>(&val1),
+            reinterpret_cast<const unsigned char *>(&val2),
             sizeof(uint32_t));
         ASSERT_EQ(0, val1);
 

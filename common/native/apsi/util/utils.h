@@ -28,14 +28,13 @@
 // GSL
 #include "gsl/span"
 
-namespace apsi
-{
-    namespace util
-    {
+namespace apsi {
+    namespace util {
         /**
         Convert the given input to digits.
         */
-        std::vector<std::uint64_t> conversion_to_digits(const std::uint64_t input, const std::uint64_t base);
+        std::vector<std::uint64_t> conversion_to_digits(
+            const std::uint64_t input, const std::uint64_t base);
 
         /**
         Split the given string.
@@ -51,7 +50,8 @@ namespace apsi
         Round up the given value using the given step.
         */
         template <typename T>
-        typename std::enable_if<std::is_pod<T>::value, T>::type round_up_to(const T val, const T step)
+        typename std::enable_if<std::is_pod<T>::value, T>::type round_up_to(
+            const T val, const T step)
         {
             return ((val + step - 1) / step) * step;
         }
@@ -63,11 +63,10 @@ namespace apsi
         The return value is a vector of pairs of points, where each pair contains the start
         and one-past-end points for the partition.
         */
-        template<typename T>
+        template <typename T>
         std::vector<std::pair<T, T>> partition_evenly(T count, T partition_count)
         {
-            if (count == 0 || partition_count == 0)
-            {
+            if (count == 0 || partition_count == 0) {
                 return {};
             }
 
@@ -81,11 +80,9 @@ namespace apsi
             T extras_needed = count - per_partition * partition_count;
 
             T partition_start = 0;
-            for (T i = 0; i < partition_count; i++)
-            {
+            for (T i = 0; i < partition_count; i++) {
                 T partition_end = partition_start + per_partition;
-                if (extras_needed)
-                {
+                if (extras_needed) {
                     partition_end++;
                     extras_needed--;
                 }
@@ -97,40 +94,43 @@ namespace apsi
         }
 
         /**
-        This function reads a given number of bytes from a stream in small parts, writing the result to the end of
-        a given vector. This can avoid issues where a large number of bytes is requested incorrectly to be read from
-        a stream, causing a larger than necessary memory allocation.
+        This function reads a given number of bytes from a stream in small parts, writing the result
+        to the end of a given vector. This can avoid issues where a large number of bytes is
+        requested incorrectly to be read from a stream, causing a larger than necessary memory
+        allocation.
         */
-        void read_from_stream(std::istream &in, std::uint32_t byte_count, std::vector<seal::seal_byte> &destination);
+        void read_from_stream(
+            std::istream &in, std::uint32_t byte_count, std::vector<seal::seal_byte> &destination);
 
         /**
-        This function reads a size-prefixed number of bytes from a stream and returns the result in a vector.
+        This function reads a size-prefixed number of bytes from a stream and returns the result in
+        a vector.
         */
         std::vector<seal::seal_byte> read_from_stream(std::istream &in);
 
         /**
-        Casts std::unique_ptr<T> to std::unique_ptr<S>, when S* can be cast to T*. Returns nullptr if the cast fails.
+        Casts std::unique_ptr<T> to std::unique_ptr<S>, when S* can be cast to T*. Returns nullptr
+        if the cast fails.
         */
-        template<typename To, typename From>
+        template <typename To, typename From>
         std::unique_ptr<To> unique_ptr_cast(std::unique_ptr<From> &from)
         {
             auto ptr = dynamic_cast<To *>(from.get());
-            if (!ptr)
-            {
+            if (!ptr) {
                 return nullptr;
             }
             return std::unique_ptr<To>{ static_cast<To *>(from.release()) };
         }
 
         /**
-        Casts std::unique_ptr<T> to std::unique_ptr<S>, when S* can be cast to T*. Returns nullptr if the cast fails.
+        Casts std::unique_ptr<T> to std::unique_ptr<S>, when S* can be cast to T*. Returns nullptr
+        if the cast fails.
         */
-        template<typename To, typename From>
+        template <typename To, typename From>
         std::unique_ptr<To> unique_ptr_cast(std::unique_ptr<From> &&from)
         {
             auto ptr = dynamic_cast<To *>(from.get());
-            if (!ptr)
-            {
+            if (!ptr) {
                 return nullptr;
             }
             return std::unique_ptr<To>{ static_cast<To *>(from.release()) };
@@ -139,18 +139,16 @@ namespace apsi
         /**
         Writes a vector into an std::ostream as [a, b, c, ..., z].
         */
-        template<typename T, std::size_t Extent, typename ToString>
+        template <typename T, std::size_t Extent, typename ToString>
         std::string to_string(gsl::span<T, Extent> values, ToString to_string_fun)
         {
-            if (values.empty())
-            {
+            if (values.empty()) {
                 return "[ ]";
             }
 
             std::stringstream ss;
             ss << "[";
-            for (std::size_t i = 0; i < values.size() - 1; i++)
-            {
+            for (std::size_t i = 0; i < values.size() - 1; i++) {
                 ss << to_string_fun(values[i]) << ", ";
             }
             ss << to_string_fun(values.back()) << "]";
@@ -161,16 +159,16 @@ namespace apsi
         /**
         Writes a vector into an std::ostream as [a, b, c, ..., z].
         */
-        template<typename T, std::size_t Extent>
+        template <typename T, std::size_t Extent>
         std::string to_string(gsl::span<T, Extent> values)
         {
-            return to_string(values, [](T &t) -> T& { return t; });
+            return to_string(values, [](T &t) -> T & { return t; });
         }
 
         /**
         Writes a vector into an std::ostream as [a, b, c, ..., z].
         */
-        template<typename T, typename ToString>
+        template <typename T, typename ToString>
         std::string to_string(const std::vector<T> &values, ToString to_string_fun)
         {
             return to_string(gsl::span<const T>(values), to_string_fun);
@@ -179,7 +177,7 @@ namespace apsi
         /**
         Writes a vector into an std::ostream as [a, b, c, ..., z].
         */
-        template<typename T>
+        template <typename T>
         std::string to_string(const std::vector<T> &values)
         {
             return to_string(gsl::span<const T>(values));
@@ -188,19 +186,17 @@ namespace apsi
         /**
         Writes a set into an std::ostream as {a, b, c, ..., z}.
         */
-        template<typename T, typename ToString>
+        template <typename T, typename ToString>
         std::string to_string(const std::set<T> &values, ToString to_string_fun)
         {
-            if (values.empty())
-            {
+            if (values.empty()) {
                 return "{ }";
             }
 
             std::stringstream ss;
             ss << "{";
             auto values_last = std::next(values.cbegin(), values.size() - 1);
-            for (auto it = values.cbegin(); it != values_last; it++)
-            {
+            for (auto it = values.cbegin(); it != values_last; it++) {
                 ss << to_string_fun(*it) << ", ";
             }
             ss << to_string_fun(*values_last) << "}";
@@ -211,14 +207,14 @@ namespace apsi
         /**
         Writes a set into an std::ostream as {a, b, c, ..., z}.
         */
-        template<typename T>
+        template <typename T>
         std::string to_string(const std::set<T> &values)
         {
-            return to_string(values, [](const T &t) -> const T& { return t; });
+            return to_string(values, [](const T &t) -> const T & { return t; });
         }
 
         /**
-        Returns the next power of 2 for the given number 
+        Returns the next power of 2 for the given number
         */
         std::uint64_t next_power_of_2(std::uint64_t v);
 

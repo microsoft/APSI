@@ -2,16 +2,16 @@
 // Licensed under the MIT license.
 
 // STD
-#include <memory>
-#include <cstddef>
+#include <algorithm>
 #include <atomic>
+#include <cstddef>
+#include <memory>
 #include <thread>
 #include <utility>
-#include <algorithm>
 
 // APSI
-#include "apsi/receiver.h"
 #include "apsi/network/zmq/zmq_channel.h"
+#include "apsi/receiver.h"
 #include "apsi/thread_pool_mgr.h"
 
 // Google Test
@@ -25,18 +25,15 @@ using namespace apsi::util;
 using namespace seal;
 using namespace kuku;
 
-namespace APSITests
-{
-    namespace
-    {
+namespace APSITests {
+    namespace {
         ZMQSenderChannel server_;
         ZMQReceiverChannel client_;
 
         shared_ptr<PSIParams> get_params()
         {
             static shared_ptr<PSIParams> params = nullptr;
-            if (!params)
-            {
+            if (!params) {
                 PSIParams::ItemParams item_params;
                 item_params.felts_per_item = 8;
 
@@ -54,7 +51,8 @@ namespace APSITests
                 seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(pmd));
                 seal_params.set_plain_modulus(65537);
 
-                params = make_shared<PSIParams>(item_params, table_params, query_params, seal_params);
+                params =
+                    make_shared<PSIParams>(item_params, table_params, query_params, seal_params);
             }
 
             return params;
@@ -63,8 +61,7 @@ namespace APSITests
         shared_ptr<CryptoContext> get_context()
         {
             static shared_ptr<CryptoContext> context = nullptr;
-            if (!context)
-            {
+            if (!context) {
                 context = make_shared<CryptoContext>(*get_params());
             }
 
@@ -72,55 +69,52 @@ namespace APSITests
         }
     } // namespace
 
-    class ReceiverTests : public ::testing::Test
-    {
+    class ReceiverTests : public ::testing::Test {
     protected:
         ReceiverTests()
         {
-            if (!server_.is_connected())
-            {
+            if (!server_.is_connected()) {
                 server_.bind("tcp://*:5556");
             }
 
-            if (!client_.is_connected())
-            {
+            if (!client_.is_connected()) {
                 client_.connect("tcp://localhost:5556");
             }
         }
 
         void start_sender(bool labels = false)
         {
-            th_ = thread([this](bool labels) {
-                // Run until stopped
-                while (!stop_token_)
-                {
-                    unique_ptr<ZMQSenderOperation> sop;
-                    if (!(sop = server_.receive_network_operation(get_context()->seal_context())))
-                    {
-                        this_thread::sleep_for(50ms);
-                        continue;
+            th_ = thread(
+                [this](bool labels) {
+                    // Run until stopped
+                    while (!stop_token_) {
+                        unique_ptr<ZMQSenderOperation> sop;
+                        if (!(sop = server_.receive_network_operation(
+                                  get_context()->seal_context()))) {
+                            this_thread::sleep_for(50ms);
+                            continue;
+                        }
+
+                        switch (sop->sop->type()) {
+                        case SenderOperationType::sop_parms:
+                            dispatch_parms(move(sop));
+                            break;
+
+                        case SenderOperationType::sop_oprf:
+                            dispatch_oprf(move(sop));
+                            break;
+
+                        case SenderOperationType::sop_query:
+                            dispatch_query(move(sop), labels);
+                            break;
+
+                        default:
+                            // We should never reach this point
+                            throw runtime_error("invalid operation");
+                        }
                     }
-
-                    switch (sop->sop->type())
-                    {
-                    case SenderOperationType::sop_parms:
-                        dispatch_parms(move(sop));
-                        break;
-
-                    case SenderOperationType::sop_oprf:
-                        dispatch_oprf(move(sop));
-                        break;
-
-                    case SenderOperationType::sop_query:
-                        dispatch_query(move(sop), labels);
-                        break;
-
-                    default:
-                        // We should never reach this point
-                        throw runtime_error("invalid operation");
-                    }
-                }
-            }, labels);
+                },
+                labels);
         }
 
         void dispatch_parms(unique_ptr<ZMQSenderOperation> sop)
@@ -137,7 +131,7 @@ namespace APSITests
 
         void dispatch_oprf(unique_ptr<ZMQSenderOperation> sop)
         {
-            auto sop_oprf = dynamic_cast<SenderOperationOPRF*>(sop->sop.get());
+            auto sop_oprf = dynamic_cast<SenderOperationOPRF *>(sop->sop.get());
 
             // Respond with exactly the same data we received
             auto response_oprf = make_unique<SenderOperationResponseOPRF>();
@@ -151,7 +145,7 @@ namespace APSITests
 
         void dispatch_query(unique_ptr<ZMQSenderOperation> sop, bool labels)
         {
-            auto sop_query = dynamic_cast<SenderOperationQuery*>(sop->sop.get());
+            auto sop_query = dynamic_cast<SenderOperationQuery *>(sop->sop.get());
 
             // We'll return 1 package
             uint32_t package_count = 1;
@@ -170,13 +164,12 @@ namespace APSITests
                 rp->bundle_idx = bundle_idx;
 
                 // Add label to result if requested
-                if (labels)
-                {
+                if (labels) {
                     rp->label_byte_count = 1;
                     Ciphertext label_ct = ct;
 
-                    // Every other byte will be 1 and every other 0 due to plain_modulus giving 16-bit encodings per
-                    // field element
+                    // Every other byte will be 1 and every other 0 due to plain_modulus giving
+                    // 16-bit encodings per field element
                     Plaintext label_tweak("1");
                     get_context()->evaluator()->add_plain_inplace(label_ct, label_tweak);
                     rp->label_result.push_back(label_ct);
@@ -201,13 +194,14 @@ namespace APSITests
 
             auto locs = table.all_locations(make_item(1, 0));
             vector<uint64_t> rp_vec(get_context()->encoder()->slot_count(), 1);
-            for (auto loc : locs)
-            {
+            for (auto loc : locs) {
                 uint32_t bundle_idx = loc / get_params()->items_per_bundle();
                 uint32_t bundle_offset = loc - bundle_idx * get_params()->items_per_bundle();
                 fill_n(
-                    rp_vec.begin() + static_cast<size_t>(bundle_offset) * get_params()->item_params().felts_per_item,
-                    get_params()->item_params().felts_per_item, 0);
+                    rp_vec.begin() + static_cast<size_t>(bundle_offset) *
+                                         get_params()->item_params().felts_per_item,
+                    get_params()->item_params().felts_per_item,
+                    0);
             }
 
             Plaintext rp_pt;
@@ -221,8 +215,7 @@ namespace APSITests
         void stop_sender()
         {
             stop_token_ = true;
-            if (th_.joinable())
-            {
+            if (th_.joinable()) {
                 th_.join();
             }
         }
@@ -242,7 +235,7 @@ namespace APSITests
     private:
         thread th_;
 
-        atomic<bool> stop_token_ { false };
+        atomic<bool> stop_token_{ false };
     };
 
     TEST_F(ReceiverTests, Constructor)
@@ -399,4 +392,4 @@ namespace APSITests
 
         stop_sender();
     }
-}
+} // namespace APSITests

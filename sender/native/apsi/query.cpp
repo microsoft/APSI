@@ -5,19 +5,17 @@
 #include <stdexcept>
 
 // APSI
+#include "apsi/log.h"
 #include "apsi/psi_params.h"
 #include "apsi/query.h"
-#include "apsi/log.h"
 
 using namespace std;
 using namespace seal;
 
-namespace apsi
-{
+namespace apsi {
     using namespace network;
 
-    namespace sender
-    {
+    namespace sender {
         Query Query::deep_copy() const
         {
             Query result;
@@ -30,12 +28,10 @@ namespace apsi
 
         Query::Query(QueryRequest query_request, shared_ptr<SenderDB> sender_db)
         {
-            if (!sender_db)
-            {
+            if (!sender_db) {
                 throw invalid_argument("sender_db cannot be null");
             }
-            if (!query_request)
-            {
+            if (!query_request) {
                 throw invalid_argument("query_request cannot be null");
             }
 
@@ -44,22 +40,19 @@ namespace apsi
 
             // Extract and validate relinearization keys
             relin_keys_ = query_request->relin_keys.extract(seal_context);
-            if (!is_valid_for(relin_keys_, *seal_context))
-            {
+            if (!is_valid_for(relin_keys_, *seal_context)) {
                 APSI_LOG_ERROR("Extracted relinearization keys are invalid for SEALContext");
                 return;
             }
 
             // Extract and validate query ciphertexts
-            for (auto &q : query_request->data)
-            {
-                APSI_LOG_DEBUG("Extracting " << q.second.size() << " ciphertexts for exponent " << q.first);
+            for (auto &q : query_request->data) {
+                APSI_LOG_DEBUG(
+                    "Extracting " << q.second.size() << " ciphertexts for exponent " << q.first);
                 vector<Ciphertext> cts;
-                for (auto &ct : q.second)
-                {
+                for (auto &ct : q.second) {
                     cts.push_back(ct.extract(seal_context));
-                    if (!is_valid_for(cts.back(), *seal_context))
-                    {
+                    if (!is_valid_for(cts.back(), *seal_context)) {
                         APSI_LOG_ERROR("Extracted ciphertext is invalid for SEALContext");
                         return;
                     }
@@ -78,9 +71,9 @@ namespace apsi
             pd_.configure(query_powers, max_items_per_bin);
 
             // Check that the PowersDag is valid
-            if (!pd_.is_configured())
-            {
-                APSI_LOG_ERROR("Failed to configure PowersDag ("
+            if (!pd_.is_configured()) {
+                APSI_LOG_ERROR(
+                    "Failed to configure PowersDag ("
                     << "source_powers: " << to_string(query_powers) << ", "
                     << "up_to_power: " << max_items_per_bin << ")");
                 return;
@@ -88,29 +81,37 @@ namespace apsi
             APSI_LOG_DEBUG("Configured PowersDag with depth " << pd_.depth());
 
             // Check that the query data size matches the PSIParams
-            if (data_.size() != query_powers.size())
-            {
-                APSI_LOG_ERROR("Extracted query data is incompatible with PSI parameters: "
-                    "query contains " << data_.size() << " ciphertext powers which does not match with "
-                    "the size of query_powers (" << query_powers.size() << ")");
+            if (data_.size() != query_powers.size()) {
+                APSI_LOG_ERROR(
+                    "Extracted query data is incompatible with PSI parameters: "
+                    "query contains "
+                    << data_.size()
+                    << " ciphertext powers which does not match with "
+                       "the size of query_powers ("
+                    << query_powers.size() << ")");
                 return;
             }
 
-            for (auto &q : data_)
-            {
+            for (auto &q : data_) {
                 // Check that powers in the query data match source nodes in the PowersDag
-                if (q.second.size() != bundle_idx_count)
-                {
-                    APSI_LOG_ERROR("Extracted query data is incompatible with PSI parameters: "
-                        "query power " << q.first << " contains " << q.second.size() << " ciphertexts which does not "
-                        "match with bundle_idx_count (" << bundle_idx_count << ")");
+                if (q.second.size() != bundle_idx_count) {
+                    APSI_LOG_ERROR(
+                        "Extracted query data is incompatible with PSI parameters: "
+                        "query power "
+                        << q.first << " contains " << q.second.size()
+                        << " ciphertexts which does not "
+                           "match with bundle_idx_count ("
+                        << bundle_idx_count << ")");
                     return;
                 }
-                auto where = find_if(query_powers.cbegin(), query_powers.cend(), [&q](auto n) { return n == q.first; });
-                if (where == query_powers.cend())
-                {
-                    APSI_LOG_ERROR("Extracted query data is incompatible with PowersDag: "
-                        "query power " << q.first << " does not match with a source node in PowersDag");
+                auto where = find_if(query_powers.cbegin(), query_powers.cend(), [&q](auto n) {
+                    return n == q.first;
+                });
+                if (where == query_powers.cend()) {
+                    APSI_LOG_ERROR(
+                        "Extracted query data is incompatible with PowersDag: "
+                        "query power "
+                        << q.first << " does not match with a source node in PowersDag");
                     return;
                 }
             }
@@ -118,5 +119,5 @@ namespace apsi
             // The query is valid
             valid_ = true;
         }
-    }
-}
+    } // namespace sender
+} // namespace apsi

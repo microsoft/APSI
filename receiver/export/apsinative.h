@@ -47,4 +47,5 @@ Perform a Query for the given items.
 The 'result' array consist of booleans encoded as integers. Any value other than 0
 is considered 'true', 0 is considered as 'false'.
 */
-APSIEXPORT bool APSICALL ReceiverQuery(int length, std::uint64_tapsi *items, int *result, std::uint64_tapsi *labels);
+APSIEXPORT bool APSICALL
+ReceiverQuery(int length, std::uint64_tapsi *items, int *result, std::uint64_tapsi *labels);

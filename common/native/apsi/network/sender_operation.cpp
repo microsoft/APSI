@@ -2,15 +2,15 @@
 // Licensed under the MIT license.
 
 // STD
+#include <algorithm>
 #include <iterator>
 #include <sstream>
 #include <stdexcept>
-#include <algorithm>
 
 // APSI
 #include "apsi/network/sender_operation.h"
-#include "apsi/network/sop_header_generated.h"
 #include "apsi/network/sop_generated.h"
+#include "apsi/network/sop_header_generated.h"
 #include "apsi/util/utils.h"
 
 // SEAL
@@ -21,28 +21,25 @@ using namespace std;
 using namespace seal;
 using namespace seal::util;
 
-namespace apsi
-{
-    namespace network
-    {
+namespace apsi {
+    namespace network {
         const char *sender_operation_type_str(SenderOperationType sop_type)
         {
-            switch (sop_type)
-            {
-                case SenderOperationType::sop_unknown:
-                    return "sop_unknown";
+            switch (sop_type) {
+            case SenderOperationType::sop_unknown:
+                return "sop_unknown";
 
-                case SenderOperationType::sop_parms:
-                    return "sop_parms";
+            case SenderOperationType::sop_parms:
+                return "sop_parms";
 
-                case SenderOperationType::sop_oprf:
-                    return "sop_oprf";
+            case SenderOperationType::sop_oprf:
+                return "sop_oprf";
 
-                case SenderOperationType::sop_query:
-                    return "sop_query";
+            case SenderOperationType::sop_query:
+                return "sop_query";
 
-                default:
-                    return "sop_invalid";
+            default:
+                return "sop_invalid";
             }
         }
 
@@ -57,7 +54,7 @@ namespace apsi
             fbs_builder.FinishSizePrefixed(sop_header);
 
             out.write(
-                reinterpret_cast<const char*>(fbs_builder.GetBufferPointer()),
+                reinterpret_cast<const char *>(fbs_builder.GetBufferPointer()),
                 safe_cast<streamsize>(fbs_builder.GetSize()));
 
             return fbs_builder.GetSize();
@@ -67,10 +64,10 @@ namespace apsi
         {
             vector<seal_byte> in_data(util::read_from_stream(in));
 
-            auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
+            auto verifier = flatbuffers::Verifier(
+                reinterpret_cast<const unsigned char *>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationHeaderBuffer(verifier);
-            if (!safe)
-            {
+            if (!safe) {
                 throw runtime_error("failed to load SenderOperationHeader: invalid buffer");
             }
 
@@ -98,7 +95,7 @@ namespace apsi
             fbs_builder.FinishSizePrefixed(sop);
 
             out.write(
-                reinterpret_cast<const char*>(fbs_builder.GetBufferPointer()),
+                reinterpret_cast<const char *>(fbs_builder.GetBufferPointer()),
                 safe_cast<streamsize>(fbs_builder.GetSize()));
 
             return fbs_builder.GetSize();
@@ -107,25 +104,23 @@ namespace apsi
         size_t SenderOperationParms::load(istream &in, shared_ptr<SEALContext> context)
         {
             // The context cannot be set for this operation
-            if (context)
-            {
+            if (context) {
                 throw invalid_argument("context must be null");
             }
 
             vector<seal_byte> in_data(util::read_from_stream(in));
 
-            auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
+            auto verifier = flatbuffers::Verifier(
+                reinterpret_cast<const unsigned char *>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationBuffer(verifier);
-            if (!safe)
-            {
+            if (!safe) {
                 throw runtime_error("failed to load SenderOperation: invalid buffer");
             }
 
             auto sop = fbs::GetSizePrefixedSenderOperation(in_data.data());
 
             // Need to check that the operation is of the right type
-            if (sop->request_type() != fbs::Request_ParmsRequest)
-            {
+            if (sop->request_type() != fbs::Request_ParmsRequest) {
                 throw runtime_error("unexpected operation type");
             }
 
@@ -136,7 +131,8 @@ namespace apsi
         {
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
-            auto oprf_data = fbs_builder.CreateVector(reinterpret_cast<const unsigned char*>(data.data()), data.size());
+            auto oprf_data = fbs_builder.CreateVector(
+                reinterpret_cast<const unsigned char *>(data.data()), data.size());
             auto req = fbs::CreateOPRFRequest(fbs_builder, oprf_data);
 
             fbs::SenderOperationBuilder sop_builder(fbs_builder);
@@ -146,7 +142,7 @@ namespace apsi
             fbs_builder.FinishSizePrefixed(sop);
 
             out.write(
-                reinterpret_cast<const char*>(fbs_builder.GetBufferPointer()),
+                reinterpret_cast<const char *>(fbs_builder.GetBufferPointer()),
                 safe_cast<streamsize>(fbs_builder.GetSize()));
 
             return fbs_builder.GetSize();
@@ -155,8 +151,7 @@ namespace apsi
         size_t SenderOperationOPRF::load(istream &in, shared_ptr<SEALContext> context)
         {
             // The context cannot be set for this operation
-            if (context)
-            {
+            if (context) {
                 throw invalid_argument("context must be null");
             }
 
@@ -165,25 +160,25 @@ namespace apsi
 
             vector<seal_byte> in_data(util::read_from_stream(in));
 
-            auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
+            auto verifier = flatbuffers::Verifier(
+                reinterpret_cast<const unsigned char *>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationBuffer(verifier);
-            if (!safe)
-            {
+            if (!safe) {
                 throw runtime_error("failed to load SenderOperation: invalid buffer");
             }
 
             auto sop = fbs::GetSizePrefixedSenderOperation(in_data.data());
 
             // Need to check that the operation is of the right type
-            if (sop->request_type() != fbs::Request_OPRFRequest)
-            {
+            if (sop->request_type() != fbs::Request_OPRFRequest) {
                 throw runtime_error("unexpected operation type");
             }
 
             // Load the OPRF request
             const auto &oprf_data = *sop->request_as_OPRFRequest()->data();
-            transform(oprf_data.begin(), oprf_data.end(), back_inserter(data),
-                [](auto a) { return static_cast<seal_byte>(a); });
+            transform(oprf_data.begin(), oprf_data.end(), back_inserter(data), [](auto a) {
+                return static_cast<seal_byte>(a);
+            });
 
             return in_data.size();
         }
@@ -195,27 +190,28 @@ namespace apsi
             vector<seal_byte> temp;
             temp.resize(relin_keys.save_size(compr_mode_type::zstd));
             auto size = relin_keys.save(temp.data(), temp.size(), compr_mode_type::zstd);
-            auto relin_keys_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(temp.data()), size);
+            auto relin_keys_data =
+                fbs_builder.CreateVector(reinterpret_cast<uint8_t *>(temp.data()), size);
 
-            // This is a little tricky; each QueryRequestPart consists of an exponent and a vector of Ciphertexts. For
-            // convenience, we create vectors in immediately-invoked lambdas and pass them to the CreateVector function.
-            // In the outer lambda, we populate a vector of QueryRequestParts, creating a new builder class for each of
-            // them. In the inner lambda we build the QueryRequestPart data by creating multiple Ciphertexts.
+            // This is a little tricky; each QueryRequestPart consists of an exponent and a vector
+            // of Ciphertexts. For convenience, we create vectors in immediately-invoked lambdas and
+            // pass them to the CreateVector function. In the outer lambda, we populate a vector of
+            // QueryRequestParts, creating a new builder class for each of them. In the inner lambda
+            // we build the QueryRequestPart data by creating multiple Ciphertexts.
             auto query_request_parts = fbs_builder.CreateVector([&]() {
                 // The QueryRequestPart vector is populated with an immediately-invoked lambda
                 vector<flatbuffers::Offset<fbs::QueryRequestPart>> ret;
-                for (const auto &q : data)
-                {
+                for (const auto &q : data) {
                     // Then the vector of Ciphertexts
                     auto cts = fbs_builder.CreateVector([&]() {
                         // The Ciphertext vector is populated with an immediately-invoked lambda
                         vector<flatbuffers::Offset<fbs::Ciphertext>> ret_inner;
-                        for (const auto &ct : q.second)
-                        {
+                        for (const auto &ct : q.second) {
                             // Save each SEALObject<seal::Ciphertext>
                             temp.resize(ct.save_size(compr_mode_type::zstd));
                             size = ct.save(temp.data(), temp.size(), compr_mode_type::zstd);
-                            auto ct_data = fbs_builder.CreateVector(reinterpret_cast<uint8_t*>(temp.data()), size);
+                            auto ct_data = fbs_builder.CreateVector(
+                                reinterpret_cast<uint8_t *>(temp.data()), size);
 
                             // Add to the Ciphertext vector
                             ret_inner.push_back(fbs::CreateCiphertext(fbs_builder, ct_data));
@@ -239,7 +235,7 @@ namespace apsi
             fbs_builder.FinishSizePrefixed(sop);
 
             out.write(
-                reinterpret_cast<const char*>(fbs_builder.GetBufferPointer()),
+                reinterpret_cast<const char *>(fbs_builder.GetBufferPointer()),
                 safe_cast<streamsize>(fbs_builder.GetSize()));
 
             return fbs_builder.GetSize();
@@ -248,12 +244,10 @@ namespace apsi
         size_t SenderOperationQuery::load(istream &in, shared_ptr<SEALContext> context)
         {
             // The context must be set and valid for this operation
-            if (!context)
-            {
+            if (!context) {
                 throw invalid_argument("context cannot be null");
             }
-            if (!context->parameters_set())
-            {
+            if (!context->parameters_set()) {
                 throw invalid_argument("context is invalid");
             }
 
@@ -262,18 +256,17 @@ namespace apsi
 
             vector<seal_byte> in_data(util::read_from_stream(in));
 
-            auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
+            auto verifier = flatbuffers::Verifier(
+                reinterpret_cast<const unsigned char *>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationBuffer(verifier);
-            if (!safe)
-            {
+            if (!safe) {
                 throw runtime_error("failed to load SenderOperation: invalid buffer");
             }
 
             auto sop = fbs::GetSizePrefixedSenderOperation(in_data.data());
 
             // Need to check that the operation is of the right type
-            if (sop->request_type() != fbs::Request_QueryRequest)
-            {
+            if (sop->request_type() != fbs::Request_QueryRequest) {
                 throw runtime_error("unexpected operation type");
             }
 
@@ -281,21 +274,17 @@ namespace apsi
 
             // Load relin_keys
             const auto &relin_keys_data = *req.relin_keys();
-            try
-            {
+            try {
                 relin_keys.load(
                     context,
-                    reinterpret_cast<const seal_byte*>(relin_keys_data.data()), relin_keys_data.size());
-            }
-            catch (const logic_error &ex)
-            {
+                    reinterpret_cast<const seal_byte *>(relin_keys_data.data()),
+                    relin_keys_data.size());
+            } catch (const logic_error &ex) {
                 stringstream ss;
                 ss << "failed to load relinearization keys: ";
                 ss << ex.what();
                 throw runtime_error(ss.str());
-            }
-            catch (const runtime_error &ex)
-            {
+            } catch (const runtime_error &ex) {
                 stringstream ss;
                 ss << "failed to load relinearization keys: ";
                 ss << ex.what();
@@ -304,35 +293,28 @@ namespace apsi
 
             // Load the query data
             const auto &query = *req.query();
-            for (const auto &query_part : query)
-            {
+            for (const auto &query_part : query) {
                 uint32_t exponent = query_part->exponent();
-                if (data.count(exponent))
-                {
+                if (data.count(exponent)) {
                     throw runtime_error("invalid query data");
                 }
 
                 const auto &cts = *query_part->cts();
                 vector<SEALObject<Ciphertext>> cts_vec;
                 cts_vec.reserve(cts.size());
-                for (const auto &ct : cts)
-                {
+                for (const auto &ct : cts) {
                     Ciphertext temp(*context);
-                    try
-                    {
+                    try {
                         temp.load(
                             *context,
-                            reinterpret_cast<const seal_byte*>(ct->data()->data()), ct->data()->size());
-                    }
-                    catch (const logic_error &ex)
-                    {
+                            reinterpret_cast<const seal_byte *>(ct->data()->data()),
+                            ct->data()->size());
+                    } catch (const logic_error &ex) {
                         stringstream ss;
                         ss << "failed to load query ciphertext: ";
                         ss << ex.what();
                         throw runtime_error(ss.str());
-                    }
-                    catch (const runtime_error &ex)
-                    {
+                    } catch (const runtime_error &ex) {
                         stringstream ss;
                         ss << "failed to load query ciphertext: ";
                         ss << ex.what();
@@ -346,5 +328,5 @@ namespace apsi
 
             return in_data.size();
         }
-    }
-}
+    } // namespace network
+} // namespace apsi

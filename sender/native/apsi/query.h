@@ -14,19 +14,16 @@
 // APSI
 #include "apsi/network/sender_operation.h"
 #include "apsi/powers.h"
-#include "apsi/sender_db.h"
 #include "apsi/requests.h"
+#include "apsi/sender_db.h"
 
 // SEAL
 #include "seal/ciphertext.h"
 #include "seal/relinkeys.h"
 
-namespace apsi
-{
-    namespace sender
-    {
-        class Query
-        {
+namespace apsi {
+    namespace sender {
+        class Query {
         public:
             Query() = default;
 
@@ -38,9 +35,9 @@ namespace apsi
 
             Query(Query &&source) = default;
 
-            Query &operator =(const Query &source) = delete;
+            Query &operator=(const Query &source) = delete;
 
-            Query &operator =(Query &&source) = default;
+            Query &operator=(Query &&source) = default;
 
             bool is_valid() const noexcept
             {
@@ -83,5 +80,5 @@ namespace apsi
 
             bool valid_ = false;
         };
-    }
-}
+    } // namespace sender
+} // namespace apsi

@@ -9,4 +9,3 @@ target_sources(unit_tests
 add_subdirectory(common)
 add_subdirectory(receiver)
 add_subdirectory(sender)
-

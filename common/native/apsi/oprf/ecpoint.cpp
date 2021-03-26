@@ -9,8 +9,8 @@
 #include "apsi/oprf/ecpoint.h"
 
 // FourQ
-#include "apsi/fourq/FourQ_internal.h"
 #include "apsi/fourq/FourQ_api.h"
+#include "apsi/fourq/FourQ_internal.h"
 #include "apsi/fourq/random.h"
 
 // SEAL
@@ -20,16 +20,15 @@
 using namespace std;
 using namespace seal;
 
-namespace apsi
-{
-    namespace oprf
-    {
-        namespace
-        {
+namespace apsi {
+    namespace oprf {
+        namespace {
             void random_scalar(ECPoint::scalar_span_type value)
             {
                 random_bytes(value.data(), util::safe_cast<unsigned int>(value.size()));
-                modulo_order(reinterpret_cast<digit_t *>(value.data()), reinterpret_cast<digit_t *>(value.data()));
+                modulo_order(
+                    reinterpret_cast<digit_t *>(value.data()),
+                    reinterpret_cast<digit_t *>(value.data()));
             }
 
             digit_t is_nonzero_scalar(ECPoint::scalar_span_type value)
@@ -37,8 +36,7 @@ namespace apsi
                 const digit_t *value_ptr = reinterpret_cast<digit_t *>(value.data());
                 digit_t c = 0;
 
-                for (size_t i = 0; i < NWORDS_ORDER; i++)
-                {
+                for (size_t i = 0; i < NWORDS_ORDER; i++) {
                     c |= value_ptr[i];
                 }
 
@@ -46,21 +44,24 @@ namespace apsi
                 sdigit_t rest_nz = -static_cast<sdigit_t>(c >> 1);
                 return static_cast<digit_t>((first_nz | rest_nz) >> (8 * sizeof(digit_t) - 1));
             }
-        }
+        } // namespace
 
         ECPoint::ECPoint(input_span_const_type value)
         {
-            if (!value.empty())
-            {
+            if (!value.empty()) {
                 f2elm_t r;
 
                 // Compute a Blake2b hash of the value
                 blake2b(
-                    reinterpret_cast<unsigned char *>(r), sizeof(f2elm_t), value.data(),
-                    static_cast<size_t>(value.size()), nullptr, 0);
+                    reinterpret_cast<unsigned char *>(r),
+                    sizeof(f2elm_t),
+                    value.data(),
+                    static_cast<size_t>(value.size()),
+                    nullptr,
+                    0);
 
-                // Reduce r; note that this does not produce a perfectly uniform distribution modulo 2^127-1, but it is
-                // good enough.
+                // Reduce r; note that this does not produce a perfectly uniform distribution modulo
+                // 2^127-1, but it is good enough.
                 mod1271(r[0]);
                 mod1271(r[1]);
 
@@ -72,11 +73,9 @@ namespace apsi
         void ECPoint::make_random_nonzero_scalar(scalar_span_type out)
         {
             // Loop until we find a non-zero element
-            do
-            {
+            do {
                 random_scalar(out);
-            }
-            while (!is_nonzero_scalar(out));
+            } while (!is_nonzero_scalar(out));
         }
 
         void ECPoint::invert_scalar(scalar_span_const_type in, scalar_span_type out)
@@ -86,10 +85,12 @@ namespace apsi
                 reinterpret_cast<digit_t *>(out.data()));
             Montgomery_inversion_mod_order(
                 reinterpret_cast<digit_t *>(out.data()), reinterpret_cast<digit_t *>(out.data()));
-            from_Montgomery(reinterpret_cast<digit_t *>(out.data()), reinterpret_cast<digit_t *>(out.data()));
+            from_Montgomery(
+                reinterpret_cast<digit_t *>(out.data()), reinterpret_cast<digit_t *>(out.data()));
         }
 
-        bool ECPoint::scalar_multiply(gsl::span<const unsigned char, order_size> scalar, bool clear_cofactor)
+        bool ECPoint::scalar_multiply(
+            gsl::span<const unsigned char, order_size> scalar, bool clear_cofactor)
         {
             // The ecc_mul functions returns false when the input point is not a valid curve point
             return ecc_mul(
@@ -101,8 +102,7 @@ namespace apsi
 
         ECPoint &ECPoint::operator=(const ECPoint &assign)
         {
-            if (&assign != this)
-            {
+            if (&assign != this) {
                 memcpy(pt_, assign.pt_, point_size);
             }
             return *this;
@@ -113,14 +113,11 @@ namespace apsi
             auto old_ex_mask = stream.exceptions();
             stream.exceptions(ios_base::failbit | ios_base::badbit);
 
-            try
-            {
+            try {
                 array<unsigned char, save_size> buf;
                 encode(pt_, buf.data());
                 stream.write(reinterpret_cast<const char *>(buf.data()), save_size);
-            }
-            catch (const ios_base::failure &)
-            {
+            } catch (const ios_base::failure &) {
                 stream.exceptions(old_ex_mask);
                 throw;
             }
@@ -132,18 +129,14 @@ namespace apsi
             auto old_ex_mask = stream.exceptions();
             stream.exceptions(ios_base::failbit | ios_base::badbit);
 
-            try
-            {
+            try {
                 array<unsigned char, save_size> buf;
                 stream.read(reinterpret_cast<char *>(buf.data()), save_size);
-                if (decode(buf.data(), pt_) != ECCRYPTO_SUCCESS)
-                {
+                if (decode(buf.data(), pt_) != ECCRYPTO_SUCCESS) {
                     stream.exceptions(old_ex_mask);
                     throw logic_error("invalid point");
                 }
-            }
-            catch (const ios_base::failure &)
-            {
+            } catch (const ios_base::failure &) {
                 stream.exceptions(old_ex_mask);
                 throw;
             }
@@ -157,8 +150,7 @@ namespace apsi
 
         void ECPoint::load(point_save_span_const_type in)
         {
-            if (decode(in.data(), pt_) != ECCRYPTO_SUCCESS)
-            {
+            if (decode(in.data(), pt_) != ECCRYPTO_SUCCESS) {
                 throw logic_error("invalid point");
             }
         }

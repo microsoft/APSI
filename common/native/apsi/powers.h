@@ -4,54 +4,53 @@
 #pragma once
 
 // STD
+#include <algorithm>
+#include <atomic>
 #include <cstdint>
-#include <utility>
+#include <future>
+#include <iostream>
 #include <memory>
-#include <unordered_map>
 #include <random>
 #include <set>
-#include <string>
-#include <vector>
 #include <stdexcept>
-#include <future>
-#include <atomic>
-#include <algorithm>
-#include <iostream>
+#include <string>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 // APSI
 #include "apsi/thread_pool_mgr.h"
 
-namespace apsi
-{
+namespace apsi {
     /**
-    PowersDag represents a DAG for computing all powers of a given query ciphertext in a depth-optimal manner given
-    a certain "base" (sources) of powers of the query.
+    PowersDag represents a DAG for computing all powers of a given query ciphertext in a
+    depth-optimal manner given a certain "base" (sources) of powers of the query.
 
-    For example, the computation up to power 7 with sources 1, 2, 5 one can represented as the DAG with nodes 1..7 and
-    edges
+    For example, the computation up to power 7 with sources 1, 2, 5 one can represented as the DAG
+    with nodes 1..7 and edges
 
         1 --> 3 <-- 2 (q^3 = q^1 * q^2)
         2 --> 4 <-- 2 (q^4 = q^2 * q^2; repeated edge)
         1 --> 6 <-- 5 (q^6 = q^1 * q^5)
         2 --> 7 <-- 5 (q^7 = q^2 * q^5)
 
-    The graph above describes how q^1...q^7 can be computed from q^1, q^2, and q^5 with a depth 1 circuit. A PowersDag
-    is configured from a given set of source powers ({ 1, 2, 5 } in the example above). The class contains no mechanism
-    for discovering a good set of source powers: it is up to the user to find using methods external to APSI.
+    The graph above describes how q^1...q^7 can be computed from q^1, q^2, and q^5 with a depth 1
+    circuit. A PowersDag is configured from a given set of source powers ({ 1, 2, 5 } in the example
+    above). The class contains no mechanism for discovering a good set of source powers: it is up to
+    the user to find using methods external to APSI.
     */
-    class PowersDag
-    {
+    class PowersDag {
     public:
         /**
-        Represents an individual node in the PowersDag. The node holds the power it represents, and depth in the DAG.
-        Source nodes (i.e., powers of a query that are given directly and do not need to be computed), have depth zero.
-        The node also holds the powers of its parents; parent values both 0 denotes that this is a source node. If only
-        one of the parent values is zero this node is invalid and the PowersDag is in an invalid state. For the DAG to
-        be in a valid state, for each non-source node, the sum of the powers of the parent nodes of a given must equal
-        the power of that node.
+        Represents an individual node in the PowersDag. The node holds the power it represents, and
+        depth in the DAG. Source nodes (i.e., powers of a query that are given directly and do not
+        need to be computed), have depth zero. The node also holds the powers of its parents; parent
+        values both 0 denotes that this is a source node. If only one of the parent values is zero
+        this node is invalid and the PowersDag is in an invalid state. For the DAG to be in a valid
+        state, for each non-source node, the sum of the powers of the parent nodes of a given must
+        equal the power of that node.
         */
-        struct PowersNode
-        {
+        struct PowersNode {
             /**
             The power represented by this node. In a valid PowersDag this can never be zero.
             */
@@ -63,8 +62,8 @@ namespace apsi
             std::uint32_t depth = 0;
 
             /**
-            Holds the powers of the two parents of this node. Both values must either be zero indicating that this is
-            a source node, or non-zero.
+            Holds the powers of the two parents of this node. Both values must either be zero
+            indicating that this is a source node, or non-zero.
             */
             std::pair<std::uint32_t, std::uint32_t> parents{ 0, 0 };
 
@@ -83,8 +82,8 @@ namespace apsi
         PowersDag() = default;
 
         /**
-        Attempts to initialize the PowersDag from the given source powers, computing powers up to the given value.
-        The function returns true on success.
+        Attempts to initialize the PowersDag from the given source powers, computing powers up to
+        the given value. The function returns true on success.
         */
         bool configure(std::set<std::uint32_t> source_powers, std::uint32_t up_to_power);
 
@@ -108,26 +107,26 @@ namespace apsi
         }
 
         /**
-        Returns up to which power the PowersDag was configured to compute. If the PowersDag is not configured, this
-        function throws an exception.
+        Returns up to which power the PowersDag was configured to compute. If the PowersDag is not
+        configured, this function throws an exception.
         */
         std::uint32_t up_to_power() const;
 
         /**
-        Returns the maximal depth of the computation represented by the PowersDag. If the PowersDag is not configured,
-        this function throws an exception.
+        Returns the maximal depth of the computation represented by the PowersDag. If the PowersDag
+        is not configured, this function throws an exception.
         */
         std::uint32_t depth() const;
 
         /**
-        Returns the number of source nodes required by the PowersDag. If the PowersDag is not configured, this function
-        throws an exception.
+        Returns the number of source nodes required by the PowersDag. If the PowersDag is not
+        configured, this function throws an exception.
         */
         std::uint32_t source_count() const;
 
         /**
-        Returns a set of source nodes for this PowersDag. If the PowersDag is not configured, this function throws
-        an exception.
+        Returns a set of source nodes for this PowersDag. If the PowersDag is not configured, this
+        function throws an exception.
         */
         std::vector<PowersNode> source_nodes() const;
 
@@ -139,24 +138,23 @@ namespace apsi
         /**
         Applies a function in a topological order to each node in the PowersDag.
         */
-        template<typename Func>
+        template <typename Func>
         void apply(Func &&func) const
         {
-            if (!is_configured())
-            {
+            if (!is_configured()) {
                 throw std::logic_error("PowersDag has not been configured");
             }
 
-            for (std::uint32_t power = 1; power <= up_to_power_; power++)
-            {
+            for (std::uint32_t power = 1; power <= up_to_power_; power++) {
                 func(nodes_.at(power));
             }
         }
 
         /**
-        Applies a function in a topological order to each node in the PowersDag using multiple threads.
+        Applies a function in a topological order to each node in the PowersDag using multiple
+        threads.
         */
-        template<typename Func>
+        template <typename Func>
         void parallel_apply(Func &&func) const
         {
             if (!is_configured()) {
@@ -164,7 +162,7 @@ namespace apsi
             }
 
             ThreadPoolMgr tpm;
-            
+
             enum class NodeState { Uncomputed = 0, Computing = 1, Computed = 2 };
 
             std::unique_ptr<std::atomic<NodeState>[]> node_states(
@@ -257,4 +255,4 @@ namespace apsi
 
         std::uint32_t source_count_;
     };
-}
+} // namespace apsi

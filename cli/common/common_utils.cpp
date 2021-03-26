@@ -4,8 +4,8 @@
 #include "common_utils.h"
 
 // STD
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 #if defined(_MSC_VER)
 #include <windows.h>
 #endif
@@ -16,10 +16,10 @@
 #endif
 
 // APSI
-#include "common/base_clp.h"
 #include "apsi/log.h"
 #include "apsi/psi_params.h"
 #include "apsi/util/utils.h"
+#include "common/base_clp.h"
 
 using namespace std;
 #if defined(__GNUC__) && (__GNUC__ < 8) && !defined(__clang__)
@@ -53,27 +53,22 @@ void prepare_console()
 }
 
 vector<string> generate_timespan_report(
-    const vector<Stopwatch::TimespanSummary> &timespans,
-    int max_name_length
-) {
+    const vector<Stopwatch::TimespanSummary> &timespans, int max_name_length)
+{
     vector<string> report;
 
     int name_col_width = max_name_length + 3;
 
-    for (const auto &timespan : timespans)
-    {
+    for (const auto &timespan : timespans) {
         stringstream ss;
         ss << setw(max_name_length) << left << timespan.event_name << ": " << setw(5) << right
-            << timespan.event_count << " instances. ";
-        if (timespan.event_count == 1)
-        {
+           << timespan.event_count << " instances. ";
+        if (timespan.event_count == 1) {
             ss << "Duration: " << setw(6) << right << static_cast<int>(timespan.avg) << "ms";
-        }
-        else
-        {
-            ss << "Average:  " << setw(6) << right << static_cast<int>(timespan.avg) << "ms Minimum: "
-                << setw(6) << right << timespan.min << "ms Maximum: " << setw(6) << right << timespan.max
-                << "ms";
+        } else {
+            ss << "Average:  " << setw(6) << right << static_cast<int>(timespan.avg)
+               << "ms Minimum: " << setw(6) << right << timespan.min << "ms Maximum: " << setw(6)
+               << right << timespan.max << "ms";
         }
 
         report.push_back(ss.str());
@@ -82,24 +77,26 @@ vector<string> generate_timespan_report(
     return report;
 }
 
-vector<string> generate_event_report(const vector<Stopwatch::Timepoint> &timepoints, int max_name_length)
+vector<string> generate_event_report(
+    const vector<Stopwatch::Timepoint> &timepoints, int max_name_length)
 {
     vector<string> report;
 
     Stopwatch::time_unit last = Stopwatch::start_time;
     int name_col_width = max_name_length + 3;
 
-    for (const auto &timepoint : timepoints)
-    {
+    for (const auto &timepoint : timepoints) {
         stringstream ss;
 
         int64_t since_start = chrono::duration_cast<chrono::milliseconds>(
-            timepoint.time_point - Stopwatch::start_time).count();
-        int64_t since_last = chrono::duration_cast<chrono::milliseconds>(
-            timepoint.time_point - last).count();
+                                  timepoint.time_point - Stopwatch::start_time)
+                                  .count();
+        int64_t since_last =
+            chrono::duration_cast<chrono::milliseconds>(timepoint.time_point - last).count();
 
-        ss << setw(max_name_length) << left << timepoint.event_name << ": " << setw(6) << right << since_start
-            << "ms since start, " << setw(6) << right << since_last << "ms since last single event.";
+        ss << setw(max_name_length) << left << timepoint.event_name << ": " << setw(6) << right
+           << since_start << "ms since start, " << setw(6) << right << since_last
+           << "ms since last single event.";
         last = timepoint.time_point;
         report.push_back(ss.str());
     }
@@ -113,13 +110,12 @@ void print_timing_report(const Stopwatch &stopwatch)
     vector<Stopwatch::TimespanSummary> timings;
     stopwatch.get_timespans(timings);
 
-    if (timings.size() > 0)
-    {
-        timing_report = generate_timespan_report(timings, stopwatch.get_max_timespan_event_name_length());
+    if (timings.size() > 0) {
+        timing_report =
+            generate_timespan_report(timings, stopwatch.get_max_timespan_event_name_length());
 
         APSI_LOG_INFO("Timespan event information");
-        for (const auto &timing : timing_report)
-        {
+        for (const auto &timing : timing_report) {
             APSI_LOG_INFO(timing.c_str());
         }
     }
@@ -127,13 +123,11 @@ void print_timing_report(const Stopwatch &stopwatch)
     vector<Stopwatch::Timepoint> timepoints;
     stopwatch.get_events(timepoints);
 
-    if (timepoints.size() > 0)
-    {
+    if (timepoints.size() > 0) {
         timing_report = generate_event_report(timepoints, stopwatch.get_max_event_name_length());
 
         APSI_LOG_INFO("Single event information");
-        for (const auto &timing : timing_report)
-        {
+        for (const auto &timing : timing_report) {
             APSI_LOG_INFO(timing.c_str());
         }
     }

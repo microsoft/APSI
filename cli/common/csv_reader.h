@@ -5,11 +5,11 @@
 
 // STD
 #include <string>
-#include <vector>
-#include <variant>
-#include <utility>
-#include <unordered_set>
 #include <unordered_map>
+#include <unordered_set>
+#include <utility>
+#include <variant>
+#include <vector>
 
 // APSI
 #include "apsi/item.h"
@@ -19,8 +19,7 @@
 /**
 Simple CSV file parser
 */
-class CSVReader
-{
+class CSVReader {
 public:
     using UnlabeledData = std::vector<apsi::Item>;
 

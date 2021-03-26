@@ -2,13 +2,13 @@
 // Licensed under the MIT license.
 
 // STD
+#include <algorithm>
 #include <cstddef>
 #include <stdexcept>
-#include <algorithm>
 
 // APSI
-#include "apsi/util/interpolate.h"
 #include "apsi/config.h"
+#include "apsi/util/interpolate.h"
 
 // SEAL
 #include "seal/util/uintarithsmallmod.h"
@@ -17,15 +17,15 @@ using namespace std;
 using namespace seal;
 using namespace seal::util;
 
-namespace apsi
-{
-    namespace util
-    {
+namespace apsi {
+    namespace util {
         /**
-        Multiplies the given polynomial P with the monomial x - a, where a is given. Polynomial coefficients are expected
-        to be in degree-ascending order, i.e., polyn[0] is the constant term.
+        Multiplies the given polynomial P with the monomial x - a, where a is given. Polynomial
+        coefficients are expected to be in degree-ascending order, i.e., polyn[0] is the constant
+        term.
         */
-        void polyn_mul_monic_monomial_inplace(vector<uint64_t> &polyn, uint64_t a, const Modulus &mod)
+        void polyn_mul_monic_monomial_inplace(
+            vector<uint64_t> &polyn, uint64_t a, const Modulus &mod)
         {
             /**
             Do the multiplication coefficient-wise. If P = [c₀, ..., cᵣ], then
@@ -42,26 +42,26 @@ namespace apsi
 
             uint64_t neg_a = negate_uint_mod(a, mod);
 
-            // We don't have to make an intermediate copy of the coefficients if we proceed from right to left
-            for (size_t i = polyn.size() - 1; i > 0; i--)
-            {
+            // We don't have to make an intermediate copy of the coefficients if we proceed from
+            // right to left
+            for (size_t i = polyn.size() - 1; i > 0; i--) {
                 // Let cᵢ = cᵢ₋₁ - a*cᵢ
                 polyn[i] = multiply_add_uint_mod(polyn[i], neg_a, polyn[i - 1], mod);
             }
 
-            // Do the new c₀ manually, since it doesn't fit the above formula (i-1 goes out of bounds)
+            // Do the new c₀ manually, since it doesn't fit the above formula (i-1 goes out of
+            // bounds)
             polyn[0] = multiply_uint_mod(polyn[0], neg_a, mod);
         }
 
         /**
-        Given a set of distinct field elements a₁, ..., aₛ, returns the coefficients of the unique monic polynoimial P with
-        roots a₁, ..., aₛ. Concretely, P = (x-a₁)*...*(x-aₛ).
-        The returned coefficients are in degree-ascending order. That is, polyn[0] is the constant term.
+        Given a set of distinct field elements a₁, ..., aₛ, returns the coefficients of the unique
+        monic polynoimial P with roots a₁, ..., aₛ. Concretely, P = (x-a₁)*...*(x-aₛ). The returned
+        coefficients are in degree-ascending order. That is, polyn[0] is the constant term.
         */
         vector<uint64_t> polyn_with_roots(const vector<uint64_t> &roots, const Modulus &mod)
         {
-            if (mod.is_zero())
-            {
+            if (mod.is_zero()) {
                 throw invalid_argument("mod cannot be zero");
             }
 
@@ -71,8 +71,7 @@ namespace apsi
             polyn.push_back(1);
 
             // For every root a, let P *= (x - a)
-            for (const uint64_t &root : roots)
-            {
+            for (const uint64_t &root : roots) {
                 polyn_mul_monic_monomial_inplace(polyn, root, mod);
             }
 
@@ -80,36 +79,32 @@ namespace apsi
         }
 
         /**
-        Returns the Newton interpolation of the given points and values. Specifically, this function returns the
-        coefficients of a polynomial P in degree-ascending order, where P(pointᵢ) valueᵢ for all i.
+        Returns the Newton interpolation of the given points and values. Specifically, this function
+        returns the coefficients of a polynomial P in degree-ascending order, where P(pointᵢ) valueᵢ
+        for all i.
         */
         vector<uint64_t> newton_interpolate_polyn(
-            const vector<uint64_t> &points,
-            const vector<uint64_t> &values,
-            const Modulus &mod
-        ) {
-            if (points.size() != values.size())
-            {
-                throw invalid_argument("number of values does not match the number of interpolation points");
+            const vector<uint64_t> &points, const vector<uint64_t> &values, const Modulus &mod)
+        {
+            if (points.size() != values.size()) {
+                throw invalid_argument(
+                    "number of values does not match the number of interpolation points");
             }
-            if (!mod.is_prime())
-            {
+            if (!mod.is_prime()) {
                 throw invalid_argument("mod must be prime");
             }
 
             auto size = points.size();
 
             bool all_zeros = all_of(values.cbegin(), values.cend(), [](auto a) { return a == 0; });
-            if (all_zeros)
-            {
+            if (all_zeros) {
                 // Return a vector of all zeros
                 return vector<uint64_t>(max<size_t>(size, 1));
             }
 
             vector<vector<uint64_t>> divided_differences;
             divided_differences.reserve(size);
-            for (size_t i = 0; i < size; i++)
-            {
+            for (size_t i = 0; i < size; i++) {
                 vector<uint64_t> inner;
                 inner.reserve(size - i);
                 inner.push_back(values[i]);
@@ -136,45 +131,38 @@ namespace apsi
                 ----------------------------------------------
                 ... | ... |    ...   |         ...         |
             */
-            for (size_t j = 1; j < size; j++)
-            {
-                for (size_t i = 0; i < size - j; i++)
-                {
+            for (size_t j = 1; j < size; j++) {
+                for (size_t i = 0; i < size - j; i++) {
                     // numerator = DD[i + 1][j - 1] - DD[i][j - 1]
                     uint64_t numerator = sub_uint_mod(
-                        divided_differences[i + 1][j - 1],
-                        divided_differences[i][j - 1],
-                        mod
-                    );
+                        divided_differences[i + 1][j - 1], divided_differences[i][j - 1], mod);
 
                     // denominator = points[i + j] - points[i]
                     uint64_t denominator = sub_uint_mod(points[i + j], points[i], mod);
 
                     // DD[i][j] = numerator / denominator
                     uint64_t inv_denominator;
-                    if (!try_invert_uint_mod(denominator, mod, inv_denominator))
-                    {
+                    if (!try_invert_uint_mod(denominator, mod, inv_denominator)) {
                         throw logic_error("tried to interpolate at repeated points");
                     }
 
                     // Push as divided_differences[i][j]
-                    divided_differences[i].push_back(multiply_uint_mod(numerator, inv_denominator, mod));
+                    divided_differences[i].push_back(
+                        multiply_uint_mod(numerator, inv_denominator, mod));
                 }
             }
 
             /**
             The Newton interpolation polynomial is
-            [y₀] + [y₀, y₁](x-x₀) + [y₀, y₁, y₂](x-x₀)(x-x₁) + ... + [y₀, y₁, ..., yᵣ](x-x₀)(x-x₁)...(x-xᵣ)
-            = [y₀] +
-                (x-x₀) * ([y₀, y₁] + ...
-                (x-xᵣ₋₃) * ([y₀, y₁, ..., yᵣ₋₂] +
-                    (x-xᵣ₋₂) * (
-                    [y₀, y₁, ..., yᵣ₋₁]
+            [y₀] + [y₀, y₁](x-x₀) + [y₀, y₁, y₂](x-x₀)(x-x₁) + ... + [y₀, y₁, ...,
+            yᵣ](x-x₀)(x-x₁)...(x-xᵣ) = [y₀] + (x-x₀) * ([y₀, y₁] + ... (x-xᵣ₋₃) * ([y₀, y₁, ...,
+            yᵣ₋₂] + (x-xᵣ₋₂) * ( [y₀, y₁, ..., yᵣ₋₁]
                     + (x-xᵣ₋₁) * [y₀, y₁, ..., yᵣ]
                     )
                 )
                 ...)
-            We use Horner's method, i.e., we start with the innermost term and repeatedly add-and-multiply
+            We use Horner's method, i.e., we start with the innermost term and repeatedly
+            add-and-multiply
             */
 
             // Start with P = 0
@@ -183,12 +171,11 @@ namespace apsi
             result.push_back(0);
 
             // Do Horner's method for all inner terms
-            for (size_t i = size - 1; i > 0; i--)
-            {
+            for (size_t i = size - 1; i > 0; i--) {
                 // P += [y₀, ..., yᵢ]
                 result[0] = add_uint_mod(result[0], divided_differences[0][i], mod);
                 // P *= (x - xᵢ₋₁)
-                polyn_mul_monic_monomial_inplace(result, points[i-1], mod);
+                polyn_mul_monic_monomial_inplace(result, points[i - 1], mod);
             }
 
             // Add the last constant term [y₀]
@@ -196,5 +183,5 @@ namespace apsi
 
             return result;
         }
-    }
+    } // namespace util
 } // namespace apsi

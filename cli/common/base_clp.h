@@ -4,8 +4,8 @@
 #pragma once
 
 // STD
-#include <string>
 #include <memory>
+#include <string>
 
 // TCLAP
 #pragma warning(push, 0)
@@ -16,10 +16,10 @@
 #include "apsi/log.h"
 
 /**
-Command line processor based on TCLAP. This is a base class that contains common arguments for both parties.
+Command line processor based on TCLAP. This is a base class that contains common arguments for both
+parties.
 */
-class BaseCLP : public TCLAP::CmdLine
-{
+class BaseCLP : public TCLAP::CmdLine {
 public:
     BaseCLP(const std::string &description, const std::string &version)
         : TCLAP::CmdLine(description, /* delim */ ' ', version)
@@ -33,11 +33,11 @@ public:
             false,
             "info",
             log_level_constraint_.get(),
-            *this
-        );
+            *this);
     }
 
-    virtual ~BaseCLP() {}
+    virtual ~BaseCLP()
+    {}
 
     /**
     Add additional arguments to the Command Line Processor.
@@ -49,7 +49,7 @@ public:
     */
     virtual void get_args() = 0;
 
-    bool parse_args(int argc, char** argv)
+    bool parse_args(int argc, char **argv)
     {
         TCLAP::ValueArg<int> threads_arg(
             "t",
@@ -57,25 +57,14 @@ public:
             "Number of threads to use",
             /* req */ false,
             /* value */ 0,
-            /* type desc */ "int"
-        );
+            /* type desc */ "int");
         add(threads_arg);
 
         TCLAP::ValueArg<std::string> logfile_arg(
-            "f",
-            "logFile",
-            "Log file path",
-            false,
-            "",
-            "file path"
-        );
+            "f", "logFile", "Log file path", false, "", "file path");
         add(logfile_arg);
 
-        TCLAP::SwitchArg silent_arg(
-            "s",
-            "silent",
-            "Do not write output to console",
-            false);
+        TCLAP::SwitchArg silent_arg("s", "silent", "Do not write output to console", false);
         add(silent_arg);
 
         // No need to add log_level_arg_, already added in constructor
@@ -83,8 +72,7 @@ public:
         // Additional arguments
         add_args();
 
-        try
-        {
+        try {
             parse(argc, argv);
 
             silent_ = silent_arg.getValue();
@@ -97,22 +85,32 @@ public:
             apsi::Log::SetLogLevel(log_level_);
 
             get_args();
-        }
-        catch (...)
-        {
+        } catch (...) {
             return false;
         }
 
         return true;
     }
 
-    int threads() const { return threads_; }
+    int threads() const
+    {
+        return threads_;
+    }
 
-    const std::string& log_level() const { return log_level_; }
+    const std::string &log_level() const
+    {
+        return log_level_;
+    }
 
-    const std::string& log_file() const { return log_file_; }
+    const std::string &log_file() const
+    {
+        return log_file_;
+    }
 
-    bool silent() const { return silent_; }
+    bool silent() const
+    {
+        return silent_;
+    }
 
 private:
     // Parameters from command line

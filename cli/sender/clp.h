@@ -4,8 +4,8 @@
 #pragma once
 
 // STD
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 #include <set>
 #include <vector>
 
@@ -19,8 +19,7 @@
 /**
 Command Line Processor for Sender.
 */
-class CLP : public BaseCLP
-{
+class CLP : public BaseCLP {
 public:
     CLP(const std::string &desc, const std::string &version) : BaseCLP(desc, version)
     {}
@@ -78,41 +77,29 @@ private:
         "unsigned integer");
 
     TCLAP::ValueArg<int> net_port_arg_ = TCLAP::ValueArg<int>(
-        "",
-        "port",
-        "TCP port to bind to (default is 1212)",
-        false,
-        1212,
-        "TCP port"
-    );
+        "", "port", "TCP port to bind to (default is 1212)", false, 1212, "TCP port");
 
     TCLAP::ValueArg<std::string> db_file_arg_ = TCLAP::ValueArg<std::string>(
         "d",
         "dbFile",
-        "Path to a saved SenderDB file or a CSV file describing the sender's dataset (an item-label pair on each row)",
+        "Path to a saved SenderDB file or a CSV file describing the sender's dataset (an "
+        "item-label pair on each row)",
         true,
         "",
-        "string"
-    );
+        "string");
 
     TCLAP::ValueArg<std::string> params_file_arg_ = TCLAP::ValueArg<std::string>(
         "p",
         "paramsFile",
-        "Path to a JSON file that specifies APSI parameters; this must be given if --dbFile is specified with a path "
+        "Path to a JSON file that specifies APSI parameters; this must be given if --dbFile is "
+        "specified with a path "
         " to a CSV file",
         false,
         "",
-        "string"
-    );
+        "string");
 
     TCLAP::ValueArg<std::string> sdb_out_file_arg_ = TCLAP::ValueArg<std::string>(
-        "o",
-        "sdbOutFile",
-        "Save the SenderDB in the given file",
-        false,
-        "",
-        "string"
-    );
+        "o", "sdbOutFile", "Save the SenderDB in the given file", false, "", "string");
 
     std::size_t nonce_byte_count_;
 

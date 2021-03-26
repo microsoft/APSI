@@ -2,9 +2,9 @@
 // Licensed under the MIT license.
 
 // STD
-#include <sstream>
 #include <cstddef>
 #include <cstring>
+#include <sstream>
 
 // APSI
 #include "apsi/util/utils.h"
@@ -16,17 +16,14 @@ using namespace std;
 using namespace seal;
 using namespace seal::util;
 
-namespace apsi
-{
-    namespace util
-    {
+namespace apsi {
+    namespace util {
         vector<uint64_t> conversion_to_digits(const uint64_t input, const uint64_t base)
         {
             vector<uint64_t> result;
             uint64_t number = input;
 
-            while (number > 0)
-            {
+            while (number > 0) {
                 result.push_back(number % base);
                 number /= base;
             }
@@ -38,8 +35,7 @@ namespace apsi
         {
             stringstream ss(s);
             string item;
-            while (getline(ss, item, delim))
-            {
+            while (getline(ss, item, delim)) {
                 elems.push_back(item);
             }
         }
@@ -59,15 +55,14 @@ namespace apsi
             // How many bytes we read in this round
             size_t to_read = min(static_cast<size_t>(byte_count), first_to_read);
 
-            while (byte_count)
-            {
+            while (byte_count) {
                 size_t old_size = destination.size();
 
                 // Save the old size and resize by adding to_read many bytes to vector
                 destination.resize(add_safe(old_size, to_read));
 
                 // Write some data into the vector
-                in.read(reinterpret_cast<char*>(destination.data() + old_size), to_read);
+                in.read(reinterpret_cast<char *>(destination.data() + old_size), to_read);
 
                 // Decrement byte_count and increase to_read for next round
                 byte_count -= static_cast<uint32_t>(to_read);
@@ -108,12 +103,10 @@ namespace apsi
 
         void xor_buffers(unsigned char *buf1, const unsigned char *buf2, size_t count)
         {
-            for (; count >= 4; count -= 4, buf1 += 4, buf2 += 4)
-            {
-                *reinterpret_cast<uint32_t*>(buf1) ^= *reinterpret_cast<const uint32_t*>(buf2);
+            for (; count >= 4; count -= 4, buf1 += 4, buf2 += 4) {
+                *reinterpret_cast<uint32_t *>(buf1) ^= *reinterpret_cast<const uint32_t *>(buf2);
             }
-            for (; count; count--, buf1++, buf2++)
-            {
+            for (; count; count--, buf1++, buf2++) {
                 *buf1 = static_cast<unsigned char>(*buf1 ^ *buf2);
             }
         }

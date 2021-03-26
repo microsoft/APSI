@@ -11,5 +11,5 @@ repos:
       name: clang-format
       entry: clang-format
       language: system
-      files: \.(cpp|h)$
+      files: \.(c|cpp|h)$
       args: ["-i"]

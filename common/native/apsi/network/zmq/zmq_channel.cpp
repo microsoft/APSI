@@ -5,20 +5,20 @@
 #include <algorithm>
 #include <cstddef>
 #include <iterator>
-#include <stdexcept>
 #include <sstream>
+#include <stdexcept>
 
 // APSI
-#include "apsi/log.h"
-#include "apsi/network/zmq/zmq_channel.h"
-#include "apsi/network/sop_header_generated.h"
-#include "apsi/network/sop_generated.h"
-#include "apsi/network/result_package_generated.h"
 #include "apsi/fourq/random.h"
+#include "apsi/log.h"
+#include "apsi/network/result_package_generated.h"
+#include "apsi/network/sop_generated.h"
+#include "apsi/network/sop_header_generated.h"
+#include "apsi/network/zmq/zmq_channel.h"
 
 // SEAL
-#include "seal/util/streambuf.h"
 #include "seal/randomgen.h"
+#include "seal/util/streambuf.h"
 
 // ZeroMQ
 #pragma warning(push, 0)
@@ -31,31 +31,30 @@ using namespace seal;
 using namespace seal::util;
 using namespace zmq;
 
-namespace apsi
-{
-    namespace network
-    {
-        namespace
-        {
-            template<typename T>
+namespace apsi {
+    namespace network {
+        namespace {
+            template <typename T>
             size_t load_from_string(string data, T &obj)
             {
                 ArrayGetBuffer agbuf(
-                    reinterpret_cast<const char *>(data.data()), static_cast<streamsize>(data.size()));
+                    reinterpret_cast<const char *>(data.data()),
+                    static_cast<streamsize>(data.size()));
                 istream stream(&agbuf);
                 return obj.load(stream);
             }
 
-            template<typename T>
+            template <typename T>
             size_t load_from_string(string data, shared_ptr<SEALContext> context, T &obj)
             {
                 ArrayGetBuffer agbuf(
-                    reinterpret_cast<const char *>(data.data()), static_cast<streamsize>(data.size()));
+                    reinterpret_cast<const char *>(data.data()),
+                    static_cast<streamsize>(data.size()));
                 istream stream(&agbuf);
                 return obj.load(stream, move(context));
             }
 
-            template<typename T>
+            template <typename T>
             size_t save_to_message(const T &obj, multipart_t &msg)
             {
                 stringstream ss;
@@ -64,7 +63,7 @@ namespace apsi
                 return size;
             }
 
-            template<>
+            template <>
             size_t save_to_message(const vector<seal_byte> &obj, multipart_t &msg)
             {
                 msg.addmem(obj.data(), obj.size());
@@ -75,19 +74,20 @@ namespace apsi
             {
                 vector<seal_byte> client_id;
                 size_t client_id_size = msg[0].size();
-                copy_n(reinterpret_cast<const seal_byte*>(msg[0].data()), client_id_size, back_inserter(client_id));
+                copy_n(
+                    reinterpret_cast<const seal_byte *>(msg[0].data()),
+                    client_id_size,
+                    back_inserter(client_id));
                 return client_id;
             }
-        }
+        } // namespace
 
-        ZMQChannel::ZMQChannel()
-            : end_point_(""), context_(make_unique<context_t>())
+        ZMQChannel::ZMQChannel() : end_point_(""), context_(make_unique<context_t>())
         {}
 
         ZMQChannel::~ZMQChannel()
         {
-            if (is_connected())
-            {
+            if (is_connected()) {
                 disconnect();
             }
         }
@@ -96,13 +96,10 @@ namespace apsi
         {
             throw_if_connected();
 
-            try
-            {
+            try {
                 end_point_ = end_point;
                 get_socket()->bind(end_point);
-            }
-            catch(const zmq::error_t &ex)
-            {
+            } catch (const zmq::error_t &ex) {
                 APSI_LOG_ERROR("ZeroMQ failed to bind socket to endpoint " << end_point);
                 throw;
             }
@@ -112,13 +109,10 @@ namespace apsi
         {
             throw_if_connected();
 
-            try
-            {
+            try {
                 end_point_ = end_point;
                 get_socket()->connect(end_point);
-            }
-            catch(const zmq::error_t &ex)
-            {
+            } catch (const zmq::error_t &ex) {
                 APSI_LOG_ERROR("ZeroMQ failed to connect socket to endpoint " << end_point);
                 throw;
             }
@@ -129,8 +123,7 @@ namespace apsi
             throw_if_not_connected();
 
             get_socket()->close();
-            if (context_)
-            {
+            if (context_) {
                 context_->shutdown();
                 context_->close();
             }
@@ -142,8 +135,7 @@ namespace apsi
 
         void ZMQChannel::throw_if_not_connected() const
         {
-            if (!is_connected())
-            {
+            if (!is_connected()) {
                 APSI_LOG_ERROR("Socket is not connected");
                 throw runtime_error("socket is not connected");
             }
@@ -151,8 +143,7 @@ namespace apsi
 
         void ZMQChannel::throw_if_connected() const
         {
-            if (is_connected())
-            {
+            if (is_connected()) {
                 APSI_LOG_ERROR("Socket is already connected");
                 throw runtime_error("socket is already connected");
             }
@@ -163,8 +154,7 @@ namespace apsi
             throw_if_not_connected();
 
             // Need to have the SenderOperation package
-            if (!sop)
-            {
+            if (!sop) {
                 APSI_LOG_ERROR("Failed to send operation: operation data is missing");
                 throw invalid_argument("operation data is missing");
             }
@@ -172,7 +162,8 @@ namespace apsi
             // Construct the header
             SenderOperationHeader sop_header;
             sop_header.type = sop->type();
-            APSI_LOG_DEBUG("Sending operation of type " << sender_operation_type_str(sop_header.type));
+            APSI_LOG_DEBUG(
+                "Sending operation of type " << sender_operation_type_str(sop_header.type));
 
             size_t bytes_sent = 0;
 
@@ -184,8 +175,9 @@ namespace apsi
             send_message(msg);
             bytes_sent_ += bytes_sent;
 
-            APSI_LOG_DEBUG("Sent an operation of type " << sender_operation_type_str(sop_header.type)
-                << " (" << bytes_sent << " bytes)");
+            APSI_LOG_DEBUG(
+                "Sent an operation of type " << sender_operation_type_str(sop_header.type) << " ("
+                                             << bytes_sent << " bytes)");
         }
 
         unique_ptr<ZMQSenderOperation> ZMQChannel::receive_network_operation(
@@ -194,10 +186,12 @@ namespace apsi
             throw_if_not_connected();
 
             bool valid_context = context && context->parameters_set();
-            if (!valid_context && (expected == SenderOperationType::sop_unknown || expected == SenderOperationType::sop_query))
-            {
+            if (!valid_context && (expected == SenderOperationType::sop_unknown ||
+                                   expected == SenderOperationType::sop_query)) {
                 // Cannot receive unknown or query operations without a valid SEALContext
-                APSI_LOG_ERROR("Cannot receive an operation of type " << sender_operation_type_str(expected)
+                APSI_LOG_ERROR(
+                    "Cannot receive an operation of type "
+                    << sender_operation_type_str(expected)
                     << "; SEALContext is missing or invalid");
                 return nullptr;
             }
@@ -205,16 +199,16 @@ namespace apsi
             size_t old_bytes_received = bytes_received_;
 
             multipart_t msg;
-            if (!receive_message(msg, wait_for_message))
-            {
+            if (!receive_message(msg, wait_for_message)) {
                 // No message yet. Don't log anything.
                 return nullptr;
             }
 
             // Should have client_id, SenderOperationHeader, and SenderOperation.
-            if (msg.size() != 3)
-            {
-                APSI_LOG_ERROR("ZeroMQ received a message with " << msg.size() << " parts but expected 3 parts");
+            if (msg.size() != 3) {
+                APSI_LOG_ERROR(
+                    "ZeroMQ received a message with " << msg.size()
+                                                      << " parts but expected 3 parts");
                 throw runtime_error("invalid message received");
             }
 
@@ -223,29 +217,27 @@ namespace apsi
 
             // Second part is the SenderOperationHeader
             SenderOperationHeader sop_header;
-            try
-            {
+            try {
                 bytes_received_ += load_from_string(msg[1].to_string(), sop_header);
-            }
-            catch (const runtime_error &ex)
-            {
+            } catch (const runtime_error &ex) {
                 // Invalid header
                 APSI_LOG_ERROR("Failed to receive a valid header");
                 return nullptr;
             }
 
-            if (!same_version(sop_header.version))
-            {
+            if (!same_version(sop_header.version)) {
                 // Check that the version numbers match exactly
-                APSI_LOG_ERROR("Received header indicates a version number " << sop_header.version
-                    << " incompatible with the current version number " << apsi_version);
+                APSI_LOG_ERROR(
+                    "Received header indicates a version number "
+                    << sop_header.version << " incompatible with the current version number "
+                    << apsi_version);
                 return nullptr;
             }
 
-            if (expected != SenderOperationType::sop_unknown && expected != sop_header.type)
-            {
+            if (expected != SenderOperationType::sop_unknown && expected != sop_header.type) {
                 // Unexpected operation
-                APSI_LOG_ERROR("Received header indicates an unexpected operation type "
+                APSI_LOG_ERROR(
+                    "Received header indicates an unexpected operation type "
                     << sender_operation_type_str(sop_header.type));
                 return nullptr;
             }
@@ -256,39 +248,34 @@ namespace apsi
             // Return value
             unique_ptr<SenderOperation> sop = nullptr;
 
-            try
-            {
-                switch (static_cast<SenderOperationType>(sop_header.type))
-                {
-                    case SenderOperationType::sop_parms:
-                        sop = make_unique<SenderOperationParms>();
-                        bytes_received = load_from_string(msg[2].to_string(), *sop);
-                        bytes_received_ += bytes_received;
-                        break;
-                    case SenderOperationType::sop_oprf:
-                        sop = make_unique<SenderOperationOPRF>();
-                        bytes_received = load_from_string(msg[2].to_string(), *sop);
-                        bytes_received_ += bytes_received;
-                        break;
-                    case SenderOperationType::sop_query:
-                        sop = make_unique<SenderOperationQuery>();
-                        bytes_received = load_from_string(msg[2].to_string(), move(context), *sop);
-                        bytes_received_ += bytes_received;
-                        break;
-                    default:
-                        // Invalid operation
-                        APSI_LOG_ERROR("Received header indicates an invalid operation type "
-                            << sender_operation_type_str(sop_header.type));
-                        return nullptr;
+            try {
+                switch (static_cast<SenderOperationType>(sop_header.type)) {
+                case SenderOperationType::sop_parms:
+                    sop = make_unique<SenderOperationParms>();
+                    bytes_received = load_from_string(msg[2].to_string(), *sop);
+                    bytes_received_ += bytes_received;
+                    break;
+                case SenderOperationType::sop_oprf:
+                    sop = make_unique<SenderOperationOPRF>();
+                    bytes_received = load_from_string(msg[2].to_string(), *sop);
+                    bytes_received_ += bytes_received;
+                    break;
+                case SenderOperationType::sop_query:
+                    sop = make_unique<SenderOperationQuery>();
+                    bytes_received = load_from_string(msg[2].to_string(), move(context), *sop);
+                    bytes_received_ += bytes_received;
+                    break;
+                default:
+                    // Invalid operation
+                    APSI_LOG_ERROR(
+                        "Received header indicates an invalid operation type "
+                        << sender_operation_type_str(sop_header.type));
+                    return nullptr;
                 }
-            }
-            catch (const invalid_argument &ex)
-            {
+            } catch (const invalid_argument &ex) {
                 APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
                 return nullptr;
-            }
-            catch (const runtime_error &ex)
-            {
+            } catch (const runtime_error &ex) {
                 APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
                 return nullptr;
             }
@@ -298,8 +285,10 @@ namespace apsi
             n_sop->client_id = move(client_id);
             n_sop->sop = move(sop);
 
-            APSI_LOG_DEBUG("Received an operation of type " << sender_operation_type_str(sop_header.type)
-                << " (" << bytes_received_ - old_bytes_received << " bytes)");
+            APSI_LOG_DEBUG(
+                "Received an operation of type " << sender_operation_type_str(sop_header.type)
+                                                 << " (" << bytes_received_ - old_bytes_received
+                                                 << " bytes)");
 
             return n_sop;
         }
@@ -316,8 +305,7 @@ namespace apsi
             throw_if_not_connected();
 
             // Need to have the SenderOperationResponse package
-            if (!sop_response)
-            {
+            if (!sop_response) {
                 APSI_LOG_ERROR("Failed to send response: response data is missing");
                 throw invalid_argument("response data is missing");
             }
@@ -325,7 +313,8 @@ namespace apsi
             // Construct the header
             SenderOperationHeader sop_header;
             sop_header.type = sop_response->sop_response->type();
-            APSI_LOG_DEBUG("Sending response of type " << sender_operation_type_str(sop_header.type));
+            APSI_LOG_DEBUG(
+                "Sending response of type " << sender_operation_type_str(sop_header.type));
 
             size_t bytes_sent = 0;
 
@@ -340,8 +329,9 @@ namespace apsi
             send_message(msg);
             bytes_sent_ += bytes_sent;
 
-            APSI_LOG_DEBUG("Sent an operation of type " << sender_operation_type_str(sop_header.type)
-                << " (" << bytes_sent << " bytes)");
+            APSI_LOG_DEBUG(
+                "Sent an operation of type " << sender_operation_type_str(sop_header.type) << " ("
+                                             << bytes_sent << " bytes)");
         }
 
         void ZMQChannel::send(unique_ptr<SenderOperationResponse> sop_response)
@@ -353,51 +343,50 @@ namespace apsi
             send(move(n_sop_response));
         }
 
-        unique_ptr<SenderOperationResponse> ZMQChannel::receive_response(SenderOperationType expected)
+        unique_ptr<SenderOperationResponse> ZMQChannel::receive_response(
+            SenderOperationType expected)
         {
             throw_if_not_connected();
 
             size_t old_bytes_received = bytes_received_;
 
             multipart_t msg;
-            if (!receive_message(msg))
-            {
+            if (!receive_message(msg)) {
                 // No message yet. Don't log anything.
                 return nullptr;
             }
 
             // Should have SenderOperationHeader and SenderOperationResponse.
-            if (msg.size() != 2)
-            {
-                APSI_LOG_ERROR("ZeroMQ received a message with " << msg.size() << " parts but expected 2 parts");
+            if (msg.size() != 2) {
+                APSI_LOG_ERROR(
+                    "ZeroMQ received a message with " << msg.size()
+                                                      << " parts but expected 2 parts");
                 throw runtime_error("invalid message received");
             }
 
             // First part is the SenderOperationHeader
             SenderOperationHeader sop_header;
-            try
-            {
+            try {
                 bytes_received_ += load_from_string(msg[0].to_string(), sop_header);
-            }
-            catch (const runtime_error &ex)
-            {
+            } catch (const runtime_error &ex) {
                 // Invalid header
                 APSI_LOG_ERROR("Failed to receive a valid header");
                 return nullptr;
             }
 
-            if (!same_version(sop_header.version))
-            {
+            if (!same_version(sop_header.version)) {
                 // Check that the version numbers match exactly
-                APSI_LOG_ERROR("Received header indicates a version number " << sop_header.version
-                    << " incompatible with the current version number " << apsi_version);
+                APSI_LOG_ERROR(
+                    "Received header indicates a version number "
+                    << sop_header.version << " incompatible with the current version number "
+                    << apsi_version);
                 return nullptr;
             }
 
-            if (expected != SenderOperationType::sop_unknown && expected != sop_header.type)
-            {
+            if (expected != SenderOperationType::sop_unknown && expected != sop_header.type) {
                 // Unexpected operation
-                APSI_LOG_ERROR("Received header indicates an unexpected operation type "
+                APSI_LOG_ERROR(
+                    "Received header indicates an unexpected operation type "
                     << sender_operation_type_str(sop_header.type));
                 return nullptr;
             }
@@ -408,41 +397,39 @@ namespace apsi
             // Return value
             unique_ptr<SenderOperationResponse> sop_response = nullptr;
 
-            try
-            {
-                switch (static_cast<SenderOperationType>(sop_header.type))
-                {
-                    case SenderOperationType::sop_parms:
-                        sop_response = make_unique<SenderOperationResponseParms>();
-                        bytes_received = load_from_string(msg[1].to_string(), *sop_response);
-                        bytes_received_ += bytes_received;
-                        break;
-                    case SenderOperationType::sop_oprf:
-                        sop_response = make_unique<SenderOperationResponseOPRF>();
-                        bytes_received = load_from_string(msg[1].to_string(), *sop_response);
-                        bytes_received_ += bytes_received;
-                        break;
-                    case SenderOperationType::sop_query:
-                        sop_response = make_unique<SenderOperationResponseQuery>();
-                        bytes_received = load_from_string(msg[1].to_string(), *sop_response);
-                        bytes_received_ += bytes_received;
-                        break;
-                    default:
-                        // Invalid operation
-                        APSI_LOG_ERROR("Received header indicates an invalid operation type "
-                            << sender_operation_type_str(sop_header.type));
-                        return nullptr;
+            try {
+                switch (static_cast<SenderOperationType>(sop_header.type)) {
+                case SenderOperationType::sop_parms:
+                    sop_response = make_unique<SenderOperationResponseParms>();
+                    bytes_received = load_from_string(msg[1].to_string(), *sop_response);
+                    bytes_received_ += bytes_received;
+                    break;
+                case SenderOperationType::sop_oprf:
+                    sop_response = make_unique<SenderOperationResponseOPRF>();
+                    bytes_received = load_from_string(msg[1].to_string(), *sop_response);
+                    bytes_received_ += bytes_received;
+                    break;
+                case SenderOperationType::sop_query:
+                    sop_response = make_unique<SenderOperationResponseQuery>();
+                    bytes_received = load_from_string(msg[1].to_string(), *sop_response);
+                    bytes_received_ += bytes_received;
+                    break;
+                default:
+                    // Invalid operation
+                    APSI_LOG_ERROR(
+                        "Received header indicates an invalid operation type "
+                        << sender_operation_type_str(sop_header.type));
+                    return nullptr;
                 }
-            }
-            catch (const runtime_error &ex)
-            {
+            } catch (const runtime_error &ex) {
                 APSI_LOG_ERROR("An exception was thrown loading response data: " << ex.what());
                 return nullptr;
             }
 
             // Loaded successfully
-            APSI_LOG_DEBUG("Received a response of type " << sender_operation_type_str(sop_header.type)
-                << " (" << bytes_received << " bytes)");
+            APSI_LOG_DEBUG(
+                "Received a response of type " << sender_operation_type_str(sop_header.type) << " ("
+                                               << bytes_received << " bytes)");
 
             return sop_response;
         }
@@ -452,13 +439,13 @@ namespace apsi
             throw_if_not_connected();
 
             // Need to have the ResultPackage
-            if (!rp)
-            {
+            if (!rp) {
                 APSI_LOG_ERROR("Failed to send result package: result package data is missing");
                 throw invalid_argument("result package data is missing");
             }
 
-            APSI_LOG_DEBUG("Sending result package ("
+            APSI_LOG_DEBUG(
+                "Sending result package ("
                 << "has matching data: " << (rp->rp->psi_result ? "yes" : "no") << "; "
                 << "label byte count: " << rp->rp->label_byte_count << "; "
                 << "nonce byte count: " << rp->rp->nonce_byte_count << "; "
@@ -491,24 +478,24 @@ namespace apsi
             throw_if_not_connected();
 
             bool valid_context = context && context->parameters_set();
-            if (!valid_context)
-            {
+            if (!valid_context) {
                 // Cannot receive a result package without a valid SEALContext
-                APSI_LOG_ERROR("Cannot receive a result package; SEALContext is missing or invalid");
+                APSI_LOG_ERROR(
+                    "Cannot receive a result package; SEALContext is missing or invalid");
                 return nullptr;
             }
 
             multipart_t msg;
-            if (!receive_message(msg))
-            {
+            if (!receive_message(msg)) {
                 // No message yet. Don't log anything.
                 return nullptr;
             }
 
             // Should have only one part: ResultPackage.
-            if (msg.size() != 1)
-            {
-                APSI_LOG_ERROR("ZeroMQ received a message with " << msg.size() << " parts but expected 1 part");
+            if (msg.size() != 1) {
+                APSI_LOG_ERROR(
+                    "ZeroMQ received a message with " << msg.size()
+                                                      << " parts but expected 1 part");
                 throw runtime_error("invalid message received");
             }
 
@@ -518,18 +505,13 @@ namespace apsi
             // Return value
             unique_ptr<ResultPackage> rp(make_unique<ResultPackage>());
 
-            try
-            {
+            try {
                 bytes_received = load_from_string(msg[0].to_string(), move(context), *rp);
                 bytes_received_ += bytes_received;
-            }
-            catch (const invalid_argument &ex)
-            {
+            } catch (const invalid_argument &ex) {
                 APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
                 return nullptr;
-            }
-            catch (const runtime_error &ex)
-            {
+            } catch (const runtime_error &ex) {
                 APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
                 return nullptr;
             }
@@ -548,8 +530,7 @@ namespace apsi
             recv_flags receive_flags = wait_for_message ? recv_flags::none : recv_flags::dontwait;
 
             bool received = msg.recv(*get_socket(), static_cast<int>(receive_flags));
-            if (!received && wait_for_message)
-            {
+            if (!received && wait_for_message) {
                 APSI_LOG_ERROR("ZeroMQ failed to receive a message")
                 throw runtime_error("failed to receive message");
             }
@@ -563,16 +544,14 @@ namespace apsi
 
             send_result_t result = send_multipart(*get_socket(), msg, send_flags::none);
             bool sent = result.has_value();
-            if (!sent)
-            {
+            if (!sent) {
                 throw runtime_error("failed to send message");
             }
         }
 
         unique_ptr<socket_t> &ZMQChannel::get_socket()
         {
-            if (nullptr == socket_)
-            {
+            if (nullptr == socket_) {
                 socket_ = make_unique<socket_t>(*context_.get(), get_socket_type());
                 set_socket_options(socket_.get());
             }
@@ -592,7 +571,8 @@ namespace apsi
 
             string buf;
             buf.resize(32);
-            random_bytes(reinterpret_cast<unsigned char*>(&buf[0]), static_cast<unsigned int>(buf.size()));
+            random_bytes(
+                reinterpret_cast<unsigned char *>(&buf[0]), static_cast<unsigned int>(buf.size()));
             // make sure first byte is _not_ zero, as that has a special meaning for ZeroMQ
             buf[0] = 'A';
             socket->set(sockopt::routing_id, buf);

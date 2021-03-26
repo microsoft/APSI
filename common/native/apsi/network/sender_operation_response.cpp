@@ -20,14 +20,11 @@ using namespace std;
 using namespace seal;
 using namespace seal::util;
 
-namespace apsi
-{
-    namespace network
-    {
+namespace apsi {
+    namespace network {
         size_t SenderOperationResponseParms::save(ostream &out) const
         {
-            if (!params)
-            {
+            if (!params) {
                 throw logic_error("parameters are not set");
             }
 
@@ -40,7 +37,7 @@ namespace apsi
 
             // Set up a vector to hold the parameter data
             auto params_data = fbs_builder.CreateVector(
-                reinterpret_cast<uint8_t*>(&params_str[0]), params_str.size());
+                reinterpret_cast<uint8_t *>(&params_str[0]), params_str.size());
 
             auto resp = fbs::CreateParmsResponse(fbs_builder, params_data);
 
@@ -51,7 +48,7 @@ namespace apsi
             fbs_builder.FinishSizePrefixed(sop_response);
 
             out.write(
-                reinterpret_cast<const char*>(fbs_builder.GetBufferPointer()),
+                reinterpret_cast<const char *>(fbs_builder.GetBufferPointer()),
                 safe_cast<streamsize>(fbs_builder.GetSize()));
 
             return fbs_builder.GetSize();
@@ -64,18 +61,17 @@ namespace apsi
 
             vector<seal_byte> in_data(util::read_from_stream(in));
 
-            auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
+            auto verifier = flatbuffers::Verifier(
+                reinterpret_cast<const unsigned char *>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationResponseBuffer(verifier);
-            if (!safe)
-            {
+            if (!safe) {
                 throw runtime_error("failed to load SenderOperationResponse: invalid buffer");
             }
 
             auto sop_response = fbs::GetSizePrefixedSenderOperationResponse(in_data.data());
 
             // Need to check that the operation is of the right type
-            if (sop_response->response_type() != fbs::Response_ParmsResponse)
-            {
+            if (sop_response->response_type() != fbs::Response_ParmsResponse) {
                 throw runtime_error("unexpected operation type");
             }
 
@@ -163,7 +159,7 @@ namespace apsi
             fbs_builder.FinishSizePrefixed(sop_response);
 
             out.write(
-                reinterpret_cast<const char*>(fbs_builder.GetBufferPointer()),
+                reinterpret_cast<const char *>(fbs_builder.GetBufferPointer()),
                 safe_cast<streamsize>(fbs_builder.GetSize()));
 
             return fbs_builder.GetSize();
@@ -173,18 +169,17 @@ namespace apsi
         {
             vector<seal_byte> in_data(util::read_from_stream(in));
 
-            auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
+            auto verifier = flatbuffers::Verifier(
+                reinterpret_cast<const unsigned char *>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationResponseBuffer(verifier);
-            if (!safe)
-            {
+            if (!safe) {
                 throw runtime_error("failed to load SenderOperationResponse: invalid buffer");
             }
 
             auto sop_response = fbs::GetSizePrefixedSenderOperationResponse(in_data.data());
 
             // Need to check that the operation is of the right type
-            if (sop_response->response_type() != fbs::Response_QueryResponse)
-            {
+            if (sop_response->response_type() != fbs::Response_QueryResponse) {
                 throw runtime_error("unexpected operation type");
             }
 
@@ -193,5 +188,5 @@ namespace apsi
 
             return in_data.size();
         }
-    }
-}
+    } // namespace network
+} // namespace apsi

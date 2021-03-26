@@ -5,7 +5,7 @@
 macro(check_for_avx target)
     include(CheckCXXSourceRuns)
     set(CMAKE_REQUIRED_FLAGS)
-    
+
     # Check AVX
     if(MSVC AND MSVC_VERSION GREATER_EQUAL 1600)
         set(CMAKE_REQUIRED_FLAGS "/arch:AVX")

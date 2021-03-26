@@ -4,30 +4,28 @@
 #pragma once
 
 // STD
-#include <cstdint>
 #include <cstddef>
-#include <stdexcept>
-#include <sstream>
+#include <cstdint>
 #include <iostream>
-#include <utility>
 #include <memory>
+#include <sstream>
+#include <stdexcept>
+#include <utility>
 
 // SEAL
-#include "seal/util/defines.h"
-#include "seal/util/common.h"
 #include "seal/context.h"
 #include "seal/serializable.h"
+#include "seal/util/common.h"
+#include "seal/util/defines.h"
 
-namespace apsi
-{
+namespace apsi {
     /**
-    This object stores SEAL objects that can optionally be wrapper in a seal::Serializable instance, such as
-    seal::RelinKeys and seal::Ciphertext. The class defines serialization methods and a getter for extracting
-    the wrapped object.
+    This object stores SEAL objects that can optionally be wrapper in a seal::Serializable instance,
+    such as seal::RelinKeys and seal::Ciphertext. The class defines serialization methods and a
+    getter for extracting the wrapped object.
     */
-    template<typename T>
-    class SEALObject
-    {
+    template <typename T>
+    class SEALObject {
     public:
         using SerializableType = typename seal::Serializable<T>;
 
@@ -37,22 +35,17 @@ namespace apsi
 
         SEALObject(SEALObject &&source) = default;
 
-        SEALObject &operator =(SEALObject &&assign) = default;
+        SEALObject &operator=(SEALObject &&assign) = default;
 
-        SEALObject &operator =(const SEALObject &assign)
+        SEALObject &operator=(const SEALObject &assign)
         {
             local_.reset();
             serializable_.reset();
-            if (assign.is_local() && !assign.is_serializable())
-            {
+            if (assign.is_local() && !assign.is_serializable()) {
                 local_ = std::make_unique<LocalType>(*assign.local_);
-            }
-            else if (!assign.is_local() && assign.is_serializable())
-            {
+            } else if (!assign.is_local() && assign.is_serializable()) {
                 serializable_ = std::make_unique<SerializableType>(*assign.serializable_);
-            }
-            else if (assign.is_local() && assign.is_serializable())
-            {
+            } else if (assign.is_local() && assign.is_serializable()) {
                 throw std::invalid_argument("source is in an invalid state");
             }
             return *this;
@@ -60,38 +53,38 @@ namespace apsi
 
         SEALObject(const SEALObject &source)
         {
-            operator =(source);
+            operator=(source);
         }
 
         SEALObject(SerializableType obj)
         {
-            operator =(std::move(obj));
+            operator=(std::move(obj));
         }
 
         SEALObject(LocalType obj)
         {
-            operator =(std::move(obj));
+            operator=(std::move(obj));
         }
 
-        SEALObject &operator =(const LocalType &obj)
+        SEALObject &operator=(const LocalType &obj)
         {
             set(obj);
             return *this;
         }
 
-        SEALObject &operator =(const SerializableType &obj)
+        SEALObject &operator=(const SerializableType &obj)
         {
             set(obj);
             return *this;
         }
 
-        SEALObject &operator =(LocalType &&obj)
+        SEALObject &operator=(LocalType &&obj)
         {
             set(std::move(obj));
             return *this;
         }
 
-        SEALObject &operator =(SerializableType &&obj)
+        SEALObject &operator=(SerializableType &&obj)
         {
             set(std::move(obj));
             return *this;
@@ -144,8 +137,7 @@ namespace apsi
 
         SerializableType extract_if_serializable()
         {
-            if (!is_serializable())
-            {
+            if (!is_serializable()) {
                 throw std::logic_error("no serializable object to extract");
             }
             SerializableType result = std::move(*serializable_);
@@ -155,8 +147,7 @@ namespace apsi
 
         LocalType extract_if_local()
         {
-            if (!is_local())
-            {
+            if (!is_local()) {
                 throw std::logic_error("no local object to extract");
             }
             LocalType result = std::move(*local_);
@@ -167,14 +158,10 @@ namespace apsi
         LocalType extract(std::shared_ptr<seal::SEALContext> context)
         {
             LocalType ret;
-            if (is_local())
-            {
+            if (is_local()) {
                 ret = extract_if_local();
-            }
-            else if (is_serializable())
-            {
-                if (!context)
-                {
+            } else if (is_serializable()) {
+                if (!context) {
                     throw std::invalid_argument("context cannot be null");
                 }
 
@@ -182,45 +169,39 @@ namespace apsi
                 std::stringstream ss;
                 ser.save(ss, seal::compr_mode_type::none);
                 ret.unsafe_load(*context, ss);
-            }
-            else
-            {
+            } else {
                 throw std::logic_error("no object to extract");
             }
 
             return std::move(ret);
         }
 
-        std::size_t save(seal::seal_byte *out, std::size_t size, seal::compr_mode_type compr_mode) const
+        std::size_t save(
+            seal::seal_byte *out, std::size_t size, seal::compr_mode_type compr_mode) const
         {
-            if (is_local() && !is_serializable())
-            {
+            if (is_local() && !is_serializable()) {
                 return seal::util::safe_cast<std::size_t>(local_->save(out, size, compr_mode));
-            }
-            else if (!is_local() && is_serializable())
-            {
-                return seal::util::safe_cast<std::size_t>(serializable_->save(out, size, compr_mode));
+            } else if (!is_local() && is_serializable()) {
+                return seal::util::safe_cast<std::size_t>(
+                    serializable_->save(out, size, compr_mode));
             }
             throw std::invalid_argument("object is in an invalid state");
         }
 
         std::size_t save_size(seal::compr_mode_type compr_mode) const
         {
-            if (is_local() && !is_serializable())
-            {
+            if (is_local() && !is_serializable()) {
                 return seal::util::safe_cast<std::size_t>(local_->save_size(compr_mode));
-            }
-            else if (!is_local() && is_serializable())
-            {
+            } else if (!is_local() && is_serializable()) {
                 return seal::util::safe_cast<std::size_t>(serializable_->save_size(compr_mode));
             }
             throw std::invalid_argument("object is in an invalid state");
         }
 
-        std::size_t load(std::shared_ptr<seal::SEALContext> context, const seal::seal_byte *in, std::size_t size)
+        std::size_t load(
+            std::shared_ptr<seal::SEALContext> context, const seal::seal_byte *in, std::size_t size)
         {
-            if (!context)
-            {
+            if (!context) {
                 throw std::invalid_argument("context cannot be null");
             }
             set(LocalType());
@@ -232,4 +213,4 @@ namespace apsi
 
         std::unique_ptr<LocalType> local_ = nullptr;
     };
-}
+} // namespace apsi

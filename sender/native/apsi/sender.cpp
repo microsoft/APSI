@@ -6,35 +6,33 @@
 #include <sstream>
 
 // APSI
-#include "apsi/sender.h"
-#include "apsi/psi_params.h"
+#include "apsi/crypto_context.h"
+#include "apsi/log.h"
 #include "apsi/network/channel.h"
 #include "apsi/network/result_package.h"
+#include "apsi/psi_params.h"
 #include "apsi/seal_object.h"
-#include "apsi/log.h"
-#include "apsi/util/utils.h"
-#include "apsi/crypto_context.h"
-#include "apsi/util/stopwatch.h"
+#include "apsi/sender.h"
 #include "apsi/thread_pool_mgr.h"
+#include "apsi/util/stopwatch.h"
+#include "apsi/util/utils.h"
 
 // SEAL
+#include "seal/evaluator.h"
 #include "seal/modulus.h"
 #include "seal/util/common.h"
 #include "seal/util/iterator.h"
-#include "seal/evaluator.h"
 
 using namespace std;
 using namespace seal;
 using namespace seal::util;
 
-namespace apsi
-{
+namespace apsi {
     using namespace util;
     using namespace oprf;
     using namespace network;
 
-    namespace sender
-    {
+    namespace sender {
         void Sender::RunParams(
             const ParamsRequest &params_request,
             shared_ptr<SenderDB> sender_db,
@@ -43,15 +41,13 @@ namespace apsi
         {
             STOPWATCH(sender_stopwatch, "Sender::RunParams");
 
-            if (!params_request)
-            {
+            if (!params_request) {
                 APSI_LOG_ERROR("Failed to process parameter request: request is invalid");
                 throw invalid_argument("request is invalid");
             }
 
             // Check that the database is set
-            if (!sender_db)
-            {
+            if (!sender_db) {
                 throw logic_error("SenderDB is not set");
             }
 
@@ -60,13 +56,12 @@ namespace apsi
             ParamsResponse response_params = make_unique<ParamsResponse::element_type>();
             response_params->params = make_unique<PSIParams>(sender_db->get_params());
 
-            try
-            {
+            try {
                 send_fun(chl, move(response_params));
-            }
-            catch (const exception &ex)
-            {
-                APSI_LOG_ERROR("Failed to send response to parameter request; function threw an exception: " << ex.what());
+            } catch (const exception &ex) {
+                APSI_LOG_ERROR(
+                    "Failed to send response to parameter request; function threw an exception: "
+                    << ex.what());
                 throw;
             }
 
@@ -81,23 +76,21 @@ namespace apsi
         {
             STOPWATCH(sender_stopwatch, "Sender::RunOPRF");
 
-            if (!oprf_request)
-            {
+            if (!oprf_request) {
                 APSI_LOG_ERROR("Failed to process OPRF request: request is invalid");
                 throw invalid_argument("request is invalid");
             }
 
-            APSI_LOG_INFO("Start processing OPRF request for " << oprf_request->data.size() / oprf_query_size << " items");
+            APSI_LOG_INFO(
+                "Start processing OPRF request for " << oprf_request->data.size() / oprf_query_size
+                                                     << " items");
 
             // OPRF response has the same size as the OPRF query
             OPRFResponse response_oprf = make_unique<OPRFResponse::element_type>();
             vector<seal_byte> oprf_result;
-            try
-            {
+            try {
                 response_oprf->data = OPRFSender::ProcessQueries(oprf_request->data, key);
-            }
-            catch (const exception &ex)
-            {
+            } catch (const exception &ex) {
                 // Something was wrong with the OPRF request. This can mean malicious
                 // data being sent to the sender in an attempt to extract OPRF key.
                 // Best not to respond anything.
@@ -105,13 +98,12 @@ namespace apsi
                 return;
             }
 
-            try
-            {
+            try {
                 send_fun(chl, move(response_oprf));
-            }
-            catch (const exception &ex)
-            {
-                APSI_LOG_ERROR("Failed to send response to OPRF request; function threw an exception: " << ex.what());
+            } catch (const exception &ex) {
+                APSI_LOG_ERROR(
+                    "Failed to send response to OPRF request; function threw an exception: "
+                    << ex.what());
                 throw;
             }
 
@@ -138,8 +130,8 @@ namespace apsi
 
             STOPWATCH(sender_stopwatch, "Sender::RunQuery");
             APSI_LOG_INFO(
-                "Start processing query request on database with " << sender_db->get_hashed_items().size()
-                                                                   << " items");
+                "Start processing query request on database with "
+                << sender_db->get_hashed_items().size() << " items");
 
             // Copy over the CryptoContext from SenderDB; set the Evaluator for this local instance
             CryptoContext crypto_context(sender_db->get_crypto_context());
@@ -197,7 +189,8 @@ namespace apsi
 
             // Compute query powers for the bundle indexes
             for (size_t bundle_idx = 0; bundle_idx < bundle_idx_count; bundle_idx++) {
-                ComputePowers(sender_db, crypto_context, all_powers, pd, static_cast<uint32_t>(bundle_idx));
+                ComputePowers(
+                    sender_db, crypto_context, all_powers, pd, static_cast<uint32_t>(bundle_idx));
             }
 
             APSI_LOG_DEBUG("Finished computing powers for all bundle indices");
@@ -208,7 +201,13 @@ namespace apsi
                 auto bundle_caches = sender_db->get_cache_at(static_cast<uint32_t>(bundle_idx));
                 for (auto &cache : bundle_caches) {
                     futures.push_back(tpm.thread_pool().enqueue([&, bundle_idx, cache]() {
-                        ProcessBinBundleCache(sender_db, cache, all_powers, chl, send_rp_fun, static_cast<uint32_t>(bundle_idx));
+                        ProcessBinBundleCache(
+                            sender_db,
+                            cache,
+                            all_powers,
+                            chl,
+                            send_rp_fun,
+                            static_cast<uint32_t>(bundle_idx));
                     }));
                 }
             }
