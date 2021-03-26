@@ -308,7 +308,7 @@ namespace apsi
                     if (!written)
                     {
                         // Make a fresh BinBundle and insert
-                        BinBundle new_bin_bundle(crypto_context, label_size, max_bin_size, compressed);
+                        BinBundle new_bin_bundle(crypto_context, label_size, max_bin_size, compressed, false);
                         int res = new_bin_bundle.multi_insert_for_real(data, bin_idx);
 
                         // If even that failed, I don't know what could've happened
@@ -530,6 +530,7 @@ namespace apsi
             crypto_context_(params_),
             label_byte_count_(label_byte_count),
             nonce_byte_count_(label_byte_count_ ? nonce_byte_count : 0),
+            item_count_(0),
             compressed_(compressed)
         {
             // The labels cannot be more than 1 KB.
@@ -556,7 +557,7 @@ namespace apsi
                     << max_nonce_byte_count
                     << ". Updating labels for existing items in the SenderDB or removing and "
                        "reinserting items with "
-                       "different labels may leak information about the labels.")
+                       "different labels may leak information about the labels.");
             }
 
             // Set the evaluator. This will be used for BatchedPlaintextPolyn::eval.
@@ -583,7 +584,9 @@ namespace apsi
             crypto_context_(source.crypto_context_),
             label_byte_count_(source.label_byte_count_),
             nonce_byte_count_(source.nonce_byte_count_),
-            compressed_(source.compressed_)
+            item_count_(source.item_count_),
+            compressed_(source.compressed_),
+            stripped_(source.stripped_)
         {
             // Lock the source before moving stuff over
             auto lock = source.get_writer_lock();
@@ -612,7 +615,9 @@ namespace apsi
             crypto_context_ = source.crypto_context_;
             label_byte_count_ = source.label_byte_count_;
             nonce_byte_count_ = source.nonce_byte_count_;
+            item_count_ = source.item_count_;
             compressed_ = source.compressed_;
+            stripped_ = source.stripped_;
 
             // Lock the source before moving stuff over
             auto source_lock = source.get_writer_lock();
@@ -644,7 +649,7 @@ namespace apsi
             auto lock = get_reader_lock();
 
             uint64_t item_count = mul_safe(
-                static_cast<uint64_t>(hashed_items_.size()),
+                static_cast<uint64_t>(get_item_count()),
                 static_cast<uint64_t>(params_.table_params().hash_func_count));
             uint64_t max_item_count = mul_safe(
                 static_cast<uint64_t>(get_bin_bundle_count()),
@@ -660,10 +665,14 @@ namespace apsi
 
             // Clear the set of inserted items
             hashed_items_.clear();
+            item_count_ = 0;
 
             // Clear the BinBundles
             bin_bundles_.clear();
             bin_bundles_.resize(params_.bundle_idx_count());
+
+            // Reset the stripped_ flag
+            stripped_ = false;
         }
 
         void SenderDB::clear()
@@ -706,12 +715,42 @@ namespace apsi
             return collect_caches(bin_bundles_.at(safe_cast<size_t>(bundle_idx)));
         }
 
+        void SenderDB::strip()
+        {   
+            // Lock the database for writing
+            auto lock = get_writer_lock();
+
+            stripped_ = true;
+            hashed_items_.clear();
+
+            ThreadPoolMgr tpm;
+
+            vector<future<void>> futures;
+            for (auto &bundle_idx : bin_bundles_) {
+                for (auto &bb : bundle_idx) {
+                    futures.push_back(tpm.thread_pool().enqueue([&bb]() { bb.strip(); }));
+                }
+            }
+
+            // Wait for the tasks to finish
+            for (auto &f : futures) {
+                f.get();
+            }
+
+            APSI_LOG_INFO("SenderDB has been stripped");
+        }
+
         void SenderDB::insert_or_assign(const vector<pair<Item, Label>> &data)
         {
+            if (stripped_)
+            {
+                APSI_LOG_ERROR("Cannot insert data to a stripped SenderDB");
+                throw logic_error("failed to insert data");
+            }
             if (!is_labeled())
             {
-                APSI_LOG_ERROR("Attempted to insert labeled data but this is an unlabeled SenderDB")
-                throw logic_error("cannot do labeled insertion on an unlabeled SenderDB");
+                APSI_LOG_ERROR("Attempted to insert labeled data but this is an unlabeled SenderDB");
+                throw logic_error("failed to insert data");
             }
 
             STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign (labeled)");
@@ -731,6 +770,7 @@ namespace apsi
                 {
                     // Add to hashed_items_ already at this point!
                     hashed_items_.insert(item_label_pair.first);
+                    item_count_++;
                 }
 
                 // Remove those that were found
@@ -799,10 +839,15 @@ namespace apsi
 
         void SenderDB::insert_or_assign(const vector<Item> &data)
         {
+            if (stripped_)
+            {
+                APSI_LOG_ERROR("Cannot insert data to a stripped SenderDB");
+                throw logic_error("failed to insert data");
+            }
             if (is_labeled())
             {
-                APSI_LOG_ERROR("Attempted to insert unlabeled data but this is a labeled SenderDB")
-                throw logic_error("cannot do unlabeled insertion on a labeled SenderDB");
+                APSI_LOG_ERROR("Attempted to insert unlabeled data but this is a labeled SenderDB");
+                throw logic_error("failed to insert data");
             }
 
             STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign (unlabeled)");
@@ -822,6 +867,7 @@ namespace apsi
                 {
                     // Add to hashed_items_ already at this point!
                     hashed_items_.insert(item);
+                    item_count_++;
                 }
 
                 // Remove those that were found
@@ -860,6 +906,12 @@ namespace apsi
 
         void SenderDB::remove(const vector<Item> &data)
         {
+            if (stripped_)
+            {
+                APSI_LOG_ERROR("Cannot remove data from a stripped SenderDB");
+                throw logic_error("failed to remove data");
+            }
+
             STOPWATCH(sender_stopwatch, "SenderDB::remove");
             APSI_LOG_INFO("Start removing " << data.size() << " items from SenderDB");
 
@@ -876,6 +928,7 @@ namespace apsi
                 {
                     // Remove from hashed_items_ already at this point!
                     hashed_items_.erase(item);
+                    item_count_--;
                 }
 
                 // Remove those that were not found
@@ -904,6 +957,12 @@ namespace apsi
 
         bool SenderDB::has_item(const Item &item) const
         {
+            if (stripped_)
+            {
+                APSI_LOG_ERROR("Cannot retrieve the presence of an item from a stripped SenderDB");
+                throw logic_error("failed to retrieve the presence of item");
+            }
+
             // First compute the hash for the input item
             auto hashed_item = oprf::OPRFSender::ComputeHashes({ &item, 1 }, oprf_key_)[0];
             
@@ -915,6 +974,11 @@ namespace apsi
 
         Label SenderDB::get_label(const Item &item) const
         {
+            if (stripped_)
+            {
+                APSI_LOG_ERROR("Cannot retrieve a label from a stripped SenderDB");
+                throw logic_error("failed to retrieve label");
+            }
             if (!is_labeled())
             {
                 APSI_LOG_ERROR("Attempted to retrieve a label but this is an unlabeled SenderDB");
@@ -932,8 +996,8 @@ namespace apsi
             // Check if this item is in the DB. If not, throw an exception
             if (hashed_items_.find(hashed_item) == hashed_items_.end())
             {
-                APSI_LOG_ERROR("Cannot retrieve label for an item that is not in the SenderDB")
-                throw invalid_argument("item was not found in SenderDB");
+                APSI_LOG_ERROR("Cannot retrieve label for an item that is not in the SenderDB");
+                throw invalid_argument("failed to retrieve label");
             }
 
             uint32_t bins_per_bundle = params_.bins_per_bundle();
@@ -967,8 +1031,8 @@ namespace apsi
             // an exception because something is terribly wrong.
             if (!got_labels)
             {
-                APSI_LOG_ERROR("Failed to retrieve label for an item that was supposed to be in the SenderDB")
-                throw logic_error("item is in set but labels could not be found in any BinBundle");
+                APSI_LOG_ERROR("Failed to retrieve label for an item that was supposed to be in the SenderDB");
+                throw logic_error("failed to retrieve label");
             }
 
             // All good. Now just reconstruct the big label from its split-up parts
@@ -1004,7 +1068,9 @@ namespace apsi
             fbs::SenderDBInfo info(
                 safe_cast<uint32_t>(label_byte_count_),
                 safe_cast<uint32_t>(nonce_byte_count_),
-                compressed_);
+                safe_cast<uint32_t>(item_count_),
+                compressed_,
+                stripped_);
             auto oprf_key_span = oprf_key_.key_span();
             auto oprf_key = fbs_builder.CreateVector(oprf_key_span.data(), oprf_key_span.size());
             auto hashed_items = fbs_builder.CreateVectorOfStructs([&]() {
@@ -1089,13 +1155,18 @@ namespace apsi
             // Load the info so we know what kind of SenderDB to create
             size_t label_byte_count = static_cast<size_t>(sdb->info()->label_byte_count());
             size_t nonce_byte_count = static_cast<size_t>(sdb->info()->nonce_byte_count());
+            size_t item_count = static_cast<size_t>(sdb->info()->item_count());
+
             bool compressed = sdb->info()->compressed();
+            bool stripped = sdb->info()->stripped();
 
             // Create the correct kind of SenderDB
             unique_ptr<SenderDB> sender_db;
             try
             {
                 sender_db = make_unique<SenderDB>(*params, label_byte_count, nonce_byte_count, compressed);
+                sender_db->stripped_ = stripped;
+                sender_db->item_count_ = item_count;
             }
             catch(const invalid_argument &ex)
             {
@@ -1120,12 +1191,23 @@ namespace apsi
             int32_t item_bit_count = sender_db->params_.item_bit_count();
             int32_t item_byte_count = (item_bit_count + 7) >> 3;
 
-            // Load the hashed items
-            const auto &hashed_items = *sdb->hashed_items();
-            sender_db->hashed_items_.reserve(hashed_items.size());
-            for (const auto &it : hashed_items)
+            // Load the hashed items if this SenderDB is not stripped
+            if (!stripped)
             {
-                sender_db->hashed_items_.insert({ it->low_word(), it->high_word() });
+                const auto &hashed_items = *sdb->hashed_items();
+                sender_db->hashed_items_.reserve(hashed_items.size());
+                for (const auto &it : hashed_items)
+                {
+                    sender_db->hashed_items_.insert({ it->low_word(), it->high_word() });
+                }
+
+                // Check that item_count matches the number of hashed items
+                if (item_count != hashed_items.size())
+                {
+                    APSI_LOG_ERROR("The item count indicated in the loaded SenderDB (" << item_count
+                        << ") does not match the size of the loaded data (" << hashed_items.size() << ")");
+                    throw runtime_error("failed to load SenderDB");          
+                }
             }
 
             uint32_t bin_bundle_count = sdb->bin_bundle_count();
@@ -1150,7 +1232,7 @@ namespace apsi
             for (size_t i = 0; i < bin_bundle_data.size(); i++)
             {
                 futures.push_back(tpm.thread_pool().enqueue([&, i]() {
-                    BinBundle bb(sender_db->crypto_context_, label_size, max_bin_size, compressed);
+                    BinBundle bb(sender_db->crypto_context_, label_size, max_bin_size, compressed, stripped);
                     auto bb_data = bb.load(bin_bundle_data[i]);
 
                     // Clear the data buffer since we have now loaded the BinBundle

@@ -178,10 +178,10 @@ namespace APSITests
         CryptoContext context(*get_params());
 
         // No evaluator set in context
-        ASSERT_THROW(BinBundle bb(context, 0, 50, true), invalid_argument);
+        ASSERT_THROW(BinBundle bb(context, 0, 50, true, false), invalid_argument);
 
         context.set_evaluator();
-        BinBundle bb(context, 0, 50, true);
+        BinBundle bb(context, 0, 50, true, false);
 
         ASSERT_TRUE(bb.cache_invalid());
         bb.clear_cache();
@@ -208,10 +208,10 @@ namespace APSITests
             CryptoContext context(*get_params());
 
             // No evaluator set in context
-            ASSERT_THROW(BinBundle bb(context, label_size, 50, true), invalid_argument);
+            ASSERT_THROW(BinBundle bb(context, label_size, 50, true, false), invalid_argument);
 
             context.set_evaluator();
-            BinBundle bb(context, label_size, 50, true);
+            BinBundle bb(context, label_size, 50, true, false);
 
             ASSERT_TRUE(bb.cache_invalid());
             bb.clear_cache();
@@ -249,7 +249,7 @@ namespace APSITests
         CryptoContext context(*get_params());
         context.set_evaluator();
 
-        BinBundle bb(context, 0, 50, true);
+        BinBundle bb(context, 0, 50, true, false);
         bb.regen_cache();
         ASSERT_FALSE(bb.cache_invalid());
         ASSERT_TRUE(bb.empty());
@@ -347,7 +347,7 @@ namespace APSITests
             CryptoContext context(*get_params());
             context.set_evaluator();
 
-            BinBundle bb(context, label_size, 50, true);
+            BinBundle bb(context, label_size, 50, true, false);
             bb.regen_cache();
             ASSERT_FALSE(bb.cache_invalid());
             ASSERT_TRUE(bb.empty());
@@ -505,7 +505,7 @@ namespace APSITests
             CryptoContext context(*get_params());
             context.set_evaluator();
 
-            BinBundle bb(context, label_size, 50, true);
+            BinBundle bb(context, label_size, 50, true, false);
 
             AlgItemLabel values{ make_pair(1, create_label(label_size, 1)) };
 
@@ -638,7 +638,7 @@ namespace APSITests
         CryptoContext context(*get_params());
         context.set_evaluator();
 
-        BinBundle bb(context, 0, 50, true);
+        BinBundle bb(context, 0, 50, true, false);
         bb.regen_cache();
         ASSERT_FALSE(bb.cache_invalid());
         ASSERT_TRUE(bb.empty());
@@ -689,12 +689,12 @@ namespace APSITests
         CryptoContext context(*get_params());
         context.set_evaluator();
 
-        BinBundle bb(context, 0, get_params()->table_params().max_items_per_bin, true);
+        BinBundle bb(context, 0, get_params()->table_params().max_items_per_bin, true, false);
         bb.regen_cache();
         ASSERT_TRUE(bb.empty());
         auto save_size = bb.save(ss, 1212);
 
-        BinBundle bb2(context, 0, get_params()->table_params().max_items_per_bin, true);
+        BinBundle bb2(context, 0, get_params()->table_params().max_items_per_bin, true, false);
         auto load_size = bb2.load(ss);
         ASSERT_EQ(1212, load_size.first);
         ASSERT_EQ(save_size, load_size.second);
@@ -736,7 +736,7 @@ namespace APSITests
 
         // Try loading to labeled BinBundle
         ss.seekg(0);
-        BinBundle bb3(context, 1, get_params()->table_params().max_items_per_bin, true);
+        BinBundle bb3(context, 1, get_params()->table_params().max_items_per_bin, true, false);
         ASSERT_THROW(bb3.load(ss), runtime_error);
     }
 
@@ -748,12 +748,12 @@ namespace APSITests
             CryptoContext context(*get_params());
             context.set_evaluator();
 
-            BinBundle bb(context, label_size, get_params()->table_params().max_items_per_bin, true);
+            BinBundle bb(context, label_size, get_params()->table_params().max_items_per_bin, true, false);
             bb.regen_cache();
             ASSERT_TRUE(bb.empty());
             auto save_size = bb.save(ss, 1);
 
-            BinBundle bb2(context, label_size, get_params()->table_params().max_items_per_bin, true);
+            BinBundle bb2(context, label_size, get_params()->table_params().max_items_per_bin, true, false);
             auto load_size = bb2.load(ss);
             ASSERT_EQ(1, load_size.first);
             ASSERT_EQ(save_size, load_size.second);
@@ -825,12 +825,160 @@ namespace APSITests
 
             // Try loading to unlabeled BinBundle
             ss.seekg(0);
-            BinBundle bb3(context, 0, get_params()->table_params().max_items_per_bin, true);
+            BinBundle bb3(context, 0, get_params()->table_params().max_items_per_bin, true, false);
             ASSERT_THROW(bb3.load(ss), runtime_error);
         };
 
         test_fun(1);
         test_fun(2);
         test_fun(3);
+    }
+
+    TEST(BinBundleTests, SealUnlabeled)
+    {
+        CryptoContext context(*get_params());
+        context.set_evaluator();
+
+        // Create a normal unlabeled BinBundle, strip, and reset
+        BinBundle bb(context, 0, get_params()->table_params().max_items_per_bin, true, false);
+        ASSERT_FALSE(bb.is_stripped());
+        bb.strip();
+        ASSERT_TRUE(bb.is_stripped());
+        bb.clear();
+        ASSERT_FALSE(bb.is_stripped());
+
+        // Insert a single item and check all sizes
+        AlgItem values{ 1 };
+        ASSERT_EQ(1, bb.multi_insert_for_real(values, 0));
+        ASSERT_FALSE(bb.empty());
+        bb.regen_cache();
+        ASSERT_EQ(get_params()->seal_params().poly_modulus_degree(), bb.get_item_bins().size());
+        ASSERT_EQ(0, bb.get_label_size());
+        ASSERT_EQ(0, bb.get_label_bins().size());
+        ASSERT_EQ(get_params()->seal_params().poly_modulus_degree(), bb.get_cache().felt_matching_polyns.size());
+        ASSERT_EQ(2, bb.get_cache().felt_matching_polyns[0].size());
+        ASSERT_EQ(0, bb.get_cache().felt_interp_polyns.size());
+        ASSERT_EQ(2, bb.get_cache().batched_matching_polyn.batched_coeffs.size());
+        ASSERT_EQ(0, bb.get_cache().batched_interp_polyns.size());
+
+        // Strip and check all sizes
+        bb.strip();
+        ASSERT_TRUE(bb.empty());
+        ASSERT_TRUE(bb.is_stripped());
+        ASSERT_EQ(0, bb.get_item_bins().size());
+        ASSERT_EQ(0, bb.get_label_size());
+        ASSERT_EQ(0, bb.get_label_bins().size());
+        ASSERT_EQ(0, bb.get_cache().felt_matching_polyns.size());
+        ASSERT_EQ(0, bb.get_cache().felt_interp_polyns.size());
+        ASSERT_EQ(2, bb.get_cache().batched_matching_polyn.batched_coeffs.size());
+        ASSERT_EQ(0, bb.get_cache().batched_interp_polyns.size());
+        ASSERT_THROW(bb.multi_insert_for_real(values, 1), logic_error);
+
+        // Save and load to a different object and check all sizes
+        stringstream ss;
+        bb.save(ss, 0);
+        BinBundle bb2(context, 0, get_params()->table_params().max_items_per_bin, true, false);
+        bb2.load(ss);
+        ASSERT_TRUE(bb2.empty());
+        ASSERT_TRUE(bb2.is_stripped());
+        ASSERT_EQ(0, bb2.get_item_bins().size());
+        ASSERT_EQ(0, bb2.get_label_size());
+        ASSERT_EQ(0, bb2.get_label_bins().size());
+        ASSERT_EQ(0, bb2.get_cache().felt_matching_polyns.size());
+        ASSERT_EQ(0, bb2.get_cache().felt_interp_polyns.size());
+        ASSERT_EQ(2, bb2.get_cache().batched_matching_polyn.batched_coeffs.size());
+        ASSERT_EQ(0, bb2.get_cache().batched_interp_polyns.size());
+        ASSERT_THROW(bb2.multi_insert_for_real(values, 1), logic_error);
+
+        // Check that data buffers match
+        ASSERT_TRUE(equal(
+            bb.get_cache().batched_matching_polyn.batched_coeffs[0].begin(),
+            bb.get_cache().batched_matching_polyn.batched_coeffs[0].end(),
+            bb2.get_cache().batched_matching_polyn.batched_coeffs[0].begin()));
+        ASSERT_TRUE(equal(
+            bb.get_cache().batched_matching_polyn.batched_coeffs[1].begin(),
+            bb.get_cache().batched_matching_polyn.batched_coeffs[1].end(),
+            bb2.get_cache().batched_matching_polyn.batched_coeffs[1].begin()));
+
+        bb2.clear();
+        ASSERT_FALSE(bb2.is_stripped());
+    }
+
+    TEST(BinBundleTests, SealLabeled)
+    {
+        CryptoContext context(*get_params());
+        context.set_evaluator();
+
+        // Create a normal labeled BinBundle, strip, and reset
+        size_t label_size = 1;
+        BinBundle bb(context, label_size, get_params()->table_params().max_items_per_bin, true, false);
+        ASSERT_FALSE(bb.is_stripped());
+        bb.strip();
+        ASSERT_TRUE(bb.is_stripped());
+        bb.clear();
+        ASSERT_FALSE(bb.is_stripped());
+
+        // Insert a single item and check all sizes
+        AlgItemLabel values{ make_pair(1, create_label(label_size, 1)) };
+        ASSERT_EQ(1, bb.multi_insert_for_real(values, 0));
+        ASSERT_FALSE(bb.empty());
+        bb.regen_cache();
+        ASSERT_EQ(get_params()->seal_params().poly_modulus_degree(), bb.get_item_bins().size());
+        ASSERT_EQ(label_size, bb.get_label_size());
+        ASSERT_EQ(label_size, bb.get_label_bins().size());
+        ASSERT_EQ(get_params()->seal_params().poly_modulus_degree(), bb.get_cache().felt_matching_polyns.size());
+        ASSERT_EQ(2, bb.get_cache().felt_matching_polyns[0].size());
+        ASSERT_EQ(label_size, bb.get_cache().felt_interp_polyns.size());
+        ASSERT_EQ(2, bb.get_cache().batched_matching_polyn.batched_coeffs.size());
+        ASSERT_EQ(label_size, bb.get_cache().batched_interp_polyns.size());
+        ASSERT_EQ(1, bb.get_cache().batched_interp_polyns[0].batched_coeffs.size());
+
+        // Strip and check all sizes
+        bb.strip();
+        ASSERT_TRUE(bb.empty());
+        ASSERT_TRUE(bb.is_stripped());
+        ASSERT_EQ(0, bb.get_item_bins().size());
+        ASSERT_EQ(label_size, bb.get_label_size());
+        ASSERT_EQ(0, bb.get_label_bins().size());
+        ASSERT_EQ(0, bb.get_cache().felt_matching_polyns.size());
+        ASSERT_EQ(0, bb.get_cache().felt_interp_polyns.size());
+        ASSERT_EQ(2, bb.get_cache().batched_matching_polyn.batched_coeffs.size());
+        ASSERT_EQ(label_size, bb.get_cache().batched_interp_polyns.size());
+        ASSERT_EQ(1, bb.get_cache().batched_interp_polyns[0].batched_coeffs.size());
+        ASSERT_THROW(bb.multi_insert_for_real(values, 1), logic_error);
+
+        // Save and load to a different object and check all sizes
+        stringstream ss;
+        bb.save(ss, 0);
+        BinBundle bb2(context, label_size, get_params()->table_params().max_items_per_bin, true, false);
+        bb2.load(ss);
+        ASSERT_TRUE(bb2.empty());
+        ASSERT_TRUE(bb2.is_stripped());
+        ASSERT_EQ(0, bb2.get_item_bins().size());
+        ASSERT_EQ(label_size, bb2.get_label_size());
+        ASSERT_EQ(0, bb2.get_label_bins().size());
+        ASSERT_EQ(0, bb2.get_cache().felt_matching_polyns.size());
+        ASSERT_EQ(0, bb2.get_cache().felt_interp_polyns.size());
+        ASSERT_EQ(2, bb2.get_cache().batched_matching_polyn.batched_coeffs.size());
+        ASSERT_EQ(label_size, bb2.get_cache().batched_interp_polyns.size());
+        ASSERT_EQ(1, bb2.get_cache().batched_interp_polyns[0].batched_coeffs.size());
+        ASSERT_THROW(bb2.multi_insert_for_real(values, 1), logic_error);
+
+        // Check that data buffers match
+        ASSERT_TRUE(equal(
+            bb.get_cache().batched_matching_polyn.batched_coeffs[0].begin(),
+            bb.get_cache().batched_matching_polyn.batched_coeffs[0].end(),
+            bb2.get_cache().batched_matching_polyn.batched_coeffs[0].begin()));
+        ASSERT_TRUE(equal(
+            bb.get_cache().batched_matching_polyn.batched_coeffs[1].begin(),
+            bb.get_cache().batched_matching_polyn.batched_coeffs[1].end(),
+            bb2.get_cache().batched_matching_polyn.batched_coeffs[1].begin()));
+        ASSERT_TRUE(equal(
+            bb.get_cache().batched_interp_polyns[0].batched_coeffs[0].begin(),
+            bb.get_cache().batched_interp_polyns[0].batched_coeffs[0].end(),
+            bb2.get_cache().batched_interp_polyns[0].batched_coeffs[0].begin()));
+
+        bb2.clear();
+        ASSERT_FALSE(bb2.is_stripped());
     }
 }

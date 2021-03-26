@@ -603,4 +603,99 @@ namespace APSITests
             ASSERT_NE(other_sdb.get_hashed_items().end(), other_sdb.get_hashed_items().find(it));
         }
     }
+
+    TEST(SenderDBTests, SealUnlabeled)
+    {
+        auto params = get_params();
+        SenderDB sender_db(*params, 0, 0, false);
+
+        // Strip and reset
+        ASSERT_FALSE(sender_db.is_stripped());
+        sender_db.strip();
+        ASSERT_TRUE(sender_db.is_stripped());
+        sender_db.clear();
+        ASSERT_FALSE(sender_db.is_stripped());
+
+        // Insert one item and check data
+        sender_db.insert_or_assign(Item(0, 0));
+        ASSERT_EQ(1, sender_db.get_hashed_items().size());
+        ASSERT_EQ(1, sender_db.get_item_count());
+        ASSERT_EQ(1, sender_db.get_bin_bundle_count());
+        ASSERT_TRUE(sender_db.has_item(Item(0, 0)));
+        auto pr = sender_db.get_packing_rate();
+
+        // Strip and check sizes
+        sender_db.strip();
+        ASSERT_TRUE(sender_db.is_stripped());
+        ASSERT_EQ(0, sender_db.get_hashed_items().size());
+        ASSERT_EQ(1, sender_db.get_item_count());
+        ASSERT_EQ(1, sender_db.get_bin_bundle_count());
+        ASSERT_EQ(pr, sender_db.get_packing_rate());
+
+        // Attempt operations on a stripped SenderDB
+        ASSERT_THROW(sender_db.has_item(Item(0, 0)), logic_error);
+        ASSERT_THROW(sender_db.insert_or_assign(Item(1, 2)), logic_error);
+        ASSERT_THROW(sender_db.remove(Item(0, 0)), logic_error);
+
+        // Save, load, and check sizes
+        stringstream ss;
+        sender_db.save(ss);
+        SenderDB sender_db2 = SenderDB::Load(ss).first;
+        ASSERT_TRUE(sender_db2.is_stripped());
+        ASSERT_EQ(0, sender_db2.get_hashed_items().size());
+        ASSERT_EQ(1, sender_db2.get_item_count());
+        ASSERT_EQ(1, sender_db2.get_bin_bundle_count());
+        ASSERT_EQ(pr, sender_db2.get_packing_rate());
+
+        sender_db2.clear();
+        ASSERT_FALSE(sender_db2.is_stripped());
+    }
+
+    TEST(SenderDBTests, SealLabeled)
+    {
+        auto params = get_params();
+        SenderDB sender_db(*params, 20, 8, false);
+
+        // Strip and reset
+        ASSERT_FALSE(sender_db.is_stripped());
+        sender_db.strip();
+        ASSERT_TRUE(sender_db.is_stripped());
+        sender_db.clear();
+        ASSERT_FALSE(sender_db.is_stripped());
+
+        // Insert one item and check data
+        sender_db.insert_or_assign(make_pair(Item(0, 0), create_label(0, 20)));
+        ASSERT_EQ(1, sender_db.get_hashed_items().size());
+        ASSERT_EQ(1, sender_db.get_item_count());
+        ASSERT_EQ(1, sender_db.get_bin_bundle_count());
+        ASSERT_TRUE(sender_db.has_item(Item(0, 0)));
+        auto pr = sender_db.get_packing_rate();
+
+        // Strip and check sizes
+        sender_db.strip();
+        ASSERT_TRUE(sender_db.is_stripped());
+        ASSERT_EQ(0, sender_db.get_hashed_items().size());
+        ASSERT_EQ(1, sender_db.get_item_count());
+        ASSERT_EQ(1, sender_db.get_bin_bundle_count());
+        ASSERT_EQ(pr, sender_db.get_packing_rate());
+
+        // Attempt operations on a stripped SenderDB
+        ASSERT_THROW(sender_db.has_item(Item(0, 0)), logic_error);
+        ASSERT_THROW(sender_db.get_label(Item(0, 0)), logic_error);
+        ASSERT_THROW(sender_db.insert_or_assign(Item(1, 2)), logic_error);
+        ASSERT_THROW(sender_db.remove(Item(0, 0)), logic_error);
+
+        // Save, load, and check sizes
+        stringstream ss;
+        sender_db.save(ss);
+        SenderDB sender_db2 = SenderDB::Load(ss).first;
+        ASSERT_TRUE(sender_db2.is_stripped());
+        ASSERT_EQ(0, sender_db2.get_hashed_items().size());
+        ASSERT_EQ(1, sender_db2.get_item_count());
+        ASSERT_EQ(1, sender_db2.get_bin_bundle_count());
+        ASSERT_EQ(pr, sender_db2.get_packing_rate());
+
+        sender_db2.clear();
+        ASSERT_FALSE(sender_db2.is_stripped());
+    }
 }

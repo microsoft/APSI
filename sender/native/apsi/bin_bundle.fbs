@@ -32,6 +32,7 @@ table BinBundle {
     item_bins:FEltMatrix (required);
     label_bins:[FEltMatrix];
     cache:BinBundleCache;
+    stripped:bool;
 }
 
 root_type BinBundle;

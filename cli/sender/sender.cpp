@@ -201,6 +201,7 @@ shared_ptr<SenderDB> create_sender_db(
         {
             sender_db = make_shared<SenderDB>(*psi_params, 0, 0, true);
             sender_db->set_data(get<CSVReader::UnlabeledData>(db_data));
+
             APSI_LOG_INFO("Created unlabeled SenderDB with " << sender_db->get_item_count() << " items");
         }
         catch (const exception &ex)
@@ -240,6 +241,9 @@ shared_ptr<SenderDB> create_sender_db(
         APSI_LOG_ERROR("Loaded database is in an invalid state");
         return nullptr;
     }
+
+    // Strip all unnecessary data from the SenderDB to reduce memory use
+    sender_db->strip();
 
     APSI_LOG_INFO("SenderDB packing rate: " << sender_db->get_packing_rate());
 

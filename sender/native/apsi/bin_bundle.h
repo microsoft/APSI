@@ -195,10 +195,9 @@ namespace apsi
             bool compressed_;
 
             /**
-            Clears the contents of the BinBundle and wipes out the cache. Sets the internal data structures to hold
-            a given number of bins and given size labels.
+            Indicates whether the BinBundle has been stripped of all information not needed for serving a query.
             */
-            void clear(std::size_t num_bins, std::size_t label_size);
+            bool stripped_;
 
             /**
             Computes and caches the appropriate polynomials of each bin. For unlabeled PSI, this is just the "matching"
@@ -213,9 +212,19 @@ namespace apsi
             void regen_plaintexts();
 
             /**
-            Maximum size of the bins
+            The size of the labels in multiples of item length.
+            */
+            std::size_t label_size_;
+
+            /**
+            Maximum size of the bins.
             */
             std::size_t max_bin_size_;
+
+            /**
+            The number of bins in the BinBundle.
+            */
+            std::size_t num_bins_;
 
             /**
             Returns the modulus that defines the finite field that we're working in
@@ -227,7 +236,8 @@ namespace apsi
                 const CryptoContext &crypto_context,
                 std::size_t label_size,
                 std::size_t max_bin_size,
-                bool compressed);
+                bool compressed,
+                bool stripped = false);
 
             BinBundle(const BinBundle &copy) = delete;
 
@@ -311,10 +321,7 @@ namespace apsi
             /**
             Clears the contents of the BinBundle and wipes out the cache.
             */
-            void clear()
-            {
-                clear(item_bins_.size(), label_bins_.size());
-            }
+            void clear(bool stripped = false);
 
             /**
             Wipes out the cache of the BinBundle
@@ -353,7 +360,7 @@ namespace apsi
             */
             std::size_t get_label_size() const noexcept
             {
-                return label_bins_.size();
+                return label_size_;
             }
 
             /**
@@ -361,7 +368,7 @@ namespace apsi
             */
             std::size_t get_num_bins() const noexcept
             {
-                return item_bins_.size();
+                return num_bins_;
             }
 
             /**
@@ -376,6 +383,19 @@ namespace apsi
             Returns whether this BinBundle is empty.
             */
             bool empty() const;
+
+            /**
+            Indicates whether the BinBundle has been stripped of all information not needed for serving a query.
+            */
+            bool is_stripped() const
+            {
+                return stripped_;
+            }
+
+            /**
+            Strips the BinBundle of all information not needed for serving a query.
+            */
+            void strip();
 
             /**
             Saves the BinBundle to a stream.

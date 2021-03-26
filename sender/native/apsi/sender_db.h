@@ -117,6 +117,19 @@ namespace apsi
             }
 
             /**
+            Indicates whether the SenderDB has been stripped of all information not needed for serving a query.
+            */
+            bool is_stripped() const
+            {
+                return stripped_;
+            }
+
+            /**
+            Strips the SenderDB of all information not needed for serving a query.
+            */
+            void strip();
+
+            /**
             Returns a copy of the OPRF key.
             */
             oprf::OPRFKey get_oprf_key() const
@@ -241,7 +254,7 @@ namespace apsi
             */
             size_t get_item_count() const 
             {
-                return hashed_items_.size();
+                return item_count_;
             }
 
             /**
@@ -318,9 +331,19 @@ namespace apsi
             std::size_t nonce_byte_count_;
 
             /**
+            The number of items currently in the SenderDB.
+            */
+            std::size_t item_count_;
+
+            /**
             Indicates whether SEAL plaintexts are compressed in memory.
             */
             bool compressed_;
+
+            /**
+            Indicates whether the SenderDB has been stripped of all information not needed for serving a query.
+            */
+            bool stripped_;
 
             /**
             All the BinBundles in the database, indexed by bundle index. The set (represented by a vector internally) at
