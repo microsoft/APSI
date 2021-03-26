@@ -10,8 +10,8 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #if defined(__WINDOWS__)
-#include <bcrypt.h>
 #include <windows.h>
+#include <bcrypt.h>
 #define RTL_GENRANDOM "SystemFunction036"
 NTSTATUS last_bcrypt_error = 0;
 #elif defined(__LINUX__)
