@@ -604,7 +604,7 @@ namespace APSITests
         }
     }
 
-    TEST(SenderDBTests, SealUnlabeled)
+    TEST(SenderDBTests, StripUnlabeled)
     {
         auto params = get_params();
         SenderDB sender_db(*params, 0, 0, false);
@@ -651,7 +651,7 @@ namespace APSITests
         ASSERT_FALSE(sender_db2.is_stripped());
     }
 
-    TEST(SenderDBTests, SealLabeled)
+    TEST(SenderDBTests, StriplLabeled)
     {
         auto params = get_params();
         SenderDB sender_db(*params, 20, 8, false);

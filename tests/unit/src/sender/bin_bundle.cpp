@@ -834,7 +834,7 @@ namespace APSITests
         test_fun(3);
     }
 
-    TEST(BinBundleTests, SealUnlabeled)
+    TEST(BinBundleTests, StripUnlabeled)
     {
         CryptoContext context(*get_params());
         context.set_evaluator();
@@ -904,7 +904,7 @@ namespace APSITests
         ASSERT_FALSE(bb2.is_stripped());
     }
 
-    TEST(BinBundleTests, SealLabeled)
+    TEST(BinBundleTests, StripLabeled)
     {
         CryptoContext context(*get_params());
         context.set_evaluator();
