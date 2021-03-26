@@ -7,7 +7,11 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#if defined(__GNUC__) && (__GNUC__ < 8) && !defined(__clang__)
+#include <experimental/filesystem>
+#else
 #include <filesystem>
+#endif
 
 // APSI
 #include "apsi/receiver.h"
@@ -20,7 +24,11 @@
 #include "receiver/clp.h"
 
 using namespace std;
+#if defined(__GNUC__) && (__GNUC__ < 8) && !defined(__clang__)
+namespace fs = std::experimental::filesystem;
+#else
 namespace fs = std::filesystem;
+#endif
 using namespace apsi;
 using namespace apsi::util;
 using namespace apsi::receiver;

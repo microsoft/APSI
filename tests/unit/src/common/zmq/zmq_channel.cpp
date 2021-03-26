@@ -316,7 +316,7 @@ namespace APSITests
 
     TEST_F(ZMQChannelTests, MultipleClients)
     {
-        atomic<bool> finished = false;
+        atomic<bool> finished { false };
 
         thread serverth([this, &finished] {
             ZMQSenderChannel sender;

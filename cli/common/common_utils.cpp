@@ -6,10 +6,13 @@
 // STD
 #include <iostream>
 #include <iomanip>
+#if defined(_MSC_VER)
+#include <windows.h>
+#endif
+#if defined(__GNUC__) && (__GNUC__ < 8) && !defined(__clang__)
+#include <experimental/filesystem>
+#else
 #include <filesystem>
-
-#ifdef _MSC_VER
-#include "windows.h"
 #endif
 
 // APSI
@@ -19,10 +22,14 @@
 #include "apsi/util/utils.h"
 
 using namespace std;
+#if defined(__GNUC__) && (__GNUC__ < 8) && !defined(__clang__)
+namespace fs = std::experimental::filesystem;
+#else
+namespace fs = std::filesystem;
+#endif
 using namespace seal;
 using namespace apsi;
 using namespace apsi::util;
-namespace fs = std::filesystem;
 
 /**
 This only turns on showing colors for Windows.
