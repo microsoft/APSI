@@ -1053,6 +1053,9 @@ namespace apsi
             // Lock the database for reading
             auto lock = get_reader_lock();
 
+            STOPWATCH(sender_stopwatch, "SenderDB::save");
+            APSI_LOG_DEBUG("Start saving SenderDB");
+
             // First save the PSIParam
             stringstream ss;
             params_.save(ss);
@@ -1119,11 +1122,16 @@ namespace apsi
             APSI_LOG_DEBUG("Saved SenderDB with " << get_hashed_items().size() << " items ("
                 << total_size << " bytes)");
 
+            APSI_LOG_DEBUG("Finished saving SenderDB");
+
             return total_size;
         }
 
         pair<SenderDB, size_t> SenderDB::Load(istream &in)
         {
+            STOPWATCH(sender_stopwatch, "SenderDB::Load");
+            APSI_LOG_DEBUG("Start loading SenderDB");
+
             vector<seal_byte> in_data(apsi::util::read_from_stream(in));
 
             auto verifier = flatbuffers::Verifier(reinterpret_cast<const unsigned char*>(in_data.data()), in_data.size());
@@ -1270,6 +1278,8 @@ namespace apsi
 
             // Make sure the BinBundle caches are valid
             sender_db->generate_caches();
+
+            APSI_LOG_DEBUG("Finished loading SenderDB");
 
             return { move(*sender_db), total_size };
         }
