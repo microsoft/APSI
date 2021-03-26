@@ -12,8 +12,10 @@
 #include "apsi/sender.h"
 #include "apsi/sender_db.h"
 #include "apsi/thread_pool_mgr.h"
-#include "gtest/gtest.h"
 #include "test_utils.h"
+
+// Google Test
+#include "gtest/gtest.h"
 
 using namespace std;
 using namespace apsi;

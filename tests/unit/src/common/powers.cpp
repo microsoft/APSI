@@ -10,6 +10,8 @@
 
 // APSI
 #include "apsi/powers.h"
+
+// Google Test
 #include "gtest/gtest.h"
 
 using namespace std;

@@ -7,6 +7,8 @@
 
 // APSI
 #include "apsi/util/stopwatch.h"
+
+// Google Test
 #include "gtest/gtest.h"
 
 using namespace std;

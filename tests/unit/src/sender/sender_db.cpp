@@ -11,6 +11,8 @@
 #include "apsi/log.h"
 #include "apsi/psi_params.h"
 #include "apsi/sender_db.h"
+
+// Google Test
 #include "gtest/gtest.h"
 
 using namespace std;

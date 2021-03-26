@@ -1,8 +1,10 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-// APSI
+// STD
 #include <sstream>
+
+// APSI
 #include "apsi/log.h"
 #include "apsi/network/zmq/zmq_channel.h"
 #include "apsi/oprf/oprf_sender.h"
@@ -11,8 +13,10 @@
 #include "apsi/sender_db.h"
 #include "apsi/thread_pool_mgr.h"
 #include "apsi/zmq/sender_dispatcher.h"
-#include "gtest/gtest.h"
 #include "test_utils.h"
+
+// Google Test
+#include "gtest/gtest.h"
 
 using namespace std;
 using namespace apsi;

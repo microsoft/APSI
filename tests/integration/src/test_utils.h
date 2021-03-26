@@ -19,6 +19,8 @@
 #include "apsi/item.h"
 #include "apsi/psi_params.h"
 #include "apsi/receiver.h"
+
+// Google Test
 #include "gtest/gtest.h"
 
 namespace APSITests {

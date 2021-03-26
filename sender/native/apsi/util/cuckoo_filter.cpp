@@ -2,9 +2,9 @@
 // Licensed under the MIT license.
 
 // APSI
-#include "cuckoo_filter.h"
 #include "apsi/util/hash.h"
 #include "apsi/util/utils.h"
+#include "cuckoo_filter.h"
 
 using namespace std;
 using namespace apsi::util;

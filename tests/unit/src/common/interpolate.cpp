@@ -16,6 +16,8 @@
 #include "seal/context.h"
 #include "seal/modulus.h"
 #include "seal/util/uintarithsmallmod.h"
+
+// Google Test
 #include "gtest/gtest.h"
 
 using namespace std;

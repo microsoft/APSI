@@ -1,11 +1,11 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT license.
 
-// STD
-
 // APSI
 #include "apsi/util/cuckoo_filter.h"
 #include "apsi/util/cuckoo_filter_table.h"
+
+// Google Test
 #include "gtest/gtest.h"
 
 using namespace std;

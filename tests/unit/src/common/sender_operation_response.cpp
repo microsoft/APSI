@@ -7,6 +7,8 @@
 
 // APSI
 #include "apsi/network/sender_operation_response.h"
+
+// Google Test
 #include "gtest/gtest.h"
 
 using namespace std;

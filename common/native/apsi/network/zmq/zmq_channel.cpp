@@ -99,7 +99,7 @@ namespace apsi {
             try {
                 end_point_ = end_point;
                 get_socket()->bind(end_point);
-            } catch (const zmq::error_t &ex) {
+            } catch (const zmq::error_t &) {
                 APSI_LOG_ERROR("ZeroMQ failed to bind socket to endpoint " << end_point);
                 throw;
             }
@@ -112,7 +112,7 @@ namespace apsi {
             try {
                 end_point_ = end_point;
                 get_socket()->connect(end_point);
-            } catch (const zmq::error_t &ex) {
+            } catch (const zmq::error_t &) {
                 APSI_LOG_ERROR("ZeroMQ failed to connect socket to endpoint " << end_point);
                 throw;
             }
@@ -219,7 +219,7 @@ namespace apsi {
             SenderOperationHeader sop_header;
             try {
                 bytes_received_ += load_from_string(msg[1].to_string(), sop_header);
-            } catch (const runtime_error &ex) {
+            } catch (const runtime_error &) {
                 // Invalid header
                 APSI_LOG_ERROR("Failed to receive a valid header");
                 return nullptr;
@@ -368,7 +368,7 @@ namespace apsi {
             SenderOperationHeader sop_header;
             try {
                 bytes_received_ += load_from_string(msg[0].to_string(), sop_header);
-            } catch (const runtime_error &ex) {
+            } catch (const runtime_error &) {
                 // Invalid header
                 APSI_LOG_ERROR("Failed to receive a valid header");
                 return nullptr;

@@ -63,7 +63,7 @@ namespace apsi {
             SenderOperationHeader sop_header;
             try {
                 bytes_received_ += sop_header.load(in_);
-            } catch (const runtime_error &ex) {
+            } catch (const runtime_error &) {
                 // Invalid header
                 APSI_LOG_ERROR("Failed to receive a valid header");
                 return nullptr;
@@ -161,7 +161,7 @@ namespace apsi {
             SenderOperationHeader sop_header;
             try {
                 bytes_received_ += sop_header.load(in_);
-            } catch (const runtime_error &ex) {
+            } catch (const runtime_error &) {
                 // Invalid header
                 APSI_LOG_ERROR("Failed to receive a valid header");
                 return nullptr;

@@ -14,6 +14,8 @@
 #include "apsi/network/zmq/zmq_channel.h"
 #include "apsi/powers.h"
 #include "apsi/util/utils.h"
+
+// Google Test
 #include "gtest/gtest.h"
 
 using namespace std;
