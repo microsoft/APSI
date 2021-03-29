@@ -61,6 +61,18 @@ steps:
     configuration: ${{ parameters.configuration }}
     diagnosticsEnabled: True
 
+- task: Semmle@1
+  displayName: 'Semmle'
+  env:
+    SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+  inputs:
+    sourceCodeDirectory: '$(Build.SourcesDirectory)'
+    language: 'cpp'
+    querySuite: 'Recommended'
+    timeout: '1800'
+    ram: '16384'
+    addProjectDirToScanningExclusionList: true
+
 - task: PublishSymbols@2
   displayName: 'Publish symbols path'
   inputs:
