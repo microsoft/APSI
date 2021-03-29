@@ -71,8 +71,11 @@ namespace apsi {
             crypto_context_.set_secret(generator.secret_key());
 
             // Create Serializable<RelinKeys> and move to relin_keys_ for storage
-            Serializable<RelinKeys> relin_keys(generator.create_relin_keys());
-            relin_keys_.set(move(relin_keys));
+            relin_keys_.clear();
+            if (get_seal_context()->using_keyswitching()) {
+                Serializable<RelinKeys> relin_keys(generator.create_relin_keys());
+                relin_keys_.set(move(relin_keys));
+            }
         }
 
         uint32_t Receiver::reset_powers_dag(const set<uint32_t> &source_powers)

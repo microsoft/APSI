@@ -240,6 +240,7 @@ namespace apsi {
             RelinKeys &relin_keys = *crypto_context.relin_keys();
 
             CiphertextPowers &powers_at_this_bundle_idx = all_powers[bundle_idx];
+            bool relinearize = crypto_context.seal_context()->using_keyswitching();
             pd.parallel_apply([&](const PowersDag::PowersNode &node) {
                 if (!node.is_source()) {
                     auto parents = node.parents;
@@ -248,7 +249,9 @@ namespace apsi {
                         powers_at_this_bundle_idx[parents.first],
                         powers_at_this_bundle_idx[parents.second],
                         prod);
-                    evaluator.relinearize_inplace(prod, relin_keys);
+                    if (relinearize) {
+                        evaluator.relinearize_inplace(prod, relin_keys);
+                    }
                     powers_at_this_bundle_idx[node.power] = move(prod);
                 }
             });

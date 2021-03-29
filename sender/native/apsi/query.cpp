@@ -39,10 +39,12 @@ namespace apsi {
             auto seal_context = sender_db_->get_seal_context();
 
             // Extract and validate relinearization keys
-            relin_keys_ = query_request->relin_keys.extract(seal_context);
-            if (!is_valid_for(relin_keys_, *seal_context)) {
-                APSI_LOG_ERROR("Extracted relinearization keys are invalid for SEALContext");
-                return;
+            if (seal_context->using_keyswitching()) {
+                relin_keys_ = query_request->relin_keys.extract(seal_context);
+                if (!is_valid_for(relin_keys_, *seal_context)) {
+                    APSI_LOG_ERROR("Extracted relinearization keys are invalid for SEALContext");
+                    return;
+                }
             }
 
             // Extract and validate query ciphertexts

@@ -616,47 +616,39 @@ This is one of the most complex parameters to set, which is why we have dedicate
 
 To construct a `PSIParams` object, one needs to provide the constructor with a valid `PSIParams::SEALParams`, `PSIParams::ItemParams`, `PSIParams::TableParams`, and `PSIParams::QueryParams`. The constructor will perform the following validations on the parameters, in order, and will throw an exception (with a descriptive message) if any of them fails:
 
-1. `PSIParams::TableParams::table_size` is verified to be a power of two.
+1. `PSIParams::TableParams::table_size` is verified to be non-zero.
 1. `PSIParams::TableParams::max_items_per_bin` is verified to be non-zero.
 1. `PSIParams::TableParams::hash_func_count` is verified to be at least 1 and at most 8.
 1. `PSIParams::ItemParams::felts_per_item` is verified to be 2, 4, 8, 16, or 32.
-1. `PSIParams::QueryParams::query_powers` is verified to not contain 0, to contain 1, to not contain values larger than `PSIParams::TableParams::max_items_per_bin`.
-1. `PSIParams::SEALParams` are verified to be valid and to support Microsoft SEAL keyswithing and batching.
-Specificially, the parameters must have at least two valid `coeff_modulus` primes and a `plain_modulus` prime that is congruent to 1 modulo `2 * poly_modulus_degree`.
+1. `PSIParams::QueryParams::query_powers` is verified to not contain 0, to contain 1, and to not contain values larger than `max_items_per_bin`.
+1. `PSIParams::SEALParams` are verified to be valid and to support Microsoft SEAL batching.
+Specificially, the parameters must have a `plain_modulus` that is prime and congruent to 1 modulo `2 * poly_modulus_degree`.
 Microsoft SEAL contains functions in `seal::CoeffModulus` and `seal::PlainModulus` classes (see [modulus.h](https://github.com/microsoft/SEAL/blob/main/native/src/seal/modulus.h)) to choose appropriate `coeff_modulus` and `plain_modulus` primes.
-1. The item bit count is computed as the product of `PSIParams::ItemParams::felts_per_item` and `floor(log_2(plain_modulus))`, and is verified to be at least 80 and at most 128.
-1. The number of item fitting vertically in a bin bundle is computed as `poly_modulus_degree / PSIParams::ItemParams::felts_per_item`.
-This number is verified to be non-zero and at most as large as `PSIParams::TableParams::table_size`.
+1. The item bit count is computed as the product of `felts_per_item` and `floor(log_2(plain_modulus))`, and is verified to be at least 80 and at most 128.
+1. The number of item fitting vertically in a bin bundle is computed as `poly_modulus_degree / felts_per_item`.
+This number is verified to be non-zero.
+1. `table_size` is verified to be a multiple of `poly_modulus_degree / felts_per_item`.
 
 If all of these checks pass, the `PSIParams` object is successfully created and is valid for use in APSI.
 
 #### Loading from JSON
 A `PSIParams` object can be created from JSON data. The `PSIParams::Load` method allows providing a string with JSON-formatted data that is then used to initialize a `PSIParams` object. The format of the JSON data is as follows:
 ```
-// APSI parameters
 {
     "table_params": {
-        // Number of hash functions to use
         "hash_func_count": 3,
-        // Size of the hash table to use
         "table_size": 512,
-        // Maximum number of items allowed in a bin
         "max_items_per_bin": 92
     },
     "item_params": {
-        // Number of field elements to use per item
         "felts_per_item": 8
     },
     "query_params": {
-        // Query powers to send in addition to 1
         "query_powers": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]
     },
     "seal_params": {
-        // Plaintext modulus prime for Microsoft SEAL encryption
         "plain_modulus": 40961,
-        // Degree of the polynomial modulus for Microsoft SEAL encryption
         "poly_modulus_degree": 4096,
-        // Bit sizes for coefficient modulus primes for Microsoft SEAL encryption
         "coeff_modulus_bits": [ 49, 40, 20 ]
     }
 }
@@ -665,11 +657,8 @@ Note that the Microsoft SEAL `plain_modulus` parameter can be set to a specific 
 ```
     ...
     "seal_params": {
-        // Bit size for plaintext modulus prime for Microsoft SEAL encryption
         "plain_modulus_bits": 24,
-        // Degree of the polynomial modulus for Microsoft SEAL encryption
         "poly_modulus_degree": 4096,
-        // Bit sizes for coefficient modulus primes for Microsoft SEAL encryption
         "coeff_modulus_bits": [ 49, 40, 20 ]
     }
     ...

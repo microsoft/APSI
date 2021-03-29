@@ -90,9 +90,8 @@ namespace apsi {
     void PSIParams::initialize()
     {
         // Checking the validity of parameters
-        if (!table_params_.table_size ||
-            (table_params_.table_size & (table_params_.table_size - 1))) {
-            throw invalid_argument("table_size is not a power of two");
+        if (!table_params_.table_size) {
+            throw invalid_argument("table_size cannot be zero");
         }
         if (!table_params_.max_items_per_bin) {
             throw invalid_argument("max_items_per_bin cannot be zero");
@@ -131,10 +130,6 @@ namespace apsi {
                << seal_context.parameter_error_message();
             throw invalid_argument(ss.str());
         }
-        if (!seal_context.using_keyswitching()) {
-            throw invalid_argument("Microsoft SEAL parameters do not support keyswitching; at "
-                                   "least two coeff_modulus primes are required");
-        }
         if (!seal_context.key_context_data()->qualifiers().using_batching) {
             throw invalid_argument(
                 "Microsoft SEAL parameters do not support batching; plain_modulus must be a prime "
@@ -159,14 +154,14 @@ namespace apsi {
             throw invalid_argument("poly_modulus_degree is too small");
         }
 
-        // table_size must be divisible by items_per_bundle; it suffices to test that table_size is
-        // not smaller
-        if (table_params_.table_size < items_per_bundle_) {
-            throw invalid_argument("table_size is too small");
+        // table_size must be a multiple of items_per_bundle_
+        if (table_params_.table_size % items_per_bundle_) {
+            throw invalid_argument(
+                "table_size must be a multiple of (poly_modulus_degree / felts_per_item)");
         }
 
         // Compute the number of bundle indices; this is now guaranteed to be greater than zero
-        bundle_idx_count_ = (table_params_.table_size + items_per_bundle_ - 1) / items_per_bundle_;
+        bundle_idx_count_ = table_params_.table_size / items_per_bundle_;
     }
 
     size_t PSIParams::save(ostream &out) const
@@ -270,45 +265,67 @@ namespace apsi {
         stringstream ss(in);
         ss >> root;
 
-        // Check expected sections are present
-        const auto &json_table_params = get_non_null_json_value(root, "table_params");
-        const auto &json_item_params = get_non_null_json_value(root, "item_params");
-        const auto &json_query_params = get_non_null_json_value(root, "query_params");
-        const auto &json_seal_params = get_non_null_json_value(root, "seal_params");
-
+        // Load TableParams
         PSIParams::TableParams table_params;
-        table_params.hash_func_count = json_value_ui32(json_table_params, "hash_func_count");
-        table_params.table_size = json_value_ui32(json_table_params, "table_size");
-        table_params.max_items_per_bin = json_value_ui32(json_table_params, "max_items_per_bin");
-
-        PSIParams::ItemParams item_params;
-        item_params.felts_per_item = json_value_ui32(json_item_params, "felts_per_item");
-
-        PSIParams::QueryParams query_params;
-        const auto &query_powers = get_non_null_json_value(json_query_params, "query_powers");
-
-        // Should always contain 1
-        query_params.query_powers.insert(1);
-        for (const auto &power : query_powers) {
-            query_params.query_powers.insert(json_value_ui32(power));
+        try {
+            const auto &json_table_params = get_non_null_json_value(root, "table_params");
+            table_params.hash_func_count = json_value_ui32(json_table_params, "hash_func_count");
+            table_params.table_size = json_value_ui32(json_table_params, "table_size");
+            table_params.max_items_per_bin =
+                json_value_ui32(json_table_params, "max_items_per_bin");
+        } catch (const exception &ex) {
+            APSI_LOG_ERROR("Failed to load table_params from JSON string: " << ex.what());
+            throw;
         }
 
-        PSIParams::SEALParams seal_params;
-        const auto &coeff_modulus_bits =
-            get_non_null_json_value(json_seal_params, "coeff_modulus_bits");
-
+        // Load ItemParams
+        PSIParams::ItemParams item_params;
         try {
+            const auto &json_item_params = get_non_null_json_value(root, "item_params");
+            item_params.felts_per_item = json_value_ui32(json_item_params, "felts_per_item");
+        } catch (const exception &ex) {
+            APSI_LOG_ERROR("Failed to load item_params from JSON string: " << ex.what());
+            throw;
+        }
+
+        // Load QueryParams
+        PSIParams::QueryParams query_params;
+        try {
+            const auto &json_query_params = get_non_null_json_value(root, "query_params");
+            const auto &query_powers = get_non_null_json_value(json_query_params, "query_powers");
+
+            // Should always contain 1
+            query_params.query_powers.insert(1);
+            for (const auto &power : query_powers) {
+                query_params.query_powers.insert(json_value_ui32(power));
+            }
+        } catch (const exception &ex) {
+            APSI_LOG_ERROR("Failed to load query_params from JSON string: " << ex.what());
+            throw;
+        }
+
+        // Load SEALParams
+        PSIParams::SEALParams seal_params;
+        try {
+            const auto &json_seal_params = get_non_null_json_value(root, "seal_params");
+            const auto &coeff_modulus_bits =
+                get_non_null_json_value(json_seal_params, "coeff_modulus_bits");
+
             size_t poly_modulus_degree = json_value_ui64(json_seal_params, "poly_modulus_degree");
             seal_params.set_poly_modulus_degree(poly_modulus_degree);
 
+            if (json_seal_params.isMember("plain_modulus") &&
+                json_seal_params.isMember("plain_modulus_bits")) {
+                throw runtime_error(
+                    "only one of plain_modulus and plain_modulus_bits must be specified");
+            }
             if (json_seal_params.isMember("plain_modulus")) {
                 seal_params.set_plain_modulus(json_value_ui64(json_seal_params, "plain_modulus"));
             } else if (json_seal_params.isMember("plain_modulus_bits")) {
                 seal_params.set_plain_modulus(PlainModulus::Batching(
                     poly_modulus_degree, json_value_int(json_seal_params, "plain_modulus_bits")));
             } else {
-                throw runtime_error(
-                    "Either plain_modulus or plain_modulus_bits not found under seal_params");
+                throw runtime_error("neither plain_modulus nor plain_modulus_bits was specified");
             }
 
             vector<int> coeff_modulus_bit_sizes;
@@ -317,8 +334,9 @@ namespace apsi {
             }
             seal_params.set_coeff_modulus(
                 CoeffModulus::Create(poly_modulus_degree, coeff_modulus_bit_sizes));
+
         } catch (const exception &ex) {
-            APSI_LOG_ERROR("Microsoft SEAL threw an exception creating SEALParams: " << ex.what());
+            APSI_LOG_ERROR("Failed to load seal_params from JSON string: " << ex.what());
             throw;
         }
 

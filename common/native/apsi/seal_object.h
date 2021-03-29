@@ -185,7 +185,7 @@ namespace apsi {
                 return seal::util::safe_cast<std::size_t>(
                     serializable_->save(out, size, compr_mode));
             }
-            throw std::invalid_argument("object is in an invalid state");
+            return 0;
         }
 
         std::size_t save_size(seal::compr_mode_type compr_mode) const
@@ -195,7 +195,7 @@ namespace apsi {
             } else if (!is_local() && is_serializable()) {
                 return seal::util::safe_cast<std::size_t>(serializable_->save_size(compr_mode));
             }
-            throw std::invalid_argument("object is in an invalid state");
+            return 0;
         }
 
         std::size_t load(

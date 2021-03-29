@@ -1107,7 +1107,7 @@ namespace apsi {
 
             total_size += bin_bundle_data_size;
             APSI_LOG_DEBUG(
-                "Saved SenderDB with " << get_hashed_items().size() << " items (" << total_size
+                "Saved SenderDB with " << get_item_count() << " items (" << total_size
                                        << " bytes)");
 
             APSI_LOG_DEBUG("Finished saving SenderDB");
@@ -1257,8 +1257,8 @@ namespace apsi {
 
             size_t total_size = in_data.size() + bin_bundle_data_size;
             APSI_LOG_DEBUG(
-                "Loaded SenderDB with " << sender_db->get_hashed_items().size() << " items ("
-                                        << total_size << " bytes)");
+                "Loaded SenderDB with " << sender_db->get_item_count() << " items (" << total_size
+                                        << " bytes)");
 
             // Make sure the BinBundle caches are valid
             sender_db->generate_caches();

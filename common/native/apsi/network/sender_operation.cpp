@@ -272,23 +272,29 @@ namespace apsi {
 
             const auto &req = *sop->request_as_QueryRequest();
 
-            // Load relin_keys
-            const auto &relin_keys_data = *req.relin_keys();
-            try {
-                relin_keys.load(
-                    context,
-                    reinterpret_cast<const seal_byte *>(relin_keys_data.data()),
-                    relin_keys_data.size());
-            } catch (const logic_error &ex) {
-                stringstream ss;
-                ss << "failed to load relinearization keys: ";
-                ss << ex.what();
-                throw runtime_error(ss.str());
-            } catch (const runtime_error &ex) {
-                stringstream ss;
-                ss << "failed to load relinearization keys: ";
-                ss << ex.what();
-                throw runtime_error(ss.str());
+            // Load relin_keys if they are needed in this case
+            if (context->using_keyswitching()) {
+                if (!req.relin_keys()) {
+                    throw runtime_error("realinearization keys data is missing");
+                }
+
+                const auto &relin_keys_data = *req.relin_keys();
+                try {
+                    relin_keys.load(
+                        context,
+                        reinterpret_cast<const seal_byte *>(relin_keys_data.data()),
+                        relin_keys_data.size());
+                } catch (const logic_error &ex) {
+                    stringstream ss;
+                    ss << "failed to load relinearization keys: ";
+                    ss << ex.what();
+                    throw runtime_error(ss.str());
+                } catch (const runtime_error &ex) {
+                    stringstream ss;
+                    ss << "failed to load relinearization keys: ";
+                    ss << ex.what();
+                    throw runtime_error(ss.str());
+                }
             }
 
             // Load the query data
