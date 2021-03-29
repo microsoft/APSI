@@ -66,9 +66,6 @@ namespace APSITests {
         KeyGenerator keygen(*context->seal_context());
         context->set_secret(keygen.secret_key());
 
-        // Save with no data; this will fail due to invalid PSI result
-        ASSERT_THROW(size_t out_size = rp.save(ss), logic_error);
-
         // Symmetric encryption
         Ciphertext ct;
         context->encryptor()->encrypt_zero_symmetric(ct);
