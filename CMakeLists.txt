@@ -368,6 +368,10 @@ if(APSI_BUILD_CLI)
         message(STATUS "Command line interface is built with C++17 regardless of APSI_USE_CXX17")
     endif()
     target_compile_features(common_cli PUBLIC cxx_std_17)
+    # Ensure PDB is generated even in Release mode
+    if(MSVC)
+        target_link_options(common_cli PUBLIC /DEBUG)
+    endif()
 
     add_executable(sender_cli)
     add_subdirectory(cli/sender)
