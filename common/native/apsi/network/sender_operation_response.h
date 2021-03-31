@@ -4,26 +4,23 @@
 #pragma once
 
 // STD
-#include <vector>
 #include <cstdint>
+#include <vector>
 
 // APSI
-#include "apsi/psi_params.h"
 #include "apsi/network/result_package.h"
 #include "apsi/network/sender_operation.h"
+#include "apsi/psi_params.h"
 
 // SEAL
 #include <seal/util/defines.h>
 
-namespace apsi
-{
-    namespace network
-    {
+namespace apsi {
+    namespace network {
         /**
         An abstract base class representing a response to a sender operation.
         */
-        class SenderOperationResponse
-        {
+        class SenderOperationResponse {
         public:
             SenderOperationResponse() = default;
 
@@ -51,8 +48,7 @@ namespace apsi
         /**
         A kind of SenderOperationResponse for representing a response to a parameter request.
         */
-        class SenderOperationResponseParms final : public SenderOperationResponse
-        {
+        class SenderOperationResponseParms final : public SenderOperationResponse {
         public:
             SenderOperationResponseParms() = default;
 
@@ -76,8 +72,7 @@ namespace apsi
         /**
         A kind of SenderOperationResponse for representing a response to an OPRF query.
         */
-        class SenderOperationResponseOPRF final : public SenderOperationResponse
-        {
+        class SenderOperationResponseOPRF final : public SenderOperationResponse {
         public:
             SenderOperationResponseOPRF() = default;
 
@@ -106,8 +101,7 @@ namespace apsi
         /**
         A kind of SenderOperationResponse for representing a response to a PSI or labeled PSI query.
         */
-        class SenderOperationResponseQuery final : public SenderOperationResponse
-        {
+        class SenderOperationResponseQuery final : public SenderOperationResponse {
         public:
             SenderOperationResponseQuery() = default;
 
@@ -123,7 +117,8 @@ namespace apsi
             }
 
             /**
-            Holds the number of ResultPackage objects the sender is expected to send back to the receiver.
+            Holds the number of ResultPackage objects the sender is expected to send back to the
+            receiver.
             */
             std::uint32_t package_count;
         }; // class SenderOperationResponseQuery

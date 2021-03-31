@@ -5,26 +5,24 @@
 
 // STD
 #include <iostream>
-#include <mutex>
 #include <memory>
+#include <mutex>
 
 // APSI
 #include "apsi/network/channel.h"
+#include "apsi/network/result_package.h"
 #include "apsi/network/sender_operation.h"
 #include "apsi/network/sender_operation_response.h"
-#include "apsi/network/result_package.h"
 
-namespace apsi
-{
-    namespace network
-    {
+namespace apsi {
+    namespace network {
         /**
-        StreamChannel is a communication channel between a sender and a receiver through a C++ stream. No data is
-        actually sent, but instead saved to a std::stringstream that can be accessed to get the data. This allows
-        downstream applications to use any custom networking solution.
+        StreamChannel is a communication channel between a sender and a receiver through a C++
+        stream. No data is actually sent, but instead saved to a std::stringstream that can be
+        accessed to get the data. This allows downstream applications to use any custom networking
+        solution.
         */
-        class StreamChannel : public Channel
-        {
+        class StreamChannel : public Channel {
         public:
             StreamChannel() = delete;
 
@@ -47,28 +45,31 @@ namespace apsi
             {}
 
             /**
-            Send a SenderOperation from a receiver to a sender. These operations represent either a parameter request,
-            an OPRF request, or a query request. The function throws an exception on failure.
+            Send a SenderOperation from a receiver to a sender. These operations represent either a
+            parameter request, an OPRF request, or a query request. The function throws an exception
+            on failure.
             */
             void send(std::unique_ptr<SenderOperation> sop) override;
 
             /**
-            Receive a SenderOperation from a receiver. Operations of type sop_query and sop_unknown require a valid
-            seal::SEALContext to be provided. For operations of type sop_parms and sop_oprf the context can be set as
-            nullptr. The function returns nullptr on failure.
+            Receive a SenderOperation from a receiver. Operations of type sop_query and sop_unknown
+            require a valid seal::SEALContext to be provided. For operations of type sop_parms and
+            sop_oprf the context can be set as nullptr. The function returns nullptr on failure.
             */
             std::unique_ptr<SenderOperation> receive_operation(
                 std::shared_ptr<seal::SEALContext> context,
                 SenderOperationType expected = SenderOperationType::sop_unknown) override;
 
             /**
-            Send a SenderOperationResponse from a sender to a receiver. These operations represent a response to either
-            a parameter request, an OPRF request, or a query request. The function throws and exception on failure.
+            Send a SenderOperationResponse from a sender to a receiver. These operations represent a
+            response to either a parameter request, an OPRF request, or a query request. The
+            function throws and exception on failure.
             */
             void send(std::unique_ptr<SenderOperationResponse> sop_response) override;
 
             /**
-            Receive a SenderOperationResponse from a sender. The function returns nullptr on failure.
+            Receive a SenderOperationResponse from a sender. The function returns nullptr on
+            failure.
             */
             std::unique_ptr<SenderOperationResponse> receive_response(
                 SenderOperationType expected = SenderOperationType::sop_unknown) override;
@@ -79,10 +80,11 @@ namespace apsi
             void send(std::unique_ptr<ResultPackage> rp) override;
 
             /**
-            Receive a ResultPackage from a sender. A valid seal::SEALContext must be provided. The function returns
-            nullptr on failure.
+            Receive a ResultPackage from a sender. A valid seal::SEALContext must be provided. The
+            function returns nullptr on failure.
             */
-            std::unique_ptr<ResultPackage> receive_result(std::shared_ptr<seal::SEALContext> context) override;
+            std::unique_ptr<ResultPackage> receive_result(
+                std::shared_ptr<seal::SEALContext> context) override;
 
         protected:
             std::istream &in_;

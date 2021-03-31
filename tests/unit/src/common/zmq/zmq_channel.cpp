@@ -15,6 +15,7 @@
 #include "apsi/powers.h"
 #include "apsi/util/utils.h"
 
+// Google Test
 #include "gtest/gtest.h"
 
 using namespace std;
@@ -22,18 +23,15 @@ using namespace seal;
 using namespace apsi;
 using namespace apsi::network;
 
-namespace APSITests
-{
-    namespace
-    {
+namespace APSITests {
+    namespace {
         ZMQSenderChannel server_;
         ZMQReceiverChannel client_;
 
         shared_ptr<PSIParams> get_params()
         {
             static shared_ptr<PSIParams> params = nullptr;
-            if (!params)
-            {
+            if (!params) {
                 PSIParams::ItemParams item_params;
                 item_params.felts_per_item = 8;
 
@@ -51,8 +49,8 @@ namespace APSITests
                 seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(pmd));
                 seal_params.set_plain_modulus(65537);
 
-                params = make_shared<PSIParams>(
-                    item_params, table_params, query_params, seal_params);
+                params =
+                    make_shared<PSIParams>(item_params, table_params, query_params, seal_params);
             }
 
             return params;
@@ -61,8 +59,7 @@ namespace APSITests
         shared_ptr<CryptoContext> get_context()
         {
             static shared_ptr<CryptoContext> context = nullptr;
-            if (!context)
-            {
+            if (!context) {
                 context = make_shared<CryptoContext>(*get_params());
                 KeyGenerator keygen(*context->seal_context());
                 context->set_secret(keygen.secret_key());
@@ -75,18 +72,15 @@ namespace APSITests
         }
     } // namespace
 
-    class ZMQChannelTests : public ::testing::Test
-    {
+    class ZMQChannelTests : public ::testing::Test {
     protected:
         ZMQChannelTests()
         {
-            if (!server_.is_connected())
-            {
+            if (!server_.is_connected()) {
                 server_.bind("tcp://*:5555");
             }
 
-            if (!client_.is_connected())
-            {
+            if (!client_.is_connected()) {
                 client_.connect("tcp://localhost:5555");
             }
 
@@ -143,8 +137,7 @@ namespace APSITests
 
             // Fill a data buffer
             vector<seal_byte> oprf_data(256);
-            for (size_t i = 0; i < oprf_data.size(); i++)
-            {
+            for (size_t i = 0; i < oprf_data.size(); i++) {
                 oprf_data[i] = static_cast<seal_byte>(i);
             }
 
@@ -171,7 +164,7 @@ namespace APSITests
             // Receive correctly the parms response
             auto rsop = clt.receive_response(SenderOperationType::sop_parms);
             unique_ptr<SenderOperationResponseParms> rsop_parms;
-            rsop_parms.reset(dynamic_cast<SenderOperationResponseParms*>(rsop.release()));
+            rsop_parms.reset(dynamic_cast<SenderOperationResponseParms *>(rsop.release()));
 
             // We received valid parameters
             ASSERT_EQ(get_params()->item_bit_count(), rsop_parms->params->item_bit_count());
@@ -179,18 +172,17 @@ namespace APSITests
             // Receive an OPRF response
             rsop = clt.receive_response(SenderOperationType::sop_oprf);
             unique_ptr<SenderOperationResponseOPRF> rsop_oprf;
-            rsop_oprf.reset(dynamic_cast<SenderOperationResponseOPRF*>(rsop.release()));
+            rsop_oprf.reset(dynamic_cast<SenderOperationResponseOPRF *>(rsop.release()));
 
             ASSERT_EQ(256, rsop_oprf->data.size());
-            for (size_t i = 0; i < rsop_oprf->data.size(); i++)
-            {
+            for (size_t i = 0; i < rsop_oprf->data.size(); i++) {
                 ASSERT_EQ(static_cast<char>(rsop_oprf->data[i]), static_cast<char>(i));
             }
 
             // Receive a query response
             rsop = clt.receive_response(SenderOperationType::sop_query);
             unique_ptr<SenderOperationResponseQuery> rsop_query;
-            rsop_query.reset(dynamic_cast<SenderOperationResponseQuery*>(rsop.release()));
+            rsop_query.reset(dynamic_cast<SenderOperationResponseQuery *>(rsop.release()));
 
             ASSERT_EQ(2, rsop_query->package_count);
 
@@ -211,8 +203,8 @@ namespace APSITests
         // Receive a parms operation
         auto sop_parms = make_unique<SenderOperationParms>();
 
-        // It's important to receive this as a SenderNetworkOperation, otherwise we can't get the client_id for ZeroMQ
-        // internal routing.
+        // It's important to receive this as a SenderNetworkOperation, otherwise we can't get the
+        // client_id for ZeroMQ internal routing.
         auto nsop = svr.receive_network_operation(get_context()->seal_context(), true);
         ASSERT_EQ(SenderOperationType::sop_parms, nsop->sop->type());
         ASSERT_FALSE(nsop->client_id.empty());
@@ -223,11 +215,10 @@ namespace APSITests
         ASSERT_EQ(SenderOperationType::sop_oprf, nsop->sop->type());
         ASSERT_EQ(client_id, nsop->client_id);
         unique_ptr<SenderOperationOPRF> sop_oprf;
-        sop_oprf.reset(dynamic_cast<SenderOperationOPRF*>(nsop->sop.release()));
+        sop_oprf.reset(dynamic_cast<SenderOperationOPRF *>(nsop->sop.release()));
 
         ASSERT_EQ(256, sop_oprf->data.size());
-        for (size_t i = 0; i < sop_oprf->data.size(); i++)
-        {
+        for (size_t i = 0; i < sop_oprf->data.size(); i++) {
             ASSERT_EQ(static_cast<char>(sop_oprf->data[i]), static_cast<char>(i));
         }
 
@@ -236,7 +227,7 @@ namespace APSITests
         ASSERT_EQ(SenderOperationType::sop_query, nsop->sop->type());
         ASSERT_EQ(client_id, nsop->client_id);
         unique_ptr<SenderOperationQuery> sop_query;
-        sop_query.reset(dynamic_cast<SenderOperationQuery*>(nsop->sop.release()));
+        sop_query.reset(dynamic_cast<SenderOperationQuery *>(nsop->sop.release()));
 
         // Are we able to extract the relinearization keys?
         ASSERT_NO_THROW(auto rlk = sop_query->relin_keys.extract_if_local());
@@ -256,13 +247,15 @@ namespace APSITests
         auto rsop_parms = make_unique<SenderOperationResponseParms>();
         rsop_parms->params = make_unique<PSIParams>(*get_params());
 
-        // Actually we need a ZMQSenderOperationResponse for ZeroMQ; we'll need to use the correct client_id here.
+        // Actually we need a ZMQSenderOperationResponse for ZeroMQ; we'll need to use the correct
+        // client_id here.
         auto nrsop = make_unique<ZMQSenderOperationResponse>();
         nrsop->client_id = client_id;
         nrsop->sop_response = move(rsop_parms);
 
-        // Try sending the parameters; the receiver is incorrectly expecting an OPRF response so it will fail to receive
-        // this package. We'll have to send it twice so that on the second time it gets the response correctly.
+        // Try sending the parameters; the receiver is incorrectly expecting an OPRF response so it
+        // will fail to receive this package. We'll have to send it twice so that on the second time
+        // it gets the response correctly.
         svr.send(move(nrsop));
 
         // Send again so receiver actually gets it
@@ -316,25 +309,23 @@ namespace APSITests
 
     TEST_F(ZMQChannelTests, MultipleClients)
     {
-        atomic<bool> finished = false;
+        atomic<bool> finished{ false };
 
         thread serverth([this, &finished] {
             ZMQSenderChannel sender;
 
             sender.bind("tcp://*:5552");
 
-            while (!finished)
-            {
+            while (!finished) {
                 unique_ptr<ZMQSenderOperation> sop;
-                if (!(sop = sender.receive_network_operation(get_context()->seal_context())))
-                {
+                if (!(sop = sender.receive_network_operation(get_context()->seal_context()))) {
                     this_thread::sleep_for(50ms);
                     continue;
                 }
 
                 ASSERT_EQ(SenderOperationType::sop_oprf, sop->sop->type());
                 unique_ptr<SenderOperationOPRF> sop_oprf;
-                sop_oprf.reset(dynamic_cast<SenderOperationOPRF*>(sop->sop.release()));
+                sop_oprf.reset(dynamic_cast<SenderOperationOPRF *>(sop->sop.release()));
                 auto client_id = sop->client_id;
 
                 // Return the same data we received
@@ -350,19 +341,16 @@ namespace APSITests
         });
 
         vector<thread> clients(5);
-        for (size_t i = 0; i < clients.size(); i++)
-        {
+        for (size_t i = 0; i < clients.size(); i++) {
             clients[i] = thread(
                 [this](size_t idx) {
                     ZMQReceiverChannel recv;
 
                     recv.connect("tcp://localhost:5552");
 
-                    for (uint32_t i = 0; i < 5; i++)
-                    {
+                    for (uint32_t i = 0; i < 5; i++) {
                         vector<seal_byte> oprf_data(256);
-                        for (size_t i = 0; i < oprf_data.size(); i++)
-                        {
+                        for (size_t i = 0; i < oprf_data.size(); i++) {
                             oprf_data[i] = static_cast<seal_byte>(i);
                         }
 
@@ -374,12 +362,12 @@ namespace APSITests
                         auto sopr = recv.receive_response();
                         ASSERT_NE(nullptr, sopr);
                         unique_ptr<SenderOperationResponseOPRF> rsop_oprf;
-                        rsop_oprf.reset(dynamic_cast<SenderOperationResponseOPRF*>(sopr.release()));
+                        rsop_oprf.reset(
+                            dynamic_cast<SenderOperationResponseOPRF *>(sopr.release()));
 
                         // Check that we receive what we sent
                         ASSERT_EQ(256, rsop_oprf->data.size());
-                        for (size_t i = 0; i < rsop_oprf->data.size(); i++)
-                        {
+                        for (size_t i = 0; i < rsop_oprf->data.size(); i++) {
                             ASSERT_EQ(static_cast<char>(rsop_oprf->data[i]), static_cast<char>(i));
                         }
                     }
@@ -387,8 +375,7 @@ namespace APSITests
                 i);
         }
 
-        for (size_t i = 0; i < clients.size(); i++)
-        {
+        for (size_t i = 0; i < clients.size(); i++) {
             clients[i].join();
         }
 

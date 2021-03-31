@@ -2,8 +2,8 @@
 // Licensed under the MIT license.
 
 // STD
-#include <cstdint>
 #include <array>
+#include <cstdint>
 #include <numeric>
 
 // APSI
@@ -12,19 +12,18 @@
 // SEAL
 #include "seal/util/defines.h"
 
+// Google Test
 #include "gtest/gtest.h"
 
 using namespace std;
 using namespace apsi;
 using namespace seal;
 
-namespace APSITests
-{
+namespace APSITests {
     TEST(BitstringViewTests, Basics)
     {
         array<unsigned char, 8> data = {};
-        for (size_t i = 0; i < data.size(); i++)
-        {
+        for (size_t i = 0; i < data.size(); i++) {
             data[i] = static_cast<unsigned char>(i);
         }
 
@@ -61,8 +60,7 @@ namespace APSITests
     {
         auto get_data = []() {
             vector<unsigned char> data(8, 0);
-            for (size_t i = 0; i < data.size(); i++)
-            {
+            for (size_t i = 0; i < data.size(); i++) {
                 data[i] = static_cast<unsigned char>(i);
             }
             return data;
@@ -94,7 +92,7 @@ namespace APSITests
         // Corner-cases
         ASSERT_THROW(Bitstring bs(get_data(), 0), invalid_argument);
         ASSERT_THROW(Bitstring bs(get_data(), 65), invalid_argument);
-        //ASSERT_THROW(Bitstring bs(get_data(), 56), invalid_argument);
+        // ASSERT_THROW(Bitstring bs(get_data(), 56), invalid_argument);
 
         bs = Bitstring(get_data(), 56);
         ASSERT_EQ(bs.bit_count(), 56);

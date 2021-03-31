@@ -9,27 +9,22 @@
 #include <set>
 
 // APSI
-#include "pd_tool/clp.h"
 #include "apsi/powers.h"
 #include "apsi/version.h"
+#include "pd_tool/clp.h"
 
 using namespace std;
 using namespace apsi;
 
 void write_dot(const PowersDag &pd, string dot_file)
 {
-    try
-    {
+    try {
         ofstream fs(dot_file);
         fs.exceptions(ios_base::badbit | ios_base::failbit);
         fs << pd.to_dot();
-    }
-    catch (const ios_base::failure &ex)
-    {
+    } catch (const ios_base::failure &ex) {
         cout << "Failed to write to file: " << ex.what() << endl;
-    }
-    catch (...)
-    {
+    } catch (...) {
         cout << "Unknown error writing to file" << endl;
         throw;
     }
@@ -47,16 +42,12 @@ int main(int argc, char **argv)
     PowersDag pd;
     set<uint32_t> sources_set(clp.sources().begin(), clp.sources().end());
     pd.configure(sources_set, clp.bound());
-    if (pd.is_configured())
-    {
+    if (pd.is_configured()) {
         cout << "Found configuration with depth " << pd.depth() << endl;
-    }
-    else
-    {
+    } else {
         cout << "Failed to configure PowersDag" << endl;
     }
-    if (pd.is_configured() && !clp.dot_file().empty())
-    {
+    if (pd.is_configured() && !clp.dot_file().empty()) {
         write_dot(pd, clp.dot_file());
     }
 

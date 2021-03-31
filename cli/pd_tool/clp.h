@@ -16,14 +16,13 @@
 /**
 Command Line Processor for pd_tool.
 */
-class CLP : public TCLAP::CmdLine
-{
+class CLP : public TCLAP::CmdLine {
 public:
     CLP(const std::string &description, const std::string &version)
         : TCLAP::CmdLine(description, /* delim */ ' ', version)
     {}
 
-    bool parse_args(int argc, char** argv)
+    bool parse_args(int argc, char **argv)
     {
         TCLAP::ValueArg<std::uint32_t> bound_arg(
             "b",
@@ -31,8 +30,7 @@ public:
             "Up to what power we want to compute (max_items_per_bin)",
             /* req */ true,
             /* value */ 1,
-            /* type desc */ "unsigned integer"
-        );
+            /* type desc */ "unsigned integer");
         add(bound_arg);
 
         TCLAP::ValueArg<std::string> dot_file_arg(
@@ -41,31 +39,25 @@ public:
             "Write the PowersDag in DOT format to given file",
             /* req */ false,
             /* value */ "",
-            /* type desc */ "string"
-        );
+            /* type desc */ "string");
         add(dot_file_arg);
 
         TCLAP::UnlabeledMultiArg<std::uint32_t> sources_arg(
             "sources",
             "The source powers",
             /* req */ true,
-            "list of unsigned integers"
-        );
+            "list of unsigned integers");
         add(sources_arg);
 
-        try
-        {
+        try {
             parse(argc, argv);
 
             bound_ = bound_arg.getValue();
-            if (dot_file_arg.isSet())
-            {
+            if (dot_file_arg.isSet()) {
                 dot_file_ = dot_file_arg.getValue();
             }
             sources_ = sources_arg.getValue();
-        }
-        catch (...)
-        {
+        } catch (...) {
             std::cout << "Error parsing parameters.";
             return false;
         }

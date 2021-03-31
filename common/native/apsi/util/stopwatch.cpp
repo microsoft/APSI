@@ -6,10 +6,8 @@
 
 using namespace std;
 
-namespace apsi
-{
-    namespace util
-    {
+namespace apsi {
+    namespace util {
         const Stopwatch::time_unit Stopwatch::start_time(Stopwatch::time_unit::clock::now());
 
         void Stopwatch::add_event(const string &name)
@@ -18,20 +16,20 @@ namespace apsi
             lock_guard<mutex> events_lock(events_mtx_);
             events_.push_back(tp);
 
-            if (static_cast<int>(name.length()) > max_event_name_length_)
-            {
+            if (static_cast<int>(name.length()) > max_event_name_length_) {
                 max_event_name_length_ = static_cast<int>(name.length());
             }
         }
 
-        void Stopwatch::add_timespan_event(const string &name, const time_unit &start, const time_unit &end)
+        void Stopwatch::add_timespan_event(
+            const string &name, const time_unit &start, const time_unit &end)
         {
-            uint64_t duration = static_cast<uint64_t>(chrono::duration_cast<chrono::milliseconds>(end - start).count());
+            uint64_t duration = static_cast<uint64_t>(
+                chrono::duration_cast<chrono::milliseconds>(end - start).count());
             lock_guard<mutex> timespan_events_lock(timespan_events_mtx_);
             auto timespan_evt = timespan_events_.find(name);
 
-            if (timespan_evt == timespan_events_.end())
-            {
+            if (timespan_evt == timespan_events_.end()) {
                 // Insert new
                 TimespanSummary summ = { /* name */ name,
                                          /* count */ 1,
@@ -41,26 +39,21 @@ namespace apsi
 
                 timespan_events_[name] = summ;
 
-                if (static_cast<int>(name.length()) > max_timespan_event_name_length_)
-                {
+                if (static_cast<int>(name.length()) > max_timespan_event_name_length_) {
                     max_timespan_event_name_length_ = static_cast<int>(name.length());
                 }
-            }
-            else
-            {
+            } else {
                 // Update existing
                 timespan_evt->second.event_count++;
                 timespan_evt->second.avg =
                     (timespan_evt->second.avg * (timespan_evt->second.event_count - 1) + duration) /
                     timespan_evt->second.event_count;
 
-                if (timespan_evt->second.min > duration)
-                {
+                if (timespan_evt->second.min > duration) {
                     timespan_evt->second.min = duration;
                 }
 
-                if (timespan_evt->second.max < duration)
-                {
+                if (timespan_evt->second.max < duration) {
                     timespan_evt->second.max = duration;
                 }
             }
@@ -71,8 +64,7 @@ namespace apsi
             lock_guard<mutex> timespan_events_lock(timespan_events_mtx_);
 
             timespans.clear();
-            for (const auto &timespan_evt : timespan_events_)
-            {
+            for (const auto &timespan_evt : timespan_events_) {
                 timespans.push_back(timespan_evt.second);
             }
         }
@@ -82,14 +74,14 @@ namespace apsi
             lock_guard<mutex> events_lock(events_mtx_);
 
             events.clear();
-            for (const auto &evt : events_)
-            {
+            for (const auto &evt : events_) {
                 events.push_back(evt);
             }
         }
 
         StopwatchScope::StopwatchScope(Stopwatch &stopwatch, const string &event_name)
-            : stopwatch_(stopwatch), event_name_(event_name), start_(Stopwatch::time_unit::clock::now())
+            : stopwatch_(stopwatch), event_name_(event_name),
+              start_(Stopwatch::time_unit::clock::now())
         {}
 
         StopwatchScope::~StopwatchScope()

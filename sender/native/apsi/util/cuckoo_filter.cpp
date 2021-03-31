@@ -2,9 +2,9 @@
 // Licensed under the MIT license.
 
 // APSI
-#include "cuckoo_filter.h"
-#include "apsi/util/utils.h"
 #include "apsi/util/hash.h"
+#include "apsi/util/utils.h"
+#include "cuckoo_filter.h"
 
 using namespace std;
 using namespace apsi::util;
@@ -16,8 +16,7 @@ namespace {
     The seed is completely arbitrary, doesn't need to be random.
     */
     HashFunc hasher_(/* seed */ 20);
-}
-
+} // namespace
 
 CuckooFilter::CuckooFilter(size_t key_count_max, size_t bits_per_tag)
     : key_count_max_(key_count_max), overflow_(), num_items_(0)
@@ -88,7 +87,6 @@ bool CuckooFilter::add_index_tag(std::size_t idx, std::uint32_t tag)
     return true;
 }
 
-
 bool CuckooFilter::remove(const felt_t &item)
 {
     size_t idx1, idx2;
@@ -109,7 +107,8 @@ bool CuckooFilter::remove(const felt_t &item)
         return true;
     }
 
-    if (overflow_.used && (overflow_.index == idx1 || overflow_.index == idx2) && overflow_.tag == tag) {
+    if (overflow_.used && (overflow_.index == idx1 || overflow_.index == idx2) &&
+        overflow_.tag == tag) {
         overflow_.used = false;
         num_items_--;
         return true;
@@ -132,7 +131,7 @@ size_t CuckooFilter::idx_bucket_limit(size_t value) const
     return value & mask;
 }
 
-void CuckooFilter::get_tag_and_index(const felt_t& item, uint32_t& tag, size_t& idx) const
+void CuckooFilter::get_tag_and_index(const felt_t &item, uint32_t &tag, size_t &idx) const
 {
     uint64_t hash = static_cast<uint64_t>(hasher_(item));
     idx = idx_bucket_limit(hash >> 32);

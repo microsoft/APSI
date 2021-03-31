@@ -2,22 +2,22 @@
 // Licensed under the MIT license.
 
 // STD
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 #include <numeric>
-#include <sstream>
 #include <set>
+#include <sstream>
 
 // APSI
 #include "apsi/powers.h"
 
+// Google Test
 #include "gtest/gtest.h"
 
 using namespace std;
 using namespace apsi;
 
-namespace APSITests
-{
+namespace APSITests {
     TEST(PowersTests, PowersDagConfigure)
     {
         PowersDag pd;
@@ -151,7 +151,7 @@ namespace APSITests
         ASSERT_FALSE(pd.is_configured());
 
         // Good configuration; required depth is 3
-        source_powers = {1, 8, 13, 58, 169, 295, 831, 1036};
+        source_powers = { 1, 8, 13, 58, 169, 295, 831, 1036 };
         ASSERT_TRUE(pd.configure(source_powers, 3485));
         ASSERT_TRUE(pd.is_configured());
 
@@ -161,7 +161,7 @@ namespace APSITests
         ASSERT_EQ(3485, pd.up_to_power());
 
         // Good configuration; required depth is 4
-        source_powers = {1, 8, 13, 58, 169, 295, 831, 1036};
+        source_powers = { 1, 8, 13, 58, 169, 295, 831, 1036 };
         ASSERT_TRUE(pd.configure(source_powers, 3486));
         ASSERT_TRUE(pd.is_configured());
 
@@ -174,7 +174,7 @@ namespace APSITests
     TEST(PowersTest, Apply)
     {
         PowersDag pd;
-        set<uint32_t> source_powers = {1, 8, 13, 58, 169, 295, 831, 1036};
+        set<uint32_t> source_powers = { 1, 8, 13, 58, 169, 295, 831, 1036 };
         ASSERT_TRUE(pd.configure(source_powers, 3485));
         ASSERT_TRUE(pd.is_configured());
 
@@ -190,4 +190,4 @@ namespace APSITests
         ASSERT_EQ(expected.size(), real.size());
         ASSERT_TRUE(equal(expected.begin(), expected.end(), real.begin()));
     }
-}
+} // namespace APSITests

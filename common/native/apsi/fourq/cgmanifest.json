@@ -1,0 +1,13 @@
+{
+    "Registrations": [
+        {
+            "component": {
+                "type": "git",
+                "git": {
+                    "repositoryUrl": "https://github.com/microsoft/FourQlib",
+                    "commitHash": "ff61f680505c98c98e33387962223ce0b5e620bc"
+                }
+            }
+        }
+    ]
+}

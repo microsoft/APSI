@@ -21,18 +21,16 @@
 #define UNIQUE_STOPWATCH_NAME(base) PP_CAT(base, __LINE__)
 
 // Measure a block
-#define STOPWATCH(stopwatch, name) apsi::util::StopwatchScope UNIQUE_STOPWATCH_NAME(stopwatchscope)(stopwatch, name);
+#define STOPWATCH(stopwatch, name) \
+    apsi::util::StopwatchScope UNIQUE_STOPWATCH_NAME(stopwatchscope)(stopwatch, name);
 
-namespace apsi
-{
-    namespace util
-    {
+namespace apsi {
+    namespace util {
         /**
         Class used to time events
         */
-        class Stopwatch
-        {
-        friend class StopwatchScope;
+        class Stopwatch {
+            friend class StopwatchScope;
 
         public:
             using time_unit = std::chrono::high_resolution_clock::time_point;
@@ -40,8 +38,7 @@ namespace apsi
             /**
             Structure used to accumulate data about timespan timing events
             */
-            struct TimespanSummary
-            {
+            struct TimespanSummary {
                 std::string event_name;
                 int event_count;
                 double avg;
@@ -52,8 +49,7 @@ namespace apsi
             /**
             Structure used to report single events
             */
-            struct Timepoint
-            {
+            struct Timepoint {
                 std::string event_name;
                 time_unit time_point;
             };
@@ -110,14 +106,15 @@ namespace apsi
             /**
             Add a time event with beginning and end
             */
-            void add_timespan_event(const std::string &name, const time_unit &start, const time_unit &end);
+            void add_timespan_event(
+                const std::string &name, const time_unit &start, const time_unit &end);
         }; // class Stopwatch
 
         /**
-        Class used to time a scope. Simply declare a variable of this type in the scope that you want to measure.
+        Class used to time a scope. Simply declare a variable of this type in the scope that you
+        want to measure.
         */
-        class StopwatchScope
-        {
+        class StopwatchScope {
         public:
             StopwatchScope(Stopwatch &stopwatch, const std::string &event_name);
             ~StopwatchScope();
@@ -132,5 +129,5 @@ namespace apsi
         Global Stopwatch objects for sender and receiver to use.
         */
         extern Stopwatch sender_stopwatch, recv_stopwatch;
-    }      // namespace util
+    } // namespace util
 } // namespace apsi

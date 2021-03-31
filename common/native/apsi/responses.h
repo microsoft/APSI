@@ -11,8 +11,7 @@
 #include "apsi/network/sender_operation_response.h"
 #include "apsi/util/utils.h"
 
-namespace apsi
-{
+namespace apsi {
     /**
     A type representing a response to any response.
     */
@@ -35,66 +34,90 @@ namespace apsi
 
     inline ParamsResponse to_params_response(Response &response)
     {
-        return util::unique_ptr_cast<network::SenderOperationResponseParms, network::SenderOperationResponse>(response);
+        return util::unique_ptr_cast<
+            network::SenderOperationResponseParms,
+            network::SenderOperationResponse>(response);
     }
 
     inline ParamsResponse to_params_response(Response &&response)
     {
-        return util::unique_ptr_cast<network::SenderOperationResponseParms, network::SenderOperationResponse>(std::move(response));
+        return util::unique_ptr_cast<
+            network::SenderOperationResponseParms,
+            network::SenderOperationResponse>(std::move(response));
     }
 
     inline OPRFResponse to_oprf_response(Response &response)
     {
-        return util::unique_ptr_cast<network::SenderOperationResponseOPRF, network::SenderOperationResponse>(response);
+        return util::
+            unique_ptr_cast<network::SenderOperationResponseOPRF, network::SenderOperationResponse>(
+                response);
     }
 
     inline OPRFResponse to_oprf_response(Response &&response)
     {
-        return util::unique_ptr_cast<network::SenderOperationResponseOPRF, network::SenderOperationResponse>(std::move(response));
+        return util::
+            unique_ptr_cast<network::SenderOperationResponseOPRF, network::SenderOperationResponse>(
+                std::move(response));
     }
 
     inline QueryResponse to_query_response(Response &response)
     {
-        return util::unique_ptr_cast<network::SenderOperationResponseQuery, network::SenderOperationResponse>(response);
+        return util::unique_ptr_cast<
+            network::SenderOperationResponseQuery,
+            network::SenderOperationResponse>(response);
     }
 
     inline QueryResponse to_query_response(Response &&response)
     {
-        return util::unique_ptr_cast<network::SenderOperationResponseQuery, network::SenderOperationResponse>(std::move(response));
+        return util::unique_ptr_cast<
+            network::SenderOperationResponseQuery,
+            network::SenderOperationResponse>(std::move(response));
     }
 
     inline Response to_response(ParamsResponse &params_response)
     {
-        return util::unique_ptr_cast<network::SenderOperationResponse, network::SenderOperationResponseParms>(params_response);
+        return util::unique_ptr_cast<
+            network::SenderOperationResponse,
+            network::SenderOperationResponseParms>(params_response);
     }
 
     inline Response to_response(ParamsResponse &&params_response)
     {
-        return util::unique_ptr_cast<network::SenderOperationResponse, network::SenderOperationResponseParms>(std::move(params_response));
+        return util::unique_ptr_cast<
+            network::SenderOperationResponse,
+            network::SenderOperationResponseParms>(std::move(params_response));
     }
 
     inline Response to_response(OPRFResponse &oprf_response)
     {
-        return util::unique_ptr_cast<network::SenderOperationResponse, network::SenderOperationResponseOPRF>(oprf_response);
+        return util::
+            unique_ptr_cast<network::SenderOperationResponse, network::SenderOperationResponseOPRF>(
+                oprf_response);
     }
 
     inline Response to_response(OPRFResponse &&oprf_response)
     {
-        return util::unique_ptr_cast<network::SenderOperationResponse, network::SenderOperationResponseOPRF>(std::move(oprf_response));
+        return util::
+            unique_ptr_cast<network::SenderOperationResponse, network::SenderOperationResponseOPRF>(
+                std::move(oprf_response));
     }
 
     inline Response to_response(QueryResponse &query_response)
     {
-        return util::unique_ptr_cast<network::SenderOperationResponse, network::SenderOperationResponseQuery>(query_response);
+        return util::unique_ptr_cast<
+            network::SenderOperationResponse,
+            network::SenderOperationResponseQuery>(query_response);
     }
 
     inline Response to_response(QueryResponse &&query_response)
     {
-        return util::unique_ptr_cast<network::SenderOperationResponse, network::SenderOperationResponseQuery>(std::move(query_response));
+        return util::unique_ptr_cast<
+            network::SenderOperationResponse,
+            network::SenderOperationResponseQuery>(std::move(query_response));
     }
 
     /**
     A type representing a partial query result.
     */
     using ResultPart = std::unique_ptr<network::ResultPackage>;
-}
+} // namespace apsi

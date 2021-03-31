@@ -7,15 +7,14 @@
 #include <cstddef>
 #include <vector>
 
-
 namespace apsi {
     namespace sender {
         namespace util {
 
             /**
             Implementation of a Cuckoo Filter table.
-            Logically the table is divided in buckets. Each bucket is capable of storing up to tags_per_bucket_ tags.
-            Each tags uses bits_per_tag_ bits of storage.
+            Logically the table is divided in buckets. Each bucket is capable of storing up to
+            tags_per_bucket_ tags. Each tags uses bits_per_tag_ bits of storage.
             */
             class CuckooFilterTable {
             public:
@@ -100,5 +99,5 @@ namespace apsi {
             };
 
         } // namespace util
-    } // namespace sender
+    }     // namespace sender
 } // namespace apsi

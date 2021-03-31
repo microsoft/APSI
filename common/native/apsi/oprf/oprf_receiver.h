@@ -4,8 +4,8 @@
 #pragma once
 
 // STD
-#include <stdexcept>
 #include <cstddef>
+#include <stdexcept>
 #include <unordered_set>
 #include <vector>
 
@@ -13,19 +13,16 @@
 #include "apsi/oprf/oprf_common.h"
 
 // SEAL
-#include "seal/util/defines.h"
 #include "seal/dynarray.h"
 #include "seal/memorymanager.h"
+#include "seal/util/defines.h"
 
 // GSL
 #include "gsl/span"
 
-namespace apsi
-{
-    namespace oprf
-    {
-        class OPRFReceiver
-        {
+namespace apsi {
+    namespace oprf {
+        class OPRFReceiver {
         public:
             OPRFReceiver(const OPRFReceiver &) = delete;
 
@@ -35,7 +32,8 @@ namespace apsi
 
             OPRFReceiver &operator=(OPRFReceiver &&) = default;
 
-            OPRFReceiver(gsl::span<const Item> oprf_items) : oprf_queries_(pool_), inv_factor_data_(pool_)
+            OPRFReceiver(gsl::span<const Item> oprf_items)
+                : oprf_queries_(pool_), inv_factor_data_(pool_)
             {
                 process_items(oprf_items);
             }
@@ -48,8 +46,7 @@ namespace apsi
             void process_responses(
                 gsl::span<const seal::seal_byte> oprf_responses,
                 gsl::span<HashedItem> oprf_hashes,
-                gsl::span<LabelKey> label_keys
-                ) const;
+                gsl::span<LabelKey> label_keys) const;
 
             void clear();
 
@@ -58,16 +55,15 @@ namespace apsi
         private:
             void set_item_count(std::size_t item_count);
 
-            void process_items(
-                gsl::span<const Item> oprf_items);
+            void process_items(gsl::span<const Item> oprf_items);
 
             // For decrypting OPRF response
-            class FactorData
-            {
+            class FactorData {
             public:
                 static constexpr std::size_t factor_size = ECPoint::order_size;
 
-                FactorData(seal::MemoryPoolHandle pool, std::size_t item_count = 0) : factor_data_(std::move(pool))
+                FactorData(seal::MemoryPoolHandle pool, std::size_t item_count = 0)
+                    : factor_data_(std::move(pool))
                 {
                     resize(item_count);
                 }
@@ -89,22 +85,22 @@ namespace apsi
 
                 auto get_factor(std::size_t index) -> ECPoint::scalar_span_type
                 {
-                    if (index >= item_count_)
-                    {
+                    if (index >= item_count_) {
                         throw std::invalid_argument("index out of bounds");
                     }
                     return ECPoint::scalar_span_type(
-                        factor_data_.span().subspan(index * factor_size, factor_size).data(), factor_size);
+                        factor_data_.span().subspan(index * factor_size, factor_size).data(),
+                        factor_size);
                 }
 
                 auto get_factor(std::size_t index) const -> ECPoint::scalar_span_const_type
                 {
-                    if (index >= item_count_)
-                    {
+                    if (index >= item_count_) {
                         throw std::invalid_argument("index out of bounds");
                     }
                     return ECPoint::scalar_span_const_type(
-                        factor_data_.span().subspan(index * factor_size, factor_size).data(), factor_size);
+                        factor_data_.span().subspan(index * factor_size, factor_size).data(),
+                        factor_size);
                 }
 
             private:
@@ -119,7 +115,8 @@ namespace apsi
                 std::size_t item_count_ = 0;
             };
 
-            seal::MemoryPoolHandle pool_ = seal::MemoryManager::GetPool(seal::mm_prof_opt::mm_force_new, true);
+            seal::MemoryPoolHandle pool_ =
+                seal::MemoryManager::GetPool(seal::mm_prof_opt::mm_force_new, true);
 
             seal::DynArray<seal::seal_byte> oprf_queries_;
 

@@ -8,14 +8,14 @@
 // APSI
 #include "apsi/psi_params.h"
 
+// Google Test
 #include "gtest/gtest.h"
 
 using namespace std;
 using namespace apsi;
 using namespace seal;
 
-namespace APSITests
-{
+namespace APSITests {
     TEST(PSIParamsTest, Constructor)
     {
         PSIParams::ItemParams item_params;
@@ -40,26 +40,36 @@ namespace APSITests
 
         // Too short item (4 * 16 == 64 < 80)
         item_params.felts_per_item = 4;
-        ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);
+        ASSERT_THROW(
+            PSIParams psi_params(item_params, table_params, query_params, seal_params),
+            invalid_argument);
 
         // Too long item (16 * 16 == 256 > 128)
         item_params.felts_per_item = 16;
-        ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);
+        ASSERT_THROW(
+            PSIParams psi_params(item_params, table_params, query_params, seal_params),
+            invalid_argument);
 
         // Too long item (16 * 16 == 256 > 128)
         item_params.felts_per_item = 16;
-        ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);
+        ASSERT_THROW(
+            PSIParams psi_params(item_params, table_params, query_params, seal_params),
+            invalid_argument);
 
         item_params.felts_per_item = 8;
 
         // Invalid table_size (must be a power of two) and divide poly_modulus_degree
         table_params.table_size = 0;
-        ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);
+        ASSERT_THROW(
+            PSIParams psi_params(item_params, table_params, query_params, seal_params),
+            invalid_argument);
 
-        // Invalid table_size; poly_modulus_degree == 4096 with felts_per_item implies 512 items per SEAL ciphertext,
-        // so this table will be too small to fill even one SEAL ciphertext.
+        // Invalid table_size; poly_modulus_degree == 4096 with felts_per_item implies 512 items per
+        // SEAL ciphertext, so this table will be too small to fill even one SEAL ciphertext.
         table_params.table_size = 256;
-        ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);
+        ASSERT_THROW(
+            PSIParams psi_params(item_params, table_params, query_params, seal_params),
+            invalid_argument);
 
         // Size 512 is in this case the smallest table_size possible
         table_params.table_size = 512;
@@ -67,20 +77,28 @@ namespace APSITests
 
         // table_size is less than felts_per_item
         table_params.table_size = 4;
-        ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);
+        ASSERT_THROW(
+            PSIParams psi_params(item_params, table_params, query_params, seal_params),
+            invalid_argument);
 
         // query_powers must contain 1
         table_params.table_size = 512;
         query_params.query_powers = { 2 };
-        ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);
+        ASSERT_THROW(
+            PSIParams psi_params(item_params, table_params, query_params, seal_params),
+            invalid_argument);
 
         // query_powers cannot contain 0
         query_params.query_powers = { 0, 1, 2 };
-        ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);
+        ASSERT_THROW(
+            PSIParams psi_params(item_params, table_params, query_params, seal_params),
+            invalid_argument);
 
         // Too big query_powers
         query_params.query_powers = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17 };
-        ASSERT_THROW(PSIParams psi_params(item_params, table_params, query_params, seal_params), invalid_argument);
+        ASSERT_THROW(
+            PSIParams psi_params(item_params, table_params, query_params, seal_params),
+            invalid_argument);
     }
 
     TEST(PSIParamsTest, SaveLoadPSIParams)
@@ -110,11 +128,17 @@ namespace APSITests
         ASSERT_EQ(save_size, compare.second);
         auto load_params = compare.first;
 
-        ASSERT_EQ(psi_params.item_params().felts_per_item, load_params.item_params().felts_per_item);
-        ASSERT_EQ(psi_params.table_params().hash_func_count, load_params.table_params().hash_func_count);
-        ASSERT_EQ(psi_params.table_params().max_items_per_bin, load_params.table_params().max_items_per_bin);
+        ASSERT_EQ(
+            psi_params.item_params().felts_per_item, load_params.item_params().felts_per_item);
+        ASSERT_EQ(
+            psi_params.table_params().hash_func_count, load_params.table_params().hash_func_count);
+        ASSERT_EQ(
+            psi_params.table_params().max_items_per_bin,
+            load_params.table_params().max_items_per_bin);
         ASSERT_EQ(psi_params.table_params().table_size, load_params.table_params().table_size);
-        ASSERT_EQ(psi_params.query_params().query_powers.size(), load_params.query_params().query_powers.size());
+        ASSERT_EQ(
+            psi_params.query_params().query_powers.size(),
+            load_params.query_params().query_powers.size());
         ASSERT_TRUE(equal(
             psi_params.query_params().query_powers.cbegin(),
             psi_params.query_params().query_powers.cend(),
@@ -337,7 +361,7 @@ namespace APSITests
                "}";
         ASSERT_THROW(PSIParams::Load(json), runtime_error);
     }
-    
+
     TEST(PSIParamsTest, JSONMissingTableParamsContent)
     {
         string json =
@@ -405,24 +429,23 @@ namespace APSITests
         // Missing table_size
         ASSERT_THROW(PSIParams::Load(json), runtime_error);
 
-        json =
-            "{"
-            "    \"table_params\": {"
-            "        \"hash_func_count\": 3,"
-            "        \"table_size\": 512"
-            "    },"
-            "    \"item_params\": {"
-            "        \"felts_per_item\": 8"
-            "    },"
-            "    \"query_params\": {"
-            "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
-            "    },"
-            "    \"seal_params\": {"
-            "        \"plain_modulus\": 40961,"
-            "        \"poly_modulus_degree\": 4096,"
-            "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
-            "    }"
-            "}";
+        json = "{"
+               "    \"table_params\": {"
+               "        \"hash_func_count\": 3,"
+               "        \"table_size\": 512"
+               "    },"
+               "    \"item_params\": {"
+               "        \"felts_per_item\": 8"
+               "    },"
+               "    \"query_params\": {"
+               "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+               "    },"
+               "    \"seal_params\": {"
+               "        \"plain_modulus\": 40961,"
+               "        \"poly_modulus_degree\": 4096,"
+               "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+               "    }"
+               "}";
 
         // Missing max_items_per_bin
         ASSERT_THROW(PSIParams::Load(json), runtime_error);
@@ -453,25 +476,24 @@ namespace APSITests
         // Correct JSON
         ASSERT_NO_THROW(PSIParams::Load(json));
 
-        json =
-            "{"
-            "    \"table_params\": {"
-            "        \"hash_func_count\": 3,"
-            "        \"table_size\": 512,"
-            "        \"max_items_per_bin\": 92"
-            "    },"
-            "    \"item_params\": {"
-            "        \"other_name\": 8"
-            "    },"
-            "    \"query_params\": {"
-            "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
-            "    },"
-            "    \"seal_params\": {"
-            "        \"plain_modulus\": 40961,"
-            "        \"poly_modulus_degree\": 4096,"
-            "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
-            "    }"
-            "}";
+        json = "{"
+               "    \"table_params\": {"
+               "        \"hash_func_count\": 3,"
+               "        \"table_size\": 512,"
+               "        \"max_items_per_bin\": 92"
+               "    },"
+               "    \"item_params\": {"
+               "        \"other_name\": 8"
+               "    },"
+               "    \"query_params\": {"
+               "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
+               "    },"
+               "    \"seal_params\": {"
+               "        \"plain_modulus\": 40961,"
+               "        \"poly_modulus_degree\": 4096,"
+               "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
+               "    }"
+               "}";
 
         // Missing felts_per_item
         ASSERT_THROW(PSIParams::Load(json), runtime_error);
@@ -613,4 +635,4 @@ namespace APSITests
         // Missing coeff_modulus_bits
         ASSERT_THROW(PSIParams::Load(json), runtime_error);
     }
-}
+} // namespace APSITests

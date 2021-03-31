@@ -3,13 +3,11 @@
 
 # Check for the presence of AVX and figure out the flags to use for it.
 macro(check_for_avx target)
-    set(AVX_FLAGS)
-
     include(CheckCXXSourceRuns)
     set(CMAKE_REQUIRED_FLAGS)
-    
+
     # Check AVX
-    if(MSVC AND NOT MSVC_VERSION LESS 1600)
+    if(MSVC AND MSVC_VERSION GREATER_EQUAL 1600)
         set(CMAKE_REQUIRED_FLAGS "/arch:AVX")
     elseif(NOT MSVC)
         set(CMAKE_REQUIRED_FLAGS "-mavx")
@@ -36,7 +34,7 @@ macro(check_for_avx target)
         HAVE_AVX_EXTENSIONS)
 
     # Check AVX2
-    if(MSVC AND NOT MSVC_VERSION LESS 1800)
+    if(MSVC AND MSVC_VERSION GREATER_EQUAL 1800)
         set(CMAKE_REQUIRED_FLAGS "/arch:AVX2")
     elseif(NOT MSVC)
         set(CMAKE_REQUIRED_FLAGS "-mavx2")
@@ -64,12 +62,12 @@ macro(check_for_avx target)
 
     # Set Flags
     if(MSVC)
-        if(HAVE_AVX2_EXTENSIONS AND NOT MSVC_VERSION LESS 1800)
+        if(HAVE_AVX2_EXTENSIONS AND MSVC_VERSION GREATER_EQUAL 1800)
             target_compile_options(${target} PUBLIC /arch:AVX2)
-        elseif(HAVE_AVX_EXTENSIONS  AND NOT MSVC_VERSION LESS 1600)
+        elseif(HAVE_AVX_EXTENSIONS AND MSVC_VERSION GREATER_EQUAL 1600)
             target_compile_options(${target} PUBLIC /arch:AVX)
         endif()
-    elseif(NOT MSVC)
+    else()
         if(HAVE_AVX2_EXTENSIONS)
             target_compile_options(${target} PUBLIC -mavx2)
         elseif(HAVE_AVX_EXTENSIONS)

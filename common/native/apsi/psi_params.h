@@ -7,9 +7,9 @@
 #include <cstdint>
 #include <iostream>
 #include <limits>
-#include <utility>
-#include <string>
 #include <set>
+#include <string>
+#include <utility>
 
 // APSI
 #include "apsi/log.h"
@@ -22,19 +22,17 @@
 #include "seal/encryptionparams.h"
 #include "seal/util/common.h"
 
-namespace apsi
-{
+namespace apsi {
     /**
     Contains a collection of parameters required to configure the protocol.
     */
-    class PSIParams
-    {
+    class PSIParams {
     public:
         /**
-        Specifies the Microsoft SEAL encryption parameters for the BFV homomorphic encryption scheme.
+        Specifies the Microsoft SEAL encryption parameters for the BFV homomorphic encryption
+        scheme.
         */
-        class SEALParams : public seal::EncryptionParameters
-        {
+        class SEALParams : public seal::EncryptionParameters {
         public:
             SEALParams() : seal::EncryptionParameters(seal::scheme_type::bfv)
             {}
@@ -47,14 +45,14 @@ namespace apsi
         /**
         Parameters describing the item and label properties.
         */
-        struct ItemParams
-        {
+        struct ItemParams {
             constexpr static std::uint32_t felts_per_item_max = 32;
 
             constexpr static std::uint32_t felts_per_item_min = 2;
 
             /**
-            Specified how many SEAL batching slots are occupied by an item. This value must be a power of two.
+            Specified how many SEAL batching slots are occupied by an item. This value must be a
+            power of two.
             */
             std::uint32_t felts_per_item;
         };
@@ -62,8 +60,7 @@ namespace apsi
         /**
         Table parameters.
         */
-        struct TableParams
-        {
+        struct TableParams {
             constexpr static std::uint32_t hash_func_count_min = 1;
 
             constexpr static std::uint32_t hash_func_count_max = 8;
@@ -74,9 +71,10 @@ namespace apsi
             std::uint32_t table_size;
 
             /**
-            Specifies the number of sender's items stored in a single hash table bin. A larger value requires a deeper
-            encrypted computation, or more powers of the encrypted query to be sent from the receiver to the sender, but
-            reduces the number of ciphertexts sent from the sender to the receiver.
+            Specifies the number of sender's items stored in a single hash table bin. A larger value
+            requires a deeper encrypted computation, or more powers of the encrypted query to be
+            sent from the receiver to the sender, but reduces the number of ciphertexts sent from
+            the sender to the receiver.
             */
             std::uint32_t max_items_per_bin;
 
@@ -89,14 +87,14 @@ namespace apsi
         /**
         Query parameters.
         */
-        struct QueryParams
-        {
+        struct QueryParams {
             /**
-            The encrypted powers of the query that are sent from the receiver to the sender. The set must contain at
-            least the power 1, and may contain all positive integers up to max_items_per_bin. Specific sets of powers
-            will result in a lower depth computation requiring smaller encryption parameters, and may subsequently
-            reduce both the computation and communication cost. Good choices for query_powers can be found by guessing
-            or systematically enumerating all options.
+            The encrypted powers of the query that are sent from the receiver to the sender. The set
+            must contain at least the power 1, and may contain all positive integers up to
+            max_items_per_bin. Specific sets of powers will result in a lower depth computation
+            requiring smaller encryption parameters, and may subsequently reduce both the
+            computation and communication cost. Good choices for query_powers can be found by
+            guessing or systematically enumerating all options.
             */
             std::set<std::uint32_t> query_powers;
         };
@@ -150,18 +148,16 @@ namespace apsi
             const ItemParams &item_params,
             const TableParams &table_params,
             const QueryParams &query_params,
-            const SEALParams &seal_params) :
-            item_params_(item_params),
-            table_params_(table_params),
-            query_params_(query_params),
-            seal_params_(seal_params)
+            const SEALParams &seal_params)
+            : item_params_(item_params), table_params_(table_params), query_params_(query_params),
+              seal_params_(seal_params)
         {
             initialize();
         }
 
         PSIParams(const PSIParams &copy) = default;
 
-        PSIParams &operator =(const PSIParams &copy) = default;
+        PSIParams &operator=(const PSIParams &copy) = default;
 
         std::string to_string() const;
 

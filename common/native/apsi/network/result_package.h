@@ -4,30 +4,27 @@
 #pragma once
 
 // STD
-#include <cstdint>
 #include <cstddef>
-#include <vector>
+#include <cstdint>
 #include <iostream>
 #include <memory>
+#include <vector>
 
 // SEAL
-#include "seal/util/defines.h"
-#include "seal/context.h"
 #include "seal/ciphertext.h"
+#include "seal/context.h"
+#include "seal/util/defines.h"
 
 // APSI
 #include "apsi/crypto_context.h"
 #include "apsi/seal_object.h"
 
-namespace apsi
-{
-    namespace network
-    {
+namespace apsi {
+    namespace network {
         /**
         Stores a decrypted and decoded PSI response and optionally a labeled PSI response.
         */
-        struct PlainResultPackage
-        {
+        struct PlainResultPackage {
             std::uint32_t bundle_idx;
 
             std::vector<std::uint64_t> psi_result;
@@ -42,8 +39,7 @@ namespace apsi
         /**
         Stores a PSI response and optionally labeled PSI response ciphertexts.
         */
-        class ResultPackage
-        {
+        class ResultPackage {
         public:
             /**
             Writes the ResultPackage to a stream.
@@ -67,5 +63,5 @@ namespace apsi
 
             std::vector<SEALObject<seal::Ciphertext>> label_result;
         }; // struct ResultPackage
-    }
+    }      // namespace network
 } // namespace apsi

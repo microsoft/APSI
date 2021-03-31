@@ -5,28 +5,25 @@
 
 // STD
 #include <atomic>
-#include <memory>
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
+#include <memory>
 
 // APSI
+#include "apsi/network/result_package.h"
 #include "apsi/network/sender_operation.h"
 #include "apsi/network/sender_operation_response.h"
-#include "apsi/network/result_package.h"
 
 // SEAL
 #include "seal/util/defines.h"
 
-namespace apsi
-{
-    namespace network
-    {
+namespace apsi {
+    namespace network {
         /**
-        Channel is an interfacate to implement a communication channel between a sender and a receiver. It keeps track
-        of the number of bytes sent and received.
+        Channel is an interfacate to implement a communication channel between a sender and a
+        receiver. It keeps track of the number of bytes sent and received.
         */
-        class Channel
-        {
+        class Channel {
         public:
             /**
             Create an instance of a Channel.
@@ -41,28 +38,31 @@ namespace apsi
             {}
 
             /**
-            Send a SenderOperation from a receiver to a sender. These operations represent either a parameter request,
-            an OPRF request, or a query request. The function throws an exception on failure.
+            Send a SenderOperation from a receiver to a sender. These operations represent either a
+            parameter request, an OPRF request, or a query request. The function throws an exception
+            on failure.
             */
             virtual void send(std::unique_ptr<SenderOperation> sop) = 0;
 
             /**
-            Receive a SenderOperation from a receiver. Operations of type sop_query and sop_unknown require a valid
-            seal::SEALContext to be provided. For operations of type sop_parms and sop_oprf the context can be set as
-            nullptr. The function returns nullptr on failure.
+            Receive a SenderOperation from a receiver. Operations of type sop_query and sop_unknown
+            require a valid seal::SEALContext to be provided. For operations of type sop_parms and
+            sop_oprf the context can be set as nullptr. The function returns nullptr on failure.
             */
             virtual std::unique_ptr<SenderOperation> receive_operation(
                 std::shared_ptr<seal::SEALContext> context,
                 SenderOperationType expected = SenderOperationType::sop_unknown) = 0;
 
             /**
-            Send a SenderOperationResponse from a sender to a receiver. These operations represent a response to either
-            a parameter request, an OPRF request, or a query request. The function throws and exception on failure.
+            Send a SenderOperationResponse from a sender to a receiver. These operations represent a
+            response to either a parameter request, an OPRF request, or a query request. The
+            function throws and exception on failure.
             */
             virtual void send(std::unique_ptr<SenderOperationResponse> sop_response) = 0;
 
             /**
-            Receive a SenderOperationResponse from a sender. The function returns nullptr on failure.
+            Receive a SenderOperationResponse from a sender. The function returns nullptr on
+            failure.
             */
             virtual std::unique_ptr<SenderOperationResponse> receive_response(
                 SenderOperationType expected = SenderOperationType::sop_unknown) = 0;
@@ -73,10 +73,11 @@ namespace apsi
             virtual void send(std::unique_ptr<ResultPackage> rp) = 0;
 
             /**
-            Receive a ResultPackage from a sender. A valid seal::SEALContext must be provided. The function returns
-            nullptr on failure.
+            Receive a ResultPackage from a sender. A valid seal::SEALContext must be provided. The
+            function returns nullptr on failure.
             */
-            virtual std::unique_ptr<ResultPackage> receive_result(std::shared_ptr<seal::SEALContext> context) = 0;
+            virtual std::unique_ptr<ResultPackage> receive_result(
+                std::shared_ptr<seal::SEALContext> context) = 0;
 
             /**
             Returns the number of bytes sent on the channel.

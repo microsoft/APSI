@@ -5,8 +5,8 @@
 #include <algorithm>
 #include <array>
 #include <memory>
-#include <vector>
 #include <unordered_set>
+#include <vector>
 
 // APSI
 #include "apsi/oprf/oprf_receiver.h"
@@ -16,6 +16,7 @@
 // SEAL
 #include "seal/randomgen.h"
 
+// Google Test
 #include "gtest/gtest.h"
 
 using namespace std;
@@ -23,8 +24,7 @@ using namespace seal;
 using namespace apsi;
 using namespace apsi::oprf;
 
-namespace APSITests
-{
+namespace APSITests {
     TEST(OPRFTests, OPRFKeyCreate)
     {
         // Creates a random key
@@ -33,14 +33,17 @@ namespace APSITests
         // Set the key to zero
         oprf_key.clear();
         auto oprf_key_span = oprf_key.key_span();
-        ASSERT_TRUE(all_of(oprf_key_span.begin(), oprf_key_span.end(), [](auto a) { return a == 0; }));
+        ASSERT_TRUE(
+            all_of(oprf_key_span.begin(), oprf_key_span.end(), [](auto a) { return a == 0; }));
 
         // Create some new random keys
         oprf_key.create();
-        ASSERT_FALSE(all_of(oprf_key_span.begin(), oprf_key_span.end(), [](auto a) { return a == 0; }));
+        ASSERT_FALSE(
+            all_of(oprf_key_span.begin(), oprf_key_span.end(), [](auto a) { return a == 0; }));
         OPRFKey oprf_key2;
         auto oprf_key2_span = oprf_key2.key_span();
-        ASSERT_FALSE(all_of(oprf_key2_span.begin(), oprf_key2_span.end(), [](auto a) { return a == 0; }));
+        ASSERT_FALSE(
+            all_of(oprf_key2_span.begin(), oprf_key2_span.end(), [](auto a) { return a == 0; }));
         ASSERT_FALSE(equal(oprf_key_span.begin(), oprf_key_span.end(), oprf_key2_span.begin()));
     }
 
@@ -64,8 +67,7 @@ namespace APSITests
 
         shared_ptr<UniformRandomGeneratorFactory> rng_factory(make_shared<Blake2xbPRNGFactory>());
         auto rng = rng_factory->create();
-        for (auto i = 0; i < item_count; i++)
-        {
+        for (auto i = 0; i < item_count; i++) {
             Item it;
             rng->generate(sizeof(Item), it.get_as<seal_byte>().data());
             items.push_back(move(it));
@@ -86,8 +88,7 @@ namespace APSITests
         vector<LabelKey> label_keys(item_count);
         receiver.process_responses(responses, receiver_hashes, label_keys);
 
-        for (auto &recv_hash : receiver_hashes)
-        {
+        for (auto &recv_hash : receiver_hashes) {
             bool found = out_items.end() !=
                          find_if(out_items.begin(), out_items.end(), [&](HashedItem &item) {
                              return item == recv_hash;
@@ -103,10 +104,10 @@ namespace APSITests
             ECPoint pt(val);
             std::array<unsigned char, ECPoint::save_size> buf;
             pt.save(buf);
-            uint64_t w1 = *reinterpret_cast<uint64_t*>(buf.data());
-            uint64_t w2 = *reinterpret_cast<uint64_t*>(buf.data() + 8);
-            uint64_t w3 = *reinterpret_cast<uint64_t*>(buf.data() + 16);
-            uint64_t w4 = *reinterpret_cast<uint64_t*>(buf.data() + 24);
+            uint64_t w1 = *reinterpret_cast<uint64_t *>(buf.data());
+            uint64_t w2 = *reinterpret_cast<uint64_t *>(buf.data() + 8);
+            uint64_t w3 = *reinterpret_cast<uint64_t *>(buf.data() + 16);
+            uint64_t w4 = *reinterpret_cast<uint64_t *>(buf.data() + 24);
 
             ASSERT_EQ(16185258159125907415ULL, w1);
             ASSERT_EQ(4603673558532365532ULL, w2);
@@ -118,10 +119,10 @@ namespace APSITests
             ECPoint pt(val);
             std::array<unsigned char, ECPoint::save_size> buf;
             pt.save(buf);
-            uint64_t w1 = *reinterpret_cast<uint64_t*>(buf.data());
-            uint64_t w2 = *reinterpret_cast<uint64_t*>(buf.data() + 8);
-            uint64_t w3 = *reinterpret_cast<uint64_t*>(buf.data() + 16);
-            uint64_t w4 = *reinterpret_cast<uint64_t*>(buf.data() + 24);
+            uint64_t w1 = *reinterpret_cast<uint64_t *>(buf.data());
+            uint64_t w2 = *reinterpret_cast<uint64_t *>(buf.data() + 8);
+            uint64_t w3 = *reinterpret_cast<uint64_t *>(buf.data() + 16);
+            uint64_t w4 = *reinterpret_cast<uint64_t *>(buf.data() + 24);
 
             ASSERT_EQ(1351976583327153065ULL, w1);
             ASSERT_EQ(6824769698500631404ULL, w2);
@@ -129,18 +130,15 @@ namespace APSITests
             ASSERT_EQ(17703950788644595294ULL, w4);
         }
         {
-            std::array<unsigned char, 16> val{
-                0xFF, 0xFE, 0xFD, 0xFC,
-                0xFB, 0xFA, 0xF9, 0xF8,
-                0xF7, 0xF6, 0xF5, 0xF4,
-                0xF3, 0xF2, 0xF1, 0xF0 };
+            std::array<unsigned char, 16> val{ 0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA, 0xF9, 0xF8,
+                                               0xF7, 0xF6, 0xF5, 0xF4, 0xF3, 0xF2, 0xF1, 0xF0 };
             ECPoint pt(val);
             std::array<unsigned char, ECPoint::save_size> buf;
             pt.save(buf);
-            uint64_t w1 = *reinterpret_cast<uint64_t*>(buf.data());
-            uint64_t w2 = *reinterpret_cast<uint64_t*>(buf.data() + 8);
-            uint64_t w3 = *reinterpret_cast<uint64_t*>(buf.data() + 16);
-            uint64_t w4 = *reinterpret_cast<uint64_t*>(buf.data() + 24);
+            uint64_t w1 = *reinterpret_cast<uint64_t *>(buf.data());
+            uint64_t w2 = *reinterpret_cast<uint64_t *>(buf.data() + 8);
+            uint64_t w3 = *reinterpret_cast<uint64_t *>(buf.data() + 16);
+            uint64_t w4 = *reinterpret_cast<uint64_t *>(buf.data() + 24);
 
             ASSERT_EQ(14742796689443832496ULL, w1);
             ASSERT_EQ(2501201975610406569ULL, w2);

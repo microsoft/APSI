@@ -67,11 +67,13 @@ ForEachMacros:
   - BOOST_FOREACH
 IncludeBlocks:   Merge
 IncludeCategories:
-  - Regex:           '<.*>'
+  - Regex:           '<windows.h>'
     Priority:        1
-  - Regex:           '"seal/util/.*"'
+  - Regex:           '<.*>'
+    Priority:        2
+  - Regex:           '"apsi/util/.*"'
     Priority:        -2
-  - Regex:           '"seal/.*"'
+  - Regex:           '"apsi/.*"'
     Priority:        -3
 IncludeIsMainRegex: '(Test)?$'
 IndentCaseLabels: false
@@ -124,4 +126,3 @@ StatementMacros:
 TabWidth:        4
 UseTab:          Never
 ...
-

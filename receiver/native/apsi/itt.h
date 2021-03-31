@@ -7,21 +7,18 @@
 #include <cstddef>
 #include <unordered_map>
 
-namespace apsi
-{
-    namespace receiver
-    {
+namespace apsi {
+    namespace receiver {
         class Receiver;
 
-        class IndexTranslationTable
-        {
-        friend class Receiver;
+        class IndexTranslationTable {
+            friend class Receiver;
 
         public:
             /**
-            Translates a cuckoo table index to an index of the vector of items that were used to create this query. If
-            the given table index was not populated, i.e., there is no translation, then this function returns the
-            number of items encoded by this query.
+            Translates a cuckoo table index to an index of the vector of items that were used to
+            create this query. If the given table index was not populated, i.e., there is no
+            translation, then this function returns the number of items encoded by this query.
             */
             std::size_t find_item_idx(std::size_t table_idx) const noexcept;
 
@@ -40,5 +37,5 @@ namespace apsi
 
             std::size_t item_count_;
         };
-    }
-}
+    } // namespace receiver
+} // namespace apsi

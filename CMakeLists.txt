@@ -54,25 +54,28 @@ set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY OFF)
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(APSI_DEBUG ON)
     # In Debug mode, enable extra compiler flags.
-    # TODO: Uncomment this
-    #include(EnableCXXCompilerFlags)
+    include(EnableCXXCompilerFlags)
 else()
     set(APSI_DEBUG OFF)
 endif()
 message(STATUS "APSI debug mode: ${APSI_DEBUG}")
 
 # TODO: C++17 or C++14, extra configurations or check for_each_n for C++17
+# Description:
+#     SEAL_USE_CXX17 and SEAL_USE_STD_FOR_EACH_N depends on compiler version when vcpkg installs SEAL.
+#     If SEAL_USE_CXX17 is ON, then GNU CC 7+. --> c++17
+#     If SEAL_USE_STD_FOR_EACH_N is ON, then GNU CC 9+. --> std::for_each_n
 # [option] APSI_USE_CXX17_OPTION_STR (default: ON)
 # Use C++17, use C++14 otherwise.
 set(APSI_USE_CXX17_OPTION_STR "Use C++17")
-option(APSI_USE_CXX17 ${APSI_USE_CXX17_OPTION_STR_OPTION_STR} ON)
+option(APSI_USE_CXX17 ${APSI_USE_CXX17_OPTION_STR} ON)
 # Enable features from C++17 if available, disable features if set to OFF.
 #include(EnableCXX17)
+message(STATUS "APSI_USE_CXX17: ${APSI_USE_CXX17}")
 
-# TODO: Do we need secure compile options?
 # Enable security-related compile options (MSVC only)
-set(APSI_SECURE_COMPILE_OPTIONS_OPTIONS_STR "Enable Control Flow Guard and Spectre mitigations (MSVC only)")
-option(APSI_SECURE_COMPILE_OPTIONS ${APSI_SECURE_COMPILE_OPTIONS_OPTIONS_STR} OFF)
+set(APSI_SECURE_COMPILE_OPTIONS_OPTION_STR "Enable Control Flow Guard and Spectre mitigations (MSVC only)")
+option(APSI_SECURE_COMPILE_OPTIONS ${APSI_SECURE_COMPILE_OPTIONS_OPTION_STR} OFF)
 mark_as_advanced(APSI_SECURE_COMPILE_OPTIONS)
 
 # Path for output
@@ -259,16 +262,9 @@ if(APSI_USE_ZMQ)
     target_link_libraries(common PUBLIC libzmq-static cppzmq-static)
 endif()
 
-# TODO: move this block into a module
+# Set AVX or AVX2 flags
 include(FindAVX)
 check_for_avx(common)
-
-# Defines for FourQlib
-target_compile_options(common PUBLIC -DHAVE_CONFIG)
-target_compile_options(common PUBLIC -DUSE_SECURE_SEED)
-target_compile_options(common PUBLIC -D_AMD64_)
-target_compile_options(common PUBLIC -DUSE_ENDO=true)
-
 if (HAVE_AVX2_EXTENSIONS)
     target_compile_options(common PUBLIC -D_AVX2_)
 elseif(HAVE_AVX_EXTENSIONS)
@@ -279,12 +275,16 @@ endif()
 
 if (MSVC)
     target_compile_options(common PUBLIC -D__WINDOWS__)
-endif()
-if (NOT MSVC)
+else()
     target_compile_options(common PUBLIC -D__LINUX__)
     target_compile_options(common PUBLIC -march=native)
 endif()
-# TODO: end of block
+
+# Defines for FourQlib
+target_compile_options(common PUBLIC -DHAVE_CONFIG)
+target_compile_options(common PUBLIC -DUSE_SECURE_SEED)
+target_compile_options(common PUBLIC -D_AMD64_)
+target_compile_options(common PUBLIC -DUSE_ENDO=true)
 
 #############################
 # APSI receiver C++ library #
@@ -354,36 +354,39 @@ endif()
 ##########################
 
 if(APSI_BUILD_CLI)
+    # TODO: check variant file
+
     add_library(common_cli OBJECT)
     add_subdirectory(cli/common)
     target_include_directories(common_cli PUBLIC cli)
     target_include_directories(common_cli PUBLIC ${TCLAP_INCLUDE_DIRS})
     target_link_libraries(common_cli PUBLIC common)
+    if (NOT MSVC AND NOT APPLE)
+        target_link_libraries(common_cli PUBLIC stdc++fs)
+    endif()
+    if(NOT APSI_USE_CXX17)
+        message(STATUS "Command line interface is built with C++17 regardless of APSI_USE_CXX17")
+    endif()
+    target_compile_features(common_cli PUBLIC cxx_std_17)
 
     add_executable(sender_cli)
     add_subdirectory(cli/sender)
-    target_link_libraries(sender_cli common_cli sender)
     # Ensure PDB is generated even in Release mode
     if(MSVC)
         target_link_options(common_cli PUBLIC /DEBUG)
     endif()
-    if(!MSVC)
-        target_link_libraries(sender_cli PUBLIC stdc++fs)
-    endif()
+    target_link_libraries(sender_cli PUBLIC common_cli sender)
     if (APPLE)
         target_compile_options(common_cli PUBLIC -DHAVE_LONG_LONG)
     endif()
 
     add_executable(receiver_cli)
     add_subdirectory(cli/receiver)
-    target_link_libraries(receiver_cli common_cli receiver)
     # Ensure PDB is generated even in Release mode
     if(MSVC)
-        target_link_options(receiver_cli PUBLIC /DEBUG)
+        target_link_options(common_cli PUBLIC /DEBUG)
     endif()
-    if (!MSVC)
-        target_link_libraries(receiver_cli PUBLIC stdc++fs)
-    endif()
+    target_link_libraries(receiver_cli PUBLIC common_cli receiver)
 
     add_executable(pd_tool)
     add_subdirectory(cli/pd_tool)

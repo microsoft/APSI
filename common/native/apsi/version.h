@@ -9,8 +9,7 @@
 // APSI
 #include "apsi/config.h"
 
-namespace apsi
-{
+namespace apsi {
     constexpr static std::uint32_t apsi_version =
         (APSI_VERSION_PATCH << 20) + (APSI_VERSION_MINOR << 10) + APSI_VERSION_MAJOR;
 
@@ -48,4 +47,4 @@ namespace apsi
     {
         return get_patch_version(version) == get_patch_version(apsi_version);
     }
-}
+} // namespace apsi

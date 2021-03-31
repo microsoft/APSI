@@ -29,7 +29,7 @@ fp2mul1271_a:
   mov    rcx, reg_p3
 
   // T0 = a0 * b0, (r11, r10, r9, r8) <- [reg_p1_0-8] * [reg_p2_0-8]
-  mov    rdx, [reg_p2]	
+  mov    rdx, [reg_p2]
   mulx   r9, r8, [reg_p1]
   mulx   rax, r10, [reg_p1+8]
   push   r15
@@ -95,7 +95,7 @@ fp2mul1271_a:
   adc    r10, 0
   adc    r11, 0
 
-  // T1 = a1 * b0, (r12, r11, r10, r9) <- [reg_p1_16-24] * [reg_p2_0-8]	
+  // T1 = a1 * b0, (r12, r11, r10, r9) <- [reg_p1_16-24] * [reg_p2_0-8]
   mov    rdx, [reg_p2]
   mulx   r9, r8, [reg_p1+16]
   mov    [rcx], r10

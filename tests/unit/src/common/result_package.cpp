@@ -2,10 +2,10 @@
 // Licensed under the MIT license.
 
 // STD
+#include <algorithm>
+#include <memory>
 #include <sstream>
 #include <vector>
-#include <memory>
-#include <algorithm>
 
 // APSI
 #include "apsi/crypto_context.h"
@@ -16,6 +16,7 @@
 #include "seal/context.h"
 #include "seal/keygenerator.h"
 
+// Google Test
 #include "gtest/gtest.h"
 
 using namespace std;
@@ -23,15 +24,12 @@ using namespace seal;
 using namespace apsi;
 using namespace apsi::network;
 
-namespace APSITests
-{
-    namespace
-    {
+namespace APSITests {
+    namespace {
         shared_ptr<PSIParams> get_params()
         {
             static shared_ptr<PSIParams> params = nullptr;
-            if (!params)
-            {
+            if (!params) {
                 PSIParams::ItemParams item_params;
                 item_params.felts_per_item = 8;
 
@@ -49,12 +47,13 @@ namespace APSITests
                 seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(pmd));
                 seal_params.set_plain_modulus(65537);
 
-                params = make_shared<PSIParams>(item_params, table_params, query_params, seal_params);
+                params =
+                    make_shared<PSIParams>(item_params, table_params, query_params, seal_params);
             }
 
             return params;
         }
-    }
+    } // namespace
 
     TEST(ResultPackageTest, SaveLoadResultPackage)
     {
@@ -66,9 +65,6 @@ namespace APSITests
 
         KeyGenerator keygen(*context->seal_context());
         context->set_secret(keygen.secret_key());
-
-        // Save with no data; this will fail due to invalid PSI result
-        ASSERT_THROW(size_t out_size = rp.save(ss), logic_error);
 
         // Symmetric encryption
         Ciphertext ct;
@@ -147,7 +143,8 @@ namespace APSITests
         ASSERT_EQ(rp.bundle_idx, prp.bundle_idx);
         ASSERT_EQ(rp.label_byte_count, prp.label_byte_count);
         ASSERT_EQ(rp.nonce_byte_count, prp.nonce_byte_count);
-        ASSERT_TRUE(all_of(prp.psi_result.begin(), prp.psi_result.end(), [](auto a) { return !a; }));
+        ASSERT_TRUE(
+            all_of(prp.psi_result.begin(), prp.psi_result.end(), [](auto a) { return !a; }));
         ASSERT_TRUE(prp.label_result.empty());
 
         // Add some label data as well
@@ -165,9 +162,12 @@ namespace APSITests
         ASSERT_EQ(rp.bundle_idx, prp.bundle_idx);
         ASSERT_EQ(rp.label_byte_count, prp.label_byte_count);
         ASSERT_EQ(rp.nonce_byte_count, prp.nonce_byte_count);
-        ASSERT_TRUE(all_of(prp.psi_result.begin(), prp.psi_result.end(), [](auto a) { return !a; }));
+        ASSERT_TRUE(
+            all_of(prp.psi_result.begin(), prp.psi_result.end(), [](auto a) { return !a; }));
         ASSERT_EQ(2, prp.label_result.size());
-        ASSERT_TRUE(all_of(prp.label_result[0].begin(), prp.label_result[0].end(), [](auto a) { return !a; }));
-        ASSERT_TRUE(all_of(prp.label_result[1].begin(), prp.label_result[1].end(), [](auto a) { return !a; }));
+        ASSERT_TRUE(all_of(
+            prp.label_result[0].begin(), prp.label_result[0].end(), [](auto a) { return !a; }));
+        ASSERT_TRUE(all_of(
+            prp.label_result[1].begin(), prp.label_result[1].end(), [](auto a) { return !a; }));
     }
-}
+} // namespace APSITests

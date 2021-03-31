@@ -9,21 +9,18 @@
 #include <utility>
 
 // APSI
-#include "apsi/network/zmq/zmq_channel.h"
 #include "apsi/network/sender_operation.h"
+#include "apsi/network/zmq/zmq_channel.h"
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/sender.h"
 #include "apsi/sender_db.h"
 
-namespace apsi
-{
-    namespace sender
-    {
+namespace apsi {
+    namespace sender {
         /**
         The ZMQSenderDispatcher is in charge of handling incoming requests through the network.
         */
-        class ZMQSenderDispatcher
-        {
+        class ZMQSenderDispatcher {
         public:
             ZMQSenderDispatcher() = delete;
 
@@ -40,17 +37,23 @@ namespace apsi
             /**
             Dispatch a Get Parameters request to the Sender.
             */
-            void dispatch_parms(std::unique_ptr<network::ZMQSenderOperation> sop, network::ZMQSenderChannel &channel);
+            void dispatch_parms(
+                std::unique_ptr<network::ZMQSenderOperation> sop,
+                network::ZMQSenderChannel &channel);
 
             /**
             Dispatch an OPRF query request to the Sender.
             */
-            void dispatch_oprf(std::unique_ptr<network::ZMQSenderOperation> sop, network::ZMQSenderChannel &channel);
+            void dispatch_oprf(
+                std::unique_ptr<network::ZMQSenderOperation> sop,
+                network::ZMQSenderChannel &channel);
 
             /**
             Dispatch a Query request to the Sender.
             */
-            void dispatch_query(std::unique_ptr<network::ZMQSenderOperation> sop, network::ZMQSenderChannel &channel);
+            void dispatch_query(
+                std::unique_ptr<network::ZMQSenderOperation> sop,
+                network::ZMQSenderChannel &channel);
         }; // class ZMQSenderDispatcher
     }      // namespace sender
 } // namespace apsi

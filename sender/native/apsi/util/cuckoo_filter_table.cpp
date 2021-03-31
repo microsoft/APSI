@@ -5,8 +5,8 @@
 #include <stdexcept>
 
 // APSI
-#include "cuckoo_filter_table.h"
 #include "apsi/util/utils.h"
+#include "cuckoo_filter_table.h"
 
 using namespace std;
 using namespace apsi::util;
@@ -25,7 +25,8 @@ namespace {
         */
         TagIndexInfo(size_t bits_per_tag, size_t tags_per_bucket, size_t bucket, size_t tag_idx)
         {
-            size_t tag_start_bit = (bucket * bits_per_tag * tags_per_bucket) + (tag_idx * bits_per_tag);
+            size_t tag_start_bit =
+                (bucket * bits_per_tag * tags_per_bucket) + (tag_idx * bits_per_tag);
             tag_start_idx = tag_start_bit / 64;
             tag_start_offset = tag_start_bit % 64;
             bits_first_word = bits_per_tag;
@@ -37,7 +38,7 @@ namespace {
             }
         }
     };
-}
+} // namespace
 
 CuckooFilterTable::CuckooFilterTable(size_t num_items, size_t bits_per_tag)
     : bits_per_tag_(bits_per_tag), tag_input_mask_(static_cast<std::uint32_t>(-1) << bits_per_tag)
@@ -45,11 +46,10 @@ CuckooFilterTable::CuckooFilterTable(size_t num_items, size_t bits_per_tag)
     num_buckets_ = next_power_of_2(std::max<uint64_t>(1, num_items / tags_per_bucket_));
     double items_to_bucket_ratio = (double)num_items / num_buckets_ / tags_per_bucket_;
     if (items_to_bucket_ratio > 0.96) {
-        // If the ratio is too close to 1 we might have failures trying to insert 
+        // If the ratio is too close to 1 we might have failures trying to insert
         // the maximum number of items
         num_buckets_ *= 2;
     }
-
 
     // Round up to the nearest uint64_t
     size_t bits_per_bucket = tags_per_bucket_ * bits_per_tag;
@@ -111,10 +111,9 @@ void CuckooFilterTable::write_tag(size_t bucket, size_t tag_idx, uint32_t tag)
     }
 }
 
-bool CuckooFilterTable::insert_tag(size_t bucket, uint32_t tag, bool kickout, uint32_t& old_tag)
+bool CuckooFilterTable::insert_tag(size_t bucket, uint32_t tag, bool kickout, uint32_t &old_tag)
 {
-    for (size_t i = 0; i < tags_per_bucket_; i++)
-    {
+    for (size_t i = 0; i < tags_per_bucket_; i++) {
         if (read_tag(bucket, i) == 0) {
             write_tag(bucket, i, tag);
             return true;
@@ -158,8 +157,7 @@ bool CuckooFilterTable::find_tag_in_bucket(std::size_t bucket, std::uint32_t tag
         throw invalid_argument("tag is not constrained to bits_per_tag");
     }
 
-    for (size_t i = 0; i < tags_per_bucket_; i++)
-    {
+    for (size_t i = 0; i < tags_per_bucket_; i++) {
         if (read_tag(bucket, i) == tag)
             return true;
     }
@@ -167,7 +165,8 @@ bool CuckooFilterTable::find_tag_in_bucket(std::size_t bucket, std::uint32_t tag
     return false;
 }
 
-bool CuckooFilterTable::find_tag_in_buckets(std::size_t bucket1, std::size_t bucket2, std::uint32_t tag) const
+bool CuckooFilterTable::find_tag_in_buckets(
+    std::size_t bucket1, std::size_t bucket2, std::uint32_t tag) const
 {
     if (bucket1 >= num_buckets_) {
         throw invalid_argument("bucket1 out of range");

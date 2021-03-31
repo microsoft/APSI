@@ -23,7 +23,7 @@ namespace {
     size_t thread_count_ = thread::hardware_concurrency();
     size_t phys_thread_count_ = thread::hardware_concurrency();
     unique_ptr<ThreadPool> thread_pool_;
-}
+} // namespace
 
 ThreadPoolMgr::ThreadPoolMgr()
 {
@@ -46,7 +46,7 @@ ThreadPoolMgr::~ThreadPoolMgr()
     }
 }
 
-ThreadPool& ThreadPoolMgr::thread_pool() const
+ThreadPool &ThreadPoolMgr::thread_pool() const
 {
     if (!thread_pool_)
         throw runtime_error("Thread pool is not available");

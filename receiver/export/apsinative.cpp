@@ -23,8 +23,7 @@ using namespace apsi;
 using namespace apsi::receiver;
 using namespace apsi::network;
 
-namespace
-{
+namespace {
     unique_ptr<Receiver> receiver_;
     unique_ptr<ReceiverChannel> rec_channel_;
 } // namespace
@@ -65,7 +64,8 @@ APSIEXPORT bool APSICALL ReceiverIsConnected()
     return rec_channel_->is_connected();
 }
 
-APSIEXPORT bool APSICALL ReceiverQuery(int length, uint64_tapsi *items, int *result, uint64_tapsi *labels)
+APSIEXPORT bool APSICALL
+ReceiverQuery(int length, uint64_tapsi *items, int *result, uint64_tapsi *labels)
 {
     if (nullptr == items)
         return false;
@@ -78,8 +78,7 @@ APSIEXPORT bool APSICALL ReceiverQuery(int length, uint64_tapsi *items, int *res
 
     vector<Item> apsi_items(length);
 
-    for (int i = 0; i < length; i++)
-    {
+    for (int i = 0; i < length; i++) {
         apsi_items[i] = items[i];
         result[i] = FALSE;
 
@@ -90,12 +89,10 @@ APSIEXPORT bool APSICALL ReceiverQuery(int length, uint64_tapsi *items, int *res
     auto qresult = receiver_->query(apsi_items, *rec_channel_);
 
     // Result
-    for (int i = 0; i < length; i++)
-    {
+    for (int i = 0; i < length; i++) {
         result[i] = qresult.first[i] ? TRUE : FALSE;
 
-        if (receiver_->get_params().use_labels())
-        {
+        if (receiver_->get_params().use_labels()) {
             memcpy(&labels[i], qresult.second[i].data(), sizeof(uint64_t));
         }
     }

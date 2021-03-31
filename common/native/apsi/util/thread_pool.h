@@ -26,18 +26,18 @@
 #pragma once
 
 // STD
-#include <vector>
-#include <queue>
-#include <memory>
-#include <thread>
-#include <mutex>
-#include <condition_variable>
-#include <future>
-#include <atomic>
-#include <functional>
-#include <stdexcept>
 #include <algorithm>
+#include <atomic>
 #include <cassert>
+#include <condition_variable>
+#include <functional>
+#include <future>
+#include <memory>
+#include <mutex>
+#include <queue>
+#include <stdexcept>
+#include <thread>
+#include <vector>
 
 // APSI
 #include "apsi/config.h"
@@ -57,8 +57,7 @@ namespace apsi {
             explicit ThreadPool(
                 std::size_t threads = (std::max)(2u, std::thread::hardware_concurrency()));
             template <class F, class... Args>
-            auto enqueue(F &&f, Args &&... args)
-                -> std::future<apsi_result_of_type>;
+            auto enqueue(F &&f, Args &&... args) -> std::future<apsi_result_of_type>;
             void wait_until_empty();
             void wait_until_nothing_in_flight();
             void set_queue_size_limit(std::size_t limit);
@@ -116,7 +115,7 @@ namespace apsi {
 
         // add new work item to the pool
         template <class F, class... Args>
-        auto ThreadPool::enqueue(F &&f, Args &&...args) -> std::future<apsi_result_of_type>
+        auto ThreadPool::enqueue(F &&f, Args &&... args) -> std::future<apsi_result_of_type>
         {
             using return_type = apsi_result_of_type;
 

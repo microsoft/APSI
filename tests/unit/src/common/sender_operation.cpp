@@ -10,9 +10,10 @@
 
 // SEAL
 #include "seal/context.h"
-#include "seal/keygenerator.h"
 #include "seal/encryptor.h"
+#include "seal/keygenerator.h"
 
+// Google Test
 #include "gtest/gtest.h"
 
 using namespace std;
@@ -20,8 +21,7 @@ using namespace seal;
 using namespace apsi;
 using namespace apsi::network;
 
-namespace APSITests
-{
+namespace APSITests {
     TEST(SenderOperationTest, SaveLoadHeader)
     {
         SenderOperationHeader header;
@@ -176,4 +176,4 @@ namespace APSITests
         ASSERT_EQ(1, sop2.data.at(1).size());
         ASSERT_EQ(2, sop2.data.at(5).size());
     }
-}
+} // namespace APSITests

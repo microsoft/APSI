@@ -10,6 +10,7 @@
 #include <random>
 #include <stdexcept>
 
+// Google Test
 #include "gtest/gtest.h"
 
 using namespace std;
@@ -18,8 +19,7 @@ using namespace apsi::receiver;
 using namespace apsi::util;
 using namespace seal;
 
-namespace APSITests
-{
+namespace APSITests {
     Label create_label(unsigned char start, size_t byte_count)
     {
         Label label(byte_count);
@@ -32,15 +32,13 @@ namespace APSITests
         mt19937_64 rg;
 
         set<size_t> ss;
-        while (ss.size() != size)
-        {
+        while (ss.size() != size) {
             ss.emplace(static_cast<size_t>(rg() % items.size()));
         }
 
         vector<Item> items_vec(items.begin(), items.end());
         unordered_set<Item> items_subset;
-        for (auto idx : ss)
-        {
+        for (auto idx : ss) {
             items_subset.insert(items_vec[idx]);
         }
 
@@ -52,16 +50,16 @@ namespace APSITests
         mt19937_64 rg;
 
         set<size_t> ss;
-        while (ss.size() != size)
-        {
+        while (ss.size() != size) {
             ss.emplace(static_cast<size_t>(rg() % item_labels.size()));
         }
 
         vector<Item> items_vec;
-        transform(item_labels.begin(), item_labels.end(), back_inserter(items_vec), [](auto &il) { return il.first; });
+        transform(item_labels.begin(), item_labels.end(), back_inserter(items_vec), [](auto &il) {
+            return il.first;
+        });
         unordered_set<Item> items_subset;
-        for (auto idx : ss)
-        {
+        for (auto idx : ss) {
             items_subset.insert(items_vec[idx]);
         }
 
@@ -105,18 +103,19 @@ namespace APSITests
     void verify_unlabeled_results(
         const vector<MatchRecord> &query_result,
         const vector<Item> &query_vec,
-        const vector<Item> &int_items
-    ) {
+        const vector<Item> &int_items)
+    {
         // Count matches
-        size_t match_count = accumulate(query_result.cbegin(), query_result.cend(), size_t(0),
-            [](auto sum, auto &curr) { return sum + curr.found; });
+        size_t match_count = accumulate(
+            query_result.cbegin(), query_result.cend(), size_t(0), [](auto sum, auto &curr) {
+                return sum + curr.found;
+            });
 
         // Check that intersection size is correct
         ASSERT_EQ(int_items.size(), match_count);
 
         // Check that every intersection item was actually found
-        for (auto &item : int_items)
-        {
+        for (auto &item : int_items) {
             auto where = find(query_vec.begin(), query_vec.end(), item);
             ASSERT_NE(query_vec.end(), where);
 
@@ -129,29 +128,26 @@ namespace APSITests
         const vector<MatchRecord> &query_result,
         const vector<Item> &query_vec,
         const vector<Item> &int_items,
-        const vector<pair<Item, Label>> &all_item_labels
-    ) {
+        const vector<pair<Item, Label>> &all_item_labels)
+    {
         verify_unlabeled_results(query_result, query_vec, int_items);
 
         // Verify that all labels were received for items that were found
-        for (auto &result : query_result)
-        {
-            if (result.found)
-            {
+        for (auto &result : query_result) {
+            if (result.found) {
                 ASSERT_TRUE(result.label);
             }
         }
 
         // Check that the labels are correct for items in the intersection
-        for (auto &item : int_items)
-        {
+        for (auto &item : int_items) {
             auto where = find(query_vec.begin(), query_vec.end(), item);
             auto idx = distance(query_vec.begin(), where);
 
-            auto reference_label = find_if(
-                all_item_labels.begin(),
-                all_item_labels.end(),
-                [&item](auto &item_label) { return item == item_label.first; });
+            auto reference_label =
+                find_if(all_item_labels.begin(), all_item_labels.end(), [&item](auto &item_label) {
+                    return item == item_label.first;
+                });
             ASSERT_NE(all_item_labels.end(), reference_label);
 
             size_t label_byte_count = reference_label->second.size();
@@ -205,4 +201,4 @@ namespace APSITests
 
         return { item_params, table_params, query_params, seal_params };
     }
-}
+} // namespace APSITests

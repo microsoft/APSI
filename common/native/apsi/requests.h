@@ -11,8 +11,7 @@
 #include "apsi/network/sender_operation.h"
 #include "apsi/util/utils.h"
 
-namespace apsi
-{
+namespace apsi {
     /**
     A type representing a parameter, an OPRF, or a query request message to be sent.
     */
@@ -35,61 +34,73 @@ namespace apsi
 
     inline ParamsRequest to_params_request(Request &request)
     {
-        return util::unique_ptr_cast<network::SenderOperationParms, network::SenderOperation>(request);
+        return util::unique_ptr_cast<network::SenderOperationParms, network::SenderOperation>(
+            request);
     }
 
     inline ParamsRequest to_params_request(Request &&request)
     {
-        return util::unique_ptr_cast<network::SenderOperationParms, network::SenderOperation>(std::move(request));
+        return util::unique_ptr_cast<network::SenderOperationParms, network::SenderOperation>(
+            std::move(request));
     }
 
     inline OPRFRequest to_oprf_request(Request &request)
     {
-        return util::unique_ptr_cast<network::SenderOperationOPRF, network::SenderOperation>(request);
+        return util::unique_ptr_cast<network::SenderOperationOPRF, network::SenderOperation>(
+            request);
     }
 
     inline OPRFRequest to_oprf_request(Request &&request)
     {
-        return util::unique_ptr_cast<network::SenderOperationOPRF, network::SenderOperation>(std::move(request));
+        return util::unique_ptr_cast<network::SenderOperationOPRF, network::SenderOperation>(
+            std::move(request));
     }
 
     inline QueryRequest to_query_request(Request &request)
     {
-        return util::unique_ptr_cast<network::SenderOperationQuery, network::SenderOperation>(request);
+        return util::unique_ptr_cast<network::SenderOperationQuery, network::SenderOperation>(
+            request);
     }
 
     inline QueryRequest to_query_request(Request &&request)
     {
-        return util::unique_ptr_cast<network::SenderOperationQuery, network::SenderOperation>(std::move(request));
+        return util::unique_ptr_cast<network::SenderOperationQuery, network::SenderOperation>(
+            std::move(request));
     }
 
     inline Request to_request(ParamsRequest &params_request)
     {
-        return util::unique_ptr_cast<network::SenderOperation, network::SenderOperationParms>(params_request);
+        return util::unique_ptr_cast<network::SenderOperation, network::SenderOperationParms>(
+            params_request);
     }
 
     inline Request to_request(ParamsRequest &&params_request)
     {
-        return util::unique_ptr_cast<network::SenderOperation, network::SenderOperationParms>(std::move(params_request));
+        return util::unique_ptr_cast<network::SenderOperation, network::SenderOperationParms>(
+            std::move(params_request));
     }
 
     inline Request to_request(OPRFRequest &oprf_request)
     {
-        return util::unique_ptr_cast<network::SenderOperation, network::SenderOperationOPRF>(oprf_request);
+        return util::unique_ptr_cast<network::SenderOperation, network::SenderOperationOPRF>(
+            oprf_request);
     }
 
     inline Request to_request(OPRFRequest &&oprf_request)
     {
-        return util::unique_ptr_cast<network::SenderOperation, network::SenderOperationOPRF>(std::move(oprf_request));
+        return util::unique_ptr_cast<network::SenderOperation, network::SenderOperationOPRF>(
+            std::move(oprf_request));
     }
 
     inline Request to_request(QueryRequest &query_request)
     {
-        return util::unique_ptr_cast<network::SenderOperation, network::SenderOperationQuery>(query_request);
+        return util::unique_ptr_cast<network::SenderOperation, network::SenderOperationQuery>(
+            query_request);
     }
 
     inline Request to_request(QueryRequest &&query_request)
     {
-        return util::unique_ptr_cast<network::SenderOperation, network::SenderOperationQuery>(std::move(query_request));
+        return util::unique_ptr_cast<network::SenderOperation, network::SenderOperationQuery>(
+            std::move(query_request));
     }
-}
+} // namespace apsi

@@ -8,10 +8,11 @@
 #include <sstream>
 
 // APSI
-#include "apsi/sender_db.h"
-#include "apsi/psi_params.h"
 #include "apsi/log.h"
+#include "apsi/psi_params.h"
+#include "apsi/sender_db.h"
 
+// Google Test
 #include "gtest/gtest.h"
 
 using namespace std;
@@ -19,15 +20,12 @@ using namespace apsi;
 using namespace apsi::sender;
 using namespace seal;
 
-namespace APSITests
-{
-    namespace
-    {
+namespace APSITests {
+    namespace {
         shared_ptr<PSIParams> get_params()
         {
             static shared_ptr<PSIParams> params = nullptr;
-            if (!params)
-            {
+            if (!params) {
                 PSIParams::ItemParams item_params;
                 item_params.felts_per_item = 8;
 
@@ -45,7 +43,8 @@ namespace APSITests
                 seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(pmd));
                 seal_params.set_plain_modulus(65537);
 
-                params = make_shared<PSIParams>(item_params, table_params, query_params, seal_params);
+                params =
+                    make_shared<PSIParams>(item_params, table_params, query_params, seal_params);
             }
 
             return params;
@@ -62,7 +61,7 @@ namespace APSITests
             iota(label.begin(), label.end(), start);
             return label;
         }
-    }
+    } // namespace
 
     TEST(SenderDBTests, Constructor)
     {
@@ -116,8 +115,9 @@ namespace APSITests
         auto set_params = sender_db.get_params();
         ASSERT_EQ(params->to_string(), set_params.to_string());
 
-        oprf::OPRFKey oprf_key = sender_db.get_oprf_key(); 
-        ASSERT_FALSE(all_of(oprf_key.key_span().begin(), oprf_key.key_span().end(), [](auto b) { return b == 0; }));
+        oprf::OPRFKey oprf_key = sender_db.get_oprf_key();
+        ASSERT_FALSE(all_of(
+            oprf_key.key_span().begin(), oprf_key.key_span().end(), [](auto b) { return b == 0; }));
     }
 
     TEST(SenderDBTests, LabeledBasics)
@@ -151,8 +151,9 @@ namespace APSITests
         auto set_params = sender_db.get_params();
         ASSERT_EQ(params->to_string(), set_params.to_string());
 
-        oprf::OPRFKey oprf_key = sender_db.get_oprf_key(); 
-        ASSERT_FALSE(all_of(oprf_key.key_span().begin(), oprf_key.key_span().end(), [](auto b) { return b == 0; }));
+        oprf::OPRFKey oprf_key = sender_db.get_oprf_key();
+        ASSERT_FALSE(all_of(
+            oprf_key.key_span().begin(), oprf_key.key_span().end(), [](auto b) { return b == 0; }));
     }
 
     TEST(SenderDBTests, UnlabeledInsertOrAssignSingle)
@@ -188,14 +189,17 @@ namespace APSITests
         ASSERT_FALSE(sender_db.has_item(Item(2, 0)));
 
         auto bundle_idx_count = params->bundle_idx_count();
-        for (uint32_t i = 0; i < bundle_idx_count; i++)
-        {
+        for (uint32_t i = 0; i < bundle_idx_count; i++) {
             // Access caches
             auto cache = sender_db.get_cache_at(i);
 
             // Check the cache; we have only one bundle at this index
-            ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto &a) { return !!a.get().batched_matching_polyn; }));
-            ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto &a) { return a.get().batched_interp_polyns.empty(); }));
+            ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto &a) {
+                return !!a.get().batched_matching_polyn;
+            }));
+            ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto &a) {
+                return a.get().batched_interp_polyns.empty();
+            }));
         }
 
         // Accessing cache beyond range
@@ -214,8 +218,7 @@ namespace APSITests
 
         // Create a vector of items without duplicates
         vector<Item> items;
-        for (uint64_t i = 0; i < 200; i++)
-        {
+        for (uint64_t i = 0; i < 200; i++) {
             items.push_back({ i, i + 1 });
         }
 
@@ -223,8 +226,7 @@ namespace APSITests
         sender_db.insert_or_assign(items);
         ASSERT_EQ(200, sender_db.get_hashed_items().size());
         auto bin_bundle_count = sender_db.get_bin_bundle_count();
-        for (auto &item : items)
-        {
+        for (auto &item : items) {
             ASSERT_TRUE(sender_db.has_item(item));
         }
         ASSERT_FALSE(sender_db.has_item(Item(1000, 1001)));
@@ -233,8 +235,7 @@ namespace APSITests
         sender_db.insert_or_assign(items);
         ASSERT_EQ(200, sender_db.get_hashed_items().size());
         ASSERT_EQ(bin_bundle_count, sender_db.get_bin_bundle_count());
-        for (auto &item : items)
-        {
+        for (auto &item : items) {
             ASSERT_TRUE(sender_db.has_item(item));
         }
         ASSERT_FALSE(sender_db.has_item(Item(1000, 1001)));
@@ -243,8 +244,7 @@ namespace APSITests
         sender_db.clear();
         ASSERT_TRUE(sender_db.get_hashed_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
-        for (auto &item : items)
-        {
+        for (auto &item : items) {
             ASSERT_FALSE(sender_db.has_item(item));
         }
 
@@ -252,21 +252,23 @@ namespace APSITests
         sender_db.insert_or_assign(items);
         ASSERT_EQ(200, sender_db.get_hashed_items().size());
         ASSERT_EQ(bin_bundle_count, sender_db.get_bin_bundle_count());
-        for (auto &item : items)
-        {
+        for (auto &item : items) {
             ASSERT_TRUE(sender_db.has_item(item));
         }
         ASSERT_FALSE(sender_db.has_item(Item(1000, 1001)));
 
         auto bundle_idx_count = params->bundle_idx_count();
-        for (uint32_t i = 0; i < bundle_idx_count; i++)
-        {
+        for (uint32_t i = 0; i < bundle_idx_count; i++) {
             // Access caches
             auto cache = sender_db.get_cache_at(i);
 
             // Check the cache; we have only one bundle at this index
-            ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto a) { return !!a.get().batched_matching_polyn; }));
-            ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto a) { return a.get().batched_interp_polyns.empty(); }));
+            ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto a) {
+                return !!a.get().batched_matching_polyn;
+            }));
+            ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto a) {
+                return a.get().batched_interp_polyns.empty();
+            }));
         }
 
         // Accessing cache beyond range
@@ -336,17 +338,16 @@ namespace APSITests
 
         // Create a vector of items and labels without duplicates
         vector<pair<Item, Label>> items;
-        for (uint64_t i = 0; i < 200; i++)
-        {
-            items.push_back(make_pair(Item(i, i + 1), create_label(static_cast<unsigned char>(i), 20)));
+        for (uint64_t i = 0; i < 200; i++) {
+            items.push_back(
+                make_pair(Item(i, i + 1), create_label(static_cast<unsigned char>(i), 20)));
         }
 
         // Insert all items
         sender_db.insert_or_assign(items);
         ASSERT_EQ(200, sender_db.get_hashed_items().size());
         auto bin_bundle_count = sender_db.get_bin_bundle_count();
-        for (auto &item : items)
-        {
+        for (auto &item : items) {
             ASSERT_TRUE(sender_db.has_item(item.first));
             ASSERT_EQ(item.second, sender_db.get_label(item.first));
         }
@@ -356,8 +357,7 @@ namespace APSITests
         sender_db.insert_or_assign(items);
         ASSERT_EQ(200, sender_db.get_hashed_items().size());
         ASSERT_EQ(bin_bundle_count, sender_db.get_bin_bundle_count());
-        for (auto &item : items)
-        {
+        for (auto &item : items) {
             ASSERT_TRUE(sender_db.has_item(item.first));
             ASSERT_EQ(item.second, sender_db.get_label(item.first));
         }
@@ -367,8 +367,7 @@ namespace APSITests
         sender_db.clear();
         ASSERT_TRUE(sender_db.get_hashed_items().empty());
         ASSERT_EQ(0, sender_db.get_bin_bundle_count());
-        for (auto &item : items)
-        {
+        for (auto &item : items) {
             ASSERT_FALSE(sender_db.has_item(item.first));
             ASSERT_THROW(auto label2 = sender_db.get_label(item.first), logic_error);
         }
@@ -377,22 +376,24 @@ namespace APSITests
         sender_db.insert_or_assign(items);
         ASSERT_EQ(200, sender_db.get_hashed_items().size());
         ASSERT_EQ(bin_bundle_count, sender_db.get_bin_bundle_count());
-        for (auto &item : items)
-        {
+        for (auto &item : items) {
             ASSERT_TRUE(sender_db.has_item(item.first));
             ASSERT_EQ(item.second, sender_db.get_label(item.first));
         }
         ASSERT_FALSE(sender_db.has_item(Item(1000, 1001)));
 
         auto bundle_idx_count = params->bundle_idx_count();
-        for (uint32_t i = 0; i < bundle_idx_count; i++)
-        {
+        for (uint32_t i = 0; i < bundle_idx_count; i++) {
             // Access caches
             auto cache = sender_db.get_cache_at(i);
 
             // Check the cache; we have only one bundle at this index
-            ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto a) { return !!a.get().batched_matching_polyn; }));
-            ASSERT_TRUE(none_of(cache.begin(), cache.end(), [](auto a) { return a.get().batched_interp_polyns.empty(); }));
+            ASSERT_TRUE(all_of(cache.begin(), cache.end(), [](auto a) {
+                return !!a.get().batched_matching_polyn;
+            }));
+            ASSERT_TRUE(none_of(cache.begin(), cache.end(), [](auto a) {
+                return a.get().batched_interp_polyns.empty();
+            }));
         }
 
         // Accessing cache beyond range
@@ -408,8 +409,9 @@ namespace APSITests
     {
         auto params = get_params();
 
-        // We use a labeled SenderDB here to end up with multiple BinBundles more quickly. This happens because in the
-        // labeled case BinBundles cannot tolerate repetitions of item parts (felts) in bins.
+        // We use a labeled SenderDB here to end up with multiple BinBundles more quickly. This
+        // happens because in the labeled case BinBundles cannot tolerate repetitions of item parts
+        // (felts) in bins.
         SenderDB sender_db(*params, 20, 16, true);
 
         // Insert a single item
@@ -428,8 +430,7 @@ namespace APSITests
 
         // Now insert until we have 2 BinBundles
         uint64_t val = 0;
-        while (sender_db.get_bin_bundle_count() < 2)
-        {
+        while (sender_db.get_bin_bundle_count() < 2) {
             sender_db.insert_or_assign(
                 { Item(val, ~val), create_label(static_cast<unsigned char>(val), 20) });
             val++;
@@ -447,8 +448,7 @@ namespace APSITests
         ASSERT_EQ(1, sender_db.get_bin_bundle_count());
 
         // Remove all inserted items, one-by-one
-        while (val > 0)
-        {
+        while (val > 0) {
             val--;
             sender_db.remove(Item(val, ~val));
         }
@@ -459,8 +459,7 @@ namespace APSITests
 
         // Again insert until we have 2 BinBundles
         val = 0;
-        while (sender_db.get_bin_bundle_count() < 2)
-        {
+        while (sender_db.get_bin_bundle_count() < 2) {
             sender_db.insert_or_assign(
                 { Item(val, ~val), create_label(static_cast<unsigned char>(val), 20) });
             val++;
@@ -511,8 +510,7 @@ namespace APSITests
 
         // Create a vector of items without duplicates
         vector<Item> items;
-        for (uint64_t i = 0; i < 200; i++)
-        {
+        for (uint64_t i = 0; i < 200; i++) {
             items.push_back({ i, i + 1 });
         }
 
@@ -533,8 +531,7 @@ namespace APSITests
         ASSERT_TRUE(oprf_keys_equal(sender_db.get_oprf_key(), other_sdb.get_oprf_key()));
 
         // Check that the items match
-        for (auto &it : sender_db.get_hashed_items())
-        {
+        for (auto &it : sender_db.get_hashed_items()) {
             ASSERT_NE(other_sdb.get_hashed_items().end(), other_sdb.get_hashed_items().find(it));
         }
     }
@@ -576,9 +573,9 @@ namespace APSITests
 
         // Create a vector of items and labels without duplicates
         vector<pair<Item, Label>> items;
-        for (uint64_t i = 0; i < 200; i++)
-        {
-            items.push_back(make_pair(Item(i, i + 1), create_label(static_cast<unsigned char>(i), 20)));
+        for (uint64_t i = 0; i < 200; i++) {
+            items.push_back(
+                make_pair(Item(i, i + 1), create_label(static_cast<unsigned char>(i), 20)));
         }
 
         // Insert all items
@@ -598,9 +595,103 @@ namespace APSITests
         ASSERT_TRUE(oprf_keys_equal(sender_db.get_oprf_key(), other_sdb.get_oprf_key()));
 
         // Check that the items match
-        for (auto &it : sender_db.get_hashed_items())
-        {
+        for (auto &it : sender_db.get_hashed_items()) {
             ASSERT_NE(other_sdb.get_hashed_items().end(), other_sdb.get_hashed_items().find(it));
         }
     }
-}
+
+    TEST(SenderDBTests, StripUnlabeled)
+    {
+        auto params = get_params();
+        SenderDB sender_db(*params, 0, 0, false);
+
+        // Strip and reset
+        ASSERT_FALSE(sender_db.is_stripped());
+        sender_db.strip();
+        ASSERT_TRUE(sender_db.is_stripped());
+        sender_db.clear();
+        ASSERT_FALSE(sender_db.is_stripped());
+
+        // Insert one item and check data
+        sender_db.insert_or_assign(Item(0, 0));
+        ASSERT_EQ(1, sender_db.get_hashed_items().size());
+        ASSERT_EQ(1, sender_db.get_item_count());
+        ASSERT_EQ(1, sender_db.get_bin_bundle_count());
+        ASSERT_TRUE(sender_db.has_item(Item(0, 0)));
+        auto pr = sender_db.get_packing_rate();
+
+        // Strip and check sizes
+        sender_db.strip();
+        ASSERT_TRUE(sender_db.is_stripped());
+        ASSERT_EQ(0, sender_db.get_hashed_items().size());
+        ASSERT_EQ(1, sender_db.get_item_count());
+        ASSERT_EQ(1, sender_db.get_bin_bundle_count());
+        ASSERT_EQ(pr, sender_db.get_packing_rate());
+
+        // Attempt operations on a stripped SenderDB
+        ASSERT_THROW(sender_db.has_item(Item(0, 0)), logic_error);
+        ASSERT_THROW(sender_db.insert_or_assign(Item(1, 2)), logic_error);
+        ASSERT_THROW(sender_db.remove(Item(0, 0)), logic_error);
+
+        // Save, load, and check sizes
+        stringstream ss;
+        sender_db.save(ss);
+        SenderDB sender_db2 = SenderDB::Load(ss).first;
+        ASSERT_TRUE(sender_db2.is_stripped());
+        ASSERT_EQ(0, sender_db2.get_hashed_items().size());
+        ASSERT_EQ(1, sender_db2.get_item_count());
+        ASSERT_EQ(1, sender_db2.get_bin_bundle_count());
+        ASSERT_EQ(pr, sender_db2.get_packing_rate());
+
+        sender_db2.clear();
+        ASSERT_FALSE(sender_db2.is_stripped());
+    }
+
+    TEST(SenderDBTests, StriplLabeled)
+    {
+        auto params = get_params();
+        SenderDB sender_db(*params, 20, 8, false);
+
+        // Strip and reset
+        ASSERT_FALSE(sender_db.is_stripped());
+        sender_db.strip();
+        ASSERT_TRUE(sender_db.is_stripped());
+        sender_db.clear();
+        ASSERT_FALSE(sender_db.is_stripped());
+
+        // Insert one item and check data
+        sender_db.insert_or_assign(make_pair(Item(0, 0), create_label(0, 20)));
+        ASSERT_EQ(1, sender_db.get_hashed_items().size());
+        ASSERT_EQ(1, sender_db.get_item_count());
+        ASSERT_EQ(1, sender_db.get_bin_bundle_count());
+        ASSERT_TRUE(sender_db.has_item(Item(0, 0)));
+        auto pr = sender_db.get_packing_rate();
+
+        // Strip and check sizes
+        sender_db.strip();
+        ASSERT_TRUE(sender_db.is_stripped());
+        ASSERT_EQ(0, sender_db.get_hashed_items().size());
+        ASSERT_EQ(1, sender_db.get_item_count());
+        ASSERT_EQ(1, sender_db.get_bin_bundle_count());
+        ASSERT_EQ(pr, sender_db.get_packing_rate());
+
+        // Attempt operations on a stripped SenderDB
+        ASSERT_THROW(sender_db.has_item(Item(0, 0)), logic_error);
+        ASSERT_THROW(sender_db.get_label(Item(0, 0)), logic_error);
+        ASSERT_THROW(sender_db.insert_or_assign(Item(1, 2)), logic_error);
+        ASSERT_THROW(sender_db.remove(Item(0, 0)), logic_error);
+
+        // Save, load, and check sizes
+        stringstream ss;
+        sender_db.save(ss);
+        SenderDB sender_db2 = SenderDB::Load(ss).first;
+        ASSERT_TRUE(sender_db2.is_stripped());
+        ASSERT_EQ(0, sender_db2.get_hashed_items().size());
+        ASSERT_EQ(1, sender_db2.get_item_count());
+        ASSERT_EQ(1, sender_db2.get_bin_bundle_count());
+        ASSERT_EQ(pr, sender_db2.get_packing_rate());
+
+        sender_db2.clear();
+        ASSERT_FALSE(sender_db2.is_stripped());
+    }
+} // namespace APSITests

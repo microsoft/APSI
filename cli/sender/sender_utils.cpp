@@ -2,14 +2,14 @@
 // Licensed under the MIT license.
 
 // STD
-#include <vector>
-#include <utility>
 #include <fstream>
+#include <utility>
+#include <vector>
 
 // APSI
-#include "sender/sender_utils.h"
 #include "apsi/log.h"
 #include "common/common_utils.h"
+#include "sender/sender_utils.h"
 
 // SEAL
 #include "seal/modulus.h"
