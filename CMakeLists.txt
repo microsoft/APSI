@@ -224,12 +224,14 @@ endif()
 
 # Add source files to library and header files to install
 # TODO: combine into a single variable
+set(APSI_SOURCE_FILES "")
 set(APSI_COMMON_SOURCE_FILES "")
 add_subdirectory(common/native/apsi)
 set(APSI_RECEIVER_SOURCE_FILES "")
 add_subdirectory(receiver/native/apsi)
 set(APSI_SENDER_SOURCE_FILES "")
 add_subdirectory(sender/native/apsi)
+set(APSI_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES} ${APSI_RECEIVER_SOURCE_FILES} ${APSI_SENDER_SOURCE_FILES})
 
 # Create the config file
 configure_file(${APSI_CONFIG_H_IN_FILENAME} ${APSI_CONFIG_H_FILENAME})
@@ -237,90 +239,97 @@ install(
     FILES ${APSI_CONFIG_H_FILENAME}
     DESTINATION ${APSI_INCLUDES_INSTALL_DIR}/apsi)
 
-add_library(common STATIC ${APSI_COMMON_SOURCE_FILES})
-set_target_properties(common PROPERTIES OUTPUT_NAME apsi_common-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
-apsi_set_language(common)
-target_include_directories(common PUBLIC
+# Create a single library "apsi" for common, sender, and receiver
+add_library(apsi STATIC ${APSI_SOURCE_FILES})
+set_target_properties(apsi PROPERTIES OUTPUT_NAME apsi-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
+apsi_set_language(apsi)
+target_include_directories(apsi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/common/native>
     $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
-target_include_directories(common PUBLIC
+target_include_directories(apsi PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/sender/native>
+    $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
+target_include_directories(apsi PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/receiver/native>
+    $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
+target_include_directories(apsi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/common/native>
     $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
-apsi_set_version(common)
-apsi_link_threads(common)
-apsi_install_target(common APSITargets)
+apsi_set_version(apsi)
+apsi_link_threads(apsi)
+apsi_install_target(apsi APSITargets)
 
-target_link_libraries(common
+target_link_libraries(apsi
     PUBLIC SEAL::seal
     PUBLIC Kuku::kuku
     PUBLIC flatbuffers::flatbuffers
     PUBLIC jsoncpp_static)
 if (APSI_USE_LOG4CPLUS)
-    target_link_libraries(common PUBLIC log4cplus::log4cplus)
+    target_link_libraries(apsi PUBLIC log4cplus::log4cplus)
 endif()
 if(APSI_USE_ZMQ)
-    target_link_libraries(common PUBLIC libzmq-static cppzmq-static)
+    target_link_libraries(apsi PUBLIC libzmq-static cppzmq-static)
 endif()
 
 # Set AVX or AVX2 flags
 include(FindAVX)
-check_for_avx(common)
+check_for_avx(apsi)
 if (HAVE_AVX2_EXTENSIONS)
-    target_compile_options(common PUBLIC -D_AVX2_)
+    target_compile_options(apsi PUBLIC -D_AVX2_)
 elseif(HAVE_AVX_EXTENSIONS)
-    target_compile_options(common PUBLIC -D_AVX_)
+    target_compile_options(apsi PUBLIC -D_AVX_)
 else()
-    target_compile_options(common PUBLIC -D_GENERIC_)
+    target_compile_options(apsi PUBLIC -D_GENERIC_)
 endif()
 
 if (MSVC)
-    target_compile_options(common PUBLIC -D__WINDOWS__)
+    target_compile_options(apsi PUBLIC -D__WINDOWS__)
 else()
-    target_compile_options(common PUBLIC -D__LINUX__)
-    target_compile_options(common PUBLIC -march=native)
+    target_compile_options(apsi PUBLIC -D__LINUX__)
+    target_compile_options(apsi PUBLIC -march=native)
 endif()
 
 # Defines for FourQlib
-target_compile_options(common PUBLIC -DHAVE_CONFIG)
-target_compile_options(common PUBLIC -DUSE_SECURE_SEED)
-target_compile_options(common PUBLIC -D_AMD64_)
-target_compile_options(common PUBLIC -DUSE_ENDO=true)
+target_compile_options(apsi PUBLIC -DHAVE_CONFIG)
+target_compile_options(apsi PUBLIC -DUSE_SECURE_SEED)
+target_compile_options(apsi PUBLIC -D_AMD64_)
+target_compile_options(apsi PUBLIC -DUSE_ENDO=true)
 
 #############################
 # APSI receiver C++ library #
 #############################
 
-add_library(receiver STATIC ${APSI_RECEIVER_SOURCE_FILES})
-set_target_properties(receiver PROPERTIES OUTPUT_NAME apsi_receiver-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
-apsi_set_language(receiver)
-target_include_directories(receiver PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/receiver/native>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/common/native>
-    $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
-apsi_set_version(receiver)
-apsi_link_threads(receiver)
-apsi_install_target(receiver APSITargets)
-target_link_libraries(receiver PUBLIC common)
+#add_library(receiver STATIC ${APSI_RECEIVER_SOURCE_FILES})
+#set_target_properties(receiver PROPERTIES OUTPUT_NAME apsi_receiver-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
+#apsi_set_language(receiver)
+#target_include_directories(receiver PUBLIC
+#    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/receiver/native>
+#    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/common/native>
+#    $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
+#apsi_set_version(receiver)
+#apsi_link_threads(receiver)
+#apsi_install_target(receiver APSITargets)
+#target_link_libraries(receiver PUBLIC common)
 
 ###########################
 # APSI sender C++ library #
 ###########################
 
-add_library(sender STATIC ${APSI_SENDER_SOURCE_FILES})
-set_target_properties(sender PROPERTIES OUTPUT_NAME apsi_sender-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
-apsi_set_language(sender)
-target_include_directories(sender PUBLIC
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/sender/native>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/common/native>
-    $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
-apsi_set_version(sender)
-apsi_link_threads(sender)
-apsi_install_target(sender APSITargets)
-target_link_libraries(sender PUBLIC common)
+#add_library(sender STATIC ${APSI_SENDER_SOURCE_FILES})
+#set_target_properties(sender PROPERTIES OUTPUT_NAME apsi_sender-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
+#apsi_set_language(sender)
+#target_include_directories(sender PUBLIC
+#    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/sender/native>
+#    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/common/native>
+#    $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
+#apsi_set_version(sender)
+#apsi_link_threads(sender)
+#apsi_install_target(sender APSITargets)
+#target_link_libraries(sender PUBLIC common)
 
 # Set secure compile options if APSI_SECURE_COMPILE_OPTIONS is ON; only supported on MSVC
 if(APSI_SECURE_COMPILE_OPTIONS)
-    apsi_set_secure_compile_options(seal PUBLIC)
+    apsi_set_secure_compile_options(apsi PUBLIC)
 endif()
 
 #################################
@@ -336,7 +345,7 @@ endif()
 if(APSI_BUILD_TESTS)
     add_executable(unit_tests)
     add_subdirectory(tests/unit/src)
-    target_link_libraries(unit_tests common sender receiver GTest::gtest)
+    target_link_libraries(unit_tests apsi GTest::gtest)
 endif()
 
 ##########################
@@ -346,7 +355,7 @@ endif()
 if(APSI_BUILD_TESTS)
     add_executable(integration_tests)
     add_subdirectory(tests/integration/src)
-    target_link_libraries(integration_tests common sender receiver GTest::gtest)
+    target_link_libraries(integration_tests apsi GTest::gtest)
 endif()
 
 ##########################
@@ -360,7 +369,7 @@ if(APSI_BUILD_CLI)
     add_subdirectory(cli/common)
     target_include_directories(common_cli PUBLIC cli)
     target_include_directories(common_cli PUBLIC ${TCLAP_INCLUDE_DIRS})
-    target_link_libraries(common_cli PUBLIC common)
+    target_link_libraries(common_cli PUBLIC apsi)
     if (NOT MSVC AND NOT APPLE)
         target_link_libraries(common_cli PUBLIC stdc++fs)
     endif()
@@ -375,18 +384,18 @@ if(APSI_BUILD_CLI)
 
     add_executable(sender_cli)
     add_subdirectory(cli/sender)
-    target_link_libraries(sender_cli PUBLIC common_cli sender)
+    target_link_libraries(sender_cli PUBLIC common_cli apsi)
     if (APPLE)
         target_compile_options(common_cli PUBLIC -DHAVE_LONG_LONG)
     endif()
 
     add_executable(receiver_cli)
     add_subdirectory(cli/receiver)
-    target_link_libraries(receiver_cli PUBLIC common_cli receiver)
+    target_link_libraries(receiver_cli PUBLIC common_cli apsi)
 
     add_executable(pd_tool)
     add_subdirectory(cli/pd_tool)
     target_include_directories(pd_tool PRIVATE cli)
     target_include_directories(pd_tool PRIVATE ${TCLAP_INCLUDE_DIRS})
-    target_link_libraries(pd_tool common)
+    target_link_libraries(pd_tool apsi)
 endif()
