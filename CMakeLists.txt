@@ -241,7 +241,7 @@ add_library(common STATIC ${APSI_COMMON_SOURCE_FILES})
 set_target_properties(common PROPERTIES OUTPUT_NAME apsi_common-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
 apsi_set_language(common)
 target_include_directories(common PUBLIC
-    $<BUILD_INTERFACE:${APSI_SOURCE_DIR}/common/native>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/common/native>
     $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
 target_include_directories(common PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/common/native>
@@ -294,8 +294,8 @@ add_library(receiver STATIC ${APSI_RECEIVER_SOURCE_FILES})
 set_target_properties(receiver PROPERTIES OUTPUT_NAME apsi_receiver-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
 apsi_set_language(receiver)
 target_include_directories(receiver PUBLIC
-    $<BUILD_INTERFACE:${APSI_SOURCE_DIR}/receiver/native>
-    $<BUILD_INTERFACE:${APSI_SOURCE_DIR}/common/native>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/receiver/native>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/common/native>
     $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
 apsi_set_version(receiver)
 apsi_link_threads(receiver)
@@ -310,8 +310,8 @@ add_library(sender STATIC ${APSI_SENDER_SOURCE_FILES})
 set_target_properties(sender PROPERTIES OUTPUT_NAME apsi_sender-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
 apsi_set_language(sender)
 target_include_directories(sender PUBLIC
-    $<BUILD_INTERFACE:${APSI_SOURCE_DIR}/sender/native>
-    $<BUILD_INTERFACE:${APSI_SOURCE_DIR}/common/native>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/sender/native>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/common/native>
     $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
 apsi_set_version(sender)
 apsi_link_threads(sender)
