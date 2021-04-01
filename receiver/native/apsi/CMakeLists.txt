@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 
 # Source files in this directory
-set(APSI_RECEIVER_SOURCE_FILES ${APSI_RECEIVER_SOURCE_FILES}
+set(APSI_SOURCE_FILES ${APSI_SOURCE_FILES}
     ${CMAKE_CURRENT_LIST_DIR}/plaintext_powers.cpp
     ${CMAKE_CURRENT_LIST_DIR}/receiver.cpp
 )
@@ -17,4 +17,4 @@ install(
         ${APSI_INCLUDES_INSTALL_DIR}/apsi
 )
 
-set(APSI_RECEIVER_SOURCE_FILES ${APSI_RECEIVER_SOURCE_FILES} PARENT_SCOPE)
+set(APSI_SOURCE_FILES ${APSI_SOURCE_FILES} PARENT_SCOPE)

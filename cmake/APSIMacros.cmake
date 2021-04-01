@@ -15,11 +15,10 @@ macro(apsi_set_version target)
     set_target_properties(${target} PROPERTIES VERSION ${APSI_VERSION})
 endmacro()
 
-# TODO: Uncomment or delete
 # Set the library filename to reflect version
-#macro(apsi_set_version_filename target)
-#    set_target_properties(${target} PROPERTIES OUTPUT_NAME ${target}-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
-#endmacro()
+macro(apsi_set_version_filename target)
+    set_target_properties(${target} PROPERTIES OUTPUT_NAME ${target}-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
+endmacro()
 
 # Set the SOVERSION property
 macro(apsi_set_soversion target)

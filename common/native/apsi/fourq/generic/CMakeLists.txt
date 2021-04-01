@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 
 # Source files in this directory
-set(APSI_COMMON_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES}
+set(APSI_SOURCE_FILES ${APSI_SOURCE_FILES}
     ${CMAKE_CURRENT_LIST_DIR}/fp.h # TODO: mistake?
 )
 
@@ -14,4 +14,4 @@ install(
         ${APSI_INCLUDES_INSTALL_DIR}/apsi/fourq/generic
 )
 
-set(APSI_COMMON_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES} PARENT_SCOPE)
+set(APSI_SOURCE_FILES ${APSI_SOURCE_FILES} PARENT_SCOPE)

@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 
 # Source files in this directory
-set(APSI_COMMON_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES}
+set(APSI_SOURCE_FILES ${APSI_SOURCE_FILES}
     ${CMAKE_CURRENT_LIST_DIR}/item.cpp
     ${CMAKE_CURRENT_LIST_DIR}/log.cpp
     ${CMAKE_CURRENT_LIST_DIR}/powers.cpp
@@ -32,4 +32,4 @@ add_subdirectory(fourq)
 add_subdirectory(network)
 add_subdirectory(oprf)
 add_subdirectory(util)
-set(APSI_COMMON_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES} PARENT_SCOPE)
+set(APSI_SOURCE_FILES ${APSI_SOURCE_FILES} PARENT_SCOPE)

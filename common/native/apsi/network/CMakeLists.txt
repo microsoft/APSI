@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 
 # Source files in this directory
-set(APSI_COMMON_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES}
+set(APSI_SOURCE_FILES ${APSI_SOURCE_FILES}
     ${CMAKE_CURRENT_LIST_DIR}/result_package.cpp
     ${CMAKE_CURRENT_LIST_DIR}/sender_operation.cpp
     ${CMAKE_CURRENT_LIST_DIR}/sender_operation_response.cpp
@@ -25,4 +25,4 @@ install(
 if(APSI_USE_ZMQ)
     add_subdirectory(zmq)
 endif()
-set(APSI_COMMON_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES} PARENT_SCOPE)
+set(APSI_SOURCE_FILES ${APSI_SOURCE_FILES} PARENT_SCOPE)

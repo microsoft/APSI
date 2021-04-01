@@ -2,7 +2,7 @@
 # Licensed under the MIT license.
 
 # Source files in this directory
-set(APSI_COMMON_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES}
+set(APSI_SOURCE_FILES ${APSI_SOURCE_FILES}
     ${CMAKE_CURRENT_LIST_DIR}/crypto_util.c
     ${CMAKE_CURRENT_LIST_DIR}/eccp2_core.c
     ${CMAKE_CURRENT_LIST_DIR}/eccp2_no_endo.c
@@ -27,4 +27,4 @@ install(
 add_subdirectory(amd64)
 add_subdirectory(arm64)
 add_subdirectory(generic)
-set(APSI_COMMON_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES} PARENT_SCOPE)
+set(APSI_SOURCE_FILES ${APSI_SOURCE_FILES} PARENT_SCOPE)

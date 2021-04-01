@@ -223,15 +223,10 @@ endif()
 # TODO: what is the new filesystem structure?
 
 # Add source files to library and header files to install
-# TODO: combine into a single variable
 set(APSI_SOURCE_FILES "")
-set(APSI_COMMON_SOURCE_FILES "")
 add_subdirectory(common/native/apsi)
-set(APSI_RECEIVER_SOURCE_FILES "")
 add_subdirectory(receiver/native/apsi)
-set(APSI_SENDER_SOURCE_FILES "")
 add_subdirectory(sender/native/apsi)
-set(APSI_SOURCE_FILES ${APSI_COMMON_SOURCE_FILES} ${APSI_RECEIVER_SOURCE_FILES} ${APSI_SENDER_SOURCE_FILES})
 
 # Create the config file
 configure_file(${APSI_CONFIG_H_IN_FILENAME} ${APSI_CONFIG_H_FILENAME})
@@ -241,7 +236,7 @@ install(
 
 # Create a single library "apsi" for common, sender, and receiver
 add_library(apsi STATIC ${APSI_SOURCE_FILES})
-set_target_properties(apsi PROPERTIES OUTPUT_NAME apsi-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
+apsi_set_version_filename(apsi)
 apsi_set_language(apsi)
 target_include_directories(apsi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/common/native>
@@ -294,43 +289,6 @@ target_compile_options(apsi PUBLIC -DHAVE_CONFIG)
 target_compile_options(apsi PUBLIC -DUSE_SECURE_SEED)
 target_compile_options(apsi PUBLIC -D_AMD64_)
 target_compile_options(apsi PUBLIC -DUSE_ENDO=true)
-
-#############################
-# APSI receiver C++ library #
-#############################
-
-#add_library(receiver STATIC ${APSI_RECEIVER_SOURCE_FILES})
-#set_target_properties(receiver PROPERTIES OUTPUT_NAME apsi_receiver-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
-#apsi_set_language(receiver)
-#target_include_directories(receiver PUBLIC
-#    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/receiver/native>
-#    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/common/native>
-#    $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
-#apsi_set_version(receiver)
-#apsi_link_threads(receiver)
-#apsi_install_target(receiver APSITargets)
-#target_link_libraries(receiver PUBLIC common)
-
-###########################
-# APSI sender C++ library #
-###########################
-
-#add_library(sender STATIC ${APSI_SENDER_SOURCE_FILES})
-#set_target_properties(sender PROPERTIES OUTPUT_NAME apsi_sender-${APSI_VERSION_MAJOR}.${APSI_VERSION_MINOR})
-#apsi_set_language(sender)
-#target_include_directories(sender PUBLIC
-#    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/sender/native>
-#    $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/common/native>
-#    $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
-#apsi_set_version(sender)
-#apsi_link_threads(sender)
-#apsi_install_target(sender APSITargets)
-#target_link_libraries(sender PUBLIC common)
-
-# Set secure compile options if APSI_SECURE_COMPILE_OPTIONS is ON; only supported on MSVC
-if(APSI_SECURE_COMPILE_OPTIONS)
-    apsi_set_secure_compile_options(apsi PUBLIC)
-endif()
 
 #################################
 # Installation and CMake config #
