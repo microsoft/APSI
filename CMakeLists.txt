@@ -294,7 +294,39 @@ target_compile_options(apsi PUBLIC -DUSE_ENDO=true)
 # Installation and CMake config #
 #################################
 
-# TODO: after directory structure is set.
+# TODO: change after directory structure is set.
+# Create the CMake config file
+include(CMakePackageConfigHelpers)
+configure_package_config_file(
+    ${APSI_CONFIG_IN_FILENAME} ${APSI_CONFIG_FILENAME}
+    INSTALL_DESTINATION ${APSI_CONFIG_INSTALL_DIR}
+)
+
+# Install the export
+install(
+    EXPORT APSITargets
+    NAMESPACE APSI::
+    DESTINATION ${APSI_CONFIG_INSTALL_DIR})
+
+# Version file; we require exact version match for downstream
+write_basic_package_version_file(
+    ${APSI_CONFIG_VERSION_FILENAME}
+    VERSION ${APSI_VERSION}
+    COMPATIBILITY SameMinorVersion)
+
+# Install config and module files
+install(
+    FILES
+        ${APSI_CONFIG_FILENAME}
+        ${APSI_CONFIG_VERSION_FILENAME}
+    DESTINATION ${APSI_CONFIG_INSTALL_DIR})
+
+# We export SEALTargets from the build tree so it can be used by other projects
+# without requiring an install.
+export(
+    EXPORT APSITargets
+    NAMESPACE APSI::
+    FILE ${APSI_TARGETS_FILENAME})
 
 ###################
 # APSI unit tests #
