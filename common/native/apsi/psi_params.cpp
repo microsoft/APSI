@@ -10,6 +10,7 @@
 // APSI
 #include "apsi/psi_params.h"
 #include "apsi/psi_params_generated.h"
+#include "apsi/version.h"
 #include "apsi/util/utils.h"
 
 // SEAL
@@ -192,6 +193,7 @@ namespace apsi {
         auto seal_params = fbs::CreateSEALParams(fbs_builder, seal_params_data);
 
         fbs::PSIParamsBuilder psi_params_builder(fbs_builder);
+        psi_params_builder.add_version(apsi_version);
         psi_params_builder.add_item_params(&item_params);
         psi_params_builder.add_table_params(&table_params);
         psi_params_builder.add_query_params(query_params);
@@ -218,6 +220,15 @@ namespace apsi {
         }
 
         auto psi_params = fbs::GetSizePrefixedPSIParams(in_data.data());
+
+        if (!same_minor_version(psi_params->version())) {
+            // Check that the version numbers match up to minor version number
+            APSI_LOG_ERROR(
+                "Loaded PSIParams data indicates a version number ("
+                << psi_params->version() << ") incompatible with the current version number ("
+                << apsi_version << ")");
+            throw runtime_error("failed to load parameters: incompatible version");
+        }
 
         PSIParams::ItemParams item_params;
         item_params.felts_per_item = psi_params->item_params()->felts_per_item();
