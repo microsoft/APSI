@@ -188,8 +188,8 @@ namespace apsi {
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
             vector<seal_byte> temp;
-            temp.resize(relin_keys.save_size(compr_mode_type::zstd));
-            auto size = relin_keys.save(temp.data(), temp.size(), compr_mode_type::zstd);
+            temp.resize(relin_keys.save_size(Serialization::compr_mode_default));
+            auto size = relin_keys.save(temp.data(), temp.size(), Serialization::compr_mode_default);
             auto relin_keys_data =
                 fbs_builder.CreateVector(reinterpret_cast<uint8_t *>(temp.data()), size);
 
@@ -208,8 +208,8 @@ namespace apsi {
                         vector<flatbuffers::Offset<fbs::Ciphertext>> ret_inner;
                         for (const auto &ct : q.second) {
                             // Save each SEALObject<seal::Ciphertext>
-                            temp.resize(ct.save_size(compr_mode_type::zstd));
-                            size = ct.save(temp.data(), temp.size(), compr_mode_type::zstd);
+                            temp.resize(ct.save_size(Serialization::compr_mode_default));
+                            size = ct.save(temp.data(), temp.size(), Serialization::compr_mode_default);
                             auto ct_data = fbs_builder.CreateVector(
                                 reinterpret_cast<uint8_t *>(temp.data()), size);
 

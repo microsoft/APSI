@@ -7,6 +7,7 @@
 
 // APSI
 #include "apsi/oprf/ecpoint.h"
+#include "apsi/util/utils.h"
 
 // FourQ
 #include "apsi/fourq/FourQ_api.h"
@@ -25,7 +26,7 @@ namespace apsi {
         namespace {
             void random_scalar(ECPoint::scalar_span_type value)
             {
-                random_bytes(value.data(), util::safe_cast<unsigned int>(value.size()));
+                random_bytes(value.data(), seal::util::safe_cast<unsigned int>(value.size()));
                 modulo_order(
                     reinterpret_cast<digit_t *>(value.data()),
                     reinterpret_cast<digit_t *>(value.data()));
@@ -52,7 +53,7 @@ namespace apsi {
                 f2elm_t r;
 
                 // Compute a Blake2b hash of the value
-                blake2b(
+                APSI_blake2b(
                     reinterpret_cast<unsigned char *>(r),
                     sizeof(f2elm_t),
                     value.data(),
@@ -158,7 +159,7 @@ namespace apsi {
         void ECPoint::extract_hash(hash_span_type out)
         {
             // Compute a Blake2b hash of the value and expand to hash_size
-            blake2b(out.data(), out.size(), pt_->y, sizeof(f2elm_t), nullptr, 0);
+            APSI_blake2b(out.data(), out.size(), pt_->y, sizeof(f2elm_t), nullptr, 0);
         }
     } // namespace oprf
 } // namespace apsi

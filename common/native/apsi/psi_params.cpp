@@ -185,8 +185,8 @@ namespace apsi {
         auto query_params = fbs::CreateQueryParams(fbs_builder, query_powers);
 
         vector<seal_byte> temp;
-        temp.resize(seal_params_.save_size(compr_mode_type::zstd));
-        auto size = seal_params_.save(temp.data(), temp.size(), compr_mode_type::zstd);
+        temp.resize(seal_params_.save_size(Serialization::compr_mode_default));
+        auto size = seal_params_.save(temp.data(), temp.size(), Serialization::compr_mode_default);
         auto seal_params_data =
             fbs_builder.CreateVector(reinterpret_cast<uint8_t *>(temp.data()), size);
         auto seal_params = fbs::CreateSEALParams(fbs_builder, seal_params_data);

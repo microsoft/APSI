@@ -34,73 +34,73 @@ namespace apsi {
 
     inline ParamsRequest to_params_request(Request &request)
     {
-        return util::unique_ptr_cast<network::SenderOperationParms, network::SenderOperation>(
-            request);
+        if (request == nullptr || request->type() != apsi::network::SenderOperationType::sop_parms)
+            return nullptr;
+        return ParamsRequest(static_cast<apsi::network::SenderOperationParms *>(request.release()));
     }
 
     inline ParamsRequest to_params_request(Request &&request)
     {
-        return util::unique_ptr_cast<network::SenderOperationParms, network::SenderOperation>(
-            std::move(request));
+        if (request == nullptr || request->type() != apsi::network::SenderOperationType::sop_parms)
+            return nullptr;
+        return ParamsRequest(static_cast<apsi::network::SenderOperationParms *>(request.release()));
     }
 
     inline OPRFRequest to_oprf_request(Request &request)
     {
-        return util::unique_ptr_cast<network::SenderOperationOPRF, network::SenderOperation>(
-            request);
+        if (request == nullptr || request->type() != apsi::network::SenderOperationType::sop_oprf)
+            return nullptr;
+        return OPRFRequest(static_cast<apsi::network::SenderOperationOPRF *>(request.release()));
     }
 
     inline OPRFRequest to_oprf_request(Request &&request)
     {
-        return util::unique_ptr_cast<network::SenderOperationOPRF, network::SenderOperation>(
-            std::move(request));
+        if (request == nullptr || request->type() != apsi::network::SenderOperationType::sop_oprf)
+            return nullptr;
+        return OPRFRequest(static_cast<apsi::network::SenderOperationOPRF *>(request.release()));
     }
 
     inline QueryRequest to_query_request(Request &request)
     {
-        return util::unique_ptr_cast<network::SenderOperationQuery, network::SenderOperation>(
-            request);
+        if (request == nullptr || request->type() != apsi::network::SenderOperationType::sop_query)
+            return nullptr;
+        return QueryRequest(static_cast<apsi::network::SenderOperationQuery *>(request.release()));
     }
 
     inline QueryRequest to_query_request(Request &&request)
     {
-        return util::unique_ptr_cast<network::SenderOperationQuery, network::SenderOperation>(
-            std::move(request));
+        if (request == nullptr || request->type() != apsi::network::SenderOperationType::sop_query)
+            return nullptr;
+        return QueryRequest(static_cast<apsi::network::SenderOperationQuery *>(request.release()));
     }
 
     inline Request to_request(ParamsRequest &params_request)
     {
-        return util::unique_ptr_cast<network::SenderOperation, network::SenderOperationParms>(
-            params_request);
+        return Request(params_request.release());
     }
 
     inline Request to_request(ParamsRequest &&params_request)
     {
-        return util::unique_ptr_cast<network::SenderOperation, network::SenderOperationParms>(
-            std::move(params_request));
+        return Request(params_request.release());
     }
 
     inline Request to_request(OPRFRequest &oprf_request)
     {
-        return util::unique_ptr_cast<network::SenderOperation, network::SenderOperationOPRF>(
-            oprf_request);
+        return Request(oprf_request.release());
     }
 
     inline Request to_request(OPRFRequest &&oprf_request)
     {
-        return util::unique_ptr_cast<network::SenderOperation, network::SenderOperationOPRF>(
-            std::move(oprf_request));
+        return Request(oprf_request.release());
     }
 
     inline Request to_request(QueryRequest &query_request)
     {
-        return util::unique_ptr_cast<network::SenderOperation, network::SenderOperationQuery>(
-            query_request);
+        return Request(query_request.release());
     }
 
     inline Request to_request(QueryRequest &&query_request)
     {
-        return util::unique_ptr_cast<network::SenderOperation, network::SenderOperationQuery>(
-            std::move(query_request));
+        return Request(query_request.release());
     }
 } // namespace apsi

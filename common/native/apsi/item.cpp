@@ -17,7 +17,7 @@ using namespace std;
 namespace apsi {
     void Item::hash_to_value(const void *in, size_t size)
     {
-        blake2b(value_.data(), sizeof(value_), in, size, nullptr, 0);
+        APSI_blake2b(value_.data(), sizeof(value_), in, size, nullptr, 0);
     }
 
     Bitstring Item::to_bitstring(uint32_t item_bit_count) const

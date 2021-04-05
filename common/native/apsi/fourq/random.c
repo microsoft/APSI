@@ -20,11 +20,13 @@ NTSTATUS last_bcrypt_error = 0;
 static int lock = -1;
 #endif
 
+#ifdef __LINUX__
 static __inline void delay(unsigned int count)
 {
     while (count--) {
     }
 }
+#endif
 
 int random_bytes(unsigned char *random_array, unsigned int nbytes)
 { // Generation of "nbytes" of random values
