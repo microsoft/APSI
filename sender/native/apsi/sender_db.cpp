@@ -1132,7 +1132,7 @@ namespace apsi {
 
             auto sdb = fbs::GetSizePrefixedSenderDB(in_data.data());
 
-            // Load the PSIParams
+            // Load the PSIParams; this will automatically check version compatibility
             unique_ptr<PSIParams> params;
             try {
                 ArrayGetBuffer agbuf(

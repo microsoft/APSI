@@ -130,8 +130,8 @@ namespace apsi {
 
             STOPWATCH(sender_stopwatch, "Sender::RunQuery");
             APSI_LOG_INFO(
-                "Start processing query request on database with "
-                << sender_db->get_hashed_items().size() << " items");
+                "Start processing query request on database with " << sender_db->get_item_count()
+                                                                   << " items");
 
             // Copy over the CryptoContext from SenderDB; set the Evaluator for this local instance
             CryptoContext crypto_context(sender_db->get_crypto_context());

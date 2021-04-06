@@ -1,91 +1,87 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
+# Exports target APSI::apsi
+#
+# Creates variables:
+#   APSI_FOUND : If APSI was found
+#   APSI_VERSION : the full version number
+#   APSI_VERSION_MAJOR : the major version number
+#   APSI_VERSION_MINOR : the minor version number
+#   APSI_VERSION_PATCH : the patch version number
+#   APSI_BUILD_TYPE : The build type (e.g., "Release" or "Debug")
+#   APSI_DEBUG : Set to non-zero value if library is compiled with extra debugging code (very slow!)
+#   APSI_USE_CXX17 : Set to non-zero value if library is compiled as C++17 instead of C++14
+#   APSI_USE_LOG4CPLUS : Set to non-zero value if library is compiled with log4cplus for logging
+#   APSI_USE_ZMQ : Set to non-zero value if library is compiled with ZeroMQ and cppzmq for networking
+
 @PACKAGE_INIT@
 
 include(CMakeFindDependencyMacro)
 
-include(${CMAKE_CURRENT_LIST_DIR}/APSITargets.cmake)
-
 macro(apsi_find_dependency dep)
     find_dependency(${dep})
     if(NOT ${dep}_FOUND)
-        if(NOT APSICommon_FIND_QUIETLY)
-            message(WARNING "Could not find dependency `${dep}`")
+        if(NOT APSI_FIND_QUIETLY)
+            message(WARNING "Could not find dependency `${dep}` required by this configuration")
         endif()
-        set(APSICommon_FOUND FALSE)
+        set(APSI_FOUND FALSE)
         return()
     endif()
 endmacro()
 
-# Exports target APSI::Common
+set(APSI_FOUND FALSE)
 
-set(APSICommon_FOUND FALSE)
+set(APSI_VERSION @APSI_VERSION@)
+set(APSI_VERSION_MAJOR @APSI_VERSION_MAJOR@)
+set(APSI_VERSION_MINOR @APSI_VERSION_MINOR@)
+set(APSI_VERSION_PATCH @APSI_VERSION_PATCH@)
 
+set(APSI_BUILD_TYPE @CMAKE_BUILD_TYPE@)
+set(APSI_DEBUG @APSI_DEBUG@)
+set(APSI_USE_CXX17 @APSI_USE_CXX17@)
+
+apsi_find_dependency(SEAL 3.6 REQUIRED)
+apsi_find_dependency(Kuku 2.1 REQUIRED)
+apsi_find_dependency(Flatbuffers REQUIRED)
+apsi_find_dependency(jsoncpp REQUIRED)
+
+set(CMAKE_THREAD_PREFER_PTHREAD TRUE)
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+apsi_find_dependency(Threads REQUIRED)
+
+set(APSI_USE_LOG4CPLUS @APSI_USE_LOG4CPLUS@)
+if(APSI_USE_LOG4CPLUS)
+    apsi_find_dependency(log4cplus REQUIRED)
+endif()
+
+set(APSI_USE_ZMQ @APSI_USE_ZMQ@)
+if(APSI_USE_ZMQ)
+    apsi_find_dependency(ZeroMQ REQUIRED)
+    apsi_find_dependency(cppzmq REQUIRED)
+endif()
+
+# Add the current directory to the module search path
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
 
-# Locate all dependencies before setting up target
-apsi_find_dependency(SEAL 3.4 REQUIRED)
-apsi_find_dependency(Kuku 1.1.1 EXACT REQUIRED)
-apsi_find_dependency(MSGSL REQUIRED)
-apsi_find_dependency(ZeroMQ REQUIRED)
-apsi_find_dependency(ZeroMQpp REQUIRED)
-apsi_find_dependency(FourQ REQUIRED)
-apsi_find_dependency(log4cplus 3.0 REQUIRED)
+include(${CMAKE_CURRENT_LIST_DIR}/APSITargets.cmake)
 
-include(${CMAKE_CURRENT_LIST_DIR}/APSICommonTargets.cmake)
-
-if(TARGET APSI::Common)
-    if(NOT APSICommon_FIND_QUIETLY)
-        message(STATUS "APSICommon -> Version ${APSICommon_VERSION} detected")
-    endif()
-    set(APSICommon_FOUND TRUE)
-else()
-    if(NOT APSICommon_FIND_QUIETLY)
-        message(WARNING "APSICommon -> NOT FOUND")
-    endif()
-    set(APSICommon_FOUND FALSE)
+if(TARGET APSI::apsi)
+    set(APSI_FOUND TRUE)
 endif()
 
-# Exports target APSI::Sender
-
-set(APSISender_FOUND FALSE)
-
-# Locate APSICommon dependency
-apsi_find_dependency(APSICommon 1.0.0 EXACT REQUIRED)
-
-include(${CMAKE_CURRENT_LIST_DIR}/APSISenderTargets.cmake)
-
-if(TARGET APSI::Sender)
-    if(NOT APSISender_FIND_QUIETLY)
-        message(STATUS "APSISender -> Version ${APSISender_VERSION} detected")
+if(APSI_FOUND)
+    if(NOT APSI_FIND_QUIETLY)
+        message(STATUS "APSI -> Version ${APSI_VERSION} detected")
     endif()
-    set(APSISender_FOUND TRUE)
+    if(APSI_DEBUG AND NOT APSI_FIND_QUIETLY)
+        message(STATUS "Performance warning: APSI compiled in debug mode")
+    endif()
+    if(NOT APSI_FIND_QUIETLY)
+        message(STATUS "APSI -> Targets available: APSI::apsi")
+    endif()
 else()
-    if(NOT APSISender_FIND_QUIETLY)
-        message(WARNING "APSISender -> NOT FOUND")
+    if(NOT APSI_FIND_QUIETLY)
+        message(STATUS "APSI -> NOT FOUND")
     endif()
-    set(APSISender_FOUND FALSE)
-endif()
-
-
-# Exports target APSI::Receiver
-
-set(APSIReceiver_FOUND FALSE)
-
-# Locate APSICommon dependency
-apsi_find_dependency(APSICommon 1.0.0 EXACT REQUIRED)
-
-include(${CMAKE_CURRENT_LIST_DIR}/APSIReceiverTargets.cmake)
-
-if(TARGET APSI::Receiver)
-    if(NOT APSIReceiver_FIND_QUIETLY)
-        message(WARNING "APSIReceiver -> Version ${APSIReceiver_VERSION} detected")
-    endif()
-    set(APSIReceiver_FOUND TRUE)
-else()
-    if(NOT APSIReceiver_FIND_QUIETLY)
-        message(WARNING "APSIReceiver -> NOT FOUND")
-    endif()
-    set(APSIReceiver_FOUND FALSE)
 endif()

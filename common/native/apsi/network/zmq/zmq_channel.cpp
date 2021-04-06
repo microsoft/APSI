@@ -225,12 +225,12 @@ namespace apsi {
                 return nullptr;
             }
 
-            if (!same_version(sop_header.version)) {
-                // Check that the version numbers match exactly
+            if (!same_minor_version(sop_header.version)) {
+                // Check that the version numbers match up to minor version number
                 APSI_LOG_ERROR(
-                    "Received header indicates a version number "
-                    << sop_header.version << " incompatible with the current version number "
-                    << apsi_version);
+                    "Received header indicates a version number ("
+                    << sop_header.version << ") incompatible with the current version number ("
+                    << apsi_version << ")");
                 return nullptr;
             }
 

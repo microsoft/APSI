@@ -6,45 +6,20 @@
 // STD
 #include <cstdint>
 
-// APSI
-#include "apsi/config.h"
-
 namespace apsi {
-    constexpr static std::uint32_t apsi_version =
-        (APSI_VERSION_PATCH << 20) + (APSI_VERSION_MINOR << 10) + APSI_VERSION_MAJOR;
+    extern const std::uint32_t apsi_version;
 
-    constexpr bool same_version(std::uint32_t version)
-    {
-        return version == apsi_version;
-    }
+    bool same_version(std::uint32_t version);
 
-    constexpr std::uint32_t get_major_version(std::uint32_t version)
-    {
-        return version & ((std::uint32_t(1) << 10) - 1);
-    }
+    std::uint32_t get_major_version(std::uint32_t version);
 
-    constexpr std::uint32_t get_minor_version(std::uint32_t version)
-    {
-        return (version & ((std::uint32_t(1) << 20) - 1)) >> 10;
-    }
+    std::uint32_t get_minor_version(std::uint32_t version);
 
-    constexpr std::uint32_t get_patch_version(std::uint32_t version)
-    {
-        return version >> 20;
-    }
+    std::uint32_t get_patch_version(std::uint32_t version);
 
-    constexpr bool same_major_version(std::uint32_t version)
-    {
-        return get_major_version(version) == get_major_version(apsi_version);
-    }
+    bool same_major_version(std::uint32_t version);
 
-    constexpr bool same_minor_version(std::uint32_t version)
-    {
-        return get_minor_version(version) == get_minor_version(apsi_version);
-    }
+    bool same_minor_version(std::uint32_t version);
 
-    constexpr bool same_patch_version(std::uint32_t version)
-    {
-        return get_patch_version(version) == get_patch_version(apsi_version);
-    }
+    bool same_patch_version(std::uint32_t version);
 } // namespace apsi

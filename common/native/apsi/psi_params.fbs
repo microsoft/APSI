@@ -22,6 +22,7 @@ table SEALParams {
 }
 
 table PSIParams {
+    version:uint32;
     item_params:ItemParams;
     table_params:TableParams;
     query_params:QueryParams;
