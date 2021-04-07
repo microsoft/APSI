@@ -148,7 +148,8 @@ namespace apsi {
                 std::vector<CiphertextPowers> &all_powers,
                 network::Channel &chl,
                 std::function<void(network::Channel &, ResultPart)> send_rp_fun,
-                std::uint32_t bundle_idx);
+                std::uint32_t bundle_idx,
+                seal::compr_mode_type compr_mode);
         }; // class Sender
     }      // namespace sender
 } // namespace apsi

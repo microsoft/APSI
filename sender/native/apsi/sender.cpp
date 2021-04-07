@@ -207,7 +207,8 @@ namespace apsi {
                             all_powers,
                             chl,
                             send_rp_fun,
-                            static_cast<uint32_t>(bundle_idx));
+                            static_cast<uint32_t>(bundle_idx),
+                            query.compr_mode());
                     }));
                 }
             }
@@ -285,12 +286,14 @@ namespace apsi {
             vector<CiphertextPowers> &all_powers,
             Channel &chl,
             function<void(Channel &, ResultPart)> send_rp_fun,
-            uint32_t bundle_idx)
+            uint32_t bundle_idx,
+            compr_mode_type compr_mode)
         {
             STOPWATCH(sender_stopwatch, "Sender::ProcessBinBundleCache");
 
             // Package for the result data
             auto rp = make_unique<ResultPackage>();
+            rp->compr_mode = compr_mode;
 
             rp->bundle_idx = bundle_idx;
             rp->nonce_byte_count = safe_cast<uint32_t>(sender_db->get_nonce_byte_count());

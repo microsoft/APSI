@@ -18,6 +18,7 @@ table QueryRequestPart {
 }
 
 table QueryRequest {
+    compression_type:ubyte;
     relin_keys:[ubyte];
     query:[QueryRequestPart];
 }

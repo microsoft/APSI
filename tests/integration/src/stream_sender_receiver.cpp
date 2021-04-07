@@ -32,7 +32,8 @@ namespace APSITests {
             size_t sender_size,
             vector<pair<size_t, size_t>> client_total_and_int_sizes,
             const PSIParams &params,
-            size_t num_threads)
+            size_t num_threads,
+            bool use_different_compression = false)
         {
             Log::SetConsoleDisabled(true);
             Log::SetLogLevel(Log::Level::info);
@@ -94,14 +95,31 @@ namespace APSITests {
                 ASSERT_EQ(hashed_recv_items.size(), recv_items.size());
 
                 // Create query and send
-                pair<Request, IndexTranslationTable> recv_query =
+                pair<Request, IndexTranslationTable> recv_query_pair =
                     receiver.create_query(hashed_recv_items);
-                IndexTranslationTable itt = move(recv_query.second);
-                chl.send(move(recv_query.first));
+
+                QueryRequest recv_query = to_query_request(move(recv_query_pair.first));
+                compr_mode_type expected_compr_mode = recv_query->compr_mode;
+
+                if (use_different_compression &&
+                    Serialization::IsSupportedComprMode(compr_mode_type::zlib) &&
+                    Serialization::IsSupportedComprMode(compr_mode_type::zstd)) {
+                    if (recv_query->compr_mode == compr_mode_type::zstd) {
+                        recv_query->compr_mode = compr_mode_type::zlib;
+                        expected_compr_mode = compr_mode_type::zlib;
+                    } else {
+                        recv_query->compr_mode = compr_mode_type::zstd;
+                        expected_compr_mode = compr_mode_type::zstd;
+                    }
+                }
+
+                IndexTranslationTable itt = move(recv_query_pair.second);
+                chl.send(move(recv_query));
 
                 // Receive the query and process response
                 QueryRequest sender_query = to_query_request(chl.receive_operation(seal_context));
                 Query query(move(sender_query), sender_db);
+                ASSERT_EQ(expected_compr_mode, query.compr_mode());
                 ASSERT_NO_THROW(Sender::RunQuery(query, chl));
 
                 // Receive query response
@@ -259,6 +277,25 @@ namespace APSITests {
               { 10, 10 } },
             params,
             1);
+    }
+
+    TEST(StreamSenderReceiverTests, UnlabeledSmallDifferentCompression)
+    {
+        size_t sender_size = 10;
+        PSIParams params = create_params();
+        RunUnlabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 5, 0 },
+              { 5, 2 },
+              { 5, 5 },
+              { 10, 0 },
+              { 10, 5 },
+              { 10, 10 } },
+            params,
+            1, true);
     }
 
     TEST(StreamSenderReceiverTests, UnlabeledSmallMultiThreaded)

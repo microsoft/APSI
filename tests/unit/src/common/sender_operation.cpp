@@ -103,6 +103,7 @@ namespace APSITests {
         // Constructor
         SenderOperationQuery sop;
         ASSERT_EQ(SenderOperationType::sop_query, sop.type());
+        ASSERT_EQ(Serialization::compr_mode_default, sop.compr_mode);
         ASSERT_FALSE(sop.relin_keys.is_local());
         ASSERT_FALSE(sop.relin_keys.is_serializable());
         ASSERT_TRUE(sop.data.empty());

@@ -132,6 +132,8 @@ namespace apsi {
                 return SenderOperationType::sop_query;
             }
 
+            seal::compr_mode_type compr_mode = seal::Serialization::compr_mode_default;
+
             SEALObject<seal::RelinKeys> relin_keys;
 
             /**

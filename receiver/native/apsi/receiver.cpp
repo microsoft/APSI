@@ -344,6 +344,7 @@ namespace apsi {
 
             // Set up the return value
             auto sop_query = make_unique<SenderOperationQuery>();
+            sop_query->compr_mode = Serialization::compr_mode_default;
             sop_query->relin_keys = relin_keys_;
             sop_query->data = move(encrypted_powers);
             auto sop = to_request(move(sop_query));
