@@ -194,11 +194,21 @@ void print_intersection_results(
 
 void print_transmitted_data(Channel &channel)
 {
-    APSI_LOG_INFO("Communication R->S: " << channel.bytes_sent() / 1024.0f << " KB");
-    APSI_LOG_INFO("Communication S->R: " << channel.bytes_received() / 1024.0f << " KB");
+    auto nice_byte_count = [](uint64_t bytes) -> string {
+        stringstream ss;
+        if (bytes >= 10 * 1024) {
+            ss << bytes / 1024 << " KB";
+        } else {
+            ss << bytes << " B";
+        }
+        return ss.str();
+    };
+
+    APSI_LOG_INFO("Communication R->S: " << nice_byte_count(channel.bytes_sent()));
+    APSI_LOG_INFO("Communication S->R: " << nice_byte_count(channel.bytes_received()));
     APSI_LOG_INFO(
-        "Communication total: " << (channel.bytes_sent() + channel.bytes_received()) / 1024.0f
-                                << " KB");
+        "Communication total: " << nice_byte_count(
+            channel.bytes_sent() + channel.bytes_received()));
 }
 
 string get_conn_addr(const CLP &cmd)

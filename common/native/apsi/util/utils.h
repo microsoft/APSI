@@ -19,9 +19,6 @@
 #include "apsi/item.h"
 #include "apsi/util/stopwatch.h"
 
-// SEAL
-#include "seal/util/defines.h"
-
 // Kuku
 #include "kuku/common.h"
 
@@ -100,13 +97,13 @@ namespace apsi {
         allocation.
         */
         void read_from_stream(
-            std::istream &in, std::uint32_t byte_count, std::vector<seal::seal_byte> &destination);
+            std::istream &in, std::uint32_t byte_count, std::vector<unsigned char> &destination);
 
         /**
         This function reads a size-prefixed number of bytes from a stream and returns the result in
         a vector.
         */
-        std::vector<seal::seal_byte> read_from_stream(std::istream &in);
+        std::vector<unsigned char> read_from_stream(std::istream &in);
 
         /**
         Casts std::unique_ptr<T> to std::unique_ptr<S>, when S* can be cast to T*. Returns nullptr
@@ -222,5 +219,11 @@ namespace apsi {
         Computes the XOR of two byte buffers.
         */
         void xor_buffers(unsigned char *buf1, const unsigned char *buf2, std::size_t count);
+
+        /**
+        Copies bytes from source to destination, throwing an exception if either source or
+        destination is nullptr. The memory ranges are assumed to be non-overlapping.
+        */
+        void copy_bytes(const void *src, std::size_t count, void *dst);
     } // namespace util
 } // namespace apsi

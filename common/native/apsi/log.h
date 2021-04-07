@@ -54,10 +54,10 @@ namespace apsi {
     }
 
 #define APSI_INTERNAL_DO_LOG(msg, msg_level) \
-    std::stringstream ss;                    \
-    ss << msg;                               \
-    std::string msg_str = ss.str();          \
-    apsi::Log::DoLog(msg_str, msg_level);
+    std::stringstream log_ss;                \
+    log_ss << msg;                           \
+    std::string log_str = log_ss.str();      \
+    apsi::Log::DoLog(log_str, msg_level);
 
 #define APSI_LOG_DEBUG(msg)                                     \
     do {                                                        \

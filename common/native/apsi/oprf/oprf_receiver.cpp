@@ -3,10 +3,10 @@
 
 // STD
 #include <array>
-#include <cstring>
 
 // APSI
 #include "apsi/oprf/oprf_receiver.h"
+#include "apsi/util/utils.h"
 
 // SEAL
 #include "seal/util/defines.h"
@@ -15,11 +15,13 @@ using namespace std;
 using namespace seal;
 
 namespace apsi {
+    using namespace util;
+
     namespace oprf {
         void OPRFReceiver::set_item_count(std::size_t item_count)
         {
             auto new_pool = MemoryManager::GetPool(mm_prof_opt::mm_force_new, true);
-            oprf_queries_ = DynArray<seal_byte>(item_count * oprf_query_size, new_pool);
+            oprf_queries_ = DynArray<unsigned char>(item_count * oprf_query_size, new_pool);
             inv_factor_data_ = FactorData(new_pool, item_count);
             pool_ = move(new_pool);
         }
@@ -29,7 +31,7 @@ namespace apsi {
             set_item_count(0);
         }
 
-        vector<seal_byte> OPRFReceiver::query_data() const
+        vector<unsigned char> OPRFReceiver::query_data() const
         {
             return { oprf_queries_.cbegin(), oprf_queries_.cend() };
         }
@@ -52,8 +54,7 @@ namespace apsi {
                 ecpt.scalar_multiply(random_scalar, false);
 
                 // Save the result to items_buffer
-                ecpt.save(ECPoint::point_save_span_type{
-                    reinterpret_cast<unsigned char *>(oprf_out_ptr), oprf_query_size });
+                ecpt.save(ECPoint::point_save_span_type{ oprf_out_ptr, oprf_query_size });
 
                 // Move forward
                 advance(oprf_out_ptr, oprf_query_size);
@@ -61,7 +62,7 @@ namespace apsi {
         }
 
         void OPRFReceiver::process_responses(
-            gsl::span<const seal_byte> oprf_responses,
+            gsl::span<const unsigned char> oprf_responses,
             gsl::span<HashedItem> oprf_hashes,
             gsl::span<LabelKey> label_keys) const
         {
@@ -79,8 +80,7 @@ namespace apsi {
             for (size_t i = 0; i < item_count(); i++) {
                 // Load the point from items_buffer
                 ECPoint ecpt;
-                ecpt.load(ECPoint::point_save_span_const_type{
-                    reinterpret_cast<const unsigned char *>(oprf_in_ptr), oprf_response_size });
+                ecpt.load(ECPoint::point_save_span_const_type{ oprf_in_ptr, oprf_response_size });
 
                 // Multiply with inverse random scalar
                 ecpt.scalar_multiply(inv_factor_data_.get_factor(i), false);
@@ -91,12 +91,12 @@ namespace apsi {
 
                 // The first 16 bytes represent the item hash; the next 32 bytes represent the label
                 // encryption key
-                memcpy(
-                    oprf_hashes[i].value().data(), item_hash_and_label_key.data(), oprf_hash_size);
-                memcpy(
-                    label_keys[i].data(),
+                copy_bytes(
+                    item_hash_and_label_key.data(), oprf_hash_size, oprf_hashes[i].value().data());
+                copy_bytes(
                     item_hash_and_label_key.data() + oprf_hash_size,
-                    label_key_byte_count);
+                    label_key_byte_count,
+                    label_keys[i].data());
 
                 // Move forward
                 advance(oprf_in_ptr, oprf_response_size);

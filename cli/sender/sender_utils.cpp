@@ -52,5 +52,5 @@ unique_ptr<PSIParams> build_psi_params(const CLP &cmd)
         return nullptr;
     }
 
-    return move(params);
+    return params;
 }

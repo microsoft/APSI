@@ -16,7 +16,6 @@
 // SEAL
 #include "seal/dynarray.h"
 #include "seal/memorymanager.h"
-#include "seal/util/defines.h"
 
 // APSI
 #include "apsi/item.h"
@@ -86,8 +85,8 @@ namespace apsi {
         public:
             OPRFSender() = delete;
 
-            static std::vector<seal::seal_byte> ProcessQueries(
-                gsl::span<const seal::seal_byte> oprf_queries, const OPRFKey &oprf_key);
+            static std::vector<unsigned char> ProcessQueries(
+                gsl::span<const unsigned char> oprf_queries, const OPRFKey &oprf_key);
 
             static std::pair<HashedItem, LabelKey> GetItemHash(
                 const Item &item, const OPRFKey &oprf_key);

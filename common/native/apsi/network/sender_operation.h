@@ -21,7 +21,6 @@
 #include "seal/ciphertext.h"
 #include "seal/relinkeys.h"
 #include "seal/util/common.h"
-#include "seal/util/defines.h"
 
 namespace apsi {
     namespace network {
@@ -115,7 +114,7 @@ namespace apsi {
             /**
             Holds the OPRF query data.
             */
-            std::vector<seal::seal_byte> data;
+            std::vector<unsigned char> data;
         }; // class SenderOperationOPRF
 
         /**

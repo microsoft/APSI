@@ -7,6 +7,7 @@
 
 // APSI
 #include "apsi/util/db_encoding.h"
+#include "apsi/util/utils.h"
 
 // SEAL
 #include "seal/util/common.h"
@@ -54,13 +55,13 @@ namespace apsi {
                 uint32_t bit_count,
                 gsl::span<unsigned char> dest)
             {
-                // the number of bits to shift by to align with dest
+                // The number of bits to shift by to align with dest
                 uint32_t low_offset = bit_offset & 7;
 
-                // the number of full bytes that should be written to dest
+                // The number of full bytes that should be written to dest
                 uint32_t full_byte_count = bit_count >> 3;
 
-                // the index of the first src word which contains our bits
+                // The index of the first src word which contains our bits
                 uint32_t word_begin = bit_offset >> 3;
 
                 uint32_t rem_bits = bit_count - full_byte_count * 8;
@@ -73,7 +74,7 @@ namespace apsi {
                 }
 #endif
                 if (low_offset) {
-                    // low_offset mean we need to shift the bytes.
+                    // Low_offset mean we need to shift the bytes.
                     // Populates all of the full bytes in dest.
                     uint32_t i = 0;
                     while (i < full_byte_count) {
@@ -85,12 +86,12 @@ namespace apsi {
                         i++;
                     }
                 } else {
-                    // simple case, just do memcpy for all of the full bytes
-                    memcpy(dest.data(), &src[word_begin], full_byte_count);
+                    // Simple case, just copy all full bytes
+                    copy_bytes(&src[word_begin], full_byte_count, dest.data());
                     word_begin += full_byte_count;
                 }
 
-                // we are now done with
+                // We are now done with
                 // dest[0], ..., dest[full_byte_count - 1].
                 //
                 // what remains is to populate dest[full_byte_count]
@@ -98,12 +99,11 @@ namespace apsi {
                 if (rem_bits) {
                     unsigned char &dest_word = dest[full_byte_count];
 
-                    // we now populate the last unsigned char of dest. Branch on
-                    // if the src bits are contained in a single seal_byte or
-                    // in two bytes.
+                    // We now populate the last unsigned char of dest. Branch on
+                    // if the src bits are contained in a single byte or in two bytes.
                     bool one_word_src = low_offset + rem_bits <= 8;
                     if (one_word_src) {
-                        // case 1: all the remaining bits live in src[word_begin]
+                        // All the remaining bits live in src[word_begin]
                         unsigned char mask =
                             static_cast<unsigned char>((uint32_t(1) << rem_bits) - 1);
 
@@ -116,27 +116,27 @@ namespace apsi {
 
                         dest_word = low | high;
                     } else {
-                        // extract the top bits out of src[word_begin].
-                        // these will become the bottom bits of dest_word
+                        // Extract the top bits out of src[word_begin].
+                        // These will become the bottom bits of dest_word
                         uint32_t low_count = 8 - low_offset;
                         unsigned char low_mask =
                             static_cast<unsigned char>((uint32_t(1) << low_count) - 1);
                         unsigned char low = (src[word_begin] >> low_offset) & low_mask;
 
-                        // extract the bottom bits out of src[word_begin + 1].
-                        // these will become the middle bits of dest_word
+                        // Extract the bottom bits out of src[word_begin + 1].
+                        // These will become the middle bits of dest_word
                         uint32_t mid_count = rem_bits - low_count;
                         unsigned char mid_mask =
                             static_cast<unsigned char>((uint32_t(1) << mid_count) - 1);
                         unsigned char mid = static_cast<unsigned char>(
                             static_cast<uint32_t>(src[word_begin + 1] & mid_mask) << low_count);
 
-                        // keep the high bits of dest_word
+                        // Keep the high bits of dest_word
                         unsigned char high_mask =
                             static_cast<unsigned char>((~uint32_t(0)) << rem_bits);
                         unsigned char high = dest_word & high_mask;
 
-                        // for everythign together;
+                        // Or everything together
                         dest_word = low | mid | high;
                     }
                 }

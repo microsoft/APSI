@@ -180,28 +180,29 @@ namespace apsi {
 
             auto compute_powers = [&]() {
                 // Start looking for work by going over node_states vector
-                std::uint32_t ns = 0;
+                std::uint32_t node_idx = 0;
                 while (true) {
                     // Check if everything is done
                     bool done = std::all_of(
-                        node_states.get(), node_states.get() + up_to_power_, [](auto &ns) {
-                            return ns == NodeState::Computed;
+                        node_states.get(), node_states.get() + up_to_power_, [](auto &node_state) {
+                            return node_state == NodeState::Computed;
                         });
                     if (done) {
                         return;
                     }
 
                     NodeState state = NodeState::Uncomputed;
-                    bool cmp = node_states[ns].compare_exchange_strong(state, NodeState::Computing);
+                    bool cmp =
+                        node_states[node_idx].compare_exchange_strong(state, NodeState::Computing);
 
                     if (!cmp) {
                         // Either done or already being processed
-                        ns = (ns + 1) % up_to_power_;
+                        node_idx = (node_idx + 1) % up_to_power_;
                         continue;
                     }
 
                     // Check for parents
-                    auto node = nodes_.at(ns + 1);
+                    auto node = nodes_.at(node_idx + 1);
                     auto p1 = node.parents.first;
                     auto p2 = node.parents.second;
                     bool p1_computed = node_states[p1 - 1] == NodeState::Computed;
@@ -209,22 +210,23 @@ namespace apsi {
 
                     if (!(p1_computed && p2_computed)) {
                         // Parents are not done
-                        NodeState state = NodeState::Computing;
-                        node_states[ns].compare_exchange_strong(state, NodeState::Uncomputed);
+                        NodeState computing_state = NodeState::Computing;
+                        node_states[node_idx].compare_exchange_strong(
+                            computing_state, NodeState::Uncomputed);
 
                         // Move on to the next node
-                        ns = (ns + 1) % up_to_power_;
+                        node_idx = (node_idx + 1) % up_to_power_;
                         continue;
                     }
 
                     // Parents are done so process this node
-                    func(nodes_.at(ns + 1));
+                    func(nodes_.at(node_idx + 1));
 
                     state = NodeState::Computing;
-                    node_states[ns].compare_exchange_strong(state, NodeState::Computed);
+                    node_states[node_idx].compare_exchange_strong(state, NodeState::Computed);
 
                     // Move on to the next node
-                    ns = (ns + 1) % up_to_power_;
+                    node_idx = (node_idx + 1) % up_to_power_;
                 }
             };
 

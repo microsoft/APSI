@@ -43,6 +43,13 @@ namespace apsi {
             // Initializes the ECPoint with the neutral element
             ECPoint() = default;
 
+            ECPoint &operator=(const ECPoint &assign);
+
+            ECPoint(const ECPoint &copy)
+            {
+                operator=(copy);
+            }
+
             // This function applies Blake2b on value and hashes the output to
             // a uniformly random elliptic curve point.
             ECPoint(input_span_const_type value);
@@ -54,8 +61,6 @@ namespace apsi {
             static void invert_scalar(scalar_span_const_type in, scalar_span_type out);
 
             bool scalar_multiply(scalar_span_const_type scalar, bool clear_cofactor);
-
-            ECPoint &operator=(const ECPoint &assign);
 
             void save(std::ostream &stream);
 

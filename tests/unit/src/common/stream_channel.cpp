@@ -121,9 +121,9 @@ namespace APSITests {
         StreamChannel clt(/* istream */ stream2, /* ostream */ stream1);
 
         // Fill a data buffer
-        vector<seal_byte> oprf_data(256);
+        vector<unsigned char> oprf_data(256);
         for (size_t i = 0; i < oprf_data.size(); i++) {
-            oprf_data[i] = static_cast<seal_byte>(i);
+            oprf_data[i] = static_cast<unsigned char>(i);
         }
 
         auto sop_oprf = make_unique<SenderOperationOPRF>();

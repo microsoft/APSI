@@ -57,8 +57,6 @@ vector<string> generate_timespan_report(
 {
     vector<string> report;
 
-    int name_col_width = max_name_length + 3;
-
     for (const auto &timespan : timespans) {
         stringstream ss;
         ss << setw(max_name_length) << left << timespan.event_name << ": " << setw(5) << right
@@ -83,8 +81,6 @@ vector<string> generate_event_report(
     vector<string> report;
 
     Stopwatch::time_unit last = Stopwatch::start_time;
-    int name_col_width = max_name_length + 3;
-
     for (const auto &timepoint : timepoints) {
         stringstream ss;
 

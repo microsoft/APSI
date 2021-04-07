@@ -14,7 +14,6 @@
 #include "apsi/util/db_encoding.h"
 
 // SEAL
-#include "seal/util/defines.h"
 #include "seal/util/iterator.h"
 #include "seal/util/uintarithsmallmod.h"
 #include "seal/util/uintcore.h"
@@ -56,7 +55,7 @@ namespace apsi {
             A sequence of coefficients represented as batched plaintexts. The length of this vector
             is the degree of the highest-degree polynomial in the sequence.
             */
-            std::vector<std::vector<seal::seal_byte>> batched_coeffs;
+            std::vector<std::vector<unsigned char>> batched_coeffs;
 
             /**
             We need this to compute eval()
@@ -76,15 +75,12 @@ namespace apsi {
             and batch encoder to do encoding and NTT ops.
             */
             BatchedPlaintextPolyn(
-                const std::vector<FEltPolyn> &polyns,
-                CryptoContext crypto_context,
-                bool compressed);
+                const std::vector<FEltPolyn> &polyns, CryptoContext context, bool compressed);
 
             /**
             Constructs an uninitialized Plaintext polynomial using the given crypto context
             */
-            BatchedPlaintextPolyn(CryptoContext crypto_context)
-                : crypto_context(std::move(crypto_context))
+            BatchedPlaintextPolyn(CryptoContext context) : crypto_context(std::move(context))
             {}
 
             /**
@@ -182,11 +178,6 @@ namespace apsi {
             std::vector<util::CuckooFilter> filters_;
 
             /**
-            A cache of all the computations we can do on the bins. This is empty by default.
-            */
-            BinBundleCache cache_;
-
-            /**
             Indicates whether SEAL plaintexts are compressed in memory.
             */
             bool compressed_;
@@ -196,19 +187,6 @@ namespace apsi {
             serving a query.
             */
             bool stripped_;
-
-            /**
-            Computes and caches the appropriate polynomials of each bin. For unlabeled PSI, this is
-            just the "matching" polynomial. For labeled PSI, this is the "matching" polynomial and
-            the Newton interpolation polynomial. Resulting values are stored in cache_.
-            */
-            void regen_polyns();
-
-            /**
-            Batches this BinBundle's polynomials into SEAL Plaintexts. Resulting values are stored
-            in cache_.
-            */
-            void regen_plaintexts();
 
             /**
             The size of the labels in multiples of item length.
@@ -226,9 +204,27 @@ namespace apsi {
             std::size_t num_bins_;
 
             /**
+            A cache of all the computations we can do on the bins. This is empty by default.
+            */
+            BinBundleCache cache_;
+
+            /**
             Returns the modulus that defines the finite field that we're working in
             */
             const seal::Modulus &field_mod() const;
+
+            /**
+            Computes and caches the appropriate polynomials of each bin. For unlabeled PSI, this is
+            just the "matching" polynomial. For labeled PSI, this is the "matching" polynomial and
+            the Newton interpolation polynomial. Resulting values are stored in cache_.
+            */
+            void regen_polyns();
+
+            /**
+            Batches this BinBundle's polynomials into SEAL Plaintexts. Resulting values are stored
+            in cache_.
+            */
+            void regen_plaintexts();
 
         public:
             BinBundle(
@@ -253,7 +249,7 @@ namespace apsi {
             insertion, returns -1. On failure, no modification is made to the BinBundle.
             */
             template <typename T>
-            int multi_insert(
+            std::int32_t multi_insert(
                 const std::vector<T> &item_labels, std::size_t start_bin_idx, bool dry_run);
 
             /**
@@ -263,7 +259,8 @@ namespace apsi {
             insertion, returns -1.
             */
             template <typename T>
-            int multi_insert_dry_run(const std::vector<T> &item_labels, std::size_t start_bin_idx)
+            std::int32_t multi_insert_dry_run(
+                const std::vector<T> &item_labels, std::size_t start_bin_idx)
             {
                 return multi_insert(item_labels, start_bin_idx, true);
             }
@@ -275,7 +272,8 @@ namespace apsi {
             BinBundle.
             */
             template <typename T>
-            int multi_insert_for_real(const std::vector<T> &item_labels, std::size_t start_bin_idx)
+            std::int32_t multi_insert_for_real(
+                const std::vector<T> &item_labels, std::size_t start_bin_idx)
             {
                 return multi_insert(item_labels, start_bin_idx, false);
             }
@@ -396,7 +394,7 @@ namespace apsi {
             /**
             Loads the BinBundle from a buffer.
             */
-            std::pair<std::uint32_t, std::size_t> load(gsl::span<const seal::seal_byte> in);
+            std::pair<std::uint32_t, std::size_t> load(gsl::span<const unsigned char> in);
 
             /**
             Loads the BinBundle from a stream.

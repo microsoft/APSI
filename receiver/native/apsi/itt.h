@@ -25,7 +25,7 @@ namespace apsi {
             /**
             Returns the number of items encoded by this index translation table.
             */
-            const std::size_t item_count() const noexcept
+            std::size_t item_count() const noexcept
             {
                 return item_count_;
             }

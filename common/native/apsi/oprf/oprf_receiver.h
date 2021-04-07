@@ -15,7 +15,6 @@
 // SEAL
 #include "seal/dynarray.h"
 #include "seal/memorymanager.h"
-#include "seal/util/defines.h"
 
 // GSL
 #include "gsl/span"
@@ -44,13 +43,13 @@ namespace apsi {
             }
 
             void process_responses(
-                gsl::span<const seal::seal_byte> oprf_responses,
+                gsl::span<const unsigned char> oprf_responses,
                 gsl::span<HashedItem> oprf_hashes,
                 gsl::span<LabelKey> label_keys) const;
 
             void clear();
 
-            std::vector<seal::seal_byte> query_data() const;
+            std::vector<unsigned char> query_data() const;
 
         private:
             void set_item_count(std::size_t item_count);
@@ -118,7 +117,7 @@ namespace apsi {
             seal::MemoryPoolHandle pool_ =
                 seal::MemoryManager::GetPool(seal::mm_prof_opt::mm_force_new, true);
 
-            seal::DynArray<seal::seal_byte> oprf_queries_;
+            seal::DynArray<unsigned char> oprf_queries_;
 
             FactorData inv_factor_data_;
         }; // class OPRFReceiver

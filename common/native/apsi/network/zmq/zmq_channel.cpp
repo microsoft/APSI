@@ -2,7 +2,6 @@
 // Licensed under the MIT license.
 
 // STD
-#include <algorithm>
 #include <cstddef>
 #include <iterator>
 #include <sstream>
@@ -15,16 +14,21 @@
 #include "apsi/network/sop_generated.h"
 #include "apsi/network/sop_header_generated.h"
 #include "apsi/network/zmq/zmq_channel.h"
+#include "apsi/util/utils.h"
 
 // SEAL
 #include "seal/randomgen.h"
 #include "seal/util/streambuf.h"
 
 // ZeroMQ
+#ifdef _MSC_VER
 #pragma warning(push, 0)
+#endif
 #include "zmq.hpp"
 #include "zmq_addon.hpp"
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 
 using namespace std;
 using namespace seal;
@@ -32,6 +36,8 @@ using namespace seal::util;
 using namespace zmq;
 
 namespace apsi {
+    using namespace util;
+
     namespace network {
         namespace {
             template <typename T>
@@ -64,20 +70,17 @@ namespace apsi {
             }
 
             template <>
-            size_t save_to_message(const vector<seal_byte> &obj, multipart_t &msg)
+            size_t save_to_message(const vector<unsigned char> &obj, multipart_t &msg)
             {
                 msg.addmem(obj.data(), obj.size());
                 return obj.size();
             }
 
-            vector<seal_byte> get_client_id(const multipart_t &msg)
+            vector<unsigned char> get_client_id(const multipart_t &msg)
             {
-                vector<seal_byte> client_id;
                 size_t client_id_size = msg[0].size();
-                copy_n(
-                    reinterpret_cast<const seal_byte *>(msg[0].data()),
-                    client_id_size,
-                    back_inserter(client_id));
+                vector<unsigned char> client_id(client_id_size);
+                copy_bytes(msg[0].data(), client_id_size, client_id.data());
                 return client_id;
             }
         } // namespace
@@ -122,7 +125,11 @@ namespace apsi {
         {
             throw_if_not_connected();
 
-            get_socket()->close();
+            // Cannot use get_socket() in disconnect(): this function is called by the destructor
+            // and get_socket() is virtual. Instead just do this.
+            if (nullptr != socket_) {
+                socket_->close();
+            }
             if (context_) {
                 context_->shutdown();
                 context_->close();
@@ -213,7 +220,7 @@ namespace apsi {
             }
 
             // First extract the client_id; this is the first part of the message
-            vector<seal_byte> client_id = get_client_id(msg);
+            vector<unsigned char> client_id = get_client_id(msg);
 
             // Second part is the SenderOperationHeader
             SenderOperationHeader sop_header;
@@ -429,7 +436,8 @@ namespace apsi {
             // Loaded successfully
             APSI_LOG_DEBUG(
                 "Received a response of type " << sender_operation_type_str(sop_header.type) << " ("
-                                               << bytes_received << " bytes)");
+                                               << bytes_received_ - old_bytes_received
+                                               << " bytes)");
 
             return sop_response;
         }
