@@ -153,7 +153,7 @@ namespace apsi {
 		      and: c_{sv} + c_{sv+1}*y + ... + c_{sv+degree%s}*y^{degree%s}  (for i=v)
 	    Large powers: y_{0*s}, y_{1*s}, ..., y_{v*s}
 	    */
-	    Ciphertext BatchedPlaintextPolyn::eval_patstock(const vector<Ciphertext> &ciphertext_powers, const size_t nsplits) const
+	    Ciphertext BatchedPlaintextPolyn::eval_patstock(const RelinKeys &relin_keys, const vector<Ciphertext> &ciphertext_powers, const size_t nsplits) const
         {
 	        int degree = batched_coeffs.size() - 1; 
 	        // Number of low powers
@@ -178,10 +178,7 @@ namespace apsi {
 
             const SEALContext &seal_context = *crypto_context.seal_context();
             Evaluator &evaluator = *crypto_context.evaluator();
-            
-	        KeyGenerator keygen(seal_context);
-	        RelinKeys relin_keys;
-	        keygen.create_relin_keys(relin_keys);
+
             //crypto_context.set_evaluator(relin_keys);
             //Evaluator &evaluator = *crypto_context.evaluator();
 	        //RelinKeys &relin_keys2 = *crypto_context.relin_keys();
@@ -205,13 +202,13 @@ namespace apsi {
             //Ciphertext result2;
             //Ciphertext prod;
             //result2.resize(seal_context, seal_context.first_parms_id(), 2);
-            //evaluator.transform_from_ntt(ciphertext_powers[2], prod);
+            //evaluator.transform_from_ntt(ciphertext_powers[1], prod);
             //result2 = prod;
             //evaluator.multiply(prod, prod, result2);
             //evaluator.relinearize_inplace(result2, relin_keys);
 	    	    
-	        // Calculating polynomial for i=1,...,v
 		    if (s > 1) {
+	            // Calculating polynomial for i=1,...,v
 	            for (int i = 1; i < v; i++) {
                     for (int j = 1; j < s; j++) { // Calculating inner polynomial for outer power y^{s*i}
 		                printf ("\ndegree:%d   s:%d   v:%d   power:%d   coeff:%d\n", degree, s, v, j, i*s+j);
@@ -308,7 +305,7 @@ namespace apsi {
             while (result.parms_id() != seal_context.last_parms_id()) {
                 evaluator.mod_switch_to_next_inplace(result);
             }
-
+            
             // If the last parameter set has only one prime, we can compress the result
             // further by setting low-order bits to zero. This effectively increases the
             // noise, but that doesn't matter as long as we don't use all noise budget.

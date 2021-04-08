@@ -99,7 +99,7 @@ namespace apsi {
   	                 	  and: c_{sv} + c_{sv+1}*y + ... + c_{sv+degree%s}*y^{degree%s}  (for i=v)
 	        Large powers: y_{0*s}, y_{1*s}, ..., y_{v*s}
             */
-	        seal::Ciphertext eval_patstock(const std::vector<seal::Ciphertext> &ciphertext_powers, const size_t splits) const;
+	        seal::Ciphertext eval_patstock(const seal::RelinKeys &relin_keys, const std::vector<seal::Ciphertext> &ciphertext_powers, const size_t splits) const;
 
             /**
             Returns whether this polynomial has non-zero size.

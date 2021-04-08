@@ -201,6 +201,7 @@ namespace apsi {
                 for (auto &cache : bundle_caches) {
                     futures.push_back(tpm.thread_pool().enqueue([&, bundle_idx, cache]() {
                         ProcessBinBundleCache(
+                            query.relin_keys(),
                             sender_db,
                             cache,
                             all_powers,
@@ -279,6 +280,7 @@ namespace apsi {
         }
 
         void Sender::ProcessBinBundleCache(
+            const RelinKeys &relin_keys,
             const shared_ptr<SenderDB> &sender_db,
             const reference_wrapper<const BinBundleCache> &cache,
             vector<CiphertextPowers> &all_powers,
@@ -298,7 +300,7 @@ namespace apsi {
             // Compute the matching result and move to rp
             const BatchedPlaintextPolyn &matching_polyn = cache.get().batched_matching_polyn;
             //rp->psi_result = matching_polyn.eval(all_powers[bundle_idx]);
-            rp->psi_result = matching_polyn.eval_patstock(all_powers[bundle_idx], all_powers.size());
+            rp->psi_result = matching_polyn.eval_patstock(relin_keys, all_powers[bundle_idx], all_powers.size());
 
 
             for (const auto &interp_polyn : cache.get().batched_interp_polyns) {

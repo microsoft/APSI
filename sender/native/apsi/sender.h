@@ -143,6 +143,7 @@ namespace apsi {
             Sends a result package through the given channel.
             */
             static void ProcessBinBundleCache(
+                const seal::RelinKeys &relin_keys,
                 const std::shared_ptr<SenderDB> &sender_db,
                 const std::reference_wrapper<const BinBundleCache> &cache,
                 std::vector<CiphertextPowers> &all_powers,
