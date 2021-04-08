@@ -19,13 +19,16 @@
 #include "seal/util/common.h"
 #include "seal/util/defines.h"
 
+#ifndef APSI_DISABLE_JSON
 // JSON
 #include "json/json.h"
+#endif
 
 using namespace std;
 using namespace seal;
 using namespace seal::util;
 
+#ifndef APSI_DISABLE_JSON
 namespace {
     const Json::Value &get_non_null_json_value(const Json::Value &parent, const string &name)
     {
@@ -86,6 +89,7 @@ namespace {
         return json_value_int(value);
     }
 } // namespace
+#endif
 
 namespace apsi {
     void PSIParams::initialize()
@@ -186,8 +190,8 @@ namespace apsi {
         auto query_params = fbs::CreateQueryParams(fbs_builder, query_powers);
 
         vector<seal_byte> temp;
-        temp.resize(seal_params_.save_size(compr_mode_type::zstd));
-        auto size = seal_params_.save(temp.data(), temp.size(), compr_mode_type::zstd);
+        temp.resize(seal_params_.save_size(Serialization::compr_mode_default));
+        auto size = seal_params_.save(temp.data(), temp.size(), Serialization::compr_mode_default);
         auto seal_params_data =
             fbs_builder.CreateVector(reinterpret_cast<const uint8_t *>(temp.data()), size);
         auto seal_params = fbs::CreateSEALParams(fbs_builder, seal_params_data);
@@ -269,6 +273,7 @@ namespace apsi {
         return { PSIParams(item_params, table_params, query_params, seal_params), in_data.size() };
     }
 
+    #ifndef APSI_DISABLE_JSON
     PSIParams PSIParams::Load(const string &in)
     {
         // Parse JSON string
@@ -353,6 +358,12 @@ namespace apsi {
 
         return PSIParams(item_params, table_params, query_params, seal_params);
     }
+    #else
+    PSIParams PSIParams::Load(const string &in)
+    {
+        throw runtime_error("JSON parameter initialization is disabled");
+    }
+    #endif
 
     string PSIParams::to_string() const
     {

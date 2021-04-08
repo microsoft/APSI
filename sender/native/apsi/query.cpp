@@ -22,6 +22,7 @@ namespace apsi {
             result.relin_keys_ = relin_keys_;
             result.data_ = data_;
             result.sender_db_ = sender_db_;
+            result.compr_mode_ = compr_mode_;
 
             return result;
         }
@@ -34,6 +35,8 @@ namespace apsi {
             if (!query_request) {
                 throw invalid_argument("query_request cannot be null");
             }
+
+            compr_mode_ = query_request->compr_mode;
 
             sender_db_ = move(sender_db);
             auto seal_context = sender_db_->get_seal_context();

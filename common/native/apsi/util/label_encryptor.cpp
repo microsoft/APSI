@@ -44,7 +44,7 @@ namespace apsi {
             random_bytes(result.data(), static_cast<unsigned int>(nonce_byte_count));
 
             // Fill result with mask from Blake2xb
-            blake2xb(
+            APSI_blake2xb(
                 reinterpret_cast<uint8_t *>(result.data() + nonce_byte_count),
                 label_byte_count,
                 reinterpret_cast<const uint8_t *>(result.data()),
@@ -76,7 +76,7 @@ namespace apsi {
             Label result(label_byte_count);
 
             // Fill result with mask from Blake2xb
-            blake2xb(
+            APSI_blake2xb(
                 reinterpret_cast<uint8_t *>(result.data()),
                 label_byte_count,
                 reinterpret_cast<const uint8_t *>(encrypted_label.data()),

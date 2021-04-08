@@ -267,6 +267,11 @@ namespace apsi {
             }
 
             /**
+            Returns the total number of bin bundles at a specific bundle index.
+            */
+            std::size_t get_bin_bundle_count(std::uint32_t bundle_idx) const;
+
+            /**
             Returns the total number of bin bundles.
             */
             std::size_t get_bin_bundle_count() const;

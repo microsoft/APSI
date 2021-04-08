@@ -30,9 +30,13 @@ namespace apsi {
         {
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
+            if (!Serialization::IsSupportedComprMode(compr_mode)) {
+                throw runtime_error("Unsupported compression mode");
+            }
+
             vector<unsigned char> temp;
-            temp.resize(psi_result.save_size(compr_mode_type::zstd));
-            auto size = psi_result.save(temp, compr_mode_type::zstd);
+            temp.resize(psi_result.save_size(compr_mode));
+            auto size = psi_result.save(temp, compr_mode);
             auto psi_ct_data =
                 fbs_builder.CreateVector(reinterpret_cast<const uint8_t *>(temp.data()), size);
             auto psi_ct = fbs::CreateCiphertext(fbs_builder, psi_ct_data);
@@ -43,10 +47,10 @@ namespace apsi {
                 vector<flatbuffers::Offset<fbs::Ciphertext>> ret;
                 for (const auto &label_ct : label_result) {
                     // Save each seal::Ciphertext
-                    temp.resize(label_ct.save_size(compr_mode_type::zstd));
-                    size = label_ct.save(temp, compr_mode_type::zstd);
-                    auto label_ct_data = fbs_builder.CreateVector(
-                        reinterpret_cast<const uint8_t *>(temp.data()), size);
+                    temp.resize(label_ct.save_size(compr_mode));
+                    size = label_ct.save(temp, compr_mode);
+                    auto label_ct_data =
+                        fbs_builder.CreateVector(reinterpret_cast<const uint8_t*>(temp.data()), size);
 
                     // Add to the Ciphertext vector
                     ret.push_back(fbs::CreateCiphertext(fbs_builder, label_ct_data));

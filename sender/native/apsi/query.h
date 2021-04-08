@@ -69,6 +69,11 @@ namespace apsi {
                 return sender_db_;
             }
 
+            seal::compr_mode_type compr_mode() const noexcept
+            {
+                return compr_mode_;
+            }
+
         private:
             seal::RelinKeys relin_keys_;
 
@@ -79,6 +84,8 @@ namespace apsi {
             std::shared_ptr<sender::SenderDB> sender_db_;
 
             bool valid_ = false;
+
+            seal::compr_mode_type compr_mode_;
         };
     } // namespace sender
 } // namespace apsi

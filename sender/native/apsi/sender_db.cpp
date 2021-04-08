@@ -614,6 +614,14 @@ namespace apsi {
             return *this;
         }
 
+        size_t SenderDB::get_bin_bundle_count(uint32_t bundle_idx) const
+        {
+            // Lock the database for reading
+            auto lock = get_reader_lock();
+
+            return bin_bundles_.at(safe_cast<size_t>(bundle_idx)).size();
+        }
+
         size_t SenderDB::get_bin_bundle_count() const
         {
             // Lock the database for reading

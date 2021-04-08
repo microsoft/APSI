@@ -25,6 +25,15 @@
 // GSL
 #include "gsl/span"
 
+#ifndef APSI_blake2b
+// Allow other systems to define the name of the function to call for blake2b
+#define APSI_blake2b blake2b
+#endif
+#ifndef APSI_blake2xb
+// Allow other systems to define the name of the function to call for blake2xb
+#define APSI_blake2xb blake2xb
+#endif
+
 namespace apsi {
     namespace util {
         /**
@@ -104,34 +113,6 @@ namespace apsi {
         a vector.
         */
         std::vector<unsigned char> read_from_stream(std::istream &in);
-
-        /**
-        Casts std::unique_ptr<T> to std::unique_ptr<S>, when S* can be cast to T*. Returns nullptr
-        if the cast fails.
-        */
-        template <typename To, typename From>
-        std::unique_ptr<To> unique_ptr_cast(std::unique_ptr<From> &from)
-        {
-            auto ptr = dynamic_cast<To *>(from.get());
-            if (!ptr) {
-                return nullptr;
-            }
-            return std::unique_ptr<To>{ static_cast<To *>(from.release()) };
-        }
-
-        /**
-        Casts std::unique_ptr<T> to std::unique_ptr<S>, when S* can be cast to T*. Returns nullptr
-        if the cast fails.
-        */
-        template <typename To, typename From>
-        std::unique_ptr<To> unique_ptr_cast(std::unique_ptr<From> &&from)
-        {
-            auto ptr = dynamic_cast<To *>(from.get());
-            if (!ptr) {
-                return nullptr;
-            }
-            return std::unique_ptr<To>{ static_cast<To *>(from.release()) };
-        }
 
         /**
         Writes a vector into an std::ostream as [a, b, c, ..., z].

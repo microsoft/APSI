@@ -25,9 +25,11 @@ namespace apsi {
 
     static unique_ptr<LogProperties> log_properties;
 
+#ifdef APSI_USE_LOG4CPLUS
     constexpr auto MSG_BUFFER_LEN = 512;
 
     static char msg_buffer[MSG_BUFFER_LEN];
+#endif
 
     LogProperties &get_log_properties()
     {

@@ -15,6 +15,7 @@
 // SEAL
 #include "seal/util/common.h"
 #include "seal/util/streambuf.h"
+#include "seal/serialization.h"
 
 using namespace std;
 using namespace seal;
@@ -188,8 +189,8 @@ namespace apsi {
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
             vector<unsigned char> temp;
-            temp.resize(relin_keys.save_size(compr_mode_type::zstd));
-            auto size = relin_keys.save(temp, compr_mode_type::zstd);
+            temp.resize(relin_keys.save_size(compr_mode));
+            auto size = relin_keys.save(temp, compr_mode);
             auto relin_keys_data =
                 fbs_builder.CreateVector(reinterpret_cast<const uint8_t *>(temp.data()), size);
 
@@ -208,8 +209,8 @@ namespace apsi {
                         vector<flatbuffers::Offset<fbs::Ciphertext>> ret_inner;
                         for (const auto &ct : q.second) {
                             // Save each SEALObject<seal::Ciphertext>
-                            temp.resize(ct.save_size(compr_mode_type::zstd));
-                            size = ct.save(temp, compr_mode_type::zstd);
+                            temp.resize(ct.save_size(compr_mode));
+                            size = ct.save(temp, compr_mode);
                             auto ct_data = fbs_builder.CreateVector(
                                 reinterpret_cast<const uint8_t *>(temp.data()), size);
 
@@ -226,7 +227,11 @@ namespace apsi {
                 return ret;
             }());
 
-            auto req = fbs::CreateQueryRequest(fbs_builder, relin_keys_data, query_request_parts);
+            auto req = fbs::CreateQueryRequest(
+                fbs_builder,
+                static_cast<uint8_t>(compr_mode),
+                relin_keys_data,
+                query_request_parts);
 
             fbs::SenderOperationBuilder sop_builder(fbs_builder);
             sop_builder.add_request_type(fbs::Request_QueryRequest);
@@ -271,6 +276,13 @@ namespace apsi {
             }
 
             const auto &req = *sop->request_as_QueryRequest();
+
+            // Check the request's compression mode is supported
+            if (!Serialization::IsSupportedComprMode(req.compression_type())) {
+                throw runtime_error("Unsupported compression mode");
+            }
+
+            compr_mode = static_cast<compr_mode_type>(req.compression_type());
 
             // Load relin_keys if they are needed in this case
             if (context->using_keyswitching()) {

@@ -55,7 +55,7 @@ void digit_x_digit(digit_t a, digit_t b, digit_t *c)
     c[1] ^= (ahbh & mask_high) + carry; // C11
 }
 
-__inline void fpcopy1271(felm_t a, felm_t c)
+void fpcopy1271(felm_t a, felm_t c)
 { // Copy of a field element, c = a
     unsigned int i;
 
@@ -63,7 +63,7 @@ __inline void fpcopy1271(felm_t a, felm_t c)
         c[i] = a[i];
 }
 
-static __inline void fpzero1271(felm_t a)
+static void fpzero1271(felm_t a)
 { // Zeroing a field element, a = 0
     unsigned int i;
 
@@ -71,7 +71,7 @@ static __inline void fpzero1271(felm_t a)
         a[i] = 0;
 }
 
-__inline void fpadd1271(felm_t a, felm_t b, felm_t c)
+void fpadd1271(felm_t a, felm_t b, felm_t c)
 { // Field addition, c = a+b mod p
     unsigned int i;
     unsigned int carry = 0;
@@ -86,7 +86,7 @@ __inline void fpadd1271(felm_t a, felm_t b, felm_t c)
     }
 }
 
-__inline void fpsub1271(felm_t a, felm_t b, felm_t c)
+void fpsub1271(felm_t a, felm_t b, felm_t c)
 { // Field subtraction, c = a-b mod p
     unsigned int i;
     unsigned int borrow = 0;
@@ -101,7 +101,7 @@ __inline void fpsub1271(felm_t a, felm_t b, felm_t c)
     }
 }
 
-__inline void fpneg1271(felm_t a)
+void fpneg1271(felm_t a)
 { // Field negation, a = -a mod p
     unsigned int i;
     unsigned int borrow = 0;
@@ -206,7 +206,7 @@ unsigned int mp_add(digit_t *a, digit_t *b, digit_t *c, unsigned int nwords)
     return carry;
 }
 
-__inline void fpexp1251(felm_t a, felm_t af)
+void fpexp1251(felm_t a, felm_t af)
 { // Exponentiation over GF(p), af = a^(125-1)
     int i;
     felm_t t1, t2, t3, t4, t5;
@@ -260,13 +260,13 @@ void fpinv1271(felm_t a)
     fpmul1271(a, t, a);
 }
 
-static __inline void multiply(const digit_t *a, const digit_t *b, digit_t *c)
+static void multiply(const digit_t *a, const digit_t *b, digit_t *c)
 { // Schoolbook multiprecision multiply, c = a*b
 
     mp_mul(a, b, c, NWORDS_ORDER);
 }
 
-static __inline unsigned int add(
+static unsigned int add(
     const digit_t *a, const digit_t *b, digit_t *c, const unsigned int nwords)
 { // Multiprecision addition, c = a+b, where lng(a) = lng(b) = nwords. Returns the carry bit
 
@@ -363,7 +363,7 @@ void conversion_to_odd(digit_t *k, digit_t *k_odd)
     }
 }
 
-__inline void fpdiv1271(felm_t a)
+void fpdiv1271(felm_t a)
 { // Field division by two, c = a/2 mod p
     digit_t mask;
     unsigned int carry = 0;

@@ -55,6 +55,8 @@ namespace apsi {
 
             std::uint32_t bundle_idx;
 
+            seal::compr_mode_type compr_mode = seal::Serialization::compr_mode_default;
+
             SEALObject<seal::Ciphertext> psi_result;
 
             std::uint32_t label_byte_count;
