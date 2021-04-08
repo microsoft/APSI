@@ -196,7 +196,7 @@ namespace apsi {
             // that is identically zero and set its NTT form flag to true so the additions below
             // will work.
             Ciphertext result;
-            result.resize(seal_context, seal_context.first_parms_id(), 2);
+            result.resize(seal_context, seal_context.first_parms_id(), 3);
             result.is_ntt_form() = true;
             Ciphertext temp;
             Ciphertext temp_out;
@@ -210,7 +210,7 @@ namespace apsi {
             //evaluator.multiply(prod, prod, result2);
             //evaluator.relinearize_inplace(result2, relin_keys);
 	    	    
-	        // Calculating polynomial for i=1,...,v-1
+	        // Calculating polynomial for i=1,...,v
 		    if (s > 1) {
 	            for (int i = 1; i < v; i++) {
                     for (int j = 1; j < s; j++) { // Calculating inner polynomial for outer power y^{s*i}
@@ -227,13 +227,33 @@ namespace apsi {
                     Ciphertext power;
                     evaluator.transform_from_ntt_inplace(temp_out);
                     evaluator.transform_from_ntt(ciphertext_powers[i*s], power);
-		            //evaluator.multiply_inplace(temp_out, power); 
+		            evaluator.multiply_inplace(temp_out, power); 
 
                     /*if (relinearize) {
 			            evaluator.relinearize_inplace(temp_out, relin_keys);
                     }*/
 		            evaluator.transform_to_ntt_inplace(temp_out);
                     evaluator.add_inplace(result, temp_out);
+                }
+	            // Calculating polynomial for i=v
+                if (degree % s > 0) {
+                    for (int j = 1; j < degree % s + 1; j++) {
+		                printf ("\ndegree:%d   s:%d   v:%d   power:%d   coeff:%d\n", degree, s, v, j, v*s+j);
+		                coeff.unsafe_load(
+                            seal_context,
+                            reinterpret_cast<const seal_byte *>(batched_coeffs[v*s + j].data()),
+                            batched_coeffs[v*s + j].size());
+		                evaluator.multiply_plain(ciphertext_powers[j], coeff, temp);
+                        if (j==1) {temp_out = temp;}
+                        else {evaluator.add_inplace(temp_out, temp);}
+		            }
+		            printf ("\ndegree:%d   s:%d   v:%d   multiply by power:%d\n", degree, s, v, v*s);
+                    Ciphertext power;
+                    evaluator.transform_from_ntt_inplace(temp_out);
+                    evaluator.transform_from_ntt(ciphertext_powers[v*s], power);
+		            evaluator.multiply_inplace(temp_out, power); 
+                    evaluator.transform_to_ntt_inplace(temp_out);
+		            evaluator.add_inplace(result, temp_out);
                 }
                 evaluator.transform_from_ntt_inplace(result);
                 if (relinearize) {
@@ -249,52 +269,9 @@ namespace apsi {
                         batched_coeffs[i*s].size());
 		            evaluator.multiply_plain(ciphertext_powers[i*s], coeff, temp);
 		            evaluator.add_inplace(result, temp);
-		    
-		        }
-	        }
-	    
-	        // Calculating polynomial for i=v
-	        if (degree % s > 0) {
-                for (int j = 1; j < degree % s + 1; j++) {
-		            printf ("\ndegree:%d   s:%d   v:%d   power:%d   coeff:%d\n", degree, s, v, j, v*s+j);
-		            coeff.unsafe_load(
-                        seal_context,
-                        reinterpret_cast<const seal_byte *>(batched_coeffs[v*s + j].data()),
-                        batched_coeffs[v*s + j].size());
-		            evaluator.multiply_plain(ciphertext_powers[j], coeff, temp);
-                    if (j==1) {temp_out = temp;}
-                    else {evaluator.add_inplace(temp_out, temp);}
-		        }
-		        printf ("\ndegree:%d   s:%d   v:%d   multiply by power:%d\n", degree, s, v, v*s);
-                Ciphertext power;
-                evaluator.transform_from_ntt_inplace(temp_out);
-                evaluator.transform_from_ntt(ciphertext_powers[v*s], power);
-		        //evaluator.multiply_inplace(temp_out, power); 
-
-                if (relinearize) {
-		            evaluator.relinearize_inplace(temp_out, relin_keys);
-		        }
-                evaluator.transform_to_ntt_inplace(temp_out);
-		        evaluator.add_inplace(result, temp_out);
-
-		        printf ("\ndegree:%d   s:%d   power:%d   coeff:%d\n", degree, s, v*s, v*s);
-                coeff.unsafe_load(
-                    seal_context,
-                    reinterpret_cast<const seal_byte *>(batched_coeffs[v*s].data()),
-                    batched_coeffs[v*s].size());
-                evaluator.multiply_plain(ciphertext_powers[v*s], coeff, temp);
-                evaluator.add_inplace(result, temp);	
-            
-            } else {
-		        coeff.unsafe_load(
-                    seal_context,
-                    reinterpret_cast<const seal_byte *>(batched_coeffs[v*s].data()),
-                    batched_coeffs[v*s].size());
-                evaluator.multiply_plain(ciphertext_powers[v*s], coeff, temp);
-                evaluator.add_inplace(result, temp);
-            }
-           
-
+                }
+	   	    }
+	  
             // Calculating inner polynomial for outer power y^{s*0}
 	        for (int j = 1; j < s; j++) {
 		        printf ("\ndegree:%d   s:%d   v:%d   power:%d   coeff:%d\n", degree, s, v, j, j);
@@ -307,7 +284,7 @@ namespace apsi {
 	        }
 	    
             // Adding the free terms of the inner polynomials
-	        for (int i = 1; i < v; i++) {
+	        for (int i = 1; i < v + 1; i++) {
 		        printf ("\ndegree:%d   s:%d   power:%d   coeff:%d\n", degree, s, i*s, i*s);
 		        coeff.unsafe_load(
                     seal_context,
@@ -316,8 +293,6 @@ namespace apsi {
                 evaluator.multiply_plain(ciphertext_powers[i*s], coeff, temp);
                 evaluator.add_inplace(result, temp);	
 	        }
-            
-           
 
             // Need to transform back from NTT form before we can add the constant coefficient. The
             // constant coefficient is specifically not in NTT form so this can work.
