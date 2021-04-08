@@ -96,7 +96,9 @@ namespace apsi {
             Plaintext coeff;
             for (size_t deg = 1; deg < batched_coeffs.size(); deg++) {
                 coeff.unsafe_load(
-                    seal_context, batched_coeffs[deg].data(), batched_coeffs[deg].size());
+                    seal_context,
+                    reinterpret_cast<const seal_byte *>(batched_coeffs[deg].data()),
+                    batched_coeffs[deg].size());
                 evaluator.multiply_plain(ciphertext_powers[deg], coeff, temp);
                 evaluator.add_inplace(result, temp);
             }
@@ -104,7 +106,10 @@ namespace apsi {
             // Need to transform back from NTT form before we can add the constant coefficient. The
             // constant coefficient is specifically not in NTT form so this can work.
             evaluator.transform_from_ntt_inplace(result);
-            coeff.unsafe_load(seal_context, batched_coeffs[0].data(), batched_coeffs[0].size());
+            coeff.unsafe_load(
+                seal_context,
+                reinterpret_cast<const seal_byte *>(batched_coeffs[0].data()),
+                batched_coeffs[0].size());
             evaluator.add_plain_inplace(result, coeff);
 
             // Make the result as small as possible by modulus switching
@@ -145,8 +150,8 @@ namespace apsi {
         batch encoder to do encoding and NTT ops.
         */
         BatchedPlaintextPolyn::BatchedPlaintextPolyn(
-            const vector<FEltPolyn> &polyns, CryptoContext crypto_context, bool compressed)
-            : crypto_context(move(crypto_context))
+            const vector<FEltPolyn> &polyns, CryptoContext context, bool compressed)
+            : crypto_context(move(context))
         {
             compr_mode_type compr_mode = compressed ? compr_mode_type::zstd : compr_mode_type::none;
 
@@ -189,9 +194,10 @@ namespace apsi {
                 }
 
                 // Push the new Plaintext
-                vector<seal_byte> pt_data;
+                vector<unsigned char> pt_data;
                 pt_data.resize(pt.save_size(compr_mode));
-                size_t size = pt.save(pt_data.data(), pt_data.size(), compr_mode);
+                size_t size = pt.save(
+                    reinterpret_cast<seal_byte *>(pt_data.data()), pt_data.size(), compr_mode);
                 pt_data.resize(size);
                 batched_coeffs.push_back(move(pt_data));
             }
@@ -212,9 +218,9 @@ namespace apsi {
             size_t max_bin_size,
             bool compressed,
             bool stripped)
-            : cache_invalid_(true), cache_(crypto_context, label_size),
-              crypto_context_(crypto_context), compressed_(compressed), label_size_(label_size),
-              max_bin_size_(max_bin_size)
+            : cache_invalid_(true), crypto_context_(crypto_context), compressed_(compressed),
+              label_size_(label_size), max_bin_size_(max_bin_size),
+              cache_(crypto_context_, label_size_)
         {
             if (!crypto_context_.evaluator()) {
                 throw invalid_argument("evaluator is not set in crypto_context");
@@ -236,7 +242,8 @@ namespace apsi {
         }
 
         template <>
-        int BinBundle::multi_insert(const vector<felt_t> &items, size_t start_bin_idx, bool dry_run)
+        int32_t BinBundle::multi_insert(
+            const vector<felt_t> &items, size_t start_bin_idx, bool dry_run)
         {
             if (stripped_) {
                 APSI_LOG_ERROR("Cannot insert data to a stripped BinBundle");
@@ -284,11 +291,11 @@ namespace apsi {
                 curr_bin_idx++;
             }
 
-            return safe_cast<int>(max_bin_size);
+            return safe_cast<int32_t>(max_bin_size);
         }
 
         template <>
-        int BinBundle::multi_insert(
+        int32_t BinBundle::multi_insert(
             const vector<pair<felt_t, vector<felt_t>>> &item_labels,
             size_t start_bin_idx,
             bool dry_run)
@@ -475,15 +482,15 @@ namespace apsi {
             }
 
             // If we're here, that means we can overwrite the labels
-            size_t max_bin_size = 0;
             curr_bin_idx = start_bin_idx;
             for (auto &curr_item_label : item_labels) {
                 felt_t curr_item = curr_item_label.first;
 
                 // Overwrite the label in the bin
                 vector<felt_t> &curr_bin = item_bins_[curr_bin_idx];
-                CuckooFilter &curr_filter = filters_[curr_bin_idx];
 
+                // No point in using cuckoo filters here for look-up: we know the item exists so do
+                // linear search
                 auto found_pos = find(curr_bin.begin(), curr_bin.end(), curr_item);
 
                 // From the earlier check we know that found_pos is not the end-iterator. Check this
@@ -699,14 +706,14 @@ namespace apsi {
 
             // Compute and cache the batched "matching" polynomials. They're computed in both
             // labeled and unlabeled PSI.
-            BatchedPlaintextPolyn p(cache_.felt_matching_polyns, crypto_context_, compressed_);
-            cache_.batched_matching_polyn = move(p);
+            BatchedPlaintextPolyn bmp(cache_.felt_matching_polyns, crypto_context_, compressed_);
+            cache_.batched_matching_polyn = move(bmp);
 
             // Compute and cache the batched Newton interpolation polynomials iff they exist.
             cache_.batched_interp_polyns.reserve(get_label_size());
             for (const auto &interp_polyn : cache_.felt_interp_polyns) {
-                BatchedPlaintextPolyn p(interp_polyn, crypto_context_, compressed_);
-                cache_.batched_interp_polyns.push_back(move(p));
+                BatchedPlaintextPolyn bip(interp_polyn, crypto_context_, compressed_);
+                cache_.batched_interp_polyns.push_back(move(bip));
             }
         }
 
@@ -723,22 +730,22 @@ namespace apsi {
             size_t label_size = get_label_size();
             cache_.felt_matching_polyns.reserve(num_bins);
             cache_.felt_interp_polyns.resize(label_size);
-            for (auto &fip : cache_.felt_interp_polyns) {
-                fip.reserve(num_bins);
+            for (auto &fips : cache_.felt_interp_polyns) {
+                fips.reserve(num_bins);
             }
 
             // For each bin in the bundle, compute and cache the corresponding "matching polynomial"
             for (size_t bin_idx = 0; bin_idx < get_num_bins(); bin_idx++) {
                 // Compute and cache the matching polynomial
-                FEltPolyn p = polyn_with_roots(item_bins_[bin_idx], mod);
-                cache_.felt_matching_polyns.push_back(move(p));
+                FEltPolyn fmp = polyn_with_roots(item_bins_[bin_idx], mod);
+                cache_.felt_matching_polyns.push_back(move(fmp));
 
                 // Compute and cache the label polynomials
                 for (size_t label_idx = 0; label_idx < get_label_size(); label_idx++) {
                     // Compute and cache the matching polynomial
-                    FEltPolyn p = newton_interpolate_polyn(
+                    FEltPolyn fip = newton_interpolate_polyn(
                         item_bins_[bin_idx], label_bins_[label_idx][bin_idx], mod);
-                    cache_.felt_interp_polyns[label_idx].push_back(move(p));
+                    cache_.felt_interp_polyns[label_idx].push_back(move(fip));
                 }
             }
         }
@@ -796,15 +803,16 @@ namespace apsi {
             }
 
             flatbuffers::Offset<fbs::Plaintext> fbs_create_plaintext(
-                flatbuffers::FlatBufferBuilder &fbs_builder, const vector<seal_byte> &pt)
+                flatbuffers::FlatBufferBuilder &fbs_builder, const vector<unsigned char> &pt)
             {
                 auto pt_data = fbs_builder.CreateVector(
-                    reinterpret_cast<const unsigned char *>(pt.data()), pt.size());
+                    reinterpret_cast<const uint8_t *>(pt.data()), pt.size());
                 return fbs::CreatePlaintext(fbs_builder, pt_data);
             }
 
             flatbuffers::Offset<fbs::BatchedPlaintextPolyn> fbs_create_batched_plaintext_polyn(
-                flatbuffers::FlatBufferBuilder &fbs_builder, const vector<vector<seal_byte>> &polyn)
+                flatbuffers::FlatBufferBuilder &fbs_builder,
+                const vector<vector<unsigned char>> &polyn)
             {
                 auto polyn_data = fbs_builder.CreateVector([&]() {
                     vector<flatbuffers::Offset<fbs::Plaintext>> ret;
@@ -881,7 +889,7 @@ namespace apsi {
             return fbs_builder.GetSize();
         }
 
-        pair<uint32_t, size_t> BinBundle::load(gsl::span<const seal_byte> in)
+        pair<uint32_t, size_t> BinBundle::load(gsl::span<const unsigned char> in)
         {
             auto verifier = flatbuffers::Verifier(
                 reinterpret_cast<const unsigned char *>(in.data()), in.size());
@@ -921,11 +929,17 @@ namespace apsi {
                 throw runtime_error("failed to load BinBundle");
             }
 
+            // Check that num_bins fits into flatbuffers::uoffset_t
+            if (!fits_in<flatbuffers::uoffset_t>(num_bins)) {
+                APSI_LOG_ERROR("The loaded BinBundle has too many bins");
+                throw runtime_error("failed to load BinBundle");
+            }
+
             // The loaded label size must match the label size for this BinBundle
             size_t label_size = get_label_size();
 
             for (size_t bin_idx = 0; !stripped_ && (bin_idx < num_bins); bin_idx++) {
-                auto &item_bin = *item_bins[bin_idx]->felts();
+                auto &item_bin = *item_bins[static_cast<flatbuffers::uoffset_t>(bin_idx)]->felts();
 
                 // Check that the sizes of the bins are at most max_bin_size_
                 if (item_bin.size() > max_bin_size_) {
@@ -969,9 +983,18 @@ namespace apsi {
                 throw runtime_error("failed to load BinBundle");
             }
 
+            // Check that label_size fits into flatbuffers::uoffset_t
+            if (!fits_in<flatbuffers::uoffset_t>(label_size)) {
+                APSI_LOG_ERROR("The loaded BinBundle has too large label size");
+                throw runtime_error("failed to load BinBundle");
+            }
+
             for (size_t label_idx = 0; !stripped_ && (label_idx < label_size); label_idx++) {
                 // We can now safely dereference bb->label_bins()
-                auto &label_bins = *bb->label_bins()->operator[](label_idx)->rows();
+                auto &label_bins = *bb->label_bins()
+                                        ->
+                                        operator[](static_cast<flatbuffers::uoffset_t>(label_idx))
+                                        ->rows();
 
                 // Check that the number of bins is the same as for the items
                 if (label_bins.size() != num_bins) {
@@ -985,7 +1008,8 @@ namespace apsi {
                 // Check that each bin has the same size as the corresponding items bin
                 for (size_t bin_idx = 0; bin_idx < num_bins; bin_idx++) {
                     size_t item_bin_size = item_bins_[bin_idx].size();
-                    auto &label_bin = *label_bins[bin_idx]->felts();
+                    auto &label_bin =
+                        *label_bins[static_cast<flatbuffers::uoffset_t>(bin_idx)]->felts();
                     if (label_bin.size() != item_bin_size) {
                         APSI_LOG_ERROR(
                             "The loaded BinBundle has at bin index "
@@ -1027,7 +1051,9 @@ namespace apsi {
                 size_t max_coeff_count = 0;
 
                 for (size_t bin_idx = 0; !stripped_ && (bin_idx < num_bins); bin_idx++) {
-                    auto &felt_matching_polyn = *felt_matching_polyns[bin_idx]->felts();
+                    auto &felt_matching_polyn =
+                        *felt_matching_polyns[static_cast<flatbuffers::uoffset_t>(bin_idx)]
+                             ->felts();
 
                     // Copy over the matching polynomial coefficients for this bin index
                     FEltPolyn p;
@@ -1072,18 +1098,18 @@ namespace apsi {
                 cache_.batched_matching_polyn = crypto_context_;
 
                 // The number of plaintexts is correct; copy them over
-                for (size_t coeff_idx = 0; coeff_idx < batched_matching_polyn.size(); coeff_idx++) {
+                for (flatbuffers::uoffset_t coeff_idx = 0;
+                     coeff_idx < batched_matching_polyn.size();
+                     coeff_idx++) {
                     // Get the current coefficient data
                     auto &batched_matching_polyn_coeff = *batched_matching_polyn[coeff_idx]->data();
 
                     // Copy the data over to a local vector
-                    vector<seal_byte> pt_data;
-                    pt_data.reserve(batched_matching_polyn_coeff.size());
-                    transform(
-                        batched_matching_polyn_coeff.begin(),
-                        batched_matching_polyn_coeff.end(),
-                        back_inserter(pt_data),
-                        [](auto b) { return static_cast<seal_byte>(b); });
+                    vector<unsigned char> pt_data(batched_matching_polyn_coeff.size());
+                    copy_bytes(
+                        batched_matching_polyn_coeff.data(),
+                        batched_matching_polyn_coeff.size(),
+                        pt_data.data());
 
                     // Move the loaded data to the cache
                     cache_.batched_matching_polyn.batched_coeffs.push_back(move(pt_data));
@@ -1123,7 +1149,10 @@ namespace apsi {
                     // not stripped
                     auto felt_interp_polyns_ptr =
                         stripped_ ? nullptr
-                                  : cache.felt_interp_polyns()->operator[](label_idx)->rows();
+                                  : cache.felt_interp_polyns()
+                                        ->
+                                        operator[](static_cast<flatbuffers::uoffset_t>(label_idx))
+                                        ->rows();
 
                     // Do we have the right number of rows in the loaded felt_interp_polyns data?
                     if (!stripped_ && (felt_interp_polyns_ptr->size() != num_bins)) {
@@ -1137,7 +1166,10 @@ namespace apsi {
                     // Next, check that the number of coefficients is correct and copy data over
                     for (size_t bin_idx = 0; !stripped_ && (bin_idx < num_bins); bin_idx++) {
                         auto &felt_interp_polyn =
-                            *felt_interp_polyns_ptr->operator[](bin_idx)->felts();
+                            *felt_interp_polyns_ptr
+                                 ->
+                                 operator[](static_cast<flatbuffers::uoffset_t>(bin_idx))
+                                 ->felts();
 
                         // Compare the number of interpolation polynomial coefficients to the number
                         // of matching polynomial coefficients
@@ -1173,8 +1205,12 @@ namespace apsi {
                     // Finally check that the number of batched interpolation polynomial
                     // coefficients is correct and copy them over.
                     auto &batched_interp_polyn =
-                        *cache.batched_interp_polyns()->operator[](label_idx)->coeffs();
-                    size_t batched_interp_polyn_coeff_count = batched_interp_polyn.size();
+                        *cache.batched_interp_polyns()
+                             ->
+                             operator[](static_cast<flatbuffers::uoffset_t>(label_idx))
+                             ->coeffs();
+                    flatbuffers::uoffset_t batched_interp_polyn_coeff_count =
+                        batched_interp_polyn.size();
                     bool empty_bundle = max_coeff_count <= 1;
                     size_t expected_batch_interp_polyn_coeff_count =
                         empty_bundle ? max_coeff_count : max_coeff_count - 1;
@@ -1200,19 +1236,18 @@ namespace apsi {
                     cache_.batched_interp_polyns.emplace_back(crypto_context_);
 
                     // The number of plaintexts is correct; copy them over
-                    for (size_t coeff_idx = 0; coeff_idx < batched_interp_polyn_coeff_count;
+                    for (flatbuffers::uoffset_t coeff_idx = 0;
+                         coeff_idx < batched_interp_polyn_coeff_count;
                          coeff_idx++) {
                         // Get the current coefficient data
                         auto &batched_interp_polyn_coeff = *batched_interp_polyn[coeff_idx]->data();
 
                         // Copy the data over to a local vector
-                        vector<seal_byte> pt_data;
-                        pt_data.reserve(batched_interp_polyn_coeff.size());
-                        transform(
-                            batched_interp_polyn_coeff.begin(),
-                            batched_interp_polyn_coeff.end(),
-                            back_inserter(pt_data),
-                            [](auto b) { return static_cast<seal_byte>(b); });
+                        vector<unsigned char> pt_data(batched_interp_polyn_coeff.size());
+                        copy_bytes(
+                            batched_interp_polyn_coeff.data(),
+                            batched_interp_polyn_coeff.size(),
+                            pt_data.data());
 
                         // Move the loaded data to the cache
                         cache_.batched_interp_polyns[label_idx].batched_coeffs.push_back(
@@ -1229,7 +1264,7 @@ namespace apsi {
 
         pair<uint32_t, size_t> BinBundle::load(istream &in)
         {
-            vector<seal_byte> in_data = read_from_stream(in);
+            vector<unsigned char> in_data = read_from_stream(in);
             return load(in_data);
         }
     } // namespace sender

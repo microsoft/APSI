@@ -142,18 +142,6 @@ namespace apsi {
             }
 
             /**
-            Converts given Item-Label pair into its algebraic form, i.e., a sequence of felt-felt
-            pairs. Also computes the Item's cuckoo index.
-            */
-            vector<pair<AlgItemLabel, size_t>> preprocess_labeled_data(
-                pair<HashedItem, EncryptedLabel> item_label, const PSIParams &params)
-            {
-                vector<pair<HashedItem, EncryptedLabel>> item_label_singleton{ move(item_label) };
-                return preprocess_labeled_data(
-                    item_label_singleton.begin(), item_label_singleton.end(), params);
-            }
-
-            /**
             Converts each given Item into its algebraic form, i.e., a sequence of felt-monostate
             pairs. Also computes each Item's cuckoo index.
             */
@@ -276,10 +264,12 @@ namespace apsi {
 
                         // Do a dry-run insertion and see if the new largest bin size in the range
                         // exceeds the limit
-                        int new_largest_bin_size = bundle_it->multi_insert_dry_run(data, bin_idx);
+                        int32_t new_largest_bin_size =
+                            bundle_it->multi_insert_dry_run(data, bin_idx);
 
                         // Check if inserting would violate the max bin size constraint
-                        if (new_largest_bin_size > 0 && new_largest_bin_size < max_bin_size) {
+                        if (new_largest_bin_size > 0 &&
+                            safe_cast<size_t>(new_largest_bin_size) < max_bin_size) {
                             // All good
                             bundle_it->multi_insert_for_real(data, bin_idx);
                             written = true;
@@ -399,7 +389,6 @@ namespace apsi {
             void remove_worker(
                 const vector<pair<AlgItem, size_t>> &data_with_indices,
                 vector<vector<BinBundle>> &bin_bundles,
-                CryptoContext &crypto_context,
                 uint32_t bundle_index,
                 uint32_t bins_per_bundle)
             {
@@ -462,7 +451,6 @@ namespace apsi {
             void dispatch_remove(
                 const vector<pair<AlgItem, size_t>> &data_with_indices,
                 vector<vector<BinBundle>> &bin_bundles,
-                CryptoContext &crypto_context,
                 uint32_t bins_per_bundle)
             {
                 ThreadPoolMgr tpm;
@@ -498,7 +486,6 @@ namespace apsi {
                         remove_worker(
                             data_with_indices,
                             bin_bundles,
-                            crypto_context,
                             static_cast<uint32_t>(bundle_idx),
                             bins_per_bundle);
                     });
@@ -652,7 +639,9 @@ namespace apsi {
                 static_cast<uint64_t>(params_.items_per_bundle()),
                 static_cast<uint64_t>(params_.table_params().max_items_per_bin));
 
-            return max_item_count ? static_cast<double>(item_count) / max_item_count : 0.0;
+            return max_item_count
+                       ? static_cast<double>(item_count) / static_cast<double>(max_item_count)
+                       : 0.0;
         }
 
         void SenderDB::clear_internal()
@@ -848,7 +837,6 @@ namespace apsi {
 
             // First compute the hashes for the input data
             auto hashed_data = oprf::OPRFSender::ComputeHashes(data, oprf_key_);
-            size_t full_data_size = hashed_data.size();
 
             // Lock the database for writing
             auto lock = get_writer_lock();
@@ -942,7 +930,7 @@ namespace apsi {
 
             // Dispatch the removal
             uint32_t bins_per_bundle = params_.bins_per_bundle();
-            dispatch_remove(data_with_indices, bin_bundles_, crypto_context_, bins_per_bundle);
+            dispatch_remove(data_with_indices, bin_bundles_, bins_per_bundle);
 
             // Generate the BinBundle caches
             generate_caches();
@@ -1050,13 +1038,10 @@ namespace apsi {
             params_.save(ss);
             string params_str = ss.str();
 
-            int32_t item_bit_count = params_.item_bit_count();
-            int32_t item_byte_count = (item_bit_count + 7) >> 3;
-
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
             auto params = fbs_builder.CreateVector(
-                reinterpret_cast<unsigned char *>(&params_str[0]), params_str.size());
+                reinterpret_cast<const uint8_t *>(&params_str[0]), params_str.size());
             fbs::SenderDBInfo info(
                 safe_cast<uint32_t>(label_byte_count_),
                 safe_cast<uint32_t>(nonce_byte_count_),
@@ -1120,10 +1105,10 @@ namespace apsi {
             STOPWATCH(sender_stopwatch, "SenderDB::Load");
             APSI_LOG_DEBUG("Start loading SenderDB");
 
-            vector<seal_byte> in_data(apsi::util::read_from_stream(in));
+            vector<unsigned char> in_data(apsi::util::read_from_stream(in));
 
             auto verifier = flatbuffers::Verifier(
-                reinterpret_cast<const unsigned char *>(in_data.data()), in_data.size());
+                reinterpret_cast<const uint8_t *>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderDBBuffer(verifier);
             if (!safe) {
                 APSI_LOG_ERROR("Failed to load SenderDB: the buffer is invalid");
@@ -1179,9 +1164,6 @@ namespace apsi {
                 reinterpret_cast<const unsigned char *>(sdb->oprf_key()->data()),
                 oprf::oprf_key_size));
 
-            int32_t item_bit_count = sender_db->params_.item_bit_count();
-            int32_t item_byte_count = (item_bit_count + 7) >> 3;
-
             // Load the hashed items if this SenderDB is not stripped
             if (!stripped) {
                 const auto &hashed_items = *sdb->hashed_items();
@@ -1206,7 +1188,7 @@ namespace apsi {
             size_t label_size = compute_label_size(nonce_byte_count + label_byte_count, *params);
 
             // Load all BinBundle data
-            vector<vector<seal_byte>> bin_bundle_data;
+            vector<vector<unsigned char>> bin_bundle_data;
             bin_bundle_data.reserve(bin_bundle_count);
             while (bin_bundle_count--) {
                 bin_bundle_data.push_back(read_from_stream(in));

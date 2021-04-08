@@ -987,7 +987,7 @@ APSI
 ## Acknowledgments
 
 Multiple people have contributed substantially to the APSI library but may not appear in Git history.
-We wish to extend special thanks to [Hao Chen](https://github.com/haochenuw), Peter Rindal](https://github.com/ladnir), and [Michael Rosenberg](https://github.com/rozbb) for major contributions to the protocol and for writing much of the library.
+We wish to extend special thanks to [Hao Chen](https://github.com/haochenuw), [Peter Rindal](https://github.com/ladnir), and [Michael Rosenberg](https://github.com/rozbb) for major contributions to the protocol and for writing much of the library.
 We wish to also thank [Craig Costello](https://www.craigcostello.com.au) and [Patrick Longa](https://www.patricklonga.com) for helping implement *hash-to-curve* for the awesome [FourQ curve](https://github.com/microsoft/FourQlib).
 
 ## Questions

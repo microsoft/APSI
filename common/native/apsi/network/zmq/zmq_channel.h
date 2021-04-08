@@ -33,7 +33,7 @@ namespace apsi {
         struct ZMQSenderOperation {
             std::unique_ptr<SenderOperation> sop;
 
-            std::vector<seal::seal_byte> client_id;
+            std::vector<unsigned char> client_id;
         };
 
         /**
@@ -42,7 +42,7 @@ namespace apsi {
         struct ZMQSenderOperationResponse {
             std::unique_ptr<SenderOperationResponse> sop_response;
 
-            std::vector<seal::seal_byte> client_id;
+            std::vector<unsigned char> client_id;
         };
 
         /**
@@ -51,7 +51,7 @@ namespace apsi {
         struct ZMQResultPackage {
             std::unique_ptr<ResultPackage> rp;
 
-            std::vector<seal::seal_byte> client_id;
+            std::vector<unsigned char> client_id;
         };
 
         /**

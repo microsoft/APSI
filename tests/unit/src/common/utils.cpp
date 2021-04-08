@@ -24,10 +24,11 @@ using namespace apsi::util;
 
 namespace APSITests {
     namespace {
-        void compare_up_to(const vector<seal_byte> &a, const vector<seal_byte> &b, size_t count)
+        template <typename T>
+        void compare_up_to(const vector<T> &a, const vector<T> &b, size_t count)
         {
             for (size_t i = 0; i < count; i++) {
-                ASSERT_EQ(static_cast<char>(a[i]), static_cast<char>(b[i]));
+                ASSERT_EQ(a[i], b[i]);
             }
         }
     } // namespace
@@ -123,16 +124,16 @@ namespace APSITests {
     TEST(UtilsTests, ReadFromStream)
     {
         stringstream ss;
-        vector<seal_byte> bytes;
+        vector<unsigned char> bytes;
         for (size_t i = 0; i < 100; i++) {
-            bytes.push_back(static_cast<seal_byte>(i));
+            bytes.push_back(i);
         }
 
         // Write the bytes to the stream
         ss.write(reinterpret_cast<const char *>(bytes.data()), bytes.size());
 
         // Now read them back to a different vector
-        vector<seal_byte> compare;
+        vector<unsigned char> compare;
 
         // Read nothing
         read_from_stream(ss, 0, compare);
@@ -162,11 +163,11 @@ namespace APSITests {
     TEST(UtilsTests, ReadFromStreamSizePrefixed)
     {
         stringstream ss;
-        vector<seal_byte> bytes;
+        vector<unsigned char> bytes;
 
         uint32_t size = 100;
         for (uint32_t i = 0; i < size; i++) {
-            bytes.push_back(static_cast<seal_byte>(i));
+            bytes.push_back(i);
         }
 
         // Write the bytes to the stream
@@ -174,7 +175,7 @@ namespace APSITests {
         ss.write(reinterpret_cast<const char *>(bytes.data()), bytes.size());
 
         // Now read them back to a different vector
-        vector<seal_byte> compare = read_from_stream(ss);
+        vector<unsigned char> compare = read_from_stream(ss);
 
         // The result contains the size prefix and the rest of the data will match
         ASSERT_EQ(compare.size() - sizeof(uint32_t), bytes.size());

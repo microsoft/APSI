@@ -82,7 +82,7 @@ namespace APSITests {
         OPRFReceiver receiver(items_vec);
         auto query = receiver.query_data();
 
-        vector<seal_byte> responses = OPRFSender::ProcessQueries(query, oprf_key);
+        vector<unsigned char> responses = OPRFSender::ProcessQueries(query, oprf_key);
 
         vector<HashedItem> receiver_hashes(item_count);
         vector<LabelKey> label_keys(item_count);

@@ -2,7 +2,6 @@
 // Licensed under the MIT license.
 
 // STD
-#include <algorithm>
 #include <iterator>
 #include <sstream>
 #include <stdexcept>
@@ -21,6 +20,8 @@ using namespace seal;
 using namespace seal::util;
 
 namespace apsi {
+    using namespace util;
+
     namespace network {
         size_t SenderOperationResponseParms::save(ostream &out) const
         {
@@ -37,7 +38,7 @@ namespace apsi {
 
             // Set up a vector to hold the parameter data
             auto params_data = fbs_builder.CreateVector(
-                reinterpret_cast<uint8_t *>(&params_str[0]), params_str.size());
+                reinterpret_cast<const uint8_t *>(&params_str[0]), params_str.size());
 
             auto resp = fbs::CreateParmsResponse(fbs_builder, params_data);
 
@@ -59,10 +60,10 @@ namespace apsi {
             // Release the current parameters
             params.reset();
 
-            vector<seal_byte> in_data(util::read_from_stream(in));
+            vector<unsigned char> in_data(util::read_from_stream(in));
 
             auto verifier = flatbuffers::Verifier(
-                reinterpret_cast<const unsigned char *>(in_data.data()), in_data.size());
+                reinterpret_cast<const uint8_t *>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationResponseBuffer(verifier);
             if (!safe) {
                 throw runtime_error("failed to load SenderOperationResponse: invalid buffer");
@@ -92,9 +93,9 @@ namespace apsi {
 
             // Set up a vector to hold the response data
             auto oprf_data = fbs_builder.CreateVector(
-                reinterpret_cast<const unsigned char *>(data.data()), data.size());
-            auto aux_data = fbs_builder.CreateVector(
-                reinterpret_cast<const unsigned char *>(aux.data()), aux.size());
+                reinterpret_cast<const uint8_t *>(data.data()), data.size());
+            auto aux_data =
+                fbs_builder.CreateVector(reinterpret_cast<const uint8_t *>(aux.data()), aux.size());
             auto resp = fbs::CreateOPRFResponse(fbs_builder, oprf_data, aux_data);
 
             fbs::SenderOperationResponseBuilder sop_response_builder(fbs_builder);
@@ -116,10 +117,10 @@ namespace apsi {
             data.clear();
             aux.clear();
 
-            vector<seal_byte> in_data(util::read_from_stream(in));
+            vector<unsigned char> in_data(util::read_from_stream(in));
 
             auto verifier = flatbuffers::Verifier(
-                reinterpret_cast<const unsigned char *>(in_data.data()), in_data.size());
+                reinterpret_cast<const uint8_t *>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationResponseBuffer(verifier);
             if (!safe) {
                 throw runtime_error("failed to load SenderOperationResponse: invalid buffer");
@@ -134,14 +135,12 @@ namespace apsi {
 
             // Load the OPRF response
             const auto &oprf_data = *sop_response->response_as_OPRFResponse()->data();
-            transform(oprf_data.begin(), oprf_data.end(), back_inserter(data), [](auto a) {
-                return static_cast<seal_byte>(a);
-            });
+            data.resize(oprf_data.size());
+            copy_bytes(oprf_data.data(), oprf_data.size(), data.data());
 
             const auto &aux_data = *sop_response->response_as_OPRFResponse()->aux();
-            transform(aux_data.begin(), aux_data.end(), back_inserter(aux), [](auto a) {
-                return static_cast<seal_byte>(a);
-            });
+            aux.resize(aux_data.size());
+            copy_bytes(aux_data.data(), aux_data.size(), aux.data());
 
             return in_data.size();
         }
@@ -167,10 +166,10 @@ namespace apsi {
 
         size_t SenderOperationResponseQuery::load(istream &in)
         {
-            vector<seal_byte> in_data(util::read_from_stream(in));
+            vector<unsigned char> in_data(util::read_from_stream(in));
 
             auto verifier = flatbuffers::Verifier(
-                reinterpret_cast<const unsigned char *>(in_data.data()), in_data.size());
+                reinterpret_cast<const uint8_t *>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedSenderOperationResponseBuffer(verifier);
             if (!safe) {
                 throw runtime_error("failed to load SenderOperationResponse: invalid buffer");

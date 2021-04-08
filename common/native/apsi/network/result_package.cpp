@@ -17,6 +17,9 @@
 // SEAL
 #include "seal/util/common.h"
 
+// GSL
+#include "gsl/span"
+
 using namespace std;
 using namespace seal;
 using namespace seal::util;
@@ -31,11 +34,11 @@ namespace apsi {
                 throw runtime_error("Unsupported compression mode");
             }
 
-            vector<seal_byte> temp;
+            vector<unsigned char> temp;
             temp.resize(psi_result.save_size(compr_mode));
-            auto size = psi_result.save(temp.data(), temp.size(), compr_mode);
+            auto size = psi_result.save(temp, compr_mode);
             auto psi_ct_data =
-                fbs_builder.CreateVector(reinterpret_cast<uint8_t *>(temp.data()), size);
+                fbs_builder.CreateVector(reinterpret_cast<const uint8_t *>(temp.data()), size);
             auto psi_ct = fbs::CreateCiphertext(fbs_builder, psi_ct_data);
 
             // There may or may not be label data
@@ -45,9 +48,9 @@ namespace apsi {
                 for (const auto &label_ct : label_result) {
                     // Save each seal::Ciphertext
                     temp.resize(label_ct.save_size(compr_mode));
-                    size = label_ct.save(temp.data(), temp.size(), compr_mode);
+                    size = label_ct.save(temp, compr_mode);
                     auto label_ct_data =
-                        fbs_builder.CreateVector(reinterpret_cast<uint8_t *>(temp.data()), size);
+                        fbs_builder.CreateVector(reinterpret_cast<const uint8_t*>(temp.data()), size);
 
                     // Add to the Ciphertext vector
                     ret.push_back(fbs::CreateCiphertext(fbs_builder, label_ct_data));
@@ -88,10 +91,10 @@ namespace apsi {
             psi_result.clear();
             label_result.clear();
 
-            vector<seal_byte> in_data(util::read_from_stream(in));
+            vector<unsigned char> in_data(util::read_from_stream(in));
 
             auto verifier = flatbuffers::Verifier(
-                reinterpret_cast<const unsigned char *>(in_data.data()), in_data.size());
+                reinterpret_cast<const uint8_t *>(in_data.data()), in_data.size());
             bool safe = fbs::VerifySizePrefixedResultPackageBuffer(verifier);
             if (!safe) {
                 throw runtime_error("failed to load ResultPackage: invalid buffer");
@@ -103,11 +106,11 @@ namespace apsi {
 
             // Load psi_result
             const auto &psi_ct = *rp->psi_result();
+            gsl::span<const unsigned char> psi_ct_span(
+                reinterpret_cast<const unsigned char *>(psi_ct.data()->data()),
+                psi_ct.data()->size());
             try {
-                psi_result.load(
-                    context,
-                    reinterpret_cast<const seal_byte *>(psi_ct.data()->data()),
-                    psi_ct.data()->size());
+                psi_result.load(context, psi_ct_span);
             } catch (const logic_error &ex) {
                 stringstream ss;
                 ss << "failed to load PSI ciphertext: ";
@@ -144,12 +147,12 @@ namespace apsi {
                 auto &label_cts = *rp->label_result();
                 label_result.reserve(label_cts.size());
                 for (const auto &label_ct : label_cts) {
-                    Ciphertext temp(*context);
+                    gsl::span<const unsigned char> label_ct_span(
+                        reinterpret_cast<const unsigned char *>(label_ct->data()->data()),
+                        label_ct->data()->size());
+                    SEALObject<Ciphertext> temp;
                     try {
-                        temp.load(
-                            *context,
-                            reinterpret_cast<const seal_byte *>(label_ct->data()->data()),
-                            label_ct->data()->size());
+                        temp.load(context, label_ct_span);
                     } catch (const logic_error &ex) {
                         stringstream ss;
                         ss << "failed to load label ciphertext: ";
@@ -161,7 +164,7 @@ namespace apsi {
                         ss << ex.what();
                         throw runtime_error(ss.str());
                     }
-                    label_result.emplace_back(move(temp));
+                    label_result.push_back(move(temp));
                 }
             }
 

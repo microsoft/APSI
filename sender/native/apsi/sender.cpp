@@ -87,7 +87,6 @@ namespace apsi {
 
             // OPRF response has the same size as the OPRF query
             OPRFResponse response_oprf = make_unique<OPRFResponse::element_type>();
-            vector<seal_byte> oprf_result;
             try {
                 response_oprf->data = OPRFSender::ProcessQueries(oprf_request->data, key);
             } catch (const exception &ex) {

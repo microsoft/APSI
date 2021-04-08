@@ -78,7 +78,7 @@ namespace APSITests {
         ASSERT_EQ(SenderOperationType::sop_oprf, sop2.type());
         ASSERT_TRUE(sop2.data.empty());
 
-        sop.data.push_back(seal_byte(0xAB));
+        sop.data.push_back(0xAB);
         out_size = sop.save(ss);
         in_size = sop2.load(ss, nullptr);
 
@@ -87,7 +87,7 @@ namespace APSITests {
         ASSERT_EQ(1, sop2.data.size());
         ASSERT_EQ(static_cast<char>(0xAB), static_cast<char>(sop2.data[0]));
 
-        sop.data.push_back(seal_byte(0xCD));
+        sop.data.push_back(0xCD);
         out_size = sop.save(ss);
         in_size = sop2.load(ss, nullptr);
 
@@ -128,10 +128,11 @@ namespace APSITests {
         SenderOperationQuery sop2;
 
         // Loading a query requires a valid SEALContext
-        ASSERT_THROW(size_t in_size = sop2.load(ss, nullptr), invalid_argument);
+        size_t in_size = 0;
+        ASSERT_THROW(in_size = sop2.load(ss, nullptr), invalid_argument);
 
         // Loading a query requires the RelinKeys to be valid
-        ASSERT_THROW(size_t in_size = sop2.load(ss, context), runtime_error);
+        ASSERT_THROW(in_size = sop2.load(ss, context), runtime_error);
 
         // A local valid relin_keys object; this time also load works
         RelinKeys rlk;
@@ -140,7 +141,7 @@ namespace APSITests {
         ASSERT_FALSE(sop.relin_keys.is_serializable());
         ASSERT_TRUE(sop.relin_keys.is_local());
         out_size = sop.save(ss);
-        size_t in_size = sop2.load(ss, context);
+        in_size = sop2.load(ss, context);
 
         ASSERT_EQ(out_size, in_size);
         ASSERT_EQ(SenderOperationType::sop_query, sop2.type());

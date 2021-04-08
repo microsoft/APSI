@@ -104,7 +104,7 @@ namespace apsi {
         ECPoint &ECPoint::operator=(const ECPoint &assign)
         {
             if (&assign != this) {
-                memcpy(pt_, assign.pt_, point_size);
+                pt_[0] = assign.pt_[0];
             }
             return *this;
         }

@@ -193,7 +193,7 @@ namespace apsi {
         temp.resize(seal_params_.save_size(Serialization::compr_mode_default));
         auto size = seal_params_.save(temp.data(), temp.size(), Serialization::compr_mode_default);
         auto seal_params_data =
-            fbs_builder.CreateVector(reinterpret_cast<uint8_t *>(temp.data()), size);
+            fbs_builder.CreateVector(reinterpret_cast<const uint8_t *>(temp.data()), size);
         auto seal_params = fbs::CreateSEALParams(fbs_builder, seal_params_data);
 
         fbs::PSIParamsBuilder psi_params_builder(fbs_builder);
@@ -214,10 +214,10 @@ namespace apsi {
 
     pair<PSIParams, size_t> PSIParams::Load(istream &in)
     {
-        vector<seal_byte> in_data(util::read_from_stream(in));
+        vector<unsigned char> in_data(util::read_from_stream(in));
 
         auto verifier = flatbuffers::Verifier(
-            reinterpret_cast<const unsigned char *>(in_data.data()), in_data.size());
+            reinterpret_cast<const uint8_t *>(in_data.data()), in_data.size());
         bool safe = fbs::VerifySizePrefixedPSIParamsBuffer(verifier);
         if (!safe) {
             throw runtime_error("failed to load parameters: invalid buffer");

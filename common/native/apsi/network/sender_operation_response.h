@@ -12,9 +12,6 @@
 #include "apsi/network/sender_operation.h"
 #include "apsi/psi_params.h"
 
-// SEAL
-#include <seal/util/defines.h>
-
 namespace apsi {
     namespace network {
         /**
@@ -90,12 +87,12 @@ namespace apsi {
             /**
             Holds the OPRF query data.
             */
-            std::vector<seal::seal_byte> data;
+            std::vector<unsigned char> data;
 
             /**
             Holds auxiliary OPRF data
             */
-            std::vector<seal::seal_byte> aux;
+            std::vector<unsigned char> aux;
         }; // class SenderOperationResponseOPRF
 
         /**

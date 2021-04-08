@@ -18,6 +18,9 @@
 #include "seal/util/common.h"
 #include "seal/util/defines.h"
 
+// GSL
+#include "gsl/span"
+
 namespace apsi {
     /**
     This object stores SEAL objects that can optionally be wrapper in a seal::Serializable instance,
@@ -142,7 +145,7 @@ namespace apsi {
             }
             SerializableType result = std::move(*serializable_);
             serializable_.reset();
-            return std::move(result);
+            return result;
         }
 
         LocalType extract_if_local()
@@ -152,7 +155,7 @@ namespace apsi {
             }
             LocalType result = std::move(*local_);
             local_.reset();
-            return std::move(result);
+            return result;
         }
 
         LocalType extract(std::shared_ptr<seal::SEALContext> context)
@@ -173,17 +176,19 @@ namespace apsi {
                 throw std::logic_error("no object to extract");
             }
 
-            return std::move(ret);
+            return ret;
         }
 
-        std::size_t save(
-            seal::seal_byte *out, std::size_t size, seal::compr_mode_type compr_mode) const
+        std::size_t save(gsl::span<unsigned char> out, seal::compr_mode_type compr_mode) const
         {
+            std::size_t size = out.size();
+            seal::seal_byte *out_ptr = reinterpret_cast<seal::seal_byte *>(out.data());
+
             if (is_local() && !is_serializable()) {
-                return seal::util::safe_cast<std::size_t>(local_->save(out, size, compr_mode));
+                return seal::util::safe_cast<std::size_t>(local_->save(out_ptr, size, compr_mode));
             } else if (!is_local() && is_serializable()) {
                 return seal::util::safe_cast<std::size_t>(
-                    serializable_->save(out, size, compr_mode));
+                    serializable_->save(out_ptr, size, compr_mode));
             }
             return 0;
         }
@@ -199,13 +204,18 @@ namespace apsi {
         }
 
         std::size_t load(
-            std::shared_ptr<seal::SEALContext> context, const seal::seal_byte *in, std::size_t size)
+            std::shared_ptr<seal::SEALContext> context, gsl::span<const unsigned char> in)
         {
             if (!context) {
                 throw std::invalid_argument("context cannot be null");
             }
+
+            std::size_t size = in.size();
+            const seal::seal_byte *in_ptr = reinterpret_cast<const seal::seal_byte *>(in.data());
+
             set(LocalType());
-            return seal::util::safe_cast<std::size_t>(local_->load(std::move(*context), in, size));
+            return seal::util::safe_cast<std::size_t>(
+                local_->load(std::move(*context), in_ptr, size));
         }
 
     private:

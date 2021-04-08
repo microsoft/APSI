@@ -9,9 +9,13 @@
 #include <vector>
 
 // TCLAP
+#ifdef _MSC_VER
 #pragma warning(push, 0)
+#endif
 #include "tclap/CmdLine.h"
+#ifdef _MSC_VER
 #pragma warning(pop)
+#endif
 
 /**
 Command Line Processor for pd_tool.

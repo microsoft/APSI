@@ -93,8 +93,8 @@ namespace APSITests {
         ASSERT_TRUE(sopr2.data.empty());
         ASSERT_TRUE(sopr2.aux.empty());
 
-        sopr.data.push_back(seal_byte(0xAB));
-        sopr.aux.push_back(seal_byte(0xCD));
+        sopr.data.push_back(0xAB);
+        sopr.aux.push_back(0xCD);
         out_size = sopr.save(ss);
         in_size = sopr2.load(ss);
 
@@ -104,8 +104,8 @@ namespace APSITests {
         ASSERT_EQ(static_cast<char>(0xAB), static_cast<char>(sopr2.data[0]));
         ASSERT_EQ(static_cast<char>(0xCD), static_cast<char>(sopr2.aux[0]));
 
-        sopr.data.push_back(seal_byte(0xEF));
-        sopr.aux.push_back(seal_byte(0xDA));
+        sopr.data.push_back(0xEF);
+        sopr.aux.push_back(0xDA);
         out_size = sopr.save(ss);
         in_size = sopr2.load(ss);
 

@@ -2,9 +2,11 @@
 // Licensed under the MIT license.
 
 // STD
+#include <algorithm>
 #include <cstddef>
 #include <cstring>
 #include <sstream>
+#include <stdexcept>
 
 // APSI
 #include "apsi/util/utils.h"
@@ -47,7 +49,7 @@ namespace apsi {
             return elems;
         }
 
-        void read_from_stream(istream &in, uint32_t byte_count, vector<seal_byte> &destination)
+        void read_from_stream(istream &in, uint32_t byte_count, vector<unsigned char> &destination)
         {
             // Initial number of bytes to read
             const size_t first_to_read = 1024;
@@ -72,13 +74,13 @@ namespace apsi {
             }
         }
 
-        vector<seal_byte> read_from_stream(istream &in)
+        vector<unsigned char> read_from_stream(istream &in)
         {
             uint32_t size = 0;
             in.read(reinterpret_cast<char *>(&size), sizeof(uint32_t));
 
-            vector<seal_byte> result(sizeof(uint32_t));
-            memcpy(result.data(), &size, sizeof(uint32_t));
+            vector<unsigned char> result(sizeof(uint32_t));
+            copy_bytes(&size, sizeof(uint32_t), result.data());
 
             read_from_stream(in, size, result);
 
@@ -109,6 +111,23 @@ namespace apsi {
             for (; count; count--, buf1++, buf2++) {
                 *buf1 = static_cast<unsigned char>(*buf1 ^ *buf2);
             }
+        }
+
+        void copy_bytes(const void *src, std::size_t count, void *dst)
+        {
+            if (!count) {
+                return;
+            }
+            if (!src) {
+                throw invalid_argument("cannot copy data: source is null");
+            }
+            if (!dst) {
+                throw invalid_argument("cannot copy data: destination is null");
+            }
+            copy_n(
+                reinterpret_cast<const unsigned char *>(src),
+                count,
+                reinterpret_cast<unsigned char *>(dst));
         }
     } // namespace util
 } // namespace apsi
