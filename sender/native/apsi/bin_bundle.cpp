@@ -146,6 +146,223 @@ namespace apsi {
         }
 
         /**
+        Evaluates the polynomial on the given ciphertext, as long as it requires less computation
+	    than the standard evaluation eval() above.
+	    Evaluated polynomial c_0 + c_1*y + c_2*y^2 + ... + y^degree
+	    Inner polynomials: c_{si} + c_{si+1}*y + ... + c_{si+s-1}*y^{s-1}  (for i=0,...,v-1)
+		      and: c_{sv} + c_{sv+1}*y + ... + c_{sv+degree%s}*y^{degree%s}  (for i=v)
+	    Large powers: y_{0*s}, y_{1*s}, ..., y_{v*s}
+	    */
+	    Ciphertext BatchedPlaintextPolyn::eval_patstock(const vector<Ciphertext> &ciphertext_powers, const size_t nsplits) const
+        {
+	        int degree = batched_coeffs.size() - 1; 
+	        // Number of low powers
+	        int s = floor(sqrt((nsplits + 1) * (degree + 1)));
+	        // Number of high powers
+	        int v = floor(degree / s);
+
+	        if ((s + 2 * v) > degree) {
+		        Ciphertext result;
+		        result = eval(ciphertext_powers);
+		        return result;
+	        }
+            
+#ifdef SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT
+            static_assert(
+                false, "SEAL must be built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF");
+#endif
+            // We need to have enough ciphertext powers to evaluate this polynomial
+            if (batched_coeffs.size() > ciphertext_powers.size()) {
+                throw invalid_argument("not enough ciphertext powers available");
+            }
+
+            const SEALContext &seal_context = *crypto_context.seal_context();
+            Evaluator &evaluator = *crypto_context.evaluator();
+            
+	        KeyGenerator keygen(seal_context);
+	        RelinKeys relin_keys;
+	        keygen.create_relin_keys(relin_keys);
+            //crypto_context.set_evaluator(relin_keys);
+            //Evaluator &evaluator = *crypto_context.evaluator();
+	        //RelinKeys &relin_keys2 = *crypto_context.relin_keys();
+	        bool relinearize = crypto_context.seal_context()->using_keyswitching();
+           
+            // Lowest degree terms are stored in the lowest index positions in vectors.
+            // Specifically, ciphertext_powers[1] is the first power of the ciphertext data, but
+            // batched_coeffs[0] is the constant coefficient.
+            //
+            // Because the plaintexts in batched_coeffs can be identically zero, SEAL should be
+            // built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF. We create a result ciphertext
+            // that is identically zero and set its NTT form flag to true so the additions below
+            // will work.
+            Ciphertext result;
+            result.resize(seal_context, seal_context.first_parms_id(), 2);
+            result.is_ntt_form() = true;
+            Ciphertext temp;
+            Ciphertext temp_out;
+            Plaintext coeff;
+
+            //Ciphertext result2;
+            //Ciphertext prod;
+            //result2.resize(seal_context, seal_context.first_parms_id(), 2);
+            //evaluator.transform_from_ntt(ciphertext_powers[2], prod);
+            //result2 = prod;
+            //evaluator.multiply(prod, prod, result2);
+            //evaluator.relinearize_inplace(result2, relin_keys);
+	    	    
+	        // Calculating polynomial for i=1,...,v-1
+		    if (s > 1) {
+	            for (int i = 1; i < v; i++) {
+                    for (int j = 1; j < s; j++) { // Calculating inner polynomial for outer power y^{s*i}
+		                printf ("\ndegree:%d   s:%d   v:%d   power:%d   coeff:%d\n", degree, s, v, j, i*s+j);
+			            coeff.unsafe_load(
+                            seal_context,
+                            reinterpret_cast<const seal_byte *>(batched_coeffs[i*s + j].data()),
+                            batched_coeffs[i*s + j].size());
+			            evaluator.multiply_plain(ciphertext_powers[j], coeff, temp);
+			            if (j==1) {temp_out = temp;}
+                        else {evaluator.add_inplace(temp_out, temp);}
+		            }
+		            printf ("\ndegree:%d   s:%d   v:%d   multiply by power:%d\n", degree, s, v, i*s);
+                    Ciphertext power;
+                    evaluator.transform_from_ntt_inplace(temp_out);
+                    evaluator.transform_from_ntt(ciphertext_powers[i*s], power);
+		            //evaluator.multiply_inplace(temp_out, power); 
+
+                    /*if (relinearize) {
+			            evaluator.relinearize_inplace(temp_out, relin_keys);
+                    }*/
+		            evaluator.transform_to_ntt_inplace(temp_out);
+                    evaluator.add_inplace(result, temp_out);
+                }
+                evaluator.transform_from_ntt_inplace(result);
+                if (relinearize) {
+			        evaluator.relinearize_inplace(result, relin_keys);
+                }
+                evaluator.transform_to_ntt_inplace(result);
+
+            } else {
+	            for (int i = 1; i < v; i++) {
+		            coeff.unsafe_load(
+                        seal_context,
+                        reinterpret_cast<const seal_byte *>(batched_coeffs[i*s].data()),
+                        batched_coeffs[i*s].size());
+		            evaluator.multiply_plain(ciphertext_powers[i*s], coeff, temp);
+		            evaluator.add_inplace(result, temp);
+		    
+		        }
+	        }
+	    
+	        // Calculating polynomial for i=v
+	        if (degree % s > 0) {
+                for (int j = 1; j < degree % s + 1; j++) {
+		            printf ("\ndegree:%d   s:%d   v:%d   power:%d   coeff:%d\n", degree, s, v, j, v*s+j);
+		            coeff.unsafe_load(
+                        seal_context,
+                        reinterpret_cast<const seal_byte *>(batched_coeffs[v*s + j].data()),
+                        batched_coeffs[v*s + j].size());
+		            evaluator.multiply_plain(ciphertext_powers[j], coeff, temp);
+                    if (j==1) {temp_out = temp;}
+                    else {evaluator.add_inplace(temp_out, temp);}
+		        }
+		        printf ("\ndegree:%d   s:%d   v:%d   multiply by power:%d\n", degree, s, v, v*s);
+                Ciphertext power;
+                evaluator.transform_from_ntt_inplace(temp_out);
+                evaluator.transform_from_ntt(ciphertext_powers[v*s], power);
+		        //evaluator.multiply_inplace(temp_out, power); 
+
+                if (relinearize) {
+		            evaluator.relinearize_inplace(temp_out, relin_keys);
+		        }
+                evaluator.transform_to_ntt_inplace(temp_out);
+		        evaluator.add_inplace(result, temp_out);
+
+		        printf ("\ndegree:%d   s:%d   power:%d   coeff:%d\n", degree, s, v*s, v*s);
+                coeff.unsafe_load(
+                    seal_context,
+                    reinterpret_cast<const seal_byte *>(batched_coeffs[v*s].data()),
+                    batched_coeffs[v*s].size());
+                evaluator.multiply_plain(ciphertext_powers[v*s], coeff, temp);
+                evaluator.add_inplace(result, temp);	
+            
+            } else {
+		        coeff.unsafe_load(
+                    seal_context,
+                    reinterpret_cast<const seal_byte *>(batched_coeffs[v*s].data()),
+                    batched_coeffs[v*s].size());
+                evaluator.multiply_plain(ciphertext_powers[v*s], coeff, temp);
+                evaluator.add_inplace(result, temp);
+            }
+           
+
+            // Calculating inner polynomial for outer power y^{s*0}
+	        for (int j = 1; j < s; j++) {
+		        printf ("\ndegree:%d   s:%d   v:%d   power:%d   coeff:%d\n", degree, s, v, j, j);
+		        coeff.unsafe_load(
+                    seal_context,
+                    reinterpret_cast<const seal_byte *>(batched_coeffs[j].data()),
+                    batched_coeffs[j].size());
+                evaluator.multiply_plain(ciphertext_powers[j], coeff, temp);
+                evaluator.add_inplace(result, temp);
+	        }
+	    
+            // Adding the free terms of the inner polynomials
+	        for (int i = 1; i < v; i++) {
+		        printf ("\ndegree:%d   s:%d   power:%d   coeff:%d\n", degree, s, i*s, i*s);
+		        coeff.unsafe_load(
+                    seal_context,
+                    reinterpret_cast<const seal_byte *>(batched_coeffs[i*s].data()),
+                    batched_coeffs[i*s].size());
+                evaluator.multiply_plain(ciphertext_powers[i*s], coeff, temp);
+                evaluator.add_inplace(result, temp);	
+	        }
+            
+           
+
+            // Need to transform back from NTT form before we can add the constant coefficient. The
+            // constant coefficient is specifically not in NTT form so this can work.
+            evaluator.transform_from_ntt_inplace(result);
+            coeff.unsafe_load(
+                seal_context,
+                reinterpret_cast<const seal_byte *>(batched_coeffs[0].data()),
+                batched_coeffs[0].size());
+            evaluator.add_plain_inplace(result, coeff);
+
+            
+            // Make the result as small as possible by modulus switching
+            while (result.parms_id() != seal_context.last_parms_id()) {
+                evaluator.mod_switch_to_next_inplace(result);
+            }
+
+            // If the last parameter set has only one prime, we can compress the result
+            // further by setting low-order bits to zero. This effectively increases the
+            // noise, but that doesn't matter as long as we don't use all noise budget.
+            const EncryptionParameters &parms = seal_context.last_context_data()->parms();
+            if (parms.coeff_modulus().size() == 1) {
+                // The number of data bits we need to have left in each ciphertext coefficient
+                int compr_coeff_bit_count = parms.plain_modulus().bit_count() +
+                                            get_significant_bit_count(parms.poly_modulus_degree());
+
+                int coeff_mod_bit_count = parms.coeff_modulus()[0].bit_count();
+
+                // The number of bits to set to zero
+                int irrelevant_bit_count = coeff_mod_bit_count - compr_coeff_bit_count;
+
+                // Can compression achieve anything?
+                if (irrelevant_bit_count > 0) {
+                    // Mask for zeroing out the irrelevant bits
+                    uint64_t mask = ~((uint64_t(1) << irrelevant_bit_count) - 1);
+                    SEAL_ITERATE(iter(result), result.size(), [&](auto &&I) {
+                        // We only have a single RNS component so dereference once more
+                        SEAL_ITERATE(*I, parms.poly_modulus_degree(), [&](auto &J) { J &= mask; });
+                    });
+                }
+            }
+
+            return result;
+        }
+
+        /**
         Constructs a batched Plaintext polynomial from a list of polynomials. Takes an evaluator and
         batch encoder to do encoding and NTT ops.
         */

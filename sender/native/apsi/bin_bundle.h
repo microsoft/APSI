@@ -92,6 +92,16 @@ namespace apsi {
             seal::Ciphertext eval(const std::vector<seal::Ciphertext> &ciphertext_powers) const;
 
             /**
+            Evaluates the polynomial on the given ciphertext, as long as it requires less computation
+    	    than the standard evaluation eval() above.
+	        Evaluates polynomial c_0 + c_1*y + c_2*y^2 + ... + y^degree
+	        Inner polynomials: c_{si} + c_{si+1}*y + ... + c_{si+s-1}*y^{s-1}  (for i=0,...,v-1)
+  	                 	  and: c_{sv} + c_{sv+1}*y + ... + c_{sv+degree%s}*y^{degree%s}  (for i=v)
+	        Large powers: y_{0*s}, y_{1*s}, ..., y_{v*s}
+            */
+	        seal::Ciphertext eval_patstock(const std::vector<seal::Ciphertext> &ciphertext_powers, const size_t splits) const;
+
+            /**
             Returns whether this polynomial has non-zero size.
             */
             explicit operator bool() const noexcept

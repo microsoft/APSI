@@ -297,7 +297,9 @@ namespace apsi {
 
             // Compute the matching result and move to rp
             const BatchedPlaintextPolyn &matching_polyn = cache.get().batched_matching_polyn;
-            rp->psi_result = matching_polyn.eval(all_powers[bundle_idx]);
+            //rp->psi_result = matching_polyn.eval(all_powers[bundle_idx]);
+            rp->psi_result = matching_polyn.eval_patstock(all_powers[bundle_idx], all_powers.size());
+
 
             for (const auto &interp_polyn : cache.get().batched_interp_polyns) {
                 // Compute the label result and move to rp
