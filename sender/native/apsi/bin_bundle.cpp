@@ -170,7 +170,7 @@ namespace apsi {
             // Number of low powers plus one 
             // (since the power C^l is actually the first high power)
             int l = floor(sqrt((nsplits + 1) * (degree + 1)));
-	        // Number of high powers
+            // Number of high powers
             int h = floor(degree / l);
 
             // Check whether it is better to use the standard eval algorithm.
