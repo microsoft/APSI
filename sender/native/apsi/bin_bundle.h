@@ -99,7 +99,7 @@ namespace apsi {
             The parameters l and h are determined according to the degree of the polynomial and the 
             number of splits in order to minimize the computation. 
 
-	        Evaluated polynomial a_0 + a_1*C + a_2*C^2 + ... + C^degree
+            Evaluated polynomial a_0 + a_1*C + a_2*C^2 + ... + C^degree
 	    
             Inner polys: a_{l*i} + a_{l*i+1}*C + ... + a_{l*i+l-1}*C^{l-1}    (for i=0,...,h-1)
 		            and: a_{l*h} + a_{l*h+1}*C + ... + a_{l*h+degree%l}*C^{degree%l}  (for i=h)
@@ -107,7 +107,7 @@ namespace apsi {
             Low powers:  C^{1}, ..., C^{l-1}
             High powers: C^{1*l}, ..., C^{l*h}
 	        */
-	        seal::Ciphertext eval_patstock(const seal::RelinKeys &relin_keys, 
+            seal::Ciphertext eval_patstock(const seal::RelinKeys &relin_keys, 
                                            const std::vector<seal::Ciphertext> &ciphertext_powers, 
                                            const size_t splits) const;
 
