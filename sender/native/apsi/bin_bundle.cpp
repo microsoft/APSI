@@ -158,6 +158,7 @@ namespace apsi {
         Inner polynomials: a_{l*i} + a_{l*i+1}*C + ... + a_{l*i+l-1}*C^{l-1}    (for i=0,...,h-1)
 		              and: a_{l*h} + a_{l*h+1}*C + ... + a_{l*h+degree%l}*C^{degree%l}  (for i=h)
 	    
+        Low powers:  C^{1}, ..., C^{l-1}
         High powers: C^{1*l}, ..., C^{h*l}
 	    */
 	    Ciphertext BatchedPlaintextPolyn::eval_patstock(const RelinKeys &relin_keys, 
@@ -166,7 +167,8 @@ namespace apsi {
         {
             // Degree of polynomial to be evaluated
 	        int degree = batched_coeffs.size() - 1; 
-	        // Number of low powers
+	        // Number of low powers plus one 
+            // (since the power C^l is actually the first high power)
 	        int l = floor(sqrt((nsplits + 1) * (degree + 1)));
 	        // Number of high powers
 	        int h = floor(degree / l);
@@ -209,7 +211,7 @@ namespace apsi {
             Plaintext coeff;
 	    	    
 		    if (l > 1) {
-	            // Calculating polynomial for i=1,...,v
+	            // Calculating polynomial for i=1,...,h-1
 	            for (int i = 1; i < h; i++) {
                     // Evaluating inner polynomial. The free term is left out and added later on. 
                     // Result is stored in temp_out.

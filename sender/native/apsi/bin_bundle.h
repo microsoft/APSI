@@ -103,7 +103,8 @@ namespace apsi {
 	    
             Inner polys: a_{l*i} + a_{l*i+1}*C + ... + a_{l*i+l-1}*C^{l-1}    (for i=0,...,h-1)
 		            and: a_{l*h} + a_{l*h+1}*C + ... + a_{l*h+degree%l}*C^{degree%l}  (for i=h)
-	    
+	   
+            Low powers:  C^{1}, ..., C^{l-1}
             High powers: C^{1*l}, ..., C^{h*l}
 	        */
 
