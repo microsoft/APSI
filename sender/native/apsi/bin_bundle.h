@@ -107,7 +107,6 @@ namespace apsi {
             Low powers:  C^{1}, ..., C^{l-1}
             High powers: C^{1*l}, ..., C^{l*h}
 	        */
-
 	        seal::Ciphertext eval_patstock(const seal::RelinKeys &relin_keys, 
                                            const std::vector<seal::Ciphertext> &ciphertext_powers, 
                                            const size_t splits) const;

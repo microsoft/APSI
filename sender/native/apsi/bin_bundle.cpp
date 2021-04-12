@@ -151,7 +151,7 @@ namespace apsi {
         The algorithm computes h+1 inner polynomials on low powers (C¹ to C^{l-1}).
         Each inner polynomial is then multiplied by the corresponding high power.
         The parameters l and h are determined according to the degree of the polynomial and the 
-        number of splits in order to minimize the computation. 
+        number of splits in order to minimize the computation complexity. 
 
 	    Evaluated polynomial a_0 + a_1*C + a_2*C^2 + ... + C^degree
 	    
@@ -173,15 +173,15 @@ namespace apsi {
 	        // Number of high powers
 	        int h = floor(degree / l);
 
-            // Check whether it is better to use the standard eval algorithm
+            // Check whether it is better to use the standard eval algorithm.
+            // If both algorithms require the same computation, the standard eval is used.
 	        if ((l + 2 * h) > degree) {
 		        Ciphertext result;
 		        result = eval(ciphertext_powers);
 		        return result;
 	        }
+            APSI_LOG_INFO("Using Paterson-Stockmeyer");
 
-            printf ("patstock nsplits:%d   degree:%d   powers:%d\n", nsplits, degree, ciphertext_powers.size()-1);
-            
 #ifdef SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT
             static_assert(
                 false, "SEAL must be built with SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT=OFF");
@@ -215,12 +215,11 @@ namespace apsi {
             // it results in less ciphertext-ciphertext multiplications than the eval function,
             // in which case l is always greater than one.  
 		    if (l > 1) {
-	            // Calculating polynomial for i=1,...,h-1
+	            // Calculate polynomial for i=1,...,h-1
 	            for (int i = 1; i < h; i++) {
-                    // Evaluating inner polynomial. The free term is left out and added later on. 
-                    // Result is stored in temp_out.
+                    // Evaluate inner polynomial. The free term is left out and added later on. 
+                    // The evaluation result is stored in temp_out.
                     for (int j = 1; j < l; j++) { 
-		                printf ("\ndegree:%d   l:%d   h:%d   power:%d   coeff:%d\n", degree, l, h, j, i*l+j);
 			            coeff.unsafe_load(
                             seal_context,
                             reinterpret_cast<const seal_byte *>(batched_coeffs[i*l + j].data()),
@@ -229,7 +228,6 @@ namespace apsi {
 			            if (j==1) {temp_out = temp;}
                         else {evaluator.add_inplace(temp_out, temp);}
 		            }
-		            printf ("\ndegree:%d   l:%d   h:%d   multiply by power:%d\n", degree, l, h, i*l);
                     // Multiplying inner polynomial by high power
                     Ciphertext power;
                     evaluator.transform_from_ntt_inplace(temp_out);
@@ -239,11 +237,10 @@ namespace apsi {
                     evaluator.add_inplace(result, temp_out);
                 }
 	            // Calculating polynomial for i=h
-                // Done separately because here the degree of the inner pol is degree%s
+                // Done separately because here the degree of the inner poly is degree%s
                 // Once again, the free term will only be added later on 
                 if (degree % l > 0) {
                     for (int j = 1; j < degree % l + 1; j++) {
-		                printf ("\ndegree:%d   l:%d   h:%d   power:%d   coeff:%d\n", degree, l, h, j, h*l+j);
 		                coeff.unsafe_load(
                             seal_context,
                             reinterpret_cast<const seal_byte *>(batched_coeffs[h*l + j].data()),
@@ -252,7 +249,6 @@ namespace apsi {
                         if (j==1) {temp_out = temp;}
                         else {evaluator.add_inplace(temp_out, temp);}
 		            }
-		            printf ("\ndegree:%d   l:%d   h:%d   multiply by power:%d\n", degree, l, h, h*l);
                     // Multiplying inner polynomial by high power
                     Ciphertext power;
                     evaluator.transform_from_ntt_inplace(temp_out);
@@ -262,6 +258,7 @@ namespace apsi {
 		            evaluator.add_inplace(result, temp_out);
                 }
                 // Relinearize sum of ciphertext-ciphertext products
+                // Using if statement since it is also used when calculating ciphertext powers
                 evaluator.transform_from_ntt_inplace(result);
                 if (relinearize) {
 			        evaluator.relinearize_inplace(result, relin_keys);
@@ -272,7 +269,6 @@ namespace apsi {
             // Calculating inner polynomial for i=0
             // Evaluated separately since there is no multiplication with a high power
 	        for (int j = 1; j < l; j++) {
-		        printf ("\ndegree:%d   l:%d   h:%d   power:%d   coeff:%d\n", degree, l, h, j, j);
 		        coeff.unsafe_load(
                     seal_context,
                     reinterpret_cast<const seal_byte *>(batched_coeffs[j].data()),
@@ -284,7 +280,6 @@ namespace apsi {
             // Adding the free terms of the inner polynomials
             // multiplied by the respective high power
 	        for (int i = 1; i < h + 1; i++) {
-		        printf ("\ndegree:%d   l:%d   power:%d   coeff:%d\n", degree, l, i*l, i*l);
 		        coeff.unsafe_load(
                     seal_context,
                     reinterpret_cast<const seal_byte *>(batched_coeffs[i*l].data()),
