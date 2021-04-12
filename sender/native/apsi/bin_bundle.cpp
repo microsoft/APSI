@@ -174,7 +174,6 @@ namespace apsi {
             int h = floor(degree / l);
 
             // Check whether it is better to use the standard eval algorithm.
-            // If both algorithms require the same computation, the standard eval is used.
             if ((l + 2 * h) > degree) {
                 Ciphertext result;
                 result = eval(ciphertext_powers);
