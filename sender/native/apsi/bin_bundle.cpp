@@ -155,13 +155,13 @@ namespace apsi {
 
 	    Evaluated polynomial a_0 + a_1*C + a_2*C^2 + ... + C^degree
 	    
-        Inner polynomials: a_{s*i} + a_{s*i+1}*C + ... + a_{s*i+s-1}*C^{s-1}            (for i=0,...,v-1)
+        Inner polynomials: a_{s*i} + a_{s*i+1}*C + ... + a_{s*i+s-1}*C^{s-1}    (for i=0,...,v-1)
 		              and: a_{s*v} + a_{s*v+1}*C + ... + a_{s*v+degree%s}*C^{degree%s}  (for i=v)
 	    
         High powers: C^{1*s}, ..., C^{v*s}
 	    */
 	    Ciphertext BatchedPlaintextPolyn::eval_patstock(const RelinKeys &relin_keys, 
-                                                        const vector<Ciphertext> &ciphertext_powers, 
+                                                        const vector<Ciphertext>&ciphertext_powers, 
                                                         const size_t nsplits) const
         {
             // Degree of polynomial to be evaluated
@@ -177,6 +177,8 @@ namespace apsi {
 		        result = eval(ciphertext_powers);
 		        return result;
 	        }
+
+            printf ("patstock nsplits:%d   degree:%d   powers:%d\n", nsplits, degree, ciphertext_powers.size()-1);
             
 #ifdef SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT
             static_assert(
@@ -211,7 +213,7 @@ namespace apsi {
 	            for (int i = 1; i < v; i++) {
                     // Evaluating inner polynomial. The free term is left out and added later on. 
                     // Result is stored in temp_out.
-                    for (int j = 1; j < s; j++) { // Calculating inner polynomial for outer power y^{s*i}
+                    for (int j = 1; j < s; j++) { 
 		                printf ("\ndegree:%d   s:%d   v:%d   power:%d   coeff:%d\n", degree, s, v, j, i*s+j);
 			            coeff.unsafe_load(
                             seal_context,
@@ -232,7 +234,7 @@ namespace apsi {
                     evaluator.add_inplace(result, temp_out);
                 }
 	            // Calculating polynomial for i=v
-                // Done separately because here the degree of the inner pol is degree%s instead of s-1
+                // Done separately because here the degree of the inner pol is degree%s
                 // Once again, the free term will only be added later on 
                 if (degree % s > 0) {
                     for (int j = 1; j < degree % s + 1; j++) {
