@@ -159,7 +159,7 @@ namespace apsi {
 		              and: a_{l*h} + a_{l*h+1}*C + ... + a_{l*h+degree%l}*C^{degree%l}  (for i=h)
 	    
         Low powers:  C^{1}, ..., C^{l-1}
-        High powers: C^{1*l}, ..., C^{h*l}
+        High powers: C^{1*l}, ..., C^{l*h}
 	    */
 	    Ciphertext BatchedPlaintextPolyn::eval_patstock(const RelinKeys &relin_keys, 
                                                         const vector<Ciphertext>&ciphertext_powers, 
@@ -231,7 +231,6 @@ namespace apsi {
                     evaluator.transform_from_ntt_inplace(temp_out);
                     evaluator.transform_from_ntt(ciphertext_powers[i*l], power);
 		            evaluator.multiply_inplace(temp_out, power); 
-
 		            evaluator.transform_to_ntt_inplace(temp_out);
                     evaluator.add_inplace(result, temp_out);
                 }
@@ -250,6 +249,7 @@ namespace apsi {
                         else {evaluator.add_inplace(temp_out, temp);}
 		            }
 		            printf ("\ndegree:%d   l:%d   h:%d   multiply by power:%d\n", degree, l, h, h*l);
+                    // Multiplying inner polynomial by high power
                     Ciphertext power;
                     evaluator.transform_from_ntt_inplace(temp_out);
                     evaluator.transform_from_ntt(ciphertext_powers[h*l], power);
@@ -263,16 +263,6 @@ namespace apsi {
 			        evaluator.relinearize_inplace(result, relin_keys);
                 }
                 evaluator.transform_to_ntt_inplace(result);
-
-            } else {
-	            for (int i = 1; i < h; i++) {
-		            coeff.unsafe_load(
-                        seal_context,
-                        reinterpret_cast<const seal_byte *>(batched_coeffs[i*l].data()),
-                        batched_coeffs[i*l].size());
-		            evaluator.multiply_plain(ciphertext_powers[i*l], coeff, temp);
-		            evaluator.add_inplace(result, temp);
-                }
 	   	    }
 	  
             // Calculating inner polynomial for i=0

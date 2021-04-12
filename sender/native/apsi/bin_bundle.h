@@ -105,7 +105,7 @@ namespace apsi {
 		            and: a_{l*h} + a_{l*h+1}*C + ... + a_{l*h+degree%l}*C^{degree%l}  (for i=h)
 	   
             Low powers:  C^{1}, ..., C^{l-1}
-            High powers: C^{1*l}, ..., C^{h*l}
+            High powers: C^{1*l}, ..., C^{l*h}
 	        */
 
 	        seal::Ciphertext eval_patstock(const seal::RelinKeys &relin_keys, 
