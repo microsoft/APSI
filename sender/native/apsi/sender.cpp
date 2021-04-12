@@ -303,7 +303,7 @@ namespace apsi {
             // Compute the matching result and move to rp
             const BatchedPlaintextPolyn &matching_polyn = cache.get().batched_matching_polyn;
             //rp->psi_result = matching_polyn.eval(all_powers[bundle_idx]);
-            rp->psi_result = matching_polyn.eval_patstock(relin_keys, all_powers[bundle_idx], all_powers.size());
+            rp->psi_result = matching_polyn.eval_patstock(relin_keys, all_powers[bundle_idx], sender_db->get_bin_bundle_count(bundle_idx));
 
 
             for (const auto &interp_polyn : cache.get().batched_interp_polyns) {

@@ -146,21 +146,32 @@ namespace apsi {
         }
 
         /**
-        Evaluates the polynomial on the given ciphertext, as long as it requires less computation
-	    than the standard evaluation eval() above.
-	    Evaluated polynomial c_0 + c_1*y + c_2*y^2 + ... + y^degree
-	    Inner polynomials: c_{si} + c_{si+1}*y + ... + c_{si+s-1}*y^{s-1}  (for i=0,...,v-1)
-		      and: c_{sv} + c_{sv+1}*y + ... + c_{sv+degree%s}*y^{degree%s}  (for i=v)
-	    Large powers: y_{0*s}, y_{1*s}, ..., y_{v*s}
+        Evaluates the polynomial on the given ciphertext using the Paterson-Stockmeyer algorithm, 
+        as long as it requires less computation than the standard evaluation function above.
+        The algorithm computes v+1 inner polynomials on low powers (C¹ to C^{s-1}).
+        Each inner polynomial is then multiplied by the corresponding high power.
+        The parameters s and v are determined according to the degree of the polynomial and the 
+        number of splits in order to minimize the computation. 
+
+	    Evaluated polynomial a_0 + a_1*C + a_2*C^2 + ... + C^degree
+	    
+        Inner polynomials: a_{s*i} + a_{s*i+1}*C + ... + a_{s*i+s-1}*C^{s-1}            (for i=0,...,v-1)
+		              and: a_{s*v} + a_{s*v+1}*C + ... + a_{s*v+degree%s}*C^{degree%s}  (for i=v)
+	    
+        High powers: C^{1*s}, ..., C^{v*s}
 	    */
-	    Ciphertext BatchedPlaintextPolyn::eval_patstock(const RelinKeys &relin_keys, const vector<Ciphertext> &ciphertext_powers, const size_t nsplits) const
+	    Ciphertext BatchedPlaintextPolyn::eval_patstock(const RelinKeys &relin_keys, 
+                                                        const vector<Ciphertext> &ciphertext_powers, 
+                                                        const size_t nsplits) const
         {
+            // Degree of polynomial to be evaluated
 	        int degree = batched_coeffs.size() - 1; 
 	        // Number of low powers
 	        int s = floor(sqrt((nsplits + 1) * (degree + 1)));
 	        // Number of high powers
 	        int v = floor(degree / s);
 
+            // Check whether it is better to use the standard eval algorithm
 	        if ((s + 2 * v) > degree) {
 		        Ciphertext result;
 		        result = eval(ciphertext_powers);
@@ -178,10 +189,6 @@ namespace apsi {
 
             const SEALContext &seal_context = *crypto_context.seal_context();
             Evaluator &evaluator = *crypto_context.evaluator();
-
-            //crypto_context.set_evaluator(relin_keys);
-            //Evaluator &evaluator = *crypto_context.evaluator();
-	        //RelinKeys &relin_keys2 = *crypto_context.relin_keys();
 	        bool relinearize = crypto_context.seal_context()->using_keyswitching();
            
             // Lowest degree terms are stored in the lowest index positions in vectors.
@@ -198,18 +205,12 @@ namespace apsi {
             Ciphertext temp;
             Ciphertext temp_out;
             Plaintext coeff;
-
-            //Ciphertext result2;
-            //Ciphertext prod;
-            //result2.resize(seal_context, seal_context.first_parms_id(), 2);
-            //evaluator.transform_from_ntt(ciphertext_powers[1], prod);
-            //result2 = prod;
-            //evaluator.multiply(prod, prod, result2);
-            //evaluator.relinearize_inplace(result2, relin_keys);
 	    	    
 		    if (s > 1) {
 	            // Calculating polynomial for i=1,...,v
 	            for (int i = 1; i < v; i++) {
+                    // Evaluating inner polynomial. The free term is left out and added later on. 
+                    // Result is stored in temp_out.
                     for (int j = 1; j < s; j++) { // Calculating inner polynomial for outer power y^{s*i}
 		                printf ("\ndegree:%d   s:%d   v:%d   power:%d   coeff:%d\n", degree, s, v, j, i*s+j);
 			            coeff.unsafe_load(
@@ -221,18 +222,18 @@ namespace apsi {
                         else {evaluator.add_inplace(temp_out, temp);}
 		            }
 		            printf ("\ndegree:%d   s:%d   v:%d   multiply by power:%d\n", degree, s, v, i*s);
+                    // Multiplying inner polynomial by high power
                     Ciphertext power;
                     evaluator.transform_from_ntt_inplace(temp_out);
                     evaluator.transform_from_ntt(ciphertext_powers[i*s], power);
 		            evaluator.multiply_inplace(temp_out, power); 
 
-                    /*if (relinearize) {
-			            evaluator.relinearize_inplace(temp_out, relin_keys);
-                    }*/
 		            evaluator.transform_to_ntt_inplace(temp_out);
                     evaluator.add_inplace(result, temp_out);
                 }
 	            // Calculating polynomial for i=v
+                // Done separately because here the degree of the inner pol is degree%s instead of s-1
+                // Once again, the free term will only be added later on 
                 if (degree % s > 0) {
                     for (int j = 1; j < degree % s + 1; j++) {
 		                printf ("\ndegree:%d   s:%d   v:%d   power:%d   coeff:%d\n", degree, s, v, j, v*s+j);
@@ -252,6 +253,7 @@ namespace apsi {
                     evaluator.transform_to_ntt_inplace(temp_out);
 		            evaluator.add_inplace(result, temp_out);
                 }
+                // Relinearize sum of ciphertext-ciphertext products
                 evaluator.transform_from_ntt_inplace(result);
                 if (relinearize) {
 			        evaluator.relinearize_inplace(result, relin_keys);
@@ -269,7 +271,8 @@ namespace apsi {
                 }
 	   	    }
 	  
-            // Calculating inner polynomial for outer power y^{s*0}
+            // Calculating inner polynomial for i=0
+            // Evaluated separately since there is no multiplication with a high power
 	        for (int j = 1; j < s; j++) {
 		        printf ("\ndegree:%d   s:%d   v:%d   power:%d   coeff:%d\n", degree, s, v, j, j);
 		        coeff.unsafe_load(
@@ -281,6 +284,7 @@ namespace apsi {
 	        }
 	    
             // Adding the free terms of the inner polynomials
+            // multiplied by the respective high power
 	        for (int i = 1; i < v + 1; i++) {
 		        printf ("\ndegree:%d   s:%d   power:%d   coeff:%d\n", degree, s, i*s, i*s);
 		        coeff.unsafe_load(
