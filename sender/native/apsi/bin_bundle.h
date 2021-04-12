@@ -92,14 +92,24 @@ namespace apsi {
             seal::Ciphertext eval(const std::vector<seal::Ciphertext> &ciphertext_powers) const;
 
             /**
-            Evaluates the polynomial on the given ciphertext, as long as it requires less computation
-    	    than the standard evaluation eval() above.
-	        Evaluates polynomial c_0 + c_1*y + c_2*y^2 + ... + y^degree
-	        Inner polynomials: c_{si} + c_{si+1}*y + ... + c_{si+s-1}*y^{s-1}  (for i=0,...,v-1)
-  	                 	  and: c_{sv} + c_{sv+1}*y + ... + c_{sv+degree%s}*y^{degree%s}  (for i=v)
-	        Large powers: y_{0*s}, y_{1*s}, ..., y_{v*s}
-            */
-	        seal::Ciphertext eval_patstock(const seal::RelinKeys &relin_keys, const std::vector<seal::Ciphertext> &ciphertext_powers, const size_t splits) const;
+            Evaluates the polynomial on the given ciphertext using the Paterson-Stockmeyer algorithm, 
+            as long as it requires less computation than the standard evaluation function above.
+            The algorithm computes h+1 inner polynomials on low powers (C¹ to C^{l-1}).
+            Each inner polynomial is then multiplied by the corresponding high power.
+            The parameters l and h are determined according to the degree of the polynomial and the 
+            number of splits in order to minimize the computation. 
+
+	        Evaluated polynomial a_0 + a_1*C + a_2*C^2 + ... + C^degree
+	    
+            Inner polys: a_{l*i} + a_{l*i+1}*C + ... + a_{l*i+l-1}*C^{l-1}    (for i=0,...,h-1)
+		            and: a_{l*h} + a_{l*h+1}*C + ... + a_{l*h+degree%l}*C^{degree%l}  (for i=h)
+	    
+            High powers: C^{1*l}, ..., C^{h*l}
+	        */
+
+	        seal::Ciphertext eval_patstock(const seal::RelinKeys &relin_keys, 
+                                           const std::vector<seal::Ciphertext> &ciphertext_powers, 
+                                           const size_t splits) const;
 
             /**
             Returns whether this polynomial has non-zero size.

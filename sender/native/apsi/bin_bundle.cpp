@@ -148,17 +148,17 @@ namespace apsi {
         /**
         Evaluates the polynomial on the given ciphertext using the Paterson-Stockmeyer algorithm, 
         as long as it requires less computation than the standard evaluation function above.
-        The algorithm computes v+1 inner polynomials on low powers (C¹ to C^{s-1}).
+        The algorithm computes h+1 inner polynomials on low powers (C¹ to C^{l-1}).
         Each inner polynomial is then multiplied by the corresponding high power.
-        The parameters s and v are determined according to the degree of the polynomial and the 
+        The parameters l and h are determined according to the degree of the polynomial and the 
         number of splits in order to minimize the computation. 
 
 	    Evaluated polynomial a_0 + a_1*C + a_2*C^2 + ... + C^degree
 	    
-        Inner polynomials: a_{s*i} + a_{s*i+1}*C + ... + a_{s*i+s-1}*C^{s-1}    (for i=0,...,v-1)
-		              and: a_{s*v} + a_{s*v+1}*C + ... + a_{s*v+degree%s}*C^{degree%s}  (for i=v)
+        Inner polynomials: a_{l*i} + a_{l*i+1}*C + ... + a_{l*i+l-1}*C^{l-1}    (for i=0,...,h-1)
+		              and: a_{l*h} + a_{l*h+1}*C + ... + a_{l*h+degree%l}*C^{degree%l}  (for i=h)
 	    
-        High powers: C^{1*s}, ..., C^{v*s}
+        High powers: C^{1*l}, ..., C^{h*l}
 	    */
 	    Ciphertext BatchedPlaintextPolyn::eval_patstock(const RelinKeys &relin_keys, 
                                                         const vector<Ciphertext>&ciphertext_powers, 
@@ -167,12 +167,12 @@ namespace apsi {
             // Degree of polynomial to be evaluated
 	        int degree = batched_coeffs.size() - 1; 
 	        // Number of low powers
-	        int s = floor(sqrt((nsplits + 1) * (degree + 1)));
+	        int l = floor(sqrt((nsplits + 1) * (degree + 1)));
 	        // Number of high powers
-	        int v = floor(degree / s);
+	        int h = floor(degree / l);
 
             // Check whether it is better to use the standard eval algorithm
-	        if ((s + 2 * v) > degree) {
+	        if ((l + 2 * h) > degree) {
 		        Ciphertext result;
 		        result = eval(ciphertext_powers);
 		        return result;
@@ -208,49 +208,49 @@ namespace apsi {
             Ciphertext temp_out;
             Plaintext coeff;
 	    	    
-		    if (s > 1) {
+		    if (l > 1) {
 	            // Calculating polynomial for i=1,...,v
-	            for (int i = 1; i < v; i++) {
+	            for (int i = 1; i < h; i++) {
                     // Evaluating inner polynomial. The free term is left out and added later on. 
                     // Result is stored in temp_out.
-                    for (int j = 1; j < s; j++) { 
-		                printf ("\ndegree:%d   s:%d   v:%d   power:%d   coeff:%d\n", degree, s, v, j, i*s+j);
+                    for (int j = 1; j < l; j++) { 
+		                printf ("\ndegree:%d   l:%d   h:%d   power:%d   coeff:%d\n", degree, l, h, j, i*l+j);
 			            coeff.unsafe_load(
                             seal_context,
-                            reinterpret_cast<const seal_byte *>(batched_coeffs[i*s + j].data()),
-                            batched_coeffs[i*s + j].size());
+                            reinterpret_cast<const seal_byte *>(batched_coeffs[i*l + j].data()),
+                            batched_coeffs[i*l + j].size());
 			            evaluator.multiply_plain(ciphertext_powers[j], coeff, temp);
 			            if (j==1) {temp_out = temp;}
                         else {evaluator.add_inplace(temp_out, temp);}
 		            }
-		            printf ("\ndegree:%d   s:%d   v:%d   multiply by power:%d\n", degree, s, v, i*s);
+		            printf ("\ndegree:%d   l:%d   h:%d   multiply by power:%d\n", degree, l, h, i*l);
                     // Multiplying inner polynomial by high power
                     Ciphertext power;
                     evaluator.transform_from_ntt_inplace(temp_out);
-                    evaluator.transform_from_ntt(ciphertext_powers[i*s], power);
+                    evaluator.transform_from_ntt(ciphertext_powers[i*l], power);
 		            evaluator.multiply_inplace(temp_out, power); 
 
 		            evaluator.transform_to_ntt_inplace(temp_out);
                     evaluator.add_inplace(result, temp_out);
                 }
-	            // Calculating polynomial for i=v
+	            // Calculating polynomial for i=h
                 // Done separately because here the degree of the inner pol is degree%s
                 // Once again, the free term will only be added later on 
-                if (degree % s > 0) {
-                    for (int j = 1; j < degree % s + 1; j++) {
-		                printf ("\ndegree:%d   s:%d   v:%d   power:%d   coeff:%d\n", degree, s, v, j, v*s+j);
+                if (degree % l > 0) {
+                    for (int j = 1; j < degree % l + 1; j++) {
+		                printf ("\ndegree:%d   l:%d   h:%d   power:%d   coeff:%d\n", degree, l, h, j, h*l+j);
 		                coeff.unsafe_load(
                             seal_context,
-                            reinterpret_cast<const seal_byte *>(batched_coeffs[v*s + j].data()),
-                            batched_coeffs[v*s + j].size());
+                            reinterpret_cast<const seal_byte *>(batched_coeffs[h*l + j].data()),
+                            batched_coeffs[h*l + j].size());
 		                evaluator.multiply_plain(ciphertext_powers[j], coeff, temp);
                         if (j==1) {temp_out = temp;}
                         else {evaluator.add_inplace(temp_out, temp);}
 		            }
-		            printf ("\ndegree:%d   s:%d   v:%d   multiply by power:%d\n", degree, s, v, v*s);
+		            printf ("\ndegree:%d   l:%d   h:%d   multiply by power:%d\n", degree, l, h, h*l);
                     Ciphertext power;
                     evaluator.transform_from_ntt_inplace(temp_out);
-                    evaluator.transform_from_ntt(ciphertext_powers[v*s], power);
+                    evaluator.transform_from_ntt(ciphertext_powers[h*l], power);
 		            evaluator.multiply_inplace(temp_out, power); 
                     evaluator.transform_to_ntt_inplace(temp_out);
 		            evaluator.add_inplace(result, temp_out);
@@ -263,20 +263,20 @@ namespace apsi {
                 evaluator.transform_to_ntt_inplace(result);
 
             } else {
-	            for (int i = 1; i < v; i++) {
+	            for (int i = 1; i < h; i++) {
 		            coeff.unsafe_load(
                         seal_context,
-                        reinterpret_cast<const seal_byte *>(batched_coeffs[i*s].data()),
-                        batched_coeffs[i*s].size());
-		            evaluator.multiply_plain(ciphertext_powers[i*s], coeff, temp);
+                        reinterpret_cast<const seal_byte *>(batched_coeffs[i*l].data()),
+                        batched_coeffs[i*l].size());
+		            evaluator.multiply_plain(ciphertext_powers[i*l], coeff, temp);
 		            evaluator.add_inplace(result, temp);
                 }
 	   	    }
 	  
             // Calculating inner polynomial for i=0
             // Evaluated separately since there is no multiplication with a high power
-	        for (int j = 1; j < s; j++) {
-		        printf ("\ndegree:%d   s:%d   v:%d   power:%d   coeff:%d\n", degree, s, v, j, j);
+	        for (int j = 1; j < l; j++) {
+		        printf ("\ndegree:%d   l:%d   h:%d   power:%d   coeff:%d\n", degree, l, h, j, j);
 		        coeff.unsafe_load(
                     seal_context,
                     reinterpret_cast<const seal_byte *>(batched_coeffs[j].data()),
@@ -287,13 +287,13 @@ namespace apsi {
 	    
             // Adding the free terms of the inner polynomials
             // multiplied by the respective high power
-	        for (int i = 1; i < v + 1; i++) {
-		        printf ("\ndegree:%d   s:%d   power:%d   coeff:%d\n", degree, s, i*s, i*s);
+	        for (int i = 1; i < h + 1; i++) {
+		        printf ("\ndegree:%d   l:%d   power:%d   coeff:%d\n", degree, l, i*l, i*l);
 		        coeff.unsafe_load(
                     seal_context,
-                    reinterpret_cast<const seal_byte *>(batched_coeffs[i*s].data()),
-                    batched_coeffs[i*s].size());
-                evaluator.multiply_plain(ciphertext_powers[i*s], coeff, temp);
+                    reinterpret_cast<const seal_byte *>(batched_coeffs[i*l].data()),
+                    batched_coeffs[i*l].size());
+                evaluator.multiply_plain(ciphertext_powers[i*l], coeff, temp);
                 evaluator.add_inplace(result, temp);	
 	        }
 
