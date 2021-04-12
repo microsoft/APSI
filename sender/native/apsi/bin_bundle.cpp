@@ -209,7 +209,11 @@ namespace apsi {
             Ciphertext temp;
             Ciphertext temp_out;
             Plaintext coeff;
-	    	    
+	    	   
+            // If l=1, we simply get the standard eval algorithm.
+            // This comparison can be removed as long as we only use paterson-stockmeyer when
+            // it results in less ciphertext-ciphertext multiplications than the eval function,
+            // in which case l is always greater than one.  
 		    if (l > 1) {
 	            // Calculating polynomial for i=1,...,h-1
 	            for (int i = 1; i < h; i++) {
