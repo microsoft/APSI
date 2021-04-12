@@ -153,33 +153,33 @@ namespace apsi {
         The parameters l and h are determined according to the degree of the polynomial and the 
         number of splits in order to minimize the computation complexity. 
 
-	    Evaluated polynomial a_0 + a_1*C + a_2*C^2 + ... + C^degree
+        Evaluated polynomial a_0 + a_1*C + a_2*C^2 + ... + C^degree
 	    
         Inner polynomials: a_{l*i} + a_{l*i+1}*C + ... + a_{l*i+l-1}*C^{l-1}    (for i=0,...,h-1)
 		              and: a_{l*h} + a_{l*h+1}*C + ... + a_{l*h+degree%l}*C^{degree%l}  (for i=h)
 	    
         Low powers:  C^{1}, ..., C^{l-1}
         High powers: C^{1*l}, ..., C^{l*h}
-	    */
-	    Ciphertext BatchedPlaintextPolyn::eval_patstock(const RelinKeys &relin_keys, 
+        */
+        Ciphertext BatchedPlaintextPolyn::eval_patstock(const RelinKeys &relin_keys, 
                                                         const vector<Ciphertext>&ciphertext_powers, 
                                                         const size_t nsplits) const
         {
             // Degree of polynomial to be evaluated
-	        int degree = batched_coeffs.size() - 1; 
-	        // Number of low powers plus one 
+            int degree = batched_coeffs.size() - 1; 
+            // Number of low powers plus one 
             // (since the power C^l is actually the first high power)
-	        int l = floor(sqrt((nsplits + 1) * (degree + 1)));
+            int l = floor(sqrt((nsplits + 1) * (degree + 1)));
 	        // Number of high powers
-	        int h = floor(degree / l);
+            int h = floor(degree / l);
 
             // Check whether it is better to use the standard eval algorithm.
             // If both algorithms require the same computation, the standard eval is used.
-	        if ((l + 2 * h) > degree) {
-		        Ciphertext result;
-		        result = eval(ciphertext_powers);
-		        return result;
-	        }
+            if ((l + 2 * h) > degree) {
+                Ciphertext result;
+                result = eval(ciphertext_powers);
+                return result;
+            }
             APSI_LOG_INFO("Using Paterson-Stockmeyer");
 
 #ifdef SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT
@@ -193,7 +193,7 @@ namespace apsi {
 
             const SEALContext &seal_context = *crypto_context.seal_context();
             Evaluator &evaluator = *crypto_context.evaluator();
-	        bool relinearize = crypto_context.seal_context()->using_keyswitching();
+            bool relinearize = crypto_context.seal_context()->using_keyswitching();
            
             // Lowest degree terms are stored in the lowest index positions in vectors.
             // Specifically, ciphertext_powers[1] is the first power of the ciphertext data, but
@@ -214,79 +214,79 @@ namespace apsi {
             // This comparison can be removed as long as we only use paterson-stockmeyer when
             // it results in less ciphertext-ciphertext multiplications than the eval function,
             // in which case l is always greater than one.  
-		    if (l > 1) {
-	            // Calculate polynomial for i=1,...,h-1
-	            for (int i = 1; i < h; i++) {
+            if (l > 1) {
+                // Calculate polynomial for i=1,...,h-1
+                for (int i = 1; i < h; i++) {
                     // Evaluate inner polynomial. The free term is left out and added later on. 
                     // The evaluation result is stored in temp_out.
                     for (int j = 1; j < l; j++) { 
-			            coeff.unsafe_load(
+                        coeff.unsafe_load(
                             seal_context,
                             reinterpret_cast<const seal_byte *>(batched_coeffs[i*l + j].data()),
                             batched_coeffs[i*l + j].size());
-			            evaluator.multiply_plain(ciphertext_powers[j], coeff, temp);
-			            if (j==1) {temp_out = temp;}
+                        evaluator.multiply_plain(ciphertext_powers[j], coeff, temp);
+                        if (j==1) {temp_out = temp;}
                         else {evaluator.add_inplace(temp_out, temp);}
-		            }
+                    }
                     // Multiplying inner polynomial by high power
                     Ciphertext power;
                     evaluator.transform_from_ntt_inplace(temp_out);
                     evaluator.transform_from_ntt(ciphertext_powers[i*l], power);
-		            evaluator.multiply_inplace(temp_out, power); 
-		            evaluator.transform_to_ntt_inplace(temp_out);
+                    evaluator.multiply_inplace(temp_out, power); 
+                    evaluator.transform_to_ntt_inplace(temp_out);
                     evaluator.add_inplace(result, temp_out);
                 }
-	            // Calculating polynomial for i=h
+                // Calculating polynomial for i=h
                 // Done separately because here the degree of the inner poly is degree%s
                 // Once again, the free term will only be added later on 
                 if (degree % l > 0) {
                     for (int j = 1; j < degree % l + 1; j++) {
-		                coeff.unsafe_load(
+                        coeff.unsafe_load(
                             seal_context,
                             reinterpret_cast<const seal_byte *>(batched_coeffs[h*l + j].data()),
                             batched_coeffs[h*l + j].size());
-		                evaluator.multiply_plain(ciphertext_powers[j], coeff, temp);
+                        evaluator.multiply_plain(ciphertext_powers[j], coeff, temp);
                         if (j==1) {temp_out = temp;}
                         else {evaluator.add_inplace(temp_out, temp);}
-		            }
+                    }
                     // Multiplying inner polynomial by high power
                     Ciphertext power;
                     evaluator.transform_from_ntt_inplace(temp_out);
                     evaluator.transform_from_ntt(ciphertext_powers[h*l], power);
-		            evaluator.multiply_inplace(temp_out, power); 
+                    evaluator.multiply_inplace(temp_out, power); 
                     evaluator.transform_to_ntt_inplace(temp_out);
-		            evaluator.add_inplace(result, temp_out);
+                    evaluator.add_inplace(result, temp_out);
                 }
                 // Relinearize sum of ciphertext-ciphertext products
                 // Using if statement since it is also used when calculating ciphertext powers
                 evaluator.transform_from_ntt_inplace(result);
                 if (relinearize) {
-			        evaluator.relinearize_inplace(result, relin_keys);
+                    evaluator.relinearize_inplace(result, relin_keys);
                 }
                 evaluator.transform_to_ntt_inplace(result);
-	   	    }
+            }
 	  
             // Calculating inner polynomial for i=0
             // Evaluated separately since there is no multiplication with a high power
-	        for (int j = 1; j < l; j++) {
-		        coeff.unsafe_load(
+            for (int j = 1; j < l; j++) {
+                coeff.unsafe_load(
                     seal_context,
                     reinterpret_cast<const seal_byte *>(batched_coeffs[j].data()),
                     batched_coeffs[j].size());
                 evaluator.multiply_plain(ciphertext_powers[j], coeff, temp);
                 evaluator.add_inplace(result, temp);
-	        }
+            }
 	    
             // Adding the free terms of the inner polynomials
             // multiplied by the respective high power
-	        for (int i = 1; i < h + 1; i++) {
-		        coeff.unsafe_load(
+            for (int i = 1; i < h + 1; i++) {
+                coeff.unsafe_load(
                     seal_context,
                     reinterpret_cast<const seal_byte *>(batched_coeffs[i*l].data()),
                     batched_coeffs[i*l].size());
                 evaluator.multiply_plain(ciphertext_powers[i*l], coeff, temp);
                 evaluator.add_inplace(result, temp);	
-	        }
+            }
 
             // Need to transform back from NTT form before we can add the constant coefficient. The
             // constant coefficient is specifically not in NTT form so this can work.
