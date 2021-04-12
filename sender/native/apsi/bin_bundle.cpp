@@ -206,7 +206,7 @@ namespace apsi {
             result.resize(seal_context, seal_context.first_parms_id(), 3);
             result.is_ntt_form() = true;
             Ciphertext temp;
-            Ciphertext temp_out;
+            Ciphertext temp_in;
             Plaintext coeff;
 	    	   
             // If l=1, we simply get the standard eval algorithm.
@@ -217,23 +217,23 @@ namespace apsi {
                 // Calculate polynomial for i=1,...,h-1
                 for (int i = 1; i < h; i++) {
                     // Evaluate inner polynomial. The free term is left out and added later on. 
-                    // The evaluation result is stored in temp_out.
+                    // The evaluation result is stored in temp_in.
                     for (int j = 1; j < l; j++) { 
                         coeff.unsafe_load(
                             seal_context,
                             reinterpret_cast<const seal_byte *>(batched_coeffs[i*l + j].data()),
                             batched_coeffs[i*l + j].size());
                         evaluator.multiply_plain(ciphertext_powers[j], coeff, temp);
-                        if (j==1) {temp_out = temp;}
-                        else {evaluator.add_inplace(temp_out, temp);}
+                        if (j==1) {temp_in = temp;}
+                        else {evaluator.add_inplace(temp_in, temp);}
                     }
                     // Multiply inner polynomial by high power
                     Ciphertext power;
-                    evaluator.transform_from_ntt_inplace(temp_out);
+                    evaluator.transform_from_ntt_inplace(temp_in);
                     evaluator.transform_from_ntt(ciphertext_powers[i*l], power);
-                    evaluator.multiply_inplace(temp_out, power); 
-                    evaluator.transform_to_ntt_inplace(temp_out);
-                    evaluator.add_inplace(result, temp_out);
+                    evaluator.multiply_inplace(temp_in, power); 
+                    evaluator.transform_to_ntt_inplace(temp_in);
+                    evaluator.add_inplace(result, temp_in);
                 }
                 // Calculate polynomial for i=h
                 // Done separately because here the degree of the inner poly is degree%s
@@ -245,16 +245,16 @@ namespace apsi {
                             reinterpret_cast<const seal_byte *>(batched_coeffs[h*l + j].data()),
                             batched_coeffs[h*l + j].size());
                         evaluator.multiply_plain(ciphertext_powers[j], coeff, temp);
-                        if (j==1) {temp_out = temp;}
-                        else {evaluator.add_inplace(temp_out, temp);}
+                        if (j==1) {temp_in = temp;}
+                        else {evaluator.add_inplace(temp_in, temp);}
                     }
                     // Multiply inner polynomial by high power
                     Ciphertext power;
-                    evaluator.transform_from_ntt_inplace(temp_out);
+                    evaluator.transform_from_ntt_inplace(temp_in);
                     evaluator.transform_from_ntt(ciphertext_powers[h*l], power);
-                    evaluator.multiply_inplace(temp_out, power); 
-                    evaluator.transform_to_ntt_inplace(temp_out);
-                    evaluator.add_inplace(result, temp_out);
+                    evaluator.multiply_inplace(temp_in, power); 
+                    evaluator.transform_to_ntt_inplace(temp_in);
+                    evaluator.add_inplace(result, temp_in);
                 }
                 // Relinearize sum of ciphertext-ciphertext products
                 // Using if statement since it is also used when calculating ciphertext powers
