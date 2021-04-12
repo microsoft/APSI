@@ -228,7 +228,7 @@ namespace apsi {
                         if (j==1) {temp_out = temp;}
                         else {evaluator.add_inplace(temp_out, temp);}
                     }
-                    // Multiplying inner polynomial by high power
+                    // Multiply inner polynomial by high power
                     Ciphertext power;
                     evaluator.transform_from_ntt_inplace(temp_out);
                     evaluator.transform_from_ntt(ciphertext_powers[i*l], power);
@@ -236,7 +236,7 @@ namespace apsi {
                     evaluator.transform_to_ntt_inplace(temp_out);
                     evaluator.add_inplace(result, temp_out);
                 }
-                // Calculating polynomial for i=h
+                // Calculate polynomial for i=h
                 // Done separately because here the degree of the inner poly is degree%s
                 // Once again, the free term will only be added later on 
                 if (degree % l > 0) {
@@ -249,7 +249,7 @@ namespace apsi {
                         if (j==1) {temp_out = temp;}
                         else {evaluator.add_inplace(temp_out, temp);}
                     }
-                    // Multiplying inner polynomial by high power
+                    // Multiply inner polynomial by high power
                     Ciphertext power;
                     evaluator.transform_from_ntt_inplace(temp_out);
                     evaluator.transform_from_ntt(ciphertext_powers[h*l], power);
@@ -266,7 +266,7 @@ namespace apsi {
                 evaluator.transform_to_ntt_inplace(result);
             }
 	  
-            // Calculating inner polynomial for i=0
+            // Calculate inner polynomial for i=0
             // Evaluated separately since there is no multiplication with a high power
             for (int j = 1; j < l; j++) {
                 coeff.unsafe_load(
@@ -277,7 +277,7 @@ namespace apsi {
                 evaluator.add_inplace(result, temp);
             }
 	    
-            // Adding the free terms of the inner polynomials
+            // Add the free terms of the inner polynomials
             // multiplied by the respective high power
             for (int i = 1; i < h + 1; i++) {
                 coeff.unsafe_load(
