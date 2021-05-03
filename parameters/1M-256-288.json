@@ -1,0 +1,19 @@
+{
+    "table_params": {
+        "hash_func_count": 3,
+        "table_size": 512,
+        "max_items_per_bin": 595
+    },
+    "item_params": {
+        "felts_per_item": 8
+    },
+    "query_params": {
+        "ps_low_degree": 0,
+        "query_powers": [ 1, 3, 4, 6, 10, 13, 15, 21, 29, 37, 45, 53, 61, 69, 75, 77, 80, 84, 86, 87, 89, 90, 181, 183, 188, 190, 195, 197, 206, 213, 214, 222, 230, 238, 246, 254, 261, 337, 338, 345, 353, 361, 370, 372, 377, 379, 384, 386, 477, 479, 486, 487, 495, 503, 511, 529, 537, 545 ]
+    },
+    "seal_params": {
+        "plain_modulus": 40961,
+        "poly_modulus_degree": 4096,
+        "coeff_modulus_bits": [ 48, 32, 29 ]
+    }
+}

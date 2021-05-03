@@ -1,0 +1,32 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license.
+
+include "ciphertext.fbs";
+
+namespace apsi.network.fbs;
+
+table ParmsRequest {
+}
+
+table OPRFRequest {
+    data:[ubyte] (required);
+}
+
+table QueryRequestPart {
+    exponent:uint32;
+    cts:[Ciphertext] (required);
+}
+
+table QueryRequest {
+    compression_type:ubyte;
+    relin_keys:[ubyte];
+    query:[QueryRequestPart] (required);
+}
+
+union Request { ParmsRequest, OPRFRequest, QueryRequest }
+
+table SenderOperation {
+    request:Request (required);
+}
+
+root_type SenderOperation;

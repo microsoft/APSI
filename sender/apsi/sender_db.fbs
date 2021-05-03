@@ -1,0 +1,29 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license.
+
+include "psi_params.fbs";
+
+namespace apsi.fbs;
+
+struct HashedItem {
+    low_word:uint64;
+    high_word:uint64;
+}
+
+struct SenderDBInfo {
+    label_byte_count:uint32;
+    nonce_byte_count:uint32;
+    item_count:uint64;
+    compressed:bool;
+    stripped:bool;
+}
+
+table SenderDB {
+    params:[ubyte] (required);
+    info:SenderDBInfo;
+    oprf_key:[ubyte] (required);
+    hashed_items:[HashedItem] (required);
+    bin_bundle_count:uint32;
+}
+
+root_type SenderDB;

@@ -1,0 +1,42 @@
+steps:
+
+- task: CmdLine@2
+  displayName: 'Bootstrap vcpkg'
+  inputs:
+    script: |
+      cd $(Build.SourcesDirectory)
+      git clone https://github.com/microsoft/vcpkg.git
+      cd vcpkg
+      ./bootstrap-vcpkg.sh -disableMetrics
+    workingDirectory: '$(Build.SourcesDirectory)'
+    failOnStderr: false
+
+- task: CmdLine@2
+  displayName: 'Configure vcpkg dependencies'
+  inputs:
+    script: |
+      ./vcpkg install cppzmq flatbuffers gtest kuku log4cplus seal[ms-gsl,zstd,no-throw-tran] tclap jsoncpp
+    workingDirectory: '$(Build.SourcesDirectory)/vcpkg'
+    failOnStderr: false
+
+- task: CMake@1
+  displayName: 'CMake APSI'
+  inputs:
+    workingDirectory: '$(Build.SourcesDirectory)'
+    cmakeArgs: '-DCMAKE_BUILD_TYPE=${{ parameters.configuration }} -DAPSI_BUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE=$(Build.SourcesDirectory)/vcpkg/scripts/buildsystems/vcpkg.cmake .'
+
+- script: |
+      cd $BUILD_SOURCESDIRECTORY
+      make
+  displayName: 'Build APSI'
+
+- script: |
+      cd $BUILD_SOURCESDIRECTORY
+      ./bin/unit_tests
+  displayName: 'Run unit tests'
+
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Artifact: drop'
+  inputs:
+      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+      artifactName: ${{ parameters.artifactName }}

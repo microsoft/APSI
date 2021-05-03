@@ -1,0 +1,16 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license.
+
+include "ciphertext.fbs";
+
+namespace apsi.network.fbs;
+
+table ResultPackage {
+    bundle_idx:uint32;
+    psi_result:Ciphertext (required);
+    label_byte_count:uint32;
+    nonce_byte_count:uint32;
+    label_result:[Ciphertext];
+}
+
+root_type ResultPackage;

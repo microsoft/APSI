@@ -1,0 +1,104 @@
+steps:
+- task: NuGetToolInstaller@1
+  displayName: 'Use NuGet'
+  inputs:
+    versionSpec: ${{ parameters.nuget_version }}
+
+- task: NuGetCommand@2
+  displayName: 'NuGet restore Configuration Packages'
+  inputs:
+    restoreSolution: config/packages.config
+    restoreDirectory: ConfigPackages
+
+- ${{ if eq(parameters.configuration, 'Release') }}:
+  - task: securedevelopmentteam.vss-secure-development-tools.build-task-credscan.CredScan@2
+    displayName: 'Run CredScan'
+    inputs:
+      toolMajorVersion: 'V2'
+      outputFormat: sarif
+      debugMode: false
+
+- task: CmdLine@2
+  displayName: 'Bootstrap vcpkg'
+  inputs:
+    script: |
+      cd $(Build.SourcesDirectory)
+      git clone https://github.com/microsoft/vcpkg.git
+      cd vcpkg
+      bootstrap-vcpkg.bat -disableMetrics
+    workingDirectory: '$(Build.SourcesDirectory)'
+    failOnStderr: false
+
+- task: CmdLine@2
+  displayName: 'Configure vcpkg dependencies'
+  inputs:
+    script: |
+      vcpkg install --triplet=x64-windows-static-md cppzmq flatbuffers gtest kuku log4cplus seal[ms-gsl,zstd,no-throw-tran] tclap jsoncpp
+    workingDirectory: '$(Build.SourcesDirectory)/vcpkg'
+    failOnStderr: false
+
+- task: CMake@1
+  displayName: 'Configure APSI'
+  inputs:
+    cmakeArgs: .. -DCMAKE_BUILD_TYPE='${{ parameters.configuration }}' -DAPSI_BUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE=$(Build.SourcesDirectory)\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static-md
+    workingDirectory: '$(Build.SourcesDirectory)/build'
+
+- task: MSBuild@1
+  displayName: 'Build APSI'
+  inputs:
+    solution: '$(Build.SourcesDirectory)/build/apsi.sln'
+    msbuildArchitecture: 'x64'
+    platform: 'x64'
+    configuration: '${{ parameters.configuration }}'
+
+- task: VSTest@2
+  displayName: 'VsTest - unit tests'
+  inputs:
+    testAssemblyVer2: |
+        **\${{ parameters.configuration }}\unit_tests.exe
+        !**\obj\**
+    platform: 'x64'
+    configuration: ${{ parameters.configuration }}
+    diagnosticsEnabled: True
+
+- ${{ if eq(parameters.configuration, 'Release') }}:
+  - task: Semmle@0
+    displayName: 'Semmle'
+    env:
+      SYSTEM_ACCESSTOKEN: $(System.AccessToken)
+    inputs:
+      sourceCodeDirectory: '$(Build.SourcesDirectory)'
+      language: 'cpp'
+      querySuite: 'Recommended'
+      timeout: '1800'
+      ram: '16384'
+      addProjectDirToScanningExclusionList: true
+      buildCommands: '"%ProgramFiles(x86)%\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsMSBuildCmd.bat" && msbuild $(Build.SourcesDirectory)/build/apsi.sln'
+      cleanupBuildCommands: '"%ProgramFiles(x86)%\Microsoft Visual Studio\2019\Enterprise\Common7\Tools\VsMSBuildCmd.bat" && msbuild $(Build.SourcesDirectory)/build/apsi.sln /t:Clean'
+
+- task: PublishSymbols@2
+  displayName: 'Publish symbols path'
+  inputs:
+    searchPattern: '**\bin\**\*.pdb'
+    PublishSymbols: false
+  continueOnError: true
+
+- task: CopyFiles@2
+  displayName: 'Copy Files to: $(Build.ArtifactStagingDirectory)'
+  inputs:
+    SourceFolder: '$(Build.SourcesDirectory)'
+    Contents: '**\${{ parameters.configuration }}\**\?(*.exe|*.dll|*.lib|*.xml)'
+    TargetFolder: '$(Build.ArtifactStagingDirectory)'
+
+- task: ms.vss-governance-buildtask.governance-build-task-component-detection.ComponentGovernanceComponentDetection@0
+  displayName: 'Component Detection'
+
+- ${{ if eq(parameters.configuration, 'Release') }}:
+  - task: securedevelopmentteam.vss-secure-development-tools.build-task-publishsecurityanalysislogs.PublishSecurityAnalysisLogs@2
+    displayName: 'Publish Security Analysis Logs'
+
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Artifact: drop'
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    artifactName: windows-drop
