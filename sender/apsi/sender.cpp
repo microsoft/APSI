@@ -21,7 +21,6 @@
 #include "seal/evaluator.h"
 #include "seal/modulus.h"
 #include "seal/util/common.h"
-#include "seal/util/iterator.h"
 
 using namespace std;
 using namespace seal;

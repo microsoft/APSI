@@ -14,7 +14,6 @@
 #include "apsi/util/db_encoding.h"
 
 // SEAL
-#include "seal/util/iterator.h"
 #include "seal/util/uintarithsmallmod.h"
 #include "seal/util/uintcore.h"
 

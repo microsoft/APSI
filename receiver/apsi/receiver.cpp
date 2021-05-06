@@ -26,7 +26,6 @@
 #include "seal/plaintext.h"
 #include "seal/util/common.h"
 #include "seal/util/defines.h"
-#include "seal/util/iterator.h"
 
 using namespace std;
 using namespace seal;
