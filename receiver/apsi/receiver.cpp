@@ -461,8 +461,7 @@ namespace apsi {
             if (received_label_byte_count < nonce_byte_count) {
                 APSI_LOG_WARNING(
                     "Expected " << nonce_byte_count
-                                << " bytes of nonce data in this result part but "
-                                   "only "
+                                << " bytes of nonce data in this result part but only "
                                 << received_label_byte_count
                                 << " bytes were received; ignoring the label data");
 
@@ -519,10 +518,9 @@ namespace apsi {
                 // If a positive MatchRecord is already present, then something is seriously wrong
                 if (mrs[item_idx]) {
                     APSI_LOG_ERROR("The table index -> item index translation table indicated a "
-                                   "location that was "
-                                   "already filled by another match from this result package; the "
-                                   "translation table (query) "
-                                   "has probably been corrupted");
+                                   "location that was already filled by another match from this "
+                                   "result package; the translation table (query) has probably "
+                                   "been corrupted");
 
                     throw runtime_error(
                         "found a duplicate positive match; something is seriously wrong");
@@ -669,11 +667,8 @@ namespace apsi {
                         // wrong
                         APSI_LOG_ERROR(
                             "Result worker [" << this_thread::get_id()
-                                              << "]: "
-                                                 "found a match for items["
-                                              << get<2>(I)
-                                              << "] "
-                                                 "but an existing match for this location was "
+                                              << "]: found a match for items[" << get<2>(I)
+                                              << "] but an existing match for this location was "
                                                  "already found before from a different result "
                                                  "part");
 
