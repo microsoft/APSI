@@ -907,7 +907,7 @@ By far the easiest and recommended way to do this is using [vcpkg](https://githu
 Each package's name in vcpkg is listed below.
 
 **Note:** On Windows, the vcpkg triplet `x64-windows-static-md` should be specified.
-For examples, to install Microsoft SEA on Windows, you must use `.\vcpkg install seal[no-throw-tran]:x64-windows-static-md`, while on other systems use simply `./vcpkg install seal[no-throw-tran]`.
+For examples, to install Microsoft SEAL on Windows, you must use `.\vcpkg install seal[no-throw-tran]:x64-windows-static-md`, while on other systems use simply `./vcpkg install seal[no-throw-tran]`.
 
 The CMake build system can then automatically find these pre-installed packages, if the following arguments are passed to CMake configuration:
 - `-DCMAKE_TOOLCHAIN_FILE=${vcpkg_root_dir}/scripts/buildsystems/vcpkg.cmake`, and
