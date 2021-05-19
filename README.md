@@ -21,11 +21,12 @@ This library is research code and is not yet intended for production use. Use at
   - [Query Powers](#query-powers)
   - [Thread Control](#thread-control)
   - [Logging](#logging)
+- [Building APSI](#building-apsi)
 - [Command-Line Interface (CLI)](#command-line-interface-(cli))
   - [Common Arguments](#common-arguments)
   - [Receiver](#receiver-1)
   - [Sender](#sender-1)
-- [Building APSI](#building-apsi)
+  - [Test Data](#test-data)
 - [Acknowledgments](#acknowledgments)
 - [Questions](#questions)
 
@@ -843,6 +844,46 @@ APSI_LOG_INFO("My value is " << val);
 ```
 would log the message *My value is 3* at `"info"` log level.
 
+## Building APSI
+
+### Requirements
+
+| System  | Toolchain                                             |
+|---------|-------------------------------------------------------|
+| Windows | Visual Studio 2019 with C++ CMake Tools for Windows   |
+| Linux   | Clang++ (>= 7.0) or GNU G++ (>= 7.0), CMake (>= 3.12) |
+| macOS   | Xcode toolchain (>= 9.3), CMake (>= 3.12)             |
+
+### Dependencies
+
+APSI has multiple external dependencies that must be pre-installed.
+By far the easiest and recommended way to do this is using [vcpkg](https://github.com/microsoft/vcpkg).
+Each package's name in vcpkg is listed below.
+
+**Note:** On Windows, the vcpkg triplet `x64-windows-static-md` should be specified.
+For examples, to install Microsoft SEAL on Windows, you must use `.\vcpkg install seal[no-throw-tran]:x64-windows-static-md`, while on other systems use simply `./vcpkg install seal[no-throw-tran]`.
+
+The CMake build system can then automatically find these pre-installed packages, if the following arguments are passed to CMake configuration:
+- `-DCMAKE_TOOLCHAIN_FILE=${vcpkg_root_dir}/scripts/buildsystems/vcpkg.cmake`, and
+- `-DVCPKG_TARGET_TRIPLET="x64-windows-static-md"` on Windows only.
+
+| Dependency                                                | vcpkg name                                           |
+|-----------------------------------------------------------|------------------------------------------------------|
+| [Microsoft SEAL](https://github.com/microsoft/SEAL)       | `seal[no-throw-tran]`                                |
+| [Microsoft Kuku](https://github.com/microsoft/Kuku)       | `kuku`                                               |
+| [Log4cplus](https://github.com/log4cplus/log4cplus)       | `log4cplus`                                          |
+| [cppzmq](https://github.com/zeromq/cppzmq)                | `cppzmq` (needed only for ZeroMQ networking support) |
+| [FlatBuffers](https://github.com/google/flatbuffers)      | `flatbuffers`                                        |
+| [jsoncpp](https://github.com/open-source-parsers/jsoncpp) | `jsoncpp`                                            |
+| [Google Test](https://github.com/google/googletest)       | `gtest` (needed only for building tests)             |
+| [TCLAP](https://sourceforge.net/projects/tclap/)          | `tclap` (needed only for building CLI)               |
+
+#### Note on Microsoft SEAL and Intel HEXL
+
+At this time the vcpkg version of Microsoft SEAL does not directly have support for [Intel HEXL](https://github.com/intel/hexl).
+To utilize the benefits of Intel HEXL, we recommend manually downloading, configuring (with `-DSEAL_USE_INTEL_HEXL=ON`), building, and installing Microsoft SEAL, instead of using vcpkg.
+Any potential benefit of using Intel HEXL is highly dependent on the CPU, but on certain systems it can have an enormous impact on the online computation time by accelerating the CPU intensive Microsoft SEAL operations.
+
 ## Command-Line Interface (CLI)
 
 The APSI library comes with example command-line programs implementing a sender and a receiver.
@@ -890,39 +931,20 @@ Leading and trailing whitespaces will be trimmed from both the item and the labe
 If the first row contains only a single value (i.e., no label), then APSI will read only items from the subsequent rows and set up an unlabeled `SenderDB` instance.
 In the labeled mode the longest label appearing will determine the label byte count.
 
-## Building APSI
+### Test Data
 
-### Requirements
-
-| System  | Toolchain                                             |
-|---------|-------------------------------------------------------|
-| Windows | Visual Studio 2019 with C++ CMake Tools for Windows   |
-| Linux   | Clang++ (>= 7.0) or GNU G++ (>= 7.0), CMake (>= 3.12) |
-| macOS   | Xcode toolchain (>= 9.3), CMake (>= 3.12)             |
-
-### Dependencies
-
-APSI has multiple external dependencies that must be pre-installed.
-By far the easiest and recommended way to do this is using [vcpkg](https://github.com/microsoft/vcpkg).
-Each package's name in vcpkg is listed below.
-
-**Note:** On Windows, the vcpkg triplet `x64-windows-static-md` should be specified.
-For examples, to install Microsoft SEAL on Windows, you must use `.\vcpkg install seal[no-throw-tran]:x64-windows-static-md`, while on other systems use simply `./vcpkg install seal[no-throw-tran]`.
-
-The CMake build system can then automatically find these pre-installed packages, if the following arguments are passed to CMake configuration:
-- `-DCMAKE_TOOLCHAIN_FILE=${vcpkg_root_dir}/scripts/buildsystems/vcpkg.cmake`, and
-- `-DVCPKG_TARGET_TRIPLET="x64-windows-static-md"` on Windows only.
-
-| Dependency                                                | vcpkg name                                           |
-|-----------------------------------------------------------|------------------------------------------------------|
-| [Microsoft SEAL](https://github.com/microsoft/SEAL)       | `seal[no-throw-tran]`                                |
-| [Microsoft Kuku](https://github.com/microsoft/Kuku)       | `kuku`                                               |
-| [Log4cplus](https://github.com/log4cplus/log4cplus)       | `log4cplus`                                          |
-| [cppzmq](https://github.com/zeromq/cppzmq)                | `cppzmq` (needed only for ZeroMQ networking support) |
-| [FlatBuffers](https://github.com/google/flatbuffers)      | `flatbuffers`                                        |
-| [jsoncpp](https://github.com/open-source-parsers/jsoncpp) | `jsoncpp`                                            |
-| [Google Test](https://github.com/google/googletest)       | `gtest` (needed only for building tests)             |
-| [TCLAP](https://sourceforge.net/projects/tclap/)          | `tclap` (needed only for building CLI)               |
+The library contains a Python script [tools/scripts/test_data_creator.py](tools/scripts/test_data_creator.py) that can be used to easily create test data for the CLI.
+Running the script is easy; it accepts three necessary arguments and two optional parameters as follows:
+```
+python3 test_data_creator.py <sender_size> <receiver_size> <intersection_size> [<label_byte_count>] [<item_byte_count>]
+```
+Here `<sender_size>` denotes the size of the sender's dataset that will be written in a file `db.csv`.
+If this file already exists, it will be overwritten.
+Similarly `<receiver_size>` denotes the size of the receiver's query that will be written in a file `query.csv`.
+The third argument, `<intersection_size>`, denotes the number of items common in both the generated `db.csv` and `query.csv`.
+The fourth (optional) argument denotes the byte size of the randomly generated labels in `db.csv`; if omitted, the data will be unlabeled.
+The last (optional) argument denotes the item byte size; it defaults to 64 if omitted.
+Since long the items will automatically be hashed before they are inserted into a `SenderDB`, the item byte size does not matter much in practice.
 
 ## Acknowledgments
 
