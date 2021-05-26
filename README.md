@@ -829,8 +829,9 @@ However, now the sender must compute all powers of the query up to 114, increasi
 
 Many of the computations APSI does are highly parallelizable.
 APSI uses a thread pool that can be controlled with the static functions `apsi::ThreadPoolMgr::SetThreadCount` and `apsi::ThreadPoolMgr::GetThreadCount` in [apsi/thread_pool_mgr.h](common/apsi/thread_pool_mgr.h).
-By default the thread count is set to `std::thread::hardware_concurrency()`, but this is in many cases not ideal due to caching issues, especially when hyper-threading is enabled
-Instead, the user would typically want to use `apsi::ThreadPoolMgr::SetThreadCount` to set it to some lower value depending on the CPU.
+
+By default the thread count is set to `std::thread::hardware_concurrency()`, but this is in many cases not ideal due to caching issues, especially when hyper-threading is enabled.
+Instead, the user would typically want to use `apsi::ThreadPoolMgr::SetThreadCount` to set it to some lower value depending on the number of physical cores.
 
 ### Logging
 
