@@ -50,7 +50,7 @@ namespace apsi {
             flatbuffers::FlatBufferBuilder fbs_builder(128);
 
             fbs::SenderOperationHeaderBuilder sop_header_builder(fbs_builder);
-            sop_header_builder.add_version(version);
+            sop_header_builder.add_protocol_version(protocol_version);
             sop_header_builder.add_type(static_cast<fbs::SenderOperationType>(type));
             auto sop_header = sop_header_builder.Finish();
             fbs_builder.FinishSizePrefixed(sop_header);
@@ -75,8 +75,8 @@ namespace apsi {
 
             auto sop_header = fbs::GetSizePrefixedSenderOperationHeader(in_data.data());
 
-            // Read the version number
-            version = sop_header->version();
+            // Read the protocol version number
+            protocol_version = sop_header->protocol_version();
 
             // Read the operation type
             type = static_cast<SenderOperationType>(sop_header->type());

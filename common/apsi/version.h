@@ -7,19 +7,29 @@
 #include <cstdint>
 
 namespace apsi {
-    extern const std::uint32_t apsi_version;
+    extern const std::uint32_t apsi_lib_version;
 
-    bool same_version(std::uint32_t version);
+    bool same_apsi_lib_version(std::uint32_t version);
 
-    std::uint32_t get_major_version(std::uint32_t version);
+    std::uint32_t get_apsi_lib_major_version(std::uint32_t version);
 
-    std::uint32_t get_minor_version(std::uint32_t version);
+    std::uint32_t get_apsi_lib_major_version();
 
-    std::uint32_t get_patch_version(std::uint32_t version);
+    std::uint32_t get_apsi_lib_minor_version(std::uint32_t version);
 
-    bool same_major_version(std::uint32_t version);
+    std::uint32_t get_apsi_lib_minor_version();
 
-    bool same_minor_version(std::uint32_t version);
+    std::uint32_t get_apsi_lib_patch_version(std::uint32_t version);
 
-    bool same_patch_version(std::uint32_t version);
+    std::uint32_t get_apsi_lib_patch_version();
+
+    bool same_apsi_lib_major_version(std::uint32_t version);
+
+    bool same_apsi_lib_minor_version(std::uint32_t version);
+
+    bool same_apsi_lib_patch_version(std::uint32_t version);
+
+    extern const std::uint32_t apsi_proto_version;
+
+    bool same_apsi_proto_version(std::uint32_t version);
 } // namespace apsi

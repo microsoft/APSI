@@ -46,7 +46,7 @@ namespace apsi {
 
             std::size_t load(std::istream &in);
 
-            std::uint32_t version = apsi_version;
+            std::uint32_t protocol_version = apsi_proto_version;
 
             SenderOperationType type = SenderOperationType::sop_unknown;
         };

@@ -28,23 +28,23 @@ namespace APSITests {
         stringstream ss;
 
         header.type = SenderOperationType::sop_unknown;
-        header.version = 999;
+        header.protocol_version = 999;
         size_t out_size = header.save(ss);
 
         SenderOperationHeader header2;
         size_t in_size = header2.load(ss);
         ASSERT_EQ(out_size, in_size);
         ASSERT_EQ(header.type, header2.type);
-        ASSERT_EQ(header.version, header2.version);
+        ASSERT_EQ(header.protocol_version, header2.protocol_version);
 
         header.type = SenderOperationType::sop_query;
-        header.version = 123;
+        header.protocol_version = 123;
         out_size = header.save(ss);
 
         in_size = header2.load(ss);
         ASSERT_EQ(out_size, in_size);
         ASSERT_EQ(header.type, header2.type);
-        ASSERT_EQ(header.version, header2.version);
+        ASSERT_EQ(header.protocol_version, header2.protocol_version);
     }
 
     TEST(SenderOperationTest, SaveLoadSenderOperationParms)

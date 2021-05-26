@@ -101,6 +101,7 @@ int remote_query(const CLP &cmd)
     }
 
     ThreadPoolMgr::SetThreadCount(cmd.threads());
+    APSI_LOG_INFO("Setting thread count to " << ThreadPoolMgr::GetThreadCount());
 
     Receiver receiver(*params);
 

@@ -128,7 +128,7 @@ bool try_save_sender_db(const CLP &cmd, shared_ptr<SenderDB> sender_db)
 int start_sender(const CLP &cmd)
 {
     ThreadPoolMgr::SetThreadCount(cmd.threads());
-    APSI_LOG_INFO("Thread count is set to " << ThreadPoolMgr::GetThreadCount());
+    APSI_LOG_INFO("Setting thread count to " << ThreadPoolMgr::GetThreadCount());
     signal(SIGINT, sigint_handler);
 
     // Check that the database file is valid
