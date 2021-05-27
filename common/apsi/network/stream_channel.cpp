@@ -69,13 +69,13 @@ namespace apsi {
                 return nullptr;
             }
 
-            if (!same_apsi_proto_version(sop_header.protocol_version)) {
-                // Check that the protocol version numbers match
+            if (!same_serialization_version(sop_header.version)) {
+                // Check that the serialization version numbers match
                 APSI_LOG_ERROR(
-                    "Received header indicates a protocol version number ("
-                    << sop_header.protocol_version
-                    << ") incompatible with the current protocol version number ("
-                    << apsi_proto_version << ")");
+                    "Received header indicates a serialization version number ("
+                    << sop_header.version
+                    << ") incompatible with the current serialization version number ("
+                    << apsi_serialization_version << ")");
                 return nullptr;
             }
 
@@ -168,13 +168,13 @@ namespace apsi {
                 return nullptr;
             }
 
-            if (!same_apsi_proto_version(sop_header.protocol_version)) {
-                // Check that the protocol version numbers match
+            if (!same_serialization_version(sop_header.version)) {
+                // Check that the serialization version numbers match
                 APSI_LOG_ERROR(
-                    "Received header indicates a protocol version number "
-                    << sop_header.protocol_version
-                    << " incompatible with the current protocol version number "
-                    << apsi_proto_version);
+                    "Received header indicates a serialization version number "
+                    << sop_header.version
+                    << " incompatible with the current serialization version number "
+                    << apsi_serialization_version);
                 return nullptr;
             }
 

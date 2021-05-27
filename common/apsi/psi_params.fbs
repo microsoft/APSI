@@ -23,7 +23,7 @@ table SEALParams {
 }
 
 table PSIParams {
-    protocol_version:uint32;
+    version:uint32;
     item_params:ItemParams;
     table_params:TableParams;
     query_params:QueryParams;

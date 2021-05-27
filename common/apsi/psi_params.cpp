@@ -209,7 +209,7 @@ namespace apsi {
         auto seal_params = fbs::CreateSEALParams(fbs_builder, seal_params_data);
 
         fbs::PSIParamsBuilder psi_params_builder(fbs_builder);
-        psi_params_builder.add_protocol_version(apsi_proto_version);
+        psi_params_builder.add_version(apsi_serialization_version);
         psi_params_builder.add_item_params(&item_params);
         psi_params_builder.add_table_params(&table_params);
         psi_params_builder.add_query_params(query_params);
@@ -237,14 +237,14 @@ namespace apsi {
 
         auto psi_params = fbs::GetSizePrefixedPSIParams(in_data.data());
 
-        if (!same_apsi_proto_version(psi_params->protocol_version())) {
-            // Check that the protocol version numbers match
+        if (!same_serialization_version(psi_params->version())) {
+            // Check that the serialization version numbers match
             APSI_LOG_ERROR(
-                "Loaded PSIParams data indicates a protocol version number ("
-                << psi_params->protocol_version()
-                << ") incompatible with the current protocol version number (" << apsi_proto_version
-                << ")");
-            throw runtime_error("failed to load parameters: incompatible protocol version");
+                "Loaded PSIParams data indicates a serialization version number ("
+                << psi_params->version()
+                << ") incompatible with the current serialization version number ("
+                << apsi_serialization_version << ")");
+            throw runtime_error("failed to load parameters: incompatible serialization version");
         }
 
         PSIParams::ItemParams item_params;

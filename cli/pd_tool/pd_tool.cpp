@@ -37,7 +37,7 @@ int main(int argc, char **argv)
 {
     CLP clp(
         "pd_tool is a command-line tool for computing the depths of source power configurations.",
-        to_string(apsi_lib_version));
+        to_string(apsi_version));
     clp.parse_args(argc, argv);
 
     PowersDag pd;
