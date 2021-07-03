@@ -90,8 +90,7 @@ namespace apsi {
                 reinterpret_cast<digit_t *>(out.data()), reinterpret_cast<digit_t *>(out.data()));
         }
 
-        bool ECPoint::scalar_multiply(
-            gsl::span<const unsigned char, order_size> scalar, bool clear_cofactor)
+        bool ECPoint::scalar_multiply(scalar_span_const_type scalar, bool clear_cofactor)
         {
             // The ecc_mul functions returns false when the input point is not a valid curve point
             return ecc_mul(
