@@ -15,7 +15,7 @@
 #ifndef __FOURQ_PARAMS_H__
 #define __FOURQ_PARAMS_H__
 
-#include "FourQ_internal.h"
+#include "apsi/fourq/FourQ_internal.h"
 
 // Encoding of field elements, elements over Z_r and elements over GF(p^2):
 // -----------------------------------------------------------------------

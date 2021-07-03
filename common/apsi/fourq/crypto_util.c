@@ -6,9 +6,9 @@
  * Abstract: crypto utility functions
  ************************************************************************************/
 
+#include "apsi/fourq/FourQ_internal.h"
+#include "apsi/fourq/FourQ_params.h"
 #include <string.h>
-#include "FourQ_internal.h"
-#include "FourQ_params.h"
 
 static digit_t mask4000 = (digit_t)1 << (sizeof(digit_t) * 8 - 2);
 static digit_t mask7fff = (digit_t)(-1) >> 1;

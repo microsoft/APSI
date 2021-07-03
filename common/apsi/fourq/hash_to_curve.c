@@ -6,8 +6,8 @@
  * Abstract: hash to FourQ
  ***********************************************************************************/
 
-#include "FourQ_internal.h"
-#include "FourQ_params.h"
+#include "apsi/fourq/FourQ_internal.h"
+#include "apsi/fourq/FourQ_params.h"
 
 static digit_t fpeq1271(digit_t *a, digit_t *b)
 { // Constant-time comparison of two field elements, ai=bi? : (0) equal, (-1) unequal

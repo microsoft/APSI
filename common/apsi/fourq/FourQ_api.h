@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#include "FourQ.h"
+#include "apsi/fourq/FourQ.h"
 
 /**************** Public ECC API ****************/
 
