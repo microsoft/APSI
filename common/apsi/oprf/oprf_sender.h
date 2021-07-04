@@ -51,7 +51,7 @@ namespace apsi {
             void create()
             {
                 // Create a random key
-                ECPoint::make_random_nonzero_scalar(
+                ECPoint::MakeRandomNonzeroScalar(
                     oprf_key_span_type{ oprf_key_.begin(), oprf_key_size });
             }
 

@@ -56,9 +56,9 @@ namespace apsi {
 
             // Creates a random non-zero number modulo the prime order subgroup
             // order and computes its inverse.
-            static void make_random_nonzero_scalar(scalar_span_type out);
+            static void MakeRandomNonzeroScalar(scalar_span_type out);
 
-            static void invert_scalar(scalar_span_const_type in, scalar_span_type out);
+            static void InvertScalar(scalar_span_const_type in, scalar_span_type out);
 
             bool scalar_multiply(scalar_span_const_type scalar, bool clear_cofactor);
 

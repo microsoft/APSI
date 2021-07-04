@@ -47,8 +47,8 @@ namespace apsi {
 
                 // Create a random scalar for OPRF and save its inverse
                 ECPoint::scalar_type random_scalar;
-                ECPoint::make_random_nonzero_scalar(random_scalar);
-                ECPoint::invert_scalar(random_scalar, inv_factor_data_.get_factor(i));
+                ECPoint::MakeRandomNonzeroScalar(random_scalar);
+                ECPoint::InvertScalar(random_scalar, inv_factor_data_.get_factor(i));
 
                 // Multiply our point with the random scalar
                 ecpt.scalar_multiply(random_scalar, false);

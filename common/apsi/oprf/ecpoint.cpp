@@ -71,7 +71,7 @@ namespace apsi {
             }
         }
 
-        void ECPoint::make_random_nonzero_scalar(scalar_span_type out)
+        void ECPoint::MakeRandomNonzeroScalar(scalar_span_type out)
         {
             // Loop until we find a non-zero element
             do {
@@ -79,7 +79,7 @@ namespace apsi {
             } while (!is_nonzero_scalar(out));
         }
 
-        void ECPoint::invert_scalar(scalar_span_const_type in, scalar_span_type out)
+        void ECPoint::InvertScalar(scalar_span_const_type in, scalar_span_type out)
         {
             to_Montgomery(
                 const_cast<digit_t *>(reinterpret_cast<const digit_t *>(in.data())),
