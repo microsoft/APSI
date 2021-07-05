@@ -62,15 +62,15 @@ namespace apsi {
 
             bool scalar_multiply(scalar_span_const_type scalar, bool clear_cofactor);
 
-            void save(std::ostream &stream);
+            void save(std::ostream &stream) const;
 
             void load(std::istream &stream);
 
-            void save(point_save_span_type out);
+            void save(point_save_span_type out) const;
 
             void load(point_save_span_const_type in);
 
-            void extract_hash(hash_span_type out);
+            void extract_hash(hash_span_type out) const;
 
         private:
             // Initialize to neutral element

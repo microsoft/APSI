@@ -108,14 +108,15 @@ namespace apsi {
             return *this;
         }
 
-        void ECPoint::save(ostream &stream)
+        void ECPoint::save(ostream &stream) const
         {
             auto old_ex_mask = stream.exceptions();
             stream.exceptions(ios_base::failbit | ios_base::badbit);
 
             try {
                 array<unsigned char, save_size> buf;
-                encode(pt_, buf.data());
+                point_t pt_copy{ pt_[0] };
+                encode(pt_copy, buf.data());
                 stream.write(reinterpret_cast<const char *>(buf.data()), save_size);
             } catch (const ios_base::failure &) {
                 stream.exceptions(old_ex_mask);
@@ -143,9 +144,10 @@ namespace apsi {
             stream.exceptions(old_ex_mask);
         }
 
-        void ECPoint::save(point_save_span_type out)
+        void ECPoint::save(point_save_span_type out) const
         {
-            encode(pt_, out.data());
+            point_t pt_copy{ pt_[0] };
+            encode(pt_copy, out.data());
         }
 
         void ECPoint::load(point_save_span_const_type in)
@@ -155,7 +157,7 @@ namespace apsi {
             }
         }
 
-        void ECPoint::extract_hash(hash_span_type out)
+        void ECPoint::extract_hash(hash_span_type out) const
         {
             // Compute a Blake2b hash of the value and expand to hash_size
             APSI_blake2b(out.data(), out.size(), pt_->y, sizeof(f2elm_t), nullptr, 0);
