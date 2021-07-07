@@ -883,9 +883,9 @@ The CMake build system can then automatically find these pre-installed packages,
 
 #### Note on Microsoft SEAL and Intel HEXL
 
-At this time the vcpkg version of Microsoft SEAL does not directly have support for [Intel HEXL](https://github.com/intel/hexl).
-To utilize the benefits of Intel HEXL, we recommend manually downloading, configuring (with `-DSEAL_USE_INTEL_HEXL=ON`), building, and installing Microsoft SEAL, instead of using vcpkg.
-Any potential benefit of using Intel HEXL is highly dependent on the CPU, but on certain systems it can have an enormous impact on the online computation time by accelerating the CPU intensive Microsoft SEAL operations.
+[Intel HEXL](https://github.com/intel/hexl) is an optional dependency of Microsoft SEAL, which aims to accelerate low-level arithmetic with advanced vector extensions.
+Any potential benefit of using Intel HEXL is highly dependent on the processor, but on Cascade lake and Ice Lake Xeon processors it can have an enormous impact on the online computation time of APSI sender operations.
+To build Microsoft SEAL with Intel HEXL support, install `seal[no-throw-tran,hexl]` instead of the vcpkg name listed above.
 
 ## Command-Line Interface (CLI)
 
