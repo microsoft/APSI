@@ -849,6 +849,8 @@ would log the message *My value is 3* at `"info"` log level.
 
 ## Building APSI
 
+To simply use the APSI library, we recommend to build and install APSI with [vcpkg](https://github.com/microsoft/vcpkg).
+To try the commandline interface or run tests, follow the guide to build and install APSI manually.
 ### Requirements
 
 | System  | Toolchain                                             |
@@ -857,7 +859,22 @@ would log the message *My value is 3* at `"info"` log level.
 | Linux   | Clang++ (>= 7.0) or GNU G++ (>= 7.0), CMake (>= 3.12) |
 | macOS   | Xcode toolchain (>= 9.3), CMake (>= 3.12)             |
 
-### Dependencies
+### Building and Installing APSI with vcpkg
+
+The easiest way is to download, build, and install APSI is using [vcpkg](https://github.com/microsoft/vcpkg).
+
+On Linux and macOS, first follow this [Quick Start on Unix](https://github.com/microsoft/vcpkg#quick-start-unix), and then run:
+```powershell
+./vcpkg install apsi
+```
+On Windows, first follow this [Quick Start on Windows](https://github.com/microsoft/vcpkg#quick-start-windows), and then run:
+```powershell
+.\vcpkg install apsi:x64-windows-static-md
+```
+
+To build your CMake project with dependency on APSI, follow [this guide](https://github.com/microsoft/vcpkg#using-vcpkg-with-cmake).
+
+### Building and Installing APSI Manually
 
 APSI has multiple external dependencies that must be pre-installed.
 By far the easiest and recommended way to do this is using [vcpkg](https://github.com/microsoft/vcpkg).
