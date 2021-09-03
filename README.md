@@ -1,9 +1,5 @@
 # APSI: C++ library for Asymmetric PSI
 
-## WARNING: This is research code
-
-This library is research code and is not yet intended for production use. Use at your own risk.
-
 - [Introduction](#introduction)
   - [(Unlabeled) PSI and Labeled PSI](#(unlabeled)-psi-and-labeled-psi)
   - [Sender and Receiver](#sender-and-receiver)
@@ -37,7 +33,7 @@ This library is research code and is not yet intended for production use. Use at
 Private Set Intersection (PSI) refers to a functionality where two parties, each holding a private set of *items*, can check which items they have in common without revealing anything else to each other.
 Upper bounds on the sizes of the sets are assumed to be public information and are not protected.
 
-The APSI (Asymmetric PSI) library provides a PSI functionality for asymmetric set sizes.
+The APSI (Asymmetric PSI) library provides a PSI functionality for asymmetric set sizes based on the protocol described in [eprint.iacr.org/2021/1116](https://eprint.iacr.org/2021/1116).
 For example, in many cases one party may hold a large dataset of millions of records, and the other party wishes to find out whether a single particular record or a small number of records appear in the dataset.
 We refer to this as APSI in *unlabeled* mode.
 
