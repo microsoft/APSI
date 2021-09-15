@@ -44,13 +44,15 @@ namespace apsi {
 
         The full process for the sender is as follows:
 
-        (1) Create an oprf::OPRFKey object and use oprf::OPRFSender::ComputeHashes with the
-        oprf::OPRFKey to process the sender's items (or item-label pairs) and convert them into
-        hashed items (or hashed-item-label pairs).
+        (1) Create a PSIParams object that is appropriate for the kinds of queries the sender is
+        expecting to serve. Create a SenderDB object from the PSIParams. The SenderDB constructor
+        optionally accepts an existing oprf::OPRFKey object and samples a random one otherwise. It
+        is recommended to construct the SenderDB directly into a std::shared_ptr, as the Query
+        constructor (see below) expects it to be passed as a std::shared_ptr<SenderDB>.
 
-        (2) Create a PSIParams object and a SenderDB object. The SenderDB must be created with the
-        PSIParams and the hashed items (or hashed item-label pairs) must be loaded into it with
-        SenderDB::set_data. The SenderDB can be used repeatedly and can be updated efficiently.
+        (2) The sender's data must be loaded into the SenderDB with SenderDB::set_data. More data
+        can always be added later with SenderDB::insert_or_assign, or removed with SenderDB::remove,
+        as long as the SenderDB has not been stripped (see SenderDB::strip).
 
         (3 -- optional) Receive a parameter request with network::Channel::receive_operation. The
         received Request object must be converted to the right type (ParamsRequest) with the

@@ -209,6 +209,9 @@ namespace apsi {
 
         Item &operator=(Item &&item) = default;
 
+        /**
+        Constructs an Item by hashing a given string of arbitrary length.
+        */
         template <typename CharT>
         Item(const std::basic_string<CharT> &str)
         {
