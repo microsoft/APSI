@@ -41,7 +41,7 @@ set(APSI_BUILD_TYPE @CMAKE_BUILD_TYPE@)
 set(APSI_DEBUG @APSI_DEBUG@)
 set(APSI_USE_CXX17 @APSI_USE_CXX17@)
 
-apsi_find_dependency(SEAL 3.6 REQUIRED)
+apsi_find_dependency(SEAL 3.7 REQUIRED)
 apsi_find_dependency(Kuku 2.1 REQUIRED)
 apsi_find_dependency(Flatbuffers REQUIRED)
 apsi_find_dependency(jsoncpp REQUIRED)
