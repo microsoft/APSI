@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.13)
 
 ###################################################
 # Project APSI includes the following components: #
@@ -26,11 +26,10 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
-project(APSI VERSION 0.3.1 LANGUAGES CXX C)
+project(APSI VERSION 0.4.0 LANGUAGES CXX C)
 
-if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.13)
-    cmake_policy(SET CMP0077 NEW)
-endif()
+# This policy was introduced in CMake 3.13; OLD by default until CMake 3.21
+cmake_policy(SET CMP0077 NEW)
 
 ########################
 # Global configuration #

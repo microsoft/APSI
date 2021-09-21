@@ -854,7 +854,7 @@ To try the commandline interface or run tests, follow the guide to build and ins
 | System  | Toolchain                                             |
 |---------|-------------------------------------------------------|
 | Windows | Visual Studio 2019 with C++ CMake Tools for Windows   |
-| Linux   | Clang++ (>= 7.0) or GNU G++ (>= 7.0), CMake (>= 3.12) |
+| Linux   | Clang++ (>= 7.0) or GNU G++ (>= 7.0), CMake (>= 3.13) |
 | macOS   | Xcode toolchain (>= 9.3), CMake (>= 3.12)             |
 
 ### Building and Installing APSI with vcpkg
