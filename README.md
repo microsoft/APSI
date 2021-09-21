@@ -658,7 +658,7 @@ The `PSIParams` constructor will verify that the item length is bounded between 
 
 #### TableParams
 
-The `PSIParams::ItemParams` struct contains parameters describing the receiver's [cuckoo hash table](#cuckoo-hashing) and the [sender's data structure](#practice).
+The `PSIParams::TableParams` struct contains parameters describing the receiver's [cuckoo hash table](#cuckoo-hashing) and the [sender's data structure](#practice).
 It holds three member variables:
 - `table_size` denotes the size of the receiver's cuckoo hash table.
 It must be such that its size is a positive multiple of (possibly equal to) the number of batching slots in a Microsoft SEAL plaintext, i.e., it must be a multiple of the [poly_modulus_degree](#encryption-parameters) parameter set in the `PSIParams::SEALParams`.
