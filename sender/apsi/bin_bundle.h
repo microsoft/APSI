@@ -268,6 +268,7 @@ namespace apsi {
                 std::size_t label_size,
                 std::size_t max_bin_size,
                 std::size_t ps_low_degree,
+                std::size_t num_bins,
                 bool compressed,
                 bool stripped);
 

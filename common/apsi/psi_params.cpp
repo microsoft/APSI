@@ -109,10 +109,6 @@ namespace apsi {
             item_params_.felts_per_item > ItemParams::felts_per_item_max) {
             throw invalid_argument("felts_per_item is too large or too small");
         }
-        if (!item_params_.felts_per_item ||
-            (item_params_.felts_per_item & (item_params_.felts_per_item - 1))) {
-            throw invalid_argument("felts_per_item is not a power of two");
-        }
         if (query_params_.ps_low_degree > table_params_.max_items_per_bin) {
             throw invalid_argument("ps_low_degree cannot be larger than max_items_per_bin");
         }
@@ -159,8 +155,9 @@ namespace apsi {
             throw invalid_argument("parameters result in too large or too small item_bit_count");
         }
 
-        // Compute how many items fit into a bundle. The division must be exact, i.e., the number
-        // of field elements per item must be a power of two and divide poly_modulus_degree.
+        // Compute how many items fit into a bundle. If felts_per_item is not a power of two, then
+        // we will simply leave a few of the batching slots unused instead of splitting items across
+        // multiple SEAL batches.
         items_per_bundle_ =
             static_cast<uint32_t>(seal_params_.poly_modulus_degree()) / item_params_.felts_per_item;
 
@@ -169,10 +166,13 @@ namespace apsi {
             throw invalid_argument("poly_modulus_degree is too small");
         }
 
+        // Compute bins_per_bundle
+        bins_per_bundle_ = items_per_bundle_ * item_params_.felts_per_item;
+
         // table_size must be a multiple of items_per_bundle_
         if (table_params_.table_size % items_per_bundle_) {
             throw invalid_argument(
-                "table_size must be a multiple of (poly_modulus_degree / felts_per_item)");
+                "table_size must be a multiple of floor(poly_modulus_degree / felts_per_item)");
         }
 
         // Compute the number of bundle indices; this is now guaranteed to be greater than zero

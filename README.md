@@ -250,6 +250,18 @@ As is obvious from above, the sender must also compute powers of `low-degree + 1
 The user may want to ensure that the multiplicative depth of computing the inner polynomials &ndash; taking into account an *additional level* from multiplying by the plaintext coefficients &ndash; matches the multiplicative depth of computing the powers of `high-degree`.
 This way the last multiplication will be depth-optimal.
 
+#### False-Positives
+
+In some cases the protocol may result in a false positive match.
+For example, suppose an item is split into `P` parts, each `B - 1` bits long, as in [Large Items](#large-items).
+In some parameterizations, the sender's hash table bin size `K` may be so large that the probability of a particular item part being present in a corresponding bin, purely by random chance instead of true match, is rather large.
+If `P` is small, the probability of each of the receiver's item's parts being discovered in the corresponding sender's hash table bins becomes non-negligible.
+If the receiver submits thousands of items per each query, and the protocol is executed many times, a false positive may become a common occurrence.
+
+There are multiple ways of preventing this from happening.
+The negative logarithm of the false-positive probability for a single receiver's item is approximately `P(B - 1 - log_2(K))`.
+Thus, one can reduce the false-positive probability by increasing the `plain_modulus` and the number of item parts `P`, or reducing the sender's bin size `K`.
+
 ### Practice
 
 We now begin to illustrate how the [Theory](#theory) is implemented in APSI.
@@ -646,22 +658,27 @@ We shall discuss each separately.
 The `PSIParams::SEALParams` simply wraps an instance of Microsoft SEAL `seal::EncryptionParameters` object with the encryption scheme always set to `seal::scheme_type::bfv`.
 Unfortunately these parameters are not entirely easy to comprehend, and while some explanation was given above in [Encryption Parameters](#encryption-parameters), we highly recommend the reader study the extensive comments in the Microsoft SEAL [examples](https://github.com/microsoft/SEAL/tree/main/native/examples) to have a better grasp of how the parameters should be set, and what their impact on performance is.
 
+One should keep in mind that the [plain_modulus](#encryption-parameters) parameter has an impact on the false-positive probability, as was explained in [False-Positives](#false-positives).
+
 #### ItemParams
 
 The `PSIParams::ItemParams` struct contains only one member variable: a 32-bit integer `felts_per_item`.
 This number was described in [Large Items](#large-items); it specifies how many Microsoft SEAL [batching slots](#encryption-parameters) should represent each item, and hence influences the item length.
+It has a significant impact on the false-positive probability, as described in [False-Positives](#false-positives).
 
-The item length (in bits) is a product of `felts_per_item` and `floor(log_2(plain_modulus))`, where `plain_modulus` refers to the Microsoft SEAL [plain_modulus](#encryption-parameters) parameter set in the `PSIParams::SEALParams`.
+The item length (in bits) is a product of `felts_per_item` and `floor(log_2(plain_modulus))`.
 The `PSIParams` constructor will verify that the item length is bounded between 80 and 128 bits, and will throw an exception otherwise.
 
-`felts_per_item` must be one of 2, 4, 8, 16, or 32.
+`felts_per_item` must be at least 2 and can be at most 32.
+Most realistic parameterizations use some number between 4 and 8.
 
 #### TableParams
 
 The `PSIParams::TableParams` struct contains parameters describing the receiver's [cuckoo hash table](#cuckoo-hashing) and the [sender's data structure](#practice).
 It holds three member variables:
 - `table_size` denotes the size of the receiver's cuckoo hash table.
-It must be such that its size is a positive multiple of (possibly equal to) the number of batching slots in a Microsoft SEAL plaintext, i.e., it must be a multiple of the [poly_modulus_degree](#encryption-parameters) parameter set in the `PSIParams::SEALParams`.
+The hash table size must be a positive multiple of the number of items that can fit into a Microsoft SEAL plaintext.
+The total number of item parts that fit in a plaintext is given by the [poly_modulus_degree](#encryption-parameters) parameter, so the total number of (complete) items is `floor(poly_modulus_degree / felts_per_item)`.
 - `max_items_per_bin` denotes how many items fit into each row of the sender's bin bundles.
 It cannot be zero.
 - `hash_func_count` denotes the number of hash functions used for cuckoo hashing.
@@ -687,7 +704,7 @@ To construct a `PSIParams` object, one needs to provide the constructor with a v
 1. `PSIParams::TableParams::table_size` is verified to be non-zero.
 1. `PSIParams::TableParams::max_items_per_bin` is verified to be non-zero.
 1. `PSIParams::TableParams::hash_func_count` is verified to be at least 1 and at most 8.
-1. `PSIParams::ItemParams::felts_per_item` is verified to be 2, 4, 8, 16, or 32.
+1. `PSIParams::ItemParams::felts_per_item` is verified to be at least 2 and at most 32.
 1. `PSIParams::QueryParams::ps_low_degree` is verified to not exceed `max_items_per_bin`.
 1. `PSIParams::QueryParams::query_powers` is verified to not contain 0, to contain 1, and to not contain values larger than `max_items_per_bin`.
 Any value larger than `ps_low_degree` is verified to be divisible by `ps_low_degree + 1`.
@@ -695,9 +712,9 @@ Any value larger than `ps_low_degree` is verified to be divisible by `ps_low_deg
 Specificially, the parameters must have a `plain_modulus` that is prime and congruent to 1 modulo `2 * poly_modulus_degree`.
 Microsoft SEAL contains functions in `seal::CoeffModulus` and `seal::PlainModulus` classes (see [modulus.h](https://github.com/microsoft/SEAL/blob/main/native/src/seal/modulus.h)) to choose appropriate `coeff_modulus` and `plain_modulus` primes.
 1. The item bit count is computed as the product of `felts_per_item` and `floor(log_2(plain_modulus))`, and is verified to be at least 80 and at most 128.
-1. The number of item fitting vertically in a bin bundle is computed as `poly_modulus_degree / felts_per_item`.
+1. The number of item fitting vertically in a bin bundle is computed as `floor(poly_modulus_degree / felts_per_item)`.
 This number is verified to be non-zero.
-1. `table_size` is verified to be a multiple of `poly_modulus_degree / felts_per_item`.
+1. `table_size` is verified to be a multiple of `floor(poly_modulus_degree / felts_per_item)`.
 
 If all of these checks pass, the `PSIParams` object is successfully created and is valid for use in APSI.
 

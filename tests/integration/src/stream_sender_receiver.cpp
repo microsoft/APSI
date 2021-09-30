@@ -230,40 +230,61 @@ namespace APSITests {
         }
     } // namespace
 
-    TEST(StreamSenderReceiverTests, UnlabeledEmpty)
+    TEST(StreamSenderReceiverTests, UnlabeledEmpty1)
     {
         size_t sender_size = 0;
-        PSIParams params = create_params();
-        RunUnlabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, params, 1);
+        RunUnlabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, create_params1(), 1);
     }
 
-    TEST(StreamSenderReceiverTests, UnlabeledEmptyMultiThreaded)
+    TEST(StreamSenderReceiverTests, UnlabeledEmpty2)
     {
         size_t sender_size = 0;
-        PSIParams params = create_params();
-        RunUnlabeledTest(
-            sender_size, { { 0, 0 }, { 1, 0 } }, params, thread::hardware_concurrency());
+        RunUnlabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, create_params2(), 1);
     }
 
-    TEST(StreamSenderReceiverTests, UnlabeledSingle)
+    TEST(StreamSenderReceiverTests, UnlabeledEmptyMultiThreaded1)
+    {
+        size_t sender_size = 0;
+        RunUnlabeledTest(
+            sender_size, { { 0, 0 }, { 1, 0 } }, create_params1(), thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, UnlabeledEmptyMultiThreaded2)
+    {
+        size_t sender_size = 0;
+        RunUnlabeledTest(
+            sender_size, { { 0, 0 }, { 1, 0 } }, create_params2(), thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, UnlabeledSingle1)
     {
         size_t sender_size = 1;
-        PSIParams params = create_params();
-        RunUnlabeledTest(sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, params, 1);
+        RunUnlabeledTest(sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, create_params1(), 1);
     }
 
-    TEST(StreamSenderReceiverTests, UnlabeledSingleMultiThreaded)
+    TEST(StreamSenderReceiverTests, UnlabeledSingle2)
     {
         size_t sender_size = 1;
-        PSIParams params = create_params();
-        RunUnlabeledTest(
-            sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, params, thread::hardware_concurrency());
+        RunUnlabeledTest(sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, create_params2(), 1);
     }
 
-    TEST(StreamSenderReceiverTests, UnlabeledSmall)
+    TEST(StreamSenderReceiverTests, UnlabeledSingleMultiThreaded1)
+    {
+        size_t sender_size = 1;
+        RunUnlabeledTest(
+            sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, create_params1(), thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, UnlabeledSingleMultiThreaded2)
+    {
+        size_t sender_size = 1;
+        RunUnlabeledTest(
+            sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, create_params2(), thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, UnlabeledSmall1)
     {
         size_t sender_size = 10;
-        PSIParams params = create_params();
         RunUnlabeledTest(
             sender_size,
             { { 0, 0 },
@@ -275,14 +296,13 @@ namespace APSITests {
               { 10, 0 },
               { 10, 5 },
               { 10, 10 } },
-            params,
+            create_params1(),
             1);
     }
 
-    TEST(StreamSenderReceiverTests, UnlabeledSmallDifferentCompression)
+    TEST(StreamSenderReceiverTests, UnlabeledSmall2)
     {
         size_t sender_size = 10;
-        PSIParams params = create_params();
         RunUnlabeledTest(
             sender_size,
             { { 0, 0 },
@@ -294,15 +314,32 @@ namespace APSITests {
               { 10, 0 },
               { 10, 5 },
               { 10, 10 } },
-            params,
+            create_params2(),
+            1);
+    }
+
+    TEST(StreamSenderReceiverTests, UnlabeledSmallDifferentCompression1)
+    {
+        size_t sender_size = 10;
+        RunUnlabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 5, 0 },
+              { 5, 2 },
+              { 5, 5 },
+              { 10, 0 },
+              { 10, 5 },
+              { 10, 10 } },
+            create_params1(),
             1,
             true);
     }
 
-    TEST(StreamSenderReceiverTests, UnlabeledSmallMultiThreaded)
+    TEST(StreamSenderReceiverTests, UnlabeledSmallDifferentCompression2)
     {
         size_t sender_size = 10;
-        PSIParams params = create_params();
         RunUnlabeledTest(
             sender_size,
             { { 0, 0 },
@@ -314,14 +351,50 @@ namespace APSITests {
               { 10, 0 },
               { 10, 5 },
               { 10, 10 } },
-            params,
+            create_params2(),
+            1,
+            true);
+    }
+
+    TEST(StreamSenderReceiverTests, UnlabeledSmallMultiThreaded1)
+    {
+        size_t sender_size = 10;
+        RunUnlabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 5, 0 },
+              { 5, 2 },
+              { 5, 5 },
+              { 10, 0 },
+              { 10, 5 },
+              { 10, 10 } },
+            create_params1(),
             thread::hardware_concurrency());
     }
 
-    TEST(StreamSenderReceiverTests, UnlabeledMedium)
+    TEST(StreamSenderReceiverTests, UnlabeledSmallMultiThreaded2)
+    {
+        size_t sender_size = 10;
+        RunUnlabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 5, 0 },
+              { 5, 2 },
+              { 5, 5 },
+              { 10, 0 },
+              { 10, 5 },
+              { 10, 10 } },
+            create_params2(),
+            thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, UnlabeledMedium1)
     {
         size_t sender_size = 500;
-        PSIParams params = create_params();
         RunUnlabeledTest(
             sender_size,
             { { 0, 0 },
@@ -332,14 +405,13 @@ namespace APSITests {
               { 100, 1 },
               { 100, 50 },
               { 100, 100 } },
-            params,
+            create_params1(),
             1);
     }
 
-    TEST(StreamSenderReceiverTests, UnlabeledMediumMultiThreaded)
+    TEST(StreamSenderReceiverTests, UnlabeledMedium2)
     {
         size_t sender_size = 500;
-        PSIParams params = create_params();
         RunUnlabeledTest(
             sender_size,
             { { 0, 0 },
@@ -350,14 +422,47 @@ namespace APSITests {
               { 100, 1 },
               { 100, 50 },
               { 100, 100 } },
-            params,
+            create_params2(),
+            1);
+    }
+
+    TEST(StreamSenderReceiverTests, UnlabeledMediumMultiThreaded1)
+    {
+        size_t sender_size = 500;
+        RunUnlabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 50, 10 },
+              { 50, 50 },
+              { 100, 1 },
+              { 100, 50 },
+              { 100, 100 } },
+            create_params1(),
             thread::hardware_concurrency());
     }
 
-    TEST(StreamSenderReceiverTests, UnlabeledLarge)
+    TEST(StreamSenderReceiverTests, UnlabeledMediumMultiThreaded2)
+    {
+        size_t sender_size = 500;
+        RunUnlabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 50, 10 },
+              { 50, 50 },
+              { 100, 1 },
+              { 100, 50 },
+              { 100, 100 } },
+            create_params2(),
+            thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, UnlabeledLarge1)
     {
         size_t sender_size = 4000;
-        PSIParams params = create_params();
         RunUnlabeledTest(
             sender_size,
             { { 0, 0 },
@@ -370,14 +475,13 @@ namespace APSITests {
               { 1000, 500 },
               { 1000, 999 },
               { 1000, 1000 } },
-            params,
+            create_params1(),
             1);
     }
 
-    TEST(StreamSenderReceiverTests, UnlabeledLargeMultiThreaded)
+    TEST(StreamSenderReceiverTests, UnlabeledLarge2)
     {
         size_t sender_size = 4000;
-        PSIParams params = create_params();
         RunUnlabeledTest(
             sender_size,
             { { 0, 0 },
@@ -390,14 +494,51 @@ namespace APSITests {
               { 1000, 500 },
               { 1000, 999 },
               { 1000, 1000 } },
-            params,
+            create_params2(),
+            1);
+    }
+
+    TEST(StreamSenderReceiverTests, UnlabeledLargeMultiThreaded1)
+    {
+        size_t sender_size = 4000;
+        RunUnlabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 500, 10 },
+              { 500, 50 },
+              { 500, 500 },
+              { 1000, 0 },
+              { 1000, 1 },
+              { 1000, 500 },
+              { 1000, 999 },
+              { 1000, 1000 } },
+            create_params1(),
             thread::hardware_concurrency());
     }
 
-    TEST(StreamSenderReceiverTests, UnlabeledHugeMultiThreaded)
+    TEST(StreamSenderReceiverTests, UnlabeledLargeMultiThreaded2)
+    {
+        size_t sender_size = 4000;
+        RunUnlabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 500, 10 },
+              { 500, 50 },
+              { 500, 500 },
+              { 1000, 0 },
+              { 1000, 1 },
+              { 1000, 500 },
+              { 1000, 999 },
+              { 1000, 1000 } },
+            create_params2(),
+            thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, UnlabeledHugeMultiThreaded1)
     {
         size_t sender_size = 50000;
-        PSIParams params = create_huge_params();
         RunUnlabeledTest(
             sender_size,
             { { 0, 0 },
@@ -408,160 +549,302 @@ namespace APSITests {
               { 10000, 5000 },
               { 10000, 10000 },
               { 50000, 50000 } },
-            params,
+            create_huge_params1(),
             thread::hardware_concurrency());
 
         sender_size = 1'000'000;
-        RunUnlabeledTest(sender_size, { { 10000, 10000 } }, params, thread::hardware_concurrency());
+        RunUnlabeledTest(sender_size, { { 10000, 10000 } }, create_huge_params1(), thread::hardware_concurrency());
     }
 
-    TEST(StreamSenderReceiverTests, LabeledEmpty)
-    {
-        size_t sender_size = 0;
-        PSIParams params = create_params();
-        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, params, 1);
-    }
-
-    TEST(StreamSenderReceiverTests, LabeledEmptyMultiThreaded)
-    {
-        size_t sender_size = 0;
-        PSIParams params = create_params();
-        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, params, thread::hardware_concurrency());
-    }
-
-    TEST(StreamSenderReceiverTests, LabeledSingle)
-    {
-        size_t sender_size = 1;
-        PSIParams params = create_params();
-        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, params, 1);
-    }
-
-    TEST(StreamSenderReceiverTests, LabeledSingleMultiThreaded)
-    {
-        size_t sender_size = 1;
-        PSIParams params = create_params();
-        RunLabeledTest(
-            sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, params, thread::hardware_concurrency());
-    }
-
-    TEST(StreamSenderReceiverTests, LabeledSmall)
-    {
-        size_t sender_size = 10;
-        PSIParams params = create_params();
-        RunLabeledTest(
-            sender_size,
-            { { 0, 0 },
-              { 1, 0 },
-              { 1, 1 },
-              { 5, 0 },
-              { 5, 2 },
-              { 5, 5 },
-              { 10, 0 },
-              { 10, 5 },
-              { 10, 10 } },
-            params,
-            1);
-    }
-
-    TEST(StreamSenderReceiverTests, LabeledSmallMultiThreaded)
-    {
-        size_t sender_size = 10;
-        PSIParams params = create_params();
-        RunLabeledTest(
-            sender_size,
-            { { 0, 0 },
-              { 1, 0 },
-              { 1, 1 },
-              { 5, 0 },
-              { 5, 2 },
-              { 5, 5 },
-              { 10, 0 },
-              { 10, 5 },
-              { 10, 10 } },
-            params,
-            thread::hardware_concurrency());
-    }
-
-    TEST(StreamSenderReceiverTests, LabeledMedium)
-    {
-        size_t sender_size = 500;
-        PSIParams params = create_params();
-        RunLabeledTest(
-            sender_size,
-            { { 0, 0 },
-              { 1, 0 },
-              { 1, 1 },
-              { 50, 10 },
-              { 50, 50 },
-              { 100, 1 },
-              { 100, 50 },
-              { 100, 100 } },
-            params,
-            1);
-    }
-
-    TEST(StreamSenderReceiverTests, LabeledMediumMultiThreaded)
-    {
-        size_t sender_size = 500;
-        PSIParams params = create_params();
-        RunLabeledTest(
-            sender_size,
-            { { 0, 0 },
-              { 1, 0 },
-              { 1, 1 },
-              { 50, 10 },
-              { 50, 50 },
-              { 100, 1 },
-              { 100, 50 },
-              { 100, 100 } },
-            params,
-            thread::hardware_concurrency());
-    }
-
-    TEST(StreamSenderReceiverTests, LabeledLarge)
-    {
-        size_t sender_size = 4000;
-        PSIParams params = create_params();
-        RunLabeledTest(
-            sender_size,
-            { { 0, 0 },
-              { 1, 0 },
-              { 500, 10 },
-              { 500, 50 },
-              { 500, 500 },
-              { 1000, 0 },
-              { 1000, 1 },
-              { 1000, 500 },
-              { 1000, 999 },
-              { 1000, 1000 } },
-            params,
-            1);
-    }
-
-    TEST(StreamSenderReceiverTests, LabeledLargeMultiThreaded)
-    {
-        size_t sender_size = 4000;
-        PSIParams params = create_params();
-        RunLabeledTest(
-            sender_size,
-            { { 0, 0 },
-              { 1, 0 },
-              { 500, 10 },
-              { 500, 50 },
-              { 500, 500 },
-              { 1000, 0 },
-              { 1000, 1 },
-              { 1000, 500 },
-              { 1000, 999 },
-              { 1000, 1000 } },
-            params,
-            thread::hardware_concurrency());
-    }
-
-    TEST(StreamSenderReceiverTests, LabeledHugeMultiThreaded)
+    TEST(StreamSenderReceiverTests, UnlabeledHugeMultiThreaded2)
     {
         size_t sender_size = 50000;
-        PSIParams params = create_huge_params();
+        RunUnlabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 5000, 100 },
+              { 5000, 5000 },
+              { 10000, 0 },
+              { 10000, 5000 },
+              { 10000, 10000 },
+              { 50000, 50000 } },
+            create_huge_params2(),
+            thread::hardware_concurrency());
+
+        sender_size = 1'000'000;
+        RunUnlabeledTest(sender_size, { { 10000, 10000 } }, create_huge_params2(), thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledEmpty1)
+    {
+        size_t sender_size = 0;
+        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, create_params1(), 1);
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledEmpty2)
+    {
+        size_t sender_size = 0;
+        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, create_params2(), 1);
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledEmptyMultiThreaded1)
+    {
+        size_t sender_size = 0;
+        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, create_params1(), thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledEmptyMultiThreaded2)
+    {
+        size_t sender_size = 0;
+        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 } }, create_params2(), thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledSingle1)
+    {
+        size_t sender_size = 1;
+        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, create_params1(), 1);
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledSingle2)
+    {
+        size_t sender_size = 1;
+        RunLabeledTest(sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, create_params2(), 1);
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledSingleMultiThreaded1)
+    {
+        size_t sender_size = 1;
+        RunLabeledTest(
+            sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, create_params1(), thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledSingleMultiThreaded2)
+    {
+        size_t sender_size = 1;
+        RunLabeledTest(
+            sender_size, { { 0, 0 }, { 1, 0 }, { 1, 1 } }, create_params2(), thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledSmall1)
+    {
+        size_t sender_size = 10;
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 5, 0 },
+              { 5, 2 },
+              { 5, 5 },
+              { 10, 0 },
+              { 10, 5 },
+              { 10, 10 } },
+            create_params1(),
+            1);
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledSmall2)
+    {
+        size_t sender_size = 10;
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 5, 0 },
+              { 5, 2 },
+              { 5, 5 },
+              { 10, 0 },
+              { 10, 5 },
+              { 10, 10 } },
+            create_params2(),
+            1);
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledSmallMultiThreaded1)
+    {
+        size_t sender_size = 10;
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 5, 0 },
+              { 5, 2 },
+              { 5, 5 },
+              { 10, 0 },
+              { 10, 5 },
+              { 10, 10 } },
+            create_params1(),
+            thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledSmallMultiThreaded2)
+    {
+        size_t sender_size = 10;
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 5, 0 },
+              { 5, 2 },
+              { 5, 5 },
+              { 10, 0 },
+              { 10, 5 },
+              { 10, 10 } },
+            create_params2(),
+            thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledMedium1)
+    {
+        size_t sender_size = 500;
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 50, 10 },
+              { 50, 50 },
+              { 100, 1 },
+              { 100, 50 },
+              { 100, 100 } },
+            create_params1(),
+            1);
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledMedium2)
+    {
+        size_t sender_size = 500;
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 50, 10 },
+              { 50, 50 },
+              { 100, 1 },
+              { 100, 50 },
+              { 100, 100 } },
+            create_params2(),
+            1);
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledMediumMultiThreaded1)
+    {
+        size_t sender_size = 500;
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 50, 10 },
+              { 50, 50 },
+              { 100, 1 },
+              { 100, 50 },
+              { 100, 100 } },
+            create_params1(),
+            thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledMediumMultiThreaded2)
+    {
+        size_t sender_size = 500;
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 1, 1 },
+              { 50, 10 },
+              { 50, 50 },
+              { 100, 1 },
+              { 100, 50 },
+              { 100, 100 } },
+            create_params2(),
+            thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledLarge1)
+    {
+        size_t sender_size = 4000;
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 500, 10 },
+              { 500, 50 },
+              { 500, 500 },
+              { 1000, 0 },
+              { 1000, 1 },
+              { 1000, 500 },
+              { 1000, 999 },
+              { 1000, 1000 } },
+            create_params1(),
+            1);
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledLarge2)
+    {
+        size_t sender_size = 4000;
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 500, 10 },
+              { 500, 50 },
+              { 500, 500 },
+              { 1000, 0 },
+              { 1000, 1 },
+              { 1000, 500 },
+              { 1000, 999 },
+              { 1000, 1000 } },
+            create_params2(),
+            1);
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledLargeMultiThreaded1)
+    {
+        size_t sender_size = 4000;
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 500, 10 },
+              { 500, 50 },
+              { 500, 500 },
+              { 1000, 0 },
+              { 1000, 1 },
+              { 1000, 500 },
+              { 1000, 999 },
+              { 1000, 1000 } },
+            create_params1(),
+            thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledLargeMultiThreaded2)
+    {
+        size_t sender_size = 4000;
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 500, 10 },
+              { 500, 50 },
+              { 500, 500 },
+              { 1000, 0 },
+              { 1000, 1 },
+              { 1000, 500 },
+              { 1000, 999 },
+              { 1000, 1000 } },
+            create_params2(),
+            thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledHugeMultiThreaded1)
+    {
+        size_t sender_size = 50000;
         RunLabeledTest(
             sender_size,
             { { 0, 0 },
@@ -572,10 +855,30 @@ namespace APSITests {
               { 10000, 5000 },
               { 10000, 10000 },
               { 50000, 50000 } },
-            params,
+            create_huge_params1(),
             thread::hardware_concurrency());
 
         sender_size = 1'000'000;
-        RunLabeledTest(sender_size, { { 10000, 10000 } }, params, thread::hardware_concurrency());
+        RunLabeledTest(sender_size, { { 10000, 10000 } }, create_huge_params1(), thread::hardware_concurrency());
+    }
+
+    TEST(StreamSenderReceiverTests, LabeledHugeMultiThreaded2)
+    {
+        size_t sender_size = 50000;
+        RunLabeledTest(
+            sender_size,
+            { { 0, 0 },
+              { 1, 0 },
+              { 5000, 100 },
+              { 5000, 5000 },
+              { 10000, 0 },
+              { 10000, 5000 },
+              { 10000, 10000 },
+              { 50000, 50000 } },
+            create_huge_params2(),
+            thread::hardware_concurrency());
+
+        sender_size = 1'000'000;
+        RunLabeledTest(sender_size, { { 10000, 10000 } }, create_huge_params2(), thread::hardware_concurrency());
     }
 } // namespace APSITests

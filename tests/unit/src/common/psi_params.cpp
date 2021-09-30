@@ -4,6 +4,7 @@
 // STD
 #include <cstddef>
 #include <sstream>
+#include <utility>
 
 // APSI
 #include "apsi/psi_params.h"
@@ -16,7 +17,7 @@ using namespace apsi;
 using namespace seal;
 
 namespace APSITests {
-    TEST(PSIParamsTest, Constructor)
+    TEST(PSIParamsTest, Constructor1)
     {
         PSIParams::ItemParams item_params;
         item_params.felts_per_item = 8;
@@ -106,6 +107,38 @@ namespace APSITests {
         ASSERT_THROW(
             PSIParams psi_params(item_params, table_params, query_params, seal_params),
             invalid_argument);
+    }
+
+    TEST(PSIParamsTest, Constructor2)
+    {
+        // Testing the case where felts_per_item is not a power of two
+
+        PSIParams::ItemParams item_params;
+        item_params.felts_per_item = 7;
+
+        PSIParams::TableParams table_params;
+        table_params.hash_func_count = 3;
+        table_params.max_items_per_bin = 16;
+        table_params.table_size = 1170;
+
+        PSIParams::QueryParams query_params;
+        query_params.ps_low_degree = 0;
+        query_params.query_powers = { 1, 2, 3 };
+
+        size_t pmd = 4096;
+        PSIParams::SEALParams seal_params;
+        seal_params.set_poly_modulus_degree(pmd);
+        seal_params.set_coeff_modulus(CoeffModulus::Create(pmd, { 40, 40 }));
+        seal_params.set_plain_modulus(65537);
+
+        // All good parameters
+        unique_ptr<PSIParams> psi_params;
+        ASSERT_NO_THROW(psi_params = make_unique<PSIParams>(
+            item_params, table_params, query_params, seal_params));
+
+        // Check that the item count is computed correctly
+        ASSERT_EQ(585, psi_params->items_per_bundle());
+        ASSERT_EQ(4095, psi_params->bins_per_bundle());
     }
 
     TEST(PSIParamsTest, SaveLoadPSIParams)

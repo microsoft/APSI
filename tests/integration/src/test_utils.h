@@ -48,7 +48,11 @@ namespace APSITests {
         const std::vector<apsi::Item> &int_items,
         const std::vector<std::pair<apsi::Item, apsi::Label>> &all_item_labels);
 
-    apsi::PSIParams create_params();
+    apsi::PSIParams create_params1();
 
-    apsi::PSIParams create_huge_params();
+    apsi::PSIParams create_params2();
+
+    apsi::PSIParams create_huge_params1();
+
+    apsi::PSIParams create_huge_params2();
 } // namespace APSITests

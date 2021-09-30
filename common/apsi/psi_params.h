@@ -52,8 +52,7 @@ namespace apsi {
             constexpr static std::uint32_t felts_per_item_min = 2;
 
             /**
-            Specified how many SEAL batching slots are occupied by an item. This value must be a
-            power of two.
+            Specified how many SEAL batching slots are occupied by an item.
             */
             std::uint32_t felts_per_item;
         };
@@ -136,7 +135,7 @@ namespace apsi {
 
         std::uint32_t bins_per_bundle() const
         {
-            return static_cast<std::uint32_t>(seal_params_.poly_modulus_degree());
+            return bins_per_bundle_;
         }
 
         std::uint32_t bundle_idx_count() const
@@ -196,6 +195,8 @@ namespace apsi {
         SEALParams seal_params_;
 
         std::uint32_t items_per_bundle_;
+
+        std::uint32_t bins_per_bundle_;
 
         std::uint32_t bundle_idx_count_;
 

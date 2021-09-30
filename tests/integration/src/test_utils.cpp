@@ -160,7 +160,7 @@ namespace APSITests {
         }
     }
 
-    PSIParams create_params()
+    PSIParams create_params1()
     {
         PSIParams::ItemParams item_params;
         item_params.felts_per_item = 8;
@@ -181,7 +181,28 @@ namespace APSITests {
         return { item_params, table_params, query_params, seal_params };
     }
 
-    PSIParams create_huge_params()
+    PSIParams create_params2()
+    {
+        PSIParams::ItemParams item_params;
+        item_params.felts_per_item = 7;
+
+        PSIParams::TableParams table_params;
+        table_params.hash_func_count = 3;
+        table_params.max_items_per_bin = 16;
+        table_params.table_size = 4680;
+
+        PSIParams::QueryParams query_params;
+        query_params.query_powers = { 1, 3, 5 };
+
+        PSIParams::SEALParams seal_params;
+        seal_params.set_poly_modulus_degree(8192);
+        seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(8192));
+        seal_params.set_plain_modulus(65537);
+
+        return { item_params, table_params, query_params, seal_params };
+    }
+
+    PSIParams create_huge_params1()
     {
         PSIParams::ItemParams item_params;
         item_params.felts_per_item = 8;
@@ -190,6 +211,27 @@ namespace APSITests {
         table_params.hash_func_count = 4;
         table_params.max_items_per_bin = 70;
         table_params.table_size = 65536;
+
+        PSIParams::QueryParams query_params;
+        query_params.query_powers = { 1, 3, 11, 15, 32 };
+
+        PSIParams::SEALParams seal_params;
+        seal_params.set_poly_modulus_degree(16384);
+        seal_params.set_coeff_modulus(CoeffModulus::BFVDefault(16384));
+        seal_params.set_plain_modulus(65537);
+
+        return { item_params, table_params, query_params, seal_params };
+    }
+
+    PSIParams create_huge_params2()
+    {
+        PSIParams::ItemParams item_params;
+        item_params.felts_per_item = 7;
+
+        PSIParams::TableParams table_params;
+        table_params.hash_func_count = 4;
+        table_params.max_items_per_bin = 70;
+        table_params.table_size = 74880;
 
         PSIParams::QueryParams query_params;
         query_params.query_powers = { 1, 3, 11, 15, 32 };

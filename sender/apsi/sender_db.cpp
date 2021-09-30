@@ -298,6 +298,7 @@ namespace apsi {
                             label_size,
                             max_bin_size,
                             ps_low_degree,
+                            bins_per_bundle,
                             compressed,
                             false);
                         int res = new_bin_bundle.multi_insert_for_real(data, bin_idx);
@@ -1218,6 +1219,7 @@ namespace apsi {
             size_t bin_bundle_data_size = 0;
             uint32_t max_bin_size = params->table_params().max_items_per_bin;
             uint32_t ps_low_degree = params->query_params().ps_low_degree;
+            uint32_t bins_per_bundle = params->bins_per_bundle();
             size_t label_size = compute_label_size(nonce_byte_count + label_byte_count, *params);
 
             // Load all BinBundle data
@@ -1240,6 +1242,7 @@ namespace apsi {
                         label_size,
                         max_bin_size,
                         ps_low_degree,
+                        bins_per_bundle,
                         compressed,
                         stripped);
                     auto bb_data = bb.load(bin_bundle_data[i]);

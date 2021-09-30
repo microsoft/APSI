@@ -427,11 +427,12 @@ namespace apsi {
             size_t label_size,
             size_t max_bin_size,
             size_t ps_low_degree,
+            size_t num_bins,
             bool compressed,
             bool stripped)
             : cache_invalid_(true), crypto_context_(crypto_context), compressed_(compressed),
               label_size_(label_size), max_bin_size_(max_bin_size), ps_low_degree_(ps_low_degree),
-              cache_(crypto_context_, label_size_)
+              num_bins_(num_bins), cache_(crypto_context_, label_size_)
         {
             if (!crypto_context_.evaluator()) {
                 throw invalid_argument("evaluator is not set in crypto_context");
@@ -439,10 +440,11 @@ namespace apsi {
             if (ps_low_degree > max_bin_size) {
                 throw invalid_argument("ps_low_degree cannot be larger than max_bin_size");
             }
+            if (!num_bins) {
+                throw invalid_argument("num_bins cannot be zero");
+            }
 
             // Set up internal data structures
-            num_bins_ =
-                crypto_context_.seal_context()->first_context_data()->parms().poly_modulus_degree();
             clear(stripped);
         }
 
