@@ -770,7 +770,7 @@ For example, if the receiver is expected to query 1024 items at a time, it would
 ### Query Powers
 
 It is unfortunately difficult to find good choices for the `query_powers` parameter in `PSIParams`.
-This is related to the so-called *global postage-stamp problem* in combinatorial number theory (see [Challis and Robinson (2010)](http://emis.impa.br/EMIS/journals/JIS/VOL13/Challis/challis6.pdf)).
+This is related to the so-called *global postage-stamp problem* in combinatorial number theory (see [Challis and Robinson (2010)](http://emis.library.cornell.edu/journals/JIS/VOL13/Challis/challis6.pdf)).
 In short, the global postage-stamp problem can be stated as follows:
 
 For given positive integers `h` and `k`, determine a set of k integers `{ a_i | 1 = a_0 < a_1 < ... < a_k }`, such that
@@ -828,9 +828,9 @@ The coefficient multiplications will increase the depth of the full computation 
 The downside is, of course, that the communication from the receiver to the sender is now three times larger than if only the query itself was sent.
 Still, the reduction in the size of the parameters is typically immensely beneficial, and using appropriate source powers will be the key to good performance.
 
-We recommend using the tables in [Challis and Robinson (2010)](http://emis.impa.br/EMIS/journals/JIS/VOL13/Challis/challis6.pdf) to determine good source powers.
+We recommend using the tables in [Challis and Robinson (2010)](http://emis.library.cornell.edu/journals/JIS/VOL13/Challis/challis6.pdf) to determine good source powers.
 For example, suppose the bin bundle rows are desired to hold at least 70 items.
-Then, looking at the tables in [Challis and Robinson (2010)](http://emis.impa.br/EMIS/journals/JIS/VOL13/Challis/challis6.pdf), we find the following possibly good source powers:
+Then, looking at the tables in [Challis and Robinson (2010)](http://emis.library.cornell.edu/journals/JIS/VOL13/Challis/challis6.pdf), we find the following possibly good source powers:
 
 | Multiplicative depth | Source powers                                           | Highest power |
 |----------------------|---------------------------------------------------------|---------------|
@@ -846,7 +846,7 @@ Several comments are in order:
 - If depth 3 is acceptable, then the last row may be the best choice, as it allows the bin bundle row size to be increased from 70 to 114. This will result in fewer bin bundles, and hence smaller communication from the sender to the receiver.
 However, now the sender must compute all powers of the query up to 114, increasing the online computation cost.
 - It is probably necessary to try all options to determine what is overall best for a particular use-case.
-- [Challis and Robinson (2010)](http://emis.impa.br/EMIS/journals/JIS/VOL13/Challis/challis6.pdf) also shows a possible set for `k = 3` with depth 3 (`h = 7`): `{ 1, 8, 13 }`. While this only allows a highest power of 69, which does not quite satisfy our requirement of 70, such a set should be considered as it reduces the receiver-to-sender communication by 25%, while increasing the sender-to-receiver communication by only a tiny amount (roughly by a factor of 70/69 = 1.45%) due to the slightly smaller bin bundles. This will almost certainly be a beneficial trade-off.
+- [Challis and Robinson (2010)](http://emis.library.cornell.edu/journals/JIS/VOL13/Challis/challis6.pdf) also shows a possible set for `k = 3` with depth 3 (`h = 7`): `{ 1, 8, 13 }`. While this only allows a highest power of 69, which does not quite satisfy our requirement of 70, such a set should be considered as it reduces the receiver-to-sender communication by 25%, while increasing the sender-to-receiver communication by only a tiny amount (roughly by a factor of 70/69 = 1.45%) due to the slightly smaller bin bundles. This will almost certainly be a beneficial trade-off.
 
 ### Thread Control
 
