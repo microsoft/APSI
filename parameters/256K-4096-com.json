@@ -1,15 +1,15 @@
 {
     "table_params": {
         "hash_func_count": 3,
-        "table_size": 5120,
-        "max_items_per_bin": 98
+        "table_size": 6552,
+        "max_items_per_bin": 54
     },
     "item_params": {
-        "felts_per_item": 8
+        "felts_per_item": 5
     },
     "query_params": {
-        "ps_low_degree": 8,
-        "query_powers": [ 1, 3, 4, 9, 27 ]
+        "ps_low_degree": 4,
+        "query_powers": [ 1, 3, 5, 15 ]
     },
     "seal_params": {
         "plain_modulus": 65537,

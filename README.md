@@ -759,6 +759,14 @@ We provide multiple example parameter sets in the [parameters/](parameters/) sub
 The files are named with triples of numbers, where the first two indicate recommended upper bounds for the sender's and receiver's set sizes, respectively, and the third (optional) number indicates that the parameters are meant for use in labeled mode and denote the label byte size.
 The file names end with an optional specifier `-com` or `-cmp`, indicating whether the parameters are optimized to minimize communication or computation cost.
 
+#### False Positives
+
+Poorly chosen parameters can have a significant false-positive probability: even if the receiver queries an item that is not in the sender's set, the protocol may return a false positive response.
+Depending on the scenario, this may or may not be a problem.
+To find the false-positive probability, the user can call the `PSIParams::log2_fpp` function, which returns the base-2 logarithm of it.
+The probability is measured per item queried by the receiver.
+For example, if the receiver is expected to query 1024 items at a time, it would be meaningful to ensure that the value returned by `PSIParams::log2_fpp`, **plus 10**, is still small enough.
+
 ### Query Powers
 
 It is unfortunately difficult to find good choices for the `query_powers` parameter in `PSIParams`.

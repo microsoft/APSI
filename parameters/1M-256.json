@@ -1,11 +1,11 @@
 {
     "table_params": {
         "hash_func_count": 3,
-        "table_size": 512,
+        "table_size": 585,
         "max_items_per_bin": 180
     },
     "item_params": {
-        "felts_per_item": 8
+        "felts_per_item": 7
     },
     "query_params": {
         "ps_low_degree": 0,
