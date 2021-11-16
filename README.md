@@ -259,7 +259,7 @@ If `P` is small, the probability of each of the receiver's item's parts being di
 If the receiver submits thousands of items per each query, and the protocol is executed many times, a false positive may become a common occurrence.
 
 There are multiple ways of preventing this from happening.
-The negative logarithm of the false-positive probability for a single receiver's item is approximately `P(B - 1 - log_2(K))`.
+The negative logarithm of the false-positive probability for a single receiver's item is approximately `P(B - 1 - log2(K))`.
 Thus, one can reduce the false-positive probability by increasing the `plain_modulus` and the number of item parts `P`, or reducing the sender's bin size `K`.
 
 ### Practice

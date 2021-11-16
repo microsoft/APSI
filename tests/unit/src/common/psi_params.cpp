@@ -133,8 +133,9 @@ namespace APSITests {
 
         // All good parameters
         unique_ptr<PSIParams> psi_params;
-        ASSERT_NO_THROW(psi_params = make_unique<PSIParams>(
-            item_params, table_params, query_params, seal_params));
+        ASSERT_NO_THROW(
+            psi_params =
+                make_unique<PSIParams>(item_params, table_params, query_params, seal_params));
 
         // Check that the item count is computed correctly
         ASSERT_EQ(585, psi_params->items_per_bundle());

@@ -143,8 +143,9 @@ namespace APSITests {
             ASSERT_EQ(params->to_string(), set_params.to_string());
 
             oprf::OPRFKey oprf_key = sender_db.get_oprf_key();
-            ASSERT_FALSE(all_of(
-                oprf_key.key_span().begin(), oprf_key.key_span().end(), [](auto b) { return b == 0; }));
+            ASSERT_FALSE(all_of(oprf_key.key_span().begin(), oprf_key.key_span().end(), [](auto b) {
+                return b == 0;
+            }));
         };
 
         test_fun(get_params1());
@@ -182,8 +183,9 @@ namespace APSITests {
             ASSERT_EQ(params->to_string(), set_params.to_string());
 
             oprf::OPRFKey oprf_key = sender_db.get_oprf_key();
-            ASSERT_FALSE(all_of(
-                oprf_key.key_span().begin(), oprf_key.key_span().end(), [](auto b) { return b == 0; }));
+            ASSERT_FALSE(all_of(oprf_key.key_span().begin(), oprf_key.key_span().end(), [](auto b) {
+                return b == 0;
+            }));
         };
 
         test_fun(get_params1());
@@ -213,7 +215,8 @@ namespace APSITests {
             ASSERT_EQ(0, sender_db.get_bin_bundle_count());
             ASSERT_FALSE(sender_db.has_item(Item(0, 0)));
 
-            // Insert an item and then a second item separately; note that we have only one bundle index
+            // Insert an item and then a second item separately; note that we have only one bundle
+            // index
             sender_db.insert_or_assign(Item(0, 0));
             sender_db.insert_or_assign(Item(1, 0));
             ASSERT_EQ(2, sender_db.get_hashed_items().size());
@@ -459,8 +462,8 @@ namespace APSITests {
     {
         auto test_fun = [](shared_ptr<PSIParams> params) {
             // We use a labeled SenderDB here to end up with multiple BinBundles more quickly. This
-            // happens because in the labeled case BinBundles cannot tolerate repetitions of item parts
-            // (felts) in bins.
+            // happens because in the labeled case BinBundles cannot tolerate repetitions of item
+            // parts (felts) in bins.
             SenderDB sender_db(*params, 20, 16, true);
 
             // Insert a single item
@@ -585,7 +588,8 @@ namespace APSITests {
 
             // Check that the items match
             for (auto &it : sender_db.get_hashed_items()) {
-                ASSERT_NE(other_sdb.get_hashed_items().end(), other_sdb.get_hashed_items().find(it));
+                ASSERT_NE(
+                    other_sdb.get_hashed_items().end(), other_sdb.get_hashed_items().find(it));
             }
         };
 
@@ -653,7 +657,8 @@ namespace APSITests {
 
             // Check that the items match
             for (auto &it : sender_db.get_hashed_items()) {
-                ASSERT_NE(other_sdb.get_hashed_items().end(), other_sdb.get_hashed_items().find(it));
+                ASSERT_NE(
+                    other_sdb.get_hashed_items().end(), other_sdb.get_hashed_items().find(it));
             }
         };
 

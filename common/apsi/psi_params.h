@@ -171,12 +171,17 @@ namespace apsi {
 
         std::string to_string() const;
 
-	/**
-	Returns an approximate base-2 logarithm of the false-positive probability per receiver's item.
-	*/
-	double log2_fpp() const
+        /**
+        Returns an approximate base-2 logarithm of the false-positive probability per receiver's
+        item.
+        */
+        double log2_fpp() const
         {
-            return std::min<double>(0.0, (-static_cast<double>(item_bit_count_per_felt_) + std::log2(static_cast<double>(table_params_.max_items_per_bin))) * item_params_.felts_per_item);
+            return std::min<double>(
+                0.0,
+                (-static_cast<double>(item_bit_count_per_felt_) +
+                 std::log2(static_cast<double>(table_params_.max_items_per_bin))) *
+                    item_params_.felts_per_item);
         }
 
         /**

@@ -222,7 +222,9 @@ namespace APSITests {
             CryptoContext context(*params);
 
             // No evaluator set in context
-            ASSERT_THROW(BinBundle bb(context, 0, 50, 0, params->bins_per_bundle(), true, false), invalid_argument);
+            ASSERT_THROW(
+                BinBundle bb(context, 0, 50, 0, params->bins_per_bundle(), true, false),
+                invalid_argument);
 
             context.set_evaluator();
             BinBundle bb(context, 0, 50, 0, params->bins_per_bundle(), true, false);
@@ -239,9 +241,7 @@ namespace APSITests {
 
             // The matching polynomial is set to a single constant zero polynomial since we haven't
             // inserted anything
-            ASSERT_EQ(
-                params->bins_per_bundle(),
-                cache.felt_matching_polyns.size());
+            ASSERT_EQ(params->bins_per_bundle(), cache.felt_matching_polyns.size());
             ASSERT_TRUE(cache.felt_interp_polyns.empty());
             ASSERT_TRUE(cache.batched_matching_polyn);
             ASSERT_TRUE(cache.batched_interp_polyns.empty());
@@ -260,7 +260,9 @@ namespace APSITests {
             CryptoContext context(*params);
 
             // No evaluator set in context
-            ASSERT_THROW(BinBundle bb(context, label_size, 50, 0, params->bins_per_bundle(), true, false), invalid_argument);
+            ASSERT_THROW(
+                BinBundle bb(context, label_size, 50, 0, params->bins_per_bundle(), true, false),
+                invalid_argument);
 
             context.set_evaluator();
             BinBundle bb(context, label_size, 50, 0, params->bins_per_bundle(), true, false);
@@ -285,9 +287,7 @@ namespace APSITests {
 
             for (auto &fip : cache.felt_interp_polyns) {
                 // We have one (empty) vector allocated per bin
-                ASSERT_EQ(
-                    params->bins_per_bundle(),
-                    fip.size());
+                ASSERT_EQ(params->bins_per_bundle(), fip.size());
             }
         };
 
@@ -329,8 +329,7 @@ namespace APSITests {
             ASSERT_FALSE(bb.cache_invalid());
             ASSERT_TRUE(bb.empty());
 
-            values.resize(
-                params->bins_per_bundle(), 1);
+            values.resize(params->bins_per_bundle(), 1);
             res = bb.multi_insert_dry_run(values, 0);
             ASSERT_EQ(1 /* largest bin size after insert */, res);
             ASSERT_FALSE(bb.cache_invalid());
@@ -451,9 +450,7 @@ namespace APSITests {
             ASSERT_FALSE(bb.cache_invalid());
             ASSERT_TRUE(bb.empty());
 
-            values.resize(
-                params->bins_per_bundle(),
-                make_pair(1, create_label(label_size, 1)));
+            values.resize(params->bins_per_bundle(), make_pair(1, create_label(label_size, 1)));
             res = bb.multi_insert_dry_run(values, 0);
             ASSERT_EQ(1 /* largest bin size after insert */, res);
             ASSERT_FALSE(bb.cache_invalid());
@@ -538,9 +535,7 @@ namespace APSITests {
             ASSERT_EQ(expected_label.size(), labels.size());
             ASSERT_TRUE(equal(expected_label.begin(), expected_label.end(), labels.begin()));
 
-            values.resize(
-                params->bins_per_bundle(),
-                make_pair(4, create_label(label_size, 4)));
+            values.resize(params->bins_per_bundle(), make_pair(4, create_label(label_size, 4)));
             res = bb.multi_insert_for_real(values, 0);
             ASSERT_EQ(3 /* largest bin size after insert */, res);
             ASSERT_TRUE(bb.cache_invalid());
@@ -677,9 +672,7 @@ namespace APSITests {
             ASSERT_TRUE(equal(expected_label.begin(), expected_label.end(), labels.begin()));
 
             bb.clear();
-            values.resize(
-                params->bins_per_bundle(),
-                make_pair(4, create_label(label_size, 4)));
+            values.resize(params->bins_per_bundle(), make_pair(4, create_label(label_size, 4)));
             res = bb.multi_insert_for_real(values, 0);
             ASSERT_EQ(1 /* largest bin size after insert */, res);
 

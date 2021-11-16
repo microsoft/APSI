@@ -2,7 +2,7 @@
     "table_params": {
         "hash_func_count": 1,
         "table_size": 1638,
-        "max_items_per_bin": 8100 
+        "max_items_per_bin": 8100
     },
     "item_params": {
         "felts_per_item": 5
