@@ -132,6 +132,15 @@ namespace apsi {
             void strip();
 
             /**
+            Clears the OPRF key. The SenderDB cannot be used to serve OPRF requests after calling
+            this function.
+            */
+            void clear_oprf_key() const
+            {
+                oprf_key_.clear();
+            }
+
+            /**
             Returns a copy of the OPRF key.
             */
             oprf::OPRFKey get_oprf_key() const
