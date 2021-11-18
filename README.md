@@ -873,7 +873,8 @@ would log the message *My value is 3* at `"info"` log level.
 ## Building APSI
 
 To simply use the APSI library, we recommend to build and install APSI with [vcpkg](https://github.com/microsoft/vcpkg).
-To try the commandline interface or run tests, follow the guide to build and install APSI manually.
+To use the example command-line interface or run tests, follow the guide below to build and [install APSI manually](#building-and-installing-apsi-manually).
+
 ### Requirements
 
 | System  | Toolchain                                             |
