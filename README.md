@@ -250,7 +250,7 @@ As is obvious from above, the sender must also compute powers of `low-degree + 1
 The user may want to ensure that the multiplicative depth of computing the inner polynomials &ndash; taking into account an *additional level* from multiplying by the plaintext coefficients &ndash; matches the multiplicative depth of computing the powers of `high-degree`.
 This way the last multiplication will be depth-optimal.
 
-#### False-Positives
+#### False Positives
 
 In some cases the protocol may result in a false positive match.
 For example, suppose an item is split into `P` parts, each `B - 1` bits long, as in [Large Items](#large-items).
