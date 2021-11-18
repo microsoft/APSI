@@ -135,7 +135,7 @@ namespace apsi {
             Clears the OPRF key. The SenderDB cannot be used to serve OPRF requests after calling
             this function.
             */
-            void clear_oprf_key() const
+            void clear_oprf_key()
             {
                 oprf_key_.clear();
             }

@@ -171,8 +171,7 @@ namespace apsi {
                         static_cast<ZMQSenderChannel &>(c).send(move(nrp));
                     });
             } catch (const exception &ex) {
-                apsi_log_error("sender threw an exception while processing query: " <<
-                ex.what());
+                APSI_LOG_ERROR("sender threw an exception while processing query: " << ex.what());
             }
         }
     } // namespace sender
