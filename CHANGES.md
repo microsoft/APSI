@@ -2,9 +2,12 @@
 
 ## Version 0.6.0
 
-- Added a function `SenderDB::clear_oprf_key` to clear the OPRF key from a `SenderDB`. This can be useful in some situations, where the `SenderDB` should serve query requests in an untrusted environment and should have no access to the OPRF key. Note that the `SenderDB::strip` function does **not** clear the OPRF key.
-- Removed `parameters/16M-256.json`: use [parameters/16M-1024.json](parameters/16M-1024.json) instead.
-- Added some error handling code in [sender/apsi/zmq/sender_dispatcher.cpp](sender/apsi/zmq/sender_dispatcher.cpp).
+- The function `SenderDB::strip` now also clears the OPRF key from held by the `SenderDB` instance.
+This can be useful in some situations, where the `SenderDB` should serve query requests in an untrusted environment and should have no access to the OPRF key.
+Note that the OPRF requests still need to be served and do require the OPRF key, but this can be done, for example, by a different isolated machine.
+It is essential to ensure that the OPRF key is saved before calling `SenderDB::strip`.
+- Removed `parameters/16M-256.json`; use [parameters/16M-1024.json](parameters/16M-1024.json) instead.
+- Added error handling code in [sender/apsi/zmq/sender_dispatcher.cpp](sender/apsi/zmq/sender_dispatcher.cpp).
 
 ## Version 0.5.0
 

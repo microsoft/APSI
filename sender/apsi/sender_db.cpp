@@ -708,13 +708,15 @@ namespace apsi {
             return collect_caches(bin_bundles_.at(safe_cast<size_t>(bundle_idx)));
         }
 
-        void SenderDB::strip()
+        OPRFKey SenderDB::strip()
         {
             // Lock the database for writing
             auto lock = get_writer_lock();
 
             stripped_ = true;
-	    oprf_key_.clear();
+
+            OPRFKey oprf_key_copy = move(oprf_key_);
+            oprf_key_.clear();
             hashed_items_.clear();
 
             ThreadPoolMgr tpm;
@@ -732,16 +734,18 @@ namespace apsi {
             }
 
             APSI_LOG_INFO("SenderDB has been stripped");
+
+            return oprf_key_copy;
         }
 
-            OPRFKey SenderDB::get_oprf_key() const
-            {
+        OPRFKey SenderDB::get_oprf_key() const
+        {
             if (stripped_) {
                 APSI_LOG_ERROR("Cannot return the OPRF key from a stripped SenderDB");
                 throw logic_error("failed to return OPRF key");
             }
-                return oprf_key_;
-            }
+            return oprf_key_;
+        }
 
         void SenderDB::insert_or_assign(const vector<pair<Item, Label>> &data)
         {
@@ -759,8 +763,8 @@ namespace apsi {
             APSI_LOG_INFO("Start inserting " << data.size() << " items in SenderDB");
 
             // First compute the hashes for the input data
-            auto hashed_data = OPRFSender::ComputeHashes(
-                data, oprf_key_, label_byte_count_, nonce_byte_count_);
+            auto hashed_data =
+                OPRFSender::ComputeHashes(data, oprf_key_, label_byte_count_, nonce_byte_count_);
 
             // Lock the database for writing
             auto lock = get_writer_lock();
@@ -1204,8 +1208,7 @@ namespace apsi {
 
             // Copy over the OPRF key
             sender_db->oprf_key_.load(oprf_key_span_const_type(
-                reinterpret_cast<const unsigned char *>(sdb->oprf_key()->data()),
-                oprf_key_size));
+                reinterpret_cast<const unsigned char *>(sdb->oprf_key()->data()), oprf_key_size));
 
             // Load the hashed items if this SenderDB is not stripped
             if (!stripped) {

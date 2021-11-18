@@ -48,6 +48,13 @@ namespace apsi {
 
             OPRFKey(OPRFKey &&source) = default;
 
+            bool operator==(const OPRFKey &compare) const;
+
+            bool operator!=(const OPRFKey &compare) const
+            {
+                return !operator==(compare);
+            }
+
             void create()
             {
                 // Create a random key

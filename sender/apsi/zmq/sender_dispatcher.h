@@ -24,8 +24,21 @@ namespace apsi {
         public:
             ZMQSenderDispatcher() = delete;
 
+            /**
+            Creates a new ZMQSenderDispatcher object. This constructor accepts both a SenderDB
+            object, as well as a separately provided OPRF key. It uses the provided OPRF key to
+            respond to OPRF requests, instead of attempting to retrieve a key from the SenderDB.
+            This is necessary, for example, when the SenderDB is stripped, in which case it no
+            longer carries a valid OPRF key.
+            */
             ZMQSenderDispatcher(std::shared_ptr<SenderDB> sender_db, oprf::OPRFKey oprf_key);
 
+            /**
+            Creates a new ZMQSenderDispatcher object. This constructor accepts a SenderDB object. It
+            attempts to retrieve an OPRF key from the SenderDB and uses it to serve OPRF requests.
+            This constructor cannot be used if the SenderDB is stripped, because the OPRF key is no
+            longer available through the SenderDB.
+            */
             ZMQSenderDispatcher(std::shared_ptr<SenderDB> sender_db);
 
             /**
@@ -36,7 +49,7 @@ namespace apsi {
         private:
             std::shared_ptr<sender::SenderDB> sender_db_;
 
-	    oprf::OPRFKey oprf_key_;
+            oprf::OPRFKey oprf_key_;
 
             /**
             Dispatch a Get Parameters request to the Sender.

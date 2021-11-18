@@ -130,6 +130,19 @@ namespace apsi {
                 reinterpret_cast<unsigned char *>(dst));
         }
 
+        bool compare_bytes(const void *first, const void *second, std::size_t count)
+        {
+            if (!first || !second) {
+                throw invalid_argument("cannot compare data: input is null");
+            }
+
+            auto first_begin = reinterpret_cast<const unsigned char *>(first);
+            auto first_end = first_begin + count;
+            auto second_begin = reinterpret_cast<const unsigned char *>(second);
+
+            return equal(first_begin, first_end, second_begin);
+        }
+
         set<uint32_t> create_powers_set(uint32_t ps_low_degree, uint32_t target_degree)
         {
             if (ps_low_degree > target_degree) {

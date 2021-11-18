@@ -127,10 +127,10 @@ namespace apsi {
             }
 
             /**
-            Strips the SenderDB of all information not needed for serving a query. Clears also the
-	    OPRF key.
+            Strips the SenderDB of all information not needed for serving a query. Returns a copy of
+            the OPRF key and clears it from the SenderDB.
             */
-            void strip();
+            oprf::OPRFKey strip();
 
             /**
             Returns a copy of the OPRF key.

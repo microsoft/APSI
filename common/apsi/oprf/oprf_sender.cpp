@@ -25,6 +25,11 @@ namespace apsi {
     using namespace util;
 
     namespace oprf {
+        bool OPRFKey::operator==(const OPRFKey &compare) const
+        {
+            return compare_bytes(oprf_key_.cbegin(), compare.oprf_key_.cbegin(), oprf_key_size);
+        }
+
         void OPRFKey::save(oprf_key_span_type oprf_key) const
         {
             copy_bytes(oprf_key_.cbegin(), oprf_key_size, oprf_key.data());

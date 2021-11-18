@@ -213,6 +213,12 @@ namespace apsi {
         void copy_bytes(const void *src, std::size_t count, void *dst);
 
         /**
+        Returns whether two byte buffers of given length hold the same data, throwing an exception
+        if either pointer is nullptr.
+        */
+        bool compare_bytes(const void *first, const void *second, std::size_t count);
+
+        /**
         Creates a set of powers (as in monomial degrees) for direct polynomial evaluation (if
         ps_low_degree is zero) or for evaluation using the Paterson-Stockmeyer algorithm (if
         ps_low_degree is non-zero). In the first case the returned set will simply contain each

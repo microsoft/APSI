@@ -42,6 +42,7 @@ unique_ptr<CSVReader::DBData> load_db(const string &db_file);
 shared_ptr<SenderDB> create_sender_db(
     const CSVReader::DBData &db_data,
     unique_ptr<PSIParams> psi_params,
+    OPRFKey &oprf_key,
     size_t nonce_byte_count,
     bool compress);
 
@@ -65,7 +66,7 @@ void sigint_handler(int param [[maybe_unused]])
     exit(0);
 }
 
-shared_ptr<SenderDB> try_load_sender_db(const CLP &cmd)
+shared_ptr<SenderDB> try_load_sender_db(const CLP &cmd, OPRFKey &oprf_key)
 {
     shared_ptr<SenderDB> result = nullptr;
 
@@ -79,6 +80,10 @@ shared_ptr<SenderDB> try_load_sender_db(const CLP &cmd)
                 "PSI parameters were loaded with the SenderDB; ignoring given PSI parameters");
         }
         result = make_shared<SenderDB>(move(data));
+
+        // Load also the OPRF key
+        oprf_key.load(fs);
+        APSI_LOG_INFO("Loaded OPRF key (" << oprf_key_size << " bytes) from " << cmd.db_file());
     } catch (const exception &e) {
         // Failed to load SenderDB
         APSI_LOG_DEBUG("Failed to load SenderDB: " << e.what());
@@ -87,7 +92,7 @@ shared_ptr<SenderDB> try_load_sender_db(const CLP &cmd)
     return result;
 }
 
-shared_ptr<SenderDB> try_load_csv_db(const CLP &cmd)
+shared_ptr<SenderDB> try_load_csv_db(const CLP &cmd, OPRFKey &oprf_key)
 {
     unique_ptr<PSIParams> params = build_psi_params(cmd);
     if (!params) {
@@ -103,10 +108,11 @@ shared_ptr<SenderDB> try_load_csv_db(const CLP &cmd)
         return nullptr;
     }
 
-    return create_sender_db(*db_data, move(params), cmd.nonce_byte_count(), cmd.compress());
+    return create_sender_db(
+        *db_data, move(params), oprf_key, cmd.nonce_byte_count(), cmd.compress());
 }
 
-bool try_save_sender_db(const CLP &cmd, shared_ptr<SenderDB> sender_db)
+bool try_save_sender_db(const CLP &cmd, shared_ptr<SenderDB> sender_db, const OPRFKey &oprf_key)
 {
     if (!sender_db) {
         return false;
@@ -117,6 +123,11 @@ bool try_save_sender_db(const CLP &cmd, shared_ptr<SenderDB> sender_db)
     try {
         size_t size = sender_db->save(fs);
         APSI_LOG_INFO("Saved SenderDB (" << size << " bytes) to " << cmd.sdb_out_file());
+
+        // Save also the OPRF key (fixed size: oprf_key_size bytes)
+        oprf_key.save(fs);
+        APSI_LOG_INFO("Saved OPRF key (" << oprf_key_size << " bytes) to " << cmd.sdb_out_file());
+
     } catch (const exception &e) {
         APSI_LOG_WARNING("Failed to save SenderDB: " << e.what());
         return false;
@@ -136,7 +147,9 @@ int start_sender(const CLP &cmd)
 
     // Try loading first as a SenderDB, then as a CSV file
     shared_ptr<SenderDB> sender_db;
-    if (!(sender_db = try_load_sender_db(cmd)) && !(sender_db = try_load_csv_db(cmd))) {
+    OPRFKey oprf_key;
+    if (!(sender_db = try_load_sender_db(cmd, oprf_key)) &&
+        !(sender_db = try_load_csv_db(cmd, oprf_key))) {
         APSI_LOG_ERROR("Failed to create SenderDB: terminating");
         return -1;
     }
@@ -158,13 +171,13 @@ int start_sender(const CLP &cmd)
         "The largest bundle index holds " << max_bin_bundles_per_bundle_idx << " bin bundles");
 
     // Try to save the SenderDB if a save file was given
-    if (!cmd.sdb_out_file().empty() && !try_save_sender_db(cmd, sender_db)) {
+    if (!cmd.sdb_out_file().empty() && !try_save_sender_db(cmd, sender_db, oprf_key)) {
         return -1;
     }
 
     // Run the dispatcher
     atomic<bool> stop = false;
-    ZMQSenderDispatcher dispatcher(sender_db);
+    ZMQSenderDispatcher dispatcher(sender_db, oprf_key);
 
     // The dispatcher will run until stopped.
     dispatcher.run(stop, cmd.net_port());
@@ -189,6 +202,7 @@ unique_ptr<CSVReader::DBData> load_db(const string &db_file)
 shared_ptr<SenderDB> create_sender_db(
     const CSVReader::DBData &db_data,
     unique_ptr<PSIParams> psi_params,
+    OPRFKey &oprf_key,
     size_t nonce_byte_count,
     bool compress)
 {
@@ -240,8 +254,8 @@ shared_ptr<SenderDB> create_sender_db(
         APSI_LOG_INFO("Using in-memory compression to reduce memory footprint");
     }
 
-    // Strip all unnecessary data from the SenderDB to reduce memory use
-    sender_db->strip();
+    // Read the OPRFKey and strip the SenderDB to reduce memory use
+    oprf_key = sender_db->strip();
 
     APSI_LOG_INFO("SenderDB packing rate: " << sender_db->get_packing_rate());
 

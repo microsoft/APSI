@@ -31,6 +31,14 @@ namespace apsi {
             if (!sender_db_) {
                 throw invalid_argument("sender_db is not set");
             }
+
+            // If SenderDB is not stripped, the OPRF key it holds must be equal to the provided
+            // oprf_key
+            if (!sender_db_->is_stripped() && oprf_key_ != sender_db->get_oprf_key()) {
+                APSI_LOG_ERROR("Failed to create ZMQSenderDispatcher: SenderDB OPRF key differs "
+                               "from the given OPRF key");
+                throw logic_error("mismatching OPRF keys");
+            }
         }
 
         ZMQSenderDispatcher::ZMQSenderDispatcher(shared_ptr<SenderDB> sender_db)
@@ -40,13 +48,12 @@ namespace apsi {
                 throw invalid_argument("sender_db is not set");
             }
 
-	    try {
-	    	oprf_key_ = sender_db->get_oprf_key();
-	    }
-	    catch (const logic_error &ex) {
-            	APSI_LOG_ERROR("Failed to create ZMQSenderDispatcher because no OPRF key was provided");
-		throw;
-	    }
+            try {
+                oprf_key_ = sender_db_->get_oprf_key();
+            } catch (const logic_error &ex) {
+                APSI_LOG_ERROR("Failed to create ZMQSenderDispatcher: missing OPRF key");
+                throw;
+            }
         }
 
         void ZMQSenderDispatcher::run(const atomic<bool> &stop, int port)
@@ -188,8 +195,7 @@ namespace apsi {
                         static_cast<ZMQSenderChannel &>(c).send(move(nrp));
                     });
             } catch (const exception &ex) {
-                APSI_LOG_ERROR("Sender threw an exception while processing query: " <<
-                ex.what());
+                APSI_LOG_ERROR("Sender threw an exception while processing query: " << ex.what());
             }
         }
     } // namespace sender
