@@ -922,6 +922,9 @@ The CMake build system can then automatically find these pre-installed packages,
 | [Google Test](https://github.com/google/googletest)       | `gtest` (needed only for building tests)             |
 | [TCLAP](https://sourceforge.net/projects/tclap/)          | `tclap` (needed only for building CLI)               |
 
+To build the unit and integration tests, set the CMake option `APSI_BUILD_TESTS` to `ON`.
+To build the sender and receiver CLI programs, set the CMake option `APSI_BUILD_CLI` to `ON`.
+
 #### Note on Microsoft SEAL and Intel HEXL
 
 [Intel HEXL](https://github.com/intel/hexl) is an optional dependency of Microsoft SEAL, which aims to accelerate low-level arithmetic with advanced vector extensions.

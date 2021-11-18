@@ -1,5 +1,10 @@
 # List of Changes
 
+## Version 0.7.0
+
+- The CMake system no longer builds unit tests and the CLI by default.
+To build these, specify `-DAPSI_BUILD_CLI=ON` and `-DAPSI_BUILD_TESTS=ON`.
+
 ## Version 0.6.0
 
 - The function `SenderDB::strip` now also clears the OPRF key from held by the `SenderDB` instance.
