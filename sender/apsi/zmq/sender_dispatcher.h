@@ -24,6 +24,8 @@ namespace apsi {
         public:
             ZMQSenderDispatcher() = delete;
 
+            ZMQSenderDispatcher(std::shared_ptr<SenderDB> sender_db, oprf::OPRFKey oprf_key);
+
             ZMQSenderDispatcher(std::shared_ptr<SenderDB> sender_db);
 
             /**
@@ -33,6 +35,8 @@ namespace apsi {
 
         private:
             std::shared_ptr<sender::SenderDB> sender_db_;
+
+	    oprf::OPRFKey oprf_key_;
 
             /**
             Dispatch a Get Parameters request to the Sender.

@@ -4,6 +4,7 @@
 // STD
 #include <cstddef>
 #include <cstdint>
+#include <stdexcept>
 #include <thread>
 
 // APSI
@@ -24,12 +25,28 @@ namespace apsi {
     using namespace oprf;
 
     namespace sender {
-        ZMQSenderDispatcher::ZMQSenderDispatcher(shared_ptr<SenderDB> sender_db)
-            : sender_db_(std::move(sender_db))
+        ZMQSenderDispatcher::ZMQSenderDispatcher(shared_ptr<SenderDB> sender_db, OPRFKey oprf_key)
+            : sender_db_(move(sender_db)), oprf_key_(move(oprf_key))
         {
             if (!sender_db_) {
                 throw invalid_argument("sender_db is not set");
             }
+        }
+
+        ZMQSenderDispatcher::ZMQSenderDispatcher(shared_ptr<SenderDB> sender_db)
+            : sender_db_(move(sender_db))
+        {
+            if (!sender_db_) {
+                throw invalid_argument("sender_db is not set");
+            }
+
+	    try {
+	    	oprf_key_ = sender_db->get_oprf_key();
+	    }
+	    catch (const logic_error &ex) {
+            	APSI_LOG_ERROR("Failed to create ZMQSenderDispatcher because no OPRF key was provided");
+		throw;
+	    }
         }
 
         void ZMQSenderDispatcher::run(const atomic<bool> &stop, int port)
@@ -123,7 +140,7 @@ namespace apsi {
 
                 Sender::RunOPRF(
                     oprf_request,
-                    sender_db_->get_oprf_key(),
+                    oprf_key_,
                     chl,
                     [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
                         auto nsop_response = make_unique<ZMQSenderOperationResponse>();
@@ -171,7 +188,7 @@ namespace apsi {
                         static_cast<ZMQSenderChannel &>(c).send(move(nrp));
                     });
             } catch (const exception &ex) {
-                apsi_log_error("sender threw an exception while processing query: " <<
+                APSI_LOG_ERROR("Sender threw an exception while processing query: " <<
                 ex.what());
             }
         }

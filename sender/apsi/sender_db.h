@@ -81,7 +81,7 @@ namespace apsi {
             SenderDB &operator=(SenderDB &&source);
 
             /**
-            Clears the database. Every item and label will be removed.
+            Clears the database. Every item and label will be removed. The OPRF key is unchanged.
             */
             void clear();
 
@@ -127,26 +127,15 @@ namespace apsi {
             }
 
             /**
-            Strips the SenderDB of all information not needed for serving a query.
+            Strips the SenderDB of all information not needed for serving a query. Clears also the
+	    OPRF key.
             */
             void strip();
 
             /**
-            Clears the OPRF key. The SenderDB cannot be used to serve OPRF requests after calling
-            this function.
-            */
-            void clear_oprf_key() const
-            {
-                oprf_key_.clear();
-            }
-
-            /**
             Returns a copy of the OPRF key.
             */
-            oprf::OPRFKey get_oprf_key() const
-            {
-                return oprf_key_;
-            }
+            oprf::OPRFKey get_oprf_key() const;
 
             /**
             Inserts the given data into the database. This function can be used only on a labeled

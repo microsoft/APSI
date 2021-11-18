@@ -585,7 +585,7 @@ namespace apsi {
             hashed_items_ = move(source.hashed_items_);
             bin_bundles_ = move(source.bin_bundles_);
             oprf_key_ = move(source.oprf_key_);
-            source.oprf_key_ = oprf::OPRFKey();
+            source.oprf_key_ = OPRFKey();
 
             // Reset the source data structures
             source.clear_internal();
@@ -615,7 +615,7 @@ namespace apsi {
             hashed_items_ = move(source.hashed_items_);
             bin_bundles_ = move(source.bin_bundles_);
             oprf_key_ = move(source.oprf_key_);
-            source.oprf_key_ = oprf::OPRFKey();
+            source.oprf_key_ = OPRFKey();
 
             // Reset the source data structures
             source.clear_internal();
@@ -714,6 +714,7 @@ namespace apsi {
             auto lock = get_writer_lock();
 
             stripped_ = true;
+	    oprf_key_.clear();
             hashed_items_.clear();
 
             ThreadPoolMgr tpm;
@@ -733,6 +734,15 @@ namespace apsi {
             APSI_LOG_INFO("SenderDB has been stripped");
         }
 
+            OPRFKey SenderDB::get_oprf_key() const
+            {
+            if (stripped_) {
+                APSI_LOG_ERROR("Cannot return the OPRF key from a stripped SenderDB");
+                throw logic_error("failed to return OPRF key");
+            }
+                return oprf_key_;
+            }
+
         void SenderDB::insert_or_assign(const vector<pair<Item, Label>> &data)
         {
             if (stripped_) {
@@ -749,7 +759,7 @@ namespace apsi {
             APSI_LOG_INFO("Start inserting " << data.size() << " items in SenderDB");
 
             // First compute the hashes for the input data
-            auto hashed_data = oprf::OPRFSender::ComputeHashes(
+            auto hashed_data = OPRFSender::ComputeHashes(
                 data, oprf_key_, label_byte_count_, nonce_byte_count_);
 
             // Lock the database for writing
@@ -848,7 +858,7 @@ namespace apsi {
             APSI_LOG_INFO("Start inserting " << data.size() << " items in SenderDB");
 
             // First compute the hashes for the input data
-            auto hashed_data = oprf::OPRFSender::ComputeHashes(data, oprf_key_);
+            auto hashed_data = OPRFSender::ComputeHashes(data, oprf_key_);
 
             // Lock the database for writing
             auto lock = get_writer_lock();
@@ -911,7 +921,7 @@ namespace apsi {
             APSI_LOG_INFO("Start removing " << data.size() << " items from SenderDB");
 
             // First compute the hashes for the input data
-            auto hashed_data = oprf::OPRFSender::ComputeHashes(data, oprf_key_);
+            auto hashed_data = OPRFSender::ComputeHashes(data, oprf_key_);
 
             // Lock the database for writing
             auto lock = get_writer_lock();
@@ -962,7 +972,7 @@ namespace apsi {
             }
 
             // First compute the hash for the input item
-            auto hashed_item = oprf::OPRFSender::ComputeHashes({ &item, 1 }, oprf_key_)[0];
+            auto hashed_item = OPRFSender::ComputeHashes({ &item, 1 }, oprf_key_)[0];
 
             // Lock the database for reading
             auto lock = get_reader_lock();
@@ -984,7 +994,7 @@ namespace apsi {
             // First compute the hash for the input item
             HashedItem hashed_item;
             LabelKey key;
-            tie(hashed_item, key) = oprf::OPRFSender::GetItemHash(item, oprf_key_);
+            tie(hashed_item, key) = OPRFSender::GetItemHash(item, oprf_key_);
 
             // Lock the database for reading
             auto lock = get_reader_lock();
@@ -1185,17 +1195,17 @@ namespace apsi {
 
             // Check that the OPRF key size is correct
             size_t oprf_key_size = sdb->oprf_key()->size();
-            if (oprf_key_size != oprf::oprf_key_size) {
+            if (oprf_key_size != oprf_key_size) {
                 APSI_LOG_ERROR(
                     "The loaded OPRF key has invalid size (" << oprf_key_size << " bytes; expected "
-                                                             << oprf::oprf_key_size << " bytes)");
+                                                             << oprf_key_size << " bytes)");
                 throw runtime_error("failed to load SenderDB");
             }
 
             // Copy over the OPRF key
-            sender_db->oprf_key_.load(oprf::oprf_key_span_const_type(
+            sender_db->oprf_key_.load(oprf_key_span_const_type(
                 reinterpret_cast<const unsigned char *>(sdb->oprf_key()->data()),
-                oprf::oprf_key_size));
+                oprf_key_size));
 
             // Load the hashed items if this SenderDB is not stripped
             if (!stripped) {
