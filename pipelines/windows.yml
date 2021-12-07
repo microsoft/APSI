@@ -7,7 +7,7 @@ steps:
 - task: NuGetCommand@2
   displayName: 'NuGet restore Configuration Packages'
   inputs:
-    restoreSolution: config/packages.config
+    restoreSolution: tools/config/packages.config
     restoreDirectory: ConfigPackages
 
 - ${{ if eq(parameters.configuration, 'Release') }}:
