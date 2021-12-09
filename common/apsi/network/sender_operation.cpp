@@ -312,7 +312,7 @@ namespace apsi {
 
             // Load the query data; this is a required field so we can always dereference
             const auto &query = *req.query();
-            for (const auto &query_part : query) {
+            for (const auto query_part : query) {
                 uint32_t exponent = query_part->exponent();
                 if (data.count(exponent)) {
                     throw runtime_error("invalid query data");
@@ -322,7 +322,7 @@ namespace apsi {
                 const auto &cts = *query_part->cts();
                 vector<SEALObject<Ciphertext>> cts_vec;
                 cts_vec.reserve(cts.size());
-                for (const auto &ct : cts) {
+                for (const auto ct : cts) {
                     gsl::span<const unsigned char> ct_span(
                         reinterpret_cast<const unsigned char *>(ct->data()->data()),
                         ct->data()->size());

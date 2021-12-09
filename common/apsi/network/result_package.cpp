@@ -146,7 +146,7 @@ namespace apsi {
             if (rp->label_result()) {
                 auto &label_cts = *rp->label_result();
                 label_result.reserve(label_cts.size());
-                for (const auto &label_ct : label_cts) {
+                for (const auto label_ct : label_cts) {
                     gsl::span<const unsigned char> label_ct_span(
                         reinterpret_cast<const unsigned char *>(label_ct->data()->data()),
                         label_ct->data()->size());
