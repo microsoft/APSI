@@ -50,7 +50,7 @@ namespace apsi {
 
             try {
                 oprf_key_ = sender_db_->get_oprf_key();
-            } catch (const logic_error &ex) {
+            } catch (const logic_error &) {
                 APSI_LOG_ERROR("Failed to create ZMQSenderDispatcher: missing OPRF key");
                 throw;
             }
