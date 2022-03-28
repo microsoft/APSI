@@ -1,5 +1,9 @@
 # List of Changes
 
+## Version 0.8.0
+
+- Fixed the bug mentioned in [Issue 21](https://github.com/microsoft/APSI/issues/21).
+
 ## Version 0.7.0
 
 - The CMake system no longer builds unit tests and the CLI by default.

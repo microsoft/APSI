@@ -78,7 +78,8 @@ namespace apsi {
                     // Populates all of the full bytes in dest.
                     uint32_t i = 0;
                     while (i < full_byte_count) {
-                        unsigned char low = src[word_begin] >> low_offset;
+                        unsigned char low =
+                            static_cast<unsigned char>(src[word_begin] >> low_offset);
                         unsigned char high = static_cast<unsigned char>(
                             static_cast<uint32_t>(src[word_begin + 1]) << (8 - low_offset));
                         dest[i] = low | high;
@@ -108,7 +109,7 @@ namespace apsi {
                             static_cast<unsigned char>((uint32_t(1) << rem_bits) - 1);
 
                         unsigned char low = src[word_begin];
-                        low = low >> low_offset;
+                        low = static_cast<unsigned char>(low >> low_offset);
                         low = low & mask;
 
                         unsigned char high = dest_word;
@@ -177,8 +178,8 @@ namespace apsi {
                         unsigned char mid =
                             static_cast<unsigned char>((src[src_begin] >> src_offset) & mask);
 
-                        mask =
-                            ~static_cast<unsigned char>(static_cast<uint32_t>(mask) << dest_offset);
+                        mask = static_cast<unsigned char>(
+                            ~(static_cast<uint32_t>(mask) << dest_offset));
                         mid = static_cast<unsigned char>(static_cast<uint32_t>(mid) << dest_offset);
 
                         dest_val = (dest_val & mask) | mid;
@@ -187,18 +188,19 @@ namespace apsi {
 
                         unsigned char low_mask =
                             static_cast<unsigned char>((uint32_t(1) << low_diff) - 1);
-                        unsigned char low = src[src_begin] >> src_offset;
+                        unsigned char low =
+                            static_cast<unsigned char>(src[src_begin] >> src_offset);
                         low &= low_mask;
 
                         unsigned char high_mask =
                             static_cast<unsigned char>((uint32_t(1) << high_diff) - 1);
                         unsigned char high = src[src_begin + 1] & high_mask;
 
-                        low <<= dest_offset;
-                        high <<= (dest_offset + low_diff);
+                        low = static_cast<unsigned char>(low << dest_offset);
+                        high = static_cast<unsigned char>(high << (dest_offset + low_diff));
 
-                        unsigned char mask =
-                            ~static_cast<unsigned char>(((uint32_t(1) << diff) - 1) << dest_offset);
+                        unsigned char mask = static_cast<unsigned char>(
+                            ~(((uint32_t(1) << diff) - 1) << dest_offset));
 
                         dest_val = (dest_val & mask) | low | high;
                     }

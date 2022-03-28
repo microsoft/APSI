@@ -1198,11 +1198,11 @@ namespace apsi {
             }
 
             // Check that the OPRF key size is correct
-            size_t oprf_key_size = sdb->oprf_key()->size();
-            if (oprf_key_size != oprf_key_size) {
+            size_t loaded_oprf_key_size = sdb->oprf_key()->size();
+            if (loaded_oprf_key_size != oprf_key_size) {
                 APSI_LOG_ERROR(
-                    "The loaded OPRF key has invalid size (" << oprf_key_size << " bytes; expected "
-                                                             << oprf_key_size << " bytes)");
+                    "The loaded OPRF key has invalid size ("
+                    << loaded_oprf_key_size << " bytes; expected " << oprf_key_size << " bytes)");
                 throw runtime_error("failed to load SenderDB");
             }
 
