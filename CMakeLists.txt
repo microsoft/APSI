@@ -282,7 +282,7 @@ else()
     target_compile_options(apsi PUBLIC -D_GENERIC_)
     message(STATUS "FourQlib optimization: arch=GENERIC")
 endif()
-if(NOT MSVC)
+if(NOT MSVC AND NOT APSI_FOURQ_ARM64)
     target_compile_options(apsi PUBLIC -march=native)
 endif()
 

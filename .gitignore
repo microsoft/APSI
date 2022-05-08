@@ -599,3 +599,6 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# FourQLib arm64 needs to be included
+!common/apsi/fourq/arm64
