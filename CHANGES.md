@@ -1,5 +1,9 @@
 # List of Changes
 
+## Version 0.8.1
+
+- Fixed the bug mentioned in [Issue 15](https://github.com/microsoft/APSI/issues/15)
+
 ## Version 0.8.0
 
 - Fixed the bug mentioned in [Issue 21](https://github.com/microsoft/APSI/issues/21).
