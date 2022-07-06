@@ -282,9 +282,6 @@ else()
     target_compile_options(apsi PUBLIC -D_GENERIC_)
     message(STATUS "FourQlib optimization: arch=GENERIC")
 endif()
-if(NOT MSVC AND NOT APSI_FOURQ_ARM64)
-    target_compile_options(apsi PUBLIC -march=native)
-endif()
 
 # Set AVX or AVX2 if not generic
 if(APSI_FOURQ_AMD64 OR APSI_FOURQ_ARM64)
