@@ -1,5 +1,15 @@
 # List of Changes
 
+## Version 0.8.2
+
+Fixes the following GitHub issues:
+
+- [#25](https://github.com/microsoft/APSI/issues/25) Force AVX when AVX2 is available
+- [#31](https://github.com/microsoft/APSI/issues/31) Build fails on Mac M1
+- [#32](https://github.com/microsoft/APSI/issues/32) Build fails on arm64-android
+- [#33](https://github.com/microsoft/APSI/issues/33) Build fails on x86-windows
+- [#34](https://github.com/microsoft/APSI/issues/34) Building arm64-windows
+
 ## Version 0.8.1
 
 - Fixed the bug mentioned in [Issue 15](https://github.com/microsoft/APSI/issues/15)
