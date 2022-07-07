@@ -73,9 +73,14 @@ option(APSI_SECURE_COMPILE_OPTIONS ${APSI_SECURE_COMPILE_OPTIONS_OPTION_STR} OFF
 mark_as_advanced(APSI_SECURE_COMPILE_OPTIONS)
 
 # Enable AVX detection
-set(APSI_DETECT_AVX_OPTION_STR "Detect the presence of AVX/AVX2 extensions")
+set(APSI_DETECT_AVX_OPTION_STR "Detect the presence of AVX extensions")
 option(APSI_DETECT_AVX ${APSI_DETECT_AVX_OPTION_STR} ON)
 mark_as_advanced(APSI_DETECT_AVX)
+
+# Enable AVX2 detection
+set(APSI_DETECT_AVX2_OPTION_STR "Detect the presence of AVX2 extensions")
+option(APSI_DETECT_AVX2 ${APSI_DETECT_AVX2_OPTION_STR} ON)
+mark_as_advanced(APSI_DETECT_AVX2)
 
 # Path for output
 set(OUTLIB_PATH "lib")
@@ -297,7 +302,7 @@ else()
 endif()
 
 # Set AVX or AVX2 if not generic
-if(APSI_FOURQ_AMD64 AND APSI_DETECT_AVX)
+if(APSI_FOURQ_AMD64 AND (APSI_DETECT_AVX OR APSI_DETECT_AVX2))
     include(FindAVX)
     check_for_avx(apsi)
     if (HAVE_AVX2_EXTENSIONS)
