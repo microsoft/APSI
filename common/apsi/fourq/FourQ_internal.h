@@ -36,8 +36,6 @@ typedef unsigned uint128_t __attribute__((mode(TI)));
 #elif (TARGET == TARGET_AMD64) && (OS_TARGET == OS_WIN && COMPILER == COMPILER_VC)
 #define SCALAR_INTRIN_SUPPORT
 typedef uint64_t uint128_t[2];
-#elif (TARGET == TARGET_ARM64) && (OS_TARGET == OS_WIN)
-typedef uint64_t uint128_t[2];
 #else
 #error-- "Unsupported configuration"
 #endif
