@@ -26,7 +26,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
-project(APSI VERSION 0.8.1 LANGUAGES CXX C)
+project(APSI VERSION 0.8.2 LANGUAGES CXX C)
 
 # This policy was introduced in CMake 3.13; OLD by default until CMake 3.21
 cmake_policy(SET CMP0077 NEW)
@@ -71,6 +71,11 @@ message(STATUS "APSI_USE_CXX17: ${APSI_USE_CXX17}")
 set(APSI_SECURE_COMPILE_OPTIONS_OPTION_STR "Enable Control Flow Guard and Spectre mitigations (MSVC only)")
 option(APSI_SECURE_COMPILE_OPTIONS ${APSI_SECURE_COMPILE_OPTIONS_OPTION_STR} OFF)
 mark_as_advanced(APSI_SECURE_COMPILE_OPTIONS)
+
+# Enable AVX detection
+set(APSI_DETECT_AVX_OPTION_STR "Detect the presence of AVX/AVX2 extensions")
+option(APSI_DETECT_AVX ${APSI_DETECT_AVX_OPTION_STR} ON)
+mark_as_advanced(APSI_DETECT_AVX)
 
 # Path for output
 set(OUTLIB_PATH "lib")
@@ -273,6 +278,8 @@ endif()
 # Set architecture
 include(DetectArch)
 if(APSI_FOURQ_ARM64)
+    # _ARM64_ needs to be set whether the ARM64 optimizations are used
+    # (in UNIX) or the generic implementation is used (Windows)
     target_compile_options(apsi PUBLIC -D_ARM64_)
 endif()
 if(APSI_FOURQ_AMD64)
@@ -286,7 +293,7 @@ else()
 endif()
 
 # Set AVX or AVX2 if not generic
-if(APSI_FOURQ_AMD64 OR APSI_FOURQ_ARM64)
+if(APSI_FOURQ_AMD64 AND APSI_DETECT_AVX)
     include(FindAVX)
     check_for_avx(apsi)
     if (HAVE_AVX2_EXTENSIONS)
