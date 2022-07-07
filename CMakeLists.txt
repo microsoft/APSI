@@ -277,7 +277,8 @@ target_link_libraries(apsi
     PUBLIC SEAL::seal
     PUBLIC Kuku::kuku
     PUBLIC Flatbuffers
-    PUBLIC jsoncpp_static)
+    PUBLIC jsoncpp
+)
 if(APSI_USE_LOG4CPLUS)
     target_link_libraries(apsi PUBLIC log4cplus::log4cplus)
 endif()
