@@ -1,30 +1,76 @@
 # APSI: C++ library for Asymmetric PSI
 
-- [Introduction](#introduction)
-  - [(Unlabeled) PSI and Labeled PSI](#(unlabeled)-psi-and-labeled-psi)
-  - [Sender and Receiver](#sender-and-receiver)
-- [How APSI Works](#how-apsi-works)
-  - [Homomorphic Encryption](#homomorphic-encryption)
-  - [Theory](#theory)
-  - [Practice](#practice)
-  - [Labeled Mode](#labeled-mode)
-- [Using APSI](#using-apsi)
-  - [Receiver](#receiver)
-  - [Request, Response, and ResultPart](#request--response--and-resultpart)
-  - [Sender](#sender)
-  - [SenderDB](#senderdb)
-  - [PSIParams](#psiparams)
-  - [Query Powers](#query-powers)
-  - [Thread Control](#thread-control)
-  - [Logging](#logging)
-- [Building APSI](#building-apsi)
-- [Command-Line Interface (CLI)](#command-line-interface-(cli))
-  - [Common Arguments](#common-arguments)
-  - [Receiver](#receiver-1)
-  - [Sender](#sender-1)
-  - [Test Data](#test-data)
-- [Acknowledgments](#acknowledgments)
-- [Questions](#questions)
+## 编译注意
+安装以下依赖
+1. 安装zmq，macOS为例：
+   ```bash
+   brew install cppzmq zeromq
+   ```
+2. flatbuffers
+   ```bash
+   brew install flatbuffers
+   ```
+   然后手工修改CMakefile中与flatbuffers相关的Include 和library路径
+   
+3. cmake & make
+   ```bash
+   mkdir build && cd build
+   cmake ..
+   make all -j
+   ```
+
+- [APSI: C++ library for Asymmetric PSI](#apsi-c-library-for-asymmetric-psi)
+  - [编译注意](#编译注意)
+  - [Introduction](#introduction)
+    - [(Unlabeled) PSI and Labeled PSI](#unlabeled-psi-and-labeled-psi)
+    - [Sender and Receiver](#sender-and-receiver)
+  - [How APSI Works](#how-apsi-works)
+    - [Homomorphic Encryption](#homomorphic-encryption)
+      - [Computation on Encrypted Data](#computation-on-encrypted-data)
+      - [Noise Budget](#noise-budget)
+      - [Encryption Parameters](#encryption-parameters)
+    - [Theory](#theory)
+      - [Naive Idea](#naive-idea)
+      - [Lowering the Depth](#lowering-the-depth)
+      - [Cuckoo Hashing](#cuckoo-hashing)
+      - [Large Items](#large-items)
+      - [OPRF](#oprf)
+      - [Paterson-Stockmeyer](#paterson-stockmeyer)
+      - [False Positives](#false-positives)
+    - [Practice](#practice)
+    - [Labeled Mode](#labeled-mode)
+      - [Basic Idea](#basic-idea)
+      - [Large Labels](#large-labels)
+      - [Label Encryption](#label-encryption)
+      - [Partial Item Collisions](#partial-item-collisions)
+  - [Using APSI](#using-apsi)
+    - [Receiver](#receiver)
+    - [Request, Response, and ResultPart](#request-response-and-resultpart)
+    - [Sender](#sender)
+    - [SenderDB](#senderdb)
+    - [PSIParams](#psiparams)
+      - [SEALParams](#sealparams)
+      - [ItemParams](#itemparams)
+      - [TableParams](#tableparams)
+      - [QueryParams](#queryparams)
+      - [PSIParams Constructor](#psiparams-constructor)
+      - [Loading from JSON](#loading-from-json)
+      - [False Positives](#false-positives-1)
+    - [Query Powers](#query-powers)
+    - [Thread Control](#thread-control)
+    - [Logging](#logging)
+  - [Building APSI](#building-apsi)
+    - [Requirements](#requirements)
+    - [Building and Installing APSI with vcpkg](#building-and-installing-apsi-with-vcpkg)
+    - [Building and Installing APSI Manually](#building-and-installing-apsi-manually)
+      - [Note on Microsoft SEAL and Intel HEXL](#note-on-microsoft-seal-and-intel-hexl)
+  - [Command-Line Interface (CLI)](#command-line-interface-cli)
+    - [Common Arguments](#common-arguments)
+    - [Receiver](#receiver-1)
+    - [Sender](#sender-1)
+    - [Test Data](#test-data)
+  - [Acknowledgments](#acknowledgments)
+  - [Contributing](#contributing)
 
 ## Introduction
 

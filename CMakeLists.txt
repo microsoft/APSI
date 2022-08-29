@@ -162,7 +162,7 @@ FetchContent_MakeAvailable(Kuku)
     # else()
     message(STATUS "Flatbuffers: found")
     # get_target_property(FLATBUFFERS_FLATC_PATH flatbuffers::flatc IMPORTED_LOCATION_RELEASE)
-    set(FLATBUFFERS_FLATC_PATH "/usr/local/bin/flatc")
+    set(FLATBUFFERS_FLATC_PATH "/opt/homebrew/bin/flatc")
     message(STATUS "flatc path: ${FLATBUFFERS_FLATC_PATH}")
     include(CompileSchemaCXX)
 # endif()
@@ -196,9 +196,10 @@ endif()
 
 # [Option] APSI_USE_ZMQ (default: ON)
 set(APSI_USE_ZMQ_OPTION_STR "Use ZeroMQ for networking")
-option(APSI_USE_ZMQ ${APSI_USE_ZMQ_OPTION_STR} OFF)
-set(APSI_USE_ZMQ OFF)
+option(APSI_USE_ZMQ ${APSI_USE_ZMQ_OPTION_STR} ON)
+# set(APSI_USE_ZMQ OFF)
 if(APSI_USE_ZMQ)
+    list (APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
     # ZeroMQ base
     find_package(ZeroMQ REQUIRED)
     if(NOT ZeroMQ_FOUND)
@@ -231,7 +232,7 @@ endif()
 # [Option] APSI_BUILD_CLI (default: OFF)
 set(APSI_BUILD_CLI_OPTION_STR "Build example command line interface applications")
 cmake_dependent_option(APSI_BUILD_CLI ${APSI_BUILD_CLI_OPTION_STR} OFF "APSI_USE_ZMQ;APSI_USE_LOG4CPLUS" OFF)
-set(APSI_BUILD_CLI OFF)
+set(APSI_BUILD_CLI ON)
 if (APSI_BUILD_CLI)
     # TCLAP
     find_path(TCLAP_INCLUDE_DIRS "tclap/Arg.h")
@@ -268,7 +269,8 @@ apsi_set_version_filename(apsi)
 apsi_set_language(apsi)
 target_include_directories(apsi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/common>
-    $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
+    $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>
+    /opt/homebrew/Cellar/flatbuffers/2.0.6/include/)
 target_include_directories(apsi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/sender>
     $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
@@ -298,7 +300,7 @@ if(APSI_USE_LOG4CPLUS)
     target_link_libraries(apsi PUBLIC log4cplus::log4cplus)
 endif()
 if(APSI_USE_ZMQ)
-    target_link_libraries(apsi PUBLIC libzmq-static cppzmq-static)
+    target_link_libraries(apsi PUBLIC libzmq cppzmq)
 endif()
 
 # Configurations for FourQlib: system, arch, SIMD, and assembler
@@ -432,6 +434,9 @@ endif()
 ##########################
 
 if(APSI_BUILD_CLI)
+    link_directories(
+        /opt/homebrew/Cellar/flatbuffers/2.0.6/lib
+        /Users/chb/Projects/deps/APSI/build/lib)
     add_library(common_cli OBJECT)
     add_subdirectory(cli/common)
     target_include_directories(common_cli PUBLIC cli)
@@ -451,14 +456,14 @@ if(APSI_BUILD_CLI)
 
     add_executable(sender_cli)
     add_subdirectory(cli/sender)
-    target_link_libraries(sender_cli PUBLIC common_cli apsi)
+    target_link_libraries(sender_cli PUBLIC common_cli apsi flatbuffers jsoncpp)
     if (APPLE)
         target_compile_options(common_cli PUBLIC -DHAVE_LONG_LONG)
     endif()
 
     add_executable(receiver_cli)
     add_subdirectory(cli/receiver)
-    target_link_libraries(receiver_cli PUBLIC common_cli apsi)
+    target_link_libraries(receiver_cli PUBLIC common_cli apsi flatbuffers jsoncpp)
 
     add_executable(pd_tool)
     add_subdirectory(cli/pd_tool)
