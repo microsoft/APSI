@@ -119,7 +119,7 @@ set(APSI_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/APSI-${APSI_VERSION_MA
 include(FetchContent)
 
 # Microsoft SEAL
-set(SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT OFF)
+set(SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT OFF CACHE INTERNAL "")
 FetchContent_Declare(
         SEAL
         GIT_REPOSITORY "https://github.com/microsoft/SEAL"
@@ -169,10 +169,10 @@ FetchContent_MakeAvailable(Kuku)
 
 # jsoncpp: for parameter configuration
 FetchContent_Declare(
-    jsoncpp
+    JsonCpp
     GIT_REPOSITORY "https://github.com/open-source-parsers/jsoncpp"
 )
-FetchContent_MakeAvailable(jsoncpp)
+FetchContent_MakeAvailable(JsonCpp)
 # find_package(jsoncpp REQUIRED)
 # if (NOT jsoncpp_FOUND)
 #     message(FATAL_ERROR "jsoncpp: not found")
@@ -291,7 +291,7 @@ apsi_install_target(apsi APSITargets)
 target_link_libraries(apsi
     PUBLIC SEAL::seal
     PUBLIC Kuku::kuku
-    PUBLIC Flatbuffers
+    PUBLIC flatbuffers
     PUBLIC jsoncpp
 )
 if(APSI_USE_LOG4CPLUS)
