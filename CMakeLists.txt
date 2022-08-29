@@ -162,7 +162,7 @@ FetchContent_MakeAvailable(Kuku)
     # else()
     message(STATUS "Flatbuffers: found")
     # get_target_property(FLATBUFFERS_FLATC_PATH flatbuffers::flatc IMPORTED_LOCATION_RELEASE)
-    set(FLATBUFFERS_FLATC_PATH "/opt/homebrew/bin/flatc")
+    set(FLATBUFFERS_FLATC_PATH "/usr/local/bin/flatc")
     message(STATUS "flatc path: ${FLATBUFFERS_FLATC_PATH}")
     include(CompileSchemaCXX)
 # endif()
@@ -198,23 +198,23 @@ endif()
 set(APSI_USE_ZMQ_OPTION_STR "Use ZeroMQ for networking")
 option(APSI_USE_ZMQ ${APSI_USE_ZMQ_OPTION_STR} ON)
 # set(APSI_USE_ZMQ OFF)
-if(APSI_USE_ZMQ)
-    list (APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
-    # ZeroMQ base
-    find_package(ZeroMQ REQUIRED)
-    if(NOT ZeroMQ_FOUND)
-        message(FATAL_ERROR "ZeroMQ: not found")
-    else()
-        message(STATUS "ZeroMQ: found")
-    endif()
-    # cppzmq wrapper
-    find_package(cppzmq REQUIRED)
-    if(NOT cppzmq_FOUND)
-        message(FATAL_ERROR "cppzmq: not found")
-    else()
-        message(STATUS "cppzmq: found")
-    endif()
-endif()
+# if(APSI_USE_ZMQ)
+#     list (APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_LIST_DIR})
+#     # ZeroMQ base
+#     find_package(ZeroMQ REQUIRED)
+#     if(NOT ZeroMQ_FOUND)
+#         message(FATAL_ERROR "ZeroMQ: not found")
+#     else()
+#         message(STATUS "ZeroMQ: found")
+#     endif()
+#     # cppzmq wrapper
+#     find_package(cppzmq REQUIRED)
+#     if(NOT cppzmq_FOUND)
+#         message(FATAL_ERROR "cppzmq: not found")
+#     else()
+#         message(STATUS "cppzmq: found")
+#     endif()
+# endif()
 
 # [Option] APSI_BUILD_TESTS (default: OFF)
 set(APSI_BUILD_TESTS_OPTION_STR "Build unit and integration tests for APSI")
@@ -267,10 +267,14 @@ install(
 add_library(apsi STATIC)
 apsi_set_version_filename(apsi)
 apsi_set_language(apsi)
+# target_include_directories(apsi PUBLIC
+#     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/common>
+#     $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>
+#     /opt/homebrew/Cellar/flatbuffers/2.0.6/include/)
 target_include_directories(apsi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/common>
     $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>
-    /opt/homebrew/Cellar/flatbuffers/2.0.6/include/)
+    /home/linuxbrew/.linuxbrew/include/)
 target_include_directories(apsi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/sender>
     $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
@@ -300,7 +304,8 @@ if(APSI_USE_LOG4CPLUS)
     target_link_libraries(apsi PUBLIC log4cplus::log4cplus)
 endif()
 if(APSI_USE_ZMQ)
-    target_link_libraries(apsi PUBLIC libzmq cppzmq)
+    # target_link_libraries(apsi PUBLIC zmq cppzmq)
+    target_link_libraries(apsi PUBLIC zmq)
 endif()
 
 # Configurations for FourQlib: system, arch, SIMD, and assembler

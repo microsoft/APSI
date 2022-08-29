@@ -19,6 +19,37 @@
    make all -j
    ```
 
+## 试用指南
+
+1. 生成测试数据，可以用自带的脚本：
+
+   ```bash
+   python3 tools/scripts/test_data_creator.py <数据个数> <查询个数> <查询命中个数> [<value 字节长度>] [<key 字节长度>]
+   ```
+
+   举例：
+   ```bash
+   python3 tools/scripts/test_data_creator.py 100000 1 1 64 64
+   ```
+
+   此时会得到 db.csv 和 query.csv 文件。其中 db.csv 由两列组成，每行为一个键值对。query.csv 每行是要查询的一个键。上面示例中键值都是 64 字节，服务器有 100000 数据，而用户有一个查询且该查询可以命中。
+
+2. 运行 server 端 cli：
+
+   ```bash
+   build/bin/sender_cli -d db.csv -p parameters/100K-1.json
+   ```
+
+   其中的 json 文件名表示 100K:1 的数据量和查询量。
+
+3. 运行 client 端 cli：
+
+   ```bash
+   build/bin/receiver_cli -q query.csv -o receiver_output.txt
+   ```
+
+   输出结果将写入 receiver_output.txt 文件中。
+
 - [APSI: C++ library for Asymmetric PSI](#apsi-c-library-for-asymmetric-psi)
   - [编译注意](#编译注意)
   - [Introduction](#introduction)
