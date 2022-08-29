@@ -119,6 +119,7 @@ set(APSI_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/APSI-${APSI_VERSION_MA
 include(FetchContent)
 
 # Microsoft SEAL
+set(SEAL_THROW_ON_TRANSPARENT_CIPHERTEXT OFF)
 FetchContent_Declare(
         SEAL
         GIT_REPOSITORY "https://github.com/microsoft/SEAL"
@@ -150,19 +151,20 @@ FetchContent_MakeAvailable(Kuku)
 # endif()
 
 # Flatbuffers
-FetchContent_Declare(
-    flatbuffers
-    GIT_REPOSITORY "https://github.com/google/flatbuffers"
-)
-FetchContent_MakeAvailable(Flatbuffers)
-# find_package(Flatbuffers REQUIRED)
-# if(NOT Flatbuffers_FOUND)
-#     message(FATAL_ERROR "Flatbuffers: not found")
-# else()
-#     message(STATUS "Flatbuffers: found")
-#     get_target_property(FLATBUFFERS_FLATC_PATH flatbuffers::flatc IMPORTED_LOCATION_RELEASE)
-#     message(STATUS "flatc path: ${FLATBUFFERS_FLATC_PATH}")
-#     include(CompileSchemaCXX)
+# FetchContent_Declare(
+#     flatbuffers
+#     GIT_REPOSITORY "https://github.com/google/flatbuffers"
+# )
+# FetchContent_MakeAvailable(Flatbuffers)
+    # find_package(Flatbuffers REQUIRED)
+    # if(NOT Flatbuffers_FOUND)
+    #     message(FATAL_ERROR "Flatbuffers: not found")
+    # else()
+    message(STATUS "Flatbuffers: found")
+    # get_target_property(FLATBUFFERS_FLATC_PATH flatbuffers::flatc IMPORTED_LOCATION_RELEASE)
+    set(FLATBUFFERS_FLATC_PATH "/usr/local/bin/flatc")
+    message(STATUS "flatc path: ${FLATBUFFERS_FLATC_PATH}")
+    include(CompileSchemaCXX)
 # endif()
 
 # jsoncpp: for parameter configuration
@@ -278,6 +280,9 @@ target_include_directories(apsi PUBLIC
     $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
 target_include_directories(apsi PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/sender>
+    $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
+target_include_directories(apsi PUBLIC 
+    $<BUILD_INTERFACE:${jsoncpp_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:${APSI_INCLUDES_INSTALL_DIR}>)
 apsi_set_version(apsi)
 apsi_link_threads(apsi)
