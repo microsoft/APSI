@@ -116,47 +116,72 @@ set(APSI_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/APSI-${APSI_VERSION_MA
 # All dependencies are assumed pre-installed.
 # find_package might throw a FATAL_ERROR before"xxx: not found", e.g. with vcpkg.cmake.
 
+include(FetchContent)
+
 # Microsoft SEAL
-find_package(SEAL 3.7 QUIET REQUIRED)
-if(NOT SEAL_FOUND)
-    message(FATAL_ERROR "Microsoft SEAL: not found")
-else()
-    message(STATUS "Microsoft SEAL: found")
-endif()
-if(NOT APSI_USE_CXX17 AND SEAL_USE_CXX17)
-    message(FATAL_ERROR "CXX standards mismatch: APSI_USE_CXX17 is OFF, SEAL_USE_CXX17 is ON")
-endif()
+FetchContent_Declare(
+        SEAL
+        GIT_REPOSITORY "https://github.com/microsoft/SEAL"
+        GIT_TAG "2d2a25c916047d2f356d45ad50c98f0a9695905a"
+)
+FetchContent_MakeAvailable(SEAL)
+# find_package(SEAL 4.0 QUIET REQUIRED)
+# if(NOT SEAL_FOUND)
+#     message(FATAL_ERROR "Microsoft SEAL: not found")
+# else()
+#     message(STATUS "Microsoft SEAL: found")
+# endif()
+# if(NOT APSI_USE_CXX17 AND SEAL_USE_CXX17)
+#     message(FATAL_ERROR "CXX standards mismatch: APSI_USE_CXX17 is OFF, SEAL_USE_CXX17 is ON")
+# endif()
 
 # Microsoft Kuku
-find_package(Kuku 2.1 QUIET REQUIRED)
-if(NOT Kuku_FOUND)
-    message(FATAL_ERROR "Microsoft Kuku: not found")
-else()
-    message(STATUS "Microsoft Kuku: found")
-endif()
+FetchContent_Declare(
+    Kuku
+    GIT_REPOSITORY "https://github.com/microsoft/Kuku"
+    GIT_TAG "1338c4ae2211ab4c739022ff57f48ce5a76531d5"
+)
+FetchContent_MakeAvailable(Kuku)
+# find_package(Kuku 2.1 QUIET REQUIRED)
+# if(NOT Kuku_FOUND)
+#     message(FATAL_ERROR "Microsoft Kuku: not found")
+# else()
+#     message(STATUS "Microsoft Kuku: found")
+# endif()
 
 # Flatbuffers
-find_package(Flatbuffers REQUIRED)
-if(NOT Flatbuffers_FOUND)
-    message(FATAL_ERROR "Flatbuffers: not found")
-else()
-    message(STATUS "Flatbuffers: found")
-    get_target_property(FLATBUFFERS_FLATC_PATH flatbuffers::flatc IMPORTED_LOCATION_RELEASE)
-    message(STATUS "flatc path: ${FLATBUFFERS_FLATC_PATH}")
-    include(CompileSchemaCXX)
-endif()
+FetchContent_Declare(
+    flatbuffers
+    GIT_REPOSITORY "https://github.com/google/flatbuffers"
+)
+FetchContent_MakeAvailable(Flatbuffers)
+# find_package(Flatbuffers REQUIRED)
+# if(NOT Flatbuffers_FOUND)
+#     message(FATAL_ERROR "Flatbuffers: not found")
+# else()
+#     message(STATUS "Flatbuffers: found")
+#     get_target_property(FLATBUFFERS_FLATC_PATH flatbuffers::flatc IMPORTED_LOCATION_RELEASE)
+#     message(STATUS "flatc path: ${FLATBUFFERS_FLATC_PATH}")
+#     include(CompileSchemaCXX)
+# endif()
 
 # jsoncpp: for parameter configuration
-find_package(jsoncpp REQUIRED)
-if (NOT jsoncpp_FOUND)
-    message(FATAL_ERROR "jsoncpp: not found")
-else()
-    message(STATUS "jsoncpp: found")
-endif()
+FetchContent_Declare(
+    jsoncpp
+    GIT_REPOSITORY "https://github.com/open-source-parsers/jsoncpp"
+)
+FetchContent_MakeAvailable(jsoncpp)
+# find_package(jsoncpp REQUIRED)
+# if (NOT jsoncpp_FOUND)
+#     message(FATAL_ERROR "jsoncpp: not found")
+# else()
+#     message(STATUS "jsoncpp: found")
+# endif()
 
 # [Option] APSI_USE_LOG4CPLUS (default: ON)
 set(APSI_USE_LOG4CPLUS_OPTION_STR "Use Log4cplus for logging")
 option(APSI_USE_LOG4CPLUS ${APSI_USE_LOG4CPLUS_OPTION_STR} ON)
+set(APSI_USE_LOG4CPLUS OFF)
 if(APSI_USE_LOG4CPLUS)
     # Log4cplus
     find_package(log4cplus REQUIRED)
@@ -169,7 +194,8 @@ endif()
 
 # [Option] APSI_USE_ZMQ (default: ON)
 set(APSI_USE_ZMQ_OPTION_STR "Use ZeroMQ for networking")
-option(APSI_USE_ZMQ ${APSI_USE_ZMQ_OPTION_STR} ON)
+option(APSI_USE_ZMQ ${APSI_USE_ZMQ_OPTION_STR} OFF)
+set(APSI_USE_ZMQ OFF)
 if(APSI_USE_ZMQ)
     # ZeroMQ base
     find_package(ZeroMQ REQUIRED)
@@ -189,7 +215,7 @@ endif()
 
 # [Option] APSI_BUILD_TESTS (default: OFF)
 set(APSI_BUILD_TESTS_OPTION_STR "Build unit and integration tests for APSI")
-option(APSI_BUILD_TESTS ${APSI_BUILD_TESTS_OPTION_STR} OFF)
+option(APSI_BUILD_TESTS OFF)
 if(APSI_BUILD_TESTS)
     # Google Test
     find_package(GTest CONFIG REQUIRED)
@@ -203,6 +229,7 @@ endif()
 # [Option] APSI_BUILD_CLI (default: OFF)
 set(APSI_BUILD_CLI_OPTION_STR "Build example command line interface applications")
 cmake_dependent_option(APSI_BUILD_CLI ${APSI_BUILD_CLI_OPTION_STR} OFF "APSI_USE_ZMQ;APSI_USE_LOG4CPLUS" OFF)
+set(APSI_BUILD_CLI OFF)
 if (APSI_BUILD_CLI)
     # TCLAP
     find_path(TCLAP_INCLUDE_DIRS "tclap/Arg.h")
@@ -259,8 +286,9 @@ apsi_install_target(apsi APSITargets)
 target_link_libraries(apsi
     PUBLIC SEAL::seal
     PUBLIC Kuku::kuku
-    PUBLIC flatbuffers::flatbuffers
-    PUBLIC jsoncpp_static)
+    PUBLIC Flatbuffers
+    PUBLIC jsoncpp
+)
 if(APSI_USE_LOG4CPLUS)
     target_link_libraries(apsi PUBLIC log4cplus::log4cplus)
 endif()
