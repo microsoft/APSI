@@ -119,7 +119,7 @@ int remote_query(const CLP &cmd)
     try {
         APSI_LOG_INFO("Sending OPRF request for " << items_vec.size() << " items");
         tie(oprf_items, label_keys) = Receiver::RequestOPRF(items_vec, channel);
-        APSI_LOG_INFO("Received OPRF request for " << items_vec.size() << " items");
+        APSI_LOG_INFO("Received OPRF response for " << items_vec.size() << " items");
     } catch (const exception &ex) {
         APSI_LOG_WARNING("OPRF request failed: " << ex.what());
         return -1;
