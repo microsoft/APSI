@@ -58,6 +58,7 @@ extern "C" {
 #define TARGET_x86 2
 #define TARGET_ARM 3
 #define TARGET_ARM64 4
+#define _AMD64_ 1
 
 #if defined(_AMD64_)
 #define TARGET TARGET_AMD64

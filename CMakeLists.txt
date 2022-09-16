@@ -232,7 +232,7 @@ endif()
 # [Option] APSI_BUILD_CLI (default: OFF)
 set(APSI_BUILD_CLI_OPTION_STR "Build example command line interface applications")
 cmake_dependent_option(APSI_BUILD_CLI ${APSI_BUILD_CLI_OPTION_STR} OFF "APSI_USE_ZMQ;APSI_USE_LOG4CPLUS" OFF)
-set(APSI_BUILD_CLI ON)
+set(APSI_BUILD_CLI OFF)
 if (APSI_BUILD_CLI)
     # TCLAP
     find_path(TCLAP_INCLUDE_DIRS "tclap/Arg.h")
