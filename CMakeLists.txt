@@ -117,7 +117,7 @@ set(APSI_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/APSI-${APSI_VERSION_MA
 # find_package might throw a FATAL_ERROR before"xxx: not found", e.g. with vcpkg.cmake.
 
 # Microsoft SEAL
-find_package(SEAL 3.7 QUIET REQUIRED)
+find_package(SEAL 4.1 QUIET REQUIRED)
 if(NOT SEAL_FOUND)
     message(FATAL_ERROR "Microsoft SEAL: not found")
 else()
