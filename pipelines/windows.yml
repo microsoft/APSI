@@ -4,12 +4,6 @@ steps:
   inputs:
     versionSpec: ${{ parameters.nuget_version }}
 
-- task: NuGetCommand@2
-  displayName: 'NuGet restore Configuration Packages'
-  inputs:
-    restoreSolution: tools/config/packages.config
-    restoreDirectory: ConfigPackages
-
 - ${{ if eq(parameters.configuration, 'Release') }}:
   - task: securedevelopmentteam.vss-secure-development-tools.build-task-credscan.CredScan@2
     displayName: 'Run CredScan'
@@ -51,15 +45,9 @@ steps:
     platform: 'x64'
     configuration: '${{ parameters.configuration }}'
 
-- task: VSTest@2
-  displayName: 'VsTest - unit tests'
-  inputs:
-    testAssemblyVer2: |
-        **\${{ parameters.configuration }}\unit_tests.exe
-        !**\obj\**
-    platform: 'x64'
-    configuration: ${{ parameters.configuration }}
-    diagnosticsEnabled: True
+- script: '${{ parameters.configuration }}\unit_tests.exe'
+  workingDirectory: '$(Build.SourcesDirectory)\build\bin'
+  displayName: 'Run unit tests'
 
 - ${{ if eq(parameters.configuration, 'Release') }}:
   - task: Semmle@0
@@ -86,8 +74,9 @@ steps:
 - task: CopyFiles@2
   displayName: 'Copy Files to: $(Build.ArtifactStagingDirectory)'
   inputs:
-    SourceFolder: '$(Build.SourcesDirectory)'
-    Contents: '**\${{ parameters.configuration }}\**\?(*.exe|*.dll|*.lib|*.xml)'
+    SourceFolder: '$(Build.SourcesDirectory)\build\bin'
+    Contents: |
+      ${{ parameters.configuration }}\**\?(*.exe|*.dll|*.lib|*.xml)
     TargetFolder: '$(Build.ArtifactStagingDirectory)'
 
 - task: ms.vss-governance-buildtask.governance-build-task-component-detection.ComponentGovernanceComponentDetection@0
