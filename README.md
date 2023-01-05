@@ -909,7 +909,7 @@ For examples, to install Microsoft SEAL on Windows, you must use `.\vcpkg instal
 
 The CMake build system can then automatically find these pre-installed packages, if the following arguments are passed to CMake configuration:
 - `-DCMAKE_TOOLCHAIN_FILE=${vcpkg_root_dir}/scripts/buildsystems/vcpkg.cmake`, and
-- `-DVCPKG_TARGET_TRIPLET="x64-windows-static-md"` on Windows only.
+- `-DVCPKG_TARGET_TRIPLET=x64-windows-static-md` on Windows only.
 
 | Dependency                                                | vcpkg name                                           |
 |-----------------------------------------------------------|------------------------------------------------------|
