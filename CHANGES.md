@@ -4,7 +4,7 @@
 
 - Switching to use SEAL 4.1.0.
 - Added $schema to cgmanifest.json [(PR #38)](https://github.com/microsoft/APSI/pull/38).
-- Fixed a mistake in (README.md)[README.md] that caused Windows configurations with `vcpkg` to fail.
+- Fixed a mistake in [README.md](README.md) that caused Windows configurations with `vcpkg` to fail.
 
 ## Version 0.8.2
 
