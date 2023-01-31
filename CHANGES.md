@@ -1,5 +1,9 @@
 # List of Changes
 
+## Version 0.9.1
+
+- Fixed a bug with SEAL dependency.
+
 ## Version 0.9.0
 
 - Switching to use SEAL 4.1.0.

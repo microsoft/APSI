@@ -50,7 +50,7 @@ steps:
   displayName: 'Run unit tests'
 
 - ${{ if eq(parameters.configuration, 'Release') }}:
-  - task: Semmle@0
+  - task: Semmle@1
     displayName: 'Semmle'
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
