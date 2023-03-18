@@ -5,17 +5,20 @@
 
 // STL
 #include <array>
+#include <cstdint>
+#include <cstddef>
 #include <memory>
 #include <vector>
 
 // APSI
 #include "apsi/util/cuckoo_filter_table.h"
-#include "apsi/util/db_encoding.h"
+
+// GSL
+#include "gsl/span"
 
 namespace apsi {
     namespace sender {
         namespace util {
-
             /**
             Implementation of a Cuckoo Filter
             */
@@ -29,18 +32,42 @@ namespace apsi {
                 /**
                 Indicates whether the given item is contained in the filter
                 */
-                bool contains(const apsi::util::felt_t &item) const;
+                bool contains(gsl::span<const std::uint64_t> item) const;
+
+                /**
+                Indicates whether the given item is contained in the filter
+                */
+                inline bool contains(std::uint64_t item) const
+                {
+                    std::array<std::uint64_t, 1> item_array{ item };
+                    return contains(item_array);
+                }
 
                 /**
                 Add an item to the Cuckoo Filter. Will fail if there is no more space to store
                 items.
                 */
-                bool add(const apsi::util::felt_t &item);
+                bool add(gsl::span<const std::uint64_t> item);
+
+                /**
+                Add an item to the Cuckoo Filter. Will fail if there is no more space to store
+                items.
+                */
+                inline bool add(std::uint64_t item) {
+                    return add({ &item, 1 });
+                }
 
                 /**
                 Remove an item from the Cuckoo Filter.
                 */
-                bool remove(const apsi::util::felt_t &item);
+                bool remove(gsl::span<const std::uint64_t> item);
+
+                /**
+                Remove an item from the Cuckoo Filter.
+                */
+                bool remove(std::uint64_t item) {
+                    return remove({ &item, 1 });
+                }
 
                 /**
                 Get the number of items currently contained in the Cuckoo Filter
@@ -54,7 +81,7 @@ namespace apsi {
                 /**
                 Maximum number of kicks before we give up trying to insert
                 */
-                constexpr static std::size_t max_cuckoo_kicks_ = 500;
+                constexpr static std::size_t max_cuckoo_kicks_ = 1000;
 
                 /**
                 Number of items contained in the filter
@@ -94,7 +121,7 @@ namespace apsi {
                 Get the tag and bucket index for a given element
                 */
                 void get_tag_and_index(
-                    const apsi::util::felt_t &item, std::uint32_t &tag, std::size_t &idx) const;
+                    gsl::span<const std::uint64_t> item, std::uint32_t &tag, std::size_t &idx) const;
 
                 /**
                 Get the alternate index for a given tag/index combination

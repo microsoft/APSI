@@ -14,7 +14,6 @@ set(APSI_SOURCE_FILES ${APSI_SOURCE_FILES}
 # Add header files for installation
 install(
     FILES
-        ${CMAKE_CURRENT_LIST_DIR}/apsi.h
         ${CMAKE_CURRENT_LIST_DIR}/crypto_context.h
         ${CMAKE_CURRENT_LIST_DIR}/item.h
         ${CMAKE_CURRENT_LIST_DIR}/log.h

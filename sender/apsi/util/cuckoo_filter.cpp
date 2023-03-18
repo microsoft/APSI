@@ -24,7 +24,7 @@ CuckooFilter::CuckooFilter(size_t key_count_max, size_t bits_per_tag) : num_item
     table_ = make_unique<CuckooFilterTable>(key_count_max, bits_per_tag);
 }
 
-bool CuckooFilter::contains(const felt_t &item) const
+bool CuckooFilter::contains(gsl::span<const uint64_t> item) const
 {
     size_t idx1, idx2;
     uint32_t tag;
@@ -40,10 +40,12 @@ bool CuckooFilter::contains(const felt_t &item) const
     return table_->find_tag_in_buckets(idx1, idx2, tag);
 }
 
-bool CuckooFilter::add(const felt_t &item)
+bool CuckooFilter::add(gsl::span<const uint64_t> item)
 {
-    if (overflow_.used)
-        return false; // No more space
+    if (overflow_.used) {
+        // No more space
+        return false;
+    }
 
     uint32_t tag;
     size_t idx;
@@ -57,7 +59,7 @@ bool CuckooFilter::add(const felt_t &item)
     return result;
 }
 
-bool CuckooFilter::add_index_tag(std::size_t idx, std::uint32_t tag)
+bool CuckooFilter::add_index_tag(size_t idx, uint32_t tag)
 {
     size_t curr_idx = idx;
     uint32_t curr_tag = tag;
@@ -78,6 +80,7 @@ bool CuckooFilter::add_index_tag(std::size_t idx, std::uint32_t tag)
         curr_idx = get_alt_index(curr_idx, curr_tag);
     }
 
+    // We only call this function when we know that overflow is not used
     overflow_.index = curr_idx;
     overflow_.tag = curr_tag;
     overflow_.used = true;
@@ -85,7 +88,7 @@ bool CuckooFilter::add_index_tag(std::size_t idx, std::uint32_t tag)
     return true;
 }
 
-bool CuckooFilter::remove(const felt_t &item)
+bool CuckooFilter::remove(gsl::span<const uint64_t> item)
 {
     size_t idx1, idx2;
     uint32_t tag;
@@ -129,16 +132,16 @@ size_t CuckooFilter::idx_bucket_limit(size_t value) const
     return value & mask;
 }
 
-void CuckooFilter::get_tag_and_index(const felt_t &item, uint32_t &tag, size_t &idx) const
+void CuckooFilter::get_tag_and_index(gsl::span<const uint64_t> item, uint32_t &tag, size_t &idx) const
 {
-    uint64_t hash = static_cast<uint64_t>(hasher_(item));
+    uint64_t hash = hasher_(item);
     idx = idx_bucket_limit(hash >> 32);
     tag = tag_bit_limit(static_cast<uint32_t>(hash));
 }
 
 size_t CuckooFilter::get_alt_index(size_t idx, uint32_t tag) const
 {
-    uint64_t hash = static_cast<uint64_t>(hasher_(tag));
+    uint64_t hash = hasher_(tag);
     size_t idx_hash = idx_bucket_limit(hash);
     return idx ^ idx_hash;
 }

@@ -40,7 +40,7 @@ namespace apsi {
                     std::size_t bucket, std::uint32_t tag, bool kickout, std::uint32_t &old_tag);
 
                 /**
-                Delete a tag fromthe given bucket
+                Delete a tag from the given bucket
                 */
                 bool delete_tag(std::size_t bucket, std::uint32_t tag);
 
