@@ -5,8 +5,6 @@
 
 // STL
 #include <array>
-#include <cstdint>
-#include <cstddef>
 #include <memory>
 #include <vector>
 
