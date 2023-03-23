@@ -1,0 +1,24 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license.
+
+namespace apsi.fbs;
+
+table CuckooFilterOverflowCache {
+    index: uint64;
+    tag: uint32;
+    used: bool;
+}
+
+table CuckooFilterTable {
+    num_buckets: uint64;
+    bits_per_tag: uint64;
+    table: [uint64] (required);
+}
+
+table CuckooFilter {
+    table: CuckooFilterTable (required);
+    num_items: uint64;
+    overflow: CuckooFilterOverflowCache (required);
+}
+
+root_type CuckooFilter;

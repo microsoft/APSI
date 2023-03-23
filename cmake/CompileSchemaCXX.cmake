@@ -64,3 +64,11 @@ execute_process(
 if(result)
     message(FATAL_ERROR "flatc failed (${result})")
 endif()
+
+execute_process(
+    COMMAND ${FLATBUFFERS_FLATC_PATH} --cpp -o "${APSI_BUILD_DIR}/sender/apsi/util" "${APSI_SOURCE_DIR}/sender/apsi/util/cuckoo_filter.fbs"
+    OUTPUT_QUIET
+    RESULT_VARIABLE result)
+if(result)
+    message(FATAL_ERROR "flatc failed (${result})")
+endif()
