@@ -54,6 +54,51 @@ namespace APSITests {
         ASSERT_EQ(96, filter.get_num_items());
     }
 
+    TEST(SenderUtilsTests, CuckooFilterSerializeDeserializeBasics)
+    {
+        stringstream ss;
+        CuckooFilter filter_template(70 * 2, 12);
+        for (uint64_t elem = 1; elem <= 100; elem++) {
+            ASSERT_EQ(true, filter_template.add(elem));
+        }
+        auto save_size = filter_template.save(ss);
+
+        size_t bytes_read;
+        auto filter = CuckooFilter::Load(ss, bytes_read);
+        ASSERT_EQ(save_size, bytes_read);
+
+        for (uint64_t elem = 1; elem <= 100; elem++) {
+            ASSERT_EQ(true, filter.contains(elem));
+        }
+
+        ASSERT_EQ(true, filter.contains(1));
+        ASSERT_EQ(true, filter.contains(2));
+        ASSERT_EQ(true, filter.contains(10));
+        ASSERT_EQ(true, filter.contains(11));
+        ASSERT_EQ(true, filter.contains(20));
+        ASSERT_EQ(true, filter.contains(21));
+        ASSERT_EQ(true, filter.contains(80));
+        ASSERT_EQ(true, filter.contains(81));
+
+        ASSERT_EQ(100, filter.get_num_items());
+
+        ASSERT_EQ(true, filter.remove(1));
+        ASSERT_EQ(true, filter.remove(10));
+        ASSERT_EQ(true, filter.remove(20));
+        ASSERT_EQ(true, filter.remove(80));
+
+        ASSERT_EQ(false, filter.contains(1));
+        ASSERT_EQ(true, filter.contains(2));
+        ASSERT_EQ(false, filter.contains(10));
+        ASSERT_EQ(true, filter.contains(11));
+        ASSERT_EQ(false, filter.contains(20));
+        ASSERT_EQ(true, filter.contains(21));
+        ASSERT_EQ(false, filter.contains(80));
+        ASSERT_EQ(true, filter.contains(81));
+
+        ASSERT_EQ(96, filter.get_num_items());
+    }
+
     TEST(SenderUtilsTests, CuckooFilterLimits)
     {
         size_t max_items = 140;

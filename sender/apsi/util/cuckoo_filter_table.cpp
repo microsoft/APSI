@@ -40,6 +40,8 @@ namespace {
     };
 } // namespace
 
+CuckooFilterTable::CuckooFilterTable(std::vector<std::uint64_t> table_ , size_t num_buckets, std::size_t bits_per_tag): table_(table_), num_buckets_(num_buckets), bits_per_tag_(bits_per_tag), tag_input_mask_(static_cast<std::uint32_t>(-1) << bits_per_tag) {}
+
 CuckooFilterTable::CuckooFilterTable(size_t num_items, size_t bits_per_tag)
     : bits_per_tag_(bits_per_tag), tag_input_mask_(static_cast<std::uint32_t>(-1) << bits_per_tag)
 {

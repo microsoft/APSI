@@ -5,6 +5,8 @@
 
 // STL
 #include <array>
+#include <cstdint>
+#include <cstddef>
 #include <memory>
 #include <vector>
 
@@ -15,7 +17,6 @@
 namespace apsi {
     namespace sender {
         namespace util {
-
             /**
             Implementation of a Cuckoo Filter
             */
@@ -25,6 +26,8 @@ namespace apsi {
                 Build an instance of a Cuckoo Filter
                 */
                 CuckooFilter(std::size_t key_count_max, std::size_t bits_per_tag);
+
+                CuckooFilter(CuckooFilterTable& table, std::size_t table_num_items, std::size_t overflow_index, std::uint32_t overflow_tag, bool overflow_used);
 
                 /**
                 Indicates whether the given item is contained in the filter
@@ -49,6 +52,16 @@ namespace apsi {
                 {
                     return num_items_;
                 }
+
+                /**
+                Saves the CuckooFilter to a stream.
+                */
+                std::size_t save(std::ostream &out) const;
+
+                /**
+                Loads the CuckooFilter from a stream.
+                */
+                static CuckooFilter Load(std::istream& in, size_t& bytes_read);
 
             private:
                 /**
