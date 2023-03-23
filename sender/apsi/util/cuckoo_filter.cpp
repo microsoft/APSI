@@ -7,7 +7,6 @@
 // APSI
 #include "apsi/util/cuckoo_filter.h"
 #include "apsi/util/cuckoo_filter_generated.h"
-#include "apsi/version.h"
 #include "apsi/util/hash.h"
 #include "apsi/util/utils.h"
 
