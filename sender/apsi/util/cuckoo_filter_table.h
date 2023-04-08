@@ -24,6 +24,11 @@ namespace apsi {
                 CuckooFilterTable(std::size_t num_items, std::size_t bits_per_tag);
 
                 /**
+                Build an instance of a Cuckoo Filter Table
+                */
+                CuckooFilterTable(std::vector<std::uint64_t> table , std::size_t num_buckets, std::size_t bits_per_tag);
+
+                /**
                 Read the tag at the given bucket and tag index within the bucket
                 */
                 std::uint32_t read_tag(std::size_t bucket, std::size_t tag_idx) const;
@@ -58,6 +63,14 @@ namespace apsi {
                 std::size_t get_bits_per_tag() const
                 {
                     return bits_per_tag_;
+                }
+
+                /**
+                Get raw table data
+                */
+                std::vector<std::uint64_t> get_raw_table_data() const
+                {
+                    return table_;
                 }
 
                 /**
