@@ -22,7 +22,13 @@ namespace {
     HashFunc hasher_(/* seed */ 20);
 } // namespace
 
-CuckooFilter::CuckooFilter(CuckooFilterTable table, size_t table_num_items, size_t overflow_index, uint32_t overflow_tag, bool overflow_used){
+CuckooFilter::CuckooFilter(
+    CuckooFilterTable table,
+    size_t table_num_items,
+    size_t overflow_index,
+    uint32_t overflow_tag,
+    bool overflow_used)
+{
     table_ = make_unique<CuckooFilterTable>(move(table));
     num_items_ = table_num_items;
     overflow_ = OverflowCache();
@@ -145,7 +151,8 @@ size_t CuckooFilter::idx_bucket_limit(size_t value) const
     return value & mask;
 }
 
-void CuckooFilter::get_tag_and_index(gsl::span<const uint64_t> item, uint32_t &tag, size_t &idx) const
+void CuckooFilter::get_tag_and_index(
+    gsl::span<const uint64_t> item, uint32_t &tag, size_t &idx) const
 {
     uint64_t hash = hasher_(item);
     idx = idx_bucket_limit(hash >> 32);
@@ -198,13 +205,12 @@ size_t CuckooFilter::save(ostream &out) const
     auto cuckoo_filter = cuckoo_filter_builder.Finish();
     fbs_builder.FinishSizePrefixed(cuckoo_filter);
     out.write(
-        reinterpret_cast<const char *>(fbs_builder.GetBufferPointer()),
-        fbs_builder.GetSize());
+        reinterpret_cast<const char *>(fbs_builder.GetBufferPointer()), fbs_builder.GetSize());
 
     return fbs_builder.GetSize();
 }
 
-CuckooFilter CuckooFilter::Load(istream& in, size_t& bytes_read)
+CuckooFilter CuckooFilter::Load(istream &in, size_t &bytes_read)
 {
     vector<unsigned char> in_data(read_from_stream(in));
 
@@ -232,10 +238,9 @@ CuckooFilter CuckooFilter::Load(istream& in, size_t& bytes_read)
         cuckoo_filter_table_fbs->bits_per_tag());
 
     bytes_read = in_data.size();
-    return CuckooFilter{
-        move(cuckoo_filter_table),
-        cuckoo_filter_fbs->num_items(),
-        cuckoo_filter_fbs->overflow()->index(),
-        cuckoo_filter_fbs->overflow()->tag(),
-        cuckoo_filter_fbs->overflow()->used() };
+    return CuckooFilter{ move(cuckoo_filter_table),
+                         cuckoo_filter_fbs->num_items(),
+                         cuckoo_filter_fbs->overflow()->index(),
+                         cuckoo_filter_fbs->overflow()->tag(),
+                         cuckoo_filter_fbs->overflow()->used() };
 }

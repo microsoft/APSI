@@ -70,7 +70,8 @@ namespace apsi {
                                 static_cast<std::size_t>((data & 0xFF00000000000000ULL) >> 56)];
                 }
 
-                inline std::uint64_t operator()(gsl::span<const std::uint64_t> data) const noexcept {
+                inline std::uint64_t operator()(gsl::span<const std::uint64_t> data) const noexcept
+                {
                     std::uint64_t result = 0;
                     for (std::size_t i = 0; i < data.size(); i++) {
                         result ^= operator()(data[i]);
