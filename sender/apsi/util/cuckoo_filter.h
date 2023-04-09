@@ -29,8 +29,6 @@ namespace apsi {
                 */
                 CuckooFilter(std::size_t key_count_max, std::size_t bits_per_tag);
 
-                CuckooFilter(CuckooFilterTable& table, std::size_t table_num_items, std::size_t overflow_index, std::uint32_t overflow_tag, bool overflow_used);
-
                 /**
                 Indicates whether the given item is contained in the filter
                 */
@@ -87,7 +85,7 @@ namespace apsi {
                 /**
                 Loads the CuckooFilter from a stream.
                 */
-                static CuckooFilter Load(std::istream& in, size_t& bytes_read);
+                static CuckooFilter Load(std::istream& in, std::size_t &bytes_read);
 
             private:
                 /**
@@ -118,6 +116,11 @@ namespace apsi {
                 Table that holds element tags
                 */
                 std::unique_ptr<CuckooFilterTable> table_;
+
+                /**
+                Create a new CuckooFilter from loaded data
+                */
+                CuckooFilter(CuckooFilterTable table, std::size_t table_num_items, std::size_t overflow_index, std::uint32_t overflow_tag, bool overflow_used);
 
                 /**
                 Returns a tag (limited by number of bits per tag)

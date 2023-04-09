@@ -54,7 +54,7 @@ namespace APSITests {
         ASSERT_EQ(96, filter.get_num_items());
     }
 
-    TEST(SenderUtilsTests, CuckooFilterSerializeDeserializeBasics)
+    TEST(SenderUtilsTests, CuckooFilterSaveLoad)
     {
         stringstream ss;
         CuckooFilter filter_template(70 * 2, 12);

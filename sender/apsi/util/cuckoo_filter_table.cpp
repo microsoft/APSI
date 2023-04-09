@@ -40,12 +40,12 @@ namespace {
     };
 } // namespace
 
-CuckooFilterTable::CuckooFilterTable(std::vector<std::uint64_t> table_ , size_t num_buckets, std::size_t bits_per_tag): table_(table_), num_buckets_(num_buckets), bits_per_tag_(bits_per_tag), tag_input_mask_(static_cast<std::uint32_t>(-1) << bits_per_tag) {}
+CuckooFilterTable::CuckooFilterTable(vector<uint64_t> table_, size_t num_buckets, size_t bits_per_tag): table_(move(table_)), num_buckets_(num_buckets), bits_per_tag_(bits_per_tag), tag_input_mask_(static_cast<uint32_t>(-1) << bits_per_tag) {}
 
 CuckooFilterTable::CuckooFilterTable(size_t num_items, size_t bits_per_tag)
-    : bits_per_tag_(bits_per_tag), tag_input_mask_(static_cast<std::uint32_t>(-1) << bits_per_tag)
+    : bits_per_tag_(bits_per_tag), tag_input_mask_(static_cast<uint32_t>(-1) << bits_per_tag)
 {
-    num_buckets_ = next_power_of_2(std::max<uint64_t>(1, num_items / tags_per_bucket_));
+    num_buckets_ = next_power_of_2(max<uint64_t>(1, num_items / tags_per_bucket_));
     double items_to_bucket_ratio =
         static_cast<double>(num_items) /
         (static_cast<double>(num_buckets_) * static_cast<double>(tags_per_bucket_));
@@ -134,7 +134,7 @@ bool CuckooFilterTable::insert_tag(size_t bucket, uint32_t tag, bool kickout, ui
     return false;
 }
 
-bool CuckooFilterTable::delete_tag(std::size_t bucket, std::uint32_t tag)
+bool CuckooFilterTable::delete_tag(size_t bucket, uint32_t tag)
 {
     if (bucket >= num_buckets_) {
         throw invalid_argument("bucket out of range");
@@ -153,7 +153,7 @@ bool CuckooFilterTable::delete_tag(std::size_t bucket, std::uint32_t tag)
     return false;
 }
 
-bool CuckooFilterTable::find_tag_in_bucket(std::size_t bucket, std::uint32_t tag) const
+bool CuckooFilterTable::find_tag_in_bucket(size_t bucket, uint32_t tag) const
 {
     if (bucket >= num_buckets_) {
         throw invalid_argument("bucket out of range");
@@ -171,7 +171,7 @@ bool CuckooFilterTable::find_tag_in_bucket(std::size_t bucket, std::uint32_t tag
 }
 
 bool CuckooFilterTable::find_tag_in_buckets(
-    std::size_t bucket1, std::size_t bucket2, std::uint32_t tag) const
+    size_t bucket1, size_t bucket2, uint32_t tag) const
 {
     if (bucket1 >= num_buckets_) {
         throw invalid_argument("bucket1 out of range");

@@ -22,9 +22,8 @@ namespace {
     HashFunc hasher_(/* seed */ 20);
 } // namespace
 
-
-CuckooFilter::CuckooFilter(CuckooFilterTable& table, std::size_t table_num_items, std::size_t overflow_index, std::uint32_t overflow_tag, bool overflow_used){
-    table_ = make_unique<CuckooFilterTable>(table);
+CuckooFilter::CuckooFilter(CuckooFilterTable table, size_t table_num_items, size_t overflow_index, uint32_t overflow_tag, bool overflow_used){
+    table_ = make_unique<CuckooFilterTable>(move(table));
     num_items_ = table_num_items;
     overflow_ = OverflowCache();
     overflow_.index = overflow_index;
@@ -169,7 +168,7 @@ void CuckooFilter::try_eliminate_overflow()
     }
 }
 
-std::size_t CuckooFilter::save(std::ostream &out) const
+size_t CuckooFilter::save(ostream &out) const
 {
     flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
@@ -205,7 +204,7 @@ std::size_t CuckooFilter::save(std::ostream &out) const
     return fbs_builder.GetSize();
 }
 
-CuckooFilter CuckooFilter::Load(std::istream& in, size_t& bytes_read)
+CuckooFilter CuckooFilter::Load(istream& in, size_t& bytes_read)
 {
     vector<unsigned char> in_data(read_from_stream(in));
 
@@ -220,25 +219,23 @@ CuckooFilter CuckooFilter::Load(std::istream& in, size_t& bytes_read)
     auto cuckoo_filter_table_fbs = cuckoo_filter_fbs->table();
     auto cuckoo_filter_table_data_fbs = cuckoo_filter_table_fbs->table();
 
-    std::vector<std::uint64_t> cuckoo_filter_table_data;
+    vector<uint64_t> cuckoo_filter_table_data;
+    cuckoo_filter_table_data.reserve(cuckoo_filter_table_data_fbs->size());
     copy(
         cuckoo_filter_table_data_fbs->cbegin(),
         cuckoo_filter_table_data_fbs->cend(),
-        inserter(cuckoo_filter_table_data, cuckoo_filter_table_data.end()));
+        back_inserter(cuckoo_filter_table_data));
 
     auto cuckoo_filter_table = CuckooFilterTable(
-        cuckoo_filter_table_data,
+        move(cuckoo_filter_table_data),
         cuckoo_filter_table_fbs->num_buckets(),
         cuckoo_filter_table_fbs->bits_per_tag());
 
     bytes_read = in_data.size();
-    return CuckooFilter(
-        cuckoo_filter_table,
+    return CuckooFilter{
+        move(cuckoo_filter_table),
         cuckoo_filter_fbs->num_items(),
         cuckoo_filter_fbs->overflow()->index(),
         cuckoo_filter_fbs->overflow()->tag(),
-        cuckoo_filter_fbs->overflow()->used());
-
-    // return std::make_pair(cuckoo_filter, in_data.size());
-    // return { cuckoo_filter, in_data.size() };
+        cuckoo_filter_fbs->overflow()->used() };
 }
