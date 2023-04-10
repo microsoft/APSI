@@ -40,7 +40,11 @@ namespace {
     };
 } // namespace
 
-CuckooFilterTable::CuckooFilterTable(vector<uint64_t> table_, size_t num_buckets, size_t bits_per_tag): table_(move(table_)), num_buckets_(num_buckets), bits_per_tag_(bits_per_tag), tag_input_mask_(static_cast<uint32_t>(-1) << bits_per_tag) {}
+CuckooFilterTable::CuckooFilterTable(
+    vector<uint64_t> table_, size_t num_buckets, size_t bits_per_tag)
+    : table_(move(table_)), num_buckets_(num_buckets), bits_per_tag_(bits_per_tag),
+      tag_input_mask_(static_cast<uint32_t>(-1) << bits_per_tag)
+{}
 
 CuckooFilterTable::CuckooFilterTable(size_t num_items, size_t bits_per_tag)
     : bits_per_tag_(bits_per_tag), tag_input_mask_(static_cast<uint32_t>(-1) << bits_per_tag)
@@ -170,8 +174,7 @@ bool CuckooFilterTable::find_tag_in_bucket(size_t bucket, uint32_t tag) const
     return false;
 }
 
-bool CuckooFilterTable::find_tag_in_buckets(
-    size_t bucket1, size_t bucket2, uint32_t tag) const
+bool CuckooFilterTable::find_tag_in_buckets(size_t bucket1, size_t bucket2, uint32_t tag) const
 {
     if (bucket1 >= num_buckets_) {
         throw invalid_argument("bucket1 out of range");

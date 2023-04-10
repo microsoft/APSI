@@ -5,8 +5,8 @@
 
 // STL
 #include <array>
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -53,7 +53,8 @@ namespace apsi {
                 Add an item to the Cuckoo Filter. Will fail if there is no more space to store
                 items.
                 */
-                inline bool add(std::uint64_t item) {
+                inline bool add(std::uint64_t item)
+                {
                     return add({ &item, 1 });
                 }
 
@@ -65,7 +66,8 @@ namespace apsi {
                 /**
                 Remove an item from the Cuckoo Filter.
                 */
-                bool remove(std::uint64_t item) {
+                bool remove(std::uint64_t item)
+                {
                     return remove({ &item, 1 });
                 }
 
@@ -85,7 +87,7 @@ namespace apsi {
                 /**
                 Loads the CuckooFilter from a stream.
                 */
-                static CuckooFilter Load(std::istream& in, std::size_t &bytes_read);
+                static CuckooFilter Load(std::istream &in, std::size_t &bytes_read);
 
             private:
                 /**
@@ -120,7 +122,12 @@ namespace apsi {
                 /**
                 Create a new CuckooFilter from loaded data
                 */
-                CuckooFilter(CuckooFilterTable table, std::size_t table_num_items, std::size_t overflow_index, std::uint32_t overflow_tag, bool overflow_used);
+                CuckooFilter(
+                    CuckooFilterTable table,
+                    std::size_t table_num_items,
+                    std::size_t overflow_index,
+                    std::uint32_t overflow_tag,
+                    bool overflow_used);
 
                 /**
                 Returns a tag (limited by number of bits per tag)
@@ -136,7 +143,9 @@ namespace apsi {
                 Get the tag and bucket index for a given element
                 */
                 void get_tag_and_index(
-                    gsl::span<const std::uint64_t> item, std::uint32_t &tag, std::size_t &idx) const;
+                    gsl::span<const std::uint64_t> item,
+                    std::uint32_t &tag,
+                    std::size_t &idx) const;
 
                 /**
                 Get the alternate index for a given tag/index combination
