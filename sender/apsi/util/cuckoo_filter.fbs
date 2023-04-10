@@ -5,7 +5,7 @@ namespace apsi.fbs;
 
 table CuckooFilterOverflowCache {
     index: uint64;
-    tag: uint32;
+    tag: uint64;
     used: bool;
 }
 

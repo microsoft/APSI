@@ -26,7 +26,7 @@ CuckooFilter::CuckooFilter(
     CuckooFilterTable table,
     size_t table_num_items,
     size_t overflow_index,
-    uint32_t overflow_tag,
+    uint64_t overflow_tag,
     bool overflow_used)
 {
     table_ = make_unique<CuckooFilterTable>(move(table));
@@ -46,7 +46,7 @@ CuckooFilter::CuckooFilter(size_t key_count_max, size_t bits_per_tag) : num_item
 bool CuckooFilter::contains(gsl::span<const uint64_t> item) const
 {
     size_t idx1, idx2;
-    uint32_t tag;
+    uint64_t tag;
 
     get_tag_and_index(item, tag, idx1);
     idx2 = get_alt_index(idx1, tag);
@@ -66,7 +66,7 @@ bool CuckooFilter::add(gsl::span<const uint64_t> item)
         return false;
     }
 
-    uint32_t tag;
+    uint64_t tag;
     size_t idx;
     get_tag_and_index(item, tag, idx);
 
@@ -78,11 +78,11 @@ bool CuckooFilter::add(gsl::span<const uint64_t> item)
     return result;
 }
 
-bool CuckooFilter::add_index_tag(size_t idx, uint32_t tag)
+bool CuckooFilter::add_index_tag(size_t idx, uint64_t tag)
 {
     size_t curr_idx = idx;
-    uint32_t curr_tag = tag;
-    uint32_t old_tag = 0;
+    uint64_t curr_tag = tag;
+    uint64_t old_tag = 0;
 
     for (size_t i = 0; i < max_cuckoo_kicks_; i++) {
         bool kickout = i > 0;
@@ -110,7 +110,7 @@ bool CuckooFilter::add_index_tag(size_t idx, uint32_t tag)
 bool CuckooFilter::remove(gsl::span<const uint64_t> item)
 {
     size_t idx1, idx2;
-    uint32_t tag;
+    uint64_t tag;
 
     get_tag_and_index(item, tag, idx1);
     idx2 = get_alt_index(idx1, tag);
@@ -137,10 +137,11 @@ bool CuckooFilter::remove(gsl::span<const uint64_t> item)
     return false;
 }
 
-uint32_t CuckooFilter::tag_bit_limit(uint32_t value) const
+uint64_t CuckooFilter::tag_bit_limit(uint64_t value) const
 {
-    uint32_t mask = (1 << static_cast<uint32_t>(table_->get_bits_per_tag())) - 1;
-    uint32_t tag = value & mask;
+    size_t bits_per_tag = table_->get_bits_per_tag();
+    uint64_t mask = ~uint64_t(0) >> (64 - bits_per_tag);
+    uint64_t tag = value & mask;
     tag += (tag == 0);
     return tag;
 }
@@ -152,14 +153,14 @@ size_t CuckooFilter::idx_bucket_limit(size_t value) const
 }
 
 void CuckooFilter::get_tag_and_index(
-    gsl::span<const uint64_t> item, uint32_t &tag, size_t &idx) const
+    gsl::span<const uint64_t> item, uint64_t &tag, size_t &idx) const
 {
     uint64_t hash = hasher_(item);
-    idx = idx_bucket_limit(hash >> 32);
-    tag = tag_bit_limit(static_cast<uint32_t>(hash));
+    idx = idx_bucket_limit(hash);
+    tag = tag_bit_limit(hash);
 }
 
-size_t CuckooFilter::get_alt_index(size_t idx, uint32_t tag) const
+size_t CuckooFilter::get_alt_index(size_t idx, uint64_t tag) const
 {
     uint64_t hash = hasher_(tag);
     size_t idx_hash = idx_bucket_limit(hash);
@@ -224,6 +225,12 @@ CuckooFilter CuckooFilter::Load(istream &in, size_t &bytes_read)
     auto cuckoo_filter_fbs = fbs::GetSizePrefixedCuckooFilter(in_data.data());
     auto cuckoo_filter_table_fbs = cuckoo_filter_fbs->table();
     auto cuckoo_filter_table_data_fbs = cuckoo_filter_table_fbs->table();
+
+    // Check that bits_per_tag is within bounds
+    size_t bits_per_tag = cuckoo_filter_table_fbs->bits_per_tag();
+    if (bits_per_tag == 0 || bits_per_tag > 64) {
+        throw runtime_error("bits_per_tag cannot be 0 or bigger than 64");
+    }
 
     vector<uint64_t> cuckoo_filter_table_data;
     cuckoo_filter_table_data.reserve(cuckoo_filter_table_data_fbs->size());

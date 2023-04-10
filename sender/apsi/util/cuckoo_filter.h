@@ -105,7 +105,7 @@ namespace apsi {
                 */
                 struct OverflowCache {
                     std::size_t index;
-                    std::uint32_t tag;
+                    std::uint64_t tag;
                     bool used;
                 };
 
@@ -126,13 +126,13 @@ namespace apsi {
                     CuckooFilterTable table,
                     std::size_t table_num_items,
                     std::size_t overflow_index,
-                    std::uint32_t overflow_tag,
+                    std::uint64_t overflow_tag,
                     bool overflow_used);
 
                 /**
                 Returns a tag (limited by number of bits per tag)
                 */
-                std::uint32_t tag_bit_limit(std::uint32_t value) const;
+                std::uint64_t tag_bit_limit(std::uint64_t value) const;
 
                 /**
                 Returns a bucket index (limited by number of buckets)
@@ -144,18 +144,18 @@ namespace apsi {
                 */
                 void get_tag_and_index(
                     gsl::span<const std::uint64_t> item,
-                    std::uint32_t &tag,
+                    std::uint64_t &tag,
                     std::size_t &idx) const;
 
                 /**
                 Get the alternate index for a given tag/index combination
                 */
-                std::size_t get_alt_index(std::size_t idx, std::uint32_t tag) const;
+                std::size_t get_alt_index(std::size_t idx, std::uint64_t tag) const;
 
                 /**
                 Add the given tag/index combination to the table
                 */
-                bool add_index_tag(std::size_t idx, std::uint32_t tag);
+                bool add_index_tag(std::size_t idx, std::uint64_t tag);
 
                 /**
                 Try to eliminate the current overflow item

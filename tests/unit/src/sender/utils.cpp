@@ -54,6 +54,46 @@ namespace APSITests {
         ASSERT_EQ(96, filter.get_num_items());
     }
 
+    TEST(SenderUtilsTests, CuckooFilterLongTag)
+    {
+        CuckooFilter filter(70 * 2, 63);
+
+        for (uint64_t elem = 1; elem <= 100; elem++) {
+            ASSERT_EQ(true, filter.add(elem));
+        }
+
+        for (uint64_t elem = 1; elem <= 100; elem++) {
+            ASSERT_EQ(true, filter.contains(elem));
+        }
+
+        ASSERT_EQ(true, filter.contains(1));
+        ASSERT_EQ(true, filter.contains(2));
+        ASSERT_EQ(true, filter.contains(10));
+        ASSERT_EQ(true, filter.contains(11));
+        ASSERT_EQ(true, filter.contains(20));
+        ASSERT_EQ(true, filter.contains(21));
+        ASSERT_EQ(true, filter.contains(80));
+        ASSERT_EQ(true, filter.contains(81));
+
+        ASSERT_EQ(100, filter.get_num_items());
+
+        ASSERT_EQ(true, filter.remove(1));
+        ASSERT_EQ(true, filter.remove(10));
+        ASSERT_EQ(true, filter.remove(20));
+        ASSERT_EQ(true, filter.remove(80));
+
+        ASSERT_EQ(false, filter.contains(1));
+        ASSERT_EQ(true, filter.contains(2));
+        ASSERT_EQ(false, filter.contains(10));
+        ASSERT_EQ(true, filter.contains(11));
+        ASSERT_EQ(false, filter.contains(20));
+        ASSERT_EQ(true, filter.contains(21));
+        ASSERT_EQ(false, filter.contains(80));
+        ASSERT_EQ(true, filter.contains(81));
+
+        ASSERT_EQ(96, filter.get_num_items());
+    }
+
     TEST(SenderUtilsTests, CuckooFilterSaveLoad)
     {
         stringstream ss;

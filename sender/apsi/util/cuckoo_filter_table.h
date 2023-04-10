@@ -42,23 +42,23 @@ namespace apsi {
                 /**
                 Read the tag at the given bucket and tag index within the bucket
                 */
-                std::uint32_t read_tag(std::size_t bucket, std::size_t tag_idx) const;
+                std::uint64_t read_tag(std::size_t bucket, std::size_t tag_idx) const;
 
                 /**
                 Write a tag at the given bucket and tag index within the bucket
                 */
-                void write_tag(std::size_t bucket, std::size_t tag_idx, std::uint32_t tag);
+                void write_tag(std::size_t bucket, std::size_t tag_idx, std::uint64_t tag);
 
                 /**
                 Insert a tag in the given bucket
                 */
                 bool insert_tag(
-                    std::size_t bucket, std::uint32_t tag, bool kickout, std::uint32_t &old_tag);
+                    std::size_t bucket, std::uint64_t tag, bool kickout, std::uint64_t &old_tag);
 
                 /**
                 Delete a tag from the given bucket
                 */
-                bool delete_tag(std::size_t bucket, std::uint32_t tag);
+                bool delete_tag(std::size_t bucket, std::uint64_t tag);
 
                 /**
                 Get the number of buckets
@@ -79,13 +79,13 @@ namespace apsi {
                 /**
                 Find a tag in the given bucket
                 */
-                bool find_tag_in_bucket(std::size_t bucket, std::uint32_t tag) const;
+                bool find_tag_in_bucket(std::size_t bucket, std::uint64_t tag) const;
 
                 /**
                 Find a tag in the given buckets
                 */
                 bool find_tag_in_buckets(
-                    std::size_t bucket1, std::size_t bucket2, std::uint32_t tag) const;
+                    std::size_t bucket1, std::size_t bucket2, std::uint64_t tag) const;
 
             private:
                 /**
@@ -101,7 +101,7 @@ namespace apsi {
                 /**
                 Input elements will be limited with this mask
                 */
-                std::uint32_t tag_input_mask_;
+                std::uint64_t tag_input_mask_;
 
                 /**
                 The bucket table is encoded as an array of uint64_t

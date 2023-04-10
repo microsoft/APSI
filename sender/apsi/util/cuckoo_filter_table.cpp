@@ -42,13 +42,26 @@ namespace {
 
 CuckooFilterTable::CuckooFilterTable(
     vector<uint64_t> table_, size_t num_buckets, size_t bits_per_tag)
-    : table_(move(table_)), num_buckets_(num_buckets), bits_per_tag_(bits_per_tag),
-      tag_input_mask_(static_cast<uint32_t>(-1) << bits_per_tag)
-{}
+    : table_(move(table_)), num_buckets_(num_buckets), bits_per_tag_(bits_per_tag)
+{
+    if (bits_per_tag == 0 || bits_per_tag > 64) {
+        throw invalid_argument("bits_per_tag cannot be 0 or bigger than 64");
+    }
+
+    // This is used to check that tags are not too big
+    tag_input_mask_ = ~uint64_t(0) << bits_per_tag;
+}
 
 CuckooFilterTable::CuckooFilterTable(size_t num_items, size_t bits_per_tag)
-    : bits_per_tag_(bits_per_tag), tag_input_mask_(static_cast<uint32_t>(-1) << bits_per_tag)
+    : bits_per_tag_(bits_per_tag)
 {
+    if (bits_per_tag == 0 || bits_per_tag > 64) {
+        throw invalid_argument("bits_per_tag cannot be 0 or bigger than 64");
+    }
+
+    // This is used to check that tags are not too big
+    tag_input_mask_ = ~uint64_t(0) << bits_per_tag;
+
     num_buckets_ = next_power_of_2(max<uint64_t>(1, num_items / tags_per_bucket_));
     double items_to_bucket_ratio =
         static_cast<double>(num_items) /
@@ -65,7 +78,7 @@ CuckooFilterTable::CuckooFilterTable(size_t num_items, size_t bits_per_tag)
     table_.resize(num_uint64);
 }
 
-uint32_t CuckooFilterTable::read_tag(size_t bucket, size_t tag_idx) const
+uint64_t CuckooFilterTable::read_tag(size_t bucket, size_t tag_idx) const
 {
     if (bucket >= num_buckets_) {
         throw invalid_argument("bucket out of range");
@@ -77,21 +90,20 @@ uint32_t CuckooFilterTable::read_tag(size_t bucket, size_t tag_idx) const
     TagIndexInfo tii(bits_per_tag_, tags_per_bucket_, bucket, tag_idx);
 
     uint64_t tag_word = table_[tii.tag_start_idx];
-    uint64_t mask = ~(~static_cast<uint64_t>(0) << tii.bits_first_word);
-    uint32_t tag = static_cast<uint32_t>((tag_word >> tii.tag_start_offset) & mask);
+    uint64_t mask = ~(~uint64_t(0) << tii.bits_first_word);
+    uint64_t tag = (tag_word >> tii.tag_start_offset) & mask;
 
     if (tii.bits_second_word != 0) {
         // The tag needs to be completed with the next uint64_t
         tag_word = table_[tii.tag_start_idx + 1];
-        mask = ~(~static_cast<uint64_t>(0) << tii.bits_second_word);
-        tag |= (static_cast<uint32_t>(tag_word) & static_cast<uint32_t>(mask))
-               << tii.bits_first_word;
+        mask = ~(~uint64_t(0) << tii.bits_second_word);
+        tag |= (tag_word & mask) << tii.bits_first_word;
     }
 
     return tag;
 }
 
-void CuckooFilterTable::write_tag(size_t bucket, size_t tag_idx, uint32_t tag)
+void CuckooFilterTable::write_tag(size_t bucket, size_t tag_idx, uint64_t tag)
 {
     if (bucket >= num_buckets_) {
         throw invalid_argument("bucket out of range");
@@ -105,22 +117,22 @@ void CuckooFilterTable::write_tag(size_t bucket, size_t tag_idx, uint32_t tag)
 
     TagIndexInfo tii(bits_per_tag_, tags_per_bucket_, bucket, tag_idx);
 
-    uint64_t tag_ones = (1ull << bits_per_tag_) - 1;
+    uint64_t tag_ones = ~tag_input_mask_;
     uint64_t tag_mask = ~(tag_ones << tii.tag_start_offset);
-    uint64_t tag_word = static_cast<uint64_t>(tag) << tii.tag_start_offset;
+    uint64_t tag_word = tag << tii.tag_start_offset;
     table_[tii.tag_start_idx] &= tag_mask;
     table_[tii.tag_start_idx] |= tag_word;
 
     if (tii.bits_second_word != 0) {
         // Write the rest of the tag to the next uint64_t
         tag_mask = ~(tag_ones >> tii.bits_first_word);
-        tag_word = static_cast<uint64_t>(tag) >> tii.bits_first_word;
+        tag_word = tag >> tii.bits_first_word;
         table_[tii.tag_start_idx + 1] &= tag_mask;
         table_[tii.tag_start_idx + 1] |= tag_word;
     }
 }
 
-bool CuckooFilterTable::insert_tag(size_t bucket, uint32_t tag, bool kickout, uint32_t &old_tag)
+bool CuckooFilterTable::insert_tag(size_t bucket, uint64_t tag, bool kickout, uint64_t &old_tag)
 {
     for (size_t i = 0; i < tags_per_bucket_; i++) {
         if (read_tag(bucket, i) == 0) {
@@ -138,7 +150,7 @@ bool CuckooFilterTable::insert_tag(size_t bucket, uint32_t tag, bool kickout, ui
     return false;
 }
 
-bool CuckooFilterTable::delete_tag(size_t bucket, uint32_t tag)
+bool CuckooFilterTable::delete_tag(size_t bucket, uint64_t tag)
 {
     if (bucket >= num_buckets_) {
         throw invalid_argument("bucket out of range");
@@ -157,7 +169,7 @@ bool CuckooFilterTable::delete_tag(size_t bucket, uint32_t tag)
     return false;
 }
 
-bool CuckooFilterTable::find_tag_in_bucket(size_t bucket, uint32_t tag) const
+bool CuckooFilterTable::find_tag_in_bucket(size_t bucket, uint64_t tag) const
 {
     if (bucket >= num_buckets_) {
         throw invalid_argument("bucket out of range");
@@ -174,7 +186,7 @@ bool CuckooFilterTable::find_tag_in_bucket(size_t bucket, uint32_t tag) const
     return false;
 }
 
-bool CuckooFilterTable::find_tag_in_buckets(size_t bucket1, size_t bucket2, uint32_t tag) const
+bool CuckooFilterTable::find_tag_in_buckets(size_t bucket1, size_t bucket2, uint64_t tag) const
 {
     if (bucket1 >= num_buckets_) {
         throw invalid_argument("bucket1 out of range");
