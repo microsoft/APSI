@@ -183,8 +183,7 @@ The shortest item length we support (after truncation) is 80 bits, which is stil
 The second trick is to break up each item into multiple parts and encode them separately into consecutive batching slots.
 Namely, if `plain_modulus` is a `B`-bit prime, then we write only `B - 1` bits of an item into a batching slot and the next `B - 1` bits into the next slot.
 One downside is that a batched plaintext/ciphertext now only holds a fraction of `poly_modulus_degree` items.
-Typically we would use either 4 or 8 slots per item.
-For example, if `plain_modulus` is a 20-bit prime, then 4 slots could encode an item of length 80, and the query ciphertext `Q` (and its powers) can encrypt up to `poly_modulus_degree / 4` of the receiver's items.
+For example, if `plain_modulus` is a 21-bit prime, then 4 slots could encode an item of length 80, and the query ciphertext `Q` (and its powers) can encrypt up to `poly_modulus_degree / 4` of the receiver's items.
 The receiver now queries substantially fewer items than before.
 The solution is to decouple the cuckoo hash table size from the `poly_modulus_degree` and simply use two or more ciphertexts to encrypt `{X_i}` (and their powers).
 
