@@ -8,7 +8,7 @@ macro(check_for_avx target)
     include(CheckCXXSourceRuns)
     set(CMAKE_REQUIRED_FLAGS)
 
-    if (APSI_DETECT_AVX)
+    if(APSI_USE_AVX)
         # Check AVX
         if(MSVC AND MSVC_VERSION GREATER_EQUAL 1600)
             set(CMAKE_REQUIRED_FLAGS "/arch:AVX")
@@ -37,7 +37,7 @@ macro(check_for_avx target)
             HAVE_AVX_EXTENSIONS)
     endif()
 
-    if (APSI_DETECT_AVX2)
+    if(APSI_USE_AVX2)
         # Check AVX2
         if(MSVC AND MSVC_VERSION GREATER_EQUAL 1800)
             set(CMAKE_REQUIRED_FLAGS "/arch:AVX2")
