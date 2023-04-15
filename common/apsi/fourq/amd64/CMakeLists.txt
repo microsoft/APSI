@@ -2,8 +2,8 @@
 # Licensed under the MIT license.
 
 # Source files in this directory
-if(APSI_FOURQ_USE_ASM)
-    if(HAVE_AVX2_EXTENSIONS)
+if(APSI_USE_ASM)
+    if(APSI_USE_AVX2)
         set(APSI_SOURCE_FILES ${APSI_SOURCE_FILES}
             ${CMAKE_CURRENT_LIST_DIR}/consts.c
             ${CMAKE_CURRENT_LIST_DIR}/fp2_1271_AVX2.S
