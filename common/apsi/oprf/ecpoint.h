@@ -13,16 +13,13 @@
 // GSL
 #include "gsl/span"
 
-// FourQ
-#include "apsi/fourq/FourQ.h"
-
 namespace apsi {
     namespace oprf {
         class ECPoint {
         public:
-            static constexpr std::size_t save_size = sizeof(f2elm_t);
-            static constexpr std::size_t point_size = sizeof(point_t);
-            static constexpr std::size_t order_size = sizeof(digit_t) * NWORDS_ORDER;
+            static constexpr std::size_t save_size = 32;
+            static constexpr std::size_t point_size = 64;
+            static constexpr std::size_t order_size = 32;
 
             using scalar_type = std::array<unsigned char, order_size>;
             using scalar_const_type = const scalar_type;
@@ -31,6 +28,12 @@ namespace apsi {
             using scalar_span_const_type = gsl::span<const unsigned char, order_size>;
 
             using input_span_const_type = gsl::span<const unsigned char>;
+
+            using point_type = std::array<unsigned char, point_size>;
+            using point_const_type = const point_type;
+
+            using point_span_type = gsl::span<unsigned char, point_size>;
+            using point_span_const_type = gsl::span<const unsigned char, point_size>;
 
             using point_save_span_type = gsl::span<unsigned char, save_size>;
             using point_save_span_const_type = gsl::span<const unsigned char, save_size>;
@@ -41,7 +44,7 @@ namespace apsi {
             using hash_span_type = gsl::span<unsigned char, hash_size>;
 
             // Initializes the ECPoint with the neutral element
-            ECPoint() = default;
+            ECPoint();
 
             ECPoint &operator=(const ECPoint &assign);
 
@@ -73,8 +76,7 @@ namespace apsi {
             void extract_hash(hash_span_type out) const;
 
         private:
-            // Initialize to neutral element
-            point_t pt_ = { { { { 0 } }, { { 1 } } } }; // { {.x = { 0 }, .y = { 1 } }};
+            point_type pt_{};
         };                                              // class ECPoint
     }                                                   // namespace oprf
 } // namespace apsi

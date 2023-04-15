@@ -10,6 +10,7 @@
 #include "apsi/util/utils.h"
 
 // FourQ
+#include "apsi/fourq/FourQ.h"
 #include "apsi/fourq/FourQ_api.h"
 #include "apsi/fourq/FourQ_internal.h"
 #include "apsi/fourq/random.h"
@@ -23,7 +24,26 @@ using namespace seal;
 
 namespace apsi {
     namespace oprf {
+        // Ensure our size constants are correct
+        static_assert(ECPoint::save_size == sizeof(f2elm_t));
+        static_assert(ECPoint::point_size == sizeof(point_t));
+        static_assert(ECPoint::order_size == sizeof(digit_t) * NWORDS_ORDER);
+
         namespace {
+            constexpr point_t neutral = { { { { 0 } }, { { 1 } } } }; // { {.x = { 0 }, .y = { 1 } }};
+
+            void set_neutral_point(ECPoint::point_span_type pt) {
+                copy_n(reinterpret_cast<const unsigned char *>(neutral), ECPoint::point_size, pt.data());
+            }
+
+            void fourq_point_to_point_type(const point_t fourq_pt, ECPoint::point_span_type pt) {
+                copy_n(reinterpret_cast<const unsigned char *>(fourq_pt), ECPoint::point_size, pt.data());
+            }
+
+            void point_type_to_fourq_point(ECPoint::point_span_const_type pt, point_t fourq_pt) {
+                copy_n(pt.data(), ECPoint::point_size, reinterpret_cast<unsigned char *>(fourq_pt));
+            }
+
             void random_scalar(ECPoint::scalar_span_type value)
             {
                 random_bytes(value.data(), seal::util::safe_cast<unsigned int>(value.size()));
@@ -47,6 +67,11 @@ namespace apsi {
             }
         } // namespace
 
+        ECPoint::ECPoint()
+        {
+            set_neutral_point(pt_);
+        }
+
         ECPoint::ECPoint(input_span_const_type value)
         {
             if (!value.empty()) {
@@ -67,7 +92,9 @@ namespace apsi {
                 mod1271(r[1]);
 
                 // Create an elliptic curve point
-                HashToCurve(r, pt_);
+                point_t pt;
+                HashToCurve(r, pt);
+                fourq_point_to_point_type(pt, pt_);
             }
         }
 
@@ -93,11 +120,15 @@ namespace apsi {
         bool ECPoint::scalar_multiply(scalar_span_const_type scalar, bool clear_cofactor)
         {
             // The ecc_mul functions returns false when the input point is not a valid curve point
-            return ecc_mul(
-                pt_,
+            point_t pt_P, pt_Q;
+            point_type_to_fourq_point(pt_, pt_P);
+            bool ret = ecc_mul(
+                pt_P,
                 const_cast<digit_t *>(reinterpret_cast<const digit_t *>(scalar.data())),
-                pt_,
+                pt_Q,
                 clear_cofactor);
+            fourq_point_to_point_type(pt_Q, pt_);
+            return ret;
         }
 
         ECPoint &ECPoint::operator=(const ECPoint &assign)
@@ -115,8 +146,9 @@ namespace apsi {
 
             try {
                 array<unsigned char, save_size> buf;
-                point_t pt_copy{ pt_[0] };
-                encode(pt_copy, buf.data());
+                point_t pt;
+                point_type_to_fourq_point(pt_, pt);
+                encode(pt, buf.data());
                 stream.write(reinterpret_cast<const char *>(buf.data()), save_size);
             } catch (const ios_base::failure &) {
                 stream.exceptions(old_ex_mask);
@@ -133,10 +165,13 @@ namespace apsi {
             try {
                 array<unsigned char, save_size> buf;
                 stream.read(reinterpret_cast<char *>(buf.data()), save_size);
-                if (decode(buf.data(), pt_) != ECCRYPTO_SUCCESS) {
+
+                point_t pt;
+                if (decode(buf.data(), pt) != ECCRYPTO_SUCCESS) {
                     stream.exceptions(old_ex_mask);
                     throw logic_error("invalid point");
                 }
+                fourq_point_to_point_type(pt, pt_);
             } catch (const ios_base::failure &) {
                 stream.exceptions(old_ex_mask);
                 throw;
@@ -146,21 +181,26 @@ namespace apsi {
 
         void ECPoint::save(point_save_span_type out) const
         {
-            point_t pt_copy{ pt_[0] };
-            encode(pt_copy, out.data());
+            point_t pt;
+            point_type_to_fourq_point(pt_, pt);
+            encode(pt, out.data());
         }
 
         void ECPoint::load(point_save_span_const_type in)
         {
-            if (decode(in.data(), pt_) != ECCRYPTO_SUCCESS) {
+            point_t pt;
+            if (decode(in.data(), pt) != ECCRYPTO_SUCCESS) {
                 throw logic_error("invalid point");
             }
+            fourq_point_to_point_type(pt, pt_);
         }
 
         void ECPoint::extract_hash(hash_span_type out) const
         {
             // Compute a Blake2b hash of the value and expand to hash_size
-            APSI_blake2b(out.data(), out.size(), pt_->y, sizeof(f2elm_t), nullptr, 0);
+            point_t pt;
+            point_type_to_fourq_point(pt_, pt);
+            APSI_blake2b(out.data(), out.size(), pt->y, sizeof(f2elm_t), nullptr, 0);
         }
     } // namespace oprf
 } // namespace apsi

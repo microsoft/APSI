@@ -26,7 +26,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
-project(APSI VERSION 0.9.1 LANGUAGES CXX C)
+project(APSI VERSION 0.11.0 LANGUAGES CXX C)
 
 # This policy was introduced in CMake 3.13; OLD by default until CMake 3.21
 cmake_policy(SET CMP0077 NEW)
@@ -72,15 +72,20 @@ set(APSI_SECURE_COMPILE_OPTIONS_OPTION_STR "Enable Control Flow Guard and Spectr
 option(APSI_SECURE_COMPILE_OPTIONS ${APSI_SECURE_COMPILE_OPTIONS_OPTION_STR} OFF)
 mark_as_advanced(APSI_SECURE_COMPILE_OPTIONS)
 
-# Enable AVX detection
-set(APSI_DETECT_AVX_OPTION_STR "Detect the presence of AVX extensions")
-option(APSI_DETECT_AVX ${APSI_DETECT_AVX_OPTION_STR} ON)
-mark_as_advanced(APSI_DETECT_AVX)
+# Enable AVX implementation
+set(APSI_USE_AVX_OPTION_STR "Use AVX extensions if available")
+option(APSI_USE_AVX ${APSI_USE_AVX_OPTION_STR} ON)
+mark_as_advanced(APSI_USE_AVX)
 
-# Enable AVX2 detection
-set(APSI_DETECT_AVX2_OPTION_STR "Detect the presence of AVX2 extensions")
-option(APSI_DETECT_AVX2 ${APSI_DETECT_AVX2_OPTION_STR} ON)
-mark_as_advanced(APSI_DETECT_AVX2)
+# Enable AVX2 implementation
+set(APSI_USE_AVX2_OPTION_STR "Use AVX2 extensions if available")
+option(APSI_USE_AVX2 ${APSI_USE_AVX2_OPTION_STR} ON)
+mark_as_advanced(APSI_USE_AVX2)
+
+# Enable ASM implementation
+set(APSI_USE_ASM_OPTION_STR "Use ASM implementation (static UNIX builds only)")
+option(APSI_USE_ASM ${APSI_USE_ASM_OPTION_STR} ON)
+mark_as_advanced(APSI_USE_ASM)
 
 # Path for output
 set(OUTLIB_PATH "lib")
@@ -280,10 +285,10 @@ elseif (UNIX)
     target_compile_options(apsi PUBLIC -D__LINUX__)
 endif()
 
-# Set architecture
+# Detect architecture
 include(DetectArch)
 if(APSI_FOURQ_ARM64)
-    # _ARM64_ needs to be set whether the ARM64 optimizations are used
+    # _ARM64_ needs to be set if the ARM64 optimizations are used
     # (in UNIX) or the generic implementation is used (Windows)
     target_compile_options(apsi PUBLIC -D_ARM64_)
 endif()
@@ -294,38 +299,43 @@ endif()
 if(APSI_FOURQ_AMD64)
     target_compile_options(apsi PUBLIC -D_AMD64_)
     message(STATUS "FourQlib optimization: arch=AMD64")
-elseif (APSI_FOURQ_ARM64 AND UNIX)
+elseif(APSI_FOURQ_ARM64 AND UNIX)
     message(STATUS "FourQlib optimization: arch=ARM64")
 else()
     target_compile_options(apsi PUBLIC -D_GENERIC_)
     message(STATUS "FourQlib optimization: arch=GENERIC")
 endif()
 
-# Set AVX or AVX2 if not generic
-if(APSI_FOURQ_AMD64 AND (APSI_DETECT_AVX OR APSI_DETECT_AVX2))
+# Detect AVX instructions
+if(APSI_FOURQ_AMD64 AND (APSI_USE_AVX OR APSI_USE_AVX2))
     include(FindAVX)
     check_for_avx(apsi)
-    if (HAVE_AVX2_EXTENSIONS)
+    if(HAVE_AVX2_EXTENSIONS AND APSI_USE_AVX2)
         target_compile_options(apsi PUBLIC -D_AVX2_)
+        set(APSI_USE_AVX OFF CACHE BOOL ${APSI_USE_AVX_OPTION_STR} FORCE)
         message(STATUS "FourQlib optimization: simd=AVX2")
-    elseif(HAVE_AVX_EXTENSIONS)
+    elseif(HAVE_AVX_EXTENSIONS AND APSI_USE_AVX)
         target_compile_options(apsi PUBLIC -D_AVX_)
+        set(APSI_USE_AVX2 OFF CACHE BOOL ${APSI_USE_AVX2_OPTION_STR} FORCE)
         message(STATUS "FourQlib optimization: simd=AVX")
     endif()
 else()
+    set(APSI_USE_AVX OFF CACHE BOOL ${APSI_USE_AVX_OPTION_STR} FORCE)
+    set(APSI_USE_AVX2 OFF CACHE BOOL ${APSI_USE_AVX2_OPTION_STR} FORCE)
     message(STATUS "FourQlib optimization: simd=OFF")
 endif()
 
-# Use optimized assembly on Linux (non-AVX or AVX2)
-set(APSI_FOURQ_USE_ASM OFF)
-if(UNIX AND NOT APPLE AND NOT CYGWIN AND NOT MINGW)
+# Use optimized assembly on UNIX
+if(APSI_USE_ASM AND UNIX AND NOT APPLE AND NOT CYGWIN AND NOT MINGW)
     check_language(ASM)
     if(CMAKE_ASM_COMPILER)
         enable_language(ASM)
         target_compile_options(apsi PUBLIC -D_ASM_)
-        set(APSI_FOURQ_USE_ASM ON)
         message(STATUS "FourQlib optimization: asm=ON")
     endif()
+else()
+    set(APSI_USE_ASM OFF CACHE BOOL ${APSI_USE_ASM_OPTION_STR} FORCE)
+    message(STATUS "FourQlib optimization: asm=OFF")
 endif()
 
 # Add source files to library and header files to install
