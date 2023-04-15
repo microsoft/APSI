@@ -77,6 +77,6 @@ namespace apsi {
 
         private:
             point_type pt_{};
-        };                                              // class ECPoint
-    }                                                   // namespace oprf
+        }; // class ECPoint
+    }      // namespace oprf
 } // namespace apsi

@@ -30,17 +30,27 @@ namespace apsi {
         static_assert(ECPoint::order_size == sizeof(digit_t) * NWORDS_ORDER);
 
         namespace {
-            constexpr point_t neutral = { { { { 0 } }, { { 1 } } } }; // { {.x = { 0 }, .y = { 1 } }};
+            constexpr point_t neutral = { { { { 0 } },
+                                            { { 1 } } } }; // { {.x = { 0 }, .y = { 1 } }};
 
-            void set_neutral_point(ECPoint::point_span_type pt) {
-                copy_n(reinterpret_cast<const unsigned char *>(neutral), ECPoint::point_size, pt.data());
+            void set_neutral_point(ECPoint::point_span_type pt)
+            {
+                copy_n(
+                    reinterpret_cast<const unsigned char *>(neutral),
+                    ECPoint::point_size,
+                    pt.data());
             }
 
-            void fourq_point_to_point_type(const point_t fourq_pt, ECPoint::point_span_type pt) {
-                copy_n(reinterpret_cast<const unsigned char *>(fourq_pt), ECPoint::point_size, pt.data());
+            void fourq_point_to_point_type(const point_t fourq_pt, ECPoint::point_span_type pt)
+            {
+                copy_n(
+                    reinterpret_cast<const unsigned char *>(fourq_pt),
+                    ECPoint::point_size,
+                    pt.data());
             }
 
-            void point_type_to_fourq_point(ECPoint::point_span_const_type pt, point_t fourq_pt) {
+            void point_type_to_fourq_point(ECPoint::point_span_const_type pt, point_t fourq_pt)
+            {
                 copy_n(pt.data(), ECPoint::point_size, reinterpret_cast<unsigned char *>(fourq_pt));
             }
 
