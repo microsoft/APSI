@@ -238,4 +238,4 @@ const char *FourQ_get_error_message(ECCRYPTO_STATUS Status)
     } else {
         return mapping[Status].string;
     }
-};
+}
