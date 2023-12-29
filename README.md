@@ -81,7 +81,7 @@ We describe three important encryption parameters that the user should be famili
 It must be a prime number congruent to 1 modulo `2 * poly_modulus_degree` and defines the finite field datatype that the BFV scheme encrypts.
 For example, if `plain_modulus` is 65537 &ndash; a 16-bit prime &ndash; then the scheme encrypts integers modulo 65537, and computations on encrypted data preserves integer arithmetic modulo 65537.
 A larger `plain_modulus` leads to faster noise budget consumption.
-It is recommended to design computation with as small a `plaint_modulus` as possible.
+It is recommended to design computation with as small a `plain_modulus` as possible.
 
 `poly_modulus_degree` is a positive power-of-two integer that determines how many integers modulo `plain_modulus` can be encoded into a single Microsoft SEAL plaintext; typical values are 2048, 4096, 8192, and 16384.
 It is now easy for the reader to appreciate the value of batching: computation of thousands of values can be done at the cost of one computation on encrypted data.
