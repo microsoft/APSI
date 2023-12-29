@@ -1,5 +1,10 @@
 # List of Changes
 
+## Version 0.12.0
+
+- Merged [PR #60](https://github.com/microsoft/APSI/pull/60), [PR #70](https://github.com/microsoft/APSI/pull/70), and [PR #72](https://github.com/microsoft/APSI/pull/72).
+- Addressed [Issue #66](https://github.com/microsoft/APSI/issues/66).
+
 ## Version 0.9.1
 
 - Fixed a bug with SEAL dependency.

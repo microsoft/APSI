@@ -7,6 +7,7 @@ build/
 **/config.h
 **/*.swp
 **/*.old
+**/*.csv
 
 #### Archives ####
 # It's better to unpack these files and commit the raw source because

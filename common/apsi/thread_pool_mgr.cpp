@@ -4,6 +4,7 @@
 // STD
 #include <memory>
 #include <mutex>
+#include <optional>
 
 // APSI
 #include "apsi/thread_pool_mgr.h"
@@ -20,9 +21,26 @@ size_t ThreadPoolMgr::ref_count_ = 0;
 
 namespace {
     mutex tp_mutex;
-    size_t thread_count = thread::hardware_concurrency();
-    size_t phys_thread_count = thread::hardware_concurrency();
     unique_ptr<ThreadPool> thread_pool_;
+
+    size_t thread_count(optional<size_t> threads = nullopt)
+    {
+        static size_t thread_count = thread::hardware_concurrency();
+        if (threads) {
+            thread_count = threads.value() != 0 ? threads.value() : thread::hardware_concurrency();
+        }
+        return thread_count;
+    }
+
+    size_t phys_thread_count(optional<size_t> threads = nullopt)
+    {
+        static size_t phys_thread_count = thread::hardware_concurrency();
+        if (threads) {
+            phys_thread_count =
+                threads.value() != 0 ? threads.value() : thread::hardware_concurrency();
+        }
+        return phys_thread_count;
+    }
 } // namespace
 
 ThreadPoolMgr::ThreadPoolMgr()
@@ -30,7 +48,7 @@ ThreadPoolMgr::ThreadPoolMgr()
     unique_lock<mutex> lock(tp_mutex);
 
     if (ref_count_ == 0) {
-        thread_pool_ = make_unique<ThreadPool>(phys_thread_count);
+        thread_pool_ = make_unique<ThreadPool>(phys_thread_count());
     }
 
     ref_count_++;
@@ -58,11 +76,11 @@ void ThreadPoolMgr::SetThreadCount(size_t threads)
 {
     unique_lock<mutex> lock(tp_mutex);
 
-    thread_count = threads != 0 ? threads : thread::hardware_concurrency();
-    phys_thread_count = thread_count;
+    threads = thread_count(threads);
+    phys_thread_count(threads);
 
     if (thread_pool_) {
-        thread_pool_->set_pool_size(phys_thread_count);
+        thread_pool_->set_pool_size(threads);
     }
 }
 
@@ -70,14 +88,14 @@ void ThreadPoolMgr::SetPhysThreadCount(size_t threads)
 {
     unique_lock<mutex> lock(tp_mutex);
 
-    phys_thread_count = threads != 0 ? threads : thread::hardware_concurrency();
+    threads = phys_thread_count(threads);
 
     if (thread_pool_) {
-        thread_pool_->set_pool_size(phys_thread_count);
+        thread_pool_->set_pool_size(threads);
     }
 }
 
 size_t ThreadPoolMgr::GetThreadCount()
 {
-    return thread_count;
+    return thread_count();
 }

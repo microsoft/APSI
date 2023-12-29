@@ -79,7 +79,7 @@ We describe three important encryption parameters that the user should be famili
 
 `plain_modulus` is the easiest to understand.
 It must be a prime number congruent to 1 modulo `2 * poly_modulus_degree` and defines the finite field datatype that the BFV scheme encrypts.
-For example, if `plain_modulus` is 65537 &ndash; a 16-bit prime &ndash; then the scheme encrypts integers modulo 65537, and computations on encrypted data preserves integer arithmetic modulo 65537.
+For example, if `plain_modulus` is 65537 &ndash; a 17-bit prime &ndash; then the scheme encrypts integers modulo 65537, and computations on encrypted data preserves integer arithmetic modulo 65537.
 A larger `plain_modulus` leads to faster noise budget consumption.
 It is recommended to design computation with as small a `plain_modulus` as possible.
 
