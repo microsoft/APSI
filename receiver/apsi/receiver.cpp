@@ -3,6 +3,7 @@
 
 // STD
 #include <algorithm>
+#include <cstring>
 #include <future>
 #include <iostream>
 #include <sstream>
@@ -11,6 +12,7 @@
 // APSI
 #include "apsi/log.h"
 #include "apsi/network/channel.h"
+#include "apsi/oprf/oprf_common.h"
 #include "apsi/plaintext_powers.h"
 #include "apsi/receiver.h"
 #include "apsi/thread_pool_mgr.h"
@@ -18,14 +20,13 @@
 #include "apsi/util/label_encryptor.h"
 #include "apsi/util/utils.h"
 
+// Kuku
+#include "kuku/kuku.h"
+
 // SEAL
 #include "seal/ciphertext.h"
-#include "seal/context.h"
-#include "seal/encryptionparams.h"
 #include "seal/keygenerator.h"
-#include "seal/plaintext.h"
 #include "seal/util/common.h"
-#include "seal/util/defines.h"
 
 using namespace std;
 using namespace seal;
@@ -56,7 +57,7 @@ namespace apsi {
             return item_idx->second;
         }
 
-        Receiver::Receiver(PSIParams params) : params_(move(params))
+        Receiver::Receiver(PSIParams params) : params_(std::move(params))
         {
             initialize();
         }
@@ -73,7 +74,7 @@ namespace apsi {
             relin_keys_.clear();
             if (get_seal_context()->using_keyswitching()) {
                 Serializable<RelinKeys> relin_keys(generator.create_relin_keys());
-                relin_keys_.set(move(relin_keys));
+                relin_keys_.set(std::move(relin_keys));
             }
         }
 
@@ -103,11 +104,11 @@ namespace apsi {
         {
             APSI_LOG_DEBUG("PSI parameters set to: " << params_.to_string());
             APSI_LOG_DEBUG(
-                "Derived parameters: "
-                << "item_bit_count_per_felt: " << params_.item_bit_count_per_felt()
-                << "; item_bit_count: " << params_.item_bit_count()
-                << "; bins_per_bundle: " << params_.bins_per_bundle()
-                << "; bundle_idx_count: " << params_.bundle_idx_count());
+                "Derived parameters: " << "item_bit_count_per_felt: "
+                                       << params_.item_bit_count_per_felt()
+                                       << "; item_bit_count: " << params_.item_bit_count()
+                                       << "; bins_per_bundle: " << params_.bins_per_bundle()
+                                       << "; bundle_idx_count: " << params_.bundle_idx_count());
 
             STOPWATCH(recv_stopwatch, "Receiver::initialize");
 
@@ -161,7 +162,7 @@ namespace apsi {
             return oprf_receiver;
         }
 
-        pair<vector<HashedItem>, vector<LabelKey>> Receiver::ExtractHashes(
+        pair<vector<HashedItem>, LabelKeyVector> Receiver::ExtractHashes(
             const OPRFResponse &oprf_response, const OPRFReceiver &oprf_receiver)
         {
             STOPWATCH(recv_stopwatch, "Receiver::ExtractHashes");
@@ -182,11 +183,14 @@ namespace apsi {
             }
 
             vector<HashedItem> items(oprf_receiver.item_count());
-            vector<LabelKey> label_keys(oprf_receiver.item_count());
-            oprf_receiver.process_responses(oprf_response->data, items, label_keys);
+            LabelKeyVector label_keys(oprf_receiver.item_count());
+            oprf_receiver.process_responses(
+                oprf_response->data,
+                items,
+                gsl::span<LabelKey>(label_keys.data(), label_keys.size()));
             APSI_LOG_INFO("Extracted OPRF hashes for " << oprf_response_item_count << " items");
 
-            return make_pair(move(items), move(label_keys));
+            return make_pair(std::move(items), std::move(label_keys));
         }
 
         unique_ptr<SenderOperation> Receiver::CreateOPRFRequest(const OPRFReceiver &oprf_receiver)
@@ -198,7 +202,7 @@ namespace apsi {
             return sop;
         }
 
-        pair<vector<HashedItem>, vector<LabelKey>> Receiver::RequestOPRF(
+        pair<vector<HashedItem>, LabelKeyVector> Receiver::RequestOPRF(
             const vector<Item> &items, NetworkChannel &chl)
         {
             auto oprf_receiver = CreateOPRFReceiver(items);
@@ -251,7 +255,9 @@ namespace apsi {
                                  << " hash functions");
                 for (size_t item_idx = 0; item_idx < items.size(); item_idx++) {
                     const auto &item = items[item_idx];
-                    if (!cuckoo.insert(item.get_as<kuku::item_type>().front())) {
+                    kuku::item_type kuku_item;
+                    std::memcpy(&kuku_item, item.value().data(), sizeof(kuku_item));
+                    if (!cuckoo.insert(kuku_item)) {
                         // Insertion can fail for two reasons:
                         //
                         //     (1) The item was already in the table, in which case the "leftover
@@ -261,14 +267,16 @@ namespace apsi {
                         // In case (1) simply move on to the next item and log this issue. Case (2)
                         // is a critical issue so we throw and exception.
                         if (cuckoo.is_empty_item(cuckoo.leftover_item())) {
-                            APSI_LOG_INFO(
+                            APSI_LOG_DEBUG(
                                 "Skipping repeated insertion of items["
                                 << item_idx << "]: " << item.to_string());
                         } else {
+                            // We redact the item (OPRF value) from the log message to avoid leaking
+                            // information about the receiver's input in case of errors.
                             APSI_LOG_ERROR(
                                 "Failed to insert items["
-                                << item_idx << "]: " << item.to_string()
-                                << "; cuckoo table fill-rate: " << cuckoo.fill_rate());
+                                << item_idx << "] (item value redacted); cuckoo table fill-rate: "
+                                << cuckoo.fill_rate());
                             throw runtime_error("failed to insert item into cuckoo table");
                         }
                     }
@@ -281,7 +289,9 @@ namespace apsi {
 
             // Once the table is filled, fill the table_idx_to_item_idx map
             for (size_t item_idx = 0; item_idx < items.size(); item_idx++) {
-                auto item_loc = cuckoo.query(items[item_idx].get_as<kuku::item_type>().front());
+                kuku::item_type kuku_item;
+                std::memcpy(&kuku_item, items[item_idx].value().data(), sizeof(kuku_item));
+                auto item_loc = cuckoo.query(kuku_item);
                 itt.table_idx_to_item_idx_[item_loc.location()] = item_idx;
             }
 
@@ -318,7 +328,7 @@ namespace apsi {
                     // Now that we have the algebraized items for this bundle index, we create a
                     // PlaintextPowers object that computes all necessary powers of the algebraized
                     // items.
-                    plain_powers.emplace_back(move(alg_items), params_, pd_);
+                    plain_powers.emplace_back(std::move(alg_items), params_, pd_);
                 }
             }
 
@@ -338,7 +348,7 @@ namespace apsi {
 
                     // Move the encrypted data to encrypted_powers
                     for (auto &e : encrypted_power) {
-                        encrypted_powers[e.first].emplace_back(move(e.second));
+                        encrypted_powers[e.first].emplace_back(std::move(e.second));
                     }
                 }
             }
@@ -347,25 +357,23 @@ namespace apsi {
             auto sop_query = make_unique<SenderOperationQuery>();
             sop_query->compr_mode = Serialization::compr_mode_default;
             sop_query->relin_keys = relin_keys_;
-            sop_query->data = move(encrypted_powers);
-            auto sop = to_request(move(sop_query));
+            sop_query->data = std::move(encrypted_powers);
+            auto sop = to_request(std::move(sop_query));
 
             APSI_LOG_INFO("Finished creating encrypted query");
 
-            return { move(sop), itt };
+            return { std::move(sop), itt };
         }
 
         vector<MatchRecord> Receiver::request_query(
-            const vector<HashedItem> &items,
-            const vector<LabelKey> &label_keys,
-            NetworkChannel &chl)
+            const vector<HashedItem> &items, const LabelKeyVector &label_keys, NetworkChannel &chl)
         {
             ThreadPoolMgr tpm;
 
             // Create query and send to Sender
             auto query = create_query(items);
-            chl.send(move(query.first));
-            auto itt = move(query.second);
+            chl.send(std::move(query.first));
+            auto itt = std::move(query.second);
 
             // Wait for query response
             QueryResponse response;
@@ -411,7 +419,7 @@ namespace apsi {
         }
 
         vector<MatchRecord> Receiver::process_result_part(
-            const vector<LabelKey> &label_keys,
+            const LabelKeyVector &label_keys,
             const IndexTranslationTable &itt,
             const ResultPart &result_part) const
         {
@@ -517,10 +525,11 @@ namespace apsi {
 
                 // If a positive MatchRecord is already present, then something is seriously wrong
                 if (mrs[item_idx]) {
-                    APSI_LOG_ERROR("The table index -> item index translation table indicated a "
-                                   "location that was already filled by another match from this "
-                                   "result package; the translation table (query) has probably "
-                                   "been corrupted");
+                    APSI_LOG_ERROR(
+                        "The table index -> item index translation table indicated a "
+                        "location that was already filled by another match from this "
+                        "result package; the translation table (query) has probably "
+                        "been corrupted");
 
                     throw runtime_error(
                         "found a duplicate positive match; something is seriously wrong");
@@ -563,18 +572,18 @@ namespace apsi {
                         decrypt_label(encrypted_label, label_keys[item_idx], nonce_byte_count);
 
                     // Set the label
-                    mr.label.set(move(label));
+                    mr.label.set(std::move(label));
                 }
 
                 // We are done with the MatchRecord, so add it to the mrs vector
-                mrs[item_idx] = move(mr);
+                mrs[item_idx] = std::move(mr);
             });
 
             return mrs;
         }
 
         vector<MatchRecord> Receiver::process_result(
-            const vector<LabelKey> &label_keys,
+            const LabelKeyVector &label_keys,
             const IndexTranslationTable &itt,
             const vector<ResultPart> &result) const
         {
@@ -594,7 +603,7 @@ namespace apsi {
                 seal_for_each_n(iter(mrs, this_mrs, size_t(0)), mrs.size(), [](auto &&I) {
                     if (get<1>(I) && !get<0>(I)) {
                         // This match needs to be merged into mrs
-                        get<0>(I) = move(get<1>(I));
+                        get<0>(I) = std::move(get<1>(I));
                     } else if (get<1>(I) && get<0>(I)) {
                         // If a positive MatchRecord is already present, then something is seriously
                         // wrong
@@ -621,7 +630,7 @@ namespace apsi {
         void Receiver::process_result_worker(
             atomic<uint32_t> &package_count,
             vector<MatchRecord> &mrs,
-            const vector<LabelKey> &label_keys,
+            const LabelKeyVector &label_keys,
             const IndexTranslationTable &itt,
             Channel &chl) const
         {
@@ -661,7 +670,7 @@ namespace apsi {
                 seal_for_each_n(iter(mrs, this_mrs, size_t(0)), mrs.size(), [](auto &&I) {
                     if (get<1>(I) && !get<0>(I)) {
                         // This match needs to be merged into mrs
-                        get<0>(I) = move(get<1>(I));
+                        get<0>(I) = std::move(get<1>(I));
                     } else if (get<1>(I) && get<0>(I)) {
                         // If a positive MatchRecord is already present, then something is seriously
                         // wrong

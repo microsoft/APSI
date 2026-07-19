@@ -109,7 +109,7 @@ namespace apsi {
                 vector<uint64_t> inner;
                 inner.reserve(size - i);
                 inner.push_back(values[i]);
-                divided_differences.push_back(move(inner));
+                divided_differences.push_back(std::move(inner));
             }
 
             /**

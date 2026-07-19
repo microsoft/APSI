@@ -29,6 +29,7 @@ namespace apsi {
         /**
         Get the thread pool managed by the thread pool manager
         */
+        [[nodiscard]]
         util::ThreadPool &thread_pool() const;
 
         /**

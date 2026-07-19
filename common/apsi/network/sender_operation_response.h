@@ -114,5 +114,5 @@ namespace apsi {
             */
             std::uint32_t package_count;
         }; // class SenderOperationResponseQuery
-    }      // namespace network
+    } // namespace network
 } // namespace apsi

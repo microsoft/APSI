@@ -97,7 +97,7 @@ namespace APSITests {
                 }
 
                 size_t label_byte_count = reference_label->second.size();
-                if (label_byte_count != query_result[idx].label.get_as<unsigned char>().size()) {
+                if (label_byte_count != query_result[idx].label.value().size()) {
                     cerr << "Label byte count is not correct" << endl;
                     return false;
                 }
@@ -105,7 +105,7 @@ namespace APSITests {
                 if (!equal(
                         reference_label->second.begin(),
                         reference_label->second.end(),
-                        query_result[idx].label.get_as<unsigned char>().begin())) {
+                        query_result[idx].label.value().begin())) {
                     cerr << "Label does not match reference label" << endl;
                     return false;
                 }
@@ -121,8 +121,8 @@ namespace APSITests {
             size_t num_clients,
             size_t num_threads)
         {
-            Log::SetConsoleDisabled(true);
-            Log::SetLogLevel(Log::Level::info);
+            SetLogger(Logger::Create({}, {}, {})); // null logger: suppress test output
+            SetLogLevel(LogLevel::info);
 
             ThreadPoolMgr::SetThreadCount(num_threads);
             ThreadPoolMgr::SetPhysThreadCount(num_threads * 2);
@@ -178,7 +178,7 @@ namespace APSITests {
                         Receiver receiver(params);
 
                         vector<HashedItem> hashed_recv_items;
-                        vector<LabelKey> label_keys;
+                        LabelKeyVector label_keys;
                         tie(hashed_recv_items, label_keys) =
                             Receiver::RequestOPRF(recvs_items[i], recv_chl);
                         auto query_result =
@@ -205,8 +205,8 @@ namespace APSITests {
             size_t num_clients,
             size_t num_threads)
         {
-            Log::SetConsoleDisabled(true);
-            Log::SetLogLevel(Log::Level::info);
+            SetLogger(Logger::Create({}, {}, {})); // null logger: suppress test output
+            SetLogLevel(LogLevel::info);
 
             ThreadPoolMgr::SetThreadCount(num_threads);
             ThreadPoolMgr::SetPhysThreadCount(num_threads * 2);
@@ -264,7 +264,7 @@ namespace APSITests {
                         Receiver receiver(params);
 
                         vector<HashedItem> hashed_recv_items;
-                        vector<LabelKey> label_keys;
+                        LabelKeyVector label_keys;
                         tie(hashed_recv_items, label_keys) =
                             Receiver::RequestOPRF(recv_items[i], recv_chl);
                         auto query_result =

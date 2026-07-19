@@ -107,5 +107,5 @@ namespace apsi {
                 std::size_t label_byte_count,
                 std::size_t nonce_byte_count);
         }; // class OPRFSender
-    }      // namespace oprf
+    } // namespace oprf
 } // namespace apsi

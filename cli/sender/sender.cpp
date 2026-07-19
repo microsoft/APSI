@@ -3,21 +3,15 @@
 
 // STD
 #include <csignal>
+#include <filesystem>
 #include <fstream>
-#include <functional>
 #include <iostream>
 #include <string>
-#if defined(__GNUC__) && (__GNUC__ < 8) && !defined(__clang__)
-#include <experimental/filesystem>
-#else
-#include <filesystem>
-#endif
 
 // APSI
 #include "apsi/log.h"
 #include "apsi/oprf/oprf_sender.h"
 #include "apsi/thread_pool_mgr.h"
-#include "apsi/version.h"
 #include "apsi/zmq/sender_dispatcher.h"
 #include "common/common_utils.h"
 #include "common/csv_reader.h"
@@ -25,15 +19,11 @@
 #include "sender/sender_utils.h"
 
 using namespace std;
-#if defined(__GNUC__) && (__GNUC__ < 8) && !defined(__clang__)
-namespace fs = std::experimental::filesystem;
-#else
-namespace fs = std::filesystem;
-#endif
 using namespace apsi;
 using namespace apsi::sender;
 using namespace apsi::network;
 using namespace apsi::oprf;
+using namespace apsi::util;
 
 int start_sender(const CLP &cmd);
 
@@ -79,7 +69,7 @@ shared_ptr<SenderDB> try_load_sender_db(const CLP &cmd, OPRFKey &oprf_key)
             APSI_LOG_WARNING(
                 "PSI parameters were loaded with the SenderDB; ignoring given PSI parameters");
         }
-        result = make_shared<SenderDB>(move(data));
+        result = make_shared<SenderDB>(std::move(data));
 
         // Load also the OPRF key
         oprf_key.load(fs);
@@ -109,7 +99,7 @@ shared_ptr<SenderDB> try_load_csv_db(const CLP &cmd, OPRFKey &oprf_key)
     }
 
     return create_sender_db(
-        *db_data, move(params), oprf_key, cmd.nonce_byte_count(), cmd.compress());
+        *db_data, std::move(params), oprf_key, cmd.nonce_byte_count(), cmd.compress());
 }
 
 bool try_save_sender_db(const CLP &cmd, shared_ptr<SenderDB> sender_db, const OPRFKey &oprf_key)
@@ -196,7 +186,7 @@ unique_ptr<CSVReader::DBData> load_db(const string &db_file)
         return nullptr;
     }
 
-    return make_unique<CSVReader::DBData>(move(db_data));
+    return make_unique<CSVReader::DBData>(std::move(db_data));
 }
 
 shared_ptr<SenderDB> create_sender_db(

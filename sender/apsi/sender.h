@@ -156,5 +156,5 @@ namespace apsi {
                 seal::compr_mode_type compr_mode,
                 seal::MemoryPoolHandle &pool);
         }; // class Sender
-    }      // namespace sender
+    } // namespace sender
 } // namespace apsi

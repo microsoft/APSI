@@ -6,6 +6,9 @@
 // STD
 #include <cstdint>
 
+// APSI
+#include "apsi/config.h"
+
 namespace apsi {
     extern const std::uint32_t apsi_version;
 

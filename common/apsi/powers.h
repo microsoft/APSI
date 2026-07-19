@@ -8,12 +8,11 @@
 #include <atomic>
 #include <cstdint>
 #include <future>
-#include <iostream>
 #include <memory>
-#include <random>
 #include <set>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -249,8 +248,11 @@ namespace apsi {
                         node_states[power_idx].compare_exchange_strong(
                             computing_state, NodeState::Uncomputed);
 
-                        // Move on to the next node
+                        // Move on to the next node. Yield to give other workers a chance to
+                        // make progress on parent nodes; without this, this thread will
+                        // spin-loop hot when only a few nodes are still in flight.
                         power_idx = (power_idx + 1) % target_powers_count;
+                        std::this_thread::yield();
                         continue;
                     }
 

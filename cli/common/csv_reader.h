@@ -5,16 +5,12 @@
 
 // STD
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
 
 // APSI
 #include "apsi/item.h"
-#include "apsi/psi_params.h"
-#include "apsi/util/db_encoding.h"
 
 /**
 Simple CSV file parser
@@ -27,9 +23,9 @@ public:
 
     using DBData = std::variant<UnlabeledData, LabeledData>;
 
-    CSVReader();
+    CSVReader() = default;
 
-    CSVReader(const std::string &file_name);
+    CSVReader(std::string file_name);
 
     std::pair<DBData, std::vector<std::string>> read(std::istream &stream) const;
 

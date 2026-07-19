@@ -1,0 +1,6 @@
+# Vendored third-party code must not be reformatted. This mirrors third_party/.clang-tidy
+# (which disables all clang-tidy checks) and holds no matter how clang-format is invoked:
+# the tools/scripts/clang-format-all.sh script, pre-commit, or editor-on-save.
+DisableFormat: true
+# DisableFormat does not by itself stop include sorting, so disable that explicitly too.
+SortIncludes: false

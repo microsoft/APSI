@@ -72,5 +72,5 @@ namespace apsi {
                 std::unique_ptr<network::ZMQSenderOperation> sop,
                 network::ZMQSenderChannel &channel);
         }; // class ZMQSenderDispatcher
-    }      // namespace sender
+    } // namespace sender
 } // namespace apsi

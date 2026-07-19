@@ -13,4 +13,4 @@ repos:
       language: system
       files: \.(c|cpp|h)$
       args: ["-i"]
-exclude: 'common/apsi/fourq/.+\.(h|c|S)$'
+exclude: '^third_party/'

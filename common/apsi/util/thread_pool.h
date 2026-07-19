@@ -21,15 +21,26 @@
 //    distribution.
 //
 // Modified for log4cplus, copyright (c) 2014-2015 Václav Zeman.
-// Modified for APSI: Copyright (c) Microsoft Corporation. All rights reserved.
+//
+// -----------------------------------------------------------------------------
+// Altered source version, plainly marked as such per condition (2) above.
+// Extensively rewritten and simplified for APSI:
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT license.
+//
+// The public interface (enqueue, wait_until_empty, wait_until_nothing_in_flight,
+// set_pool_size) and the in-flight-tracking design derive from the works above.
+// The worker lifecycle (detached workers tracked by count), pool resizing
+// (pending-exit tokens), synchronization (a single mutex with dedicated
+// condition variables), and task exception handling have been reimplemented.
+// -----------------------------------------------------------------------------
 
 #pragma once
 
 // STD
 #include <algorithm>
-#include <atomic>
-#include <cassert>
 #include <condition_variable>
+#include <cstddef>
 #include <functional>
 #include <future>
 #include <memory>
@@ -37,232 +48,242 @@
 #include <queue>
 #include <stdexcept>
 #include <thread>
-#include <vector>
+#include <type_traits>
+#include <utility>
 
 // APSI
-#include "apsi/config.h"
 #include "apsi/log.h"
 
-// SEAL
-#include "seal/util/common.h"
+namespace apsi::util {
 
-#ifdef APSI_USE_CXX17
-#define apsi_result_of_type typename std::invoke_result<F, Args...>::type
-#else
-#define apsi_result_of_type typename std::result_of<F(Args...)>::type
-#endif
-
-namespace apsi {
-    namespace util {
-
-        class ThreadPool {
-        public:
-            explicit ThreadPool(
-                std::size_t threads = (std::max)(2u, std::thread::hardware_concurrency()));
-            template <class F, class... Args>
-            auto enqueue(F &&f, Args &&... args) -> std::future<apsi_result_of_type>;
-            void wait_until_empty();
-            void wait_until_nothing_in_flight();
-            void set_queue_size_limit(std::size_t limit);
-            void set_pool_size(std::size_t limit);
-            ~ThreadPool();
-
-        private:
-            void emplace_back_worker(std::size_t worker_number);
-            void set_queue_size_limit_no_lock(std::size_t limit);
-
-            // need to keep track of threads so we can join them
-            std::vector<std::thread> workers;
-            // target pool size
-            std::size_t pool_size;
-            // the task queue
-            std::queue<std::function<void()> > tasks;
-            // queue length limit
-            std::size_t max_queue_size = 100000;
-            // stop signal
-            bool stop = false;
-
-            // synchronization
-            std::mutex queue_mutex;
-            std::condition_variable condition_producers;
-            std::condition_variable condition_consumers;
-
-            std::mutex in_flight_mutex;
-            std::condition_variable in_flight_condition;
-            std::atomic<std::size_t> in_flight;
-
-            struct handle_in_flight_decrement {
-                ThreadPool &tp;
-
-                handle_in_flight_decrement(ThreadPool &tp_) : tp(tp_)
-                {}
-
-                ~handle_in_flight_decrement()
-                {
-                    std::size_t prev = std::atomic_fetch_sub_explicit(
-                        &tp.in_flight, std::size_t(1), std::memory_order_acq_rel);
-                    if (prev == 1) {
-                        std::unique_lock<std::mutex> guard(tp.in_flight_mutex);
-                        tp.in_flight_condition.notify_all();
-                    }
-                }
-            };
-        };
-
-        // the constructor just launches some amount of workers
-        inline ThreadPool::ThreadPool(std::size_t threads) : pool_size(threads), in_flight(0)
+    /**
+    Thread pool used by APSI internals. Workers are interchangeable: they are spawned with
+    std::thread::detach so the pool never owns thread handles, only an active-worker count.
+    Resizing is done by raising or lowering a pending-exit counter that any waiting worker can
+    claim. The task queue is unbounded; tasks that throw are caught and logged so a single bad
+    task cannot tear down a worker. Destruction sets a stop flag, drains pending tasks, and
+    waits for the active count to reach zero before returning.
+    */
+    class ThreadPool {
+    public:
+        explicit ThreadPool(
+            std::size_t threads = (std::max)(2U, std::thread::hardware_concurrency()))
         {
-            for (std::size_t i = 0; i != threads; ++i)
-                emplace_back_worker(i);
+            set_pool_size(threads);
         }
 
-        // add new work item to the pool
-        template <class F, class... Args>
-        auto ThreadPool::enqueue(F &&f, Args &&... args) -> std::future<apsi_result_of_type>
+        ThreadPool(const ThreadPool &) = delete;
+        ThreadPool &operator=(const ThreadPool &) = delete;
+        ThreadPool(ThreadPool &&) = delete;
+        ThreadPool &operator=(ThreadPool &&) = delete;
+
+        ~ThreadPool()
         {
-            using return_type = apsi_result_of_type;
+            std::unique_lock<std::mutex> lock(mutex_);
+            stop_ = true;
+            queue_cv_.notify_all();
+            workers_empty_cv_.wait(lock, [this] { return active_workers_ == 0; });
+        }
 
-            auto task = std::make_shared<std::packaged_task<return_type()> >(
+        /**
+        Schedule a callable to run on a worker thread. Returns a std::future to retrieve the
+        callable's return value (or rethrow its exception). Throws std::runtime_error if called
+        after the pool has been signaled to stop.
+        */
+        template <typename F, typename... Args>
+        auto enqueue(F &&f, Args &&...args) -> std::future<std::invoke_result_t<F, Args...>>
+        {
+            using return_type = std::invoke_result_t<F, Args...>;
+
+            // std::bind is deliberate here. Forwarding the argument pack into a lambda capture
+            // needs C++20 pack-capture ([...args = std::forward<Args>(args)]); in C++17 a pack
+            // cannot be expanded in an init-capture. bind decay-copies its arguments, so the
+            // documented way to hand move-only state to a task is to capture it in the callable
+            // itself rather than pass it as a trailing argument (see the MoveOnlyTaskArgs test).
+            auto task = std::make_shared<std::packaged_task<return_type()>>(
+                // NOLINTNEXTLINE(modernize-avoid-bind)
                 std::bind(std::forward<F>(f), std::forward<Args>(args)...));
-
             std::future<return_type> res = task->get_future();
 
-            std::unique_lock<std::mutex> lock(queue_mutex);
-            if (tasks.size() >= max_queue_size) {
-                std::size_t new_queue_size = seal::util::mul_safe<std::size_t>(max_queue_size, 2);
-                APSI_LOG_WARNING(
-                    "Thread pool queue has reached maximum size. Increasing to " << new_queue_size
-                                                                                 << " tasks.");
-                set_queue_size_limit_no_lock(new_queue_size);
-
-                // wait for the queue to empty or be stopped
-                condition_producers.wait(
-                    lock, [this] { return tasks.size() < max_queue_size || stop; });
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                if (stop_) {
+                    throw std::runtime_error("enqueue on stopped ThreadPool");
+                }
+                tasks_.emplace([task] { (*task)(); });
+                in_flight_++;
             }
-
-            // don't allow enqueueing after stopping the pool
-            if (stop)
-                throw std::runtime_error("enqueue on stopped ThreadPool");
-
-            tasks.emplace([task]() { (*task)(); });
-            std::atomic_fetch_add_explicit(&in_flight, std::size_t(1), std::memory_order_relaxed);
-            condition_consumers.notify_one();
+            queue_cv_.notify_one();
 
             return res;
         }
 
-        // the destructor joins all threads
-        inline ThreadPool::~ThreadPool()
+        /**
+        Block until the task queue is empty. Tasks may still be running after this returns;
+        call wait_until_nothing_in_flight to also wait for in-progress tasks.
+        */
+        void wait_until_empty()
         {
-            std::unique_lock<std::mutex> lock(queue_mutex);
-            stop = true;
-            condition_consumers.notify_all();
-            condition_producers.notify_all();
-            pool_size = 0;
-            condition_consumers.wait(lock, [this] { return this->workers.empty(); });
-            assert(in_flight == 0);
+            std::unique_lock<std::mutex> lock(mutex_);
+            empty_cv_.wait(lock, [this] { return tasks_.empty(); });
         }
 
-        inline void ThreadPool::wait_until_empty()
+        /**
+        Block until every enqueued task has finished executing.
+        */
+        void wait_until_nothing_in_flight()
         {
-            std::unique_lock<std::mutex> lock(this->queue_mutex);
-            this->condition_producers.wait(lock, [this] { return this->tasks.empty(); });
+            std::unique_lock<std::mutex> lock(mutex_);
+            in_flight_cv_.wait(lock, [this] { return in_flight_ == 0; });
         }
 
-        inline void ThreadPool::wait_until_nothing_in_flight()
+        /**
+        Resize the pool to new_size workers (minimum 1). Growing first cancels any currently
+        pending exits, then spawns the remaining shortfall as new detached threads. Shrinking
+        raises pending_exits_ by the appropriate delta and wakes the waiters; whichever workers
+        claim the tokens first will exit. After this call returns the logical pool size is
+        new_size, but the actual active count converges asynchronously as workers wake.
+        */
+        void set_pool_size(std::size_t new_size)
         {
-            std::unique_lock<std::mutex> lock(this->in_flight_mutex);
-            this->in_flight_condition.wait(lock, [this] { return this->in_flight == 0; });
-        }
+            if (new_size == 0) {
+                new_size = 1;
+            }
 
-        inline void ThreadPool::set_queue_size_limit(std::size_t limit)
-        {
-            std::unique_lock<std::mutex> lock(this->queue_mutex);
-            set_queue_size_limit_no_lock(limit);
-        }
+            // Clamp to a sane upper bound so that a misconfigured caller cannot drive the
+            // pool to spawn until pthread_create returns EAGAIN. The bound is generous
+            // (16x hardware concurrency) and only matters as a backstop.
+            const std::size_t hw = (std::max)(1U, std::thread::hardware_concurrency());
+            const std::size_t max_workers = hw * 16;
+            if (new_size > max_workers) {
+                APSI_LOG_WARNING(
+                    "ThreadPool::set_pool_size("
+                    << new_size << ") exceeds the safety cap " << max_workers
+                    << "; clamping. If you genuinely need this many workers, raise the cap.");
+                new_size = max_workers;
+            }
 
-        inline void ThreadPool::set_pool_size(std::size_t limit)
-        {
-            if (limit < 1)
-                limit = 1;
-
-            std::unique_lock<std::mutex> lock(this->queue_mutex);
-
-            if (stop)
+            std::lock_guard<std::mutex> lock(mutex_);
+            if (stop_) {
                 return;
+            }
 
-            pool_size = limit;
-            std::size_t const old_size = this->workers.size();
-            if (pool_size > old_size) {
-                // create new worker threads
-                for (std::size_t i = old_size; i != pool_size; ++i)
-                    emplace_back_worker(i);
-            } else if (pool_size < old_size)
-                // notify all worker threads to start downsizing
-                this->condition_consumers.notify_all();
-        }
+            const std::size_t current_target = active_workers_ - pending_exits_;
+            if (new_size == current_target) {
+                return;
+            }
 
-        inline void ThreadPool::emplace_back_worker(std::size_t worker_number)
-        {
-            workers.emplace_back([this, worker_number] {
-                for (;;) {
-                    std::function<void()> task;
-                    bool notify;
-
-                    {
-                        std::unique_lock<std::mutex> lock(this->queue_mutex);
-                        this->condition_consumers.wait(lock, [this, worker_number] {
-                            return this->stop || !this->tasks.empty() ||
-                                   pool_size < worker_number + 1;
-                        });
-
-                        // deal with downsizing of thread pool or shutdown
-                        if ((this->stop && this->tasks.empty()) ||
-                            (!this->stop && pool_size < worker_number + 1)) {
-                            std::thread &last_thread = this->workers.back();
-                            std::thread::id this_id = std::this_thread::get_id();
-                            if (this_id == last_thread.get_id()) {
-                                // highest number thread exits, resizes the workers
-                                // vector, and notifies others
-                                last_thread.detach();
-                                this->workers.pop_back();
-                                this->condition_consumers.notify_all();
-                                return;
-                            } else
-                                continue;
-                        } else if (!this->tasks.empty()) {
-                            task = std::move(this->tasks.front());
-                            this->tasks.pop();
-                            notify =
-                                this->tasks.size() + 1 == max_queue_size || this->tasks.empty();
-                        } else
-                            continue;
-                    }
-
-                    handle_in_flight_decrement guard(*this);
-
-                    if (notify) {
-                        std::unique_lock<std::mutex> lock(this->queue_mutex);
-                        condition_producers.notify_all();
-                    }
-
-                    task();
+            if (new_size > current_target) {
+                std::size_t delta = new_size - current_target;
+                const std::size_t cancel = (std::min)(pending_exits_, delta);
+                pending_exits_ -= cancel;
+                delta -= cancel;
+                for (std::size_t i = 0; i < delta; i++) {
+                    std::thread worker([this] { worker_loop(); });
+                    worker.detach();
+                    active_workers_++;
                 }
-            });
+            } else {
+                pending_exits_ += (current_target - new_size);
+                queue_cv_.notify_all();
+            }
         }
 
-        inline void ThreadPool::set_queue_size_limit_no_lock(std::size_t limit)
+        /**
+        Return the current logical size of the pool: the number of workers the pool is converging
+        toward, i.e. the value most recently requested via the constructor or set_pool_size (after
+        the zero-to-one and safety-cap clamping). Growth takes effect synchronously -- the new
+        workers are spawned before set_pool_size returns -- so a grow is reflected at once. A shrink
+        is asynchronous: the excess workers keep running until they wake and claim a pending-exit
+        token, but this method reports the post-shrink target immediately rather than the
+        temporarily larger live-worker count. For a live pool the result is always at least one.
+        */
+        [[nodiscard]]
+        std::size_t pool_size() const
         {
-            if (stop) {
-                return;
-            }
+            std::lock_guard<std::mutex> lock(mutex_);
+            // active_workers_ >= pending_exits_ holds for any live pool (each worker that claims an
+            // exit token decrements both counters in the same critical section), so this is the
+            // logical target. Guard the subtraction anyway so a caller racing with teardown --
+            // where workers exit without clearing pending_exits_ -- can never observe an underflow.
+            return active_workers_ > pending_exits_ ? active_workers_ - pending_exits_ : 0;
+        }
 
-            std::size_t old_limit = max_queue_size;
-            max_queue_size = (std::max)(limit, std::size_t(1));
-            if (old_limit < max_queue_size) {
-                condition_producers.notify_all();
+    private:
+        void worker_loop()
+        {
+            for (;;) {
+                std::function<void()> task;
+                {
+                    std::unique_lock<std::mutex> lock(mutex_);
+                    queue_cv_.wait(
+                        lock, [this] { return stop_ || !tasks_.empty() || pending_exits_ > 0; });
+
+                    if (stop_ && tasks_.empty()) {
+                        on_worker_exit_locked();
+                        return;
+                    }
+
+                    if (pending_exits_ > 0 && !stop_) {
+                        pending_exits_--;
+                        on_worker_exit_locked();
+                        return;
+                    }
+
+                    task = std::move(tasks_.front());
+                    tasks_.pop();
+                    if (tasks_.empty()) {
+                        empty_cv_.notify_all();
+                    }
+                }
+
+                try {
+                    task();
+                } catch (const std::exception &ex) {
+                    // Logging itself can throw (allocator failure, logger torn down during
+                    // shutdown). Detached threads must never let an exception escape or the
+                    // process terminates.
+                    try {
+                        APSI_LOG_ERROR("Unhandled exception in thread pool task: " << ex.what());
+                    } catch (...) { // NOLINT(bugprone-empty-catch): logger may throw
+                    }
+                } catch (...) {
+                    try {
+                        APSI_LOG_ERROR("Unhandled non-standard exception in thread pool task");
+                    } catch (...) { // NOLINT(bugprone-empty-catch): logger may throw
+                    }
+                }
+
+                bool notify_drained = false;
+                {
+                    std::lock_guard<std::mutex> lock(mutex_);
+                    notify_drained = (--in_flight_ == 0);
+                }
+                if (notify_drained) {
+                    in_flight_cv_.notify_all();
+                }
             }
         }
 
-    } // namespace util
-} // namespace apsi
+        // Caller must hold mutex_.
+        void on_worker_exit_locked()
+        {
+            if (--active_workers_ == 0) {
+                workers_empty_cv_.notify_all();
+            }
+        }
+
+        std::queue<std::function<void()>> tasks_;
+        std::size_t active_workers_ = 0;
+        std::size_t pending_exits_ = 0;
+        std::size_t in_flight_ = 0;
+        bool stop_ = false;
+
+        mutable std::mutex mutex_;
+        std::condition_variable queue_cv_;
+        std::condition_variable empty_cv_;
+        std::condition_variable in_flight_cv_;
+        std::condition_variable workers_empty_cv_;
+    };
+
+} // namespace apsi::util

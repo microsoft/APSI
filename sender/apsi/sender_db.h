@@ -370,5 +370,5 @@ namespace apsi {
             */
             oprf::OPRFKey oprf_key_;
         }; // class SenderDB
-    }      // namespace sender
+    } // namespace sender
 } // namespace apsi

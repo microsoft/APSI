@@ -1,0 +1,12 @@
+schemaVersion: 1.0.0
+providers:
+- provider: InventoryAsCode
+  version: 1.0.0
+  metadata:
+    isProduction: true 
+    accountableOwners:
+      service: 4c16e673-19bf-4af1-b950-706388b368d4
+    routing:
+      defaultAreaPath:
+        org: msrcrypto
+        path: APSI

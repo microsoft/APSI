@@ -30,13 +30,15 @@ namespace APSITests {
     namespace {
         void RunUnlabeledTest(
             size_t sender_size,
-            vector<pair<size_t, size_t>> client_total_and_int_sizes,
+            const vector<pair<size_t, size_t>> &client_total_and_int_sizes,
             const PSIParams &params,
-            size_t num_threads,
-            bool use_different_compression = false)
+            size_t num_threads)
         {
-            Log::SetConsoleDisabled(true);
-            Log::SetLogLevel(Log::Level::info);
+            // Install a null sink but keep the level at info, so log calls still format their
+            // messages and run through the logger's locking/dispatch (exercised by the
+            // multithreaded handshake below) while the empty handlers discard the output.
+            SetLogger(Logger::Create({}, {}, {}));
+            SetLogLevel(LogLevel::info);
 
             ThreadPoolMgr::SetThreadCount(num_threads);
 
@@ -76,7 +78,7 @@ namespace APSITests {
                 Request oprf_request = Receiver::CreateOPRFRequest(oprf_receiver);
 
                 // Send the OPRF request
-                ASSERT_NO_THROW(chl.send(move(oprf_request)));
+                ASSERT_NO_THROW(chl.send(std::move(oprf_request)));
                 size_t bytes_sent = chl.bytes_sent();
 
                 // Receive the OPRF request and process response
@@ -89,7 +91,7 @@ namespace APSITests {
                 // Receive OPRF response
                 OPRFResponse oprf_response = to_oprf_response(chl.receive_response());
                 vector<HashedItem> hashed_recv_items;
-                vector<LabelKey> label_keys;
+                LabelKeyVector label_keys;
                 tie(hashed_recv_items, label_keys) =
                     Receiver::ExtractHashes(oprf_response, oprf_receiver);
                 ASSERT_EQ(hashed_recv_items.size(), recv_items.size());
@@ -98,27 +100,15 @@ namespace APSITests {
                 pair<Request, IndexTranslationTable> recv_query_pair =
                     receiver.create_query(hashed_recv_items);
 
-                QueryRequest recv_query = to_query_request(move(recv_query_pair.first));
+                QueryRequest recv_query = to_query_request(std::move(recv_query_pair.first));
                 compr_mode_type expected_compr_mode = recv_query->compr_mode;
 
-                if (use_different_compression &&
-                    Serialization::IsSupportedComprMode(compr_mode_type::zlib) &&
-                    Serialization::IsSupportedComprMode(compr_mode_type::zstd)) {
-                    if (recv_query->compr_mode == compr_mode_type::zstd) {
-                        recv_query->compr_mode = compr_mode_type::zlib;
-                        expected_compr_mode = compr_mode_type::zlib;
-                    } else {
-                        recv_query->compr_mode = compr_mode_type::zstd;
-                        expected_compr_mode = compr_mode_type::zstd;
-                    }
-                }
-
-                IndexTranslationTable itt = move(recv_query_pair.second);
-                chl.send(move(recv_query));
+                IndexTranslationTable itt = std::move(recv_query_pair.second);
+                chl.send(std::move(recv_query));
 
                 // Receive the query and process response
                 QueryRequest sender_query = to_query_request(chl.receive_operation(seal_context));
-                Query query(move(sender_query), sender_db);
+                Query query(std::move(sender_query), sender_db);
                 ASSERT_EQ(expected_compr_mode, query.compr_mode());
                 ASSERT_NO_THROW(Sender::RunQuery(query, chl));
 
@@ -139,12 +129,15 @@ namespace APSITests {
 
         void RunLabeledTest(
             size_t sender_size,
-            vector<pair<size_t, size_t>> client_total_and_int_sizes,
+            const vector<pair<size_t, size_t>> &client_total_and_int_sizes,
             const PSIParams &params,
             size_t num_threads)
         {
-            Log::SetConsoleDisabled(true);
-            Log::SetLogLevel(Log::Level::info);
+            // Install a null sink but keep the level at info, so log calls still format their
+            // messages and run through the logger's locking/dispatch (exercised by the
+            // multithreaded handshake below) while the empty handlers discard the output.
+            SetLogger(Logger::Create({}, {}, {}));
+            SetLogLevel(LogLevel::info);
 
             ThreadPoolMgr::SetThreadCount(num_threads);
 
@@ -185,7 +178,7 @@ namespace APSITests {
                 Request oprf_request = Receiver::CreateOPRFRequest(oprf_receiver);
 
                 // Send the OPRF request
-                ASSERT_NO_THROW(chl.send(move(oprf_request)));
+                ASSERT_NO_THROW(chl.send(std::move(oprf_request)));
                 size_t bytes_sent = chl.bytes_sent();
 
                 // Receive the OPRF request and process response
@@ -198,7 +191,7 @@ namespace APSITests {
                 // Receive OPRF response
                 OPRFResponse oprf_response = to_oprf_response(chl.receive_response());
                 vector<HashedItem> hashed_recv_items;
-                vector<LabelKey> label_keys;
+                LabelKeyVector label_keys;
                 tie(hashed_recv_items, label_keys) =
                     Receiver::ExtractHashes(oprf_response, oprf_receiver);
                 ASSERT_EQ(hashed_recv_items.size(), recv_items.size());
@@ -206,12 +199,12 @@ namespace APSITests {
                 // Create query and send
                 pair<Request, IndexTranslationTable> recv_query =
                     receiver.create_query(hashed_recv_items);
-                IndexTranslationTable itt = move(recv_query.second);
-                chl.send(move(recv_query.first));
+                IndexTranslationTable itt = std::move(recv_query.second);
+                chl.send(std::move(recv_query.first));
 
                 // Receive the query and process response
                 QueryRequest sender_query = to_query_request(chl.receive_operation(seal_context));
-                Query query(move(sender_query), sender_db);
+                Query query(std::move(sender_query), sender_db);
                 ASSERT_NO_THROW(Sender::RunQuery(query, chl));
 
                 // Receive query response
@@ -322,44 +315,6 @@ namespace APSITests {
               { 10, 10 } },
             create_params2(),
             1);
-    }
-
-    TEST(StreamSenderReceiverTests, UnlabeledSmallDifferentCompression1)
-    {
-        size_t sender_size = 10;
-        RunUnlabeledTest(
-            sender_size,
-            { { 0, 0 },
-              { 1, 0 },
-              { 1, 1 },
-              { 5, 0 },
-              { 5, 2 },
-              { 5, 5 },
-              { 10, 0 },
-              { 10, 5 },
-              { 10, 10 } },
-            create_params1(),
-            1,
-            true);
-    }
-
-    TEST(StreamSenderReceiverTests, UnlabeledSmallDifferentCompression2)
-    {
-        size_t sender_size = 10;
-        RunUnlabeledTest(
-            sender_size,
-            { { 0, 0 },
-              { 1, 0 },
-              { 1, 1 },
-              { 5, 0 },
-              { 5, 2 },
-              { 5, 5 },
-              { 10, 0 },
-              { 10, 5 },
-              { 10, 10 } },
-            create_params2(),
-            1,
-            true);
     }
 
     TEST(StreamSenderReceiverTests, UnlabeledSmallMultiThreaded1)

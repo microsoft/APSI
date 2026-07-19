@@ -12,8 +12,6 @@
 
 // APSI
 #include "apsi/network/zmq/zmq_channel.h"
-#include "apsi/powers.h"
-#include "apsi/util/utils.h"
 
 // Google Test
 #include "gtest/gtest.h"
@@ -65,7 +63,7 @@ namespace APSITests {
                 context->set_secret(keygen.secret_key());
                 RelinKeys rlk;
                 keygen.create_relin_keys(rlk);
-                context->set_evaluator(move(rlk));
+                context->set_evaluator(std::move(rlk));
             }
 
             return context;
@@ -118,6 +116,30 @@ namespace APSITests {
         ASSERT_THROW(mychannel.send(make_unique<ZMQSenderOperationResponse>()), runtime_error);
     }
 
+    TEST_F(ZMQChannelTests, ReceiveOperationReturnsNullOnInvalidInput)
+    {
+        // receive_operation wraps receive_network_operation and must propagate a nullptr
+        // return rather than dereferencing it. This is a regression test: the wrapper once
+        // accessed `receive_network_operation(...)->sop` unconditionally, so every path that
+        // returns nullptr (missing context, empty non-blocking queue, malformed input) crashed
+        // instead of failing cleanly. Here we exercise two such paths and require nullptr.
+
+        // Use a dedicated socket pair so lingering queue state from the shared server_/client_
+        // instances cannot affect the result.
+        ZMQSenderChannel svr;
+        ZMQReceiverChannel clt;
+        svr.bind("tcp://*:5559");
+        clt.connect("tcp://localhost:5559");
+
+        // The default expected type sop_unknown requires a SEALContext; passing nullptr makes
+        // receive_network_operation return nullptr before it reads any message.
+        ASSERT_EQ(nullptr, svr.receive_operation(nullptr));
+
+        // sop_parms needs no context, so this reaches the (non-blocking) receive, which returns
+        // nullptr because no message has been queued.
+        ASSERT_EQ(nullptr, svr.receive_operation(nullptr, SenderOperationType::sop_parms));
+    }
+
     TEST_F(ZMQChannelTests, ClientServerFullSession)
     {
         ZMQSenderChannel svr;
@@ -133,7 +155,7 @@ namespace APSITests {
             unique_ptr<SenderOperation> sop = make_unique<SenderOperationParms>();
 
             // Send a Parms operation
-            clt.send(move(sop));
+            clt.send(std::move(sop));
 
             // Fill a data buffer
             vector<unsigned char> oprf_data(256);
@@ -143,20 +165,20 @@ namespace APSITests {
 
             auto sop_oprf = make_unique<SenderOperationOPRF>();
             sop_oprf->data = oprf_data;
-            sop = move(sop_oprf);
+            sop = std::move(sop_oprf);
 
             // Send an OPRF operation with some dummy data
-            clt.send(move(sop));
+            clt.send(std::move(sop));
 
             auto sop_query = make_unique<SenderOperationQuery>();
             auto relin_keys = get_context()->relin_keys();
             sop_query->relin_keys = *relin_keys;
             sop_query->data[0].push_back(get_context()->encryptor()->encrypt_zero_symmetric());
             sop_query->data[123].push_back(get_context()->encryptor()->encrypt_zero_symmetric());
-            sop = move(sop_query);
+            sop = std::move(sop_query);
 
             // Send a query operation with some dummy data
-            clt.send(move(sop));
+            clt.send(std::move(sop));
 
             // Next, try receiving an OPRF response; this is incorrect so should return nullptr
             ASSERT_EQ(nullptr, clt.receive_response(SenderOperationType::sop_oprf));
@@ -251,36 +273,36 @@ namespace APSITests {
         // client_id here.
         auto nrsop = make_unique<ZMQSenderOperationResponse>();
         nrsop->client_id = client_id;
-        nrsop->sop_response = move(rsop_parms);
+        nrsop->sop_response = std::move(rsop_parms);
 
         // Try sending the parameters; the receiver is incorrectly expecting an OPRF response so it
         // will fail to receive this package. We'll have to send it twice so that on the second time
         // it gets the response correctly.
-        svr.send(move(nrsop));
+        svr.send(std::move(nrsop));
 
         // Send again so receiver actually gets it
         rsop_parms = make_unique<SenderOperationResponseParms>();
         rsop_parms->params = make_unique<PSIParams>(*get_params());
         nrsop = make_unique<ZMQSenderOperationResponse>();
         nrsop->client_id = client_id;
-        nrsop->sop_response = move(rsop_parms);
-        svr.send(move(nrsop));
+        nrsop->sop_response = std::move(rsop_parms);
+        svr.send(std::move(nrsop));
 
         // Create an OPRF response and response with the same data we received
         auto rsop_oprf = make_unique<SenderOperationResponseOPRF>();
         rsop_oprf->data = sop_oprf->data;
         nrsop = make_unique<ZMQSenderOperationResponse>();
         nrsop->client_id = client_id;
-        nrsop->sop_response = move(rsop_oprf);
-        svr.send(move(nrsop));
+        nrsop->sop_response = std::move(rsop_oprf);
+        svr.send(std::move(nrsop));
 
         // Create a query response; we will return two packages
         auto rsop_query = make_unique<SenderOperationResponseQuery>();
         rsop_query->package_count = 2;
         nrsop = make_unique<ZMQSenderOperationResponse>();
         nrsop->client_id = client_id;
-        nrsop->sop_response = move(rsop_query);
-        svr.send(move(nrsop));
+        nrsop->sop_response = std::move(rsop_query);
+        svr.send(std::move(nrsop));
 
         // Finally send two ZMQResultPackages
         auto rp = make_unique<ResultPackage>();
@@ -290,8 +312,8 @@ namespace APSITests {
         rp->psi_result = query_ct0;
         auto nrp = make_unique<ZMQResultPackage>();
         nrp->client_id = client_id;
-        nrp->rp = move(rp);
-        svr.send(move(nrp));
+        nrp->rp = std::move(rp);
+        svr.send(std::move(nrp));
 
         rp = make_unique<ResultPackage>();
         rp->bundle_idx = 123;
@@ -301,8 +323,8 @@ namespace APSITests {
         rp->label_result.push_back(query_ct123);
         nrp = make_unique<ZMQResultPackage>();
         nrp->client_id = client_id;
-        nrp->rp = move(rp);
-        svr.send(move(nrp));
+        nrp->rp = std::move(rp);
+        svr.send(std::move(nrp));
 
         clientth.join();
     }
@@ -333,10 +355,10 @@ namespace APSITests {
                 rsop_oprf->data = sop_oprf->data;
                 auto sopr = make_unique<ZMQSenderOperationResponse>();
                 sopr->client_id = client_id;
-                sopr->sop_response = move(rsop_oprf);
+                sopr->sop_response = std::move(rsop_oprf);
 
                 // Send
-                sender.send(move(sopr));
+                sender.send(std::move(sopr));
             }
         });
 
@@ -355,8 +377,8 @@ namespace APSITests {
 
                     auto sop_oprf = make_unique<SenderOperationOPRF>();
                     sop_oprf->data = oprf_data;
-                    unique_ptr<SenderOperation> sop = move(sop_oprf);
-                    recv.send(move(sop));
+                    unique_ptr<SenderOperation> sop = std::move(sop_oprf);
+                    recv.send(std::move(sop));
 
                     auto sopr = recv.receive_response();
                     ASSERT_NE(nullptr, sopr);

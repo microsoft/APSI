@@ -137,7 +137,7 @@ namespace APSITests {
         // A local valid relin_keys object; this time also load works
         RelinKeys rlk;
         keygen.create_relin_keys(rlk);
-        sop.relin_keys.set(move(rlk));
+        sop.relin_keys.set(std::move(rlk));
         ASSERT_FALSE(sop.relin_keys.is_serializable());
         ASSERT_TRUE(sop.relin_keys.is_local());
         out_size = sop.save(ss);

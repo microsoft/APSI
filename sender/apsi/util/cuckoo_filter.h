@@ -163,5 +163,5 @@ namespace apsi {
                 void try_eliminate_overflow();
             };
         } // namespace util
-    }     // namespace sender
+    } // namespace sender
 } // namespace apsi

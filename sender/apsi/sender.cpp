@@ -56,7 +56,7 @@ namespace apsi {
             response_params->params = make_unique<PSIParams>(sender_db->get_params());
 
             try {
-                send_fun(chl, move(response_params));
+                send_fun(chl, std::move(response_params));
             } catch (const exception &ex) {
                 APSI_LOG_ERROR(
                     "Failed to send response to parameter request; function threw an exception: "
@@ -97,7 +97,7 @@ namespace apsi {
             }
 
             try {
-                send_fun(chl, move(response_oprf));
+                send_fun(chl, std::move(response_oprf));
             } catch (const exception &ex) {
                 APSI_LOG_ERROR(
                     "Failed to send response to OPRF request; function threw an exception: "
@@ -155,7 +155,7 @@ namespace apsi {
             response_query->package_count = package_count;
 
             try {
-                send_fun(chl, move(response_query));
+                send_fun(chl, std::move(response_query));
             } catch (const exception &ex) {
                 APSI_LOG_ERROR(
                     "Failed to send response to query request; function threw an exception: "
@@ -190,7 +190,7 @@ namespace apsi {
                     APSI_LOG_DEBUG(
                         "Extracting query ciphertext power " << exponent << " for bundle index "
                                                              << bundle_idx);
-                    all_powers[bundle_idx][exponent] = move(q.second[bundle_idx]);
+                    all_powers[bundle_idx][exponent] = std::move(q.second[bundle_idx]);
                 }
             }
 
@@ -273,7 +273,7 @@ namespace apsi {
                     if (relinearize) {
                         evaluator->relinearize_inplace(prod, *relin_keys, pool);
                     }
-                    powers_at_this_bundle_idx[node.power] = move(prod);
+                    powers_at_this_bundle_idx[node.power] = std::move(prod);
                 }
             });
 
@@ -379,7 +379,7 @@ namespace apsi {
 
             // Send this result part
             try {
-                send_rp_fun(chl, move(rp));
+                send_rp_fun(chl, std::move(rp));
             } catch (const exception &ex) {
                 APSI_LOG_ERROR(
                     "Failed to send result part; function threw an exception: " << ex.what());

@@ -1,0 +1,44 @@
+{
+  "name": "apsi",
+  "version": "0.13.0",
+  "description": "Asymmetric Private Set Intersection",
+  "license": "MIT",
+  "homepage": "https://github.com/microsoft/APSI",
+  "dependencies": [
+    {
+      "name": "seal",
+      "version>=": "4.3.2",
+      "default-features": false,
+      "features": [ "zstd", "no-throw-tran" ]
+    },
+    "ms-gsl",
+    "kuku",
+    "flatbuffers",
+    "jsoncpp"
+  ],
+  "default-features": [ "zmq" ],
+  "features": {
+    "tests": {
+      "description": "Build the unit and integration test suites.",
+      "dependencies": [ "gtest" ]
+    },
+    "cli": {
+      "description": "Build the example sender / receiver / pd_tool CLIs.",
+      "dependencies": [
+        "tclap",
+        { "name": "apsi", "default-features": false, "features": [ "zmq" ] }
+      ]
+    },
+    "zmq": {
+      "description": "Use ZeroMQ + cppzmq for the simple network API.",
+      "dependencies": [ "cppzmq" ]
+    },
+    "hexl": {
+      "description": "Build SEAL with Intel HEXL acceleration.",
+      "dependencies": [
+        { "name": "seal", "features": [ "hexl" ] }
+      ]
+    }
+  },
+  "builtin-baseline": "a78b96b07eb590c59bde5db0f4b260bda45ba92d"
+}

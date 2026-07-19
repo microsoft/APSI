@@ -147,7 +147,7 @@ namespace APSITests {
             bytes.back() &= static_cast<unsigned char>((1 << (8 - bitlen_diff)) - 1);
 
             // Make the Bitstring object
-            Bitstring bs(move(bytes), bit_len);
+            Bitstring bs(std::move(bytes), bit_len);
 
             // Now do a round trip
             vector<felt_t> felts = bits_to_field_elts(bs.to_view(), mod);

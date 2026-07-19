@@ -13,7 +13,6 @@ jobs:
     steps:
     - template: windows.yml
       parameters:
-        nuget_version: '5.4.0'
         ${{ if eq(parameters.debug, 'true') }}:
           configuration: 'debug'
           path: 'Debug'

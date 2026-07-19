@@ -62,7 +62,7 @@ namespace APSITests {
                 context->set_secret(keygen.secret_key());
                 RelinKeys rlk;
                 keygen.create_relin_keys(rlk);
-                context->set_evaluator(move(rlk));
+                context->set_evaluator(std::move(rlk));
             }
 
             return context;
@@ -89,7 +89,7 @@ namespace APSITests {
         unique_ptr<SenderOperation> sop = make_unique<SenderOperationParms>();
 
         // Send a parms operation
-        clt.send(move(sop));
+        clt.send(std::move(sop));
 
         sop = svr.receive_operation(get_context()->seal_context());
         ASSERT_NE(nullptr, sop);
@@ -98,8 +98,8 @@ namespace APSITests {
         // Create a parms response
         auto rsop_parms = make_unique<SenderOperationResponseParms>();
         rsop_parms->params = make_unique<PSIParams>(*get_params());
-        unique_ptr<SenderOperationResponse> rsop = move(rsop_parms);
-        svr.send(move(rsop));
+        unique_ptr<SenderOperationResponse> rsop = std::move(rsop_parms);
+        svr.send(std::move(rsop));
 
         // Receive the parms response
         rsop = clt.receive_response(SenderOperationType::sop_parms);
@@ -128,10 +128,10 @@ namespace APSITests {
 
         auto sop_oprf = make_unique<SenderOperationOPRF>();
         sop_oprf->data = oprf_data;
-        unique_ptr<SenderOperation> sop = move(sop_oprf);
+        unique_ptr<SenderOperation> sop = std::move(sop_oprf);
 
         // Send an OPRF operation
-        clt.send(move(sop));
+        clt.send(std::move(sop));
 
         // Receive the operation
         sop = svr.receive_operation(get_context()->seal_context());
@@ -147,8 +147,8 @@ namespace APSITests {
         // Create an OPRF response
         auto rsop_oprf = make_unique<SenderOperationResponseOPRF>();
         rsop_oprf->data = oprf_data;
-        unique_ptr<SenderOperationResponse> rsop = move(rsop_oprf);
-        svr.send(move(rsop));
+        unique_ptr<SenderOperationResponse> rsop = std::move(rsop_oprf);
+        svr.send(std::move(rsop));
 
         // Receive the OPRF response
         rsop = clt.receive_response(SenderOperationType::sop_oprf);
@@ -176,10 +176,10 @@ namespace APSITests {
         sop_query->relin_keys = *get_context()->relin_keys();
         sop_query->data[0].push_back(get_context()->encryptor()->encrypt_zero_symmetric());
         sop_query->data[123].push_back(get_context()->encryptor()->encrypt_zero_symmetric());
-        unique_ptr<SenderOperation> sop = move(sop_query);
+        unique_ptr<SenderOperation> sop = std::move(sop_query);
 
         // Send a query operation
-        clt.send(move(sop));
+        clt.send(std::move(sop));
 
         // Receive the operation
         sop = svr.receive_operation(get_context()->seal_context());
@@ -203,8 +203,8 @@ namespace APSITests {
         // Create a query response
         auto rsop_query = make_unique<SenderOperationResponseQuery>();
         rsop_query->package_count = 2;
-        unique_ptr<SenderOperationResponse> rsop = move(rsop_query);
-        svr.send(move(rsop));
+        unique_ptr<SenderOperationResponse> rsop = std::move(rsop_query);
+        svr.send(std::move(rsop));
 
         // Receive the query response
         rsop = clt.receive_response(SenderOperationType::sop_query);
@@ -219,7 +219,7 @@ namespace APSITests {
         rp->label_byte_count = 0;
         rp->nonce_byte_count = 0;
         rp->psi_result = query_ct0;
-        svr.send(move(rp));
+        svr.send(std::move(rp));
 
         rp = make_unique<ResultPackage>();
         rp->bundle_idx = 123;
@@ -227,7 +227,7 @@ namespace APSITests {
         rp->nonce_byte_count = 4;
         rp->psi_result = query_ct123;
         rp->label_result.push_back(query_ct123);
-        svr.send(move(rp));
+        svr.send(std::move(rp));
 
         // Receive two packages
         rp = clt.receive_result(get_context()->seal_context());

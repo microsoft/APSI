@@ -67,6 +67,10 @@ namespace apsi {
                 // Invalid header
                 APSI_LOG_ERROR("Failed to receive a valid header");
                 return nullptr;
+            } catch (const exception &ex) {
+                // Any other failure, e.g. allocation failure from an oversized size prefix
+                APSI_LOG_ERROR("Failed to receive a valid header: " << ex.what());
+                return nullptr;
             }
 
             if (!same_serialization_version(sop_header.version)) {
@@ -102,7 +106,7 @@ namespace apsi {
                     break;
                 case SenderOperationType::sop_query:
                     sop = make_unique<SenderOperationQuery>();
-                    bytes_received_ += sop->load(in_, move(context));
+                    bytes_received_ += sop->load(in_, std::move(context));
                     break;
                 default:
                     // Invalid operation
@@ -115,6 +119,10 @@ namespace apsi {
                 APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
                 return nullptr;
             } catch (const runtime_error &ex) {
+                APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
+                return nullptr;
+            } catch (const exception &ex) {
+                // Any other failure, e.g. allocation failure from an oversized size prefix
                 APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
                 return nullptr;
             }
@@ -166,6 +174,10 @@ namespace apsi {
                 // Invalid header
                 APSI_LOG_ERROR("Failed to receive a valid header");
                 return nullptr;
+            } catch (const exception &ex) {
+                // Any other failure, e.g. allocation failure from an oversized size prefix
+                APSI_LOG_ERROR("Failed to receive a valid header: " << ex.what());
+                return nullptr;
             }
 
             if (!same_serialization_version(sop_header.version)) {
@@ -211,6 +223,10 @@ namespace apsi {
                     return nullptr;
                 }
             } catch (const runtime_error &ex) {
+                APSI_LOG_ERROR("An exception was thrown loading response data: " << ex.what());
+                return nullptr;
+            } catch (const exception &ex) {
+                // Any other failure, e.g. allocation failure from an oversized size prefix
                 APSI_LOG_ERROR("An exception was thrown loading response data: " << ex.what());
                 return nullptr;
             }
@@ -264,12 +280,17 @@ namespace apsi {
             unique_ptr<ResultPackage> rp(make_unique<ResultPackage>());
 
             try {
-                bytes_received_ += rp->load(in_, move(context));
+                bytes_received_ += rp->load(in_, std::move(context));
             } catch (const invalid_argument &ex) {
                 APSI_LOG_ERROR(
                     "An exception was thrown loading result package data: " << ex.what());
                 return nullptr;
             } catch (const runtime_error &ex) {
+                APSI_LOG_ERROR(
+                    "An exception was thrown loading result package data: " << ex.what());
+                return nullptr;
+            } catch (const exception &ex) {
+                // Any other failure, e.g. allocation failure from an oversized size prefix
                 APSI_LOG_ERROR(
                     "An exception was thrown loading result package data: " << ex.what());
                 return nullptr;

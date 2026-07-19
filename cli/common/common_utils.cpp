@@ -4,30 +4,18 @@
 #include "common_utils.h"
 
 // STD
+#include <filesystem>
 #include <iomanip>
 #include <iostream>
 #if defined(_MSC_VER)
 #include <windows.h>
 #endif
-#if defined(__GNUC__) && (__GNUC__ < 8) && !defined(__clang__)
-#include <experimental/filesystem>
-#else
-#include <filesystem>
-#endif
 
 // APSI
 #include "apsi/log.h"
-#include "apsi/psi_params.h"
-#include "apsi/util/utils.h"
-#include "common/base_clp.h"
 
 using namespace std;
-#if defined(__GNUC__) && (__GNUC__ < 8) && !defined(__clang__)
-namespace fs = std::experimental::filesystem;
-#else
 namespace fs = std::filesystem;
-#endif
-using namespace seal;
 using namespace apsi;
 using namespace apsi::util;
 
@@ -37,7 +25,7 @@ This only turns on showing colors for Windows.
 void prepare_console()
 {
 #ifndef _MSC_VER
-    return; // Nothing to do on Linux.
+    // Nothing to do on Linux.
 #else
     HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
     if (hConsole == INVALID_HANDLE_VALUE)

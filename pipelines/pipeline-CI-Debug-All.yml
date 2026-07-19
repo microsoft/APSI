@@ -4,13 +4,15 @@ trigger:
   batch: true
   branches:
     include:
-    - master
+    - main 
   paths:
     exclude:
-    - CONTRIBUTING.md
+    - CHANGES.md
     - CODE_OF_CONDUCT.md
+    - CONTRIBUTING.md
     - LICENSE
     - README.md
+    - SECURITY.md
 
 stages:
   - stage: build

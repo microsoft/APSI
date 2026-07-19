@@ -1,6 +1,14 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
+# Mirror amd64 header into the build tree under apsi/fourq/amd64/ so includes like
+# "apsi/fourq/amd64/fp_x64.h" resolve via the public include path
+# ${CMAKE_BINARY_DIR}/common.
+configure_file(
+    ${CMAKE_CURRENT_LIST_DIR}/fp_x64.h
+    ${CMAKE_BINARY_DIR}/common/apsi/fourq/amd64/fp_x64.h
+    COPYONLY)
+
 # Source files in this directory
 if(APSI_USE_ASM)
     if(APSI_USE_AVX2)

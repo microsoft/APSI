@@ -21,6 +21,7 @@
 using namespace std;
 using namespace apsi;
 using namespace apsi::sender;
+using namespace apsi::util;
 using namespace seal;
 
 namespace APSITests {

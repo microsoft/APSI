@@ -100,5 +100,5 @@ namespace apsi {
 
             std::atomic<std::uint64_t> bytes_received_;
         }; // class Channel
-    }      // namespace network
+    } // namespace network
 } // namespace apsi

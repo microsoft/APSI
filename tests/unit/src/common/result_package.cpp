@@ -69,7 +69,7 @@ namespace APSITests {
         // Symmetric encryption
         Ciphertext ct;
         context->encryptor()->encrypt_zero_symmetric(ct);
-        rp.psi_result.set(move(ct));
+        rp.psi_result.set(std::move(ct));
         rp.label_byte_count = 1;
         rp.nonce_byte_count = 2;
         size_t out_size = rp.save(ss);

@@ -65,5 +65,5 @@ namespace apsi {
 
             std::vector<SEALObject<seal::Ciphertext>> label_result;
         }; // struct ResultPackage
-    }      // namespace network
+    } // namespace network
 } // namespace apsi

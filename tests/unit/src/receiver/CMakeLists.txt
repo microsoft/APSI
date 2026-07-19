@@ -1,6 +1,11 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
+target_sources(unit_tests
+    PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/receiver.cpp
+)
+
 if(APSI_USE_ZMQ)
     add_subdirectory(zmq)
 endif()

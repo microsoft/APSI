@@ -3,21 +3,18 @@
 
 // STD
 #include <cstddef>
-#include <iterator>
+#include <cstdint>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 
 // APSI
 #include "apsi/fourq/random.h"
 #include "apsi/log.h"
-#include "apsi/network/result_package_generated.h"
-#include "apsi/network/sop_generated.h"
-#include "apsi/network/sop_header_generated.h"
 #include "apsi/network/zmq/zmq_channel.h"
 #include "apsi/util/utils.h"
 
 // SEAL
-#include "seal/randomgen.h"
 #include "seal/util/streambuf.h"
 
 // ZeroMQ
@@ -57,7 +54,7 @@ namespace apsi {
                     reinterpret_cast<const char *>(data.data()),
                     static_cast<streamsize>(data.size()));
                 istream stream(&agbuf);
-                return obj.load(stream, move(context));
+                return obj.load(stream, std::move(context));
             }
 
             template <typename T>
@@ -230,6 +227,10 @@ namespace apsi {
                 // Invalid header
                 APSI_LOG_ERROR("Failed to receive a valid header");
                 return nullptr;
+            } catch (const exception &ex) {
+                // Any other failure, e.g. allocation failure from an oversized size prefix
+                APSI_LOG_ERROR("Failed to receive a valid header: " << ex.what());
+                return nullptr;
             }
 
             if (!same_serialization_version(sop_header.version)) {
@@ -270,7 +271,7 @@ namespace apsi {
                     break;
                 case SenderOperationType::sop_query:
                     sop = make_unique<SenderOperationQuery>();
-                    bytes_received = load_from_string(msg[2].to_string(), move(context), *sop);
+                    bytes_received = load_from_string(msg[2].to_string(), std::move(context), *sop);
                     bytes_received_ += bytes_received;
                     break;
                 default:
@@ -286,12 +287,16 @@ namespace apsi {
             } catch (const runtime_error &ex) {
                 APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
                 return nullptr;
+            } catch (const exception &ex) {
+                // Any other failure, e.g. allocation failure from an oversized size prefix
+                APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
+                return nullptr;
             }
 
             // Loaded successfully; set up ZMQSenderOperation package
             auto n_sop = make_unique<ZMQSenderOperation>();
-            n_sop->client_id = move(client_id);
-            n_sop->sop = move(sop);
+            n_sop->client_id = std::move(client_id);
+            n_sop->sop = std::move(sop);
 
             APSI_LOG_DEBUG(
                 "Received an operation of type " << sender_operation_type_str(sop_header.type)
@@ -304,8 +309,13 @@ namespace apsi {
         unique_ptr<SenderOperation> ZMQChannel::receive_operation(
             shared_ptr<SEALContext> context, SenderOperationType expected)
         {
-            // Ignore the client_id
-            return move(receive_network_operation(move(context), expected)->sop);
+            // receive_network_operation returns nullptr on every error path (malformed header,
+            // version mismatch, unexpected/invalid operation type, parse exception).
+            auto n_sop = receive_network_operation(std::move(context), expected);
+            if (!n_sop) {
+                return nullptr;
+            }
+            return std::move(n_sop->sop);
         }
 
         void ZMQChannel::send(unique_ptr<ZMQSenderOperationResponse> sop_response)
@@ -346,9 +356,9 @@ namespace apsi {
         {
             // Leave the client_id empty
             auto n_sop_response = make_unique<ZMQSenderOperationResponse>();
-            n_sop_response->sop_response = move(sop_response);
+            n_sop_response->sop_response = std::move(sop_response);
 
-            send(move(n_sop_response));
+            send(std::move(n_sop_response));
         }
 
         unique_ptr<SenderOperationResponse> ZMQChannel::receive_response(
@@ -379,6 +389,10 @@ namespace apsi {
             } catch (const runtime_error &) {
                 // Invalid header
                 APSI_LOG_ERROR("Failed to receive a valid header");
+                return nullptr;
+            } catch (const exception &ex) {
+                // Any other failure, e.g. allocation failure from an oversized size prefix
+                APSI_LOG_ERROR("Failed to receive a valid header: " << ex.what());
                 return nullptr;
             }
 
@@ -433,6 +447,10 @@ namespace apsi {
             } catch (const runtime_error &ex) {
                 APSI_LOG_ERROR("An exception was thrown loading response data: " << ex.what());
                 return nullptr;
+            } catch (const exception &ex) {
+                // Any other failure, e.g. allocation failure from an oversized size prefix
+                APSI_LOG_ERROR("An exception was thrown loading response data: " << ex.what());
+                return nullptr;
             }
 
             // Loaded successfully
@@ -478,9 +496,9 @@ namespace apsi {
         {
             // Leave the client_id empty
             auto n_rp = make_unique<ZMQResultPackage>();
-            n_rp->rp = move(rp);
+            n_rp->rp = std::move(rp);
 
-            send(move(n_rp));
+            send(std::move(n_rp));
         }
 
         unique_ptr<ResultPackage> ZMQChannel::receive_result(shared_ptr<SEALContext> context)
@@ -516,12 +534,16 @@ namespace apsi {
             unique_ptr<ResultPackage> rp(make_unique<ResultPackage>());
 
             try {
-                bytes_received = load_from_string(msg[0].to_string(), move(context), *rp);
+                bytes_received = load_from_string(msg[0].to_string(), std::move(context), *rp);
                 bytes_received_ += bytes_received;
             } catch (const invalid_argument &ex) {
                 APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
                 return nullptr;
             } catch (const runtime_error &ex) {
+                APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
+                return nullptr;
+            } catch (const exception &ex) {
+                // Any other failure, e.g. allocation failure from an oversized size prefix
                 APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
                 return nullptr;
             }
@@ -541,7 +563,7 @@ namespace apsi {
 
             bool received = msg.recv(*get_socket(), static_cast<int>(receive_flags));
             if (!received && wait_for_message) {
-                APSI_LOG_ERROR("ZeroMQ failed to receive a message")
+                APSI_LOG_ERROR("ZeroMQ failed to receive a message");
                 throw runtime_error("failed to receive message");
             }
 
@@ -579,10 +601,17 @@ namespace apsi {
             // Ensure messages are not dropped
             socket->set(sockopt::rcvhwm, 70000);
 
+            // Reject any single inbound message larger than INT32_MAX. This matches the
+            // FlatBuffers verifier's per-buffer maximum, so anything beyond that would fail
+            // verification later anyway. This stops a peer from forcing a multi-GiB ZMQ
+            // allocation before APSI's own size caps get a chance to run.
+            socket->set(sockopt::maxmsgsize, static_cast<int64_t>(numeric_limits<int32_t>::max()));
+
             string buf;
             buf.resize(32);
             random_bytes(
-                reinterpret_cast<unsigned char *>(&buf[0]), static_cast<unsigned int>(buf.size()));
+                reinterpret_cast<unsigned char *>(buf.data()),
+                static_cast<unsigned int>(buf.size()));
             // make sure first byte is _not_ zero, as that has a special meaning for ZeroMQ
             buf[0] = 'A';
             socket->set(sockopt::routing_id, buf);
@@ -597,6 +626,10 @@ namespace apsi {
         {
             // Ensure messages are not dropped
             socket->set(sockopt::sndhwm, 70000);
+
+            // Reject any single inbound message larger than INT32_MAX. See the matching
+            // comment in ZMQReceiverChannel::set_socket_options.
+            socket->set(sockopt::maxmsgsize, static_cast<int64_t>(numeric_limits<int32_t>::max()));
         }
     } // namespace network
 } // namespace apsi

@@ -7,22 +7,12 @@
 #include <cmath>
 #include <cstdint>
 #include <iostream>
-#include <limits>
 #include <set>
 #include <string>
 #include <utility>
 
-// APSI
-#include "apsi/log.h"
-#include "apsi/util/utils.h"
-
-// Kuku
-#include "kuku/kuku.h"
-
 // SEAL
 #include "seal/encryptionparams.h"
-#include "seal/serialization.h"
-#include "seal/util/common.h"
 
 namespace apsi {
     /**
@@ -55,7 +45,7 @@ namespace apsi {
             /**
             Specified how many SEAL batching slots are occupied by an item.
             */
-            std::uint32_t felts_per_item;
+            std::uint32_t felts_per_item = 0;
         };
 
         /**
@@ -69,7 +59,7 @@ namespace apsi {
             /**
             Specified the size of the cuckoo hash table for storing the receiver's items.
             */
-            std::uint32_t table_size;
+            std::uint32_t table_size = 0;
 
             /**
             Specifies the number of sender's items stored in a single hash table bin. A larger value
@@ -77,12 +67,12 @@ namespace apsi {
             sent from the receiver to the sender, but reduces the number of ciphertexts sent from
             the sender to the receiver.
             */
-            std::uint32_t max_items_per_bin;
+            std::uint32_t max_items_per_bin = 0;
 
             /**
             The number of hash functions used in receiver's cuckoo hashing.
             */
-            std::uint32_t hash_func_count;
+            std::uint32_t hash_func_count = 0;
         }; // struct TableParams
 
         /**
@@ -109,58 +99,67 @@ namespace apsi {
             std::set<std::uint32_t> query_powers;
         };
 
+        [[nodiscard]]
         const ItemParams &item_params() const
         {
             return item_params_;
         }
 
+        [[nodiscard]]
         const TableParams &table_params() const
         {
             return table_params_;
         }
 
+        [[nodiscard]]
         const QueryParams &query_params() const
         {
             return query_params_;
         }
 
+        [[nodiscard]]
         const SEALParams &seal_params() const
         {
             return seal_params_;
         }
 
+        [[nodiscard]]
         std::uint32_t items_per_bundle() const
         {
             return items_per_bundle_;
         }
 
+        [[nodiscard]]
         std::uint32_t bins_per_bundle() const
         {
             return bins_per_bundle_;
         }
 
+        [[nodiscard]]
         std::uint32_t bundle_idx_count() const
         {
             return bundle_idx_count_;
         }
 
+        [[nodiscard]]
         std::uint32_t item_bit_count() const
         {
             return item_bit_count_;
         }
 
+        [[nodiscard]]
         std::uint32_t item_bit_count_per_felt() const
         {
             return item_bit_count_per_felt_;
         }
 
         PSIParams(
-            const ItemParams &item_params,
-            const TableParams &table_params,
-            const QueryParams &query_params,
-            const SEALParams &seal_params)
-            : item_params_(item_params), table_params_(table_params), query_params_(query_params),
-              seal_params_(seal_params)
+            ItemParams item_params,
+            TableParams table_params,
+            QueryParams query_params,
+            SEALParams seal_params)
+            : item_params_(item_params), table_params_(table_params),
+              query_params_(std::move(query_params)), seal_params_(std::move(seal_params))
         {
             initialize();
         }
@@ -169,12 +168,14 @@ namespace apsi {
 
         PSIParams &operator=(const PSIParams &copy) = default;
 
+        [[nodiscard]]
         std::string to_string() const;
 
         /**
         Returns an approximate base-2 logarithm of the false-positive probability per receiver's
         item.
         */
+        [[nodiscard]]
         double log2_fpp() const
         {
             return std::min<double>(
@@ -187,16 +188,19 @@ namespace apsi {
         /**
         Writes the PSIParams to a stream.
         */
+        [[nodiscard]]
         std::size_t save(std::ostream &out) const;
 
         /**
         Reads the PSIParams from a stream.
         */
+        [[nodiscard]]
         static std::pair<PSIParams, std::size_t> Load(std::istream &in);
 
         /**
         Reads the PSIParams from a JSON string
         */
+        [[nodiscard]]
         static PSIParams Load(const std::string &in);
 
     private:
@@ -208,15 +212,15 @@ namespace apsi {
 
         SEALParams seal_params_;
 
-        std::uint32_t items_per_bundle_;
+        std::uint32_t items_per_bundle_ = 0;
 
-        std::uint32_t bins_per_bundle_;
+        std::uint32_t bins_per_bundle_ = 0;
 
-        std::uint32_t bundle_idx_count_;
+        std::uint32_t bundle_idx_count_ = 0;
 
-        std::uint32_t item_bit_count_;
+        std::uint32_t item_bit_count_ = 0;
 
-        std::uint32_t item_bit_count_per_felt_;
+        std::uint32_t item_bit_count_per_felt_ = 0;
 
         void initialize();
     }; // class PSIParams
