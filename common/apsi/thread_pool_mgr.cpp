@@ -66,8 +66,9 @@ ThreadPoolMgr::~ThreadPoolMgr()
 
 ThreadPool &ThreadPoolMgr::thread_pool() const
 {
-    if (!thread_pool_)
+    if (!thread_pool_) {
         throw runtime_error("Thread pool is not available");
+    }
 
     return *thread_pool_;
 }

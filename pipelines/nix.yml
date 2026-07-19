@@ -4,26 +4,21 @@ steps:
   displayName: 'Bootstrap vcpkg'
   inputs:
     script: |
-      cd $(Build.SourcesDirectory)
+      BASELINE=$(python3 -c "import json; print(json.load(open('vcpkg.json'))['builtin-baseline'])")
       git clone https://github.com/microsoft/vcpkg.git
       cd vcpkg
+      git checkout $BASELINE
       ./bootstrap-vcpkg.sh -disableMetrics
     workingDirectory: '$(Build.SourcesDirectory)'
     failOnStderr: false
 
-- task: CmdLine@2
-  displayName: 'Configure vcpkg dependencies'
-  inputs:
-    script: |
-      ./vcpkg install cppzmq flatbuffers gtest kuku log4cplus seal[ms-gsl,zstd,no-throw-tran] tclap jsoncpp
-    workingDirectory: '$(Build.SourcesDirectory)/vcpkg'
-    failOnStderr: false
-
+# Dependencies are resolved from vcpkg.json at the project root. CMake configure
+# drives the install via the vcpkg toolchain file.
 - task: CMake@1
   displayName: 'CMake APSI'
   inputs:
     workingDirectory: '$(Build.SourcesDirectory)'
-    cmakeArgs: '-DCMAKE_BUILD_TYPE=${{ parameters.configuration }} -DAPSI_BUILD_TESTS=ON -DCMAKE_TOOLCHAIN_FILE=$(Build.SourcesDirectory)/vcpkg/scripts/buildsystems/vcpkg.cmake .'
+    cmakeArgs: '-DCMAKE_BUILD_TYPE=${{ parameters.configuration }} -DAPSI_BUILD_TESTS=ON -DVCPKG_MANIFEST_FEATURES=tests -DCMAKE_TOOLCHAIN_FILE=$(Build.SourcesDirectory)/vcpkg/scripts/buildsystems/vcpkg.cmake .'
 
 - script: |
       cd $BUILD_SOURCESDIRECTORY

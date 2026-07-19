@@ -3,6 +3,7 @@
 
 // STD
 #include <algorithm>
+#include <cstring>
 #include <future>
 #include <iterator>
 #include <memory>
@@ -56,9 +57,12 @@ namespace apsi {
             unordered_set<location_type> all_locations(
                 const vector<LocFunc> &hash_funcs, const HashedItem &item)
             {
+                kuku::item_type kuku_item;
+                std::memcpy(&kuku_item, item.value().data(), sizeof(kuku_item));
+
                 unordered_set<location_type> result;
-                for (auto &hf : hash_funcs) {
-                    result.emplace(hf(item.get_as<kuku::item_type>().front()));
+                for (const auto &hf : hash_funcs) {
+                    result.emplace(hf(kuku_item));
                 }
 
                 return result;
@@ -313,7 +317,7 @@ namespace apsi {
                         }
 
                         // Push a new BinBundle to the set of BinBundles at this bundle index
-                        bundle_set.push_back(move(new_bin_bundle));
+                        bundle_set.push_back(std::move(new_bin_bundle));
                     }
                 }
 
@@ -570,7 +574,7 @@ namespace apsi {
             : SenderDB(params, label_byte_count, nonce_byte_count, compressed)
         {
             // Initialize oprf key with the one given to this constructor
-            oprf_key_ = move(oprf_key);
+            oprf_key_ = std::move(oprf_key);
         }
 
         SenderDB::SenderDB(SenderDB &&source)
@@ -582,9 +586,9 @@ namespace apsi {
             // Lock the source before moving stuff over
             auto lock = source.get_writer_lock();
 
-            hashed_items_ = move(source.hashed_items_);
-            bin_bundles_ = move(source.bin_bundles_);
-            oprf_key_ = move(source.oprf_key_);
+            hashed_items_ = std::move(source.hashed_items_);
+            bin_bundles_ = std::move(source.bin_bundles_);
+            oprf_key_ = std::move(source.oprf_key_);
             source.oprf_key_ = OPRFKey();
 
             // Reset the source data structures
@@ -612,9 +616,9 @@ namespace apsi {
             // Lock the source before moving stuff over
             auto source_lock = source.get_writer_lock();
 
-            hashed_items_ = move(source.hashed_items_);
-            bin_bundles_ = move(source.bin_bundles_);
-            oprf_key_ = move(source.oprf_key_);
+            hashed_items_ = std::move(source.hashed_items_);
+            bin_bundles_ = std::move(source.bin_bundles_);
+            oprf_key_ = std::move(source.oprf_key_);
             source.oprf_key_ = OPRFKey();
 
             // Reset the source data structures
@@ -715,7 +719,7 @@ namespace apsi {
 
             stripped_ = true;
 
-            OPRFKey oprf_key_copy = move(oprf_key_);
+            OPRFKey oprf_key_copy = std::move(oprf_key_);
             oprf_key_.clear();
             hashed_items_.clear();
 
@@ -1085,9 +1089,13 @@ namespace apsi {
                 vector<fbs::HashedItem> ret;
                 ret.reserve(get_hashed_items().size());
                 for (const auto &it : get_hashed_items()) {
-                    // Then create the vector of bytes for this hashed item
-                    auto item_data = it.get_as<uint64_t>();
-                    ret.emplace_back(item_data[0], item_data[1]);
+                    // Read out the two 64-bit halves with memcpy to avoid strict-aliasing UB.
+                    const auto &v = it.value();
+                    uint64_t lw;
+                    uint64_t hw;
+                    std::memcpy(&lw, v.data(), sizeof(lw));
+                    std::memcpy(&hw, v.data() + sizeof(lw), sizeof(hw));
+                    ret.emplace_back(lw, hw);
                 }
                 return ret;
             }());
@@ -1229,6 +1237,22 @@ namespace apsi {
             }
 
             uint32_t bin_bundle_count = sdb->bin_bundle_count();
+
+            // Cap bin_bundle_count to a sane upper bound before reserving. Without this, a
+            // malicious DB blob could set bin_bundle_count to (close to) UINT32_MAX and force
+            // a multi-gigabyte reservation just for the outer vector. The legitimate value is
+            // at most a small multiple of bundle_idx_count; cap at 64K * bundle_idx_count
+            // which leaves enormous headroom over realistic configurations.
+            uint64_t max_bin_bundle_count = mul_safe<uint64_t>(
+                static_cast<uint64_t>(params->bundle_idx_count()), uint64_t(65536));
+            if (bin_bundle_count > max_bin_bundle_count) {
+                APSI_LOG_ERROR(
+                    "The loaded SenderDB declares " << bin_bundle_count
+                                                    << " bin bundles, exceeding the upper bound ("
+                                                    << max_bin_bundle_count << ")");
+                throw runtime_error("failed to load SenderDB");
+            }
+
             size_t bin_bundle_data_size = 0;
             uint32_t max_bin_size = params->table_params().max_items_per_bin;
             uint32_t ps_low_degree = params->query_params().ps_low_degree;
@@ -1248,8 +1272,9 @@ namespace apsi {
             vector<mutex> bundle_idx_mtxs(sender_db->bin_bundles_.size());
             mutex bin_bundle_data_size_mtx;
             vector<future<void>> futures;
-            for (size_t i = 0; i < bin_bundle_data.size(); i++) {
-                futures.push_back(tpm.thread_pool().enqueue([&, i]() {
+            futures.reserve(bin_bundle_data.size());
+            for (auto &raw_bb_data : bin_bundle_data) {
+                futures.push_back(tpm.thread_pool().enqueue([&]() {
                     BinBundle bb(
                         sender_db->crypto_context_,
                         label_size,
@@ -1258,10 +1283,10 @@ namespace apsi {
                         bins_per_bundle,
                         compressed,
                         stripped);
-                    auto bb_data = bb.load(bin_bundle_data[i]);
+                    auto bb_data = bb.load(raw_bb_data);
 
                     // Clear the data buffer since we have now loaded the BinBundle
-                    bin_bundle_data[i].clear();
+                    raw_bb_data.clear();
 
                     // Check that the loaded bundle index is not out of range
                     if (bb_data.first >= sender_db->bin_bundles_.size()) {
@@ -1274,7 +1299,7 @@ namespace apsi {
 
                     // Add the loaded BinBundle to the correct location in bin_bundles_
                     bundle_idx_mtxs[bb_data.first].lock();
-                    sender_db->bin_bundles_[bb_data.first].push_back(move(bb));
+                    sender_db->bin_bundles_[bb_data.first].push_back(std::move(bb));
                     bundle_idx_mtxs[bb_data.first].unlock();
 
                     APSI_LOG_DEBUG(
@@ -1301,7 +1326,7 @@ namespace apsi {
 
             APSI_LOG_DEBUG("Finished loading SenderDB");
 
-            return { move(*sender_db), total_size };
+            return { std::move(*sender_db), total_size };
         }
     } // namespace sender
 } // namespace apsi

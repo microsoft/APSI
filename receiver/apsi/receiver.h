@@ -65,7 +65,7 @@ namespace apsi {
         to_oprf_response function. This function will return nullptr if the received response was
         not of the right type. Finally, Receiver::ExtractHashes must be called with the
         OPRFResponse and the oprf::OPRFReceiver object. This function returns
-        std::pair<std::vector<HashedItem>, std::vector<LabelKey>>, containing the OPRF hashed items
+        std::pair<std::vector<HashedItem>, LabelKeyVector>, containing the OPRF hashed items
         and the label encryption keys. Both vectors in this pair must be kept for the next steps.
 
         (3) Receiver::create_query (non-static member function) must then be used to create the
@@ -87,7 +87,7 @@ namespace apsi {
         Alternatively, one can first retrieve all ResultParts, collect them into a
         std::vector<ResultPart>, and use Receiver::process_result to find the complete result --
         just like what the simple API returns. Both Receiver::process_result_part and
-        Receiver::process_result require the IndexTranslationTable and the std::vector<LabelKey>
+        Receiver::process_result require the IndexTranslationTable and the LabelKeyVector
         objects created in the previous steps.
         */
         class Receiver {
@@ -143,7 +143,7 @@ namespace apsi {
             Performs an OPRF request on a vector of items through a given channel and returns a
             vector of OPRF hashed items of the same size as the input vector.
             */
-            static std::pair<std::vector<HashedItem>, std::vector<LabelKey>> RequestOPRF(
+            static std::pair<std::vector<HashedItem>, LabelKeyVector> RequestOPRF(
                 const std::vector<Item> &items, network::NetworkChannel &chl);
 
             /**
@@ -154,7 +154,7 @@ namespace apsi {
             */
             std::vector<MatchRecord> request_query(
                 const std::vector<HashedItem> &items,
-                const std::vector<LabelKey> &label_keys,
+                const LabelKeyVector &label_keys,
                 network::NetworkChannel &chl);
 
             /**
@@ -178,7 +178,7 @@ namespace apsi {
             Extracts a vector of OPRF hashed items from an OPRFResponse and the corresponding
             oprf::OPRFReceiver.
             */
-            static std::pair<std::vector<HashedItem>, std::vector<LabelKey>> ExtractHashes(
+            static std::pair<std::vector<HashedItem>, LabelKeyVector> ExtractHashes(
                 const OPRFResponse &oprf_response, const oprf::OPRFReceiver &oprf_receiver);
 
             /**
@@ -199,7 +199,7 @@ namespace apsi {
             results for each received ResultPart must be checked.
             */
             std::vector<MatchRecord> process_result_part(
-                const std::vector<LabelKey> &label_keys,
+                const LabelKeyVector &label_keys,
                 const IndexTranslationTable &itt,
                 const ResultPart &result_part) const;
 
@@ -209,7 +209,7 @@ namespace apsi {
             vector of MatchRecords reflects the logical OR of the results from each ResultPart.
             */
             std::vector<MatchRecord> process_result(
-                const std::vector<LabelKey> &label_keys,
+                const LabelKeyVector &label_keys,
                 const IndexTranslationTable &itt,
                 const std::vector<ResultPart> &result) const;
 
@@ -224,7 +224,7 @@ namespace apsi {
             void process_result_worker(
                 std::atomic<std::uint32_t> &package_count,
                 std::vector<MatchRecord> &mrs,
-                const std::vector<LabelKey> &label_keys,
+                const LabelKeyVector &label_keys,
                 const IndexTranslationTable &itt,
                 network::Channel &chl) const;
 
@@ -238,5 +238,5 @@ namespace apsi {
 
             SEALObject<seal::RelinKeys> relin_keys_;
         }; // class Receiver
-    }      // namespace receiver
+    } // namespace receiver
 } // namespace apsi

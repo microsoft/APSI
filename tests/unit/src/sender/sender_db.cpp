@@ -537,7 +537,7 @@ namespace APSITests {
             stringstream ss;
             size_t save_size = sender_db.save(ss);
             auto other = SenderDB::Load(ss);
-            auto other_sdb = move(other.first);
+            auto other_sdb = std::move(other.first);
 
             ASSERT_EQ(save_size, other.second);
             ASSERT_EQ(params->to_string(), other_sdb.get_params().to_string());
@@ -553,7 +553,7 @@ namespace APSITests {
 
             save_size = sender_db.save(ss);
             other = SenderDB::Load(ss);
-            other_sdb = move(other.first);
+            other_sdb = std::move(other.first);
 
             ASSERT_EQ(save_size, other.second);
             ASSERT_EQ(params->to_string(), other_sdb.get_params().to_string());
@@ -575,7 +575,7 @@ namespace APSITests {
 
             save_size = sender_db.save(ss);
             other = SenderDB::Load(ss);
-            other_sdb = move(other.first);
+            other_sdb = std::move(other.first);
 
             ASSERT_EQ(save_size, other.second);
             ASSERT_EQ(params->to_string(), other_sdb.get_params().to_string());
@@ -605,7 +605,7 @@ namespace APSITests {
             stringstream ss;
             size_t save_size = sender_db.save(ss);
             auto other = SenderDB::Load(ss);
-            auto other_sdb = move(other.first);
+            auto other_sdb = std::move(other.first);
 
             ASSERT_EQ(save_size, other.second);
             ASSERT_EQ(params->to_string(), other_sdb.get_params().to_string());
@@ -621,7 +621,7 @@ namespace APSITests {
 
             save_size = sender_db.save(ss);
             other = SenderDB::Load(ss);
-            other_sdb = move(other.first);
+            other_sdb = std::move(other.first);
 
             ASSERT_EQ(save_size, other.second);
             ASSERT_EQ(params->to_string(), other_sdb.get_params().to_string());
@@ -644,7 +644,7 @@ namespace APSITests {
 
             save_size = sender_db.save(ss);
             other = SenderDB::Load(ss);
-            other_sdb = move(other.first);
+            other_sdb = std::move(other.first);
 
             ASSERT_EQ(save_size, other.second);
             ASSERT_EQ(params->to_string(), other_sdb.get_params().to_string());

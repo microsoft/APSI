@@ -28,12 +28,13 @@ public:
     BaseCLP(const std::string &description, const std::string &version)
         : TCLAP::CmdLine(description, /* delim */ ' ', version)
     {
-        std::vector<std::string> log_levels = { "all", "debug", "info", "warning", "error", "off" };
+        std::vector<std::string> log_levels = { "trace",   "debug", "info",
+                                                "warning", "error", "suppress" };
         log_level_constraint_ = std::make_unique<TCLAP::ValuesConstraint<std::string>>(log_levels);
         log_level_arg_ = std::make_unique<TCLAP::ValueArg<std::string>>(
             "l",
             "logLevel",
-            "One of \"all\", \"debug\", \"info\" (default), \"warning\", \"error\", \"off\"",
+            "One of \"trace\", \"debug\", \"info\" (default), \"warning\", \"error\", \"suppress\"",
             false,
             "info",
             log_level_constraint_.get(),
@@ -84,9 +85,17 @@ public:
             threads_ = threads_arg.getValue();
             log_level_ = log_level_arg_->getValue();
 
-            apsi::Log::SetConsoleDisabled(silent_);
-            apsi::Log::SetLogFile(log_file_);
-            apsi::Log::SetLogLevel(log_level_);
+            apsi::SetLogLevel(log_level_);
+            std::shared_ptr<apsi::Logger> logger;
+            if (!log_file_.empty()) {
+                logger = apsi::NewFileLogger(log_file_, /*also_console=*/!silent_);
+            } else if (silent_) {
+                // Empty handler arrays produce a no-op Logger that drops every emission.
+                logger = apsi::Logger::Create({}, {}, {});
+            } else {
+                logger = apsi::NewDefaultLogger();
+            }
+            apsi::SetLogger(std::move(logger));
 
             get_args();
         } catch (...) {

@@ -4,20 +4,16 @@
 // STD
 #include <array>
 #include <cstdint>
-#include <numeric>
+#include <cstring>
 
 // APSI
 #include "apsi/item.h"
-
-// SEAL
-#include "seal/util/defines.h"
 
 // Google Test
 #include "gtest/gtest.h"
 
 using namespace std;
 using namespace apsi;
-using namespace seal;
 
 namespace APSITests {
     TEST(BitstringViewTests, Basics)
@@ -104,16 +100,20 @@ namespace APSITests {
         // Zero item test
         Item item;
 
-        auto data = item.get_as<uint64_t>();
-        ASSERT_EQ(uint64_t(0), data[0]);
-        ASSERT_EQ(uint64_t(0), data[1]);
+        uint64_t lo = 0;
+        uint64_t hi = 0;
+        std::memcpy(&lo, item.value().data(), sizeof(lo));
+        std::memcpy(&hi, item.value().data() + sizeof(lo), sizeof(hi));
+        ASSERT_EQ(uint64_t(0), lo);
+        ASSERT_EQ(uint64_t(0), hi);
 
         // Size must be 16 bytes
         ASSERT_EQ(size_t(16), sizeof(Item));
 
         Item item2(0xFAFAFAFAFAFAFAFAULL, 0xB0B0B0B0B0B0B0B0ULL);
-        auto data2 = item2.get_as<uint64_t>();
-        ASSERT_EQ(0xFAFAFAFAFAFAFAFAULL, data2[0]);
-        ASSERT_EQ(0xB0B0B0B0B0B0B0B0ULL, data2[1]);
+        std::memcpy(&lo, item2.value().data(), sizeof(lo));
+        std::memcpy(&hi, item2.value().data() + sizeof(lo), sizeof(hi));
+        ASSERT_EQ(0xFAFAFAFAFAFAFAFAULL, lo);
+        ASSERT_EQ(0xB0B0B0B0B0B0B0B0ULL, hi);
     }
 } // namespace APSITests

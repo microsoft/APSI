@@ -4,14 +4,13 @@
 // STD
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <memory>
-#include <unordered_set>
 #include <vector>
 
 // APSI
 #include "apsi/oprf/oprf_receiver.h"
 #include "apsi/oprf/oprf_sender.h"
-#include "apsi/util/utils.h"
 
 // SEAL
 #include "seal/randomgen.h"
@@ -69,8 +68,8 @@ namespace APSITests {
         auto rng = rng_factory->create();
         for (size_t i = 0; i < item_count; i++) {
             Item it;
-            rng->generate(sizeof(Item), it.get_as<seal_byte>().data());
-            items.push_back(move(it));
+            rng->generate(sizeof(Item), reinterpret_cast<std::byte *>(it.value().data()));
+            items.push_back(std::move(it));
         }
 
         // Create random key

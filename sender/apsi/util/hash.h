@@ -95,5 +95,5 @@ namespace apsi {
                 std::array<std::uint64_t, random_array_size_> random_array_;
             };
         } // namespace util
-    }     // namespace sender
+    } // namespace sender
 } // namespace apsi

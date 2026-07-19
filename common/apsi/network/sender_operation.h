@@ -141,5 +141,5 @@ namespace apsi {
             */
             std::unordered_map<std::uint32_t, std::vector<SEALObject<seal::Ciphertext>>> data;
         }; // class SenderOperationQuery
-    }      // namespace network
+    } // namespace network
 } // namespace apsi

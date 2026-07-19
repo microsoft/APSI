@@ -3,11 +3,13 @@
 
 // STD
 #include <algorithm>
+#include <cstddef>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 
 // APSI
+#include "apsi/log.h"
 #include "apsi/psi_params.h"
 #include "apsi/psi_params_generated.h"
 #include "apsi/version.h"
@@ -200,7 +202,7 @@ namespace apsi {
         auto query_params =
             fbs::CreateQueryParams(fbs_builder, query_params_.ps_low_degree, query_powers);
 
-        vector<seal_byte> temp;
+        vector<std::byte> temp;
         temp.resize(safe_cast<size_t>(seal_params_.save_size(compr_mode_type::none)));
         size_t size =
             static_cast<size_t>(seal_params_.save(temp.data(), temp.size(), compr_mode_type::none));
@@ -266,7 +268,7 @@ namespace apsi {
         auto &seal_params_data = *psi_params->seal_params()->data();
         try {
             seal_params.load(
-                reinterpret_cast<const seal_byte *>(seal_params_data.data()),
+                reinterpret_cast<const std::byte *>(seal_params_data.data()),
                 seal_params_data.size());
         } catch (const logic_error &ex) {
             stringstream ss;
@@ -352,8 +354,10 @@ namespace apsi {
             if (json_seal_params.isMember("plain_modulus")) {
                 seal_params.set_plain_modulus(json_value_ui64(json_seal_params, "plain_modulus"));
             } else if (json_seal_params.isMember("plain_modulus_bits")) {
-                seal_params.set_plain_modulus(PlainModulus::Batching(
-                    poly_modulus_degree, json_value_int(json_seal_params, "plain_modulus_bits")));
+                seal_params.set_plain_modulus(
+                    PlainModulus::Batching(
+                        poly_modulus_degree,
+                        json_value_int(json_seal_params, "plain_modulus_bits")));
             } else {
                 throw runtime_error("neither plain_modulus nor plain_modulus_bits was specified");
             }

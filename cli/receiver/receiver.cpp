@@ -2,33 +2,22 @@
 // Licensed under the MIT license.
 
 // STD
+#include <filesystem>
 #include <fstream>
-#include <iomanip>
 #include <iostream>
 #include <string>
 #include <vector>
-#if defined(__GNUC__) && (__GNUC__ < 8) && !defined(__clang__)
-#include <experimental/filesystem>
-#else
-#include <filesystem>
-#endif
 
 // APSI
 #include "apsi/log.h"
 #include "apsi/network/zmq/zmq_channel.h"
 #include "apsi/receiver.h"
 #include "apsi/thread_pool_mgr.h"
-#include "apsi/version.h"
 #include "common/common_utils.h"
 #include "common/csv_reader.h"
 #include "receiver/clp.h"
 
 using namespace std;
-#if defined(__GNUC__) && (__GNUC__ < 8) && !defined(__clang__)
-namespace fs = std::experimental::filesystem;
-#else
-namespace fs = std::filesystem;
-#endif
 using namespace apsi;
 using namespace apsi::util;
 using namespace apsi::receiver;
@@ -115,7 +104,7 @@ int remote_query(const CLP &cmd)
     auto &items = get<CSVReader::UnlabeledData>(*query_data);
     vector<Item> items_vec(items.begin(), items.end());
     vector<HashedItem> oprf_items;
-    vector<LabelKey> label_keys;
+    LabelKeyVector label_keys;
     try {
         APSI_LOG_INFO("Sending OPRF request for " << items_vec.size() << " items");
         tie(oprf_items, label_keys) = Receiver::RequestOPRF(items_vec, channel);
@@ -154,7 +143,7 @@ pair<unique_ptr<CSVReader::DBData>, vector<string>> load_db(const string &db_fil
         return { nullptr, orig_items };
     }
 
-    return { make_unique<CSVReader::DBData>(move(db_data)), move(orig_items) };
+    return { make_unique<CSVReader::DBData>(std::move(db_data)), std::move(orig_items) };
 }
 
 void print_intersection_results(

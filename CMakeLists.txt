@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.25)
 
 ###################################################
 # Project APSI includes the following components: #
@@ -26,7 +26,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "Build type (CMAKE_BUILD_TYPE): ${CMAKE_BUILD_TYPE}")
 
-project(APSI VERSION 0.12.0 LANGUAGES CXX C)
+project(APSI VERSION 0.13.0 LANGUAGES CXX C)
 
 # This policy was introduced in CMake 3.13; OLD by default until CMake 3.21
 cmake_policy(SET CMP0077 NEW)
@@ -60,12 +60,6 @@ else()
     set(APSI_DEBUG OFF)
 endif()
 message(STATUS "APSI debug mode: ${APSI_DEBUG}")
-
-# [option] APSI_USE_CXX17_OPTION_STR (default: ON)
-# Use C++17, use C++14 otherwise. An error will be thrown if SEAL_USE_CXX17 is ON but APSI_USE_CXX17 is OFF.
-set(APSI_USE_CXX17_OPTION_STR "Use C++17")
-option(APSI_USE_CXX17 ${APSI_USE_CXX17_OPTION_STR} ON)
-message(STATUS "APSI_USE_CXX17: ${APSI_USE_CXX17}")
 
 # Enable security-related compile options (MSVC only)
 set(APSI_SECURE_COMPILE_OPTIONS_OPTION_STR "Enable Control Flow Guard and Spectre mitigations (MSVC only)")
@@ -122,18 +116,15 @@ set(APSI_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/APSI-${APSI_VERSION_MA
 # find_package might throw a FATAL_ERROR before"xxx: not found", e.g. with vcpkg.cmake.
 
 # Microsoft SEAL
-find_package(SEAL 4.1 QUIET REQUIRED)
+find_package(SEAL 4.3.2 CONFIG QUIET REQUIRED)
 if(NOT SEAL_FOUND)
     message(FATAL_ERROR "Microsoft SEAL: not found")
 else()
     message(STATUS "Microsoft SEAL: found")
 endif()
-if(NOT APSI_USE_CXX17 AND SEAL_USE_CXX17)
-    message(FATAL_ERROR "CXX standards mismatch: APSI_USE_CXX17 is OFF, SEAL_USE_CXX17 is ON")
-endif()
 
 # Microsoft Kuku
-find_package(Kuku 2.1 QUIET REQUIRED)
+find_package(Kuku CONFIG QUIET REQUIRED)
 if(NOT Kuku_FOUND)
     message(FATAL_ERROR "Microsoft Kuku: not found")
 else()
@@ -157,19 +148,6 @@ if (NOT jsoncpp_FOUND)
     message(FATAL_ERROR "jsoncpp: not found")
 else()
     message(STATUS "jsoncpp: found")
-endif()
-
-# [Option] APSI_USE_LOG4CPLUS (default: ON)
-set(APSI_USE_LOG4CPLUS_OPTION_STR "Use Log4cplus for logging")
-option(APSI_USE_LOG4CPLUS ${APSI_USE_LOG4CPLUS_OPTION_STR} ON)
-if(APSI_USE_LOG4CPLUS)
-    # Log4cplus
-    find_package(log4cplus REQUIRED)
-    if(NOT log4cplus_FOUND)
-        message(FATAL_ERROR "log4cplus: not found")
-    else()
-        message(STATUS "log4cplus: found")
-    endif()
 endif()
 
 # [Option] APSI_USE_ZMQ (default: ON)
@@ -207,7 +185,7 @@ endif()
 
 # [Option] APSI_BUILD_CLI (default: OFF)
 set(APSI_BUILD_CLI_OPTION_STR "Build example command line interface applications")
-cmake_dependent_option(APSI_BUILD_CLI ${APSI_BUILD_CLI_OPTION_STR} OFF "APSI_USE_ZMQ;APSI_USE_LOG4CPLUS" OFF)
+cmake_dependent_option(APSI_BUILD_CLI ${APSI_BUILD_CLI_OPTION_STR} OFF "APSI_USE_ZMQ" OFF)
 if (APSI_BUILD_CLI)
     # TCLAP
     find_path(TCLAP_INCLUDE_DIRS "tclap/Arg.h")
@@ -266,9 +244,6 @@ target_link_libraries(apsi
     PUBLIC Kuku::kuku
     PUBLIC flatbuffers::flatbuffers
     PUBLIC jsoncpp_static)
-if(APSI_USE_LOG4CPLUS)
-    target_link_libraries(apsi PUBLIC log4cplus::log4cplus)
-endif()
 if(APSI_USE_ZMQ)
     target_link_libraries(apsi PUBLIC libzmq-static cppzmq-static)
 endif()
@@ -345,6 +320,7 @@ endif()
 # Add source files to library and header files to install
 # Must follow configurations for FourQlib
 set(APSI_SOURCE_FILES "")
+add_subdirectory(third_party/fourq)
 add_subdirectory(common/apsi)
 add_subdirectory(receiver/apsi)
 add_subdirectory(sender/apsi)
@@ -420,9 +396,6 @@ if(APSI_BUILD_CLI)
     target_link_libraries(common_cli PUBLIC apsi)
     if (NOT MSVC AND NOT APPLE)
         target_link_libraries(common_cli PUBLIC stdc++fs)
-    endif()
-    if(NOT APSI_USE_CXX17)
-        message(STATUS "Command line interface is built with C++17 regardless of APSI_USE_CXX17")
     endif()
     target_compile_features(common_cli PUBLIC cxx_std_17)
     # Ensure PDB is generated even in Release mode

@@ -15,6 +15,9 @@
 #include "apsi/receiver.h"
 #include "apsi/thread_pool_mgr.h"
 
+// Kuku
+#include "kuku/kuku.h"
+
 // Google Test
 #include "gtest/gtest.h"
 
@@ -96,15 +99,15 @@ namespace APSITests {
 
                     switch (sop->sop->type()) {
                     case SenderOperationType::sop_parms:
-                        dispatch_parms(move(sop));
+                        dispatch_parms(std::move(sop));
                         break;
 
                     case SenderOperationType::sop_oprf:
-                        dispatch_oprf(move(sop));
+                        dispatch_oprf(std::move(sop));
                         break;
 
                     case SenderOperationType::sop_query:
-                        dispatch_query(move(sop), labels);
+                        dispatch_query(std::move(sop), labels);
                         break;
 
                     default:
@@ -121,10 +124,10 @@ namespace APSITests {
             auto response_parms = make_unique<SenderOperationResponseParms>();
             response_parms->params = make_unique<PSIParams>(*get_params());
             auto response = make_unique<ZMQSenderOperationResponse>();
-            response->sop_response = move(response_parms);
-            response->client_id = move(sop->client_id);
+            response->sop_response = std::move(response_parms);
+            response->client_id = std::move(sop->client_id);
 
-            server_.send(move(response));
+            server_.send(std::move(response));
         }
 
         void dispatch_oprf(unique_ptr<ZMQSenderOperation> sop)
@@ -135,10 +138,10 @@ namespace APSITests {
             auto response_oprf = make_unique<SenderOperationResponseOPRF>();
             response_oprf->data = sop_oprf->data;
             auto response = make_unique<ZMQSenderOperationResponse>();
-            response->sop_response = move(response_oprf);
-            response->client_id = move(sop->client_id);
+            response->sop_response = std::move(response_oprf);
+            response->client_id = std::move(sop->client_id);
 
-            server_.send(move(response));
+            server_.send(std::move(response));
         }
 
         void dispatch_query(unique_ptr<ZMQSenderOperation> sop, bool labels)
@@ -149,10 +152,10 @@ namespace APSITests {
             auto response_query = make_unique<SenderOperationResponseQuery>();
             response_query->package_count = package_count;
             auto response = make_unique<ZMQSenderOperationResponse>();
-            response->sop_response = move(response_query);
+            response->sop_response = std::move(response_query);
             response->client_id = sop->client_id;
 
-            server_.send(move(response));
+            server_.send(std::move(response));
 
             // Query will send result to client in a stream of ResultPackages
             auto send_nrp = [&](Ciphertext ct, uint32_t bundle_idx) {
@@ -172,12 +175,12 @@ namespace APSITests {
                 }
 
                 // Always add PSI result
-                rp->psi_result = move(ct);
+                rp->psi_result = std::move(ct);
 
                 auto nrp = make_unique<ZMQResultPackage>();
-                nrp->rp = move(rp);
+                nrp->rp = std::move(rp);
                 nrp->client_id = sop->client_id;
-                server_.send(move(nrp));
+                server_.send(std::move(nrp));
             };
 
             KukuTable table(
@@ -206,7 +209,7 @@ namespace APSITests {
             Ciphertext rp_ct;
             get_context()->encryptor()->encrypt_symmetric(rp_pt, rp_ct);
 
-            send_nrp(move(rp_ct), 0);
+            send_nrp(std::move(rp_ct), 0);
         }
 
         void stop_sender()
@@ -300,7 +303,7 @@ namespace APSITests {
 
         // Empty query; empty response
         vector<HashedItem> items;
-        vector<LabelKey> label_keys;
+        LabelKeyVector label_keys;
         auto result = recv.request_query(items, label_keys, client_);
 
         ASSERT_TRUE(result.empty());
@@ -352,7 +355,7 @@ namespace APSITests {
 
         // Empty query; empty response
         vector<HashedItem> items;
-        vector<LabelKey> label_keys;
+        LabelKeyVector label_keys;
         auto result = recv.request_query(items, label_keys, client_);
         ASSERT_TRUE(result.empty());
 

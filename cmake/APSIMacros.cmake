@@ -1,13 +1,9 @@
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT license.
 
-# Set the C++ language version
+# Set the C++ language version. APSI requires C++17.
 macro(apsi_set_language target)
-    if(APSI_USE_CXX17)
-        target_compile_features(${target} PUBLIC cxx_std_17)
-    else()
-        target_compile_features(${target} PUBLIC cxx_std_14)
-    endif()
+    target_compile_features(${target} PUBLIC cxx_std_17)
 endmacro()
 
 # Set the VERSION property

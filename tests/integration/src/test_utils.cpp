@@ -151,12 +151,12 @@ namespace APSITests {
             ASSERT_NE(all_item_labels.end(), reference_label);
 
             size_t label_byte_count = reference_label->second.size();
-            ASSERT_EQ(label_byte_count, query_result[idx].label.get_as<unsigned char>().size());
+            ASSERT_EQ(label_byte_count, query_result[idx].label.value().size());
 
             ASSERT_TRUE(equal(
                 reference_label->second.begin(),
                 reference_label->second.end(),
-                query_result[idx].label.get_as<unsigned char>().begin()));
+                query_result[idx].label.value().begin()));
         }
     }
 

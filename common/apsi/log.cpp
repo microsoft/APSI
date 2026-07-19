@@ -2,208 +2,358 @@
 // Licensed under the MIT license.
 
 // STD
+#include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdio>
-#include <cstdlib>
+#include <ctime>
+#include <fstream>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
+#include <time.h> // NOLINT(modernize-deprecated-headers,hicpp-deprecated-headers): localtime_r
+#include <utility>
 
 // APSI
-#include "apsi/config.h"
 #include "apsi/log.h"
 
 using namespace std;
 
 namespace apsi {
-    class LogProperties {
-    public:
-        bool configured = false;
-        string log_file;
-        bool disable_console = false;
-    };
+    namespace {
+        // Global emission threshold.
+        std::atomic<LogLevel> log_level_{ LogLevel::suppress };
 
-    static unique_ptr<LogProperties> log_properties;
+        // Mutex guards the global_logger pointer. Logger::log itself takes its own internal
+        // mutex, so emission only contends on this one for the brief shared_ptr copy in
+        // internal::DoLog / GetLogger.
+        std::mutex logger_mutex;
+        std::shared_ptr<Logger> global_logger;
 
-    LogProperties &get_log_properties()
-    {
-        if (nullptr == log_properties) {
-            log_properties = make_unique<LogProperties>();
+        std::shared_ptr<Logger> get_or_init_default_unlocked()
+        {
+            if (!global_logger) {
+                global_logger = NewDefaultLogger();
+            }
+            return global_logger;
         }
 
-        return *log_properties;
-    }
-
-    void Log::SetLogFile(const string &file)
-    {
-        get_log_properties().log_file = file;
-        get_log_properties().configured = false;
-    }
-
-    void Log::SetConsoleDisabled(bool disable_console)
-    {
-        get_log_properties().disable_console = disable_console;
-        get_log_properties().configured = false;
-    }
-
-    void Log::ConfigureIfNeeded()
-    {
-        if (!get_log_properties().configured) {
-            Configure();
+        const char *level_label(LogLevel level)
+        {
+            switch (level) {
+            case LogLevel::trace:
+                return "TRACE";
+            case LogLevel::debug:
+                return "DEBUG";
+            case LogLevel::info:
+                return "INFO ";
+            case LogLevel::warning:
+                return "WARN ";
+            case LogLevel::error:
+                return "ERROR";
+            case LogLevel::suppress:
+                return "SUPP ";
+            }
+            return "?????";
         }
+
+        string format_log_line(LogLevel level, const string &msg)
+        {
+            auto now = std::chrono::system_clock::now();
+            auto t = std::chrono::system_clock::to_time_t(now);
+            auto ms =
+                std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) %
+                1000;
+            std::tm tm{};
+#ifdef _MSC_VER
+            localtime_s(&tm, &t);
+#else
+            localtime_r(&t, &tm);
+#endif
+            std::array<char, 32> timebuf{};
+            std::snprintf(
+                timebuf.data(),
+                timebuf.size(),
+                "%02d:%02d:%02d:%03d",
+                tm.tm_hour,
+                tm.tm_min,
+                tm.tm_sec,
+                static_cast<int>(ms.count()));
+
+            string out;
+            out.reserve(6 + timebuf.size() + msg.size() + 4);
+            out.append(level_label(level));
+            out.append(" ");
+            out.append(timebuf.data());
+            out.append(": ");
+            out.append(msg);
+            out.append("\n");
+            return out;
+        }
+    } // namespace
+
+    void SetLogLevel(LogLevel level)
+    {
+        switch (level) {
+        case LogLevel::trace:
+        case LogLevel::debug:
+        case LogLevel::info:
+        case LogLevel::warning:
+        case LogLevel::error:
+        case LogLevel::suppress:
+            break;
+        default:
+            throw invalid_argument("unknown log level");
+        }
+        log_level_.store(level, std::memory_order_relaxed);
     }
 
-    Log::Level Log::log_level_ = Log::Level::off;
-
-    void Log::SetLogLevel(const string &level)
+    void SetLogLevel(const string &level)
     {
-        Log::Level ll;
-
-        if (level == "all") {
-            ll = Log::Level::all;
+        if (level == "trace") {
+            SetLogLevel(LogLevel::trace);
         } else if (level == "debug") {
-            ll = Log::Level::debug;
+            SetLogLevel(LogLevel::debug);
         } else if (level == "info") {
-            ll = Log::Level::info;
+            SetLogLevel(LogLevel::info);
         } else if (level == "warning") {
-            ll = Log::Level::warning;
+            SetLogLevel(LogLevel::warning);
         } else if (level == "error") {
-            ll = Log::Level::error;
-        } else if (level == "off") {
-            ll = Log::Level::off;
+            SetLogLevel(LogLevel::error);
+        } else if (level == "suppress") {
+            SetLogLevel(LogLevel::suppress);
         } else {
             throw invalid_argument("unknown log level");
         }
-
-        SetLogLevel(ll);
     }
 
-    Log::Level Log::GetLogLevel()
+    LogLevel GetLogLevel()
     {
-        return log_level_;
+        return log_level_.load(std::memory_order_relaxed);
+    }
+
+    void SetLogger(shared_ptr<Logger> logger)
+    {
+        shared_ptr<Logger> old_logger;
+        {
+            lock_guard<mutex> lock(logger_mutex);
+            old_logger = std::move(global_logger);
+            global_logger = std::move(logger);
+        }
+        if (old_logger) {
+            old_logger->close();
+        }
+    }
+
+    shared_ptr<Logger> GetLogger()
+    {
+        lock_guard<mutex> lock(logger_mutex);
+        return get_or_init_default_unlocked();
+    }
+
+    void ResetDefaultLogger()
+    {
+        SetLogger(NewDefaultLogger());
+    }
+
+    void CloseLogger()
+    {
+        shared_ptr<Logger> old_logger;
+        {
+            lock_guard<mutex> lock(logger_mutex);
+            old_logger = std::move(global_logger);
+        }
+        if (old_logger) {
+            old_logger->close();
+        }
+    }
+
+    namespace internal {
+        void DoLog(LogLevel level, const string &msg)
+        {
+            shared_ptr<Logger> logger;
+            {
+                lock_guard<mutex> lock(logger_mutex);
+                logger = get_or_init_default_unlocked();
+            }
+            if (logger) {
+                logger->log(level, msg);
+            }
+        }
+    } // namespace internal
+
+    shared_ptr<Logger> Logger::Create(
+        array<log_handler_t, level_count> log_handlers,
+        array<flush_handler_t, level_count> flush_handlers,
+        array<close_handler_t, level_count> close_handlers)
+    {
+        return shared_ptr<Logger>(new Logger(
+            std::move(log_handlers), std::move(flush_handlers), std::move(close_handlers)));
+    }
+
+    Logger::Logger(
+        array<log_handler_t, level_count> log_handlers,
+        array<flush_handler_t, level_count> flush_handlers,
+        array<close_handler_t, level_count> close_handlers)
+        : log_handlers_(std::move(log_handlers)), flush_handlers_(std::move(flush_handlers)),
+          close_handlers_(std::move(close_handlers))
+    {}
+
+    Logger::~Logger()
+    {
+        try {
+            close_internal();
+        } catch (...) { // NOLINT(bugprone-empty-catch) // Intentional
+            // We must not throw in a destructor.
+        }
+    }
+
+    void Logger::log(LogLevel level, const string &msg)
+    {
+        auto idx = static_cast<size_t>(level);
+        if (idx >= level_count) {
+            return;
+        }
+        // Invoke the handler while holding the mutex. Serializing all emissions on a given
+        // logger means the bundled console/file sinks (and any user handler that is not itself
+        // thread-safe) can be called from multiple threads without a data race, and a concurrent
+        // close() cannot race the handler invocation. The cost is that a slow handler blocks
+        // other emitters, which is acceptable. Handlers must not re-enter the logger
+        // (e.g. by calling APSI_LOG_*): mtx_ is not recursive and would deadlock.
+        std::lock_guard<std::mutex> lk(mtx_);
+        if (closed_) {
+            return;
+        }
+        if (log_handlers_[idx]) {
+            log_handlers_[idx](msg);
+        }
+    }
+
+    void Logger::flush()
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        if (closed_) {
+            return;
+        }
+        for (auto &f : flush_handlers_) {
+            if (f) {
+                f();
+            }
+        }
+    }
+
+    void Logger::close()
+    {
+        close_internal();
+    }
+
+    void Logger::close_internal()
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        if (closed_) {
+            return;
+        }
+        for (auto &f : flush_handlers_) {
+            if (f) {
+                f();
+            }
+        }
+        for (auto &c : close_handlers_) {
+            if (c) {
+                c();
+            }
+        }
+        log_handlers_.fill(nullptr);
+        flush_handlers_.fill(nullptr);
+        close_handlers_.fill(nullptr);
+        closed_ = true;
+    }
+
+    namespace {
+        // Builds the four per-level handler arrays for a logger that fans out to a console
+        // stream (stdout for debug/info, stderr for warning/error) and/or a shared file
+        // stream. Either (or both) may be null/empty.
+        struct DefaultLoggerSinks {
+            array<Logger::log_handler_t, Logger::level_count> log_handlers{};
+            array<Logger::flush_handler_t, Logger::level_count> flush_handlers{};
+            array<Logger::close_handler_t, Logger::level_count> close_handlers{};
+        };
+
+        DefaultLoggerSinks build_sinks(
+            const shared_ptr<ofstream> &file_stream, bool console_enabled)
+        {
+            DefaultLoggerSinks sinks;
+
+            auto build_handler = [console_enabled, file_stream](LogLevel level, ostream *console) {
+                return [level, console, file_stream, console_enabled](const string &msg) {
+                    string line = format_log_line(level, msg);
+                    if (console_enabled && console) {
+                        *console << line;
+                    }
+                    if (file_stream && file_stream->is_open()) {
+                        *file_stream << line;
+                    }
+                };
+            };
+
+            sinks.log_handlers[static_cast<size_t>(LogLevel::trace)] =
+                build_handler(LogLevel::trace, &std::cout);
+            sinks.log_handlers[static_cast<size_t>(LogLevel::debug)] =
+                build_handler(LogLevel::debug, &std::cout);
+            sinks.log_handlers[static_cast<size_t>(LogLevel::info)] =
+                build_handler(LogLevel::info, &std::cout);
+            sinks.log_handlers[static_cast<size_t>(LogLevel::warning)] =
+                build_handler(LogLevel::warning, &std::cerr);
+            sinks.log_handlers[static_cast<size_t>(LogLevel::error)] =
+                build_handler(LogLevel::error, &std::cerr);
+
+            auto flush_fn = [file_stream]() {
+                std::cout.flush();
+                std::cerr.flush();
+                if (file_stream && file_stream->is_open()) {
+                    file_stream->flush();
+                }
+            };
+            sinks.flush_handlers[static_cast<size_t>(LogLevel::trace)] = flush_fn;
+            sinks.flush_handlers[static_cast<size_t>(LogLevel::debug)] = flush_fn;
+            sinks.flush_handlers[static_cast<size_t>(LogLevel::info)] = flush_fn;
+            sinks.flush_handlers[static_cast<size_t>(LogLevel::warning)] = flush_fn;
+            sinks.flush_handlers[static_cast<size_t>(LogLevel::error)] = flush_fn;
+
+            // A single close action on the file stream; std::cout / std::cerr are not closed.
+            sinks.close_handlers[static_cast<size_t>(LogLevel::error)] = [file_stream]() {
+                if (file_stream && file_stream->is_open()) {
+                    file_stream->close();
+                }
+            };
+
+            return sinks;
+        }
+    } // namespace
+
+    shared_ptr<Logger> NewDefaultLogger()
+    {
+        auto sinks = build_sinks(/*file_stream=*/nullptr, /*console_enabled=*/true);
+        return Logger::Create(
+            std::move(sinks.log_handlers),
+            std::move(sinks.flush_handlers),
+            std::move(sinks.close_handlers));
+    }
+
+    shared_ptr<Logger> NewFileLogger(const string &log_file, bool also_console)
+    {
+        if (log_file.empty()) {
+            throw invalid_argument("log_file path is empty");
+        }
+        auto file_stream = make_shared<ofstream>(log_file, std::ios::app);
+        if (!file_stream->is_open()) {
+            throw runtime_error("failed to open log file: " + log_file);
+        }
+        auto sinks = build_sinks(file_stream, also_console);
+        return Logger::Create(
+            std::move(sinks.log_handlers),
+            std::move(sinks.flush_handlers),
+            std::move(sinks.close_handlers));
     }
 } // namespace apsi
-
-#ifdef APSI_USE_LOG4CPLUS
-
-#include "log4cplus/consoleappender.h"
-#include "log4cplus/fileappender.h"
-#include "log4cplus/logger.h"
-#include "log4cplus/nullappender.h"
-
-using namespace log4cplus;
-
-namespace apsi {
-    void Log::Configure()
-    {
-        if (nullptr != log_properties && log_properties->configured) {
-            throw runtime_error("Logger is already configured.");
-        }
-
-        Logger::getInstance("APSI").removeAllAppenders();
-
-        if (!get_log_properties().disable_console) {
-            SharedAppenderPtr appender(new ConsoleAppender);
-            appender->setLayout(make_unique<PatternLayout>("%-5p %D{%H:%M:%S:%Q}: %m%n"));
-            Logger::getInstance("APSI").addAppender(appender);
-        }
-
-        if (!get_log_properties().log_file.empty()) {
-            SharedAppenderPtr appender(new RollingFileAppender(get_log_properties().log_file));
-            appender->setLayout(make_unique<PatternLayout>("%-5p %D{%H:%M:%S:%Q}: %m%n"));
-            Logger::getInstance("APSI").addAppender(appender);
-        }
-
-        if (get_log_properties().disable_console && get_log_properties().log_file.empty()) {
-            // Log4cplus needs at least one appender. Use the null appender if the user doesn't want
-            // any output.
-            SharedAppenderPtr appender(new NullAppender());
-            Logger::getInstance("APSI").addAppender(appender);
-        }
-
-        get_log_properties().configured = true;
-    }
-
-    void Log::DoLog(string msg, Level msg_level)
-    {
-        LogLevel ll;
-        switch (msg_level) {
-        case Level::all:
-            ll = ALL_LOG_LEVEL;
-            break;
-        case Level::info:
-            ll = INFO_LOG_LEVEL;
-            break;
-        case Level::debug:
-            ll = DEBUG_LOG_LEVEL;
-            break;
-        case Level::warning:
-            ll = WARN_LOG_LEVEL;
-            break;
-        case Level::error:
-            ll = ERROR_LOG_LEVEL;
-            break;
-        case Level::off:
-            ll = OFF_LOG_LEVEL;
-            break;
-        default:
-            throw invalid_argument("unknown log level");
-        }
-        Logger::getInstance("APSI").log(ll, msg);
-    }
-
-    void Log::SetLogLevel(Log::Level level)
-    {
-        // Verify level is a known log level
-        LogLevel ll = ALL_LOG_LEVEL;
-        switch (level) {
-        case Level::all:
-            ll = ALL_LOG_LEVEL;
-            break;
-        case Level::debug:
-            ll = DEBUG_LOG_LEVEL;
-            break;
-        case Level::info:
-            ll = INFO_LOG_LEVEL;
-            break;
-        case Level::warning:
-            ll = WARN_LOG_LEVEL;
-            break;
-        case Level::error:
-            ll = ERROR_LOG_LEVEL;
-            break;
-        case Level::off:
-            ll = OFF_LOG_LEVEL;
-            break;
-        default:
-            throw invalid_argument("unknown log level");
-        }
-
-        log_level_ = level;
-        Logger::getInstance("APSI").setLogLevel(ll);
-    }
-
-    void Log::Terminate()
-    {
-        log4cplus::deinitialize();
-        log_properties = nullptr;
-    }
-} // namespace apsi
-
-#else
-
-namespace apsi {
-    void Log::SetLogLevel(Level level)
-    {}
-
-    void Log::Configure()
-    {}
-
-    void Log::Terminate()
-    {}
-
-    void Log::DoLog(string msg, Level msg_level)
-    {}
-} // namespace apsi
-
-#endif // !APSI_LOG_DISABLED

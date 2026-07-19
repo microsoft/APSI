@@ -4,8 +4,10 @@
 # Licensed under the MIT license.
 
 BASE_DIR=$(dirname "$0")
-APSI_ROOT_DIR=$BASE_DIR/../../
-shopt -s globstar
-clang-format -i $APSI_ROOT_DIR/**/*.h
-clang-format -i $APSI_ROOT_DIR/**/*.c
-clang-format -i $APSI_ROOT_DIR/**/*.cpp
+APSI_ROOT_DIR=$(cd "$BASE_DIR/../.." && pwd)
+
+# Format all C/C++ sources and headers, skipping vendored code under third_party/.
+find "$APSI_ROOT_DIR" \
+    -type d -name third_party -prune -o \
+    -type f \( -name '*.h' -o -name '*.c' -o -name '*.cpp' \) -print0 |
+    xargs -0 clang-format -i

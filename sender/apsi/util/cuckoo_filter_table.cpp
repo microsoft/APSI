@@ -41,8 +41,8 @@ namespace {
 } // namespace
 
 CuckooFilterTable::CuckooFilterTable(
-    vector<uint64_t> table_, size_t num_buckets, size_t bits_per_tag)
-    : table_(move(table_)), num_buckets_(num_buckets), bits_per_tag_(bits_per_tag)
+    vector<uint64_t> table, size_t num_buckets, size_t bits_per_tag)
+    : bits_per_tag_(bits_per_tag), table_(std::move(table)), num_buckets_(num_buckets)
 {
     if (bits_per_tag == 0 || bits_per_tag > 64) {
         throw invalid_argument("bits_per_tag cannot be 0 or bigger than 64");

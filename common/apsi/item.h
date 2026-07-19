@@ -9,14 +9,15 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
 
-// Kuku
-#include "kuku/common.h"
+// APSI
+#include "apsi/util/wiping_allocator.h"
 
 // GSL
 #include "gsl/span"
@@ -170,7 +171,8 @@ namespace apsi {
         std::vector<unsigned char> release()
         {
             bit_count_ = 0;
-            return std::move(data_);
+            std::vector<unsigned char> result = std::move(data_);
+            return result;
         }
     };
 
@@ -215,7 +217,7 @@ namespace apsi {
         template <typename CharT>
         Item(const std::basic_string<CharT> &str)
         {
-            operator=<CharT>(str);
+            operator= <CharT>(str);
         }
 
         /**
@@ -242,40 +244,18 @@ namespace apsi {
             return value_ == other.value_;
         }
 
-        /**
-        Returns a span of a desired (standard layout) type to the label data.
-        */
-        template <typename T, typename = std::enable_if_t<std::is_standard_layout<T>::value>>
-        auto get_as() const
-        {
-            constexpr std::size_t count = sizeof(value_) / sizeof(T);
-            return gsl::span<std::add_const_t<T>, count>(
-                reinterpret_cast<std::add_const_t<T> *>(value_.data()), count);
-        }
-
-        /**
-        Returns a span of a desired (standard layout) type to the label data.
-        */
-        template <typename T, typename = std::enable_if_t<std::is_standard_layout<T>::value>>
-        auto get_as()
-        {
-            constexpr std::size_t count = sizeof(value_) / sizeof(T);
-            return gsl::span<T, count>(reinterpret_cast<T *>(value_.data()), count);
-        }
-
         Item(std::uint64_t lw, std::uint64_t hw)
         {
-            auto words = get_as<std::uint64_t>();
-            words[0] = lw;
-            words[1] = hw;
+            std::memcpy(value_.data(), &lw, sizeof(lw));
+            std::memcpy(value_.data() + sizeof(lw), &hw, sizeof(hw));
         }
 
-        value_type value() const
+        const value_type &value() const noexcept
         {
             return value_;
         }
 
-        value_type &value()
+        value_type &value() noexcept
         {
             return value_;
         }
@@ -323,6 +303,13 @@ namespace apsi {
     Represents a label encryption key.
     */
     using LabelKey = std::array<unsigned char, label_key_byte_count>;
+
+    /**
+    A std::vector of LabelKey using apsi::util::wiping_allocator. The underlying heap
+    buffer is overwritten with zeros (via apsi::util::secure_zero) before being returned
+    to the allocator on destruction, resize-induced reallocation, or shrink_to_fit.
+    */
+    using LabelKeyVector = std::vector<LabelKey, util::wiping_allocator<LabelKey>>;
 } // namespace apsi
 
 namespace std {
@@ -333,10 +320,16 @@ namespace std {
     struct hash<apsi::Item> {
         std::size_t operator()(const apsi::Item &item) const
         {
-            auto words = item.get_as<uint64_t>();
+            // Read the two 64-bit halves out of the byte-array storage with memcpy to avoid
+            // strict-aliasing UB.
+            const auto &v = item.value();
+            std::uint64_t lw;
+            std::uint64_t hw;
+            std::memcpy(&lw, v.data(), sizeof(lw));
+            std::memcpy(&hw, v.data() + sizeof(lw), sizeof(hw));
             std::uint64_t result = 17;
-            result = 31 * result + words[0];
-            result = 31 * result + words[1];
+            result = (31 * result) + lw;
+            result = (31 * result) + hw;
             return static_cast<std::size_t>(result);
         }
     };

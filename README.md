@@ -116,6 +116,9 @@ In APSI, the user will need to explicitly provide the `coeff_modulus` prime bit 
 
 The basic idea of APSI is as follows.
 Suppose the sender holds a set `{Y_i}` of items &ndash; each an integer modulo `plain_modulus` &ndash; and the receiver holds a single item `X` &ndash; also an integer modulo `plain_modulus`.
+
+> **Note on notation:** This section uses `X` for the receiver's (query) item and `{Y_i}` for the sender's set. This is transposed relative to the [paper](https://eprint.iacr.org/2021/1116), where `X` denotes the sender's (larger) set and `Y` the receiver's set. Only the choice of letters differs; the protocol is identical.
+
 The receiver can choose a secret key, encrypts `X` to obtain a ciphertext `Q = Enc(X)`, and sends it over to the sender.
 The sender can now evaluate the *matching polynomial* `M(x) = (x - Y_0)(x - Y_1)...(x - Y_n)` at `x = Q`.
 Here the values `Y_i` are unencrypted data held by the sender.
@@ -540,7 +543,8 @@ Next, `Receiver::CreateOPRFRequest` must be used to create an OPRF request from 
 The sender must respond to the request and the response must be received on the channel with `network::Channel::receive_response`.
 The received `Response` object must be converted to the right type (`OPRFResponse`) with the `to_oprf_response` function. This function will return `nullptr` if the received response was not of the right type.
 Finally, `Receiver::ExtractHashes` must be called with the `OPRFResponse` and the `oprf::OPRFReceiver` object.
-This function returns `std::pair<std::vector<HashedItem>, std::vector<LabelKey>>`, containing the OPRF hashed items and the label encryption keys.
+This function returns `std::pair<std::vector<HashedItem>, LabelKeyVector>`, containing the OPRF hashed items and the label encryption keys.
+The `LabelKeyVector` is an alias for `std::vector<LabelKey, apsi::util::wiping_allocator<LabelKey>>`; the custom allocator wipes the underlying buffer with `apsi::util::secure_zero` before freeing it, so per-item label keys do not linger in heap memory after a query completes.
 Both vectors in this pair must be kept for the next steps.
 
 1. `Receiver::create_query` (non-static member function) must then be used to create the query itself.
@@ -554,7 +558,7 @@ The `QueryResponse` contains only one important piece of data: the number of `Re
 1. `network::Channel::receive_result` must be called repeatedly to receive all `ResultParts`.
 For each received `ResultPart`, `Receiver::process_result_part` must be called to find a `std::vector<MatchRecord>` representing the match data associated to that `ResultPart`.
 Alternatively, one can first retrieve all `ResultParts`, collect them into a `std::vector<ResultPart>`, and use `Receiver::process_result` to find the complete result &ndash; just like what the simple API returns.
-Both `Receiver::process_result_part` and `Receiver::process_result` require the `IndexTranslationTable` and the `std::vector<LabelKey>` objects created in the previous steps.
+Both `Receiver::process_result_part` and `Receiver::process_result` require the `IndexTranslationTable` and the `LabelKeyVector` objects created in the previous steps.
 
 ### Request, Response, and ResultPart
 
@@ -857,11 +861,11 @@ Instead, the user would typically want to use `apsi::ThreadPoolMgr::SetThreadCou
 
 ### Logging
 
-APSI can be optionally compiled to use [log4cplus](https://github.com/log4cplus/log4cplus) for logging.
-Logging is configured using the static member functions of `apsi::Log` in [apsi/log.h](common/apsi/log.h).
-For example, these can be used to set the log level (one of `"all"`, `"debug"`, `"info"`, `"warning"`, `"error"`, or `"off"`), set a log filename, and control console output.
+APSI ships a simple built-in logger.
+The level threshold is controlled by `apsi::SetLogLevel` (one of `"trace"`, `"debug"`, `"info"`, `"warning"`, `"error"`, or `"suppress"`); the active sink is controlled by `apsi::SetLogger`.
+By default — when no logger has been installed — APSI lazily installs `apsi::NewDefaultLogger()`, which writes trace/debug/info to stdout and warning/error to stderr.
 
-Log messages for different log levels are emitted with the macros `APSI_LOG_DEBUG`, `APSI_LOG_INFO`, `APSI_LOG_WARNING`, and `APSI_LOG_ERROR`.
+Log messages for different log levels are emitted with the macros `APSI_LOG_TRACE`, `APSI_LOG_DEBUG`, `APSI_LOG_INFO`, `APSI_LOG_WARNING`, and `APSI_LOG_ERROR`.
 The macros allow "streaming"; for example,
 ```
 int val = 3;
@@ -869,66 +873,126 @@ APSI_LOG_INFO("My value is " << val);
 ```
 would log the message *My value is 3* at `"info"` log level.
 
+To redirect output, install a different logger via `apsi::SetLogger`:
+
+- **Append to a file** (and optionally also keep stdout/stderr): `apsi::SetLogger(apsi::NewFileLogger("/path/to/log", /*also_console=*/true));`
+- **Suppress all output**: prefer `apsi::SetLogLevel("suppress")` (equivalently `apsi::SetLogLevel(apsi::LogLevel::suppress)`).
+This drops every message at the level check, before it is formatted or dispatched, and is undone simply by raising the level again.
+Installing a no-op logger with `apsi::SetLogger(apsi::Logger::Create({}, {}, {}))` also discards all output, but only after each message has been formatted and passed through the logger, so reach for it only when you want to detach the sink while leaving the level threshold in place.
+- **Forward into your own logging stack** (spdlog, glog, an internal logger, a test capture buffer, etc.): construct an `apsi::Logger` via `apsi::Logger::Create` with per-level handler callbacks and install it.
+Each handler receives an already-formatted `std::string`.
+`Logger::log` invokes the handler while holding the logger's internal mutex, so emissions on a single logger are serialized and your handler need not be thread-safe; it must, however, not re-enter the logger (for example by calling an `APSI_LOG_*` macro), as the mutex is not recursive.
+
+Before the program exits, flush and close the active logger so that buffered output — for example a file sink that is not flushed on every line — is not lost.
+`apsi::CloseLogger()` flushes and closes the current global logger; installing a replacement with `apsi::SetLogger` also flushes and closes the previous one first.
+A `Logger` additionally flushes and closes itself on destruction, but relying on static-destruction order at process exit is fragile, so prefer an explicit `apsi::CloseLogger()`.
+
 ## Building APSI
 
-To simply use the APSI library, we recommend to build and install APSI with [vcpkg](https://github.com/microsoft/vcpkg).
-To use the example command-line interface or run tests, follow the guide below to build and [install APSI manually](#building-and-installing-apsi-manually).
+To simply use the APSI library, we recommend installing APSI with [vcpkg](https://github.com/microsoft/vcpkg).
+To use the example command-line interface, run tests, or work on APSI itself, [build from source](#building-apsi-from-source).
 
 ### Requirements
 
-| System  | Toolchain                                             |
-|---------|-------------------------------------------------------|
-| Windows | Visual Studio 2019 with C++ CMake Tools for Windows   |
-| Linux   | Clang++ (>= 7.0) or GNU G++ (>= 7.0), CMake (>= 3.13) |
-| macOS   | Xcode toolchain (>= 9.3), CMake (>= 3.12)             |
+| System  | Toolchain                                                      |
+|---------|----------------------------------------------------------------|
+| Windows | Visual Studio 2022 or 2026 with C++ CMake Tools for Windows   |
+| Linux   | Clang++ or GNU G++ with full C++17 support, CMake (>= 3.25)    |
+| macOS   | Xcode toolchain with full C++17 support, CMake (>= 3.25)       |
 
-### Building and Installing APSI with vcpkg
+APSI is C++17. Only static builds are supported; the build configuration fails fast if `BUILD_SHARED_LIBS=ON` is passed.
 
-The easiest way is to download, build, and install APSI is using [vcpkg](https://github.com/microsoft/vcpkg).
+> **Note:** The `win-vs2026-*` presets use the `Visual Studio 18 2026` generator, which requires CMake ≥ 4.2 (newer than the ≥ 3.25 baseline). All other presets work with CMake ≥ 3.25.
 
-On Linux and macOS, first follow this [Quick Start on Unix](https://github.com/microsoft/vcpkg#quick-start-unix), and then run:
-```powershell
+### Installing APSI with vcpkg
+
+The easiest way to obtain APSI for downstream use is via [vcpkg](https://github.com/microsoft/vcpkg).
+
+On Linux and macOS, first follow [Quick Start on Unix](https://github.com/microsoft/vcpkg#quick-start-unix), and then run:
+```sh
 ./vcpkg install apsi
 ```
-On Windows, first follow this [Quick Start on Windows](https://github.com/microsoft/vcpkg#quick-start-windows), and then run:
+On Windows, first follow [Quick Start on Windows](https://github.com/microsoft/vcpkg#quick-start-windows), and then run:
 ```powershell
 .\vcpkg install apsi:x64-windows-static-md
 ```
 
-To build your CMake project with dependency on APSI, follow [this guide](https://github.com/microsoft/vcpkg#using-vcpkg-with-cmake).
+To consume APSI from a CMake project, follow [this guide](https://github.com/microsoft/vcpkg#using-vcpkg-with-cmake).
 
-### Building and Installing APSI Manually
+### Building APSI from Source
 
-APSI has multiple external dependencies that must be pre-installed.
-By far the easiest and recommended way to do this is using [vcpkg](https://github.com/microsoft/vcpkg).
-Each package's name in vcpkg is listed below.
+APSI uses CMake (≥ 3.25) and resolves its external dependencies via [vcpkg](https://github.com/microsoft/vcpkg) in manifest mode.
+The `vcpkg.json` at the project root pins the dependency set, and the vcpkg toolchain file picks the packages up automatically at CMake configure time.
+There is no separate "install dependencies" step.
 
-**Note:** On Windows, the vcpkg triplet `x64-windows-static-md` should be specified.
-For examples, to install Microsoft SEAL on Windows, you must use `.\vcpkg install seal[no-throw-tran]:x64-windows-static-md`, while on other systems use simply `./vcpkg install seal[no-throw-tran]`.
+#### Prerequisites
 
-The CMake build system can then automatically find these pre-installed packages, if the following arguments are passed to CMake configuration:
-- `-DCMAKE_TOOLCHAIN_FILE=${vcpkg_root_dir}/scripts/buildsystems/vcpkg.cmake`, and
-- `-DVCPKG_TARGET_TRIPLET=x64-windows-static-md` on Windows only.
+- A C++17 toolchain (see [Requirements](#requirements) above).
+- CMake ≥ 3.25.
+- A clone of [vcpkg](https://github.com/microsoft/vcpkg) with `bootstrap-vcpkg.sh` (or `bootstrap-vcpkg.bat` on Windows) run, and the environment variable `VCPKG_ROOT` set to its path.
 
-| Dependency                                                | vcpkg name                                           |
-|-----------------------------------------------------------|------------------------------------------------------|
-| [Microsoft SEAL](https://github.com/microsoft/SEAL)       | `seal[no-throw-tran]`                                |
-| [Microsoft Kuku](https://github.com/microsoft/Kuku)       | `kuku`                                               |
-| [Log4cplus](https://github.com/log4cplus/log4cplus)       | `log4cplus`                                          |
-| [cppzmq](https://github.com/zeromq/cppzmq)                | `cppzmq` (needed only for ZeroMQ networking support) |
-| [FlatBuffers](https://github.com/google/flatbuffers)      | `flatbuffers`                                        |
-| [jsoncpp](https://github.com/open-source-parsers/jsoncpp) | `jsoncpp`                                            |
-| [Google Test](https://github.com/google/googletest)       | `gtest` (needed only for building tests)             |
-| [TCLAP](https://sourceforge.net/projects/tclap/)          | `tclap` (needed only for building CLI)               |
+#### Configuring and building with CMake presets
 
-To build the unit and integration tests, set the CMake option `APSI_BUILD_TESTS` to `ON`.
-To build the sender and receiver CLI programs, set the CMake option `APSI_BUILD_CLI` to `ON`.
+`CMakePresets.json` ships ready-to-use presets for the common host/configuration combinations.
+To list available presets, use `cmake --list-presets`.
+To configure and build:
+```sh
+cmake --preset linux-debug          # or linux-release
+cmake --build --preset linux-debug
+```
+The same pattern works for `macos-arm64-debug`, `macos-arm64-release`, `macos-x64-debug`, `macos-x64-release`, `win-vs2022-x64`, `win-vs2022-arm64`, `win-vs2026-x64`, and `win-vs2026-arm64`.
+The `win-vs2026-*` presets require CMake ≥ 4.2 (see the [Requirements](#requirements) note); all others work with CMake ≥ 3.25.
+The base preset enables both tests and CLI; binaries land under `out/build/<preset>/bin/`.
+
+To run the tests:
+```sh
+./out/build/linux-debug/bin/unit_tests
+./out/build/linux-debug/bin/integration_tests
+```
+
+#### Configuring without presets
+
+If presets are not desired, the equivalent manual invocation is:
+```sh
+cmake -S . -B build \
+    -DCMAKE_BUILD_TYPE=Debug \
+    -DAPSI_BUILD_TESTS=ON \
+    -DAPSI_BUILD_CLI=ON \
+    -DVCPKG_MANIFEST_FEATURES="tests;cli" \
+    -DCMAKE_TOOLCHAIN_FILE=${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake
+cmake --build build
+```
+On Windows, add `-DVCPKG_TARGET_TRIPLET=x64-windows-static-md`.
+
+#### Build options
+
+| Option              | Default | Purpose                                                                                                  |
+|---------------------|---------|----------------------------------------------------------------------------------------------------------|
+| `APSI_BUILD_TESTS`  | OFF     | Build `unit_tests` and `integration_tests`. Pulls in `gtest` via the `tests` manifest feature.           |
+| `APSI_BUILD_CLI`    | OFF     | Build the example `sender_cli`, `receiver_cli`, and `pd_tool` programs. Requires `APSI_USE_ZMQ=ON`.      |
+| `APSI_USE_ZMQ`      | ON      | Enable the ZeroMQ-backed `network::Channel` implementation. Required for the CLI.                       |
+| `BUILD_SHARED_LIBS` | OFF     | Must remain OFF; APSI does not support shared builds and configuration fails fast otherwise.            |
+
+#### Dependencies pulled from `vcpkg.json`
+
+These are resolved automatically by manifest mode at configure time; no explicit `./vcpkg install ...` step is needed.
+
+| Dependency                                                | Used for                                              |
+|-----------------------------------------------------------|-------------------------------------------------------|
+| [Microsoft SEAL](https://github.com/microsoft/SEAL) ≥ 4.3.2 | BFV homomorphic encryption                          |
+| [Microsoft Kuku](https://github.com/microsoft/Kuku)       | Cuckoo hashing on the receiver's side                 |
+| [ms-gsl](https://github.com/microsoft/GSL)                | `gsl::span` for I/O buffers                           |
+| [FlatBuffers](https://github.com/google/flatbuffers)      | Serialization of network messages                     |
+| [jsoncpp](https://github.com/open-source-parsers/jsoncpp) | Parsing `PSIParams` from JSON                         |
+| [cppzmq](https://github.com/zeromq/cppzmq)                | ZeroMQ network channels (default, `APSI_USE_ZMQ=ON`)  |
+| [Google Test](https://github.com/google/googletest)       | Unit and integration tests (`APSI_BUILD_TESTS=ON`)    |
+| [TCLAP](https://sourceforge.net/projects/tclap/)          | CLI argument parsing (`APSI_BUILD_CLI=ON`)            |
 
 #### Note on Microsoft SEAL and Intel HEXL
 
-[Intel HEXL](https://github.com/intel/hexl) is an optional dependency of Microsoft SEAL, which aims to accelerate low-level arithmetic with advanced vector extensions.
-Any potential benefit of using Intel HEXL is highly dependent on the processor, but on Cascade lake and Ice Lake Xeon processors it can have an enormous impact on the online computation time of APSI sender operations.
-To build Microsoft SEAL with Intel HEXL support, install `seal[no-throw-tran,hexl]` instead of the vcpkg name listed above.
+[Intel HEXL](https://GitHub.com/IntelLabs/hexl) is an optional dependency of Microsoft SEAL that accelerates low-level arithmetic with advanced vector extensions.
+Its impact depends on the processor, but it can substantially reduce APSI sender online computation time.
+To enable, configure with `-DVCPKG_MANIFEST_FEATURES=hexl` (in addition to any other features), which adds `seal[hexl]` to the manifest-mode resolution.
 
 ## Command-Line Interface (CLI)
 
@@ -944,7 +1008,7 @@ The following optional arguments are common both to the sender and the receiver 
 | `-t` \| `--threads` | Number of threads to use |
 | `-f` \| `--logFile` | Log file path |
 | `-s` \| `--silent` | Do not write output to console |
-| `-l` \| `--logLevel` | One of `all`, `debug`, `info` (default), `warning`, `error`, `off` |
+| `-l` \| `--logLevel` | One of `trace`, `debug`, `info` (default), `warning`, `error`, `suppress` |
 
 ### Receiver
 

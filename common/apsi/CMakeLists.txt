@@ -28,7 +28,6 @@ install(
         ${APSI_INCLUDES_INSTALL_DIR}/apsi
 )
 
-add_subdirectory(fourq)
 add_subdirectory(network)
 add_subdirectory(oprf)
 add_subdirectory(util)

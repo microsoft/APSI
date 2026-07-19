@@ -23,10 +23,11 @@ using namespace seal::util;
 namespace apsi {
     using namespace network;
     using namespace oprf;
+    using namespace util;
 
     namespace sender {
         ZMQSenderDispatcher::ZMQSenderDispatcher(shared_ptr<SenderDB> sender_db, OPRFKey oprf_key)
-            : sender_db_(move(sender_db)), oprf_key_(move(oprf_key))
+            : sender_db_(std::move(sender_db)), oprf_key_(std::move(oprf_key))
         {
             if (!sender_db_) {
                 throw invalid_argument("sender_db is not set");
@@ -35,14 +36,15 @@ namespace apsi {
             // If SenderDB is not stripped, the OPRF key it holds must be equal to the provided
             // oprf_key
             if (!sender_db_->is_stripped() && oprf_key_ != sender_db->get_oprf_key()) {
-                APSI_LOG_ERROR("Failed to create ZMQSenderDispatcher: SenderDB OPRF key differs "
-                               "from the given OPRF key");
+                APSI_LOG_ERROR(
+                    "Failed to create ZMQSenderDispatcher: SenderDB OPRF key differs "
+                    "from the given OPRF key");
                 throw logic_error("mismatching OPRF keys");
             }
         }
 
         ZMQSenderDispatcher::ZMQSenderDispatcher(shared_ptr<SenderDB> sender_db)
-            : sender_db_(move(sender_db))
+            : sender_db_(std::move(sender_db))
         {
             if (!sender_db_) {
                 throw invalid_argument("sender_db is not set");
@@ -87,17 +89,17 @@ namespace apsi {
                 switch (sop->sop->type()) {
                 case SenderOperationType::sop_parms:
                     APSI_LOG_INFO("Received parameter request");
-                    dispatch_parms(move(sop), chl);
+                    dispatch_parms(std::move(sop), chl);
                     break;
 
                 case SenderOperationType::sop_oprf:
                     APSI_LOG_INFO("Received OPRF request");
-                    dispatch_oprf(move(sop), chl);
+                    dispatch_oprf(std::move(sop), chl);
                     break;
 
                 case SenderOperationType::sop_query:
                     APSI_LOG_INFO("Received query");
-                    dispatch_query(move(sop), chl);
+                    dispatch_query(std::move(sop), chl);
                     break;
 
                 default:
@@ -116,7 +118,7 @@ namespace apsi {
 
             try {
                 // Extract the parameter request
-                ParamsRequest params_request = to_params_request(move(sop->sop));
+                ParamsRequest params_request = to_params_request(std::move(sop->sop));
 
                 Sender::RunParams(
                     params_request,
@@ -124,11 +126,11 @@ namespace apsi {
                     chl,
                     [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
                         auto nsop_response = make_unique<ZMQSenderOperationResponse>();
-                        nsop_response->sop_response = move(sop_response);
-                        nsop_response->client_id = move(sop->client_id);
+                        nsop_response->sop_response = std::move(sop_response);
+                        nsop_response->client_id = std::move(sop->client_id);
 
                         // We know for sure that the channel is a SenderChannel so use static_cast
-                        static_cast<ZMQSenderChannel &>(c).send(move(nsop_response));
+                        static_cast<ZMQSenderChannel &>(c).send(std::move(nsop_response));
                     });
             } catch (const exception &ex) {
                 APSI_LOG_ERROR(
@@ -143,7 +145,7 @@ namespace apsi {
 
             try {
                 // Extract the OPRF request
-                OPRFRequest oprf_request = to_oprf_request(move(sop->sop));
+                OPRFRequest oprf_request = to_oprf_request(std::move(sop->sop));
 
                 Sender::RunOPRF(
                     oprf_request,
@@ -151,11 +153,11 @@ namespace apsi {
                     chl,
                     [&sop](Channel &c, unique_ptr<SenderOperationResponse> sop_response) {
                         auto nsop_response = make_unique<ZMQSenderOperationResponse>();
-                        nsop_response->sop_response = move(sop_response);
-                        nsop_response->client_id = move(sop->client_id);
+                        nsop_response->sop_response = std::move(sop_response);
+                        nsop_response->client_id = std::move(sop->client_id);
 
                         // We know for sure that the channel is a SenderChannel so use static_cast
-                        static_cast<ZMQSenderChannel &>(c).send(move(nsop_response));
+                        static_cast<ZMQSenderChannel &>(c).send(std::move(nsop_response));
                     });
             } catch (const exception &ex) {
                 APSI_LOG_ERROR(
@@ -170,7 +172,7 @@ namespace apsi {
 
             try {
                 // Create the Query object
-                Query query(to_query_request(move(sop->sop)), sender_db_);
+                Query query(to_query_request(std::move(sop->sop)), sender_db_);
 
                 // Query will send result to client in a stream of ResultPackages (ResultParts)
                 Sender::RunQuery(
@@ -179,20 +181,20 @@ namespace apsi {
                     // Lambda function for sending the query response
                     [&sop](Channel &c, Response response) {
                         auto nsop_response = make_unique<ZMQSenderOperationResponse>();
-                        nsop_response->sop_response = move(response);
+                        nsop_response->sop_response = std::move(response);
                         nsop_response->client_id = sop->client_id;
 
                         // We know for sure that the channel is a SenderChannel so use static_cast
-                        static_cast<ZMQSenderChannel &>(c).send(move(nsop_response));
+                        static_cast<ZMQSenderChannel &>(c).send(std::move(nsop_response));
                     },
                     // Lambda function for sending the result parts
                     [&sop](Channel &c, ResultPart rp) {
                         auto nrp = make_unique<ZMQResultPackage>();
-                        nrp->rp = move(rp);
+                        nrp->rp = std::move(rp);
                         nrp->client_id = sop->client_id;
 
                         // We know for sure that the channel is a SenderChannel so use static_cast
-                        static_cast<ZMQSenderChannel &>(c).send(move(nrp));
+                        static_cast<ZMQSenderChannel &>(c).send(std::move(nrp));
                     });
             } catch (const exception &ex) {
                 APSI_LOG_ERROR("Sender threw an exception while processing query: " << ex.what());

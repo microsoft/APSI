@@ -96,5 +96,5 @@ namespace apsi {
 
             std::mutex send_mutex_;
         }; // class StreamChannel
-    }      // namespace network
+    } // namespace network
 } // namespace apsi

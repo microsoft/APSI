@@ -59,8 +59,7 @@ namespace apsi {
         Round up the given value using the given step.
         */
         template <typename T>
-        typename std::enable_if<std::is_pod<T>::value, T>::type round_up_to(
-            const T val, const T step)
+        std::enable_if_t<std::is_arithmetic_v<T>, T> round_up_to(const T val, const T step)
         {
             return ((val + step - 1) / step) * step;
         }
@@ -217,6 +216,14 @@ namespace apsi {
         if either pointer is nullptr.
         */
         bool compare_bytes(const void *first, const void *second, std::size_t count);
+
+        /**
+        Securely zero a memory region. The implementation must not be optimized away even if the
+        buffer is not subsequently read. Use this on stack-allocated secret material before it
+        goes out of scope (e.g., scratch scalars, OPRF hash output buffers containing label
+        encryption keys). No-op on null pointer or zero count.
+        */
+        void secure_zero(void *ptr, std::size_t count) noexcept;
 
         /**
         Creates a set of powers (as in monomial degrees) for direct polynomial evaluation (if
