@@ -325,7 +325,7 @@ namespace APSITests {
     {
         ThreadPool pool(2);
         constexpr int producer_count = 4;
-        constexpr int tasks_per_producer = 250;
+        static constexpr int tasks_per_producer = 250;
         atomic<int> done(0);
 
         vector<thread> producers;
