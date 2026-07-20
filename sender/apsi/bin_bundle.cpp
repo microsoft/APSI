@@ -137,7 +137,7 @@ namespace apsi {
             for (size_t deg = 1; deg < batched_coeffs.size(); deg++) {
                 coeff.unsafe_load(
                     *seal_context,
-                    reinterpret_cast<const std::byte *>(batched_coeffs[deg].data()),
+                    reinterpret_cast<const seal_byte *>(batched_coeffs[deg].data()),
                     batched_coeffs[deg].size());
                 evaluator->multiply_plain(ciphertext_powers[deg], coeff, temp, pool);
                 evaluator->add_inplace(result, temp);
@@ -148,7 +148,7 @@ namespace apsi {
             evaluator->transform_from_ntt_inplace(result);
             coeff.unsafe_load(
                 *seal_context,
-                reinterpret_cast<const std::byte *>(batched_coeffs[0].data()),
+                reinterpret_cast<const seal_byte *>(batched_coeffs[0].data()),
                 batched_coeffs[0].size());
             evaluator->add_plain_inplace(result, coeff);
 
@@ -240,7 +240,7 @@ namespace apsi {
                 for (size_t j = 1; j < ps_high_degree; j++) {
                     coeff.unsafe_load(
                         *seal_context,
-                        reinterpret_cast<const std::byte *>(
+                        reinterpret_cast<const seal_byte *>(
                             batched_coeffs[(i * ps_high_degree) + j].data()),
                         batched_coeffs[(i * ps_high_degree) + j].size());
 
@@ -269,7 +269,7 @@ namespace apsi {
                 for (size_t j = 1; j <= degree % ps_high_degree; j++) {
                     coeff.unsafe_load(
                         *seal_context,
-                        reinterpret_cast<const std::byte *>(
+                        reinterpret_cast<const seal_byte *>(
                             batched_coeffs[(ps_high_degree_powers * ps_high_degree) + j].data()),
                         batched_coeffs[(ps_high_degree_powers * ps_high_degree) + j].size());
 
@@ -303,7 +303,7 @@ namespace apsi {
             for (size_t j = 1; j < ps_high_degree; j++) {
                 coeff.unsafe_load(
                     *seal_context,
-                    reinterpret_cast<const std::byte *>(batched_coeffs[j].data()),
+                    reinterpret_cast<const seal_byte *>(batched_coeffs[j].data()),
                     batched_coeffs[j].size());
 
                 evaluator->multiply_plain(ciphertext_powers[j], coeff, temp, pool);
@@ -317,7 +317,7 @@ namespace apsi {
             for (size_t i = 1; i < ps_high_degree_powers + 1; i++) {
                 coeff.unsafe_load(
                     *seal_context,
-                    reinterpret_cast<const std::byte *>(batched_coeffs[i * ps_high_degree].data()),
+                    reinterpret_cast<const seal_byte *>(batched_coeffs[i * ps_high_degree].data()),
                     batched_coeffs[i * ps_high_degree].size());
 
                 evaluator->multiply_plain(ciphertext_powers[i * ps_high_degree], coeff, temp, pool);
@@ -328,7 +328,7 @@ namespace apsi {
             // Add the constant coefficient
             coeff.unsafe_load(
                 *seal_context,
-                reinterpret_cast<const std::byte *>(batched_coeffs[0].data()),
+                reinterpret_cast<const seal_byte *>(batched_coeffs[0].data()),
                 batched_coeffs[0].size());
 
             evaluator->add_plain_inplace(result, coeff);
@@ -407,7 +407,7 @@ namespace apsi {
                 vector<unsigned char> pt_data;
                 pt_data.resize(safe_cast<size_t>(pt.save_size(compr_mode)));
                 size_t size = static_cast<size_t>(pt.save(
-                    reinterpret_cast<std::byte *>(pt_data.data()), pt_data.size(), compr_mode));
+                    reinterpret_cast<seal_byte *>(pt_data.data()), pt_data.size(), compr_mode));
                 pt_data.resize(size);
                 batched_coeffs.push_back(std::move(pt_data));
             }

@@ -184,7 +184,7 @@ namespace apsi {
         std::size_t save(gsl::span<unsigned char> out, seal::compr_mode_type compr_mode) const
         {
             std::size_t size = out.size();
-            std::byte *out_ptr = reinterpret_cast<std::byte *>(out.data());
+            seal::seal_byte *out_ptr = reinterpret_cast<seal::seal_byte *>(out.data());
 
             if (is_local() && !is_serializable()) {
                 return seal::util::safe_cast<std::size_t>(local_->save(out_ptr, size, compr_mode));
@@ -215,7 +215,7 @@ namespace apsi {
             }
 
             std::size_t size = in.size();
-            const std::byte *in_ptr = reinterpret_cast<const std::byte *>(in.data());
+            const seal::seal_byte *in_ptr = reinterpret_cast<const seal::seal_byte *>(in.data());
 
             set(LocalType());
             return seal::util::safe_cast<std::size_t>(

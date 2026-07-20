@@ -202,7 +202,7 @@ namespace apsi {
         auto query_params =
             fbs::CreateQueryParams(fbs_builder, query_params_.ps_low_degree, query_powers);
 
-        vector<std::byte> temp;
+        vector<seal_byte> temp;
         temp.resize(safe_cast<size_t>(seal_params_.save_size(compr_mode_type::none)));
         size_t size =
             static_cast<size_t>(seal_params_.save(temp.data(), temp.size(), compr_mode_type::none));
@@ -268,7 +268,7 @@ namespace apsi {
         const auto &seal_params_data = *psi_params->seal_params()->data();
         try {
             seal_params.load(
-                reinterpret_cast<const std::byte *>(seal_params_data.data()),
+                reinterpret_cast<const seal_byte *>(seal_params_data.data()),
                 seal_params_data.size());
         } catch (const logic_error &ex) {
             stringstream ss;

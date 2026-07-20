@@ -7,38 +7,57 @@
   "dependencies": [
     {
       "name": "seal",
-      "version>=": "4.3.2",
       "default-features": false,
-      "features": [ "zstd", "no-throw-tran" ]
+      "features": [
+        "zstd",
+        "no-throw-tran"
+      ]
     },
     "ms-gsl",
     "kuku",
     "flatbuffers",
     "jsoncpp"
   ],
-  "default-features": [ "zmq" ],
+  "default-features": [
+    "zmq"
+  ],
   "features": {
     "tests": {
       "description": "Build the unit and integration test suites.",
-      "dependencies": [ "gtest" ]
+      "dependencies": [
+        "gtest"
+      ]
     },
     "cli": {
       "description": "Build the example sender / receiver / pd_tool CLIs.",
       "dependencies": [
         "tclap",
-        { "name": "apsi", "default-features": false, "features": [ "zmq" ] }
+        {
+          "name": "apsi",
+          "default-features": false,
+          "features": [
+            "zmq"
+          ]
+        }
       ]
     },
     "zmq": {
       "description": "Use ZeroMQ + cppzmq for the simple network API.",
-      "dependencies": [ "cppzmq" ]
+      "dependencies": [
+        "cppzmq"
+      ]
     },
     "hexl": {
       "description": "Build SEAL with Intel HEXL acceleration.",
       "dependencies": [
-        { "name": "seal", "features": [ "hexl" ] }
+        {
+          "name": "seal",
+          "features": [
+            "hexl"
+          ]
+        }
       ]
     }
   },
-  "builtin-baseline": "a78b96b07eb590c59bde5db0f4b260bda45ba92d"
+  "builtin-baseline": "0878b5224d4a4968940ee296a2e7fae2d3b62983"
 }
