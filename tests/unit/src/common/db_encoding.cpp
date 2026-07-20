@@ -27,7 +27,7 @@ namespace APSITests {
         {
             size_t byte_idx = bit_idx >> 3;
             felt_t res = static_cast<felt_t>(in[byte_idx]);
-            size_t bit_in_byte = bit_idx - byte_idx * 8;
+            size_t bit_in_byte = bit_idx - (byte_idx * 8);
             return (res >> bit_in_byte) & 0x1;
         }
 
@@ -35,7 +35,7 @@ namespace APSITests {
         {
             size_t byte_idx = nibble_idx >> 1;
             felt_t res = static_cast<felt_t>(in[byte_idx]);
-            size_t nibble_in_byte = nibble_idx - byte_idx * 2;
+            size_t nibble_in_byte = nibble_idx - (byte_idx * 2);
             return (res >> (nibble_in_byte * 4)) & 0xF;
         }
     } // namespace
@@ -141,7 +141,7 @@ namespace APSITests {
             // Pick a random bit length within range, i.e., within 7 bits of the total length
             std::uniform_int_distribution<size_t> bitlen_dist(0, 7);
             size_t bitlen_diff = bitlen_dist(rd);
-            uint32_t bit_len = static_cast<uint32_t>(bytes.size() * 8 - bitlen_diff);
+            uint32_t bit_len = static_cast<uint32_t>((bytes.size() * 8) - bitlen_diff);
 
             // Mask away extra bits from top byte
             bytes.back() &= static_cast<unsigned char>((1 << (8 - bitlen_diff)) - 1);

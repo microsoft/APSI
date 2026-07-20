@@ -31,8 +31,21 @@ using namespace kuku;
 
 namespace APSITests {
     namespace {
-        ZMQSenderChannel server_;
-        ZMQReceiverChannel client_;
+        // The shared server/client channels are bound/connected once and reused across every test
+        // in the fixture. Function-local statics defer their (potentially throwing) construction to
+        // first use, where the exception can propagate normally, rather than during dynamic
+        // initialization.
+        ZMQSenderChannel &server()
+        {
+            static ZMQSenderChannel instance;
+            return instance;
+        }
+
+        ZMQReceiverChannel &client()
+        {
+            static ZMQReceiverChannel instance;
+            return instance;
+        }
 
         shared_ptr<PSIParams> get_params()
         {
@@ -77,12 +90,12 @@ namespace APSITests {
     protected:
         ReceiverTests()
         {
-            if (!server_.is_connected()) {
-                server_.bind("tcp://*:5556");
+            if (!server().is_connected()) {
+                server().bind("tcp://*:5556");
             }
 
-            if (!client_.is_connected()) {
-                client_.connect("tcp://localhost:5556");
+            if (!client().is_connected()) {
+                client().connect("tcp://localhost:5556");
             }
         }
 
@@ -91,8 +104,9 @@ namespace APSITests {
             th_ = thread([this, labels]() {
                 // Run until stopped
                 while (!stop_token_) {
-                    unique_ptr<ZMQSenderOperation> sop;
-                    if (!(sop = server_.receive_network_operation(get_context()->seal_context()))) {
+                    unique_ptr<ZMQSenderOperation> sop =
+                        server().receive_network_operation(get_context()->seal_context());
+                    if (!sop) {
                         this_thread::sleep_for(50ms);
                         continue;
                     }
@@ -127,12 +141,12 @@ namespace APSITests {
             response->sop_response = std::move(response_parms);
             response->client_id = std::move(sop->client_id);
 
-            server_.send(std::move(response));
+            server().send(std::move(response));
         }
 
         void dispatch_oprf(unique_ptr<ZMQSenderOperation> sop)
         {
-            auto sop_oprf = dynamic_cast<SenderOperationOPRF *>(sop->sop.get());
+            auto *sop_oprf = dynamic_cast<SenderOperationOPRF *>(sop->sop.get());
 
             // Respond with exactly the same data we received
             auto response_oprf = make_unique<SenderOperationResponseOPRF>();
@@ -141,7 +155,7 @@ namespace APSITests {
             response->sop_response = std::move(response_oprf);
             response->client_id = std::move(sop->client_id);
 
-            server_.send(std::move(response));
+            server().send(std::move(response));
         }
 
         void dispatch_query(unique_ptr<ZMQSenderOperation> sop, bool labels)
@@ -155,7 +169,7 @@ namespace APSITests {
             response->sop_response = std::move(response_query);
             response->client_id = sop->client_id;
 
-            server_.send(std::move(response));
+            server().send(std::move(response));
 
             // Query will send result to client in a stream of ResultPackages
             auto send_nrp = [&](Ciphertext ct, uint32_t bundle_idx) {
@@ -171,7 +185,7 @@ namespace APSITests {
                     // 16-bit encodings per field element
                     Plaintext label_tweak("1");
                     get_context()->evaluator()->add_plain_inplace(label_ct, label_tweak);
-                    rp->label_result.push_back(label_ct);
+                    rp->label_result.emplace_back(label_ct);
                 }
 
                 // Always add PSI result
@@ -180,7 +194,7 @@ namespace APSITests {
                 auto nrp = make_unique<ZMQResultPackage>();
                 nrp->rp = std::move(rp);
                 nrp->client_id = sop->client_id;
-                server_.send(std::move(nrp));
+                server().send(std::move(nrp));
             };
 
             KukuTable table(
@@ -193,10 +207,10 @@ namespace APSITests {
 
             auto locs = table.all_locations(make_item(1, 0));
             vector<uint64_t> rp_vec(get_context()->encoder()->slot_count(), 1);
-            using rp_vec_diff_type = typename decay_t<decltype(rp_vec)>::difference_type;
+            using rp_vec_diff_type = decay_t<decltype(rp_vec)>::difference_type;
             for (auto loc : locs) {
                 uint32_t bundle_idx = loc / get_params()->items_per_bundle();
-                uint32_t bundle_offset = loc - bundle_idx * get_params()->items_per_bundle();
+                uint32_t bundle_offset = loc - (bundle_idx * get_params()->items_per_bundle());
                 uint32_t offset = bundle_offset * get_params()->item_params().felts_per_item;
                 fill_n(
                     rp_vec.begin() + static_cast<rp_vec_diff_type>(offset),
@@ -220,16 +234,13 @@ namespace APSITests {
             }
         }
 
-        ~ReceiverTests()
+    public:
+        // Public + virtual: GoogleTest owns the fixture through a testing::Test pointer and deletes
+        // it polymorphically. The shared server()/client() channels are intentionally left
+        // connected across tests, so the destructor only tears down this fixture's sender thread.
+        ~ReceiverTests() override
         {
             stop_sender();
-
-            // Do not disconnect, as the Constructor / Destructor is called for every test.
-            // if (client_.is_connected())
-            //	client_.disconnect();
-
-            // if (server_.is_connected())
-            //	server_.disconnect();
         }
 
     private:
@@ -247,7 +258,7 @@ namespace APSITests {
     {
         start_sender();
 
-        PSIParams params = Receiver::RequestParams(client_);
+        PSIParams params = Receiver::RequestParams(client());
         ASSERT_EQ(get_params()->to_string(), params.to_string());
 
         stop_sender();
@@ -258,20 +269,20 @@ namespace APSITests {
         start_sender();
 
         vector<Item> items;
-        auto hashed_items = Receiver::RequestOPRF(items, client_);
+        auto hashed_items = Receiver::RequestOPRF(items, client());
         ASSERT_TRUE(hashed_items.first.empty());
         ASSERT_TRUE(hashed_items.second.empty());
 
         // A single item
         items.emplace_back(0, 0);
-        hashed_items = Receiver::RequestOPRF(items, client_);
+        hashed_items = Receiver::RequestOPRF(items, client());
         ASSERT_EQ(1, hashed_items.first.size());
         ASSERT_EQ(1, hashed_items.second.size());
         ASSERT_NE(hashed_items.first[0].value(), items[0].value());
 
         // Same item repeating
         items.emplace_back(0, 0);
-        hashed_items = Receiver::RequestOPRF(items, client_);
+        hashed_items = Receiver::RequestOPRF(items, client());
         ASSERT_EQ(2, hashed_items.first.size());
         ASSERT_EQ(2, hashed_items.second.size());
         ASSERT_EQ(hashed_items.first[0].value(), hashed_items.first[1].value());
@@ -279,7 +290,7 @@ namespace APSITests {
 
         // Two different items
         items[1].value()[0] = 1;
-        hashed_items = Receiver::RequestOPRF(items, client_);
+        hashed_items = Receiver::RequestOPRF(items, client());
         ASSERT_EQ(2, hashed_items.first.size());
         ASSERT_EQ(2, hashed_items.second.size());
         ASSERT_NE(hashed_items.first[0].value(), hashed_items.first[1].value());
@@ -304,25 +315,25 @@ namespace APSITests {
         // Empty query; empty response
         vector<HashedItem> items;
         LabelKeyVector label_keys;
-        auto result = recv.request_query(items, label_keys, client_);
+        auto result = recv.request_query(items, label_keys, client());
 
         ASSERT_TRUE(result.empty());
 
         // Cannot query the empty item
         items.emplace_back(0, 0);
         label_keys.push_back(LabelKey{});
-        ASSERT_THROW(recv.request_query(items, label_keys, client_), invalid_argument);
+        ASSERT_THROW(recv.request_query(items, label_keys, client()), invalid_argument);
 
         // Query a single non-empty item
         items[0].value()[0] = 1;
-        result = recv.request_query(items, label_keys, client_);
+        result = recv.request_query(items, label_keys, client());
         ASSERT_EQ(1, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_FALSE(result[0].label);
 
         // Query a single non-empty item
         items[0].value()[0] = 2;
-        result = recv.request_query(items, label_keys, client_);
+        result = recv.request_query(items, label_keys, client());
         ASSERT_EQ(1, result.size());
         ASSERT_FALSE(result[0].found);
         ASSERT_FALSE(result[0].label);
@@ -332,7 +343,7 @@ namespace APSITests {
         label_keys.push_back(LabelKey{});
         items[0].value()[0] = 1;
         items[1].value()[0] = 2;
-        result = recv.request_query(items, label_keys, client_);
+        result = recv.request_query(items, label_keys, client());
         ASSERT_EQ(2, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_FALSE(result[1].found);
@@ -356,24 +367,24 @@ namespace APSITests {
         // Empty query; empty response
         vector<HashedItem> items;
         LabelKeyVector label_keys;
-        auto result = recv.request_query(items, label_keys, client_);
+        auto result = recv.request_query(items, label_keys, client());
         ASSERT_TRUE(result.empty());
 
         // Cannot query the empty item
         items.emplace_back(0, 0);
         label_keys.push_back(LabelKey{});
-        ASSERT_THROW(recv.request_query(items, label_keys, client_), invalid_argument);
+        ASSERT_THROW(recv.request_query(items, label_keys, client()), invalid_argument);
 
         // Query a single non-empty item
         items[0].value()[0] = 1;
-        result = recv.request_query(items, label_keys, client_);
+        result = recv.request_query(items, label_keys, client());
         ASSERT_EQ(1, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_FALSE(result[0].label);
 
         // Query a single non-empty item
         items[0].value()[0] = 2;
-        result = recv.request_query(items, label_keys, client_);
+        result = recv.request_query(items, label_keys, client());
         ASSERT_EQ(1, result.size());
         ASSERT_FALSE(result[0].found);
         ASSERT_FALSE(result[0].label);
@@ -383,7 +394,7 @@ namespace APSITests {
         label_keys.push_back(LabelKey{});
         items[0].value()[0] = 1;
         items[1].value()[0] = 2;
-        result = recv.request_query(items, label_keys, client_);
+        result = recv.request_query(items, label_keys, client());
         ASSERT_EQ(2, result.size());
         ASSERT_TRUE(result[0].found);
         ASSERT_FALSE(result[1].found);

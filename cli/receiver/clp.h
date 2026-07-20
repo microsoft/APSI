@@ -17,7 +17,7 @@ public:
     CLP(const std::string &desc, const std::string &version) : BaseCLP(desc, version)
     {}
 
-    virtual void add_args()
+    void add_args() override
     {
         add(net_addr_arg_);
         add(net_port_arg_);
@@ -25,7 +25,7 @@ public:
         add(out_file_arg_);
     }
 
-    virtual void get_args()
+    void get_args() override
     {
         net_addr_ = net_addr_arg_.getValue();
         net_port_ = net_port_arg_.getValue();
@@ -33,22 +33,22 @@ public:
         output_file_ = out_file_arg_.getValue();
     }
 
-    const std::string &net_addr() const
+    [[nodiscard]] const std::string &net_addr() const
     {
         return net_addr_;
     }
 
-    int net_port() const
+    [[nodiscard]] int net_port() const
     {
         return net_port_;
     }
 
-    const std::string &query_file() const
+    [[nodiscard]] const std::string &query_file() const
     {
         return query_file_;
     }
 
-    const std::string &output_file() const
+    [[nodiscard]] const std::string &output_file() const
     {
         return output_file_;
     }
@@ -78,7 +78,7 @@ private:
 
     std::string net_addr_;
 
-    int net_port_;
+    int net_port_{};
 
     std::string query_file_;
 

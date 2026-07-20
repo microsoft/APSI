@@ -36,7 +36,7 @@ namespace apsi::oprf {
             process_items(oprf_items);
         }
 
-        inline std::size_t item_count() const noexcept
+        [[nodiscard]] std::size_t item_count() const noexcept
         {
             return inv_factor_data_.item_count();
         }
@@ -48,7 +48,7 @@ namespace apsi::oprf {
 
         void clear();
 
-        std::vector<unsigned char> query_data() const;
+        [[nodiscard]] std::vector<unsigned char> query_data() const;
 
     private:
         void set_item_count(std::size_t item_count);
@@ -76,7 +76,7 @@ namespace apsi::oprf {
 
             FactorData &operator=(FactorData &&) = default;
 
-            std::size_t item_count() const noexcept
+            [[nodiscard]] std::size_t item_count() const noexcept
             {
                 return item_count_;
             }
@@ -90,7 +90,8 @@ namespace apsi::oprf {
                     factor_data_.begin() + (index * factor_size), factor_size);
             }
 
-            auto get_factor(std::size_t index) const -> ECPoint::scalar_span_const_type
+            [[nodiscard]] auto get_factor(std::size_t index) const
+                -> ECPoint::scalar_span_const_type
             {
                 if (index >= item_count_) {
                     throw std::invalid_argument("index out of bounds");

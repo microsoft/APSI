@@ -48,6 +48,9 @@ namespace apsi {
             }
 
             template <typename T>
+            // context is taken by value to match the by-value SEALContext convention of the
+            // Channel interface this helper serves.
+            // NOLINTNEXTLINE(performance-unnecessary-value-param)
             size_t load_from_string(string data, shared_ptr<SEALContext> context, T &obj)
             {
                 ArrayGetBuffer agbuf(
@@ -82,13 +85,20 @@ namespace apsi {
             }
         } // namespace
 
-        ZMQChannel::ZMQChannel() : end_point_(""), context_(make_unique<context_t>())
+        ZMQChannel::ZMQChannel() : context_(make_unique<context_t>())
         {}
 
         ZMQChannel::~ZMQChannel()
         {
-            if (is_connected()) {
-                disconnect();
+            try {
+                if (is_connected()) {
+                    disconnect();
+                }
+            } catch (...) {
+                try {
+                    APSI_LOG_DEBUG("Failed to disconnect socket during ZMQChannel destruction");
+                } catch (...) { // NOLINT(bugprone-empty-catch): a destructor must not throw
+                }
             }
         }
 
@@ -258,7 +268,7 @@ namespace apsi {
             unique_ptr<SenderOperation> sop = nullptr;
 
             try {
-                switch (static_cast<SenderOperationType>(sop_header.type)) {
+                switch (sop_header.type) {
                 case SenderOperationType::sop_parms:
                     sop = make_unique<SenderOperationParms>();
                     bytes_received = load_from_string(msg[2].to_string(), *sop);
@@ -421,7 +431,7 @@ namespace apsi {
             unique_ptr<SenderOperationResponse> sop_response = nullptr;
 
             try {
-                switch (static_cast<SenderOperationType>(sop_header.type)) {
+                switch (sop_header.type) {
                 case SenderOperationType::sop_parms:
                     sop_response = make_unique<SenderOperationResponseParms>();
                     bytes_received = load_from_string(msg[1].to_string(), *sop_response);
@@ -477,7 +487,7 @@ namespace apsi {
                 << "has matching data: " << (rp->rp->psi_result ? "yes" : "no") << "; "
                 << "label byte count: " << rp->rp->label_byte_count << "; "
                 << "nonce byte count: " << rp->rp->nonce_byte_count << "; "
-                << "has label data: " << (rp->rp->label_result.size() ? "yes" : "no") << ")");
+                << "has label data: " << (!rp->rp->label_result.empty() ? "yes" : "no") << ")");
 
             multipart_t msg;
 
@@ -584,7 +594,7 @@ namespace apsi {
         unique_ptr<socket_t> &ZMQChannel::get_socket()
         {
             if (nullptr == socket_) {
-                socket_ = make_unique<socket_t>(*context_.get(), get_socket_type());
+                socket_ = make_unique<socket_t>(*context_, get_socket_type());
                 set_socket_options(socket_.get());
             }
 

@@ -9,7 +9,7 @@
 #include <sstream>
 #include <stdexcept>
 
-#if defined(_WIN32)
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
@@ -70,7 +70,9 @@ namespace apsi::util {
             destination.resize(add_safe(old_size, to_read));
 
             // Write some data into the vector
-            in.read(reinterpret_cast<char *>(destination.data() + old_size), to_read);
+            in.read(
+                reinterpret_cast<char *>(destination.data() + old_size),
+                static_cast<streamsize>(to_read));
             if (!in) {
                 // Stream truncated mid-read (e.g., peer closed the connection or the
                 // underlying file is shorter than the declared byte_count). Fail loudly
@@ -130,8 +132,8 @@ namespace apsi::util {
     {
         // Process 8 bytes at a time.
         while (count >= sizeof(uint64_t)) {
-            uint64_t a;
-            uint64_t b;
+            uint64_t a = 0;
+            uint64_t b = 0;
             memcpy(&a, buf1, sizeof(uint64_t));
             memcpy(&b, buf2, sizeof(uint64_t));
             a ^= b;
@@ -170,7 +172,7 @@ namespace apsi::util {
         if (!ptr || !count) {
             return;
         }
-#if defined(_WIN32)
+#ifdef _WIN32
         // SecureZeroMemory is the Win32 documented zeroizer that the compiler is
         // contractually required not to optimize away.
         SecureZeroMemory(ptr, count);
@@ -187,11 +189,12 @@ namespace apsi::util {
             throw invalid_argument("cannot compare data: input is null");
         }
 
-        auto first_begin = reinterpret_cast<const unsigned char *>(first);
-        auto first_end = first_begin + count;
-        auto second_begin = reinterpret_cast<const unsigned char *>(second);
+        const auto *first_begin = reinterpret_cast<const unsigned char *>(first);
+        const auto *first_end = first_begin + count;
+        const auto *second_begin = reinterpret_cast<const unsigned char *>(second);
 
-        return equal(first_begin, first_end, second_begin);
+        return equal(
+            first_begin, first_end, second_begin); // NOLINT(readability-suspicious-call-argument)
     }
 
     set<uint32_t> create_powers_set(uint32_t ps_low_degree, uint32_t target_degree)
@@ -227,7 +230,7 @@ namespace apsi::util {
         return result;
     }
 
-    parms_id_type get_parms_id_for_chain_idx(SEALContext seal_context, size_t chain_idx)
+    parms_id_type get_parms_id_for_chain_idx(const SEALContext &seal_context, size_t chain_idx)
     {
         // This function returns a parms_id matching the given chain index or -- if the chain
         // index is too large -- for the largest possible parameters (first data level).

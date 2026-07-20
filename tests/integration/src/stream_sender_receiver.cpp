@@ -43,8 +43,9 @@ namespace APSITests {
             ThreadPoolMgr::SetThreadCount(num_threads);
 
             vector<Item> sender_items;
+            sender_items.reserve(sender_size);
             for (size_t i = 0; i < sender_size; i++) {
-                sender_items.push_back({ i + 1, i + 1 });
+                sender_items.emplace_back(i + 1, i + 1);
             }
 
             auto sender_db = make_shared<SenderDB>(params, 0);
@@ -66,11 +67,12 @@ namespace APSITests {
 
                 vector<Item> recv_int_items = rand_subset(sender_items, int_size);
                 vector<Item> recv_items;
+                recv_items.reserve(recv_int_items.size());
                 for (auto item : recv_int_items) {
                     recv_items.push_back(item);
                 }
                 for (size_t i = int_size; i < client_size; i++) {
-                    recv_items.push_back({ i + 1, ~(i + 1) });
+                    recv_items.emplace_back(i + 1, ~(i + 1));
                 }
 
                 // Create the OPRF receiver
@@ -142,10 +144,11 @@ namespace APSITests {
             ThreadPoolMgr::SetThreadCount(num_threads);
 
             vector<pair<Item, Label>> sender_items;
+            sender_items.reserve(sender_size);
             for (size_t i = 0; i < sender_size; i++) {
-                sender_items.push_back(make_pair(
+                sender_items.emplace_back(
                     Item(i + 1, i + 1),
-                    create_label(seal::util::safe_cast<unsigned char>((i + 1) & 0xFF), 10)));
+                    create_label(seal::util::safe_cast<unsigned char>((i + 1) & 0xFF), 10));
             }
 
             auto sender_db = make_shared<SenderDB>(params, 10, 4, true);
@@ -166,11 +169,12 @@ namespace APSITests {
 
                 vector<Item> recv_int_items = rand_subset(sender_items, int_size);
                 vector<Item> recv_items;
+                recv_items.reserve(recv_int_items.size());
                 for (auto item : recv_int_items) {
                     recv_items.push_back(item);
                 }
                 for (size_t i = int_size; i < client_size; i++) {
-                    recv_items.push_back({ i + 1, ~(i + 1) });
+                    recv_items.emplace_back(i + 1, ~(i + 1));
                 }
 
                 // Create the OPRF receiver

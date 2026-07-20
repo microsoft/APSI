@@ -21,32 +21,30 @@
 // GSL
 #include "gsl/span"
 
-namespace apsi {
-    namespace receiver {
-        class PlaintextPowers {
-        public:
-            PlaintextPowers(
-                std::vector<std::uint64_t> values, const PSIParams &params, const PowersDag &pd);
+namespace apsi::receiver {
+    class PlaintextPowers {
+    public:
+        PlaintextPowers(
+            const std::vector<std::uint64_t> &values, const PSIParams &params, const PowersDag &pd);
 
-            std::unordered_map<std::uint32_t, SEALObject<seal::Ciphertext>> encrypt(
-                const CryptoContext &crypto_context);
+        std::unordered_map<std::uint32_t, SEALObject<seal::Ciphertext>> encrypt(
+            const CryptoContext &crypto_context);
 
-        private:
-            seal::Modulus mod_;
+    private:
+        seal::Modulus mod_;
 
-            std::unordered_map<std::uint32_t, std::vector<std::uint64_t>> powers_;
+        std::unordered_map<std::uint32_t, std::vector<std::uint64_t>> powers_;
 
-            void square_array(gsl::span<std::uint64_t> in) const;
+        void square_array(gsl::span<std::uint64_t> in) const;
 
-            void multiply_array(
-                gsl::span<std::uint64_t> in1,
-                gsl::span<std::uint64_t> in2,
-                gsl::span<std::uint64_t> out) const;
+        void multiply_array(
+            gsl::span<std::uint64_t> in1,
+            gsl::span<std::uint64_t> in2,
+            gsl::span<std::uint64_t> out) const;
 
-            std::vector<std::uint64_t> exponentiate_array(
-                std::vector<std::uint64_t> values, std::uint32_t exponent);
+        std::vector<std::uint64_t> exponentiate_array(
+            std::vector<std::uint64_t> values, std::uint32_t exponent);
 
-            void compute_powers(std::vector<std::uint64_t> values, const PowersDag &pd);
-        };
-    } // namespace receiver
-} // namespace apsi
+        void compute_powers(const std::vector<std::uint64_t> &values, const PowersDag &pd);
+    };
+} // namespace apsi::receiver

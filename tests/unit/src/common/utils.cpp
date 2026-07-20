@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 // STD
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <sstream>
@@ -125,12 +126,14 @@ namespace APSITests {
     {
         stringstream ss;
         vector<unsigned char> bytes;
+        bytes.reserve(100);
         for (unsigned char i = 0; i < 100; i++) {
             bytes.push_back(i);
         }
 
         // Write the bytes to the stream
-        ss.write(reinterpret_cast<const char *>(bytes.data()), bytes.size());
+        ss.write(
+            reinterpret_cast<const char *>(bytes.data()), static_cast<streamsize>(bytes.size()));
 
         // Now read them back to a different vector
         vector<unsigned char> compare;
@@ -166,13 +169,15 @@ namespace APSITests {
         vector<unsigned char> bytes;
 
         uint32_t size = 100;
+        bytes.reserve(size);
         for (uint32_t i = 0; i < size; i++) {
             bytes.push_back(static_cast<unsigned char>(i));
         }
 
         // Write the bytes to the stream
         ss.write(reinterpret_cast<const char *>(&size), sizeof(uint32_t));
-        ss.write(reinterpret_cast<const char *>(bytes.data()), bytes.size());
+        ss.write(
+            reinterpret_cast<const char *>(bytes.data()), static_cast<streamsize>(bytes.size()));
 
         // Now read them back to a different vector
         vector<unsigned char> compare = read_from_stream(ss);
@@ -217,10 +222,10 @@ namespace APSITests {
             sizeof(uint32_t));
         ASSERT_EQ(0, val1);
 
-        unsigned char arr1_5[5]{ 0x1, 0x2, 0x1, 0x2, 0x1 };
-        unsigned char arr2_5[5]{ 0x2, 0x1, 0x2, 0x1, 0x2 };
-        unsigned char res[5]{ 0x3, 0x3, 0x3, 0x3, 0x3 };
-        xor_buffers(arr1_5, arr2_5, sizeof(arr1_5));
-        ASSERT_TRUE(equal(arr1_5, arr1_5 + sizeof(arr1_5), res));
+        array<unsigned char, 5> arr1_5{ 0x1, 0x2, 0x1, 0x2, 0x1 };
+        array<unsigned char, 5> arr2_5{ 0x2, 0x1, 0x2, 0x1, 0x2 };
+        array<unsigned char, 5> res{ 0x3, 0x3, 0x3, 0x3, 0x3 };
+        xor_buffers(arr1_5.data(), arr2_5.data(), arr1_5.size());
+        ASSERT_TRUE(equal(arr1_5.begin(), arr1_5.end(), res.begin()));
     }
 } // namespace APSITests

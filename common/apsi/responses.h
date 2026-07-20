@@ -35,8 +35,9 @@ namespace apsi {
     inline ParamsResponse to_params_response(Response &response)
     {
         if (nullptr == response ||
-            response->type() != apsi::network::SenderOperationType::sop_parms)
+            response->type() != apsi::network::SenderOperationType::sop_parms) {
             return nullptr;
+        }
         return ParamsResponse(
             static_cast<apsi::network::SenderOperationResponseParms *>(response.release()));
     }
@@ -44,24 +45,29 @@ namespace apsi {
     inline ParamsResponse to_params_response(Response &&response)
     {
         if (nullptr == response ||
-            response->type() != apsi::network::SenderOperationType::sop_parms)
+            response->type() != apsi::network::SenderOperationType::sop_parms) {
             return nullptr;
+        }
         return ParamsResponse(
             static_cast<apsi::network::SenderOperationResponseParms *>(response.release()));
     }
 
     inline OPRFResponse to_oprf_response(Response &response)
     {
-        if (nullptr == response || response->type() != apsi::network::SenderOperationType::sop_oprf)
+        if (nullptr == response ||
+            response->type() != apsi::network::SenderOperationType::sop_oprf) {
             return nullptr;
+        }
         return OPRFResponse(
             static_cast<apsi::network::SenderOperationResponseOPRF *>(response.release()));
     }
 
     inline OPRFResponse to_oprf_response(Response &&response)
     {
-        if (nullptr == response || response->type() != apsi::network::SenderOperationType::sop_oprf)
+        if (nullptr == response ||
+            response->type() != apsi::network::SenderOperationType::sop_oprf) {
             return nullptr;
+        }
         return OPRFResponse(
             static_cast<apsi::network::SenderOperationResponseOPRF *>(response.release()));
     }
@@ -69,8 +75,9 @@ namespace apsi {
     inline QueryResponse to_query_response(Response &response)
     {
         if (nullptr == response ||
-            response->type() != apsi::network::SenderOperationType::sop_query)
+            response->type() != apsi::network::SenderOperationType::sop_query) {
             return nullptr;
+        }
         return QueryResponse(
             static_cast<apsi::network::SenderOperationResponseQuery *>(response.release()));
     }
@@ -78,8 +85,9 @@ namespace apsi {
     inline QueryResponse to_query_response(Response &&response)
     {
         if (nullptr == response ||
-            response->type() != apsi::network::SenderOperationType::sop_query)
+            response->type() != apsi::network::SenderOperationType::sop_query) {
             return nullptr;
+        }
         return QueryResponse(
             static_cast<apsi::network::SenderOperationResponseQuery *>(response.release()));
     }

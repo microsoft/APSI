@@ -3,6 +3,7 @@
 
 // STD
 #include <algorithm>
+#include <random>
 #include <thread>
 
 // APSI
@@ -64,8 +65,13 @@ namespace APSITests {
                     string evt_name;
                     get_thread_name(idx, evt_name);
 
+                    // rand() is not thread-safe; use a per-thread engine for the sleep jitter.
+                    // A fixed seed is intentional: reproducible test timing, no security relevance.
+                    // NOLINTNEXTLINE(bugprone-random-generator-seed)
+                    static thread_local mt19937 gen(/* seed */ 0);
+                    uniform_int_distribution<int> dist(0, 10);
                     for (int j = 0; j < 6; j++) {
-                        int millis = (std::rand() * 10 / RAND_MAX);
+                        int millis = dist(gen);
                         chrono::milliseconds ms(millis);
                         this_thread::sleep_for(ms);
 
@@ -128,7 +134,7 @@ namespace APSITests {
         if (timesp->avg < 150.0) {
             // Timings can vary a lot, specially when running on old machines.
             // If the check fails show a message but do not fail the test.
-            std::cerr << msg << std::endl;
+            std::cerr << msg << '\n';
         }
 
         {
@@ -139,7 +145,7 @@ namespace APSITests {
         if (timesp->min < 100 || timesp->min >= 150) {
             // Timings can vary a lot, specially when running on old machines.
             // If the check fails show a message but do not fail the test.
-            std::cerr << msg << std::endl;
+            std::cerr << msg << '\n';
         }
 
         {
@@ -150,7 +156,7 @@ namespace APSITests {
         if (timesp->max < 200 || timesp->max >= 250) {
             // Timings can vary a lot, specially when running on old machines.
             // If the check fails show a message but do not fail the test.
-            std::cerr << msg << std::endl;
+            std::cerr << msg << '\n';
         }
 
         timesp = std::find_if(tsp.begin(), tsp.end(), [](Stopwatch::TimespanSummary &tss) {

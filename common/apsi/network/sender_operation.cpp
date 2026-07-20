@@ -72,7 +72,7 @@ namespace apsi::network {
             throw runtime_error("failed to load SenderOperationHeader: invalid buffer");
         }
 
-        auto sop_header = fbs::GetSizePrefixedSenderOperationHeader(in_data.data());
+        const auto *sop_header = fbs::GetSizePrefixedSenderOperationHeader(in_data.data());
 
         // Read the serialization version number
         version = sop_header->version();
@@ -118,7 +118,7 @@ namespace apsi::network {
             throw runtime_error("failed to load SenderOperation: invalid buffer");
         }
 
-        auto sop = fbs::GetSizePrefixedSenderOperation(in_data.data());
+        const auto *sop = fbs::GetSizePrefixedSenderOperation(in_data.data());
 
         // Need to check that the operation is of the right type
         if (sop->request_type() != fbs::Request_ParmsRequest) {
@@ -168,7 +168,7 @@ namespace apsi::network {
             throw runtime_error("failed to load SenderOperation: invalid buffer");
         }
 
-        auto sop = fbs::GetSizePrefixedSenderOperation(in_data.data());
+        const auto *sop = fbs::GetSizePrefixedSenderOperation(in_data.data());
 
         // Need to check that the operation is of the right type
         if (sop->request_type() != fbs::Request_OPRFRequest) {
@@ -266,7 +266,7 @@ namespace apsi::network {
             throw runtime_error("failed to load SenderOperation: invalid buffer");
         }
 
-        auto sop = fbs::GetSizePrefixedSenderOperation(in_data.data());
+        const auto *sop = fbs::GetSizePrefixedSenderOperation(in_data.data());
 
         // Need to check that the operation is of the right type
         if (sop->request_type() != fbs::Request_QueryRequest) {

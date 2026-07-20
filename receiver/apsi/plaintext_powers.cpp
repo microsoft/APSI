@@ -21,10 +21,10 @@ using namespace seal::util;
 
 namespace apsi::receiver {
     PlaintextPowers::PlaintextPowers(
-        vector<uint64_t> values, const PSIParams &params, const PowersDag &pd)
+        const vector<uint64_t> &values, const PSIParams &params, const PowersDag &pd)
         : mod_(params.seal_params().plain_modulus())
     {
-        compute_powers(std::move(values), pd);
+        compute_powers(values, pd);
     }
 
     unordered_map<uint32_t, SEALObject<Ciphertext>> PlaintextPowers::encrypt(
@@ -38,7 +38,7 @@ namespace apsi::receiver {
         for (auto &p : powers_) {
             Plaintext pt;
             crypto_context.encoder()->encode(p.second, pt);
-            result.emplace(make_pair(p.first, crypto_context.encryptor()->encrypt_symmetric(pt)));
+            result.emplace(p.first, crypto_context.encryptor()->encrypt_symmetric(pt));
         }
 
         return result;
@@ -77,7 +77,7 @@ namespace apsi::receiver {
         return result;
     }
 
-    void PlaintextPowers::compute_powers(vector<uint64_t> values, const PowersDag &pd)
+    void PlaintextPowers::compute_powers(const vector<uint64_t> &values, const PowersDag &pd)
     {
         auto source_powers = pd.source_nodes();
 

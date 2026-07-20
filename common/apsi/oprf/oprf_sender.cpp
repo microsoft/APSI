@@ -74,8 +74,8 @@ namespace apsi::oprf {
         size_t query_count = oprf_queries.size() / oprf_query_size;
         vector<unsigned char> oprf_responses(query_count * oprf_response_size);
 
-        auto oprf_in_ptr = oprf_queries.data();
-        auto oprf_out_ptr = oprf_responses.data();
+        const auto *oprf_in_ptr = oprf_queries.data();
+        auto *oprf_out_ptr = oprf_responses.data();
 
         ThreadPoolMgr tpm;
         size_t task_count = min<size_t>(ThreadPoolMgr::GetThreadCount(), query_count);
@@ -86,7 +86,7 @@ namespace apsi::oprf {
                 // Load the point from input buffer
                 ECPoint ecpt;
                 ecpt.load(
-                    ECPoint::point_save_span_const_type{ oprf_in_ptr + idx * oprf_query_size,
+                    ECPoint::point_save_span_const_type{ oprf_in_ptr + (idx * oprf_query_size),
                                                          oprf_query_size });
 
                 // Multiply with key
@@ -96,7 +96,7 @@ namespace apsi::oprf {
 
                 // Save the result to oprf_responses
                 ecpt.save(
-                    ECPoint::point_save_span_type{ oprf_out_ptr + idx * oprf_response_size,
+                    ECPoint::point_save_span_type{ oprf_out_ptr + (idx * oprf_response_size),
                                                    oprf_response_size });
             }
         };
@@ -122,7 +122,7 @@ namespace apsi::oprf {
         ecpt.scalar_multiply(oprf_key.key_span(), true);
 
         // Extract the item hash and the label encryption key
-        array<unsigned char, ECPoint::hash_size> item_hash_and_label_key;
+        array<unsigned char, ECPoint::hash_size> item_hash_and_label_key{};
         ecpt.extract_hash(item_hash_and_label_key);
 
         // The first 128 bits represent the item hash; the next 128 bits represent the

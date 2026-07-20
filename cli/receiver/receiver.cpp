@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 // STD
+#include <cstddef>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -25,18 +26,12 @@ using namespace apsi::network;
 
 namespace {
     struct Colors {
-        static const string Red;
-        static const string Green;
-        static const string RedBold;
-        static const string GreenBold;
-        static const string Reset;
+        [[maybe_unused]] static constexpr const char *Red = "\033[31m";
+        [[maybe_unused]] static constexpr const char *Green = "\033[32m";
+        [[maybe_unused]] static constexpr const char *RedBold = "\033[1;31m";
+        static constexpr const char *GreenBold = "\033[1;32m";
+        static constexpr const char *Reset = "\033[0m";
     };
-
-    const string Colors::Red = "\033[31m";
-    const string Colors::Green = "\033[32m";
-    const string Colors::RedBold = "\033[1;31m";
-    const string Colors::GreenBold = "\033[1;32m";
-    const string Colors::Reset = "\033[0m";
 } // namespace
 
 int remote_query(const CLP &cmd);
@@ -55,13 +50,21 @@ void print_transmitted_data(Channel &channel);
 
 int main(int argc, char *argv[])
 {
-    CLP cmd("Example of a Receiver implementation", APSI_VERSION);
-    if (!cmd.parse_args(argc, argv)) {
-        APSI_LOG_ERROR("Failed parsing command line arguments");
+    try {
+        CLP cmd("Example of a Receiver implementation", APSI_VERSION);
+        if (!cmd.parse_args(argc, argv)) {
+            APSI_LOG_ERROR("Failed parsing command line arguments");
+            return -1;
+        }
+
+        return remote_query(cmd);
+    } catch (const exception &ex) {
+        APSI_LOG_ERROR("Receiver terminated with an unhandled exception: " << ex.what());
+        return -1;
+    } catch (...) {
+        APSI_LOG_ERROR("Receiver terminated with an unknown exception");
         return -1;
     }
-
-    return remote_query(cmd);
 }
 
 int remote_query(const CLP &cmd)
@@ -167,7 +170,7 @@ void print_intersection_results(
                 msg << Colors::GreenBold << intersection[i].label.to_string() << Colors::Reset;
                 csv_output << "," << intersection[i].label.to_string();
             }
-            csv_output << endl;
+            csv_output << '\n';
             APSI_LOG_INFO(msg.str());
         } else {
             // msg << Colors::RedBold << orig_items[i] << Colors::Reset << " (NOT FOUND)";
@@ -186,7 +189,7 @@ void print_transmitted_data(Channel &channel)
 {
     auto nice_byte_count = [](uint64_t bytes) -> string {
         stringstream ss;
-        if (bytes >= 10 * 1024) {
+        if (bytes >= static_cast<uint64_t>(10 * 1024)) {
             ss << bytes / 1024 << " KB";
         } else {
             ss << bytes << " B";

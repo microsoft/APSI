@@ -83,7 +83,7 @@ namespace apsi::network {
     /**
     Reads the ResultPackage from a stream.
     */
-    size_t ResultPackage::load(istream &in, shared_ptr<SEALContext> context)
+    size_t ResultPackage::load(istream &in, const shared_ptr<SEALContext> &context)
     {
         // The context must be set and valid for this operation
         if (!context) {
@@ -106,7 +106,7 @@ namespace apsi::network {
             throw runtime_error("failed to load ResultPackage: invalid buffer");
         }
 
-        auto rp = fbs::GetSizePrefixedResultPackage(in_data.data());
+        const auto *rp = fbs::GetSizePrefixedResultPackage(in_data.data());
 
         bundle_idx = rp->bundle_idx();
 
@@ -149,7 +149,7 @@ namespace apsi::network {
 
         // Load the label_result data if present
         if (rp->label_result()) {
-            auto &label_cts = *rp->label_result();
+            const auto &label_cts = *rp->label_result();
 
             // We deliberately do not reserve() label_cts.size(): the count comes from the
             // wire, so reserving it up front would let a malformed buffer force a large

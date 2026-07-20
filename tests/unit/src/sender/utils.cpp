@@ -4,6 +4,7 @@
 // APSI
 #include "apsi/util/cuckoo_filter.h"
 #include "apsi/util/cuckoo_filter_table.h"
+#include <cstddef>
 
 // Google Test
 #include "gtest/gtest.h"
@@ -16,7 +17,7 @@ using namespace apsi::sender::util;
 namespace APSITests {
     TEST(SenderUtilsTests, CuckooFilterBasics)
     {
-        CuckooFilter filter(70 * 2, 12);
+        CuckooFilter filter(static_cast<std::size_t>(70 * 2), 12);
 
         for (uint64_t elem = 1; elem <= 100; elem++) {
             ASSERT_EQ(true, filter.add(elem));
@@ -56,7 +57,7 @@ namespace APSITests {
 
     TEST(SenderUtilsTests, CuckooFilterLongTag)
     {
-        CuckooFilter filter(70 * 2, 63);
+        CuckooFilter filter(static_cast<std::size_t>(70 * 2), 63);
 
         for (uint64_t elem = 1; elem <= 100; elem++) {
             ASSERT_EQ(true, filter.add(elem));
@@ -97,13 +98,13 @@ namespace APSITests {
     TEST(SenderUtilsTests, CuckooFilterSaveLoad)
     {
         stringstream ss;
-        CuckooFilter filter_template(70 * 2, 12);
+        CuckooFilter filter_template(static_cast<std::size_t>(70 * 2), 12);
         for (uint64_t elem = 1; elem <= 100; elem++) {
             ASSERT_EQ(true, filter_template.add(elem));
         }
         auto save_size = filter_template.save(ss);
 
-        size_t bytes_read;
+        size_t bytes_read = 0;
         auto filter = CuckooFilter::Load(ss, bytes_read);
         ASSERT_EQ(save_size, bytes_read);
 
@@ -192,7 +193,7 @@ namespace APSITests {
 
     TEST(SenderUtilsTests, CuckooFilterTableBasics12)
     {
-        CuckooFilterTable table(/* num_items */ 70 * 2, 12);
+        CuckooFilterTable table(/* num_items */ static_cast<std::size_t>(70 * 2), 12);
 
         ASSERT_EQ(64, table.get_num_buckets());
 
@@ -225,7 +226,7 @@ namespace APSITests {
 
     TEST(SenderUtilsTests, CuckooFilterTableBasics8)
     {
-        CuckooFilterTable table(/* num_items */ 70 * 2, 8);
+        CuckooFilterTable table(/* num_items */ static_cast<std::size_t>(70 * 2), 8);
 
         ASSERT_EQ(64, table.get_num_buckets());
 
@@ -258,7 +259,7 @@ namespace APSITests {
 
     TEST(SenderUtilsTests, CuckooFilterTableBasics4)
     {
-        CuckooFilterTable table(/* num_items */ 70 * 2, 4);
+        CuckooFilterTable table(/* num_items */ static_cast<std::size_t>(70 * 2), 4);
 
         ASSERT_EQ(64, table.get_num_buckets());
 
@@ -291,7 +292,7 @@ namespace APSITests {
 
     TEST(SenderUtilsTests, CuckooFilterTableOverwrite12)
     {
-        CuckooFilterTable table(70 * 2, 12);
+        CuckooFilterTable table(static_cast<std::size_t>(70 * 2), 12);
 
         ASSERT_EQ(64, table.get_num_buckets());
 
@@ -334,7 +335,7 @@ namespace APSITests {
 
     TEST(SenderUtilsTests, CuckooFilterTableOverwrite8)
     {
-        CuckooFilterTable table(70 * 2, 8);
+        CuckooFilterTable table(static_cast<std::size_t>(70 * 2), 8);
 
         ASSERT_EQ(64, table.get_num_buckets());
 
@@ -377,7 +378,7 @@ namespace APSITests {
 
     TEST(SenderUtilsTests, CuckooFilterTableOverwrite4)
     {
-        CuckooFilterTable table(70 * 2, 4);
+        CuckooFilterTable table(static_cast<std::size_t>(70 * 2), 4);
 
         ASSERT_EQ(64, table.get_num_buckets());
 
@@ -420,7 +421,7 @@ namespace APSITests {
 
     TEST(SenderUtilsTests, CuckooFilterTableBasics2_12)
     {
-        CuckooFilterTable table(/* num_items */ 70 * 2, 12);
+        CuckooFilterTable table(/* num_items */ static_cast<std::size_t>(70 * 2), 12);
 
         ASSERT_EQ(64, table.get_num_buckets());
 
@@ -453,7 +454,7 @@ namespace APSITests {
 
     TEST(SenderUtilsTests, CuckooFilterTableBasics2_8)
     {
-        CuckooFilterTable table(/* num_items */ 70 * 2, 8);
+        CuckooFilterTable table(/* num_items */ static_cast<std::size_t>(70 * 2), 8);
 
         ASSERT_EQ(64, table.get_num_buckets());
 
@@ -504,7 +505,7 @@ namespace APSITests {
 
     TEST(SenderUtilsTests, CuckooFilterTableFindTag12)
     {
-        CuckooFilterTable table(/* num_items */ 70 * 2, 12);
+        CuckooFilterTable table(/* num_items */ static_cast<std::size_t>(70 * 2), 12);
 
         ASSERT_EQ(64, table.get_num_buckets());
 
@@ -543,7 +544,7 @@ namespace APSITests {
 
     TEST(SenderUtilsTests, CuckooFilterTableFindTag8)
     {
-        CuckooFilterTable table(/* num_items */ 70 * 2, 8);
+        CuckooFilterTable table(/* num_items */ static_cast<std::size_t>(70 * 2), 8);
 
         ASSERT_EQ(64, table.get_num_buckets());
 

@@ -22,124 +22,122 @@
 #include "seal/relinkeys.h"
 #include "seal/util/common.h"
 
-namespace apsi {
-    namespace network {
-        enum class SenderOperationType : std::uint32_t {
-            sop_unknown = 0,
+namespace apsi::network {
+    enum class SenderOperationType : std::uint32_t {
+        sop_unknown = 0,
 
-            sop_parms = 1,
+        sop_parms = 1,
 
-            sop_oprf = 2,
+        sop_oprf = 2,
 
-            sop_query = 3
-        };
+        sop_query = 3
+    };
 
-        const char *sender_operation_type_str(SenderOperationType sop_type);
+    const char *sender_operation_type_str(SenderOperationType sop_type);
 
-        /**
-        A class describing the type of a SenderOperation object and an optional member to identify
-        the client.
-        */
-        class SenderOperationHeader {
-        public:
-            std::size_t save(std::ostream &out) const;
+    /**
+    A class describing the type of a SenderOperation object and an optional member to identify
+    the client.
+    */
+    class SenderOperationHeader {
+    public:
+        std::size_t save(std::ostream &out) const;
 
-            std::size_t load(std::istream &in);
+        std::size_t load(std::istream &in);
 
-            std::uint32_t version = apsi_serialization_version;
+        std::uint32_t version = apsi_serialization_version;
 
-            SenderOperationType type = SenderOperationType::sop_unknown;
-        };
+        SenderOperationType type = SenderOperationType::sop_unknown;
+    };
 
-        /**
-        An abstract base class representing a sender operation.
-        */
-        class SenderOperation {
-        public:
-            SenderOperation() = default;
-
-            /**
-            Destroys the SenderOperation.
-            */
-            virtual ~SenderOperation() = default;
-
-            /**
-            Writes the SenderOperation to a stream.
-            */
-            virtual std::size_t save(std::ostream &out) const = 0;
-
-            /**
-            Reads the SenderOperation from a stream.
-            */
-            virtual std::size_t load(
-                std::istream &in, std::shared_ptr<seal::SEALContext> context = nullptr) = 0;
-
-            /**
-            Returns the type of the SenderOperation.
-            */
-            virtual SenderOperationType type() const noexcept = 0;
-        }; // class SenderOperation
+    /**
+    An abstract base class representing a sender operation.
+    */
+    class SenderOperation {
+    public:
+        SenderOperation() = default;
 
         /**
-        A kind of SenderOperation for representing a parameter request from the receiver.
+        Destroys the SenderOperation.
         */
-        class SenderOperationParms final : public SenderOperation {
-        public:
-            std::size_t save(std::ostream &out) const override;
-
-            std::size_t load(
-                std::istream &in, std::shared_ptr<seal::SEALContext> context = nullptr) override;
-
-            SenderOperationType type() const noexcept override
-            {
-                return SenderOperationType::sop_parms;
-            }
-        }; // class SenderOperationParms
+        virtual ~SenderOperation() = default;
 
         /**
-        A kind of SenderOperation for representing an OPRF query from the receiver.
+        Writes the SenderOperation to a stream.
         */
-        class SenderOperationOPRF final : public SenderOperation {
-        public:
-            std::size_t save(std::ostream &out) const override;
-
-            std::size_t load(
-                std::istream &in, std::shared_ptr<seal::SEALContext> context = nullptr) override;
-
-            SenderOperationType type() const noexcept override
-            {
-                return SenderOperationType::sop_oprf;
-            }
-
-            /**
-            Holds the OPRF query data.
-            */
-            std::vector<unsigned char> data;
-        }; // class SenderOperationOPRF
+        virtual std::size_t save(std::ostream &out) const = 0;
 
         /**
-        A kind of SenderOperation for representing a PSI or labeled PSI query from the receiver.
+        Reads the SenderOperation from a stream.
         */
-        class SenderOperationQuery final : public SenderOperation {
-        public:
-            std::size_t save(std::ostream &out) const override;
+        virtual std::size_t load(
+            std::istream &in, std::shared_ptr<seal::SEALContext> context = nullptr) = 0;
 
-            std::size_t load(std::istream &in, std::shared_ptr<seal::SEALContext> context) override;
+        /**
+        Returns the type of the SenderOperation.
+        */
+        [[nodiscard]] virtual SenderOperationType type() const noexcept = 0;
+    }; // class SenderOperation
 
-            SenderOperationType type() const noexcept override
-            {
-                return SenderOperationType::sop_query;
-            }
+    /**
+    A kind of SenderOperation for representing a parameter request from the receiver.
+    */
+    class SenderOperationParms final : public SenderOperation {
+    public:
+        std::size_t save(std::ostream &out) const override;
 
-            seal::compr_mode_type compr_mode = seal::Serialization::compr_mode_default;
+        std::size_t load(
+            std::istream &in, std::shared_ptr<seal::SEALContext> context = nullptr) override;
 
-            SEALObject<seal::RelinKeys> relin_keys;
+        [[nodiscard]] SenderOperationType type() const noexcept override
+        {
+            return SenderOperationType::sop_parms;
+        }
+    }; // class SenderOperationParms
 
-            /**
-            Holds the encrypted query data. In the map the key labels the exponent of the query
-            ciphertext and the vector holds the ciphertext data for different bundle indices.
-            */
-            std::unordered_map<std::uint32_t, std::vector<SEALObject<seal::Ciphertext>>> data;
-        }; // class SenderOperationQuery
-    } // namespace network
-} // namespace apsi
+    /**
+    A kind of SenderOperation for representing an OPRF query from the receiver.
+    */
+    class SenderOperationOPRF final : public SenderOperation {
+    public:
+        std::size_t save(std::ostream &out) const override;
+
+        std::size_t load(
+            std::istream &in, std::shared_ptr<seal::SEALContext> context = nullptr) override;
+
+        [[nodiscard]] SenderOperationType type() const noexcept override
+        {
+            return SenderOperationType::sop_oprf;
+        }
+
+        /**
+        Holds the OPRF query data.
+        */
+        std::vector<unsigned char> data;
+    }; // class SenderOperationOPRF
+
+    /**
+    A kind of SenderOperation for representing a PSI or labeled PSI query from the receiver.
+    */
+    class SenderOperationQuery final : public SenderOperation {
+    public:
+        std::size_t save(std::ostream &out) const override;
+
+        std::size_t load(std::istream &in, std::shared_ptr<seal::SEALContext> context) override;
+
+        [[nodiscard]] SenderOperationType type() const noexcept override
+        {
+            return SenderOperationType::sop_query;
+        }
+
+        seal::compr_mode_type compr_mode = seal::Serialization::compr_mode_default;
+
+        SEALObject<seal::RelinKeys> relin_keys;
+
+        /**
+        Holds the encrypted query data. In the map the key labels the exponent of the query
+        ciphertext and the vector holds the ciphertext data for different bundle indices.
+        */
+        std::unordered_map<std::uint32_t, std::vector<SEALObject<seal::Ciphertext>>> data;
+    }; // class SenderOperationQuery
+} // namespace apsi::network

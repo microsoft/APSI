@@ -34,9 +34,9 @@ namespace apsi {
     namespace sender {
         void Sender::RunParams(
             const ParamsRequest &params_request,
-            shared_ptr<SenderDB> sender_db,
+            const shared_ptr<SenderDB> &sender_db,
             network::Channel &chl,
-            function<void(Channel &, Response)> send_fun)
+            const function<void(Channel &, Response)> &send_fun)
         {
             STOPWATCH(sender_stopwatch, "Sender::RunParams");
 
@@ -69,9 +69,9 @@ namespace apsi {
 
         void Sender::RunOPRF(
             const OPRFRequest &oprf_request,
-            OPRFKey key,
+            const OPRFKey &key,
             network::Channel &chl,
-            function<void(Channel &, Response)> send_fun)
+            const function<void(Channel &, Response)> &send_fun)
         {
             STOPWATCH(sender_stopwatch, "Sender::RunOPRF");
 
@@ -111,7 +111,7 @@ namespace apsi {
         void Sender::RunQuery(
             const Query &query,
             Channel &chl,
-            function<void(Channel &, Response)> send_fun,
+            const function<void(Channel &, Response)> &send_fun,
             function<void(Channel &, ResultPart)> send_rp_fun)
         {
             if (!query) {
@@ -147,7 +147,7 @@ namespace apsi {
             uint32_t max_items_per_bin = params.table_params().max_items_per_bin;
 
             // Extract the PowersDag
-            PowersDag pd = query.pd();
+            const PowersDag &pd = query.pd();
 
             // The query response only tells how many ResultPackages to expect; send this first
             uint32_t package_count = safe_cast<uint32_t>(sender_db->get_bin_bundle_count());
@@ -180,7 +180,7 @@ namespace apsi {
             }
 
             // Load inputs provided in the query
-            for (auto &q : query.data()) {
+            for (const auto &q : query.data()) {
                 // The exponent of all the query powers we're about to iterate through
                 size_t exponent = static_cast<size_t>(q.first);
 
@@ -190,7 +190,7 @@ namespace apsi {
                     APSI_LOG_DEBUG(
                         "Extracting query ciphertext power " << exponent << " for bundle index "
                                                              << bundle_idx);
-                    all_powers[bundle_idx][exponent] = std::move(q.second[bundle_idx]);
+                    all_powers[bundle_idx][exponent] = q.second[bundle_idx];
                 }
             }
 
@@ -245,7 +245,7 @@ namespace apsi {
         {
             STOPWATCH(sender_stopwatch, "Sender::ComputePowers");
             auto bundle_caches = sender_db->get_cache_at(bundle_idx);
-            if (!bundle_caches.size()) {
+            if (bundle_caches.empty()) {
                 return;
             }
 
@@ -336,7 +336,7 @@ namespace apsi {
             reference_wrapper<const BinBundleCache> cache,
             vector<CiphertextPowers> &all_powers,
             Channel &chl,
-            function<void(Channel &, ResultPart)> send_rp_fun,
+            const function<void(Channel &, ResultPart)> &send_rp_fun,
             uint32_t bundle_idx,
             compr_mode_type compr_mode,
             MemoryPoolHandle &pool)
@@ -370,10 +370,10 @@ namespace apsi {
                 degree = safe_cast<uint32_t>(interp_polyn.batched_coeffs.size()) - 1;
                 using_ps = (ps_low_degree > 1) && (ps_low_degree < degree);
                 if (using_ps) {
-                    rp->label_result.push_back(interp_polyn.eval_patstock(
+                    rp->label_result.emplace_back(interp_polyn.eval_patstock(
                         crypto_context, all_powers[bundle_idx], ps_low_degree, pool));
                 } else {
-                    rp->label_result.push_back(interp_polyn.eval(all_powers[bundle_idx], pool));
+                    rp->label_result.emplace_back(interp_polyn.eval(all_powers[bundle_idx], pool));
                 }
             }
 

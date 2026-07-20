@@ -237,7 +237,7 @@ namespace apsi {
             throw runtime_error("failed to load parameters: invalid buffer");
         }
 
-        auto psi_params = fbs::GetSizePrefixedPSIParams(in_data.data());
+        const auto *psi_params = fbs::GetSizePrefixedPSIParams(in_data.data());
 
         if (!same_serialization_version(psi_params->version())) {
             // Check that the serialization version numbers match
@@ -265,7 +265,7 @@ namespace apsi {
             inserter(query_params.query_powers, query_params.query_powers.end()));
 
         PSIParams::SEALParams seal_params;
-        auto &seal_params_data = *psi_params->seal_params()->data();
+        const auto &seal_params_data = *psi_params->seal_params()->data();
         try {
             seal_params.load(
                 reinterpret_cast<const std::byte *>(seal_params_data.data()),
@@ -374,7 +374,7 @@ namespace apsi {
             throw;
         }
 
-        return PSIParams(item_params, table_params, query_params, seal_params);
+        return { item_params, table_params, query_params, seal_params };
     }
 #else
     PSIParams PSIParams::Load(const string &in)

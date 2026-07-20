@@ -24,7 +24,7 @@ public:
     CLP(const std::string &desc, const std::string &version) : BaseCLP(desc, version)
     {}
 
-    virtual void add_args()
+    void add_args() override
     {
         add(compress_arg_);
         add(nonce_byte_count_arg_);
@@ -34,7 +34,7 @@ public:
         add(sdb_out_file_arg_);
     }
 
-    virtual void get_args()
+    void get_args() override
     {
         compress_ = compress_arg_.getValue();
         nonce_byte_count_ = nonce_byte_count_arg_.getValue();
@@ -44,32 +44,32 @@ public:
         sdb_out_file_ = sdb_out_file_arg_.getValue();
     }
 
-    std::size_t nonce_byte_count() const
+    [[nodiscard]] std::size_t nonce_byte_count() const
     {
         return nonce_byte_count_;
     }
 
-    bool compress() const
+    [[nodiscard]] bool compress() const
     {
         return compress_;
     }
 
-    int net_port() const
+    [[nodiscard]] int net_port() const
     {
         return net_port_;
     }
 
-    const std::string &db_file() const
+    [[nodiscard]] const std::string &db_file() const
     {
         return db_file_;
     }
 
-    const std::string &params_file() const
+    [[nodiscard]] const std::string &params_file() const
     {
         return params_file_;
     }
 
-    const std::string &sdb_out_file() const
+    [[nodiscard]] const std::string &sdb_out_file() const
     {
         return sdb_out_file_;
     }
@@ -111,11 +111,11 @@ private:
     TCLAP::SwitchArg compress_arg_ =
         TCLAP::SwitchArg("c", "compress", "Whether to compress the SenderDB in memory", false);
 
-    std::size_t nonce_byte_count_;
+    std::size_t nonce_byte_count_{};
 
-    bool compress_;
+    bool compress_{};
 
-    int net_port_;
+    int net_port_{};
 
     std::string db_file_;
 

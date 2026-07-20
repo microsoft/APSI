@@ -39,6 +39,9 @@ namespace apsi {
 
         SEALObject &operator=(const SEALObject &assign)
         {
+            if (this == &assign) {
+                return *this;
+            }
             local_.reset();
             serializable_.reset();
             if (assign.is_local() && !assign.is_serializable()) {
@@ -96,12 +99,12 @@ namespace apsi {
             local_.reset();
         }
 
-        bool is_local() const
+        [[nodiscard]] bool is_local() const
         {
             return !!local_;
         }
 
-        bool is_serializable() const
+        [[nodiscard]] bool is_serializable() const
         {
             return !!serializable_;
         }
@@ -155,7 +158,7 @@ namespace apsi {
             return result;
         }
 
-        LocalType extract(std::shared_ptr<seal::SEALContext> context)
+        LocalType extract(const std::shared_ptr<seal::SEALContext> &context)
         {
             LocalType ret;
             if (is_local()) {
@@ -176,6 +179,8 @@ namespace apsi {
             return ret;
         }
 
+        // save() writes through the output span, so its byte-count return may be ignored.
+        // NOLINTNEXTLINE(modernize-use-nodiscard)
         std::size_t save(gsl::span<unsigned char> out, seal::compr_mode_type compr_mode) const
         {
             std::size_t size = out.size();
@@ -191,18 +196,19 @@ namespace apsi {
             return 0;
         }
 
-        std::size_t save_size(seal::compr_mode_type compr_mode) const
+        [[nodiscard]] std::size_t save_size(seal::compr_mode_type compr_mode) const
         {
             if (is_local() && !is_serializable()) {
                 return seal::util::safe_cast<std::size_t>(local_->save_size(compr_mode));
-            } else if (!is_local() && is_serializable()) {
+            }
+            if (!is_local() && is_serializable()) {
                 return seal::util::safe_cast<std::size_t>(serializable_->save_size(compr_mode));
             }
             return 0;
         }
 
         std::size_t load(
-            std::shared_ptr<seal::SEALContext> context, gsl::span<const unsigned char> in)
+            const std::shared_ptr<seal::SEALContext> &context, gsl::span<const unsigned char> in)
         {
             if (!context) {
                 throw std::invalid_argument("context cannot be null");

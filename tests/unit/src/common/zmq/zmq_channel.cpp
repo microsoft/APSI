@@ -23,8 +23,21 @@ using namespace apsi::network;
 
 namespace APSITests {
     namespace {
-        ZMQSenderChannel server_;
-        ZMQReceiverChannel client_;
+        // The shared server/client channels are bound/connected once and reused across every test
+        // in the fixture. Function-local statics defer their (potentially throwing) construction to
+        // first use, where the exception can propagate normally, rather than during dynamic
+        // initialization.
+        ZMQSenderChannel &server()
+        {
+            static ZMQSenderChannel instance;
+            return instance;
+        }
+
+        ZMQReceiverChannel &client()
+        {
+            static ZMQReceiverChannel instance;
+            return instance;
+        }
 
         shared_ptr<PSIParams> get_params()
         {
@@ -74,27 +87,21 @@ namespace APSITests {
     protected:
         ZMQChannelTests()
         {
-            if (!server_.is_connected()) {
-                server_.bind("tcp://*:5555");
+            if (!server().is_connected()) {
+                server().bind("tcp://*:5555");
             }
 
-            if (!client_.is_connected()) {
-                client_.connect("tcp://localhost:5555");
+            if (!client().is_connected()) {
+                client().connect("tcp://localhost:5555");
             }
 
             // Set up the context ahead of time
             (void)get_context();
         }
 
-        ~ZMQChannelTests()
-        {
-            // Do not disconnect, as the Constructor / Destructor is called for every test.
-            // if (client_.is_connected())
-            //	client_.disconnect();
-
-            // if (server_.is_connected())
-            //	server_.disconnect();
-        }
+        // No destructor: the fixture is constructed and destroyed for every test, but the shared
+        // server()/client() channels are intentionally left connected so the port is bound only
+        // once. The implicit destructor (public, virtual via the base) is exactly what we want.
     };
 
     TEST_F(ZMQChannelTests, ThrowWithoutConnectTest)
@@ -124,7 +131,7 @@ namespace APSITests {
         // returns nullptr (missing context, empty non-blocking queue, malformed input) crashed
         // instead of failing cleanly. Here we exercise two such paths and require nullptr.
 
-        // Use a dedicated socket pair so lingering queue state from the shared server_/client_
+        // Use a dedicated socket pair so lingering queue state from the shared server()/client()
         // instances cannot affect the result.
         ZMQSenderChannel svr;
         ZMQReceiverChannel clt;
@@ -173,8 +180,8 @@ namespace APSITests {
             auto sop_query = make_unique<SenderOperationQuery>();
             auto relin_keys = get_context()->relin_keys();
             sop_query->relin_keys = *relin_keys;
-            sop_query->data[0].push_back(get_context()->encryptor()->encrypt_zero_symmetric());
-            sop_query->data[123].push_back(get_context()->encryptor()->encrypt_zero_symmetric());
+            sop_query->data[0].emplace_back(get_context()->encryptor()->encrypt_zero_symmetric());
+            sop_query->data[123].emplace_back(get_context()->encryptor()->encrypt_zero_symmetric());
             sop = std::move(sop_query);
 
             // Send a query operation with some dummy data
@@ -320,7 +327,7 @@ namespace APSITests {
         rp->label_byte_count = 80;
         rp->nonce_byte_count = 4;
         rp->psi_result = query_ct123;
-        rp->label_result.push_back(query_ct123);
+        rp->label_result.emplace_back(query_ct123);
         nrp = make_unique<ZMQResultPackage>();
         nrp->client_id = client_id;
         nrp->rp = std::move(rp);
@@ -339,8 +346,9 @@ namespace APSITests {
             sender.bind("tcp://*:5552");
 
             while (!finished) {
-                unique_ptr<ZMQSenderOperation> sop;
-                if (!(sop = sender.receive_network_operation(get_context()->seal_context()))) {
+                unique_ptr<ZMQSenderOperation> sop =
+                    sender.receive_network_operation(get_context()->seal_context());
+                if (!sop) {
                     this_thread::sleep_for(50ms);
                     continue;
                 }
@@ -363,8 +371,8 @@ namespace APSITests {
         });
 
         vector<thread> clients(5);
-        for (size_t i = 0; i < clients.size(); i++) {
-            clients[i] = thread([]() {
+        for (auto &client : clients) {
+            client = thread([]() {
                 ZMQReceiverChannel recv;
 
                 recv.connect("tcp://localhost:5552");
@@ -396,8 +404,8 @@ namespace APSITests {
             });
         }
 
-        for (size_t i = 0; i < clients.size(); i++) {
-            clients[i].join();
+        for (auto &client : clients) {
+            client.join();
         }
 
         finished = true;

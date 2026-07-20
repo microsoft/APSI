@@ -29,7 +29,7 @@ public:
 
     std::pair<DBData, std::vector<std::string>> read(std::istream &stream) const;
 
-    std::pair<DBData, std::vector<std::string>> read() const;
+    [[nodiscard]] std::pair<DBData, std::vector<std::string>> read() const;
 
 private:
     std::string file_name_;

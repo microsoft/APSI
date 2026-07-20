@@ -137,7 +137,7 @@ namespace apsi {
         }
 
         vector<PowersNode> result;
-        for (auto &node : nodes_) {
+        for (const auto &node : nodes_) {
             if (!node.second.parents.first && !node.second.parents.second) {
                 result.push_back(node.second);
             }
@@ -153,24 +153,24 @@ namespace apsi {
         }
 
         stringstream ss;
-        ss << "digraph powers {" << endl;
-        for (auto &node : nodes_) {
+        ss << "digraph powers {" << '\n';
+        for (const auto &node : nodes_) {
             // Add the node
             uint32_t power = node.second.power;
-            ss << "\t" << power << ";" << endl;
+            ss << "\t" << power << ";" << '\n';
 
             // Add the two parent edges if they are non-zero
             auto p1 = node.second.parents.first;
             auto p2 = node.second.parents.second;
             if (p1) {
-                ss << "\t" << power << " -> " << p1 << ";" << endl;
+                ss << "\t" << power << " -> " << p1 << ";" << '\n';
             }
             if (p2) {
-                ss << "\t" << power << " -> " << p2 << ";" << endl;
+                ss << "\t" << power << " -> " << p2 << ";" << '\n';
             }
         }
 
-        ss << "}" << endl;
+        ss << "}" << '\n';
 
         return ss.str();
     }

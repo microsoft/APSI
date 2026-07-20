@@ -29,6 +29,8 @@ namespace APSITests {
 
     unordered_set<Item> rand_subset(const unordered_set<Item> &items, size_t size)
     {
+        // Deterministic seed on purpose: test subsets must be reproducible across runs.
+        // NOLINTNEXTLINE(bugprone-random-generator-seed)
         mt19937_64 rg;
 
         set<size_t> ss;
@@ -47,6 +49,8 @@ namespace APSITests {
 
     unordered_set<Item> rand_subset(const unordered_map<Item, Label> &item_labels, size_t size)
     {
+        // Deterministic seed on purpose: test subsets must be reproducible across runs.
+        // NOLINTNEXTLINE(bugprone-random-generator-seed)
         mt19937_64 rg;
 
         set<size_t> ss;
@@ -68,6 +72,8 @@ namespace APSITests {
 
     vector<Item> rand_subset(const vector<Item> &items, size_t size)
     {
+        // Deterministic seed on purpose: test subsets must be reproducible across runs.
+        // NOLINTNEXTLINE(bugprone-random-generator-seed)
         mt19937_64 rg;
 
         set<size_t> ss;
@@ -76,6 +82,7 @@ namespace APSITests {
         }
 
         vector<Item> items_subset;
+        items_subset.reserve(ss.size());
         for (auto idx : ss) {
             items_subset.push_back(items[idx]);
         }
@@ -85,6 +92,8 @@ namespace APSITests {
 
     vector<Item> rand_subset(const vector<pair<Item, Label>> &items, size_t size)
     {
+        // Deterministic seed on purpose: test subsets must be reproducible across runs.
+        // NOLINTNEXTLINE(bugprone-random-generator-seed)
         mt19937_64 rg;
 
         set<size_t> ss;
@@ -93,6 +102,7 @@ namespace APSITests {
         }
 
         vector<Item> items_subset;
+        items_subset.reserve(ss.size());
         for (auto idx : ss) {
             items_subset.push_back(items[idx].first);
         }
@@ -107,15 +117,16 @@ namespace APSITests {
     {
         // Count matches
         size_t match_count = accumulate(
-            query_result.cbegin(), query_result.cend(), size_t(0), [](auto sum, auto &curr) {
-                return sum + curr.found;
-            });
+            query_result.cbegin(),
+            query_result.cend(),
+            static_cast<size_t>(0),
+            [](auto sum, auto &curr) { return sum + curr.found; });
 
         // Check that intersection size is correct
         ASSERT_EQ(int_items.size(), match_count);
 
         // Check that every intersection item was actually found
-        for (auto &item : int_items) {
+        for (const auto &item : int_items) {
             auto where = find(query_vec.begin(), query_vec.end(), item);
             ASSERT_NE(query_vec.end(), where);
 
@@ -133,14 +144,14 @@ namespace APSITests {
         verify_unlabeled_results(query_result, query_vec, int_items);
 
         // Verify that all labels were received for items that were found
-        for (auto &result : query_result) {
+        for (const auto &result : query_result) {
             if (result.found) {
                 ASSERT_TRUE(result.label);
             }
         }
 
         // Check that the labels are correct for items in the intersection
-        for (auto &item : int_items) {
+        for (const auto &item : int_items) {
             auto where = find(query_vec.begin(), query_vec.end(), item);
             size_t idx = static_cast<size_t>(distance(query_vec.begin(), where));
 

@@ -188,7 +188,6 @@ namespace apsi {
         /**
         Writes the PSIParams to a stream.
         */
-        [[nodiscard]]
         std::size_t save(std::ostream &out) const;
 
         /**
