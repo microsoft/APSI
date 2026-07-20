@@ -68,7 +68,7 @@ namespace APSITests {
         auto rng = rng_factory->create();
         for (size_t i = 0; i < item_count; i++) {
             Item it;
-            rng->generate(sizeof(Item), reinterpret_cast<std::byte *>(it.value().data()));
+            rng->generate(sizeof(Item), reinterpret_cast<seal_byte *>(it.value().data()));
             items.push_back(it);
         }
 
