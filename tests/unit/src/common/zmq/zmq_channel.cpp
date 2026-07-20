@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 // STD
+#include <chrono>
 #include <string>
 #include <thread>
 #include <utility>
@@ -17,6 +18,7 @@
 #include "gtest/gtest.h"
 
 using namespace std;
+using namespace std::chrono_literals;
 using namespace seal;
 using namespace apsi;
 using namespace apsi::network;

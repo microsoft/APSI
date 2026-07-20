@@ -428,7 +428,7 @@ namespace APSITests {
         // while NewFileLoggerIsThreadSafe below targets the stream-sink data-race guarantee that
         // the under-lock dispatch provides.
         constexpr int thread_count = 8;
-        constexpr int lines_per_thread = 1000;
+        static constexpr int lines_per_thread = 1000;
 
         GlobalLoggerScope scope;
         LogCapture cap;
@@ -484,7 +484,7 @@ namespace APSITests {
         } cleanup{ log_path };
 
         constexpr int thread_count = 8;
-        constexpr int lines_per_thread = 500;
+        static constexpr int lines_per_thread = 500;
 
         {
             GlobalLoggerScope scope;
