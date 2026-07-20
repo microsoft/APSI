@@ -69,37 +69,37 @@ namespace apsi {
             evaluator_.reset();
         }
 
-        std::shared_ptr<seal::SEALContext> seal_context() const
+        [[nodiscard]] std::shared_ptr<seal::SEALContext> seal_context() const
         {
             return seal_context_;
         }
 
-        std::shared_ptr<seal::RelinKeys> relin_keys() const
+        [[nodiscard]] std::shared_ptr<seal::RelinKeys> relin_keys() const
         {
             return relin_keys_;
         }
 
-        std::shared_ptr<seal::BatchEncoder> encoder() const
+        [[nodiscard]] std::shared_ptr<seal::BatchEncoder> encoder() const
         {
             return encoder_;
         }
 
-        std::shared_ptr<seal::SecretKey> secret_key() const
+        [[nodiscard]] std::shared_ptr<seal::SecretKey> secret_key() const
         {
             return secret_key_;
         }
 
-        std::shared_ptr<seal::Encryptor> encryptor() const
+        [[nodiscard]] std::shared_ptr<seal::Encryptor> encryptor() const
         {
             return encryptor_;
         }
 
-        std::shared_ptr<seal::Decryptor> decryptor() const
+        [[nodiscard]] std::shared_ptr<seal::Decryptor> decryptor() const
         {
             return decryptor_;
         }
 
-        std::shared_ptr<seal::Evaluator> evaluator() const
+        [[nodiscard]] std::shared_ptr<seal::Evaluator> evaluator() const
         {
             return evaluator_;
         }

@@ -29,7 +29,7 @@ namespace apsi {
     template <
         typename T,
         typename = std::enable_if_t<
-            std::is_same<T, unsigned char>::value || std::is_same<T, const unsigned char>::value>>
+            std::is_same_v<T, unsigned char> || std::is_same_v<T, const unsigned char>>>
     class BitstringView {
     private:
         gsl::span<T> data_;
@@ -65,10 +65,8 @@ namespace apsi {
 
         template <typename S>
         BitstringView(const BitstringView<S> &view)
-        {
-            data_ = static_cast<gsl::span<S>>(view.data());
-            bit_count_ = view.bit_count();
-        }
+            : data_(static_cast<gsl::span<S>>(view.data())), bit_count_(view.bit_count())
+        {}
 
         bool operator==(const BitstringView<T> &rhs) const
         {
@@ -76,7 +74,7 @@ namespace apsi {
             return (bit_count_ == rhs.bit_count_) && (data_.data() == rhs.data_.data());
         }
 
-        std::uint32_t bit_count() const
+        [[nodiscard]] std::uint32_t bit_count() const
         {
             return bit_count_;
         }
@@ -84,7 +82,7 @@ namespace apsi {
         /**
         Returns a reference to the underlying bytes.
         */
-        gsl::span<T> data() const
+        [[nodiscard]] gsl::span<T> data() const
         {
             return { data_.data(), data_.size() };
         }
@@ -128,7 +126,7 @@ namespace apsi {
             return (bit_count_ == rhs.bit_count_) && (data_ == rhs.data_);
         }
 
-        std::uint32_t bit_count() const
+        [[nodiscard]] std::uint32_t bit_count() const
         {
             return bit_count_;
         }
@@ -144,7 +142,7 @@ namespace apsi {
         /**
         Returns a BitstringView representing the same underlying data.
         */
-        BitstringView<const unsigned char> to_view() const
+        [[nodiscard]] BitstringView<const unsigned char> to_view() const
         {
             return { data(), bit_count_ };
         }
@@ -160,7 +158,7 @@ namespace apsi {
         /**
         Returns a reference to the underlying bytes.
         */
-        gsl::span<const unsigned char> data() const
+        [[nodiscard]] gsl::span<const unsigned char> data() const
         {
             return { data_.data(), data_.size() };
         }
@@ -237,7 +235,7 @@ namespace apsi {
         /**
         Returns the Bitstring representing this Item's data.
         */
-        Bitstring to_bitstring(std::uint32_t item_bit_count) const;
+        [[nodiscard]] Bitstring to_bitstring(std::uint32_t item_bit_count) const;
 
         bool operator==(const Item &other) const
         {
@@ -250,7 +248,7 @@ namespace apsi {
             std::memcpy(value_.data() + sizeof(lw), &hw, sizeof(hw));
         }
 
-        const value_type &value() const noexcept
+        [[nodiscard]] const value_type &value() const noexcept
         {
             return value_;
         }
@@ -260,7 +258,7 @@ namespace apsi {
             return value_;
         }
 
-        std::string to_string() const;
+        [[nodiscard]] std::string to_string() const;
 
     private:
         void hash_to_value(const void *in, std::size_t size);
@@ -323,8 +321,8 @@ namespace std {
             // Read the two 64-bit halves out of the byte-array storage with memcpy to avoid
             // strict-aliasing UB.
             const auto &v = item.value();
-            std::uint64_t lw;
-            std::uint64_t hw;
+            std::uint64_t lw = 0;
+            std::uint64_t hw = 0;
             std::memcpy(&lw, v.data(), sizeof(lw));
             std::memcpy(&hw, v.data() + sizeof(lw), sizeof(hw));
             std::uint64_t result = 17;

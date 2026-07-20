@@ -69,7 +69,7 @@ namespace APSITests {
         for (size_t i = 0; i < item_count; i++) {
             Item it;
             rng->generate(sizeof(Item), reinterpret_cast<std::byte *>(it.value().data()));
-            items.push_back(std::move(it));
+            items.push_back(it);
         }
 
         // Create random key
@@ -101,7 +101,7 @@ namespace APSITests {
         {
             std::array<unsigned char, 1> val{ 0 };
             ECPoint pt(val);
-            std::array<unsigned char, ECPoint::save_size> buf;
+            std::array<unsigned char, ECPoint::save_size> buf{};
             pt.save(buf);
             uint64_t w1 = *reinterpret_cast<uint64_t *>(buf.data());
             uint64_t w2 = *reinterpret_cast<uint64_t *>(buf.data() + 8);
@@ -116,7 +116,7 @@ namespace APSITests {
         {
             std::array<unsigned char, 2> val{ 0, 0 };
             ECPoint pt(val);
-            std::array<unsigned char, ECPoint::save_size> buf;
+            std::array<unsigned char, ECPoint::save_size> buf{};
             pt.save(buf);
             uint64_t w1 = *reinterpret_cast<uint64_t *>(buf.data());
             uint64_t w2 = *reinterpret_cast<uint64_t *>(buf.data() + 8);
@@ -132,7 +132,7 @@ namespace APSITests {
             std::array<unsigned char, 16> val{ 0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA, 0xF9, 0xF8,
                                                0xF7, 0xF6, 0xF5, 0xF4, 0xF3, 0xF2, 0xF1, 0xF0 };
             ECPoint pt(val);
-            std::array<unsigned char, ECPoint::save_size> buf;
+            std::array<unsigned char, ECPoint::save_size> buf{};
             pt.save(buf);
             uint64_t w1 = *reinterpret_cast<uint64_t *>(buf.data());
             uint64_t w2 = *reinterpret_cast<uint64_t *>(buf.data() + 8);

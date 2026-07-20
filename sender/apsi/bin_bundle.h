@@ -124,7 +124,7 @@ namespace apsi::sender {
         */
         explicit operator bool() const noexcept
         {
-            return batched_coeffs.size();
+            return !batched_coeffs.empty();
         }
     };
 
@@ -175,7 +175,7 @@ namespace apsi::sender {
         /**
         This is true iff cache_ needs to be regenerated
         */
-        bool cache_invalid_;
+        bool cache_invalid_{ true };
 
         /**
         We need this to make Plaintexts
@@ -214,7 +214,7 @@ namespace apsi::sender {
         Indicates whether the BinBundle has been stripped of all information not needed for
         serving a query.
         */
-        bool stripped_;
+        bool stripped_{};
 
         /**
         The size of the labels in multiples of item length.
@@ -244,7 +244,7 @@ namespace apsi::sender {
         /**
         Returns the modulus that defines the finite field that we're working in
         */
-        const seal::Modulus &field_mod() const;
+        [[nodiscard]] const seal::Modulus &field_mod() const;
 
         /**
         Computes and caches the appropriate polynomials of each bin. For unlabeled PSI, this is
@@ -261,7 +261,7 @@ namespace apsi::sender {
 
     public:
         BinBundle(
-            const CryptoContext &crypto_context,
+            CryptoContext crypto_context,
             std::size_t label_size,
             std::size_t max_bin_size,
             std::size_t ps_low_degree,
@@ -355,7 +355,7 @@ namespace apsi::sender {
         /**
         Returns whether this BinBundle's cache needs to be recomputed
         */
-        bool cache_invalid() const noexcept
+        [[nodiscard]] bool cache_invalid() const noexcept
         {
             return cache_invalid_;
         }
@@ -364,7 +364,7 @@ namespace apsi::sender {
         Gets a constant reference to this BinBundle's cache. This will throw an exception if the
         cache is invalid. Check the cache before you wreck the cache.
         */
-        const BinBundleCache &get_cache() const;
+        [[nodiscard]] const BinBundleCache &get_cache() const;
 
         /**
         Generates and caches all the polynomials and plaintexts that this BinBundle requires
@@ -374,7 +374,8 @@ namespace apsi::sender {
         /**
         Returns a constant reference to the items in this BinBundle.
         */
-        const std::vector<std::vector<apsi::util::felt_t>> &get_item_bins() const noexcept
+        [[nodiscard]] const std::vector<std::vector<apsi::util::felt_t>> &get_item_bins()
+            const noexcept
         {
             return item_bins_;
         }
@@ -382,7 +383,7 @@ namespace apsi::sender {
         /**
         Returns the size of the label in multiples of the item size.
         */
-        std::size_t get_label_size() const noexcept
+        [[nodiscard]] std::size_t get_label_size() const noexcept
         {
             return label_size_;
         }
@@ -390,7 +391,7 @@ namespace apsi::sender {
         /**
         Returns the number of bins.
         */
-        std::size_t get_num_bins() const noexcept
+        [[nodiscard]] std::size_t get_num_bins() const noexcept
         {
             return num_bins_;
         }
@@ -398,8 +399,8 @@ namespace apsi::sender {
         /**
         Returns a constant reference to the label parts in this BinBundle.
         */
-        const std::vector<std::vector<std::vector<apsi::util::felt_t>>> &get_label_bins()
-            const noexcept
+        [[nodiscard]] const std::vector<std::vector<std::vector<apsi::util::felt_t>>> &
+        get_label_bins() const noexcept
         {
             return label_bins_;
         }
@@ -407,13 +408,13 @@ namespace apsi::sender {
         /**
         Returns whether this BinBundle is empty.
         */
-        bool empty() const;
+        [[nodiscard]] bool empty() const;
 
         /**
         Indicates whether the BinBundle has been stripped of all information not needed for
         serving a query.
         */
-        bool is_stripped() const
+        [[nodiscard]] bool is_stripped() const
         {
             return stripped_;
         }

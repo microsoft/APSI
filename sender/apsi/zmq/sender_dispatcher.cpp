@@ -35,7 +35,7 @@ namespace apsi {
 
             // If SenderDB is not stripped, the OPRF key it holds must be equal to the provided
             // oprf_key
-            if (!sender_db_->is_stripped() && oprf_key_ != sender_db->get_oprf_key()) {
+            if (!sender_db_->is_stripped() && oprf_key_ != sender_db_->get_oprf_key()) {
                 APSI_LOG_ERROR(
                     "Failed to create ZMQSenderDispatcher: SenderDB OPRF key differs "
                     "from the given OPRF key");
@@ -73,8 +73,8 @@ namespace apsi {
             // Run until stopped
             bool logged_waiting = false;
             while (!stop) {
-                unique_ptr<ZMQSenderOperation> sop;
-                if (!(sop = chl.receive_network_operation(seal_context))) {
+                unique_ptr<ZMQSenderOperation> sop = chl.receive_network_operation(seal_context);
+                if (!sop) {
                     if (!logged_waiting) {
                         // We want to log 'Waiting' only once, even if we have to wait
                         // for several sleeps. And only once after processing a request as well.

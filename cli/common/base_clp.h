@@ -11,6 +11,9 @@
 #ifdef _MSC_VER
 #pragma warning(push, 0)
 #endif
+// TCLAP 1.2.5's CmdLine.h pulls in HelpVisitor.h (which references ExitException) before any
+// header that defines it; include ArgException.h first so the reference resolves under libc++.
+#include "tclap/ArgException.h"
 #include "tclap/CmdLine.h"
 #ifdef _MSC_VER
 #pragma warning(pop)
@@ -34,15 +37,14 @@ public:
         log_level_arg_ = std::make_unique<TCLAP::ValueArg<std::string>>(
             "l",
             "logLevel",
-            "One of \"trace\", \"debug\", \"info\" (default), \"warning\", \"error\", \"suppress\"",
+            R"(One of "trace", "debug", "info" (default), "warning", "error", "suppress")",
             false,
             "info",
             log_level_constraint_.get(),
             *this);
     }
 
-    virtual ~BaseCLP()
-    {}
+    ~BaseCLP() override = default;
 
     /**
     Add additional arguments to the Command Line Processor.
@@ -105,32 +107,32 @@ public:
         return true;
     }
 
-    std::size_t threads() const
+    [[nodiscard]] std::size_t threads() const
     {
         return threads_;
     }
 
-    const std::string &log_level() const
+    [[nodiscard]] const std::string &log_level() const
     {
         return log_level_;
     }
 
-    const std::string &log_file() const
+    [[nodiscard]] const std::string &log_file() const
     {
         return log_file_;
     }
 
-    bool silent() const
+    [[nodiscard]] bool silent() const
     {
         return silent_;
     }
 
 private:
     // Parameters from command line
-    std::size_t threads_;
+    std::size_t threads_{};
     std::string log_level_;
     std::string log_file_;
-    bool silent_;
+    bool silent_{};
 
     // Parameters with constraints
     std::unique_ptr<TCLAP::ValueArg<std::string>> log_level_arg_;

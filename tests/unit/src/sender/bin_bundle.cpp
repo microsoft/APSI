@@ -131,7 +131,7 @@ namespace APSITests {
 
     TEST(BinBundleTests, BatchedPlaintextPolynCreate)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             CryptoContext context(*params);
             context.set_evaluator();
 
@@ -159,7 +159,7 @@ namespace APSITests {
 
     TEST(BinBundleTests, BatchedPlaintextPolynEval)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             CryptoContext context(*params);
             context.set_evaluator();
 
@@ -172,7 +172,7 @@ namespace APSITests {
             ASSERT_TRUE(bpp);
 
             KeyGenerator keygen(*context.seal_context());
-            auto sk = keygen.secret_key();
+            const auto &sk = keygen.secret_key();
             context.set_secret(sk);
 
             Ciphertext zeros_ct;
@@ -219,7 +219,7 @@ namespace APSITests {
 
     TEST(BinBundleTests, BinBundleUnlabeledCreate)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             CryptoContext context(*params);
 
             // No evaluator set in context
@@ -238,7 +238,7 @@ namespace APSITests {
             ASSERT_THROW(bb.get_cache(), logic_error);
 
             bb.regen_cache();
-            auto &cache = bb.get_cache();
+            const auto &cache = bb.get_cache();
 
             // The matching polynomial is set to a single constant zero polynomial since we haven't
             // inserted anything
@@ -257,7 +257,7 @@ namespace APSITests {
 
     TEST(BinBundleTests, BinBundleLabeledCreate)
     {
-        auto test_fun = [&](shared_ptr<PSIParams> params, size_t label_size) {
+        auto test_fun = [&](const shared_ptr<PSIParams> &params, size_t label_size) {
             CryptoContext context(*params);
 
             // No evaluator set in context
@@ -276,17 +276,17 @@ namespace APSITests {
             ASSERT_THROW(bb.get_cache(), logic_error);
 
             bb.regen_cache();
-            auto &cache = bb.get_cache();
+            const auto &cache = bb.get_cache();
 
             ASSERT_TRUE(cache.batched_matching_polyn);
             ASSERT_EQ(label_size, cache.batched_interp_polyns.size());
 
-            for (auto &bip : cache.batched_interp_polyns) {
+            for (const auto &bip : cache.batched_interp_polyns) {
                 // Nothing has been inserted yet; we have a constant interpolation polynomial
                 ASSERT_EQ(1, bip.batched_coeffs.size());
             }
 
-            for (auto &fip : cache.felt_interp_polyns) {
+            for (const auto &fip : cache.felt_interp_polyns) {
                 // We have one (empty) vector allocated per bin
                 ASSERT_EQ(params->bins_per_bundle(), fip.size());
             }
@@ -303,7 +303,7 @@ namespace APSITests {
 
     TEST(BinBundleTests, BinBundleUnlabeledMultiInsert)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             CryptoContext context(*params);
             context.set_evaluator();
 
@@ -408,7 +408,7 @@ namespace APSITests {
 
     TEST(BinBundleTests, BinBundleLabeledMultiInsert)
     {
-        auto test_fun = [&](shared_ptr<PSIParams> params, size_t label_size) {
+        auto test_fun = [&](const shared_ptr<PSIParams> &params, size_t label_size) {
             CryptoContext context(*params);
             context.set_evaluator();
 
@@ -430,22 +430,22 @@ namespace APSITests {
             ASSERT_TRUE(labels.empty());
 
             // Attempt to insert with no label
-            values.push_back(make_pair(1, vector<felt_t>{}));
+            values.emplace_back(1, vector<felt_t>{});
             ASSERT_THROW(res = bb.multi_insert_dry_run(values, 0), invalid_argument);
             values.pop_back();
 
             // Attempt to insert wrong size label
-            values.push_back(make_pair(1, create_label(label_size + 1, 1)));
+            values.emplace_back(1, create_label(label_size + 1, 1));
             ASSERT_THROW(res = bb.multi_insert_dry_run(values, 0), invalid_argument);
             values.pop_back();
 
-            values.push_back(make_pair(1, create_label(label_size, 1)));
+            values.emplace_back(1, create_label(label_size, 1));
             res = bb.multi_insert_dry_run(values, 0);
             ASSERT_EQ(1 /* largest bin size after insert */, res);
             ASSERT_FALSE(bb.cache_invalid());
             ASSERT_TRUE(bb.empty());
 
-            values.push_back(make_pair(2, create_label(label_size, 2)));
+            values.emplace_back(2, create_label(label_size, 2));
             res = bb.multi_insert_dry_run(values, 0);
             ASSERT_EQ(1 /* largest bin size after insert */, res);
             ASSERT_FALSE(bb.cache_invalid());
@@ -465,7 +465,7 @@ namespace APSITests {
 
             // Clear the values vector
             values.clear();
-            values.push_back(make_pair(1, create_label(label_size, 1)));
+            values.emplace_back(1, create_label(label_size, 1));
 
             // Now insert for real
             res = bb.multi_insert_for_real(values, 0);
@@ -488,7 +488,7 @@ namespace APSITests {
             ASSERT_EQ(0, labels.size());
 
             // Insert at index 1 so that we don't actually increase the max size
-            values.push_back(make_pair(1, create_label(label_size, 1)));
+            values.emplace_back(1, create_label(label_size, 1));
             res = bb.multi_insert_for_real(values, 1);
             ASSERT_EQ(1 /* largest bin size after insert */, res);
             ASSERT_TRUE(bb.cache_invalid());
@@ -517,8 +517,8 @@ namespace APSITests {
             values.clear();
 
             // Use a repeating label; there is no problem since the item value is different
-            values.push_back(make_pair(2, create_label(label_size, 7)));
-            values.push_back(make_pair(3, create_label(label_size, 8)));
+            values.emplace_back(2, create_label(label_size, 7));
+            values.emplace_back(3, create_label(label_size, 8));
             res = bb.multi_insert_for_real(values, 1);
             ASSERT_EQ(2 /* largest bin size after insert */, res);
             ASSERT_TRUE(bb.cache_invalid());
@@ -566,7 +566,7 @@ namespace APSITests {
 
     TEST(BinBundleTests, BinBundleTryMultiOverwrite)
     {
-        auto test_fun = [&](shared_ptr<PSIParams> params, size_t label_size) {
+        auto test_fun = [&](const shared_ptr<PSIParams> &params, size_t label_size) {
             CryptoContext context(*params);
             context.set_evaluator();
 
@@ -698,7 +698,7 @@ namespace APSITests {
 
     TEST(BinBundleTests, BinBundleTryMultiRemove)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             CryptoContext context(*params);
             context.set_evaluator();
 
@@ -755,7 +755,7 @@ namespace APSITests {
 
     TEST(BinBundleTests, SaveLoadUnlabeled)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             stringstream ss;
 
             CryptoContext context(*params);
@@ -842,7 +842,7 @@ namespace APSITests {
 
     TEST(BinBundleTests, SaveLoadLabeled)
     {
-        auto test_fun = [&](shared_ptr<PSIParams> params, size_t label_size) {
+        auto test_fun = [&](const shared_ptr<PSIParams> &params, size_t label_size) {
             stringstream ss;
 
             CryptoContext context(*params);
@@ -957,7 +957,7 @@ namespace APSITests {
 
     TEST(BinBundleTests, StripUnlabeled)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             CryptoContext context(*params);
             context.set_evaluator();
 
@@ -1049,7 +1049,7 @@ namespace APSITests {
 
     TEST(BinBundleTests, StripLabeled)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             CryptoContext context(*params);
             context.set_evaluator();
 

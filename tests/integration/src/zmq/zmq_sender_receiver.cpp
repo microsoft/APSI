@@ -36,27 +36,28 @@ namespace APSITests {
         {
             // Count matches
             size_t match_count = accumulate(
-                query_result.cbegin(), query_result.cend(), size_t(0), [](auto sum, auto &curr) {
-                    return sum + curr.found;
-                });
+                query_result.cbegin(),
+                query_result.cend(),
+                static_cast<size_t>(0),
+                [](auto sum, auto &curr) { return sum + curr.found; });
 
             // Check that intersection size is correct
             if (int_items.size() != match_count) {
-                cerr << "intersection size is not correct" << endl;
+                cerr << "intersection size is not correct" << '\n';
                 return false;
             }
 
             // Check that every intersection item was actually found
-            for (auto &item : int_items) {
+            for (const auto &item : int_items) {
                 auto where = find(query_vec.begin(), query_vec.end(), item);
                 if (query_vec.end() == where) {
-                    cerr << "Could not find intersection item" << endl;
+                    cerr << "Could not find intersection item" << '\n';
                     return false;
                 }
 
                 size_t idx = static_cast<size_t>(distance(query_vec.begin(), where));
                 if (!query_result[idx].found) {
-                    cerr << "Query result should be found" << endl;
+                    cerr << "Query result should be found" << '\n';
                     return false;
                 }
             }
@@ -73,17 +74,17 @@ namespace APSITests {
             verify_unlabeled_results(query_result, query_vec, int_items);
 
             // Verify that all labels were received for items that were found
-            for (auto &result : query_result) {
+            for (const auto &result : query_result) {
                 if (result.found) {
                     if (!result.label) {
-                        cerr << "Label does not contain data" << endl;
+                        cerr << "Label does not contain data" << '\n';
                         return false;
                     }
                 }
             }
 
             // Check that the labels are correct for items in the intersection
-            for (auto &item : int_items) {
+            for (const auto &item : int_items) {
                 auto where = find(query_vec.begin(), query_vec.end(), item);
                 size_t idx = static_cast<size_t>(distance(query_vec.begin(), where));
 
@@ -92,13 +93,13 @@ namespace APSITests {
                         return item == item_label.first;
                     });
                 if (all_item_labels.end() == reference_label) {
-                    cerr << "Reference label was not found" << endl;
+                    cerr << "Reference label was not found" << '\n';
                     return false;
                 }
 
                 size_t label_byte_count = reference_label->second.size();
                 if (label_byte_count != query_result[idx].label.value().size()) {
-                    cerr << "Label byte count is not correct" << endl;
+                    cerr << "Label byte count is not correct" << '\n';
                     return false;
                 }
 
@@ -106,7 +107,7 @@ namespace APSITests {
                         reference_label->second.begin(),
                         reference_label->second.end(),
                         query_result[idx].label.value().begin())) {
-                    cerr << "Label does not match reference label" << endl;
+                    cerr << "Label does not match reference label" << '\n';
                     return false;
                 }
             }
@@ -116,7 +117,7 @@ namespace APSITests {
 
         void RunUnlabeledTest(
             size_t sender_size,
-            vector<pair<size_t, size_t>> client_total_and_int_sizes,
+            const vector<pair<size_t, size_t>> &client_total_and_int_sizes,
             const PSIParams &params,
             size_t num_clients,
             size_t num_threads)
@@ -128,8 +129,9 @@ namespace APSITests {
             ThreadPoolMgr::SetPhysThreadCount(num_threads * 2);
 
             vector<Item> sender_items;
+            sender_items.reserve(sender_size);
             for (size_t i = 0; i < sender_size; i++) {
-                sender_items.push_back({ i + 1, i + 1 });
+                sender_items.emplace_back(i + 1, i + 1);
             }
 
             auto sender_db = make_shared<SenderDB>(params, 0);
@@ -165,7 +167,7 @@ namespace APSITests {
                         recvs_items[idx].push_back(item);
                     }
                     for (size_t i = int_size; i < client_size; i++) {
-                        recvs_items[idx].push_back({ i + 1, ~(i + 1) });
+                        recvs_items[idx].emplace_back(i + 1, ~(i + 1));
                     }
                 }
 
@@ -200,7 +202,7 @@ namespace APSITests {
 
         void RunLabeledTest(
             size_t sender_size,
-            vector<pair<size_t, size_t>> client_total_and_int_sizes,
+            const vector<pair<size_t, size_t>> &client_total_and_int_sizes,
             const PSIParams &params,
             size_t num_clients,
             size_t num_threads)
@@ -212,10 +214,11 @@ namespace APSITests {
             ThreadPoolMgr::SetPhysThreadCount(num_threads * 2);
 
             vector<pair<Item, Label>> sender_items;
+            sender_items.reserve(sender_size);
             for (size_t i = 0; i < sender_size; i++) {
-                sender_items.push_back(make_pair(
+                sender_items.emplace_back(
                     Item(i + 1, i + 1),
-                    create_label(seal::util::safe_cast<unsigned char>((i + 1) & 0xFF), 10)));
+                    create_label(seal::util::safe_cast<unsigned char>((i + 1) & 0xFF), 10));
             }
 
             auto sender_db = make_shared<SenderDB>(params, 10, 4, true);
@@ -251,7 +254,7 @@ namespace APSITests {
                         recv_items[idx].push_back(item);
                     }
                     for (size_t i = int_size; i < client_size; i++) {
-                        recv_items[idx].push_back({ i + 1, ~(i + 1) });
+                        recv_items[idx].emplace_back(i + 1, ~(i + 1));
                     }
                 }
 

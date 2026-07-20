@@ -30,7 +30,7 @@ namespace apsi::sender::util {
         /**
         Get the raw contents of the table
         */
-        const std::vector<std::uint64_t> &get_raw_table_data() const
+        [[nodiscard]] const std::vector<std::uint64_t> &get_raw_table_data() const
         {
             return table_;
         }
@@ -38,7 +38,7 @@ namespace apsi::sender::util {
         /**
         Read the tag at the given bucket and tag index within the bucket
         */
-        std::uint64_t read_tag(std::size_t bucket, std::size_t tag_idx) const;
+        [[nodiscard]] std::uint64_t read_tag(std::size_t bucket, std::size_t tag_idx) const;
 
         /**
         Write a tag at the given bucket and tag index within the bucket
@@ -59,7 +59,7 @@ namespace apsi::sender::util {
         /**
         Get the number of buckets
         */
-        std::size_t get_num_buckets() const
+        [[nodiscard]] std::size_t get_num_buckets() const
         {
             return num_buckets_;
         }
@@ -67,7 +67,7 @@ namespace apsi::sender::util {
         /**
         Get the number of bits to use per tag
         */
-        std::size_t get_bits_per_tag() const
+        [[nodiscard]] std::size_t get_bits_per_tag() const
         {
             return bits_per_tag_;
         }
@@ -75,12 +75,13 @@ namespace apsi::sender::util {
         /**
         Find a tag in the given bucket
         */
-        bool find_tag_in_bucket(std::size_t bucket, std::uint64_t tag) const;
+        [[nodiscard]] bool find_tag_in_bucket(std::size_t bucket, std::uint64_t tag) const;
 
         /**
         Find a tag in the given buckets
         */
-        bool find_tag_in_buckets(std::size_t bucket1, std::size_t bucket2, std::uint64_t tag) const;
+        [[nodiscard]] bool find_tag_in_buckets(
+            std::size_t bucket1, std::size_t bucket2, std::uint64_t tag) const;
 
     private:
         /**

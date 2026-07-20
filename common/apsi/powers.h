@@ -69,7 +69,7 @@ namespace apsi {
             /**
             Returns whether this is a source node.
             */
-            bool is_source() const
+            [[nodiscard]] bool is_source() const
             {
                 return !parents.first && !parents.second;
             }
@@ -101,7 +101,7 @@ namespace apsi {
         /**
         Returns whether the PowersDag was successfully configured.
         */
-        bool is_configured() const
+        [[nodiscard]] bool is_configured() const
         {
             return configured_;
         }
@@ -110,30 +110,30 @@ namespace apsi {
         Returns the target powers that this PowersDag computes. If the PowersDag is not
         configured, this function throws an exception.
         */
-        std::set<std::uint32_t> target_powers() const;
+        [[nodiscard]] std::set<std::uint32_t> target_powers() const;
 
         /**
         Returns the maximal depth of the computation represented by the PowersDag. If the PowersDag
         is not configured, this function throws an exception.
         */
-        std::uint32_t depth() const;
+        [[nodiscard]] std::uint32_t depth() const;
 
         /**
         Returns the number of source nodes required by the PowersDag. If the PowersDag is not
         configured, this function throws an exception.
         */
-        std::uint32_t source_count() const;
+        [[nodiscard]] std::uint32_t source_count() const;
 
         /**
         Returns a set of source nodes for this PowersDag. If the PowersDag is not configured, this
         function throws an exception.
         */
-        std::vector<PowersNode> source_nodes() const;
+        [[nodiscard]] std::vector<PowersNode> source_nodes() const;
 
         /**
         Returns this PowersDag in the DOT format as a string.
         */
-        std::string to_dot() const;
+        [[nodiscard]] std::string to_dot() const;
 
         /**
         Applies a function in a topological order to each node in the PowersDag.
@@ -171,8 +171,7 @@ namespace apsi {
             enum class NodeState { Uncomputed = 0, Computing = 1, Computed = 2 };
 
             // Initialize all nodes as uncomputed
-            std::unique_ptr<std::atomic<NodeState>[]> node_states(
-                new std::atomic<NodeState>[target_powers_count]);
+            std::vector<std::atomic<NodeState>> node_states(target_powers_count);
             for (std::size_t power_idx = 0; power_idx < target_powers_count; power_idx++) {
                 node_states[power_idx].store(NodeState::Uncomputed);
             }
@@ -183,8 +182,8 @@ namespace apsi {
                 while (true) {
                     // Check if everything is done
                     bool done = std::all_of(
-                        node_states.get(),
-                        node_states.get() + target_powers_count,
+                        node_states.data(),
+                        node_states.data() + target_powers_count,
                         [](auto &node_state) { return node_state == NodeState::Computed; });
                     if (done) {
                         return;
@@ -291,8 +290,8 @@ namespace apsi {
 
         std::set<std::uint32_t> target_powers_;
 
-        std::uint32_t depth_;
+        std::uint32_t depth_{};
 
-        std::uint32_t source_count_;
+        std::uint32_t source_count_{};
     };
 } // namespace apsi

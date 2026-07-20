@@ -3,6 +3,7 @@
 
 // STD
 #include <algorithm>
+#include <cstddef>
 #include <cstring>
 #include <future>
 #include <iostream>
@@ -57,7 +58,7 @@ namespace apsi {
             return item_idx->second;
         }
 
-        Receiver::Receiver(PSIParams params) : params_(std::move(params))
+        Receiver::Receiver(const PSIParams &params) : params_(params)
         {
             initialize();
         }
@@ -307,11 +308,12 @@ namespace apsi {
 
                     // First, find the items for this bundle index
                     gsl::span<const item_type> bundle_items(
-                        cuckoo.table().data() + bundle_idx * params_.items_per_bundle(),
+                        cuckoo.table().data() +
+                            (static_cast<size_t>(bundle_idx * params_.items_per_bundle())),
                         params_.items_per_bundle());
 
                     vector<uint64_t> alg_items;
-                    for (auto &item : bundle_items) {
+                    for (const auto &item : bundle_items) {
                         // Now set up a BitstringView to this item
                         gsl::span<const unsigned char> item_bytes(
                             reinterpret_cast<const unsigned char *>(item.data()), sizeof(item));
@@ -505,79 +507,83 @@ namespace apsi {
 
             // Iterate over the decoded data to find consecutive zeros indicating a match
             StrideIter<const uint64_t *> plain_rp_iter(plain_rp.psi_result.data(), felts_per_item);
-            seal_for_each_n(iter(plain_rp_iter, size_t(0)), items_per_bundle, [&](auto &&I) {
-                // Find felts_per_item consecutive zeros
-                bool match = has_n_zeros(get<0>(I).ptr(), felts_per_item);
-                if (!match) {
-                    return;
-                }
-
-                // Compute the cuckoo table index for this item. Then find the corresponding index
-                // in the input items vector so we know where to place the result.
-                size_t table_idx = add_safe(get<1>(I), bundle_start);
-                auto item_idx = itt.find_item_idx(table_idx);
-
-                // If this table_idx doesn't match any item_idx, ignore the result no matter what it
-                // is
-                if (item_idx == itt.item_count()) {
-                    return;
-                }
-
-                // If a positive MatchRecord is already present, then something is seriously wrong
-                if (mrs[item_idx]) {
-                    APSI_LOG_ERROR(
-                        "The table index -> item index translation table indicated a "
-                        "location that was already filled by another match from this "
-                        "result package; the translation table (query) has probably "
-                        "been corrupted");
-
-                    throw runtime_error(
-                        "found a duplicate positive match; something is seriously wrong");
-                }
-
-                APSI_LOG_DEBUG(
-                    "Match found for items[" << item_idx << "] at cuckoo table index "
-                                             << table_idx);
-
-                // Create a new MatchRecord
-                MatchRecord mr;
-                mr.found = true;
-
-                // Next, extract the label results, if any
-                if (label_byte_count) {
-                    APSI_LOG_DEBUG(
-                        "Found " << plain_rp.label_result.size() << " label parts for items["
-                                 << item_idx << "]; expecting " << label_byte_count
-                                 << "-byte label");
-
-                    // Collect the entire label into this vector
-                    AlgLabel alg_label;
-
-                    size_t label_offset = mul_safe(get<1>(I), felts_per_item);
-                    for (auto &label_parts : plain_rp.label_result) {
-                        gsl::span<felt_t> label_part(
-                            label_parts.data() + label_offset, felts_per_item);
-                        copy(label_part.begin(), label_part.end(), back_inserter(alg_label));
+            seal_for_each_n(
+                iter(plain_rp_iter, static_cast<size_t>(0)), items_per_bundle, [&](auto &&I) {
+                    // Find felts_per_item consecutive zeros
+                    bool match = has_n_zeros(get<0>(I).ptr(), felts_per_item);
+                    if (!match) {
+                        return;
                     }
 
-                    // Create the label
-                    EncryptedLabel encrypted_label = dealgebraize_label(
-                        alg_label, received_label_bit_count, params_.seal_params().plain_modulus());
+                    // Compute the cuckoo table index for this item. Then find the corresponding
+                    // index in the input items vector so we know where to place the result.
+                    size_t table_idx = add_safe(get<1>(I), bundle_start);
+                    auto item_idx = itt.find_item_idx(table_idx);
 
-                    // Resize down to the effective byte count
-                    encrypted_label.resize(effective_label_byte_count);
+                    // If this table_idx doesn't match any item_idx, ignore the result no matter
+                    // what it is
+                    if (item_idx == itt.item_count()) {
+                        return;
+                    }
 
-                    // Decrypt the label
-                    Label label =
-                        decrypt_label(encrypted_label, label_keys[item_idx], nonce_byte_count);
+                    // If a positive MatchRecord is already present, then something is seriously
+                    // wrong
+                    if (mrs[item_idx]) {
+                        APSI_LOG_ERROR(
+                            "The table index -> item index translation table indicated a "
+                            "location that was already filled by another match from this "
+                            "result package; the translation table (query) has probably "
+                            "been corrupted");
 
-                    // Set the label
-                    mr.label.set(std::move(label));
-                }
+                        throw runtime_error(
+                            "found a duplicate positive match; something is seriously wrong");
+                    }
 
-                // We are done with the MatchRecord, so add it to the mrs vector
-                mrs[item_idx] = std::move(mr);
-            });
+                    APSI_LOG_DEBUG(
+                        "Match found for items[" << item_idx << "] at cuckoo table index "
+                                                 << table_idx);
+
+                    // Create a new MatchRecord
+                    MatchRecord mr;
+                    mr.found = true;
+
+                    // Next, extract the label results, if any
+                    if (label_byte_count) {
+                        APSI_LOG_DEBUG(
+                            "Found " << plain_rp.label_result.size() << " label parts for items["
+                                     << item_idx << "]; expecting " << label_byte_count
+                                     << "-byte label");
+
+                        // Collect the entire label into this vector
+                        AlgLabel alg_label;
+
+                        size_t label_offset = mul_safe(get<1>(I), felts_per_item);
+                        for (auto &label_parts : plain_rp.label_result) {
+                            gsl::span<felt_t> label_part(
+                                label_parts.data() + label_offset, felts_per_item);
+                            copy(label_part.begin(), label_part.end(), back_inserter(alg_label));
+                        }
+
+                        // Create the label
+                        EncryptedLabel encrypted_label = dealgebraize_label(
+                            alg_label,
+                            received_label_bit_count,
+                            params_.seal_params().plain_modulus());
+
+                        // Resize down to the effective byte count
+                        encrypted_label.resize(effective_label_byte_count);
+
+                        // Decrypt the label
+                        Label label =
+                            decrypt_label(encrypted_label, label_keys[item_idx], nonce_byte_count);
+
+                        // Set the label
+                        mr.label.set(std::move(label));
+                    }
+
+                    // We are done with the MatchRecord, so add it to the mrs vector
+                    mrs[item_idx] = std::move(mr);
+                });
 
             return mrs;
         }
@@ -592,7 +598,7 @@ namespace apsi {
 
             vector<MatchRecord> mrs(itt.item_count());
 
-            for (auto &result_part : result) {
+            for (const auto &result_part : result) {
                 auto this_mrs = process_result_part(label_keys, itt, result_part);
                 if (this_mrs.size() != mrs.size()) {
                     // Something went wrong with process_result; error is already logged
@@ -600,23 +606,24 @@ namespace apsi {
                 }
 
                 // Merge the new MatchRecords with mrs
-                seal_for_each_n(iter(mrs, this_mrs, size_t(0)), mrs.size(), [](auto &&I) {
-                    if (get<1>(I) && !get<0>(I)) {
-                        // This match needs to be merged into mrs
-                        get<0>(I) = std::move(get<1>(I));
-                    } else if (get<1>(I) && get<0>(I)) {
-                        // If a positive MatchRecord is already present, then something is seriously
-                        // wrong
-                        APSI_LOG_ERROR(
-                            "Found a match for items["
-                            << get<2>(I)
-                            << "] but an existing match for this "
-                               "location was already found before from a different result part");
+                seal_for_each_n(
+                    iter(mrs, this_mrs, static_cast<size_t>(0)), mrs.size(), [](auto &&I) {
+                        if (get<1>(I) && !get<0>(I)) {
+                            // This match needs to be merged into mrs
+                            get<0>(I) = std::move(get<1>(I));
+                        } else if (get<1>(I) && get<0>(I)) {
+                            // If a positive MatchRecord is already present, then something is
+                            // seriously wrong
+                            APSI_LOG_ERROR(
+                                "Found a match for items[" << get<2>(I)
+                                                           << "] but an existing match for this "
+                                                              "location was already found before "
+                                                              "from a different result part");
 
-                        throw runtime_error(
-                            "found a duplicate positive match; something is seriously wrong");
-                    }
-                });
+                            throw runtime_error(
+                                "found a duplicate positive match; something is seriously wrong");
+                        }
+                    });
             }
 
             APSI_LOG_INFO(
@@ -660,31 +667,34 @@ namespace apsi {
 
                 // Wait for a valid ResultPart
                 ResultPart result_part;
-                while (!(result_part = chl.receive_result(seal_context)))
+                while (!(result_part = chl.receive_result(seal_context))) {
                     ;
+                }
 
                 // Process the ResultPart to get the corresponding vector of MatchRecords
                 auto this_mrs = process_result_part(label_keys, itt, result_part);
 
                 // Merge the new MatchRecords with mrs
-                seal_for_each_n(iter(mrs, this_mrs, size_t(0)), mrs.size(), [](auto &&I) {
-                    if (get<1>(I) && !get<0>(I)) {
-                        // This match needs to be merged into mrs
-                        get<0>(I) = std::move(get<1>(I));
-                    } else if (get<1>(I) && get<0>(I)) {
-                        // If a positive MatchRecord is already present, then something is seriously
-                        // wrong
-                        APSI_LOG_ERROR(
-                            "Result worker [" << this_thread::get_id()
-                                              << "]: found a match for items[" << get<2>(I)
-                                              << "] but an existing match for this location was "
-                                                 "already found before from a different result "
-                                                 "part");
+                seal_for_each_n(
+                    iter(mrs, this_mrs, static_cast<size_t>(0)), mrs.size(), [](auto &&I) {
+                        if (get<1>(I) && !get<0>(I)) {
+                            // This match needs to be merged into mrs
+                            get<0>(I) = std::move(get<1>(I));
+                        } else if (get<1>(I) && get<0>(I)) {
+                            // If a positive MatchRecord is already present, then something is
+                            // seriously wrong
+                            APSI_LOG_ERROR(
+                                "Result worker ["
+                                << this_thread::get_id() << "]: found a match for items["
+                                << get<2>(I)
+                                << "] but an existing match for this location was "
+                                   "already found before from a different result "
+                                   "part");
 
-                        throw runtime_error(
-                            "found a duplicate positive match; something is seriously wrong");
-                    }
-                });
+                            throw runtime_error(
+                                "found a duplicate positive match; something is seriously wrong");
+                        }
+                    });
             }
         }
     } // namespace receiver

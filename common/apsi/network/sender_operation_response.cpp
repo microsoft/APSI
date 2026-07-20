@@ -47,7 +47,7 @@ namespace apsi::network {
 
         // Set up a vector to hold the parameter data
         auto params_data = fbs_builder.CreateVector(
-            reinterpret_cast<const uint8_t *>(&params_str[0]), params_str.size());
+            reinterpret_cast<const uint8_t *>(params_str.data()), params_str.size());
 
         auto resp = fbs::CreateParmsResponse(fbs_builder, params_data);
 
@@ -78,7 +78,7 @@ namespace apsi::network {
             throw runtime_error("failed to load SenderOperationResponse: invalid buffer");
         }
 
-        auto sop_response = fbs::GetSizePrefixedSenderOperationResponse(in_data.data());
+        const auto *sop_response = fbs::GetSizePrefixedSenderOperationResponse(in_data.data());
 
         // Need to check that the operation is of the right type
         if (sop_response->response_type() != fbs::Response_ParmsResponse) {
@@ -132,7 +132,7 @@ namespace apsi::network {
             throw runtime_error("failed to load SenderOperationResponse: invalid buffer");
         }
 
-        auto sop_response = fbs::GetSizePrefixedSenderOperationResponse(in_data.data());
+        const auto *sop_response = fbs::GetSizePrefixedSenderOperationResponse(in_data.data());
 
         // Need to check that the operation is of the right type
         if (sop_response->response_type() != fbs::Response_OPRFResponse) {
@@ -182,7 +182,7 @@ namespace apsi::network {
             throw runtime_error("failed to load SenderOperationResponse: invalid buffer");
         }
 
-        auto sop_response = fbs::GetSizePrefixedSenderOperationResponse(in_data.data());
+        const auto *sop_response = fbs::GetSizePrefixedSenderOperationResponse(in_data.data());
 
         // Need to check that the operation is of the right type
         if (sop_response->response_type() != fbs::Response_QueryResponse) {

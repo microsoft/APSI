@@ -44,6 +44,7 @@ namespace apsi {
             vector<LocFunc> hash_functions(const PSIParams &params)
             {
                 vector<LocFunc> result;
+                result.reserve(params.table_params().hash_func_count);
                 for (uint32_t i = 0; i < params.table_params().hash_func_count; i++) {
                     result.emplace_back(params.table_params().table_size, make_item(i, 0));
                 }
@@ -73,7 +74,7 @@ namespace apsi {
             */
             size_t compute_label_size(size_t label_byte_count, const PSIParams &params)
             {
-                return (label_byte_count * 8 + params.item_bit_count() - 1) /
+                return ((label_byte_count * 8) + params.item_bit_count() - 1) /
                        params.item_bit_count();
             }
 
@@ -135,7 +136,7 @@ namespace apsi {
                         size_t bin_idx = location * bins_per_item;
 
                         // Store the data along with its index
-                        data_with_indices.push_back(make_pair(alg_item_label, bin_idx));
+                        data_with_indices.emplace_back(alg_item_label, bin_idx);
                     }
                 }
 
@@ -184,7 +185,7 @@ namespace apsi {
                         size_t bin_idx = location * bins_per_item;
 
                         // Store the data along with its index
-                        data_with_indices.emplace_back(make_pair(alg_item, bin_idx));
+                        data_with_indices.emplace_back(alg_item, bin_idx);
                     }
                 }
 
@@ -239,7 +240,8 @@ namespace apsi {
 
                     // Get the bundle index
                     size_t cuckoo_idx = data_with_idx.second;
-                    size_t bin_idx, bundle_idx;
+                    size_t bin_idx;
+                    size_t bundle_idx;
                     tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
 
                     // If the bundle_idx isn't in the prescribed range, don't try to insert this
@@ -351,7 +353,8 @@ namespace apsi {
                 set<size_t> bundle_indices_set;
                 for (auto &data_with_idx : data_with_indices) {
                     size_t cuckoo_idx = data_with_idx.second;
-                    size_t bin_idx, bundle_idx;
+                    size_t bin_idx;
+                    size_t bundle_idx;
                     tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
                     bundle_indices_set.insert(bundle_idx);
                 }
@@ -409,10 +412,11 @@ namespace apsi {
                 APSI_LOG_INFO("Remove worker [" << bundle_index << "]");
 
                 // Iteratively remove each item-label pair at the given cuckoo index
-                for (auto &data_with_idx : data_with_indices) {
+                for (const auto &data_with_idx : data_with_indices) {
                     // Get the bundle index
                     size_t cuckoo_idx = data_with_idx.second;
-                    size_t bin_idx, bundle_idx;
+                    size_t bin_idx;
+                    size_t bundle_idx;
                     tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
 
                     // If the bundle_idx isn't in the prescribed range, don't try to remove this
@@ -473,9 +477,10 @@ namespace apsi {
                 // should be roughly the same. Note that the contents of bundle_indices is always
                 // sorted (increasing order).
                 set<size_t> bundle_indices_set;
-                for (auto &data_with_idx : data_with_indices) {
+                for (const auto &data_with_idx : data_with_indices) {
                     size_t cuckoo_idx = data_with_idx.second;
-                    size_t bin_idx, bundle_idx;
+                    size_t bin_idx;
+                    size_t bundle_idx;
                     tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
                     bundle_indices_set.insert(bundle_idx);
                 }
@@ -517,6 +522,7 @@ namespace apsi {
                 vector<BinBundle> &bin_bundles)
             {
                 vector<reference_wrapper<const BinBundleCache>> result;
+                result.reserve(bin_bundles.size());
                 for (const auto &bundle : bin_bundles) {
                     result.emplace_back(cref(bundle.get_cache()));
                 }
@@ -526,7 +532,10 @@ namespace apsi {
         } // namespace
 
         SenderDB::SenderDB(
-            PSIParams params, size_t label_byte_count, size_t nonce_byte_count, bool compressed)
+            const PSIParams &params,
+            size_t label_byte_count,
+            size_t nonce_byte_count,
+            bool compressed)
             : params_(params), crypto_context_(params_), label_byte_count_(label_byte_count),
               nonce_byte_count_(label_byte_count_ ? nonce_byte_count : 0), item_count_(0),
               compressed_(compressed)
@@ -566,7 +575,7 @@ namespace apsi {
         }
 
         SenderDB::SenderDB(
-            PSIParams params,
+            const PSIParams &params,
             OPRFKey oprf_key,
             size_t label_byte_count,
             size_t nonce_byte_count,
@@ -577,25 +586,29 @@ namespace apsi {
             oprf_key_ = std::move(oprf_key);
         }
 
-        SenderDB::SenderDB(SenderDB &&source)
-            : params_(source.params_), crypto_context_(source.crypto_context_),
-              label_byte_count_(source.label_byte_count_),
+        // Acquiring the source's writer lock can in principle throw; a lock failure is
+        // unrecoverable, so terminating (rather than dropping noexcept) is acceptable here.
+        // NOLINTNEXTLINE(bugprone-exception-escape)
+        SenderDB::SenderDB(SenderDB &&source) noexcept
+            : hashed_items_(std::move(source.hashed_items_)), params_(source.params_),
+              crypto_context_(source.crypto_context_), label_byte_count_(source.label_byte_count_),
               nonce_byte_count_(source.nonce_byte_count_), item_count_(source.item_count_),
-              compressed_(source.compressed_), stripped_(source.stripped_)
+              compressed_(source.compressed_), stripped_(source.stripped_),
+              bin_bundles_(std::move(source.bin_bundles_)), oprf_key_(std::move(source.oprf_key_))
         {
             // Lock the source before moving stuff over
             auto lock = source.get_writer_lock();
 
-            hashed_items_ = std::move(source.hashed_items_);
-            bin_bundles_ = std::move(source.bin_bundles_);
-            oprf_key_ = std::move(source.oprf_key_);
             source.oprf_key_ = OPRFKey();
 
             // Reset the source data structures
             source.clear_internal();
         }
 
-        SenderDB &SenderDB::operator=(SenderDB &&source)
+        // Acquiring the writer lock can in principle throw; a lock failure is unrecoverable, so
+        // terminating (rather than dropping noexcept) is acceptable here.
+        // NOLINTNEXTLINE(bugprone-exception-escape)
+        SenderDB &SenderDB::operator=(SenderDB &&source) noexcept
         {
             // Do nothing if moving to self
             if (&source == this) {
@@ -642,9 +655,10 @@ namespace apsi {
 
             // Compute the total number of BinBundles
             return accumulate(
-                bin_bundles_.cbegin(), bin_bundles_.cend(), size_t(0), [&](auto &a, auto &b) {
-                    return a + b.size();
-                });
+                bin_bundles_.cbegin(),
+                bin_bundles_.cend(),
+                static_cast<size_t>(0),
+                [&](auto &a, auto &b) { return a + b.size(); });
         }
 
         double SenderDB::get_packing_rate() const
@@ -683,7 +697,7 @@ namespace apsi {
 
         void SenderDB::clear()
         {
-            if (hashed_items_.size()) {
+            if (!hashed_items_.empty()) {
                 APSI_LOG_INFO("Removing " << hashed_items_.size() << " items pairs from SenderDB");
             }
 
@@ -1019,11 +1033,12 @@ namespace apsi {
             // element representation as well as its cuckoo hash. We only read one of the locations
             // because the labels are the same in each location.
             AlgItem alg_item;
-            size_t cuckoo_idx;
+            size_t cuckoo_idx = 0;
             tie(alg_item, cuckoo_idx) = preprocess_unlabeled_data(hashed_item, params_)[0];
 
             // Now figure out where to look to get the label
-            size_t bin_idx, bundle_idx;
+            size_t bin_idx;
+            size_t bundle_idx;
             tie(bin_idx, bundle_idx) = unpack_cuckoo_idx(cuckoo_idx, bins_per_bundle);
 
             // Retrieve the algebraic labels from one of the BinBundles at this index
@@ -1075,7 +1090,7 @@ namespace apsi {
             flatbuffers::FlatBufferBuilder fbs_builder(1024);
 
             auto params = fbs_builder.CreateVector(
-                reinterpret_cast<const uint8_t *>(&params_str[0]), params_str.size());
+                reinterpret_cast<const uint8_t *>(params_str.data()), params_str.size());
             fbs::SenderDBInfo info(
                 safe_cast<uint32_t>(label_byte_count_),
                 safe_cast<uint32_t>(nonce_byte_count_),
@@ -1091,8 +1106,8 @@ namespace apsi {
                 for (const auto &it : get_hashed_items()) {
                     // Read out the two 64-bit halves with memcpy to avoid strict-aliasing UB.
                     const auto &v = it.value();
-                    uint64_t lw;
-                    uint64_t hw;
+                    uint64_t lw = 0;
+                    uint64_t hw = 0;
                     std::memcpy(&lw, v.data(), sizeof(lw));
                     std::memcpy(&hw, v.data() + sizeof(lw), sizeof(hw));
                     ret.emplace_back(lw, hw);
@@ -1119,7 +1134,7 @@ namespace apsi {
             // Finally write the BinBundles
             size_t bin_bundle_data_size = 0;
             for (size_t bundle_idx = 0; bundle_idx < bin_bundles_.size(); bundle_idx++) {
-                for (auto &bb : bin_bundles_[bundle_idx]) {
+                for (const auto &bb : bin_bundles_[bundle_idx]) {
                     auto size = bb.save(out, static_cast<uint32_t>(bundle_idx));
                     APSI_LOG_DEBUG(
                         "Saved BinBundle at bundle index " << bundle_idx << " (" << size
@@ -1153,7 +1168,7 @@ namespace apsi {
                 throw runtime_error("failed to load SenderDB");
             }
 
-            auto sdb = fbs::GetSizePrefixedSenderDB(in_data.data());
+            const auto *sdb = fbs::GetSizePrefixedSenderDB(in_data.data());
 
             // Load the PSIParams; this will automatically check version compatibility
             unique_ptr<PSIParams> params;
@@ -1244,7 +1259,7 @@ namespace apsi {
             // at most a small multiple of bundle_idx_count; cap at 64K * bundle_idx_count
             // which leaves enormous headroom over realistic configurations.
             uint64_t max_bin_bundle_count = mul_safe<uint64_t>(
-                static_cast<uint64_t>(params->bundle_idx_count()), uint64_t(65536));
+                static_cast<uint64_t>(params->bundle_idx_count()), static_cast<uint64_t>(65536));
             if (bin_bundle_count > max_bin_bundle_count) {
                 APSI_LOG_ERROR(
                     "The loaded SenderDB declares " << bin_bundle_count

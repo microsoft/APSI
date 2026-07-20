@@ -12,6 +12,9 @@
 #ifdef _MSC_VER
 #pragma warning(push, 0)
 #endif
+// TCLAP 1.2.5's CmdLine.h pulls in HelpVisitor.h (which references ExitException) before any
+// header that defines it; include ArgException.h first so the reference resolves under libc++.
+#include "tclap/ArgException.h"
 #include "tclap/CmdLine.h"
 #ifdef _MSC_VER
 #pragma warning(pop)
@@ -79,28 +82,28 @@ public:
         return true;
     }
 
-    std::uint32_t bound() const
+    [[nodiscard]] std::uint32_t bound() const
     {
         return bound_;
     }
 
-    std::uint32_t ps_low_degree() const
+    [[nodiscard]] std::uint32_t ps_low_degree() const
     {
         return ps_low_degree_;
     }
 
-    std::string dot_file() const
+    [[nodiscard]] std::string dot_file() const
     {
         return dot_file_;
     }
 
-    const std::vector<std::uint32_t> &sources() const
+    [[nodiscard]] const std::vector<std::uint32_t> &sources() const
     {
         return sources_;
     }
 
 private:
-    std::uint32_t bound_;
+    std::uint32_t bound_{};
 
     std::uint32_t ps_low_degree_ = 0;
 

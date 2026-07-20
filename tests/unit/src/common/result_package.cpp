@@ -102,8 +102,8 @@ namespace APSITests {
         // Add some label data as well
         rp.bundle_idx = 2;
         rp.psi_result.set(ser_ct);
-        rp.label_result.push_back(ser_ct);
-        rp.label_result.push_back(ser_ct);
+        rp.label_result.emplace_back(ser_ct);
+        rp.label_result.emplace_back(ser_ct);
         out_size = rp.save(ss);
         in_size = rp2.load(ss, context->seal_context());
         ASSERT_EQ(out_size, in_size);
@@ -149,8 +149,8 @@ namespace APSITests {
 
         // Add some label data as well
         rp.psi_result.set(ct);
-        rp.label_result.push_back(ct);
-        rp.label_result.push_back(ct);
+        rp.label_result.emplace_back(ct);
+        rp.label_result.emplace_back(ct);
 
         prp = rp.extract(*context);
 

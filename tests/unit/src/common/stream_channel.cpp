@@ -69,14 +69,7 @@ namespace APSITests {
         }
     } // namespace
 
-    class StreamChannelTests : public ::testing::Test {
-    protected:
-        StreamChannelTests()
-        {}
-
-        ~StreamChannelTests()
-        {}
-    };
+    class StreamChannelTests : public ::testing::Test {};
 
     TEST_F(StreamChannelTests, SendReceiveParms)
     {
@@ -174,8 +167,8 @@ namespace APSITests {
 
         auto sop_query = make_unique<SenderOperationQuery>();
         sop_query->relin_keys = *get_context()->relin_keys();
-        sop_query->data[0].push_back(get_context()->encryptor()->encrypt_zero_symmetric());
-        sop_query->data[123].push_back(get_context()->encryptor()->encrypt_zero_symmetric());
+        sop_query->data[0].emplace_back(get_context()->encryptor()->encrypt_zero_symmetric());
+        sop_query->data[123].emplace_back(get_context()->encryptor()->encrypt_zero_symmetric());
         unique_ptr<SenderOperation> sop = std::move(sop_query);
 
         // Send a query operation
@@ -226,7 +219,7 @@ namespace APSITests {
         rp->label_byte_count = 80;
         rp->nonce_byte_count = 4;
         rp->psi_result = query_ct123;
-        rp->label_result.push_back(query_ct123);
+        rp->label_result.emplace_back(query_ct123);
         svr.send(std::move(rp));
 
         // Receive two packages

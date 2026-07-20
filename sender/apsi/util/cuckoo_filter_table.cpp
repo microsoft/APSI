@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 // STD
+#include <random>
 #include <stdexcept>
 
 // APSI
@@ -17,20 +18,19 @@ namespace {
         size_t tag_start_idx;
         size_t tag_start_offset;
         size_t bits_first_word;
-        size_t bits_second_word;
+        size_t bits_second_word = 0;
 
         /**
         Compute the necessary indexes and bit positions to locate a tag position
         within an array of uint64_t
         */
         TagIndexInfo(size_t bits_per_tag, size_t tags_per_bucket, size_t bucket, size_t tag_idx)
+            : bits_first_word(bits_per_tag)
         {
             size_t tag_start_bit =
                 (bucket * bits_per_tag * tags_per_bucket) + (tag_idx * bits_per_tag);
             tag_start_idx = tag_start_bit / 64;
             tag_start_offset = tag_start_bit % 64;
-            bits_first_word = bits_per_tag;
-            bits_second_word = 0;
 
             if (tag_start_offset > 64 - bits_per_tag) {
                 bits_first_word = 64 - tag_start_offset;
@@ -49,7 +49,7 @@ CuckooFilterTable::CuckooFilterTable(
     }
 
     // This is used to check that tags are not too big
-    tag_input_mask_ = ~uint64_t(0) << bits_per_tag;
+    tag_input_mask_ = ~static_cast<uint64_t>(0) << bits_per_tag;
 }
 
 CuckooFilterTable::CuckooFilterTable(size_t num_items, size_t bits_per_tag)
@@ -60,7 +60,7 @@ CuckooFilterTable::CuckooFilterTable(size_t num_items, size_t bits_per_tag)
     }
 
     // This is used to check that tags are not too big
-    tag_input_mask_ = ~uint64_t(0) << bits_per_tag;
+    tag_input_mask_ = ~static_cast<uint64_t>(0) << bits_per_tag;
 
     num_buckets_ = next_power_of_2(max<uint64_t>(1, num_items / tags_per_bucket_));
     double items_to_bucket_ratio =
@@ -74,7 +74,7 @@ CuckooFilterTable::CuckooFilterTable(size_t num_items, size_t bits_per_tag)
 
     // Round up to the nearest uint64_t
     size_t bits_per_bucket = tags_per_bucket_ * bits_per_tag;
-    size_t num_uint64 = (bits_per_bucket * num_buckets_ + 63) / 64;
+    size_t num_uint64 = ((bits_per_bucket * num_buckets_) + 63) / 64;
     table_.resize(num_uint64);
 }
 
@@ -90,13 +90,13 @@ uint64_t CuckooFilterTable::read_tag(size_t bucket, size_t tag_idx) const
     TagIndexInfo tii(bits_per_tag_, tags_per_bucket_, bucket, tag_idx);
 
     uint64_t tag_word = table_[tii.tag_start_idx];
-    uint64_t mask = ~(~uint64_t(0) << tii.bits_first_word);
+    uint64_t mask = ~(~static_cast<uint64_t>(0) << tii.bits_first_word);
     uint64_t tag = (tag_word >> tii.tag_start_offset) & mask;
 
     if (tii.bits_second_word != 0) {
         // The tag needs to be completed with the next uint64_t
         tag_word = table_[tii.tag_start_idx + 1];
-        mask = ~(~uint64_t(0) << tii.bits_second_word);
+        mask = ~(~static_cast<uint64_t>(0) << tii.bits_second_word);
         tag |= (tag_word & mask) << tii.bits_first_word;
     }
 
@@ -142,7 +142,12 @@ bool CuckooFilterTable::insert_tag(size_t bucket, uint64_t tag, bool kickout, ui
     }
 
     if (kickout) {
-        size_t rnd_idx = static_cast<size_t>(rand()) % tags_per_bucket_;
+        // Pick a victim slot to evict. The randomness quality is unimportant, so a thread-local
+        // Mersenne Twister with a fixed seed suffices; unlike rand() it is thread-safe. A fixed
+        // seed is intentional (deterministic, reproducible eviction; no security relevance here).
+        // NOLINTNEXTLINE(bugprone-random-generator-seed)
+        static thread_local std::mt19937 gen(/* seed */ 0);
+        size_t rnd_idx = static_cast<size_t>(gen()) % tags_per_bucket_;
         old_tag = read_tag(bucket, rnd_idx);
         write_tag(bucket, rnd_idx, tag);
     }
@@ -179,8 +184,9 @@ bool CuckooFilterTable::find_tag_in_bucket(size_t bucket, uint64_t tag) const
     }
 
     for (size_t i = 0; i < tags_per_bucket_; i++) {
-        if (read_tag(bucket, i) == tag)
+        if (read_tag(bucket, i) == tag) {
             return true;
+        }
     }
 
     return false;
@@ -195,10 +201,12 @@ bool CuckooFilterTable::find_tag_in_buckets(size_t bucket1, size_t bucket2, uint
         throw invalid_argument("bucket2 out of range");
     }
 
-    if (find_tag_in_bucket(bucket1, tag))
+    if (find_tag_in_bucket(bucket1, tag)) {
         return true;
-    if (find_tag_in_bucket(bucket2, tag))
+    }
+    if (find_tag_in_bucket(bucket2, tag)) {
         return true;
+    }
 
     return false;
 }

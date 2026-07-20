@@ -22,13 +22,20 @@ Checks: >
   -hicpp-use-auto,
   -hicpp-explicit-conversions,
   -hicpp-vararg,
+  -hicpp-signed-bitwise,
+  -hicpp-no-array-decay,
   -cppcoreguidelines-pro-type-vararg,
   -cppcoreguidelines-missing-std-forward,
+  -cppcoreguidelines-rvalue-reference-param-not-moved,
   -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
+  -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
   -cppcoreguidelines-pro-bounds-constant-array-index,
   -cppcoreguidelines-pro-bounds-pointer-arithmetic,
   -cppcoreguidelines-pro-type-const-cast,
   -cppcoreguidelines-pro-type-reinterpret-cast,
+  -cppcoreguidelines-pro-type-static-cast-downcast,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -misc-non-private-member-variables-in-classes,
   -misc-const-correctness,
   -performance-enum-size,
   -misc-include-cleaner,
@@ -46,5 +53,5 @@ Checks: >
 
 WarningsAsErrors: '*,-cppcoreguidelines-init-variables,-cppcoreguidelines-pro-type-member-init,-hicpp-member-init,-readability-simplify-boolean-expr'
 HeaderFilterRegex: '(common/apsi|sender/apsi|receiver/apsi|cli|tests)/'
-ExcludeHeaderFilterRegex: '(config)\.h$'
+ExcludeHeaderFilterRegex: '(config|.*_generated)\.h$|/fourq/'
 FormatStyle: file

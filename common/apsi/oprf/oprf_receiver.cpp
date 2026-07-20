@@ -78,7 +78,7 @@ namespace apsi::oprf {
             throw invalid_argument("oprf_responses size is incompatible with oprf_hashes size");
         }
 
-        auto oprf_in_ptr = oprf_responses.data();
+        const auto *oprf_in_ptr = oprf_responses.data();
         for (size_t i = 0; i < item_count(); i++) {
             // Load the point from items_buffer
             ECPoint ecpt;
@@ -88,7 +88,7 @@ namespace apsi::oprf {
             ecpt.scalar_multiply(inv_factor_data_.get_factor(i), false);
 
             // Extract the item hash and the label encryption key
-            array<unsigned char, ECPoint::hash_size> item_hash_and_label_key;
+            array<unsigned char, ECPoint::hash_size> item_hash_and_label_key{};
             ecpt.extract_hash(item_hash_and_label_key);
 
             // The first 16 bytes represent the item hash; the next 32 bytes represent the label

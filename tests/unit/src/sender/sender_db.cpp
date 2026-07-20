@@ -78,7 +78,7 @@ namespace APSITests {
             return params;
         }
 
-        bool oprf_keys_equal(oprf::OPRFKey key1, oprf::OPRFKey key2)
+        bool oprf_keys_equal(const oprf::OPRFKey &key1, const oprf::OPRFKey &key2)
         {
             return equal(key1.key_span().begin(), key1.key_span().end(), key2.key_span().begin());
         }
@@ -119,7 +119,7 @@ namespace APSITests {
 
     TEST(SenderDBTests, UnlabeledBasics)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             // Nonce byte count is totally ignored when label byte count is zero
             ASSERT_NO_THROW(SenderDB sender_db(*params, 0, 17));
 
@@ -154,7 +154,7 @@ namespace APSITests {
 
     TEST(SenderDBTests, LabeledBasics)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             // Label byte count is too large
             ASSERT_THROW(SenderDB sender_db(*params, 1025, 0), invalid_argument);
 
@@ -194,7 +194,7 @@ namespace APSITests {
 
     TEST(SenderDBTests, UnlabeledInsertOrAssignSingle)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             SenderDB sender_db(*params, 0);
 
             // Insert a single item
@@ -254,13 +254,14 @@ namespace APSITests {
 
     TEST(SenderDBTests, UnlabeledInsertOrAssignMany)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             SenderDB sender_db(*params, 0);
 
             // Create a vector of items without duplicates
             vector<Item> items;
+            items.reserve(200);
             for (uint64_t i = 0; i < 200; i++) {
-                items.push_back({ i, i + 1 });
+                items.emplace_back(i, i + 1);
             }
 
             // Insert all items
@@ -327,7 +328,7 @@ namespace APSITests {
 
     TEST(SenderDBTests, LabeledInsertOrAssignSingle)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             SenderDB sender_db(*params, 20, 16, true);
 
             // Insert a single item with zero label
@@ -382,14 +383,14 @@ namespace APSITests {
 
     TEST(SenderDBTests, LabeledInsertOrAssignMany)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             SenderDB sender_db(*params, 20, 16, true);
 
             // Create a vector of items and labels without duplicates
             vector<pair<Item, Label>> items;
+            items.reserve(200);
             for (uint64_t i = 0; i < 200; i++) {
-                items.push_back(
-                    make_pair(Item(i, i + 1), create_label(static_cast<unsigned char>(i), 20)));
+                items.emplace_back(Item(i, i + 1), create_label(static_cast<unsigned char>(i), 20));
             }
 
             // Insert all items
@@ -460,7 +461,7 @@ namespace APSITests {
 
     TEST(SenderDBTests, Remove)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             // We use a labeled SenderDB here to end up with multiple BinBundles more quickly. This
             // happens because in the labeled case BinBundles cannot tolerate repetitions of item
             // parts (felts) in bins.
@@ -531,7 +532,7 @@ namespace APSITests {
 
     TEST(SenderDBTests, SaveLoadUnlabeled)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             SenderDB sender_db(*params, 0, 0, false);
 
             stringstream ss;
@@ -566,8 +567,9 @@ namespace APSITests {
 
             // Create a vector of items without duplicates
             vector<Item> items;
+            items.reserve(200);
             for (uint64_t i = 0; i < 200; i++) {
-                items.push_back({ i, i + 1 });
+                items.emplace_back(i, i + 1);
             }
 
             // Insert all items
@@ -587,7 +589,7 @@ namespace APSITests {
             ASSERT_TRUE(oprf_keys_equal(sender_db.get_oprf_key(), other_sdb.get_oprf_key()));
 
             // Check that the items match
-            for (auto &it : sender_db.get_hashed_items()) {
+            for (const auto &it : sender_db.get_hashed_items()) {
                 ASSERT_NE(
                     other_sdb.get_hashed_items().end(), other_sdb.get_hashed_items().find(it));
             }
@@ -599,7 +601,7 @@ namespace APSITests {
 
     TEST(SenderDBTests, SaveLoadLabeled)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             SenderDB sender_db(*params, 20, 8);
 
             stringstream ss;
@@ -634,9 +636,9 @@ namespace APSITests {
 
             // Create a vector of items and labels without duplicates
             vector<pair<Item, Label>> items;
+            items.reserve(200);
             for (uint64_t i = 0; i < 200; i++) {
-                items.push_back(
-                    make_pair(Item(i, i + 1), create_label(static_cast<unsigned char>(i), 20)));
+                items.emplace_back(Item(i, i + 1), create_label(static_cast<unsigned char>(i), 20));
             }
 
             // Insert all items
@@ -656,7 +658,7 @@ namespace APSITests {
             ASSERT_TRUE(oprf_keys_equal(sender_db.get_oprf_key(), other_sdb.get_oprf_key()));
 
             // Check that the items match
-            for (auto &it : sender_db.get_hashed_items()) {
+            for (const auto &it : sender_db.get_hashed_items()) {
                 ASSERT_NE(
                     other_sdb.get_hashed_items().end(), other_sdb.get_hashed_items().find(it));
             }
@@ -668,7 +670,7 @@ namespace APSITests {
 
     TEST(SenderDBTests, StripUnlabeled)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             SenderDB sender_db(*params, 0, 0, false);
 
             // Strip and reset
@@ -719,7 +721,7 @@ namespace APSITests {
 
     TEST(SenderDBTests, StripLabeled)
     {
-        auto test_fun = [](shared_ptr<PSIParams> params) {
+        auto test_fun = [](const shared_ptr<PSIParams> &params) {
             SenderDB sender_db(*params, 20, 8, false);
 
             // Strip and reset

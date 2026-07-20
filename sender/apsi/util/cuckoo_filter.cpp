@@ -16,10 +16,15 @@ using namespace apsi::sender::util;
 
 namespace {
     /**
-    Hash function for the cuckoo filter.
-    The seed is completely arbitrary, doesn't need to be random.
+    Hash function for the cuckoo filter. The seed is completely arbitrary, doesn't need to be
+    random. A function-local static defers the (potentially throwing) construction to first use
+    rather than during dynamic initialization.
     */
-    HashFunc hasher_(/* seed */ 20);
+    HashFunc &hasher()
+    {
+        static HashFunc instance(/* seed */ 20);
+        return instance;
+    }
 } // namespace
 
 CuckooFilter::CuckooFilter(
@@ -28,9 +33,10 @@ CuckooFilter::CuckooFilter(
     size_t overflow_index,
     uint64_t overflow_tag,
     bool overflow_used)
+    : num_items_(table_num_items)
 {
     table_ = make_unique<CuckooFilterTable>(std::move(table));
-    num_items_ = table_num_items;
+
     overflow_ = OverflowCache();
     overflow_.index = overflow_index;
     overflow_.tag = overflow_tag;
@@ -45,15 +51,17 @@ CuckooFilter::CuckooFilter(size_t key_count_max, size_t bits_per_tag) : num_item
 
 bool CuckooFilter::contains(gsl::span<const uint64_t> item) const
 {
-    size_t idx1, idx2;
-    uint64_t tag;
+    size_t idx1;
+    size_t idx2;
+    uint64_t tag = 0;
 
     get_tag_and_index(item, tag, idx1);
     idx2 = get_alt_index(idx1, tag);
 
     if (overflow_.used && overflow_.tag == tag) {
-        if (overflow_.index == idx1 || overflow_.index == idx2)
+        if (overflow_.index == idx1 || overflow_.index == idx2) {
             return true;
+        }
     }
 
     return table_->find_tag_in_buckets(idx1, idx2, tag);
@@ -66,8 +74,8 @@ bool CuckooFilter::add(gsl::span<const uint64_t> item)
         return false;
     }
 
-    uint64_t tag;
-    size_t idx;
+    uint64_t tag = 0;
+    size_t idx = 0;
     get_tag_and_index(item, tag, idx);
 
     bool result = add_index_tag(idx, tag);
@@ -109,8 +117,9 @@ bool CuckooFilter::add_index_tag(size_t idx, uint64_t tag)
 
 bool CuckooFilter::remove(gsl::span<const uint64_t> item)
 {
-    size_t idx1, idx2;
-    uint64_t tag;
+    size_t idx1;
+    size_t idx2;
+    uint64_t tag = 0;
 
     get_tag_and_index(item, tag, idx1);
     idx2 = get_alt_index(idx1, tag);
@@ -140,7 +149,7 @@ bool CuckooFilter::remove(gsl::span<const uint64_t> item)
 uint64_t CuckooFilter::tag_bit_limit(uint64_t value) const
 {
     size_t bits_per_tag = table_->get_bits_per_tag();
-    uint64_t mask = ~uint64_t(0) >> (64 - bits_per_tag);
+    uint64_t mask = ~static_cast<uint64_t>(0) >> (64 - bits_per_tag);
     uint64_t tag = value & mask;
     tag += (tag == 0);
     return tag;
@@ -155,14 +164,14 @@ size_t CuckooFilter::idx_bucket_limit(size_t value) const
 void CuckooFilter::get_tag_and_index(
     gsl::span<const uint64_t> item, uint64_t &tag, size_t &idx) const
 {
-    uint64_t hash = hasher_(item);
+    uint64_t hash = hasher()(item);
     idx = idx_bucket_limit(hash);
     tag = tag_bit_limit(hash);
 }
 
 size_t CuckooFilter::get_alt_index(size_t idx, uint64_t tag) const
 {
-    uint64_t hash = hasher_(tag);
+    uint64_t hash = hasher()(tag);
     size_t idx_hash = idx_bucket_limit(hash);
     return idx ^ idx_hash;
 }
@@ -222,9 +231,9 @@ CuckooFilter CuckooFilter::Load(istream &in, size_t &bytes_read)
         throw runtime_error("failed to load parameters: invalid buffer");
     }
 
-    auto cuckoo_filter_fbs = fbs::GetSizePrefixedCuckooFilter(in_data.data());
-    auto cuckoo_filter_table_fbs = cuckoo_filter_fbs->table();
-    auto cuckoo_filter_table_data_fbs = cuckoo_filter_table_fbs->table();
+    const auto *cuckoo_filter_fbs = fbs::GetSizePrefixedCuckooFilter(in_data.data());
+    const auto *cuckoo_filter_table_fbs = cuckoo_filter_fbs->table();
+    const auto *cuckoo_filter_table_data_fbs = cuckoo_filter_table_fbs->table();
 
     // Check that bits_per_tag is within bounds
     size_t bits_per_tag = cuckoo_filter_table_fbs->bits_per_tag();

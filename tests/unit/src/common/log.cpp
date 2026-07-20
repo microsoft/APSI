@@ -87,10 +87,8 @@ namespace APSITests {
         // ordering does not matter and one test cannot leak state into the next.
         class GlobalLoggerScope {
         public:
-            GlobalLoggerScope()
-            {
-                saved_level_ = GetLogLevel();
-            }
+            GlobalLoggerScope() : saved_level_(GetLogLevel())
+            {}
             ~GlobalLoggerScope()
             {
                 // Drop any custom logger and rebuild the default; then restore the saved level.

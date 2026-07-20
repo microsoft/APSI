@@ -31,7 +31,9 @@ auto CSVReader::read(istream &stream) const -> pair<DBData, vector<string>>
     if (!getline(stream, line)) {
         APSI_LOG_WARNING("Nothing to read in `" << file_name_ << "`");
         return { UnlabeledData{}, {} };
-    } else {
+    }
+
+    {
         string orig_item;
         Item item;
         Label label;
@@ -66,7 +68,7 @@ auto CSVReader::read(istream &stream) const -> pair<DBData, vector<string>>
         if (holds_alternative<UnlabeledData>(result)) {
             get<UnlabeledData>(result).push_back(item);
         } else if (holds_alternative<LabeledData>(result)) {
-            get<LabeledData>(result).push_back(make_pair(item, std::move(label)));
+            get<LabeledData>(result).emplace_back(item, std::move(label));
         } else {
             // Something is terribly wrong
             APSI_LOG_ERROR("Critical error reading data");

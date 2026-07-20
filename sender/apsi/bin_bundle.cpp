@@ -85,7 +85,7 @@ namespace apsi {
                     // Can compression achieve anything?
                     if (irrelevant_bit_count > 0) {
                         // Mask for zeroing out the irrelevant bits
-                        uint64_t mask = ~((uint64_t(1) << irrelevant_bit_count) - 1);
+                        uint64_t mask = ~((static_cast<uint64_t>(1) << irrelevant_bit_count) - 1);
                         seal_for_each_n(iter(ciphertext), ciphertext.size(), [&](auto &&I) {
                             // We only have a single RNS component so dereference once more
                             seal_for_each_n(
@@ -241,8 +241,8 @@ namespace apsi {
                     coeff.unsafe_load(
                         *seal_context,
                         reinterpret_cast<const std::byte *>(
-                            batched_coeffs[i * ps_high_degree + j].data()),
-                        batched_coeffs[i * ps_high_degree + j].size());
+                            batched_coeffs[(i * ps_high_degree) + j].data()),
+                        batched_coeffs[(i * ps_high_degree) + j].size());
 
                     evaluator->multiply_plain(ciphertext_powers[j], coeff, temp, pool);
 
@@ -270,8 +270,8 @@ namespace apsi {
                     coeff.unsafe_load(
                         *seal_context,
                         reinterpret_cast<const std::byte *>(
-                            batched_coeffs[ps_high_degree_powers * ps_high_degree + j].data()),
-                        batched_coeffs[ps_high_degree_powers * ps_high_degree + j].size());
+                            batched_coeffs[(ps_high_degree_powers * ps_high_degree) + j].data()),
+                        batched_coeffs[(ps_high_degree_powers * ps_high_degree) + j].size());
 
                     evaluator->multiply_plain(ciphertext_powers[j], coeff, temp, pool);
 
@@ -423,14 +423,14 @@ namespace apsi {
         }
 
         BinBundle::BinBundle(
-            const CryptoContext &crypto_context,
+            CryptoContext crypto_context,
             size_t label_size,
             size_t max_bin_size,
             size_t ps_low_degree,
             size_t num_bins,
             bool compressed,
             bool stripped)
-            : cache_invalid_(true), crypto_context_(crypto_context), compressed_(compressed),
+            : crypto_context_(std::move(crypto_context)), compressed_(compressed),
               label_size_(label_size), max_bin_size_(max_bin_size), ps_low_degree_(ps_low_degree),
               num_bins_(num_bins), cache_(crypto_context_, label_size_)
         {
@@ -458,6 +458,8 @@ namespace apsi {
         }
 
         template <>
+        // Unlabeled overload names its argument 'items' rather than the generic 'item_labels'.
+        // NOLINTNEXTLINE(readability-inconsistent-declaration-parameter-name)
         int32_t BinBundle::multi_insert(
             const vector<felt_t> &items, size_t start_bin_idx, bool dry_run)
         {
@@ -489,9 +491,7 @@ namespace apsi {
                 vector<felt_t> &curr_bin = item_bins_[curr_bin_idx];
 
                 // Compare the would-be bin size here to the running max
-                if (max_bin_size < curr_bin.size() + 1) {
-                    max_bin_size = curr_bin.size() + 1;
-                }
+                max_bin_size = std::max(max_bin_size, curr_bin.size() + 1);
 
                 // Insert if not dry run
                 if (!dry_run) {
@@ -555,7 +555,7 @@ namespace apsi {
                 // For each key, check that we can insert into the corresponding bin. If the answer
                 // is "no" at any point, return -1.
                 size_t curr_bin_idx = start_bin_idx;
-                for (auto &curr_item_label : item_labels) {
+                for (const auto &curr_item_label : item_labels) {
                     felt_t curr_item = curr_item_label.first;
                     vector<felt_t> &curr_bin = item_bins_[curr_bin_idx];
                     CuckooFilter &curr_filter = filters_[curr_bin_idx];
@@ -573,14 +573,12 @@ namespace apsi {
             // If we're here, that means we can insert in all bins
             size_t max_bin_size = 0;
             size_t curr_bin_idx = start_bin_idx;
-            for (auto &curr_item_label : item_labels) {
+            for (const auto &curr_item_label : item_labels) {
                 felt_t curr_item = curr_item_label.first;
                 vector<felt_t> &curr_bin = item_bins_[curr_bin_idx];
 
                 // Compare the would-be bin size here to the running max
-                if (max_bin_size < curr_bin.size() + 1) {
-                    max_bin_size = curr_bin.size() + 1;
-                }
+                max_bin_size = std::max(max_bin_size, curr_bin.size() + 1);
 
                 // Insert if not dry run
                 if (!dry_run) {
@@ -607,6 +605,8 @@ namespace apsi {
         }
 
         template <>
+        // Unlabeled overload names its argument 'items' rather than the generic 'item_labels'.
+        // NOLINTNEXTLINE(readability-inconsistent-declaration-parameter-name)
         bool BinBundle::try_multi_overwrite(const vector<felt_t> &items, size_t start_bin_idx)
         {
             if (stripped_) {
@@ -684,7 +684,7 @@ namespace apsi {
 
             // Check that all the item components appear sequentially in this BinBundle
             size_t curr_bin_idx = start_bin_idx;
-            for (auto &curr_item_label : item_labels) {
+            for (const auto &curr_item_label : item_labels) {
                 felt_t curr_item = curr_item_label.first;
                 vector<felt_t> &curr_bin = item_bins_[curr_bin_idx];
                 CuckooFilter &curr_filter = filters_[curr_bin_idx];
@@ -699,7 +699,7 @@ namespace apsi {
 
             // If we're here, that means we can overwrite the labels
             curr_bin_idx = start_bin_idx;
-            for (auto &curr_item_label : item_labels) {
+            for (const auto &curr_item_label : item_labels) {
                 felt_t curr_item = curr_item_label.first;
 
                 // Overwrite the label in the bin
@@ -759,7 +759,7 @@ namespace apsi {
             vector<vector<felt_t>::iterator> to_remove_item_its;
             vector<vector<vector<felt_t>::iterator>> to_remove_label_its(get_label_size());
 
-            for (auto &item : items) {
+            for (const auto &item : items) {
                 vector<felt_t> &curr_bin = item_bins_[curr_bin_idx];
                 CuckooFilter &curr_filter = filters_[curr_bin_idx];
 
@@ -767,17 +767,17 @@ namespace apsi {
                 if (curr_bin.end() == to_remove_item_it) {
                     // One of the items isn't there; return false;
                     return false;
-                } else {
-                    // Found the item; mark it for removal
-                    to_remove_item_its.push_back(to_remove_item_it);
+                }
 
-                    // We need to also mark the corresponding labels for removal
-                    auto item_loc_in_bin = distance(curr_bin.begin(), to_remove_item_it);
-                    for (size_t label_idx = 0; label_idx < get_label_size(); label_idx++) {
-                        auto to_remove_label_it =
-                            label_bins_[label_idx][curr_bin_idx].begin() + item_loc_in_bin;
-                        to_remove_label_its[label_idx].push_back(to_remove_label_it);
-                    }
+                // Found the item; mark it for removal
+                to_remove_item_its.push_back(to_remove_item_it);
+
+                // We need to also mark the corresponding labels for removal
+                auto item_loc_in_bin = distance(curr_bin.begin(), to_remove_item_it);
+                for (size_t label_idx = 0; label_idx < get_label_size(); label_idx++) {
+                    auto to_remove_label_it =
+                        label_bins_[label_idx][curr_bin_idx].begin() + item_loc_in_bin;
+                    to_remove_label_its[label_idx].push_back(to_remove_label_it);
                 }
 
                 curr_bin_idx++;
@@ -852,7 +852,7 @@ namespace apsi {
                 size_t item_idx_in_bin = static_cast<size_t>(distance(curr_bin.begin(), item_it));
                 for (size_t label_idx = 0; label_idx < get_label_size(); label_idx++) {
                     // Need to reorder the felts
-                    labels[items.size() * label_idx + item_idx] =
+                    labels[(items.size() * label_idx) + item_idx] =
                         label_bins_[label_idx][curr_bin_idx][item_idx_in_bin];
                 }
 
@@ -978,6 +978,7 @@ namespace apsi {
             vector<future<void>> futures;
             // For each bin in the bundle, compute and cache the corresponding "matching
             // polynomial"
+            futures.reserve(num_bins);
             for (size_t bin_idx = 0; bin_idx < num_bins; bin_idx++) {
                 futures.push_back(tpm.thread_pool().enqueue([&, bin_idx]() {
                     // Compute and cache the matching polynomial
@@ -1048,6 +1049,7 @@ namespace apsi {
             {
                 auto felt_matrix_data = fbs_builder.CreateVector([&]() {
                     vector<flatbuffers::Offset<fbs::FEltArray>> ret;
+                    ret.reserve(felts.size());
                     for (const auto &felts_row : felts) {
                         ret.push_back(fbs_create_felt_array(fbs_builder, felts_row));
                     }
@@ -1070,6 +1072,7 @@ namespace apsi {
             {
                 auto polyn_data = fbs_builder.CreateVector([&]() {
                     vector<flatbuffers::Offset<fbs::Plaintext>> ret;
+                    ret.reserve(polyn.size());
                     for (const auto &coeff : polyn) {
                         ret.push_back(fbs_create_plaintext(fbs_builder, coeff));
                     }
@@ -1087,7 +1090,8 @@ namespace apsi {
             auto item_bins = fbs_create_felt_matrix(fbs_builder, item_bins_);
             auto label_bins = fbs_builder.CreateVector([&]() {
                 vector<flatbuffers::Offset<fbs::FEltMatrix>> ret;
-                for (auto &bin : label_bins_) {
+                ret.reserve(label_bins_.size());
+                for (const auto &bin : label_bins_) {
                     ret.push_back(fbs_create_felt_matrix(fbs_builder, bin));
                 }
                 return ret;
@@ -1102,6 +1106,7 @@ namespace apsi {
 
                 auto felt_interp_polyns = fbs_builder.CreateVector([&]() {
                     vector<flatbuffers::Offset<fbs::FEltMatrix>> ret;
+                    ret.reserve(cache_.felt_interp_polyns.size());
                     for (const auto &fips : cache_.felt_interp_polyns) {
                         ret.push_back(fbs_create_felt_matrix(fbs_builder, fips));
                     }
@@ -1110,6 +1115,7 @@ namespace apsi {
 
                 auto batched_interp_polyns = fbs_builder.CreateVector([&]() {
                     vector<flatbuffers::Offset<fbs::BatchedPlaintextPolyn>> ret;
+                    ret.reserve(cache_.batched_interp_polyns.size());
                     for (const auto &bips : cache_.batched_interp_polyns) {
                         ret.push_back(
                             fbs_create_batched_plaintext_polyn(fbs_builder, bips.batched_coeffs));
@@ -1153,7 +1159,7 @@ namespace apsi {
                 throw runtime_error("failed to load BinBundle");
             }
 
-            auto bb = fbs::GetSizePrefixedBinBundle(in.data());
+            const auto *bb = fbs::GetSizePrefixedBinBundle(in.data());
 
             // Load the bundle index
             uint32_t bundle_idx = bb->bundle_idx();
@@ -1193,7 +1199,8 @@ namespace apsi {
             size_t label_size = get_label_size();
 
             for (size_t bin_idx = 0; !stripped_ && (bin_idx < num_bins); bin_idx++) {
-                auto &item_bin = *item_bins[static_cast<flatbuffers::uoffset_t>(bin_idx)]->felts();
+                const auto &item_bin =
+                    *item_bins[static_cast<flatbuffers::uoffset_t>(bin_idx)]->felts();
 
                 // Check that the sizes of the bins are at most max_bin_size_
                 if (item_bin.size() > max_bin_size_) {
@@ -1245,9 +1252,10 @@ namespace apsi {
 
             for (size_t label_idx = 0; !stripped_ && (label_idx < label_size); label_idx++) {
                 // We can now safely dereference bb->label_bins()
-                auto &label_bins = *bb->label_bins()
-                                        ->operator[](static_cast<flatbuffers::uoffset_t>(label_idx))
-                                        ->rows();
+                const auto &label_bins =
+                    *bb->label_bins()
+                         ->operator[](static_cast<flatbuffers::uoffset_t>(label_idx))
+                         ->rows();
 
                 // Check that the number of bins is the same as for the items
                 if (label_bins.size() != num_bins) {
@@ -1261,7 +1269,7 @@ namespace apsi {
                 // Check that each bin has the same size as the corresponding items bin
                 for (size_t bin_idx = 0; bin_idx < num_bins; bin_idx++) {
                     size_t item_bin_size = item_bins_[bin_idx].size();
-                    auto &label_bin =
+                    const auto &label_bin =
                         *label_bins[static_cast<flatbuffers::uoffset_t>(bin_idx)]->felts();
                     if (label_bin.size() != item_bin_size) {
                         APSI_LOG_ERROR(
@@ -1292,7 +1300,7 @@ namespace apsi {
                 const auto &cache = *bb->cache();
 
                 // Do we have the right number of rows in the loaded felt_matching_polyns data?
-                auto &felt_matching_polyns = *cache.felt_matching_polyns()->rows();
+                const auto &felt_matching_polyns = *cache.felt_matching_polyns()->rows();
                 if (!stripped_ && (felt_matching_polyns.size() != num_bins)) {
                     APSI_LOG_ERROR(
                         "The loaded BinBundle cache contains an incorrect number ("
@@ -1305,7 +1313,7 @@ namespace apsi {
                 size_t max_coeff_count = 0;
 
                 for (size_t bin_idx = 0; !stripped_ && (bin_idx < num_bins); bin_idx++) {
-                    auto &felt_matching_polyn =
+                    const auto &felt_matching_polyn =
                         *felt_matching_polyns[static_cast<flatbuffers::uoffset_t>(bin_idx)]
                              ->felts();
 
@@ -1330,7 +1338,7 @@ namespace apsi {
 
                 // Each "column" of coefficients is batched into a single plaintext, so check that
                 // the number of plaintexts actually matches max_coeff_count.
-                auto &batched_matching_polyn = *cache.batched_matching_polyn()->coeffs();
+                const auto &batched_matching_polyn = *cache.batched_matching_polyn()->coeffs();
                 if (!stripped_ && (batched_matching_polyn.size() != max_coeff_count)) {
                     APSI_LOG_ERROR(
                         "The loaded BinBundle cache contains an incorrect number ("
@@ -1352,11 +1360,9 @@ namespace apsi {
                 cache_.batched_matching_polyn = crypto_context_;
 
                 // The number of plaintexts is correct; copy them over
-                for (flatbuffers::uoffset_t coeff_idx = 0;
-                     coeff_idx < batched_matching_polyn.size();
-                     coeff_idx++) {
+                for (const auto *coeff_idx : batched_matching_polyn) {
                     // Get the current coefficient data
-                    auto &batched_matching_polyn_coeff = *batched_matching_polyn[coeff_idx]->data();
+                    const auto &batched_matching_polyn_coeff = *coeff_idx->data();
 
                     // Copy the data over to a local vector
                     vector<unsigned char> pt_data(batched_matching_polyn_coeff.size());
@@ -1401,7 +1407,7 @@ namespace apsi {
                 for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
                     // The felt interpolation polynomial data is present only when the BinBundle is
                     // not stripped
-                    auto felt_interp_polyns_ptr =
+                    const auto *felt_interp_polyns_ptr =
                         stripped_ ? nullptr
                                   : cache.felt_interp_polyns()
                                         ->operator[](static_cast<flatbuffers::uoffset_t>(label_idx))
@@ -1418,7 +1424,7 @@ namespace apsi {
 
                     // Next, check that the number of coefficients is correct and copy data over
                     for (size_t bin_idx = 0; !stripped_ && (bin_idx < num_bins); bin_idx++) {
-                        auto &felt_interp_polyn =
+                        const auto &felt_interp_polyn =
                             *felt_interp_polyns_ptr
                                  ->operator[](static_cast<flatbuffers::uoffset_t>(bin_idx))
                                  ->felts();
@@ -1456,7 +1462,7 @@ namespace apsi {
 
                     // Finally check that the number of batched interpolation polynomial
                     // coefficients is correct and copy them over.
-                    auto &batched_interp_polyn =
+                    const auto &batched_interp_polyn =
                         *cache.batched_interp_polyns()
                              ->operator[](static_cast<flatbuffers::uoffset_t>(label_idx))
                              ->coeffs();
@@ -1491,7 +1497,8 @@ namespace apsi {
                          coeff_idx < batched_interp_polyn_coeff_count;
                          coeff_idx++) {
                         // Get the current coefficient data
-                        auto &batched_interp_polyn_coeff = *batched_interp_polyn[coeff_idx]->data();
+                        const auto &batched_interp_polyn_coeff =
+                            *batched_interp_polyn[coeff_idx]->data();
 
                         // Copy the data over to a local vector
                         vector<unsigned char> pt_data(batched_interp_polyn_coeff.size());

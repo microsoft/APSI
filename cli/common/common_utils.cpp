@@ -7,7 +7,7 @@
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
-#if defined(_MSC_VER)
+#ifdef _MSC_VER
 #include <windows.h>
 #endif
 
@@ -94,7 +94,7 @@ void print_timing_report(const Stopwatch &stopwatch)
     vector<Stopwatch::TimespanSummary> timings;
     stopwatch.get_timespans(timings);
 
-    if (timings.size() > 0) {
+    if (!timings.empty()) {
         timing_report =
             generate_timespan_report(timings, stopwatch.get_max_timespan_event_name_length());
 
@@ -107,7 +107,7 @@ void print_timing_report(const Stopwatch &stopwatch)
     vector<Stopwatch::Timepoint> timepoints;
     stopwatch.get_events(timepoints);
 
-    if (timepoints.size() > 0) {
+    if (!timepoints.empty()) {
         timing_report = generate_event_report(timepoints, stopwatch.get_max_event_name_length());
 
         APSI_LOG_INFO("Single event information");

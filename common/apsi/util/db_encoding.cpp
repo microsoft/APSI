@@ -35,7 +35,7 @@ namespace apsi::util {
 
         array<unsigned char, 8> write_u64_little_endian(uint64_t num)
         {
-            array<unsigned char, 8> bytes;
+            array<unsigned char, 8> bytes{};
             bytes[0] = static_cast<unsigned char>(num & 0x00000000000000FFULL);
             bytes[1] = static_cast<unsigned char>((num & 0x000000000000FF00ULL) >> 8U);
             bytes[2] = static_cast<unsigned char>((num & 0x0000000000FF0000ULL) >> 16U);
@@ -103,7 +103,8 @@ namespace apsi::util {
                 bool one_word_src = low_offset + rem_bits <= 8;
                 if (one_word_src) {
                     // All the remaining bits live in src[word_begin]
-                    unsigned char mask = static_cast<unsigned char>((uint32_t(1) << rem_bits) - 1);
+                    unsigned char mask =
+                        static_cast<unsigned char>((static_cast<uint32_t>(1) << rem_bits) - 1);
 
                     unsigned char low = src[word_begin];
                     low = static_cast<unsigned char>(low >> low_offset);
@@ -132,7 +133,7 @@ namespace apsi::util {
 
                     // Keep the high bits of dest_word
                     unsigned char high_mask =
-                        static_cast<unsigned char>((~uint32_t(0)) << rem_bits);
+                        static_cast<unsigned char>((~static_cast<uint32_t>(0)) << rem_bits);
                     unsigned char high = dest_word & high_mask;
 
                     // Or everything together
@@ -173,7 +174,8 @@ namespace apsi::util {
                 unsigned char &dest_val = dest[dest_begin];
 
                 if (high_diff <= 0) {
-                    unsigned char mask = static_cast<unsigned char>((uint32_t(1) << diff) - 1);
+                    unsigned char mask =
+                        static_cast<unsigned char>((static_cast<uint32_t>(1) << diff) - 1);
                     unsigned char mid = static_cast<unsigned char>(
                         (static_cast<uint32_t>(src[src_begin]) >> src_offset) & mask);
 
@@ -188,21 +190,21 @@ namespace apsi::util {
                     uint32_t low_diff = diff - high_diff;
 
                     unsigned char low_mask =
-                        static_cast<unsigned char>((uint32_t(1) << low_diff) - 1);
+                        static_cast<unsigned char>((static_cast<uint32_t>(1) << low_diff) - 1);
                     unsigned char low = static_cast<unsigned char>(
                         (static_cast<uint32_t>(src[src_begin]) >> src_offset) & low_mask);
                     low &= low_mask;
 
                     unsigned char high_mask =
-                        static_cast<unsigned char>((uint32_t(1) << high_diff) - 1);
+                        static_cast<unsigned char>((static_cast<uint32_t>(1) << high_diff) - 1);
                     unsigned char high = static_cast<unsigned char>(
                         static_cast<uint32_t>(src[src_begin + 1]) & high_mask);
 
                     low = static_cast<unsigned char>(low << dest_offset);
                     high = static_cast<unsigned char>(high << (dest_offset + low_diff));
 
-                    unsigned char mask =
-                        static_cast<unsigned char>(~(((uint32_t(1) << diff) - 1) << dest_offset));
+                    unsigned char mask = static_cast<unsigned char>(
+                        ~(((static_cast<uint32_t>(1) << diff) - 1) << dest_offset));
 
                     dest_val = static_cast<unsigned char>(
                         (static_cast<uint32_t>(dest_val) & static_cast<uint32_t>(mask)) |
@@ -295,7 +297,7 @@ namespace apsi::util {
         // ⌈bit_count / 8⌉. Use add_safe to defend against an attacker-supplied bit_count
         // close to UINT32_MAX even though the earlier `bit_count > max_num_bits` check
         // already rules this out for realistic inputs.
-        vector<unsigned char> bit_buf(add_safe(bit_count, uint32_t(7)) / 8, 0);
+        vector<unsigned char> bit_buf(add_safe(bit_count, static_cast<uint32_t>(7)) / 8, 0);
         gsl::span<unsigned char> bit_buf_view(bit_buf.data(), bit_buf.size());
 
         uint32_t num_uncopied_bits = bit_count;
@@ -318,7 +320,7 @@ namespace apsi::util {
             num_uncopied_bits -= copy_size;
         }
 
-        return Bitstring(std::move(bit_buf), bit_count);
+        return { std::move(bit_buf), bit_count };
     }
 
     AlgItemLabel algebraize_item_label(
@@ -335,7 +337,7 @@ namespace apsi::util {
 
         // Convert the label to a sequence of field elements. This is the "algebraic label".
         BitstringView<const unsigned char> label_bsw(
-            label.data(), safe_cast<uint32_t>(mul_safe(label.size(), size_t(8))));
+            label.data(), safe_cast<uint32_t>(mul_safe(label.size(), static_cast<size_t>(8))));
         vector<felt_t> alg_label = bits_to_field_elts(label_bsw, mod);
 
         // Pad alg_label with zeros to be a multiple of alg_item length; label_size indicates
@@ -353,7 +355,7 @@ namespace apsi::util {
             vector<felt_t> label_parts;
             label_parts.reserve(label_size);
             for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
-                label_parts.push_back(alg_label[felts_per_item * label_idx + felt_item_idx]);
+                label_parts.push_back(alg_label[(felts_per_item * label_idx) + felt_item_idx]);
             }
 
             // Append to the AlgItemLabel
@@ -374,7 +376,7 @@ namespace apsi::util {
     HashedItem dealgebraize_item(const AlgItem &item, size_t item_bit_count, const Modulus &mod)
     {
         Bitstring bits = field_elts_to_bits(item, safe_cast<uint32_t>(item_bit_count), mod);
-        return HashedItem(bits.to_view());
+        return { bits.to_view() };
     }
 
     EncryptedLabel dealgebraize_label(
@@ -382,6 +384,6 @@ namespace apsi::util {
     {
         vector<unsigned char> bits(
             field_elts_to_bits(label, safe_cast<uint32_t>(label_bit_count), mod).release());
-        return EncryptedLabel(std::move(bits), allocator<unsigned char>());
+        return { std::move(bits), allocator<unsigned char>() };
     }
 } // namespace apsi::util

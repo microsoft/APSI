@@ -44,7 +44,7 @@ namespace apsi::receiver {
         /**
         Returns a const reference to the underlying byte buffer.
         */
-        const Label &value() const noexcept
+        [[nodiscard]] const Label &value() const noexcept
         {
             return label_;
         }
@@ -52,7 +52,7 @@ namespace apsi::receiver {
         /**
         Returns a string containing the label data.
         */
-        std::string to_string() const
+        [[nodiscard]] std::string to_string() const
         {
             if (!has_data()) {
                 return {};
@@ -65,7 +65,7 @@ namespace apsi::receiver {
         /**
         Returns whether the LabelData object holds any any data.
         */
-        bool has_data() const noexcept
+        [[nodiscard]] bool has_data() const noexcept
         {
             return !label_.empty();
         }

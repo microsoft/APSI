@@ -38,21 +38,31 @@ shared_ptr<SenderDB> create_sender_db(
 
 int main(int argc, char *argv[])
 {
-    prepare_console();
+    try {
+        prepare_console();
 
-    CLP cmd("Example of a Sender implementation", APSI_VERSION);
-    if (!cmd.parse_args(argc, argv)) {
-        APSI_LOG_ERROR("Failed parsing command line arguments");
+        CLP cmd("Example of a Sender implementation", APSI_VERSION);
+        if (!cmd.parse_args(argc, argv)) {
+            APSI_LOG_ERROR("Failed parsing command line arguments");
+            return -1;
+        }
+
+        return start_sender(cmd);
+    } catch (const exception &ex) {
+        APSI_LOG_ERROR("Sender terminated with an unhandled exception: " << ex.what());
+        return -1;
+    } catch (...) {
+        APSI_LOG_ERROR("Sender terminated with an unknown exception");
         return -1;
     }
-
-    return start_sender(cmd);
 }
 
 void sigint_handler(int param [[maybe_unused]])
 {
     APSI_LOG_WARNING("Sender interrupted");
     print_timing_report(sender_stopwatch);
+    // exit() runs atexit handlers to flush output; acceptable in this CLI's SIGINT handler.
+    // NOLINTNEXTLINE(concurrency-mt-unsafe)
     exit(0);
 }
 
@@ -92,7 +102,11 @@ shared_ptr<SenderDB> try_load_csv_db(const CLP &cmd, OPRFKey &oprf_key)
     }
 
     unique_ptr<CSVReader::DBData> db_data;
-    if (cmd.db_file().empty() || !(db_data = load_db(cmd.db_file()))) {
+    if (!cmd.db_file().empty()) {
+        db_data = load_db(cmd.db_file());
+    }
+
+    if (!db_data) {
         // Failed to read db file
         APSI_LOG_DEBUG("Failed to load data from a CSV file");
         return nullptr;
@@ -102,7 +116,8 @@ shared_ptr<SenderDB> try_load_csv_db(const CLP &cmd, OPRFKey &oprf_key)
         *db_data, std::move(params), oprf_key, cmd.nonce_byte_count(), cmd.compress());
 }
 
-bool try_save_sender_db(const CLP &cmd, shared_ptr<SenderDB> sender_db, const OPRFKey &oprf_key)
+bool try_save_sender_db(
+    const CLP &cmd, const shared_ptr<SenderDB> &sender_db, const OPRFKey &oprf_key)
 {
     if (!sender_db) {
         return false;
@@ -136,10 +151,12 @@ int start_sender(const CLP &cmd)
     throw_if_file_invalid(cmd.db_file());
 
     // Try loading first as a SenderDB, then as a CSV file
-    shared_ptr<SenderDB> sender_db;
     OPRFKey oprf_key;
-    if (!(sender_db = try_load_sender_db(cmd, oprf_key)) &&
-        !(sender_db = try_load_csv_db(cmd, oprf_key))) {
+    shared_ptr<SenderDB> sender_db = try_load_sender_db(cmd, oprf_key);
+    if (!sender_db) {
+        sender_db = try_load_csv_db(cmd, oprf_key);
+    }
+    if (!sender_db) {
         APSI_LOG_ERROR("Failed to create SenderDB: terminating");
         return -1;
     }
@@ -215,7 +232,7 @@ shared_ptr<SenderDB> create_sender_db(
         }
     } else if (holds_alternative<CSVReader::LabeledData>(db_data)) {
         try {
-            auto &labeled_db_data = get<CSVReader::LabeledData>(db_data);
+            const auto &labeled_db_data = get<CSVReader::LabeledData>(db_data);
 
             // Find the longest label and use that as label size
             size_t label_byte_count =

@@ -30,12 +30,13 @@ namespace APSITests {
         const vector<uint64_t> &poly, const uint64_t &x, const seal::Modulus &mod)
     {
         // cout << "f(" << x << ") = ";
-        uint64_t result = 0, x_pow = 1;
+        uint64_t result = 0;
+        uint64_t x_pow = 1;
 
-        MultiplyUIntModOperand x_mod_op;
+        MultiplyUIntModOperand x_mod_op{};
         x_mod_op.set(x, mod);
-        for (size_t i = 0; i < poly.size(); ++i) {
-            result = add_uint_mod(result, multiply_uint_mod(poly[i], x_pow, mod), mod);
+        for (unsigned long long i : poly) {
+            result = add_uint_mod(result, multiply_uint_mod(i, x_pow, mod), mod);
             x_pow = multiply_uint_mod(x_pow, x_mod_op, mod);
         }
         return result;
