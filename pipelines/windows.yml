@@ -1,12 +1,4 @@
 steps:
-- ${{ if eq(parameters.configuration, 'Release') }}:
-  - task: securedevelopmentteam.vss-secure-development-tools.build-task-credscan.CredScan@2
-    displayName: 'Run CredScan'
-    inputs:
-      toolMajorVersion: 'V2'
-      outputFormat: sarif
-      debugMode: false
-
 - task: Powershell@2
   displayName: 'Bootstrap vcpkg'
   inputs:
@@ -27,6 +19,9 @@ steps:
     cmakeArgs: .. -DCMAKE_BUILD_TYPE='${{ parameters.configuration }}' -DAPSI_BUILD_TESTS=ON -DVCPKG_MANIFEST_FEATURES=tests -DCMAKE_TOOLCHAIN_FILE=$(Build.SourcesDirectory)\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static-md
     workingDirectory: '$(Build.SourcesDirectory)/build'
 
+- ${{ if eq(parameters.configuration, 'Release') }}:
+  - task: CodeQL3000Init@0
+
 - task: MSBuild@1
   displayName: 'Build APSI'
   inputs:
@@ -34,6 +29,9 @@ steps:
     msbuildArchitecture: 'x64'
     platform: 'x64'
     configuration: '${{ parameters.configuration }}'
+
+- ${{ if eq(parameters.configuration, 'Release') }}:
+  - task: CodeQL3000Finalize@0
 
 - script: '${{ parameters.configuration }}\unit_tests.exe'
   workingDirectory: '$(Build.SourcesDirectory)\build\bin'
@@ -54,15 +52,28 @@ steps:
       ${{ parameters.configuration }}\**\?(*.exe|*.dll|*.lib|*.xml)
     TargetFolder: '$(Build.ArtifactStagingDirectory)'
 
-- task: ms.vss-governance-buildtask.governance-build-task-component-detection.ComponentGovernanceComponentDetection@0
-  displayName: 'Component Detection'
-
-- ${{ if eq(parameters.configuration, 'Release') }}:
-  - task: securedevelopmentteam.vss-secure-development-tools.build-task-publishsecurityanalysislogs.PublishSecurityAnalysisLogs@2
-    displayName: 'Publish Security Analysis Logs'
-
 - task: PublishBuildArtifacts@1
   displayName: 'Publish Artifact: drop'
   inputs:
     PathtoPublish: '$(Build.ArtifactStagingDirectory)'
     artifactName: windows-drop
+
+- ${{ if eq(parameters.configuration, 'Release') }}:
+  - task: CredScan@3
+    displayName: 'Credential Scan'
+
+  - task: ComponentGovernanceComponentDetection@0
+    displayName: 'Component Detection'
+    inputs:
+      scanType: 'Register'
+      verbosity: 'Verbose'
+      alertWarningLevel: 'High'
+
+- task: PublishSecurityAnalysisLogs@3
+  displayName: 'Publish Security Analysis Logs'
+  inputs:
+    ArtifactName: 'CodeAnalysisLogs'
+    ArtifactType: 'Container'
+    PublishProcessedResults: true
+    AllTools: true
+    ToolLogsNotFoundAction: 'Standard'

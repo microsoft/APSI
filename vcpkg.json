@@ -1,6 +1,6 @@
 {
   "name": "apsi",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "description": "Asymmetric Private Set Intersection",
   "license": "MIT",
   "homepage": "https://github.com/microsoft/APSI",
