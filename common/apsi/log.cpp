@@ -22,21 +22,40 @@ using namespace std;
 
 namespace apsi {
     namespace {
-        // Global emission threshold.
+        // Global emission threshold. A trivially destructible atomic, so it is safe to leave at
+        // namespace scope even if it is read during static destruction at process exit.
         std::atomic<LogLevel> log_level_{ LogLevel::suppress };
 
-        // Mutex guards the global_logger pointer. Logger::log itself takes its own internal
-        // mutex, so emission only contends on this one for the brief shared_ptr copy in
-        // internal::DoLog / GetLogger.
-        std::mutex logger_mutex;
-        std::shared_ptr<Logger> global_logger;
+        // Immortal singleton holding the global logger and the mutex guarding it. It is
+        // heap-allocated exactly once and never destroyed, so the logger stays valid even when
+        // APSI is called from a host's static/global destructor during process teardown. This
+        // avoids the static destruction-order fiasco: a namespace-scope mutex / shared_ptr
+        // destroyed before a host static that logs on its way out would otherwise be locked /
+        // read after destruction (undefined behavior). Because ~Logger therefore never runs for
+        // the global logger, the bundled sinks flush on every write (see build_sinks) instead of
+        // relying on a close() at teardown to drain a buffered file stream; std::cout / std::cerr
+        // are additionally flushed by the standard library at exit.
+        struct LoggerState {
+            std::mutex mtx;
+            std::shared_ptr<Logger> logger;
+        };
 
+        LoggerState &logger_state()
+        {
+            // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): intentional immortal singleton.
+            static LoggerState &state = *new LoggerState();
+            return state;
+        }
+
+        // Returns the global logger, creating the default one on first use. The caller must hold
+        // logger_state().mtx.
         std::shared_ptr<Logger> get_or_init_default_unlocked()
         {
-            if (!global_logger) {
-                global_logger = NewDefaultLogger();
+            auto &state = logger_state();
+            if (!state.logger) {
+                state.logger = NewDefaultLogger();
             }
-            return global_logger;
+            return state.logger;
         }
 
         const char *level_label(LogLevel level)
@@ -137,9 +156,10 @@ namespace apsi {
     {
         shared_ptr<Logger> old_logger;
         {
-            lock_guard<mutex> lock(logger_mutex);
-            old_logger = std::move(global_logger);
-            global_logger = std::move(logger);
+            auto &state = logger_state();
+            lock_guard<mutex> lock(state.mtx);
+            old_logger = std::move(state.logger);
+            state.logger = std::move(logger);
         }
         if (old_logger) {
             old_logger->close();
@@ -148,7 +168,8 @@ namespace apsi {
 
     shared_ptr<Logger> GetLogger()
     {
-        lock_guard<mutex> lock(logger_mutex);
+        auto &state = logger_state();
+        lock_guard<mutex> lock(state.mtx);
         return get_or_init_default_unlocked();
     }
 
@@ -161,8 +182,9 @@ namespace apsi {
     {
         shared_ptr<Logger> old_logger;
         {
-            lock_guard<mutex> lock(logger_mutex);
-            old_logger = std::move(global_logger);
+            auto &state = logger_state();
+            lock_guard<mutex> lock(state.mtx);
+            old_logger = std::move(state.logger);
         }
         if (old_logger) {
             old_logger->close();
@@ -174,7 +196,8 @@ namespace apsi {
         {
             shared_ptr<Logger> logger;
             {
-                lock_guard<mutex> lock(logger_mutex);
+                auto &state = logger_state();
+                lock_guard<mutex> lock(state.mtx);
                 logger = get_or_init_default_unlocked();
             }
             if (logger) {
@@ -288,11 +311,18 @@ namespace apsi {
             auto build_handler = [console_enabled, file_stream](LogLevel level, ostream *console) {
                 return [level, console, file_stream, console_enabled](const string &msg) {
                     string line = format_log_line(level, msg);
+                    // Flush on every write. The global logger is an immortal singleton whose
+                    // ~Logger never runs, so there is no close()/flush at process exit to drain a
+                    // buffered file stream; flushing per line keeps both the file and console
+                    // current with no data loss. std::cerr is already unit-buffered, and the cost
+                    // is negligible at APSI's logging rates.
                     if (console_enabled && console) {
                         *console << line;
+                        console->flush();
                     }
                     if (file_stream && file_stream->is_open()) {
                         *file_stream << line;
+                        file_stream->flush();
                     }
                 };
             };

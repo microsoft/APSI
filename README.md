@@ -883,9 +883,13 @@ Installing a no-op logger with `apsi::SetLogger(apsi::Logger::Create({}, {}, {})
 Each handler receives an already-formatted `std::string`.
 `Logger::log` invokes the handler while holding the logger's internal mutex, so emissions on a single logger are serialized and your handler need not be thread-safe; it must, however, not re-enter the logger (for example by calling an `APSI_LOG_*` macro), as the mutex is not recursive.
 
-Before the program exits, flush and close the active logger so that buffered output — for example a file sink that is not flushed on every line — is not lost.
-`apsi::CloseLogger()` flushes and closes the current global logger; installing a replacement with `apsi::SetLogger` also flushes and closes the previous one first.
-A `Logger` additionally flushes and closes itself on destruction, but relying on static-destruction order at process exit is fragile, so prefer an explicit `apsi::CloseLogger()`.
+APSI's global logger is intentionally **never destroyed** at process exit — it is a heap-allocated singleton that outlives static destruction.
+This keeps APSI safe to call from a host object's static or global destructor: it avoids the static destruction-order problem, in which a namespace-scope mutex or pointer destroyed before such a host static would be used after destruction.
+The tradeoff is that the global logger's destructor never runs at exit, so its `flush`/`close` handlers are **not** invoked automatically on shutdown.
+
+The built-in loggers account for this by flushing on every write: both `apsi::NewDefaultLogger()` and `apsi::NewFileLogger()` flush the console and (when present) the file after each line, so they lose no output and need no explicit teardown.
+If you install a **custom** logger that buffers output or holds a resource such as a file handle, call `apsi::CloseLogger()` during your controlled shutdown to guarantee a final flush and close; installing a replacement with `apsi::SetLogger` also flushes and closes the previous logger first.
+For the same reason, avoid APSI-dependent logging in your own static or global destructors, where ordering relative to the C++ runtime's stream flushing is undefined.
 
 ## Building APSI
 
