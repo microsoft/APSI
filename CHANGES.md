@@ -1,5 +1,11 @@
 # List of Changes
 
+## Version 0.13.1
+
+- Updated the vcpkg baseline to build against Microsoft SEAL 4.4.0.
+- The global logger is now a never-destroyed ("immortal") singleton, which avoids a static-destruction-order issue when another library logs through APSI during process teardown. As a consequence the logger's handlers are no longer invoked automatically at exit, so the built-in console and file loggers now flush on every write. Custom buffering loggers should be flushed and closed via `apsi::CloseLogger()` (see [Logging](README.md#logging)).
+- Fixed some issues in [CMakePresets.json](CMakePresets.json).
+
 ## Version 0.13.0
 
 - Numerous bug fixes.
