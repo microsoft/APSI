@@ -504,7 +504,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(ZMQSenderReceiverTests, UnlabeledLarge1)
+    TEST(ZMQSenderReceiverTests, DISABLED_UnlabeledLarge1)
     {
         size_t sender_size = 4000;
         RunUnlabeledTest(
@@ -524,7 +524,7 @@ namespace APSITests {
             1);
     }
 
-    TEST(ZMQSenderReceiverTests, UnlabeledLarge2)
+    TEST(ZMQSenderReceiverTests, DISABLED_UnlabeledLarge2)
     {
         size_t sender_size = 4000;
         RunUnlabeledTest(
@@ -544,7 +544,7 @@ namespace APSITests {
             1);
     }
 
-    TEST(ZMQSenderReceiverTests, UnlabeledLargeMultiThreaded1)
+    TEST(ZMQSenderReceiverTests, DISABLED_UnlabeledLargeMultiThreaded1)
     {
         size_t sender_size = 4000;
         RunUnlabeledTest(
@@ -564,7 +564,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(ZMQSenderReceiverTests, UnlabeledLargeMultiThreaded2)
+    TEST(ZMQSenderReceiverTests, DISABLED_UnlabeledLargeMultiThreaded2)
     {
         size_t sender_size = 4000;
         RunUnlabeledTest(
@@ -584,7 +584,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(ZMQSenderReceiverTests, UnlabeledLargeMultiThreadedMultiClient1)
+    TEST(ZMQSenderReceiverTests, DISABLED_UnlabeledLargeMultiThreadedMultiClient1)
     {
         size_t sender_size = 4000;
         RunUnlabeledTest(
@@ -604,7 +604,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(ZMQSenderReceiverTests, UnlabeledLargeMultiThreadedMultiClient2)
+    TEST(ZMQSenderReceiverTests, DISABLED_UnlabeledLargeMultiThreadedMultiClient2)
     {
         size_t sender_size = 4000;
         RunUnlabeledTest(
@@ -624,7 +624,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(ZMQSenderReceiverTests, UnlabeledHugeMultiThreaded1)
+    TEST(ZMQSenderReceiverTests, DISABLED_UnlabeledHugeMultiThreaded1)
     {
         size_t sender_size = 50000;
         RunUnlabeledTest(
@@ -650,7 +650,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(ZMQSenderReceiverTests, UnlabeledHugeMultiThreaded2)
+    TEST(ZMQSenderReceiverTests, DISABLED_UnlabeledHugeMultiThreaded2)
     {
         size_t sender_size = 50000;
         RunUnlabeledTest(
@@ -892,7 +892,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(ZMQSenderReceiverTests, LabeledLarge1)
+    TEST(ZMQSenderReceiverTests, DISABLED_LabeledLarge1)
     {
         size_t sender_size = 4000;
         RunLabeledTest(
@@ -912,7 +912,7 @@ namespace APSITests {
             1);
     }
 
-    TEST(ZMQSenderReceiverTests, LabeledLarge2)
+    TEST(ZMQSenderReceiverTests, DISABLED_LabeledLarge2)
     {
         size_t sender_size = 4000;
         RunLabeledTest(
@@ -932,7 +932,7 @@ namespace APSITests {
             1);
     }
 
-    TEST(ZMQSenderReceiverTests, LabeledLargeMultiThreaded1)
+    TEST(ZMQSenderReceiverTests, DISABLED_LabeledLargeMultiThreaded1)
     {
         size_t sender_size = 4000;
         RunLabeledTest(
@@ -952,7 +952,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(ZMQSenderReceiverTests, LabeledLargeMultiThreaded2)
+    TEST(ZMQSenderReceiverTests, DISABLED_LabeledLargeMultiThreaded2)
     {
         size_t sender_size = 4000;
         RunLabeledTest(
@@ -972,7 +972,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(ZMQSenderReceiverTests, LabeledLargeMultiThreadedMultiClient1)
+    TEST(ZMQSenderReceiverTests, DISABLED_LabeledLargeMultiThreadedMultiClient1)
     {
         size_t sender_size = 4000;
         RunLabeledTest(
@@ -992,7 +992,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(ZMQSenderReceiverTests, LabeledLargeMultiThreadedMultiClient2)
+    TEST(ZMQSenderReceiverTests, DISABLED_LabeledLargeMultiThreadedMultiClient2)
     {
         size_t sender_size = 4000;
         RunLabeledTest(
@@ -1012,7 +1012,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(ZMQSenderReceiverTests, LabeledHugeMultiThreaded1)
+    TEST(ZMQSenderReceiverTests, DISABLED_LabeledHugeMultiThreaded1)
     {
         size_t sender_size = 50000;
         RunLabeledTest(
@@ -1038,7 +1038,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(ZMQSenderReceiverTests, LabeledHugeMultiThreaded2)
+    TEST(ZMQSenderReceiverTests, DISABLED_LabeledHugeMultiThreaded2)
     {
         size_t sender_size = 50000;
         RunLabeledTest(

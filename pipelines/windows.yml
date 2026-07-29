@@ -37,6 +37,15 @@ steps:
   workingDirectory: '$(Build.SourcesDirectory)\build\bin'
   displayName: 'Run unit tests'
 
+# Integration tests are Release-only: a Debug build links vcpkg's unoptimized SEAL, which
+# makes the homomorphic operations 10-20x slower and the suite impractical as a gate.
+# The Large and Huge cases are DISABLED_ in the source, so only the small and medium ones
+# run here. Add --gtest_also_run_disabled_tests before tagging a release.
+- ${{ if eq(parameters.configuration, 'Release') }}:
+  - script: '${{ parameters.configuration }}\integration_tests.exe'
+    workingDirectory: '$(Build.SourcesDirectory)\build\bin'
+    displayName: 'Run integration tests'
+
 - task: PublishSymbols@2
   displayName: 'Publish symbols path'
   inputs:

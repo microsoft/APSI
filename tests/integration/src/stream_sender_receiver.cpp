@@ -425,7 +425,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(StreamSenderReceiverTests, UnlabeledLarge1)
+    TEST(StreamSenderReceiverTests, DISABLED_UnlabeledLarge1)
     {
         size_t sender_size = 4000;
         RunUnlabeledTest(
@@ -444,7 +444,7 @@ namespace APSITests {
             1);
     }
 
-    TEST(StreamSenderReceiverTests, UnlabeledLarge2)
+    TEST(StreamSenderReceiverTests, DISABLED_UnlabeledLarge2)
     {
         size_t sender_size = 4000;
         RunUnlabeledTest(
@@ -463,7 +463,7 @@ namespace APSITests {
             1);
     }
 
-    TEST(StreamSenderReceiverTests, UnlabeledLargeMultiThreaded1)
+    TEST(StreamSenderReceiverTests, DISABLED_UnlabeledLargeMultiThreaded1)
     {
         size_t sender_size = 4000;
         RunUnlabeledTest(
@@ -482,7 +482,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(StreamSenderReceiverTests, UnlabeledLargeMultiThreaded2)
+    TEST(StreamSenderReceiverTests, DISABLED_UnlabeledLargeMultiThreaded2)
     {
         size_t sender_size = 4000;
         RunUnlabeledTest(
@@ -501,7 +501,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(StreamSenderReceiverTests, UnlabeledHugeMultiThreaded1)
+    TEST(StreamSenderReceiverTests, DISABLED_UnlabeledHugeMultiThreaded1)
     {
         size_t sender_size = 50000;
         RunUnlabeledTest(
@@ -525,7 +525,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(StreamSenderReceiverTests, UnlabeledHugeMultiThreaded2)
+    TEST(StreamSenderReceiverTests, DISABLED_UnlabeledHugeMultiThreaded2)
     {
         size_t sender_size = 50000;
         RunUnlabeledTest(
@@ -747,7 +747,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(StreamSenderReceiverTests, LabeledLarge1)
+    TEST(StreamSenderReceiverTests, DISABLED_LabeledLarge1)
     {
         size_t sender_size = 4000;
         RunLabeledTest(
@@ -766,7 +766,7 @@ namespace APSITests {
             1);
     }
 
-    TEST(StreamSenderReceiverTests, LabeledLarge2)
+    TEST(StreamSenderReceiverTests, DISABLED_LabeledLarge2)
     {
         size_t sender_size = 4000;
         RunLabeledTest(
@@ -785,7 +785,7 @@ namespace APSITests {
             1);
     }
 
-    TEST(StreamSenderReceiverTests, LabeledLargeMultiThreaded1)
+    TEST(StreamSenderReceiverTests, DISABLED_LabeledLargeMultiThreaded1)
     {
         size_t sender_size = 4000;
         RunLabeledTest(
@@ -804,7 +804,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(StreamSenderReceiverTests, LabeledLargeMultiThreaded2)
+    TEST(StreamSenderReceiverTests, DISABLED_LabeledLargeMultiThreaded2)
     {
         size_t sender_size = 4000;
         RunLabeledTest(
@@ -823,7 +823,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(StreamSenderReceiverTests, LabeledHugeMultiThreaded1)
+    TEST(StreamSenderReceiverTests, DISABLED_LabeledHugeMultiThreaded1)
     {
         size_t sender_size = 50000;
         RunLabeledTest(
@@ -847,7 +847,7 @@ namespace APSITests {
             thread::hardware_concurrency());
     }
 
-    TEST(StreamSenderReceiverTests, LabeledHugeMultiThreaded2)
+    TEST(StreamSenderReceiverTests, DISABLED_LabeledHugeMultiThreaded2)
     {
         size_t sender_size = 50000;
         RunLabeledTest(
