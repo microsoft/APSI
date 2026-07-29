@@ -7,8 +7,10 @@
 #include <algorithm>
 #include <atomic>
 #include <cstdint>
+#include <exception>
 #include <future>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -166,8 +168,6 @@ namespace apsi {
                 target_powers_.cbegin(), target_powers_.cend());
             std::size_t target_powers_count = target_powers_vec.size();
 
-            ThreadPoolMgr tpm;
-
             enum class NodeState { Uncomputed = 0, Computing = 1, Computed = 2 };
 
             // Initialize all nodes as uncomputed
@@ -176,10 +176,34 @@ namespace apsi {
                 node_states[power_idx].store(NodeState::Uncomputed);
             }
 
+            // Shared failure state. A worker that throws leaves its node in the Computing state
+            // forever, so the completion check below could never pass again: every other worker
+            // would spin at 100% CPU and never return, which in turn makes ~ThreadPool block
+            // forever waiting for them. Recording the failure lets all workers exit promptly; the
+            // first exception is rethrown after every worker has been joined.
+            std::atomic<bool> failed(false);
+            std::mutex failure_mutex;
+            std::exception_ptr first_exception;
+
+            auto capture_failure = [&]() {
+                {
+                    std::lock_guard<std::mutex> lock(failure_mutex);
+                    if (!first_exception) {
+                        first_exception = std::current_exception();
+                    }
+                }
+                failed.store(true);
+            };
+
             auto node_worker = [&]() {
                 // Start looking for work by going over node_states vector
                 std::size_t power_idx = 0;
                 while (true) {
+                    // Give up as soon as any worker has failed
+                    if (failed.load()) {
+                        return;
+                    }
+
                     // Check if everything is done
                     bool done = std::all_of(
                         node_states.data(),
@@ -267,14 +291,46 @@ namespace apsi {
                 }
             };
 
+            // Declared last, and so destroyed first: the workers hold references to every local
+            // above, and ~ThreadPoolMgr can block until the pool's workers are gone. Keeping the
+            // pool manager below that state means the state cannot outlive its users even if the
+            // drain below is ever bypassed.
+            ThreadPoolMgr tpm;
+
             std::size_t task_count = ThreadPoolMgr::GetThreadCount();
             std::vector<std::future<void>> futures(task_count);
-            for (std::size_t t = 0; t < task_count; t++) {
-                futures[t] = tpm.thread_pool().enqueue(node_worker);
+            try {
+                for (std::size_t t = 0; t < task_count; t++) {
+                    futures[t] = tpm.thread_pool().enqueue([&]() {
+                        try {
+                            node_worker();
+                        } catch (...) {
+                            capture_failure();
+                        }
+                    });
+                }
+            } catch (...) {
+                // enqueue itself failed; workers that already started must be told to stop or the
+                // drain below would never finish
+                capture_failure();
             }
 
+            // Every worker must be joined before any of the state it captured by reference goes
+            // out of scope. Futures obtained from a std::packaged_task do not wait on destruction,
+            // so abandoning them here would leave workers running against a destroyed node_states.
             for (auto &f : futures) {
-                f.get();
+                if (!f.valid()) {
+                    continue;
+                }
+                try {
+                    f.get();
+                } catch (...) {
+                    capture_failure();
+                }
+            }
+
+            if (first_exception) {
+                std::rethrow_exception(first_exception);
             }
         }
 

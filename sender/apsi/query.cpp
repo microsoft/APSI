@@ -62,6 +62,32 @@ namespace apsi {
                         APSI_LOG_ERROR("Extracted ciphertext is invalid for SEALContext");
                         return;
                     }
+
+                    // is_valid_for only checks internal consistency: it accepts a ciphertext at
+                    // any level of the modulus chain, of any size, and in either NTT or
+                    // coefficient form. An honest receiver always sends freshly encrypted source
+                    // powers and Sender::ComputePowers depends on that, so anything else must be
+                    // rejected here: operands at mixed levels or in NTT form make
+                    // Evaluator::multiply throw, and a size greater than 2 outruns the
+                    // relinearization keys. Either throw escapes into a worker thread.
+                    if (cts.back().parms_id() != seal_context->first_parms_id()) {
+                        APSI_LOG_ERROR(
+                            "Extracted ciphertext is not at the highest level of the "
+                            "modulus chain");
+                        return;
+                    }
+                    if (cts.back().size() != 2) {
+                        APSI_LOG_ERROR(
+                            "Extracted ciphertext has size " << cts.back().size()
+                                                             << "; expected a fresh encryption of "
+                                                                "size 2");
+                        return;
+                    }
+                    if (cts.back().is_ntt_form()) {
+                        APSI_LOG_ERROR(
+                            "Extracted ciphertext is in NTT form; expected coefficient form");
+                        return;
+                    }
                 }
                 data_[q.first] = std::move(cts);
             }

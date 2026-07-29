@@ -2,14 +2,23 @@
 // Licensed under the MIT license.
 
 // STD
+#include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <future>
+#include <iostream>
 #include <numeric>
 #include <set>
 #include <sstream>
+#include <stdexcept>
+#include <thread>
+#include <vector>
 
 // APSI
 #include "apsi/powers.h"
+#include "apsi/thread_pool_mgr.h"
 #include "apsi/util/utils.h"
 
 // Google Test
@@ -200,5 +209,149 @@ namespace APSITests {
         // Compare
         ASSERT_EQ(expected.size(), real.size());
         ASSERT_TRUE(equal(expected.begin(), expected.end(), real.begin()));
+    }
+
+    namespace {
+        struct ApplyOutcome {
+            bool threw = false;
+        };
+
+        /**
+        Sets the shared thread pool size for the duration of a test and restores the default on
+        scope exit. A trailing SetThreadCount call in the test body is skipped whenever an ASSERT_*
+        fires, which would leak the oversized pool into whichever test runs next.
+        */
+        class ScopedThreadCount {
+        public:
+            explicit ScopedThreadCount(size_t threads)
+            {
+                ThreadPoolMgr::SetThreadCount(threads);
+            }
+
+            ~ScopedThreadCount()
+            {
+                ThreadPoolMgr::SetThreadCount(0);
+            }
+
+            ScopedThreadCount(const ScopedThreadCount &) = delete;
+            ScopedThreadCount &operator=(const ScopedThreadCount &) = delete;
+        };
+
+        /**
+        Runs parallel_apply on a detached thread and gives up after a deadline. A regression in
+        parallel_apply's exception handling shows up as a livelock, which would hang the whole test
+        binary instead of failing it; this turns that hang into a reported failure. The process is
+        terminated on timeout because the wedged workers can never be joined, so even shutting down
+        cleanly is impossible from that point on.
+        */
+        template <typename Func>
+        ApplyOutcome apply_with_deadline(const PowersDag &pd, Func func)
+        {
+            auto outcome = make_shared<ApplyOutcome>();
+            auto signal = make_shared<promise<void>>();
+            future<void> done = signal->get_future();
+
+            thread([pd, func, outcome, signal]() mutable {
+                try {
+                    pd.parallel_apply(func);
+                } catch (const exception &) {
+                    outcome->threw = true;
+                }
+                signal->set_value();
+            }).detach();
+
+            if (done.wait_for(chrono::seconds(30)) != future_status::ready) {
+                ADD_FAILURE() << "parallel_apply did not return within 30 seconds; the thread pool "
+                                 "is wedged";
+                cout.flush();
+                cerr.flush();
+                _Exit(EXIT_FAILURE);
+            }
+
+            return *outcome;
+        }
+    } // namespace
+
+    TEST(PowersTests, ParallelApply)
+    {
+        ScopedThreadCount threads(8);
+
+        PowersDag pd;
+        set<uint32_t> source_powers = { 1, 2, 5 };
+        set<uint32_t> target_powers = create_powers_set(0, 64);
+        ASSERT_TRUE(pd.configure(source_powers, target_powers));
+
+        vector<atomic<int>> visits(65);
+        for (auto &visit : visits) {
+            visit.store(0);
+        }
+
+        ApplyOutcome outcome = apply_with_deadline(
+            pd, [&visits](const PowersDag::PowersNode &node) { visits[node.power]++; });
+
+        ASSERT_FALSE(outcome.threw);
+        for (uint32_t power = 1; power <= 64; power++) {
+            ASSERT_EQ(1, visits[power].load()) << "power " << power << " was not visited once";
+        }
+    }
+
+    TEST(PowersTests, ParallelApplyPropagatesException)
+    {
+        ScopedThreadCount threads(8);
+
+        PowersDag pd;
+        set<uint32_t> source_powers = { 1, 2, 5 };
+        set<uint32_t> target_powers = create_powers_set(0, 64);
+        ASSERT_TRUE(pd.configure(source_powers, target_powers));
+
+        // Throw on the highest target power. The abandoned node stays in the Computing state, so
+        // the "all nodes computed" check can never pass again; before the fix, every other worker
+        // kept re-scanning the node list at full speed and never returned.
+        uint32_t poison = *target_powers.crbegin();
+
+        ApplyOutcome outcome = apply_with_deadline(pd, [poison](const PowersDag::PowersNode &node) {
+            if (node.power == poison) {
+                throw runtime_error("poisoned node");
+            }
+        });
+
+        ASSERT_TRUE(outcome.threw) << "the exception thrown by the applied function was swallowed";
+    }
+
+    TEST(PowersTests, ParallelApplyLeavesThreadPoolUsable)
+    {
+        ScopedThreadCount threads(8);
+
+        // Hold a ThreadPoolMgr for the whole test, exactly as Sender::RunQuery does. This keeps
+        // the shared pool alive across both calls below, which is what made the original livelock
+        // permanent rather than confined to a single query.
+        ThreadPoolMgr tpm;
+
+        PowersDag pd;
+        set<uint32_t> source_powers = { 1, 2, 5 };
+        set<uint32_t> target_powers = create_powers_set(0, 64);
+        ASSERT_TRUE(pd.configure(source_powers, target_powers));
+
+        uint32_t poison = *target_powers.crbegin();
+        ApplyOutcome failed_outcome =
+            apply_with_deadline(pd, [poison](const PowersDag::PowersNode &node) {
+                if (node.power == poison) {
+                    throw runtime_error("poisoned node");
+                }
+            });
+        ASSERT_TRUE(failed_outcome.threw);
+
+        // The pool must still be able to run work: no worker may have been left spinning.
+        vector<atomic<int>> visits(65);
+        for (auto &visit : visits) {
+            visit.store(0);
+        }
+        ApplyOutcome outcome = apply_with_deadline(
+            pd, [&visits](const PowersDag::PowersNode &node) { visits[node.power]++; });
+
+        ASSERT_FALSE(outcome.threw);
+        for (uint32_t power = 1; power <= 64; power++) {
+            ASSERT_EQ(1, visits[power].load()) << "power " << power << " was not visited once";
+        }
     }
 } // namespace APSITests
