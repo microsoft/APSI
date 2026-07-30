@@ -11,46 +11,62 @@
 
 namespace apsi {
     /**
-    Manages lifetime of a static thread pool. While an instance of this class exists,
-    a static thread pool will be shared among all instances.
+    Reference-counting handle to a process-wide shared ThreadPool. The pool is created when the
+    first ThreadPoolMgr is constructed and destroyed when the last one goes out of scope, so a
+    process that is not currently running APSI work holds no worker threads.
+
+    The reference counting is not merely an optimization. ThreadPool's workers are detached and
+    may log on their way out, and ~ThreadPool blocks until they have all exited. A pool owned by
+    a function-local static would instead be torn down during static destruction, racing the
+    destruction of the logger it writes to -- these are separate translation units, so their
+    relative destruction order is unspecified. Tying the pool's lifetime to a stack object
+    destroys it at a deterministic point while the rest of the program is still alive.
+
+    Instances are cheap; construct one in any scope that enqueues work, including nested scopes.
+    All members are safe to call concurrently.
     */
     class ThreadPoolMgr {
     public:
         /**
-        Build an instance of ThreadPoolMgr
+        Take a reference on the shared thread pool, creating it if this is the first reference.
         */
         ThreadPoolMgr();
 
         /**
-        Destructor for ThreadPoolMgr
+        Release the reference, destroying the shared thread pool if this was the last one.
         */
         ~ThreadPoolMgr();
 
         /**
-        Get the thread pool managed by the thread pool manager
+        Get the shared thread pool. The reference stays valid for the lifetime of this instance.
         */
         [[nodiscard]]
         util::ThreadPool &thread_pool() const;
 
         /**
-        Set the number of threads to be used by the thread pool
+        Set the number of worker threads the shared pool runs, resizing it immediately if it
+        currently exists. Zero requests the hardware default. The value is clamped into
+        [ThreadPool::MinPoolSize(), ThreadPool::MaxPoolSize()].
+
+        This also sets the fan-out width reported by GetThreadCount, so calling it after
+        SetPoolWorkerCount discards that setting. Set this one first.
         */
         static void SetThreadCount(std::size_t threads);
 
         /**
-        This method is to be used explicitly by tests.
+        Set only the number of worker threads in the shared pool, leaving the fan-out width
+        reported by GetThreadCount alone. This is what makes the two numbers diverge.
+
+        Raising the worker count above the fan-out width is currently REQUIRED, not merely an
+        optimization, whenever more than one APSI operation runs concurrently in a process.
         */
-        static void SetPhysThreadCount(std::size_t threads);
+        static void SetPoolWorkerCount(std::size_t threads);
 
         /**
-        Get the number of threads used by the thread pool
+        Get the fan-out width: the number of tasks a single APSI operation splits itself into.
+        Guaranteed to be at least one and never larger than the pool's cap. This is not
+        necessarily the pool's worker count -- see SetPoolWorkerCount.
         */
         static std::size_t GetThreadCount();
-
-    private:
-        /**
-        Reference count to manage lifetime of the static thread pool
-        */
-        static std::size_t ref_count_;
     };
 } // namespace apsi

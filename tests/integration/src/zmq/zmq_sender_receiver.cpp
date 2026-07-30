@@ -126,7 +126,7 @@ namespace APSITests {
             SetLogLevel(LogLevel::info);
 
             ThreadPoolMgr::SetThreadCount(num_threads);
-            ThreadPoolMgr::SetPhysThreadCount(num_threads * 2);
+            ThreadPoolMgr::SetPoolWorkerCount(num_threads * 2);
 
             vector<Item> sender_items;
             sender_items.reserve(sender_size);
@@ -211,7 +211,7 @@ namespace APSITests {
             SetLogLevel(LogLevel::info);
 
             ThreadPoolMgr::SetThreadCount(num_threads);
-            ThreadPoolMgr::SetPhysThreadCount(num_threads * 2);
+            ThreadPoolMgr::SetPoolWorkerCount(num_threads * 2);
 
             vector<pair<Item, Label>> sender_items;
             sender_items.reserve(sender_size);
