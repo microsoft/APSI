@@ -5,6 +5,7 @@
 #include <atomic>
 #include <chrono>
 #include <future>
+#include <limits>
 #include <memory>
 #include <set>
 #include <stdexcept>
@@ -463,5 +464,63 @@ namespace APSITests {
 
         rel.set_value();
         tpm.thread_pool().wait_until_nothing_in_flight();
+    }
+
+    TEST(ThreadPoolTests, ClampPoolSizeStaysWithinBounds)
+    {
+        ASSERT_LE(ThreadPool::MinPoolSize(), ThreadPool::MaxPoolSize());
+
+        // A pool of zero workers would accept tasks and never run them.
+        ASSERT_EQ(ThreadPool::MinPoolSize(), ThreadPool::ClampPoolSize(0));
+        ASSERT_EQ(size_t(1), ThreadPool::ClampPoolSize(1));
+
+        // An absurd request is capped rather than allowed to exhaust the thread limit.
+        ASSERT_EQ(
+            ThreadPool::MaxPoolSize(), ThreadPool::ClampPoolSize(numeric_limits<size_t>::max()));
+    }
+
+    TEST(ThreadPoolMgrTests, ThreadCountMatchesActualPoolBounds)
+    {
+        // Every fan-out site in APSI uses GetThreadCount as a task count, where zero means "run
+        // no tasks at all" rather than "run serially", and a count above the pool's cap means
+        // enqueueing work no worker will ever claim. GetThreadCount must therefore report a
+        // number the pool can actually honor. Values are collected first and the global count is
+        // restored before any assertion, so a failure here cannot leak into later tests.
+        const size_t max_size = ThreadPool::MaxPoolSize();
+
+        ThreadPoolMgr::SetThreadCount(0);
+        const size_t defaulted = ThreadPoolMgr::GetThreadCount();
+
+        ThreadPoolMgr::SetThreadCount(numeric_limits<size_t>::max());
+        const size_t clamped = ThreadPoolMgr::GetThreadCount();
+
+        ThreadPoolMgr::SetThreadCount(0);
+
+        ASSERT_LE(ThreadPool::MinPoolSize(), defaulted);
+        ASSERT_GE(max_size, defaulted);
+        ASSERT_EQ(max_size, clamped);
+    }
+
+    TEST(ThreadPoolMgrTests, PoolWorkerCountDoesNotChangeThreadCount)
+    {
+        // SetPoolWorkerCount raises the pool's worker count above the fan-out width so that
+        // concurrent APSI operations do not starve each other. Receiver::request_query enqueues
+        // GetThreadCount() workers that block on network reads from inside pool tasks, so a pool
+        // sized exactly to the fan-out width can deadlock when two operations share it. That only
+        // works if SetPoolWorkerCount leaves the fan-out width alone.
+        ThreadPoolMgr::SetThreadCount(2);
+        ASSERT_EQ(size_t(2), ThreadPoolMgr::GetThreadCount());
+
+        ThreadPoolMgr::SetPoolWorkerCount(4);
+        const size_t after_pool_resize = ThreadPoolMgr::GetThreadCount();
+
+        // SetThreadCount, by contrast, resets both, so the ordering of the two calls matters.
+        ThreadPoolMgr::SetThreadCount(3);
+        const size_t after_thread_count = ThreadPoolMgr::GetThreadCount();
+
+        ThreadPoolMgr::SetThreadCount(0);
+
+        ASSERT_EQ(size_t(2), after_pool_resize);
+        ASSERT_EQ(size_t(3), after_thread_count);
     }
 } // namespace APSITests

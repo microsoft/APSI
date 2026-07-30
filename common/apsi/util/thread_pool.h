@@ -66,8 +66,7 @@ namespace apsi::util {
     */
     class ThreadPool {
     public:
-        explicit ThreadPool(
-            std::size_t threads = (std::max)(2U, std::thread::hardware_concurrency()))
+        explicit ThreadPool(std::size_t threads)
         {
             set_pool_size(threads);
         }
@@ -138,54 +137,114 @@ namespace apsi::util {
         }
 
         /**
-        Resize the pool to new_size workers (minimum 1). Growing first cancels any currently
-        pending exits, then spawns the remaining shortfall as new detached threads. Shrinking
-        raises pending_exits_ by the appropriate delta and wakes the waiters; whichever workers
-        claim the tokens first will exit. After this call returns the logical pool size is
-        new_size, but the actual active count converges asynchronously as workers wake.
+        Smallest number of workers a pool may have. A pool of zero workers would accept tasks
+        and never run them.
+        */
+        static constexpr std::size_t MinPoolSize()
+        {
+            return 1;
+        }
+
+        /**
+        Largest number of workers a pool may have: 16 times the number of hardware threads.
+        This is far more than any APSI workload benefits from, and exists only so that a
+        nonsensical thread count -- a typo in a config file, say -- cannot make the pool keep
+        starting threads until the operating system refuses to create more. Note that
+        std::thread::hardware_concurrency may return 0 when it cannot determine the hardware
+        thread count, hence the floor of 1.
+        */
+        static std::size_t MaxPoolSize()
+        {
+            return static_cast<std::size_t>((std::max)(1U, std::thread::hardware_concurrency())) *
+                   16;
+        }
+
+        /**
+        Clamp a requested worker count into [MinPoolSize(), MaxPoolSize()]. Callers that
+        report a pool size to others should clamp with this so that the number they publish
+        matches the number of workers the pool will actually run.
+        */
+        static std::size_t ClampPoolSize(std::size_t size)
+        {
+            if (size < MinPoolSize()) {
+                return MinPoolSize();
+            }
+            const std::size_t max_size = MaxPoolSize();
+            if (size > max_size) {
+                APSI_LOG_WARNING(
+                    "Requested thread pool size " << size << " exceeds the maximum of " << max_size
+                                                  << "; using " << max_size << " threads instead");
+                return max_size;
+            }
+            return size;
+        }
+
+        /**
+        Resize the pool to new_size workers. new_size is clamped into[MinPoolSize(), MaxPoolSize()].
+        Growing first cancels any currently pending exits, then spawns the remaining shortfall as
+        new detached threads. Shrinking raises pending_exits_ by the appropriate delta and wakes the
+        waiters; whichever workers claim the tokens first will exit. After this call returns the
+        logical pool size is new_size, but the actual active count converges asynchronously as
+        workers wake.
+
+        If the operating system refuses to create a thread partway through a grow, the pool keeps
+        the workers it managed to start and logs a warning rather than propagating the failure:
+        running with fewer workers is slower but correct. The exception is only allowed to escape
+        when the pool has no workers at all, since such a pool would accept tasks and never run
+        them. See the comment in the spawn loop for why this distinction matters.
         */
         void set_pool_size(std::size_t new_size)
         {
-            if (new_size == 0) {
-                new_size = 1;
-            }
+            new_size = ClampPoolSize(new_size);
 
-            // Clamp to a sane upper bound so that a misconfigured caller cannot drive the
-            // pool to spawn until pthread_create returns EAGAIN. The bound is generous
-            // (16x hardware concurrency) and only matters as a backstop.
-            const std::size_t hw = (std::max)(1U, std::thread::hardware_concurrency());
-            const std::size_t max_workers = hw * 16;
-            if (new_size > max_workers) {
-                APSI_LOG_WARNING(
-                    "ThreadPool::set_pool_size("
-                    << new_size << ") exceeds the safety cap " << max_workers
-                    << "; clamping. If you genuinely need this many workers, raise the cap.");
-                new_size = max_workers;
-            }
+            std::size_t spawned = 0;
+            std::size_t wanted = 0;
 
-            std::lock_guard<std::mutex> lock(mutex_);
-            if (stop_) {
-                return;
-            }
-
-            const std::size_t current_target = active_workers_ - pending_exits_;
-            if (new_size == current_target) {
-                return;
-            }
-
-            if (new_size > current_target) {
-                std::size_t delta = new_size - current_target;
-                const std::size_t cancel = (std::min)(pending_exits_, delta);
-                pending_exits_ -= cancel;
-                delta -= cancel;
-                for (std::size_t i = 0; i < delta; i++) {
-                    std::thread worker([this] { worker_loop(); });
-                    worker.detach();
-                    active_workers_++;
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                if (stop_) {
+                    return;
                 }
-            } else {
-                pending_exits_ += (current_target - new_size);
-                queue_cv_.notify_all();
+
+                const std::size_t current_target = active_workers_ - pending_exits_;
+                if (new_size == current_target) {
+                    return;
+                }
+
+                if (new_size > current_target) {
+                    std::size_t delta = new_size - current_target;
+                    const std::size_t cancel = (std::min)(pending_exits_, delta);
+                    pending_exits_ -= cancel;
+                    delta -= cancel;
+                    wanted = delta;
+                    for (; spawned < delta; spawned++) {
+                        try {
+                            std::thread worker([this] { worker_loop(); });
+                            worker.detach();
+                        } catch (...) {
+                            // Thread creation failed. Every worker started above this point is
+                            // detached and holds a pointer to this pool, so letting the exception
+                            // escape a constructor call would destroy the pool while those workers
+                            // are still running against it. Keep what we have instead. When no
+                            // worker exists at all there is nothing to strand, and a pool with no
+                            // workers would silently swallow every task, so that case must fail.
+                            if (active_workers_ == 0) {
+                                throw;
+                            }
+                            break;
+                        }
+                        active_workers_++;
+                    }
+                } else {
+                    pending_exits_ += (current_target - new_size);
+                    queue_cv_.notify_all();
+                }
+            }
+
+            if (spawned < wanted) {
+                APSI_LOG_WARNING(
+                    "The operating system refused to create more threads; the thread pool started "
+                    << spawned << " of the " << wanted << " additional workers it requested");
             }
         }
 
