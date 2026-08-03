@@ -4,7 +4,6 @@
 // STD
 #include <algorithm>
 #include <cstddef>
-#include <future>
 #include <utility>
 
 // APSI
@@ -12,6 +11,7 @@
 #include "apsi/bin_bundle_generated.h"
 #include "apsi/thread_pool_mgr.h"
 #include "apsi/util/interpolate.h"
+#include "apsi/util/task_group.h"
 #include "apsi/util/utils.h"
 
 // SEAL
@@ -925,8 +925,8 @@ namespace apsi {
 
             ThreadPoolMgr tpm;
 
-            vector<future<void>> futures;
-            futures.push_back(tpm.thread_pool().enqueue([&]() {
+            TaskGroup tasks(tpm.thread_pool());
+            tasks.add([&]() {
                 // Compute and cache the batched "matching polynomials". They're computed in both
                 // labeled and unlabeled PSI.
                 BatchedPlaintextPolyn bmp(
@@ -935,10 +935,10 @@ namespace apsi {
                     static_cast<uint32_t>(ps_low_degree_),
                     compressed_);
                 cache_.batched_matching_polyn = std::move(bmp);
-            }));
+            });
 
             for (size_t label_idx = 0; label_idx < cache_.felt_interp_polyns.size(); label_idx++) {
-                futures.push_back(tpm.thread_pool().enqueue([&, label_idx]() {
+                tasks.add([&, label_idx]() {
                     // Compute and cache the batched Newton interpolation polynomials
                     const auto &interp_polyn = cache_.felt_interp_polyns[label_idx];
                     BatchedPlaintextPolyn bip(
@@ -947,13 +947,11 @@ namespace apsi {
                         static_cast<uint32_t>(ps_low_degree_),
                         compressed_);
                     cache_.batched_interp_polyns[label_idx] = std::move(bip);
-                }));
+                });
             }
 
             // Wait for the tasks to finish
-            for (auto &f : futures) {
-                f.get();
-            }
+            tasks.join();
         }
 
         void BinBundle::regen_polyns()
@@ -975,34 +973,32 @@ namespace apsi {
 
             ThreadPoolMgr tpm;
 
-            vector<future<void>> futures;
+            TaskGroup tasks(tpm.thread_pool());
             // For each bin in the bundle, compute and cache the corresponding "matching
             // polynomial"
-            futures.reserve(num_bins);
+            tasks.reserve(num_bins);
             for (size_t bin_idx = 0; bin_idx < num_bins; bin_idx++) {
-                futures.push_back(tpm.thread_pool().enqueue([&, bin_idx]() {
+                tasks.add([&, bin_idx]() {
                     // Compute and cache the matching polynomial
                     FEltPolyn fmp = polyn_with_roots(item_bins_[bin_idx], mod);
                     cache_.felt_matching_polyns[bin_idx] = std::move(fmp);
-                }));
+                });
             }
 
             // For each bin in the bundle, compute and cache the corresponding "label polynomials"
             for (size_t label_idx = 0; label_idx < label_size; label_idx++) {
                 for (size_t bin_idx = 0; bin_idx < num_bins; bin_idx++) {
-                    futures.push_back(tpm.thread_pool().enqueue([&, label_idx, bin_idx]() {
+                    tasks.add([&, label_idx, bin_idx]() {
                         // Compute and cache the matching polynomial
                         FEltPolyn fip = newton_interpolate_polyn(
                             item_bins_[bin_idx], label_bins_[label_idx][bin_idx], mod);
                         cache_.felt_interp_polyns[label_idx][bin_idx] = std::move(fip);
-                    }));
+                    });
                 }
             }
 
             // Wait for the tasks to finish
-            for (auto &f : futures) {
-                f.get();
-            }
+            tasks.join();
         }
 
         void BinBundle::regen_cache()

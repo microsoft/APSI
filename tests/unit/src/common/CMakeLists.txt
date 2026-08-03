@@ -15,6 +15,7 @@ target_sources(unit_tests
         ${CMAKE_CURRENT_LIST_DIR}/sender_operation_response.cpp
         ${CMAKE_CURRENT_LIST_DIR}/stopwatch.cpp
         ${CMAKE_CURRENT_LIST_DIR}/stream_channel.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/task_group.cpp
         ${CMAKE_CURRENT_LIST_DIR}/thread_pool.cpp
         ${CMAKE_CURRENT_LIST_DIR}/utils.cpp
 )

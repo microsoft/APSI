@@ -2,7 +2,6 @@
 // Licensed under the MIT license.
 
 // STD
-#include <future>
 #include <sstream>
 
 // APSI
@@ -15,6 +14,7 @@
 #include "apsi/sender.h"
 #include "apsi/thread_pool_mgr.h"
 #include "apsi/util/stopwatch.h"
+#include "apsi/util/task_group.h"
 #include "apsi/util/utils.h"
 
 // SEAL
@@ -208,11 +208,11 @@ namespace apsi {
             APSI_LOG_DEBUG("Finished computing powers for all bundle indices");
             APSI_LOG_DEBUG("Start processing bin bundle caches");
 
-            vector<future<void>> futures;
+            TaskGroup tasks(tpm.thread_pool());
             for (size_t bundle_idx = 0; bundle_idx < bundle_idx_count; bundle_idx++) {
                 auto bundle_caches = sender_db->get_cache_at(static_cast<uint32_t>(bundle_idx));
                 for (auto &cache : bundle_caches) {
-                    futures.push_back(tpm.thread_pool().enqueue([&, bundle_idx, cache]() {
+                    tasks.add([&, bundle_idx, cache]() {
                         ProcessBinBundleCache(
                             sender_db,
                             crypto_context,
@@ -223,14 +223,12 @@ namespace apsi {
                             static_cast<uint32_t>(bundle_idx),
                             query.compr_mode(),
                             pool);
-                    }));
+                    });
                 }
             }
 
             // Wait until all bin bundle caches have been processed
-            for (auto &f : futures) {
-                f.get();
-            }
+            tasks.join();
 
             APSI_LOG_INFO("Finished processing query request");
         }
@@ -298,9 +296,9 @@ namespace apsi {
 
             uint32_t ps_low_degree = sender_db->get_params().query_params().ps_low_degree;
 
-            vector<future<void>> futures;
+            TaskGroup tasks(tpm.thread_pool());
             for (uint32_t power : pd.target_powers()) {
-                futures.push_back(tpm.thread_pool().enqueue([&, power]() {
+                tasks.add([&, power]() {
                     if (!ps_low_degree) {
                         // Only one ciphertext-plaintext multiplication is needed after this
                         evaluator->mod_switch_to_inplace(
@@ -322,12 +320,10 @@ namespace apsi {
                                 powers_at_this_bundle_idx[power], high_powers_parms_id, pool);
                         }
                     }
-                }));
+                });
             }
 
-            for (auto &f : futures) {
-                f.get();
-            }
+            tasks.join();
         }
 
         void Sender::ProcessBinBundleCache(
