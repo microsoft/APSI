@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstring>
-#include <future>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -19,6 +18,7 @@
 #include "apsi/thread_pool_mgr.h"
 #include "apsi/util/db_encoding.h"
 #include "apsi/util/label_encryptor.h"
+#include "apsi/util/task_group.h"
 #include "apsi/util/utils.h"
 
 // Kuku
@@ -399,18 +399,16 @@ namespace apsi {
 
             // Launch threads to receive ResultPackages and decrypt results
             size_t task_count = min<size_t>(ThreadPoolMgr::GetThreadCount(), package_count);
-            vector<future<void>> futures(task_count);
+            TaskGroup tasks(tpm.thread_pool());
             APSI_LOG_INFO(
                 "Launching " << task_count << " result worker tasks to handle " << package_count
                              << " result parts");
             for (size_t t = 0; t < task_count; t++) {
-                futures[t] = tpm.thread_pool().enqueue(
+                tasks.add(
                     [&]() { process_result_worker(package_count, mrs, label_keys, itt, chl); });
             }
 
-            for (auto &f : futures) {
-                f.get();
-            }
+            tasks.join();
 
             APSI_LOG_INFO(
                 "Found " << accumulate(mrs.begin(), mrs.end(), 0, [](auto acc, auto &curr) {

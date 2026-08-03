@@ -4,7 +4,6 @@
 // STD
 #include <algorithm>
 #include <cstring>
-#include <future>
 #include <iterator>
 #include <memory>
 #include <mutex>
@@ -17,6 +16,7 @@
 #include "apsi/thread_pool_mgr.h"
 #include "apsi/util/db_encoding.h"
 #include "apsi/util/label_encryptor.h"
+#include "apsi/util/task_group.h"
 #include "apsi/util/utils.h"
 
 // Kuku
@@ -370,12 +370,12 @@ namespace apsi {
                 sort(bundle_indices.begin(), bundle_indices.end());
 
                 // Run the threads on the partitions
-                vector<future<void>> futures(bundle_indices.size());
+                TaskGroup tasks(tpm.thread_pool());
+                tasks.reserve(bundle_indices.size());
                 APSI_LOG_INFO(
                     "Launching " << bundle_indices.size() << " insert-or-assign worker tasks");
-                size_t future_idx = 0;
                 for (auto &bundle_idx : bundle_indices) {
-                    futures[future_idx++] = tpm.thread_pool().enqueue([&, bundle_idx]() {
+                    tasks.add([&, bundle_idx]() {
                         insert_or_assign_worker(
                             data_with_indices,
                             bin_bundles,
@@ -391,9 +391,7 @@ namespace apsi {
                 }
 
                 // Wait for the tasks to finish
-                for (auto &f : futures) {
-                    f.get();
-                }
+                tasks.join();
 
                 APSI_LOG_INFO("Finished insert-or-assign worker tasks");
             }
@@ -496,11 +494,11 @@ namespace apsi {
                 sort(bundle_indices.begin(), bundle_indices.end());
 
                 // Run the threads on the partitions
-                vector<future<void>> futures(bundle_indices.size());
+                TaskGroup tasks(tpm.thread_pool());
+                tasks.reserve(bundle_indices.size());
                 APSI_LOG_INFO("Launching " << bundle_indices.size() << " remove worker tasks");
-                size_t future_idx = 0;
                 for (auto &bundle_idx : bundle_indices) {
-                    futures[future_idx++] = tpm.thread_pool().enqueue([&]() {
+                    tasks.add([&, bundle_idx]() {
                         remove_worker(
                             data_with_indices,
                             bin_bundles,
@@ -510,9 +508,7 @@ namespace apsi {
                 }
 
                 // Wait for the tasks to finish
-                for (auto &f : futures) {
-                    f.get();
-                }
+                tasks.join();
             }
 
             /**
@@ -739,17 +735,19 @@ namespace apsi {
 
             ThreadPoolMgr tpm;
 
-            vector<future<void>> futures;
+            TaskGroup tasks(tpm.thread_pool());
             for (auto &bundle_idx : bin_bundles_) {
                 for (auto &bb : bundle_idx) {
-                    futures.push_back(tpm.thread_pool().enqueue([&bb]() { bb.strip(); }));
+                    // Capture the element's address by value. bb is a loop reference variable
+                    // whose lifetime ends when the iteration does, while the task it was handed
+                    // to may still be running; the element itself lives in bin_bundles_ and
+                    // outlives the join() below.
+                    tasks.add([bb_ptr = &bb]() { bb_ptr->strip(); });
                 }
             }
 
             // Wait for the tasks to finish
-            for (auto &f : futures) {
-                f.get();
-            }
+            tasks.join();
 
             APSI_LOG_INFO("SenderDB has been stripped");
 
@@ -1286,10 +1284,14 @@ namespace apsi {
 
             vector<mutex> bundle_idx_mtxs(sender_db->bin_bundles_.size());
             mutex bin_bundle_data_size_mtx;
-            vector<future<void>> futures;
-            futures.reserve(bin_bundle_data.size());
-            for (auto &raw_bb_data : bin_bundle_data) {
-                futures.push_back(tpm.thread_pool().enqueue([&]() {
+            TaskGroup tasks(tpm.thread_pool());
+            tasks.reserve(bin_bundle_data.size());
+            // A range-for here would force the task to capture the loop's reference variable,
+            // which is rebound on every iteration while earlier tasks are still running.
+            // Indexing lets the task capture bb_data_idx by value instead.
+            // NOLINTNEXTLINE(modernize-loop-convert)
+            for (size_t bb_data_idx = 0; bb_data_idx < bin_bundle_data.size(); bb_data_idx++) {
+                tasks.add([&, bb_data_idx]() {
                     BinBundle bb(
                         sender_db->crypto_context_,
                         label_size,
@@ -1298,6 +1300,7 @@ namespace apsi {
                         bins_per_bundle,
                         compressed,
                         stripped);
+                    auto &raw_bb_data = bin_bundle_data[bb_data_idx];
                     auto bb_data = bb.load(raw_bb_data);
 
                     // Clear the data buffer since we have now loaded the BinBundle
@@ -1312,10 +1315,14 @@ namespace apsi {
                         throw runtime_error("failed to load SenderDB");
                     }
 
-                    // Add the loaded BinBundle to the correct location in bin_bundles_
-                    bundle_idx_mtxs[bb_data.first].lock();
-                    sender_db->bin_bundles_[bb_data.first].push_back(std::move(bb));
-                    bundle_idx_mtxs[bb_data.first].unlock();
+                    // Add the loaded BinBundle to the correct location in bin_bundles_. The lock
+                    // must be released even if push_back throws: the tasks are waited on as a
+                    // group, so a mutex left locked here would hang every other task that needs
+                    // this bundle index rather than just failing this one.
+                    {
+                        lock_guard<mutex> bundle_idx_lock(bundle_idx_mtxs[bb_data.first]);
+                        sender_db->bin_bundles_[bb_data.first].push_back(std::move(bb));
+                    }
 
                     APSI_LOG_DEBUG(
                         "Loaded BinBundle at bundle index " << bb_data.first << " ("
@@ -1323,13 +1330,11 @@ namespace apsi {
 
                     lock_guard<mutex> bin_bundle_data_size_lock(bin_bundle_data_size_mtx);
                     bin_bundle_data_size += bb_data.second;
-                }));
+                });
             }
 
             // Wait for the tasks to finish
-            for (auto &f : futures) {
-                f.get();
-            }
+            tasks.join();
 
             size_t total_size = in_data.size() + bin_bundle_data_size;
             APSI_LOG_DEBUG(

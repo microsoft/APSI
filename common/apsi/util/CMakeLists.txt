@@ -17,6 +17,7 @@ install(
         ${CMAKE_CURRENT_LIST_DIR}/label_encryptor.h
         ${CMAKE_CURRENT_LIST_DIR}/db_encoding.h
         ${CMAKE_CURRENT_LIST_DIR}/stopwatch.h
+        ${CMAKE_CURRENT_LIST_DIR}/task_group.h
         ${CMAKE_CURRENT_LIST_DIR}/thread_pool.h
         ${CMAKE_CURRENT_LIST_DIR}/utils.h
         ${CMAKE_CURRENT_LIST_DIR}/wiping_allocator.h

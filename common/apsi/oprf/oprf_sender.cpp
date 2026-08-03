@@ -3,7 +3,6 @@
 
 // STD
 #include <array>
-#include <future>
 
 // APSI
 #include "apsi/log.h"
@@ -11,6 +10,7 @@
 #include "apsi/thread_pool_mgr.h"
 #include "apsi/util/label_encryptor.h"
 #include "apsi/util/stopwatch.h"
+#include "apsi/util/task_group.h"
 #include "apsi/util/utils.h"
 
 using namespace std;
@@ -79,7 +79,7 @@ namespace apsi::oprf {
 
         ThreadPoolMgr tpm;
         size_t task_count = min<size_t>(ThreadPoolMgr::GetThreadCount(), query_count);
-        vector<future<void>> futures(task_count);
+        TaskGroup tasks(tpm.thread_pool());
 
         auto ProcessQueriesLambda = [&](size_t start_idx, size_t step) {
             for (size_t idx = start_idx; idx < query_count; idx += step) {
@@ -102,13 +102,10 @@ namespace apsi::oprf {
         };
 
         for (size_t thread_idx = 0; thread_idx < task_count; thread_idx++) {
-            futures[thread_idx] =
-                tpm.thread_pool().enqueue(ProcessQueriesLambda, thread_idx, task_count);
+            tasks.add(ProcessQueriesLambda, thread_idx, task_count);
         }
 
-        for (auto &f : futures) {
-            f.get();
-        }
+        tasks.join();
 
         return oprf_responses;
     }
@@ -150,7 +147,7 @@ namespace apsi::oprf {
         ThreadPoolMgr tpm;
         vector<HashedItem> oprf_hashes(oprf_items.size());
         size_t task_count = min<size_t>(ThreadPoolMgr::GetThreadCount(), oprf_items.size());
-        vector<future<void>> futures(task_count);
+        TaskGroup tasks(tpm.thread_pool());
 
         auto ComputeHashesLambda = [&](size_t start_idx, size_t step) {
             for (size_t idx = start_idx; idx < oprf_items.size(); idx += step) {
@@ -159,13 +156,10 @@ namespace apsi::oprf {
         };
 
         for (size_t thread_idx = 0; thread_idx < task_count; thread_idx++) {
-            futures[thread_idx] =
-                tpm.thread_pool().enqueue(ComputeHashesLambda, thread_idx, task_count);
+            tasks.add(ComputeHashesLambda, thread_idx, task_count);
         }
 
-        for (auto &f : futures) {
-            f.get();
-        }
+        tasks.join();
 
         APSI_LOG_DEBUG("Finished computing OPRF hashes for " << oprf_items.size() << " items");
 
@@ -190,7 +184,7 @@ namespace apsi::oprf {
         ThreadPoolMgr tpm;
         vector<pair<HashedItem, EncryptedLabel>> oprf_hashes(oprf_item_labels.size());
         size_t task_count = min<size_t>(ThreadPoolMgr::GetThreadCount(), oprf_item_labels.size());
-        vector<future<void>> futures(task_count);
+        TaskGroup tasks(tpm.thread_pool());
 
         auto ComputeHashesLambda = [&](size_t start_idx, size_t step) {
             for (size_t idx = start_idx; idx < oprf_item_labels.size(); idx += step) {
@@ -214,13 +208,10 @@ namespace apsi::oprf {
         };
 
         for (size_t thread_idx = 0; thread_idx < task_count; thread_idx++) {
-            futures[thread_idx] =
-                tpm.thread_pool().enqueue(ComputeHashesLambda, thread_idx, task_count);
+            tasks.add(ComputeHashesLambda, thread_idx, task_count);
         }
 
-        for (auto &f : futures) {
-            f.get();
-        }
+        tasks.join();
 
         APSI_LOG_DEBUG(
             "Finished computing OPRF hashes and encrypted labels for " << oprf_item_labels.size()

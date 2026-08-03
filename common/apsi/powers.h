@@ -8,7 +8,6 @@
 #include <atomic>
 #include <cstdint>
 #include <exception>
-#include <future>
 #include <memory>
 #include <mutex>
 #include <set>
@@ -21,6 +20,7 @@
 
 // APSI
 #include "apsi/thread_pool_mgr.h"
+#include "apsi/util/task_group.h"
 
 namespace apsi {
     /**
@@ -292,16 +292,16 @@ namespace apsi {
             };
 
             // Declared last, and so destroyed first: the workers hold references to every local
-            // above, and ~ThreadPoolMgr can block until the pool's workers are gone. Keeping the
-            // pool manager below that state means the state cannot outlive its users even if the
-            // drain below is ever bypassed.
+            // above. The TaskGroup's destructor waits for all of them, and ~ThreadPoolMgr sitting
+            // below it is a further backstop that blocks until the pool's workers are gone.
             ThreadPoolMgr tpm;
+            util::TaskGroup tasks(tpm.thread_pool());
 
             std::size_t task_count = ThreadPoolMgr::GetThreadCount();
-            std::vector<std::future<void>> futures(task_count);
+            tasks.reserve(task_count);
             try {
                 for (std::size_t t = 0; t < task_count; t++) {
-                    futures[t] = tpm.thread_pool().enqueue([&]() {
+                    tasks.add([&]() {
                         try {
                             node_worker();
                         } catch (...) {
@@ -309,24 +309,16 @@ namespace apsi {
                         }
                     });
                 }
-            } catch (...) {
-                // enqueue itself failed; workers that already started must be told to stop or the
-                // drain below would never finish
-                capture_failure();
-            }
 
-            // Every worker must be joined before any of the state it captured by reference goes
-            // out of scope. Futures obtained from a std::packaged_task do not wait on destruction,
-            // so abandoning them here would leave workers running against a destroyed node_states.
-            for (auto &f : futures) {
-                if (!f.valid()) {
-                    continue;
-                }
-                try {
-                    f.get();
-                } catch (...) {
-                    capture_failure();
-                }
+                // Every worker must be joined before any of the state it captured by reference
+                // goes out of scope.
+                tasks.join();
+            } catch (...) {
+                // Either a task could not be queued, or join() surfaced an exception that a worker
+                // was unable to record itself. Workers spin until every node is computed or a
+                // failure is recorded, so they must be told to stop; anything still running is
+                // then drained by the TaskGroup destructor.
+                capture_failure();
             }
 
             if (first_exception) {
