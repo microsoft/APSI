@@ -45,6 +45,34 @@ namespace apsi {
         {
             return all_of(ptr, ptr + count, [](auto a) { return a == T(0); });
         }
+
+        /**
+        Decides whether a result package carrying the given sender-chosen bundle index is worth
+        processing. Returns false, having logged why, for a bundle index outside the range this
+        query covers.
+
+        Note this cannot deduplicate bundle indices. A sender legitimately sends one package per
+        bin bundle and may hold several bin bundles at a single bundle index, so "already seen"
+        is not an error -- Sender::RunQuery announces get_bin_bundle_count() packages, which
+        exceeds bundle_idx_count as soon as any bundle index overflows one bin bundle. Duplicate
+        and replayed packages are therefore handled where they actually conflict, by the
+        keep-first merge under the merge lock.
+
+        An out-of-range index is hostile input rather than an internal error, so it must not
+        abort the query.
+        */
+        bool bundle_idx_in_range(uint32_t bundle_idx, uint32_t bundle_idx_count)
+        {
+            if (bundle_idx >= bundle_idx_count) {
+                APSI_LOG_ERROR(
+                    "Received a result package for bundle index "
+                    << bundle_idx << " but this query covers only " << bundle_idx_count
+                    << " bundle indices; ignoring the package");
+                return false;
+            }
+
+            return true;
+        }
     } // namespace
 
     namespace receiver {
@@ -391,8 +419,8 @@ namespace apsi {
                 this_thread::sleep_for(50ms);
             }
 
-            // Set up the result
-            vector<MatchRecord> mrs(query.second.item_count());
+            // Set up the result. Note itt, not query.second, which was moved from above.
+            ResultMergeState merge_state(itt.item_count());
 
             // Get the number of ResultPackages we expect to receive
             atomic<uint32_t> package_count{ response->package_count };
@@ -404,18 +432,20 @@ namespace apsi {
                 "Launching " << task_count << " result worker tasks to handle " << package_count
                              << " result parts");
             for (size_t t = 0; t < task_count; t++) {
-                tasks.add(
-                    [&]() { process_result_worker(package_count, mrs, label_keys, itt, chl); });
+                tasks.add([&]() {
+                    process_result_worker(package_count, merge_state, label_keys, itt, chl);
+                });
             }
 
             tasks.join();
 
+            auto &mrs = merge_state.mrs;
             APSI_LOG_INFO(
                 "Found " << accumulate(mrs.begin(), mrs.end(), 0, [](auto acc, auto &curr) {
                     return acc + curr.found;
                 }) << " matches");
 
-            return mrs;
+            return std::move(mrs);
         }
 
         vector<MatchRecord> Receiver::process_result_part(
@@ -524,17 +554,19 @@ namespace apsi {
                         return;
                     }
 
-                    // If a positive MatchRecord is already present, then something is seriously
-                    // wrong
+                    // Two cuckoo table indices in this one package translated to the same item.
+                    // The translation table is built by the receiver and maps each item to a
+                    // single location, so this indicates the table has been corrupted rather than
+                    // anything the sender did. Report it and keep the match already recorded; a
+                    // package arriving over the network must never abort the query.
                     if (mrs[item_idx]) {
                         APSI_LOG_ERROR(
                             "The table index -> item index translation table indicated a "
                             "location that was already filled by another match from this "
                             "result package; the translation table (query) has probably "
-                            "been corrupted");
+                            "been corrupted; keeping the first match");
 
-                        throw runtime_error(
-                            "found a duplicate positive match; something is seriously wrong");
+                        return;
                     }
 
                     APSI_LOG_DEBUG(
@@ -597,6 +629,15 @@ namespace apsi {
             vector<MatchRecord> mrs(itt.item_count());
 
             for (const auto &result_part : result) {
+                if (!result_part) {
+                    APSI_LOG_ERROR("Failed to process result: result_part is null");
+                    continue;
+                }
+
+                if (!bundle_idx_in_range(result_part->bundle_idx, params_.bundle_idx_count())) {
+                    continue;
+                }
+
                 auto this_mrs = process_result_part(label_keys, itt, result_part);
                 if (this_mrs.size() != mrs.size()) {
                     // Something went wrong with process_result; error is already logged
@@ -610,16 +651,18 @@ namespace apsi {
                             // This match needs to be merged into mrs
                             get<0>(I) = std::move(get<1>(I));
                         } else if (get<1>(I) && get<0>(I)) {
-                            // If a positive MatchRecord is already present, then something is
-                            // seriously wrong
+                            // Two result parts claim the same item. An honest sender cannot do
+                            // this: the receiver's cuckoo table maps each item to exactly one
+                            // table index, so exactly one bin bundle can match it. So this is a
+                            // repeated or forged package. Report it, keep the match already
+                            // recorded, and carry on -- the caller assembled this vector, possibly
+                            // from a hostile sender, so it must not be able to abort the query.
                             APSI_LOG_ERROR(
                                 "Found a match for items[" << get<2>(I)
                                                            << "] but an existing match for this "
                                                               "location was already found before "
-                                                              "from a different result part");
-
-                            throw runtime_error(
-                                "found a duplicate positive match; something is seriously wrong");
+                                                              "from a different result part; "
+                                                              "keeping the first match");
                         }
                     });
             }
@@ -634,7 +677,7 @@ namespace apsi {
 
         void Receiver::process_result_worker(
             atomic<uint32_t> &package_count,
-            vector<MatchRecord> &mrs,
+            ResultMergeState &merge_state,
             const LabelKeyVector &label_keys,
             const IndexTranslationTable &itt,
             Channel &chl) const
@@ -669,28 +712,41 @@ namespace apsi {
                     ;
                 }
 
+                // The bundle index is readable before the package is decrypted, so screen it
+                // first: a package for an index this query does not cover costs us no decryption.
+                if (!bundle_idx_in_range(result_part->bundle_idx, params_.bundle_idx_count())) {
+                    continue;
+                }
+
                 // Process the ResultPart to get the corresponding vector of MatchRecords
                 auto this_mrs = process_result_part(label_keys, itt, result_part);
+                if (this_mrs.size() != merge_state.mrs.size()) {
+                    // Something went wrong with process_result_part; error is already logged
+                    continue;
+                }
 
                 // Merge the new MatchRecords with mrs
+                lock_guard<mutex> merge_lock(merge_state.mtx);
                 seal_for_each_n(
-                    iter(mrs, this_mrs, static_cast<size_t>(0)), mrs.size(), [](auto &&I) {
+                    iter(merge_state.mrs, this_mrs, static_cast<size_t>(0)),
+                    merge_state.mrs.size(),
+                    [](auto &&I) {
                         if (get<1>(I) && !get<0>(I)) {
                             // This match needs to be merged into mrs
                             get<0>(I) = std::move(get<1>(I));
                         } else if (get<1>(I) && get<0>(I)) {
-                            // If a positive MatchRecord is already present, then something is
-                            // seriously wrong
+                            // A repeated or forged package; see the note on the same case in
+                            // Receiver::process_result. This branch is the reason the merge runs
+                            // under the lock: reaching it means two workers are writing the same
+                            // MatchRecord, and doing that unsynchronized corrupts the label's
+                            // vector. Keep the match already recorded and carry on.
                             APSI_LOG_ERROR(
                                 "Result worker ["
                                 << this_thread::get_id() << "]: found a match for items["
                                 << get<2>(I)
                                 << "] but an existing match for this location was "
                                    "already found before from a different result "
-                                   "part");
-
-                            throw runtime_error(
-                                "found a duplicate positive match; something is seriously wrong");
+                                   "part; keeping the first match");
                         }
                     });
             }

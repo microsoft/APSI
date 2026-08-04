@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <stdexcept>
 #include <type_traits>
@@ -220,9 +221,34 @@ namespace apsi::receiver {
         */
         std::uint32_t reset_powers_dag(const std::set<std::uint32_t> &source_powers);
 
+        /**
+        The destination the parallel result workers merge into, together with the lock that makes
+        merging safe.
+
+        A result package carries a sender-chosen bundle_idx that decides which items in mrs it can
+        match, and nothing binds a package to a bundle index the sender has not used before. A
+        malicious sender can therefore send several packages carrying the same one, and the workers
+        processing them would move-assign into the same MatchRecord concurrently.
+
+        Note the bundle index cannot be used to deduplicate: an honest sender sends one package per
+        bin bundle and may hold several bin bundles at one bundle index; mtx is what makes the
+        merge safe, and the keep-first rule inside it is what makes a replay harmless.
+
+        mrs is sized once, before any worker starts, and is never resized afterwards, so its size()
+        may be read without the lock. Its elements may not.
+        */
+        struct ResultMergeState {
+            explicit ResultMergeState(std::size_t item_count) : mrs(item_count)
+            {}
+
+            std::mutex mtx;
+
+            std::vector<MatchRecord> mrs;
+        };
+
         void process_result_worker(
             std::atomic<std::uint32_t> &package_count,
-            std::vector<MatchRecord> &mrs,
+            ResultMergeState &merge_state,
             const LabelKeyVector &label_keys,
             const IndexTranslationTable &itt,
             network::Channel &chl) const;

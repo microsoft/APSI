@@ -3,6 +3,7 @@
 
 target_sources(integration_tests
     PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/hostile_sender.cpp
         ${CMAKE_CURRENT_LIST_DIR}/integration_tests_runner.cpp
         ${CMAKE_CURRENT_LIST_DIR}/stream_sender_receiver.cpp
         ${CMAKE_CURRENT_LIST_DIR}/test_utils.cpp
