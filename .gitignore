@@ -602,4 +602,11 @@ MigrationBackup/
 FodyWeavers.xsd
 
 # FourQLib arm64 needs to be included
+#
+# The [Aa][Rr][Mm]64/ rule above is Visual Studio boilerplate for build output
+# directories, and it also matches the vendored FourQ ARM64 implementation. Without
+# these exceptions those sources are not tracked at all and a fresh clone fails to
+# configure on any ARM64 target.
 !common/apsi/fourq/arm64
+!third_party/fourq/arm64
+!third_party/fourq/arm64/**
