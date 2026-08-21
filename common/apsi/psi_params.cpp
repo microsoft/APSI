@@ -100,8 +100,14 @@ namespace apsi {
         if (!table_params_.table_size) {
             throw invalid_argument("table_size cannot be zero");
         }
+        if (table_params_.table_size > TableParams::table_size_max) {
+            throw invalid_argument("table_size is too large");
+        }
         if (!table_params_.max_items_per_bin) {
             throw invalid_argument("max_items_per_bin cannot be zero");
+        }
+        if (table_params_.max_items_per_bin > TableParams::max_items_per_bin_max) {
+            throw invalid_argument("max_items_per_bin is too large");
         }
         if (table_params_.hash_func_count < TableParams::hash_func_count_min ||
             table_params_.hash_func_count > TableParams::hash_func_count_max) {
@@ -132,6 +138,12 @@ namespace apsi {
                     "query_powers cannot contain values larger than ps_low_degree that are not "
                     "multiples ps_low_degree + 1");
             }
+        }
+
+        // Reject an oversized modulus chain before building anything from it; a SEALContext over
+        // these parameters is what the cost would be paid on.
+        if (seal_params_.coeff_modulus().size() > coeff_modulus_size_max) {
+            throw invalid_argument("coeff_modulus has too many primes");
         }
 
         // Create a SEALContext (with expand_mod_chain == false) to check validity of parameters
@@ -179,6 +191,20 @@ namespace apsi {
 
         // Compute the number of bundle indices; this is now guaranteed to be greater than zero
         bundle_idx_count_ = table_params_.table_size / items_per_bundle_;
+
+        // Bound the size of the encrypted query these parameters describe. table_size is already
+        // bounded above, but query_powers is constrained only by max_items_per_bin, which callers
+        // choose freely, so the two must be bounded together as a product rather than separately.
+        uint64_t ciphertext_byte_count = static_cast<uint64_t>(2) *
+                                         seal_params_.poly_modulus_degree() *
+                                         seal_params_.coeff_modulus().size() * sizeof(uint64_t);
+        uint64_t ciphertext_count =
+            static_cast<uint64_t>(bundle_idx_count_) * query_params_.query_powers.size();
+
+        // Compare by division so that the check itself cannot overflow
+        if (ciphertext_count > query_byte_count_max / ciphertext_byte_count) {
+            throw invalid_argument("parameters result in too large an encrypted query");
+        }
     }
 
     size_t PSIParams::save(ostream &out) const
@@ -249,6 +275,18 @@ namespace apsi {
             throw runtime_error("failed to load parameters: incompatible serialization version");
         }
 
+        // The schema marks each of these required, so a buffer reaching this point has already
+        // been through a verifier that rejects any omission. Checking again costs a handful of
+        // predictable branches and keeps the guarantee local: these accessors are dereferenced
+        // unconditionally below, and the data behind them comes from the sender, whom the
+        // receiver does not trust.
+        if (!psi_params->item_params() || !psi_params->table_params() ||
+            !psi_params->query_params() || !psi_params->query_params()->query_powers() ||
+            !psi_params->seal_params() || !psi_params->seal_params()->data()) {
+            APSI_LOG_ERROR("Loaded PSIParams data is missing one or more required fields");
+            throw runtime_error("failed to load parameters: missing required field");
+        }
+
         PSIParams::ItemParams item_params;
         item_params.felts_per_item = psi_params->item_params()->felts_per_item();
 
@@ -259,6 +297,25 @@ namespace apsi {
 
         PSIParams::QueryParams query_params;
         query_params.ps_low_degree = psi_params->query_params()->ps_low_degree();
+
+        // Screen the count before materializing the set. initialize() rejects a query_powers
+        // larger than max_items_per_bin, but only once a PSIParams object exists, and building
+        // one means inserting every element into a node-per-element container first. Parameters
+        // are the first thing a receiver accepts from a sender, so this vector is attacker-chosen
+        // input arriving before anything has been agreed; the FlatBuffers verifier bounds a
+        // scalar vector's extent but not its length, leaving a modest frame able to cost orders
+        // of magnitude more in heap. max_items_per_bin_max is the ceiling of the bound
+        // initialize() will apply, so nothing legitimate is refused here.
+        if (psi_params->query_params()->query_powers()->size() >
+            TableParams::max_items_per_bin_max) {
+            APSI_LOG_ERROR(
+                "Loaded PSIParams data indicates a query_powers count ("
+                << psi_params->query_params()->query_powers()->size()
+                << ") larger than the maximum supported (" << TableParams::max_items_per_bin_max
+                << ")");
+            throw runtime_error("failed to load parameters: query_powers is too large");
+        }
+
         copy(
             psi_params->query_params()->query_powers()->cbegin(),
             psi_params->query_params()->query_powers()->cend(),

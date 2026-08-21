@@ -15,18 +15,22 @@ struct TableParams {
 
 table QueryParams {
     ps_low_degree:uint32;
-    query_powers:[uint32];
+    query_powers:[uint32] (required);
 }
 
 table SEALParams {
     data:[ubyte] (required);
 }
 
+// Every table field here is required, as is QueryParams.query_powers. Parameters arrive from the
+// sender, which the receiver does not trust, and PSIParams::Load builds a PSIParams out of each of
+// these tables. Marking them required is what lets the FlatBuffers verifier reject a buffer that
+// omits any of them before a field is read, ahead of the loader's own check on the same fields.
 table PSIParams {
     version:uint32;
-    item_params:ItemParams;
-    table_params:TableParams;
-    query_params:QueryParams;
+    item_params:ItemParams (required);
+    table_params:TableParams (required);
+    query_params:QueryParams (required);
     seal_params:SEALParams (required);
 }
 
