@@ -111,9 +111,18 @@ namespace apsi::network {
         /**
         Receive a ZMQSenderOperation from a receiver. Operations of type sop_query and
         sop_unknown require a valid seal::SEALContext to be provided. For operations of type
-        sop_parms and sop_oprf the context can be set as nullptr. The function returns nullptr
-        on failure. This call does not block if wait_for_message is false: if there is no
-        operation pending, it will immediately return nullptr.
+        sop_parms and sop_oprf the context can be set as nullptr.
+
+        A nullptr return has two meanings that callers must tell apart. Either nothing has
+        arrived yet, in which case asking again is worthwhile, or a message arrived and was
+        rejected, in which case it has been consumed and no amount of waiting will bring it
+        back. Only the second records a failure, so receive_failed and receive_failure_count
+        distinguish them; a loop that retries on nullptr without consulting one of those waits
+        forever for data that is already gone.
+
+        If wait_for_message is false this call does not block. If it is true the call blocks
+        only until the socket's receive timeout elapses, so it always returns control to the
+        caller within a bounded interval however the peer behaves.
         */
         virtual std::unique_ptr<ZMQSenderOperation> receive_network_operation(
             std::shared_ptr<seal::SEALContext> context,
@@ -123,9 +132,9 @@ namespace apsi::network {
         /**
         Receive a ZMQSenderOperation from a receiver. Operations of type sop_query and
         sop_unknown require a valid seal::SEALContext to be provided. For operations of type
-        sop_parms and sop_oprf the context can be set as nullptr. The function returns nullptr
-        on failure. This call does not block: if there is no operation pending, it will
-        immediately return nullptr.
+        sop_parms and sop_oprf the context can be set as nullptr. This call does not block: if
+        there is no operation pending, it will immediately return nullptr. See the overload
+        taking wait_for_message for what a nullptr return does and does not mean.
         */
         virtual std::unique_ptr<ZMQSenderOperation> receive_network_operation(
             std::shared_ptr<seal::SEALContext> context,
@@ -144,8 +153,10 @@ namespace apsi::network {
         virtual void send(std::unique_ptr<ZMQSenderOperationResponse> sop_response);
 
         /**
-        Receive a SenderOperationResponse from a sender. The function returns nullptr on
-        failure.
+        Receive a SenderOperationResponse from a sender. Returns nullptr either because nothing
+        arrived within the socket's receive timeout or because a message arrived and was
+        rejected; receive_failed tells the two apart, and a caller that loops on nullptr must
+        consult it. The call always returns control within a bounded interval.
         */
         std::unique_ptr<SenderOperationResponse> receive_response(
             SenderOperationType expected = SenderOperationType::sop_unknown) override;
@@ -158,8 +169,11 @@ namespace apsi::network {
         virtual void send(std::unique_ptr<ZMQResultPackage> rp);
 
         /**
-        Receive a ResultPackage from a sender. A valid seal::SEALContext must be provided. The
-        function returns nullptr on failure.
+        Receive a ResultPackage from a sender. A valid seal::SEALContext must be provided.
+        Returns nullptr either because nothing arrived within the socket's receive timeout or
+        because a message arrived and was rejected; receive_failed tells the two apart, and a
+        caller that loops on nullptr must consult it. The call always returns control within a
+        bounded interval.
         */
         std::unique_ptr<ResultPackage> receive_result(
             std::shared_ptr<seal::SEALContext> context) override;

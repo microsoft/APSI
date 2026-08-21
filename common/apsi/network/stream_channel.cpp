@@ -51,6 +51,7 @@ namespace apsi::network {
             APSI_LOG_ERROR(
                 "Cannot receive an operation of type " << sender_operation_type_str(expected)
                                                        << "; SEALContext is missing or invalid");
+            set_receive_failed();
             return nullptr;
         }
 
@@ -63,10 +64,12 @@ namespace apsi::network {
         } catch (const runtime_error &) {
             // Invalid header
             APSI_LOG_ERROR("Failed to receive a valid header");
+            set_receive_failed();
             return nullptr;
         } catch (const exception &ex) {
             // Any other failure, e.g. allocation failure from an oversized size prefix
             APSI_LOG_ERROR("Failed to receive a valid header: " << ex.what());
+            set_receive_failed();
             return nullptr;
         }
 
@@ -77,6 +80,7 @@ namespace apsi::network {
                 << sop_header.version
                 << ") incompatible with the current serialization version number ("
                 << apsi_serialization_version << ")");
+            set_receive_failed();
             return nullptr;
         }
 
@@ -85,6 +89,7 @@ namespace apsi::network {
             APSI_LOG_ERROR(
                 "Received header indicates an unexpected operation type "
                 << sender_operation_type_str(sop_header.type));
+            set_receive_failed();
             return nullptr;
         }
 
@@ -110,17 +115,21 @@ namespace apsi::network {
                 APSI_LOG_ERROR(
                     "Received header indicates an invalid operation type "
                     << sender_operation_type_str(sop_header.type));
+                set_receive_failed();
                 return nullptr;
             }
         } catch (const invalid_argument &ex) {
             APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
+            set_receive_failed();
             return nullptr;
         } catch (const runtime_error &ex) {
             APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
+            set_receive_failed();
             return nullptr;
         } catch (const exception &ex) {
             // Any other failure, e.g. allocation failure from an oversized size prefix
             APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
+            set_receive_failed();
             return nullptr;
         }
 
@@ -168,10 +177,12 @@ namespace apsi::network {
         } catch (const runtime_error &) {
             // Invalid header
             APSI_LOG_ERROR("Failed to receive a valid header");
+            set_receive_failed();
             return nullptr;
         } catch (const exception &ex) {
             // Any other failure, e.g. allocation failure from an oversized size prefix
             APSI_LOG_ERROR("Failed to receive a valid header: " << ex.what());
+            set_receive_failed();
             return nullptr;
         }
 
@@ -182,6 +193,7 @@ namespace apsi::network {
                 << sop_header.version
                 << " incompatible with the current serialization version number "
                 << apsi_serialization_version);
+            set_receive_failed();
             return nullptr;
         }
 
@@ -190,6 +202,7 @@ namespace apsi::network {
             APSI_LOG_ERROR(
                 "Received header indicates an unexpected operation type "
                 << sender_operation_type_str(sop_header.type));
+            set_receive_failed();
             return nullptr;
         }
 
@@ -215,14 +228,17 @@ namespace apsi::network {
                 APSI_LOG_ERROR(
                     "Received header indicates an invalid operation type "
                     << sender_operation_type_str(sop_header.type));
+                set_receive_failed();
                 return nullptr;
             }
         } catch (const runtime_error &ex) {
             APSI_LOG_ERROR("An exception was thrown loading response data: " << ex.what());
+            set_receive_failed();
             return nullptr;
         } catch (const exception &ex) {
             // Any other failure, e.g. allocation failure from an oversized size prefix
             APSI_LOG_ERROR("An exception was thrown loading response data: " << ex.what());
+            set_receive_failed();
             return nullptr;
         }
 
@@ -263,6 +279,7 @@ namespace apsi::network {
         if (!valid_context) {
             // Cannot receive a result package without a valid SEALContext
             APSI_LOG_ERROR("Cannot receive a result package; SEALContext is missing or invalid");
+            set_receive_failed();
             return nullptr;
         }
 
@@ -276,13 +293,16 @@ namespace apsi::network {
             bytes_received_ += rp->load(in_, context);
         } catch (const invalid_argument &ex) {
             APSI_LOG_ERROR("An exception was thrown loading result package data: " << ex.what());
+            set_receive_failed();
             return nullptr;
         } catch (const runtime_error &ex) {
             APSI_LOG_ERROR("An exception was thrown loading result package data: " << ex.what());
+            set_receive_failed();
             return nullptr;
         } catch (const exception &ex) {
             // Any other failure, e.g. allocation failure from an oversized size prefix
             APSI_LOG_ERROR("An exception was thrown loading result package data: " << ex.what());
+            set_receive_failed();
             return nullptr;
         }
 

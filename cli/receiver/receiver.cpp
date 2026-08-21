@@ -85,7 +85,7 @@ int remote_query(const CLP &cmd)
     unique_ptr<PSIParams> params;
     try {
         APSI_LOG_INFO("Sending parameter request");
-        params = make_unique<PSIParams>(Receiver::RequestParams(channel));
+        params = make_unique<PSIParams>(Receiver::RequestParams(channel, cmd.timeout()));
         APSI_LOG_INFO("Received valid parameters");
     } catch (const exception &ex) {
         APSI_LOG_WARNING("Failed to receive valid parameters: " << ex.what());
@@ -110,7 +110,7 @@ int remote_query(const CLP &cmd)
     LabelKeyVector label_keys;
     try {
         APSI_LOG_INFO("Sending OPRF request for " << items_vec.size() << " items");
-        tie(oprf_items, label_keys) = Receiver::RequestOPRF(items_vec, channel);
+        tie(oprf_items, label_keys) = Receiver::RequestOPRF(items_vec, channel, cmd.timeout());
         APSI_LOG_INFO("Received OPRF response for " << items_vec.size() << " items");
     } catch (const exception &ex) {
         APSI_LOG_WARNING("OPRF request failed: " << ex.what());
@@ -120,7 +120,7 @@ int remote_query(const CLP &cmd)
     vector<MatchRecord> query_result;
     try {
         APSI_LOG_INFO("Sending APSI query");
-        query_result = receiver.request_query(oprf_items, label_keys, channel);
+        query_result = receiver.request_query(oprf_items, label_keys, channel, cmd.timeout());
         APSI_LOG_INFO("Received APSI query response");
     } catch (const exception &ex) {
         APSI_LOG_WARNING("Failed sending APSI query: " << ex.what());
@@ -157,6 +157,9 @@ void print_intersection_results(
 {
     if (orig_items.size() != items.size()) {
         throw invalid_argument("orig_items must have same size as items");
+    }
+    if (intersection.size() != items.size()) {
+        throw invalid_argument("intersection must have same size as items");
     }
 
     stringstream csv_output;

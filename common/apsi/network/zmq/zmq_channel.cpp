@@ -37,6 +37,31 @@ namespace apsi {
 
     namespace network {
         namespace {
+            // How long a blocking receive parks before returning empty-handed so the caller can
+            // re-examine shared state and decide whether waiting is still worthwhile. Large
+            // enough that idle polling costs nothing, small enough that a stuck exchange
+            // unwinds promptly.
+            constexpr int receive_poll_interval_ms = 1000;
+
+            // How long closing a receiver socket waits for messages it has queued but not yet
+            // handed to the peer. ZeroMQ waits forever by default, which turns a peer that has
+            // gone away into a process that cannot exit: the request sits in the outbound queue
+            // with nobody to take it, and the close blocks on it. A receiver only ever has a
+            // small request outstanding, and that request is worthless once the receiver has
+            // stopped waiting for its answer, so a short bound costs nothing and caps what a
+            // vanished sender can charge the receiver at shutdown.
+            constexpr int receiver_linger_ms = 1000;
+
+            // The same bound for a sender socket, which is a very different proposition. A
+            // sender hands its whole result stream to ZeroMQ asynchronously and returns while
+            // the bytes are still in flight, so at close time the outbound queue can hold the
+            // entire answer to a query. Discarding it truncates a legitimate response, and the
+            // receiver then waits out its own deadline and reports a timeout instead of the
+            // result it had already earned. The bound therefore has to be generous enough to
+            // push a large response over a slow link, and only exists at all so that a sender
+            // shutting down cannot be pinned indefinitely by a receiver that has gone away.
+            constexpr int sender_linger_ms = 60000;
+
             template <typename T>
             size_t load_from_string(string data, T &obj)
             {
@@ -207,6 +232,7 @@ namespace apsi {
                     "Cannot receive an operation of type "
                     << sender_operation_type_str(expected)
                     << "; SEALContext is missing or invalid");
+                set_receive_failed();
                 return nullptr;
             }
 
@@ -223,7 +249,8 @@ namespace apsi {
                 APSI_LOG_ERROR(
                     "ZeroMQ received a message with " << msg.size()
                                                       << " parts but expected 3 parts");
-                throw runtime_error("invalid message received");
+                set_receive_failed();
+                return nullptr;
             }
 
             // First extract the client_id; this is the first part of the message
@@ -236,10 +263,12 @@ namespace apsi {
             } catch (const runtime_error &) {
                 // Invalid header
                 APSI_LOG_ERROR("Failed to receive a valid header");
+                set_receive_failed();
                 return nullptr;
             } catch (const exception &ex) {
                 // Any other failure, e.g. allocation failure from an oversized size prefix
                 APSI_LOG_ERROR("Failed to receive a valid header: " << ex.what());
+                set_receive_failed();
                 return nullptr;
             }
 
@@ -250,6 +279,7 @@ namespace apsi {
                     << sop_header.version
                     << ") incompatible with the current serialization version number ("
                     << apsi_serialization_version << ")");
+                set_receive_failed();
                 return nullptr;
             }
 
@@ -258,6 +288,7 @@ namespace apsi {
                 APSI_LOG_ERROR(
                     "Received header indicates an unexpected operation type "
                     << sender_operation_type_str(sop_header.type));
+                set_receive_failed();
                 return nullptr;
             }
 
@@ -289,17 +320,21 @@ namespace apsi {
                     APSI_LOG_ERROR(
                         "Received header indicates an invalid operation type "
                         << sender_operation_type_str(sop_header.type));
+                    set_receive_failed();
                     return nullptr;
                 }
             } catch (const invalid_argument &ex) {
                 APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
+                set_receive_failed();
                 return nullptr;
             } catch (const runtime_error &ex) {
                 APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
+                set_receive_failed();
                 return nullptr;
             } catch (const exception &ex) {
                 // Any other failure, e.g. allocation failure from an oversized size prefix
                 APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
+                set_receive_failed();
                 return nullptr;
             }
 
@@ -389,7 +424,8 @@ namespace apsi {
                 APSI_LOG_ERROR(
                     "ZeroMQ received a message with " << msg.size()
                                                       << " parts but expected 2 parts");
-                throw runtime_error("invalid message received");
+                set_receive_failed();
+                return nullptr;
             }
 
             // First part is the SenderOperationHeader
@@ -399,10 +435,12 @@ namespace apsi {
             } catch (const runtime_error &) {
                 // Invalid header
                 APSI_LOG_ERROR("Failed to receive a valid header");
+                set_receive_failed();
                 return nullptr;
             } catch (const exception &ex) {
                 // Any other failure, e.g. allocation failure from an oversized size prefix
                 APSI_LOG_ERROR("Failed to receive a valid header: " << ex.what());
+                set_receive_failed();
                 return nullptr;
             }
 
@@ -413,6 +451,7 @@ namespace apsi {
                     << sop_header.version
                     << " incompatible with the current serialization version number "
                     << apsi_serialization_version);
+                set_receive_failed();
                 return nullptr;
             }
 
@@ -421,6 +460,7 @@ namespace apsi {
                 APSI_LOG_ERROR(
                     "Received header indicates an unexpected operation type "
                     << sender_operation_type_str(sop_header.type));
+                set_receive_failed();
                 return nullptr;
             }
 
@@ -452,14 +492,17 @@ namespace apsi {
                     APSI_LOG_ERROR(
                         "Received header indicates an invalid operation type "
                         << sender_operation_type_str(sop_header.type));
+                    set_receive_failed();
                     return nullptr;
                 }
             } catch (const runtime_error &ex) {
                 APSI_LOG_ERROR("An exception was thrown loading response data: " << ex.what());
+                set_receive_failed();
                 return nullptr;
             } catch (const exception &ex) {
                 // Any other failure, e.g. allocation failure from an oversized size prefix
                 APSI_LOG_ERROR("An exception was thrown loading response data: " << ex.what());
+                set_receive_failed();
                 return nullptr;
             }
 
@@ -520,6 +563,7 @@ namespace apsi {
                 // Cannot receive a result package without a valid SEALContext
                 APSI_LOG_ERROR(
                     "Cannot receive a result package; SEALContext is missing or invalid");
+                set_receive_failed();
                 return nullptr;
             }
 
@@ -534,7 +578,8 @@ namespace apsi {
                 APSI_LOG_ERROR(
                     "ZeroMQ received a message with " << msg.size()
                                                       << " parts but expected 1 part");
-                throw runtime_error("invalid message received");
+                set_receive_failed();
+                return nullptr;
             }
 
             // Number of bytes received now
@@ -548,13 +593,16 @@ namespace apsi {
                 bytes_received_ += bytes_received;
             } catch (const invalid_argument &ex) {
                 APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
+                set_receive_failed();
                 return nullptr;
             } catch (const runtime_error &ex) {
                 APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
+                set_receive_failed();
                 return nullptr;
             } catch (const exception &ex) {
                 // Any other failure, e.g. allocation failure from an oversized size prefix
                 APSI_LOG_ERROR("An exception was thrown loading operation data: " << ex.what());
+                set_receive_failed();
                 return nullptr;
             }
 
@@ -571,13 +619,16 @@ namespace apsi {
             msg.clear();
             recv_flags receive_flags = wait_for_message ? recv_flags::none : recv_flags::dontwait;
 
-            bool received = msg.recv(*get_socket(), static_cast<int>(receive_flags));
-            if (!received && wait_for_message) {
-                APSI_LOG_ERROR("ZeroMQ failed to receive a message");
-                throw runtime_error("failed to receive message");
-            }
-
-            return received;
+            // A false return means no message was available: either the caller asked not to
+            // wait, or a blocking receive hit the socket's receive timeout. Genuine socket
+            // errors surface as zmq::error_t from recv itself. The timeout is what lets a
+            // blocking caller regain control periodically, so it can notice that the exchange
+            // it is waiting on has already failed on another thread.
+            //
+            // A message is delivered to a reader only once every one of its frames has arrived,
+            // so an empty return can only land on a message boundary and never leaves a
+            // half-read message behind to be mistaken for the start of the next one.
+            return msg.recv(*get_socket(), static_cast<int>(receive_flags));
         }
 
         void ZMQChannel::send_message(multipart_t &msg)
@@ -611,11 +662,30 @@ namespace apsi {
             // Ensure messages are not dropped
             socket->set(sockopt::rcvhwm, 70000);
 
-            // Reject any single inbound message larger than INT32_MAX. This matches the
+            // Wake a blocking receive periodically instead of letting it park in the kernel
+            // indefinitely. This is a poll interval, not a deadline: a caller that is still
+            // waiting legitimately just loops and receives again, so a sender that takes many
+            // minutes over a large database is unaffected. What it buys is the chance to
+            // re-examine shared state between attempts. The receiver runs several result
+            // workers over this one socket, serialized by the receive mutex, so without this a
+            // worker could hold the mutex parked forever on a package the sender never sends,
+            // while its siblings, and the join that waits for them, are stuck behind it.
+            socket->set(sockopt::rcvtimeo, receive_poll_interval_ms);
+
+            // Reject any single inbound frame larger than INT32_MAX. This matches the
             // FlatBuffers verifier's per-buffer maximum, so anything beyond that would fail
-            // verification later anyway. This stops a peer from forcing a multi-GiB ZMQ
-            // allocation before APSI's own size caps get a chance to run.
+            // verification later anyway. Note that this bounds each frame on its own and says
+            // nothing about how many frames a message may contain. Nothing here can: ZeroMQ
+            // buffers a message in full before offering it to a reader, so the cost of a
+            // message made of very many tiny frames is already paid by the time any code in
+            // this file runs. The exposure is proportional to concurrent connections rather
+            // than to cumulative traffic, so it is bounded at the network layer by limiting
+            // concurrent peers, not here.
             socket->set(sockopt::maxmsgsize, static_cast<int64_t>(numeric_limits<int32_t>::max()));
+
+            // Bound how long closing this socket waits on messages the peer never collected.
+            // This is what lets a receiver that has given up on a silent sender actually exit.
+            socket->set(sockopt::linger, receiver_linger_ms);
 
             string buf;
             buf.resize(32);
@@ -637,9 +707,24 @@ namespace apsi {
             // Ensure messages are not dropped
             socket->set(sockopt::sndhwm, 70000);
 
-            // Reject any single inbound message larger than INT32_MAX. See the matching
-            // comment in ZMQReceiverChannel::set_socket_options.
+            // Wake a blocking receive periodically rather than letting it park in the kernel
+            // indefinitely, so that every channel honours the bounded-blocking obligation the
+            // Channel contract states. The dispatcher never takes a blocking receive, so this
+            // has no effect on the serving path; it matters for callers that use the blocking
+            // overload directly, which would otherwise have no way back out.
+            socket->set(sockopt::rcvtimeo, receive_poll_interval_ms);
+
+            // Reject any single inbound frame larger than INT32_MAX. See the matching comment
+            // in ZMQReceiverChannel::set_socket_options, including the note that this does not
+            // bound the number of frames in a message.
             socket->set(sockopt::maxmsgsize, static_cast<int64_t>(numeric_limits<int32_t>::max()));
+
+            // Bound how long closing this socket waits on messages the peer never collected.
+            // Generously, unlike the receiver: what is queued here is the answer to a query,
+            // which may still be streaming out over a slow link when the sender is asked to
+            // stop. Cutting that short would silently truncate a legitimate response and leave
+            // the receiver to time out on an answer that had in fact been computed.
+            socket->set(sockopt::linger, sender_linger_ms);
         }
     } // namespace network
 } // namespace apsi

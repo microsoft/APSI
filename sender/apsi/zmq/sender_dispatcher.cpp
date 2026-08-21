@@ -70,41 +70,89 @@ namespace apsi {
 
             auto seal_context = sender_db_->get_seal_context();
 
+            // Checked once, here, rather than left to the serving loop. The loop treats a rise
+            // in the channel's failure count as proof that a message was consumed and rejected,
+            // and skips its back-off on that basis. An unusable SEALContext is the one condition
+            // the channel reports as a failure without ever reading the socket, so leaving it to
+            // be discovered per-iteration would turn the loop into a spin. It is also not a
+            // condition that can improve by waiting: a SenderDB whose context is unusable can
+            // never serve a query, so this is a startup error.
+            if (!seal_context || !seal_context->parameters_set()) {
+                throw runtime_error("SenderDB is not initialized with a valid SEALContext");
+            }
+
             // Run until stopped
             bool logged_waiting = false;
             while (!stop) {
-                unique_ptr<ZMQSenderOperation> sop = chl.receive_network_operation(seal_context);
-                if (!sop) {
-                    if (!logged_waiting) {
-                        // We want to log 'Waiting' only once, even if we have to wait
-                        // for several sleeps. And only once after processing a request as well.
-                        logged_waiting = true;
-                        APSI_LOG_INFO("Waiting for request from Receiver");
+                // One peer must not be able to end the process. A malformed request is already
+                // dropped by the channel, but everything downstream of that -- socket errors
+                // from the send side, a failure deep inside query processing -- can still throw.
+                // Contain it here and keep serving: dropping one exchange is the correct blast
+                // radius for a server that handles requests from anyone.
+                try {
+                    uint64_t failures_before = chl.receive_failure_count();
+                    unique_ptr<ZMQSenderOperation> sop =
+                        chl.receive_network_operation(seal_context);
+                    if (!sop) {
+                        // Nothing to serve, but for one of two very different reasons. If the
+                        // channel consumed a message and rejected it there is every chance more
+                        // are waiting, and backing off would let a peer sending rubbish decide
+                        // how fast this loop may take requests from everyone else. Only a
+                        // genuinely empty poll is worth sleeping on.
+                        if (chl.receive_failure_count() != failures_before) {
+                            continue;
+                        }
+
+                        if (!logged_waiting) {
+                            // We want to log 'Waiting' only once, even if we have to wait
+                            // for several sleeps. And only once after processing a request as
+                            // well.
+                            logged_waiting = true;
+                            APSI_LOG_INFO("Waiting for request from Receiver");
+                        }
+
+                        this_thread::sleep_for(50ms);
+                        continue;
                     }
 
+                    switch (sop->sop->type()) {
+                    case SenderOperationType::sop_parms:
+                        APSI_LOG_INFO("Received parameter request");
+                        dispatch_parms(std::move(sop), chl);
+                        break;
+
+                    case SenderOperationType::sop_oprf:
+                        APSI_LOG_INFO("Received OPRF request");
+                        dispatch_oprf(std::move(sop), chl);
+                        break;
+
+                    case SenderOperationType::sop_query:
+                        APSI_LOG_INFO("Received query");
+                        dispatch_query(std::move(sop), chl);
+                        break;
+
+                    default:
+                        APSI_LOG_ERROR(
+                            "Received an operation of unhandled type "
+                            << sender_operation_type_str(sop->sop->type()) << "; ignoring it");
+                        break;
+                    }
+                } catch (const exception &ex) {
+                    APSI_LOG_ERROR(
+                        "Failed to handle a request from a Receiver: " << ex.what()
+                                                                       << "; continuing");
+                    // Back off before trying again. Whatever threw is likely to be there on the
+                    // next iteration too, and a loop that logs and retries at full speed turns a
+                    // persistent fault into a busy spin.
                     this_thread::sleep_for(50ms);
-                    continue;
-                }
-
-                switch (sop->sop->type()) {
-                case SenderOperationType::sop_parms:
-                    APSI_LOG_INFO("Received parameter request");
-                    dispatch_parms(std::move(sop), chl);
-                    break;
-
-                case SenderOperationType::sop_oprf:
-                    APSI_LOG_INFO("Received OPRF request");
-                    dispatch_oprf(std::move(sop), chl);
-                    break;
-
-                case SenderOperationType::sop_query:
-                    APSI_LOG_INFO("Received query");
-                    dispatch_query(std::move(sop), chl);
-                    break;
-
-                default:
-                    // We should never reach this point
-                    throw runtime_error("invalid operation");
+                } catch (...) {
+                    // Nothing may escape this loop. An exception that does not derive from
+                    // std::exception would otherwise leave run() and terminate a process that is
+                    // still perfectly able to serve.
+                    APSI_LOG_ERROR(
+                        "Failed to handle a request from a Receiver with an unrecognized error; "
+                        "continuing");
+                    this_thread::sleep_for(50ms);
                 }
 
                 logged_waiting = false;

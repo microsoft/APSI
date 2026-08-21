@@ -52,7 +52,8 @@ namespace apsi::network {
         /**
         Receive a SenderOperation from a receiver. Operations of type sop_query and sop_unknown
         require a valid seal::SEALContext to be provided. For operations of type sop_parms and
-        sop_oprf the context can be set as nullptr. The function returns nullptr on failure.
+        sop_oprf the context can be set as nullptr. The function returns nullptr on failure, and
+        records the failure for receive_failed to report.
         */
         std::unique_ptr<SenderOperation> receive_operation(
             std::shared_ptr<seal::SEALContext> context,
@@ -67,7 +68,7 @@ namespace apsi::network {
 
         /**
         Receive a SenderOperationResponse from a sender. The function returns nullptr on
-        failure.
+        failure, and records the failure for receive_failed to report.
         */
         std::unique_ptr<SenderOperationResponse> receive_response(
             SenderOperationType expected = SenderOperationType::sop_unknown) override;
@@ -79,7 +80,8 @@ namespace apsi::network {
 
         /**
         Receive a ResultPackage from a sender. A valid seal::SEALContext must be provided. The
-        function returns nullptr on failure.
+        function returns nullptr on failure, and records the failure for receive_failed to
+        report.
         */
         std::unique_ptr<ResultPackage> receive_result(
             std::shared_ptr<seal::SEALContext> context) override;

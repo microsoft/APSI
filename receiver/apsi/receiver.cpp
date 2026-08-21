@@ -3,11 +3,13 @@
 
 // STD
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
 #include <cstring>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 
 // APSI
 #include "apsi/log.h"
@@ -73,6 +75,27 @@ namespace apsi {
 
             return true;
         }
+
+        /**
+        Aborts the exchange if the channel reports that a receive failed in a way that retrying
+        cannot repair. Callers wait for a message by looping on a null return, so without this
+        check a single malformed or mistyped message from the sender holds the receiver for its
+        whole deadline -- and indefinitely where the caller asked to wait indefinitely -- for data
+        the sender has already sent and will not send again.
+
+        Aborting is louder than returning what was collected so far. A partial result set is
+        indistinguishable from a genuine "no match" at every call site, so quietly returning one
+        would turn a transport failure into a wrong answer.
+        */
+        void throw_if_receive_failed(const Channel &chl, const char *what)
+        {
+            if (!chl.receive_failed()) {
+                return;
+            }
+
+            APSI_LOG_ERROR("Channel failed while waiting for the " << what);
+            throw runtime_error(string("failed to receive the ") + what);
+        }
     } // namespace
 
     namespace receiver {
@@ -84,6 +107,42 @@ namespace apsi {
             }
 
             return item_idx->second;
+        }
+
+        Receiver::ReceiveDeadline::ReceiveDeadline(chrono::milliseconds timeout)
+            : timeout_(timeout),
+              last_progress_(chrono::steady_clock::now().time_since_epoch().count())
+        {}
+
+        void Receiver::ReceiveDeadline::note_progress() noexcept
+        {
+            last_progress_.store(
+                chrono::steady_clock::now().time_since_epoch().count(), memory_order_relaxed);
+        }
+
+        void Receiver::ReceiveDeadline::throw_if_expired(const char *what) const
+        {
+            // Exactly zero, and only exactly zero, asks for an indefinite wait. A negative
+            // timeout is treated as one already spent, which is what makes the natural way of
+            // passing on a remaining budget -- deadline minus now -- safe: once that budget runs
+            // out the subtraction goes negative, and a caller doing the more careful thing must
+            // not thereby switch the deadline off.
+            if (timeout_ == chrono::milliseconds::zero()) {
+                return;
+            }
+
+            chrono::steady_clock::time_point last_progress{ chrono::steady_clock::duration{
+                last_progress_.load(memory_order_relaxed) } };
+            auto silent_for = chrono::duration_cast<chrono::milliseconds>(
+                chrono::steady_clock::now() - last_progress);
+            if (silent_for < timeout_) {
+                return;
+            }
+
+            APSI_LOG_ERROR(
+                "Gave up waiting for the " << what << " after " << silent_for.count()
+                                           << " ms without hearing from the sender");
+            throw runtime_error(string("timed out waiting for the ") + what);
         }
 
         Receiver::Receiver(const PSIParams &params) : params_(params)
@@ -159,15 +218,26 @@ namespace apsi {
             return sop;
         }
 
-        PSIParams Receiver::RequestParams(NetworkChannel &chl)
+        PSIParams Receiver::RequestParams(NetworkChannel &chl, chrono::milliseconds timeout)
         {
             // Create parameter request and send to Sender
             chl.send(CreateParamsRequest());
 
-            // Wait for a valid message of the right type
+            // Only one message is expected, so nothing restarts this clock: it bounds the wait
+            // from the moment the request went out.
+            ReceiveDeadline deadline(timeout);
+
+            // Wait for a valid message of the right type. Naming the expected type lets the
+            // channel reject a response of any other type as a failure; left unnamed, a
+            // mismatched response would be discarded silently and waited for again forever.
             ParamsResponse response;
             bool logged_waiting = false;
-            while (!(response = to_params_response(chl.receive_response()))) {
+            while (
+                !(response =
+                      to_params_response(chl.receive_response(SenderOperationType::sop_parms)))) {
+                throw_if_receive_failed(chl, "response to the parameter request");
+                deadline.throw_if_expired("response to the parameter request");
+
                 if (!logged_waiting) {
                     // We want to log 'Waiting' only once, even if we have to wait for several
                     // sleeps.
@@ -232,17 +302,26 @@ namespace apsi {
         }
 
         pair<vector<HashedItem>, LabelKeyVector> Receiver::RequestOPRF(
-            const vector<Item> &items, NetworkChannel &chl)
+            const vector<Item> &items, NetworkChannel &chl, chrono::milliseconds timeout)
         {
             auto oprf_receiver = CreateOPRFReceiver(items);
 
             // Create OPRF request and send to Sender
             chl.send(CreateOPRFRequest(oprf_receiver));
 
-            // Wait for a valid message of the right type
+            // Only one message is expected, so nothing restarts this clock: it bounds the wait
+            // from the moment the request went out.
+            ReceiveDeadline deadline(timeout);
+
+            // Wait for a valid message of the right type. Naming the expected type lets the
+            // channel reject a response of any other type as a failure.
             OPRFResponse response;
             bool logged_waiting = false;
-            while (!(response = to_oprf_response(chl.receive_response()))) {
+            while (!(
+                response = to_oprf_response(chl.receive_response(SenderOperationType::sop_oprf)))) {
+                throw_if_receive_failed(chl, "response to the OPRF request");
+                deadline.throw_if_expired("response to the OPRF request");
+
                 if (!logged_waiting) {
                     // We want to log 'Waiting' only once, even if we have to wait for several
                     // sleeps.
@@ -254,7 +333,19 @@ namespace apsi {
             }
 
             // Extract the OPRF hashed items
-            return ExtractHashes(response, oprf_receiver);
+            auto hashes = ExtractHashes(response, oprf_receiver);
+
+            // ExtractHashes reports an unusable response by returning nothing, which the channel
+            // has no reason to record as a failure: the message itself was well formed, it just
+            // did not answer the question asked. Left to propagate, an empty result is
+            // indistinguishable from a genuine empty intersection at every call site downstream,
+            // so a sender could turn a transport-level failure into a wrong answer by replying
+            // with the wrong number of hashes.
+            if (hashes.first.size() != items.size()) {
+                throw runtime_error("failed to extract OPRF hashes from the sender's response");
+            }
+
+            return hashes;
         }
 
         pair<Request, IndexTranslationTable> Receiver::create_query(const vector<HashedItem> &items)
@@ -396,7 +487,10 @@ namespace apsi {
         }
 
         vector<MatchRecord> Receiver::request_query(
-            const vector<HashedItem> &items, const LabelKeyVector &label_keys, NetworkChannel &chl)
+            const vector<HashedItem> &items,
+            const LabelKeyVector &label_keys,
+            NetworkChannel &chl,
+            chrono::milliseconds timeout)
         {
             ThreadPoolMgr tpm;
 
@@ -405,10 +499,22 @@ namespace apsi {
             chl.send(std::move(query.first));
             auto itt = std::move(query.second);
 
-            // Wait for query response
+            // One deadline covers both phases of the exchange. The query response restarts it, so
+            // the sender gets the full window again for the first result package, and each package
+            // restarts it for the next. Sending is asynchronous, so this first window also covers
+            // uploading the query; see Receiver::default_receive_timeout.
+            ReceiveDeadline deadline(timeout);
+
+            // Wait for query response. Naming the expected type lets the channel reject a
+            // response of any other type as a failure.
             QueryResponse response;
             bool logged_waiting = false;
-            while (!(response = to_query_response(chl.receive_response()))) {
+            while (
+                !(response =
+                      to_query_response(chl.receive_response(SenderOperationType::sop_query)))) {
+                throw_if_receive_failed(chl, "response to the query request");
+                deadline.throw_if_expired("response to the query request");
+
                 if (!logged_waiting) {
                     // We want to log 'Waiting' only once, even if we have to wait for several
                     // sleeps.
@@ -418,6 +524,8 @@ namespace apsi {
 
                 this_thread::sleep_for(50ms);
             }
+
+            deadline.note_progress();
 
             // Set up the result. Note itt, not query.second, which was moved from above.
             ResultMergeState merge_state(itt.item_count());
@@ -433,7 +541,8 @@ namespace apsi {
                              << " result parts");
             for (size_t t = 0; t < task_count; t++) {
                 tasks.add([&]() {
-                    process_result_worker(package_count, merge_state, label_keys, itt, chl);
+                    process_result_worker(
+                        package_count, merge_state, deadline, label_keys, itt, chl);
                 });
             }
 
@@ -678,6 +787,7 @@ namespace apsi {
         void Receiver::process_result_worker(
             atomic<uint32_t> &package_count,
             ResultMergeState &merge_state,
+            ReceiveDeadline &deadline,
             const LabelKeyVector &label_keys,
             const IndexTranslationTable &itt,
             Channel &chl) const
@@ -706,11 +816,22 @@ namespace apsi {
                     continue;
                 }
 
-                // Wait for a valid ResultPart
+                // Wait for a valid ResultPart. A null return either means nothing has arrived
+                // yet, which is worth waiting out, or that the channel consumed a package it
+                // could not parse, which is not: this worker has already claimed a slot in
+                // package_count, and the package that would have filled it no longer exists.
+                // Sleeping between attempts keeps an idle wait off the CPU.
                 ResultPart result_part;
                 while (!(result_part = chl.receive_result(seal_context))) {
-                    ;
+                    throw_if_receive_failed(chl, "result package");
+                    deadline.throw_if_expired("result package");
+
+                    this_thread::sleep_for(50ms);
                 }
+
+                // Every package is evidence for all the workers that the sender is still there,
+                // not just for the one that happened to read it.
+                deadline.note_progress();
 
                 // The bundle index is readable before the package is decrypted, so screen it
                 // first: a package for an index this query does not cover costs us no decryption.

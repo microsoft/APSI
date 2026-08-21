@@ -5,6 +5,7 @@
 
 // STD
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -100,6 +101,56 @@ namespace apsi::receiver {
         static constexpr std::uint64_t cuckoo_table_insert_attempts = 500;
 
         /**
+        How long the receiver waits for the sender to make progress before it gives up on an
+        exchange.
+
+        This is a *no-progress* window, not a budget for the whole operation: every message that
+        arrives restarts the clock, so a sender that is merely slow to compute is never cut off,
+        however long the query takes in total. What it bounds is silence. Without it, a sender
+        that accepts a request and then simply stops responding parks the receiver's calling
+        thread, and in the case of a query its result workers as well, for as long as the process
+        lives.
+
+        More precisely, it bounds the interval between messages arriving at this receiver's
+        socket. The clock starts when the request is handed to the channel, not when the sender
+        receives it, because sending is asynchronous and returns as soon as the message is
+        queued. The first window therefore has to cover uploading the request as well as waiting
+        for the answer, which makes it depend on link speed and not only on the sender: a query
+        built from the largest shipped parameter set serializes to roughly 11 MiB, which needs
+        about 95 seconds to upload on a 1 Mbit/s link. Parameters are bounded such that a query
+        cannot exceed PSIParams::query_byte_count_max, so the slowest link a given timeout can
+        tolerate follows from that bound.
+
+        The default is chosen against the one silence an honest sender genuinely produces. The
+        sender sends its query response before it begins the homomorphic work, and then computes
+        the query powers for every bundle index as a serial barrier, emitting nothing until the
+        first result package. That barrier is the whole honest gap, and it is not small: measured
+        over the shipped parameter sets it runs from roughly 17 seconds on ten fast cores to
+        around 100 seconds on one, and those figures count only the multiply-and-relinearize work,
+        not the transforms in the same phase. A sender on a small virtual machine is therefore
+        plausibly in the low hundreds of seconds.
+
+        Thirty minutes is sized so that such a sender finishes with room to spare, because the
+        cost of being wrong in that direction is a correctly-computing query discarded, while the
+        cost of being wrong in the other direction is only that a hostile sender holds one
+        receiver thread for longer before it gives up. A deployment that knows its sender is fast
+        should pass something shorter; the guarantee that matters is that the wait is bounded at
+        all.
+
+        Pass exactly std::chrono::milliseconds::zero() to wait indefinitely. Only do that when the
+        peer is trusted, since it gives a hostile or broken sender an unbounded hold on the
+        calling thread. A negative duration counts as a deadline that has already passed, not as
+        an indefinite wait, so that a caller passing on what is left of a wider budget as
+        deadline minus now cannot silently disable the timeout by running out of budget.
+
+        The deadline is checked between receive calls on the channel, so it holds only for channels
+        whose receive calls return control within a bounded interval; see the note on
+        network::Channel. network::ZMQChannel does this by setting a socket receive timeout.
+        */
+        static constexpr std::chrono::milliseconds default_receive_timeout =
+            std::chrono::minutes(30);
+
+        /**
         Creates a new receiver with parameters specified. In this case the receiver has
         specified the parameters and expects the sender to use the same set.
         */
@@ -136,26 +187,41 @@ namespace apsi::receiver {
 
         /**
         Performs a parameter request and returns the received PSIParams object.
+
+        Throws std::runtime_error if the sender sends nothing for timeout; see
+        Receiver::default_receive_timeout for what that bound means and how to lift it.
         */
-        static PSIParams RequestParams(network::NetworkChannel &chl);
+        static PSIParams RequestParams(
+            network::NetworkChannel &chl,
+            std::chrono::milliseconds timeout = default_receive_timeout);
 
         /**
         Performs an OPRF request on a vector of items through a given channel and returns a
         vector of OPRF hashed items of the same size as the input vector.
+
+        Throws std::runtime_error if the sender sends nothing for timeout; see
+        Receiver::default_receive_timeout for what that bound means and how to lift it.
         */
         static std::pair<std::vector<HashedItem>, LabelKeyVector> RequestOPRF(
-            const std::vector<Item> &items, network::NetworkChannel &chl);
+            const std::vector<Item> &items,
+            network::NetworkChannel &chl,
+            std::chrono::milliseconds timeout = default_receive_timeout);
 
         /**
         Performs a PSI or labeled PSI (depending on the sender) query. The query is a vector of
         items, and the result is a same-size vector of MatchRecord objects. If an item is in the
         intersection, the corresponding MatchRecord indicates it in the `found` field, and the
         `label` field may contain the corresponding label if a sender's data included it.
+
+        Throws std::runtime_error if the sender sends nothing for timeout, whether that happens
+        before the query response or partway through the result packages; see
+        Receiver::default_receive_timeout for what that bound means and how to lift it.
         */
         std::vector<MatchRecord> request_query(
             const std::vector<HashedItem> &items,
             const LabelKeyVector &label_keys,
-            network::NetworkChannel &chl);
+            network::NetworkChannel &chl,
+            std::chrono::milliseconds timeout = default_receive_timeout);
 
         /**
         Creates and returns a parameter request that can be sent to the sender with the
@@ -222,6 +288,41 @@ namespace apsi::receiver {
         std::uint32_t reset_powers_dag(const std::set<std::uint32_t> &source_powers);
 
         /**
+        Tracks how long the receiver has been waiting for the sender without hearing anything,
+        and gives up once that silence exceeds the caller's timeout.
+
+        The receiver waits for a message by looping on a null return, so every such loop needs an
+        answer to "how long is too long". Measuring silence rather than total elapsed time is what
+        lets the same bound serve a query against a hundred items and a query against a hundred
+        million: note_progress restarts the clock, so only a sender that stops talking altogether
+        is ever cut off.
+
+        Result workers share one instance. A package received by any worker is evidence for all of
+        them that the sender is still there, so a worker waiting on a package that is still being
+        computed must not time out just because its own wait has been long.
+        */
+        class ReceiveDeadline {
+        public:
+            explicit ReceiveDeadline(std::chrono::milliseconds timeout);
+
+            /**
+            Records that the sender was heard from, restarting the clock for every waiter.
+            */
+            void note_progress() noexcept;
+
+            /**
+            Throws std::runtime_error if nothing has been heard for longer than the timeout. The
+            description of what was being waited for goes into the log and the exception message.
+            */
+            void throw_if_expired(const char *what) const;
+
+        private:
+            std::chrono::milliseconds timeout_;
+
+            std::atomic<std::chrono::steady_clock::rep> last_progress_;
+        };
+
+        /**
         The destination the parallel result workers merge into, together with the lock that makes
         merging safe.
 
@@ -249,6 +350,7 @@ namespace apsi::receiver {
         void process_result_worker(
             std::atomic<std::uint32_t> &package_count,
             ResultMergeState &merge_state,
+            ReceiveDeadline &deadline,
             const LabelKeyVector &label_keys,
             const IndexTranslationTable &itt,
             network::Channel &chl) const;
