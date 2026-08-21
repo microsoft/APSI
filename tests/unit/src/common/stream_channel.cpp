@@ -238,4 +238,94 @@ namespace APSITests {
         ASSERT_EQ(svr.bytes_sent(), clt.bytes_received());
         ASSERT_EQ(svr.bytes_received(), clt.bytes_sent());
     }
+
+    // The tests below pin down what a null return from a receive means. A caller that waits
+    // for a message loops until it gets one, so it needs to know whether waiting longer can
+    // possibly help. receive_failed answers that: it is set exactly when the channel has taken
+    // input off the wire that it could not turn into an object, or has been asked for
+    // something it can never produce. In both cases the awaited message will never arrive, and
+    // a caller that keeps waiting waits forever.
+
+    TEST_F(StreamChannelTests, ReceiveFailedStaysClearThroughAHealthyExchange)
+    {
+        stringstream stream1;
+        stringstream stream2;
+
+        StreamChannel svr(/* istream */ stream1, /* ostream */ stream2);
+        StreamChannel clt(/* istream */ stream2, /* ostream */ stream1);
+
+        clt.send(unique_ptr<SenderOperation>(make_unique<SenderOperationParms>()));
+        ASSERT_NE(nullptr, svr.receive_operation(get_context()->seal_context()));
+
+        auto rsop_parms = make_unique<SenderOperationResponseParms>();
+        rsop_parms->params = make_unique<PSIParams>(*get_params());
+        svr.send(unique_ptr<SenderOperationResponse>(std::move(rsop_parms)));
+        ASSERT_NE(nullptr, clt.receive_response(SenderOperationType::sop_parms));
+
+        ASSERT_FALSE(svr.receive_failed());
+        ASSERT_FALSE(clt.receive_failed());
+    }
+
+    TEST_F(StreamChannelTests, UnreadableResponseIsReportedAsFailure)
+    {
+        stringstream stream1;
+        stringstream stream2;
+
+        StreamChannel svr(/* istream */ stream1, /* ostream */ stream2);
+        StreamChannel clt(/* istream */ stream2, /* ostream */ stream1);
+
+        // Bytes that are not a serialized header at all
+        stream2 << "not a serialized message";
+
+        ASSERT_EQ(nullptr, clt.receive_response());
+        ASSERT_TRUE(clt.receive_failed());
+    }
+
+    TEST_F(StreamChannelTests, ResponseOfTheWrongTypeIsReportedAsFailure)
+    {
+        stringstream stream1;
+        stringstream stream2;
+
+        StreamChannel svr(/* istream */ stream1, /* ostream */ stream2);
+        StreamChannel clt(/* istream */ stream2, /* ostream */ stream1);
+
+        auto rsop_parms = make_unique<SenderOperationResponseParms>();
+        rsop_parms->params = make_unique<PSIParams>(*get_params());
+        svr.send(unique_ptr<SenderOperationResponse>(std::move(rsop_parms)));
+
+        // Naming an expected type is what lets the channel reject this. The header is consumed
+        // and the body is left in the stream, so a caller that asked for sop_oprf will never see
+        // this message and cannot read anything after it either; it must be told to stop waiting
+        // rather than left to ask again.
+        ASSERT_EQ(nullptr, clt.receive_response(SenderOperationType::sop_oprf));
+        ASSERT_TRUE(clt.receive_failed());
+    }
+
+    TEST_F(StreamChannelTests, UnreadableResultPackageIsReportedAsFailure)
+    {
+        stringstream stream1;
+        stringstream stream2;
+
+        StreamChannel svr(/* istream */ stream1, /* ostream */ stream2);
+        StreamChannel clt(/* istream */ stream2, /* ostream */ stream1);
+
+        stream2 << "not a serialized result package";
+
+        ASSERT_EQ(nullptr, clt.receive_result(get_context()->seal_context()));
+        ASSERT_TRUE(clt.receive_failed());
+    }
+
+    TEST_F(StreamChannelTests, ResultPackageWithoutAContextIsReportedAsFailure)
+    {
+        stringstream stream1;
+        stringstream stream2;
+
+        StreamChannel svr(/* istream */ stream1, /* ostream */ stream2);
+        StreamChannel clt(/* istream */ stream2, /* ostream */ stream1);
+
+        // A result package can never be decoded without a SEALContext, so no amount of waiting
+        // will make this call succeed.
+        ASSERT_EQ(nullptr, clt.receive_result(nullptr));
+        ASSERT_TRUE(clt.receive_failed());
+    }
 } // namespace APSITests

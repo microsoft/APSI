@@ -14,6 +14,9 @@
 // APSI
 #include "apsi/network/zmq/zmq_channel.h"
 
+// ZeroMQ
+#include "zmq_addon.hpp"
+
 // Google Test
 #include "gtest/gtest.h"
 
@@ -147,6 +150,105 @@ namespace APSITests {
         // sop_parms needs no context, so this reaches the (non-blocking) receive, which returns
         // nullptr because no message has been queued.
         ASSERT_EQ(nullptr, svr.receive_operation(nullptr, SenderOperationType::sop_parms));
+    }
+
+    TEST_F(ZMQChannelTests, WrongFrameCountIsReportedAsFailureRatherThanThrown)
+    {
+        // A peer controls how many frames it puts in a message, so a frame count that does not
+        // match what the receiving function expects is ordinary hostile input. Throwing on it
+        // would let any peer unwind the stack of whichever thread happened to read the message;
+        // in the sender that thread runs the dispatch loop for every client. The count is
+        // reported the same way as any other unreadable message instead: null, plus a failure
+        // the caller can see.
+        ZMQSenderChannel svr;
+        ZMQReceiverChannel clt;
+        // Every port in this binary must be unique for the life of the process: the receiver
+        // tests hold theirs open on a function-local static that is never released, so a port
+        // reused here would bind or fail purely according to the order the tests happen to run
+        // in. 5552 and 5554-5559 are taken elsewhere.
+        svr.bind("tcp://*:5553");
+        clt.connect("tcp://localhost:5553");
+
+        // A response carries one more frame than an operation, so sending one where an
+        // operation is expected produces a message of the wrong length without any hand-built
+        // ZeroMQ frames.
+        auto rsop_parms = make_unique<SenderOperationResponseParms>();
+        rsop_parms->params = make_unique<PSIParams>(*get_params());
+        clt.send(unique_ptr<SenderOperationResponse>(std::move(rsop_parms)));
+
+        unique_ptr<ZMQSenderOperation> nsop;
+        ASSERT_NO_THROW(nsop = svr.receive_network_operation(get_context()->seal_context(), true));
+        ASSERT_EQ(nullptr, nsop);
+        ASSERT_TRUE(svr.receive_failed());
+    }
+
+    TEST_F(ZMQChannelTests, ManyFramedMessageIsRejectedAndTheChannelKeepsServing)
+    {
+        // A peer chooses how many frames it packs into one message, so an absurd count is
+        // ordinary hostile input. It must be rejected on frame count like any other malformed
+        // message, and the channel must go on serving afterwards.
+        //
+        // Note what this does NOT establish. ZeroMQ's message size limit applies to each frame
+        // separately and its high-water mark counts whole messages, so neither bounds the frame
+        // count, and ZeroMQ buffers a message in full before offering it to the application.
+        // The memory is therefore already spent by the time any APSI code runs, and no check
+        // here can prevent that. Mitigating it means bounding concurrent connections at the
+        // network layer, since the cost scales with concurrent peers and not with total traffic.
+        ZMQSenderChannel svr;
+        svr.bind("tcp://*:5558");
+
+        zmq::context_t ctx;
+        zmq::socket_t peer(ctx, zmq::socket_type::dealer);
+        peer.set(zmq::sockopt::linger, 0);
+        peer.connect("tcp://localhost:5558");
+
+        zmq::multipart_t oversized;
+        for (size_t i = 0; i < 500; i++) {
+            oversized.addstr("");
+        }
+        ASSERT_TRUE(oversized.send(peer));
+
+        unique_ptr<ZMQSenderOperation> nsop;
+        ASSERT_NO_THROW(nsop = svr.receive_network_operation(get_context()->seal_context(), true));
+        ASSERT_EQ(nullptr, nsop);
+        ASSERT_TRUE(svr.receive_failed());
+
+        // An honest request sent afterwards is read as a request, not as the tail of the
+        // message that was thrown away.
+        ZMQReceiverChannel clt;
+        clt.connect("tcp://localhost:5558");
+        clt.send(unique_ptr<SenderOperation>(make_unique<SenderOperationParms>()));
+
+        unique_ptr<ZMQSenderOperation> honest;
+        ASSERT_NO_THROW(
+            honest = svr.receive_network_operation(get_context()->seal_context(), true));
+        ASSERT_NE(nullptr, honest);
+        ASSERT_EQ(SenderOperationType::sop_parms, honest->sop->type());
+    }
+
+    TEST_F(ZMQChannelTests, ResponseOfTheWrongTypeIsReportedAsFailure)
+    {
+        // The receiver waits for a response by looping until one arrives. A response of a type
+        // it did not ask for is consumed and discarded, so unless the discard is reported the
+        // loop waits forever for a message that has already come and gone.
+        ZMQSenderChannel svr;
+        ZMQReceiverChannel clt;
+        svr.bind("tcp://*:5557");
+        clt.connect("tcp://localhost:5557");
+
+        clt.send(unique_ptr<SenderOperation>(make_unique<SenderOperationParms>()));
+        auto nsop = svr.receive_network_operation(get_context()->seal_context(), true);
+        ASSERT_NE(nullptr, nsop);
+
+        auto rsop_parms = make_unique<SenderOperationResponseParms>();
+        rsop_parms->params = make_unique<PSIParams>(*get_params());
+        auto nrsop = make_unique<ZMQSenderOperationResponse>();
+        nrsop->client_id = nsop->client_id;
+        nrsop->sop_response = std::move(rsop_parms);
+        svr.send(std::move(nrsop));
+
+        ASSERT_EQ(nullptr, clt.receive_response(SenderOperationType::sop_oprf));
+        ASSERT_TRUE(clt.receive_failed());
     }
 
     TEST_F(ZMQChannelTests, ClientServerFullSession)
