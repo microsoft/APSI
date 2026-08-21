@@ -1,7 +1,7 @@
 # APSI: C++ library for Asymmetric PSI
 
 - [Introduction](#introduction)
-  - [(Unlabeled) PSI and Labeled PSI](#(unlabeled)-psi-and-labeled-psi)
+  - [(Unlabeled) PSI and Labeled PSI](#unlabeled-psi-and-labeled-psi)
   - [Sender and Receiver](#sender-and-receiver)
 - [How APSI Works](#how-apsi-works)
   - [Homomorphic Encryption](#homomorphic-encryption)
@@ -10,7 +10,7 @@
   - [Labeled Mode](#labeled-mode)
 - [Using APSI](#using-apsi)
   - [Receiver](#receiver)
-  - [Request, Response, and ResultPart](#request--response--and-resultpart)
+  - [Request, Response, and ResultPart](#request-response-and-resultpart)
   - [Sender](#sender)
   - [SenderDB](#senderdb)
   - [PSIParams](#psiparams)
@@ -18,13 +18,14 @@
   - [Thread Control](#thread-control)
   - [Logging](#logging)
 - [Building APSI](#building-apsi)
-- [Command-Line Interface (CLI)](#command-line-interface-(cli))
+- [Command-Line Interface (CLI)](#command-line-interface-cli)
   - [Common Arguments](#common-arguments)
   - [Receiver](#receiver-1)
   - [Sender](#sender-1)
+  - [pd_tool](#pd_tool)
   - [Test Data](#test-data)
 - [Acknowledgments](#acknowledgments)
-- [Questions](#questions)
+- [Contributing](#contributing)
 
 ## Introduction
 
@@ -526,6 +527,11 @@ The "simple" API consists of three functions: `Receiver::RequestParams`, `Receiv
 However, these functions only support `network::NetworkChannel`, such as `network::ZMQReceiverChannel`, for the communication.
 Other channels, such as `network::StreamChannel`, are only supported by the "advanced" API.
 
+Each of the three takes an optional trailing `std::chrono::milliseconds timeout`, defaulting to `Receiver::default_receive_timeout` (thirty minutes).
+The timeout bounds how long the sender may stay *silent*, not how long the query may take: every message received restarts the clock, so a sender that is slow but responsive is never cut off, however large its database.
+Passing `std::chrono::milliseconds::zero()` waits indefinitely, which is appropriate only against a sender you trust.
+All three throw `std::runtime_error` if that deadline passes, or if the channel receives a message it cannot use &ndash; including, for `Receiver::RequestOPRF`, a response that does not carry exactly one OPRF hash per requested item.
+
 The advanced API requires many more steps.
 The full process is as follows:
 
@@ -560,6 +566,18 @@ For each received `ResultPart`, `Receiver::process_result_part` must be called t
 Alternatively, one can first retrieve all `ResultParts`, collect them into a `std::vector<ResultPart>`, and use `Receiver::process_result` to find the complete result &ndash; just like what the simple API returns.
 Both `Receiver::process_result_part` and `Receiver::process_result` require the `IndexTranslationTable` and the `LabelKeyVector` objects created in the previous steps.
 
+Note that the advanced API gives you the receive loop, and with it the responsibility the simple API handles on your behalf.
+`network::Channel::receive_response` and `network::Channel::receive_result` return `nullptr` for two different reasons: nothing has arrived yet, or a message arrived and was rejected.
+Only the second records a failure, so `network::Channel::receive_failed` is what tells them apart.
+A loop that simply retries on `nullptr` will wait forever once a malformed message has been consumed, because the data it is waiting for no longer exists.
+For the same reason such a loop needs a deadline of its own: a sender that accepts a request and then falls silent will otherwise hold the calling thread indefinitely.
+The simple API does both of these for you, bounded by its `timeout` argument.
+
+Which of those two reasons can occur depends on the channel.
+A `network::NetworkChannel` such as `network::ZMQReceiverChannel` returns control within a bounded interval whether or not a message arrived, so both reasons are live and a caller-side deadline is effective.
+`network::StreamChannel` instead blocks inside the underlying stream's own read and returns only when that read does, so it has no "nothing has arrived yet" return &ndash; but for the same reason a deadline checked between receive calls cannot bound a `network::StreamChannel` that is blocked on a silent peer.
+Bounding that case requires a stream that does not block indefinitely.
+
 ### Request, Response, and ResultPart
 
 The `Request` type is defined in [requests.h](common/apsi/requests.h) as an alias for `std::unique_ptr<network::SenderOperation>`, where `network::SenderOperation` is a purely virtual class representing either a parameter request (`network::SenderOperationParms`), an OPRF request (`network::SenderOperationOPRF`), or a PSI or labeled PSI query request (`network::SenderOperationQuery`).
@@ -567,7 +585,7 @@ The types `ParamsRequest`, `OPRFRequest`, and `QueryRequest` are similar aliases
 The functions `to_params_request`, `to_oprf_request`, and `to_query_request` convert a `Request` into the specific kind of request, returning `nullptr` if the `Request` was not of the right type.
 Conversely, the `to_request` function converts a `ParamsRequest`, `OPRFRequest`, or `QueryRequest` into a `Request` object.
 
-Similarly, the `Response` type is defined in [responses.h](common/apsi/responses.h) as an alias for `std::unique_ptr<network::SenderOperationResponse>`, along with related type aliases `ParamsResponse`, `OPRFResponse`, and `QueryResponse`, and corresponding conversion functions `to_params_response`, `to_oprf_responset`, `to_query_response`, and `to_response`.
+Similarly, the `Response` type is defined in [responses.h](common/apsi/responses.h) as an alias for `std::unique_ptr<network::SenderOperationResponse>`, along with related type aliases `ParamsResponse`, `OPRFResponse`, and `QueryResponse`, and corresponding conversion functions `to_params_response`, `to_oprf_response`, `to_query_response`, and `to_response`.
 
 Finally, the `ResultPart` type is defined in [responses.h](common/apsi/responses.h) as an alias for `std::unique_ptr<network::ResultPackage>`, where `network::ResultPackage` contains an encrypted result to a query request.
 Since the query is evaluated independently per each bin bundle (recall [Practice](#practice)), the results for each bin bundle are sent back to the receiver as separate `ResultPart` objects.
@@ -944,7 +962,8 @@ To configure and build:
 cmake --preset linux-debug          # or linux-release
 cmake --build --preset linux-debug
 ```
-The same pattern works for `macos-arm64-debug`, `macos-arm64-release`, `macos-x64-debug`, `macos-x64-release`, `win-vs2022-x64`, `win-vs2022-arm64`, `win-vs2026-x64`, and `win-vs2026-arm64`.
+The same pattern works for `macos-arm64-debug`, `macos-arm64-release`, `macos-x64-debug`, and `macos-x64-release`.
+The Windows presets separate the two steps: configure with `win-vs2022-x64`, `win-vs2022-arm64`, `win-vs2026-x64`, or `win-vs2026-arm64`, then build with the matching `-debug` or `-release` build preset, for example `win-vs2022-x64-release`.
 The `win-vs2026-*` presets require CMake ≥ 4.2 (see the [Requirements](#requirements) note); all others work with CMake ≥ 3.25.
 The base preset enables both tests and CLI; binaries land under `out/build/<preset>/bin/`.
 
@@ -976,14 +995,20 @@ On Windows, add `-DVCPKG_TARGET_TRIPLET=x64-windows-static-md`.
 | `APSI_BUILD_CLI`    | OFF     | Build the example `sender_cli`, `receiver_cli`, and `pd_tool` programs. Requires `APSI_USE_ZMQ=ON`.      |
 | `APSI_USE_ZMQ`      | ON      | Enable the ZeroMQ-backed `network::Channel` implementation. Required for the CLI.                       |
 | `BUILD_SHARED_LIBS` | OFF     | Must remain OFF; APSI does not support shared builds and configuration fails fast otherwise.            |
+| `APSI_USE_AVX`      | ON      | Use the FourQ AVX implementation where the target supports it. Advanced option.                         |
+| `APSI_USE_AVX2`     | ON      | Use the FourQ AVX2 implementation where the target supports it. Advanced option.                        |
+| `APSI_USE_ASM`      | ON      | Use the FourQ assembly implementation on supported static UNIX builds. Advanced option.                  |
+| `APSI_SECURE_COMPILE_OPTIONS` | OFF | Enable Control Flow Guard and Spectre mitigations. MSVC only; advanced option.                    |
 
 #### Dependencies pulled from `vcpkg.json`
 
 These are resolved automatically by manifest mode at configure time; no explicit `./vcpkg install ...` step is needed.
+Exact versions come from the `builtin-baseline` pinned in `vcpkg.json`; the versions below are what that baseline currently resolves to.
+Note that SEAL releases before 4.4.0 carry known vulnerabilities, including in the deserialization paths APSI exposes to a remote peer, so a build resolved against an older SEAL should not be used.
 
 | Dependency                                                | Used for                                              |
 |-----------------------------------------------------------|-------------------------------------------------------|
-| [Microsoft SEAL](https://github.com/microsoft/SEAL) ≥ 4.3.2 | BFV homomorphic encryption                          |
+| [Microsoft SEAL](https://github.com/microsoft/SEAL) 4.4.3 | BFV homomorphic encryption                          |
 | [Microsoft Kuku](https://github.com/microsoft/Kuku)       | Cuckoo hashing on the receiver's side                 |
 | [ms-gsl](https://github.com/microsoft/GSL)                | `gsl::span` for I/O buffers                           |
 | [FlatBuffers](https://github.com/google/flatbuffers)      | Serialization of network messages                     |
@@ -1024,6 +1049,11 @@ The following arguments specify the receiver's behavior.
 | `-o` \| `--outFile` | Path to a file where intersection result will be written |
 | `-a` \| `--ipAddr` | IP address for a sender endpoint |
 | `--port` | TCP port to connect to (default is 1212) |
+| `--timeout` | Seconds of sender silence to tolerate before giving up (default is 1800; 0 waits forever) |
+
+Every message received restarts the `--timeout` clock, so it bounds how long the sender may stay silent, not how long the query may take.
+A sender that is slow but responsive is never cut off, however large its database.
+Passing `0` disables the deadline, which is appropriate only against a sender you trust: a hostile or broken one can then hold the receiver indefinitely.
 
 ### Sender
 
@@ -1038,12 +1068,25 @@ Note that in other applications the receiver may already know the parameters, an
 | `--port` | TCP port to bind to (default is 1212) |
 | `-n` \| `--nonceByteCount` | Number of bytes used for the nonce in labeled mode (default is 16) |
 | `-c` \| `--compress` | Whether to compress the SenderDB in memory; this will make the memory footprint smaller at the cost of increased computation |
+| `-o` \| `--sdbOutFile` | Save the `SenderDB` in the given file |
 
 **Note:** The first row of the CSV file provided to `--dbFile` determines whether APSI will be used in unlabeled or labeled mode.
 If the first row contains two values, the first will be interpreted as the item and the rest will be interpreted as the label data.
 Leading and trailing whitespaces will be trimmed from both the item and the label data.
 If the first row contains only a single value (i.e., no label), then APSI will read only items from the subsequent rows and set up an unlabeled `SenderDB` instance.
 In the labeled mode the longest label appearing will determine the label byte count.
+
+### pd_tool
+
+`pd_tool` explores `PowersDag` configurations offline, which is how the `query_powers` set in a parameter file is chosen.
+Given a bound and a set of source powers it reports the depth of the resulting `PowersDag`, so candidate configurations can be compared without running a query.
+
+| <div style="width:190px">Parameter</div> | Explanation |
+|-----------|-------------|
+| `-b` \| `--bound` | Required. Up to what power to compute, i.e. `max_items_per_bin` |
+| `-p` \| `--ps_low_degree` | Low power when using Paterson-Stockmeyer for polynomial evaluation (default is 0) |
+| `-o` \| `--out` | Write the `PowersDag` in DOT format to the given file |
+| `<list of unsigned integers>` | Required. The source powers, given as positional arguments |
 
 ### Test Data
 

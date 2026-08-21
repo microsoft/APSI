@@ -67,17 +67,23 @@ macro(check_for_avx target)
     endif()
 
     # Set Flags
+    #
+    # These belong to the target being compiled and must not reach its consumers. They exist so
+    # the vendored FourQ sources can use AVX intrinsics; propagating them would additionally
+    # license the compiler to emit AVX instructions throughout a consumer's own code, which then
+    # faults on any machine without the extension. Whether the host that built this library has
+    # AVX2 says nothing about where the consumer will run.
     if(MSVC)
         if(HAVE_AVX2_EXTENSIONS AND MSVC_VERSION GREATER_EQUAL 1800)
-            target_compile_options(${target} PUBLIC /arch:AVX2)
+            target_compile_options(${target} PRIVATE /arch:AVX2)
         elseif(HAVE_AVX_EXTENSIONS AND MSVC_VERSION GREATER_EQUAL 1600)
-            target_compile_options(${target} PUBLIC /arch:AVX)
+            target_compile_options(${target} PRIVATE /arch:AVX)
         endif()
     else()
         if(HAVE_AVX2_EXTENSIONS)
-            target_compile_options(${target} PUBLIC -mavx2)
+            target_compile_options(${target} PRIVATE -mavx2)
         elseif(HAVE_AVX_EXTENSIONS)
-            target_compile_options(${target} PUBLIC -mavx)
+            target_compile_options(${target} PRIVATE -mavx)
         endif()
     endif()
     set(CMAKE_REQUIRED_QUIET ${CMAKE_REQUIRED_QUIET_OLD})
