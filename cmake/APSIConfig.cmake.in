@@ -39,6 +39,7 @@ set(APSI_BUILD_TYPE @CMAKE_BUILD_TYPE@)
 set(APSI_DEBUG @APSI_DEBUG@)
 
 apsi_find_dependency(SEAL REQUIRED)
+apsi_find_dependency(Microsoft.GSL REQUIRED)
 apsi_find_dependency(Kuku REQUIRED)
 apsi_find_dependency(Flatbuffers REQUIRED)
 apsi_find_dependency(jsoncpp REQUIRED)

@@ -116,11 +116,31 @@ set(APSI_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/APSI-${APSI_VERSION_MA
 # find_package might throw a FATAL_ERROR before"xxx: not found", e.g. with vcpkg.cmake.
 
 # Microsoft SEAL
-find_package(SEAL CONFIG QUIET REQUIRED)
+# The version is pinned rather than merely floored, because SEAL's own package configuration
+# declares differing minor versions incompatible: this request accepts 4.4.3 and later 4.4.x
+# patch releases and rejects everything else, including the 4.3.x line. That is the intent.
+# Microsoft SEAL 4.4.0 is a critical security update that hardened untrusted deserialization and
+# fixed memory-safety defects, so every earlier release is unsuitable for a library that
+# deserializes messages from an untrusted peer. Rejecting an unexpected SEAL at configure time is
+# better than building a library that is quietly weaker than documented.
+# Raise this together with the vcpkg baseline whenever SEAL is updated.
+find_package(SEAL 4.4.3 CONFIG QUIET REQUIRED)
 if(NOT SEAL_FOUND)
     message(FATAL_ERROR "Microsoft SEAL: not found")
 else()
     message(STATUS "Microsoft SEAL: found")
+endif()
+
+# Microsoft GSL
+# APSI's public headers include <gsl/span>, so this is part of the installed interface and not
+# merely a build-time convenience. SEAL is built here with SEAL_USE_MSGSL=OFF and so does not
+# propagate GSL, and relying on vcpkg's global include directory would leave any consumer
+# outside a vcpkg manifest unable to include an APSI header at all.
+find_package(Microsoft.GSL CONFIG QUIET REQUIRED)
+if(NOT Microsoft.GSL_FOUND)
+    message(FATAL_ERROR "Microsoft GSL: not found")
+else()
+    message(STATUS "Microsoft GSL: found")
 endif()
 
 # Microsoft Kuku
@@ -186,6 +206,15 @@ endif()
 # [Option] APSI_BUILD_CLI (default: OFF)
 set(APSI_BUILD_CLI_OPTION_STR "Build example command line interface applications")
 cmake_dependent_option(APSI_BUILD_CLI ${APSI_BUILD_CLI_OPTION_STR} OFF "APSI_USE_ZMQ" OFF)
+# cmake_dependent_option silently forces the value to OFF when the condition fails, which for a
+# request the user made explicitly is the wrong answer: the build simply produces no CLI and says
+# nothing about why. Detect that case and say so.
+if(DEFINED CACHE{APSI_BUILD_CLI} AND NOT APSI_USE_ZMQ)
+    get_property(apsi_cli_requested CACHE APSI_BUILD_CLI PROPERTY VALUE)
+    if(apsi_cli_requested)
+        message(FATAL_ERROR "APSI_BUILD_CLI requires APSI_USE_ZMQ=ON; the CLI has no other transport")
+    endif()
+endif()
 if (APSI_BUILD_CLI)
     # TCLAP
     find_path(TCLAP_INCLUDE_DIRS "tclap/Arg.h")
@@ -241,6 +270,7 @@ apsi_install_target(apsi APSITargets)
 
 target_link_libraries(apsi
     PUBLIC SEAL::seal
+    PUBLIC Microsoft.GSL::GSL
     PUBLIC Kuku::kuku
     PUBLIC flatbuffers::flatbuffers
     PUBLIC jsoncpp_static)
@@ -249,15 +279,21 @@ if(APSI_USE_ZMQ)
 endif()
 
 # Configurations for FourQlib: system, arch, SIMD, and assembler
-target_compile_options(apsi PUBLIC -DHAVE_CONFIG)
-target_compile_options(apsi PUBLIC -DUSE_SECURE_SEED)
-target_compile_options(apsi PUBLIC -DUSE_ENDO=true)
+#
+# PRIVATE throughout. These configure the vendored FourQ sources, which are compiled into this
+# target and reached only from .cpp files, so no installed header needs them. Exporting them
+# would impose FourQ's build configuration on every consumer -- including naming the host's
+# operating system and architecture, which are not necessarily the consumer's, and claiming the
+# very generic HAVE_CONFIG, which a consumer may define for its own purposes.
+target_compile_options(apsi PRIVATE -DHAVE_CONFIG)
+target_compile_options(apsi PRIVATE -DUSE_SECURE_SEED)
+target_compile_options(apsi PRIVATE -DUSE_ENDO=true)
 
 # Set system
 if(MSVC)
-    target_compile_options(apsi PUBLIC -D__WINDOWS__)
+    target_compile_options(apsi PRIVATE -D__WINDOWS__)
 elseif (UNIX)
-    target_compile_options(apsi PUBLIC -D__LINUX__)
+    target_compile_options(apsi PRIVATE -D__LINUX__)
 endif()
 
 # Detect architecture
@@ -265,19 +301,19 @@ include(DetectArch)
 if(APSI_FOURQ_ARM64)
     # _ARM64_ needs to be set if the ARM64 optimizations are used
     # (in UNIX) or the generic implementation is used (Windows)
-    target_compile_options(apsi PUBLIC -D_ARM64_)
+    target_compile_options(apsi PRIVATE -D_ARM64_)
 endif()
 if(CMAKE_SYSTEM_PROCESSOR STREQUAL x86)
-    target_compile_options(apsi PUBLIC -D_X86_)
+    target_compile_options(apsi PRIVATE -D_X86_)
 endif()
 
 if(APSI_FOURQ_AMD64)
-    target_compile_options(apsi PUBLIC -D_AMD64_)
+    target_compile_options(apsi PRIVATE -D_AMD64_)
     message(STATUS "FourQlib optimization: arch=AMD64")
 elseif(APSI_FOURQ_ARM64 AND UNIX)
     message(STATUS "FourQlib optimization: arch=ARM64")
 else()
-    target_compile_options(apsi PUBLIC -D_GENERIC_)
+    target_compile_options(apsi PRIVATE -D_GENERIC_)
     message(STATUS "FourQlib optimization: arch=GENERIC")
 endif()
 
@@ -286,11 +322,11 @@ if(APSI_FOURQ_AMD64 AND (APSI_USE_AVX OR APSI_USE_AVX2))
     include(FindAVX)
     check_for_avx(apsi)
     if(HAVE_AVX2_EXTENSIONS AND APSI_USE_AVX2)
-        target_compile_options(apsi PUBLIC -D_AVX2_)
+        target_compile_options(apsi PRIVATE -D_AVX2_)
         set(APSI_USE_AVX OFF CACHE BOOL ${APSI_USE_AVX_OPTION_STR} FORCE)
         message(STATUS "FourQlib optimization: simd=AVX2")
     elseif(HAVE_AVX_EXTENSIONS AND APSI_USE_AVX)
-        target_compile_options(apsi PUBLIC -D_AVX_)
+        target_compile_options(apsi PRIVATE -D_AVX_)
         set(APSI_USE_AVX2 OFF CACHE BOOL ${APSI_USE_AVX2_OPTION_STR} FORCE)
         message(STATUS "FourQlib optimization: simd=AVX")
     else()
@@ -309,7 +345,7 @@ if(APSI_USE_ASM AND UNIX AND NOT APPLE AND NOT CYGWIN AND NOT MINGW)
     check_language(ASM)
     if(CMAKE_ASM_COMPILER)
         enable_language(ASM)
-        target_compile_options(apsi PUBLIC -D_ASM_)
+        target_compile_options(apsi PRIVATE -D_ASM_)
         message(STATUS "FourQlib optimization: asm=ON")
     endif()
 else()

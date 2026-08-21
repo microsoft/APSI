@@ -2,7 +2,13 @@
 
 ## Version 0.13.1
 
-- Updated the vcpkg baseline to build against Microsoft SEAL 4.4.0.
+- Updated the vcpkg baseline and now require Microsoft SEAL 4.4.3.
+- Added an optional `std::chrono::milliseconds timeout` to `Receiver::RequestParams`, `Receiver::RequestOPRF`, and `Receiver::request_query`, defaulting to 30 minutes; they throw `std::runtime_error` if the sender stops responding for that long. Pass `std::chrono::milliseconds::zero()` for the previous unbounded wait. The added parameter changes the mangled names, so consumers must recompile rather than relink.
+- `Receiver::RequestOPRF` throws if the sender's response does not contain one OPRF hash per requested item, instead of returning an empty result.
+- Added `network::Channel::receive_failed` and `network::Channel::receive_failure_count`; code that loops on a `nullptr` receive must consult them (see [Request, Response, and ResultPart](README.md#request-response-and-resultpart)).
+- `PSIParams` rejects out-of-range parameters and malformed serialized data. The serialized format is unchanged, but a custom parameter set exceeding the new bounds is no longer accepted; the sets in [parameters](parameters) are unaffected.
+- Declared Microsoft GSL as a dependency of the exported CMake package, and stopped exporting the FourQ and AVX build flags to consumers.
+- Fixed [.gitignore](.gitignore) excluding the FourQ ARM64 sources, which broke a fresh clone on ARM64.
 - The global logger is now a never-destroyed ("immortal") singleton, which avoids a static-destruction-order issue when another library logs through APSI during process teardown. As a consequence the logger's handlers are no longer invoked automatically at exit, so the built-in console and file loggers now flush on every write. Custom buffering loggers should be flushed and closed via `apsi::CloseLogger()` (see [Logging](README.md#logging)).
 - Fixed some issues in [CMakePresets.json](CMakePresets.json).
 
