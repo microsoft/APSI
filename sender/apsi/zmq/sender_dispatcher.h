@@ -5,6 +5,7 @@
 
 // STD
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <utility>
 
@@ -42,8 +43,15 @@ namespace apsi::sender {
 
         /**
         Run the dispatcher on the given port.
+
+        A port of 0 asks the operating system to choose a free port, which is useful when
+        nothing depends on the sender living at a particular one. Because the choice is only
+        made at bind time, the port that was actually taken is reported through on_bound, which
+        is called once, before the first request is served, with the port in use. It is called
+        on the calling thread and is skipped if empty.
         */
-        void run(const std::atomic<bool> &stop, int port);
+        void run(
+            const std::atomic<bool> &stop, int port, const std::function<void(int)> &on_bound = {});
 
     private:
         std::shared_ptr<sender::SenderDB> sender_db_;

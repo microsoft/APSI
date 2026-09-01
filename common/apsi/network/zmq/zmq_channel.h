@@ -6,6 +6,7 @@
 // STD
 #include <memory>
 #include <mutex>
+#include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -99,6 +100,20 @@ namespace apsi::network {
         bool is_connected() const
         {
             return !end_point_.empty();
+        }
+
+        /**
+        The endpoint the channel is bound or connected to, or an empty string if the channel is
+        not connected.
+
+        For a bound channel this is the endpoint ZeroMQ actually bound, which is not necessarily
+        the one requested: binding to a port of 0 leaves the choice of port to the operating
+        system, and this is how the caller learns which one it received, so that it can tell a
+        peer where to connect.
+        */
+        const std::string &end_point() const noexcept
+        {
+            return end_point_;
         }
 
         /**

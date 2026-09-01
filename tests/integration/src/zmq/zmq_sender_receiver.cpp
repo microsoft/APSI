@@ -2,7 +2,11 @@
 // Licensed under the MIT license.
 
 // STD
+#include <atomic>
+#include <future>
+#include <memory>
 #include <sstream>
+#include <string>
 
 // APSI
 #include "apsi/log.h"
@@ -13,6 +17,7 @@
 #include "apsi/sender_db.h"
 #include "apsi/thread_pool_mgr.h"
 #include "apsi/zmq/sender_dispatcher.h"
+#include "support/zmq_test_utils.h"
 #include "test_utils.h"
 
 // Google Test
@@ -29,6 +34,49 @@ using namespace seal;
 
 namespace APSITests {
     namespace {
+        /**
+        A running dispatcher together with the address its clients should connect to.
+        */
+        struct RunningDispatcher {
+            std::future<void> done;
+
+            std::string conn_addr;
+        };
+
+        /**
+        Starts a dispatcher on a port chosen by the operating system and waits until it is
+        listening, so that the address returned is one a client can actually connect to.
+
+        The port cannot be hard-coded: a fixed one collides with any other test binary running
+        at the same time. It is therefore only settled at bind time, which is why the caller has
+        to wait for it here. Should the dispatcher fail before it ever binds, that failure is
+        what surfaces, rather than a wait for an address that will never arrive.
+        */
+        RunningDispatcher start_dispatcher(
+            std::shared_ptr<SenderDB> sender_db, const std::atomic<bool> &stop)
+        {
+            auto port = std::make_shared<std::promise<int>>();
+            std::future<int> bound_port = port->get_future();
+
+            std::future<void> done = async(launch::async, [sender_db, &stop, port]() {
+                try {
+                    ZMQSenderDispatcher dispatcher(sender_db);
+                    dispatcher.run(
+                        stop, 0, [port](int listening_port) { port->set_value(listening_port); });
+                } catch (...) {
+                    try {
+                        port->set_exception(std::current_exception());
+                    } catch (const std::future_error &) {
+                        // The port was already reported, so the dispatcher bound successfully
+                        // and failed later. Nobody is waiting on the promise any more.
+                    }
+                    throw;
+                }
+            });
+
+            return { std::move(done), connect_address(bound_port.get()) };
+        }
+
         bool verify_unlabeled_results(
             const vector<MatchRecord> &query_result,
             const vector<Item> &query_vec,
@@ -146,12 +194,8 @@ namespace APSITests {
 
             atomic<bool> stop_sender{ false };
 
-            future<void> sender_f = async(launch::async, [&]() {
-                ZMQSenderDispatcher dispatcher(loaded_sender_db);
-                dispatcher.run(stop_sender, 5550);
-            });
-
-            string conn_addr = "tcp://localhost:5550";
+            RunningDispatcher sender = start_dispatcher(loaded_sender_db, stop_sender);
+            const string &conn_addr = sender.conn_addr;
 
             for (auto client_total_and_int_size : client_total_and_int_sizes) {
                 auto client_size = client_total_and_int_size.first;
@@ -197,7 +241,7 @@ namespace APSITests {
             }
 
             stop_sender = true;
-            sender_f.get();
+            sender.done.get();
         }
 
         void RunLabeledTest(
@@ -233,12 +277,8 @@ namespace APSITests {
 
             atomic<bool> stop_sender{ false };
 
-            future<void> sender_f = async(launch::async, [&]() {
-                ZMQSenderDispatcher dispatcher(loaded_sender_db);
-                dispatcher.run(stop_sender, 5550);
-            });
-
-            string conn_addr = "tcp://localhost:5550";
+            RunningDispatcher sender = start_dispatcher(loaded_sender_db, stop_sender);
+            const string &conn_addr = sender.conn_addr;
 
             for (auto client_total_and_int_size : client_total_and_int_sizes) {
                 auto client_size = client_total_and_int_size.first;
@@ -284,7 +324,7 @@ namespace APSITests {
             }
 
             stop_sender = true;
-            sender_f.get();
+            sender.done.get();
         }
     } // namespace
 

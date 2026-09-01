@@ -402,6 +402,7 @@ export(
 if(APSI_BUILD_TESTS)
     add_executable(unit_tests)
     add_subdirectory(tests/unit/src)
+    target_include_directories(unit_tests PRIVATE ${CMAKE_CURRENT_LIST_DIR}/tests)
     target_link_libraries(unit_tests apsi GTest::gtest)
 endif()
 
@@ -412,6 +413,7 @@ endif()
 if(APSI_BUILD_TESTS)
     add_executable(integration_tests)
     add_subdirectory(tests/integration/src)
+    target_include_directories(integration_tests PRIVATE ${CMAKE_CURRENT_LIST_DIR}/tests)
     target_link_libraries(integration_tests apsi GTest::gtest)
 endif()
 

@@ -4,7 +4,9 @@
 // STD
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <stdexcept>
+#include <string>
 #include <thread>
 
 // APSI
@@ -26,6 +28,28 @@ namespace apsi {
     using namespace util;
 
     namespace sender {
+        namespace {
+            /**
+            The port out of an endpoint of the form "tcp://0.0.0.0:5550", which is the shape
+            ZeroMQ reports for a bound TCP socket. The port is always last, so this also handles
+            the bracketed IPv6 form. Returns 0 for anything else, including the inproc and ipc
+            transports, which have no port to report.
+            */
+            int port_from_end_point(const string &end_point)
+            {
+                size_t colon = end_point.find_last_of(':');
+                if (colon == string::npos || colon + 1 == end_point.size()) {
+                    return 0;
+                }
+
+                try {
+                    return stoi(end_point.substr(colon + 1));
+                } catch (const exception &) {
+                    return 0;
+                }
+            }
+        } // namespace
+
         ZMQSenderDispatcher::ZMQSenderDispatcher(shared_ptr<SenderDB> sender_db, OPRFKey oprf_key)
             : sender_db_(std::move(sender_db)), oprf_key_(std::move(oprf_key))
         {
@@ -58,15 +82,25 @@ namespace apsi {
             }
         }
 
-        void ZMQSenderDispatcher::run(const atomic<bool> &stop, int port)
+        void ZMQSenderDispatcher::run(
+            const atomic<bool> &stop, int port, const function<void(int)> &on_bound)
         {
             ZMQSenderChannel chl;
 
             stringstream ss;
             ss << "tcp://*:" << port;
 
-            APSI_LOG_INFO("ZMQSenderDispatcher listening on port " << port);
             chl.bind(ss.str());
+
+            // Report the bound port rather than the requested one. With a port of 0 the
+            // operating system makes the choice, so this is the first point at which the port
+            // in use is known, both for the log line and for a caller that has to tell a peer
+            // where to connect.
+            int listening_port = port_from_end_point(chl.end_point());
+            APSI_LOG_INFO("ZMQSenderDispatcher listening on port " << listening_port);
+            if (on_bound) {
+                on_bound(listening_port);
+            }
 
             auto seal_context = sender_db_->get_seal_context();
 

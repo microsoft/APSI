@@ -10,7 +10,9 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <random>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <vector>
@@ -26,6 +28,36 @@ using namespace apsi;
 
 namespace APSITests {
     namespace {
+        /**
+        A temporary log file path that no other test and no other process is using.
+
+        Uniqueness within the process is not enough. Two test binaries can run against the same
+        temporary directory at the same time -- a Debug and a Release run, two jobs sharing a
+        machine, or simply the suite started twice -- and a name built only from a per-process
+        counter is identical in both. They then write to one file, and each sees the other's
+        lines interleaved into its own, which surfaces as the file logger appearing to tear lines
+        it never touched.
+        */
+        std::filesystem::path unique_temp_log_path(const std::string &prefix)
+        {
+            namespace fs = std::filesystem;
+            static std::atomic<std::uint64_t> seq{ 0 };
+
+            std::random_device rd;
+            for (int attempt = 0; attempt < 100; attempt++) {
+                std::ostringstream name;
+                name << prefix << std::hex << rd() << '_' << seq.fetch_add(1) << ".log";
+
+                fs::path candidate = fs::temp_directory_path() / name.str();
+                std::error_code ec;
+                if (!fs::exists(candidate, ec)) {
+                    return candidate;
+                }
+            }
+
+            throw std::runtime_error("could not find an unused temporary log path");
+        }
+
         // Capturing logger: each level appends "[level] msg" to a shared vector. Tests inspect
         // the vector to verify routing, level filtering, and lifecycle.
         struct CapturedLog {
@@ -363,13 +395,10 @@ namespace APSITests {
 
     TEST(LogTests, NewFileLoggerWritesAllLevelsToFile)
     {
-        // Construct a unique path under the OS temp directory. The counter survives across tests
-        // run in the same process so concurrent test workers (if anyone ever sets that up) get
-        // distinct files even on the same second.
+        // A path of its own under the OS temp directory, unique across processes as well as
+        // within this one.
         namespace fs = std::filesystem;
-        static std::atomic<std::uint64_t> seq{ 0 };
-        fs::path log_path = fs::temp_directory_path() /
-                            ("apsi_test_log_" + std::to_string(seq.fetch_add(1)) + ".log");
+        fs::path log_path = unique_temp_log_path("apsi_test_log_");
 
         // Ensure we don't leave the file behind even if the test asserts.
         struct RemoveOnExit {
@@ -470,9 +499,7 @@ namespace APSITests {
         // characters from concurrent emissions into the same line. Hammer it from many threads
         // and assert every line arrives whole. Run under ThreadSanitizer to catch the race.
         namespace fs = std::filesystem;
-        static std::atomic<std::uint64_t> seq{ 0 };
-        fs::path log_path = fs::temp_directory_path() /
-                            ("apsi_test_mtlog_" + std::to_string(seq.fetch_add(1)) + ".log");
+        fs::path log_path = unique_temp_log_path("apsi_test_mtlog_");
 
         struct RemoveOnExit {
             fs::path p;
