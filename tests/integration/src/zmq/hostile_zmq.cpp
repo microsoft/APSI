@@ -22,6 +22,7 @@
 #include "apsi/sender_db.h"
 #include "apsi/thread_pool_mgr.h"
 #include "apsi/zmq/sender_dispatcher.h"
+#include "support/zmq_test_utils.h"
 #include "test_utils.h"
 
 // ZeroMQ
@@ -42,14 +43,6 @@ using namespace seal;
 
 namespace APSITests {
     namespace {
-        // Ports of their own, so these tests never collide with the honest ZMQ suite on 5550 or
-        // with the channel and receiver unit tests on 5552-5559.
-        constexpr int dispatcher_port = 5560;
-
-        constexpr int silent_sender_port = 5561;
-
-        constexpr int dead_peer_port = 5562;
-
         /**
         Stops a dispatcher running on another thread and waits for it, on every exit path.
 
@@ -101,14 +94,23 @@ namespace APSITests {
             ThreadPoolMgr::SetPoolWorkerCount(num_threads * 2);
         }
 
-        string connect_address(int port)
-        {
-            return "tcp://localhost:" + to_string(port);
-        }
+        /**
+        A port with nothing behind it.
 
-        string bind_address(int port)
+        Taken by binding a socket and then dropping it, so the number is one the operating system
+        was willing to hand out and is free again by the time it is returned. Another process
+        could in principle claim it in between; that would not weaken the test, because a peer
+        that does not speak the protocol leaves the receiver waiting exactly as an absent one
+        does.
+        */
+        int unused_port()
         {
-            return "tcp://*:" + to_string(port);
+            ZMQSenderChannel probe;
+            probe.bind(any_port_bind_address());
+            int port = bound_port(probe);
+            probe.disconnect();
+
+            return port;
         }
 
         shared_ptr<SenderDB> CreateSenderDB(const PSIParams &params, const vector<Item> &items)
@@ -174,11 +176,9 @@ namespace APSITests {
         void RunSilentSender(
             const shared_ptr<SenderDB> &sender_db,
             uint32_t announced_package_count,
-            atomic<bool> &stop)
+            atomic<bool> &stop,
+            ZMQSenderChannel &chl)
         {
-            ZMQSenderChannel chl;
-            chl.bind(bind_address(silent_sender_port));
-
             OPRFKey oprf_key = sender_db->get_oprf_key();
 
             while (!stop) {
@@ -245,13 +245,31 @@ namespace APSITests {
 
         atomic<bool> stop_sender{ false };
         auto sender_db = CreateSenderDB(params, sender_items);
+
+        // The dispatcher takes whichever port the operating system gives it, so the address is
+        // settled only once it has bound. A dispatcher that fails before that reports the failure
+        // here, rather than leaving the test waiting for a port that will never be announced.
+        promise<int> listening_on;
+        future<int> listening_on_f = listening_on.get_future();
+
         future<void> sender_f = async(launch::async, [&]() {
-            ZMQSenderDispatcher dispatcher(sender_db);
-            dispatcher.run(stop_sender, dispatcher_port);
+            try {
+                ZMQSenderDispatcher dispatcher(sender_db);
+                dispatcher.run(
+                    stop_sender, 0, [&listening_on](int port) { listening_on.set_value(port); });
+            } catch (...) {
+                try {
+                    listening_on.set_exception(current_exception());
+                } catch (const future_error &) {
+                    // The port was already announced, so the bind succeeded and the failure came
+                    // later. Nothing is waiting on the promise any more.
+                }
+                throw;
+            }
         });
         DispatcherStopper stopper(stop_sender, sender_f);
 
-        string address = connect_address(dispatcher_port);
+        string address = connect_address(listening_on_f.get());
 
         // Too few parts, too many parts, and the right number carrying nothing the sender can
         // read. Each one leaves the sender's channel marked as failed, and that mark is sticky,
@@ -306,12 +324,20 @@ namespace APSITests {
 
         atomic<bool> stop_sender{ false };
         auto sender_db = CreateSenderDB(params, sender_items);
+
+        // Bound here rather than inside the sender thread, so that the address is known before
+        // the thread starts and a bind that fails surfaces as a failure of this test rather than
+        // as a wait that never ends. Only the sender thread uses the channel once it is running.
+        ZMQSenderChannel silent_chl;
+        silent_chl.bind(any_port_bind_address());
+        string address = connect_address(silent_chl);
+
         future<void> sender_f =
-            async(launch::async, [&]() { RunSilentSender(sender_db, 2, stop_sender); });
+            async(launch::async, [&]() { RunSilentSender(sender_db, 2, stop_sender, silent_chl); });
         DispatcherStopper stopper(stop_sender, sender_f);
 
         ZMQReceiverChannel recv_chl;
-        recv_chl.connect(connect_address(silent_sender_port));
+        recv_chl.connect(address);
 
         Receiver receiver(params);
 
@@ -355,7 +381,7 @@ namespace APSITests {
 
             // Nothing is listening here and nothing ever will be, so the request can never be
             // delivered.
-            chl.connect(connect_address(dead_peer_port));
+            chl.connect(connect_address(unused_port()));
 
             try {
                 (void)Receiver::RequestParams(chl, 2s);

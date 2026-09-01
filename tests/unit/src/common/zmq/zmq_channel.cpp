@@ -14,6 +14,9 @@
 // APSI
 #include "apsi/network/zmq/zmq_channel.h"
 
+// APSI test support
+#include "support/zmq_test_utils.h"
+
 // ZeroMQ
 #include "zmq_addon.hpp"
 
@@ -93,11 +96,11 @@ namespace APSITests {
         ZMQChannelTests()
         {
             if (!server().is_connected()) {
-                server().bind("tcp://*:5555");
+                server().bind(any_port_bind_address());
             }
 
             if (!client().is_connected()) {
-                client().connect("tcp://localhost:5555");
+                client().connect(connect_address(server()));
             }
 
             // Set up the context ahead of time
@@ -140,8 +143,8 @@ namespace APSITests {
         // instances cannot affect the result.
         ZMQSenderChannel svr;
         ZMQReceiverChannel clt;
-        svr.bind("tcp://*:5559");
-        clt.connect("tcp://localhost:5559");
+        svr.bind(any_port_bind_address());
+        clt.connect(connect_address(svr));
 
         // The default expected type sop_unknown requires a SEALContext; passing nullptr makes
         // receive_network_operation return nullptr before it reads any message.
@@ -162,12 +165,8 @@ namespace APSITests {
         // the caller can see.
         ZMQSenderChannel svr;
         ZMQReceiverChannel clt;
-        // Every port in this binary must be unique for the life of the process: the receiver
-        // tests hold theirs open on a function-local static that is never released, so a port
-        // reused here would bind or fail purely according to the order the tests happen to run
-        // in. 5552 and 5554-5559 are taken elsewhere.
-        svr.bind("tcp://*:5553");
-        clt.connect("tcp://localhost:5553");
+        svr.bind(any_port_bind_address());
+        clt.connect(connect_address(svr));
 
         // A response carries one more frame than an operation, so sending one where an
         // operation is expected produces a message of the wrong length without any hand-built
@@ -195,12 +194,12 @@ namespace APSITests {
         // here can prevent that. Mitigating it means bounding concurrent connections at the
         // network layer, since the cost scales with concurrent peers and not with total traffic.
         ZMQSenderChannel svr;
-        svr.bind("tcp://*:5558");
+        svr.bind(any_port_bind_address());
 
         zmq::context_t ctx;
         zmq::socket_t peer(ctx, zmq::socket_type::dealer);
         peer.set(zmq::sockopt::linger, 0);
-        peer.connect("tcp://localhost:5558");
+        peer.connect(connect_address(svr));
 
         zmq::multipart_t oversized;
         for (size_t i = 0; i < 500; i++) {
@@ -216,7 +215,7 @@ namespace APSITests {
         // An honest request sent afterwards is read as a request, not as the tail of the
         // message that was thrown away.
         ZMQReceiverChannel clt;
-        clt.connect("tcp://localhost:5558");
+        clt.connect(connect_address(svr));
         clt.send(unique_ptr<SenderOperation>(make_unique<SenderOperationParms>()));
 
         unique_ptr<ZMQSenderOperation> honest;
@@ -233,8 +232,8 @@ namespace APSITests {
         // loop waits forever for a message that has already come and gone.
         ZMQSenderChannel svr;
         ZMQReceiverChannel clt;
-        svr.bind("tcp://*:5557");
-        clt.connect("tcp://localhost:5557");
+        svr.bind(any_port_bind_address());
+        clt.connect(connect_address(svr));
 
         clt.send(unique_ptr<SenderOperation>(make_unique<SenderOperationParms>()));
         auto nsop = svr.receive_network_operation(get_context()->seal_context(), true);
@@ -256,8 +255,8 @@ namespace APSITests {
         ZMQSenderChannel svr;
         ZMQReceiverChannel clt;
 
-        svr.bind("tcp://*:5554");
-        clt.connect("tcp://localhost:5554");
+        svr.bind(any_port_bind_address());
+        clt.connect(connect_address(svr));
 
         thread clientth([&clt] {
             this_thread::sleep_for(50ms);
@@ -444,11 +443,14 @@ namespace APSITests {
     {
         atomic<bool> finished{ false };
 
-        thread serverth([&finished] {
-            ZMQSenderChannel sender;
+        // Bound here rather than inside the server thread so that the clients can be told which
+        // port the operating system handed out. Only the server thread touches the channel once
+        // it starts, and the bind happens before that.
+        ZMQSenderChannel sender;
+        sender.bind(any_port_bind_address());
+        const string server_address = connect_address(sender);
 
-            sender.bind("tcp://*:5552");
-
+        thread serverth([&finished, &sender] {
             while (!finished) {
                 unique_ptr<ZMQSenderOperation> sop =
                     sender.receive_network_operation(get_context()->seal_context());
@@ -476,10 +478,10 @@ namespace APSITests {
 
         vector<thread> clients(5);
         for (auto &client : clients) {
-            client = thread([]() {
+            client = thread([&server_address]() {
                 ZMQReceiverChannel recv;
 
-                recv.connect("tcp://localhost:5552");
+                recv.connect(server_address);
 
                 for (uint32_t k = 0; k < 5; k++) {
                     vector<unsigned char> oprf_data(256);

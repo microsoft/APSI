@@ -132,8 +132,14 @@ namespace apsi {
             throw_if_connected();
 
             try {
-                end_point_ = end_point;
                 get_socket()->bind(end_point);
+
+                // Record what ZeroMQ actually bound rather than what was asked for. A port of 0
+                // asks the operating system to pick a free one, and this is the only way to find
+                // out which. Assigning only after the bind succeeds also matters: a channel whose
+                // bind threw must not be left looking connected, or a caller that retries on
+                // is_connected() will skip the retry and go on to use an unbound socket.
+                end_point_ = get_socket()->get(sockopt::last_endpoint);
             } catch (const zmq::error_t &) {
                 APSI_LOG_ERROR("ZeroMQ failed to bind socket to endpoint " << end_point);
                 throw;
@@ -145,8 +151,8 @@ namespace apsi {
             throw_if_connected();
 
             try {
-                end_point_ = end_point;
                 get_socket()->connect(end_point);
+                end_point_ = end_point;
             } catch (const zmq::error_t &) {
                 APSI_LOG_ERROR("ZeroMQ failed to connect socket to endpoint " << end_point);
                 throw;

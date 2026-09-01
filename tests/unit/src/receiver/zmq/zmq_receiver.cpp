@@ -15,6 +15,9 @@
 #include "apsi/receiver.h"
 #include "apsi/thread_pool_mgr.h"
 
+// APSI test support
+#include "support/zmq_test_utils.h"
+
 // Kuku
 #include "kuku/kuku.h"
 
@@ -91,11 +94,11 @@ namespace APSITests {
         ReceiverTests()
         {
             if (!server().is_connected()) {
-                server().bind("tcp://*:5556");
+                server().bind(any_port_bind_address());
             }
 
             if (!client().is_connected()) {
-                client().connect("tcp://localhost:5556");
+                client().connect(connect_address(server()));
             }
         }
 
