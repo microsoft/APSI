@@ -1,6 +1,6 @@
 {
   "name": "apsi",
-  "version": "0.13.1",
+  "version": "1.0.0",
   "description": "Asymmetric Private Set Intersection",
   "license": "MIT",
   "homepage": "https://github.com/microsoft/APSI",
@@ -11,7 +11,8 @@
       "features": [
         "zstd",
         "no-throw-tran"
-      ]
+      ],
+      "version>=": "4.4.4"
     },
     "ms-gsl",
     "kuku",
