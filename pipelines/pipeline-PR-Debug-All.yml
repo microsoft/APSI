@@ -13,6 +13,11 @@ pr:
     - README.md
     - SECURITY.md
 
+# See pipeline-CI-Debug-All.yml: CodeQL is a Release-only gate, and policy auto-injection would
+# instrument vcpkg's dependency build and push the job past the agent timeout.
+variables:
+  Codeql.SkipTaskAutoInjection: true
+
 stages:
   - stage: build
     displayName: Build
