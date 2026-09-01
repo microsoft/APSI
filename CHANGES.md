@@ -2,7 +2,7 @@
 
 ## Version 0.13.1
 
-- Updated the vcpkg baseline and now require Microsoft SEAL 4.4.3.
+- Updated the vcpkg baseline and now require Microsoft SEAL 4.4.4.
 - Added an optional `std::chrono::milliseconds timeout` to `Receiver::RequestParams`, `Receiver::RequestOPRF`, and `Receiver::request_query`, defaulting to 30 minutes; they throw `std::runtime_error` if the sender stops responding for that long. Pass `std::chrono::milliseconds::zero()` for the previous unbounded wait. The added parameter changes the mangled names, so consumers must recompile rather than relink.
 - `Receiver::RequestOPRF` throws if the sender's response does not contain one OPRF hash per requested item, instead of returning an empty result.
 - Added `network::Channel::receive_failed` and `network::Channel::receive_failure_count`; code that loops on a `nullptr` receive must consult them (see [Request, Response, and ResultPart](README.md#request-response-and-resultpart)).
