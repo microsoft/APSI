@@ -592,6 +592,7 @@ Since the query is evaluated independently per each bin bundle (recall [Practice
 The receiver must collect all these together to find the final result, as was described above in [Receiver](#receiver).
 
 The important thing about `Request`, `Response`, and `ResultPart` is that these are the object handled by the `network::Channel` class member functions `send`, `receive_operation`, `receive_response`, and `receive_result` (see [channel.h](common/apsi/network/channel.h)).
+A custom `network::Channel` must tolerate concurrent calls, because a sender sends result packages from several tasks at once and a receiver receives them on several threads at once; the channels shipped with APSI serialize their sends and receives internally, and a replacement for the sender's result-package send callback must do the same.
 
 ### Sender
 
@@ -872,10 +873,25 @@ However, now the sender must compute all powers of the query up to 114, increasi
 ### Thread Control
 
 Many of the computations APSI does are highly parallelizable.
-APSI uses a thread pool that can be controlled with the static functions `apsi::ThreadPoolMgr::SetThreadCount` and `apsi::ThreadPoolMgr::GetThreadCount` in [apsi/thread_pool_mgr.h](common/apsi/thread_pool_mgr.h).
+APSI runs them on a single process-wide thread pool, controlled through the static functions of `apsi::ThreadPoolMgr` in [apsi/thread_pool_mgr.h](common/apsi/thread_pool_mgr.h).
 
-By default the thread count is set to `std::thread::hardware_concurrency()`, but this is in many cases not ideal due to caching issues, especially when hyper-threading is enabled.
-Instead, the user would typically want to use `apsi::ThreadPoolMgr::SetThreadCount` to set it to some lower value depending on the number of physical cores.
+Two separate numbers govern it.
+The *fan-out width*, reported by `ThreadPoolMgr::GetThreadCount`, is how many tasks a single APSI operation splits itself into.
+The *pool worker count* is how many threads are available to run those tasks.
+`ThreadPoolMgr::SetThreadCount` sets both at once, and `ThreadPoolMgr::SetPoolWorkerCount` sets only the worker count, which is what makes the two diverge.
+Both accept zero to mean the hardware default, and clamp the result to a sane range.
+
+`SetThreadCount` resets both numbers, so it must be called *first*; calling it after `SetPoolWorkerCount` silently discards the worker count.
+`ThreadPoolMgr::GetPoolWorkerCount` reports how many workers the pool actually runs, which can be fewer than requested if the operating system refused to create the threads.
+
+By default both are `std::thread::hardware_concurrency()`, which is often not ideal due to caching effects, especially with hyper-threading enabled; a value near the number of physical cores is usually better.
+
+The pool is used for the sender's computation only.
+A receiver runs its query on the calling thread and its result workers on threads of their own, so a process that only receives never creates the pool, and no APSI code waits on the network from a pool worker.
+Raising the worker count above the fan-out width with `SetPoolWorkerCount` therefore only affects how much concurrent work can proceed at once; it is a tuning knob, not a requirement.
+
+The pool exists only while at least one `ThreadPoolMgr` instance does; it is created with the first and destroyed with the last, so an idle process holds no worker threads.
+Instances are cheap and scope-bound, and cannot be copied or moved.
 
 ### Logging
 

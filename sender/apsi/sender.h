@@ -119,6 +119,11 @@ namespace apsi::sender {
 
         /**
         Generate and send a response to a query.
+
+        The result packages are produced by several tasks at once, so send_rp_fun is called
+        concurrently on the same channel and must be safe to call that way. The default sends
+        through the channel, which serializes internally; a replacement that does anything else
+        has to provide its own synchronization.
         */
         static void RunQuery(
             const Query &query,

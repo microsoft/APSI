@@ -292,8 +292,10 @@ namespace apsi {
             };
 
             // Declared last, and so destroyed first: the workers hold references to every local
-            // above. The TaskGroup's destructor waits for all of them, and ~ThreadPoolMgr sitting
-            // below it is a further backstop that blocks until the pool's workers are gone.
+            // above, and the TaskGroup's destructor waits for all of them. ~ThreadPoolMgr sitting
+            // below it releases this scope's reference to the shared pool; it blocks for the
+            // workers only when it happens to be the last reference, which it usually is not --
+            // Sender::RunQuery, for instance, holds one of its own further up the stack.
             ThreadPoolMgr tpm;
             util::TaskGroup tasks(tpm.thread_pool());
 

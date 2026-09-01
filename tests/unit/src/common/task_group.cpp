@@ -8,11 +8,13 @@
 #include <future>
 #include <stdexcept>
 #include <thread>
+#include <utility>
 #include <vector>
 
 // APSI
 #include "apsi/thread_pool_mgr.h"
 #include "apsi/util/task_group.h"
+#include "apsi/util/thread_pool.h"
 
 // GTest
 #include "gtest/gtest.h"
@@ -216,5 +218,62 @@ namespace APSITests {
 
         ASSERT_NO_THROW(tasks.join());
         ASSERT_EQ(static_cast<size_t>(46), total.load());
+    }
+
+    TEST(TaskGroupTests, PoolWorkersAreIdentifiedAsSuch)
+    {
+        // The nested-use guard rests on a pool being able to recognize its own workers, and on
+        // not mistaking another pool's. Waiting on a different pool from a worker is safe, so
+        // confusing the two would either miss real deadlocks or reject sound code.
+        ThreadPool pool_a(1);
+        ThreadPool pool_b(1);
+
+        ASSERT_FALSE(pool_a.is_worker_thread());
+        ASSERT_FALSE(pool_b.is_worker_thread());
+
+        auto from_a = pool_a.enqueue([&pool_a, &pool_b]() {
+            return make_pair(pool_a.is_worker_thread(), pool_b.is_worker_thread());
+        });
+
+        auto seen = from_a.get();
+        ASSERT_TRUE(seen.first);   // its own pool
+        ASSERT_FALSE(seen.second); // an unrelated pool
+
+        // The marker must not outlive the worker: this thread never becomes a worker.
+        ASSERT_FALSE(pool_a.is_worker_thread());
+    }
+
+    TEST(TaskGroupTests, RejectsUseFromInsideItsOwnPool)
+    {
+        // Adding to a group backed by the pool the caller is running on is the step that makes a
+        // deadlock possible: join() would then block a worker on work only that pool can run.
+        // It is refused outright, so the mistake surfaces as an error where it is made rather
+        // than as a hang whose cause is somewhere else entirely.
+        ThreadPool pool(2);
+
+        auto fut = pool.enqueue([&pool]() {
+            TaskGroup nested(pool);
+            nested.add([]() {});
+        });
+
+        ASSERT_THROW(fut.get(), logic_error);
+    }
+
+    TEST(TaskGroupTests, AllowsUseFromAWorkerOfADifferentPool)
+    {
+        // The guard is about waiting on the pool you occupy. A worker of one pool waiting on a
+        // different pool cannot starve it, and must keep working.
+        ThreadPool pool_a(1);
+        ThreadPool pool_b(2);
+
+        auto fut = pool_a.enqueue([&pool_b]() {
+            TaskGroup tasks(pool_b);
+            atomic<int> ran{ 0 };
+            tasks.add([&ran]() { ran++; });
+            tasks.join();
+            return ran.load();
+        });
+
+        ASSERT_EQ(1, fut.get());
     }
 } // namespace APSITests

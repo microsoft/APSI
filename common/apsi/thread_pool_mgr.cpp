@@ -5,6 +5,7 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <utility>
 
 // APSI
 #include "apsi/thread_pool_mgr.h"
@@ -16,12 +17,13 @@ using namespace apsi::util;
 namespace {
     mutex tp_mutex;
 
-    // All four are guarded by tp_mutex.
+    // All four are written only under tp_mutex. tp_ptr is additionally read without the lock in
+    // ThreadPoolMgr::thread_pool(); see the comment there for why that read is safe.
     unique_ptr<ThreadPool> tp_ptr = nullptr;
 
     // Numeber of active references to the shared pool. The pool is created when this goes from 0 to
-    // 1 and destroyed when it goes from 1 to 0. It is never decremented to zero while any ThreadPoolMgr
-    // instance exists, so tp_ptr is never cleared while any instance can access it.
+    // 1 and destroyed when it goes from 1 to 0. It is never decremented to zero while any
+    // ThreadPoolMgr instance exists, so tp_ptr is never cleared while any instance can access it.
     std::size_t ref_count = 0;
 
     // Number of tasks a single APSI operation splits itself into. Zero means "not resolved yet";
@@ -30,7 +32,7 @@ namespace {
     std::size_t thread_count = 0;
 
     // Number of workers in the shared pool. Normally equal to thread_count; SetPoolWorkerCount
-    // raises it above thread_count so that concurrent operations do not starve each other.
+    // raises it above thread_count so that concurrent operations can run at the same time.
     std::size_t pool_worker_count = 0;
 
     /**
@@ -80,6 +82,11 @@ ThreadPoolMgr::ThreadPoolMgr()
 
     if (ref_count == 0) {
         tp_ptr = make_unique<ThreadPool>(pool_worker_count_locked());
+
+        // The pool may have started fewer workers than asked for, if the operating system
+        // refused. Record what it actually has, so that the count reported to callers is never
+        // a promise of workers that do not exist.
+        pool_worker_count = tp_ptr->pool_size();
     }
 
     ref_count++;
@@ -87,12 +94,30 @@ ThreadPoolMgr::ThreadPoolMgr()
 
 ThreadPoolMgr::~ThreadPoolMgr()
 {
-    unique_lock<mutex> lock(tp_mutex);
+    // The pool is destroyed after tp_mutex has been released, never while holding it.
+    // ~ThreadPool blocks until every worker has finished, and a worker is free to call back into
+    // ThreadPoolMgr -- GetThreadCount, or taking a reference of its own -- which needs this
+    // mutex. Holding it across that wait leaves the destructor waiting for a worker that is
+    // waiting for the destructor.
+    //
+    // Clearing tp_ptr still happens under the lock, so no one can reach a pool that is on its
+    // way out: thread_pool() and GetPoolWorkerCount() either see the live pool or see none.
+    // Releasing the lock early does mean a new ThreadPoolMgr can build a fresh pool while the
+    // old one is still draining. The two are independent objects and the overlap is brief, which
+    // is a better trade than serializing every manager behind one pool's teardown.
+    std::unique_ptr<ThreadPool> doomed;
 
-    ref_count--;
-    if (ref_count == 0) {
-        tp_ptr = nullptr;
+    {
+        unique_lock<mutex> lock(tp_mutex);
+
+        ref_count--;
+        if (ref_count == 0) {
+            doomed = std::move(tp_ptr);
+        }
     }
+
+    // ~ThreadPool runs here, unlocked. It still completes before this destructor returns, so the
+    // documented guarantee -- the pool is gone once the last manager is -- is unchanged.
 }
 
 ThreadPool &ThreadPoolMgr::thread_pool() const
@@ -117,13 +142,15 @@ void ThreadPoolMgr::SetThreadCount(size_t threads)
     // fail here: it only throws when the resize would leave the pool with no workers at all, and a
     // pool that already exists always has at least one (set_pool_size never targets fewer than
     // ThreadPool::MinPoolSize(), so a shrink always leaves one worker unclaimed).
-    const size_t resolved = resolve_thread_count(threads);
-    if (tp_ptr) {
-        tp_ptr->set_pool_size(resolved);
-    }
+    //
+    // Record what the pool achieved rather than what was requested. The operating system can
+    // refuse to create threads, and reporting a worker count that was never reached would leave
+    // callers sizing their work for capacity that does not exist.
+    const size_t requested = resolve_thread_count(threads);
+    const size_t achieved = tp_ptr ? tp_ptr->set_pool_size(requested) : requested;
 
-    thread_count = resolved;
-    pool_worker_count = resolved;
+    thread_count = achieved;
+    pool_worker_count = achieved;
 }
 
 void ThreadPoolMgr::SetPoolWorkerCount(size_t threads)
@@ -131,13 +158,9 @@ void ThreadPoolMgr::SetPoolWorkerCount(size_t threads)
     unique_lock<mutex> lock(tp_mutex);
 
     // Ordered as in SetThreadCount: the fallible call comes first, the count is recorded only once
-    // it has succeeded.
-    const size_t resolved = resolve_thread_count(threads);
-    if (tp_ptr) {
-        tp_ptr->set_pool_size(resolved);
-    }
-
-    pool_worker_count = resolved;
+    // it has succeeded, and it is the achieved count that is recorded.
+    const size_t requested = resolve_thread_count(threads);
+    pool_worker_count = tp_ptr ? tp_ptr->set_pool_size(requested) : requested;
 }
 
 size_t ThreadPoolMgr::GetThreadCount()
@@ -145,4 +168,17 @@ size_t ThreadPoolMgr::GetThreadCount()
     unique_lock<mutex> lock(tp_mutex);
 
     return thread_count_locked();
+}
+
+size_t ThreadPoolMgr::GetPoolWorkerCount()
+{
+    unique_lock<mutex> lock(tp_mutex);
+
+    // Ask the live pool when there is one: it is the authority on how many workers it runs, and
+    // the recorded count can only ever be a copy of that.
+    if (tp_ptr) {
+        return tp_ptr->pool_size();
+    }
+
+    return pool_worker_count_locked();
 }

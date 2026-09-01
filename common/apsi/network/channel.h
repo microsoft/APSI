@@ -33,6 +33,12 @@ namespace apsi::network {
     enforce their own deadlines between receive calls and have no way to interrupt one already in
     progress, so an implementation that blocks indefinitely inside a receive leaves the caller
     waiting for as long as the peer stays silent.
+
+    Implementations must tolerate concurrent calls. A receiver runs several result workers at
+    once, all calling receive_result on the same channel, and a sender sends result packages from
+    several tasks at once. The channels shipped with APSI serialize sends and receives
+    internally; a channel written elsewhere has to do the same, and so does any send callback
+    passed to sender::Sender, which is invoked from those same concurrent tasks.
     */
     class Channel {
     public:

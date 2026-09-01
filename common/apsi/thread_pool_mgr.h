@@ -38,6 +38,22 @@ namespace apsi {
         ~ThreadPoolMgr();
 
         /**
+        Not copyable or movable. A copy would not take a reference on the shared pool, yet its
+        destructor would release one, so the reference count would drop while instances still
+        hold the pool. Because the count is unsigned, the extra release underflows it, and every
+        later ThreadPoolMgr then sees a nonzero count and never recreates the pool: the process
+        is left permanently unable to run APSI work. There is no meaningful copy of a scope-bound
+        reference anyway, so the operations are removed rather than defined.
+        */
+        ThreadPoolMgr(const ThreadPoolMgr &) = delete;
+
+        ThreadPoolMgr(ThreadPoolMgr &&) = delete;
+
+        ThreadPoolMgr &operator=(const ThreadPoolMgr &) = delete;
+
+        ThreadPoolMgr &operator=(ThreadPoolMgr &&) = delete;
+
+        /**
         Get the shared thread pool. The reference stays valid for the lifetime of this instance.
         */
         [[nodiscard]]
@@ -46,7 +62,9 @@ namespace apsi {
         /**
         Set the number of worker threads the shared pool runs, resizing it immediately if it
         currently exists. Zero requests the hardware default. The value is clamped into
-        [ThreadPool::MinPoolSize(), ThreadPool::MaxPoolSize()].
+        [ThreadPool::MinPoolSize(), ThreadPool::MaxPoolSize()], and reduced further if the
+        operating system refuses to create that many threads, so the counts reported afterwards
+        may be lower than the value requested.
 
         This also sets the fan-out width reported by GetThreadCount, so calling it after
         SetPoolWorkerCount discards that setting. Set this one first.
@@ -57,8 +75,13 @@ namespace apsi {
         Set only the number of worker threads in the shared pool, leaving the fan-out width
         reported by GetThreadCount alone. This is what makes the two numbers diverge.
 
-        Raising the worker count above the fan-out width is currently REQUIRED, not merely an
-        optimization, whenever more than one APSI operation runs concurrently in a process.
+        This is a tuning knob rather than a correctness requirement: APSI does not block a pool
+        worker on the network, so concurrent operations sharing an undersized pool interleave
+        rather than starve. Raising it above the fan-out width lets concurrent operations make
+        progress at the same time instead of in sequence.
+
+        Compare the result with GetPoolWorkerCount to see how many workers were actually
+        obtained; a request the operating system could not satisfy is reduced, not refused.
         */
         static void SetPoolWorkerCount(std::size_t threads);
 
@@ -68,5 +91,12 @@ namespace apsi {
         necessarily the pool's worker count -- see SetPoolWorkerCount.
         */
         static std::size_t GetThreadCount();
+
+        /**
+        Get the number of worker threads the shared pool runs, which is what the pool actually
+        obtained rather than what was last requested. If no pool currently exists this is the
+        count the next one will be created with.
+        */
+        static std::size_t GetPoolWorkerCount();
     };
 } // namespace apsi

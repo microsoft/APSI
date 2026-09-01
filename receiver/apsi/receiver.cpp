@@ -6,10 +6,14 @@
 #include <chrono>
 #include <cstddef>
 #include <cstring>
+#include <exception>
+#include <future>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <utility>
+#include <vector>
 
 // APSI
 #include "apsi/log.h"
@@ -20,7 +24,6 @@
 #include "apsi/thread_pool_mgr.h"
 #include "apsi/util/db_encoding.h"
 #include "apsi/util/label_encryptor.h"
-#include "apsi/util/task_group.h"
 #include "apsi/util/utils.h"
 
 // Kuku
@@ -492,7 +495,10 @@ namespace apsi {
             NetworkChannel &chl,
             chrono::milliseconds timeout)
         {
-            ThreadPoolMgr tpm;
+            // No ThreadPoolMgr here: the receiver no longer puts any work on the shared pool.
+            // Query creation and result decryption run on this thread and on the dedicated
+            // result-worker threads below, so a process that only receives holds no pool
+            // threads at all.
 
             // Create query and send to Sender
             auto query = create_query(items);
@@ -535,18 +541,47 @@ namespace apsi {
 
             // Launch threads to receive ResultPackages and decrypt results
             size_t task_count = min<size_t>(ThreadPoolMgr::GetThreadCount(), package_count);
-            TaskGroup tasks(tpm.thread_pool());
             APSI_LOG_INFO(
-                "Launching " << task_count << " result worker tasks to handle " << package_count
+                "Launching " << task_count << " result worker threads to handle " << package_count
                              << " result parts");
+
+            // Deliberately dedicated threads rather than tasks on the shared thread pool. A
+            // result worker spends most of its life waiting on the sender, and the pool is
+            // APSI's compute resource: parking every worker in a network wait leaves any
+            // concurrent operation queued behind them. Worse, a worker only enforces the
+            // deadline once it is running, so a worker still sitting in the pool's queue makes
+            // no progress towards giving up, and the bounded wait the caller asked for would
+            // not begin until the pool happened to schedule it. A thread of its own starts
+            // immediately and keeps the deadline meaningful however busy the process is.
+            //
+            // Declared after everything the workers capture, so that these futures -- which
+            // block until their thread finishes -- are destroyed first and no worker outlives
+            // the state it borrowed.
+            vector<future<void>> result_workers;
+            result_workers.reserve(task_count);
             for (size_t t = 0; t < task_count; t++) {
-                tasks.add([&]() {
+                result_workers.push_back(async(launch::async, [&]() {
                     process_result_worker(
                         package_count, merge_state, deadline, label_keys, itt, chl);
-                });
+                }));
             }
 
-            tasks.join();
+            // Wait for every worker before rethrowing, as returning while one is still running
+            // would leave it using locals this frame is about to destroy.
+            exception_ptr first_exception;
+            for (auto &worker : result_workers) {
+                try {
+                    worker.get();
+                } catch (...) {
+                    if (!first_exception) {
+                        first_exception = current_exception();
+                    }
+                }
+            }
+
+            if (first_exception) {
+                rethrow_exception(first_exception);
+            }
 
             auto &mrs = merge_state.mrs;
             APSI_LOG_INFO(
