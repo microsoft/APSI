@@ -1020,6 +1020,8 @@ On Windows, add `-DVCPKG_TARGET_TRIPLET=x64-windows-static-md`.
 
 These are resolved automatically by manifest mode at configure time; no explicit `./vcpkg install ...` step is needed.
 Exact versions come from the `builtin-baseline` pinned in `vcpkg.json`.
+APSI additionally requires a minimum Microsoft SEAL version, enforced at configure time; the exact range is in [CMakeLists.txt](CMakeLists.txt).
+Older SEAL releases carry known vulnerabilities, including in the deserialization paths APSI exposes to a remote peer, so the check should not be relaxed.
 
 | Dependency                                                | Used for                                              |
 |-----------------------------------------------------------|-------------------------------------------------------|
