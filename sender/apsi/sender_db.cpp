@@ -733,6 +733,15 @@ namespace apsi {
             oprf_key_.clear();
             hashed_items_.clear();
 
+            // Regenerate any stale caches here, on this thread, before fanning out below.
+            // BinBundle::strip must not be the one to discover a stale cache: it would call
+            // regen_cache from inside a pool task, and regenerating enqueues further tasks and
+            // blocks on them, so every worker would sit in an inner wait while the work it waits
+            // for is queued behind it. This call is a no-op whenever the caches are already
+            // valid, which is the normal case; it costs something only after an operation that
+            // left them stale, and that is exactly the case that would otherwise deadlock.
+            generate_caches();
+
             ThreadPoolMgr tpm;
 
             TaskGroup tasks(tpm.thread_pool());

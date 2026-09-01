@@ -655,8 +655,8 @@ namespace APSITests {
             size_t num_threads = thread::hardware_concurrency();
             ThreadPoolMgr::SetThreadCount(num_threads);
 
-            // Give the pool more workers than the query fans out to, so the result workers
-            // genuinely run at the same time instead of being serialized behind each other.
+            // Give the pool more workers than a single operation fans out to, so that concurrent
+            // work proceeds at the same time instead of in sequence.
             ThreadPoolMgr::SetPoolWorkerCount(num_threads * 2);
         }
     } // namespace

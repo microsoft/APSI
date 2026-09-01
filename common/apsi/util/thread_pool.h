@@ -60,9 +60,14 @@ namespace apsi::util {
     Thread pool used by APSI internals. Workers are interchangeable: they are spawned with
     std::thread::detach so the pool never owns thread handles, only an active-worker count.
     Resizing is done by raising or lowering a pending-exit counter that any waiting worker can
-    claim. The task queue is unbounded; tasks that throw are caught and logged so a single bad
-    task cannot tear down a worker. Destruction sets a stop flag, drains pending tasks, and
+    claim. The task queue is unbounded. Destruction sets a stop flag, drains pending tasks, and
     waits for the active count to reach zero before returning.
+
+    A task that throws does not tear down its worker, but not because the worker catches it:
+    enqueue wraps every task in a std::packaged_task, which stores the exception in the shared
+    state rather than letting it propagate. The exception therefore surfaces only from the
+    returned future, and a caller that discards the future discards the error with it -- nothing
+    is logged. Prefer TaskGroup, whose join() rethrows, over dropping futures.
     */
     class ThreadPool {
     public:
@@ -160,6 +165,19 @@ namespace apsi::util {
         }
 
         /**
+        Whether the calling thread is one of this pool's workers.
+
+        Code that fans work out needs this to avoid waiting on the pool from inside it: a worker
+        that blocks until other tasks in the same pool finish cannot run any of them itself, so
+        enough such waits at once leave every worker blocked on work that can never start.
+        */
+        [[nodiscard]]
+        bool is_worker_thread() const noexcept
+        {
+            return current_worker_pool() == this;
+        }
+
+        /**
         Clamp a requested worker count into [MinPoolSize(), MaxPoolSize()]. Callers that
         report a pool size to others should clamp with this so that the number they publish
         matches the number of workers the pool will actually run.
@@ -183,9 +201,13 @@ namespace apsi::util {
         Resize the pool to new_size workers. new_size is clamped into[MinPoolSize(), MaxPoolSize()].
         Growing first cancels any currently pending exits, then spawns the remaining shortfall as
         new detached threads. Shrinking raises pending_exits_ by the appropriate delta and wakes the
-        waiters; whichever workers claim the tokens first will exit. After this call returns the
-        logical pool size is new_size, but the actual active count converges asynchronously as
-        workers wake.
+        waiters; whichever workers claim the tokens first will exit. The actual active count
+        converges asynchronously as workers wake.
+
+        Returns the logical size the pool ended up with, which is new_size except when the operating
+        system refused to create some of the threads, and zero for a pool that is stopping. Callers
+        that publish a capacity to others should publish this value rather than the one they asked
+        for, so that nobody is told about workers that do not exist.
 
         If the operating system refuses to create a thread partway through a grow, the pool keeps
         the workers it managed to start and logs a warning rather than propagating the failure:
@@ -193,22 +215,23 @@ namespace apsi::util {
         when the pool has no workers at all, since such a pool would accept tasks and never run
         them. See the comment in the spawn loop for why this distinction matters.
         */
-        void set_pool_size(std::size_t new_size)
+        std::size_t set_pool_size(std::size_t new_size)
         {
             new_size = ClampPoolSize(new_size);
 
             std::size_t spawned = 0;
             std::size_t wanted = 0;
+            std::size_t achieved = 0;
 
             {
                 std::lock_guard<std::mutex> lock(mutex_);
                 if (stop_) {
-                    return;
+                    return 0;
                 }
 
                 const std::size_t current_target = active_workers_ - pending_exits_;
                 if (new_size == current_target) {
-                    return;
+                    return new_size;
                 }
 
                 if (new_size > current_target) {
@@ -220,7 +243,23 @@ namespace apsi::util {
                     for (; spawned < delta; spawned++) {
                         try {
                             std::thread worker([this] { worker_loop(); });
-                            worker.detach();
+                            try {
+                                worker.detach();
+                            } catch (...) {
+                                // Unrecoverable, and not for want of trying: the worker is
+                                // already running and holds a pointer to this pool, so it can
+                                // neither be abandoned -- destroying a joinable std::thread
+                                // terminates -- nor waited for, since it runs until the pool
+                                // stops. The runtime is about to terminate on the way out of
+                                // this scope regardless; say why first, so the cause is not a
+                                // mystery in the crash report.
+                                try {
+                                    APSI_LOG_ERROR(
+                                        "Thread pool worker could not be detached; terminating");
+                                } catch (...) { // NOLINT(bugprone-empty-catch): logger may throw
+                                }
+                                std::terminate();
+                            }
                         } catch (...) {
                             // Thread creation failed. Every worker started above this point is
                             // detached and holds a pointer to this pool, so letting the exception
@@ -239,6 +278,8 @@ namespace apsi::util {
                     pending_exits_ += (current_target - new_size);
                     queue_cv_.notify_all();
                 }
+
+                achieved = active_workers_ > pending_exits_ ? active_workers_ - pending_exits_ : 0;
             }
 
             if (spawned < wanted) {
@@ -246,6 +287,8 @@ namespace apsi::util {
                     "The operating system refused to create more threads; the thread pool started "
                     << spawned << " of the " << wanted << " additional workers it requested");
             }
+
+            return achieved;
         }
 
         /**
@@ -255,7 +298,10 @@ namespace apsi::util {
         workers are spawned before set_pool_size returns -- so a grow is reflected at once. A shrink
         is asynchronous: the excess workers keep running until they wake and claim a pending-exit
         token, but this method reports the post-shrink target immediately rather than the
-        temporarily larger live-worker count. For a live pool the result is always at least one.
+        temporarily larger live-worker count. The one case where this is not the requested value is
+        a grow during which the operating system refused to create some of the threads:
+        set_pool_size keeps the workers it did start, so the result is the smaller number actually
+        running. For a live pool the result is always at least one.
         */
         [[nodiscard]]
         std::size_t pool_size() const
@@ -269,8 +315,33 @@ namespace apsi::util {
         }
 
     private:
+        /**
+        The pool whose worker is running on the calling thread, or nullptr. Identifying the pool
+        rather than just "some worker" keeps the check meaningful when more than one pool exists:
+        waiting on pool B from a worker of pool A is perfectly safe.
+        */
+        static const ThreadPool *&current_worker_pool() noexcept
+        {
+            thread_local const ThreadPool *pool = nullptr;
+            return pool;
+        }
+
         void worker_loop()
         {
+            // Marks this thread for the whole of the loop, and unmarks it however the loop is
+            // left, so is_worker_thread() cannot outlive the worker it describes.
+            struct WorkerMarker {
+                explicit WorkerMarker(const ThreadPool *pool) noexcept
+                {
+                    current_worker_pool() = pool;
+                }
+
+                ~WorkerMarker()
+                {
+                    current_worker_pool() = nullptr;
+                }
+            } marker(this);
+
             for (;;) {
                 std::function<void()> task;
                 {

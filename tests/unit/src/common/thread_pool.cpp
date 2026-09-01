@@ -10,6 +10,7 @@
 #include <set>
 #include <stdexcept>
 #include <thread>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -413,6 +414,40 @@ namespace APSITests {
         ASSERT_EQ(42, fut.get());
     }
 
+    TEST(ThreadPoolMgrTests, IsNeitherCopyableNorMovable)
+    {
+        // A copy takes no reference on the shared pool but its destructor releases one, so the
+        // reference count drops while instances still hold the pool. The count is unsigned, so
+        // the surplus release underflows it and every later ThreadPoolMgr sees a nonzero count
+        // and never recreates the pool, leaving the process permanently unable to run APSI work.
+        // The type refusing to be copied is the only thing standing between a caller and that,
+        // so assert it at compile time rather than trusting review to catch a reintroduction.
+        static_assert(
+            !is_copy_constructible_v<ThreadPoolMgr>,
+            "ThreadPoolMgr must not be copy constructible");
+        static_assert(
+            !is_copy_assignable_v<ThreadPoolMgr>, "ThreadPoolMgr must not be copy assignable");
+        static_assert(
+            !is_move_constructible_v<ThreadPoolMgr>,
+            "ThreadPoolMgr must not be move constructible");
+        static_assert(
+            !is_move_assignable_v<ThreadPoolMgr>, "ThreadPoolMgr must not be move assignable");
+
+        // Nested scopes must still leave the pool usable: this is the pattern the copy would
+        // have corrupted, and the reference counting is what makes it work.
+        {
+            ThreadPoolMgr outer;
+            {
+                ThreadPoolMgr inner;
+                ASSERT_NO_THROW(static_cast<void>(inner.thread_pool()));
+            }
+            ASSERT_NO_THROW(static_cast<void>(outer.thread_pool()));
+        }
+
+        ThreadPoolMgr fresh;
+        ASSERT_NO_THROW(static_cast<void>(fresh.thread_pool()));
+    }
+
     TEST(ThreadPoolMgrTests, SetThreadCountTakesEffectOnNextPool)
     {
         // SetThreadCount before any ThreadPoolMgr instance exists must be respected when the pool
@@ -501,13 +536,112 @@ namespace APSITests {
         ASSERT_EQ(max_size, clamped);
     }
 
+    TEST(ThreadPoolTests, SetPoolSizeReportsTheSizeItAchieved)
+    {
+        // Callers publish this number as available capacity, so it has to describe the pool
+        // rather than the request. Growth and shrink both settle on the requested value here;
+        // the case where they diverge is an operating system refusing to create threads, which
+        // a test cannot provoke portably.
+        ThreadPool pool(2);
+        ASSERT_EQ(size_t(2), pool.pool_size());
+
+        ASSERT_EQ(size_t(4), pool.set_pool_size(4));
+        ASSERT_EQ(size_t(4), pool.pool_size());
+
+        // A no-op resize still reports the size in force.
+        ASSERT_EQ(size_t(4), pool.set_pool_size(4));
+
+        // Shrinking is asynchronous, but the logical size is reported at once.
+        ASSERT_EQ(size_t(1), pool.set_pool_size(1));
+        ASSERT_EQ(size_t(1), pool.pool_size());
+
+        // Clamping applies to the reported value too, so it never overstates capacity.
+        ASSERT_EQ(ThreadPool::MinPoolSize(), pool.set_pool_size(0));
+        ASSERT_EQ(ThreadPool::MaxPoolSize(), pool.set_pool_size(numeric_limits<size_t>::max()));
+    }
+
+    TEST(ThreadPoolMgrTests, PoolWorkerCountIsReportedAndNotTheRequestedValue)
+    {
+        // The worker count is a capacity claim, and a caller that raises it needs to be able to
+        // see whether it took effect. GetPoolWorkerCount must therefore follow the pool rather
+        // than echo the last request, and must stay independent of the fan-out width.
+        ThreadPoolMgr::SetThreadCount(2);
+        ThreadPoolMgr tpm;
+
+        const size_t both_set = ThreadPoolMgr::GetPoolWorkerCount();
+
+        ThreadPoolMgr::SetPoolWorkerCount(5);
+        const size_t widened_workers = ThreadPoolMgr::GetPoolWorkerCount();
+        const size_t widened_fanout = ThreadPoolMgr::GetThreadCount();
+
+        // SetThreadCount resets both, so the worker count follows it back down.
+        ThreadPoolMgr::SetThreadCount(3);
+        const size_t reset_workers = ThreadPoolMgr::GetPoolWorkerCount();
+        const size_t reset_fanout = ThreadPoolMgr::GetThreadCount();
+
+        ThreadPoolMgr::SetThreadCount(0);
+
+        ASSERT_EQ(size_t(2), both_set);
+        ASSERT_EQ(size_t(5), widened_workers);
+        ASSERT_EQ(size_t(2), widened_fanout);
+        ASSERT_EQ(size_t(3), reset_workers);
+        ASSERT_EQ(size_t(3), reset_fanout);
+    }
+
+    TEST(ThreadPoolMgrTests, DestructionDoesNotHoldTheManagerMutex)
+    {
+        // ~ThreadPoolMgr destroys the pool, which waits for its workers. It must not hold the
+        // manager's mutex while it waits: a worker that calls back into ThreadPoolMgr would block
+        // on that mutex while the destructor blocks on the worker, and neither would finish.
+        //
+        // Provoking that deadlock directly would wedge every later test, so this observes the
+        // property that prevents it instead. While a teardown is waiting on a task, an unrelated
+        // GetThreadCount must still be served. The gate is opened by a timer rather than by this
+        // thread, so if the mutex were held the call would merely be slow -- and the assertion
+        // would fail -- rather than hanging the suite.
+        promise<void> release;
+        shared_future<void> gate = release.get_future().share();
+
+        promise<void> running;
+        future<void> running_f = running.get_future();
+
+        thread opener([&release]() {
+            this_thread::sleep_for(2s);
+            release.set_value();
+        });
+
+        thread owner([&running, gate]() {
+            ThreadPoolMgr tpm;
+
+            // Fire and forget: nothing waits on this, so it is still running when tpm goes out
+            // of scope and the pool's destructor has to drain it.
+            (void)tpm.thread_pool().enqueue([&running, gate]() {
+                running.set_value();
+                gate.wait();
+            });
+        });
+
+        running_f.wait();
+
+        // Give the owner time to leave the scope and settle into the teardown wait.
+        this_thread::sleep_for(100ms);
+
+        auto start = chrono::steady_clock::now();
+        (void)ThreadPoolMgr::GetThreadCount();
+        auto elapsed = chrono::steady_clock::now() - start;
+
+        owner.join();
+        opener.join();
+
+        // Held across teardown, this call would have waited out the whole two-second gate.
+        ASSERT_LT(elapsed, 1s);
+    }
+
     TEST(ThreadPoolMgrTests, PoolWorkerCountDoesNotChangeThreadCount)
     {
         // SetPoolWorkerCount raises the pool's worker count above the fan-out width so that
-        // concurrent APSI operations do not starve each other. Receiver::request_query enqueues
-        // GetThreadCount() workers that block on network reads from inside pool tasks, so a pool
-        // sized exactly to the fan-out width can deadlock when two operations share it. That only
-        // works if SetPoolWorkerCount leaves the fan-out width alone.
+        // concurrent APSI operations can proceed at the same time rather than in sequence. That
+        // only works if it leaves the fan-out width alone, which is what this pins down.
         ThreadPoolMgr::SetThreadCount(2);
         ASSERT_EQ(size_t(2), ThreadPoolMgr::GetThreadCount());
 

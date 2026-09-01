@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <exception>
 #include <future>
+#include <stdexcept>
 #include <utility>
 #include <vector>
 
@@ -50,6 +51,12 @@ namespace apsi::util {
     can enforce this.
 
     Not thread-safe: add() and join() must be called from the thread that owns the group.
+
+    Do not use a TaskGroup from inside a task that is itself running on the pool. join() blocks
+    the worker it runs on while waiting for tasks queued to that same pool, so once as many such
+    tasks are in flight as there are workers, none of the inner tasks can ever be scheduled and
+    the pool deadlocks. Fan out at one level only, or do the nested work on the calling thread
+    before the outer fan-out starts.
     */
     class TaskGroup {
     public:
@@ -94,6 +101,21 @@ namespace apsi::util {
         template <typename F, typename... Args>
         void add(F &&f, Args &&...args)
         {
+            // Checked here rather than at join(), because by the time join() blocks the mistake
+            // has already been made and whether it hangs is a matter of how many other workers
+            // happen to be doing the same thing. Adding is the decision that makes the deadlock
+            // possible, so that is what is reported.
+            //
+            // Unconditional rather than debug-only: no correct program trips this, the cost is a
+            // pointer comparison against a thread-local, and the failure it replaces is a hang
+            // with no diagnostic -- in a sender, a denial of service. An error that names the
+            // problem is strictly better than a process that stops responding.
+            if (pool_.is_worker_thread()) {
+                throw std::logic_error(
+                    "TaskGroup used from inside a task of the same thread pool; this deadlocks "
+                    "once every worker is doing it");
+            }
+
             futures_.emplace_back();
             futures_.back() = pool_.enqueue(std::forward<F>(f), std::forward<Args>(args)...);
         }
