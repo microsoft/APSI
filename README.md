@@ -1003,12 +1003,11 @@ On Windows, add `-DVCPKG_TARGET_TRIPLET=x64-windows-static-md`.
 #### Dependencies pulled from `vcpkg.json`
 
 These are resolved automatically by manifest mode at configure time; no explicit `./vcpkg install ...` step is needed.
-Exact versions come from the `builtin-baseline` pinned in `vcpkg.json`; the versions below are what that baseline currently resolves to.
-Note that SEAL releases before 4.4.0 carry known vulnerabilities, including in the deserialization paths APSI exposes to a remote peer, so a build resolved against an older SEAL should not be used.
+Exact versions come from the `builtin-baseline` pinned in `vcpkg.json`.
 
 | Dependency                                                | Used for                                              |
 |-----------------------------------------------------------|-------------------------------------------------------|
-| [Microsoft SEAL](https://github.com/microsoft/SEAL) 4.4.3 | BFV homomorphic encryption                          |
+| [Microsoft SEAL](https://github.com/microsoft/SEAL)       | BFV homomorphic encryption                            |
 | [Microsoft Kuku](https://github.com/microsoft/Kuku)       | Cuckoo hashing on the receiver's side                 |
 | [ms-gsl](https://github.com/microsoft/GSL)                | `gsl::span` for I/O buffers                           |
 | [FlatBuffers](https://github.com/google/flatbuffers)      | Serialization of network messages                     |

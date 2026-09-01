@@ -116,15 +116,10 @@ set(APSI_INCLUDES_INSTALL_DIR ${CMAKE_INSTALL_INCLUDEDIR}/APSI-${APSI_VERSION_MA
 # find_package might throw a FATAL_ERROR before"xxx: not found", e.g. with vcpkg.cmake.
 
 # Microsoft SEAL
-# The version is pinned rather than merely floored, because SEAL's own package configuration
-# declares differing minor versions incompatible: this request accepts 4.4.3 and later 4.4.x
-# patch releases and rejects everything else, including the 4.3.x line. That is the intent.
-# Microsoft SEAL 4.4.0 is a critical security update that hardened untrusted deserialization and
-# fixed memory-safety defects, so every earlier release is unsuitable for a library that
-# deserializes messages from an untrusted peer. Rejecting an unexpected SEAL at configure time is
-# better than building a library that is quietly weaker than documented.
+# SEAL's package configuration uses COMPATIBILITY SameMinorVersion, so this request accepts
+# 4.4.4 and later 4.4.x patch releases and rejects every other minor version.
 # Raise this together with the vcpkg baseline whenever SEAL is updated.
-find_package(SEAL 4.4.3 CONFIG QUIET REQUIRED)
+find_package(SEAL 4.4.4 CONFIG QUIET REQUIRED)
 if(NOT SEAL_FOUND)
     message(FATAL_ERROR "Microsoft SEAL: not found")
 else()
