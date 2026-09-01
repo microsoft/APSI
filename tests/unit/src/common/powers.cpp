@@ -43,9 +43,9 @@ namespace APSITests {
         ASSERT_FALSE(pd.is_configured());
 
         // Check for member variables
-        ASSERT_THROW(pd.depth(), logic_error);
-        ASSERT_THROW(pd.source_count(), logic_error);
-        ASSERT_THROW(pd.target_powers(), logic_error);
+        ASSERT_THROW(static_cast<void>(pd.depth()), logic_error);
+        ASSERT_THROW(static_cast<void>(pd.source_count()), logic_error);
+        ASSERT_THROW(static_cast<void>(pd.target_powers()), logic_error);
 
         // Bad configuration
         source_powers = { 0, 1 };
