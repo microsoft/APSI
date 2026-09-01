@@ -530,7 +530,7 @@ Other channels, such as `network::StreamChannel`, are only supported by the "adv
 Each of the three takes an optional trailing `std::chrono::milliseconds timeout`, defaulting to `Receiver::default_receive_timeout` (thirty minutes).
 The timeout bounds how long the sender may stay *silent*, not how long the query may take: every message received restarts the clock, so a sender that is slow but responsive is never cut off, however large its database.
 Passing `std::chrono::milliseconds::zero()` waits indefinitely, which is appropriate only against a sender you trust.
-All three throw `std::runtime_error` if that deadline passes, or if the channel receives a message it cannot use &ndash; including, for `Receiver::RequestOPRF`, a response that does not carry exactly one OPRF hash per requested item.
+All three throw `std::runtime_error` if that deadline passes, or if the channel receives a message it cannot use.
 
 The advanced API requires many more steps.
 The full process is as follows:

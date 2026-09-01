@@ -1,14 +1,27 @@
 # List of Changes
 
+## Version 1.0.0
+
+- Require Microsoft SEAL 4.4.4 or a newer 4.x release, and update the vcpkg baseline.
+- Added an optional `timeout` to `Receiver::RequestParams`, `Receiver::RequestOPRF`, and `Receiver::request_query`, and a `--timeout` option to the receiver CLI.
+- Added `network::Channel::receive_failed` and `network::Channel::receive_failure_count`; code that loops on a `nullptr` receive must consult them.
+- Added `network::ZMQChannel::end_point` and an optional `on_bound` callback to `ZMQSenderDispatcher::run`, so a sender can bind to port 0.
+- Added `util::TaskGroup` and replaced `ThreadPoolMgr::SetPhysThreadCount` with `ThreadPoolMgr::SetPoolWorkerCount`. `TaskGroup` now throws if used from inside a task of the same pool, which would otherwise deadlock.
+- Added `ThreadPoolMgr::GetPoolWorkerCount`; the thread counts now report what the pool obtained rather than what was requested.
+- The receiver runs its result workers on dedicated threads instead of the shared pool, so no APSI code waits on the network from a pool worker and a receiving process creates no pool.
+- `ThreadPoolMgr` is no longer copyable or movable; copying one corrupted the shared pool's reference count.
+- Hardened `PSIParams` and the receiver against a hostile sender: bounded waits, validated parameters, and duplicate or out-of-range result packages are ignored.
+- Fixed exception handling in `PowersDag::parallel_apply`.
+- Declared Microsoft GSL as a dependency of the exported CMake package, and stopped exporting the FourQ and AVX build flags, `APSI_DEBUG`, and `APSI_BUILD_TYPE`.
+- `APSI_BUILD_CLI=ON` with `APSI_USE_ZMQ=OFF` is now rejected at configure time.
+- Fixed [.gitignore](.gitignore) excluding the FourQ ARM64 sources.
+- Fixed `APSI_USE_ASM` being honored on architectures with no FourQ assembly, which broke the link on aarch64 Linux.
+- Tests no longer bind fixed ports, so concurrent runs do not collide.
+- Consumers must recompile rather than relink.
+
 ## Version 0.13.1
 
-- Updated the vcpkg baseline and now require Microsoft SEAL 4.4.4.
-- Added an optional `std::chrono::milliseconds timeout` to `Receiver::RequestParams`, `Receiver::RequestOPRF`, and `Receiver::request_query`, defaulting to 30 minutes; they throw `std::runtime_error` if the sender stops responding for that long. Pass `std::chrono::milliseconds::zero()` for the previous unbounded wait. The added parameter changes the mangled names, so consumers must recompile rather than relink.
-- `Receiver::RequestOPRF` throws if the sender's response does not contain one OPRF hash per requested item, instead of returning an empty result.
-- Added `network::Channel::receive_failed` and `network::Channel::receive_failure_count`; code that loops on a `nullptr` receive must consult them (see [Request, Response, and ResultPart](README.md#request-response-and-resultpart)).
-- `PSIParams` rejects out-of-range parameters and malformed serialized data. The serialized format is unchanged, but a custom parameter set exceeding the new bounds is no longer accepted; the sets in [parameters](parameters) are unaffected.
-- Declared Microsoft GSL as a dependency of the exported CMake package, and stopped exporting the FourQ and AVX build flags to consumers.
-- Fixed [.gitignore](.gitignore) excluding the FourQ ARM64 sources, which broke a fresh clone on ARM64.
+- Updated the vcpkg baseline to build against Microsoft SEAL 4.4.0.
 - The global logger is now a never-destroyed ("immortal") singleton, which avoids a static-destruction-order issue when another library logs through APSI during process teardown. As a consequence the logger's handlers are no longer invoked automatically at exit, so the built-in console and file loggers now flush on every write. Custom buffering loggers should be flushed and closed via `apsi::CloseLogger()` (see [Logging](README.md#logging)).
 - Fixed some issues in [CMakePresets.json](CMakePresets.json).
 
