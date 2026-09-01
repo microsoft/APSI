@@ -369,7 +369,7 @@ namespace APSITests {
             reinterpret_cast<const char *>(missing_tables),
             static_cast<streamsize>(sizeof(missing_tables)));
 
-        ASSERT_THROW(PSIParams::Load(ss), runtime_error);
+        ASSERT_THROW(static_cast<void>(PSIParams::Load(ss)), runtime_error);
     }
 
     TEST(PSIParamsTest, LoadRejectsOversizedQueryPowersBeforeMaterializingThem)
@@ -421,7 +421,7 @@ namespace APSITests {
             reinterpret_cast<const char *>(fbs_builder.GetBufferPointer()),
             static_cast<streamsize>(fbs_builder.GetSize()));
 
-        ASSERT_THROW(PSIParams::Load(ss), runtime_error);
+        ASSERT_THROW(static_cast<void>(PSIParams::Load(ss)), runtime_error);
     }
 
     TEST(PSIParamsTest, LoadAcceptsAFrozenBufferFromAnEarlierVersion)
@@ -628,11 +628,11 @@ namespace APSITests {
             "}";
 
         // Correct JSON
-        ASSERT_NO_THROW(PSIParams::Load(json));
+        ASSERT_NO_THROW(static_cast<void>(PSIParams::Load(json)));
 
         // Empty json
         json = "{}";
-        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+        ASSERT_THROW(static_cast<void>(PSIParams::Load(json)), runtime_error);
 
         // Missing table_params
         json = "{"
@@ -649,7 +649,7 @@ namespace APSITests {
                "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
                "    }"
                "}";
-        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+        ASSERT_THROW(static_cast<void>(PSIParams::Load(json)), runtime_error);
 
         // Missing item_params
         json = "{"
@@ -668,7 +668,7 @@ namespace APSITests {
                "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
                "    }"
                "}";
-        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+        ASSERT_THROW(static_cast<void>(PSIParams::Load(json)), runtime_error);
 
         // Missing query_params
         json = "{"
@@ -686,7 +686,7 @@ namespace APSITests {
                "        \"coeff_modulus_bits\": [ 49, 40, 20 ]"
                "    }"
                "}";
-        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+        ASSERT_THROW(static_cast<void>(PSIParams::Load(json)), runtime_error);
 
         // Missing seal_params
         json = "{"
@@ -703,7 +703,7 @@ namespace APSITests {
                "        \"query_powers\": [ 3, 4, 5, 8, 14, 20, 26, 32, 38, 41, 42, 43, 45, 46 ]"
                "    }"
                "}";
-        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+        ASSERT_THROW(static_cast<void>(PSIParams::Load(json)), runtime_error);
     }
 
     TEST(PSIParamsTest, JSONMissingTableParamsContent)
@@ -730,7 +730,7 @@ namespace APSITests {
             "}";
 
         // Correct JSON
-        ASSERT_NO_THROW(PSIParams::Load(json));
+        ASSERT_NO_THROW(static_cast<void>(PSIParams::Load(json)));
 
         json = "{"
                "    \"table_params\": {"
@@ -752,7 +752,7 @@ namespace APSITests {
                "}";
 
         // Missing hash_func_count
-        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+        ASSERT_THROW(static_cast<void>(PSIParams::Load(json)), runtime_error);
 
         json = "{"
                "    \"table_params\": {"
@@ -774,7 +774,7 @@ namespace APSITests {
                "}";
 
         // Missing table_size
-        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+        ASSERT_THROW(static_cast<void>(PSIParams::Load(json)), runtime_error);
 
         json = "{"
                "    \"table_params\": {"
@@ -796,7 +796,7 @@ namespace APSITests {
                "}";
 
         // Missing max_items_per_bin
-        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+        ASSERT_THROW(static_cast<void>(PSIParams::Load(json)), runtime_error);
     }
 
     TEST(PSIParamsTest, JSONMissingItemParams)
@@ -823,7 +823,7 @@ namespace APSITests {
             "}";
 
         // Correct JSON
-        ASSERT_NO_THROW(PSIParams::Load(json));
+        ASSERT_NO_THROW(static_cast<void>(PSIParams::Load(json)));
 
         json = "{"
                "    \"table_params\": {"
@@ -846,7 +846,7 @@ namespace APSITests {
                "}";
 
         // Missing felts_per_item
-        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+        ASSERT_THROW(static_cast<void>(PSIParams::Load(json)), runtime_error);
     }
 
     TEST(PSIParamsTest, JSONMissingQueryParams)
@@ -873,7 +873,7 @@ namespace APSITests {
             "}";
 
         // Correct JSON
-        ASSERT_NO_THROW(PSIParams::Load(json));
+        ASSERT_NO_THROW(static_cast<void>(PSIParams::Load(json)));
 
         json = "{"
                "    \"table_params\": {"
@@ -896,7 +896,7 @@ namespace APSITests {
                "}";
 
         // Missing ps_low_degree
-        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+        ASSERT_THROW(static_cast<void>(PSIParams::Load(json)), runtime_error);
 
         json = "{"
                "    \"table_params\": {"
@@ -919,7 +919,7 @@ namespace APSITests {
                "}";
 
         // Missing query_powers
-        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+        ASSERT_THROW(static_cast<void>(PSIParams::Load(json)), runtime_error);
     }
 
     TEST(PSIParamsTest, JSONMissingSEALParams)
@@ -946,7 +946,7 @@ namespace APSITests {
             "}";
 
         // Correct JSON
-        ASSERT_NO_THROW(PSIParams::Load(json));
+        ASSERT_NO_THROW(static_cast<void>(PSIParams::Load(json)));
 
         json = "{"
                "    \"table_params\": {"
@@ -968,7 +968,7 @@ namespace APSITests {
                "}";
 
         // Missing plain_modulus
-        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+        ASSERT_THROW(static_cast<void>(PSIParams::Load(json)), runtime_error);
 
         json = "{"
                "    \"table_params\": {"
@@ -990,7 +990,7 @@ namespace APSITests {
                "}";
 
         // Missing poly_modulus_degree
-        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+        ASSERT_THROW(static_cast<void>(PSIParams::Load(json)), runtime_error);
 
         json = "{"
                "    \"table_params\": {"
@@ -1012,6 +1012,6 @@ namespace APSITests {
                "}";
 
         // Missing coeff_modulus_bits
-        ASSERT_THROW(PSIParams::Load(json), runtime_error);
+        ASSERT_THROW(static_cast<void>(PSIParams::Load(json)), runtime_error);
     }
 } // namespace APSITests

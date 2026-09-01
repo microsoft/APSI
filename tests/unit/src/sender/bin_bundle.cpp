@@ -235,7 +235,7 @@ namespace APSITests {
             ASSERT_TRUE(bb.cache_invalid());
 
             // The cache is stale; cannot get it
-            ASSERT_THROW(bb.get_cache(), logic_error);
+            ASSERT_THROW(static_cast<void>(bb.get_cache()), logic_error);
 
             bb.regen_cache();
             const auto &cache = bb.get_cache();
@@ -273,7 +273,7 @@ namespace APSITests {
             ASSERT_TRUE(bb.cache_invalid());
 
             // The cache is stale; cannot get it
-            ASSERT_THROW(bb.get_cache(), logic_error);
+            ASSERT_THROW(static_cast<void>(bb.get_cache()), logic_error);
 
             bb.regen_cache();
             const auto &cache = bb.get_cache();
