@@ -1,5 +1,12 @@
+parameters:
+- name: configuration
+  type: string
+  values:
+  - Debug
+  - Release
+
 steps:
-- task: Powershell@2
+- task: PowerShell@2
   displayName: 'Bootstrap vcpkg'
   inputs:
     targetType: 'inline'
@@ -11,30 +18,31 @@ steps:
       .\bootstrap-vcpkg.bat -disableMetrics
     workingDirectory: '$(Build.SourcesDirectory)'
 
-# Dependencies are resolved from vcpkg.json at the project root. CMake configure
-# drives the install via the vcpkg toolchain file.
-- task: CMake@1
+# Configure and build through CMakePresets.json rather than a hand-written command line, so that
+# CI builds what a contributor following the README builds. Anything CI needs to differ on
+# belongs in a preset, where both see it.
+#
+# windows-latest carries Visual Studio 2022, so this is the vs2022 preset; the vs2026 presets
+# additionally need CMake 4.2, which the image does not have either. Dependencies are resolved
+# from vcpkg.json by the toolchain file the preset names, which reads VCPKG_ROOT from the job.
+- script: cmake --preset win-vs2022-x64
+  workingDirectory: '$(Build.SourcesDirectory)'
   displayName: 'Configure APSI'
-  inputs:
-    cmakeArgs: .. -DCMAKE_BUILD_TYPE='${{ parameters.configuration }}' -DAPSI_BUILD_TESTS=ON -DVCPKG_MANIFEST_FEATURES=tests -DCMAKE_TOOLCHAIN_FILE=$(Build.SourcesDirectory)\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static-md
-    workingDirectory: '$(Build.SourcesDirectory)/build'
 
 - ${{ if eq(parameters.configuration, 'Release') }}:
   - task: CodeQL3000Init@0
 
-- task: MSBuild@1
+# CodeQL observes the compiler invocations themselves, so driving the build through CMake rather
+# than the MSBuild task does not hide anything from it.
+- script: cmake --build --preset win-vs2022-x64-${{ lower(parameters.configuration) }}
+  workingDirectory: '$(Build.SourcesDirectory)'
   displayName: 'Build APSI'
-  inputs:
-    solution: '$(Build.SourcesDirectory)/build/apsi.sln'
-    msbuildArchitecture: 'x64'
-    platform: 'x64'
-    configuration: '${{ parameters.configuration }}'
 
 - ${{ if eq(parameters.configuration, 'Release') }}:
   - task: CodeQL3000Finalize@0
 
-- script: '${{ parameters.configuration }}\unit_tests.exe'
-  workingDirectory: '$(Build.SourcesDirectory)\build\bin'
+- script: unit_tests.exe
+  workingDirectory: '$(Build.SourcesDirectory)\out\build\win-vs2022-x64\bin\${{ parameters.configuration }}'
   displayName: 'Run unit tests'
 
 # Integration tests are Release-only: a Debug build links vcpkg's unoptimized SEAL, which
@@ -42,31 +50,13 @@ steps:
 # The Large and Huge cases are DISABLED_ in the source, so only the small and medium ones
 # run here. Add --gtest_also_run_disabled_tests before tagging a release.
 - ${{ if eq(parameters.configuration, 'Release') }}:
-  - script: '${{ parameters.configuration }}\integration_tests.exe'
-    workingDirectory: '$(Build.SourcesDirectory)\build\bin'
+  - script: integration_tests.exe
+    workingDirectory: '$(Build.SourcesDirectory)\out\build\win-vs2022-x64\bin\${{ parameters.configuration }}'
     displayName: 'Run integration tests'
 
-- task: PublishSymbols@2
-  displayName: 'Publish symbols path'
-  inputs:
-    searchPattern: '**\bin\**\*.pdb'
-    PublishSymbols: false
-  continueOnError: true
-
-- task: CopyFiles@2
-  displayName: 'Copy Files to: $(Build.ArtifactStagingDirectory)'
-  inputs:
-    SourceFolder: '$(Build.SourcesDirectory)\build\bin'
-    Contents: |
-      ${{ parameters.configuration }}\**\?(*.exe|*.dll|*.lib|*.xml)
-    TargetFolder: '$(Build.ArtifactStagingDirectory)'
-
-- task: PublishBuildArtifacts@1
-  displayName: 'Publish Artifact: drop'
-  inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-    artifactName: windows-drop
-
+# No build artifacts are published. APSI is consumed as source or through vcpkg, so a drop of
+# unsigned CI binaries has no consumer and only invites someone to use one. The security
+# analysis logs below are a different matter and are still published.
 - ${{ if eq(parameters.configuration, 'Release') }}:
   - task: CredScan@3
     displayName: 'Credential Scan'

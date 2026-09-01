@@ -1,4 +1,8 @@
 # This file selects the correct job definition based on system and buildType.
+#
+# Configuration values are capitalized deliberately. On the Ninja jobs they reach CMake as
+# CMAKE_BUILD_TYPE, which is compared with STREQUAL against "Debug", so a lowercase value
+# silently fails to match and the build is not the one the job name claims.
 
 parameters:
   debug: 'false'
@@ -10,25 +14,31 @@ jobs:
     displayName: ${{ parameters.name }}
     pool:
       vmImage: 'windows-latest'
+    variables:
+      # What the presets resolve their toolchain file against. Hosted agents do ship a vcpkg,
+      # but they expose it as VCPKG_INSTALLATION_ROOT and it is an image snapshot that can
+      # predate the baseline in vcpkg.json, so the bootstrap step clones the baseline instead
+      # and this points at that clone.
+      VCPKG_ROOT: $(Build.SourcesDirectory)/vcpkg
     steps:
     - template: windows.yml
       parameters:
         ${{ if eq(parameters.debug, 'true') }}:
-          configuration: 'debug'
-          path: 'Debug'
+          configuration: 'Debug'
         ${{ if eq(parameters.debug, 'false') }}:
-          configuration: 'release'
-          path: 'Release'
+          configuration: 'Release'
 
 - ${{ if eq(parameters.name, 'Linux') }}:
   - job: ${{ parameters.name }}
     displayName: ${{ parameters.name }}
     pool:
       vmImage: 'ubuntu-latest'
+    variables:
+      VCPKG_ROOT: $(Build.SourcesDirectory)/vcpkg
     steps:
     - template: nix.yml
       parameters:
-        artifactName: linux-drop
+        presetPrefix: 'linux'
         ${{ if eq(parameters.debug, 'true') }}:
           configuration: 'Debug'
         ${{ if eq(parameters.debug, 'false') }}:
@@ -39,10 +49,15 @@ jobs:
     displayName: ${{ parameters.name }}
     pool:
       vmImage: 'macos-latest'
+    variables:
+      VCPKG_ROOT: $(Build.SourcesDirectory)/vcpkg
     steps:
     - template: nix.yml
       parameters:
-        artifactName: macos-drop
+        # macos-latest is still the x86_64 image. If it becomes Apple silicon, switch this to
+        # macos-arm64: those presets differ in CMAKE_OSX_ARCHITECTURES and vcpkg triplet, and
+        # building the wrong one produces binaries the agent cannot run.
+        presetPrefix: 'macos-x64'
         ${{ if eq(parameters.debug, 'true') }}:
           configuration: 'Debug'
         ${{ if eq(parameters.debug, 'false') }}:

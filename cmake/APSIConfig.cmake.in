@@ -9,9 +9,14 @@
 #   APSI_VERSION_MAJOR : the major version number
 #   APSI_VERSION_MINOR : the minor version number
 #   APSI_VERSION_PATCH : the patch version number
-#   APSI_BUILD_TYPE : The build type (e.g., "Release" or "Debug")
-#   APSI_DEBUG : Set to non-zero value if library is compiled with extra debugging code (very slow!)
 #   APSI_USE_ZMQ : Set to non-zero value if library is compiled with ZeroMQ and cppzmq for networking
+#
+# Note there is deliberately no variable reporting whether this is a debug build. This file is
+# generated once at configure time, whereas a multi-configuration generator such as Visual Studio
+# or Xcode builds every configuration from that single generated file, so no value written here
+# can describe the configuration a consumer ends up linking against. CMake already solves this
+# properly: the imported target APSI::apsi carries per-configuration locations, and a consumer's
+# own $<CONFIG> selects among them.
 
 @PACKAGE_INIT@
 
@@ -34,9 +39,6 @@ set(APSI_VERSION @APSI_VERSION@)
 set(APSI_VERSION_MAJOR @APSI_VERSION_MAJOR@)
 set(APSI_VERSION_MINOR @APSI_VERSION_MINOR@)
 set(APSI_VERSION_PATCH @APSI_VERSION_PATCH@)
-
-set(APSI_BUILD_TYPE @CMAKE_BUILD_TYPE@)
-set(APSI_DEBUG @APSI_DEBUG@)
 
 apsi_find_dependency(SEAL REQUIRED)
 apsi_find_dependency(Microsoft.GSL REQUIRED)
@@ -66,9 +68,6 @@ endif()
 if(APSI_FOUND)
     if(NOT APSI_FIND_QUIETLY)
         message(STATUS "APSI -> Version ${APSI_VERSION} detected")
-    endif()
-    if(APSI_DEBUG AND NOT APSI_FIND_QUIETLY)
-        message(STATUS "Performance warning: APSI compiled in debug mode")
     endif()
     if(NOT APSI_FIND_QUIETLY)
         message(STATUS "APSI -> Targets available: APSI::apsi")
