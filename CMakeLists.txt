@@ -51,7 +51,9 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # Make the install target depend on the all target (required by vcpkg)
 set(CMAKE_SKIP_INSTALL_ALL_DEPENDENCY OFF)
 
-# In Debug mode, define APSI_DEBUG
+# Whether this is a Debug build. It reflects CMAKE_BUILD_TYPE and so means something only for
+# single-configuration generators; all it gates is the extra warning flags below. The APSI_DEBUG
+# macro the sources actually use is set per configuration on the target further down.
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(APSI_DEBUG ON)
     # In Debug mode, enable extra compiler flags.
@@ -269,6 +271,15 @@ apsi_set_version(apsi)
 apsi_link_threads(apsi)
 apsi_install_target(apsi APSITargets)
 
+# APSI_DEBUG marks a debug build for APSI's own sources, which use it to enable extra
+# validation. It is set per configuration rather than written into config.h, because a
+# multi-configuration generator such as Visual Studio or Xcode configures once and builds every
+# configuration from that single generated header: a configure-time #cmakedefine there is fixed
+# to whatever CMAKE_BUILD_TYPE happened to say, and so was never set in a Visual Studio Debug
+# build. PRIVATE and BUILD_INTERFACE because only these sources consult it; a consumer compiling
+# against an installed APSI must not have its own build flip a macro inside APSI's headers.
+target_compile_definitions(apsi PRIVATE $<BUILD_INTERFACE:$<$<CONFIG:Debug>:APSI_DEBUG>>)
+
 target_link_libraries(apsi
     PUBLIC SEAL::seal
     PUBLIC Microsoft.GSL::GSL
@@ -342,13 +353,20 @@ else()
 endif()
 
 # Use optimized assembly on UNIX
-if(APSI_USE_ASM AND UNIX AND NOT APPLE AND NOT CYGWIN AND NOT MINGW)
+#
+# Restricted to AMD64 because that is the only architecture the vendored FourQ ships assembly
+# for. Without that condition an aarch64 Linux build defines _ASM_, so eccp2_core.c calls
+# fp2mul1271_a and friends, while third_party/fourq/arm64 contributes no sources to define
+# them: the build fails at link time. A failure to detect an assembler is handled the same way,
+# rather than leaving APSI_USE_ASM on with nothing to assemble.
+if(APSI_USE_ASM AND APSI_FOURQ_AMD64 AND UNIX AND NOT APPLE AND NOT CYGWIN AND NOT MINGW)
     check_language(ASM)
-    if(CMAKE_ASM_COMPILER)
-        enable_language(ASM)
-        target_compile_options(apsi PRIVATE -D_ASM_)
-        message(STATUS "FourQlib optimization: asm=ON")
-    endif()
+endif()
+if(APSI_USE_ASM AND APSI_FOURQ_AMD64 AND UNIX AND NOT APPLE AND NOT CYGWIN AND NOT MINGW
+        AND CMAKE_ASM_COMPILER)
+    enable_language(ASM)
+    target_compile_options(apsi PRIVATE -D_ASM_)
+    message(STATUS "FourQlib optimization: asm=ON")
 else()
     set(APSI_USE_ASM OFF CACHE BOOL ${APSI_USE_ASM_OPTION_STR} FORCE)
     message(STATUS "FourQlib optimization: asm=OFF")

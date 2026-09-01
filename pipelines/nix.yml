@@ -1,47 +1,49 @@
+parameters:
+- name: configuration
+  type: string
+  values:
+  - Debug
+  - Release
+- name: presetPrefix
+  type: string
+
 steps:
 
-- task: CmdLine@2
+- bash: |
+    set -e
+    BASELINE=$(python3 -c "import json; print(json.load(open('vcpkg.json'))['builtin-baseline'])")
+    git clone https://github.com/microsoft/vcpkg.git
+    cd vcpkg
+    git checkout "$BASELINE"
+    ./bootstrap-vcpkg.sh -disableMetrics
   displayName: 'Bootstrap vcpkg'
-  inputs:
-    script: |
-      BASELINE=$(python3 -c "import json; print(json.load(open('vcpkg.json'))['builtin-baseline'])")
-      git clone https://github.com/microsoft/vcpkg.git
-      cd vcpkg
-      git checkout $BASELINE
-      ./bootstrap-vcpkg.sh -disableMetrics
-    workingDirectory: '$(Build.SourcesDirectory)'
-    failOnStderr: false
+  workingDirectory: '$(Build.SourcesDirectory)'
 
-# Dependencies are resolved from vcpkg.json at the project root. CMake configure
-# drives the install via the vcpkg toolchain file.
-- task: CMake@1
-  displayName: 'CMake APSI'
-  inputs:
-    workingDirectory: '$(Build.SourcesDirectory)'
-    cmakeArgs: '-DCMAKE_BUILD_TYPE=${{ parameters.configuration }} -DAPSI_BUILD_TESTS=ON -DVCPKG_MANIFEST_FEATURES=tests -DCMAKE_TOOLCHAIN_FILE=$(Build.SourcesDirectory)/vcpkg/scripts/buildsystems/vcpkg.cmake .'
+# Configure and build through CMakePresets.json rather than a hand-written command line, so that
+# CI builds what a contributor following the README builds. Anything CI needs to differ on
+# belongs in a preset, where both see it. Dependencies are resolved from vcpkg.json by the
+# toolchain file the preset names, which reads VCPKG_ROOT from the job.
+- bash: cmake --preset ${{ parameters.presetPrefix }}-${{ lower(parameters.configuration) }}
+  displayName: 'Configure APSI'
+  workingDirectory: '$(Build.SourcesDirectory)'
 
-- script: |
-      cd $BUILD_SOURCESDIRECTORY
-      make
+- bash: cmake --build --preset ${{ parameters.presetPrefix }}-${{ lower(parameters.configuration) }}
   displayName: 'Build APSI'
+  workingDirectory: '$(Build.SourcesDirectory)'
 
-- script: |
-      cd $BUILD_SOURCESDIRECTORY
-      ./bin/unit_tests
+- bash: ./unit_tests
   displayName: 'Run unit tests'
+  workingDirectory: '$(Build.SourcesDirectory)/out/build/${{ parameters.presetPrefix }}-${{ lower(parameters.configuration) }}/bin'
 
 # Integration tests are Release-only: a Debug build links vcpkg's unoptimized SEAL, which
 # makes the homomorphic operations 10-20x slower and the suite impractical as a gate.
 # The Large and Huge cases are DISABLED_ in the source, so only the small and medium ones
 # run here. Add --gtest_also_run_disabled_tests before tagging a release.
 - ${{ if eq(parameters.configuration, 'Release') }}:
-  - script: |
-        cd $BUILD_SOURCESDIRECTORY
-        ./bin/integration_tests
+  - bash: ./integration_tests
     displayName: 'Run integration tests'
+    workingDirectory: '$(Build.SourcesDirectory)/out/build/${{ parameters.presetPrefix }}-${{ lower(parameters.configuration) }}/bin'
 
-- task: PublishBuildArtifacts@1
-  displayName: 'Publish Artifact: drop'
-  inputs:
-      PathtoPublish: '$(Build.ArtifactStagingDirectory)'
-      artifactName: ${{ parameters.artifactName }}
+# No build artifacts are published; see the note in windows.yml. The step that used to be here
+# published the staging directory without anything ever having been copied into it, so what it
+# actually produced was an empty artifact.
