@@ -131,6 +131,37 @@ namespace APSITests {
         ASSERT_THROW(mychannel.send(make_unique<ZMQSenderOperationResponse>()), runtime_error);
     }
 
+    TEST_F(ZMQChannelTests, ChannelIsDestructibleAfterAFailedBindOrConnect)
+    {
+        // Terminating a ZeroMQ context blocks until every socket in it is closed, and the socket
+        // is created before the bind or connect that may throw. A channel whose bind failed must
+        // therefore still close its socket on the way out, even though it never became connected
+        // and its cleanup path is keyed on exactly that.
+        //
+        // A regression here does not fail this test, it hangs the whole binary with no output, so
+        // reaching the end of the test body is the assertion. Note also that the fix cannot be to
+        // call disconnect() unconditionally from the destructor: disconnect() begins by throwing
+        // when the channel is not connected, and a destructor has to swallow that, which leaves
+        // the socket open and the hang in place.
+        {
+            ZMQSenderChannel occupied;
+            occupied.bind(any_port_bind_address());
+            string taken = "tcp://*:" + to_string(bound_port(occupied));
+
+            ZMQSenderChannel collides;
+            ASSERT_THROW(collides.bind(taken), zmq::error_t);
+            ASSERT_FALSE(collides.is_connected());
+        }
+
+        {
+            ZMQReceiverChannel bad_address;
+            ASSERT_THROW(bad_address.connect("this is not an endpoint"), zmq::error_t);
+            ASSERT_FALSE(bad_address.is_connected());
+        }
+
+        SUCCEED() << "both channels were destroyed without hanging";
+    }
+
     TEST_F(ZMQChannelTests, ReceiveOperationReturnsNullOnInvalidInput)
     {
         // receive_operation wraps receive_network_operation and must propagate a nullptr
