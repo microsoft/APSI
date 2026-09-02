@@ -489,8 +489,9 @@ Of course at this later point the sender may decide to serve a normal query to t
 
 APSI allows the sender can specify the nonce size in bytes.
 The default nonce size is set to 16 bytes, but expert users who fully understand the issue may want to use smaller values to achieve improved performance.
-A labeled `SenderDB` must have a nonce of at least one byte, however, and constructing one with a nonce size of zero is refused.
-Zero is not a smaller nonce but the absence of one: it removes the randomization entirely, so encrypting a label for the same item a second time &ndash; by updating the label, or by removing the item and reinserting it &ndash; reproduces the same keystream, and the two ciphertexts together reveal the two labels.
+A nonce size of zero is permitted and makes label encryption deterministic, which saves the nonce bytes on every item.
+It is safe only for a `SenderDB` whose labels are never rewritten: encrypting a label for the same item a second time &ndash; by updating it, or by removing the item and reinserting it &ndash; reproduces the same keystream, and the two ciphertexts together reveal the two labels.
+The `SenderDB` constructor warns whenever the nonce is shorter than the default, and warns specifically when it is zero.
 
 #### Partial Item Collisions
 

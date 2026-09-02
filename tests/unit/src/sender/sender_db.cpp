@@ -119,27 +119,29 @@ namespace APSITests {
         ASSERT_EQ(0, memcmp(db_key_str.data(), new_key_str.data(), db_key_str.size()));
     }
 
-    TEST(SenderDBTests, LabeledSenderDBRequiresANonzeroNonce)
+    TEST(SenderDBTests, LabeledSenderDBAcceptsAZeroNonce)
     {
         auto params = get_params1();
 
-        // A nonce of zero removes the randomization from label encryption rather than merely
-        // shortening it, so encrypting a label for the same item twice reproduces the keystream
-        // and the two ciphertexts XOR to the two plaintexts. The SenderDB cannot detect the
-        // second encryption -- a label update does it, and so does removing and reinserting an
-        // item -- so the only place it can be refused is here.
-        ASSERT_THROW(SenderDB(*params, 16, 0), invalid_argument);
+        // A zero nonce makes label encryption deterministic, which is safe for a SenderDB whose
+        // labels are never rewritten and saves the nonce bytes on every item. It is warned about
+        // rather than refused: the operator is the only party that knows whether labels will be
+        // rewritten, and refusing zero while accepting one would draw an arbitrary line, since a
+        // one-byte nonce repeats after a handful of updates anyway.
+        ASSERT_NO_THROW(SenderDB(*params, 16, 0));
 
         oprf::OPRFKey key;
-        ASSERT_THROW(SenderDB(*params, key, 16, 0), invalid_argument);
+        ASSERT_NO_THROW(SenderDB(*params, key, 16, 0));
 
-        // A short nonce stays available; it weakens the bound on safe label rewrites rather than
-        // removing it, and the constructor warns.
+        // Short nonces stay available for the same reason.
         ASSERT_NO_THROW(SenderDB(*params, 16, 1));
 
-        // An unlabeled SenderDB has no labels to encrypt, so a zero nonce is the correct value
-        // and must keep working.
+        // An unlabeled SenderDB has no labels to encrypt, so zero is simply the correct value.
         ASSERT_NO_THROW(SenderDB(*params, 0, 0));
+
+        // A nonce larger than the maximum is still refused; that bound is structural rather than
+        // a judgement about the deployment.
+        ASSERT_THROW(SenderDB(*params, 16, max_nonce_byte_count + 1), invalid_argument);
     }
 
     TEST(SenderDBTests, BadBatchIsRejectedWithoutModifyingTheDatabase)
