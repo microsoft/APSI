@@ -11,6 +11,10 @@
 - The receiver runs its result workers on dedicated threads instead of the shared pool, so no APSI code waits on the network from a pool worker and a receiving process creates no pool.
 - `ThreadPoolMgr` is no longer copyable or movable; copying one corrupted the shared pool's reference count.
 - Hardened `PSIParams` and the receiver against a hostile sender: bounded waits, validated parameters, and duplicate or out-of-range result packages are ignored.
+- A labeled `SenderDB` now requires a nonce byte count of at least 1; zero is refused. Zero is not a smaller nonce but the absence of one, and it makes re-encrypting a label for the same item reproduce the keystream.
+- `SenderDB::insert_or_assign` now validates a labeled batch before modifying anything, and refuses it if a label is longer than the `SenderDB` holds or if an item appears twice. Over-long labels were previously truncated silently, and a repeated item left the database describing items it had not inserted. Repeats in an unlabeled batch are collapsed rather than refused.
+- An OPRF request is now limited to `oprf::oprf_query_count_max` items, refused both when the request is loaded and in `oprf::OPRFSender::ProcessQueries`. The bound is the largest query a receiver could cuckoo-hash into a table of `TableParams::table_size_max` bins, so it cannot refuse a request that could have led to a query.
+- `SenderDB::Load` now rejects a serialized `SenderDB` that omits a required field instead of dereferencing it.
 - Fixed exception handling in `PowersDag::parallel_apply`.
 - Declared Microsoft GSL as a dependency of the exported CMake package, and stopped exporting the FourQ and AVX build flags, `APSI_DEBUG`, and `APSI_BUILD_TYPE`.
 - `APSI_BUILD_CLI=ON` with `APSI_USE_ZMQ=OFF` is now rejected at configure time.
