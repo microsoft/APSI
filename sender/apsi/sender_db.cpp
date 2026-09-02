@@ -552,21 +552,19 @@ namespace apsi {
                 throw invalid_argument("nonce_byte_count is too large");
             }
 
-            // A labeled SenderDB must have a nonce. Zero is not simply a smaller nonce: it removes
-            // the randomization entirely, so encrypting a label for the same item twice reproduces
-            // the same keystream, and the two ciphertexts XOR to the two plaintexts. That happens
-            // whenever a label is updated, and also when an item is removed and reinserted, which
-            // the SenderDB cannot detect. A smaller-but-nonzero nonce weakens the bound on how many
-            // times an item's label may safely be rewritten; zero makes it once, with no way to
-            // enforce it.
-            if (label_byte_count_ && !nonce_byte_count_) {
-                APSI_LOG_ERROR("A labeled SenderDB requires a nonce byte count of at least 1");
-                throw invalid_argument("nonce_byte_count cannot be zero for a labeled SenderDB");
-            }
-
             // If the nonce byte count is less than max_nonce_byte_count, print a warning; this is a
-            // labeled SenderDB but may not be safe to use for arbitrary label changes.
-            if (label_byte_count_ && nonce_byte_count_ < max_nonce_byte_count) {
+            // labeled SenderDB but may not be safe to use for arbitrary label changes. A nonce of
+            // zero is called out separately because it differs in kind rather than in degree: a
+            // shorter nonce makes a repeated keystream likelier, while no nonce makes it certain.
+            if (label_byte_count_ && !nonce_byte_count_) {
+                APSI_LOG_WARNING(
+                    "You have instantiated a labeled SenderDB instance with a nonce byte count of "
+                    "zero, so label encryption is deterministic. Encrypting a label for the same "
+                    "item a second time -- by updating it, or by removing the item and "
+                    "reinserting it -- will reproduce the same keystream, and the two ciphertexts "
+                    "together reveal the two labels. This is safe only for a SenderDB whose "
+                    "labels are never rewritten.");
+            } else if (label_byte_count_ && nonce_byte_count_ < max_nonce_byte_count) {
                 APSI_LOG_WARNING(
                     "You have instantiated a labeled SenderDB instance with a nonce byte count "
                     << nonce_byte_count_ << ", which is less than the safe default value "
