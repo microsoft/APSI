@@ -69,9 +69,15 @@ namespace apsi::oprf {
             throw invalid_argument("oprf_queries has invalid size");
         }
 
+        size_t query_count = oprf_queries.size() / oprf_query_size;
+        if (query_count > oprf_query_count_max) {
+            // Bounded here rather than only at the call site, so that every caller is covered:
+            // the cost is one scalar multiplication per item, charged to this process.
+            throw invalid_argument("oprf_queries has too many items");
+        }
+
         STOPWATCH(sender_stopwatch, "OPRFSender::ProcessQueries");
 
-        size_t query_count = oprf_queries.size() / oprf_query_size;
         vector<unsigned char> oprf_responses(query_count * oprf_response_size);
 
         const auto *oprf_in_ptr = oprf_queries.data();
