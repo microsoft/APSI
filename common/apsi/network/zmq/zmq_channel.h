@@ -224,6 +224,14 @@ namespace apsi::network {
         virtual void set_socket_options(zmq::socket_t *socket) = 0;
 
     private:
+        // Declared before socket_ so that it is destroyed after it. Terminating a ZeroMQ context
+        // blocks until every socket in that context has been closed, so a context destroyed while
+        // one of its sockets is still open hangs forever. Nothing else in this class guarantees
+        // the socket is closed first: a bind or connect that throws leaves the socket open but
+        // end_point_ empty, and the destructor's cleanup is keyed on end_point_. Ordering the
+        // members makes the guarantee structural and independent of which paths happen to fail.
+        std::unique_ptr<zmq::context_t> context_;
+
         std::unique_ptr<zmq::socket_t> socket_;
 
         std::string end_point_;
@@ -231,8 +239,6 @@ namespace apsi::network {
         std::mutex receive_mutex_;
 
         std::mutex send_mutex_;
-
-        std::unique_ptr<zmq::context_t> context_;
 
         std::unique_ptr<zmq::socket_t> &get_socket();
 
