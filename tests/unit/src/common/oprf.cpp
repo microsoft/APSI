@@ -96,6 +96,32 @@ namespace APSITests {
         }
     }
 
+    TEST(OPRFTests, ProcessQueriesRejectsTooManyItems)
+    {
+        OPRFKey oprf_key;
+
+        // The work is one scalar multiplication per item and lands entirely on the sender, whose
+        // dispatcher serves one request at a time, so an unbounded request occupies it for as long
+        // as the request takes while every other peer waits. The bound is checked here rather than
+        // only at the protocol call site, so that every caller of the primitive is covered.
+        //
+        // The buffer is never processed, only measured, so sizing one at the limit costs nothing.
+        vector<unsigned char> too_many((oprf_query_count_max + 1) * oprf_query_size);
+        ASSERT_THROW((void)OPRFSender::ProcessQueries(too_many, oprf_key), invalid_argument);
+
+        // A ragged buffer is still rejected on its own grounds.
+        vector<unsigned char> ragged(oprf_query_size + 1);
+        ASSERT_THROW((void)OPRFSender::ProcessQueries(ragged, oprf_key), invalid_argument);
+
+        // An ordinary request is unaffected. The largest shipped parameter set recommends 11041
+        // receiver items, so the bound leaves roughly two orders of magnitude of headroom.
+        vector<unsigned char> ordinary(4 * oprf_query_size);
+        OPRFReceiver oprf_receiver(vector<Item>(4));
+        auto query = oprf_receiver.query_data();
+        copy(query.cbegin(), query.cend(), ordinary.begin());
+        ASSERT_NO_THROW((void)OPRFSender::ProcessQueries(ordinary, oprf_key));
+    }
+
     TEST(OPRFTests, Hash2Curve)
     {
         {

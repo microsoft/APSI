@@ -10,6 +10,7 @@
 #include "apsi/network/sender_operation.h"
 #include "apsi/network/sop_generated.h"
 #include "apsi/network/sop_header_generated.h"
+#include "apsi/oprf/oprf_common.h"
 #include "apsi/util/utils.h"
 
 // SEAL
@@ -175,10 +176,15 @@ namespace apsi::network {
             throw runtime_error("unexpected operation type");
         }
 
-        // Load the OPRF request; this is a required field so we can always dereference. The
-        // size is bounded by the verified buffer (INT32_MAX) and the allocation is 1:1 with
-        // the received bytes, so there is nothing to amplify.
+        // Load the OPRF request; this is a required field so we can always dereference. Screen the
+        // item count before copying: the allocation is 1:1 with the received bytes, so there is
+        // nothing to amplify, but the scalar multiplication this buys is charged to the sender's
+        // dispatcher, which serves one request at a time.
         const auto &oprf_data = *sop->request_as_OPRFRequest()->data();
+        if (oprf_data.size() > apsi::oprf::oprf_query_count_max * apsi::oprf::oprf_query_size) {
+            throw runtime_error("oprf request is too large");
+        }
+
         data.resize(oprf_data.size());
         copy_bytes(oprf_data.data(), oprf_data.size(), data.data());
 
