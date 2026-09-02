@@ -8,6 +8,7 @@
 #include <memory>
 #include <mutex>
 #include <sstream>
+#include <unordered_set>
 
 // APSI
 #include "apsi/psi_params.h"
@@ -551,6 +552,18 @@ namespace apsi {
                 throw invalid_argument("nonce_byte_count is too large");
             }
 
+            // A labeled SenderDB must have a nonce. Zero is not simply a smaller nonce: it removes
+            // the randomization entirely, so encrypting a label for the same item twice reproduces
+            // the same keystream, and the two ciphertexts XOR to the two plaintexts. That happens
+            // whenever a label is updated, and also when an item is removed and reinserted, which
+            // the SenderDB cannot detect. A smaller-but-nonzero nonce weakens the bound on how many
+            // times an item's label may safely be rewritten; zero makes it once, with no way to
+            // enforce it.
+            if (label_byte_count_ && !nonce_byte_count_) {
+                APSI_LOG_ERROR("A labeled SenderDB requires a nonce byte count of at least 1");
+                throw invalid_argument("nonce_byte_count cannot be zero for a labeled SenderDB");
+            }
+
             // If the nonce byte count is less than max_nonce_byte_count, print a warning; this is a
             // labeled SenderDB but may not be safe to use for arbitrary label changes.
             if (label_byte_count_ && nonce_byte_count_ < max_nonce_byte_count) {
@@ -787,6 +800,34 @@ namespace apsi {
             STOPWATCH(sender_stopwatch, "SenderDB::insert_or_assign (labeled)");
             APSI_LOG_INFO("Start inserting " << data.size() << " items in SenderDB");
 
+            // Validate the whole batch before anything is computed or modified. Insertion fans
+            // out across worker threads and cannot be unwound partway, so the only point at which
+            // a bad batch can be rejected cleanly is before it has had any effect.
+            {
+                unordered_set<Item> batch_items;
+                batch_items.reserve(data.size());
+                for (const auto &item_label : data) {
+                    if (item_label.second.size() > label_byte_count_) {
+                        // Truncating here instead would store a label the receiver cannot
+                        // distinguish from a correct one.
+                        APSI_LOG_ERROR(
+                            "Attempted to insert a label of "
+                            << item_label.second.size()
+                            << " bytes but this SenderDB holds labels of " << label_byte_count_
+                            << " bytes");
+                        throw invalid_argument("failed to insert data: label is too long");
+                    }
+                    if (!batch_items.insert(item_label.first).second) {
+                        // Two labels for one item in a single batch: which one was meant cannot
+                        // be known, so neither is chosen.
+                        APSI_LOG_ERROR(
+                            "Attempted to insert the same item twice in one batch, so the "
+                            "intended label is ambiguous");
+                        throw invalid_argument("failed to insert data: duplicate item in batch");
+                    }
+                }
+            }
+
             // First compute the hashes for the input data
             auto hashed_data =
                 OPRFSender::ComputeHashes(data, oprf_key_, label_byte_count_, nonce_byte_count_);
@@ -796,18 +837,12 @@ namespace apsi {
 
             // We need to know which items are new and which are old, since we have to tell
             // dispatch_insert_or_assign when to have an overwrite-on-collision versus
-            // add-binbundle-on-collision policy.
+            // add-binbundle-on-collision policy. Partition without recording anything: an item
+            // registered in hashed_items_ before it is actually in a bin bundle is what leaves
+            // has_item answering yes while get_label throws, and that state survives a save.
             auto new_data_end =
-                remove_if(hashed_data.begin(), hashed_data.end(), [&](const auto &item_label_pair) {
-                    bool found = hashed_items_.find(item_label_pair.first) != hashed_items_.end();
-                    if (!found) {
-                        // Add to hashed_items_ already at this point!
-                        hashed_items_.insert(item_label_pair.first);
-                        item_count_++;
-                    }
-
-                    // Remove those that were found
-                    return found;
+                partition(hashed_data.begin(), hashed_data.end(), [&](const auto &item_label_pair) {
+                    return hashed_items_.find(item_label_pair.first) == hashed_items_.end();
                 });
 
             // Dispatch the insertion, first for the new data, then for the data we're gonna
@@ -841,9 +876,6 @@ namespace apsi {
                     ps_low_degree,
                     true, /* overwrite items */
                     compressed_);
-
-                // Release memory that is no longer needed
-                hashed_data.erase(new_data_end, hashed_data.end());
             }
 
             if (new_item_count) {
@@ -852,7 +884,7 @@ namespace apsi {
                 // Process and add the new data. Break the data into field element representation.
                 // Also compute the items' cuckoo indices.
                 vector<pair<AlgItemLabel, size_t>> data_with_indices =
-                    preprocess_labeled_data(hashed_data.begin(), hashed_data.end(), params_);
+                    preprocess_labeled_data(hashed_data.begin(), new_data_end, params_);
 
                 dispatch_insert_or_assign(
                     data_with_indices,
@@ -865,6 +897,14 @@ namespace apsi {
                     false, /* don't overwrite items */
                     compressed_);
             }
+
+            // Both dispatches have succeeded, so the new items really are in bin bundles now and
+            // can be recorded. Doing this last is what keeps the item set and the bin bundles
+            // describing the same database when an insertion fails.
+            for (auto it = hashed_data.begin(); it != new_data_end; it++) {
+                hashed_items_.insert(it->first);
+            }
+            item_count_ += static_cast<size_t>(new_item_count);
 
             // Generate the BinBundle caches
             generate_caches();
@@ -892,30 +932,38 @@ namespace apsi {
             // Lock the database for writing
             auto lock = get_writer_lock();
 
-            // We are not going to insert items that already appear in the database.
-            auto new_data_end =
-                remove_if(hashed_data.begin(), hashed_data.end(), [&](const auto &item) {
-                    bool found = hashed_items_.find(item) != hashed_items_.end();
-                    if (!found) {
-                        // Add to hashed_items_ already at this point!
-                        hashed_items_.insert(item);
-                        item_count_++;
-                    }
+            // We are not going to insert items that already appear in the database. Partition
+            // without recording anything: an item registered in hashed_items_ before it is
+            // actually in a bin bundle is what leaves the item set describing a database that
+            // does not exist if the insertion below throws.
+            //
+            // Repeats within the batch are collapsed rather than refused. Inserting the same
+            // unlabeled item twice is idempotent, so a repeat carries no ambiguity -- unlike a
+            // labeled batch, where two labels for one item cannot both be meant. remove_if
+            // applies its predicate exactly once per element, which is what makes using it to
+            // deduplicate sound.
+            unordered_set<HashedItem> batch_items;
+            batch_items.reserve(hashed_data.size());
+            hashed_data.erase(
+                remove_if(
+                    hashed_data.begin(),
+                    hashed_data.end(),
+                    [&](const auto &item) { return !batch_items.insert(item).second; }),
+                hashed_data.end());
 
-                    // Remove those that were found
-                    return found;
+            auto new_data_end =
+                partition(hashed_data.begin(), hashed_data.end(), [&](const auto &item) {
+                    return hashed_items_.find(item) == hashed_items_.end();
                 });
 
-            // Erase the previously existing items from hashed_data; in unlabeled case there is
-            // nothing to do
-            hashed_data.erase(new_data_end, hashed_data.end());
+            auto new_item_count = distance(hashed_data.begin(), new_data_end);
 
-            APSI_LOG_INFO("Found " << hashed_data.size() << " new items to insert in SenderDB");
+            APSI_LOG_INFO("Found " << new_item_count << " new items to insert in SenderDB");
 
             // Break the new data down into its field element representation. Also compute the
             // items' cuckoo indices.
             vector<pair<AlgItem, size_t>> data_with_indices =
-                preprocess_unlabeled_data(hashed_data.begin(), hashed_data.end(), params_);
+                preprocess_unlabeled_data(hashed_data.begin(), new_data_end, params_);
 
             // Dispatch the insertion
             uint32_t bins_per_bundle = params_.bins_per_bundle();
@@ -932,6 +980,14 @@ namespace apsi {
                 ps_low_degree,
                 false, /* don't overwrite items */
                 compressed_);
+
+            // The dispatch has succeeded, so the new items really are in bin bundles now and can
+            // be recorded. Doing this last is what keeps the item set and the bin bundles
+            // describing the same database when an insertion fails.
+            for (auto it = hashed_data.begin(); it != new_data_end; it++) {
+                hashed_items_.insert(*it);
+            }
+            item_count_ += static_cast<size_t>(new_item_count);
 
             // Generate the BinBundle caches
             generate_caches();
@@ -1176,6 +1232,16 @@ namespace apsi {
             }
 
             const auto *sdb = fbs::GetSizePrefixedSenderDB(in_data.data());
+
+            // The schema marks each of these required, so a buffer reaching this point has been
+            // through a verifier that rejects any omission. Checking again keeps the guarantee
+            // local to the code that relies on it: these accessors are dereferenced
+            // unconditionally below, and a SenderDB is loaded from a file whose integrity this
+            // function cannot assume.
+            if (!sdb->params() || !sdb->info() || !sdb->oprf_key() || !sdb->hashed_items()) {
+                APSI_LOG_ERROR("Failed to load SenderDB: the buffer is missing a required field");
+                throw runtime_error("failed to load SenderDB");
+            }
 
             // Load the PSIParams; this will automatically check version compatibility
             unique_ptr<PSIParams> params;

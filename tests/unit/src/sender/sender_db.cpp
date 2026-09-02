@@ -9,8 +9,10 @@
 
 // APSI
 #include "apsi/log.h"
+#include "apsi/oprf/oprf_common.h"
 #include "apsi/psi_params.h"
 #include "apsi/sender_db.h"
+#include "apsi/sender_db_generated.h"
 
 // Google Test
 #include "gtest/gtest.h"
@@ -115,6 +117,95 @@ namespace APSITests {
 
         ASSERT_EQ(db_key_str.size(), new_key_str.size());
         ASSERT_EQ(0, memcmp(db_key_str.data(), new_key_str.data(), db_key_str.size()));
+    }
+
+    TEST(SenderDBTests, LabeledSenderDBRequiresANonzeroNonce)
+    {
+        auto params = get_params1();
+
+        // A nonce of zero removes the randomization from label encryption rather than merely
+        // shortening it, so encrypting a label for the same item twice reproduces the keystream
+        // and the two ciphertexts XOR to the two plaintexts. The SenderDB cannot detect the
+        // second encryption -- a label update does it, and so does removing and reinserting an
+        // item -- so the only place it can be refused is here.
+        ASSERT_THROW(SenderDB(*params, 16, 0), invalid_argument);
+
+        oprf::OPRFKey key;
+        ASSERT_THROW(SenderDB(*params, key, 16, 0), invalid_argument);
+
+        // A short nonce stays available; it weakens the bound on safe label rewrites rather than
+        // removing it, and the constructor warns.
+        ASSERT_NO_THROW(SenderDB(*params, 16, 1));
+
+        // An unlabeled SenderDB has no labels to encrypt, so a zero nonce is the correct value
+        // and must keep working.
+        ASSERT_NO_THROW(SenderDB(*params, 0, 0));
+    }
+
+    TEST(SenderDBTests, BadBatchIsRejectedWithoutModifyingTheDatabase)
+    {
+        auto params = get_params1();
+        SenderDB sender_db(*params, 8, 16);
+
+        vector<pair<Item, Label>> good;
+        good.push_back(make_pair(Item(1, 1), create_label(1, 8)));
+        good.push_back(make_pair(Item(2, 2), create_label(2, 8)));
+        sender_db.insert_or_assign(good);
+        ASSERT_EQ(size_t(2), sender_db.get_item_count());
+
+        // A batch naming the same item twice: the two labels cannot both be meant, so neither is
+        // chosen. Previously the second occurrence was classified as an item to overwrite, and
+        // the overwrite ran before the new items were inserted, so it threw partway and left
+        // every genuinely new item in the batch registered but absent from any bin bundle.
+        vector<pair<Item, Label>> duplicated;
+        duplicated.push_back(make_pair(Item(7, 7), create_label(7, 8)));
+        duplicated.push_back(make_pair(Item(9, 9), create_label(9, 8)));
+        duplicated.push_back(make_pair(Item(7, 7), create_label(11, 8)));
+        ASSERT_THROW(sender_db.insert_or_assign(duplicated), invalid_argument);
+
+        // A label longer than the database holds. Truncating it would store something the
+        // receiver cannot tell apart from a correct label.
+        vector<pair<Item, Label>> too_long;
+        too_long.push_back(make_pair(Item(3, 3), create_label(3, 9)));
+        ASSERT_THROW(sender_db.insert_or_assign(too_long), invalid_argument);
+
+        // Nothing from either rejected batch reached the database, and the items that were
+        // already there are still whole: present, and with retrievable labels.
+        ASSERT_EQ(size_t(2), sender_db.get_item_count());
+        for (auto &bad : { Item(7, 7), Item(9, 9), Item(3, 3) }) {
+            ASSERT_FALSE(sender_db.has_item(bad));
+        }
+        for (uint64_t i : { uint64_t(1), uint64_t(2) }) {
+            Item item(i, i);
+            ASSERT_TRUE(sender_db.has_item(item));
+            ASSERT_NO_THROW((void)sender_db.get_label(item));
+        }
+
+        // A batch that is merely rejected must not poison later inserts.
+        vector<pair<Item, Label>> retry;
+        retry.push_back(make_pair(Item(7, 7), create_label(7, 8)));
+        retry.push_back(make_pair(Item(9, 9), create_label(9, 8)));
+        ASSERT_NO_THROW(sender_db.insert_or_assign(retry));
+        ASSERT_EQ(size_t(4), sender_db.get_item_count());
+        ASSERT_NO_THROW((void)sender_db.get_label(Item(7, 7)));
+    }
+
+    TEST(SenderDBTests, RepeatedUnlabeledItemInOneBatchIsCollapsed)
+    {
+        auto params = get_params1();
+        SenderDB sender_db(*params, 0);
+
+        // Unlike a labeled batch, a repeat here carries no ambiguity: inserting the same item
+        // twice is idempotent, so it is collapsed rather than refused.
+        vector<Item> repeated;
+        repeated.push_back(Item(1, 1));
+        repeated.push_back(Item(2, 2));
+        repeated.push_back(Item(1, 1));
+        ASSERT_NO_THROW(sender_db.insert_or_assign(repeated));
+
+        ASSERT_EQ(size_t(2), sender_db.get_item_count());
+        ASSERT_TRUE(sender_db.has_item(Item(1, 1)));
+        ASSERT_TRUE(sender_db.has_item(Item(2, 2)));
     }
 
     TEST(SenderDBTests, UnlabeledBasics)
@@ -528,6 +619,47 @@ namespace APSITests {
 
         test_fun(get_params1());
         test_fun(get_params2());
+    }
+
+    TEST(SenderDBTests, LoadRejectsABufferMissingRequiredFields)
+    {
+        // A serialized SenderDB carrying params, oprf_key and hashed_items but omitting info.
+        // SenderDB::Load reads info unconditionally -- item_count, label_byte_count,
+        // nonce_byte_count, compressed and stripped all come from it -- so a buffer that leaves it
+        // out would be dereferenced as a null pointer. The schema marks it required so the
+        // verifier refuses the buffer before any field is read, and Load checks the same fields
+        // again so the guarantee does not rest on the schema alone.
+        //
+        // Built here through the generated builder, since the buffer this guards against can no
+        // longer be constructed through the ordinary API. The params field must carry a VALID
+        // serialized PSIParams: PSIParams::Load runs first, so a garbage blob there would make
+        // this test pass without ever reaching the info dereference it exists to cover.
+        auto real_params = get_params1();
+        stringstream params_ss;
+        real_params->save(params_ss);
+        string params_str = params_ss.str();
+        vector<uint8_t> params_bytes(params_str.cbegin(), params_str.cend());
+
+        flatbuffers::FlatBufferBuilder fbs_builder(1024);
+
+        auto params = fbs_builder.CreateVector(params_bytes);
+        auto oprf_key = fbs_builder.CreateVector(vector<uint8_t>(apsi::oprf::oprf_key_size, 0));
+        auto hashed_items = fbs_builder.CreateVectorOfStructs(vector<fbs::HashedItem>{});
+
+        fbs::SenderDBBuilder sender_db_builder(fbs_builder);
+        sender_db_builder.add_params(params);
+        sender_db_builder.add_oprf_key(oprf_key);
+        sender_db_builder.add_hashed_items(hashed_items);
+        sender_db_builder.add_bin_bundle_count(0);
+        auto sdb = sender_db_builder.Finish();
+        fbs_builder.FinishSizePrefixed(sdb);
+
+        stringstream ss;
+        ss.write(
+            reinterpret_cast<const char *>(fbs_builder.GetBufferPointer()),
+            static_cast<streamsize>(fbs_builder.GetSize()));
+
+        ASSERT_THROW((void)SenderDB::Load(ss), runtime_error);
     }
 
     TEST(SenderDBTests, SaveLoadUnlabeled)
