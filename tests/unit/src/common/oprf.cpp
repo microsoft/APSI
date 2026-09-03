@@ -6,6 +6,8 @@
 #include <array>
 #include <cstddef>
 #include <memory>
+#include <sstream>
+#include <stdexcept>
 #include <vector>
 
 // APSI
@@ -169,6 +171,76 @@ namespace APSITests {
             ASSERT_EQ(2501201975610406569ULL, w2);
             ASSERT_EQ(5901317566272664835ULL, w3);
             ASSERT_EQ(15287245637096301833ULL, w4);
+        }
+    }
+
+    TEST(OPRFTests, LoadAcceptsEveryEncodingSaveProduces)
+    {
+        // The canonical-encoding requirement on load must never reject what APSI itself writes,
+        // so a point has to survive a save/load round trip whatever it hashes to.
+        array<unsigned char, ECPoint::save_size> buf{};
+        for (unsigned char i = 0; i < 128; i++) {
+            array<unsigned char, 16> val{};
+            val[0] = i;
+            val[15] = static_cast<unsigned char>(0xFF - i);
+            ECPoint pt(val);
+            pt.save(buf);
+
+            ECPoint loaded;
+            ASSERT_NO_THROW(loaded.load(buf));
+        }
+    }
+
+    TEST(OPRFTests, LoadRejectsNonCanonicalEncodings)
+    {
+        // A serialized point is two field elements modulo p = 2^127 - 1. decode() masks the sign
+        // bit out of the high half but range-checks neither half, and the curve equation it then
+        // validates is not sound on an unreduced coordinate, so a large fraction of these would
+        // otherwise reach scalar multiplication with the long-term OPRF key. Each iteration
+        // corrupts a freshly saved encoding three different ways, all of which name a value that
+        // is at or above p and so cannot come from an honest peer.
+        array<unsigned char, ECPoint::save_size> buf{};
+        for (unsigned char i = 0; i < 128; i++) {
+            array<unsigned char, 16> val{};
+            val[0] = i;
+            ECPoint pt(val);
+            ECPoint loaded;
+
+            // Bit 127 of the low half is data, and decode() never clears it.
+            pt.save(buf);
+            buf[15] |= 0x80;
+            ASSERT_THROW(loaded.load(buf), logic_error);
+
+            // The low half becomes exactly p, the redundant encoding of zero.
+            pt.save(buf);
+            fill_n(buf.begin(), 16, static_cast<unsigned char>(0xFF));
+            buf[15] = 0x7F;
+            ASSERT_THROW(loaded.load(buf), logic_error);
+
+            // The high half becomes p once its sign bit is masked away.
+            pt.save(buf);
+            fill_n(buf.begin() + 16, 16, static_cast<unsigned char>(0xFF));
+            ASSERT_THROW(loaded.load(buf), logic_error);
+        }
+    }
+
+    TEST(OPRFTests, LoadFromStreamRejectsNonCanonicalEncodings)
+    {
+        // The stream overload decodes the same encoding and needs the same guard.
+        array<unsigned char, ECPoint::save_size> buf{};
+        for (unsigned char i = 0; i < 32; i++) {
+            array<unsigned char, 16> val{};
+            val[0] = i;
+            ECPoint pt(val);
+            pt.save(buf);
+            buf[15] |= 0x80;
+
+            stringstream ss;
+            ss.write(
+                reinterpret_cast<const char *>(buf.data()), static_cast<streamsize>(buf.size()));
+
+            ECPoint loaded;
+            ASSERT_THROW(loaded.load(ss), logic_error);
         }
     }
 } // namespace APSITests

@@ -13,6 +13,7 @@
 - Hardened `PSIParams` and the receiver against a hostile sender: bounded waits, validated parameters, and duplicate or out-of-range result packages are ignored.
 - `SenderDB::insert_or_assign` now validates a labeled batch before modifying anything, and refuses it if a label is longer than the `SenderDB` holds or if an item appears twice. Over-long labels were previously truncated silently, and a repeated item left the database describing items it had not inserted. Repeats in an unlabeled batch are collapsed rather than refused.
 - An OPRF request is now limited to `oprf::oprf_query_count_max` items, refused both when the request is loaded and in `oprf::OPRFSender::ProcessQueries`. The bound is the largest query a receiver could cuckoo-hash into a table of `TableParams::table_size_max` bins, so it cannot refuse a request that could have led to a query.
+- `oprf::ECPoint::load` now requires a canonical point encoding, rejecting coordinates at or above the field prime before they reach scalar multiplication.
 - `SenderDB::Load` now rejects a serialized `SenderDB` that omits a required field instead of dereferencing it.
 - Fixed exception handling in `PowersDag::parallel_apply`.
 - Declared Microsoft GSL as a dependency of the exported CMake package, and stopped exporting the FourQ and AVX build flags, `APSI_DEBUG`, and `APSI_BUILD_TYPE`.

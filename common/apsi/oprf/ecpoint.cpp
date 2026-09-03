@@ -3,6 +3,9 @@
 
 // STD
 #include <algorithm>
+#include <array>
+#include <cstdint>
+#include <cstring>
 #include <functional>
 
 // APSI
@@ -46,6 +49,41 @@ namespace apsi::oprf {
         void point_type_to_fourq_point(ECPoint::point_span_const_type pt, point_t fourq_pt)
         {
             copy_n(pt.data(), ECPoint::point_size, reinterpret_cast<unsigned char *>(fourq_pt));
+        }
+
+        // A serialized point is two 128-bit field elements, low half then high half, each a
+        // residue modulo p = 2^127 - 1; the top bit of the high half carries the sign of x
+        // rather than data. A canonical half is therefore strictly less than p, which rules out
+        // both an element at or above p and the redundant encoding of zero as p itself.
+        bool half_is_canonical(const unsigned char *half)
+        {
+            uint64_t low_word = 0;
+            uint64_t high_word = 0;
+            std::memcpy(&low_word, half, sizeof(low_word));
+            std::memcpy(&high_word, half + sizeof(low_word), sizeof(high_word));
+
+            // p - 1 is 0x7FFF...F FFFF...F, so a value is below p exactly when its high word is
+            // below 0x7FFF...F, or equals it while the low word is not all ones.
+            constexpr uint64_t high_word_max = 0x7FFFFFFFFFFFFFFFULL;
+            constexpr uint64_t low_word_max = 0xFFFFFFFFFFFFFFFFULL;
+            return high_word < high_word_max ||
+                   (high_word == high_word_max && low_word < low_word_max);
+        }
+
+        // decode() masks the sign bit out of the high half but range-checks neither half, and
+        // the curve equation it then validates is not sound on an unreduced coordinate: about
+        // half of all non-canonical encodings pass it and reach scalar multiplication with the
+        // long-term OPRF key. Every encoding APSI produces is canonical, so requiring one here
+        // rejects exactly the encodings no honest peer sends.
+        bool encoding_is_canonical(ECPoint::point_save_span_const_type in)
+        {
+            constexpr size_t half_size = ECPoint::save_size / 2;
+
+            array<unsigned char, half_size> high_half{};
+            copy_n(in.data() + half_size, half_size, high_half.data());
+            high_half[half_size - 1] &= 0x7F; // Drop the sign bit; it is not part of the value.
+
+            return half_is_canonical(in.data()) && half_is_canonical(high_half.data());
         }
 
         void random_scalar(ECPoint::scalar_span_type value)
@@ -172,7 +210,7 @@ namespace apsi::oprf {
             stream.read(reinterpret_cast<char *>(buf.data()), save_size);
 
             point_t pt;
-            if (decode(buf.data(), pt) != ECCRYPTO_SUCCESS) {
+            if (!encoding_is_canonical(buf) || decode(buf.data(), pt) != ECCRYPTO_SUCCESS) {
                 stream.exceptions(old_ex_mask);
                 throw logic_error("invalid point");
             }
@@ -194,7 +232,7 @@ namespace apsi::oprf {
     void ECPoint::load(point_save_span_const_type in)
     {
         point_t pt;
-        if (decode(in.data(), pt) != ECCRYPTO_SUCCESS) {
+        if (!encoding_is_canonical(in) || decode(in.data(), pt) != ECCRYPTO_SUCCESS) {
             throw logic_error("invalid point");
         }
         fourq_point_to_point_type(pt, pt_);
