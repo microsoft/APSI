@@ -632,10 +632,9 @@ namespace APSITests {
         // verifier refuses the buffer before any field is read, and Load checks the same fields
         // again so the guarantee does not rest on the schema alone.
         //
-        // Built here through the generated builder, since the buffer this guards against can no
-        // longer be constructed through the ordinary API. The params field must carry a VALID
-        // serialized PSIParams: PSIParams::Load runs first, so a garbage blob there would make
-        // this test pass without ever reaching the info dereference it exists to cover.
+        // The params field must carry a VALID serialized PSIParams: PSIParams::Load runs first,
+        // so a garbage blob there would make this test pass without ever reaching the info
+        // dereference it exists to cover.
         auto real_params = get_params1();
         stringstream params_ss;
         real_params->save(params_ss);
@@ -648,12 +647,15 @@ namespace APSITests {
         auto oprf_key = fbs_builder.CreateVector(vector<uint8_t>(apsi::oprf::oprf_key_size, 0));
         auto hashed_items = fbs_builder.CreateVectorOfStructs(vector<fbs::HashedItem>{});
 
-        fbs::SenderDBBuilder sender_db_builder(fbs_builder);
-        sender_db_builder.add_params(params);
-        sender_db_builder.add_oprf_key(oprf_key);
-        sender_db_builder.add_hashed_items(hashed_items);
-        sender_db_builder.add_bin_bundle_count(0);
-        auto sdb = sender_db_builder.Finish();
+        // Written through the underlying table API rather than the generated SenderDBBuilder.
+        // That builder's Finish() asserts that every required field is present, and the assert
+        // is live in Debug builds, so it cannot express a buffer that omits one. These are the
+        // same calls it would make, minus those asserts.
+        auto table_start = fbs_builder.StartTable();
+        fbs_builder.AddOffset(fbs::SenderDB::VT_PARAMS, params);
+        fbs_builder.AddOffset(fbs::SenderDB::VT_OPRF_KEY, oprf_key);
+        fbs_builder.AddOffset(fbs::SenderDB::VT_HASHED_ITEMS, hashed_items);
+        auto sdb = flatbuffers::Offset<fbs::SenderDB>(fbs_builder.EndTable(table_start));
         fbs_builder.FinishSizePrefixed(sdb);
 
         stringstream ss;
